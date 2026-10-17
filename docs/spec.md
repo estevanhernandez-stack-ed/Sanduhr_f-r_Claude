@@ -14,6 +14,8 @@ Pairs with `docs/scope.md` + `docs/prd.md`. Architecture mirrors RORORO (`RORORO
 > (`signin-debug.log`, `fetch-debug.log`) plus `Debug.WriteLine`. The hourglass deepening round is
 > already folded into "Focus hourglass — view rebuild" below.
 
+The Mac app (`mac/`) is specified per item; see the last section.
+
 ## Solution layout (`windows-dotnet/`)
 
 ```
@@ -107,3 +109,72 @@ Port the 286 Python test intents to xUnit, Core-first (pacing, plan, tiers, hist
 4. Embedded WebView2 login + manual fallback.
 5. Settings, multi-account, themes/sounds, history charts, focus timer, game, tier badge, auto-start.
 6. MSIX manifest + Velopack + release per the playbook.
+
+## The Mac app (`mac/`)
+
+The Mac app (SwiftUI, Sparkle updates, Homebrew tap) is specified per item in the documents
+below rather than in this file; this file remains the Windows spec. `mac/README.md` is the Mac
+app's behavior reference; `mac/build.sh` and `mac/test.sh` build and test it, and
+`mac/smoke/README.md` covers the smoke tools for a running dev build.
+
+```
+mac/
+  Package.swift               # SwiftPM manifest: the Sanduhr executable (Sparkle 2.6+) and SanduhrTests
+  build.sh                    # release build → Sanduhr.app, universal; --debug for native-arch iteration
+  test.sh                     # swift test, with the SDK and plugin paths the command line tools need
+  make-dmg.sh                 # drag-to-Applications Sanduhr.dmg (hdiutil + osascript only)
+  notarize.sh                 # submit Sanduhr.app or Sanduhr.dmg to Apple, staple the ticket
+  release.sh                  # local fallback for CI: signed, notarized, stapled release + appcast
+  Sources/Sanduhr/
+    Debug/                    # the sanduhr://debug hooks mac/smoke/smoke talks to (off by default)
+    Desk/                     # the desktop layer and notch: meters, message line, now playing, AV lights
+    Helpers/                  # shared pieces: fonts, usage math, visual effects, quit
+    Models/                   # value types: Theme, Tier, UsageData, hotkeys, tour, What's New
+    Services/                 # accounts, Keychain, usage fetching, snapshot, installer, packs, watchers
+    Views/                    # the widget, Settings pages and sheets
+  Tests/SanduhrTests/         # swift-testing suite, run by mac/test.sh; Fixtures/ holds synthetic Claude Code logs
+  integrations/
+    sanduhr_mcp.py            # the sanduhr MCP server (stdio), Mac port of Sanduhr.Mcp
+    sanduhr_statusline.py     # the statusline segment, Mac port of StatuslineScript.cs
+    install.sh                # shell installer, kept for those who skip Settings, Claude Code
+    tests/                    # stdlib-only tests for the two scripts and per-seat meters
+    mods/sanduhr-meters/      # the Claude Code mod: the meters band above the prompt
+    band-fixtures/            # the band's frames as fixtures; the Swift port must match them
+  smoke/
+    smoke                     # Ruby CLI: window shots, UI tree as YAML, live watch, scenarios
+    selftest.rb               # offline checks for the smoke tools, no running app
+    scenarios/                # YAML scenarios that drive the app and assert on what it shows
+    lib/                      # smoke_core.rb, shared by smoke and selftest.rb
+    fixtures/                 # a fixture snapshot and scenarios for selftest.rb
+  scripts/
+    appcast_add.py            # add one release to docs/appcast.xml, newest first
+    build-mediaremote-adapter.sh  # build the vendored adapter, universal, with plain clang
+    export-release-secrets.sh # one-time upload of the signing material to the mac-release environment
+  Resources/Fonts/            # EsteFont Pro and EsteFont 26, copied into the app bundle
+  Vendor/mediaremote-adapter/ # vendored source for now playing (item 53)
+  icon/                       # generate.swift + make-icon.sh → Sanduhr.icns
+```
+
+### Per-item specs
+
+| Item | Document | What it covers |
+|---|---|---|
+| 36 | `docs/mac-accounts-spec.md` | Named Claude accounts on the Mac, ported from Windows 2.2: one active account, following, per-account session keys |
+| 43 to 48 | `docs/mac-usage-data-spec.md` | The usage vault, Claude Code views and remaining MCP tools, organized per account: what Sanduhr keeps and what Claude can see |
+| 52 | `docs/mac-now-playing-spike.md` | Spike verdict for now playing: ship opt-in with the MediaRemote adapter (`mac/Vendor/mediaremote-adapter/`) as the source and a quiet fallback |
+| 71 | `docs/mods-and-config-spec.md` | Mods & Config: one page per seat that reads every Claude Code config first and writes only through receipts |
+| 72 | `docs/settings-v2-spec.md` | Settings v2: pages by task, one home and one name per control, reachable without scrolling blind, an in-app Reset |
+| 75 | `docs/mod-studio-spec.md` | Mod Studio: a sheet for working on one mod with a live preview that replays `mac/integrations/band-fixtures/`, and a shorter Catalog |
+| 76 | `docs/config-transfer-spec.md` | Packs: one format to share a mod, then carry a whole Claude Code folder, always reviewed before it lands |
+| 76, slice H | `docs/agnostify-spec.md` | Agnostify: the pack's second folder, any-agent, in the formats Codex, Gemini CLI, Cursor and Copilot read |
+
+### Plans, checklist and release
+
+| Document | What it covers |
+|---|---|
+| `docs/mac-parity-plan.md` | Each Windows 3.4.x feature ranked for porting by value against effort; the full feature inventory |
+| `docs/mac-merge-plan.md` | Sanduhr for Mac and Sanduhr Desk become one app, then parity where it matters; supersedes the parity plan's order |
+| `docs/mac-implementation-plan.md` | The merge plan as one milestone per pull request, with the Windows code to port, acceptance checks and tests |
+| `docs/checklist.md` | The build checklist; the Mac items are 13 onward, under the "Iteration (Mac)" headings |
+| `docs/mac-release.md` | Signed, notarized Mac releases on GitHub Actions: where the signing material lives and the steps; `mac/release.sh` is the local fallback |
+| `docs/mac-smoke-test.md` | The by-hand smoke test before every Mac release; `mac/smoke/smoke` (run) covers the automatable checks |
