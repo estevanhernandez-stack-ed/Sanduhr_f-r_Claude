@@ -91,28 +91,18 @@ enum MCPAccess {
         case written, unchanged, failed
     }
 
-    /// Writes `data` to `url` unless the file already holds it: a temporary sibling, owner-only
-    /// (it names a folder and a history file), renamed over the file so a reader never sees half
-    /// of it. Failures are logged by error type only.
+    /// Writes `data` to `url` unless the file already holds it: owner-only (it names a folder and
+    /// a history file) and atomic, through `HandoffFiles`, so a reader never sees half of it.
+    /// Failures are logged by error type only.
     @discardableResult
     static func write(_ data: Data, to url: URL = standardURL) -> WriteOutcome {
         // Reset Sanduhr… ran: the access file stays gone (and with it, the MCP server shares nothing).
         guard !ResetGate.isOn else { return .unchanged }
         if let current = try? Data(contentsOf: url), current == data { return .unchanged }
-        let fm = FileManager.default
-        let tmp = url.deletingLastPathComponent()
-            .appendingPathComponent(".\(fileName).\(UUID().uuidString).tmp")
         do {
-            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            guard fm.createFile(atPath: tmp.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
-                throw CocoaError(.fileWriteUnknown)
-            }
-            guard rename(tmp.path, url.path) == 0 else {
-                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
-            }
+            try HandoffFiles.writeOwnerOnlyOrThrow(data, to: url)
             return .written
         } catch {
-            unlink(tmp.path)
             NSLog("Sanduhr mcp-access write failed (\(type(of: error)))")
             return .failed
         }
