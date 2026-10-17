@@ -4,7 +4,8 @@ import Foundation
 /// A config pack (item 76, slice C, `docs/config-transfer-spec.md`): what a personal seat holds,
 /// described rather than copied. Plain files travel (CLAUDE.md, agents, skills, commands, output
 /// styles, kept mods); plugins travel as their marketplace source; MCP servers with `${VAR}` in
-/// place of every env and header value; chosen settings keys; env by name only. The home folder
+/// place of every env and header value; chosen settings keys; env by name, with the value only for
+/// Claude Code's documented switches (`switchEnv`). The home folder
 /// is written as `~`, any other machine path keeps its row from travelling, and every file is
 /// scanned for secrets before it can be chosen. Reading only: nothing in the seat is written.
 enum ConfigPack {
@@ -61,8 +62,33 @@ enum ConfigPack {
                                "cleanupPeriodDays"]
     /// Env names that are this Mac's alone and never listed.
     static let machineEnv: Set<String> = ["CLAUDE_CODE_PLUGIN_DIRS", "CLAUDE_CONFIG_DIR"]
+    /// Claude Code's documented env variables that are switches, limits and model names, never
+    /// secrets: their values travel when short and plain (`switchValue`). Every other name travels
+    /// alone and is typed in on import (spec open question 1, answered 2026-10-16).
+    static let switchEnv: Set<String> = [
+        "DISABLE_AUTOUPDATER", "DISABLE_BUG_COMMAND", "DISABLE_COST_WARNINGS", "DISABLE_ERROR_REPORTING",
+        "DISABLE_INTERLEAVED_THINKING", "DISABLE_NON_ESSENTIAL_MODEL_CALLS", "DISABLE_PROMPT_CACHING",
+        "DISABLE_PROMPT_CACHING_HAIKU", "DISABLE_PROMPT_CACHING_OPUS", "DISABLE_PROMPT_CACHING_SONNET", "DISABLE_TELEMETRY",
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "CLAUDE_CODE_DISABLE_TERMINAL_TITLE", "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS",
+        "CLAUDE_CODE_ENABLE_TELEMETRY", "CLAUDE_CODE_MAX_OUTPUT_TOKENS", "CLAUDE_CODE_SUBAGENT_MODEL",
+        "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL", "CLAUDE_CODE_AUTO_CONNECT_IDE",
+        "CLAUDE_CODE_API_KEY_HELPER_TTL_MS", "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR",
+        "BASH_DEFAULT_TIMEOUT_MS", "BASH_MAX_TIMEOUT_MS", "BASH_MAX_OUTPUT_LENGTH", "MAX_THINKING_TOKENS", "MAX_MCP_OUTPUT_TOKENS",
+        "MCP_TIMEOUT", "MCP_TOOL_TIMEOUT", "USE_BUILTIN_RIPGREP",
+        "ANTHROPIC_MODEL", "ANTHROPIC_SMALL_FAST_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL",
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+    ]
     /// Absolute paths every Mac has: a command under these still travels.
     static let systemPrefixes = ["/usr/", "/bin/", "/sbin/", "/System/", "/Library/Apple/", "/opt/homebrew/"]
+
+    /// The value that travels for env `name`: a switch's short plain string (letters, digits and
+    /// `. _ : -`, up to 64, nothing the mask would hide), nil for any other name or value.
+    static func switchValue(_ name: String, _ value: Any?) -> String? {
+        guard switchEnv.contains(name), let v = value as? String,
+              v.range(of: #"^[A-Za-z0-9._:-]{1,64}$"#, options: .regularExpression) != nil,
+              ConfigMask.maskString(v) == v else { return nil }
+        return v
+    }
 
     // MARK: The scan
 
@@ -235,10 +261,16 @@ enum ConfigPack {
             item.json = try? JSONSerialization.data(withJSONObject: [key: clean])
             items.append(item)
         }
-        let names = (settings["env"] as? [String: Any] ?? [:]).keys.filter { !machineEnv.contains($0) }.sorted()
+        let env = settings["env"] as? [String: Any] ?? [:]
+        let names = env.keys.filter { !machineEnv.contains($0) }.sorted()
         if !names.isEmpty {
-            var item = Item(kind: .env, name: "env", detail: "\(names.count) \(names.count == 1 ? "name" : "names"), values typed in on import: " + names.joined(separator: ", "))
-            item.json = try? JSONSerialization.data(withJSONObject: names)
+            // A switch carries its value; every other name is typed in on import.
+            let entries: [[String: Any]] = names.map { n in switchValue(n, env[n]).map { ["name": n, "value": $0] } ?? ["name": n, "needs_value": true] }
+            let shown = entries.map { e in (e["value"] as? String).map { "\(e["name"]!)=\($0)" } ?? "\(e["name"]!)" }
+            let typed = entries.filter { $0["value"] == nil }.count
+            var item = Item(kind: .env, name: "env", detail: "\(names.count) \(names.count == 1 ? "name" : "names"), "
+                            + (typed == 0 ? "switches with their values: " : "\(typed) typed in on import: ") + shown.joined(separator: ", "))
+            item.json = try? JSONSerialization.data(withJSONObject: entries)
             items.append(item)
         }
         return items
@@ -377,7 +409,7 @@ enum ConfigPack {
             case .plugin: if let doc { plugins.append(doc) }
             case .mcpServer: if let doc { mcp.append(doc) }
             case .keptMod: if let doc { mods.append(doc) }
-            case .env: env = (doc as? [String] ?? []).map { ["name": $0, "needs_value": true] }
+            case .env: env = doc as? [[String: Any]] ?? []
             default: break
             }
         }

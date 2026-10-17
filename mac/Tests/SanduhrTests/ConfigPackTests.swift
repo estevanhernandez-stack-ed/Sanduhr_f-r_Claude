@@ -24,7 +24,8 @@ struct ConfigPackTests {
          "hooks": {"Stop": [{"hooks": [{"type": "command", "command": "open -g sanduhr://claude-code?event=stop"}]},
                             {"hooks": [{"type": "command", "command": "\(home)/bin/notify.sh"}]}],
                    "PreToolUse": [{"hooks": [{"type": "command", "command": "/Volumes/Work/guard.sh"}]}]},
-         "env": {"GITHUB_TOKEN": "ghp_secretsecretsecret", "CLAUDE_CODE_PLUGIN_DIRS": "/x", "MY_FLAG": "1"},
+         "env": {"GITHUB_TOKEN": "ghp_secretsecretsecret", "CLAUDE_CODE_PLUGIN_DIRS": "/x", "MY_FLAG": "1",
+                 "DISABLE_TELEMETRY": "1", "ANTHROPIC_MODEL": "claude-opus-5-5", "MCP_TIMEOUT": "/Users/x/odd"},
          "enabledPlugins": {"swift-lsp@claude-plugins-official": true, "local-thing@my-dir": true}}
         """)
         h.file("\(s)/plugins/known_marketplaces.json", """
@@ -120,8 +121,20 @@ struct ConfigPackTests {
         #expect(try item(items, .setting, "hooks").blocked == "It names /Volumes/Work/guard.sh, a path on this Mac only.")
         #expect(try item(items, .setting, "model").canTravel)
         #expect(!items.contains { $0.name == "enabledPlugins" })
-        // Env by name only; this Mac's own names left out.
-        #expect(try json(try item(items, .env, "env")) as? [String] == ["GITHUB_TOKEN", "MY_FLAG"])
+        // Env by name; a switch's plain value travels; this Mac's own names left out.
+        let env = try #require(try json(try item(items, .env, "env")) as? [[String: Any]])
+        #expect(env.map { $0["name"] as? String } == ["ANTHROPIC_MODEL", "DISABLE_TELEMETRY", "GITHUB_TOKEN", "MCP_TIMEOUT", "MY_FLAG"])
+        #expect(env.map { $0["value"] as? String } == ["claude-opus-5-5", "1", nil, nil, nil])
+    }
+
+    @Test func onlyASwitchsPlainValueTravels() {
+        #expect(ConfigPack.switchValue("DISABLE_TELEMETRY", "1") == "1")
+        #expect(ConfigPack.switchValue("ANTHROPIC_MODEL", "us.anthropic.claude-opus-5-5-v1:0") == "us.anthropic.claude-opus-5-5-v1:0")
+        #expect(ConfigPack.switchValue("MY_FLAG", "1") == nil)                       // not a documented switch
+        #expect(ConfigPack.switchValue("CLAUDE_CODE_OAUTH_TOKEN", "abc") == nil)     // a secret, never listed
+        #expect(ConfigPack.switchValue("ANTHROPIC_MODEL", "https://proxy/x") == nil) // not plain
+        #expect(ConfigPack.switchValue("BASH_MAX_TIMEOUT_MS", 600000) == nil)        // not a string
+        #expect(ConfigPack.switchValue("ANTHROPIC_MODEL", "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789") == nil)
     }
 
     @Test func thePackHoldsNoValueSecretOrPathOfThisMac() throws {
@@ -141,7 +154,8 @@ struct ConfigPackTests {
         p.waitUntilExit()
         let manifest = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: out.appendingPathComponent("sanduhr-pack.json"))) as? [String: Any])
         #expect(manifest["kind"] as? String == "config" && manifest["label"] as? String == "Personal")
-        #expect((manifest["env"] as? [[String: Any]])?.map { $0["name"] as? String } == ["GITHUB_TOKEN", "MY_FLAG"])
+        #expect((manifest["env"] as? [[String: Any]])?.map { $0["name"] as? String } == ["ANTHROPIC_MODEL", "DISABLE_TELEMETRY", "GITHUB_TOKEN", "MCP_TIMEOUT", "MY_FLAG"])
+        #expect((manifest["env"] as? [[String: Any]])?.compactMap { $0["value"] as? String } == ["claude-opus-5-5", "1"])
         #expect((manifest["settings"] as? [String: Any])?["hooks"] == nil)
         #expect(!FileManager.default.fileExists(atPath: out.appendingPathComponent("files/agents/leaky.md").path))
 

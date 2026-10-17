@@ -100,7 +100,7 @@ enum AnyAgent {
 
         // Environment variables to set: the env row's names and every reference a server makes.
         var envNames = Set(items.filter { $0.kind == .env }.flatMap { item -> [String] in
-            item.json.flatMap { (try? JSONSerialization.jsonObject(with: $0)) as? [String] } ?? []
+            (item.json.flatMap { (try? JSONSerialization.jsonObject(with: $0)) as? [[String: Any]] } ?? []).compactMap { $0["name"] as? String }
         })
         for s in servers { envNames.formUnion(references(in: s.config)) }
         envNames.remove("HOME")

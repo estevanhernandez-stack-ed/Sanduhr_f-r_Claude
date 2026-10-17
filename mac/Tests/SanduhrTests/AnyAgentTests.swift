@@ -23,7 +23,7 @@ struct AnyAgentTests {
 
     private var rows: [ConfigPack.Item] {
         var env = ConfigPack.Item(kind: .env, name: "env")
-        env.json = try? JSONSerialization.data(withJSONObject: ["MY_FLAG"])
+        env.json = try? JSONSerialization.data(withJSONObject: [["name": "MY_FLAG", "needs_value": true]])
         return [
             file(.skill, "Release_Notes", "files/skills/Release_Notes/SKILL.md", "---\nname: Release_Notes\ndescription: Writes release notes.\n---\n\nSteps.\n"),
             file(.agent, "reviewer", "files/agents/reviewer.md", "---\nname: reviewer\ndescription: |\n  Reviews a diff.\n  Use after edits.\ntools: Read, Grep\nmodel: sonnet\n---\n\nYou review code.\n"),

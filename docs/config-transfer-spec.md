@@ -126,7 +126,7 @@ A and B answer the owner's ask (finish-line on another machine or another person
 
 ## Open questions
 
-1. Should `env` values that are plainly not secrets (`CLAUDE_CODE_*` switches, `DISABLE_*` flags) travel with their values? The proposal is a short allowlist of Claude Code's documented variables, everything else by name.
+1. ~~Should `env` values that are plainly not secrets travel with their values?~~ Answered 2026-10-16: yes, for an allowlist of Claude Code's documented switches, limits and model names (`ConfigPack.switchEnv`), when the value is short and plain (letters, digits, `. _ : -`, up to 64, nothing the mask hides). Checked again on import; the field comes filled in and shown. Every other name travels alone.
 2. ~~Should a work seat be able to export?~~ Answered 2026-10-15: yes, to any seat, stamped and with a warning when it lands outside work (slice G).
 3. Should a mod pack carry plugins that aren't mods (shell hooks, Python scripts)? `propose_mod`'s file rules don't allow them, and the validator's report covers mod modules, not shell hooks [unverified]. The default is to carry those as marketplace sources only.
 4. Should Claude be able to propose a config change (an agent, a skill, a settings key) through the MCP server, as it proposes mods? It would reuse the switch and the review; not in these slices.

@@ -18,7 +18,7 @@ struct ConfigImportTests {
         h.file("\(s)/skills/notes/SKILL.md", "---\nname: notes\n---\nWrite notes.\n")
         h.file("\(s)/settings.json", """
         {"permissions": {"allow": ["Read(\(home)/source/notes/**)"]}, "model": "opus", "cleanupPeriodDays": 90,
-         "env": {"API_TOKEN": "never-travels", "MY_FLAG": "1"}}
+         "env": {"API_TOKEN": "never-travels", "MY_FLAG": "1", "DISABLE_TELEMETRY": "1"}}
         """)
         h.file("\(s)/plugins/known_marketplaces.json", #"{"claude-plugins-official": {"source": {"source": "github", "repo": "anthropics/claude-plugins-official"}}}"#)
         h.file("\(s)/.claude.json", #"{"mcpServers": {"docs": {"type": "http", "url": "https://docs.example.com/mcp", "headers": {"X-Api-Key": "secret"}}}}"#)
@@ -59,6 +59,9 @@ struct ConfigImportTests {
         #expect((perms.value as? [String: Any])?["allow"] as? [String] == ["Read(\(home)/source/notes/**)"])
         #expect(try row(rows, .env, "API_TOKEN").status == .needsValue)
         #expect(try row(rows, .env, "MY_FLAG").status == .same)
+        let telemetry = try row(rows, .env, "DISABLE_TELEMETRY")
+        #expect(telemetry.status == .needsValue && telemetry.value as? String == "1")
+        #expect(try row(rows, .env, "API_TOKEN").value == nil)
         guard case .command(let plugin) = try row(rows, .plugin, "swift-lsp").status,
               case .command(let mcp) = try row(rows, .mcpServer, "docs").status else {
             Issue.record("plugins and servers are commands")
@@ -93,7 +96,8 @@ struct ConfigImportTests {
         #expect(written.hasPrefix("{\n    \"model\": \"sonnet\",\n    \"theme\": \"dark\""))   // the seat's own, as they were
         let parsed = try JSONEdit.root(Data(written.utf8))
         #expect(parsed["model"] as? String == "sonnet" && parsed["cleanupPeriodDays"] as? Int == 90)
-        #expect((parsed["env"] as? [String: String]) == ["API_TOKEN": "typed-here"])
+        // The typed value, and the switch with the value it came with.
+        #expect((parsed["env"] as? [String: String]) == ["API_TOKEN": "typed-here", "DISABLE_TELEMETRY": "1"])
         // The record names what it wrote, never an env value.
         let encoded = try JSONEncoder().encode(record)
         #expect(!String(decoding: encoded, as: UTF8.self).contains("typed-here"))
