@@ -394,6 +394,20 @@ final class ModsPageModel {
         ConfigCatalog.sections(shownCards(demo: demo), failedChecks: failedChecks, byLoad: sortByLoad)
     }
 
+    /// Which controls apply (polish 2026-10-17): the whole catalog's count and the folders demo
+    /// mode shows, and whether a filter is set.
+    func controls(demo: Bool) -> ModsControls {
+        ModsControls(cards: ConfigCatalog.filter(catalog, CatalogFilter(), demo: demo).count,
+                     folders: filterSeats(demo: demo).count, narrowed: filter.narrows)
+    }
+
+    /// The tab bar's segments: Compare with two or more folders. `tab` may still be `.compare`
+    /// (the smoke hook); the view then says what it needs.
+    func tabs(demo: Bool) -> [ModsTab] {
+        let controls = controls(demo: demo)
+        return ModsTab.allCases.filter { $0 != .compare || controls.compare }
+    }
+
     /// The seats' session loads the Catalog shows: no work seat in demo mode.
     func shownLoads(demo: Bool) -> [(seat: Seat, load: SessionLoad)] {
         zip(seats, loads).filter { !(demo && $0.0.isWork) }.map { (seat: $0.0, load: $0.1) }
@@ -797,20 +811,22 @@ struct ModsSettings: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    if model.loaded && model.claude == nil {
-                        Text(ModsPageModel.cliMissing)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
                     // Sanduhr's own mod first (2026-10-17): the switch per folder, under the title.
                     MetersHeader(model: model, linked: linked, demo: vm.demo)
                         .settingsAnchor(SettingsAnchor.metersMod)
                     ModsMore(model: model, demo: vm.demo) {
                         ModsSummaryCard(model: model)
                         // Catalog | By Seat (item 71, slice 1), right above what each shows.
-                        ModsTabBar(model: model)
+                        ModsTabBar(model: model, demo: vm.demo)
                             .settingsAnchor(SettingsAnchor.inventory)
+                        // Check needs `claude`: the note sits with the cards that offer it, not at
+                        // the page top (polish 2026-10-17, #25).
+                        if model.loaded && model.claude == nil {
+                            Text(ModsPageModel.cliMissing)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         tabContent
                     }
                     ModsFolderActions(model: model, linked: linked)

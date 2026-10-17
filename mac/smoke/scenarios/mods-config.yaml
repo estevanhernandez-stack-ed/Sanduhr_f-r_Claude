@@ -4,7 +4,9 @@
 # state keys still say `seat`). state.yaml's `mods_config` carries the tab and counts only, never
 # a name, label, path or value. Read only: the run switches tabs and demo mode (in memory) and nothing else; no seat
 # file changes (the tests prove the scan writes nothing; by hand, docs/mac-smoke-test.md,
-# sections 49 and 50).
+# sections 49 and 50). Controls appear when they apply (2026-10-17): on a one-folder Mac there
+# is no filter row, sort, Expand All, chip picker or Compare segment, so this run expects none
+# of them; Search, the count line and the tab bar are always there.
 name: Mods & Config Catalog and By Folder
 steps:
   # Demo mode first, so the snaps show no work seat, its sources or its descriptions.

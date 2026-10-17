@@ -112,7 +112,8 @@ struct ModsBySeatView: View {
             if !model.loaded {
                 Text("Reading your Claude Code folders…").font(.caption).foregroundStyle(.secondary)
             } else if let seat = model.shownSeat(demo: demo) {
-                SeatPicker(model: model, demo: demo)
+                // One folder: its header says what it is; the picker comes with a second.
+                if model.controls(demo: demo).picker { SeatPicker(model: model, demo: demo) }
                 OtherFolderImports(model: model)
                 SeatHeader(seat: seat, model: model, linked: linked)
                     .id(ModsPageModel.seatAnchor(seat.path))

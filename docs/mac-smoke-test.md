@@ -1983,10 +1983,14 @@ note the modification times of each folder's `settings.json` and `.claude.json` 
 and compare them at the end.
 
 1. Settings, **Mods & Config**: Meters above the prompt at the top, then **More: mods and config**
-   (open, with two folders) holding the summary card and the **Catalog | By Folder**
+   (open, with two folders) holding the summary card and the **Catalog | By Folder | Compare**
    tabs on Catalog (never "By Seat": the page says folder, one word per concept, 2026-10-17).
    Switch to By Folder, open another page and come back: still By Folder. Close and
-   reopen Settings: Catalog again.
+   reopen Settings: Catalog again. Controls appear when they apply (2026-10-17): with one
+   folder and ten or fewer cards the Catalog shows Search, the count and New Mod… only, no
+   Kind, Folder or Show filter, no sort, no Expand All / Collapse All, and no Compare segment;
+   with `claude` off the PATH, its note sits inside More under the tabs, never at the page top.
+   `smoke/smoke do mods-config compare` still lands on Compare, which says it needs two folders.
 2. The Catalog's first card is sanduhr-meters (Mod, From Sanduhr), with a chip for each folder
    it is installed in, or "Not installed." and no Available badge (the Studio's word). Below it, one card per plugin, skill,
    agent, command, output style and MCP server, each with a chip per folder that has it: the
@@ -1995,9 +1999,11 @@ and compare them at the end.
 3. A plugin enabled from two marketplaces in any folder is one card with both "Marketplace …"
    sources and an orange **Duplicate** badge, and "On twice in <label>". A plugin a marketplace
    lists that no folder installed has no chips and a green **Available** badge.
-4. Filters: Kind, Agents shows only agents; Folder (All folders), one folder shows only cards with its chip;
+4. Filters (shown with two folders, or more than ten cards): Kind, Agents shows only agents;
+   Folder (All folders, with two folders), one folder shows only cards with its chip;
    Available only and Needs a look narrow the list; search for a marketplace's name finds its
-   plugins. The count line says "N of M shown.".
+   plugins. The count line says "N of M shown.". Expand All, Collapse All, Folders… and
+   Studio… are small bordered buttons like New Mod…, not links.
 5. On By Folder, pick a folder and give it a **Label** in its header (press Return) and, in the
    **Work or personal** picker beside it (its label shows), mark it **Work**: back on the Catalog
    its chips carry the new label and an orange Work badge. A folder whose linked account is
@@ -2021,7 +2027,8 @@ On a Mac with two or more Claude Code folders, one marked Work and one Personal 
 5). Note each folder's modification times first (`stat -f '%m %N'` on `settings.json`,
 `.claude.json` and `history.jsonl`) and compare at the end: nothing may change.
 
-1. By Folder: a chip per folder with its label and badge; start `claude` in a terminal with
+1. By Folder: a chip per folder with its label and badge (the picker shows with two or more
+   folders; with one, its header alone says what it is); start `claude` in a terminal with
    `CLAUDE_CONFIG_DIR` set to one folder, Read Again: that chip shows a green dot. Quit it, Read
    Again: the dot goes.
 2. The header names the folder (`~/…`), its account or "No account linked", the install model
