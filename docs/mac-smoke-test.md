@@ -1338,9 +1338,11 @@ never your real settings, and remove it afterwards. Copy `mac/integrations/mods/
 to `~/modtest/meters` and give `~/.claude-modtest/settings.json`
 `{"env": {"CLAUDE_CODE_PLUGIN_DIRS": "~/modtest/meters:~/modtest/gone"}}`.
 
-1. Settings, Mods & Config (under Claude Code, cube symbol) opens with a summary card: mods, plugins, on,
-   folders, and missing when one is; "Sanduhr's own mod switches here; other mods are read-only." No Sample
-   label. VoiceOver reads it as one sentence with the counts.
+1. Settings, Mods & Config (under Claude Code, cube symbol) opens with **Meters above the prompt** (section
+   37), then **More: mods and config**, open here (two folders). First inside it is the summary card: mods,
+   plugins, on, folders, and missing when one is; "Sanduhr's own mod switches per folder in Meters above the
+   prompt, at the top of the page; other mods are read-only." No Sample label. VoiceOver reads it as one
+   sentence with the counts.
 2. One box per Claude Code folder, its path on top. `~/.claude-modtest` lists **sanduhr-meters**
    (0.2.0, Mod, On, its description, "Plugin folder list (CLAUDE_CODE_PLUGIN_DIRS)" and the path),
    "Draws: band above the prompt, toasts", "Its code reads or writes files." in orange, and a
@@ -1454,13 +1456,15 @@ and remove them afterwards. Give `~/.claude-modtest/settings.json` `{"model": "o
 `shasum`. Settings, Mods & Config: turn on **Meters above the prompt** for `~/.claude-modtest`
 (Install in the sheet).
 
-1. Settings, Mods & Config: **Meters above the prompt** sits at the top, above Mods and plugins,
-   with a row per folder: its path, On/Off/Not installed, Update and Remove when they apply, and a
-   switch. Its intro says how Off differs from Remove. `~/.claude-modtest` is on: "Version …,
-   through Sanduhr's current folder: it follows Sanduhr's updates." Under the rows, "Show watchers
-   above the prompt: off. …" with **Watchers Settings…**. The sanduhr-meters row in the inventory
-   below says "Sanduhr's own mod. It switches per folder at the top of this page, Meters above the
-   prompt." Settings, Claude Code has no switch for it: each folder box ends "Meters above the
+1. Settings, Mods & Config: **Meters above the prompt** is the first thing under the title, above
+   **More: mods and config**, with a row per folder: its path, On/Off/Not installed, Update and
+   Remove when they apply, and a switch; then **Studio…**. `~/.claude-modtest` is on: "Version …,
+   through Sanduhr's current folder: it follows Sanduhr's updates." Under the rows, "Watcher rows
+   above the prompt: off. …" with **Watchers Settings…**. More is folded on a fresh profile with one
+   folder; it starts open with a kept mod, a waiting proposal or install request, or two or more
+   folders, and once opened or closed by hand it stays so across launches. Inside it, the
+   sanduhr-meters line in the Catalog says where it is on, with **Folders…** and **Studio…**.
+   Settings, Claude Code has no switch for it: each folder box ends "Meters above the
    prompt: on" (off, not installed) with **Mods & Config Settings…**, which opens Mods & Config
    scrolled to the mod (`smoke/smoke do settings "mods meters"` does the same).
 2. Switch it off: the row reads "… Off: enabledPlugins sets sanduhr-meters@inline to false here."
@@ -1976,7 +1980,8 @@ On a Mac with two or more Claude Code folders. Nothing here changes a folder: be
 note the modification times of each folder's `settings.json` and `.claude.json` (`stat -f '%m %N'`),
 and compare them at the end.
 
-1. Settings, **Mods & Config**: Meters above the prompt at the top, then the **Catalog | By Seat**
+1. Settings, **Mods & Config**: Meters above the prompt at the top, then **More: mods and config**
+   (open, with two folders) holding the summary card and the **Catalog | By Seat**
    tabs on Catalog. Switch to By Seat, open another page and come back: still By Seat. Close and
    reopen Settings: Catalog again.
 2. The Catalog's first card is sanduhr-meters (Mod, From Sanduhr), with a chip for each folder
