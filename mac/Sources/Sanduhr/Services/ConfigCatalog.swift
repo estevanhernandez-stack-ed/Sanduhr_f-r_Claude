@@ -274,6 +274,9 @@ struct CatalogFilter: Equatable, Sendable {
     var seat: String?
     var show: Show = .all
     var search = ""
+
+    /// A filter other than the search is set (the toolbar stays while one is, so it can be cleared).
+    var narrows: Bool { kind != nil || seat != nil || show != .all }
 }
 
 /// Builds the Catalog from every seat's scan (item 71, slice 1): one card per extension, a chip
