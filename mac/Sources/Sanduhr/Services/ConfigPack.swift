@@ -54,6 +54,71 @@ enum ConfigPack {
         var text: String
     }
 
+    /// One thing the pack doesn't carry, said so the user can bring it by hand (slice I).
+    struct Carry: Equatable {
+        /// The row's group title, or "Values" and "Never in a pack".
+        var kind: String
+        var name: String
+        var why: String
+
+        var json: [String: String] { ["kind": kind, "name": name, "why": why] }
+    }
+
+    /// What no pack holds, whatever is chosen: said in every carry list.
+    static let neverCarried: [Carry] = [
+        Carry(kind: "Never in a pack", name: "Sign-in", why: "Sign in to Claude Code on the other machine."),
+        Carry(kind: "Never in a pack", name: "settings.local.json", why: "This folder's local settings stay on this Mac."),
+        Carry(kind: "Never in a pack", name: "Projects' own config", why: "A repo's .claude/ folder and .mcp.json travel with the repo, not the pack."),
+        Carry(kind: "Never in a pack", name: "Memory and transcripts", why: "Claude Code's memory, history and sessions stay here."),
+        Carry(kind: "Never in a pack", name: "Credentials", why: "Tokens and keys: bring them with your password manager."),
+    ]
+
+    /// Everything the pack leaves behind: rows that can't travel and why, rows left unchecked, the
+    /// env values and `${VAR}` references to bring, then what no pack holds.
+    static func carry(_ all: [Item], chosen: Set<String>) -> [Carry] {
+        var out: [Carry] = []
+        for item in all {
+            // The list goes in the pack: a reason never names a path of this Mac or a watch word.
+            if let why = item.blocked {
+                out.append(Carry(kind: item.kind.title, name: item.name, why: withoutPaths(why)))
+            } else if !chosen.contains(item.id) {
+                out.append(Carry(kind: item.kind.title, name: item.name, why: item.watched.isEmpty ? "Left out when the pack was made." : "Left out: it names work."))
+            }
+        }
+        let taken = all.filter { $0.canTravel && chosen.contains($0.id) }
+        for item in taken where item.kind == .env {
+            let entries = item.json.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [[String: Any]] } ?? []
+            for e in entries where e["value"] == nil {
+                guard let name = e["name"] as? String else { continue }
+                out.append(Carry(kind: "Values", name: name, why: "An environment variable: its value is typed in on import."))
+            }
+        }
+        for item in taken where item.kind == .mcpServer {
+            let config = item.json.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+            for ref in AnyAgent.references(in: config).subtracting(["HOME"]).sorted() {
+                out.append(Carry(kind: "Values", name: ref, why: "MCP server \(item.name) reads it: set it where Claude Code runs."))
+            }
+        }
+        return out + neverCarried
+    }
+
+    /// A reason with the path it names dropped: "It runs /opt/x, a path on this Mac only." becomes
+    /// "It runs a path on this Mac only."
+    static func withoutPaths(_ why: String) -> String {
+        why.replacingOccurrences(of: #"(?:~|/)\S*, (a path on this Mac only)"#, with: "$1", options: .regularExpression)
+    }
+
+    /// `CARRY.md`: the carry list as a checklist, grouped.
+    static func carryMarkdown(_ list: [Carry], label: String) -> String {
+        var out = "# To carry by hand\n\nWhat the \(label) pack doesn't hold. Bring these yourself, or leave them.\n"
+        var groups: [String] = []
+        for c in list where !groups.contains(c.kind) { groups.append(c.kind) }
+        for g in groups {
+            out += "\n## \(g)\n\n" + list.filter { $0.kind == g }.map { "- [ ] **\($0.name)**: \($0.why)" }.joined(separator: "\n") + "\n"
+        }
+        return out
+    }
+
     static let maxFileBytes = ModPackReader.maxFileBytes
     /// Settings keys a pack may carry: the ones Claude Code documents as shareable, and the wall
     /// switches. Plugins travel as rows of their own, so `enabledPlugins` isn't one of them.
@@ -391,7 +456,7 @@ enum ConfigPack {
     /// The manifest for the chosen rows. Names no machine, user or seat; `fromWork` stamps it
     /// `"from": "work"` so an import elsewhere can say where it came from.
     static func manifest(_ items: [Item], label: String, version: String, now: Date, fromWork: Bool = false,
-                         extra: [File] = []) -> [String: Any] {
+                         extra: [File] = [], carry: [Carry] = []) -> [String: Any] {
         var files: [[String: Any]] = []
         var settings: [String: Any] = [:]
         var plugins: [Any] = []
@@ -413,7 +478,7 @@ enum ConfigPack {
             default: break
             }
         }
-        // any-agent/ is listed like every file, so a reader verifies it; import reads only files/.
+        // any-agent/ and CARRY.md are listed like every file, so a reader verifies them; import reads only files/.
         for f in extra {
             let data = Data(f.text.utf8)
             files.append(["path": f.path, "bytes": data.count, "sha256": SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()])
@@ -422,6 +487,7 @@ enum ConfigPack {
                                   "label": label, "files": files, "settings": settings, "env": env, "plugins": plugins, "mcp": mcp,
                                   "kept_mods": mods]
         if fromWork { doc["from"] = "work" }
+        if !carry.isEmpty { doc["carry"] = carry.map(\.json) }
         return doc
     }
 
@@ -440,9 +506,11 @@ enum ConfigPack {
     /// Writes the chosen rows (blocked ones are never written) as a pack at `destination`. Built
     /// in a temporary folder, zipped with `ditto`, moved into place.
     static func write(_ chosen: [Item], label: String, to destination: URL, version: String = ModPack.appVersion,
-                      now: Date = Date(), fromWork: Bool = false, anyAgent: Bool = false) throws {
+                      now: Date = Date(), fromWork: Bool = false, anyAgent: Bool = false, all: [Item]? = nil) throws {
         let items = chosen.filter(\.canTravel)
-        let extra = anyAgent ? anyAgentFiles(items) ?? [] : []
+        // The carry list, from every row the sheet showed (`all`), as CARRY.md and in the manifest.
+        let carry = carry(all ?? chosen, chosen: Set(items.map(\.id)))
+        let extra = (anyAgent ? anyAgentFiles(items) ?? [] : []) + [File(path: "CARRY.md", text: carryMarkdown(carry, label: label))]
         let fm = FileManager.default
         let work = fm.temporaryDirectory.appendingPathComponent("sanduhr-config-\(UUID().uuidString)", isDirectory: true)
         defer { try? fm.removeItem(at: work) }
@@ -454,7 +522,7 @@ enum ConfigPack {
                 try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try Data(f.text.utf8).write(to: url)
             }
-            let doc = manifest(items, label: label, version: version, now: now, fromWork: fromWork, extra: extra)
+            let doc = manifest(items, label: label, version: version, now: now, fromWork: fromWork, extra: extra, carry: carry)
             var data = try JSONSerialization.data(withJSONObject: doc, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
             data.append(0x0A)
             try data.write(to: tree.appendingPathComponent(ModPack.manifestName))

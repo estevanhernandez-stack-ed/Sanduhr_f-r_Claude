@@ -67,6 +67,37 @@ enum ConfigImport {
         case mcp(name: String, json: String, sha256: String)
     }
 
+    // MARK: The carry list (slice I)
+
+    /// What the pack itself said it left behind, minus env names that are rows here.
+    static func packCarry(_ pack: ModPackReader.Unpacked, rows: [Row]) -> [ConfigPack.Carry] {
+        let envRows = Set(rows.filter { $0.kind == .env }.map(\.name))
+        return (pack.manifest["carry"] as? [[String: Any]] ?? []).compactMap { e in
+            guard let kind = e["kind"] as? String, let name = e["name"] as? String, let why = e["why"] as? String else { return nil }
+            if kind == "Values", envRows.contains(name), (e["why"] as? String)?.hasPrefix("An environment variable") == true { return nil }
+            return ConfigPack.Carry(kind: kind, name: name, why: why)
+        }
+    }
+
+    /// After an import: the rows it didn't bring, each with what's left to do by hand.
+    static func leftOver(_ rows: [Row], chosen: Set<String>, env values: [String: String]) -> [ConfigPack.Carry] {
+        rows.compactMap { r in
+            let why: String
+            switch r.status {
+            case .refused(let reason): why = reason
+            case .command(let cmd): why = "Run it yourself: " + cmd
+            case .needsValue where chosen.contains(r.id) && (values[r.name] ?? r.value as? String ?? "").isEmpty:
+                why = "No value was typed: set it in settings.json by hand."
+            case .new, .needsValue, .review, .install:
+                guard !chosen.contains(r.id) else { return nil }
+                why = "Not brought over."
+            case .same, .differs:
+                return nil
+            }
+            return ConfigPack.Carry(kind: r.kind.title, name: r.name, why: why)
+        }
+    }
+
     // MARK: Planning
 
     /// The rows of `pack` against `seat`. Reads the seat; writes nothing.

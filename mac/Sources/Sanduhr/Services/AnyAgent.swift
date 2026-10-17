@@ -245,7 +245,7 @@ enum AnyAgent {
         return out + ns.substring(from: last)
     }
 
-    private static func references(in config: [String: Any]) -> Set<String> {
+    static func references(in config: [String: Any]) -> Set<String> {
         var out = Set<String>()
         func walk(_ v: Any) {
             switch v {

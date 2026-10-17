@@ -54,10 +54,10 @@ extension ModsPageModel {
     /// Writes the chosen rows to `url` off the main thread (any-agent/ and the zip take a moment).
     func finishConfigExport(_ state: ConfigExportState, to url: URL) async {
         let chosen = state.items.filter { state.chosen.contains($0.id) }
-        let (label, work, anyAgent) = (state.label, state.isWork, state.forOtherAgents)
+        let (all, label, work, anyAgent) = (state.items, state.label, state.isWork, state.forOtherAgents)
         do {
             try await Task.detached(priority: .userInitiated) {
-                try ConfigPack.write(chosen, label: label, to: url, fromWork: work, anyAgent: anyAgent)
+                try ConfigPack.write(chosen, label: label, to: url, fromWork: work, anyAgent: anyAgent, all: all)
             }.value
             configExportNote = "Exported \(state.chosen.count) \(state.chosen.count == 1 ? "item" : "items") from \(state.label) to \(url.lastPathComponent)."
             configExport = nil
@@ -111,7 +111,9 @@ struct ConfigExportSheet: View {
             otherAgents
             HStack {
                 let blocked = state.items.filter { !$0.canTravel }.count
-                Text("\(state.chosen.count) chosen" + (blocked > 0 ? ", \(blocked) can't travel" : ""))
+                let carry = ConfigPack.carry(state.items, chosen: state.chosen).count - ConfigPack.neverCarried.count
+                Text("\(state.chosen.count) chosen" + (blocked > 0 ? ", \(blocked) can't travel" : "")
+                     + (carry > 0 ? "; \(carry) to carry by hand, listed in CARRY.md" : "; what never travels is listed in CARRY.md"))
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 if writing {

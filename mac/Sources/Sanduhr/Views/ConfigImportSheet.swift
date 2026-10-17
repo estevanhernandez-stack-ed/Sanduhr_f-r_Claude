@@ -276,11 +276,38 @@ struct ConfigImportSheet: View {
         }
         if state.hasSeat {
             rowList
+            carryList(ConfigImport.packCarry(state.pack, rows: state.rows), title: "Carry by hand")
         } else {
             Text("Choose the folder to open it into. Nothing is written until you press Import and confirm.")
                 .font(.callout).frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
         }
         footer
+    }
+
+    /// What the pack doesn't bring (and, after Import, what the import left), grouped, with a
+    /// button that copies it as a checklist.
+    @ViewBuilder private func carryList(_ list: [ConfigPack.Carry], title: String) -> some View {
+        if !list.isEmpty {
+            DisclosureGroup {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(list.enumerated()), id: \.offset) { _, c in
+                            (Text(c.kind + ", ").foregroundStyle(.secondary) + Text(c.name).bold() + Text(": " + c.why))
+                                .font(.caption).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 140)
+                Button("Copy List") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(ConfigPack.carryMarkdown(list, label: state.label), forType: .string)
+                }
+                .controlSize(.small)
+            } label: {
+                Text("\(title) (\(list.count))").font(.callout)
+            }
+        }
     }
 
     private var confirmMessage: String {
@@ -421,6 +448,8 @@ struct ConfigImportSheet: View {
         ForEach(state.cliFailures, id: \.self) { line in
             Text("Not put in: " + line).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
         }
+        carryList(ConfigImport.packCarry(state.pack, rows: state.rows)
+                  + ConfigImport.leftOver(state.rows, chosen: state.chosen, env: state.env), title: "Still to carry by hand")
         if let undone {
             Text(undone.note).font(.caption).foregroundStyle(undone.isClean ? Color.secondary : Color.orange).fixedSize(horizontal: false, vertical: true)
         }
