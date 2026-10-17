@@ -7,6 +7,8 @@ import AppKit
 struct DeskArrangeGeometry: Equatable {
     var content: CGRect
     var centerDrop: CGFloat
+    /// The Dock's reach at the bottom of the window, so the Hidden strip sits above it.
+    var dockBottom: CGFloat = 0
 }
 
 extension DeskArrangeMode {
@@ -88,22 +90,35 @@ private struct DeskArrangeable: ViewModifier {
         }
     }
 
+    /// The dashed outline, and above it the name tag with its Hide button (the one part of the
+    /// outline that takes clicks).
     private var outline: some View {
         RoundedRectangle(cornerRadius: 8)
             .strokeBorder(Color.white.opacity(0.85), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
             .shadow(color: .black.opacity(0.5), radius: 2)
             .padding(-Self.outlinePad)
-            .overlay(alignment: .topLeading) {
-                Text(name)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(Color.black.opacity(0.55)))
-                    .fixedSize()
-                    .offset(x: -Self.outlinePad, y: -Self.outlinePad - 20)
-            }
             .allowsHitTesting(false)
+            .overlay(alignment: .topLeading) {
+                nameTag.offset(x: -Self.outlinePad, y: -Self.outlinePad - 20)
+            }
+    }
+
+    private var nameTag: some View {
+        HStack(spacing: 4) {
+            Text(name)
+            Button { mode.edit { $0.hide(widget) } } label: {
+                Image(systemName: "xmark.circle.fill")
+            }
+            .buttonStyle(.plain)
+            .help(DeskArrangeCopy.hide)
+            .accessibilityLabel("\(DeskArrangeCopy.hide) \(name)")
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Capsule().fill(Color.black.opacity(0.55)))
+        .fixedSize()
     }
 
     private func handle(_ corner: (trailing: Bool, bottom: Bool)) -> some View {
@@ -166,6 +181,7 @@ private struct DeskArrangeable: ViewModifier {
         Button("Move Down") { mode.edit { $0.move(widget, by: 1) } }
         Button("Bigger") { mode.edit { $0.setScale(widget, placement.scale + DeskArrangement.scaleStep) } }
         Button("Smaller") { mode.edit { $0.setScale(widget, placement.scale - DeskArrangement.scaleStep) } }
+        Button(DeskArrangeCopy.hide) { mode.edit { $0.hide(widget) } }
     }
 }
 
@@ -181,8 +197,9 @@ struct DeskArrangePlate: View {
 }
 
 /// Over the pieces while arranging: the eight anchors, lit while a piece is dragged with the one
-/// it would land on brightest, and the dragged piece's ghost under the pointer. The bar with
-/// Cancel and Done is not here: it floats above every window in its own panel
+/// it would land on brightest, the dragged piece's ghost under the pointer, and at the bottom of
+/// the plate the Hidden strip, with a Show button for each piece the layout leaves out. The bar
+/// with Cancel and Done is not here: it floats above every window in its own panel
 /// (DeskArrangeBarController), so an app window can never cover it.
 struct DeskArrangeOverlay: View {
     let mode: DeskArrangeMode
@@ -194,8 +211,41 @@ struct DeskArrangeOverlay: View {
                 lights(drag)
                 ghost(drag)
             }
+            if let hidden = mode.working?.hidden, !hidden.isEmpty {
+                hiddenStrip(hidden)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// "Hidden: Clock and date [Show] …", above the Dock's reach.
+    private func hiddenStrip(_ hidden: [String]) -> some View {
+        HStack(spacing: 8) {
+            Text(DeskArrangeCopy.hiddenStrip).font(.system(size: 11, weight: .semibold))
+            ForEach(hidden, id: \.self) { widget in
+                let name = DeskLayout.widgets.first { $0.key == widget }?.name ?? widget
+                HStack(spacing: 4) {
+                    Text(name).font(.system(size: 11))
+                    Button(DeskArrangeCopy.show) { mode.edit { $0.show(widget) } }
+                        .controlSize(.mini)
+                        .accessibilityLabel("\(DeskArrangeCopy.show) \(name)")
+                }
+                .padding(.leading, 6)
+                .padding(.trailing, 2)
+                .padding(.vertical, 2)
+                .background(Capsule().fill(Color.white.opacity(0.12)))
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Capsule().fill(Color.black.opacity(0.55)))
+        .environment(\.colorScheme, .dark)
+        .fixedSize()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .padding(.bottom, geometry.dockBottom + 12)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(DeskArrangeCopy.hiddenStrip)
     }
 
     private func lights(_ drag: DeskArrangeDrag) -> some View {

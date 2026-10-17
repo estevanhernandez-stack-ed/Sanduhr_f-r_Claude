@@ -98,7 +98,8 @@ struct DeskView: View {
         let notch = DeskAnchorGeometry.notchBottom(notch: model.notchRect, island: island, chin: chin)
         return DeskArrangeGeometry(
             content: DeskAnchorGeometry.content(window: size, margins: margins, inset: inset),
-            centerDrop: DeskAnchorGeometry.centerDrop(contentTop: margins.top + inset, notchBottom: notch))
+            centerDrop: DeskAnchorGeometry.centerDrop(contentTop: margins.top + inset, notchBottom: notch),
+            dockBottom: model.dockInsets.bottom)
     }
 
     /// The columns. Corners and middles only: the two side columns as before item 59, the
