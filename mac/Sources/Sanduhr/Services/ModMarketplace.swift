@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// A marketplace of the user's own (item 76, slice F): kept mods published into a git clone the
@@ -195,7 +194,7 @@ struct ModMarketplace {
         var parts: [String] = []
         for rel in rels {
             guard let data = FileManager.default.contents(atPath: folder.appendingPathComponent(rel).path) else { return nil }
-            parts.append(rel + ":" + SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined())
+            parts.append(rel + ":" + Digest.sha256Hex(data))
         }
         return parts.sorted().joined(separator: "\n")
     }

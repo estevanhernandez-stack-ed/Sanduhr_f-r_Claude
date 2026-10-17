@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// Opening a config pack into a seat (item 76, slice D, `docs/config-transfer-spec.md`). Each
@@ -627,7 +626,7 @@ enum ConfigImport {
         return left
     }
 
-    static func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+    static func sha(_ data: Data) -> String { Digest.sha256Hex(data) }
 
     static func canonicalSHA(_ value: Any) -> String {
         let data = (try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .fragmentsAllowed, .withoutEscapingSlashes])) ?? Data()

@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// The Claude Code integration scripts (item 49): shipped inside the app at
@@ -146,14 +145,12 @@ struct IntegrationScripts {
 
     /// The stamp of a folder holding `files` (the app's list), or nil when one is missing.
     static func stamp(of folder: URL, files: [String]) -> String? {
-        var hasher = SHA256()
+        var parts: [Data] = []
         for name in files {
             guard let data = try? Data(contentsOf: folder.appendingPathComponent(name)) else { return nil }
-            hasher.update(data: Data(name.utf8))
-            hasher.update(data: Data([0]))
-            hasher.update(data: data)
+            parts += [Data(name.utf8), Data([0]), data]
         }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined().prefix(12).description
+        return Digest.sha256Hex(parts, prefix: 12)
     }
 
     /// The stamp of a folder over the files it holds itself.
