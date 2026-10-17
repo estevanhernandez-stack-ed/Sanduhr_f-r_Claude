@@ -1202,7 +1202,7 @@ private struct ModReportView: View {
 /// ModProposalStore.shared, so they never disagree.
 struct ModsFromClaudeRow: View {
     static let title = "Let agents propose mods"
-    static let caption = "Claude can hand you mods and config to review here (New Mod, From Claude, and the folder's row on By Folder). Off: Claude's requests are refused and the Build prompt tells it so."
+    static let caption = "Claude can hand you mods and config to review here (New Mod, From Claude, and the folder's row on By Folder). Off: Claude's requests are refused, and the Build prompt leaves that step out."
 
     var body: some View {
         @Bindable var proposals = ModProposalStore.shared
