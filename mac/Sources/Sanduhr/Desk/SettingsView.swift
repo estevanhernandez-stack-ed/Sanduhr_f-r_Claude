@@ -330,6 +330,7 @@ struct DeskLookSection: View {
     @AppStorage(DeskMessageLook.glowKey, store: .desk) private var messageGlow = true
     @AppStorage("inkColor", store: .desk) private var inkColor = "ffffff"
     @AppStorage("inkShadow", store: .desk) private var inkShadow = true
+    @AppStorage("plate", store: .desk) private var plate = DeskPlate.defaultOn
     @State private var families: [String] = []
 
     /// The Desk font as drawn (EsteFont Pro until one is picked, or when the picked one is gone);
@@ -373,6 +374,9 @@ struct DeskLookSection: View {
                 Toggle("Glow around the message", isOn: $messageGlow)
                 ColorRow(title: "Clock, date, meetings, Claude", value: $inkColor, showsHex: false)
                 Toggle("Drop shadow under the clock text", isOn: $inkShadow)
+                Toggle(DeskPlate.title, isOn: $plate)
+                Text(DeskPlate.caption)
+                    .font(.caption).foregroundStyle(.secondary)
                 Text("Pick a preset; Advanced, below, takes your own hex colors. Notch text color is on Notch; how the clock and the message take clicks is on Desk.")
                     .font(.caption).foregroundStyle(.secondary)
             }
