@@ -44,6 +44,8 @@ enum AboutLinks {
     static let privacy = URL(string: repo + "/blob/main/docs/PRIVACY.md")!
     /// The MIT license file at the repo root.
     static let license = URL(string: repo + "/blob/main/LICENSE")!
+    /// The setup guide's Notch section (docs/setup-guide.md, task 4), linked from Settings, Notch.
+    static let notchGuide = URL(string: repo + "/blob/main/docs/setup-guide.md#4-use-the-notch")!
     static let sparkle = URL(string: "https://sparkle-project.org")!
     /// Now playing's source (item 53), credited in About and Settings, Desk, Now Playing.
     static let mediaRemoteAdapter = URL(string: "https://github.com/ungive/mediaremote-adapter")!

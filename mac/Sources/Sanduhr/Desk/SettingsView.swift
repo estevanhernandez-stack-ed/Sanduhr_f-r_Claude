@@ -783,7 +783,7 @@ struct DeskNotchSection: View {
                 Toggle(SettingsNames.notchSwitch, isOn: $enabled)
                     .settingsAnchor(SettingsAnchor.notch)
                 NeedsDeskRow()
-                Text("Widens the notch into one black island while the Desk is on. Click it to open these settings. Screens without a notch are left alone.")
+                Text("\(NeedsDeskRow.text) Widens the notch into one black island; click it to open these settings. Screens without a notch are left alone.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             NotchTextSection()
@@ -939,9 +939,11 @@ private struct AVIndicatorSection: View {
                 ForEach(AVPlace.allCases) { Text($0.label).tag($0) }
             }
             .disabled(dot == .never && !mic)
-            Text("Indicators only: Sanduhr sees that a camera or the microphone is in use, never which app or anything captured, and never mutes or changes a device. No permission is asked and nothing is saved. In a wing or under the camera they show while one is in use, and that place shows its own text the rest of the time; a place whose text is off shows them beside the camera instead. With the island off, or on a screen without a notch, they show in a small tab at the top. Click one for what is in use. Needs the Desk. With Reduce Motion the dot holds still and they come and go without a fade.")
+            Text("Indicators only: Sanduhr sees that a camera or the mic is in use, never which app or what it captures, and never mutes or changes a device. Without the island they show in a small tab at the top.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Link("Learn more", destination: AboutLinks.notchGuide)
+                .font(.caption)
         }
     }
 }

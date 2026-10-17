@@ -123,7 +123,7 @@ Under **Advanced**, at the bottom of the page, **Size** sets **Extra width each 
 2. Turn on **Show a mic while the microphone is on**.
 3. **Where they show** picks one place: **Beside the camera, left**, **Beside the camera, right**, **In the left wing**, **In the right wing** or **Under the camera**. In a wing or under the camera they show while one is in use, and that place shows its own text the rest of the time.
 
-These are indicators only. Sanduhr never mutes, records or changes a device. Click one to see what's in use, with **Notch Settings…** at the bottom.
+These are indicators only. Sanduhr never mutes, records or changes a device. No permission is asked and nothing is saved. Click one to see what's in use, with **Notch Settings…** at the bottom. A place whose text is off shows them beside the camera instead, and with the island off they show in a small tab at the top. With Reduce Motion the dot holds still and they come and go without a fade.
 
 Click the island itself to open Settings, Notch.
 
