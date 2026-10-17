@@ -7,6 +7,10 @@ steps:
   - expect:
       window: settings
       contains: { text: "/Notch: the island around the camera/" }
+  # The caption under the switch leads with the rule (polish-ux 13).
+  - expect:
+      window: settings
+      contains: { text: "/^Needs the Desk\\. Widens the notch into one black island/" }
   - expect_state: { settings_section: notch }
   - snap: notch-settings
   - do: close-settings

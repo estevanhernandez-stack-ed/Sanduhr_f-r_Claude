@@ -35,6 +35,10 @@ struct AboutLinksTests {
     @Test func sparkleCredit() {
         #expect(AboutLinks.sparkle.absoluteString == "https://sparkle-project.org")
     }
+
+    @Test func notchPageLearnMoreOpensTheGuideAtTheNotch() {
+        #expect(AboutLinks.notchGuide.absoluteString == repo + "/blob/main/docs/setup-guide.md#4-use-the-notch")
+    }
 }
 
 @Suite("App info")

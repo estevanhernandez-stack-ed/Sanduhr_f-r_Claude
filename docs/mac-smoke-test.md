@@ -110,6 +110,7 @@ Fresh-install and migration checks stay manual.
 - [ ] Strip under the notch draws when Notch, "Extra height below" is above 0; its text appears with "Text under the camera too".
 - [ ] Notch, Text: set Right wing to Message: the right wing shows today's message within 15 seconds, growing to fit. Set Left wing to Nothing: a plain black wing. "Under the camera" to Time: the strip shows the time. Put all three back to their first choices (Next meeting, or the time; Claude meters; Next meeting, or the Claude meters).
 - [ ] Click the island: Sanduhr Settings opens.
+- [ ] Captions (polish-ux 13): the caption under the island switch starts "Needs the Desk." (with the Desk off, the Needs the Desk. row and its Desk Settings… button sit above it). Camera and mic ends in a two-sentence caption and a **Learn more** link that opens the setup guide at "4. Use the notch" in the browser. With the island off, Glow and Camera and mic stay usable (see item 27 and §24 step 9); only Text is disabled.
 - [ ] Quit and relaunch: the notch is still on (the switch saved). Turn it off: wings and strip go, Desk layer stays.
 - [ ] Full-screen an app: wings stay above it. Switch Spaces: wings stay.
 - [ ] External display as main: no island drawn.
