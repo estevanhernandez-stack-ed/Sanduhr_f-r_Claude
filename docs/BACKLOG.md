@@ -123,7 +123,7 @@ step), and whether a demo mode (made-up numbers until real usage arrives) helps 
 
 ## #4 — "Just the Desk": Sanduhr without a Claude account (first slice built)
 
-**First slice built 2026-10-11 for 2.15.0** (`JustTheDesk`, smoke-test section 45): the welcome sheet's **Just the Desk**, the widget following its choice without waiting for sign-in, no sign-in line on the Desk or notch, What's New still showing after updates, and a sign-in ending it (the reminder back on if it turned it off). Alerts and Claude Code now open with a plain line that they start once you sign in (Usage already said "Add an account in Accounts first"). Still open from the sketch below: an empty notch wing collapsing, Store and landing copy, and Windows parity.
+**First slice built 2026-10-11 for 2.15.0** (`JustTheDesk`, smoke-test section 45): the welcome sheet's **Just the Desk**, the widget following its choice without waiting for sign-in, no sign-in line on the Desk or notch, What's New still showing after updates, and a sign-in ending it (the reminder back on if it turned it off). Alerts and Claude Code now open with a plain line that they start once you sign in (Usage already said "Add an account in Accounts first"). Still open from the sketch below: Store and landing copy, and Windows parity (an empty notch wing collapsing shipped with checklist item 72 slice 4, noted 2026-10-17).
 
 Raised 2026-10-10 by the owner: "The Desk portion of our app is strong enough that some folks who
 don't have Claude might like it." Today a first launch assumes a Claude subscription: the welcome
