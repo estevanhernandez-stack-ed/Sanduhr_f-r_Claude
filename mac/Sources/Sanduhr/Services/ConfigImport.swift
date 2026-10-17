@@ -45,6 +45,10 @@ enum ConfigImport {
         var status: Status
         /// Files to write, by path inside the seat.
         var files: [(path: String, data: Data)] = []
+        /// Of `files`, the ones written runnable (a carried plugin's scripts).
+        var executable: Set<String> = []
+        /// A carried plugin written without `claude` to hand: the command that installs it.
+        var command: String?
         /// A settings key's value as it will be written (home folder put back for `~/`).
         var value: Any?
         /// What `claude` runs for a plugin or MCP server row.
@@ -88,6 +92,8 @@ enum ConfigImport {
             case .command(let cmd): why = "Run it yourself: " + cmd
             case .needsValue where chosen.contains(r.id) && (values[r.name] ?? r.value as? String ?? "").isEmpty:
                 why = "No value was typed: set it in settings.json by hand."
+            case .new where chosen.contains(r.id) && r.command != nil:
+                why = "Its files are written; install it yourself: " + (r.command ?? "")
             case .new, .needsValue, .review, .install:
                 guard !chosen.contains(r.id) else { return nil }
                 why = "Not brought over."
@@ -187,7 +193,12 @@ enum ConfigImport {
             case .running: .refused("Claude Code is running in this folder. Quit it, then open the pack again to install this.")
             }
         }
-        for p in pack.manifest["plugins"] as? [[String: Any]] ?? [] {
+        for p in pack.manifest["plugins"] as? [[String: Any]] ?? [] where p["carried"] as? Bool == true {
+            guard let name = p["name"] as? String, ConfigPack.isPluginName(name) else { continue }
+            rows.append(carriedRow(pack, name: name, executable: p["executable"] as? [String] ?? [], root: root, prefix: prefix,
+                                   installed: installed, cli: cli))
+        }
+        for p in pack.manifest["plugins"] as? [[String: Any]] ?? [] where p["carried"] as? Bool != true {
             guard let name = p["name"] as? String, let market = p["marketplace"] as? [String: Any],
                   let mname = market["name"] as? String, let source = market["source"] as? [String: Any] else { continue }
             guard let arg = marketplaceArgument(source) else {
@@ -212,6 +223,78 @@ enum ConfigImport {
             rows.append(row)
         }
         return rows
+    }
+
+    /// Where a carried plugin is written in the seat: a one-plugin marketplace of its own.
+    static let carriedFolder = "carried-plugins"
+
+    /// A plugin carried as files (slice J): written under `carried-plugins/<name>/` as a one-plugin
+    /// marketplace (`carried-<name>`, source `./plugin`), then added and installed through `claude`.
+    /// The row names every hook command the plugin runs.
+    private static func carriedRow(_ pack: ModPackReader.Unpacked, name: String, executable: [String], root: String, prefix: String,
+                                   installed: Set<String>, cli: CLIState) -> Row {
+        let market = "carried-" + name
+        let id = name + "@" + market
+        let base = "\(carriedFolder)/\(name)"
+        let from = "plugins/\(name)/"
+        var files = pack.files.filter { $0.key.hasPrefix(from) }.sorted { $0.key < $1.key }
+            .map { (path: base + "/plugin/" + String($0.key.dropFirst(from.count)), data: $0.value) }
+        let manifest: [String: Any] = ["name": market, "owner": ["name": "Carried with Sanduhr"],
+                                       "plugins": [["name": name, "source": "./plugin"]]]
+        if let data = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]) {
+            files.append((path: base + "/.claude-plugin/marketplace.json", data: data + Data([0x0A])))
+        }
+        let folder = (root as NSString).appendingPathComponent(base)
+        let cmd = "\(prefix)claude plugin marketplace add \(shellQuoted(folder)) && \(prefix)claude plugin install \(shellQuoted(id)) --scope user"
+        let hooks = hookCommands(pack, plugin: from)
+        var detail = "from a folder, \(files.count - 1) \(files.count == 2 ? "file" : "files")"
+        if !hooks.isEmpty { detail += "; runs " + hooks.joined(separator: ", ") }
+        var row = Row(kind: .plugin, name: name, detail: detail, status: .new)
+        row.files = files
+        row.executable = Set(executable.filter { !$0.contains("..") }.map { base + "/plugin/" + $0 })
+        row.job = .plugin(id: id, marketplace: market, source: folder)
+        if files.count < 2 {
+            row.status = .refused("The pack holds none of its files.")
+        } else if installed.contains(id) {
+            row.status = .same
+        } else if installed.contains(where: { $0.hasPrefix(name + "@") }) {
+            row.status = .differs
+        } else if FileManager.default.fileExists(atPath: folder) {
+            row.status = .refused("\(base) is in this folder already.")
+        } else {
+            switch cli {
+            case .ready: row.status = .install(cmd)
+            case .running: row.status = .refused("Claude Code is running in this folder. Quit it, then open the pack again to install this.")
+            case .missing:
+                // Written, then installed by hand: the files are what the command needs.
+                row.detail += ". Then run: " + cmd
+                row.command = cmd
+            }
+        }
+        return row
+    }
+
+    /// The commands a carried plugin's hooks run, from `hooks/hooks.json` and the manifest's own
+    /// `hooks`, each once, `${CLAUDE_PLUGIN_ROOT}` shortened.
+    static func hookCommands(_ pack: ModPackReader.Unpacked, plugin from: String) -> [String] {
+        var out: [String] = []
+        func walk(_ v: Any) {
+            switch v {
+            case let o as [String: Any]:
+                if let c = o["command"] as? String {
+                    let short = c.replacingOccurrences(of: "${CLAUDE_PLUGIN_ROOT}/", with: "")
+                    if !out.contains(short) { out.append(short) }
+                }
+                o.values.forEach(walk)
+            case let a as [Any]: a.forEach(walk)
+            default: break
+            }
+        }
+        for path in [from + "hooks/hooks.json", from + ".claude-plugin/plugin.json"] {
+            guard let data = pack.files[path], let doc = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+            walk(path.hasSuffix("plugin.json") ? doc["hooks"] ?? [:] : doc)
+        }
+        return out
     }
 
     private static func stem(_ file: String) -> String { (file as NSString).deletingPathExtension }
@@ -331,7 +414,8 @@ enum ConfigImport {
         let fm = FileManager.default
         var record = Record(id: UUID().uuidString.lowercased(), seat: root, label: label, packSHA256: packSHA256, at: now, steps: [])
 
-        for row in rows where row.status == .new && !row.files.isEmpty {
+        // Files for what's new, and a carried plugin's before `claude` installs it.
+        for row in rows where !row.files.isEmpty && (row.status == .new || { if case .install = row.status { true } else { false } }()) {
             for f in row.files {
                 let target = (root as NSString).appendingPathComponent(f.path)
                 // Made since the plan: the seat's own now, left alone.
@@ -347,7 +431,7 @@ enum ConfigImport {
                         try fm.createDirectory(atPath: d, withIntermediateDirectories: false)
                         record.steps.append(Step(kind: .folder, name: d))
                     }
-                    guard fm.createFile(atPath: target, contents: f.data, attributes: [.posixPermissions: 0o644]) else {
+                    guard fm.createFile(atPath: target, contents: f.data, attributes: [.posixPermissions: row.executable.contains(f.path) ? 0o755 : 0o644]) else {
                         throw CocoaError(.fileWriteUnknown)
                     }
                     record.steps.append(Step(kind: .file, name: target, sha256: sha(f.data)))
