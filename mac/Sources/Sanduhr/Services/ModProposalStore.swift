@@ -62,7 +62,8 @@ struct ModInstallRecord: Codable, Equatable, Identifiable, Sendable {
 final class ModProposalStore {
     static let shared = ModProposalStore()
 
-    /// Mods & Config, New Mod, From Claude: "Let agents propose mods", off by default.
+    /// Mods & Config, More's From Claude row (and New Mod, From Claude, which mirrors it):
+    /// "Let agents propose mods", off by default.
     nonisolated static let switchKey = "modsAgentsPropose"
     static let keepDecided = 30
 

@@ -815,6 +815,8 @@ struct ModsSettings: View {
                     MetersHeader(model: model, linked: linked, demo: vm.demo)
                         .settingsAnchor(SettingsAnchor.metersMod)
                     ModsMore(model: model, demo: vm.demo) {
+                        // The agents switch on the page (polish 2026-10-17, #20); New Mod mirrors it.
+                        ModsFromClaudeRow()
                         ModsSummaryCard(model: model)
                         // Catalog | By Seat (item 71, slice 1), right above what each shows.
                         ModsTabBar(model: model, demo: vm.demo)
@@ -1195,8 +1197,28 @@ private struct ModReportView: View {
     }
 }
 
+/// From Claude, on the page (polish 2026-10-17, #20): the agents switch, in plain words, at the
+/// top of More. New Mod's From Claude shows the same switch and caption; both bind to
+/// ModProposalStore.shared, so they never disagree.
+struct ModsFromClaudeRow: View {
+    static let title = "Let agents propose mods"
+    static let caption = "Claude can hand you mods and config to review here (New Mod, From Claude, and the folder's row on By Folder). Off: Claude's requests are refused, and the Build prompt leaves that step out."
+
+    var body: some View {
+        @Bindable var proposals = ModProposalStore.shared
+        VStack(alignment: .leading, spacing: 4) {
+            Text("From Claude").font(.subheadline.weight(.semibold))
+            Toggle(Self.title, isOn: $proposals.allowed)
+            Text(Self.caption)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
 /// The page's summary card (item 68's pattern): the counts across folders, on the preview
-/// wallpaper. Since 2026-10-17 it sits first under More, on the page, not above it.
+/// wallpaper. Since 2026-10-17 it sits under More, on the page, after the From Claude row.
 struct ModsSummaryCard: View {
     var model: ModsPageModel
 
