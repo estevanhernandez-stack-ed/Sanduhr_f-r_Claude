@@ -23,6 +23,24 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      # Windows download links filter the shared release list by major version
+      # (`releases?q=v3`) because /releases/latest is the Mac app's slot. A new
+      # Windows major would leave those links listing the old line with nothing
+      # to warn, so the tag's major must match them before anything builds.
+      - name: Windows download links match this major version
+        shell: pwsh
+        working-directory: .
+        run: |
+          $major = ("${{ github.ref_name }}" -replace "^v", "").Split(".")[0]
+          $bad = @()
+          foreach ($f in "docs/index.html", "INSTALL.md") {
+            if (-not (Select-String -Path $f -SimpleMatch -Quiet "releases?q=v$major&")) { $bad += $f }
+          }
+          if ($bad) {
+            Write-Output "::error::Tag ${{ github.ref_name }} is Windows major $major, but these files don't link releases?q=v$major&: $($bad -join ', '). Update the Windows download links (and docs/release-runbook.md Phase 6) to the new major, then re-tag."
+            exit 1
+          }
+          Write-Output "Windows download links already point at v$major."
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
