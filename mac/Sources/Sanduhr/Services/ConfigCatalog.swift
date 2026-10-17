@@ -581,8 +581,8 @@ enum ConfigCatalog {
             let (seat, scan) = pair
             guard !scan.unreadableFiles.isEmpty || scan.partial, !(demo && seat.isWork) else { return nil }
             return scan.unreadableFiles.isEmpty
-                ? "\(seat.label): a folder walk stopped at its limit, so what's listed may be partial. See By Seat."
-                : "\(seat.label): some files couldn't be read. See By Seat."
+                ? "\(seat.label): a folder walk stopped at its limit, so what's listed may be partial. See By Folder."
+                : "\(seat.label): some files couldn't be read. See By Folder."
         }
     }
 

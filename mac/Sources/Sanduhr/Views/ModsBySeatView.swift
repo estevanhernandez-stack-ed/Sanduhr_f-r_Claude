@@ -9,12 +9,12 @@ enum SeatSectionID: String, CaseIterable, Sendable {
         switch self {
         case .settings: "Settings"
         case .instructions: "Instructions"
-        case .extensions: "Extensions"
+        case .extensions: "Mods and plugins"
         case .mcp: "MCP servers"
         case .history: "History"
         case .housekeeping: "Housekeeping"
-        case .seat: "Seat"
-        case .drift: "Drift between seats"
+        case .seat: "Folder"
+        case .drift: "Drift between folders"
         }
     }
 
@@ -84,14 +84,14 @@ enum SeatSummary {
         var parts: [String] = [r.model.title]
         if r.killSwitch { parts.append("sync switched off") }
         if case .unknownSchema = r.sync { parts.append("state.json in an unknown schema") }
-        if r.remoteMatches == false { parts.append("its origin doesn't match the seat file") }
+        if r.remoteMatches == false { parts.append("its origin doesn't match its identity file") }
         return (parts.joined(separator: ", ") + ".", r.remoteMatches == false)
     }
 
     static func drift(_ d: [SeatReport.Drift], others: Int) -> (text: String, warns: Bool) {
-        if others == 0 { return ("No other seat to compare.", false) }
+        if others == 0 { return ("No other folder to compare.", false) }
         let n: Int = d.reduce(0) { $0 + $1.count }
-        return (n == 0 ? "Same as the other seats." : plural(n, "difference") + " with " + plural(others, "other seat") + ".", false)
+        return (n == 0 ? "Same as the other folders." : plural(n, "difference") + " with " + plural(others, "other folder") + ".", false)
     }
 }
 
@@ -229,7 +229,7 @@ private struct SeatPickerChip: View {
     var body: some View {
         HStack(spacing: 5) {
             if running {
-                Circle().fill(Color.hex("4ade80")).frame(width: 7, height: 7).help("Claude Code is running in this seat.")
+                Circle().fill(Color.hex("4ade80")).frame(width: 7, height: 7).help("Claude Code is running in this folder.")
             }
             Text(seat.label).font(.callout.weight(selected ? .semibold : .regular))
             SeatMarkBadge(mark: seat.mark)

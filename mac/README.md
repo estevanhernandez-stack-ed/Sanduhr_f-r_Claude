@@ -617,7 +617,7 @@ the watcher tools, `propose_now_playing_looks` (Now playing, below), and `propos
 `list_catalog`, `propose_install` with `get_mod_status` (Mod Studio: a mod's files for you to
 review, your kept mods, a request to turn one on in a folder; only while **Let agents propose
 mods** is on), and `propose_config` under the same switch (agents, skills, commands, output
-styles, settings keys and MCP servers for one Claude Code folder, opened on By Seat as an import
+styles, settings keys and MCP servers for one Claude Code folder, opened on By Folder as an import
 you review).
 `publish_usage` is dropped on the Mac. What it may read comes from
 `mcp-access.json`, which the app writes:
@@ -875,8 +875,9 @@ commands, args and permission rules; names kept, never editable) and `ClaudeProc
 of each running `claude` of this user, from `CLAUDE_CONFIG_DIR` in its launch environment through
 `KERN_PROCARGS2`; arguments and every other variable are dropped while parsing).
 
-**Catalog | By Seat (item 71, slice 1a).** Under Sanduhr's own mod the page has two tabs,
-**Catalog** and **By Seat** (`ModsTabBar`, anchor `mods#inventory`), the choice kept by the
+**Catalog | By Folder (item 71, slice 1a).** Under Sanduhr's own mod the page has two tabs,
+**Catalog** and **By Folder** (`ModsTabBar`, `ModsTab.bySeat`, anchor `mods#inventory`; the screen
+says "folder" for a Claude Code folder everywhere since 2026-10-17, the code keeps "seat"), the choice kept by the
 page's model while the Settings window lives. Each seat is read once per load by
 `SeatScanner.scan` (`SeatScan.swift`), files only: no CLI, no network, no marketplace refresh,
 no mod or server started, nothing written. It reads the seat's `settings.json` (a file that
@@ -899,10 +900,11 @@ alpha", "Inline folder", "Skills folder", "claude.ai (synced)", "Sanduhr"; two s
 (always, first), and agents, skills, commands, output styles and MCP servers grouped by name.
 A card shows its name, kind, version, description, sources, Check's risk line when Check ran,
 what needs a look (declared and not installed, a missing folder, on twice in one seat), and a
-chip per seat that holds it: the seat's label, its Work, Personal or Unmarked badge and **On**,
+chip per seat that holds it: the seat's label, its Work, Personal or Not marked badge and **On**,
 **Off**, **Declared, not installed**, **In N projects** (never which) or **Its session only**. A
-card with no chip is **Available**. A chip opens By Seat at that seat with the extension lit.
-Filters: kind, seat, Everything, Installed somewhere, Available only, Needs a look (a duplicate,
+card with no chip is **Available** (Sanduhr's own mod says **Not installed** instead, the Studio's
+word). A chip opens By Folder at that seat with the extension lit.
+Filters: Kind, Folder, Everything, Installed somewhere, Available only, Needs a look (a duplicate,
 a problem or a Check that failed), and search over name, description and sources. **Duplicate**
 counts only sources a plugin is installed or turned on from; a marketplace that merely lists it
 doesn't make one. Project plugins resolve as Claude Code does: managed `enabledPlugins` over a
@@ -911,13 +913,13 @@ record means installed there, not on; managed `enabledPlugins` also switch a sea
 **Demo mode** shows each card as `CatalogCard.demoView` draws it: every source, description,
 version, problem and chip is recorded with whether a work seat supplied it, so demo keeps only
 what a seat that isn't work supplied (a personal seat's description wins), and drops a card only
-work seats hold or only a work seat's marketplace lists; the Seat filter offers no work seat, and
-By Seat drops work seats. Descriptions and versions go through `ConfigMask.maskString`.
+work seats hold or only a work seat's marketplace lists; the Folder filter offers no work seat, and
+By Folder drops work seats. Descriptions and versions go through `ConfigMask.maskString`.
 **Bounded reads:** only regular files are read (never a FIFO, socket or device), each with a
 size cap (`.claude.json` 32 MB, `installed_plugins.json` and `marketplace.json` 4 MB, settings
 2 MB, others 1 MB); a file over its cap, not JSON, or holding a comment or trailing comma (Claude
 Code's strict JSON refuses both, Foundation's parser doesn't) is unreadable, and the Catalog
-names each seat with such a file ("some files couldn't be read. See By Seat."). The walks of
+names each seat with such a file ("some files couldn't be read. See By Folder."). The walks of
 `agents/`, `commands/` and `output-styles/` skip hidden folders (`.git`) and `node_modules`, go at
 most three folders down and share a budget of 5,000 visits per seat; a spent budget marks the
 seat's list partial. Symlinked subfolders aren't followed, so a link loop can't trap a walk and a

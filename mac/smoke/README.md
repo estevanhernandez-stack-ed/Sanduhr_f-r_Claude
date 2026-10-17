@@ -83,7 +83,7 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `claude` was found; never a mod's name, a path or a report), `mods_config` (item 71, slice 1: `tab`, `catalog` or `seat`;
   `seats`, how many Claude Code folders it read; `cards`, `available` (listed by a marketplace, installed nowhere),
   `needs_look`, `duplicates` and `work_only` (cards only work seats hold, hidden in demo mode) across the Catalog;
-  `shown`, the cards the filters and demo mode let through; `selected`, the seat By Seat shows, from 1, 0 before the
+  `shown`, the cards the filters and demo mode let through; `selected`, the folder By Folder shows, from 1, 0 before the
   seats are read; `by_seat`, one entry per seat in seat order with `settings` (keys in effect), `warnings`, `unreadable`
   (its settings.json doesn't parse), `instructions` (files in the CLAUDE.md tree), `extensions`, `parity` (plugin
   checks to look at), `hooks`, `mcp`, `history_warning` (the 30-day purge applies), `leftovers`, `drift` (differences
@@ -138,8 +138,9 @@ Code folders hold a Sanduhr entry) and `steps`, in run order, each a `part` (`cl
 `records`, `desk_messages`, `themes`, `settings`), a `kind` and a `count`; never a path, a folder, a label or a
 domain's contents. `reset_dry_run` is null until one ran. Any other arg is an error: no hook resets for real,
 and the selftest fails a scenario whose `reset` step is anything but `--dry-run`),
-`mods-config catalog|seat [n]` (item 71, slice 1: Settings, Mods & Config on its Catalog or By Seat tab, as the tab
-bar picks it; `seat 2` opens By Seat at the second seat. Reads only, changes no seat and no preference).
+`mods-config catalog|seat [n]` (item 71, slice 1: Settings, Mods & Config on its Catalog or By Folder tab, as the tab
+bar picks it; `seat 2` opens By Folder at the second folder; the hook's word stays `seat` while the tab says
+By Folder since 2026-10-17. Reads only, changes no folder and no preference).
 
 ## Scenarios
 

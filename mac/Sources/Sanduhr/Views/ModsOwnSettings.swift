@@ -47,10 +47,13 @@ struct OwnModRow: Identifiable, Equatable, Sendable {
     /// Update has something to do here: an entry naming older scripts, or an older pinned version.
     var updateWaiting: Bool { state.listed && (status == .outdated || (updateAvailable && !missing)) }
 
-    /// "On in 2 of 3 folders, an update waiting in 1", nil without a folder (item 75, slice C).
+    /// "On in 2 of 3 folders, an update waiting in 1", "Not installed" while no folder lists it (the
+    /// Catalog's word, 2026-10-17), nil without a folder (item 75, slice C).
     static func onLine(_ rows: [OwnModRow]) -> String? {
         guard !rows.isEmpty else { return nil }
-        var text = "On in \(rows.filter(\.state.isOn).count) of \(rows.count) folder\(rows.count == 1 ? "" : "s")"
+        var text = rows.contains(where: \.state.listed)
+            ? "On in \(rows.filter(\.state.isOn).count) of \(rows.count) folder\(rows.count == 1 ? "" : "s")"
+            : "Not installed"
         let waiting = rows.filter(\.updateWaiting).count
         if waiting > 0 { text += ", an update waiting in \(waiting)" }
         return text

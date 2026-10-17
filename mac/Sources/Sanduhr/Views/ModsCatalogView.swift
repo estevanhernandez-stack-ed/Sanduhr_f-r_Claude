@@ -32,7 +32,7 @@ struct SeatMarkBadge: View {
         switch mark {
         case .work: "Work"
         case .personal: "Personal"
-        case .unmarked: "Unmarked"
+        case .unmarked: "Not marked"
         }
     }
 
@@ -58,7 +58,7 @@ struct ModsCatalogView: View {
         let cards = model.shownCards(demo: demo)
         let searching = !model.filter.search.trimmingCharacters(in: .whitespaces).isEmpty
         VStack(alignment: .leading, spacing: 10) {
-            Text("Everything your Claude Code folders hold or a marketplace they added lists, one line each, with a dot for every folder (seat) that has it. Click a line for its card, and a chip on the card to open that seat. Read from files only: nothing is fetched, run or changed.")
+            Text("Everything your Claude Code folders hold or a marketplace they added lists, one line each, with a dot for every folder that has it. Click a line for its card, and a chip on the card to open that folder on By Folder. Read from files only: nothing is fetched, run or changed.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -394,8 +394,8 @@ private struct CatalogFilterBar: View {
                     ForEach(CatalogKind.allCases, id: \.self) { Text($0.title).tag(CatalogKind?.some($0)) }
                 }
                 .frame(maxWidth: 200)
-                Picker("Seat", selection: $model.filter.seat) {
-                    Text("All seats").tag(String?.none)
+                Picker("Folder", selection: $model.filter.seat) {
+                    Text("All folders").tag(String?.none)
                     ForEach(model.filterSeats(demo: demo)) { Text($0.label).tag(String?.some($0.path)) }
                 }
                 .frame(maxWidth: 200)
@@ -556,7 +556,8 @@ private struct CatalogCardHeader: View {
             }
             CatalogBadge(text: card.kind == .plugin && card.isMod ? "Mod" : card.kind.badge, color: .secondary)
             if card.isDuplicate { CatalogBadge(text: "Duplicate", color: .orange) }
-            if card.isAvailable { CatalogBadge(text: "Available", color: Color.hex("4ade80")) }
+            // Sanduhr's own mod says Not installed in its chips line; Available is a marketplace listing's word.
+            if card.isAvailable && !card.isSanduhrs { CatalogBadge(text: "Available", color: Color.hex("4ade80")) }
         }
     }
 }
@@ -582,7 +583,7 @@ private struct CatalogChips: View {
 
     var body: some View {
         if card.isAvailable {
-            Text(card.isSanduhrs ? "Installed in no folder yet." : "Listed by a marketplace, installed in no folder.")
+            Text(card.isSanduhrs ? "Not installed." : "Listed by a marketplace, installed in no folder.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } else {
@@ -590,7 +591,7 @@ private struct CatalogChips: View {
                 ForEach(card.chips) { chip in
                     Button { model.open(chip, card: card) } label: { CatalogChipLabel(chip: chip) }
                         .buttonStyle(.plain)
-                        .help("Open \(chip.label) on By Seat")
+                        .help("Open \(chip.label) on By Folder")
                         .accessibilityLabel("\(chip.label), \(SeatMarkBadge(mark: chip.mark).title), \(chip.state.title)")
                 }
             }
@@ -652,10 +653,10 @@ struct SeatLabelControls: View {
             if seat.markSource == .account {
                 SeatMarkBadge(mark: seat.mark)
             } else {
-                Text("side not set").font(.caption).foregroundStyle(.secondary)
+                Text("not marked").font(.caption).foregroundStyle(.secondary)
             }
             Button("Edit on Accounts…") { SettingsWindowController.shared.showAccount(account) }
-                .help("This folder is linked to \(account). Its name and Work or Personal side are set on Accounts.")
+                .help("This folder is linked to \(account). Its name and whether it is marked work or personal are set on Accounts.")
         }
         .controlSize(.small)
         .accessibilityElement(children: .combine)
@@ -670,13 +671,12 @@ struct SeatLabelControls: View {
                 .onSubmit { save() }
                 .onChange(of: editing) { if !editing { save() } }
                 .help("Your name for this folder. Sanduhr never takes one from the folder's files.")
-            Picker("Side", selection: Binding(get: { seat.mark }, set: { model.setMark($0, for: seat.path) })) {
-                Text("Unmarked").tag(SeatMark.unmarked)
+            Picker("Work or personal", selection: Binding(get: { seat.mark }, set: { model.setMark($0, for: seat.path) })) {
+                Text("Not marked").tag(SeatMark.unmarked)
                 Text("Work").tag(SeatMark.work)
                 Text("Personal").tag(SeatMark.personal)
             }
-            .labelsHidden()
-            .frame(maxWidth: 120)
+            .fixedSize()
         }
         .controlSize(.small)
         .onAppear { draft = seat.labelChosen ? seat.label : "" }
