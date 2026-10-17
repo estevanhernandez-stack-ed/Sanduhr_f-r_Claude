@@ -40,7 +40,8 @@ struct DeskLayerTests {
 
     @Test func theWordsSayTheCostAndSearchFindsIt() {
         #expect(DeskLayer.title == "Keep the Desk under desktop icons")
-        #expect(DeskLayer.caption.contains("takes no clicks"))
+        #expect(DeskLayer.caption.contains("still take their clicks"))
+        #expect(DeskLayer.caption.contains("let every click through"))
         #expect(SettingsSearch.hits("under desktop icons").contains { $0.entry.page == .deskLayout })
         #expect(SettingsSearch.hits("bottom").contains { $0.entry.page == .deskLayout })
     }

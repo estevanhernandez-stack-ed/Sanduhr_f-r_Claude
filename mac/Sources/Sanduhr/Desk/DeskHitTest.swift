@@ -327,15 +327,17 @@ enum DeskPointerWatch {
 /// Where the Desk window sits (Settings, Desk, Clicks's "Keep the Desk under desktop icons"):
 /// just below normal windows, as it always has, or in the desktop layer under Finder's icons,
 /// so files on the desktop sit on top of the Desk's text instead of under it. Under the icons
-/// the Desk takes no clicks: Finder's icon window covers the whole screen above it, and on
-/// recent macOS a click there counts as clicking the wallpaper.
+/// the Desk window itself takes no clicks: Finder's icon window covers the whole screen above
+/// it, and on recent macOS a click there counts as clicking the wallpaper. The click layer
+/// (DeskClickLayer) stays at the old level with the small pieces' click areas, so those keep
+/// working; the big pieces' menus wait until the Desk is back above the icons.
 enum DeskLayer {
     /// Desk suite key (com.626labs.sanduhr.desk).
     static let key = "underIcons"
     static let defaultOn = false
 
     static let title = "Keep the Desk under desktop icons"
-    static let caption = "Files on the desktop sit on top of the Desk's text. While this is on, the Desk takes no clicks: the clock's menu, meeting rows and watchers don't respond, and a click on the Desk counts as a click on the wallpaper."
+    static let caption = "Files on the desktop sit on top of the Desk's text. Meeting rows, watchers, now playing and the account name still take their clicks, a file over one of them included. The clock, the message and the meters let every click through to the files, so their menus wait until this is off."
 
     static func isOn(in store: DefaultsStore) -> Bool {
         store.object(forKey: key) as? Bool ?? defaultOn
