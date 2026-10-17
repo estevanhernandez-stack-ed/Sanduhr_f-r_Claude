@@ -7,8 +7,16 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2260: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.26.0", id: "carry-more",
+            title: "Packs carry more, and say what they don't",
+            body: "Plugins from a folder and switch values now travel, every pack lists what to carry by hand, and Claude can propose config for you to review.",
+            art: .symbol("suitcase"), destination: .mods),
+    ]
 
     static let release2250: [WhatsNewCard] = [
         WhatsNewCard(

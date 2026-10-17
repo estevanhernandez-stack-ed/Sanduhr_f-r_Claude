@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Claude can propose config.** With **Let agents propose mods** on, Claude can send agents, skills, commands, output styles, settings keys and MCP servers for one of your Claude Code folders through `propose_config`. Sanduhr checks it again and scans every file and value for secrets, then lists it on that folder in By Seat: **Review…** opens it like a config pack, where only what the folder lacks can be brought over and Undo Import takes it back; **Dismiss** drops it. A proposal that sets hooks asks for "hooks" typed out. `get_mod_status` tells Claude what you decided.
+
 - **Plugins from a folder travel too.** A plugin from a folder on this Mac (a directory marketplace, or one listed in `CLAUDE_CODE_PLUGIN_DIRS`) used to stay behind. A config pack now carries its files, shell and Python hooks included, each scanned like every other file; a binary or a line that looks like a secret keeps it home and on the carry list. Open writes it under the folder's `carried-plugins/` as a marketplace of its own, then adds and installs it with `claude`, its row naming every hook command it runs. Scripts stay runnable, and Undo Import uninstalls it and removes the files.
 
 - **What to carry by hand.** Every config pack now holds `CARRY.md`, a checklist of what it doesn't bring: rows that couldn't travel and why, rows you left unchecked, the env values and `${VAR}` references still to set, and what no pack holds (the sign-in, `settings.local.json`, a repo's own config, memory, credentials). The list never names a path of your Mac or a watch word. The export sheet counts it; Open shows it under **Carry by hand**, and after an import adds what the import left, with **Copy List**.

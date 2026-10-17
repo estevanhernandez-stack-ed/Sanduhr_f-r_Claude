@@ -27,6 +27,9 @@ tools the same way on either machine:
                              hands a Claude Code mod's files to Sanduhr for the user to review and
                              keep, lists the kept mods and where they are on, asks to turn one on in
                              a folder, and reports each decision, when the user lets agents propose mods
+  propose_config             hands agents, skills, commands, output styles, settings keys and MCP
+                             servers for one Claude Code folder to Sanduhr, which opens them for the
+                             user to import or dismiss, under the same switch
 
 What each tool may read is decided per account in Sanduhr (Settings, Accounts, Data, Share
 with Claude) and handed over in ~/Library/Application Support/Sanduhr/mcp-access.json. No
@@ -45,8 +48,8 @@ the Keychain or account names; never calls claude.ai or anything else on the net
 logs. The files it writes are desk-messages-request.json (propose_desk_messages),
 theme-request.json (propose_theme), now-playing-looks-request.json (propose_now_playing_looks) and
 watch-request-<ms>-<seq>-<id>.json (the watch tools, only while watchers.json, written by Sanduhr,
-says agents may show watchers) and mod-request.json and mod-install-request.json (propose_mod and propose_install, only while
-mods-agents.json says agents may propose mods), atomically and owner-only; it never writes messages.txt, a theme or
+says agents may show watchers) and mod-request.json, mod-install-request.json and config-request.json (propose_mod,
+propose_install and propose_config, only while mods-agents.json says agents may propose mods), atomically and owner-only; it never writes messages.txt, a theme or
 the saved looks. No tool takes a path. Failures are typed results (status/reason/remedy), never protocol
 errors. Python 3.9 standard library only.
 
@@ -301,7 +304,8 @@ MOD_STATUS_GUIDE = (
     "Where a mod you proposed with propose_mod stands: pending_review (the user hasn't decided), "
     "approved (kept in Sanduhr; on in no folder until the user turns it on), dismissed, replaced (a "
     "newer proposal under the same name took its place) or rejected with reasons. Pass the request_id "
-    "propose_mod returned. Works only while the user lets agents propose mods.")
+    "propose_mod returned; it answers for propose_install and propose_config too (kind says which). "
+    "Works only while the user lets agents propose mods.")
 
 CATALOG_GUIDE = (
     "The mods the user keeps in Sanduhr (made in their sessions or proposed with propose_mod and "
@@ -315,6 +319,21 @@ INSTALL_GUIDE = (
     "the mod. pending_review means the user has it; call get_mod_status with request_id for the "
     "decision (approved, dismissed). rejected comes with reasons. Works only while the user lets "
     "agents propose mods.")
+
+CONFIG_GUIDE = (
+    "Propose config for one of the user's Claude Code folders, named as list_catalog names it "
+    "(.claude-personal): agents, skills, commands and output styles as files, settings keys, and MCP "
+    "servers. Sanduhr opens it as an import the user reviews row by row: only what the folder lacks "
+    "can be brought over, nothing it has is replaced, and Undo Import takes it back. Pass folder, a "
+    "one-line summary, and any of: files, up to 24 of {path, text} relative to the folder "
+    "(agents/<name>.md, commands/<name>.md, output-styles/<name>.md, skills/<name>/SKILL.md and its "
+    "files, CLAUDE.md; 64 KB each, 256 KB in all); settings, an object of permissions, model, "
+    "outputStyle, hooks, extraKnownMarketplaces, syncClaudeAiSkills, syncClaudeAiPlugins, "
+    "disableClaudeAiConnectors or cleanupPeriodDays; mcp_servers, an object of name to its config, "
+    "every env and headers value a ${NAME} reference. Never an env value, a token or a path of this "
+    "Mac: a line that looks like a secret refuses the proposal. Works only while the user lets agents "
+    "propose mods. pending_review means the user has it; get_mod_status with request_id gives the "
+    "decision (approved when they imported any of it, dismissed). queued means Sanduhr did not answer.")
 
 READ_ONLY = {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}
 NO_ARGS = {"type": "object", "properties": {}, "additionalProperties": False}
@@ -592,6 +611,34 @@ TOOLS += [
         "annotations": READ_ONLY,
     },
 ]
+TOOLS += [
+    {
+        "name": "propose_config",
+        "description": CONFIG_GUIDE,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "folder": {"type": "string", "pattern": "^\\.claude(-[A-Za-z0-9._-]{1,40})?$"},
+                "summary": {"type": "string", "maxLength": 200, "description": "One line for the user: what it adds."},
+                "files": {
+                    "type": "array", "maxItems": 24,
+                    "items": {
+                        "type": "object",
+                        "properties": {"path": {"type": "string", "maxLength": 200}, "text": {"type": "string"}},
+                        "required": ["path", "text"],
+                        "additionalProperties": False,
+                    },
+                },
+                "settings": {"type": "object"},
+                "mcp_servers": {"type": "object"},
+            },
+            "required": ["folder", "summary"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False,
+                        "openWorldHint": False},
+    },
+]
 TOOL_NAMES = [t["name"] for t in TOOLS]
 # The Desk messages handoff (item 54). The app mirrors these names (DeskMessageHandoff); a test on
 # each side pins them.
@@ -661,6 +708,17 @@ MOD_INSTALL_REQUEST_FILE = "mod-install-request.json"
 MOD_INSTALL_RESULT_FILE = "mod-install-result.json"
 MOD_FOLDER_RE = re.compile(r"^\.claude(-[A-Za-z0-9._-]{1,40})?$")
 MOD_STATES = ("on", "off", "other_version")
+# propose_config (item 76, slice K). The app mirrors these (ConfigProposal); a test on each side pins them.
+CONFIG_REQUEST_FILE = "config-request.json"
+CONFIG_RESULT_FILE = "config-result.json"
+CONFIG_SETTINGS_KEYS = ("permissions", "model", "outputStyle", "hooks", "extraKnownMarketplaces",
+                        "syncClaudeAiSkills", "syncClaudeAiPlugins", "disableClaudeAiConnectors", "cleanupPeriodDays")
+CONFIG_MAX_SETTINGS_BYTES = 64 * 1024
+CONFIG_MAX_SERVERS = 16
+CONFIG_SERVER_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+CONFIG_REF_RE = re.compile(r"^\$\{[A-Za-z_][A-Za-z0-9_]{0,127}\}$")
+CONFIG_FILE_RE = re.compile(r"^(CLAUDE\.md|(agents|commands|output-styles)/[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*\.md|"
+                            r"skills/[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+)$")
 
 
 class Paths:
@@ -694,6 +752,8 @@ class Paths:
         self.mod_catalog = os.path.join(self.support_dir, MOD_CATALOG_FILE)
         self.mod_install_request = os.path.join(self.support_dir, MOD_INSTALL_REQUEST_FILE)
         self.mod_install_result = os.path.join(self.support_dir, MOD_INSTALL_RESULT_FILE)
+        self.config_request = os.path.join(self.support_dir, CONFIG_REQUEST_FILE)
+        self.config_result = os.path.join(self.support_dir, CONFIG_RESULT_FILE)
 
     def history_file(self, name):
         return os.path.join(self.support_dir, name)
@@ -2802,6 +2862,136 @@ def build_get_mod_status(args, paths=None):
             "remedy": "Sanduhr has no proposal with that id: it was never received, or is old enough to be dropped."}
 
 
+# -- propose_config (item 76, slice K) ----------------------------------------------------------
+#
+# Shape only here, as for propose_mod: the app checks again, scans every file and value for secrets,
+# and opens it as an import the user reviews. Handed over in config-request.json; the decision is
+# listed in mod-proposals.json with kind "config", so get_mod_status answers for it.
+
+def check_config(args):
+    """The proposal's problems (empty when it is good) and its clean form."""
+    reasons = []
+    unknown = sorted(k for k in args if k not in ("folder", "summary", "files", "settings", "mcp_servers"))
+    if unknown:
+        reasons.append("unknown argument(s): " + ", ".join(k[:20] for k in unknown[:5]))
+    folder = args.get("folder")
+    if not isinstance(folder, str) or not MOD_FOLDER_RE.match(folder):
+        reasons.append("folder must be a Claude Code folder's name, as list_catalog gives it (.claude-personal)")
+    summary = args.get("summary")
+    if not isinstance(summary, str) or not summary.strip() or len(summary) > MOD_MAX_SUMMARY \
+            or any(is_control(c) for c in summary):
+        reasons.append("summary must be one line of 1 to %d characters" % MOD_MAX_SUMMARY)
+    files = args.get("files", [])
+    clean_files = []
+    if not isinstance(files, list) or len(files) > MOD_MAX_FILES:
+        reasons.append("files must be a list of at most %d {path, text}" % MOD_MAX_FILES)
+        files = []
+    seen, total = set(), 0
+    for f in files:
+        if not isinstance(f, dict) or sorted(f) != ["path", "text"]:
+            reasons.append("each file is exactly {path, text}")
+            continue
+        path, text = f["path"], f["text"]
+        if not isinstance(path, str) or len(path) > MOD_MAX_PATH or not CONFIG_FILE_RE.match(path) \
+                or any(p in (".", "..") or p.startswith(".") for p in path.split("/")):
+            reasons.append("%s: a path is CLAUDE.md, agents/<name>.md, commands/<name>.md, output-styles/<name>.md "
+                           "or skills/<name>/<file>" % str(path)[:60])
+            continue
+        if path.lower() in seen:
+            reasons.append("%s is there twice" % path)
+            continue
+        seen.add(path.lower())
+        if not isinstance(text, str) or "\x00" in text:
+            reasons.append("%s: text must be a string without NUL characters" % path)
+            continue
+        try:
+            size = len(text.encode("utf-8"))
+        except UnicodeEncodeError:
+            reasons.append("%s: text is not valid UTF-8" % path)
+            continue
+        if size > MOD_MAX_FILE_BYTES:
+            reasons.append("%s is larger than %d KB" % (path, MOD_MAX_FILE_BYTES // 1024))
+            continue
+        total += size
+        clean_files.append({"path": path, "text": text})
+    if total > MOD_MAX_BYTES:
+        reasons.append("the files are larger than %d KB in all" % (MOD_MAX_BYTES // 1024))
+    settings = args.get("settings", {})
+    if not isinstance(settings, dict):
+        reasons.append("settings must be an object")
+        settings = {}
+    other = sorted(k for k in settings if k not in CONFIG_SETTINGS_KEYS)
+    if other:
+        reasons.append("settings may hold only " + ", ".join(CONFIG_SETTINGS_KEYS) + "; not " + ", ".join(k[:30] for k in other[:5]))
+    elif len(json.dumps(settings)) > CONFIG_MAX_SETTINGS_BYTES:
+        reasons.append("settings are larger than %d KB" % (CONFIG_MAX_SETTINGS_BYTES // 1024))
+    servers = args.get("mcp_servers", {})
+    if not isinstance(servers, dict) or len(servers) > CONFIG_MAX_SERVERS:
+        reasons.append("mcp_servers must be an object of at most %d servers" % CONFIG_MAX_SERVERS)
+        servers = {}
+    for name, config in servers.items():
+        if not CONFIG_SERVER_RE.match(name) or name == "sanduhr":
+            reasons.append("%s: a server name is 1-64 letters, digits, '_' or '-', and not sanduhr" % name[:40])
+            continue
+        if not isinstance(config, dict) or not (isinstance(config.get("command"), str) or isinstance(config.get("url"), str)):
+            reasons.append("%s: a server is an object with a command or a url" % name)
+            continue
+        for key in ("env", "headers"):
+            values = config.get(key, {})
+            if not isinstance(values, dict) or any(not isinstance(v, str) or not CONFIG_REF_RE.match(v) for v in values.values()):
+                reasons.append("%s: every %s value must be a ${NAME} reference, never the value" % (name, key))
+    if not reasons and not (clean_files or settings or servers):
+        reasons.append("propose at least one file, setting or MCP server")
+    return reasons, {"folder": folder, "summary": summary.strip() if isinstance(summary, str) else "",
+                     "files": clean_files, "settings": settings, "mcp_servers": servers}
+
+
+def build_propose_config(args, now=None, paths=None, wait=MOD_WAIT_SECONDS, poll=DESK_POLL_SECONDS,
+                         sleep=time.sleep, clock=time.monotonic):
+    """Checks the proposal's shape here, then hands it to the app through config-request.json and
+    waits briefly for config-result.json. Never writes a Claude Code folder."""
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    args = args if isinstance(args, dict) else {}
+    if not mods_allowed(paths):
+        return dict(MOD_SWITCHED_OFF)
+    reasons, config = check_config(args)
+    if reasons:
+        return {"status": "rejected", "reason": "invalid_config", "reasons": reasons[:20],
+                "remedy": "Fix what reasons names and call again."}
+    if config["folder"] is not None:
+        cat = read_catalog(paths)
+        if cat is not None and config["folder"] not in cat[0]:
+            return {"status": "rejected", "reason": "unknown_folder",
+                    "remedy": "Sanduhr knows no Claude Code folder named '%s'; list_catalog names them." % config["folder"]}
+    request_id = uuid.uuid4().hex
+    request = {"schema_version": 1, "id": request_id, "requested_at": iso_o(now)}
+    request.update(config)
+    try:
+        os.makedirs(paths.support_dir, mode=0o700, exist_ok=True)
+        tmp = paths.config_request + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(request, f, ensure_ascii=False)
+        os.replace(tmp, paths.config_request)
+    except OSError as e:
+        return {"status": "error", "reason": "request_write_failed",
+                "remedy": "Could not queue the request (%s)." % type(e).__name__}
+    deadline = clock() + wait
+    while True:
+        res = read_desk_result(paths.config_result, request_id)
+        if res is not None:
+            out = {k: res[k] for k in ("status", "reason", "reasons", "remedy", "folder") if k in res}
+            out["request_id"] = request_id
+            return out
+        if clock() >= deadline:
+            break
+        sleep(poll)
+    return {"status": "queued", "reason": "app_not_responding", "request_id": request_id, "folder": config["folder"],
+            "remedy": "Sanduhr did not answer within %d seconds. Start Sanduhr: it picks the request up within "
+                      "ten minutes of when it was made." % int(wait)}
+
+
 def call_tool(name, args):
     """The payload for a tools/call, or None for an unknown tool."""
     args = args if isinstance(args, dict) else {}
@@ -2832,6 +3022,8 @@ def call_tool(name, args):
         return build_propose_now_playing_looks(args)
     if name == "propose_mod":
         return build_propose_mod(args)
+    if name == "propose_config":
+        return build_propose_config(args)
     if name == "get_mod_status":
         return build_get_mod_status(args)
     if name == "list_catalog":

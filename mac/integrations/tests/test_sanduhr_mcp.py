@@ -547,7 +547,7 @@ class ActivityLevel(Base):
                          ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
                           "get_desk_messages", "propose_desk_messages", "propose_theme",
                           "watch_start", "watch_update", "watch_end", "propose_now_playing_looks",
-                          "propose_mod", "list_catalog", "propose_install", "get_mod_status"])
+                          "propose_mod", "list_catalog", "propose_install", "get_mod_status", "propose_config"])
         self.assertFalse(p["watchers_allowed"])
         self.assertEqual(sorted(p["tools_not_on_mac"]), ["publish_usage"])
         text = json.dumps(p)
@@ -610,7 +610,7 @@ class Protocol(Base):
         self.assertEqual(names, ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
                                  "get_desk_messages", "propose_desk_messages", "propose_theme",
                                  "watch_start", "watch_update", "watch_end", "propose_now_playing_looks",
-                                 "propose_mod", "list_catalog", "propose_install", "get_mod_status"])
+                                 "propose_mod", "list_catalog", "propose_install", "get_mod_status", "propose_config"])
         for t in frames[1]["result"]["tools"]:
             if t["name"] == "propose_desk_messages":
                 # The one tool that asks for a change: not read-only, never destructive, no path.
@@ -652,6 +652,14 @@ class Protocol(Base):
                 self.assertFalse(t["annotations"]["readOnlyHint"])
                 self.assertFalse(t["annotations"]["destructiveHint"])
                 self.assertEqual(sorted(t["inputSchema"]["properties"]), ["folder", "name"])
+                self.assertFalse(t["inputSchema"]["additionalProperties"])
+                continue
+            if t["name"] == "propose_config":
+                # Asks, never writes a folder itself; no path argument.
+                self.assertFalse(t["annotations"]["readOnlyHint"])
+                self.assertFalse(t["annotations"]["destructiveHint"])
+                self.assertEqual(sorted(t["inputSchema"]["properties"]), ["files", "folder", "mcp_servers", "settings", "summary"])
+                self.assertEqual(t["inputSchema"]["required"], ["folder", "summary"])
                 self.assertFalse(t["inputSchema"]["additionalProperties"])
                 continue
             if t["name"] == "get_mod_status":
@@ -1615,6 +1623,88 @@ MOD_FILES = [
     {"path": "hooks/hooks.json", "text": '{"modules": ["./register.tsx"]}'},
     {"path": "hooks/register.tsx", "text": "export const register = (on) => {}\n"},
 ]
+
+
+class ProposeConfig(Base):
+    """propose_config (item 76, slice K): shape checked here under the mods switch, handed over in
+    config-request.json; the app's answer is played by a fake sleep."""
+
+    def propose(self, args, answer=None):
+        ticks = [0.0]
+
+        def clock():
+            return ticks[0]
+
+        def sleep(seconds):
+            ticks[0] += seconds
+            if answer is None or not os.path.exists(self.paths.config_request):
+                return
+            with open(self.paths.config_request, encoding="utf-8") as f:
+                req = json.load(f)
+            self.fx.write_json(mcp.CONFIG_RESULT_FILE, {"id": req["id"], "completed_at": iso(NOW), "result": answer(req)})
+
+        return mcp.build_propose_config(args, now=NOW, paths=self.paths, wait=1.0, poll=0.25, sleep=sleep, clock=clock)
+
+    def good(self, **kw):
+        args = {"folder": ".claude-personal", "summary": "A reviewer agent and the docs server.",
+                "files": [{"path": "agents/reviewer.md", "text": "---\nname: reviewer\n---\nRead the diff.\n"},
+                          {"path": "skills/notes/SKILL.md", "text": "---\nname: notes\n---\nWrite notes.\n"}],
+                "settings": {"model": "opus"},
+                "mcp_servers": {"docs": {"type": "http", "url": "https://docs.example.com/mcp", "headers": {"X-Api-Key": "${DOCS_KEY}"}}}}
+        args.update(kw)
+        return args
+
+    def test_file_names_match_the_app(self):
+        self.assertEqual((mcp.CONFIG_REQUEST_FILE, mcp.CONFIG_RESULT_FILE), ("config-request.json", "config-result.json"))
+        self.assertEqual(mcp.CONFIG_SETTINGS_KEYS, ("permissions", "model", "outputStyle", "hooks", "extraKnownMarketplaces",
+                                                    "syncClaudeAiSkills", "syncClaudeAiPlugins", "disableClaudeAiConnectors",
+                                                    "cleanupPeriodDays"))
+
+    def test_switched_off_writes_nothing(self):
+        before = sorted(os.listdir(self.fx.support))
+        r = self.propose(self.good())
+        self.assertEqual((r["status"], r["reason"]), ("rejected", "switched_off"))
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+
+    def test_a_good_proposal_is_handed_over_and_answered(self):
+        self.fx.write_json("mods-agents.json", {"propose": True, "schema_version": 1})
+        r = self.propose(self.good(), answer=lambda req: {"status": "pending_review", "folder": req["folder"]})
+        self.assertEqual((r["status"], r["folder"]), ("pending_review", ".claude-personal"))
+        with open(self.paths.config_request, encoding="utf-8") as f:
+            req = json.load(f)
+        self.assertEqual(os.stat(self.paths.config_request).st_mode & 0o777, 0o600)
+        self.assertEqual(sorted(req), ["files", "folder", "id", "mcp_servers", "requested_at", "schema_version", "settings", "summary"])
+        self.assertEqual(r["request_id"], req["id"])
+
+    def test_silence_is_queued_and_an_unknown_folder_refused(self):
+        self.fx.write_json("mods-agents.json", {"propose": True, "schema_version": 1})
+        self.assertEqual(self.propose(self.good())["status"], "queued")
+        self.fx.write_json("mods-catalog.json", {"schema_version": 1, "folders": [".claude"], "mods": []})
+        r = self.propose(self.good())
+        self.assertEqual((r["status"], r["reason"]), ("rejected", "unknown_folder"))
+
+    def test_bad_proposals_are_refused_here(self):
+        self.fx.write_json("mods-agents.json", {"propose": True, "schema_version": 1})
+        before = sorted(os.listdir(self.fx.support))
+        cases = [
+            self.good(folder="/Users/x/.claude"),
+            self.good(summary=""),
+            self.good(files=[{"path": "../evil.md", "text": "x"}]),
+            self.good(files=[{"path": "hooks/run.sh", "text": "x"}]),
+            self.good(files=[{"path": "agents/.hidden.md", "text": "x"}]),
+            self.good(settings={"env": {"TOKEN": "abc"}}),
+            self.good(settings={"apiKeyHelper": "/bin/echo"}),
+            self.good(mcp_servers={"docs": {"url": "https://x", "headers": {"Authorization": "Bearer abc"}}}),
+            self.good(mcp_servers={"sanduhr": {"command": "python3"}}),
+            self.good(mcp_servers={"empty": {}}),
+            self.good(env={"A": "1"}),
+            {"folder": ".claude", "summary": "Nothing."},
+        ]
+        for args in cases:
+            r = self.propose(args)
+            self.assertEqual((r["status"], r["reason"]), ("rejected", "invalid_config"), args)
+            self.assertTrue(r["reasons"])
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
 
 
 class ProposeMod(Base):

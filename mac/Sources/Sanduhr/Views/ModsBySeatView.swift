@@ -149,6 +149,27 @@ private struct ImportRecordRow: View {
     }
 }
 
+/// Config Claude proposed for this folder through `propose_config` (item 76, slice K), waiting:
+/// Review opens it in the Open sheet, Dismiss drops it.
+private struct ConfigProposalRow: View {
+    let record: ConfigProposalRecord
+    var model: ModsPageModel
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles").foregroundStyle(.tint)
+            Text("Claude proposes: \(record.summary) (" + [(record.files, "file"), (record.settings, "setting"), (record.servers, "MCP server")]
+                    .filter { $0.0 > 0 }.map { "\($0.0) \($0.1)\($0.0 == 1 ? "" : "s")" }.joined(separator: ", ") + ")")
+                .font(.caption).lineLimit(2)
+            Button("Review…") { model.reviewConfigProposal(record) }
+                .controlSize(.small)
+                .help("Opens it like a config pack: you choose what to bring over, and only what this folder lacks can be.")
+            Button("Dismiss") { ModProposalStore.shared.decideConfig(record.id, approved: false) }
+                .controlSize(.small)
+        }
+    }
+}
+
 /// Imports into a folder chosen by Other Folder… that isn't listed as a seat: their Undo has no
 /// seat to sit under, so they sit above the seats.
 private struct OtherFolderImports: View {
@@ -231,6 +252,9 @@ private struct SeatHeader: View {
                 }
             }
             Text(facts).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            ForEach(ModProposalStore.shared.pendingConfigs.filter { $0.folder == AccountData.normalized(seat.path) }) { r in
+                ConfigProposalRow(record: r, model: model)
+            }
             ForEach(model.imports.filter { $0.seat == AccountData.normalized(seat.path) }) { record in
                 ImportRecordRow(record: record, model: model, folder: nil)
             }
