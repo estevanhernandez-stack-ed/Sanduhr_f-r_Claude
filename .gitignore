@@ -57,3 +57,9 @@ windows-dotnet/src/Sanduhr.App/Package/Logos/AppIcon.ico
 
 # vibe-iterate local state (atlas, radar cache, per-machine config)
 .vibe-iterate/
+
+# vibe-sec per-project state (findings, audit state, threat-model sidecar); docs/vibe-sec/ is kept
+.vibe-sec/
+
+# vibe-test per-project state (audit sidecars, project state); docs/vibe-test/ is kept
+.vibe-test/
