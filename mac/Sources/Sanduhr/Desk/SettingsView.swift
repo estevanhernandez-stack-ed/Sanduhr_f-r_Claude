@@ -424,19 +424,51 @@ struct ColorRow: View {
     }
 }
 
-/// A hex field and its swatch: one hex color, or several with commas for a gradient.
+/// A hex field and its swatch: one hex color, or several with commas for a gradient. The field
+/// commits on Return and on losing focus (DeskHex): a valid value is saved, a bad one is not,
+/// the text stays for fixing and a red caption says what is wrong until it is valid or a preset
+/// resets the field.
 struct HexRow: View {
     let title: String?
     @Binding var value: String
+    @State private var text: String
+    @State private var problem: String?
+    @FocusState private var editing: Bool
+
+    init(title: String?, value: Binding<String>) {
+        self.title = title
+        _value = value
+        _text = State(initialValue: value.wrappedValue)
+    }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            field
+            if let problem {
+                Text(problem).font(.caption).foregroundStyle(.red)
+            }
+        }
+        .onChange(of: value) { text = value; problem = nil }
+        .onChange(of: text) { if problem != nil { problem = DeskHex.problem(text) } }
+        .onChange(of: editing) { if !editing { commit() } }
+    }
+
+    private var field: some View {
         HStack {
             if let title { Text(title) }
-            TextField("hex", text: $value)
+            TextField("hex", text: $text)
                 .font(.system(.body, design: .monospaced))
                 .accessibilityLabel(title.map { "\($0) hex" } ?? "Hex")
+                .focused($editing)
+                .onSubmit { commit() }
             Swatch(value: value).frame(width: 90, height: 18)
         }
+    }
+
+    private func commit() {
+        let result = DeskHex.commit(text, saved: value)
+        problem = result.problem
+        if result.value != value { value = result.value }
     }
 }
 
