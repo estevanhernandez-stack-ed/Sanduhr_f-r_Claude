@@ -62,3 +62,10 @@ Mods & Config opens on **Meters above the prompt**: one row per folder with its 
 Uncommitted files in your tree at run start. The run cut from `e53377c` and did not stash, reset or check out over them.
 - `docs/vibe-iterate/` (untracked: `ux-polish-2026-10-17.md`, the scan this run executed)
 - `docs/cart-runs/2026-10-17-polish-ux/` (this run folder, untracked)
+
+## After the run: the Desk under the icons (two commits on the tip)
+The scan's "full desktop" concern turned out to be layer order, not readability: files should sit on top of the Desk, not under it. Two commits on `cart/polish-ux` after the run's close-out, both tried on a real desktop with files over the pieces:
+- `4151850` **"Keep the Desk under desktop icons"** (`DeskLayer`, key `underIcons`, off by default and for new installs): the Desk window moves to desktop+1, under Finder's icon window. Settings, Desk, Clicks; search finds "under desktop icons", "bottom", "behind files"; `desk_under_icons` in the smoke snapshot.
+- `187ad02` **A click layer** (`DeskClickLayer`): under the icons nothing on the Desk window can be clicked (Finder's window covers the screen), so a second transparent window at the Desk's old level holds one faint plate per click area of the small pieces a click acts on (meeting rows with a link, the calendar note, the account name, watchers, now playing, the camera strip). Same monitors, same hit test, same actions, on the layer's own element list. The big pieces (meters, clock, message, claude line) get no plate, so the files under them stay the Finder's: the first cut covered them too and made a full desktop's files immovable. Arrange raises the Desk window and rests the layer. Close-out on the tip: 1,779 tests, selftest 940.
+
+Cost named in the caption: a file under a small piece yields that spot to the piece, and the meters', clock's and message's menus wait until the option is off.
