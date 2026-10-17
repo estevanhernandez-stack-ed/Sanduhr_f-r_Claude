@@ -32,6 +32,7 @@ struct ConfigImportState: Identifiable {
         guard hasSeat else { rows = []; chosen = []; return }
         rows = ConfigImport.plan(pack, seat: seat, home: home, cli: cli)
         chosen = Set(rows.filter { $0.choosable && $0.kind != .instructions }.map(\.id))
+        for r in rows where r.kind == .env { if let v = r.value as? String, env[r.name] == nil { env[r.name] = v } }
     }
 }
 
@@ -304,6 +305,19 @@ struct ConfigImportSheet: View {
         }.count
     }
 
+    /// A switch's travelled value shows plainly, to read and change; any other value stays hidden.
+    @ViewBuilder private func envField(_ r: ConfigImport.Row) -> some View {
+        let text = Binding(get: { state.env[r.name] ?? "" }, set: { state.env[r.name] = $0 })
+        Group {
+            if r.value != nil {
+                TextField("Value for \(r.name)", text: text)
+            } else {
+                SecureField("Value for \(r.name)", text: text)
+            }
+        }
+        .textFieldStyle(.roundedBorder).frame(maxWidth: 320).padding(.leading, 20)
+    }
+
     private var chosenCount: Int {
         state.rows.filter { state.chosen.contains($0.id) && ($0.status != .needsValue || !(state.env[$0.name] ?? "").isEmpty) }.count
     }
@@ -349,8 +363,7 @@ struct ConfigImportSheet: View {
             case .differs:
                 Text("This folder has its own; it stays.").font(.caption).foregroundStyle(.orange).padding(.leading, 20)
             case .needsValue:
-                SecureField("Value for \(r.name)", text: Binding(get: { state.env[r.name] ?? "" }, set: { state.env[r.name] = $0 }))
-                    .textFieldStyle(.roundedBorder).frame(maxWidth: 320).padding(.leading, 20)
+                envField(r)
             case .review:
                 Text("Waits in New Mod for Check, Try and Keep; nothing runs before.").font(.caption).foregroundStyle(.secondary).padding(.leading, 20)
             case .install(let cmd):

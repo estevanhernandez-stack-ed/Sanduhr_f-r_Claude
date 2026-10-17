@@ -64,6 +64,22 @@ struct ModMarketplaceTests {
         #expect(ModMarketplace.defaultName(source: "/tmp/x/origin.git") == "origin")
     }
 
+    @Test func anEntryNamesItsAuthorAndKeepsTheUsersOwn() {
+        let mod = KeptMod(name: "ci-band", version: "0.1.0", stamp: "abc", keptAt: Date(), session: "s", files: 1, bytes: 1)
+        let repo = ModMarketplace.Repo(remote: "", branch: "main", source: "someone/my-mods", name: "my-mods")
+        let entry = { (doc: [String: Any]) in (doc["plugins"] as? [[String: Any]])?.first?["author"] as? [String: String] }
+        // The repo's owner, unless the mod names its own author (object or string).
+        #expect(entry(ModMarketplace.manifest(nil, mod: mod, repo: repo)) == ["name": "someone"])
+        #expect(entry(ModMarketplace.manifest(nil, mod: mod, repo: repo, author: ["name": "Ada", "email": "a@example.com"])) == ["name": "Ada"])
+        #expect(entry(ModMarketplace.manifest(nil, mod: mod, repo: repo, author: "Ada")) == ["name": "Ada"])
+        // A remote that isn't GitHub has no owner to name.
+        let other = ModMarketplace.Repo(remote: "", branch: "main", source: "/tmp/origin.git", name: "origin")
+        #expect(entry(ModMarketplace.manifest(nil, mod: mod, repo: other)) == nil)
+        // An author the user wrote into the entry stays.
+        let mine: [String: Any] = ["name": "my-mods", "plugins": [["name": "ci-band", "author": ["name": "Me"]]]]
+        #expect(entry(ModMarketplace.manifest(mine, mod: mod, repo: repo)) == ["name": "Me"])
+    }
+
     @Test func gitIsFoundWithoutTouchingTheStub() {
         #expect(ModMarketplace.findGit { $0 == "/usr/bin/git" } == nil)
         #expect(ModMarketplace.findGit { $0 == "/opt/homebrew/bin/git" } == "/opt/homebrew/bin/git")

@@ -126,12 +126,16 @@ enum ConfigImport {
             rows.append(row)
         }
 
-        // Env names: the seat's own are kept; a missing one waits for a value.
+        // Env names: the seat's own are kept; a missing one waits for a value, filled in already for a
+        // switch whose value travelled (checked again here: a pack is only data).
         let env = settings?["env"] as? [String: Any] ?? [:]
         for e in pack.manifest["env"] as? [[String: Any]] ?? [] {
             guard let name = e["name"] as? String, isEnvName(name), !ConfigPack.machineEnv.contains(name) else { continue }
-            rows.append(Row(kind: .env, name: name, detail: env[name] != nil ? "set in this folder already" : "type its value",
-                            status: env[name] != nil ? .same : .needsValue))
+            let travelled = ConfigPack.switchValue(name, e["value"])
+            var row = Row(kind: .env, name: name, detail: env[name] != nil ? "set in this folder already" : travelled != nil ? "its value came with the pack" : "type its value",
+                          status: env[name] != nil ? .same : .needsValue)
+            row.value = travelled
+            rows.append(row)
         }
 
         // Kept mods: reviewed as proposals.
@@ -323,7 +327,9 @@ enum ConfigImport {
         }
 
         let settingsRows = rows.filter { $0.kind == .setting && $0.status == .new }
-        let envRows = rows.filter { $0.kind == .env && $0.status == .needsValue && !(values[$0.name] ?? "").isEmpty }
+        // A typed value wins over one that came with the pack.
+        let envValue = { (row: Row) in values[row.name] ?? row.value as? String ?? "" }
+        let envRows = rows.filter { $0.kind == .env && $0.status == .needsValue && !envValue($0).isEmpty }
         guard !settingsRows.isEmpty || !envRows.isEmpty else { return (record, nil) }
         let file = (root as NSString).appendingPathComponent("settings.json")
         for _ in 0..<3 {
@@ -352,7 +358,7 @@ enum ConfigImport {
                         guard let m = try JSONEdit.topObject(b).member("env") else { break }
                         let obj = try JSONEdit.object(b, at: m.valueStart)
                         guard obj.member(row.name) == nil else { continue }
-                        let r = JSONEdit.set(b, in: obj, key: row.name, value: .string(values[row.name] ?? ""))
+                        let r = JSONEdit.set(b, in: obj, key: row.name, value: .string(envValue(row)))
                         b = r.bytes
                         steps.append(Step(kind: .env, name: row.name, emptyInner: r.emptyInner.map { String(decoding: $0, as: UTF8.self) }))
                     }

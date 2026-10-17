@@ -2,6 +2,10 @@
 
 ## Unreleased (mac)
 
+- **Switches travel with their values.** A config pack still carries env variables by name, but Claude Code's documented switches (`DISABLE_TELEMETRY`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, `BASH_MAX_TIMEOUT_MS`, model names and the like) now bring their value when it's short and plain. On import their field is filled in and shown, to change if you like; every other value is still typed in and hidden.
+
+- **Published mods name their author.** Publish to Marketplace gives each entry in `marketplace.json` an `author`: the mod's own `plugin.json` author when it has one, else the GitHub owner. A name only, never an email; an author you wrote into the entry yourself stays.
+
 - **Fixed: publishing a mod that's already published.** The confirm asked "Publish …?" with nothing to do. It now says the mod is already published, shows the commands that add it on another machine, and has **Copy Commands**.
 
 - **The name to type, in blue.** Keeping or trying a high-risk mod asks for its name typed out. That confirm is now a small sheet that opens with "To keep it, type **name** below.", the name in blue, the field ready with the name as its placeholder, and Keep enabled once it matches. Other confirms are unchanged.

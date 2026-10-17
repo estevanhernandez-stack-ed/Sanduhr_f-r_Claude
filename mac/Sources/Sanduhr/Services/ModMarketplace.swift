@@ -203,18 +203,25 @@ struct ModMarketplace {
     // MARK: Publishing
 
     /// The manifest with `mod`'s entry added or replaced, other plugins and keys as they were.
-    static func manifest(_ existing: [String: Any]?, mod: KeptMod, repo: Repo) -> [String: Any] {
+    /// `author` is the mod's own `plugin.json` author, when it names one.
+    static func manifest(_ existing: [String: Any]?, mod: KeptMod, repo: Repo, author: Any? = nil) -> [String: Any] {
+        // A GitHub `owner/repo`; a path or a URL names no owner.
+        let owner = repo.source.range(of: #"^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"#, options: .regularExpression) != nil
+            ? String(repo.source.split(separator: "/")[0]) : nil
         var doc = existing ?? [
             "name": repo.name,
             "description": "Mods for Claude Code, published from Sanduhr.",
-            "owner": ["name": repo.source.contains("/") && !repo.source.contains(":")
-                ? String(repo.source.split(separator: "/")[0]) : "Published with Sanduhr"],
+            "owner": ["name": owner ?? "Published with Sanduhr"],
         ]
         var entry: [String: Any] = ["name": mod.name, "source": "./\(pluginsDir)/\(mod.name)", "description": mod.description]
         if let v = mod.version { entry["version"] = v }
+        // Who made it: the mod's own author, else the repo's owner. A name only, never an email.
+        if let name = authorName(author) ?? owner { entry["author"] = ["name": name] }
         var plugins = doc["plugins"] as? [[String: Any]] ?? []
         if let i = plugins.firstIndex(where: { $0["name"] as? String == mod.name }) {
-            // Keep keys the user added to the entry (category, tags) under the new source and version.
+            // Keep keys the user added to the entry (category, tags, an author of their own) under
+            // the new source and version.
+            if plugins[i]["author"] != nil, authorName(author) == nil { entry["author"] = nil }
             plugins[i] = plugins[i].merging(entry) { $1 }
             if mod.version == nil { plugins[i]["version"] = nil }
         } else {
@@ -222,6 +229,12 @@ struct ModMarketplace {
         }
         doc["plugins"] = plugins
         return doc
+    }
+
+    /// The name in a `plugin.json` author, given as an object or a plain string.
+    static func authorName(_ author: Any?) -> String? {
+        let name = (author as? [String: Any])?["name"] as? String ?? author as? String
+        return name.map { $0.trimmingCharacters(in: .whitespaces) }.flatMap { $0.isEmpty ? nil : $0 }
     }
 
     static let listStart = "<!-- sanduhr:plugins -->"
@@ -275,7 +288,9 @@ struct ModMarketplace {
         let target = folder.appendingPathComponent(Self.pluginsDir).appendingPathComponent(mod.name)
         var paths = [ModPack.marketplacePath, "\(Self.pluginsDir)/\(mod.name)"]
         do {
-            let manifest = Self.manifest(try readManifest(), mod: mod, repo: plan.repo)
+            let pluginJSON = fm.contents(atPath: kept.appendingPathComponent(".claude-plugin/plugin.json").path)
+                .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            let manifest = Self.manifest(try readManifest(), mod: mod, repo: plan.repo, author: pluginJSON?["author"])
             if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
             for rel in rels {
                 let to = target.appendingPathComponent(rel)
