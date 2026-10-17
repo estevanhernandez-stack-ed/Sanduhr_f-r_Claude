@@ -46,6 +46,10 @@ enum AboutLinks {
     static let license = URL(string: repo + "/blob/main/LICENSE")!
     /// The setup guide's Notch section (docs/setup-guide.md, task 4), linked from Settings, Notch.
     static let notchGuide = URL(string: repo + "/blob/main/docs/setup-guide.md#4-use-the-notch")!
+    /// The setup guide's Desk section (task 3), linked from Settings, Desk, Where each piece sits.
+    static let deskGuide = URL(string: repo + "/blob/main/docs/setup-guide.md#3-put-things-on-your-desktop")!
+    /// The setup guide's Claude Code section (task 7), linked from Settings, Notch, Notch glow.
+    static let claudeCodeGuide = URL(string: repo + "/blob/main/docs/setup-guide.md#7-connect-claude-code")!
     static let sparkle = URL(string: "https://sparkle-project.org")!
     /// Now playing's source (item 53), credited in About and Settings, Desk, Now Playing.
     static let mediaRemoteAdapter = URL(string: "https://github.com/ungive/mediaremote-adapter")!

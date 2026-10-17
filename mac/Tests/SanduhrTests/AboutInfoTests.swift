@@ -39,6 +39,14 @@ struct AboutLinksTests {
     @Test func notchPageLearnMoreOpensTheGuideAtTheNotch() {
         #expect(AboutLinks.notchGuide.absoluteString == repo + "/blob/main/docs/setup-guide.md#4-use-the-notch")
     }
+
+    @Test func deskPageLearnMoreOpensTheGuideAtTheDesk() {
+        #expect(AboutLinks.deskGuide.absoluteString == repo + "/blob/main/docs/setup-guide.md#3-put-things-on-your-desktop")
+    }
+
+    @Test func notchGlowLearnMoreOpensTheGuideAtClaudeCode() {
+        #expect(AboutLinks.claudeCodeGuide.absoluteString == repo + "/blob/main/docs/setup-guide.md#7-connect-claude-code")
+    }
 }
 
 @Suite("App info")

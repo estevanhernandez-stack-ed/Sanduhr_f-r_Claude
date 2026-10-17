@@ -34,6 +34,8 @@ struct DeskLayoutSection: View {
                 }
                 Text(DeskLayout.placesCaption)
                     .font(.caption).foregroundStyle(.secondary)
+                Link("Learn more", destination: AboutLinks.deskGuide)
+                    .font(.caption)
             }
             Section("Order") {
                 // One row, so the section's anchor marks the whole list.
@@ -300,7 +302,8 @@ enum DeskLayout {
     static let standard = "message:tl clock:bl claude:bl meetings:bl"
 
     /// Desk, Where each piece sits: what the places are, under the rows.
-    static let placesCaption = "Eight places: the four corners, the top and bottom centers, and the middle of each side. Top center sits below the notch. Size scales a piece from 60% to 160%; the message starts from its own size in Desk Look. Hidden takes a piece off the desktop."
+    /// Two sentences (polish-ux 14); the notch and Desk Look details are in the setup guide.
+    static let placesCaption = "Eight places: the four corners, the top and bottom centers, and the middle of each side. Size scales a piece from 60% to 160%; Hidden takes it off the desktop."
 
     static let widgets: [(key: String, name: String)] = [
         ("message", "Message"), ("clock", "Clock and date"), ("claude", SettingsNames.claudeMetersLine),
@@ -607,7 +610,8 @@ struct DeskMessageSection: View {
 
     var body: some View {
         // Slice 3 (F13): Add Line, List | Text, Save and Revert sit in a bar that never scrolls
-        // away; the rotation, the lines and Ask Claude scroll under it.
+        // away; the rotation, the lines and Ask Claude scroll under it in a grouped Form, so the
+        // margins and sections match the other Desk pages (polish-ux 14).
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
                 if let proposal = handoff.pending {
@@ -623,21 +627,7 @@ struct DeskMessageSection: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
             Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    MessageRotationGroup(changed: refreshDesk)
-                        .settingsAnchor(SettingsAnchor.rotation)
-                    if editor.mode == .list {
-                        MessageListEditor(editor: editor, pinChanged: refreshDesk)
-                    } else {
-                        MessageTextEditorPane(editor: editor, pinChanged: refreshDesk)
-                    }
-                    Divider()
-                    MessageAskClaude()
-                        .settingsAnchor(SettingsAnchor.askClaude)
-                }
-                .padding(20)
-            }
+            form
         }
         .onAppear { editor.loadIfNeeded() }
         .onChange(of: rotate) { _, _ in refreshDesk() }
@@ -652,6 +642,29 @@ struct DeskMessageSection: View {
                                         close: { reviewing = false })
             }
         }
+    }
+
+    /// Rotation, the lines (one row each way, so the list keeps its own drag and drop, as the
+    /// Desk page's Order list does) and Ask Claude, each its own section.
+    private var form: some View {
+        Form {
+            Section {
+                MessageRotationGroup(changed: refreshDesk)
+                    .settingsAnchor(SettingsAnchor.rotation)
+            }
+            Section {
+                if editor.mode == .list {
+                    MessageListEditor(editor: editor, pinChanged: refreshDesk)
+                } else {
+                    MessageTextEditorPane(editor: editor, pinChanged: refreshDesk)
+                }
+            }
+            Section {
+                MessageAskClaude()
+                    .settingsAnchor(SettingsAnchor.askClaude)
+            }
+        }
+        .formStyle(.grouped)
     }
 
     /// The Desk picks today's line again.
@@ -799,7 +812,7 @@ struct DeskNotchSection: View {
                     Slider(value: $lightBrightness, in: CameraLightLayout.brightnessRange)
                     Text("\(Int((lightBrightness * 100).rounded()))%")
                         .font(.system(.body, design: .monospaced))
-                        .frame(width: 48, alignment: .trailing)
+                        .frame(width: sliderValueWidth, alignment: .trailing)
                 }
                 slider("Reach below the menu bar", $lightSize, CameraLightLayout.sizeRange)
                 Text("While any app uses a camera, a soft white light around the notch lights your face, above every app. It ends when the camera stops, with or without Desk or the island. Tools, Camera Fill Light shows it by hand. Screens without a notch get it at the top center.")
@@ -1007,12 +1020,15 @@ private struct NotchGlowSection: View {
         Toggle("Not while a terminal is in front", isOn: $skipTerminal)
             .disabled(!claudeWaiting && !claudeDone)
         HStack(alignment: .firstTextBaseline) {
-            Text("The two Claude Code rows need the \(SettingsNames.claudeCodeGlowHook) in a Claude Code folder, installed in Claude Code. Claude Code tells Sanduhr only that it waits or finished, nothing about the conversation. At most one glow of each kind every 20 seconds. With a terminal or an editor that runs Claude Code in front (Terminal, iTerm2, Ghostty, Warp, WezTerm, Alacritty, kitty, VS Code, Cursor, Zed), you are already looking, so it doesn't glow. Screens without a notch glow at the top center.")
+            Text("The two Claude Code rows need the \(SettingsNames.claudeCodeGlowHook) in a Claude Code folder, installed in Claude Code. Claude Code tells Sanduhr only that it waits or finished, nothing about the conversation.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
             SettingsLinkButton(.integrations, anchor: SettingsAnchor.folders)
         }
+        // The 20-second cap, the terminals it skips and the notchless top-center glow are in the guide.
+        Link("Learn more", destination: AboutLinks.claudeCodeGuide)
+            .font(.caption)
     }
 }
 
@@ -1169,12 +1185,15 @@ private struct ShortcutsSection: View {
 
 // MARK: - Shared
 
+/// The value column beside every Desk slider, the hand-built Brightness row included (polish-ux 14).
+private let sliderValueWidth: CGFloat = 40
+
 private func slider(_ title: String, _ value: Binding<Double>, _ range: ClosedRange<Double>) -> some View {
     HStack {
         Text(title)
         Slider(value: value, in: range, step: 1)
         Text("\(Int(value.wrappedValue))")
             .font(.system(.body, design: .monospaced))
-            .frame(width: 40, alignment: .trailing)
+            .frame(width: sliderValueWidth, alignment: .trailing)
     }
 }

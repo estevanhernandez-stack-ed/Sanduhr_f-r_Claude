@@ -90,7 +90,7 @@ The pieces are: **Message** (a line of your own, see task 5), **Clock and date**
 4. Drag a piece up or down its stack to reorder it. Drag its round handle to resize it.
 5. Press Return (or click **Done**) to keep it. Press Escape (or click **Cancel**) to put everything back.
 
-**Move pieces from Settings.** Settings, **Desk** has the same choices as menus. **Where each piece sits** picks a place (or **Hidden**) and a size for each piece; to keep your meters off the desktop, set both Claude meters pieces to **Hidden**. **Order** lists the stacks; drag to reorder. **Margins**, under **Advanced** at the bottom, keeps pieces away from the screen edges.
+**Move pieces from Settings.** Settings, **Desk** has the same choices as menus. **Where each piece sits** picks a place (or **Hidden**) and a size for each piece; to keep your meters off the desktop, set both Claude meters pieces to **Hidden**. Size scales a piece from 60% to 160%; the message starts from its own size in Desk Look. Top center sits below the notch. **Order** lists the stacks; drag to reorder. **Margins**, under **Advanced** at the bottom, keeps pieces away from the screen edges.
 
 **Change the look.** Settings, **Desk Look** sets the **Desk font**, the **Message font**, the sizes of the clock and message, and the colors: pick a preset under **Colors**, or type your own hex colors under **Advanced** (one, or two to four with commas for a gradient). EsteFont Pro, a handwriting font, is the Desk font on new installs.
 
@@ -201,7 +201,7 @@ Remove takes out exactly what Sanduhr added.
 
 **Already have a statusline?** The sheet offers **Combine** (keeps yours and adds Sanduhr's), **Replace** or **Cancel**. Combine lets you pick which pieces of each line stay and how they join. Check **Show Sanduhr's meters above the prompt instead (animated)** to keep your line as it is and put Sanduhr's meters above the prompt (turn on Meters above the prompt for the same folder, on Mods & Config).
 
-**Turn on the glow.** The Claude Code glow hook only tells Sanduhr. To see it, open Settings, **Notch** (or click **Notch Settings…** right there in Claude Code), and under **Notch glow** turn on **When Claude Code is waiting on you** or **When Claude Code finishes**. **Not while a terminal is in front** skips it when you're already looking.
+**Turn on the glow.** The Claude Code glow hook only tells Sanduhr. To see it, open Settings, **Notch** (or click **Notch Settings…** right there in Claude Code), and under **Notch glow** turn on **When Claude Code is waiting on you** or **When Claude Code finishes**. **Not while a terminal is in front** skips it when you're already looking: with a terminal or an editor that runs Claude Code in front (Terminal, iTerm2, Ghostty, Warp, WezTerm, Alacritty, kitty, VS Code, Cursor, Zed), it doesn't glow. At most one glow of each kind every 20 seconds. Screens without a notch glow at the top center.
 
 **Share with your agents.** The MCP server shares nothing until you say so, per account:
 
