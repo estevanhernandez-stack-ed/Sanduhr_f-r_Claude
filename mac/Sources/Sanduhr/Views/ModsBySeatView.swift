@@ -104,6 +104,11 @@ struct ModsBySeatView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // A note with no folder to sit under: a pack from Finder that isn't one Sanduhr
+            // opens, or an undo into a folder not listed.
+            if let note = model.importNotes.note(for: nil) {
+                Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             if !model.loaded {
                 Text("Reading your Claude Code folders…").font(.caption).foregroundStyle(.secondary)
             } else if let seat = model.shownSeat(demo: demo) {
@@ -149,7 +154,7 @@ private struct ImportRecordRow: View {
                 .help("Takes back what that import wrote. A file or setting changed since is left, and named.")
                 .confirmationDialog("Undo the import into \(folder ?? model.display(record.seat))?", isPresented: $undoing) {
                     Button("Undo Import", role: .destructive) {
-                        Task { model.configImportNote = await model.undoImport(record).note }
+                        Task { model.importNotes.setNote(await model.undoImport(record).note, for: model.importNoteFolder(record.seat)) }
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
@@ -275,10 +280,10 @@ private struct SeatHeader: View {
             ForEach(model.imports.filter { $0.seat == AccountData.normalized(seat.path) }) { record in
                 ImportRecordRow(record: record, model: model, folder: nil)
             }
-            if let note = model.configImportNote, !note.isEmpty {
+            if let note = model.importNotes.note(for: seat.path) {
                 Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            if let note = model.configExportNote {
+            if let note = model.exportNotes.note(for: seat.path) {
                 Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             if let note = model.configNotes[seat.path] {
