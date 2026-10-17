@@ -188,15 +188,9 @@ struct MessageProposal: Equatable, Identifiable {
     /// lines_added?, lines_skipped?}}`.
     static func resultJSON(id: String, status: Status, mode: Mode?, reasons: [String] = [],
                            applied: Applied? = nil, now: Date = Date()) -> Data {
-        var result: [String: Any] = ["status": status.rawValue]
-        if let mode { result["mode"] = mode.rawValue }
-        if !reasons.isEmpty { result["reasons"] = reasons }
-        if let applied {
-            result["lines_added"] = applied.added
-            result["lines_skipped"] = applied.skipped
-        }
-        let root: [String: Any] = ["id": id, "completed_at": ISO8601.stamp(now), "result": result]
-        return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()
+        HandoffFiles.resultJSON(id: id, status: status.rawValue, fields: [
+            ("mode", mode?.rawValue), ("lines_added", applied?.added), ("lines_skipped", applied?.skipped),
+        ], reasons: reasons, now: now)
     }
 
     /// desk-messages-state.json: what get_desk_messages reports about the user's settings. The

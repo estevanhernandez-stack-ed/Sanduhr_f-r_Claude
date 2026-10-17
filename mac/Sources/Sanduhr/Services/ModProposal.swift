@@ -138,11 +138,9 @@ struct ModProposal: Equatable, Sendable {
     /// The answer the server waits for: `pending_review`, or `rejected` with reasons.
     static func resultJSON(id: String, status: String, name: String? = nil, version: String? = nil,
                            reason: String? = nil, reasons: [String] = [], remedy: String? = nil, now: Date = Date()) -> Data {
-        var result: [String: Any] = ["status": status]
-        for (k, v) in [("name", name), ("version", version), ("reason", reason), ("remedy", remedy)] { if let v { result[k] = v } }
-        if !reasons.isEmpty { result["reasons"] = reasons }
-        let root: [String: Any] = ["id": id, "completed_at": HandoffFiles.stamp(now), "result": result]
-        return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()
+        HandoffFiles.resultJSON(id: id, status: status,
+                                fields: [("name", name), ("version", version), ("reason", reason), ("remedy", remedy)],
+                                reasons: reasons, now: now)
     }
 
     /// A folder as the server names it: `.claude`, `.claude-<name>`.
