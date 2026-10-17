@@ -192,6 +192,20 @@ final class ModsPageModel {
         tab = .catalog
         focus = nil
         moreOpenedByLink = false
+        clearConfigNotes()
+    }
+
+    /// Both notes gone: the picker moved to another folder, or the window closed.
+    func clearConfigNotes() {
+        exportNotes.clearNotes()
+        importNotes.clearNotes()
+    }
+
+    /// Where an import's note sits: under `folder`'s header when it is a listed seat, else
+    /// above the picker (an import by Other Folder… has no header to sit under).
+    func importNoteFolder(_ folder: String) -> String? {
+        let p = AccountData.normalized(folder)
+        return seats.contains { $0.path == p } ? p : nil
     }
 
     /// Seats with files Sanduhr couldn't read, for the Catalog's note.
@@ -233,12 +247,17 @@ final class ModsPageModel {
     var studioTab: StudioTab = .look
     /// New Mod, the Build with Claude prompt (slice E), and the tab it opens on.
     var newModOpen = false
-    /// Export Config (item 76, slice C): the sheet's rows while it's open, and the last result.
+    /// Export Config (item 76, slice C): the sheet's rows while it's open.
     var configExport: ConfigExportState?
-    var configExportNote: String?
-    /// Open Config Pack (item 76, slice D): the sheet while open, a note, and imports not undone.
+    /// Open Config Pack (item 76, slice D): the sheet while open, and imports not undone.
     var configImport: ConfigImportState?
-    var configImportNote: String?
+    /// What the last export and the last import said, per folder (polish 2026-10-17, #8): a
+    /// folder's header shows its own line only. A refusal with no folder (a pack from Finder
+    /// that isn't one Sanduhr opens) sits in the general slot, above the picker. Both clear
+    /// when the picker changes folder, when the window closes, and when that folder's next
+    /// export or import starts.
+    var exportNotes = FolderNotes()
+    var importNotes = FolderNotes()
     var imports: [ConfigImport.Record] = ConfigImport.Log.standard.list()
     /// Imports whose Undo is running now.
     var undoingImports: Set<String> = []
@@ -250,7 +269,9 @@ final class ModsPageModel {
     var kept: [KeptMod] = []
     var keptChecks: [String: ModCheckOutcome] = [:]
     var keptBusy: Set<String> = []
-    var keptNote: String?
+    /// What From Claude's last action said (polish 2026-10-17, #9): orange only when it failed.
+    /// Cleared when New Mod closes, so each open starts clean.
+    var keptNote: KeptNote?
     /// Publish to a marketplace of your own (item 76, slice F): the confirm while open, and the
     /// commands that add the last one published on another machine.
     var publishing: MarketplacePublish?
@@ -438,8 +459,10 @@ final class ModsPageModel {
     private(set) var claudeVersion: String?
     /// The seat Sanduhr's own `CLAUDE_CONFIG_DIR` names (Sanduhr runs from the Dock, so usually none).
     private(set) var environmentSeat: String?
-    /// The seat By Seat shows.
-    var selectedSeat: String?
+    /// The seat By Seat shows. Moving to another folder clears the notes: they were the last one's.
+    var selectedSeat: String? {
+        didSet { if oldValue != selectedSeat { clearConfigNotes() } }
+    }
     /// By Seat's sections that are open (SeatSectionID raw values), kept while the window lives.
     var openSections: Set<String> = []
 
@@ -1202,4 +1225,18 @@ private struct ModsTile: View {
         .padding(.horizontal, 10)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.white.opacity(0.08)))
     }
+}
+
+/// One line per folder, keyed by the normalized path (polish 2026-10-17, #8), so a note from
+/// one folder never shows under another. `nil` is the general slot: a note with no folder.
+struct FolderNotes: Equatable, Sendable {
+    private var lines: [String: String] = [:]
+
+    func note(for folder: String?) -> String? { lines[Self.key(folder)] }
+
+    mutating func setNote(_ note: String?, for folder: String?) { lines[Self.key(folder)] = note }
+
+    mutating func clearNotes() { lines = [:] }
+
+    private static func key(_ folder: String?) -> String { folder.map(AccountData.normalized) ?? "" }
 }

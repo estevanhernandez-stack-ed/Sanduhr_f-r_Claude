@@ -20,6 +20,7 @@ extension ModsPageModel {
     /// Plans the export of `seat`. A seat marked work exports too (the owner, 2026-10-15), stamped.
     func startConfigExport(_ seat: Seat) async {
         guard let scan = scans.first(where: { $0.seat == AccountData.normalized(seat.path) }) else { return }
+        exportNotes.setNote(nil, for: seat.path)
         await refreshKept()
         let on = kept.filter { keptState($0, folder: seat.path) == .on }
         let store = keptStore
@@ -52,17 +53,23 @@ extension ModsPageModel {
     }
 
     /// Writes the chosen rows to `url` off the main thread (any-agent/ and the zip take a moment).
-    func finishConfigExport(_ state: ConfigExportState, to url: URL) async {
+    /// Returns why it failed, for the sheet to show (polish 2026-10-17, #7); nil once written.
+    @discardableResult
+    func finishConfigExport(_ state: ConfigExportState, to url: URL) async -> String? {
         let chosen = state.items.filter { state.chosen.contains($0.id) }
         let (all, label, work, anyAgent) = (state.items, state.label, state.isWork, state.forOtherAgents)
         do {
             try await Task.detached(priority: .userInitiated) {
                 try ConfigPack.write(chosen, label: label, to: url, fromWork: work, anyAgent: anyAgent, all: all)
             }.value
-            configExportNote = "Exported \(state.chosen.count) \(state.chosen.count == 1 ? "item" : "items") from \(state.label) to \(url.lastPathComponent)."
+            exportNotes.setNote("Exported \(state.chosen.count) \(state.chosen.count == 1 ? "item" : "items") from \(state.label) to \(url.lastPathComponent).",
+                                for: state.seat)
             configExport = nil
+            return nil
         } catch {
-            configExportNote = (error as? ModPack.Failure)?.message ?? ModPack.Failure.writeFailed.message
+            let failure = (error as? ModPack.Failure)?.message ?? ModPack.Failure.writeFailed.message
+            exportNotes.setNote(failure, for: state.seat)
+            return failure
         }
     }
 }
@@ -76,6 +83,8 @@ struct ConfigExportSheet: View {
     @State private var editingWords = false
     @State private var writing = false
     @State private var draft = ""
+    /// Why the last Export… didn't write, shown under the footer until the next try.
+    @State private var exportFailure: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -127,14 +136,18 @@ struct ConfigExportSheet: View {
                 Button("Export…") {
                     guard let url = model.configExportDestination(state) else { return }
                     writing = true
+                    exportFailure = nil
                     let given = state
                     Task {
-                        await model.finishConfigExport(given, to: url)
+                        exportFailure = await model.finishConfigExport(given, to: url)
                         writing = false
                     }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(state.chosen.isEmpty || writing || editingWords)
+            }
+            if let exportFailure {
+                Text(exportFailure).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(20)
