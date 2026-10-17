@@ -20,6 +20,9 @@ on:
       - "mac/**"
       - ".github/workflows/mac-ci.yml"
 
+permissions:
+  contents: read
+
 concurrency:
   group: mac-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -35,14 +38,14 @@ jobs:
     # Normal runs take about 3 minutes; a hung macOS job is the expensive kind.
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Toolchain
         run: swift --version && xcode-select -p
       # Only the package downloads (Sparkle's repository, checkout and binary), keyed on
       # Package.resolved: small, and the same from run to run. Build products are not
       # cached; they would be large and could go stale.
       - name: Cache Swift packages
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             mac/.build/repositories
@@ -51,7 +54,7 @@ jobs:
           key: mac-spm-${{ runner.os }}-${{ hashFiles('mac/Package.resolved') }}
       # The meters mod's band, drawn by its own code, is the fixture the Swift port (the Mod
       # Studio's preview) must match: fail when the fixture no longer matches the mod (item 75).
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
       - name: Band frames match the mod
