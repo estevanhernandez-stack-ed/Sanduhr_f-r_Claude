@@ -282,14 +282,24 @@ enum ConfigPack {
         // Plugins from marketplaces, by their marketplace's source.
         let known = readObject((root as NSString).appendingPathComponent("plugins/known_marketplaces.json")) ?? [:]
         for p in scan.plugins {
+            // A plugin from a folder on this Mac (a directory marketplace, or one listed in
+            // CLAUDE_CODE_PLUGIN_DIRS) travels as its files (slice J). Sanduhr's own folder is left:
+            // its mod stays, and kept mods travel as rows of their own.
+            if case .pluginDirs = p.origin {
+                if let path = p.path, !path.contains("/Application Support/Sanduhr/") { items.append(carriedPlugin(p, folder: path, home: home)) }
+                continue
+            }
             guard case .installed(let market) = p.origin, !["inline", "synced", "skills-dir"].contains(market) else { continue }
-            var item = Item(kind: .plugin, name: p.name, detail: "from \(market)")
             let source = (known[market] as? [String: Any])?["source"] as? [String: Any]
             let kind = source?["source"] as? String
+            if kind == "directory" || kind == "file" {
+                items.append(p.path.map { carriedPlugin(p, folder: $0, home: home) }
+                             ?? Item(kind: .plugin, name: p.name, detail: "from \(market)", blocked: "\(market) is a folder on this Mac, and Sanduhr couldn't find the plugin's copy."))
+                continue
+            }
+            var item = Item(kind: .plugin, name: p.name, detail: "from \(market)")
             if source == nil {
                 item.blocked = "Sanduhr can't tell where \(market) comes from."
-            } else if kind == "directory" || kind == "file" {
-                item.blocked = "\(market) is a folder on this Mac."
             }
             item.json = try? JSONSerialization.data(withJSONObject: [
                 "name": p.name, "marketplace": ["name": market, "source": source ?? [:]],
@@ -340,6 +350,29 @@ enum ConfigPack {
         }
         return items
     }
+
+    /// A plugin carried as its files under `plugins/<name>/`, scanned like every file: any text file
+    /// travels (shell and Python hooks too), a binary or oversized one keeps the row from travelling.
+    /// Which files run as programs is recorded, so import can make them runnable again.
+    private static func carriedPlugin(_ p: ModItem, folder: String, home: String) -> Item {
+        let files = folderFiles(folder)
+        guard isPluginName(p.name), !files.isEmpty else {
+            return Item(kind: .plugin, name: p.name, detail: "from a folder", blocked: "Its folder couldn't be read, or holds a link.")
+        }
+        let prefix = AccountData.normalized(folder) + "/"
+        let rels = files.map { String($0.dropFirst(prefix.count)) }
+        var item = fileItem(.plugin, name: p.name, sources: zip(files, rels).map { ($0, "plugins/\(p.name)/\($1)") }, home: home)
+        item.detail = "from a folder, " + item.detail
+        let executable = zip(files, rels).filter { FileManager.default.isExecutableFile(atPath: $0.0) }.map(\.1)
+        item.json = try? JSONSerialization.data(withJSONObject: [
+            "name": p.name, "carried": true, "executable": executable, "scope": "user", "enabled": p.state == .on,
+        ] as [String: Any])
+        item.onByDefault = p.state == .on
+        return item
+    }
+
+    /// A plugin name a folder can be made of.
+    static func isPluginName(_ s: String) -> Bool { s.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"#, options: .regularExpression) != nil && !s.contains("..") }
 
     /// A row made of files: each read as text, the home folder written as `~`, and scanned.
     private static func fileItem(_ kind: Item.Kind, name: String, sources: [(String, String)], home: String) -> Item {

@@ -40,6 +40,13 @@ struct ConfigPackTests {
            "leaky": {"command": "npx", "args": ["server", "--token", "abc"]},
            "sanduhr": {"command": "/usr/bin/python3", "args": ["\(home)/Library/Application Support/Sanduhr/integrations/sanduhr_mcp.py"]}}}
         """)
+        // A plugin from a folder marketplace, with a shell hook; one listed in CLAUDE_CODE_PLUGIN_DIRS.
+        h.dir("market/local-thing/.claude-plugin"); h.dir("market/local-thing/hooks"); h.dir("tools/inline-tool/.claude-plugin")
+        h.file("market/local-thing/.claude-plugin/plugin.json", #"{"name": "local-thing"}"#)
+        h.file("market/local-thing/hooks/hooks.json", #"{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/stop.sh"}]}]}}"#)
+        h.file("market/local-thing/hooks/stop.sh", "#!/bin/sh\necho done\n")
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: h.at("market/local-thing/hooks/stop.sh"))
+        h.file("tools/inline-tool/.claude-plugin/plugin.json", #"{"name": "inline-tool"}"#)
         let root = h.at(s)
         var scan = SeatScan(seat: root)
         scan.agents = [SeatEntry(name: "reviewer", description: "", scope: .seat, path: root + "/agents/reviewer.md"),
@@ -48,8 +55,9 @@ struct ConfigPackTests {
         scan.commands = [SeatEntry(name: "ship", description: "", scope: .seat, path: root + "/commands/ship.md")]
         scan.skills = [SeatEntry(name: "notes", description: "", scope: .seat, path: root + "/skills/notes/SKILL.md")]
         scan.plugins = [ModItem(folder: root, name: "swift-lsp", path: nil, origin: .installed(marketplace: "claude-plugins-official")),
-                        ModItem(folder: root, name: "local-thing", path: nil, origin: .installed(marketplace: "my-dir")),
-                        ModItem(folder: root, name: "sanduhr-meters", path: nil, origin: .pluginDirs)]
+                        ModItem(folder: root, name: "local-thing", path: h.at("market/local-thing"), origin: .installed(marketplace: "my-dir")),
+                        ModItem(folder: root, name: "inline-tool", path: h.at("tools/inline-tool"), origin: .pluginDirs),
+                        ModItem(folder: root, name: "sanduhr-meters", path: h.at("Library/Application Support/Sanduhr/mods/sanduhr-meters"), origin: .pluginDirs)]
         return (root, scan)
     }
 
@@ -100,10 +108,15 @@ struct ConfigPackTests {
         #expect(try item(items, .skill, "notes").files.map(\.path) == ["files/skills/notes/SKILL.md", "files/skills/notes/scripts/run.sh"])
         #expect(try item(items, .command, "ship").canTravel)
 
-        // Plugins by marketplace source; a folder marketplace stays; Sanduhr's mod isn't listed.
+        // Plugins by marketplace source; one from a folder as its files, scripts marked runnable;
+        // Sanduhr's mod isn't listed.
         let lsp = try json(try item(items, .plugin, "swift-lsp")) as? [String: Any]
         #expect(((lsp?["marketplace"] as? [String: Any])?["source"] as? [String: Any])?["repo"] as? String == "anthropics/claude-plugins-official")
-        #expect(try item(items, .plugin, "local-thing").blocked == "my-dir is a folder on this Mac.")
+        let local = try item(items, .plugin, "local-thing")
+        #expect(local.canTravel && local.files.map(\.path) == ["plugins/local-thing/.claude-plugin/plugin.json", "plugins/local-thing/hooks/hooks.json", "plugins/local-thing/hooks/stop.sh"])
+        let carried = try json(local) as? [String: Any]
+        #expect(carried?["carried"] as? Bool == true && carried?["executable"] as? [String] == ["hooks/stop.sh"])
+        #expect(try item(items, .plugin, "inline-tool").files.map(\.path) == ["plugins/inline-tool/.claude-plugin/plugin.json"])
         #expect(!items.contains { $0.name == "sanduhr-meters" })
 
         // MCP: values become references, a secret in args blocks, Sanduhr's own isn't listed.

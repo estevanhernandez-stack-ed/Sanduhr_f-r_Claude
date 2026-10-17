@@ -131,6 +131,50 @@ struct ConfigImportTests {
         #expect(!ConfigImport.leftOver(rows, chosen: [skill.id], env: [:]).contains { $0.name == "notes" })
     }
 
+    @Test func aPluginFromAFolderIsWrittenAsAMarketplaceItsScriptRunnable() throws {
+        let h = TempHome()
+        defer { h.cleanUp() }
+        let home = AccountData.normalized(h.at(""))
+        h.dir("source/.claude-personal"); h.dir("tools/stopper/.claude-plugin"); h.dir("tools/stopper/hooks")
+        h.file("tools/stopper/.claude-plugin/plugin.json", #"{"name": "stopper", "hooks": {"Stop": [{"hooks": [{"type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/note.py"}]}]}}"#)
+        h.file("tools/stopper/hooks/hooks.json", #"{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/stop.sh"}]}]}}"#)
+        h.file("tools/stopper/hooks/stop.sh", "#!/bin/sh\necho done\n")
+        h.file("tools/stopper/hooks/note.py", "print('noted')\n")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: h.at("tools/stopper/hooks/stop.sh"))
+        let source = h.at("source/.claude-personal")
+        var scan = SeatScan(seat: source)
+        scan.plugins = [ModItem(folder: source, name: "stopper", path: h.at("tools/stopper"), origin: .pluginDirs)]
+        let items = ConfigPack.plan(seat: source, scan: scan, keptOn: [], kept: KeptMods(dir: URL(fileURLWithPath: h.at("k"))), home: home)
+        let url = URL(fileURLWithPath: h.at("p.sanduhrpack"))
+        try ConfigPack.write(items, label: "Personal", to: url, version: "2.26.0", now: Self.at)
+        let p = try ModPackReader.read(url)
+
+        let target = "target/.claude-personal"
+        h.dir(target)
+        let seat = h.at(target)
+        let row = try row(ConfigImport.plan(p, seat: seat, home: home, cli: .ready), .plugin, "stopper")
+        guard case .install(let cmd) = row.status else { Issue.record("a carried plugin installs through claude"); return }
+        #expect(cmd.contains("claude plugin marketplace add '\(seat)/carried-plugins/stopper'") && cmd.contains("claude plugin install 'stopper@carried-stopper'"))
+        #expect(row.detail.contains("runs hooks/stop.sh, python3 hooks/note.py") || row.detail.contains("runs python3 hooks/note.py, hooks/stop.sh"))
+        #expect(row.job == .plugin(id: "stopper@carried-stopper", marketplace: "carried-stopper", source: seat + "/carried-plugins/stopper"))
+
+        let (record, failure) = ConfigImport.apply([row], env: [:], seat: seat, label: "Personal", packSHA256: "x", now: Self.at)
+        #expect(failure == nil)
+        let base = h.at("\(target)/carried-plugins/stopper")
+        let market = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: base + "/.claude-plugin/marketplace.json"))) as? [String: Any]
+        #expect(market?["name"] as? String == "carried-stopper")
+        #expect((market?["plugins"] as? [[String: Any]])?.first?["source"] as? String == "./plugin")
+        #expect(FileManager.default.isExecutableFile(atPath: base + "/plugin/hooks/stop.sh"))
+        #expect(!FileManager.default.isExecutableFile(atPath: base + "/plugin/hooks/note.py"))
+        #expect(ConfigImport.undo(record).isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: h.at("\(target)/carried-plugins")))
+
+        // Without claude, the files are written and the command is on the carry list.
+        let manual = try self.row(ConfigImport.plan(p, seat: seat, home: home, cli: .missing), .plugin, "stopper")
+        #expect(manual.status == .new && manual.command?.contains("claude plugin install 'stopper@carried-stopper'") == true)
+        #expect(ConfigImport.leftOver([manual], chosen: [manual.id], env: [:]).first?.why.hasPrefix("Its files are written; install it yourself: ") == true)
+    }
+
     @Test func undoLeavesWhatChangedSinceAndASeatWithoutSettingsGetsItsFileBackToNone() throws {
         let h = TempHome()
         defer { h.cleanUp() }

@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Plugins from a folder travel too.** A plugin from a folder on this Mac (a directory marketplace, or one listed in `CLAUDE_CODE_PLUGIN_DIRS`) used to stay behind. A config pack now carries its files, shell and Python hooks included, each scanned like every other file; a binary or a line that looks like a secret keeps it home and on the carry list. Open writes it under the folder's `carried-plugins/` as a marketplace of its own, then adds and installs it with `claude`, its row naming every hook command it runs. Scripts stay runnable, and Undo Import uninstalls it and removes the files.
+
 - **What to carry by hand.** Every config pack now holds `CARRY.md`, a checklist of what it doesn't bring: rows that couldn't travel and why, rows you left unchecked, the env values and `${VAR}` references still to set, and what no pack holds (the sign-in, `settings.local.json`, a repo's own config, memory, credentials). The list never names a path of your Mac or a watch word. The export sheet counts it; Open shows it under **Carry by hand**, and after an import adds what the import left, with **Copy List**.
 
 - **Switches travel with their values.** A config pack still carries env variables by name, but Claude Code's documented switches (`DISABLE_TELEMETRY`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, `BASH_MAX_TIMEOUT_MS`, model names and the like) now bring their value when it's short and plain. On import their field is filled in and shown, to change if you like; every other value is still typed in and hidden.
