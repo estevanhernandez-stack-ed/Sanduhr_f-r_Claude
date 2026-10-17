@@ -34,8 +34,8 @@ Fresh-install and migration checks stay manual.
 - [ ] After the first successful fetch the widget hides by itself (Desk is on, and a new install's
   Widget, Show the widget is "Hidden while Desk is on") and the meters fill in. The menu bar
   hourglass shows the percent; left-click brings the widget back.
-- [ ] `defaults read com.626labs.sanduhr.desk` shows `deskEnabled = 1`, `layout = "message:tl clock:bl meters:bl meetings:bl"`,
-  `showMeetings = 0`, `notch = 0` and `migrated = 1`. `defaults read com.626labs.sanduhr` shows
+- [ ] `defaults read com.626labs.sanduhr.desk` shows `deskEnabled = 1`, `layout = "message:tl clock:bl meters:bl"`,
+  `showMeetings = 0`, `piecesTakeClicks = 0`, `notch = 0` and `migrated = 1`. `defaults read com.626labs.sanduhr` shows
   `deskFirstRunDone = 1`, `panelHidden = 1`, `widgetVisibility = whileDeskOff` and no `tuckAfterFirstFetch`.
 - [ ] Show the widget, quit and relaunch: the widget is hidden again (Desk is on); Desk is unchanged.
   Desk, turn the Desk switch off: the widget shows; on: it hides.
@@ -1651,9 +1651,10 @@ Standard layout (message top left; clock, claude line and meters bottom left), D
 showing today. Put a desktop icon (a scratch file) right under the clock first, and another on the
 desktop well away from every piece.
 
-1. Settings, Desk Look ends with **Clicks**: **Clock and message take clicks**, on, captioned "On:
-   two-finger click them for Sanduhr's menu. Desktop icons right beneath them can't be clicked
-   there while it's on." `smoke/smoke state` shows `desk_piece_clicks: true` and `desk_frames`
+1. Settings, Desk Look ends with **Clicks**: **Clock and message take clicks**, on (an existing
+   profile; a new install starts off), captioned "Desktop icons under the clock or message can't
+   be clicked while this is on. On: two-finger click them for Sanduhr's menu." `smoke/smoke state`
+   shows `desk_piece_clicks: true` and `desk_frames`
    lists `clock`, `message` and `claude_line` with non-empty frames; `desk_frames_ok: true`.
 2. Close Settings. Two-finger click (or Control-click) the time, the date, the gap between the
    hour and the minutes, and the space between two words of the message: each time Sanduhr's menu

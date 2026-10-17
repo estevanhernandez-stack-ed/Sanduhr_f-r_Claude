@@ -51,4 +51,11 @@ struct DeskPlateTests {
         #expect(DeskPlate.caption == "A soft dark plate behind each piece, for desktops with files under it.")
         #expect(SettingsSearch.hits("plate").contains { $0.entry.page == .deskLook })
     }
+
+    /// The shadow switch beside it (DeskInk): named for every piece it reaches, not the clock alone.
+    @Test func theShadowToggleNamesEveryPieceAndIsFoundBySearch() {
+        #expect(DeskInkShadow.title == "Drop shadow under the text")
+        #expect(DeskInkShadow.caption == "Under every piece but the message, which has its glow.")
+        #expect(SettingsSearch.hits("shadow").contains { $0.entry.page == .deskLook })
+    }
 }
