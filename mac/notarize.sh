@@ -47,20 +47,27 @@ else
 fi
 xcrun notarytool submit "$UPLOAD" "${CREDS[@]}" --wait
 
+# Both staple and validate look the ticket up at Apple's ticket-delivery service; a dropped
+# connection there ("The network connection was lost", error 68) is Apple's side and passes
+# on a retry. Two releases in a row lost the staple on the first try (2026-10-17).
+retry_stapler() {
+    local action=$1
+    for attempt in 1 2 3 4 5; do
+        if xcrun stapler "$action" "$TARGET"; then
+            return 0
+        fi
+        if [[ $attempt -eq 5 ]]; then
+            echo "✗ stapler $action failed 5 times" >&2
+            return 1
+        fi
+        echo "→ $action failed (attempt $attempt of 5), retrying in 30 s..."
+        sleep 30
+    done
+}
+
 echo "→ Stapling ticket to $TARGET..."
-xcrun stapler staple "$TARGET"
-# validate looks the ticket up online; a dropped connection there (error 68) is retried.
-for attempt in 1 2 3 4 5; do
-    if xcrun stapler validate "$TARGET"; then
-        break
-    fi
-    if [[ $attempt -eq 5 ]]; then
-        echo "✗ stapler validate failed 5 times" >&2
-        exit 1
-    fi
-    echo "→ validate failed (attempt $attempt of 5), retrying in 20 s..."
-    sleep 20
-done
+retry_stapler staple
+retry_stapler validate
 
 if [[ -n "$CLEANUP_ZIP" ]]; then
     rm -f "$CLEANUP_ZIP"
