@@ -191,7 +191,11 @@ before the reset (`security unlock-keychain <path>`), then:
 5. **Check the DMG** (download from the draft or the run): it opens with no Gatekeeper warning,
    and `lipo -archs /Volumes/Sanduhr/Sanduhr.app/Contents/MacOS/Sanduhr` prints `x86_64 arm64`.
 6. **Publish the draft** (edit the notes first if you like). This creates the tag and makes the
-   DMG URL live.
+   DMG URL live. Then confirm the release's tag is `v2.1.0-mac`: a publish from the GitHub UI
+   can land on a placeholder (`untagged-…`) if the tag field was touched, and the appcast and the
+   cask point at `releases/download/v2.1.0-mac/`. `gh release view v2.1.0-mac` must answer; if it
+   does not, set the tag on the release (`gh api -X PATCH repos/<owner>/<repo>/releases/<id>
+   -f tag_name=v2.1.0-mac -f target_commitish=<the release commit>`) before step 7.
 7. **Merge the pull request.** GitHub Pages republishes `docs/appcast.xml`; Sparkle clients see
    2.1.0 on their next daily check.
 8. **Accept:** on a Mac running 2.0.4, menu, Check for Updates offers 2.1.0, installs and
