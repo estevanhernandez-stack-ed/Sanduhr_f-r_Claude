@@ -41,6 +41,18 @@ Full ledger: `decisions.md`. Highest stakes:
 2. Settings, Desk, Notch: the new toggle under the island switch and its caption; the preview's spoken line with the pill on.
 3. Restore the support folder and relaunch the release app.
 
+## Live pass (2026-10-18 22:41, before the push was reviewed)
+Run from the integration worktree's dev build on this notched Mac, with the support folder backed
+up and restored after and the release app relaunched:
+- `smoke/smoke run smoke/scenarios/notch-pill.yaml`: 1 passed, 0 failed, all eight steps.
+- Forced on, the pill drew as a 228 by 39 pt black capsule at the top center with the wing text
+  (the time and the signed-out line), over the real island as force implies here.
+- `notch_pill.shown` read true with the pointer away, false with the pointer in the menu bar, true
+  again after it left, false after `notch-pill off`.
+- Settings, Desk, Notch shows the toggle under the island switch with its two-sentence caption.
+Still unseen: the pill on a real no-notch display, full screen and Spaces, the glow and the camera
+light on the pill. Those stay in section 51 of `docs/mac-smoke-test.md`.
+
 ## Found along the way, not fixed (for your call)
 - The camera and mic badge on a no-notch Mac still goes to the top-center tab, under or over the pill (`AVIndicatorPlacement.spot` ties islandUp to the wings window; the pill view already carries the beside-wing slot). BACKLOG #6, D9.
 - The pill's text size follows `textSize(barHeight)`, about 10 pt on a 24-pt external-display bar; a floor may be wanted once seen on hardware. BACKLOG #6.
