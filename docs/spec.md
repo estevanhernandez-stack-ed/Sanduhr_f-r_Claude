@@ -115,7 +115,8 @@ Port the 286 Python test intents to xUnit, Core-first (pacing, plan, tiers, hist
 The Mac app (SwiftUI, Sparkle updates, Homebrew tap) is specified per item in the documents
 below rather than in this file; this file remains the Windows spec. `mac/README.md` is the Mac
 app's behavior reference; `mac/build.sh` and `mac/test.sh` build and test it, and
-`mac/smoke/README.md` covers the smoke tools for a running dev build.
+`mac/smoke/README.md` covers the smoke tools for a running dev build. `docs/mac-scope.md` is the
+Mac app's scope of record: its user, what each surface is for, the constraints and the cuts.
 
 ```
 mac/
@@ -178,3 +179,14 @@ mac/
 | `docs/checklist.md` | The build checklist; the Mac items are 13 onward, under the "Iteration (Mac)" headings |
 | `docs/mac-release.md` | Signed, notarized Mac releases on GitHub Actions: where the signing material lives and the steps; `mac/release.sh` is the local fallback |
 | `docs/mac-smoke-test.md` | The by-hand smoke test before every Mac release; `mac/smoke/smoke` (run) covers the automatable checks |
+
+### Desk under the icons
+
+The click layer (`DeskClickLayer`, 2.27.0) covers only the small pieces a click acts on: meeting
+rows with a link, the calendar note, the account name, watchers, now playing and the camera strip.
+The big pieces (the meters, the clock, the message, the claude line) get no plate, so the files
+under them stay the Finder's. It is not icon-aware on purpose: Finder scripting returns no icon
+positions on a sorted desktop (every item reports -1), so a layer that yields to a file under a
+piece cannot learn where the files are that way. Reading Finder's desktop for the positions needs
+the Accessibility permission. That is the route if the big pieces' menus are ever wanted under the
+icons; it is a permission prompt and a scope decision, not a polish item.
