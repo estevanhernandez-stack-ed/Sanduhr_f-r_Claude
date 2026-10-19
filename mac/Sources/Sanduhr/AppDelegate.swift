@@ -287,6 +287,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Ends Just the Desk without a key (the smoke hook's off): the keys cleared, the Claude pieces
+    /// and the menu bar item redrawn.
+    func endJustTheDesk() {
+        JustTheDesk.end()
+        DeskController.shared.model.refreshClaude()
+        renderStatusItem()
+    }
+
     /// Shows or hides the widget as WidgetVisibilityRule says for `event`; leaves it alone when
     /// the rule does ("Always shown"), so a manual show or hide lasts until the next event.
     private func applyWidgetVisibility(_ event: WidgetVisibilityEvent) {

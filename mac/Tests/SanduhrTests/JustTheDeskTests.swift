@@ -59,6 +59,25 @@ struct JustTheDeskTests {
         #expect(!SignInReminder.isOn(in: d))
     }
 
+    @Test func endClearsBothKeysAndBringsTheReminderBack() {
+        let s = MemoryDefaults(), d = MemoryDefaults()
+        JustTheDesk.choose(standard: s, desk: d)
+        JustTheDesk.end(standard: s, desk: d)
+        #expect(!JustTheDesk.isOn(in: s))
+        #expect(s.values[JustTheDesk.key] == nil && s.values[JustTheDesk.silencedKey] == nil)
+        #expect(SignInReminder.isOn(in: d))
+        #expect(d.values[DeskController.enabledKey] as? Bool == true)
+    }
+
+    @Test func endLeavesAReminderTheyHadTurnedOffOff() {
+        let s = MemoryDefaults(), d = MemoryDefaults()
+        SignInReminder.set(false, in: d)
+        JustTheDesk.choose(standard: s, desk: d)
+        JustTheDesk.end(standard: s, desk: d)
+        #expect(!JustTheDesk.isOn(in: s))
+        #expect(!SignInReminder.isOn(in: d))
+    }
+
     @Test func theWidgetFollowsItsChoiceInsteadOfWaitingForSignIn() {
         // A fresh install's choice is Hidden while Desk is on; Just the Desk turns the Desk on.
         let settled = JustTheDesk.signInSettled(awaitingSignIn: true, hasSessionKey: false, in: {

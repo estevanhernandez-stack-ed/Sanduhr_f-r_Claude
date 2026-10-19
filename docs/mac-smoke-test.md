@@ -1883,6 +1883,11 @@ com.626labs.sanduhr.desk` on a throwaway profile with no Sanduhr Keychain item),
    The menu bar item is the icon alone.
    Settings, Alerts and Claude Code open with "…once you sign in" and **Accounts Settings…**, which
    opens Accounts; the line is gone once signed in.
+1b. A second later, if the welcome tour was still pending, the Desk-only tour opens: three steps, On
+   your desktop, At a glance (with Around the notch on a Mac that has one), and Sign in any time,
+   whose Accounts button opens Accounts. A hook drives the same path:
+   `smoke/smoke do just-the-desk on` (and `off` to end it), or
+   `smoke/smoke run smoke/scenarios/just-the-desk.yaml` (run from `mac/`).
 2. Quit and open again: no welcome sheet, the widget stays hidden, the Desk comes back. Show
    Widget from the menu bar: it reads "Not signed in — sign in"; a click opens Accounts.
 3. After an update (`defaults write com.626labs.sanduhr whatsNewLastSeen 2.13.0`, relaunch):

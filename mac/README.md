@@ -1573,7 +1573,7 @@ launch and What's New no longer waits for a key. Saving a key ends it at once, b
 (`JustTheDesk.endBySignIn`), turning the reminder back on only if Just the Desk had turned it off, so a
 key that then fails gets the usual sign-in flow (the widget up for it, the Desk's sign-in line).
 A pending welcome tour opens a second after the choice, once a launch, as its Desk-only variant (see
-Welcome tour). state.yaml: `just_the_desk`.
+Welcome tour). `smoke/smoke do just-the-desk on|off` drives both ends. state.yaml: `just_the_desk`.
 
 ## Signed out and demo mode
 

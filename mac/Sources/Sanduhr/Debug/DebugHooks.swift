@@ -129,6 +129,8 @@ enum DebugHooks {
             case .on: break
             }
             DeskController.shared.applyPill()
+        case .justTheDesk(let on):
+            if on { app.chooseJustTheDesk() } else { app.endJustTheDesk() }
         case .cameraLight(let on): CameraLightController.shared.setManual(on)
         case .glow: NotchGlowController.shared.fire()
         case .demo(let on):

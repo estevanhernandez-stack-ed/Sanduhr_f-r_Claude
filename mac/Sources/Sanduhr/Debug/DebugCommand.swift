@@ -38,6 +38,9 @@ enum DebugAction: Equatable {
     /// the debug override too); `force` writes the switch and the override, so a notched Mac
     /// draws the pill for the smoke tools. Applied live.
     case notchPill(NotchPillMode)
+    /// Just the Desk (BACKLOG #4): `on` does what the welcome sheet's button does; `off` ends it as a
+    /// sign-in does, without a key. Applied live.
+    case justTheDesk(on: Bool)
 
     enum NotchPillMode: String, CaseIterable {
         case on, off, force
@@ -111,7 +114,7 @@ enum DebugAction: Equatable {
     case modsConfig(ModsTab, seat: Int?)
 
     static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
-                        "test-alert", "pulse", "tool", "desk", "notch", "notch-pill", "camera-light", "glow",
+                        "test-alert", "pulse", "tool", "desk", "notch", "notch-pill", "just-the-desk", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
                         "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
                         "desk-arrange", "hot-key", "reset", "mods-config"]
@@ -213,6 +216,12 @@ enum DebugLink {
                 return bad("notch-pill needs arg=on, off or force")
             }
             return .success(.notchPill(mode))
+        case "just-the-desk":
+            switch arg?.lowercased() {
+            case "on": return .success(.justTheDesk(on: true))
+            case "off": return .success(.justTheDesk(on: false))
+            default: return bad("just-the-desk needs arg=on or off")
+            }
         case "camera-light": return onOff(DebugAction.cameraLight)
         case "demo": return onOff(DebugAction.demo)
         case "glow":

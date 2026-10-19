@@ -41,10 +41,18 @@ enum JustTheDesk {
     @discardableResult
     static func endBySignIn(standard: DefaultsStore = UserDefaults.standard, desk: DefaultsStore = UserDefaults.desk) -> Bool {
         guard isOn(in: standard) else { return false }
+        end(standard: standard, desk: desk)
+        return true
+    }
+
+    /// Ends Just the Desk whatever ended it: clears both keys and turns the sign-in reminder back
+    /// on when Just the Desk had turned it off (a reminder the person had already turned off stays
+    /// off). The Desk stays on. A sign-in reaches it through endBySignIn; the smoke hook calls it
+    /// directly.
+    static func end(standard: DefaultsStore = UserDefaults.standard, desk: DefaultsStore = UserDefaults.desk) {
         if standard.object(forKey: silencedKey) as? Bool == true { SignInReminder.set(true, in: desk) }
         standard.set(nil, forKey: key)
         standard.set(nil, forKey: silencedKey)
-        return true
     }
 
     /// Whether the welcome sheet shows on its own: no session key, Just the Desk not chosen, and
