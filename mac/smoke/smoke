@@ -19,7 +19,9 @@ module Smoke
                             close-settings, refresh, test-alert,
                             pulse [tier], tool deep-work|pacing|snake, desk on|off, notch on|off,
                             notch-pill on|off|force (the top-center pill; force draws it on a
-                            notched Mac too, off clears that), camera-light on|off,
+                            notched Mac too, off clears that),
+                            just-the-desk on|off (the welcome sheet's button; off ends it),
+                            camera-light on|off,
                             glow [alert|meeting|camera],
                             demo on|off (sample data on every surface, in memory),
                             account next (the next account, as the widget's chip),

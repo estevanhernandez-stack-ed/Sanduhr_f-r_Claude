@@ -64,6 +64,9 @@ class FakeApp
       p['forced'] = arg == 'force'
       p['shown'] = p['on'] && s['notch'] && (p['forced'] || !s['has_notch'])
       p['frame'] = p['shown'] ? [760, 0, 400, 24] : nil
+    when 'just-the-desk'
+      s['just_the_desk'] = (arg == 'on')
+      s['desk_enabled'] = s['desk_running'] = true if arg == 'on'
     when 'camera-light' then s['camera_light'] = (arg == 'on')
     when 'glow', 'pulse'
       s['glow_count'] = s['glow_count'].to_i + 1
@@ -485,6 +488,10 @@ eq('a pill switched on goes back on without the override',
    Restore.plan(base.merge('notch_pill' => pill_off.merge('on' => true)), base.merge('notch_pill' => pill_forced)), [['notch-pill', 'on']])
 eq('a pill left as it was needs nothing',
    Restore.plan(base.merge('notch_pill' => pill_forced), base.merge('notch_pill' => pill_forced.merge('shown' => false))), [])
+eq('restore ends a Just the Desk the run turned on',
+   Restore.plan(base.merge('just_the_desk' => false), base.merge('just_the_desk' => true)), [['just-the-desk', 'off']])
+eq('restore leaves a Just the Desk that was already on',
+   Restore.plan(base.merge('just_the_desk' => true), base.merge('just_the_desk' => true)), [])
 # The shipped pill scenario on the fixture (a notched Mac, notch off): the island goes on, the
 # override shows the pill, off clears it, and the restore puts the notch back. The fixture tree has
 # no pill window, so the tree step is dropped here and runs live.
@@ -701,7 +708,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config]
+    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill just-the-desk camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end
