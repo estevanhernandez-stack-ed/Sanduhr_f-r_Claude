@@ -7,8 +7,9 @@ steps:
   - do: just-the-desk
     arg: on
   - expect_state: { just_the_desk: true, desk_enabled: true }
-  # The offer opens the tour a second later when it is pending; closing makes the next step
-  # deterministic.
+  # The offer opens the tour a second later when it is pending, and show resets it to step 1:
+  # wait for it, then close, so the steps below are deterministic.
+  - wait: 1.5
   - do: close-tour
   - do: tour
   - expect_state: { tour.open: true, tour.step: 1 }
