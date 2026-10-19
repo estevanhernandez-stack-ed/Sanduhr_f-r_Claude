@@ -111,8 +111,8 @@ is approved, not after. That is a practice note for both of us.
 
 ## Your Goals
 
-The profile on file holds no written goals. `(default — confirm on next interactive run)` The
-goal stated in this cycle was "ready for any user". Evidence it was reached: a new install gets
+The profile on file holds no written goals. The goal stated in this cycle was "ready for any
+user", and asked whether it landed, the builder's answer was yes. Evidence it was reached: a new install gets
 the plate, no click cost on the clock and message, Mods & Config opening on one row per folder;
 an existing install changes nothing until a toggle. Evidence of the remainder: the run report
 lists six found-not-fixed items for your call, and the Desk's Order caption is a fourth caption
@@ -120,7 +120,7 @@ wall the scan did not list.
 
 ## Reflection
 
-Builder's answer: not collected, the run was autonomous. `(confirm on next interactive run)`
+Builder's answer, asked after the autonomous run: nothing surprised him. "This system works."
 
 Agent's read on what surprised: the real concern was a layer-order option, and it surfaced only
 after a 14-item polish run had shipped around it. The scan read the symptom (text over files) and
