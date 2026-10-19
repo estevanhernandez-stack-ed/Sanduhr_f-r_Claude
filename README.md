@@ -25,7 +25,7 @@ markers, sparkline trends, and five hand-tuned glass themes.
 </p>
 
 <p align="center">
-<sub>Independent third-party tool. Not affiliated with Anthropic. Requires an active Claude Pro / Team / Enterprise subscription.</sub>
+<sub>Independent third-party tool. Not affiliated with Anthropic. Pacing needs an active Claude Pro, Team or Enterprise subscription; on the Mac, the Desk works without one.</sub>
 </p>
 
 ---
