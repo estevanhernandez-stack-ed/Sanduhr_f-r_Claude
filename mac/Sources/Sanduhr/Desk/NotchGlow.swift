@@ -191,12 +191,15 @@ enum NotchGlowLayout {
 
     // MARK: The plain notch
 
-    /// What a glow outlines: the extended island while Desk draws it, else the hardware notch
-    /// itself when a screen has one (whether or not Desk runs), else, for a glow that asks for it
-    /// (Claude Code's), a notch-wide spot at the top center as the camera light uses, else nothing.
+    /// What a glow outlines: the extended island while Desk draws it, else the top-center pill
+    /// while Desk draws that (NotchPill: every glow outlines it, as every glow outlines the
+    /// island), else the hardware notch itself when a screen has one (whether or not Desk runs),
+    /// else, for a glow that asks for it (Claude Code's), a notch-wide spot at the top center as
+    /// the camera light uses, else nothing.
     static func shape(deskRunning: Bool, notchOn: Bool, hasIsland: Bool, hasNotch: Bool,
-                      topFallback: Bool = false) -> NotchGlowShape {
+                      hasPill: Bool = false, topFallback: Bool = false) -> NotchGlowShape {
         if deskRunning, notchOn, hasIsland { return .island }
+        if deskRunning, notchOn, hasPill { return .top }
         if hasNotch { return .plain }
         return topFallback ? .top : .none
     }
@@ -438,7 +441,8 @@ final class NotchGlowController {
         let screen = Self.notchedScreen()
         let shape = NotchGlowLayout.shape(deskRunning: desk.running, notchOn: notchOn,
                                           hasIsland: desk.wingsWindow != nil && desk.model.notchRect != nil,
-                                          hasNotch: screen != nil, topFallback: topFallback)
+                                          hasNotch: screen != nil, hasPill: desk.pillFrame != nil,
+                                          topFallback: topFallback)
         let frame: CGRect
         let content: AnyView
         switch shape {
@@ -461,11 +465,14 @@ final class NotchGlowController {
             content = AnyView(NotchHaloView(width: cut.width, height: cut.height,
                                             radius: NotchGlowLayout.plainRadius(notchHeight: notch.height)))
         case .top:
-            guard let main = NSScreen.main ?? NSScreen.screens.first else { return }
+            guard let main = desk.pillWindow?.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
             // A hidden menu bar leaves no inset: use the bar's usual thickness.
             let inset = main.frame.maxY - main.visibleFrame.maxY
             let bar = inset > 0 ? inset : NSStatusBar.system.thickness
-            let spot = NotchGlowLayout.topSpot(screenWidth: main.frame.width, barHeight: bar)
+            // The top-center pill while it is up (NotchPill): the halo hugs it, as the camera
+            // light does; else the camera light's notch-wide spot.
+            let spot = desk.pillRect(on: main)
+                ?? NotchGlowLayout.topSpot(screenWidth: main.frame.width, barHeight: bar)
             frame = NotchGlowLayout.plainFrame(screen: main.frame, notch: spot)
             content = AnyView(NotchHaloView(width: spot.width, height: spot.height,
                                             radius: NotchGlowLayout.plainRadius(notchHeight: spot.height)))

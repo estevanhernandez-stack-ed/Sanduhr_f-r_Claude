@@ -48,6 +48,13 @@ enum NotchPill {
         store.object(forKey: debugForceKey) as? Bool ?? false
     }
 
+    /// Whether the Desk builds the pill's window at all (DeskController.buildPillWindow): with the
+    /// switch on, on a screen without a notch, or on any screen under the debug override. A notched
+    /// Mac without the override never builds one, so nothing there changes.
+    static func builds(on: Bool, hasNotch: Bool, forced: Bool) -> Bool {
+        on && (!hasNotch || forced)
+    }
+
     /// The pill window's frame in screen (AppKit, bottom-left origin) coordinates: as tall as the
     /// menu bar, at the top of `screen`, centered on it, `contentWidth` wide up to
     /// `maxWidthFraction` of the screen and never narrower than it is tall (a round pill at the

@@ -62,16 +62,17 @@ struct NotchPreview: View {
     @State private var samples: PreviewSamples = []
     @State private var glow = 0.0
     @AppStorage(DeskController.notchKey, store: .desk) private var enabled = false
+    @AppStorage(NotchPill.key, store: .desk) private var pill = NotchPill.defaultOn
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let g = NotchPreviewGeometry.current()
-        SettingsPreviewCard(kind: .notch, label: Self.spoken(enabled: enabled, hasNotch: g.hasNotch),
+        SettingsPreviewCard(kind: .notch, label: Self.spoken(enabled: enabled, hasNotch: g.hasNotch, pill: pill),
                             samples: samples, accessory: AnyView(testGlow)) {
             if g.hasNotch {
                 NotchIslandCanvas(model: preview, geometry: g, glow: glow)
             } else {
-                NotchTabCanvas(model: preview, geometry: g)
+                NotchTabCanvas(model: preview, geometry: g, pill: pill && enabled)
             }
         }
         .modifier(PreviewModelSync(preview: preview, live: live, islandUp: enabled && g.hasNotch, samples: $samples))
@@ -79,8 +80,18 @@ struct NotchPreview: View {
         .onReceive(NotificationCenter.default.publisher(for: NotchGlowController.didFire)) { _ in glowOnce() }
     }
 
-    static func spoken(enabled: Bool, hasNotch: Bool) -> String {
-        if !hasNotch { return "This Mac has no notch, so the camera and mic indicators show in a small tab at the top." }
+    /// The card's one line. On a Mac without a notch, `pill` is the top-center pill switch
+    /// (NotchPill): with the island on too, the island draws as a pill at the top center.
+    static func spoken(enabled: Bool, hasNotch: Bool, pill: Bool = false) -> String {
+        if !hasNotch {
+            if pill, enabled {
+                return "This Mac has no notch, so the island draws as a pill at the top center of the menu bar, with the wings' text."
+            }
+            if pill {
+                return "This Mac has no notch. With the island on, it draws as a pill at the top center of the menu bar."
+            }
+            return "This Mac has no notch, so the camera and mic indicators show in a small tab at the top."
+        }
         return enabled
             ? "The notch island with its wings, the strip under the camera and the camera and mic indicators, as set below."
             : "The camera notch as it is now: the island is off."
@@ -136,10 +147,12 @@ private struct NotchIslandCanvas: View {
     }
 }
 
-/// A Mac without a notch: the camera and mic tab (AVIndicatorBadge) at the top center.
+/// A Mac without a notch: the camera and mic tab (AVIndicatorBadge) at the top center. With the
+/// top-center pill on (NotchPill) the line under it says so.
 private struct NotchTabCanvas: View {
     var model: DeskModel
     let geometry: NotchPreviewGeometry
+    var pill = false
 
     var body: some View {
         let size = max(10, geometry.bar * 0.42)
@@ -153,7 +166,8 @@ private struct NotchTabCanvas: View {
                 }
             }
             .frame(width: 520)
-            Text("No notch on this Mac's screens: the island stays off.")
+            Text(pill ? "No notch on this Mac's screens: the island draws as a pill at the top center."
+                      : "No notch on this Mac's screens: the island stays off.")
                 .font(.system(size: 13))
                 .foregroundStyle(.white.opacity(0.75))
         }

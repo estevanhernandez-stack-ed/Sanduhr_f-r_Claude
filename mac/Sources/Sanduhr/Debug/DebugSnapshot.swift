@@ -16,6 +16,9 @@ struct DebugStateInput {
     var notch = false
     /// This screen has a camera notch and Desk built the island's window for it.
     var hasNotch = false
+    /// The top-center pill (NotchPill, issue #119): its switch, the debug override, whether its
+    /// window is up and visible, and where.
+    var notchPill = NotchPillDebug()
     /// What each place on the notch island shows, as saved or its default.
     var notchLeft = NotchContent.Place.left.fallback
     var notchRight = NotchContent.Place.right.fallback
@@ -165,6 +168,16 @@ struct DeskArrangeDebug: Equatable {
     var clickThrough = "drawn"
     /// The bar's floating panel (Cancel and Done) is on screen.
     var barVisible = false
+}
+
+/// state.yaml's `notch_pill:` (NotchPill, issue #119): the switch (`on`, quoted so Ruby reads a
+/// key, not a boolean), the debug override, whether the pill's window is up and visible, and its
+/// frame in whole points from the primary screen's top left (null while it is not up).
+struct NotchPillDebug: Equatable {
+    var on = NotchPill.defaultOn
+    var forced = false
+    var shown = false
+    var frame: CGRect?
 }
 
 /// state.yaml's `dock:` (item 56): the Dock's side and auto-hide (its own settings, read only),
@@ -341,6 +354,17 @@ enum DebugState {
               YAMLPair("bar_visible", .bool(a.barVisible))])
     }
 
+    /// `notch_pill:` (issue #119): the switch, the override, shown, and the frame as `[x, y, w, h]`
+    /// in whole points, top-left origin like `desk_frames`, or null.
+    static func notchPillYAML(_ p: NotchPillDebug) -> YAMLNode {
+        let frame: YAMLNode = p.frame.map { f in
+            let rounded: [YAMLNode] = [f.minX, f.minY, f.width, f.height].map { .int(Int($0.rounded())) }
+            return .list(rounded)
+        } ?? .null
+        return .map([YAMLPair("on", .bool(p.on)), YAMLPair("forced", .bool(p.forced)),
+                     YAMLPair("shown", .bool(p.shown)), YAMLPair("frame", frame)])
+    }
+
     /// `dock:` (item 56): side, auto-hide and the inset applied now.
     static func dockYAML(_ d: DockDebug) -> YAMLNode {
         .map([YAMLPair("side", .string(d.side.rawValue)), YAMLPair("autohide", .bool(d.autohide)),
@@ -510,6 +534,7 @@ enum DebugState {
         pairs.append(("desk_arrange", deskArrangeYAML(s.deskArrange)))
         pairs.append(("notch", .bool(s.notch)))
         pairs.append(("has_notch", .bool(s.hasNotch)))
+        pairs.append(("notch_pill", notchPillYAML(s.notchPill)))
         pairs.append(("notch_left", .string(s.notchLeft.rawValue)))
         pairs.append(("notch_right", .string(s.notchRight.rawValue)))
         pairs.append(("notch_strip", .string(s.notchStrip.rawValue)))

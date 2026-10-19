@@ -34,6 +34,14 @@ enum DebugAction: Equatable {
     case tool(MenuCommand)
     case desk(Bool)
     case notch(Bool)
+    /// The top-center pill (NotchPill, issue #119): `on` and `off` write its switch (off clears
+    /// the debug override too); `force` writes the switch and the override, so a notched Mac
+    /// draws the pill for the smoke tools. Applied live.
+    case notchPill(NotchPillMode)
+
+    enum NotchPillMode: String, CaseIterable {
+        case on, off, force
+    }
     /// The camera light shown or hidden by hand, as Tools, Camera Light does.
     case cameraLight(Bool)
     /// The notch glow for one kind of event, whatever its switch says.
@@ -101,7 +109,7 @@ enum DebugAction: Equatable {
     case modsConfig(ModsTab, seat: Int?)
 
     static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
-                        "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
+                        "test-alert", "pulse", "tool", "desk", "notch", "notch-pill", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
                         "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
                         "desk-arrange", "hot-key", "reset", "mods-config"]
@@ -198,6 +206,11 @@ enum DebugLink {
             }
         case "desk": return onOff(DebugAction.desk)
         case "notch": return onOff(DebugAction.notch)
+        case "notch-pill":
+            guard let mode = arg.flatMap({ DebugAction.NotchPillMode(rawValue: $0.lowercased()) }) else {
+                return bad("notch-pill needs arg=on, off or force")
+            }
+            return .success(.notchPill(mode))
         case "camera-light": return onOff(DebugAction.cameraLight)
         case "demo": return onOff(DebugAction.demo)
         case "glow":
