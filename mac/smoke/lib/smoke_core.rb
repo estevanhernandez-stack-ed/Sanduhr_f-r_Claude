@@ -284,6 +284,13 @@ module Smoke
         steps << [before['widget_visible'] ? 'show-widget' : 'hide-widget', nil]
       end
       steps << ['notch', before['notch'] ? 'on' : 'off'] if !!before['notch'] != !!after['notch']
+      # The top-center pill (issue #119): its switch and the debug override go back together; the
+      # hook's `off` clears both, `force` sets both, `on` sets the switch alone.
+      pill_before = before['notch_pill'].is_a?(Hash) ? before['notch_pill'] : {}
+      pill_after = after['notch_pill'].is_a?(Hash) ? after['notch_pill'] : {}
+      if %w[on forced].any? { |k| !!pill_before[k] != !!pill_after[k] }
+        steps << ['notch-pill', pill_before['forced'] ? 'force' : (pill_before['on'] ? 'on' : 'off')]
+      end
       # The camera light by hand, only when no camera was in use (a running camera lights it too).
       if !before['camera_in_use'] && !after['camera_in_use'] && !!before['camera_light'] != !!after['camera_light']
         steps << ['camera-light', before['camera_light'] ? 'on' : 'off']

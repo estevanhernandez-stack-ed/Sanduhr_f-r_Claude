@@ -234,6 +234,13 @@ struct NotchWingsView: View {
     /// Settings, Now Playing's preview (item 68): the wings drawn with the island on, text on and
     /// these contents, whatever the Notch page says; nil everywhere else.
     var showing: Showing? = nil
+    /// The top-center pill (NotchPill, issue #119): the two wings joined into one capsule with no
+    /// camera gap and no top flares, centered in its window, for a screen without a notch. The
+    /// content, the click to Settings and every wing's two-finger menu are the island's.
+    var pill = false
+    /// With `pill`, the width the capsule wants (`pillWidth`), reported whenever it changes and
+    /// once on appear, 0 while nothing draws: the window sizes itself to it (DeskController).
+    var onPillWidth: ((CGFloat) -> Void)? = nil
 
     /// What a preview draws in each wing.
     struct Showing: Equatable {
@@ -254,35 +261,58 @@ struct NotchWingsView: View {
                                     left: showing?.left ?? leftContent, right: showing?.right ?? rightContent, idle: idle,
                                     font: font, notchHeight: notchHeight, styleSongs: styleSongs,
                                     avPlace: avPlace)
-                let left = w.leftText, right = w.rightText, size = w.size
-                let wingL = w.left, wingR = w.right
-                if w.totalLeft > 0 || w.totalRight > 0 {
-                    ZStack {
-                        IslandShape(flare: 8, radius: min(10, barHeight * 0.3))
-                            .fill(Color.black)
-                        HStack(spacing: 0) {
-                            wing(left, size, w.leftContent, place: .left, width: wingL).frame(width: max(0, wingL - 10), alignment: .trailing)
-                            // Always in the row, 0 wide when empty: never inserted or removed (AVBesideSlot).
-                            AVBesideSlot(model: model, side: .left, size: size, width: w.besideLeft)
-                            Color.clear.frame(width: notchWidth + 20)
-                            AVBesideSlot(model: model, side: .right, size: size, width: w.besideRight)
-                            wing(right, size, w.rightContent, place: .right, width: wingR).frame(width: max(0, wingR - 10), alignment: .leading)
-                        }
+                island(w)
+                    .onChange(of: pill ? Self.pillWidth(w) : 0, initial: true) { _, width in
+                        if pill { onPillWidth?(width) }
                     }
-                    .frame(width: notchWidth + w.totalLeft + w.totalRight, height: barHeight)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        DeskController.shared.showSettings(NotchIsland.clickSection(settingsOpen: SettingsWindowController.shared.isOpen))
-                    }
-                    .help(NotchIsland.clickOpens.linkTitle)
-                    // Last, so the island's click area moves with its drawing: an offset before
-                    // contentShape left the click area at the unshifted place, so the far end of
-                    // the wider wing (a paused Next button) drew where nothing took the click.
-                    .offset(x: (w.totalRight - w.totalLeft) / 2)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+        } else if pill {
+            // The island switch is off: the pill has nothing to draw, and its window hides.
+            Color.clear.onAppear { onPillWidth?(0) }
+        }
+    }
+
+    /// The black island with its wings, or nothing while both wings are empty.
+    @ViewBuilder
+    private func island(_ w: Layout) -> some View {
+        let left = w.leftText, right = w.rightText, size = w.size
+        let wingL = w.left, wingR = w.right
+        if w.totalLeft > 0 || w.totalRight > 0 {
+            ZStack {
+                IslandShape(flare: pill ? 0 : 8, radius: min(10, barHeight * 0.3))
+                    .fill(Color.black)
+                HStack(spacing: 0) {
+                    wing(left, size, w.leftContent, place: .left, width: wingL).frame(width: max(0, wingL - 10), alignment: .trailing)
+                    // Always in the row, 0 wide when empty: never inserted or removed (AVBesideSlot).
+                    AVBesideSlot(model: model, side: .left, size: size, width: w.besideLeft)
+                    Color.clear.frame(width: pill ? Self.pillGap : notchWidth + 20)
+                    AVBesideSlot(model: model, side: .right, size: size, width: w.besideRight)
+                    wing(right, size, w.rightContent, place: .right, width: wingR).frame(width: max(0, wingR - 10), alignment: .leading)
                 }
             }
+            .frame(width: pill ? Self.pillWidth(w) : notchWidth + w.totalLeft + w.totalRight, height: barHeight)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                DeskController.shared.showSettings(NotchIsland.clickSection(settingsOpen: SettingsWindowController.shared.isOpen))
+            }
+            .help(NotchIsland.clickOpens.linkTitle)
+            // Last, so the island's click area moves with its drawing: an offset before
+            // contentShape left the click area at the unshifted place, so the far end of
+            // the wider wing (a paused Next button) drew where nothing took the click.
+            // The pill has no camera to stay centered on: it sits in the middle of its window.
+            .offset(x: pill ? 0 : (w.totalRight - w.totalLeft) / 2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+    }
+
+    /// The room between the pill's two wings, where the camera gap would be.
+    static let pillGap: CGFloat = 12
+
+    /// The pill's width for a layout: both wings and the gap between them, 0 when both wings are
+    /// empty so the window hides instead of drawing a dot.
+    static func pillWidth(_ w: Layout) -> CGFloat {
+        let wings = w.totalLeft + w.totalRight
+        return wings > 0 ? wings + pillGap : 0
     }
 
     /// One wing's text. Now playing takes its own clicks: a click plays or pauses, a two-finger

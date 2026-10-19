@@ -160,7 +160,8 @@ enum SettingsAnchor {
     ]
 
     private static let notchPages: [SettingsEntry] = [
-        SettingsEntry(title: SettingsNames.notchSwitch, page: .notch, anchor: notch, synonyms: ["island", "camera notch"]),
+        SettingsEntry(title: SettingsNames.notchSwitch, page: .notch, anchor: notch,
+                      synonyms: ["island", "camera notch", "no notch", "top-center", "pill", "external display"]),
         SettingsEntry(title: "Text", page: .notch, anchor: text,
                       synonyms: ["wing", "Left wing", "Right wing", "Text beside the camera", "Text under the camera too"]),
         SettingsEntry(title: SettingsNames.notchGlow, page: .notch, anchor: glow,

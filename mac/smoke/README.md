@@ -17,7 +17,7 @@ open Sanduhr.app
 
 smoke/smoke enable             # defaults write com.626labs.sanduhr debugHooks -bool true
 smoke/smoke snap               # prints the folder: renders, tree.yaml, state.yaml, screen-*.png
-smoke/smoke tree settings      # the Settings window's UI tree (widget, desk, notch, camera, settings, whats-new, sheet)
+smoke/smoke tree settings      # the Settings window's UI tree (widget, desk, notch, pill, camera, settings, whats-new, sheet)
 smoke/smoke state              # Desk, notch, widget, Settings, meters, alerts, menu, version
 smoke/smoke do settings notch  # one action, waits for it
 smoke/smoke watch 5            # live log + out/watch/index.html refreshing every 5 s; Ctrl-C stops
@@ -63,6 +63,12 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   Desk window takes clicks over its whole frame, `drawn` when only what is drawn takes them; `bar_visible`,
   the floating panel with Cancel and Done is on screen),
   `notch`, `has_notch`,
+  `notch_pill` (issue #119, the island as a pill over the middle of the menu bar on a screen without a notch:
+  `on`, Settings, Desk, Notch's "Top-center island on screens without a notch", desk suite key `notchPill`, off when
+  absent; `forced`, the debug override `notchPillForce` that draws it on a notched Mac too; `shown`, its window is up
+  and visible now, which it is not while the pointer is in the menu bar or the bar is hidden; `frame`, `[x, y, w, h]` in
+  whole points from the primary screen's top left while the pill is up, null otherwise. The `on` key is quoted in
+  the file, so YAML reads a key and not `true`; its window is kind `pill` in tree.yaml),
   `notch_left`, `notch_right`, `notch_strip` (what each place on the island shows, a
   `NotchContent` raw value such as `meetingOrTime`, `meters` or `nothing`; the default when unset),
   `camera_in_use` (an app is using a camera; only watched while the camera light switch is on),
@@ -108,7 +114,9 @@ the page scrolled to that section, opening its Advanced disclosure when it is un
 an error naming the ones it has), `settings-search <words>` (the sidebar search with the words typed and Return
 pressed: the best match opened, scrolled to and lit; words that find nothing are an error), `close-settings`, `refresh` (waits for the fetch), `test-alert`,
 `pulse [tier]` (`five_hour` by default; it glows the notch too), `tool deep-work|pacing|snake` (as the Tools menu: chosen
-again it closes), `desk on|off`, `notch on|off`, `camera-light on|off` (the light by hand, as Tools, Camera Fill Light;
+again it closes), `desk on|off`, `notch on|off`, `notch-pill on|off|force` (issue #119: the top-center pill's switch,
+applied live; `force` also writes the override `notchPillForce`, so this notched Mac draws the pill for the smoke tools,
+and `off` clears both. A run puts the switch and the override back as they were), `camera-light on|off` (the light by hand, as Tools, Camera Fill Light;
 its window is kind `camera` in tree.yaml, one node labeled `Camera fill light`), `glow [alert|meeting|camera|claude-waiting|claude-done]`
 (the notch glow once, whatever its switches; around the island while Desk runs with it on, else around
 the plain hardware notch on a notched screen, in a click-through window of kind `glow` labeled `Notch glow` that fades out after about three seconds),

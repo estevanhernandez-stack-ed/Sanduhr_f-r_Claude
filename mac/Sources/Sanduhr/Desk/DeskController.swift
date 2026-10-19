@@ -24,7 +24,15 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// Where the pointer was at the close watch's last tick (screen coordinates).
     private var lastWatchedPointer: NSPoint?
     private(set) var wingsWindow: NSWindow?
+    /// Re-fronts the wings and the pill every few seconds (buildWingsWindow, buildPillWindow).
     private var wingsTimer: Timer?
+    /// The top-center pill (NotchPill, issue #119): the island's wings as one capsule over the
+    /// middle of the menu bar on a screen without a notch, nil on a notched screen (unless the
+    /// debug override asks) and with the switch off.
+    private(set) var pillWindow: NSWindow?
+    /// The pill's content width as its wings last reported it (NotchWingsView.onPillWidth), 0
+    /// while nothing draws: then the window stays hidden.
+    private var pillContentWidth: CGFloat = 0
     /// The click layer (DeskClickLayer): stands in for the Desk window's click areas while the
     /// Desk is under the desktop icons, nil otherwise and while arranging.
     private(set) var clickWindow: NSWindow?
@@ -175,6 +183,7 @@ final class DeskController: NSObject, NSMenuDelegate {
     @objc private func appBecameActive() {
         recheckCalendar()
         updateMouseThrough()
+        updatePill()
     }
 
     /// An alert chose the Desk (or the debug pulse): pulse those meters once and glow the notch,
@@ -210,6 +219,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         running = false
         window?.close(); window = nil
         wingsWindow?.close(); wingsWindow = nil
+        pillWindow?.close(); pillWindow = nil
+        pillContentWidth = 0
         clickWindow?.close(); clickWindow = nil
         wingsTimer?.invalidate(); wingsTimer = nil
         mouseMonitors.forEach { NSEvent.removeMonitor($0) }
@@ -348,6 +359,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         model.notchRect = screen.cameraNotch
         dock.screenChanged(screen)
         buildWingsWindow(on: screen)
+        buildPillWindow(on: screen)
         w.contentView = FirstClickHostingView(rootView: DeskView(model: model))
         w.setFrame(screen.frame, display: true)
         w.orderFront(nil)
@@ -398,15 +410,147 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.orderFrontRegardless()
         wingsWindow = w
         // Keep winning: re-front every few seconds and whenever the Space changes.
+        scheduleRefront()
+    }
+
+    /// The 3-second re-front the wings always had, shared with the pill (the Space change runs
+    /// it too). Started by whichever of the two is built first.
+    private func scheduleRefront() {
         wingsTimer?.invalidate()
         wingsTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
-            self?.wingsWindow?.orderFrontRegardless()
+            self?.refrontIslands()
         }
+    }
+
+    /// Brings the wings, and the pill while it shows, back over menu bar tools that re-raise
+    /// their own overlays. A hidden pill stays hidden.
+    private func refrontIslands() {
+        wingsWindow?.orderFrontRegardless()
+        if let pill = pillWindow, pill.isVisible { pill.orderFrontRegardless() }
+    }
+
+    // MARK: The top-center pill (NotchPill, issue #119)
+
+    /// The island as a pill over the middle of the menu bar, for a screen without a notch
+    /// (NotchPill.builds): a borderless, clear window at the wings' level and collection
+    /// behavior, sized by `NotchPill.frame` to the width its wings report
+    /// (NotchWingsView.onPillWidth), hosting the wings view in its pill form. Nothing with the
+    /// switch off, and nothing on a notched screen without the debug override, so the wings
+    /// window and everything around it stay as they are there.
+    private func buildPillWindow(on screen: NSScreen) {
+        pillWindow?.close()
+        pillWindow = nil
+        pillContentWidth = 0
+        let desk = UserDefaults.desk
+        guard NotchPill.builds(on: NotchPill.isOn(in: desk), hasNotch: model.notchRect != nil,
+                               forced: NotchPill.forced(in: desk)) else { return }
+        let bar = Self.menuBarHeight(of: screen)
+        // A hidden menu bar (full screen at launch) gives no frame yet: a round placeholder at
+        // the top center, hidden until updatePill finds the bar.
+        let initial = NotchPill.frame(screen: screen.frame, visibleFrame: screen.visibleFrame, contentWidth: 0)
+            ?? CGRect(x: screen.frame.midX - bar / 2, y: screen.frame.maxY - bar, width: bar, height: bar)
+        let w = NSWindow(contentRect: initial, styleMask: [.borderless], backing: .buffered, defer: false)
+        w.isReleasedWhenClosed = false
+        w.level = .popUpMenu
+        w.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        w.isOpaque = false
+        w.backgroundColor = .clear
+        w.hasShadow = false
+        // Clickable (the pill opens Settings, its wings carry their menus); the window server
+        // hands it only clicks on drawn pixels, so the clear margins fall through.
+        w.ignoresMouseEvents = false
+        // The bar is the pill's notch: text sized for its height, black the bar's full height.
+        var view = NotchWingsView(model: model, notchWidth: 0, notchHeight: bar, barHeight: bar)
+        view.pill = true
+        view.onPillWidth = { [weak self] width in
+            // Reported from inside a SwiftUI update: the window moves after it.
+            DispatchQueue.main.async { self?.pillContentChanged(width) }
+        }
+        w.contentView = FirstClickHostingView(rootView: view)
+        w.setFrame(initial, display: true)
+        pillWindow = w
+        if wingsTimer == nil { scheduleRefront() }
+        updatePill()
+    }
+
+    /// The pill's wings want another width (text came, went or grew): the window takes the frame
+    /// for it, shows or hides, and the camera light follows.
+    private func pillContentChanged(_ width: CGFloat) {
+        guard pillWindow != nil, pillContentWidth != width else { return }
+        pillContentWidth = width
+        updatePill()
+        MainActor.assumeIsolated { CameraLightController.shared.followPill() }
+    }
+
+    /// Shows or hides the pill by `NotchPill.shows`: the switch on, no notch (or the override),
+    /// the menu bar visible and the pointer out of it, and something to draw. Runs on every
+    /// mouse move (one guard without a pill window), on a Space, screen or width change and when
+    /// Sanduhr becomes active. While it shows it also follows the menu bar's frame.
+    private func updatePill() {
+        guard let w = pillWindow else { return }
+        guard let screen = w.screen ?? window?.screen ?? NSScreen.main else {
+            if w.isVisible { w.orderOut(nil) }
+            return
+        }
+        let desk = UserDefaults.desk
+        let frame = NotchPill.frame(screen: screen.frame, visibleFrame: screen.visibleFrame, contentWidth: pillContentWidth)
+        let shows = NotchPill.shows(
+            on: NotchPill.isOn(in: desk),
+            hasNotch: model.notchRect != nil && !NotchPill.forced(in: desk),
+            isMainScreen: true,
+            menuBarVisible: frame != nil,
+            pointerInMenuBar: NotchPill.pointerInMenuBar(NSEvent.mouseLocation, screen: screen.frame,
+                                                         barHeight: screen.frame.maxY - screen.visibleFrame.maxY))
+            && pillContentWidth > 0
+        if shows, let frame {
+            if w.frame != frame { w.setFrame(frame, display: true) }
+            if !w.isVisible { w.orderFrontRegardless() }
+        } else if w.isVisible {
+            w.orderOut(nil)
+        }
+    }
+
+    /// The pill switch flipped (Settings, Desk, Notch) or the hook wrote it: the pill comes up
+    /// or goes away on the Desk's screen, live, as applyLayer does for the click layer.
+    func applyPill() {
+        guard running, let screen = window?.screen ?? NSScreen.main else { return }
+        buildPillWindow(on: screen)
+        MainActor.assumeIsolated { CameraLightController.shared.followPill() }
+    }
+
+    /// The pill's frame in screen coordinates while the pill is up (built, with something
+    /// drawn), nil otherwise: the glow and the camera light hug it (NotchGlowController,
+    /// CameraLightController). The pointer passing through the menu bar hides the window for a
+    /// moment without changing this, so a light already on keeps its place.
+    var pillFrame: CGRect? {
+        guard let w = pillWindow, pillContentWidth > 0 else { return nil }
+        return w.frame
+    }
+
+    /// `pillFrame` in points from `screen`'s top-left corner, the way `NSScreen.cameraNotch`
+    /// reports the notch, so the glow and the camera light can treat the pill as one. Nil while
+    /// the pill is not up, or sits on another screen.
+    func pillRect(on screen: NSScreen) -> CGRect? {
+        guard let frame = pillFrame, pillWindow?.screen === screen else { return nil }
+        return Self.pillLocalRect(frame, screen: screen.frame)
+    }
+
+    /// A pill frame (AppKit screen coordinates) as a rect hanging from `screen`'s top edge, in
+    /// points from its top-left corner.
+    static func pillLocalRect(_ frame: CGRect, screen: CGRect) -> CGRect {
+        CGRect(x: frame.minX - screen.minX, y: screen.maxY - frame.maxY, width: frame.width, height: frame.height)
+    }
+
+    /// The menu bar's height on `screen`; its usual thickness while the bar is hidden (full
+    /// screen, auto-hide), when the screen reports no inset.
+    static func menuBarHeight(of screen: NSScreen) -> CGFloat {
+        let inset = screen.frame.maxY - screen.visibleFrame.maxY
+        return inset > 0 ? inset : NSStatusBar.system.thickness
     }
 
     @objc private func spaceChanged() {
         dock.refreshPrefs()
-        wingsWindow?.orderFrontRegardless()
+        refrontIslands()
         updateMouseThrough()
     }
 
@@ -693,6 +837,8 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// every mouse move, when the frames change, when the window appears, on a Space or app
     /// switch, and on the close watch's tick while the pointer is near a block (DeskPointerWatch).
     private func updateMouseThrough() {
+        // The pill hides under the pointer in the menu bar and comes back after (NotchPill).
+        updatePill()
         guard let w = window, let point = pointerInWindow() else {
             watchApproach(false)
             return

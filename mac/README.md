@@ -1086,6 +1086,36 @@ Tests: `ModsPageTests` (temp folders and the validator's JSON captured as fixtur
 member changed meanwhile, project and managed overrides, an update that asks and one that
 doesn't, pinned stamps surviving refresh, Remove back to the original bytes).
 
+## Top-center pill
+
+Issue #119. A Mac mini, an iMac, an external display or a clamshell MacBook has no camera notch,
+so the island never drew there. **Top-center island on screens without a notch** (Settings, Desk,
+Notch, under the island switch; `notchPill` in the Desk defaults, off by default) draws the
+island's two wings as one black capsule over the middle of the menu bar instead: the same wing
+content (`NotchWingsView` with `pill`, no camera gap and no top flares), the same click to open
+Settings, the same two-finger menus on now playing, a watcher or the indicators. Its window
+(`DeskController.pillWindow`) is built next to the wings window, at the wings' level, and sized by
+`NotchPill.frame` to the width the wings report (`NotchWingsView.onPillWidth`): as tall as the
+menu bar, centered on the screen, never wider than 36 percent of it, never narrower than it is
+tall. Both wings empty, nothing draws and the window hides.
+
+The rules (`NotchPill`, all pinned): main screen only in this cut; never on a screen with a notch,
+where the island draws; hidden while the menu bar is hidden (full screen, auto-hide) and while the
+pointer is in the menu bar, so whatever sits under the pill can always be reached; the width cap
+keeps room for app menus and status items on either side. The middle of the menu bar is not free
+space the way the notch is, and the collision rule waits for real no-notch hardware: issue #119
+keeps that check. While the pill is up, a notch glow outlines it (`NotchGlowLayout.shape` with
+`hasPill`, shape `top`) and the camera fill light hugs it as it would the notch
+(`DeskController.pillRect`). Nothing changes on a notched Mac, and nothing with the switch off:
+`buildWingsWindow` is as it was.
+
+Smoke: `smoke do notch-pill on|off|force` (`force` also writes `notchPillForce`, so a notched Mac
+draws the pill for the smoke tools; `off` clears both), state.yaml's `notch_pill` (`on`, `forced`,
+`shown`, `frame`), and the window is kind `pill` in tree.yaml.
+
+    defaults write com.626labs.sanduhr.desk notchPill -bool true       # the switch; off by default
+    defaults write com.626labs.sanduhr.desk notchPillForce -bool true  # debug: the pill on a notched Mac too
+
 ## Camera and mic indicators
 
 Item 67. Indicators only, read-only: a red recording dot while any app uses a camera, and an

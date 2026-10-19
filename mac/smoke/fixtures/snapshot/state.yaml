@@ -26,6 +26,11 @@ desk_arrange:
   bar_visible: false
 notch: false
 has_notch: true
+notch_pill:
+  "on": false
+  forced: false
+  shown: false
+  frame: null
 notch_left: meetingOrTime
 notch_right: meters
 notch_strip: meetingOrMeters

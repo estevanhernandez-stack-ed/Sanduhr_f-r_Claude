@@ -60,6 +60,12 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action?name=desk&arg=on").command == .action(.desk(true), dir: nil))
         #expect(parse("sanduhr://debug/action?name=desk&arg=off").command == .action(.desk(false), dir: nil))
         #expect(parse("sanduhr://debug/action?name=notch&arg=on").command == .action(.notch(true), dir: nil))
+        // Issue #119: the top-center pill's switch, and the override that draws it on a notched Mac.
+        #expect(parse("sanduhr://debug/action?name=notch-pill&arg=on").command == .action(.notchPill(.on), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=notch-pill&arg=off").command == .action(.notchPill(.off), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=notch-pill&arg=FORCE").command == .action(.notchPill(.force), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=notch-pill").error == "notch-pill needs arg=on, off or force")
+        #expect(parse("sanduhr://debug/action?name=notch-pill&arg=maybe").error == "notch-pill needs arg=on, off or force")
         #expect(parse("sanduhr://debug/action?name=camera-light&arg=on").command == .action(.cameraLight(true), dir: nil))
         #expect(parse("sanduhr://debug/action?name=camera-light&arg=off").command == .action(.cameraLight(false), dir: nil))
         #expect(parse("sanduhr://debug/action?name=glow").command == .action(.glow(.alert), dir: nil))
@@ -278,7 +284,7 @@ struct DebugStateTests {
         let keys = yaml.split(separator: "\n").filter { !$0.hasPrefix(" ") && !$0.hasPrefix("-") }
             .map { String($0.split(separator: ":")[0]) }
         #expect(keys == ["desk_enabled", "desk_running", "layout", "desk_pieces", "desk_arrange", "notch", "has_notch",
-                         "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "now_playing", "now_playing_idle", "notch_shows", "widget_visible", "widget_visibility",
+                         "notch_pill", "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "now_playing", "now_playing_idle", "notch_shows", "widget_visible", "widget_visibility",
                          "menu_bar", "menu_bar_item", "settings_open", "settings_section", "settings_anchor", "settings_anchor_visible", "usage_page", "meters", "widget_warnings", "hidden_limits",
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "desk_piece_clicks", "desk_plate", "desk_under_icons", "dock", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
@@ -378,6 +384,19 @@ struct DebugStateTests {
         """))
         let empty = YAMLEmitter.emit(DebugState.yaml(DebugStateInput()))
         #expect(empty.contains("desk_frames: []\ndesk_frames_ok: true\ndesk_frames_problem: null\n"))
+    }
+
+    /// Issue #119: the top-center pill's switch, override, whether it shows and its frame, as a
+    /// four-number list from the primary screen's top left; null while it is not up. The `on` key
+    /// is quoted: bare, Ruby's YAML would read it as true.
+    @Test func theNotchPillReportsItsSwitchOverrideAndFrame() {
+        var s = DebugStateInput()
+        s.notchPill = NotchPillDebug(on: true, forced: true, shown: true,
+                                     frame: CGRect(x: 760.4, y: 0, width: 400, height: 24.6))
+        let yaml = YAMLEmitter.emit(DebugState.yaml(s))
+        #expect(yaml.contains("has_notch: false\nnotch_pill:\n  \"on\": true\n  forced: true\n  shown: true\n  frame: [760, 0, 400, 25]\nnotch_left:"))
+        let rest = YAMLEmitter.emit(DebugState.yaml(DebugStateInput()))
+        #expect(rest.contains("notch_pill:\n  \"on\": false\n  forced: false\n  shown: false\n  frame: null\n"))
     }
 
     /// Item 56: the Dock's side and auto-hide, and the inset the Desk applies now.

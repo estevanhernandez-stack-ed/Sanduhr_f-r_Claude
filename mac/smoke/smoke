@@ -10,15 +10,17 @@ module Smoke
 
       snap [label]          snapshot into out/<time>-<label>/: in-app renders, tree.yaml,
                             state.yaml and on-screen captures (screen-<window>.png)
-      tree [window]         snapshot and print the UI tree (widget, desk, notch, camera, settings, whats-new,
-                            welcome-tour, sheet)
+      tree [window]         snapshot and print the UI tree (widget, desk, notch, pill, camera, settings,
+                            whats-new, welcome-tour, sheet)
       state                 snapshot and print state.yaml
       do <action> [arg]     run one hook action and wait for it: show-widget, hide-widget,
                             settings [section [anchor]] (notch glow: the page scrolled to a section),
                             settings-search <words> (the sidebar search's best match, as Return),
                             close-settings, refresh, test-alert,
                             pulse [tier], tool deep-work|pacing|snake, desk on|off, notch on|off,
-                            camera-light on|off, glow [alert|meeting|camera],
+                            notch-pill on|off|force (the top-center pill; force draws it on a
+                            notched Mac too, off clears that), camera-light on|off,
+                            glow [alert|meeting|camera],
                             demo on|off (sample data on every surface, in memory),
                             account next (the next account, as the widget's chip),
                             whats-new, close-whats-new (the What's New window),

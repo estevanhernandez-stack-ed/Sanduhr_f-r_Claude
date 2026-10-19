@@ -198,3 +198,29 @@ Fix candidates (verify against Microsoft docs before choosing):
 Also: `ping` should tell "no snapshot anywhere" apart from "snapshot at a path I can't see", and
 the manifest comment should be corrected. Verify with a clean Store install on a machine with no
 existing `%APPDATA%\Sanduhr`.
+
+## #6 — No-notch island: what still needs the old Mac
+
+**Raised 2026-10-18 from the no-notch island run (issue #119, smoke-test section 51).** The pill
+shipped on a notched MacBook through the debug override; every rule that needs a screen without a
+notch, or hardware this Mac does not have, stays open here. The issue keeps the hardware check.
+
+- The menu-collision rule, measured on real no-notch hardware. Today the rule is conservative: the
+  pill is never wider than 0.36 of the screen (`NotchPill.maxWidthFraction`) and hides while the
+  pointer is in the menu bar, so whatever sits under it can always be reached. On the old Mac,
+  with a wide app menu (Xcode, Final Cut) and a full row of status items, measure where the two
+  actually meet and decide whether the cap, the hide, or a layout that yields to the app menu is
+  the rule.
+- The camera and mic badge on a no-notch Mac still places itself at the top center, under the pill.
+  `AVIndicatorPlacement.spot` ties `islandUp` to the wings window (`AVIndicatorViews.update`), so
+  with the pill up and no wings window the indicators fall back to the tab. The pill view already
+  carries the beside-wing slot; the placement needs to count the pill as the island.
+- A floor for the pill's text size on a 24-pt external-display menu bar. The pill is as tall as
+  the bar and sizes its text to it; a 24-pt bar on an external display is tighter than a notched
+  MacBook's 37-pt one. Read it at arm's length on the old Mac's display and set a floor if it
+  needs one.
+- The Touch Bar spike (issue #119, Proposal B): needs the Touch Bar Mac and a probe against the
+  private DFRFoundation APIs. A findings note, not app code.
+- CPU and memory with the Desk on, on the old Mac (issue #119, "Also measure"): Activity Monitor
+  over an hour with the Desk, the pill and the watchers on, against the same hour with the Desk
+  off.

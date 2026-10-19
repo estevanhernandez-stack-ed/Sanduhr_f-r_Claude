@@ -49,6 +49,13 @@ class FakeApp
     case name
     when 'desk' then s['desk_enabled'] = s['desk_running'] = (arg == 'on')
     when 'notch' then s['notch'] = (arg == 'on')
+    when 'notch-pill'
+      # Issue #119: on a notched Mac only force draws it; off clears the override too.
+      p = (s['notch_pill'] ||= {})
+      p['on'] = arg != 'off'
+      p['forced'] = arg == 'force'
+      p['shown'] = p['on'] && s['notch'] && (p['forced'] || !s['has_notch'])
+      p['frame'] = p['shown'] ? [760, 0, 400, 24] : nil
     when 'camera-light' then s['camera_light'] = (arg == 'on')
     when 'glow', 'pulse'
       s['glow_count'] = s['glow_count'].to_i + 1
@@ -246,6 +253,9 @@ eq('piece clicks on in the fixture', state['desk_piece_clicks'], true)
 eq('plate off in the fixture', state['desk_plate'], false)
 # "Keep the Desk under desktop icons": off in the fixture, what an absent key reads as.
 eq('under icons off in the fixture', state['desk_under_icons'], false)
+# Issue #119: the top-center pill is off, not forced and not up in the fixture; its frame is null
+# until it is. The `on` key is quoted in the fixture, so it reads as a key and not as true.
+eq('pill off in the fixture', state['notch_pill'], { 'on' => false, 'forced' => false, 'shown' => false, 'frame' => nil })
 no_pieces = { 'desk_frames' => '/\A(?!.*(clock|message))/m' }
 check('the clock and message are click areas in the fixture', State.check(state, no_pieces).length == 1)
 check('off, neither is a click area',
@@ -440,6 +450,37 @@ eq('hot keys in the fixture', state['hot_keys'].values_at('join_keys', 'settings
    ['⌥J', '⌥S', false, false])
 # Item 73 b: the app menu check is off by default and nothing has asked for Accessibility.
 eq('app menu check in the fixture', state['hot_keys'].values_at('check_app_menus', 'app_menus_trusted'), [false, false])
+# Issue #119: a pill a scenario switched on or forced goes back to how it was.
+pill_off = { 'on' => false, 'forced' => false, 'shown' => false, 'frame' => nil }
+pill_forced = { 'on' => true, 'forced' => true, 'shown' => true, 'frame' => [760, 0, 400, 24] }
+eq('a forced pill is put back off',
+   Restore.plan(base.merge('notch_pill' => pill_off), base.merge('notch_pill' => pill_forced)), [['notch-pill', 'off']])
+eq('a pill switched off goes back to forced',
+   Restore.plan(base.merge('notch_pill' => pill_forced), base.merge('notch_pill' => pill_off)), [['notch-pill', 'force']])
+eq('a pill switched on goes back on without the override',
+   Restore.plan(base.merge('notch_pill' => pill_off.merge('on' => true)), base.merge('notch_pill' => pill_forced)), [['notch-pill', 'on']])
+eq('a pill left as it was needs nothing',
+   Restore.plan(base.merge('notch_pill' => pill_forced), base.merge('notch_pill' => pill_forced.merge('shown' => false))), [])
+# The shipped pill scenario on the fixture (a notched Mac, notch off): the island goes on, the
+# override shows the pill, off clears it, and the restore puts the notch back. The fixture tree has
+# no pill window, so the tree step is dropped here and runs live.
+pill_doc = YAML.safe_load(File.read(File.join(Smoke::SCENARIOS, 'notch-pill.yaml')))
+pill_doc['steps'].reject! { |s| s.key?('expect') }
+FileUtils.mkdir_p(File.join(Smoke::OUT, '.selftest-pill'))
+pill_file = File.join(Smoke::OUT, '.selftest-pill', 'notch-pill.yaml')
+File.write(pill_file, YAML.dump(pill_doc))
+app_pill = FakeApp.new
+r = Runner.new(app_pill, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-pill', 'out'), io: StringIO.new, settle: 0, poll: 0.01, within: 0.05)
+    .run_file(pill_file)
+eq('pill scenario passes on the fixture', [r['status'], r['reason']], ['pass', nil])
+eq('pill scenario forces the pill, clears it, then puts the notch back', app_pill.actions,
+   ['notch on', 'notch-pill force', 'notch-pill off', 'notch off'])
+eq('pill scenario leaves the pill off', app_pill.state_now['notch_pill'], pill_off)
+# Without the island switch the pill has nothing to draw: the forced override alone shows nothing.
+app_dark = FakeApp.new
+app_dark.action('notch-pill', 'force')
+eq('a forced pill with the island off is not shown', app_dark.state_now['notch_pill'].values_at('on', 'forced', 'shown'), [true, true, false])
+FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-pill'))
 eq('changed shortcut keys are put back',
    Restore.plan(base.merge('hot_keys' => { 'settings_keys' => '⌥S' }), base.merge('hot_keys' => { 'settings_keys' => '⌃⌥S' })), [['hot-key', 'settings ⌥S']])
 # The fixture tree holds no Settings page: the state steps run, the tree ones are dropped.
@@ -635,7 +676,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config]
+    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

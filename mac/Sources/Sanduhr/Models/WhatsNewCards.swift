@@ -7,8 +7,16 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2280: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.28.0", id: "no-notch-pill",
+            title: "The island, on any screen",
+            body: "A Mac without a notch can draw the island's wing text as a pill over the middle of the menu bar. Switch it on under Settings, Desk, Notch.",
+            art: .symbol("capsule"), destination: .notch),
+    ]
 
     static let release2270: [WhatsNewCard] = [
         WhatsNewCard(
