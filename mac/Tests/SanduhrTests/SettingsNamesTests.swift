@@ -186,6 +186,21 @@ struct SettingsCopyTests {
         #expect(!mon.contains("instead of every-day lines"))
     }
 
+    @Test func needsTheDeskIsSaidOncePerPage() {
+        // Polish-leftovers 3: the Notch page's caption led with "Needs the Desk." in every state,
+        // and the row above it says the same with the Desk off, so the sentence showed twice.
+        #expect(NeedsDeskRow.text == "Needs the Desk.")
+        #expect(NeedsDeskRow.lead("Widens.", deskOn: true) == "Needs the Desk. Widens.")
+        #expect(NeedsDeskRow.lead("Widens.", deskOn: false) == "Widens.")
+        let on = NeedsDeskRow.lead(DeskNotchSection.islandCaption, deskOn: true)
+        let off = NeedsDeskRow.lead(DeskNotchSection.islandCaption, deskOn: false)
+        #expect(on.hasPrefix("Needs the Desk. Widens the notch into one black island"))
+        #expect(off == DeskNotchSection.islandCaption)
+        #expect(!off.contains(NeedsDeskRow.text))
+        #expect(on.components(separatedBy: NeedsDeskRow.text).count == 2)
+        #expect(DeskNotchSection.islandCaption.hasSuffix("."))
+    }
+
     @Test func modsTilesSayWhatTheyCount() {
         // F21: "27 on" didn't say what was on.
         let c = ModCounts(folders: 2, mods: 1, plugins: 27, on: 27, missing: 0)

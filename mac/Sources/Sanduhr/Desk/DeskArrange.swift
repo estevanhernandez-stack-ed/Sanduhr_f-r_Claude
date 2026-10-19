@@ -264,4 +264,22 @@ final class DeskArrangeMode {
             a.setScale("clock", 1.2)
         }
     }
+
+    /// `desk-arrange hide`: the working layout's first placed piece goes, the edit its Hide
+    /// button makes. Nothing placed, or not arranging: nothing changes.
+    func smokeHide() {
+        edit { a in
+            guard let first = a.pieces.first else { return }
+            a.hide(first.widget)
+        }
+    }
+
+    /// `desk-arrange show`: the Hidden strip's first piece comes back, the edit its Show button
+    /// makes. Nothing hidden, or not arranging: nothing changes.
+    func smokeShow() {
+        edit { a in
+            guard let first = a.hidden.first else { return }
+            a.show(first)
+        }
+    }
 }

@@ -24,6 +24,7 @@ desk_arrange:
   working: null
   click_through: drawn
   bar_visible: false
+  hidden: []
 notch: false
 has_notch: true
 notch_pill:

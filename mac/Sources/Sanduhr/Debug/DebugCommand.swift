@@ -88,12 +88,14 @@ enum DebugAction: Equatable {
         case add, revert
     }
     /// Arrange mode on the Desk (item 60): start enters it as Arrange Desk… does, test makes the
-    /// smoke's own edit (the clock to Top right at 120%, unsaved), done ends it writing the layout
-    /// once when it changed, cancel ends it writing nothing.
+    /// smoke's own edit (the clock to Top right at 120%, unsaved), hide takes the working layout's
+    /// first placed piece off as its Hide button does, show puts the Hidden strip's first piece
+    /// back as its Show button does (both unsaved, no-ops outside Arrange mode), done ends it
+    /// writing the layout once when it changed, cancel ends it writing nothing.
     case deskArrange(DeskArrangeStep)
 
     enum DeskArrangeStep: String, CaseIterable {
-        case start, test, done, cancel
+        case start, test, hide, show, done, cancel
     }
 
     /// A shortcut's keys set as General's recorder sets them (2026-10-08), with its rules: nil is
@@ -258,7 +260,7 @@ enum DebugLink {
             return .success(.messageEditor(step))
         case "desk-arrange":
             guard let step = arg.flatMap({ DebugAction.DeskArrangeStep(rawValue: $0.lowercased()) }) else {
-                return bad("desk-arrange needs arg=start, test, done or cancel")
+                return bad("desk-arrange needs arg=start, test, hide, show, done or cancel")
             }
             return .success(.deskArrange(step))
         case "hot-key":

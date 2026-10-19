@@ -43,8 +43,10 @@ struct DeskLayoutSection: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .disabled(arranging)
                     .settingsAnchor(SettingsAnchor.order)
-                Text("Pieces in the same place stack top to bottom in this order. Drag a piece up or down to reorder it, or onto a piece in another place to move it there. The top, middle and bottom of a side share a column, and a side keeps clear of the centers, so places never overlap.")
+                Text("Pieces in the same place stack top to bottom in this order. Drag a piece up or down to reorder it, or onto a piece in another place to move it there.")
                     .font(.caption).foregroundStyle(.secondary)
+                Link("Learn more", destination: AboutLinks.deskGuide)
+                    .font(.caption)
             }
             DeskClicksSection()
             // The margins move every piece, so they wait while arranging as the places and the order do.
@@ -147,6 +149,13 @@ private struct DeskPieceExtra: View {
 struct NeedsDeskRow: View {
     @AppStorage(DeskController.enabledKey, store: .desk) private var deskOn = false
     static let text = "Needs the Desk."
+
+    /// A caption that leads with the rule, but only while the row is not already saying it: the
+    /// row shows with the Desk off, so the sentence leads the caption with the Desk on and is
+    /// left to the row with it off. Either way a page says "Needs the Desk." once.
+    static func lead(_ rest: String, deskOn: Bool) -> String {
+        deskOn ? "\(text) \(rest)" : rest
+    }
 
     var body: some View {
         if !deskOn {
@@ -590,7 +599,7 @@ private struct MeterWarningGroup: View {
             Slider(value: $threshold, in: 50...100, step: 5)
             Text("\(Int(threshold))%")
                 .font(.system(.body, design: .monospaced))
-                .frame(width: 48, alignment: .trailing)
+                .frame(width: sliderValueWidth, alignment: .trailing)
         }
         .disabled(!enabled)
         Picker("Only while the reset is more than", selection: $minReset) {
@@ -791,11 +800,16 @@ struct MessageSuggestionReview: View {
 // MARK: - Notch
 
 struct DeskNotchSection: View {
+    @AppStorage(DeskController.enabledKey, store: .desk) private var deskOn = false
     @AppStorage(DeskController.notchKey, store: .desk) private var enabled = false
     @AppStorage(NotchPill.key, store: .desk) private var pill = NotchPill.defaultOn
     @AppStorage(CameraLightController.enabledKey, store: .desk) private var cameraLight = false
     @AppStorage(CameraLightController.brightnessKey, store: .desk) private var lightBrightness = CameraLightController.defaultBrightness
     @AppStorage(CameraLightController.sizeKey, store: .desk) private var lightSize = CameraLightController.defaultSize
+
+    /// What the island is, under its switch. `NeedsDeskRow.lead` puts the rule in front of it
+    /// while the Desk is on (polish-ux 13; polish-leftovers 3).
+    static let islandCaption = "Widens the notch into one black island; click it to open these settings."
 
     var body: some View {
         Form {
@@ -803,7 +817,7 @@ struct DeskNotchSection: View {
                 Toggle(SettingsNames.notchSwitch, isOn: $enabled)
                     .settingsAnchor(SettingsAnchor.notch)
                 NeedsDeskRow()
-                Text("\(NeedsDeskRow.text) Widens the notch into one black island; click it to open these settings.")
+                Text(NeedsDeskRow.lead(Self.islandCaption, deskOn: deskOn))
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle(NotchPill.title, isOn: $pill)
                     .onChange(of: pill) { _, _ in DeskController.shared.applyPill() }

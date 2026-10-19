@@ -110,7 +110,7 @@ Fresh-install and migration checks stay manual.
 - [ ] Strip under the notch draws when Notch, "Extra height below" is above 0; its text appears with "Text under the camera too".
 - [ ] Notch, Text: set Right wing to Message: the right wing shows today's message within 15 seconds, growing to fit. Set Left wing to Nothing: a plain black wing. "Under the camera" to Time: the strip shows the time. Put all three back to their first choices (Next meeting, or the time; Claude meters; Next meeting, or the Claude meters).
 - [ ] Click the island: Sanduhr Settings opens.
-- [ ] Captions (polish-ux 13): the caption under the island switch starts "Needs the Desk." (with the Desk off, the Needs the Desk. row and its Desk Settings… button sit above it). Camera and mic ends in a two-sentence caption and a **Learn more** link that opens the setup guide at "4. Use the notch" in the browser. With the island off, Glow and Camera and mic stay usable (see item 27 and §24 step 9); only Text is disabled.
+- [ ] Captions (polish-ux 13, polish-leftovers 3): with the Desk on, the caption under the island switch starts "Needs the Desk."; with the Desk off, the Needs the Desk. row and its Desk Settings… button sit above it and the caption starts "Widens the notch", so the sentence reads once either way. Camera and mic ends in a two-sentence caption and a **Learn more** link that opens the setup guide at "4. Use the notch" in the browser. With the island off, Glow and Camera and mic stay usable (see item 27 and §24 step 9); only Text is disabled.
 - [ ] Captions and spacing (polish-ux 14): Notch glow's Claude Code caption is two sentences (the hook, and that Claude Code says only waiting or finished) with a **Learn more** link that opens the setup guide at "7. Connect Claude Code"; Desk, Where each piece sits ends in a two-sentence caption with a **Learn more** link to "3. Put things on your desktop". Camera fill light's Brightness value column is as wide as Reach below the menu bar's (the percent sits flush with the number under it). Message's rotation, lines and Ask Claude sit in grouped sections with the same margins as Desk Look, under the bar that never scrolls away; the list still scrolls, and dragging a row onto another still reorders it.
 - [ ] Quit and relaunch: the notch is still on (the switch saved). Turn it off: wings and strip go, Desk layer stays.
 - [ ] Full-screen an app: wings stay above it. Switch Spaces: wings stay.
@@ -1601,6 +1601,10 @@ the end.
     Bottom left at 100% (the message comes back at Top left), exactly where Settings' place picker
     would. Cancel puts hidden pieces back and shown ones away; Done writes the string without the
     hidden piece's word (its size part included) and with the shown one's.
+    By hook: `smoke/smoke do desk-arrange hide` takes the first placed piece off exactly as its × does,
+    and `desk_arrange.hidden` in state.yaml lists it first (the strip's order, Settings' order).
+    `smoke/smoke do desk-arrange show` puts the strip's first piece back exactly as its Show does, and
+    it leaves `desk_arrange.hidden`; outside Arrange mode both do nothing and `hidden` is `[]`.
 14b. **The Desk page waits.** While arranging, Settings, Desk's Margins under Advanced and the
     Meetings row's "Read today's meetings" are off, as Where each piece sits and Order are. With
     every piece Hidden in Settings, the Order list reads "Nothing is placed on the Desk." and

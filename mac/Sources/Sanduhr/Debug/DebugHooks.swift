@@ -153,6 +153,8 @@ enum DebugHooks {
         case .messageEditor(.revert): SettingsWindowController.shared.messageEditor.load()
         case .deskArrange(.start): DeskController.shared.arrangeDesk()
         case .deskArrange(.test): DeskController.shared.model.arrange.smokeEdit()
+        case .deskArrange(.hide): DeskController.shared.model.arrange.smokeHide()
+        case .deskArrange(.show): DeskController.shared.model.arrange.smokeShow()
         case .deskArrange(.done): DeskController.shared.endArrange(keep: true)
         case .deskArrange(.cancel): DeskController.shared.endArrange(keep: false)
         case .hotKey(let s, let combo, let anyway):
@@ -326,7 +328,7 @@ enum DebugHooks {
         let arrange = desk.model.arrange
         s.deskArrange = DeskArrangeDebug(active: arrange.active, changed: arrange.session?.changed ?? false,
                                          working: arrange.working?.string, clickThrough: desk.clickThrough,
-                                         barVisible: desk.arrangeBarVisible)
+                                         barVisible: desk.arrangeBarVisible, hidden: arrange.working?.hidden ?? [])
         s.notch = UserDefaults.desk.bool(forKey: DeskController.notchKey)
         s.hasNotch = desk.wingsWindow != nil
         let primaryHeight = NSScreen.screens.first?.frame.maxY ?? 0

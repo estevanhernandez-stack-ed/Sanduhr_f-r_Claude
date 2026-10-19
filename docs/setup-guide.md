@@ -90,7 +90,7 @@ The pieces are: **Message** (a line of your own, see task 5), **Clock and date**
 4. Drag a piece up or down its stack to reorder it. Drag its round handle to resize it.
 5. Press Return (or click **Done**) to keep it. Press Escape (or click **Cancel**) to put everything back.
 
-**Move pieces from Settings.** Settings, **Desk** has the same choices as menus. **Where each piece sits** picks a place (or **Hidden**) and a size for each piece; to keep your meters off the desktop, set both Claude meters pieces to **Hidden**. Size scales a piece from 60% to 160%; the message starts from its own size in Desk Look. Top center sits below the notch. **Order** lists the stacks; drag to reorder. **Margins**, under **Advanced** at the bottom, keeps pieces away from the screen edges.
+**Move pieces from Settings.** Settings, **Desk** has the same choices as menus. **Where each piece sits** picks a place (or **Hidden**) and a size for each piece; to keep your meters off the desktop, set both Claude meters pieces to **Hidden**. Size scales a piece from 60% to 160%; the message starts from its own size in Desk Look. Top center sits below the notch. **Order** lists the stacks; drag to reorder. The top, middle and bottom of a side share a column, and a side keeps clear of the centers, so places never overlap. **Margins**, under **Advanced** at the bottom, keeps pieces away from the screen edges.
 
 **Change the look.** Settings, **Desk Look** sets the **Desk font**, the **Message font**, the sizes of the clock and message, and the colors: pick a preset under **Colors**, or type your own hex colors under **Advanced** (one, or two to four with commas for a gradient). EsteFont Pro, a handwriting font, is the Desk font on new installs.
 

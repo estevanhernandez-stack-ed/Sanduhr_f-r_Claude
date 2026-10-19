@@ -43,6 +43,14 @@ class FakeApp
     YAML.safe_load(File.read(File.join(snapshot(dir, screens: false), 'state.yaml')))
   end
 
+  # The Desk's widget keys in Settings' order (DeskLayout.widgets), for Arrange mode's Hidden strip.
+  ARRANGE_KNOWN = %w[message clock claude meters nowPlaying watchers meetings].freeze
+
+  # The known pieces a layout string leaves out, in Settings' order: `desk_arrange.hidden`.
+  def arrange_hidden(layout)
+    ARRANGE_KNOWN - layout.to_s.split.map { |w| w.split(':').first }
+  end
+
   def action(name, arg = nil)
     @actions << [name, arg].compact.join(' ')
     s = @state_now
@@ -116,13 +124,29 @@ class FakeApp
       when 'start'
         unless a['active']
           a.merge!('active' => true, 'changed' => false, 'working' => s['layout'], 'click_through' => 'whole',
-                   'bar_visible' => true)
+                   'bar_visible' => true, 'hidden' => arrange_hidden(s['layout']))
           # Settings steps aside while arranging and comes back after.
           @arrange_hid_settings = s['settings_open'] == true
           s['settings_open'] = false
         end
       when 'test'
         a.merge!('changed' => true, 'working' => s['layout'].sub('clock:bl', 'clock:tr:1.2')) if a['active']
+      when 'hide'
+        # The first placed piece's word goes, as its Hide button takes it.
+        if a['active'] && !a['working'].to_s.empty?
+          a['working'] = a['working'].split.drop(1).join(' ')
+          a.merge!('changed' => true, 'hidden' => arrange_hidden(a['working']))
+        end
+      when 'show'
+        # The Hidden strip's first piece comes back at its default anchor at size 1, seated by
+        # Settings' order, as its Show button puts it.
+        if a['active'] && !a['hidden'].to_a.empty?
+          piece = a['hidden'].first
+          words = a['working'].to_s.split
+          at = words.index { |w| ARRANGE_KNOWN.index(w.split(':').first).to_i > ARRANGE_KNOWN.index(piece) } || words.length
+          words.insert(at, "#{piece}:#{piece == 'message' ? 'tl' : 'bl'}")
+          a.merge!('working' => words.join(' '), 'changed' => true, 'hidden' => arrange_hidden(words.join(' ')))
+        end
       when 'done', 'cancel'
         if a['active'] && a['changed'] && arg == 'done'
           s['layout'] = a['working']
@@ -133,7 +157,7 @@ class FakeApp
           @arrange_hid_settings = false
         end
         a.merge!('active' => false, 'changed' => false, 'working' => nil, 'click_through' => 'drawn',
-                 'bar_visible' => false)
+                 'bar_visible' => false, 'hidden' => [])
       end
     when 'demo'
       # Item 72, slice 4: sample meters on the widget and the Desk, two sample accounts; off puts
@@ -553,9 +577,10 @@ eq('demo off before and after: nothing to do', Restore.plan(fresh, fresh), [])
 check('demo scenario touches no account', File.read(File.join(Smoke::SCENARIOS, 'demo-every-surface.yaml')) !~ /do:\s*account/)
 FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-demo'))
 # Item 60: Arrange mode, flags and a layout string only; a scenario that leaves it on is cancelled.
-eq('desk arrange keys', state['desk_arrange'].keys, %w[active changed working click_through bar_visible])
+eq('desk arrange keys', state['desk_arrange'].keys, %w[active changed working click_through bar_visible hidden])
 eq('desk arrange in the fixture: off, clicks only where drawn, no bar',
    state['desk_arrange'].values_at('active', 'working', 'click_through', 'bar_visible'), [false, nil, 'drawn', false])
+eq('desk arrange in the fixture: nothing hidden outside Arrange mode', state['desk_arrange']['hidden'], [])
 eq('arrange mode a scenario left on is cancelled',
    Restore.plan(base, base.merge('desk_arrange' => { 'active' => true })), [%w[desk-arrange cancel]])
 eq('arrange mode on before is left alone',
@@ -564,10 +589,10 @@ app_ar = FakeApp.new
 r = Runner.new(app_ar, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-ar'), io: StringIO.new, settle: 0, poll: 0.01, within: 0.05)
     .run_file(File.join(Smoke::SCENARIOS, 'desk-arrange.yaml'))
 eq('desk arrange scenario passes', [r['status'], r['reason']], ['pass', nil])
-eq('desk arrange scenario starts from Settings, cancels, then saves with done, Settings put back',
+eq('desk arrange scenario starts from Settings, hides and shows, cancels, then saves with done, Settings put back',
    app_ar.actions,
-   ['settings deskLayout', 'desk-arrange start', 'desk-arrange test', 'desk-arrange cancel',
-    'desk-arrange start', 'desk-arrange test', 'desk-arrange done', 'settings notch'])
+   ['settings deskLayout', 'desk-arrange start', 'desk-arrange test', 'desk-arrange hide', 'desk-arrange show',
+    'desk-arrange cancel', 'desk-arrange start', 'desk-arrange test', 'desk-arrange done', 'settings notch'])
 FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-ar'))
 app_av = FakeApp.new
 app_av.action('av-test', 'mic on')

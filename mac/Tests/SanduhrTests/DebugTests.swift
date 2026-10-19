@@ -85,6 +85,10 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action?name=tour").command == .action(.tour(step: 1), dir: nil))
         #expect(parse("sanduhr://debug/action?name=tour-step&arg=3").command == .action(.tour(step: 3), dir: nil))
         #expect(parse("sanduhr://debug/action?name=close-tour").command == .action(.closeTour, dir: nil))
+        // Item 60: Arrange mode's steps; hide and show are the piece's Hide and the strip's Show.
+        #expect(parse("sanduhr://debug/action?name=desk-arrange&arg=hide").command == .action(.deskArrange(.hide), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=desk-arrange&arg=show").command == .action(.deskArrange(.show), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=desk-arrange&arg=hidden").error == "desk-arrange needs arg=start, test, hide, show, done or cancel")
         #expect(parse("sanduhr://debug/action?name=tour-step").error == "tour-step needs arg=<step number from 1>")
         #expect(parse("sanduhr://debug/action?name=tour-step&arg=0").error == "tour-step needs arg=<step number from 1>")
     }
