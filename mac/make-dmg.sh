@@ -27,16 +27,30 @@ if [[ ! -d "$APP" ]]; then
     exit 1
 fi
 
-# hdiutil fails now and then with "Resource busy" while something (Spotlight, XProtect, a
-# CI runner's scanners) still holds the image or its folder. Retry a few times before failing.
+# hdiutil fails now and then with "Resource busy" or "Resource temporarily unavailable" while
+# something (Spotlight, XProtect, a CI runner's scanners, diskimages-helper letting go after a
+# detach) still holds the image or its folder. Retry with a growing wait before failing: eight
+# attempts, 5 s to 40 s apart, three minutes in all. Five tries over 45 s lost the 2.28.0
+# release run on the convert step (2026-10-18).
 retry() {
     local attempt
-    for attempt in 1 2 3 4 5; do
+    for attempt in 1 2 3 4 5 6 7 8; do
         "$@" && return 0
-        echo "  hdiutil busy (attempt $attempt of 5), retrying in $((attempt * 3))s..." >&2
-        sleep $((attempt * 3))
+        echo "  hdiutil busy (attempt $attempt of 8), retrying in $((attempt * 5))s..." >&2
+        sleep $((attempt * 5))
     done
     return 1
+}
+
+# After a detach, hdiutil can still list the image for a moment; converting it then fails with
+# "Resource temporarily unavailable". Wait until it is gone, up to 30 s.
+wait_detached() {
+    local i
+    for i in $(seq 1 15); do
+        hdiutil info 2>/dev/null | grep -q -- "$1" || return 0
+        sleep 2
+    done
+    echo "  image still listed after a detach, converting anyway" >&2
 }
 
 echo "→ Staging DMG contents..."
@@ -110,6 +124,7 @@ sleep 2
 echo "→ Unmounting..."
 cleanup_mount
 trap - EXIT
+wait_detached "$TMP_DMG"
 
 echo "→ Compressing final DMG..."
 retry hdiutil convert "$TMP_DMG" -ov \
