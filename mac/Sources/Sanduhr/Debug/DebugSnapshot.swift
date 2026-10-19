@@ -168,6 +168,9 @@ struct DeskArrangeDebug: Equatable {
     var clickThrough = "drawn"
     /// The bar's floating panel (Cancel and Done) is on screen.
     var barVisible = false
+    /// The working layout's hidden pieces (DeskLayout's keys, in Settings' order): the Hidden
+    /// strip's pieces. Empty outside Arrange mode.
+    var hidden: [String] = []
 }
 
 /// state.yaml's `notch_pill:` (NotchPill, issue #119): the switch (`on`, quoted so Ruby reads a
@@ -346,12 +349,14 @@ enum DebugState {
     }
 
     /// `desk_arrange:` (item 60): active, changed, the working layout string (null outside Arrange
-    /// mode), click_through (`whole` or `drawn`) and bar_visible (the floating bar is on screen).
+    /// mode), click_through (`whole` or `drawn`), bar_visible (the floating bar is on screen) and
+    /// hidden (the working layout's hidden piece keys, the Hidden strip; `[]` outside Arrange mode).
     static func deskArrangeYAML(_ a: DeskArrangeDebug) -> YAMLNode {
         .map([YAMLPair("active", .bool(a.active)), YAMLPair("changed", .bool(a.changed)),
               YAMLPair("working", a.working.map(YAMLNode.string) ?? .null),
               YAMLPair("click_through", .string(a.clickThrough)),
-              YAMLPair("bar_visible", .bool(a.barVisible))])
+              YAMLPair("bar_visible", .bool(a.barVisible)),
+              YAMLPair("hidden", .list(a.hidden.map(YAMLNode.string)))])
     }
 
     /// `notch_pill:` (issue #119): the switch, the override, shown, and the frame as `[x, y, w, h]`

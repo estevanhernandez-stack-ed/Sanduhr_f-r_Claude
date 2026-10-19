@@ -1601,6 +1601,10 @@ the end.
     Bottom left at 100% (the message comes back at Top left), exactly where Settings' place picker
     would. Cancel puts hidden pieces back and shown ones away; Done writes the string without the
     hidden piece's word (its size part included) and with the shown one's.
+    By hook: `smoke/smoke do desk-arrange hide` takes the first placed piece off exactly as its × does,
+    and `desk_arrange.hidden` in state.yaml lists it first (the strip's order, Settings' order).
+    `smoke/smoke do desk-arrange show` puts the strip's first piece back exactly as its Show does, and
+    it leaves `desk_arrange.hidden`; outside Arrange mode both do nothing and `hidden` is `[]`.
 14b. **The Desk page waits.** While arranging, Settings, Desk's Margins under Advanced and the
     Meetings row's "Read today's meetings" are off, as Where each piece sits and Order are. With
     every piece Hidden in Settings, the Order list reads "Nothing is placed on the Desk." and
