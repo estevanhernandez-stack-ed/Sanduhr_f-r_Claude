@@ -397,15 +397,45 @@ struct DeskArrangeClickTests {
     func debug() {
         #expect((try? DebugLink.action("desk-arrange", arg: "start").get()) == .deskArrange(.start))
         #expect((try? DebugLink.action("desk-arrange", arg: "CANCEL").get()) == .deskArrange(.cancel))
+        #expect((try? DebugLink.action("desk-arrange", arg: "hide").get()) == .deskArrange(.hide))
+        #expect((try? DebugLink.action("desk-arrange", arg: "Show").get()) == .deskArrange(.show))
         #expect((try? DebugLink.action("desk-arrange", arg: nil).get()) == nil)
         #expect(DebugAction.names.contains("desk-arrange"))
         var input = DebugStateInput()
         #expect(YAMLEmitter.emit(DebugState.yaml(input)).contains(
-            "desk_arrange:\n  active: false\n  changed: false\n  working: null\n  click_through: drawn\n  bar_visible: false\n"))
+            "desk_arrange:\n  active: false\n  changed: false\n  working: null\n  click_through: drawn\n  bar_visible: false\n  hidden: []\n"))
         input.deskArrange = DeskArrangeDebug(active: true, changed: true, working: "message:tl clock:tr:1.2",
-                                             clickThrough: "whole", barVisible: true)
+                                             clickThrough: "whole", barVisible: true, hidden: ["claude", "meters"])
         #expect(YAMLEmitter.emit(DebugState.yaml(input)).contains(
-            "desk_arrange:\n  active: true\n  changed: true\n  working: \"message:tl clock:tr:1.2\"\n  click_through: whole\n  bar_visible: true\n"))
+            "desk_arrange:\n  active: true\n  changed: true\n  working: \"message:tl clock:tr:1.2\"\n  click_through: whole\n  bar_visible: true\n  hidden:\n    - claude\n    - meters\n"))
+    }
+
+    @Test("desk-arrange hide and show make the Hide and Show buttons' edits on the working layout only")
+    func smokeHideAndShow() {
+        let d = CountingDefaults()
+        d.values["layout"] = "message:tl clock:bl meters:bl meetings:bl"
+        let mode = DeskArrangeMode(store: d)
+        // Not arranging: both are no-ops.
+        mode.smokeHide()
+        mode.smokeShow()
+        #expect(mode.working == nil)
+        mode.begin()
+        #expect(mode.working?.hidden == ["claude", "nowPlaying", "watchers"])
+        mode.smokeEdit()
+        mode.smokeHide()
+        #expect(mode.working?.string == "clock:tr:1.2 meters:bl meetings:bl")
+        #expect(mode.working?.hidden == ["message", "claude", "nowPlaying", "watchers"])
+        mode.smokeShow()
+        #expect(mode.working?.string == "message:tl clock:tr:1.2 meters:bl meetings:bl")
+        #expect(mode.working?.hidden == ["claude", "nowPlaying", "watchers"])
+        mode.cancel()
+        #expect(d.values["layout"] as? String == "message:tl clock:bl meters:bl meetings:bl")
+        #expect(d.writes.isEmpty)
+        mode.begin()
+        mode.smokeHide()
+        #expect(mode.done())
+        #expect(d.values["layout"] as? String == "clock:bl meters:bl meetings:bl")
+        #expect(d.writes == ["layout"])
     }
 
     @Test("the menu item and the Settings button say Arrange Desk…")

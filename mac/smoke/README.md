@@ -61,7 +61,8 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `desk_arrange` (item 60: `active`, Arrange mode is on; `changed`, its edit differs from the saved layout;
   `working`, the layout string being edited, null outside Arrange mode; `click_through`, `whole` while the
   Desk window takes clicks over its whole frame, `drawn` when only what is drawn takes them; `bar_visible`,
-  the floating panel with Cancel and Done is on screen),
+  the floating panel with Cancel and Done is on screen; `hidden`, the working layout's hidden pieces as
+  the Hidden strip lists them, by widget key in Settings' order, `[]` outside Arrange mode),
   `notch`, `has_notch`,
   `notch_pill` (issue #119, the island as a pill over the middle of the menu bar on a screen without a notch:
   `on`, Settings, Desk, Notch's "Top-center island on screens without a notch", desk suite key `notchPill`, off when
@@ -131,9 +132,11 @@ recorded: the tour's state and What's New's last-seen version stay as they were)
 `message-editor add|revert` (item 69: Settings, Message's editor; add opens it and adds the smoke's own line,
 Fridays, "ship it." in a sunset gradient in script with a sweep, as the controls write it; revert drops
 unsaved edits. Neither saves, so `messages.txt` is never written; a run reverts what it added),
-`desk-arrange start|test|done|cancel` (item 60: Arrange mode on the Desk, as Arrange Desk… enters it; test
-makes the smoke's own edit, the clock to Top right at 120%, in the working layout only; done ends it writing
-the layout once when it changed, cancel ends it writing nothing. A run that leaves it on cancels it),
+`desk-arrange start|test|hide|show|done|cancel` (item 60: Arrange mode on the Desk, as Arrange Desk… enters
+it; test makes the smoke's own edit, the clock to Top right at 120%, in the working layout only; hide takes
+the working layout's first placed piece off as its Hide button does and show puts the Hidden strip's first
+piece back as its Show button does, both unsaved and no-ops outside Arrange mode; done ends it writing the
+layout once when it changed, cancel ends it writing nothing. A run that leaves it on cancels it),
 `hot-key settings|join <keys> [anyway]|default` (General, Shortcuts: a shortcut's keys set as the recorder sets them,
 written as `ctrl-opt-s` or `⌃⌥S`; refused with an error, nothing saved, without ⌘, ⌃ or ⌥ or when the other
 shortcut has them. Keys macOS also uses (item 73) are refused without an error, as the recorder refuses them:

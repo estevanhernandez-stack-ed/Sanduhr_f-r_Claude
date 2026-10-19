@@ -29,8 +29,9 @@ module Smoke
                             av-test camera on|off, av-test mic on|off (fake the camera or mic signal)
                             message-editor add|revert (Settings, Message: the smoke's own line,
                             unsaved; revert drops unsaved edits; never saves)
-                            desk-arrange start|test|done|cancel (Arrange mode on the Desk: test is
-                            the smoke's own edit, unsaved; done writes the layout, cancel nothing)
+                            desk-arrange start|test|hide|show|done|cancel (Arrange mode on the Desk:
+                            test is the smoke's own edit, hide and show the first piece's Hide and the
+                            Hidden strip's Show, all unsaved; done writes the layout, cancel nothing)
                             hot-key settings|join <keys>|default (a shortcut's keys, as General's
                             recorder sets them: ctrl-opt-s or ⌃⌥S; refused without ⌘⌃⌥ or when the
                             other shortcut has them; a run puts them back)

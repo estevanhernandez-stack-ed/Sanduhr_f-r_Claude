@@ -3,7 +3,10 @@
 # whole). The bar with Cancel and Done floats above every window in its own panel (bar_visible),
 # and Settings, where Arrange is often started from, steps aside until it ends and then comes back.
 # The smoke's own edit moves the clock to Top right at 120% in the working layout only: the saved
-# layout is untouched until Done. Cancel drops the edit and the layout stays exactly as it was; Done
+# layout is untouched until Done. The hide hook takes the first placed piece (the message) off as its
+# Hide button does, so it joins the Hidden strip (desk_arrange.hidden, which already lists the pieces
+# the layout leaves out); the show hook puts the strip's first piece back as its Show button does, at
+# its default place at 100%. Cancel drops the edit and the layout stays exactly as it was; Done
 # writes it once. Either way the bar closes and the window goes back to taking clicks only where
 # something is drawn (click_through: drawn). The layout is put back afterwards.
 name: Desk arrange mode moves a piece, Cancel restores, Done saves
@@ -28,8 +31,21 @@ steps:
   - expect_state:
       desk_arrange.changed: true
       desk_arrange.working: "message:tl clock:tr:1.2 meters:bl meetings:bl"
+      desk_arrange.hidden.0: claude
       layout: "message:tl clock:bl meters:bl meetings:bl"
   - snap: desk-arrange
+  - do: desk-arrange
+    arg: hide
+  - expect_state:
+      desk_arrange.hidden.0: message
+      desk_arrange.working: "clock:tr:1.2 meters:bl meetings:bl"
+      layout: "message:tl clock:bl meters:bl meetings:bl"
+  - do: desk-arrange
+    arg: show
+  - expect_state:
+      desk_arrange.hidden.0: claude
+      desk_arrange.working: "message:tl clock:tr:1.2 meters:bl meetings:bl"
+      layout: "message:tl clock:bl meters:bl meetings:bl"
   - do: desk-arrange
     arg: cancel
   - expect_state:
@@ -37,6 +53,7 @@ steps:
       desk_arrange.working: null
       desk_arrange.click_through: drawn
       desk_arrange.bar_visible: false
+      desk_arrange.hidden: []
       settings_open: true
       layout: "message:tl clock:bl meters:bl meetings:bl"
       desk_pieces[piece=clock].anchor: bl
