@@ -592,7 +592,7 @@ private struct MeterWarningGroup: View {
             Slider(value: $threshold, in: 50...100, step: 5)
             Text("\(Int(threshold))%")
                 .font(.system(.body, design: .monospaced))
-                .frame(width: 48, alignment: .trailing)
+                .frame(width: sliderValueWidth, alignment: .trailing)
         }
         .disabled(!enabled)
         Picker("Only while the reset is more than", selection: $minReset) {
