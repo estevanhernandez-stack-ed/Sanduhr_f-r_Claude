@@ -2072,3 +2072,37 @@ On a Mac with two or more Claude Code folders, one marked Work and one Personal 
 11. `smoke/smoke run smoke/scenarios/mods-config.yaml` (from `mac/`) passes; `smoke/smoke state`
     shows `mods_config.selected` and one `by_seat` entry per folder, numbers and flags only. Compare
     the modification times from the start: unchanged.
+
+## 51. Top-center pill (issue #119)
+
+The island for a screen without a notch: a Mac mini, an iMac, an external display as the main
+screen, or a clamshell MacBook. Settings, Desk, Notch, **Top-center island on screens without a
+notch**, under the island switch, off by default. The pill needs the island switch on; with it off
+the pill has nothing to draw. On a notched MacBook nothing shows without the debug override, which
+is what the smoke tools use: `smoke/smoke do notch-pill force` (from `mac/`) writes the switch and
+`notchPillForce` together; `smoke/smoke do notch-pill off` clears both.
+
+1. `smoke/smoke run smoke/scenarios/notch-pill.yaml` (from `mac/`) passes on any Mac with the Desk
+   on: it turns the notch on, forces the pill, checks `notch_pill: {on: true, forced: true, shown:
+   true}` with a frame, snaps it, switches it off and puts the notch back. `smoke/smoke tree` while
+   forced lists a `pill` window.
+2. On a no-notch Mac (or any Mac with the override): notch on, then the switch (or the hook). A black
+   capsule sits over the middle of the menu bar, as tall as the bar, centered, with the left wing's
+   time or next meeting and the right wing's `5h N%  wk N%` and a small gap between them where the
+   camera would be: no camera gap, no flares at its top corners, never wider than about a third of
+   the screen. Signed out, the right wing is empty and the capsule shrinks to the left wing alone.
+3. Click the pill: Sanduhr Settings opens. Two-finger click (or Control-click) a wing that carries a
+   menu (now playing, a watcher, the indicators): the island's menu, the same as on the island.
+4. Move the pointer into the menu bar: the pill hides at once, and whatever sat under it (an app
+   menu, a status item) takes the click. Move the pointer out: it comes back.
+5. Enter full screen in another app: the pill goes with the menu bar. Leave full screen: it comes
+   back on the menu bar within a second. Switch Spaces: it stays. With the menu bar set to auto-hide
+   (System Settings, Control Center), it shows only while the bar does.
+6. Glow and the camera light follow it: Settings, Notch, Glow, **Test Glow** (or `smoke/smoke do glow`)
+   outlines the pill, no outline along the screen edge; Tools, Camera Fill Light hugs the pill the way
+   it hugs the notch.
+7. Switch it off (the Settings switch, or `smoke/smoke do notch-pill off`): the pill goes at once,
+   nothing is left at the top of the screen, and `smoke/smoke state` shows `notch_pill: {on: false,
+   forced: false, shown: false, frame: null}`.
+8. On a notched Mac with the override cleared: switch the setting on. Nothing shows, the island draws
+   as before, and `smoke/smoke state` reads `shown: false` with `has_notch: true`. Switch it off.
