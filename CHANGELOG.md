@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.28.0-mac — 2026-10-18
 
 - **The island, on any screen.** A Mac without a notch (a Mac mini, an iMac, an external display, a closed MacBook) can draw the island's wing text as a pill over the middle of the menu bar: Settings, Desk, Notch gains **Top-center island on screens without a notch**. Same content, same click to Settings, same two-finger menu; the glow and the camera light use the pill's frame. It hides while the pointer is in the menu bar and while the menu bar is hidden, as in full screen, and caps its width so app menus stay clear. Off by default; nothing changes on a Mac with a notch.
 
