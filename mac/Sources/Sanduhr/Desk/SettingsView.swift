@@ -43,8 +43,10 @@ struct DeskLayoutSection: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .disabled(arranging)
                     .settingsAnchor(SettingsAnchor.order)
-                Text("Pieces in the same place stack top to bottom in this order. Drag a piece up or down to reorder it, or onto a piece in another place to move it there. The top, middle and bottom of a side share a column, and a side keeps clear of the centers, so places never overlap.")
+                Text("Pieces in the same place stack top to bottom in this order. Drag a piece up or down to reorder it, or onto a piece in another place to move it there.")
                     .font(.caption).foregroundStyle(.secondary)
+                Link("Learn more", destination: AboutLinks.deskGuide)
+                    .font(.caption)
             }
             DeskClicksSection()
             // The margins move every piece, so they wait while arranging as the places and the order do.
