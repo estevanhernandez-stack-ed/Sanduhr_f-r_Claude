@@ -272,13 +272,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func widgetVisibilityDidChange() { applyWidgetVisibility(.choiceChanged) }
 
     /// The welcome sheet's Just the Desk: the Desk on, the sign-in line gone, and the widget out of
-    /// the way as its When the widget shows choice says.
+    /// the way as its When the widget shows choice says. A pending tour opens a moment later, as
+    /// its Desk-only steps (no fetch is coming to offer it).
     func chooseJustTheDesk() {
         JustTheDesk.choose()
         DeskController.shared.apply()
         DeskController.shared.model.refreshClaude()
         applyWidgetVisibility(.justTheDesk)
         renderStatusItem()
+        guard WelcomeTour.showsForJustTheDesk(state: WelcomeTour.state(), offeredThisLaunch: tourOffered) else { return }
+        tourOffered = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            MainActor.assumeIsolated { WelcomeTourWindowController.shared.show() }
+        }
     }
 
     /// Shows or hides the widget as WidgetVisibilityRule says for `event`; leaves it alone when

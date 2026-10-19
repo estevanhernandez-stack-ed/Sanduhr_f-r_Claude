@@ -468,7 +468,8 @@ enum DebugHooks {
                                    open: WhatsNewWindowController.shared.isOpen, hidden: WhatsNew.hidden())
         let tour = WelcomeTourWindowController.shared
         s.tour = TourDebug(open: tour.isOpen, step: tour.isOpen ? tour.navigation.index + 1 : 0,
-                           stepsShown: WelcomeTour.steps(features: WelcomeTourWindowController.features()).count,
+                           stepsShown: WelcomeTour.steps(features: WelcomeTourWindowController.features(),
+                                                     justTheDesk: JustTheDesk.isOn()).count,
                            done: WelcomeTour.done(), pending: WelcomeTour.state() == .pending)
         s.build = info["CFBundleVersion"] as? String ?? ""
         let shown = desk.model.watchers
