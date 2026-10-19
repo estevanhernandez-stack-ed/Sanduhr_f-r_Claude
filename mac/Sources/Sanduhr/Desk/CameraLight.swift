@@ -208,10 +208,19 @@ final class CameraLightController {
     private func targetFrame() -> (frame: CGRect, shape: CameraLightLayout.Shape)? {
         guard let screen = Self.screen() else { return nil }
         let size = UserDefaults.desk.object(forKey: Self.sizeKey) as? Double ?? Self.defaultSize
-        let notch = screen.cameraNotch
+        // On a screen without a notch the top-center pill, while it is up (NotchPill), stands in
+        // for the notch: the light hugs it as it would the camera.
+        let notch = screen.cameraNotch ?? DeskController.shared.pillRect(on: screen)
         let bar = screen.frame.maxY - screen.visibleFrame.maxY
         let frame = CameraLightLayout.frame(screen: screen.frame, notch: notch, barHeight: bar, size: size)
         return (frame, CameraLightLayout.shape(notch: notch, barHeight: bar, size: size))
+    }
+
+    /// The top-center pill came, went or changed width (DeskController): a light already showing
+    /// moves to hug it, or back to its own spot.
+    func followPill() {
+        guard visible, let w = window else { return }
+        if w.frame != targetFrame()?.frame { place() }
     }
 
     private func makeWindow() -> NSWindow {

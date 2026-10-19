@@ -49,6 +49,13 @@ class FakeApp
     case name
     when 'desk' then s['desk_enabled'] = s['desk_running'] = (arg == 'on')
     when 'notch' then s['notch'] = (arg == 'on')
+    when 'notch-pill'
+      # Issue #119: on a notched Mac only force draws it; off clears the override too.
+      p = (s['notch_pill'] ||= {})
+      p['on'] = arg != 'off'
+      p['forced'] = arg == 'force'
+      p['shown'] = p['on'] && s['notch'] && (p['forced'] || !s['has_notch'])
+      p['frame'] = p['shown'] ? [760, 0, 400, 24] : nil
     when 'camera-light' then s['camera_light'] = (arg == 'on')
     when 'glow', 'pulse'
       s['glow_count'] = s['glow_count'].to_i + 1
@@ -246,6 +253,9 @@ eq('piece clicks on in the fixture', state['desk_piece_clicks'], true)
 eq('plate off in the fixture', state['desk_plate'], false)
 # "Keep the Desk under desktop icons": off in the fixture, what an absent key reads as.
 eq('under icons off in the fixture', state['desk_under_icons'], false)
+# Issue #119: the top-center pill is off, not forced and not up in the fixture; its frame is null
+# until it is. The `on` key is quoted in the fixture, so it reads as a key and not as true.
+eq('pill off in the fixture', state['notch_pill'], { 'on' => false, 'forced' => false, 'shown' => false, 'frame' => nil })
 no_pieces = { 'desk_frames' => '/\A(?!.*(clock|message))/m' }
 check('the clock and message are click areas in the fixture', State.check(state, no_pieces).length == 1)
 check('off, neither is a click area',
@@ -440,6 +450,17 @@ eq('hot keys in the fixture', state['hot_keys'].values_at('join_keys', 'settings
    ['⌥J', '⌥S', false, false])
 # Item 73 b: the app menu check is off by default and nothing has asked for Accessibility.
 eq('app menu check in the fixture', state['hot_keys'].values_at('check_app_menus', 'app_menus_trusted'), [false, false])
+# Issue #119: a pill a scenario switched on or forced goes back to how it was.
+pill_off = { 'on' => false, 'forced' => false, 'shown' => false, 'frame' => nil }
+pill_forced = { 'on' => true, 'forced' => true, 'shown' => true, 'frame' => [760, 0, 400, 24] }
+eq('a forced pill is put back off',
+   Restore.plan(base.merge('notch_pill' => pill_off), base.merge('notch_pill' => pill_forced)), [['notch-pill', 'off']])
+eq('a pill switched off goes back to forced',
+   Restore.plan(base.merge('notch_pill' => pill_forced), base.merge('notch_pill' => pill_off)), [['notch-pill', 'force']])
+eq('a pill switched on goes back on without the override',
+   Restore.plan(base.merge('notch_pill' => pill_off.merge('on' => true)), base.merge('notch_pill' => pill_forced)), [['notch-pill', 'on']])
+eq('a pill left as it was needs nothing',
+   Restore.plan(base.merge('notch_pill' => pill_forced), base.merge('notch_pill' => pill_forced.merge('shown' => false))), [])
 eq('changed shortcut keys are put back',
    Restore.plan(base.merge('hot_keys' => { 'settings_keys' => '⌥S' }), base.merge('hot_keys' => { 'settings_keys' => '⌃⌥S' })), [['hot-key', 'settings ⌥S']])
 # The fixture tree holds no Settings page: the state steps run, the tree ones are dropped.

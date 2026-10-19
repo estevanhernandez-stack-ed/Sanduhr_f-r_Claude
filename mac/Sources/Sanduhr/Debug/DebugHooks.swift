@@ -119,6 +119,16 @@ enum DebugHooks {
             DeskController.shared.apply()
         case .notch(let on):
             UserDefaults.desk.set(on, forKey: DeskController.notchKey)
+        case .notchPill(let mode):
+            // off clears the override too, so a notched Mac goes back to its island alone.
+            let desk = UserDefaults.desk
+            NotchPill.set(mode != .off, in: desk)
+            switch mode {
+            case .force: desk.set(true, forKey: NotchPill.debugForceKey)
+            case .off: desk.removeObject(forKey: NotchPill.debugForceKey)
+            case .on: break
+            }
+            DeskController.shared.applyPill()
         case .cameraLight(let on): CameraLightController.shared.setManual(on)
         case .glow: NotchGlowController.shared.fire()
         case .demo(let on):
@@ -207,6 +217,7 @@ enum DebugHooks {
             if w is FloatingPanel { kind = "widget" }
             else if w === desk.window { kind = "desk" }
             else if w === desk.wingsWindow { kind = "notch" }
+            else if w === desk.pillWindow { kind = "pill" }
             else if w === CameraLightController.shared.window { kind = "camera" }
             else if w === NotchGlowController.shared.window { kind = "glow" }
             else if w === AVIndicatorController.shared.window { kind = "indicators" }
@@ -318,6 +329,10 @@ enum DebugHooks {
                                          barVisible: desk.arrangeBarVisible)
         s.notch = UserDefaults.desk.bool(forKey: DeskController.notchKey)
         s.hasNotch = desk.wingsWindow != nil
+        let primaryHeight = NSScreen.screens.first?.frame.maxY ?? 0
+        s.notchPill = NotchPillDebug(on: NotchPill.isOn(in: UserDefaults.desk), forced: NotchPill.forced(in: UserDefaults.desk),
+                                     shown: desk.pillWindow?.isVisible == true,
+                                     frame: desk.pillFrame.map { DebugTree.topLeft($0, primaryHeight: primaryHeight) })
         s.notchLeft = NotchContent.saved(.left, in: .desk)
         s.notchRight = NotchContent.saved(.right, in: .desk)
         s.notchStrip = NotchContent.saved(.strip, in: .desk)
