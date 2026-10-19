@@ -1,0 +1,32 @@
+# Issue #119: the top-center pill, the island for a screen without a notch. The pill sits under the
+# island switch, so the run turns the notch on first (the restore puts it back). `force` is how
+# this notched Mac shows it: the hook writes the switch and the debug override `notchPillForce`
+# together, and `off` clears both. state.yaml's `notch_pill` keys: `on` (quoted in the file, so
+# YAML reads a key and not true; the dotted lookup below finds it by name), `forced`, `shown`,
+# and `frame`, a four-number list in whole points from the primary screen's top left while the
+# pill is up (null otherwise), checked here by its width and height. The window is kind `pill`
+# in tree.yaml; its left wing shows the time or the next meeting by default, so some text draws
+# even signed out. Watch the snap: a black capsule over the middle of the menu bar, no camera gap,
+# no flares at its top corners, never wider than about a third of the screen.
+# By hand: docs/mac-smoke-test.md, section 51, "Top-center pill".
+name: Top-center pill through the force override
+needs: [desk]
+steps:
+  - do: notch
+    arg: "on"
+  - expect_state: { notch: true }
+  - do: notch-pill
+    arg: force
+  - expect_state:
+      notch_pill.on: true
+      notch_pill.forced: true
+      notch_pill.shown: true
+      notch_pill.frame.2: '/^[1-9]\d*(\.\d+)?$/'
+      notch_pill.frame.3: '/^[1-9]\d*(\.\d+)?$/'
+  - expect:
+      window: pill
+      contains: { text: "/\\S/" }
+  - snap: notch-pill
+  - do: notch-pill
+    arg: "off"
+  - expect_state: { notch_pill.shown: false, notch_pill.forced: false, notch_pill.on: false, notch_pill.frame: null }

@@ -461,6 +461,26 @@ eq('a pill switched on goes back on without the override',
    Restore.plan(base.merge('notch_pill' => pill_off.merge('on' => true)), base.merge('notch_pill' => pill_forced)), [['notch-pill', 'on']])
 eq('a pill left as it was needs nothing',
    Restore.plan(base.merge('notch_pill' => pill_forced), base.merge('notch_pill' => pill_forced.merge('shown' => false))), [])
+# The shipped pill scenario on the fixture (a notched Mac, notch off): the island goes on, the
+# override shows the pill, off clears it, and the restore puts the notch back. The fixture tree has
+# no pill window, so the tree step is dropped here and runs live.
+pill_doc = YAML.safe_load(File.read(File.join(Smoke::SCENARIOS, 'notch-pill.yaml')))
+pill_doc['steps'].reject! { |s| s.key?('expect') }
+FileUtils.mkdir_p(File.join(Smoke::OUT, '.selftest-pill'))
+pill_file = File.join(Smoke::OUT, '.selftest-pill', 'notch-pill.yaml')
+File.write(pill_file, YAML.dump(pill_doc))
+app_pill = FakeApp.new
+r = Runner.new(app_pill, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-pill', 'out'), io: StringIO.new, settle: 0, poll: 0.01, within: 0.05)
+    .run_file(pill_file)
+eq('pill scenario passes on the fixture', [r['status'], r['reason']], ['pass', nil])
+eq('pill scenario forces the pill, clears it, then puts the notch back', app_pill.actions,
+   ['notch on', 'notch-pill force', 'notch-pill off', 'notch off'])
+eq('pill scenario leaves the pill off', app_pill.state_now['notch_pill'], pill_off)
+# Without the island switch the pill has nothing to draw: the forced override alone shows nothing.
+app_dark = FakeApp.new
+app_dark.action('notch-pill', 'force')
+eq('a forced pill with the island off is not shown', app_dark.state_now['notch_pill'].values_at('on', 'forced', 'shown'), [true, true, false])
+FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-pill'))
 eq('changed shortcut keys are put back',
    Restore.plan(base.merge('hot_keys' => { 'settings_keys' => '⌥S' }), base.merge('hot_keys' => { 'settings_keys' => '⌃⌥S' })), [['hot-key', 'settings ⌥S']])
 # The fixture tree holds no Settings page: the state steps run, the tree ones are dropped.
@@ -656,7 +676,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config]
+    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end
