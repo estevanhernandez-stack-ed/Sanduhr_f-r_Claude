@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **The island, on any screen.** A Mac without a notch (a Mac mini, an iMac, an external display, a closed MacBook) can draw the island's wing text as a pill over the middle of the menu bar: Settings, Desk, Notch gains **Top-center island on screens without a notch**. Same content, same click to Settings, same two-finger menu; the glow and the camera light use the pill's frame. It hides while the pointer is in the menu bar and while the menu bar is hidden, as in full screen, and caps its width so app menus stay clear. Off by default; nothing changes on a Mac with a notch.
+
+- **The Mac app has a scope page.** `docs/mac-scope.md` names the Mac's user, its surfaces and its cuts, and the spec records why the Desk's click layer is not icon-aware.
+
 ## v2.27.0-mac — 2026-10-17
 
 - **The Desk can sit under your files.** Settings, Desk, Clicks gains **Keep the Desk under desktop icons**: the Desk window moves below the Finder's desktop icons, so files on the desktop sit on top of its text and can be selected, opened and dragged wherever they are. Meeting rows, watchers, now playing and the account name keep their clicks through a transparent click layer at the Desk's old level; the clock's, message's and meters' menus wait until the option is off. Off by default.
