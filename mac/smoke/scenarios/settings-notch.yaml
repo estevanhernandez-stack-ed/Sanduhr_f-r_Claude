@@ -1,6 +1,9 @@
 # The spec's example: Settings opens at Notch with its switch, named as on General (Settings v2,
-# slice 1: "Extend the camera notch" retired).
+# slice 1: "Extend the camera notch" retired). Needs the Desk on: the caption under the switch
+# leads with the rule only then; with the Desk off the Needs the Desk. row says it instead
+# (polish-leftovers 3), so the run switches the Desk off, checks, and the end puts it back.
 name: Settings opens at Notch
+needs: [desk]
 steps:
   - do: settings
     arg: notch
@@ -13,5 +16,21 @@ steps:
       contains: { text: "/^Needs the Desk\\. Widens the notch into one black island/" }
   - expect_state: { settings_section: notch }
   - snap: notch-settings
+  # With the Desk off, the row carries the sentence and the caption drops it: once per page.
+  - do: desk
+    arg: "off"
+  - expect_state: { desk_enabled: false }
+  - expect:
+      window: settings
+      contains: { text: "/^Needs the Desk\\.$/" }
+  - expect:
+      window: settings
+      contains: { text: "/^Widens the notch into one black island/" }
+  - expect:
+      window: settings
+      missing: { text: "/^Needs the Desk\\. Widens/" }
+  - do: desk
+    arg: "on"
+  - expect_state: { desk_enabled: true }
   - do: close-settings
   - expect_state: { settings_open: false }

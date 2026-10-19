@@ -150,6 +150,13 @@ struct NeedsDeskRow: View {
     @AppStorage(DeskController.enabledKey, store: .desk) private var deskOn = false
     static let text = "Needs the Desk."
 
+    /// A caption that leads with the rule, but only while the row is not already saying it: the
+    /// row shows with the Desk off, so the sentence leads the caption with the Desk on and is
+    /// left to the row with it off. Either way a page says "Needs the Desk." once.
+    static func lead(_ rest: String, deskOn: Bool) -> String {
+        deskOn ? "\(text) \(rest)" : rest
+    }
+
     var body: some View {
         if !deskOn {
             HStack {
@@ -793,11 +800,16 @@ struct MessageSuggestionReview: View {
 // MARK: - Notch
 
 struct DeskNotchSection: View {
+    @AppStorage(DeskController.enabledKey, store: .desk) private var deskOn = false
     @AppStorage(DeskController.notchKey, store: .desk) private var enabled = false
     @AppStorage(NotchPill.key, store: .desk) private var pill = NotchPill.defaultOn
     @AppStorage(CameraLightController.enabledKey, store: .desk) private var cameraLight = false
     @AppStorage(CameraLightController.brightnessKey, store: .desk) private var lightBrightness = CameraLightController.defaultBrightness
     @AppStorage(CameraLightController.sizeKey, store: .desk) private var lightSize = CameraLightController.defaultSize
+
+    /// What the island is, under its switch. `NeedsDeskRow.lead` puts the rule in front of it
+    /// while the Desk is on (polish-ux 13; polish-leftovers 3).
+    static let islandCaption = "Widens the notch into one black island; click it to open these settings."
 
     var body: some View {
         Form {
@@ -805,7 +817,7 @@ struct DeskNotchSection: View {
                 Toggle(SettingsNames.notchSwitch, isOn: $enabled)
                     .settingsAnchor(SettingsAnchor.notch)
                 NeedsDeskRow()
-                Text("\(NeedsDeskRow.text) Widens the notch into one black island; click it to open these settings.")
+                Text(NeedsDeskRow.lead(Self.islandCaption, deskOn: deskOn))
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle(NotchPill.title, isOn: $pill)
                     .onChange(of: pill) { _, _ in DeskController.shared.applyPill() }
