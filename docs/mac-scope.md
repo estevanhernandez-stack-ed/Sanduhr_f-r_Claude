@@ -14,7 +14,7 @@ A Claude subscriber on a Mac who wants to know how fast the session and weekly l
 
 - **The one with a full desktop.** Files cover the screen. The Desk's text has to stay readable over them (the readability plate), and the files have to stay the Finder's: movable, clickable, droppable (the click layer under the icons, 2.27.0).
 - **The one with no notch.** A Mac mini, an iMac, an external display or a clamshell MacBook. The island, its wings and the camera strip need the notch today; the glow and the camera light fall back to a spot at the top center of the main screen.
-- **The one with no Claude plan.** Picks **Just the Desk** on the welcome sheet (`docs/BACKLOG.md` #4, `mac/Sources/Sanduhr/Models/JustTheDesk.swift`): the Desk on, the widget following its own setting instead of waiting for sign-in, the sign-in reminder off, and every Claude piece back the moment a key is saved.
+- **The one with no Claude plan.** Picks **Just the Desk** on the welcome sheet (`docs/BACKLOG.md` #4, `mac/Sources/Sanduhr/Models/JustTheDesk.swift`): the Desk on, the widget following its own setting instead of waiting for sign-in, the sign-in reminder off, every Claude piece back the moment a key is saved, and a Desk-only tour.
 
 ## Problem
 
