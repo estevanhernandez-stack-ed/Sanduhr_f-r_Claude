@@ -34,6 +34,8 @@ markers, sparkline trends, and five hand-tuned glass themes.
 
 ### macOS — native SwiftUI
 
+The Mac build's page, with Desk and the Claude config carry in pictures: [626labs.dev/sanduhr](https://626labs.dev/sanduhr/).
+
 **Via Homebrew** (recommended):
 
 ```sh
