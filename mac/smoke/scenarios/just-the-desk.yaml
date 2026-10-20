@@ -5,7 +5,7 @@
 name: Just the Desk
 steps:
   - do: just-the-desk
-    arg: on
+    arg: "on"
   - expect_state: { just_the_desk: true, desk_enabled: true }
   # The offer opens the tour a second later when it is pending, and show resets it to step 1:
   # wait for it, then close, so the steps below are deterministic.
@@ -39,5 +39,5 @@ steps:
   - do: close-tour
   - expect_state: { tour.open: false }
   - do: just-the-desk
-    arg: off
+    arg: "off"
   - expect_state: { just_the_desk: false }
