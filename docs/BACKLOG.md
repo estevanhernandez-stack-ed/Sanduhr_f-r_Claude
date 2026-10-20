@@ -226,3 +226,36 @@ notch, or hardware this Mac does not have, stays open here. The issue keeps the 
 - **Measured 2026-10-19** (note, section 4): the Desk, the pill and a watcher cost about 8 MB of RSS and no measurable CPU over an hour on the 2019 i5. The finding is a sustained baseline of about 9% of one core with the Desk off, with the debug hooks on in both runs; still open: the same hour with the hooks off, to separate the harness from the app. As raised: CPU and memory with the Desk on, on the old Mac (issue #119, "Also measure"): Activity Monitor
   over an hour with the Desk, the pill and the watchers on, against the same hour with the Desk
   off.
+
+## #7 — Idle CPU: the app should idle under 1 percent of a core
+
+**Raised 2026-10-19 from the no-notch measurements** (`docs/notes/no-notch-measurements.md`
+section 4). Steady-state CPU with nothing happening, measured as CPU seconds per minute (`ps -o time`
+deltas; `ps %cpu` is a lifetime average and misleads):
+
+| Mac | Build | Hooks | Steady |
+|---|---|---|---|
+| 2019 i5 (no notch) | 2.28.0 | on | about 9 percent, both with the Desk on and off |
+| newer Mac (notch) | 2.28.0 | off | 6.1 percent (3.66 CPU seconds in 60 s) |
+
+So it is the app, not the Desk and not the smoke harness.
+
+**Lead, from a 10 s `sample` of the release app:** the hottest frames are the local Claude Code
+burn scan, `UsageViewModel.refreshLocalBurn` to `LocalBurnSource.scan` to
+`CCLogReader.discoverLogFiles` to `LocalCCLogFileSystem.jsonlFiles(under:)`. Every 30 s (the
+countdown tick) and on every refresh it walks the shown seat's whole `projects` folder with a
+`FileManager` enumerator, stats every `.jsonl` and sorts the list before reading anything. On the
+newer Mac that is 933 files over 1.5 GB across the two seats. The file set changes rarely. SwiftUI
+graph updates (`AttributeGraph`) also appear in the sample.
+
+Plan:
+
+1. Profile first: Instruments' Time Profiler or `sample Sanduhr 30` with the hooks off, on both
+   Macs, so the fix answers the measurement and not the guess.
+2. Cache the log file list: re-walk a project folder only when its directory modification time
+   changes (or watch `projects` with FSEvents), and never more than once a minute; keep the per-file
+   stat-and-offset cache that already avoids re-reading.
+3. Look at what the countdown tick redraws every 30 s, and at any other timer that wakes the
+   process when nothing changed.
+4. Re-measure by CPU seconds per minute on both Macs. Done when the newer Mac idles under 1 percent
+   and the 2019 i5 under 2, with the Desk, the pill and a watcher on.
