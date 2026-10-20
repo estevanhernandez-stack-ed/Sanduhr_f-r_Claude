@@ -1096,7 +1096,7 @@ content (`NotchWingsView` with `pill`, no camera gap and no top flares), the sam
 Settings, the same two-finger menus on now playing, a watcher or the indicators. Its window
 (`DeskController.pillWindow`) is built next to the wings window, at the wings' level, and sized by
 `NotchPill.frame` to the width the wings report (`NotchWingsView.onPillWidth`): as tall as the
-menu bar, centered on the screen, never wider than 36 percent of it, never narrower than it is
+menu bar, centered on the screen, never wider than 30 percent of it, never narrower than it is
 tall. Both wings empty, nothing draws and the window hides.
 
 The rules (`NotchPill`, all pinned): main screen only in this cut; never on a screen with a notch,

@@ -207,7 +207,7 @@ existing `%APPDATA%\Sanduhr`.
 shipped on a notched MacBook through the debug override; every rule that needs a screen without a
 notch, or hardware this Mac does not have, stays open here. The issue keeps the hardware check. Seen live 2026-10-19 on the old Mac (maccy-lives, a 2560 by 1600 built-in display with no notch, 2.28.0): the pill draws and reads; screenshots in `docs/screenshots/mac/notch-pill-*.png`. The measurements below are briefed to that Mac's session; their note lands at `docs/notes/no-notch-measurements.md`.
 
-- The menu-collision rule, measured on real no-notch hardware. Today the rule is conservative: the
+- **Measured 2026-10-19** on the old Mac (`docs/notes/no-notch-measurements.md`): Xcode's menus end at 737 pt, the pill sat at 753 to 926, the leftmost status item at 1099 on a 1680-pt screen; the hide is what keeps a wide app menu reachable, and the cap went from 0.36 to 0.30 so the pill always clears the status items. Yielding to the app menu would need Accessibility menu frames and is not done. The bullet as raised: the menu-collision rule, measured on real no-notch hardware. The rule was conservative: the
   pill is never wider than 0.36 of the screen (`NotchPill.maxWidthFraction`) and hides while the
   pointer is in the menu bar, so whatever sits under it can always be reached. On the old Mac,
   with a wide app menu (Xcode, Final Cut) and a full row of status items, measure where the two
