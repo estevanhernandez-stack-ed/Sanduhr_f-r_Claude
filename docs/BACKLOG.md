@@ -94,9 +94,9 @@ Update, in the same session the fix lands:
 - `mac/release.sh:9-10,47-54` — confirms Developer ID signing + notarization are
   live today, closing the stated blocker to real Keychain.
 
-## #3 — New user walkthrough (spec'd)
+## #3 — New user walkthrough (shipped as the welcome tour)
 
-**Spec'd 2026-10-05 as a shared tour on the What's New cards: `docs/welcome-tour-spec.md`** (checklist item 61). The sketch below is kept for the record.
+**Shipped as the welcome tour in 2.7.0** (checklist item 61, `docs/welcome-tour-spec.md`), with a Desk-only variant for Just the Desk in 2.29.0 (`docs/cart-runs/2026-10-19-just-the-desk/`). Spec'd 2026-10-05 as a shared tour on the What's New cards. The sketch below is kept for the record.
 
 Raised 2026-10-05. A new install today gets the Welcome sheet (paste the `sessionKey`) and then a
 widget, and nothing points at the rest: the Desk, the notch wings and glow, the menu bar, accounts,
@@ -205,15 +205,15 @@ existing `%APPDATA%\Sanduhr`.
 
 **Raised 2026-10-18 from the no-notch island run (issue #119, smoke-test section 51).** The pill
 shipped on a notched MacBook through the debug override; every rule that needs a screen without a
-notch, or hardware this Mac does not have, stays open here. The issue keeps the hardware check.
+notch, or hardware this Mac does not have, stays open here. The issue keeps the hardware check. Seen live 2026-10-19 on the old Mac (maccy-lives, a 2560 by 1600 built-in display with no notch, 2.28.0): the pill draws and reads; screenshots in `docs/screenshots/mac/notch-pill-*.png`. The measurements below are briefed to that Mac's session; their note lands at `docs/notes/no-notch-measurements.md`.
 
-- The menu-collision rule, measured on real no-notch hardware. Today the rule is conservative: the
+- **Measured 2026-10-19** on the old Mac (`docs/notes/no-notch-measurements.md`): Xcode's menus end at 737 pt, the pill sat at 753 to 926, the leftmost status item at 1099 on a 1680-pt screen; the hide is what keeps a wide app menu reachable, and the cap went from 0.36 to 0.30 so the pill always clears the status items. Yielding to the app menu would need Accessibility menu frames and is not done. The bullet as raised: the menu-collision rule, measured on real no-notch hardware. The rule was conservative: the
   pill is never wider than 0.36 of the screen (`NotchPill.maxWidthFraction`) and hides while the
   pointer is in the menu bar, so whatever sits under it can always be reached. On the old Mac,
   with a wide app menu (Xcode, Final Cut) and a full row of status items, measure where the two
   actually meet and decide whether the cap, the hide, or a layout that yields to the app menu is
   the rule.
-- The camera and mic badge on a no-notch Mac still places itself at the top center, under the pill.
+- **Fixed 2026-10-19** (run `docs/cart-runs/2026-10-19-pill-badge-and-splits/`, pending the old Mac's check): the camera and mic badge on a no-notch Mac placed itself at the top center, under the pill.
   `AVIndicatorPlacement.spot` ties `islandUp` to the wings window (`AVIndicatorViews.update`), so
   with the pill up and no wings window the indicators fall back to the tab. The pill view already
   carries the beside-wing slot; the placement needs to count the pill as the island.

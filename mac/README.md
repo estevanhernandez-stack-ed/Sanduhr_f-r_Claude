@@ -1096,7 +1096,7 @@ content (`NotchWingsView` with `pill`, no camera gap and no top flares), the sam
 Settings, the same two-finger menus on now playing, a watcher or the indicators. Its window
 (`DeskController.pillWindow`) is built next to the wings window, at the wings' level, and sized by
 `NotchPill.frame` to the width the wings report (`NotchWingsView.onPillWidth`): as tall as the
-menu bar, centered on the screen, never wider than 36 percent of it, never narrower than it is
+menu bar, centered on the screen, never wider than 30 percent of it, never narrower than it is
 tall. Both wings empty, nothing draws and the window hides.
 
 The rules (`NotchPill`, all pinned): main screen only in this cut; never on a screen with a notch,
@@ -1141,7 +1141,10 @@ in `com.626labs.sanduhr.desk`):
   once: a place on Camera and mic becomes that placement and goes back to its default content,
   otherwise `avSide` becomes Beside the camera, left or right.
 
-They run only while Desk runs and they are on.
+They run only while Desk runs and they are on. The top-center pill counts as the island
+(`AVIndicatorPlacement.islandUp`): with the island switch on and either the wings or the pill up,
+the indicators draw beside its text or in a chosen place, and the tab shows only when neither the
+wings nor the pill is up.
 
 **Motion** (`AVIndicatorMotion`). Coming and going is a 0.25-second ease-in-out opacity fade, the
 island's room growing or shrinking with it in the same transaction; the tab fades its window. The

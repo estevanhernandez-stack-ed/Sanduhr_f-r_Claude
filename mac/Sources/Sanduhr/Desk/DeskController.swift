@@ -516,6 +516,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         guard running, let screen = window?.screen ?? NSScreen.main else { return }
         buildPillWindow(on: screen)
         MainActor.assumeIsolated { CameraLightController.shared.followPill() }
+        // The pill counts as the island for the camera and mic indicators (AVIndicatorPlacement).
+        MainActor.assumeIsolated { AVIndicatorController.shared.update() }
     }
 
     /// The pill's frame in screen coordinates while the pill is up (built, with something
