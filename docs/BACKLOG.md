@@ -217,12 +217,12 @@ notch, or hardware this Mac does not have, stays open here. The issue keeps the 
   `AVIndicatorPlacement.spot` ties `islandUp` to the wings window (`AVIndicatorViews.update`), so
   with the pill up and no wings window the indicators fall back to the tab. The pill view already
   carries the beside-wing slot; the placement needs to count the pill as the island.
-- A floor for the pill's text size on a 24-pt external-display menu bar. The pill is as tall as
+- **Measured 2026-10-19** (`docs/notes/no-notch-measurements.md` section 2): on the old Mac's 24-pt built-in bar the pill's type is 10.5 pt, digits 7 to 8.5 pt tall; a 12-pt floor would widen the steady pill from 173 to about 198 pt, past what clears Xcode's menus. The floor is the owner's call from the 2x crop in the note. As raised: a floor for the pill's text size on a 24-pt external-display menu bar. The pill is as tall as
   the bar and sizes its text to it; a 24-pt bar on an external display is tighter than a notched
   MacBook's 37-pt one. Read it at arm's length on the old Mac's display and set a floor if it
   needs one.
-- The Touch Bar spike (issue #119, Proposal B): needs the Touch Bar Mac and a probe against the
+- **Findings 2026-10-19** (note, section 5): the old Mac has a Touch Bar; DFRFoundation is cache-only but its exports list the Control Strip presence call; the AppKit side is not verifiable from the cache. No app code. As raised: the Touch Bar spike (issue #119, Proposal B): needs the Touch Bar Mac and a probe against the
   private DFRFoundation APIs. A findings note, not app code.
-- CPU and memory with the Desk on, on the old Mac (issue #119, "Also measure"): Activity Monitor
+- **Measured 2026-10-19** (note, section 4): the Desk, the pill and a watcher cost about 8 MB of RSS and no measurable CPU over an hour on the 2019 i5. The finding is a sustained baseline of about 9% of one core with the Desk off, with the debug hooks on in both runs; still open: the same hour with the hooks off, to separate the harness from the app. As raised: CPU and memory with the Desk on, on the old Mac (issue #119, "Also measure"): Activity Monitor
   over an hour with the Desk, the pill and the watchers on, against the same hour with the Desk
   off.
