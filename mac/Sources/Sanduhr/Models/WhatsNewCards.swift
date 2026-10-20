@@ -7,8 +7,16 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2290: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.29.0", id: "desk-only-tour",
+            title: "A tour for the Desk on its own",
+            body: "Choose Just the Desk on the welcome sheet and a three-step tour shows the desktop, the menu bar and the notch, then where sign-in lives. Take the Tour… shows it again any time.",
+            art: .symbol("map"), destination: .deskLayout),
+    ]
 
     static let release2280: [WhatsNewCard] = [
         WhatsNewCard(

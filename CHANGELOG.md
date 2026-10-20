@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **A tour for the Desk on its own.** Choose Just the Desk on the welcome sheet and a three-step tour opens a moment later: the desktop, the menu bar (with the notch on a Mac that has one), then Sign in any time, whose button opens Accounts. Take the Tour… shows the same three steps for as long as Just the Desk is on. The landing page and README now say the Desk works without a Claude subscription; pacing still needs one.
+
+- **Four small fixes from the polish pass.** The Desk page's Order caption is two sentences with a Learn more link to the setup guide; the meter-warning card's At column lines up with the rest of the page; the Notch page says "Needs the Desk." once with the Desk off; the Desk's hex fields accept three-digit shorthand ("fff", "9ad") and expand it.
+
+- **For the smoke harness.** `just-the-desk on|off` and `desk-arrange hide|show` hooks, a `just-the-desk` scenario, and `desk_arrange.hidden` in the snapshot.
+
 ## v2.28.0-mac — 2026-10-18
 
 - **The island, on any screen.** A Mac without a notch (a Mac mini, an iMac, an external display, a closed MacBook) can draw the island's wing text as a pill over the middle of the menu bar: Settings, Desk, Notch gains **Top-center island on screens without a notch**. Same content, same click to Settings, same two-finger menu; the glow and the camera light use the pill's frame. It hides while the pointer is in the menu bar and while the menu bar is hidden, as in full screen, and caps its width so app menus stay clear. Off by default; nothing changes on a Mac with a notch.
