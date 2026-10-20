@@ -254,8 +254,16 @@ enum AVIndicatorPlacement {
         return out
     }
 
-    /// Where they draw: nowhere with nothing to show; on the island while it is up (in a chosen
-    /// place when there is one, else beside the camera); else in their own tab.
+    /// Whether the island is up for the indicators: the Desk runs, the island switch is on, and
+    /// either the wings window or the top-center pill (NotchPill) is built. The pill counts as the
+    /// island, so on a screen without a notch the indicators draw beside its text, not in a tab
+    /// that would sit under it.
+    static func islandUp(running: Bool, notchOn: Bool, wingsUp: Bool, pillUp: Bool) -> Bool {
+        running && notchOn && (wingsUp || pillUp)
+    }
+
+    /// Where they draw: nowhere with nothing to show; on the island, the wings or the pill, while it
+    /// is up (in a chosen place when there is one, else beside the camera); else in their own tab.
     static func spot(_ shown: AVIndicators, islandUp: Bool, side: AVIndicatorSide,
                      chosen: [NotchContent.Place]) -> AVIndicatorSpot {
         guard shown.any else { return .none }

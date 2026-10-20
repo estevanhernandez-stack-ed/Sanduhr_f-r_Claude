@@ -75,7 +75,7 @@ struct NotchPreview: View {
                 NotchTabCanvas(model: preview, geometry: g, pill: pill && enabled)
             }
         }
-        .modifier(PreviewModelSync(preview: preview, live: live, islandUp: enabled && g.hasNotch, samples: $samples))
+        .modifier(PreviewModelSync(preview: preview, live: live, islandUp: enabled && (g.hasNotch || pill), samples: $samples))
         .onAppear { preview.notchRect = g.hasNotch ? g.notchRect : nil }
         .onReceive(NotificationCenter.default.publisher(for: NotchGlowController.didFire)) { _ in glowOnce() }
     }
@@ -148,11 +148,14 @@ private struct NotchIslandCanvas: View {
 }
 
 /// A Mac without a notch: the camera and mic tab (AVIndicatorBadge) at the top center. With the
-/// top-center pill on (NotchPill) the line under it says so.
+/// top-center pill on (NotchPill) the pill takes the tab's place, as on screen (the indicators
+/// draw beside its text, or in a chosen place), and the line under it says so.
 private struct NotchTabCanvas: View {
     var model: DeskModel
     let geometry: NotchPreviewGeometry
     var pill = false
+    /// The width the pill's wings ask for, as the pill window reports it.
+    @State private var pillWidth: CGFloat = 0
 
     var body: some View {
         let size = max(10, geometry.bar * 0.42)
@@ -160,7 +163,9 @@ private struct NotchTabCanvas: View {
         VStack(spacing: 12) {
             ZStack(alignment: .top) {
                 MenuBarStrip(height: geometry.bar)
-                if shown.any {
+                if pill {
+                    pillView
+                } else if shown.any {
                     AVIndicatorBadge(model: model, size: size)
                         .frame(width: AVIndicatorLayout.badgeWidth(shown, size: size), height: geometry.bar)
                 }
@@ -171,6 +176,17 @@ private struct NotchTabCanvas: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.white.opacity(0.75))
         }
+    }
+
+    /// The pill as the Desk builds it (DeskController.buildPillWindow): the wings joined, as tall as
+    /// the bar, centered, never wider than the pill's cap and never narrower than it is tall.
+    private var pillView: some View {
+        let bar = geometry.bar
+        var wings = NotchWingsView(model: model, notchWidth: 0, notchHeight: bar, barHeight: bar)
+        wings.pill = true
+        wings.onPillWidth = { width in DispatchQueue.main.async { pillWidth = width } }
+        return wings
+            .frame(width: max(min(pillWidth, 520 * NotchPill.maxWidthFraction), bar), height: bar)
     }
 }
 
