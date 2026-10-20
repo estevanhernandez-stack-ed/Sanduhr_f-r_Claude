@@ -56,7 +56,7 @@ struct VaultRoot: Equatable, Hashable, Sendable {
 final class VaultIngester: @unchecked Sendable {
     static let coverageMarginDays = 25
     static let checkpointPruneDays = 7
-    static let currentWalkVersion = 2
+    static let currentWalkVersion = 3
     static let tailGuardBytes = 64
     static let quiesceAfter: TimeInterval = 3600
     static let chunkSize = 1 << 20
@@ -273,19 +273,16 @@ final class VaultIngester: @unchecked Sendable {
         let fm = FileManager.default
         guard let dirs = try? fm.contentsOfDirectory(atPath: projects) else { return [] }
         var files: [LogFile] = []
+        // The attributes come with the walk (CCLogBulkWalk), not a stat per file (BACKLOG #7).
+        // Modification times arrive as Dates, so a tick is rounded to the Date's precision; walk
+        // version 3 re-ingests once so stored checkpoints compare against the same rounding.
         for name in dirs.sorted() {
             let projectDir = (projects as NSString).appendingPathComponent(name)
             var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: projectDir, isDirectory: &isDir), isDir.boolValue,
-                  let walker = fm.enumerator(atPath: projectDir) else { continue }
-            while let rel = walker.nextObject() as? String {
-                guard rel.hasSuffix(".jsonl") else { continue }
-                let full = (projectDir as NSString).appendingPathComponent(rel)
-                var st = stat()
-                guard stat(full, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG else { continue }
-                files.append(LogFile(path: full, projectDir: projectDir, length: Int64(st.st_size),
-                                     mtimeTicks: VaultTime.ticks(seconds: Int64(st.st_mtimespec.tv_sec),
-                                                                 nanoseconds: Int64(st.st_mtimespec.tv_nsec))))
+            guard fm.fileExists(atPath: projectDir, isDirectory: &isDir), isDir.boolValue else { continue }
+            CCLogBulkWalk.each(under: projectDir) { path, size, modified in
+                files.append(LogFile(path: path, projectDir: projectDir, length: Int64(size),
+                                     mtimeTicks: VaultTime.ticks(modified)))
             }
         }
         files.sort { ($0.mtimeTicks, $0.path) < ($1.mtimeTicks, $1.path) }

@@ -252,7 +252,7 @@ struct VaultIngesterTests {
         #expect(meta.since == "2026-07-12")
         #expect(meta.covered == [VaultDateRange(from: "2026-06-17", to: "2026-07-12")])
         #expect(meta.lastIngestTs == "2026-07-12T18:00:00.000000+00:00")
-        #expect(meta.walkVersion == 2)
+        #expect(meta.walkVersion == 3)
 
         b.ingest(now: B.now.addingTimeInterval(3 * 86_400))
         meta = try #require(b.store.loadMeta(".claude"))
@@ -556,8 +556,9 @@ struct VaultIngesterTests {
         // Regress to a v1 vault: no walk_version, and the nested row a one-level walk never saw.
         let metaPath = b.rootPath() + "/meta.json"
         let meta = String(decoding: FileManager.default.contents(atPath: metaPath) ?? Data(), as: UTF8.self)
-        let stripped = meta.replacingOccurrences(of: ",\"walk_version\":2", with: "")
-            .replacingOccurrences(of: "\"walk_version\":2,", with: "")
+        let v = VaultIngester.currentWalkVersion
+        let stripped = meta.replacingOccurrences(of: ",\"walk_version\":\(v)", with: "")
+            .replacingOccurrences(of: "\"walk_version\":\(v),", with: "")
         #expect(stripped != meta)
         FileManager.default.createFile(atPath: metaPath, contents: Data(stripped.utf8))
         var s1 = b.shard()

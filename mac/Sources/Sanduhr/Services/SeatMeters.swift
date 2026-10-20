@@ -245,8 +245,6 @@ enum SeatActivity {
     static func recent(folder: String, fs: CCLogFileSystem, now: Date, within: TimeInterval = window) -> Bool {
         let projects = (folder as NSString).appendingPathComponent("projects")
         guard fs.isDirectory(projects) else { return false }
-        return fs.jsonlFiles(under: projects).contains { file in
-            fs.stat(file).map { now.timeIntervalSince($0.modified) <= within } ?? false
-        }
+        return fs.logFiles(under: projects).contains { now.timeIntervalSince($0.stat.modified) <= within }
     }
 }
