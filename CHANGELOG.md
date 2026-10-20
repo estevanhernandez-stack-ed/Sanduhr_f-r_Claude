@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.29.0-mac — 2026-10-19
 
 - **A tour for the Desk on its own.** Choose Just the Desk on the welcome sheet and a three-step tour opens a moment later: the desktop, the menu bar (with the notch on a Mac that has one), then Sign in any time, whose button opens Accounts. Take the Tour… shows the same three steps for as long as Just the Desk is on. The landing page and README now say the Desk works without a Claude subscription; pacing still needs one.
 
