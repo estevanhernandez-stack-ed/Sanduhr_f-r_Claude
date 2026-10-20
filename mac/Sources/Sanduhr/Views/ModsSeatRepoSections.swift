@@ -17,9 +17,9 @@ struct SeatHistorySection: View {
                 SeatCaption("cleanupPeriodDays: \(part.cleanupDays ?? 30) days.")
             }
             SeatCaption("desktopSessionCleanupPeriodDays (Claude Desktop and Cowork): " + (part.desktopDays.map { "\($0) days." } ?? "not set."))
-            SeatCaption("\(bytes(part.transcriptBytes)) of transcripts in \(part.sessions) sessions across \(part.projects) projects; \(bytes(part.recentBytes)) written in the last 30 days.")
+            SeatCaption("\(seatBytes(part.transcriptBytes)) of transcripts in \(part.sessions) sessions across \(part.projects) projects; \(seatBytes(part.recentBytes)) written in the last 30 days.")
             if let oldest = part.oldest { SeatCaption("Oldest: \(oldest.formatted(date: .abbreviated, time: .omitted)).") }
-            SeatCaption("history.jsonl: " + (part.historyBytes.map { bytes($0) + ", kept until you delete it." } ?? "none."))
+            SeatCaption("history.jsonl: " + (part.historyBytes.map { seatBytes($0) + ", kept until you delete it." } ?? "none."))
             if part.orphanSidecars > 0 {
                 SeatCaption("\(part.orphanSidecars) subagent folder\(part.orphanSidecars == 1 ? "" : "s") outlived their session.", color: .orange)
             }
@@ -28,7 +28,7 @@ struct SeatHistorySection: View {
             }
             if !hideNames, !part.largest.isEmpty {
                 SeatSubHeading("Largest projects")
-                ForEach(part.largest, id: \.name) { SeatCaption("\($0.name): \(bytes($0.bytes))") }
+                ForEach(part.largest, id: \.name) { SeatCaption("\($0.name): \(seatBytes($0.bytes))") }
             }
         }
     }
@@ -54,7 +54,7 @@ struct SeatHousekeepingSection: View {
 
     private func detail(_ item: SeatReport.Leftover) -> String {
         var parts = ["Left by \(item.origin)"]
-        if item.bytes > 0 { parts.append(bytes(item.bytes)) }
+        if item.bytes > 0 { parts.append(seatBytes(item.bytes)) }
         if let m = item.modified { parts.append(m.formatted(date: .abbreviated, time: .omitted)) }
         parts.append(item.ifLeft)
         return parts.joined(separator: " · ")

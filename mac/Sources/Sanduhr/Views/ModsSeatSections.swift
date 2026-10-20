@@ -28,7 +28,7 @@ struct SeatSubHeading: View {
     }
 }
 
-func bytes(_ n: Int64) -> String { ByteCountFormatter.string(fromByteCount: n, countStyle: .file) }
+func seatBytes(_ n: Int64) -> String { ByteCountFormatter.string(fromByteCount: n, countStyle: .file) }
 
 // MARK: Settings
 
@@ -121,7 +121,7 @@ struct SeatInstructionsSection: View {
 
     private func memoryLine(_ m: SeatReport.MemoryIndex, index: Int) -> String {
         let name = hideNames ? "Project \(index + 1)" : m.project
-        var t = "\(name): MEMORY.md \(m.lines) lines, \(bytes(Int64(m.bytes)))"
+        var t = "\(name): MEMORY.md \(m.lines) lines, \(seatBytes(Int64(m.bytes)))"
         if m.overLimit { t += ", over the \(SeatReports.memoryLineLimit)-line or 25 KB load limit" }
         if m.missingLinks > 0 { t += ", \(m.missingLinks) link\(m.missingLinks == 1 ? "" : "s") to missing files" }
         return t + "."
@@ -155,7 +155,7 @@ private struct InstructionNodeRow: View {
 
     private var detail: String {
         if node.missing { return "doesn't resolve" }
-        var parts = ["\(node.lines) lines", bytes(Int64(node.bytes))]
+        var parts = ["\(node.lines) lines", seatBytes(Int64(node.bytes))]
         switch node.kind {
         case .managed: parts.insert("managed", at: 0)
         case .rule: parts.insert(node.gate.map { "rule, paths \(ConfigMask.maskString($0))" } ?? "rule", at: 0)
