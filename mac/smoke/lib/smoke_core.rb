@@ -291,6 +291,9 @@ module Smoke
       if %w[on forced].any? { |k| !!pill_before[k] != !!pill_after[k] }
         steps << ['notch-pill', pill_before['forced'] ? 'force' : (pill_before['on'] ? 'on' : 'off')]
       end
+      # Just the Desk (BACKLOG #4) a scenario turned on goes off again; the Desk's own switch is
+      # handled above.
+      steps << ['just-the-desk', 'off'] if !before['just_the_desk'] && after['just_the_desk']
       # The camera light by hand, only when no camera was in use (a running camera lights it too).
       if !before['camera_in_use'] && !after['camera_in_use'] && !!before['camera_light'] != !!after['camera_light']
         steps << ['camera-light', before['camera_light'] ? 'on' : 'off']

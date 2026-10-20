@@ -117,7 +117,7 @@ pressed: the best match opened, scrolled to and lit; words that find nothing are
 `pulse [tier]` (`five_hour` by default; it glows the notch too), `tool deep-work|pacing|snake` (as the Tools menu: chosen
 again it closes), `desk on|off`, `notch on|off`, `notch-pill on|off|force` (issue #119: the top-center pill's switch,
 applied live; `force` also writes the override `notchPillForce`, so this notched Mac draws the pill for the smoke tools,
-and `off` clears both. A run puts the switch and the override back as they were), `camera-light on|off` (the light by hand, as Tools, Camera Fill Light;
+and `off` clears both. A run puts the switch and the override back as they were), `just-the-desk on|off` (BACKLOG #4: `on` does what the welcome sheet's Just the Desk does, the Desk on and the sign-in reminder off, and offers the pending tour a second later; `off` ends it as a sign-in does, without a key. A run that turns it on turns it off again), `camera-light on|off` (the light by hand, as Tools, Camera Fill Light;
 its window is kind `camera` in tree.yaml, one node labeled `Camera fill light`), `glow [alert|meeting|camera|claude-waiting|claude-done]`
 (the notch glow once, whatever its switches; around the island while Desk runs with it on, else around
 the plain hardware notch on a notched screen, in a click-through window of kind `glow` labeled `Notch glow` that fades out after about three seconds),

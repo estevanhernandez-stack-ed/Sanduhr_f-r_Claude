@@ -21,6 +21,58 @@ struct WelcomeTourStepTests {
         #expect(steps.count == 5)
     }
 
+    @Test func justTheDeskTourIsThreeStepsWithANotch() {
+        let steps = WelcomeTour.steps(features: [.notch], justTheDesk: true)
+        #expect(ids(steps) == [["desk"], ["menu-bar", "notch"], ["sign-in"]])
+        #expect(steps.map { $0[0].step } == [1, 2, 3])
+    }
+
+    @Test func justTheDeskTourWithoutANotch() {
+        let steps = WelcomeTour.steps(features: [], justTheDesk: true)
+        #expect(ids(steps) == [["desk"], ["menu-bar"], ["sign-in"]])
+        #expect(steps.map { $0[0].step } == [1, 2, 3])
+    }
+
+    @Test func justTheDeskKeepsTheDeskCardAsWrittenEvenSignedOut() {
+        let written = WelcomeTour.table.first { $0.id == "desk" }!
+        for signedIn in [true, false] {
+            let desk = WelcomeTour.steps(features: [], signedIn: signedIn, justTheDesk: true)[0][0]
+            #expect(desk.body == written.body)
+            #expect(desk.title == written.title)
+            #expect(desk.art == written.art)
+            #expect(desk.showMe == written.showMe)
+            #expect(desk.showMeTitle == written.showMeTitle)
+            #expect(desk.choices == written.choices)
+        }
+        // The signed-in tour is untouched by the new parameter: its first card still says sign in.
+        #expect(WelcomeTour.steps(features: [], signedIn: false)[0][0].showMeTitle == "Sign In")
+    }
+
+    @Test func justTheDeskMenuBarCardHasNoNumbersToShow() {
+        let card = WelcomeTour.deskOnly.first { $0.id == "menu-bar" }!
+        #expect(card.body == "The hourglass in the menu bar opens Settings and the Desk's pages. Once you sign in it shows a percent of your limits.")
+        let written = WelcomeTour.table.first { $0.id == "menu-bar" }!
+        #expect(card.title == written.title && card.art == written.art)
+        #expect(card.showMe == written.showMe && card.choices == written.choices)
+        let notch = WelcomeTour.deskOnly.first { $0.id == "notch" }!
+        #expect(notch.requires == .notch)
+        #expect(notch.body == WelcomeTour.table.first { $0.id == "notch" }!.body)
+    }
+
+    @Test func justTheDeskSignInCardOpensAccounts() {
+        let card = WelcomeTour.deskOnly.first { $0.id == "sign-in" }!
+        #expect(card.title == "Sign in any time")
+        #expect(card.art == .preview(.meters))
+        #expect(card.showMe == .settings(.credentials))
+        #expect(card.showMeTitle == "Accounts")
+        #expect(card.step == 3 && card.choices.isEmpty && card.requires == nil)
+    }
+
+    @Test func anExplicitTableWinsOverJustTheDesk() {
+        let table = [TourCard(id: "a", step: 1, title: "a", body: "", art: .symbol("star"), showMe: .widget)]
+        #expect(ids(WelcomeTour.steps(features: [], table: table, justTheDesk: true)) == [["a"]])
+    }
+
     @Test func aStepWhoseOnlyCardNeedsAMissingFeatureHides() {
         let table = [
             TourCard(id: "a", step: 1, title: "a", body: "", art: .symbol("star"), showMe: .widget),
@@ -58,6 +110,8 @@ struct WelcomeTourStepTests {
         #expect(WelcomeTour.table.filter { !$0.choices.isEmpty }.map(\.id) == ["desk", "menu-bar"])
         #expect(byID["notch"]?.requires == .notch)
         #expect(WelcomeTour.table.filter { $0.requires != nil }.map(\.id) == ["notch"])
+        #expect(WelcomeTour.deskOnly.filter { !$0.choices.isEmpty }.map(\.id) == ["desk", "menu-bar"])
+        #expect(WelcomeTour.deskOnly.filter { $0.requires != nil }.map(\.id) == ["notch"])
     }
 
     @MainActor @Test func showMeDestinations() {
@@ -67,6 +121,11 @@ struct WelcomeTourStepTests {
             "notch": .settings(.notch), "accounts": .settings(.credentials),
             "claude-code": .settings(.integrations),
         ])
+        let deskOnly = Dictionary(uniqueKeysWithValues: WelcomeTour.deskOnly.map { ($0.id, $0.showMe) })
+        #expect(deskOnly == [
+            "desk": .settings(.deskLayout), "menu-bar": .settings(.general),
+            "notch": .settings(.notch), "sign-in": .settings(.credentials),
+        ])
         #expect(TourCardView.showMeHelp(.widget) == "Shows the widget")
         #expect(TourCardView.showMeHelp(.settings(.integrations)) == "Opens Settings, Claude Code")
     }
@@ -74,7 +133,8 @@ struct WelcomeTourStepTests {
     @Test func copyIsShortAndPlain() {
         let banned = ["seamless", "powerful", "unlock", "leverage", "delightful"]
         #expect(Set(WelcomeTour.table.map(\.id)).count == WelcomeTour.table.count)
-        for c in WelcomeTour.table {
+        #expect(Set(WelcomeTour.deskOnly.map(\.id)).count == WelcomeTour.deskOnly.count)
+        for c in WelcomeTour.table + WelcomeTour.deskOnly {
             #expect(!c.title.isEmpty && !c.body.isEmpty, "\(c.id)")
             #expect(c.title.count <= 48, "\(c.id) title")
             #expect(c.body.count <= 200, "\(c.id) body")
@@ -129,6 +189,15 @@ struct WelcomeTourOnceTests {
             #expect(!WelcomeTour.showsAfterFetch(state: state, fetched: true, offeredThisLaunch: false))
         }
         #expect(!WelcomeTour.showsAfterFetch(state: nil, fetched: true, offeredThisLaunch: false))
+    }
+
+    @Test func justTheDeskOffersThePendingTourOnceALaunch() {
+        #expect(WelcomeTour.showsForJustTheDesk(state: .pending, offeredThisLaunch: false))
+        #expect(!WelcomeTour.showsForJustTheDesk(state: .pending, offeredThisLaunch: true))
+        for state in [WelcomeTour.State.finished, .skipped, .notOffered] {
+            #expect(!WelcomeTour.showsForJustTheDesk(state: state, offeredThisLaunch: false))
+        }
+        #expect(!WelcomeTour.showsForJustTheDesk(state: nil, offeredThisLaunch: false))
     }
 
     @Test func finishAndSkipAreDoneAndRecordWhatsNew() {

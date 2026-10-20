@@ -1572,7 +1572,8 @@ shows instead of staying up for sign-in (`JustTheDesk.signInSettled`). The sheet
 launch and What's New no longer waits for a key. Saving a key ends it at once, before any fetch
 (`JustTheDesk.endBySignIn`), turning the reminder back on only if Just the Desk had turned it off, so a
 key that then fails gets the usual sign-in flow (the widget up for it, the Desk's sign-in line).
-state.yaml: `just_the_desk`.
+A pending welcome tour opens a second after the choice, once a launch, as its Desk-only variant (see
+Welcome tour). `smoke/smoke do just-the-desk on|off` drives both ends. state.yaml: `just_the_desk`.
 
 ## Signed out and demo mode
 
@@ -1629,6 +1630,12 @@ notch, more than one account, and Claude Code (the Usage page and Claude Code). 
 the real settings, written as you make them; Show me opens the widget or the right Settings page
 and leaves the tour open. Next and Return move on, Back goes back, Skip the Tour (or Escape) closes
 it with every setting as it is, and the last step's Finish ends it. It never installs anything.
+
+Someone who chose Just the Desk gets a three-step variant (`WelcomeTour.deskOnly`): the Desk, the
+menu bar and the notch (a Mac with one), then Sign in any time, whose button opens Accounts. It is
+offered once, a second after the choice, while the tour is pending (`showsForJustTheDesk`), and
+Take the Tour… shows it for as long as Just the Desk is on. Finishing or skipping records the same
+state as the full tour.
 
 It shows once: never after an update, never on a Mac that already had a key, accounts or a What's
 New version when this build first ran, and What's New waits while it is pending. Finishing or

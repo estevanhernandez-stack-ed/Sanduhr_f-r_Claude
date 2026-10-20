@@ -83,11 +83,15 @@ enum WelcomeTour {
             }.map(\.element)
     }
 
-    /// The steps that have a card showing, in order, each with its cards.
-    static func steps(features: Set<TourFeature>, table: [TourCard] = WelcomeTour.table,
-                      signedIn: Bool = true) -> [[TourCard]] {
+    /// The steps that have a card showing, in order, each with its cards. `table` is the signed-in
+    /// table unless given; `justTheDesk` picks `deskOnly` in its place when no table is given, and
+    /// skips `signedOut` (its last card already says how to sign in).
+    static func steps(features: Set<TourFeature>, table: [TourCard]? = nil,
+                      signedIn: Bool = true, justTheDesk: Bool = false) -> [[TourCard]] {
         var out: [[TourCard]] = []
-        for card in cards(features: features, table: table).map({ signedIn ? $0 : signedOut($0) }) {
+        let base = table ?? (justTheDesk ? deskOnly : WelcomeTour.table)
+        let adapt: (TourCard) -> TourCard = { signedIn || justTheDesk ? $0 : signedOut($0) }
+        for card in cards(features: features, table: base).map(adapt) {
             if let last = out.last?.first, last.step == card.step {
                 out[out.count - 1].append(card)
             } else {
@@ -147,6 +151,12 @@ enum WelcomeTour {
     /// successful fetch, once a launch.
     static func showsAfterFetch(state: State?, fetched: Bool, offeredThisLaunch: Bool) -> Bool {
         state == .pending && fetched && !offeredThisLaunch
+    }
+
+    /// After choosing Just the Desk: show the tour now? Only while pending, once a launch. It
+    /// takes the Desk-only steps, since the person has no account to show meters for.
+    static func showsForJustTheDesk(state: State?, offeredThisLaunch: Bool) -> Bool {
+        state == .pending && !offeredThisLaunch
     }
 
     /// Finish or Skip the Tour (Escape and the close button count as Skip). Only a pending tour

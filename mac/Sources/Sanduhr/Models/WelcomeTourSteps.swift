@@ -7,6 +7,33 @@ import Foundation
 extension WelcomeTour {
     static var table: [TourCard] { yourNumbers + aroundTheMac + beyondTheWidget }
 
+    /// The tour for someone who chose Just the Desk: three steps with no meters, accounts or
+    /// Claude Code in them. The desk, menu-bar and notch cards are the table's, moved up a step
+    /// (the menu-bar body is rewritten for a Mac with no numbers); a last card says the Desk
+    /// stands alone and where sign-in lives.
+    static var deskOnly: [TourCard] {
+        let byID = Dictionary(uniqueKeysWithValues: table.map { ($0.id, $0) })
+        return [
+            moved(byID["desk"]!, to: 1),
+            moved(byID["menu-bar"]!, to: 2,
+                  body: "The hourglass in the menu bar opens Settings and the Desk's pages. Once you sign in it shows a percent of your limits."),
+            moved(byID["notch"]!, to: 2),
+            TourCard(
+                id: "sign-in", step: 3,
+                title: "Sign in any time",
+                body: "The Desk works without a Claude account. Sign in from Settings, Accounts whenever you have one, and the meters fill in on the desktop and the notch.",
+                art: .preview(.meters), showMe: .settings(.credentials),
+                showMeTitle: "Accounts"),
+        ]
+    }
+
+    /// `card` at `step`, with `body` when one is given. Everything else is the table's.
+    private static func moved(_ card: TourCard, to step: Int, body: String? = nil) -> TourCard {
+        TourCard(id: card.id, step: step, title: card.title, body: body ?? card.body, art: card.art,
+                 showMe: card.showMe, choices: card.choices, requires: card.requires,
+                 showMeTitle: card.showMeTitle)
+    }
+
     static let yourNumbers: [TourCard] = [
         TourCard(
             id: "paced", step: 1,

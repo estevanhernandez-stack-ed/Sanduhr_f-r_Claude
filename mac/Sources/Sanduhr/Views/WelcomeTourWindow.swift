@@ -35,7 +35,8 @@ final class WelcomeTourWindowController: NSObject, NSWindowDelegate {
     /// Opens the tour at `step` (0-based, clamped), with the current settings and sign-in.
     func show(step: Int = 0) {
         navigation.steps = WelcomeTour.steps(features: Self.features(),
-                                              signedIn: KeychainStore.exists(account: KeychainAccount.sessionKey))
+                                              signedIn: KeychainStore.exists(account: KeychainAccount.sessionKey),
+                                              justTheDesk: JustTheDesk.isOn())
         navigation.index = max(0, min(step, navigation.count - 1))
         if window == nil {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 600),

@@ -121,9 +121,9 @@ Shape to spec:
 Open questions: whether the walkthrough also offers the MCP integrations (likely a last, optional
 step), and whether a demo mode (made-up numbers until real usage arrives) helps the first minute.
 
-## #4 — "Just the Desk": Sanduhr without a Claude account (first slice built)
+## #4 — "Just the Desk": Sanduhr without a Claude account (Mac complete; Store copy and Windows parity with the Windows agent)
 
-**First slice built 2026-10-11 for 2.15.0** (`JustTheDesk`, smoke-test section 45): the welcome sheet's **Just the Desk**, the widget following its choice without waiting for sign-in, no sign-in line on the Desk or notch, What's New still showing after updates, and a sign-in ending it (the reminder back on if it turned it off). Alerts and Claude Code now open with a plain line that they start once you sign in (Usage already said "Add an account in Accounts first"). Still open from the sketch below: Store and landing copy, and Windows parity (an empty notch wing collapsing shipped with checklist item 72 slice 4, noted 2026-10-17).
+**First slice built 2026-10-11 for 2.15.0** (`JustTheDesk`, smoke-test section 45): the welcome sheet's **Just the Desk**, the widget following its choice without waiting for sign-in, no sign-in line on the Desk or notch, What's New still showing after updates, and a sign-in ending it (the reminder back on if it turned it off). Alerts and Claude Code now open with a plain line that they start once you sign in (Usage already said "Add an account in Accounts first"). An empty notch wing collapsing shipped with checklist item 72 slice 4 (noted 2026-10-17). Completed on the Mac 2026-10-19 (run `docs/cart-runs/2026-10-19-just-the-desk/`): a Desk-only tour offered after Just the Desk, and the landing page and README no longer requiring a subscription. Still elsewhere: the Store copy and Windows parity (the Windows agent), and the hub page at 626labs.dev/sanduhr (the owner's other machine).
 
 Raised 2026-10-10 by the owner: "The Desk portion of our app is strong enough that some folks who
 don't have Claude might like it." Today a first launch assumes a Claude subscription: the welcome
@@ -145,8 +145,10 @@ Shape to spec:
   surface naming Claude (the 10.1.4.4 bar).
 - Windows parity as its own item.
 
-Open questions: whether Just the Desk should also skip the Keychain prompt path entirely, and
-whether the tour gets a Desk-only variant.
+Open questions, answered 2026-10-19: the Keychain prompt path stays (the launch's one
+`KeychainStore.exists` lookup gets no prompt from a signed release build; the dev build's prompt is
+its partition list, see `CLAUDE.md`), and the tour has a Desk-only variant (`WelcomeTour.deskOnly`,
+three steps, offered once after the choice).
 
 ## #5 — Windows Store build: AppData writes are invisible outside the package (fixed in 3.4.3)
 
