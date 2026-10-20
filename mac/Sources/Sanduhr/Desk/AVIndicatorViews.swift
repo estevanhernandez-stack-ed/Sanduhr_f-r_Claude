@@ -293,7 +293,9 @@ final class AVIndicatorController {
             ? AVIndicators(camera: cameraDot(.saved(in: desk)),
                            mic: desk.bool(forKey: AVIndicators.micKey) && micInUse)
             : AVIndicators()
-        let islandUp = running && desk.bool(forKey: DeskController.notchKey) && controller.wingsWindow != nil
+        let islandUp = AVIndicatorPlacement.islandUp(
+            running: running, notchOn: desk.bool(forKey: DeskController.notchKey),
+            wingsUp: controller.wingsWindow != nil, pillUp: controller.pillWindow != nil)
         let next = AVIndicatorPlacement.spot(shown, islandUp: islandUp, in: desk)
         let model = controller.model
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion

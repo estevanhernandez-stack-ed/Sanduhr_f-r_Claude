@@ -1141,7 +1141,10 @@ in `com.626labs.sanduhr.desk`):
   once: a place on Camera and mic becomes that placement and goes back to its default content,
   otherwise `avSide` becomes Beside the camera, left or right.
 
-They run only while Desk runs and they are on.
+They run only while Desk runs and they are on. The top-center pill counts as the island
+(`AVIndicatorPlacement.islandUp`): with the island switch on and either the wings or the pill up,
+the indicators draw beside its text or in a chosen place, and the tab shows only when neither the
+wings nor the pill is up.
 
 **Motion** (`AVIndicatorMotion`). Coming and going is a 0.25-second ease-in-out opacity fade, the
 island's room growing or shrinking with it in the same transaction; the tab fades its window. The
