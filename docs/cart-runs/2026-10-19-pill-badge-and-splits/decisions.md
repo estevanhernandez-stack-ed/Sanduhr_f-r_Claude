@@ -72,3 +72,10 @@
 - **Alternative not taken:** Duplicating the helpers in the new file.
 - **Item:** 3
 - **How to reverse:** Concatenate and restore the private names.
+
+## D11
+- **Decision:** `NotchPill.maxWidthFraction` goes from 0.36 to 0.30, on the owner's word after the old Mac's measurements; the hide rule stays; yielding to the app menu is not done.
+- **Why:** On a 1680-pt no-notch screen the 0.36 cap allowed the pill 43 pt over the status items; 0.30 is the widest that always clears them, and the pointer hide is what keeps a wide app menu reachable (Xcode's ended 16 pt short of the pill).
+- **Alternative not taken:** Yielding the left wing to the time when an app menu reaches the pill, which needs Accessibility menu frames.
+- **Item:** run (added after close-out, on the integration branch)
+- **How to reverse:** One constant and its test pin.
