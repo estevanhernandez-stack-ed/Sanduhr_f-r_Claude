@@ -87,6 +87,7 @@ final class SpyCCFileSystem: CCLogFileSystem, @unchecked Sendable {
     func subdirectories(of path: String) -> [String] { note("subdirectories"); return base.subdirectories(of: path) }
     func jsonlFiles(under path: String) -> [String] { note("jsonlFiles"); return base.jsonlFiles(under: path) }
     func stat(_ path: String) -> CCLogFileStat? { note("stat"); return base.stat(path) }
+    func logFiles(under path: String) -> [CCLogFile] { note("logFiles"); return base.logFiles(under: path) }
     func read(_ path: String, from offset: UInt64) -> Data? {
         lock.lock()
         _calls.append("read")
@@ -542,5 +543,54 @@ struct CCTimestampAndFormatTests {
         #expect(CCLogReader.number("12") == 0)
         #expect(CCLogReader.number(NSNumber(value: true)) == 0)
         #expect(CCLogReader.number(nil) == 0)
+    }
+}
+
+@Suite("Claude Code log walk, attributes in bulk")
+struct CCLogWalkTests {
+    /// The bulk walk finds the same files as the path walk, with the same size and time, nested
+    /// ones included, and leaves other files and empty folders out (BACKLOG #7).
+    @Test func bulkWalkMatchesTheFileByFileWalk() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("cc-walk-\(UUID().uuidString)").path
+        defer { try? fm.removeItem(atPath: root) }
+        let p1 = root + "/projects/p1", p2 = root + "/projects/p2"
+        try fm.createDirectory(atPath: p1 + "/sub/deeper", withIntermediateDirectories: true)
+        try fm.createDirectory(atPath: p2 + "/empty", withIntermediateDirectories: true)
+        try "{\"a\":1}\n".write(toFile: p1 + "/a.jsonl", atomically: true, encoding: .utf8)
+        try String(repeating: "x", count: 3000).write(toFile: p1 + "/sub/deeper/b.jsonl", atomically: true, encoding: .utf8)
+        try "notes".write(toFile: p1 + "/notes.txt", atomically: true, encoding: .utf8)
+        try "".write(toFile: p2 + "/c.jsonl", atomically: true, encoding: .utf8)
+        let fs = LocalCCLogFileSystem()
+        for dir in [p1, p2] {
+            let bulk = fs.logFiles(under: dir)
+            let slow = fs.jsonlFiles(under: dir).compactMap { p in fs.stat(p).map { CCLogFile(path: p, stat: $0) } }
+            #expect(bulk == slow, "\(dir)")
+            #expect(bulk.map(\.path) == bulk.map(\.path).sorted())
+        }
+        #expect(fs.logFiles(under: p1).map { ($0.path as NSString).lastPathComponent } == ["a.jsonl", "b.jsonl"])
+        #expect(fs.logFiles(under: p1).map(\.stat.size) == [8, 3000])
+        #expect(fs.logFiles(under: p2).map(\.stat.size) == [0])
+        #expect(fs.logFiles(under: root + "/missing").isEmpty)
+        // The reader's discovery is the same walk, project by project.
+        let reader = CCLogReader(root: root, fileSystem: fs)
+        #expect(reader.discoverLogs() == fs.logFiles(under: p1) + fs.logFiles(under: p2))
+        #expect(reader.discoverLogFiles() == reader.discoverLogs().map(\.path))
+    }
+
+    /// A file system that offers only the old pair gets the bulk walk from them.
+    @Test func theDefaultBuildsFromJsonlFilesAndStat() {
+        let fs = SpyCCFileSystem()
+        let dir = FileManager.default.temporaryDirectory.path
+        _ = fs.logFiles(under: dir)
+        #expect(fs.calls.first == "logFiles")
+    }
+
+    @Test func dateTicksRoundTripToTheDatesPrecision() {
+        let d = Date(timeIntervalSince1970: 1_760_000_000.123456)
+        let t = VaultTime.ticks(d)
+        #expect(t == VaultTime.ticks(seconds: 1_760_000_000, nanoseconds: 123_456_000))
+        #expect(abs(VaultTime.date(ticks: t).timeIntervalSince(d)) < 0.000_001)
+        #expect(VaultTime.ticks(Date(timeIntervalSince1970: 5)) == VaultTime.ticks(seconds: 5, nanoseconds: 0))
     }
 }

@@ -118,7 +118,9 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   (opus, sonnet and haiku models map to the Opus, Sonnet and All Models weekly cards, as on
   Windows). claude.ai's numbers lag by minutes and the widget asks every 5; the badge covers
   both. It starts again from zero at each refresh and grows with a scan every 30 seconds, off
-  the main thread. `CCLogReader` is a port of Windows `CcLogReader` (worktree and subfolder
+  the main thread; the scan walks the logs with their attributes read in bulk (`logFiles(under:)`,
+  one read per directory, not a stat per file), as the vault's walk and the per-seat activity check
+  do (BACKLOG #7). `CCLogReader` is a port of Windows `CcLogReader` (worktree and subfolder
   folding for project names, burn for a local day, by model, by project, by skill); it reads
   only the timestamp, model, token counts, cwd and skill of `assistant` lines, never message
   content, and keeps its parse in memory: per file the offset of the last whole line, so a

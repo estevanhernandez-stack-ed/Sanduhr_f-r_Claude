@@ -492,6 +492,13 @@ enum VaultTime {
         unixEpochTicks + seconds * 10_000_000 + nanoseconds / 100
     }
 
+    /// `ticks` of a Date, to the Date's precision (about a quarter of a microsecond today).
+    static func ticks(_ date: Date) -> Int64 {
+        let t = date.timeIntervalSince1970
+        let seconds = t.rounded(.down)
+        return ticks(seconds: Int64(seconds), nanoseconds: Int64(((t - seconds) * 1_000_000_000).rounded()))
+    }
+
     static func date(ticks: Int64) -> Date {
         Date(timeIntervalSince1970: Double(ticks - unixEpochTicks) / 10_000_000)
     }
