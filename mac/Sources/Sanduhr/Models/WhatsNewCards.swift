@@ -7,8 +7,21 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2300 + release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2300: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.30.0", id: "pill-indicators",
+            title: "Camera and mic on the pill",
+            body: "On a Mac without a notch the camera and mic indicators draw beside the pill's text instead of in a tab underneath it. The pill also keeps clear of the status items.",
+            art: .symbol("camera"), destination: .notch),
+        WhatsNewCard(
+            version: "2.30.0", id: "idle-cpu",
+            title: "Lighter when idle",
+            body: "The local Claude Code scan reads each folder's file times in one pass instead of a call per transcript. Sanduhr idles on a fraction of the CPU it used.",
+            art: .symbol("leaf"), destination: .usage),
+    ]
 
     static let release2290: [WhatsNewCard] = [
         WhatsNewCard(

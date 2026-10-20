@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **Camera and mic on the pill.** On a Mac without a notch the camera and mic indicators counted only the notch wings as the island, so with the pill up they fell back to their own tab at the top center, under the pill. They now draw beside the pill's text, or in a chosen place, and the Settings Notch preview draws the pill in the tab's place. From the first measurements on a notchless Mac, the pill's width cap goes from 0.36 to 0.30 of the screen, so it always keeps clear of the status items; the hide while the pointer is in the menu bar stays.
+
+- **Lighter when idle.** The local Claude Code scan, the usage vault's walk and the per-seat activity check each enumerated every transcript with three calls per file, the scan every 30 seconds. One shared walk reads a folder's sizes and times in bulk: about 6 ms where it took 129 on a seat with 750 logs. The vault re-ingests once after the update, by its walk-version rule.
+
+- **For the smoke harness.** `smoke/scenarios/just-the-desk.yaml` quotes its `on` and `off` args (a bare one is a YAML boolean).
+
 ## v2.29.0-mac — 2026-10-19
 
 - **A tour for the Desk on its own.** Choose Just the Desk on the welcome sheet and a three-step tour opens a moment later: the desktop, the menu bar (with the notch on a Mac that has one), then Sign in any time, whose button opens Accounts. Take the Tour… shows the same three steps for as long as Just the Desk is on. The landing page and README now say the Desk works without a Claude subscription; pacing still needs one.
