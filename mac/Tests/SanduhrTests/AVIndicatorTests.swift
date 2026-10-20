@@ -227,6 +227,25 @@ struct AVIndicatorPlacementTests {
         #expect(AVIndicatorPlacement.spot(AVIndicators(mic: true), islandUp: false, side: .left, chosen: [.right]) == .badge)
     }
 
+    @Test func theIslandIsUpWithTheWingsOrThePill() {
+        // The pill counts as the island: a screen without a notch has no wings window, only the pill.
+        #expect(AVIndicatorPlacement.islandUp(running: true, notchOn: true, wingsUp: true, pillUp: false))
+        #expect(AVIndicatorPlacement.islandUp(running: true, notchOn: true, wingsUp: false, pillUp: true))
+        #expect(AVIndicatorPlacement.islandUp(running: true, notchOn: true, wingsUp: true, pillUp: true))
+        #expect(!AVIndicatorPlacement.islandUp(running: true, notchOn: true, wingsUp: false, pillUp: false))
+    }
+
+    @Test func theIslandIsNotUpWhileOffOrNotRunning() {
+        #expect(!AVIndicatorPlacement.islandUp(running: false, notchOn: true, wingsUp: true, pillUp: true))
+        #expect(!AVIndicatorPlacement.islandUp(running: true, notchOn: false, wingsUp: true, pillUp: true))
+    }
+
+    @Test func underThePillTheyDrawBesideItsTextNotInATab() {
+        let up = AVIndicatorPlacement.islandUp(running: true, notchOn: true, wingsUp: false, pillUp: true)
+        #expect(AVIndicatorPlacement.spot(both, islandUp: up, side: .right, chosen: []) == .beside(.right))
+        #expect(AVIndicatorPlacement.spot(both, islandUp: up, side: .right, chosen: [.left]) == .places)
+    }
+
     @Test func chosenNeedsAPlaceThatDraws() {
         #expect(AVIndicatorPlacement.chosen(left: .avIndicators, right: .meters, strip: .meetingOrMeters,
                                             wingText: true, chinText: false, chin: 26) == [.left])

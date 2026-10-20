@@ -64,13 +64,13 @@ struct NotchPillTests {
     }
 
     @Test func theWidthIsCappedAtTheFractionOfTheScreen() {
-        #expect(NotchPill.maxWidthFraction == 0.36)
+        #expect(NotchPill.maxWidthFraction == 0.30)
         let f = NotchPill.frame(screen: Self.screen, visibleFrame: Self.visible, contentWidth: 5000)
-        #expect(f?.width == 1920 * 0.36)
+        #expect(f?.width == 1920 * 0.30)
         #expect(abs((f?.midX ?? 0) - Self.screen.midX) < 0.001)
         // Exactly at the cap is not capped.
-        let at = NotchPill.frame(screen: Self.screen, visibleFrame: Self.visible, contentWidth: 1920 * 0.36)
-        #expect(at?.width == 1920 * 0.36)
+        let at = NotchPill.frame(screen: Self.screen, visibleFrame: Self.visible, contentWidth: 1920 * 0.30)
+        #expect(at?.width == 1920 * 0.30)
     }
 
     @Test func theWidthIsNeverUnderTheHeightSoTheLeastPillIsRound() {

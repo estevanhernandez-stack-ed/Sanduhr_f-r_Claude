@@ -10,9 +10,12 @@ import CoreGraphics
 ///
 /// The middle of the menu bar is not free space the way the notch is: app menus grow from the
 /// left and status items from the right, and on a small screen the two can meet under the pill.
-/// Until the collision rule is settled on real no-notch hardware (issue #119 keeps that check),
-/// the rule is conservative: the pill is never wider than `maxWidthFraction` of the screen, and it
-/// hides while the pointer is in the menu bar, so whatever sits under it can always be reached.
+/// Measured on a no-notch Mac 2026-10-19 (`docs/notes/no-notch-measurements.md`): with Xcode's
+/// menus and a full row of status items on a 1680-pt screen, the pill cleared the menus by 16 pt
+/// and a 0.30 cap is the widest that always clears the status items. So the rule: the pill is
+/// never wider than `maxWidthFraction` of the screen, and it hides while the pointer is in the
+/// menu bar, so whatever sits under it can always be reached (the hide is what keeps a wide app
+/// menu reachable; the cap keeps the status items clear).
 /// It also hides while the menu bar is hidden (full screen, auto-hide), when there is no bar to
 /// sit on. Main screen only in this cut, like the Desk window itself; every notch-less screen is
 /// a later item.
@@ -29,7 +32,7 @@ enum NotchPill {
 
     /// The widest the pill gets, as a fraction of the screen's width, so app menus and status
     /// items keep room on either side.
-    static let maxWidthFraction: CGFloat = 0.36
+    static let maxWidthFraction: CGFloat = 0.30
 
     /// Debug key in the same suite: the smoke hook writes it so a notched Mac can show the pill
     /// for the smoke tools. Nothing here writes it.
