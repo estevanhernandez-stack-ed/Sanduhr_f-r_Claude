@@ -63,18 +63,23 @@ not connected, append to `docs/decisions/_pending-dashboard-log.md` and let the 
 
 ## Gotchas, Windows (the Windows agent's, kept here until `windows-dotnet/` has its own keystone)
 
-- `runFullTrust` does not stop MSIX AppData write virtualization. The Store manifest opts out with
-  `desktop6:FileSystemWriteVirtualization` and `virtualization:ExcludedDirectories` scoped to the two
-  Sanduhr folders, behind `rescap:unvirtualizedResources`; `PackageManifestTests` pins them. Drop them
-  and Claude Code, `sanduhr-mcp` and the statusline lose sight of the widget's files. Store data from
-  before 3.4.3 sits in the package LocalCache until `PackagedDataMigration` copies it out on first launch.
+- The Store build's AppData is virtualized. `runFullTrust` does not stop MSIX write virtualization,
+  and Microsoft denied `rescap:unvirtualizedResources` (2026-10-20), so the manifest declares
+  `runFullTrust` only (`PackageManifestTests` pins it; MinVersion 10.0.17763.0). A new file the
+  package writes under `%APPDATA%` goes to the package `LocalCache`, which shadows a real file of
+  the same name on read. Anything a process outside the package touches therefore lives in
+  `%USERPROFILE%\.sanduhr` (`Paths.ExternalDir`), never AppData. A new file for Claude Code, the
+  MCP or the statusline goes there, with its own name in `Reset`.
+- `~\.sanduhr` is shared ground: other estate tools keep their own files there (`time\`). Sanduhr
+  creates, reads and deletes only its own names in it, never the folder wholesale; Reset removes
+  the folder only when it is empty.
 - The MCP process is network-free by contract: `Sanduhr.Mcp.csproj` has no ProjectReference or
   PackageReference, source-links four Core files, and `TrustBoundaryTests` pins the allowlist.
-  `publish_usage` hands uploads to the widget through request/result files under `%APPDATA%\Sanduhr`.
+  `publish_usage` hands uploads to the widget through request/result files under `%USERPROFILE%\.sanduhr`.
   Widening the link list is a design decision that must break CI.
 - The publish token lives in Credential Manager slot `publish:token` (service `com.626labs.sanduhr`);
   a legacy `626labs:agentKey` entry migrates on first use. Never in `settings.json` or a log.
-- `%APPDATA%\Sanduhr\snapshot.json` is written only by 3.4.0+ builds, stamped `writer_version`; a
+- `%USERPROFILE%\.sanduhr\snapshot.json` is written only by 3.4.0+ builds, stamped `writer_version`; a
   stale one stamped `1.0.0` came from a dev build.
 - Velopack packId `626Labs.Sanduhr` is frozen and the install tree must stay disjoint from
   `%LOCALAPPDATA%\Sanduhr` (the vault) or a fresh install deletes it. Store versions need a `.0`

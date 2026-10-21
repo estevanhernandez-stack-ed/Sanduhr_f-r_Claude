@@ -178,7 +178,7 @@ The Claude Code side (`docs/spec.md` Stage 4, `../docs/mods-and-config-spec.md`)
   weekly reset) on their own line or the same one; the script looks the folder up in
   `seats.json` for per-folder meters.
 - **Meters mod**: the Mac's `sanduhr-meters` mod ships in the app output (`mods\`), installs to
-  `%APPDATA%\Sanduhr\mods\<stamp>` and joins `env.CLAUDE_CODE_PLUGIN_DIRS`; On, Off, Update and
+  `%USERPROFILE%\.sanduhr\mods\<stamp>` and joins `env.CLAUDE_CODE_PLUGIN_DIRS`; On, Off, Update and
   Remove live on **Mods & Config**, which otherwise reads a folder without changing it (settings,
   statusline, hooks, plugins, mods, MCP names, `CLAUDE.md`, retention). Secrets are masked.
 - **Glow when Claude needs you**: `Notification` and `Stop` hooks touch a signal file; the widget
@@ -186,8 +186,15 @@ The Claude Code side (`docs/spec.md` Stage 4, `../docs/mods-and-config-spec.md`)
   success color (done), and flashes the taskbar button. Off by default (`claude_code_glow`).
 - **Accounts**: Follow the account I'm using (`follow_account`, off by default) checks the other
   signed-in accounts every 15 minutes through their own WebView2 profiles
-  (`%APPDATA%\Sanduhr\webview2-<account_ref>`); linked folders get `snapshot.<account_ref>.json`
-  and `seats.json` (`account_folders`).
+  (`%APPDATA%\Sanduhr\webview2-<account_ref>`); linked folders get
+  `%USERPROFILE%\.sanduhr\snapshot.<account_ref>.json` and `seats.json` (`account_folders`).
+- **Files outside AppData (3.5.0).** Everything a process outside the app reads or writes lives in
+  `%USERPROFILE%\.sanduhr` (`Paths.ExternalDir`): the snapshots, `seats.json`, `mcp-settings.json`
+  (a projection of the MCP consent and publish readiness), the publish and theme handoff files, the
+  glow signals, `bin\`, `mcp\` and `mods\`. Private data stays in `%APPDATA%\Sanduhr` and the vault;
+  on the Store build Windows keeps those in package storage. The manifest declares `runFullTrust`
+  only. `ExternalDirMigration` re-points registrations that still name the old paths on first
+  launch. See "Plan B" in `docs/spec.md`.
 - **Reset Sanduhr…** on About: five parts, all checked, then quit.
 - **The MCP** reads discovered folders behind the `mcp_roots` consent (it now source-links
   `ClaudeCodeHomes.cs`); `publish_usage` hands its request over atomically.

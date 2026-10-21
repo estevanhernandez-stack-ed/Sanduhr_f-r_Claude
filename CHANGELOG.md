@@ -336,7 +336,25 @@ Also:
 
 ## v3.5.0 — 2026-10-12
 
-**Platform:** Windows (.NET 10 / WPF). The Windows parity cycle: the Windows app catches up with the Mac's features (PRs #204, #205, #206, #208, #209, #213, #214). `Sanduhr.Mcp` to 3.5.0. No change to `Package.appxmanifest` since 3.4.3 other than the version: no new capability.
+**Platform:** Windows (.NET 10 / WPF). The Windows parity cycle: the Windows app catches up with the Mac's features (PRs #204, #205, #206, #208, #209, #213, #214). `Sanduhr.Mcp` to 3.5.0. The manifest declares `runFullTrust` only, and `TargetDeviceFamily MinVersion` is back to Windows 10 1809 (10.0.17763.0).
+
+### Claude Code files move out of AppData
+
+- **Everything Claude Code reads now lives in `%USERPROFILE%\.sanduhr`.** The Store build keeps a packaged app's new files under `%APPDATA%` in the package's own storage, where Claude Code, `sanduhr-mcp` and the statusline cannot see them. Microsoft denied the capability that turns that off (`rescap:unvirtualizedResources`, 2026-10-20), so the files those processes use moved instead, for both builds: `snapshot.json`, `snapshot.<ref>.json` and `seats.json`; the `publish`, `theme`, `desk-messages` and `watch-request` handoff files; `glow-waiting.signal` and `glow-done.signal`; the statusline script and MCP launcher under `bin\`; the MCP server copy under `mcp\`; and the meters mod under `mods\`. Settings, history, themes, sounds, sign-in profiles, logs, messages, install receipts and backups, and the vault stay private in `%APPDATA%\Sanduhr` and `%LOCALAPPDATA%\Sanduhr`, which on the Store build Windows removes with the app. With `SANDUHR_DEV_PROFILE` set the folder is `<profile>\external`.
+- **`mcp-settings.json`.** While the MCP integration is installed, the widget writes a projection of `settings.json` that `sanduhr-mcp` reads: which homes you ticked, and whether publishing is on, an endpoint is set and a credential is ready. Never the endpoint URL, never a token. A missing or unreadable file means nothing is ticked and publishing is off. Consent still lives in `settings.json`.
+- **Existing setups move on first launch.** Sanduhr re-points its own Claude Code registrations that still name `%APPDATA%\Sanduhr` (the statusline, the MCP server, the meters mod and the glow hooks) to the new folder, only while they are still Sanduhr's, with a backup of each file and the receipts updated. An entry you changed is left alone. The old copies in `%APPDATA%\Sanduhr\{bin,mcp,mods}` stay (a running session may still use them); Reset removes them. It runs once in the background, never blocks startup, and retries up to three launches.
+- **`sanduhr-mcp` reads the vault where the widget keeps it**, including package storage on the Store build.
+- **`~\.sanduhr` is shared ground.** Other tools keep their own files there. Sanduhr creates, reads and deletes only its own names in it, never the folder wholesale.
+
+### Reset, About and the Store uninstall
+
+- **Reset Sanduhr…** now takes out Sanduhr's files in `~\.sanduhr` and the old copies in `%APPDATA%\Sanduhr`, per part, and removes `~\.sanduhr` only if nothing else is in it.
+- **Settings ▸ About ▸ Where settings live** gains a **Claude Code files** row for `~\.sanduhr`, and shows the folder your data is really in on the Store build.
+- **A Store uninstall removes the private data and leaves `~\.sanduhr`** and Sanduhr's entries in your Claude Code folders. Run Reset before uninstalling, or follow the steps in `PRIVACY.md`.
+
+### Store manifest
+
+- **The virtualization opt-out is withdrawn.** 3.4.3 asked for `rescap:unvirtualizedResources`; Microsoft denied it, and 3.4.3 never shipped to the Store. 3.5.0 declares only `runFullTrust`, with no `desktop6` or `virtualization` entries, and the minimum Windows version returns to 10.0.17763.0 (1809). 3.4.3's one-time copy out of the package (`PackagedDataMigration`) is removed.
 
 ### What's New and the welcome tour
 
@@ -419,6 +437,8 @@ Going back to a version before 3.5 turns the Settings shortcut off; your keys ar
 ## v3.4.3 — 2026-10-11
 
 **Platform:** Windows (.NET 10 / WPF). Store (MSIX) build only; the Setup.exe build is unchanged.
+
+**Superseded: 3.4.3 never shipped to the Store.** Microsoft denied the `rescap:unvirtualizedResources` request (2026-10-20). The entries below record what was built and tested on sideloaded machines; 3.5.0 replaces the approach by moving the files Claude Code reads out of AppData, declares only `runFullTrust`, and removes the one-time copy.
 
 ### Fixed
 
