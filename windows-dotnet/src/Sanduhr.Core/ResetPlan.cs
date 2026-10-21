@@ -64,6 +64,8 @@ public static partial class ResetPlan
     public const string IntegrationsName = "integrations";
     public const string ModsName = "mods";
     public const string McpName = "mcp";
+    public const string BinName = "bin";
+    public const string McpSettingsName = "mcp-settings.json";
 
     /// <summary>The sign-in window's WebView2 user-data root (<c>SignInCoordinator</c> makes a folder per attempt inside it).</summary>
     public const string SignInProfileName = "webview2";
@@ -123,16 +125,23 @@ public static partial class ResetPlan
     {
         string app = paths.AppDataDir;
         string local = Path.GetDirectoryName(paths.VaultDir)!;
+        // The external folder (%USERPROFILE%\.sanduhr) is shared ground: only Sanduhr's own names are
+        // listed, never the folder itself, and the path is read without creating it.
+        string ext = paths.ExternalDirPath;
         string backups = Path.Combine(app, BackupsName);
         var map = new Dictionary<ResetPart, IReadOnlyList<ResetItem>>();
 
-        // Claude Code entries: the receipts file and Sanduhr's copies. The service deletes these only
-        // after the undo succeeded, since a failed folder keeps its receipt so Settings can still remove it.
+        // Claude Code entries: the receipts file and Sanduhr's copies, in ~\.sanduhr and the pre-3.5.0
+        // AppData places. The service deletes these only after the undo succeeded, since a failed folder
+        // keeps its receipt so Settings can still remove it.
         var cc = new List<ResetItem>();
         AddDir(cc, Path.Combine(app, IntegrationsName));
-        AddDir(cc, Path.Combine(app, ModsName));
-        AddDir(cc, Path.Combine(app, McpName));
-        AddDir(cc, paths.StatuslineBinDir);
+        foreach (var name in new[] { ModsName, McpName, BinName })
+        {
+            AddDir(cc, Path.Combine(ext, name));
+            AddDir(cc, Path.Combine(app, name));
+        }
+        AddFile(cc, Path.Combine(ext, McpSettingsName));
         map[ResetPart.ClaudeCodeEntries] = Finish(cc, backups);
 
         var accounts = new List<ResetItem>();
@@ -144,23 +153,28 @@ public static partial class ResetPlan
 
         var history = new List<ResetItem>();
         AddMatchingFiles(history, app, "history*.json");
-        AddMatchingFiles(history, app, "snapshot*.json");
-        AddFile(history, Path.Combine(app, SeatFiles.SeatsName));
         AddDir(history, paths.VaultDir);
         AddFile(history, Path.Combine(local, "last-update-check.txt"));
         AddFile(history, paths.LegacyHistoryFile);
-        AddFile(history, Path.Combine(app, PublishHandoff.RequestFileName));
-        AddFile(history, Path.Combine(app, PublishHandoff.ResultFileName));
-        AddFile(history, Path.Combine(app, ThemeHandoff.RequestFileName));
-        AddFile(history, Path.Combine(app, ThemeHandoff.ResultFileName));
-        AddMatchingFiles(history, app, "glow-*.signal");
         AddFile(history, paths.LastErrorFile);
         AddMatchingFiles(history, app, "sanduhr.log*");
         AddFile(history, Path.Combine(app, "fetch-debug.log"));
         AddFile(history, Path.Combine(app, "signin-debug.log"));
-        // S6's handoffs: Claude's suggested Desk messages and watcher requests (spec 6.9).
-        AddMatchingFiles(history, app, "desk-messages-*.json");
-        AddMatchingFiles(history, app, "watch-request-*.json");
+        // The snapshots, seats, handoff and signal files live in ~\.sanduhr since 3.5.0; builds before it
+        // wrote them in AppData. Each is taken from both places. Includes S6's handoffs: Claude's
+        // suggested Desk messages and watcher requests (spec 6.9).
+        foreach (var dir in new[] { ext, app })
+        {
+            AddMatchingFiles(history, dir, "snapshot*.json");
+            AddFile(history, Path.Combine(dir, SeatFiles.SeatsName));
+            AddFile(history, Path.Combine(dir, PublishHandoff.RequestFileName));
+            AddFile(history, Path.Combine(dir, PublishHandoff.ResultFileName));
+            AddFile(history, Path.Combine(dir, ThemeHandoff.RequestFileName));
+            AddFile(history, Path.Combine(dir, ThemeHandoff.ResultFileName));
+            AddMatchingFiles(history, dir, "glow-*.signal");
+            AddMatchingFiles(history, dir, "desk-messages-*.json");
+            AddMatchingFiles(history, dir, "watch-request-*.json");
+        }
         map[ResetPart.History] = Finish(history, backups);
 
         var themes = new List<ResetItem>();
@@ -172,6 +186,8 @@ public static partial class ResetPlan
         AddFile(settings, Path.Combine(app, "messages.txt"));
         AddFile(settings, Path.Combine(app, "messages.txt.previous"));
         AddFile(settings, paths.SettingsFile);
+        // A stale projection must not outlive the consent it copies.
+        AddFile(settings, Path.Combine(ext, McpSettingsName));
         map[ResetPart.Settings] = Finish(settings, backups);
 
         return map;

@@ -82,14 +82,31 @@ public class ResetPlanTests : IDisposable
             "backups\\keep-me.json", "backups\\sub\\also.json",
             "messages.txt", "messages.txt.previous", "desk-messages-request.json", "watch-request-1-2-w1.json",
         ];
+        // The AppData tree above is what a pre-3.5.0 build left; the same names exist in ~\.sanduhr now.
+        string ext = paths.ExternalDirPath;
+        string[] externalFiles =
+        [
+            "snapshot.json", "snapshot.abcd1234.json", "seats.json",
+            "publish-request.json", "publish-result.json", "theme-request.json", "theme-result.json",
+            "glow-waiting.signal", "glow-done.signal", "desk-messages-request.json", "watch-request-1-2-w1.json",
+            "mods\\m\\file.txt", "mcp\\v1\\sanduhr-mcp.exe", "bin\\sanduhr-statusline.ps1", "mcp-settings.json",
+        ];
         foreach (var f in files) Touch(Path.Combine(app, f));
+        foreach (var f in externalFiles) Touch(Path.Combine(ext, f));
         Directory.CreateDirectory(Path.Combine(app, "webview2-nothex12"));   // not an account profile
         Touch(Path.Combine(paths.VaultDir, "root", "meta.json"));
 
         var inv = ResetPlan.Inventory(paths);
-        string Rel(ResetItem i) => Path.GetRelativePath(app, i.Path);
+        string Rel(ResetItem i) => i.Path.StartsWith(ext, StringComparison.OrdinalIgnoreCase)
+            ? "~\\" + Path.GetRelativePath(ext, i.Path)
+            : Path.GetRelativePath(app, i.Path);
 
-        Assert.Equal(new HashSet<string> { "integrations", "mods", "mcp", "bin" },
+        Assert.Equal(
+            new HashSet<string>
+            {
+                "integrations", "mods", "mcp", "bin",
+                "~\\mods", "~\\mcp", "~\\bin", "~\\mcp-settings.json",
+            },
             inv[ResetPart.ClaudeCodeEntries].Select(Rel).ToHashSet());
         Assert.Equal(new HashSet<string> { "webview2-0a1b2c3d", "webview2-fetch", "webview2" },
             inv[ResetPart.Accounts].Select(Rel).ToHashSet());
@@ -97,26 +114,52 @@ public class ResetPlanTests : IDisposable
         var hist = inv[ResetPart.History].Select(i => i.Path == paths.VaultDir ? "<vault>" : Rel(i)).ToHashSet();
         foreach (var expected in new[]
         {
-            "history.json", "history.abcd1234.json", "snapshot.json", "snapshot.abcd1234.json", "seats.json",
+            "history.json", "history.abcd1234.json", "last_error.json", "sanduhr.log", "sanduhr.log.1", "<vault>",
+            // old AppData copies
+            "snapshot.json", "snapshot.abcd1234.json", "seats.json",
             "publish-request.json", "publish-result.json", "theme-request.json", "theme-result.json",
-            "glow-waiting.signal", "glow-done.signal", "last_error.json", "sanduhr.log", "sanduhr.log.1", "<vault>", "desk-messages-request.json", "watch-request-1-2-w1.json",
-            "desk-messages-request.json", "watch-request-1-2-w1.json",
+            "glow-waiting.signal", "glow-done.signal", "desk-messages-request.json", "watch-request-1-2-w1.json",
+            // the same names in ~\.sanduhr
+            "~\\snapshot.json", "~\\snapshot.abcd1234.json", "~\\seats.json",
+            "~\\publish-request.json", "~\\publish-result.json", "~\\theme-request.json", "~\\theme-result.json",
+            "~\\glow-waiting.signal", "~\\glow-done.signal", "~\\desk-messages-request.json", "~\\watch-request-1-2-w1.json",
         })
             Assert.Contains(expected, hist);
 
         Assert.Equal(["themes"], inv[ResetPart.Themes].Select(Rel));
-        Assert.Equal(["messages.txt", "messages.txt.previous", "settings.json"], inv[ResetPart.Settings].Select(Rel));
+        Assert.Equal(["messages.txt", "messages.txt.previous", "settings.json", "~\\mcp-settings.json"],
+            inv[ResetPart.Settings].Select(Rel));
 
         string backups = Path.Combine(app, "backups");
         foreach (var items in inv.Values)
+        {
             Assert.DoesNotContain(items, i => i.Path.StartsWith(backups, StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(items, i => string.Equals(i.Path.TrimEnd('\\'), ext, StringComparison.OrdinalIgnoreCase));
+        }
     }
 
     [Fact]
-    public void Inventory_on_an_empty_tree_is_empty()
+    public void A_foreign_file_in_the_external_folder_is_never_listed()
     {
-        var inv = ResetPlan.Inventory(Make());
+        var paths = Make();
+        string ext = paths.ExternalDirPath;
+        Touch(Path.Combine(ext, "time", "x"));
+        Touch(Path.Combine(ext, "snapshot.json"));
+        Touch(Path.Combine(ext, "other-tool.json"));
+
+        var all = ResetPlan.Inventory(paths).Values.SelectMany(v => v).Select(i => i.Path).ToList();
+        Assert.Contains(Path.Combine(ext, "snapshot.json"), all);
+        Assert.DoesNotContain(all, p => p.StartsWith(Path.Combine(ext, "time"), StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(all, p => p.EndsWith("other-tool.json", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Inventory_on_an_empty_tree_is_empty_and_does_not_create_the_external_folder()
+    {
+        var paths = Make();
+        var inv = ResetPlan.Inventory(paths);
         Assert.Equal(5, inv.Count);
         Assert.All(inv.Values, v => Assert.Empty(v));
+        Assert.False(Directory.Exists(paths.ExternalDirPath));
     }
 }
