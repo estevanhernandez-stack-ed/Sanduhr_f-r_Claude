@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Toolkit.Uwp.Notifications;
+using Sanduhr.App.Interop;
 using Sanduhr.App.Services;
 using Sanduhr.Core;
 
@@ -27,6 +29,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private readonly NowPlayingHub _nowPlaying;
     private readonly DeskMessageSource _messages;
     private readonly WatcherStore? _watchers;
+    private readonly Paths? _paths;
+    private readonly LauncherAppCache? _launcherApps;
+    private readonly Dispatcher _ui = Dispatcher.CurrentDispatcher;
     private readonly DispatcherTimer _minute;
     private readonly TelemetrySource _telemetry = new();
     private readonly AudioLevelSource _audio = new();
@@ -39,6 +44,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private NowPlayingSettings _np = NowPlayingSettings.Default;
     private DeskWeatherSettings _weatherSettings = DeskWeatherSettings.Default;
     private DeskUsage _usage = DeskUsage.Empty;
+    private LauncherModel _launcher = LauncherModel.Empty;
     private readonly List<DeskView> _views = [];
     /// <summary>Message lines whose once-only motion has run (spec 6.2), kept across redraws.</summary>
     private readonly HashSet<string> _played = new(StringComparer.Ordinal);
@@ -62,8 +68,12 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private DeskArrangeMode? _arrangeMode;
 
     public DeskController(SettingsStore store, Func<IDeskHost> hostFactory, Func<DeskUsage> usageSource,
-        NowPlayingHub nowPlaying, DeskMessageSource messages, WatcherStore? watchers = null)
+        NowPlayingHub nowPlaying, DeskMessageSource messages, WatcherStore? watchers = null,
+        Paths? paths = null, LauncherAppCache? launcherApps = null)
     {
+        _paths = paths;
+        _launcherApps = launcherApps;
+        if (_launcherApps is not null) _launcherApps.Changed += OnLauncherAppsChanged;
         _store = store;
         _hostFactory = hostFactory;
         _usageSource = usageSource;
@@ -88,6 +98,92 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private IReadOnlyList<Watcher> WatchersNow() => _watchers is not null && Placed("watchers") ? _watchers.Shown : [];
 
     private bool _piecesTakeClicks = DeskPieceClicks.DefaultOn;
+
+    /// <summary>A click landed on a Launcher button whose app is no longer installed (its index): Settings opens at it.</summary>
+    public event Action<int>? LauncherMissingClicked;
+
+    /// <summary>The Start menu's list or an app's icon arrived: redraw if the Launcher shows.</summary>
+    private void OnLauncherAppsChanged()
+    {
+        if (_host is null || _stopped || !Placed("launcher") || _launcher.IsEmpty) return;
+        Render();
+    }
+
+    /// <summary>What the Launcher piece draws from now: the buttons, the apps the Start menu no longer has, and the
+    /// icons, names and chosen images the shell and the images folder have already given. Null when the piece
+    /// is not placed or has no buttons. Asks the cache to read the Start menu in the background when its list is old.</summary>
+    private DeskLauncherFrame? LauncherNow()
+    {
+        if (_launcher.IsEmpty || !Placed("launcher")) return null;
+        var ids = _launcher.Buttons.Where(b => b.Kind == LauncherKind.App).Select(b => b.Target).Distinct(StringComparer.Ordinal).ToList();
+        _launcherApps?.Refresh(ids);
+        var missing = new HashSet<string>(StringComparer.Ordinal);
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        var icons = new Dictionary<string, System.Windows.Media.ImageSource>(StringComparer.Ordinal);
+        var images = new Dictionary<string, System.Windows.Media.ImageSource>(StringComparer.Ordinal);
+        foreach (var b in _launcher.Buttons)
+        {
+            if (b.Image is { } file && _paths is not null && !images.ContainsKey(file) && LauncherImages.Load(_paths, file) is { } picked)
+                images[file] = picked;
+        }
+        foreach (var b in _launcher.Buttons.Where(b => b.Kind == LauncherKind.App))
+        {
+            if (_launcherApps is null) break;
+            if (_launcherApps.NameOf(b.Target) is { } name) names[b.Target] = name;
+            if (_launcherApps.IsMissing(b.Target)) { missing.Add(b.Target); continue; }
+            bool hasOwnImage = b.Image is { } f && images.ContainsKey(f);
+            if (!hasOwnImage && _launcherApps.IconOf(b.Target) is { } icon) icons[b.Target] = icon;
+        }
+        return new DeskLauncherFrame(_launcher, missing, icons, names, images);
+    }
+
+    /// <summary>
+    /// A Launcher button was clicked, tapped or invoked (spec, Desk Launcher): the app opens through the shell, the
+    /// link in the default browser, off the UI thread, never elevated and never waited for. An app the Start menu no
+    /// longer has sends the click to Settings, at that button; any other failure shows a toast with the button's name.
+    /// </summary>
+    public void LaunchButton(int index)
+    {
+        if (_stopped || index < 0 || index >= _launcher.Buttons.Count) return;
+        var button = _launcher.Buttons[index];
+        var name = button.DisplayName(_launcherApps?.NameOf(button.Target));
+        Func<string, bool>? exists = _launcherApps is null ? null : _launcherApps.ExistsNow;
+        Task.Run(() => LauncherApps.Open(button, exists)).ContinueWith(t =>
+        {
+            var result = t.IsCompletedSuccessfully ? t.Result : LauncherApps.OpenResult.Failed;
+            _ui.BeginInvoke(() =>
+            {
+                if (_stopped) return;
+                switch (result)
+                {
+                    case LauncherApps.OpenResult.Missing:
+                        _launcherApps?.Refresh([], force: true);   // the dim follows what the Start menu says now
+                        LauncherMissingClicked?.Invoke(index);
+                        break;
+                    case LauncherApps.OpenResult.Opened:
+                        break;
+                    default:
+                        ShowOpenFailed(name);
+                        break;
+                }
+            });
+        });
+    }
+
+    private static void ShowOpenFailed(string name)
+    {
+        try
+        {
+            new ToastContentBuilder()
+                .AddText($"Couldn't open {name}")
+                .AddText("Check that it is still there, then try again.")
+                .Show();
+        }
+        catch (Exception e)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Sanduhr] Launcher toast failed: {e.GetType().Name}");
+        }
+    }
 
     /// <summary>A Desk menu item was chosen (spec 7.4); the app opens the page, arranges or turns the Desk off.</summary>
     public event Action<DeskMenuAction>? MenuRequested;
@@ -142,6 +238,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _nowPlaying.Configure(_np.Prefs);
         _weatherSettings = _store.LoadDeskWeather();
         _piecesTakeClicks = _store.LoadDeskPiecesTakeClicks();
+        _launcher = _store.LoadLauncher();
         _messages.Reload();
         if (!_settings.Enabled)
         {
@@ -185,6 +282,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         StopHost();
         _nowPlaying.Changed -= OnTrackChanged;
         _nowPlaying.PresenceChanged -= OnPresenceChanged;
+        if (_launcherApps is not null) _launcherApps.Changed -= OnLauncherAppsChanged;
         _pump.Stop();
         _audio.Dispose();
         _weather.Dispose();
@@ -238,6 +336,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Place = _weatherSettings.Place,
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
             Watchers = WatchersNow(),
+            Launcher = LauncherNow(),
         };
         DeskArrangeMode mode;
         try
@@ -462,6 +561,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Place = _weatherSettings.Place,
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
             Watchers = WatchersNow(),
+            Launcher = LauncherNow(),
         };
         _fullAt = now;
         foreach (var old in _views) old.Dispose();

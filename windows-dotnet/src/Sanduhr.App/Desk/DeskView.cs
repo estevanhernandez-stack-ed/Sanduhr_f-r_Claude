@@ -46,6 +46,8 @@ internal sealed record DeskFrame
     public WeatherReading? Weather { get; init; }
     public bool WeatherOn { get; init; }
     public IReadOnlyList<Watcher> Watchers { get; init; } = [];
+    /// <summary>The Launcher piece's buttons and what they draw from (null: none to draw).</summary>
+    public DeskLauncherFrame? Launcher { get; init; }
 }
 
 /// <summary>
@@ -64,7 +66,7 @@ internal sealed class DeskView : Grid, IDisposable
     private static readonly Color WarningRed = Color.FromRgb(0xF8, 0x71, 0x71);
 
     /// <summary>The pieces this build draws (watchers: only from the harness until their tools ship).</summary>
-    public static readonly IReadOnlyList<string> Drawn = ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "glow"];
+    public static readonly IReadOnlyList<string> Drawn = ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "glow"];
 
     private readonly DeskScreen _screen;
     private readonly DeskSettings _settings;
@@ -392,6 +394,7 @@ internal sealed class DeskView : Grid, IDisposable
             "telemetry" => TelemetryPiece(ts, align),
             "weather" => WeatherPiece(ts, align),
             "watchers" => WatchersPiece(ts, align),
+            "launcher" => LauncherPiece(ts),
             "glow" => GlowSlot(ts),
             _ => null,
         };
@@ -402,7 +405,7 @@ internal sealed class DeskView : Grid, IDisposable
         piece.Tag = p.Widget; // which piece this is, for the Desk's clicks (DeskClicks, spec 7.4)
         // The message carries its own glow (spec 6.2) and the glow's spot is clear at rest; every other
         // piece takes the ink's shadow.
-        if (p.Widget is not ("message" or "nowPlaying" or "glow") && _ink.ShadowOpacity > 0)
+        if (p.Widget is not ("message" or "nowPlaying" or "glow" or "launcher") && _ink.ShadowOpacity > 0)
             piece.Effect = Shadow(_ink);
         return piece;
     }
@@ -798,6 +801,14 @@ internal sealed class DeskView : Grid, IDisposable
         _live.Add(new Unhook(() => audio.Frame -= Frame));
         return canvas;
     }
+
+    /// <summary>The Launcher (spec, Desk Launcher): up to eight buttons in a row or a column, drawn by
+    /// <see cref="DeskLauncherPiece"/>; null with no buttons. The labels take the ink's shadow, the images none.</summary>
+    private FrameworkElement? LauncherPiece(double ts) =>
+        _frame.Launcher is { } launcher
+            ? DeskLauncherPiece.Create(launcher, ts, _family, Ink, _ink.Stops.Count > 0 ? Rgb(_ink.Stops[0]) : Colors.White,
+                _ink.TextOpacity, _ink.ShadowOpacity > 0 ? Shadow(_ink) : null)
+            : null;
 
     /// <summary>Watchers (spec 6.9): a card per watcher, most urgent first: the title, its progress,
     /// its state or note, and how long it has run.</summary>

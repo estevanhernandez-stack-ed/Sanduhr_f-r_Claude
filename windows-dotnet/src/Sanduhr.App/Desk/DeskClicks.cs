@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -8,7 +9,7 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Desk;
 
 /// <summary>What a Desk menu item asks the app to do (spec 7.4).</summary>
-internal enum DeskMenuAction { EditMessages, DeskSettings, Arrange, TurnOffDesk }
+internal enum DeskMenuAction { EditMessages, DeskSettings, LauncherSettings, Arrange, TurnOffDesk }
 
 /// <summary>What a click on the Desk can do; the controller answers.</summary>
 internal interface IDeskClickActions
@@ -18,6 +19,10 @@ internal interface IDeskClickActions
 
     /// <summary>The weather credit was clicked: open Open-Meteo's site (its licence asks for the link).</summary>
     void OpenWeatherCredit();
+
+    /// <summary>A Launcher button was clicked, tapped or invoked: open its app or link (the controller answers, and
+    /// sends a click on a missing app to Settings).</summary>
+    void LaunchButton(int index);
 
     /// <summary>A Desk menu item was chosen.</summary>
     void Menu(DeskMenuAction action);
@@ -30,7 +35,9 @@ internal interface IDeskClickActions
 /// plate (alpha 1 of 255, so its frame takes the mouse while it looks the same), marks the island
 /// <see cref="DeskIsland.TakesClicks"/> and answers its clicks through <see cref="DeskHitTest"/>. An island
 /// with none stays click-through as before, and fully transparent pixels always pass clicks to the desktop.
-/// Nothing here activates a window.
+/// The Launcher's buttons always take clicks: each is its own hit region (key = its index), the mouse glows them on
+/// hover and launches on release, and touch glows on touch-down, launches on touch-up and cancels on a drag out
+/// (<see cref="LauncherPointer"/> holds those rules). Nothing here activates a window.
 /// </summary>
 internal static class DeskClicks
 {
@@ -42,6 +49,7 @@ internal static class DeskClicks
 
     public const string EditMessages = "Edit messages…";
     public const string DeskSettings = "Desk settings…";
+    public const string LauncherSettings = "Edit buttons…";
     public const string TurnOffDesk = "Turn off the Desk";
 
     private static readonly Brush Plate = Frozen(Color.FromArgb(1, 0, 0, 0));
@@ -80,8 +88,10 @@ internal static class DeskClicks
         IReadOnlyList<string> widgets, bool piecesTakeClicks)
     {
         bool Has(DeskElementKind k) => found.Any(f => f.Kind == k);
+        var launcherButtons = found.Where(f => f.Kind == DeskElementKind.LauncherButton).Select(_ => default(DeskRect)).ToList();
         var input = new DeskElementsInput(
             new HashSet<string>(widgets, StringComparer.Ordinal),
+            LauncherFrames: launcherButtons.Count > 0 ? launcherButtons : null,
             NowPlayingDrawn: Has(DeskElementKind.NowPlaying),
             WeatherCreditDrawn: Has(DeskElementKind.WeatherCredit),
             PiecesTakeClicks: piecesTakeClicks,
@@ -99,6 +109,7 @@ internal static class DeskClicks
         var found = new List<(DeskElementKind, FrameworkElement)>();
         void Walk(object node)
         {
+            if (node is LauncherButtonVisual button) found.Add((DeskElementKind.LauncherButton, button));
             if (node is FrameworkElement fe && fe.Tag is string tag)
             {
                 DeskElementKind? kind = tag switch
@@ -136,23 +147,110 @@ internal static class DeskClicks
 
     private static void Wire(FrameworkElement content, List<(DeskElementKind Kind, FrameworkElement Element)> targets, IDeskClickActions actions)
     {
-        DeskElement? Hit(MouseEventArgs e)
+        DeskElement? HitAt(Point p)
         {
-            var p = e.GetPosition(content);
             var elements = new List<DeskElement>(targets.Count);
             foreach (var (kind, fe) in targets)
             {
                 var r = fe.IsVisible && fe.RenderSize.Width > 0
                     ? fe.TransformToAncestor(content).TransformBounds(new Rect(fe.RenderSize))
                     : Rect.Empty;
-                elements.Add(new DeskElement(kind, null, r.IsEmpty ? default : new DeskRect(r.X, r.Y, r.Width, r.Height)));
+                string? key = fe is LauncherButtonVisual b ? b.Index.ToString(CultureInfo.InvariantCulture) : null;
+                elements.Add(new DeskElement(kind, key, r.IsEmpty ? default : new DeskRect(r.X, r.Y, r.Width, r.Height)));
             }
             return DeskHitTest.Element(p.X, p.Y, elements);
         }
+        DeskElement? Hit(MouseEventArgs e) => HitAt(e.GetPosition(content));
+
+        var launcher = targets.Where(t => t.Kind == DeskElementKind.LauncherButton).Select(t => (LauncherButtonVisual)t.Element).ToList();
+        var pointer = new LauncherPointer();
+        static int? ButtonAt(DeskElement? hit) =>
+            hit is { Kind: DeskElementKind.LauncherButton, Key: { } key }
+            && int.TryParse(key, NumberStyles.None, CultureInfo.InvariantCulture, out var index) ? index : null;
+        void Show()
+        {
+            foreach (var b in launcher)
+            {
+                b.SetGlow(pointer.Glow == b.Index);
+                b.SetDip(pointer.Dip == b.Index);
+            }
+        }
+        // A touch the system also promotes to mouse events must not act twice: the touch handlers take it.
+        static bool FromTouch(MouseEventArgs e) => e.StylusDevice?.TabletDevice?.Type == TabletDeviceType.Touch;
+
+        foreach (var b in launcher)
+        {
+            int index = b.Index;
+            b.Invoked += () => actions.LaunchButton(index);
+        }
+
+        if (launcher.Count > 0)
+        {
+            content.MouseMove += (_, e) =>
+            {
+                if (FromTouch(e)) return;
+                pointer.MouseMove(ButtonAt(Hit(e)));
+                Show();
+            };
+            content.MouseLeave += (_, _) =>
+            {
+                pointer.MouseLeave();
+                Show();
+            };
+            content.MouseLeftButtonDown += (_, e) =>
+            {
+                if (FromTouch(e)) return;
+                var index = ButtonAt(Hit(e));
+                pointer.MouseDown(index);
+                Show();
+                if (index is not null) e.Handled = true;
+            };
+            content.TouchDown += (_, e) =>
+            {
+                pointer.TouchDown(ButtonAt(HitAt(e.GetTouchPoint(content).Position)));
+                Show();
+                if (!pointer.Touching) return;
+                content.CaptureTouch(e.TouchDevice);
+                e.Handled = true;
+            };
+            content.TouchMove += (_, e) =>
+            {
+                if (!pointer.Touching) return;
+                pointer.TouchMove(ButtonAt(HitAt(e.GetTouchPoint(content).Position)));
+                Show();
+                e.Handled = true;
+            };
+            content.TouchUp += (_, e) =>
+            {
+                if (!pointer.Touching) return;
+                var launch = pointer.TouchUp(ButtonAt(HitAt(e.GetTouchPoint(content).Position)));
+                content.ReleaseTouchCapture(e.TouchDevice);
+                Show();
+                e.Handled = true;
+                if (launch is { } index) actions.LaunchButton(index);
+            };
+            content.LostTouchCapture += (_, _) =>
+            {
+                pointer.Cancel();
+                Show();
+            };
+        }
         content.MouseLeftButtonUp += (_, e) =>
         {
-            switch (Hit(e)?.Kind)
+            if (FromTouch(e)) return;
+            var hit = Hit(e);
+            int? launch = null;
+            if (launcher.Count > 0)
             {
+                launch = pointer.MouseUp(ButtonAt(hit));
+                Show();
+            }
+            switch (hit?.Kind)
+            {
+                case DeskElementKind.LauncherButton:
+                    if (launch is { } index) actions.LaunchButton(index);
+                    e.Handled = true;
+                    break;
                 case DeskElementKind.NowPlaying: actions.PlayPause(); e.Handled = true; break;
                 case DeskElementKind.WeatherCredit: actions.OpenWeatherCredit(); e.Handled = true; break;
                 case null: break;
@@ -182,6 +280,7 @@ internal static class DeskClicks
             menu.Items.Add(item);
         }
         if (kind == DeskElementKind.Message) Add(EditMessages, DeskMenuAction.EditMessages);
+        if (kind == DeskElementKind.LauncherButton) Add(LauncherSettings, DeskMenuAction.LauncherSettings);
         Add(DeskSettings, DeskMenuAction.DeskSettings);
         Add(DeskArrangeCopy.MenuItem, DeskMenuAction.Arrange);
         menu.Items.Add(new Separator());
