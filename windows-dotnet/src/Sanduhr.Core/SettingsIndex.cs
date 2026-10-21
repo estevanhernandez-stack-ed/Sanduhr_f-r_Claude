@@ -206,7 +206,7 @@ public static class SettingsIndex
         E("Message look", SettingsPage.DeskMessage, MessageLook, ["message size", "message color", "message font", "glow"]),
 
         E(SettingsNames.NowPlayingInWidget, SettingsPage.NowPlaying, NowPlayingWidget,
-            ["now playing", "music", "song", "track", "Spotify", "media", "play", "pause", "next", "hide while paused"]),
+            ["now playing", "music", "song", "track", "Spotify", "media", "play", "pause", "next", "keep showing while paused", "hide while paused", "hide when nothing plays"]),
         E("Apps", SettingsPage.NowPlaying, NowPlayingApps, ["apps", "exclude", "browser", "player"]),
         E("Bars", SettingsPage.NowPlaying, NowPlayingBars, ["visualizer", "bars", "audio", "level", "equalizer"]),
 

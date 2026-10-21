@@ -323,6 +323,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _nowPlaying.Want(this, on && Placed("nowPlaying"));
         bool bars = on && !Arranging && _np.Bars && InSight("nowPlaying") && track?.State == NowPlayingState.Playing;
         _audio.Follow(track?.AppId);
+        _audio.Follow(track?.AppId);
         if (bars) _audio.Start(); else if (_audio.Running) _audio.Stop();
         if (on && Placed("weather") && _weatherSettings.Place is { } place)
             _weather.Start(place, _weatherSettings.UnitOr(RegionInfo.CurrentRegion.IsMetric));
@@ -519,11 +520,17 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
 /// <summary>
 /// One <see cref="NowPlayingService"/> shared by the widget line and the Desk piece: it runs while
 /// either wants it and stops when neither does, so the media-session listener costs nothing unused.
+/// It also owns the one <see cref="NowPlayingPresence"/>: the piece is up while the media session is
+/// playing (or paused, with "Keep showing while paused") and fades out after a 5 s grace, so the widget
+/// line and the Desk piece come and go together. The session's state is the only input; audio levels
+/// and system sounds never reach it.
 /// </summary>
 internal sealed class NowPlayingHub : IDisposable
 {
     private readonly NowPlayingService _service;
     private readonly HashSet<object> _wanted = [];
+    private readonly DispatcherTimer _grace;
+    private NowPlayingPrefs _prefs = new();
 
     /// <summary>The app's one hub (Settings, Now playing reads the apps seen from it); null in tests and the harness.</summary>
     public static NowPlayingHub? Current { get; set; }
@@ -532,19 +539,76 @@ internal sealed class NowPlayingHub : IDisposable
     {
         _service = service ?? new NowPlayingService();
         _service.Changed += () => Changed?.Invoke();
+        _service.Observed += Evaluate;
+        _grace = new DispatcherTimer(DispatcherPriority.Background);
+        _grace.Tick += (_, _) => { _grace.Stop(); Evaluate(); };
     }
 
     public NowPlayingService Service => _service;
     public NowPlayingInfo? Shown => _service.Shown;
+
+    /// <summary>Whether the piece is up, and how far (0 to 1) for the fade and the gap.</summary>
+    public NowPlayingPresence Presence { get; } = new();
+
+    /// <summary>The shown track changed.</summary>
     public event Action? Changed;
+
+    /// <summary>The piece should now be up or gone (<see cref="NowPlayingPresence.Wanted"/> flipped).
+    /// The amount then moves on its own; read <see cref="NowPlayingPresence.Amount"/> per frame.</summary>
+    public event Action? PresenceChanged;
+
+    /// <summary>The Now playing settings the presence rule follows (excluded apps, keep showing while
+    /// paused). The widget line and the Desk both pass the saved ones.</summary>
+    public void Configure(NowPlayingPrefs prefs)
+    {
+        _prefs = prefs;
+        Evaluate();
+    }
 
     /// <summary><paramref name="who"/> wants the service running (or not).</summary>
     public void Want(object who, bool want)
     {
         bool changed = want ? _wanted.Add(who) : _wanted.Remove(who);
         if (!changed) return;
-        if (_wanted.Count > 0) _service.Start(); else _service.Stop();
+        if (_wanted.Count > 0) _service.Start();
+        else
+        {
+            _service.Stop();
+            _grace.Stop();
+            bool was = Presence.Wanted;
+            Presence.Reset();
+            if (was) PresenceChanged?.Invoke();
+        }
     }
 
-    public void Dispose() => _service.Dispose();
+    private void Evaluate()
+    {
+        if (!_service.Running)
+        {
+            _grace.Stop();
+            return;
+        }
+        // Windows' "Show animations" off: the piece snaps in and out.
+        Presence.Animate = System.Windows.SystemParameters.ClientAreaAnimation;
+        bool was = Presence.Wanted;
+        var now = DateTimeOffset.Now;
+        var current = _service.Current;
+        TimeSpan? wait = null;
+        // An app the user turned off goes at once; anything else that stops waits out the grace.
+        if (current.State != NowPlayingState.None && _prefs.IsExcluded(current.AppId)) Presence.Dismiss(now);
+        else wait = Presence.Observe(_prefs.IsActive(current), now);
+        _grace.Stop();
+        if (wait is { } w)
+        {
+            _grace.Interval = w < TimeSpan.FromMilliseconds(10) ? TimeSpan.FromMilliseconds(10) : w;
+            _grace.Start();
+        }
+        if (was != Presence.Wanted) PresenceChanged?.Invoke();
+    }
+
+    public void Dispose()
+    {
+        _grace.Stop();
+        _service.Dispose();
+    }
 }

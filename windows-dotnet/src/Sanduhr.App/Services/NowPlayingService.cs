@@ -34,11 +34,19 @@ internal sealed class NowPlayingService : IDisposable
     /// <summary>The track to show (before the user's hide rules), or null.</summary>
     public NowPlayingInfo? Shown => _tracker.Shown;
 
+    /// <summary>The newest reading of the current session, before the tracker's clear delay: what the
+    /// session says right now (the presence rule reads this, so a stop counts at once).</summary>
+    public NowPlayingInfo Current => _tracker.Latest;
+
     /// <summary>Apps seen playing this session, first seen first (Settings' app list). Memory only.</summary>
     public IReadOnlyList<string> SeenApps { get; private set; } = [];
 
     /// <summary>The shown track changed (title, state or position anchor).</summary>
     public event Action? Changed;
+
+    /// <summary>The session said something new (any event, including a stop that the tracker still
+    /// holds on screen for its clear delay). <see cref="Current"/> has the newest reading.</summary>
+    public event Action? Observed;
 
     public bool Running => _running;
 
@@ -72,6 +80,7 @@ internal sealed class NowPlayingService : IDisposable
         Detach();
         _settle.Stop();
         _tracker.Reset();
+        Observed?.Invoke();
         Changed?.Invoke();
     }
 
@@ -161,6 +170,7 @@ internal sealed class NowPlayingService : IDisposable
         if (info.State != NowPlayingState.None) SeenApps = NowPlayingApps.Seen(SeenApps, info.AppId);
         var before = _tracker.Shown;
         Schedule(_tracker.Replace(info, DateTimeOffset.Now));
+        Observed?.Invoke();
         if (before != _tracker.Shown) Changed?.Invoke();
     }
 

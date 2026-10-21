@@ -57,17 +57,20 @@ public sealed record DeskMessageSettings(
 }
 
 /// <summary>
-/// Now playing's settings (spec 6.3), settings.json <c>now_playing</c>: the widget line (off), hide
-/// while paused (off), the excluded apps (by app id, picked from apps seen this session) and the bars
-/// beside the Desk piece (on). Titles are never stored here or anywhere.
+/// Now playing's settings (spec 6.3), settings.json <c>now_playing</c>: the widget line (off), keep
+/// showing while paused (off: a paused session hides the piece after 5 s), the excluded apps (by app id,
+/// picked from apps seen this session) and the bars beside the Desk piece (on). Titles are never stored
+/// here or anywhere. The retired <c>hide_paused</c> key is read by nothing: it used to make a paused
+/// track hide at once, and hiding after the grace is now the default for everyone; it is dropped the
+/// next time the page saves.
 /// </summary>
-public sealed record NowPlayingSettings(bool Widget, bool HidePaused, IReadOnlyList<string> Excluded, bool Bars)
+public sealed record NowPlayingSettings(bool Widget, bool KeepPaused, IReadOnlyList<string> Excluded, bool Bars)
 {
     public const string Key = "now_playing";
 
     public static NowPlayingSettings Default { get; } = new(false, false, [], true);
 
-    public NowPlayingPrefs Prefs => new() { HideWhilePaused = HidePaused, Excluded = Excluded };
+    public NowPlayingPrefs Prefs => new() { KeepWhilePaused = KeepPaused, Excluded = Excluded };
 
     public static NowPlayingSettings Decode(JsonNode? node)
     {
@@ -80,7 +83,7 @@ public sealed record NowPlayingSettings(bool Widget, bool HidePaused, IReadOnlyL
                     excluded.Add(s);
         return new NowPlayingSettings(
             SettingsJson.Bool(o, "widget", d.Widget),
-            SettingsJson.Bool(o, "hide_paused", d.HidePaused),
+            SettingsJson.Bool(o, "keep_paused", d.KeepPaused),
             excluded,
             SettingsJson.Bool(o, "visualizer", d.Bars));
     }
@@ -88,7 +91,7 @@ public sealed record NowPlayingSettings(bool Widget, bool HidePaused, IReadOnlyL
     public JsonObject Encode() => new()
     {
         ["widget"] = Widget,
-        ["hide_paused"] = HidePaused,
+        ["keep_paused"] = KeepPaused,
         ["excluded"] = new JsonArray([.. Excluded.Select(e => (JsonNode?)JsonValue.Create(e))]),
         ["visualizer"] = Bars,
     };

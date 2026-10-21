@@ -184,11 +184,15 @@ public sealed class NowPlayingTracker
 
 /// <summary>
 /// The Now playing settings that decide whether a track shows (the Mac's <c>NowPlayingPrefs</c>,
-/// less the AppleScript switch). Where it shows is the settings and Desk layout's business.
+/// less the AppleScript switch). Where it shows is the settings and Desk layout's business. Whether
+/// a paused track stays is <see cref="KeepWhilePaused"/>; when the piece goes is
+/// <see cref="NowPlayingPresence"/>'s business, not this record's.
 /// </summary>
 public sealed record NowPlayingPrefs
 {
-    public bool HideWhilePaused { get; init; }
+    /// <summary>"Keep showing while paused": a paused session keeps the piece up instead of letting
+    /// it fade out after <see cref="NowPlayingPresence.Grace"/>. Off by default.</summary>
+    public bool KeepWhilePaused { get; init; }
 
     /// <summary>App ids (AppUserModelIds) whose playback never shows. Compared ignoring case.</summary>
     public IReadOnlyCollection<string> Excluded { get; init; } = [];
@@ -196,18 +200,24 @@ public sealed record NowPlayingPrefs
     public bool IsExcluded(string? appId) =>
         appId is not null && Excluded.Contains(appId, StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The track to draw, or null: nothing plays, its app is excluded, or it is paused and
-    /// paused tracks hide.</summary>
+    /// <summary>The track to draw, or null: nothing plays or its app is excluded. A paused track is
+    /// still returned (it draws during the grace period); <see cref="IsActive"/> says whether it
+    /// holds the piece open.</summary>
     public NowPlayingInfo? Visible(NowPlayingInfo? info)
     {
-        if (info is null) return null;
-        switch (info.State)
-        {
-            case NowPlayingState.None: return null;
-            case NowPlayingState.Paused when HideWhilePaused: return null;
-        }
+        if (info is null || info.State == NowPlayingState.None) return null;
         return IsExcluded(info.AppId) ? null : info;
     }
+
+    /// <summary>True when the session is the reason the piece should be up: a visible track that is
+    /// playing, or paused while <see cref="KeepWhilePaused"/>. The session state alone decides:
+    /// nothing about audio levels or system sounds reaches this.</summary>
+    public bool IsActive(NowPlayingInfo? info) => Visible(info)?.State switch
+    {
+        NowPlayingState.Playing => true,
+        NowPlayingState.Paused => KeepWhilePaused,
+        _ => false,
+    };
 }
 
 /// <summary>The apps seen playing this session, for Settings' app list. In memory only, plus
