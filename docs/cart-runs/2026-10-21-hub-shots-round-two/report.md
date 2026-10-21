@@ -3,18 +3,16 @@
 6 merged, 0 held, 0 parked, 0 stopped.
 
 ## Ready to push
-- **Integration branch:** `cart/hub-shots-round-two` (base `0681282`, tip `70a9412`), worktree `~/.cwt/sanduhr-f-r-clau-hub-shots-round-two/int`
+- **Integration branch:** `cart/hub-shots-round-two` (base `dad41b5`, tip `70a9412`), worktree `~/.cwt/sanduhr-f-r-clau-hub-shots-round-two/int`
 - **Commits** (each item merged with a `merge: item NN <slug>` commit):
-`  - `70a9412 docs(screenshots): keep the live Export Config and Compare shots; only Accounts is new (#292)
-`  - `baca3cb docs(screenshots): Export Config, Compare on import and Accounts for the hub page (#292)
-`  - `abd26f4 feat(mac): the export and import samples and demo Accounts show only invented data
-`  - `fc2ced2 feat(mac): mods-config export and import-sample hooks open the two sheets for screenshots
-`  - `910b98a fix(mac): the notchless Notch preview draws no empty bar with the pill off (#290)
-`  - `8be8b84 perf(mac): the log walks sort paths by bytes, not Unicode comparison
-`  - `2f094e9 docs(mac): the README names the Mods tabs as they read
-`  - `ea27b61 fix(mac): the session-start card sits above the Mods tabs (#291)
-`  - `4acf611 docs: BACKLOG #7 met in 2.31.0 on both Macs, and the pill's camera badge verified
-`  - `14d24e2 test(mac): add 2.31.0 recheck pill shot from a no-notch Mac
+  - `70a9412` docs(screenshots): keep the live Export Config and Compare shots; only Accounts is new (#292)
+  - `baca3cb` docs(screenshots): Export Config, Compare on import and Accounts for the hub page (#292)
+  - `abd26f4` feat(mac): the export and import samples and demo Accounts show only invented data
+  - `fc2ced2` feat(mac): mods-config export and import-sample hooks open the two sheets for screenshots
+  - `910b98a` fix(mac): the notchless Notch preview draws no empty bar with the pill off (#290)
+  - `8be8b84` perf(mac): the log walks sort paths by bytes, not Unicode comparison
+  - `2f094e9` docs(mac): the README names the Mods tabs as they read
+  - `ea27b61` fix(mac): the session-start card sits above the Mods tabs (#291)
 - **Checks:** every code item ran `./build.sh --debug`, the full `./test.sh` and `ruby smoke/selftest.rb` in its worktree and again before its merge. Close-out on the integration tip: build ✓, 1,842 tests in 238 suites passed, selftest 1,008 checks passed, pytest 223 passed, and a secret and home-path grep over the run's diff found nothing. The vibe gates cannot run on this Mac (previous runs).
 - **Seen live:** the export and import samples and the demo Accounts layout, on the integration build in demo mode; the notchless preview fix (item 5) only through its tests, since this Mac has a notch.
 
