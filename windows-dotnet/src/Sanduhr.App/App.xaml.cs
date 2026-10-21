@@ -840,7 +840,8 @@ public partial class App : Application
                 _desk?.StopForReset();
                 _vm?.NowPlaying?.Dispose();
             },
-            vm.InactiveReader.DeleteAllProfilesAsync);
+            vm.InactiveReader.DeleteAllProfilesAsync,
+            () => new SettingsStore(paths).ClearClaudeCodeSwitchesForReset());
         ResetWindow.ShowFor(_settingsWindow, service, QuitApp);
     }
 

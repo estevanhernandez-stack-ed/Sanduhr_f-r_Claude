@@ -26,14 +26,20 @@ internal sealed class ResetService
     private readonly Action _stopBackgroundWork;
     private readonly Func<Task<int>>? _deleteAccountProfiles;
 
+    /// <summary>Turns the Claude Code switches off in settings.json once the entries are out (see
+    /// <see cref="SettingsStore.ClearClaudeCodeSwitchesForReset"/>); null in contexts without a store.</summary>
+    private readonly Action? _clearClaudeCodeSwitches;
+
     public ResetService(
         Paths paths,
         AccountStore accounts,
         PublishTokenStore publishToken,
         Func<Task<IReadOnlyList<string>>> undoClaudeCodeEntries,
         Action stopBackgroundWork,
-        Func<Task<int>>? deleteAccountProfiles = null)
+        Func<Task<int>>? deleteAccountProfiles = null,
+        Action? clearClaudeCodeSwitches = null)
     {
+        _clearClaudeCodeSwitches = clearClaudeCodeSwitches;
         _deleteAccountProfiles = deleteAccountProfiles;
         _paths = paths;
         _accounts = accounts;
@@ -95,7 +101,12 @@ internal sealed class ResetService
 
         // A failed entry keeps its receipt (and the files it points at) so it can still be removed later.
         if (failures.Count == 0)
+        {
+            // The entries are out: their switches go off too, or the next launch re-creates the projection,
+            // the launcher and the script. A Settings part that runs later deletes the file anyway.
+            try { _clearClaudeCodeSwitches?.Invoke(); } catch (Exception) { /* best effort */ }
             failures.AddRange(await DeleteItemsAsync(ResetPart.ClaudeCodeEntries));
+        }
         return ResetStepResult.Failed(ResetPart.ClaudeCodeEntries, Distinct(failures));
     }
 
