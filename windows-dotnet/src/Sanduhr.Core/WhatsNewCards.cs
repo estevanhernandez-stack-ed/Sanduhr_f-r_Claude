@@ -11,6 +11,10 @@ public static class WhatsNewCards
 
     private static WhatsNewCard[] Release360() =>
     [
+        WhatsNewCard.Of("3.6.0", "now-playing-steps-aside", "Now playing steps aside",
+            "It shows only while something plays and fades 5 seconds after you pause, with the pieces around it closing the gap. The bars follow your music, not Windows' dings.",
+            "", // MusicNote
+            WhatsNewPreview.None, SettingsPage.NowPlaying),
         WhatsNewCard.Of("3.6.0", "watchers", "Watchers on the Desk",
             "Claude Code can show a live card on your Desk for work it's watching, and say when it needs you. Turn it on in Settings, Desk, then place Watchers.",
             "", // Stopwatch

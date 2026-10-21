@@ -4,6 +4,7 @@
 
 ### What's new
 
+- **Now playing steps aside.** It shows only while music or video is playing, fades 5 seconds after you pause, and the pieces around it slide to fill the space. The bars move with your music, not with Windows' dings and chimes.
 - **Watchers on the Desk.** Let Claude Code put a live card on your desktop for work it is watching (a CI run, a deploy): a title, progress, a short note, "waiting on you" when it needs you, and a fade when it passes. Turn on **Let agents show watchers** in Settings ▸ Desk and place **Watchers**. Off by default.
 - **Claude can suggest Desk messages.** Ask Claude Code for a line or two; the suggestion waits on Settings ▸ Message until you **Add**, **Review** or **Dismiss** it. Nothing changes without Add.
 - **A plate behind the Desk's text**, for a desktop with files under it. On for new installs; turn it on in Settings ▸ Desk.

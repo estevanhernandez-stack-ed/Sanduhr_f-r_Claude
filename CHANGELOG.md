@@ -10,6 +10,13 @@
 - **Arrange Desk hides and shows pieces.** Each piece has **Hide** while arranging, and a **Hidden** strip brings one back. Done writes the layout once; Cancel drops every change. Done waits while every piece is hidden ("Show a piece first, or Cancel."). The Margins section waits while you arrange.
 - **Watchers on the Desk.** Turn on **Let agents show watchers** (Settings ▸ Desk, off by default) and place **Watchers**: Claude Code can put a live card on the Desk for work it is watching, with a title, progress and a short note, "waiting on you" when it needs you, fading when it passes. Cards live in memory only.
 
+### Now playing
+
+- **Shows only while something plays.** Now playing appears the moment a media app reports Playing and fades away 5 seconds after a pause or stop; resuming inside those 5 seconds never hides it. The rule reads the media session's own state, never the sound level, so a system chime can't open it. **Keep showing while paused** (Settings ▸ Now playing, off by default) replaces the old hide-while-paused switch. The widget's now-playing line follows the same rule.
+- **No hole left behind.** When it hides, the other pieces in its stack slide to close the gap (about 0.6 s), and slide back as it returns (about 1 s), inside a Desk window that never resizes mid-move. With Windows animations off, it snaps.
+- **The bars follow the music, not the dings.** The visualizer reads the playing app's own audio-session peak meter (Spotify, browsers, Media Player, Apple Music and more, matched by app), never the System Sounds session or Sanduhr's own chimes, and never the whole output device. Still peak values only, in memory, nothing captured.
+- **Whichever app is playing wins.** With several media sessions open, a playing one beats a paused one that Windows calls current, so a paused browser tab can't hide your music.
+
 ### Claude Code
 
 - **Five new MCP tools.** `watch_start`, `watch_update` and `watch_end` drive the Desk's watcher cards; `get_desk_messages` reads your Desk messages and `propose_desk_messages` suggests lines, which wait on Settings ▸ Message for **Add**, **Review** or **Dismiss**. Nothing changes your messages without Add. Requests travel as files in `%USERPROFILE%\.sanduhr`; the server stays network-free.

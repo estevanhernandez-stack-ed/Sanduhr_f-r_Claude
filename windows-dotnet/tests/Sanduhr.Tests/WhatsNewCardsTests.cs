@@ -12,17 +12,17 @@ public class WhatsNewCardsTests
     public void Table_HasBothReleasesNewestFirst()
     {
         Assert.Equal(
-            ["watchers", "suggested-messages", "desk-plate", "arrange-hide", "statusline-label",
+            ["now-playing-steps-aside", "watchers", "suggested-messages", "desk-plate", "arrange-hide", "statusline-label",
              "desk", "settings-redesigned", "claude-code-page",
              "shortcut-keys", "tray-shows", "limits-come-and-go", "every-folder", "steady-sparklines", "whats-new"],
             Table.Select(c => c.Id));
     }
 
     [Fact]
-    public void Release360_ShowsOnlyItsOwnFiveCardsAfterTheUpdate()
+    public void Release360_ShowsOnlyItsOwnSixCardsAfterTheUpdate()
     {
         var shown = WhatsNew.Cards("3.5.0", "3.6.0");
-        Assert.Equal(["watchers", "suggested-messages", "desk-plate", "arrange-hide", "statusline-label"], shown.Select(c => c.Id));
+        Assert.Equal(["now-playing-steps-aside", "watchers", "suggested-messages", "desk-plate", "arrange-hide", "statusline-label"], shown.Select(c => c.Id));
         Assert.All(shown, c => Assert.Equal("3.6.0", c.Version));
     }
 
