@@ -16,7 +16,7 @@
   Verify: `dotnet test windows-dotnet` green with new `WelcomeTour` tests; run the app with `--demo` and open Take the Tour… in both states.
   Stop class: go
 
-- [ ] **3. A plate behind every Desk piece**
+- [x] **3. A plate behind every Desk piece**
   Spec ref: `CHANGELOG.md > v2.27.0-mac "A plate behind every Desk piece"`; `src/Sanduhr.App/Desk/DeskClicks.cs:47` (hit-test brush only); Mac Desk Look settings
   What to build: Desk Look gains **Plate behind the text**: a soft dark rounded plate behind each piece. On for a new install, untouched (off) for an existing one, via a settings key that defaults by install age the way other Desk keys do. Keep the hit-test brush behavior unchanged. Size S.
   Acceptance: Done when the switch exists in Settings ▸ Desk Look, the plate renders behind each piece in light and dark ink, the new-vs-existing default holds (test), and settings round-trip.

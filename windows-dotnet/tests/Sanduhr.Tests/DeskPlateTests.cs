@@ -49,6 +49,16 @@ public class DeskPlateTests
         Assert.False(DeskPlate.Read(chose));
     }
 
+    [Fact]
+    public void TurningItOffSurvivesAnotherSeed()
+    {
+        var root = new JsonObject();
+        DeskPlate.Seed(root, freshInstall: true);
+        DeskPlate.Write(root, false);
+        Assert.False(DeskPlate.Seed(root, freshInstall: true));
+        Assert.False(DeskPlate.Read(root));
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

@@ -39,12 +39,9 @@ public static class DeskPlate
     public static bool Read(JsonObject? root) =>
         root?[Key] is JsonValue v && v.TryGetValue<bool>(out var on) ? on : DefaultOn;
 
-    /// <summary>Writes the switch. Off removes the key, which reads as off.</summary>
-    public static void Write(JsonObject root, bool on)
-    {
-        if (on) root[Key] = true;
-        else root.Remove(Key);
-    }
+    /// <summary>Writes the switch. Off is written as false, never removed, so a later <see cref="Seed"/>
+    /// can't mistake a choice for a missing key and turn the plate back on.</summary>
+    public static void Write(JsonObject root, bool on) => root[Key] = on;
 
     /// <summary>
     /// A fresh install's first launch: the plate goes on unless the key is already there. An existing
