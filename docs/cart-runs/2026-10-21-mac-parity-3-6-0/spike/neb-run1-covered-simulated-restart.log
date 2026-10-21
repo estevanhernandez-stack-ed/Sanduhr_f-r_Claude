@@ -1,0 +1,71 @@
+2026-10-21 13:52:49.845  under-icons spike starting, pid 22668, 20s, log C:\Users\estev\Projects\Sanduhr_f-r_Claude\docs\cart-runs\2026-10-21-mac-parity-3-6-0\spike\under-icons.log
+2026-10-21 13:52:49.857  OS 10.0.26220.0, process DPI awareness via manifest (PerMonitorV2)
+2026-10-21 13:52:49.858  primary monitor 0,0 3440x1440, work 0,0 3440x1392; piece target (24,24) 360x120
+2026-10-21 13:52:49.864  build: Progman Progman[0x1016E] rect (0,0) 5360x1440, DefView SHELLDLL_DefView[0x10176], WorkerW WorkerW[0xB133E] rect (0,0) 5360x1440 exstyle 0x0
+2026-10-21 13:52:49.914  piece: created 0x76129E layered (per-pixel alpha), rect (24,24) 360x120, parent WorkerW[0xB133E], visible True
+2026-10-21 13:52:49.918  click layer: created 0x2B0DE0 rect (24,24) 360x120, owner Progman[0x1016E], exstyle 0x8080080, visible True
+2026-10-21 13:52:49.919  --- structure [after build] ---
+2026-10-21 13:52:49.919  shell window Progman[0x1016E] rect (0,0) 5360x1440 exstyle 0x200080
+2026-10-21 13:52:49.919    Progman child #0 (top to bottom): SHELLDLL_DefView[0x10176] rect (0,0) 5360x1440 visible True exstyle 0x80000
+2026-10-21 13:52:49.919    Progman child #1 (top to bottom): WorkerW[0xB133E] rect (0,0) 5360x1440 visible True exstyle 0x0
+2026-10-21 13:52:49.919  piece parent chain: UnderIconsPiece[0x76129E] -> WorkerW[0xB133E] -> Progman[0x1016E]
+2026-10-21 13:52:49.919  piece rect (24,24) 360x120, layered True, visible True, DPI 96
+2026-10-21 13:52:49.919  desktop icon count (LVM_GETITEMCOUNT) 45
+2026-10-21 13:52:49.920  click layer UnderIconsClick[0x2B0DE0] rect (24,24) 360x120 (piece rect (24,24) 360x120), owner Progman[0x1016E]
+2026-10-21 13:52:49.920  top-level z-order: 713 windows; click layer index 711, Progman (SHELLDLL_DefView's host) index 712; click layer ABOVE Progman: True
+2026-10-21 13:52:49.920  z-order around click layer: MSCTFIME UI[0x101A2] | IME[0x10104] | [CLICK] UnderIconsClick[0x2B0DE0] | Progman[0x1016E] [PROGMAN] | 
+2026-10-21 13:52:49.921  hit test, piece centre (204,84): WindowFromPoint Chrome_RenderWidgetHostHWND[0x8C12C0] (root Chrome_WidgetWin_1[0x5D1228]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 1
+2026-10-21 13:52:49.921  hit test, outside, right of piece (+80px) (464,84): WindowFromPoint Chrome_RenderWidgetHostHWND[0x8C12C0] (root Chrome_WidgetWin_1[0x5D1228]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:52:49.921  hit test, outside, below piece (+80px) (204,224): WindowFromPoint Chrome_RenderWidgetHostHWND[0x8C12C0] (root Chrome_WidgetWin_1[0x5D1228]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:52:51.925  --- structure [after 2s settle] ---
+2026-10-21 13:52:51.925  shell window Progman[0x1016E] rect (0,0) 5360x1440 exstyle 0x200080
+2026-10-21 13:52:51.925    Progman child #0 (top to bottom): SHELLDLL_DefView[0x10176] rect (0,0) 5360x1440 visible True exstyle 0x80000
+2026-10-21 13:52:51.925    Progman child #1 (top to bottom): WorkerW[0xB133E] rect (0,0) 5360x1440 visible True exstyle 0x0
+2026-10-21 13:52:51.926  piece parent chain: UnderIconsPiece[0x76129E] -> WorkerW[0xB133E] -> Progman[0x1016E]
+2026-10-21 13:52:51.926  piece rect (24,24) 360x120, layered True, visible True, DPI 96
+2026-10-21 13:52:51.926  desktop icon count (LVM_GETITEMCOUNT) 45
+2026-10-21 13:52:51.926  click layer UnderIconsClick[0x2B0DE0] rect (24,24) 360x120 (piece rect (24,24) 360x120), owner Progman[0x1016E]
+2026-10-21 13:52:51.926  top-level z-order: 713 windows; click layer index 711, Progman (SHELLDLL_DefView's host) index 712; click layer ABOVE Progman: True
+2026-10-21 13:52:51.926  z-order around click layer: MSCTFIME UI[0x101A2] | IME[0x10104] | [CLICK] UnderIconsClick[0x2B0DE0] | Progman[0x1016E] [PROGMAN] | 
+2026-10-21 13:52:51.926  hit test, piece centre (204,84): WindowFromPoint Chrome_RenderWidgetHostHWND[0x8C12C0] (root Chrome_WidgetWin_1[0x5D1228]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 1
+2026-10-21 13:52:51.927  hit test, outside, right of piece (+80px) (464,84): WindowFromPoint Chrome_RenderWidgetHostHWND[0x8C12C0] (root Chrome_WidgetWin_1[0x5D1228]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:52:51.927  hit test, outside, below piece (+80px) (204,224): WindowFromPoint Chrome_RenderWidgetHostHWND[0x8C12C0] (root Chrome_WidgetWin_1[0x5D1228]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:52:54.071  screenshot C:\Users\estev\Projects\Sanduhr_f-r_Claude\docs\cart-runs\2026-10-21-mac-parity-3-6-0\spike\screen-neb.png (5360x1440 at 0,0); magenta samples in the piece rect 0/22; topmost window at piece centre: Chrome_WidgetWin_1[0x5D1228]
+2026-10-21 13:52:54.071  screenshot: NO magenta pixels in the piece rect (covered by an app window, or the WorkerW child draws nothing visible)
+2026-10-21 13:52:57.922  SIMULATED restart: destroying both windows as Explorer's exit would, then posting TaskbarCreated to this process's sentinel only
+2026-10-21 13:52:57.925  TaskbarCreated received (Explorer restarted, or simulated); shell is now Progman[0x1016E]. Rebuilding both windows (rebuild #1).
+2026-10-21 13:52:58.424  build: Progman Progman[0x1016E] rect (0,0) 5360x1440, DefView SHELLDLL_DefView[0x10176], WorkerW WorkerW[0xB133E] rect (0,0) 5360x1440 exstyle 0x0
+2026-10-21 13:52:58.426  piece: created 0x2C0DE0 layered (per-pixel alpha), rect (24,24) 360x120, parent WorkerW[0xB133E], visible True
+2026-10-21 13:52:58.430  click layer: created 0x77129E rect (24,24) 360x120, owner Progman[0x1016E], exstyle 0x8080080, visible True
+2026-10-21 13:52:58.430  rebuild ok after 1 attempt(s)
+2026-10-21 13:52:58.431  --- structure [after rebuild] ---
+2026-10-21 13:52:58.431  shell window Progman[0x1016E] rect (0,0) 5360x1440 exstyle 0x200080
+2026-10-21 13:52:58.431    Progman child #0 (top to bottom): SHELLDLL_DefView[0x10176] rect (0,0) 5360x1440 visible True exstyle 0x80000
+2026-10-21 13:52:58.431    Progman child #1 (top to bottom): WorkerW[0xB133E] rect (0,0) 5360x1440 visible True exstyle 0x0
+2026-10-21 13:52:58.431  piece parent chain: UnderIconsPiece[0x2C0DE0] -> WorkerW[0xB133E] -> Progman[0x1016E]
+2026-10-21 13:52:58.431  piece rect (24,24) 360x120, layered True, visible True, DPI 96
+2026-10-21 13:52:58.431  desktop icon count (LVM_GETITEMCOUNT) 45
+2026-10-21 13:52:58.431  click layer UnderIconsClick[0x77129E] rect (24,24) 360x120 (piece rect (24,24) 360x120), owner Progman[0x1016E]
+2026-10-21 13:52:58.431  top-level z-order: 713 windows; click layer index 711, Progman (SHELLDLL_DefView's host) index 712; click layer ABOVE Progman: True
+2026-10-21 13:52:58.431  z-order around click layer: MSCTFIME UI[0x101A2] | IME[0x10104] | [CLICK] UnderIconsClick[0x77129E] | Progman[0x1016E] [PROGMAN] | 
+2026-10-21 13:52:58.431  hit test, piece centre (204,84): WindowFromPoint Chrome_RenderWidgetHostHWND[0x8C12C0] (root Chrome_WidgetWin_1[0x5D1228]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 1
+2026-10-21 13:52:58.431  hit test, outside, right of piece (+80px) (464,84): WindowFromPoint Chrome_RenderWidgetHostHWND[0x8C12C0] (root Chrome_WidgetWin_1[0x5D1228]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:52:58.431  hit test, outside, below piece (+80px) (204,224): WindowFromPoint Chrome_RenderWidgetHostHWND[0x8C12C0] (root Chrome_WidgetWin_1[0x5D1228]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:52:59.923  heartbeat: piece alive True visible True parent WorkerW[0xB133E]; click layer alive True above Progman; clicks 0
+2026-10-21 13:53:09.931  timed run over (20s)
+2026-10-21 13:53:09.931  --- structure [final] ---
+2026-10-21 13:53:09.931  shell window Progman[0x1016E] rect (0,0) 5360x1440 exstyle 0x200080
+2026-10-21 13:53:09.931    Progman child #0 (top to bottom): SHELLDLL_DefView[0x10176] rect (0,0) 5360x1440 visible True exstyle 0x80000
+2026-10-21 13:53:09.931    Progman child #1 (top to bottom): WorkerW[0xB133E] rect (0,0) 5360x1440 visible True exstyle 0x0
+2026-10-21 13:53:09.931  piece parent chain: UnderIconsPiece[0x2C0DE0] -> WorkerW[0xB133E] -> Progman[0x1016E]
+2026-10-21 13:53:09.931  piece rect (24,24) 360x120, layered True, visible True, DPI 96
+2026-10-21 13:53:09.932  desktop icon count (LVM_GETITEMCOUNT) 45
+2026-10-21 13:53:09.932  click layer UnderIconsClick[0x77129E] rect (24,24) 360x120 (piece rect (24,24) 360x120), owner Progman[0x1016E]
+2026-10-21 13:53:09.932  top-level z-order: 713 windows; click layer index 711, Progman (SHELLDLL_DefView's host) index 712; click layer ABOVE Progman: True
+2026-10-21 13:53:09.932  z-order around click layer: MSCTFIME UI[0x101A2] | IME[0x10104] | [CLICK] UnderIconsClick[0x77129E] | Progman[0x1016E] [PROGMAN] | 
+2026-10-21 13:53:09.932  hit test, piece centre (204,84): WindowFromPoint Chrome_RenderWidgetHostHWND[0x8C12C0] (root Chrome_WidgetWin_1[0x5D1228]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 1
+2026-10-21 13:53:09.932  hit test, outside, right of piece (+80px) (464,84): WindowFromPoint Chrome_RenderWidgetHostHWND[0x8C12C0] (root Chrome_WidgetWin_1[0x5D1228]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:53:09.932  hit test, outside, below piece (+80px) (204,224): WindowFromPoint Chrome_RenderWidgetHostHWND[0x8C12C0] (root Chrome_WidgetWin_1[0x5D1228]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:53:09.932  closing
+2026-10-21 13:53:09.936  cleanup: windows destroyed, GDI objects released
+2026-10-21 13:53:09.936  exit: clicks on click layer 0, clicks on piece 0, rebuilds 1
