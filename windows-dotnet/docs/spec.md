@@ -309,6 +309,22 @@ Either needs one run on a desktop with a visible area (Este's call: a quiet minu
 
 **Ruling (Este, 2026-10-11): V3, Rainmeter's way.** The live checks (a), (b) and (e) wait for Este to clear his desktop; the runner is a scratchpad tool, not shipped, and Stage 5 does not merge until they pass.
 
+### 5.0b The under-icons spike (run 2026-10-21 on Neb, build 26220; dropped from 3.6.0)
+
+The question: can Windows copy the Mac's "Keep the Desk under desktop icons" (v2.27.0-mac), with the visuals below the icons and a transparent click layer at the V3 level for the clickable pieces? Spike: `windows-dotnet/spikes/under-icons/` (`cf03a19`), not in the solution; logs, checklist and a crop in `docs/cart-runs/2026-10-21-mac-parity-3-6-0/spike/`.
+
+| Criterion | Verdict | Evidence |
+|---|---|---|
+| Pixels below the icons | **PASS, opaque paint only** | A layered child of `Progman`'s `WorkerW` (the wallpaper host below `SHELLDLL_DefView`) shows on the real desktop, read from the screen (22 of 22 samples), only when painted with `SetLayeredWindowAttributes` (alpha 255) and `WM_PAINT`. `UpdateLayeredWindow` per-pixel alpha, which the Desk paints with, and a plain non-layered child both draw nothing there (0 of 22). This closes 5.0's unproven (a): `PrintWindow` of `Progman` still returns black, but the screen does not. |
+| Clicks on a piece | **PASS** | A `Progman`-owned tool window sized to the piece sits directly above `Progman` in the top-level z-order; `WindowFromPoint` returns it over the piece. Este's live click landed on it (1 on the click layer, 0 on the piece). |
+| Clicks elsewhere | **PASS** | Outside the piece `WindowFromPoint` returns `SysListView32`; the desktop menu and rubber band behave as usual. |
+| Dropping an icon on a clickable piece | **Blocked** | The click layer takes the drop (no-go cursor). Rainmeter's skins do the same. |
+| Explorer restart | **PASS, simulated only** | `TaskbarCreated` rebuilt both windows in one attempt; a real restart was not run. |
+
+**Rainmeter is not under the icons.** Measured on Neb (Rainmeter 4.5.28): every skin is a top-level `RainmeterMeterWindow` above `Progman` (z 123 to 489, `Progman` at 500), the V3 route the Desk already uses. An icon looks "on top" of a skin only where the skin is transparent: per-pixel alpha zero shows the icon and passes the click to it. The shipping Desk gives the same behavior wherever its ink is transparent.
+
+**Outcome (Este, 2026-10-21): dropped.** On Windows, under-icons only changes the spots where Desk ink overlaps an icon, and it needs a second, opaque paint path (hard edges, no soft shadows while the option is on). That is M-L work for a narrow gain that looks worse; the plate behind Desk text (3.6.0) covers the readability case. Revisit only if per-pixel alpha below `SHELLDLL_DefView` becomes possible (for example a DirectComposition visual hosted in the `WorkerW`), which this spike did not try. Also seen on Neb: Stardock Fences keeps z-order guide windows just above `Progman`; any future desktop-layer change has to coexist with it.
+
 ### 5.1 The Desk on V3 (deepened against the Mac and Rainmeter)
 
 What ships in S5, with the Mac's names: the layout string and its rules (`DeskArrangement.swift`, `DeskAnchorGeometry`), the clock and date, the Claude line and the meters (`DeskMeters.swift`), EsteFont, taskbar clearance (the Windows answer to `DockClearance.swift`), the layout map in Settings (`DeskLayoutMap.swift`). Not in S5: the message, meetings, now playing, watchers (S6), arrange by dragging, piece clicks, sign-in reminders as a switch (S7), and the notch (cut). The Mac draws its Desk on the main screen only; Windows draws it on every monitor, each laid out against its own work area.

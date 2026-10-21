@@ -2,7 +2,7 @@
 
 `src/` and `tests/` paths are under `windows-dotnet/`; every other path is from the repo root. Every item: conventional commit on `feat/mac-parity`, `dotnet test windows-dotnet` green, quit `Sanduhr.exe` before any publish, never `sed -i` a tracked file (CRLF tree).
 
-- [ ] **1. Spike: the Desk drawn behind the desktop icons, with clicks through a layer above**
+- [x] **1. Spike: the Desk drawn behind the desktop icons, with clicks through a layer above** (verdict in `windows-dotnet/docs/spec.md > 5.0b`; item 6 dropped by Este 2026-10-21)
   Spec ref: `windows-dotnet/docs/spec.md > 5.0 The WorkerW spike` (criteria (a) and (b)); `CHANGELOG.md > v2.27.0-mac "The Desk can sit under your files"`; `mac/Sources/Sanduhr/Desk/DeskClickLayer.swift`
   What to build: A throwaway spike (not wired into the app) on Neb: a layered window parented to the `WorkerW` child of `Progman` (the wallpaper host below `SHELLDLL_DefView` on 24H2+) that draws a visible test piece, plus a V3-style owned tool window above the icons that takes clicks only over the piece's rect. Measure (a) the piece's pixels are visible on the real desktop (screenshot, not PrintWindow), icons draw over it, normal windows cover it; (b) clicks on the piece reach the click layer and clicks elsewhere reach the desktop (icon selection, desktop menu, rubber band); (c) it survives an Explorer restart by rebuild. Size M.
   Acceptance: Done when `windows-dotnet/docs/spec.md` gains a "5.0b Under-icons spike" section with a PASS/FAIL per criterion and evidence (screenshots under `docs/cart-runs/2026-10-21-mac-parity-3-6-0/`), and the spike code is removed or kept only under a `spikes/` path outside the build.
@@ -37,7 +37,7 @@
   Verify: `dotnet test windows-dotnet` green; run the generated `sanduhr-statusline.ps1` with `CLAUDE_CONFIG_DIR` set to `.claude-personal`, to `.claude`, and with `SANDUHR_LABEL=Work`, and see `personal | …`, no label, `Work | …`.
   Stop class: go
 
-- [ ] **6. Keep the Desk under desktop icons (only if item 1 passes)**
+- [x] ~~**6. Keep the Desk under desktop icons (only if item 1 passes)**~~ DROPPED (Este, 2026-10-21): needs an opaque second paint path for a narrow gain; see spec 5.0b.
   Spec ref: item 1 verdict; `CHANGELOG.md > v2.27.0-mac`; `src/Sanduhr.App/Desk/DesktopLayerHost.cs`; `mac/Sources/Sanduhr/Desk/DeskClickLayer.swift`, `DeskController.swift`
   What to build: Settings ▸ Desk ▸ Clicks gains **Keep the Desk under desktop icons**, off by default. On: the Desk's visuals move to the spike's behind-icons host; meeting rows, watchers, now playing and the account name keep their clicks through a transparent click layer at the current V3 level; the clock's, message's and meters' menus wait until the option is off. Rebuilds on `TaskbarCreated`, display and work-area changes as today. Size M-L.
   Acceptance: Done when the option toggles live without restart, icons draw over the Desk with it on, clickable pieces still click, desktop clicks elsewhere still reach the desktop, Explorer restart recovers, and off restores today's behavior exactly.
