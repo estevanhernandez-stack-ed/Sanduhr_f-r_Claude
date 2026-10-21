@@ -111,6 +111,66 @@ public class McpSettingsExportTests : IDisposable
     }
 
     [Fact]
+    public void A_replace_that_fails_briefly_is_retried_and_lands()
+    {
+        var path = Path.Combine(_dir, "mcp-settings.json");
+        File.WriteAllText(path, "old");
+        int calls = 0;
+        var logs = new List<string>();
+        McpSettingsExport.Sync(Parse("""{"mcp_enabled":true,"mcp_roots":{".claude":true}}"""), path, logs.Add,
+            (from, to) =>
+            {
+                if (++calls < 3) throw new IOException("busy");
+                File.Move(from, to, overwrite: true);
+            });
+        Assert.Equal(3, calls);
+        Assert.Empty(logs);
+        Assert.True((bool)JsonNode.Parse(File.ReadAllText(path))!["mcp_roots"]![".claude"]!);
+        Assert.Empty(Directory.GetFiles(_dir, "*.tmp"));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void A_replace_that_keeps_failing_deletes_the_old_file_so_the_server_fails_closed(bool unauthorized)
+    {
+        var path = Path.Combine(_dir, "mcp-settings.json");
+        File.WriteAllText(path, """{"schema_version":1,"mcp_roots":{".claude":true},"publish":{"enabled":true}}""");
+        int calls = 0;
+        var logs = new List<string>();
+        McpSettingsExport.Sync(Parse("""{"mcp_enabled":true,"mcp_roots":{".claude":false}}"""), path, logs.Add,
+            (_, _) =>
+            {
+                calls++;
+                throw unauthorized ? new UnauthorizedAccessException("no") : new IOException("busy");
+            });
+        Assert.Equal(4, calls);   // the first try and three retries
+        Assert.False(File.Exists(path));
+        Assert.Empty(Directory.GetFiles(_dir, "*.tmp"));
+        var line = Assert.Single(logs);
+        Assert.Contains(unauthorized ? "UnauthorizedAccessException" : "IOException", line);
+        Assert.Contains("stale file removed", line);
+        Assert.DoesNotContain(_dir, line);
+    }
+
+    [Fact]
+    public void A_stale_file_that_cannot_be_deleted_either_is_logged_as_kept()
+    {
+        var path = Path.Combine(_dir, "mcp-settings.json");
+        File.WriteAllText(path, "old");
+        var logs = new List<string>();
+        using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            McpSettingsExport.Sync(Parse("""{"mcp_enabled":true}"""), path, logs.Add,
+                (_, _) => throw new IOException("busy"));
+        }
+        Assert.True(File.Exists(path));
+        var line = Assert.Single(logs);
+        Assert.Contains("stale file kept (IOException)", line);
+        Assert.DoesNotContain(_dir, line);
+    }
+
+    [Fact]
     public void Sync_never_throws_and_logs_the_exception_type_when_the_write_fails()
     {
         // The target path is a directory: the replace cannot succeed.

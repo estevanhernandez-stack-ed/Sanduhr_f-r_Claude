@@ -61,10 +61,15 @@ public static class McpSettingsExport
     /// <summary>
     /// Bring the file at <paramref name="path"/> in line with the projection: deleted when the projection is null, else
     /// written only when its bytes differ, atomically (temp sibling, then replace). Never throws; a failure is logged by
-    /// exception type name only.
+    /// exception type name only. sanduhr-mcp may hold the file open for a moment, so the replace is retried up to three
+    /// times (about 60 ms apart); if it still fails the old file is deleted when possible, so the server fails closed
+    /// (missing means nothing is consented) rather than keeping stale consent.
     /// </summary>
-    public static void Sync(JsonObject settingsRoot, string path, Action<string>? log = null)
+    /// <param name="replace">Test seam for the atomic replace: (temp, target). Defaults to <c>File.Move(overwrite)</c>.</param>
+    public static void Sync(JsonObject settingsRoot, string path, Action<string>? log = null,
+        Action<string, string>? replace = null)
     {
+        replace ??= (from, to) => File.Move(from, to, overwrite: true);
         try
         {
             var projection = Project(settingsRoot);
@@ -92,7 +97,25 @@ public static class McpSettingsExport
             try
             {
                 File.WriteAllBytes(temp, bytes);
-                File.Move(temp, path, overwrite: true);
+                const int retries = 3;
+                for (int attempt = 0; ; attempt++)
+                {
+                    try
+                    {
+                        replace(temp, path);
+                        break;
+                    }
+                    catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                    {
+                        if (attempt < retries)
+                        {
+                            Thread.Sleep(20 * (attempt + 1));
+                            continue;
+                        }
+                        FailClosed(path, e, log);
+                        break;
+                    }
+                }
             }
             finally
             {
@@ -103,6 +126,24 @@ public static class McpSettingsExport
         {
             log?.Invoke($"mcp-settings: sync failed ({e.GetType().Name})");
         }
+    }
+
+    /// <summary>The replace failed for good: take the old file away so the server reads "missing" (nothing consented, publish
+    /// off) instead of a projection that no longer matches settings.json. One log line, exception type names only.</summary>
+    private static void FailClosed(string path, Exception cause, Action<string>? log)
+    {
+        string outcome;
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+            outcome = "stale file removed";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            outcome = $"stale file kept ({e.GetType().Name})";
+        }
+        log?.Invoke($"mcp-settings: sync failed ({cause.GetType().Name}), {outcome}");
     }
 
     private static bool ReadBool(JsonNode? node)
