@@ -1,6 +1,6 @@
 # Changelog
 
-## v3.6.0 — unreleased
+## v3.6.0 — 2026-10-21
 
 **Platform:** Windows (.NET 10 / WPF). A Mac-parity slice: the tour learns the Desk, the Desk gets its plate and a better Arrange, the statusline says which folder it is in, and Claude Code can watch work and suggest Desk messages through `sanduhr-mcp`. `Sanduhr.Mcp` to 3.6.0. No new capability, no new outbound destination; the manifest still declares `runFullTrust` only.
 
