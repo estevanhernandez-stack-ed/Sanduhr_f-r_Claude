@@ -221,7 +221,7 @@ notch, or hardware this Mac does not have, stays open here. The issue keeps the 
   with a wide app menu (Xcode, Final Cut) and a full row of status items, measure where the two
   actually meet and decide whether the cap, the hide, or a layout that yields to the app menu is
   the rule.
-- **Fixed 2026-10-19** (run `docs/cart-runs/2026-10-19-pill-badge-and-splits/`, pending the old Mac's check): the camera and mic badge on a no-notch Mac placed itself at the top center, under the pill.
+- **Fixed 2026-10-19, verified 2026-10-21 on the old Mac in 2.31.0** (run `docs/cart-runs/2026-10-19-pill-badge-and-splits/`; `av_indicators.shown` beside_right, the dot inline in the pill, `docs/screenshots/mac/old-mac-2.31/pill-camera-dot-beside.png`; the 0.30 cap kept the pill at 750 to 930 pt with Xcode frontmost, clear of the status items at 1099): the camera and mic badge on a no-notch Mac placed itself at the top center, under the pill.
   `AVIndicatorPlacement.spot` ties `islandUp` to the wings window (`AVIndicatorViews.update`), so
   with the pill up and no wings window the indicators fall back to the tab. The pill view already
   carries the beside-wing slot; the placement needs to count the pill as the island.
@@ -235,7 +235,7 @@ notch, or hardware this Mac does not have, stays open here. The issue keeps the 
   over an hour with the Desk, the pill and the watchers on, against the same hour with the Desk
   off.
 
-## #7 — Idle CPU: the app should idle under 1 percent of a core
+## #7 — Idle CPU: the app should idle under 1 percent of a core (met in 2.31.0)
 
 **Raised 2026-10-19 from the no-notch measurements** (`docs/notes/no-notch-measurements.md`
 section 4). Steady-state CPU with nothing happening, measured as CPU seconds per minute (`ps -o time`
@@ -277,3 +277,14 @@ measured 4.45 percent before and 0.59 percent after moving the pulse to a Core A
 (`BreathLayerView`, the render server animates opacity; Reduce Motion holds the rest opacity).
 Still worth a look: the bulk walk sorts paths with Unicode comparison (about 0.2 percent); the
 Desk's per-second watcher rows and the menu bar rotation are the next timers.
+
+**Met 2026-10-21 on the 2.31.0 release app**, signed in, hooks off, five minutes after launch, CPU
+seconds per minute:
+
+| Mac | Before | 2.31.0 | Target |
+|---|---|---|---|
+| newer Mac (notch) | 6.1 percent (2.28.0) | 1.18, 0.92, 0.83 percent | under 1 |
+| 2019 i5 (no notch) | about 9 percent (2.28.0) | 0.40, 0.43, 0.45 percent | under 2 |
+
+`brew upgrade` replaced the bundle but left the old process running on the old Mac; quit and
+relaunch before measuring an update.
