@@ -847,6 +847,7 @@ folder loads, read-only. The folders are the ones Integrations lists: `~/.claude
 `~/.claude-*` folders and `CLAUDE_CONFIG_DIR`'s (`ClaudeCodeFolders.discover`, which now skips
 `*.config-backup-*` copies a config tool leaves beside a home, unless `CLAUDE_CONFIG_DIR` names
 one), the accounts' linked folders and the folders Sanduhr installed into.
+The "What a new session starts with" card sits above the Catalog and By Seat tabs, so it shows on every tab (anchor `session-load`).
 
 **The ground (item 71, slice 0).** `ClaudeCodeFolders.discover` also skips `.claude-backup-*`
 folders a seat migration leaves. **Add Folder…** under the folders keeps a folder discovery

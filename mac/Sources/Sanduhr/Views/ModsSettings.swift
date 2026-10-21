@@ -38,6 +38,11 @@ struct ModsSettings: View {
                         // The agents switch on the page (polish 2026-10-17, #20); New Mod mirrors it.
                         ModsFromClaudeRow()
                         ModsSummaryCard(model: model)
+                        // Above the tabs so it shows on every one and the fold never lands inside it (#291).
+                        if model.loaded {
+                            SessionLoadPanel(loads: model.shownLoads(demo: vm.demo))
+                                .settingsAnchor(SettingsAnchor.sessionLoad)
+                        }
                         // Catalog | By Seat (item 71, slice 1), right above what each shows.
                         ModsTabBar(model: model, demo: vm.demo)
                             .settingsAnchor(SettingsAnchor.inventory)
