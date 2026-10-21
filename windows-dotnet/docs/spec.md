@@ -512,13 +512,15 @@ Microsoft denied `rescap:unvirtualizedResources` (decision 5p8RPXHEljLOSQJJzr19)
 ### B.1 The rule
 `Paths.ExternalDir` is `%USERPROFILE%\.sanduhr`, one constant for both builds (Velopack and Store), so the MCP, the statusline, the hooks and the mod have one location. Everything an outside process reads or writes lives there; everything else stays in `Paths.AppDataDir` / `VaultDir`, which on the Store build is package storage that Windows removes on uninstall. With `SANDUHR_DEV_PROFILE` set, `ExternalDir` is `<profile>\external`, so a dev build stays isolated as before. Tests that inject an AppData base get `<base>\.sanduhr` unless they pass a home or an external dir: no test can touch the real profile.
 
-`%USERPROFILE%\.sanduhr` is shared ground: another estate tool already keeps `~\.sanduhr\time\` there (seen on Dunder). Sanduhr only ever creates, reads and deletes its own names inside it, never the folder wholesale.
+With `SANDUHR_DEV_PROFILE` set, only the widget's own files move to `<profile>\external`. A dev build's integrations still point Claude Code at `%USERPROFILE%\.sanduhr` (the hook, the script, the mod and the MCP launcher name it literally), as they pointed at `%APPDATA%` before; a dev build that installs an integration therefore writes into the real profile's Claude Code folder, as it always did.
+
+`%USERPROFILE%\.sanduhr` is shared ground: another estate tool already keeps `~\.sanduhr\time\` there (seen on Dunder). Sanduhr only ever creates, reads and deletes its own names inside it, never the folder wholesale. Some of those names are generic: Reset deletes `bin`, `mcp` and `mods` inside `~\.sanduhr` as Sanduhr's own (nothing else is expected under those three names there).
 
 ### B.2 The file split
 
 | `%USERPROFILE%\.sanduhr` (external) | Reader / writer outside the package |
 |---|---|
-| `snapshot.json` | statusline script, sanduhr-mcp, meters mod |
+| `snapshot.json` (written while the statusline, the meters mod or the MCP server is installed: `statusline_enabled` OR `mcp_enabled`) | statusline script, sanduhr-mcp, meters mod |
 | `snapshot.<ref>.json`, `seats.json` | statusline script (per-seat meters) |
 | `mcp-settings.json` (new: a projection of settings.json) | sanduhr-mcp (consent and publish readiness) |
 | `publish-request.json` / `publish-result.json` | sanduhr-mcp `publish_usage` |
@@ -548,6 +550,8 @@ No `rescap:unvirtualizedResources`, no `desktop6:FileSystemWriteVirtualization`,
   - glow hooks: a group whose command is byte for byte the old `$env:APPDATA` command is replaced by the new `$env:USERPROFILE\.sanduhr` one.
   - An entry that is no longer Sanduhr's (another shape, another path) is left alone. The engines recognise the old forms as Sanduhr's (old mods root, old hook command), so Install, Status (Outdated), Remove and Reset handle them even without the migration.
   - Old files under `%APPDATA%\Sanduhr\{bin,mcp,mods}` are left (a running session may pin them); Reset removes them.
+  - The old AppData copies of the names that moved out are deleted, best-effort, as part of the run before `done` is written: `snapshot.json`, `snapshot.*.json`, `seats.json`, `glow-*.signal`, `publish-request.json`, `publish-result.json`, `theme-request.json`, `theme-result.json`, `desk-messages-*.json`, `watch-request-*.json`. Not history, settings, logs, `bin`, `mcp` or `mods`. A delete that fails is logged by exception type name and does not count as a migration failure.
+  - `RepointLegacy(Hooks)` reinstalls both glow events, so a group the user removed by hand comes back when the other event still holds a legacy group. The receipts file has no cross-process lock, so an install clicked in the window during the first-launch migration could race it (accepted, low odds: the migration runs seconds after launch and each write is a compare-and-swap).
 - **Machines that ran 3.4.3** (Neb and Dunder sideloads only): 3.4.3 copied LocalCache into real AppData and kept the cache copies as a rollback; under 3.5.0 those older cache copies would shadow the newer real files (B.0). No code ships for two dev machines: the test plan moves `LocalCache\{Roaming,Local}\Sanduhr` aside before installing 3.5.0.
 
 ### B.5 Everything else that names the paths
