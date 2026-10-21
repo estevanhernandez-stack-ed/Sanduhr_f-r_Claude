@@ -145,4 +145,11 @@ struct NotchPillTests {
         #expect(SettingsSearch.hits("pill").contains { $0.entry.page == .notch })
         #expect(SettingsSearch.hits("external display").contains { $0.entry.page == .notch })
     }
+
+    @Test func theNotchlessPreviewDrawsTheStripOnlyWhenSomethingSitsOnIt() {
+        #expect(NotchPill.previewDrawsStrip(pill: true, indicators: false))
+        #expect(NotchPill.previewDrawsStrip(pill: false, indicators: true))
+        #expect(NotchPill.previewDrawsStrip(pill: true, indicators: true))
+        #expect(!NotchPill.previewDrawsStrip(pill: false, indicators: false))
+    }
 }

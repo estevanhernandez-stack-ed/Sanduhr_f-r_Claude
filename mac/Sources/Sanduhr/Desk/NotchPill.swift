@@ -27,6 +27,12 @@ enum NotchPill {
     static let key = "notchPill"
     static let defaultOn = false
 
+    /// The notchless preview's rule: the menu-bar strip is drawn only when something sits on it,
+    /// the pill or the camera and mic tab. With neither, the card shows no empty bar (issue #290).
+    static func previewDrawsStrip(pill: Bool, indicators: Bool) -> Bool {
+        pill || indicators
+    }
+
     static let title = "Top-center island on screens without a notch"
     static let caption = "Draws the island's wing text as a pill over the middle of the menu bar on a screen with no camera notch. It hides while the pointer is in the menu bar and while the menu bar is hidden, as in full screen."
 
