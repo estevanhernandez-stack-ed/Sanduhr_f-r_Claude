@@ -214,7 +214,7 @@ The Desk (`docs/spec.md` Stages 5 and 6), off until **Settings, Desk** turns it 
   (Rainmeter's "On desktop"), per monitor and per-monitor DPI; it keeps clear of the taskbar.
 - **Pieces**: the clock and date, the Claude line and meters, the **message** (`messages.txt` in
   `%APPDATA%\Sanduhr`, the Mac's grammar and effects, special days that stack, take turns or
-  scroll, edited on **Settings, Message**), **now playing** with bars from the output peak meter,
+  scroll, edited on **Settings, Message**), **now playing** (shown only while something plays) with bars from the playing app's peak meter,
   **system** readings (CPU, RAM, disk) and **weather** from Open-Meteo for a city you pick
   (**Settings, Weather**), and **watchers**: live cards for work an agent is watching, shown when you turn on "Let agents show watchers" (**Settings, Desk**) and place the piece.
 - **Ink**: Automatic (from the wallpaper image behind each piece, never the screen), Light, Dark,
