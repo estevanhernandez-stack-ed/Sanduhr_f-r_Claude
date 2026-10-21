@@ -631,6 +631,7 @@ internal sealed class NowPlayingHub : IDisposable
     public void Configure(NowPlayingPrefs prefs)
     {
         _prefs = prefs;
+        _service.Configure(prefs);
         Evaluate();
     }
 
