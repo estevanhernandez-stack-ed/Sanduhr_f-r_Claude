@@ -13,6 +13,9 @@ struct ConfigExportState: Identifiable {
     var forOtherAgents = true
     var items: [ConfigPack.Item]
     var chosen: Set<String>
+    /// The invented rows the `mods-config export-sample` debug hook opens for screenshots: Export
+    /// just closes the sheet and writes nothing.
+    var sample = false
     var id: String { seat }
 }
 
@@ -134,6 +137,7 @@ struct ConfigExportSheet: View {
                 Button("Cancel", role: .cancel) { close() }
                     .disabled(writing)
                 Button("Export…") {
+                    if state.sample { close(); return }
                     guard let url = model.configExportDestination(state) else { return }
                     writing = true
                     exportFailure = nil

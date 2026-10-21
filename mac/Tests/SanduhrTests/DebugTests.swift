@@ -27,13 +27,15 @@ struct DebugLinkTests {
 
     @Test func modsConfigOpensTheTwoSheetsAndRefusesOtherWords() {
         #expect((try? DebugLink.action("mods-config", arg: "export").get()) == .modsSheet(.export))
+        #expect((try? DebugLink.action("mods-config", arg: "export-sample").get()) == .modsSheet(.exportSample))
         #expect((try? DebugLink.action("mods-config", arg: "import-sample").get()) == .modsSheet(.importSample))
+        if case .success = DebugLink.action("mods-config", arg: "export-sample now") { Issue.record("export-sample now parsed") }
         if case .success = DebugLink.action("mods-config", arg: "import") { Issue.record("import parsed") }
         if case .success = DebugLink.action("mods-config", arg: "export now") { Issue.record("export now parsed") }
     }
 
     @Test func theSamplePackIsInventedAndShowsSeveralDifferences() {
-        let state = SampleConfigPack.state(seat: SampleConfigPack.fallbackSeat)
+        let state = SampleConfigPack.state(seat: SampleConfigPack.seat)
         #expect(state.sample)
         #expect(state.rows.filter { $0.status != .same }.count >= 3)
         #expect(state.chosen.count >= 3)
@@ -44,6 +46,29 @@ struct DebugLinkTests {
         var again = state
         again.plan()
         #expect(again.rows.count == state.rows.count)
+    }
+
+    @Test func theExportSampleIsInventedAndHasRowsThatCannotTravel() {
+        let state = SampleConfigPack.exportState()
+        #expect(state.sample)
+        #expect(state.label == "Sample")
+        #expect(state.items.filter { !$0.canTravel }.count >= 2)
+        #expect(state.items.contains { $0.kind == .mcpServer && $0.detail.contains("${") })
+        let text = state.items.flatMap { [$0.name, $0.detail, $0.blocked ?? ""] + $0.files.flatMap { [$0.path, $0.text] } }
+            + [state.seat, state.label]
+        #expect(!text.contains { $0.contains("/Users/") || $0.contains("/home/") })
+    }
+
+    @Test func theImportSampleIntoListIsTheInventedFolderOnly() {
+        let state = SampleConfigPack.state(seat: SampleConfigPack.seat)
+        #expect(state.seat == "~/.claude-sample")
+        #expect(SampleConfigPack.seatLabel == "Sample")
+        #expect(!state.seat.contains("/Users/") && !state.seat.contains("/home/"))
+    }
+
+    @Test func theDemoAccountsPageHasTwoAccountsAndTheFollowSwitch() {
+        #expect(DemoAccountsLayout.labels.count == 2)
+        #expect(DemoAccountsLayout.showsFollow)
     }
 
     @Test func onlySanduhrDebugLinks() {

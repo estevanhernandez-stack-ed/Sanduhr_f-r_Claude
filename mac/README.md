@@ -1616,7 +1616,7 @@ Settings v2, slice 4 (item 72; `Models/SignedOut.swift`, `Models/DemoMode.swift`
   surface: `UsageViewModel.setDemo` puts two sample accounts, Work (active) and Personal, with
   made-up numbers and history on the widget, its chip and the menu bar, and through
   `DeskModel.update` on both Claude meters pieces and the notch; Settings, Usage draws the samples'
-  meter history and Settings, Accounts lists the sample accounts read-only. The real numbers,
+  meter history and Settings, Accounts draws its real layout over the sample accounts (list, detail pane and the Follow switch) with every account action inert. The real numbers,
   accounts and history wait in memory (`DemoSession`), and every fetch pauses: the active account's
   (an answer already on its way is dropped), Follow the account I'm using (off while demo is on)
   and the per-seat rounds (`SeatMeters.paused`; seats.json and the seat files still follow the real

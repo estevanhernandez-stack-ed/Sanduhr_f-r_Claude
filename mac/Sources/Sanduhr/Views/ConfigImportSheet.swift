@@ -297,12 +297,16 @@ struct ConfigImportSheet: View {
     @ViewBuilder private var choosing: some View {
         Picker("Into", selection: Binding(get: { state.seat }, set: { pick($0) })) {
             if !state.hasSeat { Text("Choose a folder…").tag("") }
-            ForEach(model.pickerSeats(demo: demo)) { s in
-                Text(s.label + (s.isWork ? " (work)" : "") + "  " + model.display(s.path)).tag(s.path)
+            if state.sample {
+                Text(SampleConfigPack.seatLabel + "  " + SampleConfigPack.seat).tag(SampleConfigPack.seat)
+            } else {
+                ForEach(model.pickerSeats(demo: demo)) { s in
+                    Text(s.label + (s.isWork ? " (work)" : "") + "  " + model.display(s.path)).tag(s.path)
+                }
+                if let other { Text(model.display(other)).tag(other) }
+                Divider()
+                Text("Other Folder…").tag(Self.otherTag)
             }
-            if let other { Text(model.display(other)).tag(other) }
-            Divider()
-            Text("Other Folder…").tag(Self.otherTag)
         }
         .frame(maxWidth: 420)
         Text("Only what this folder doesn't have yet can be brought over. What it has, the same or its own, stays as it is. Plugins and MCP servers are shown as the commands to run.")
@@ -314,7 +318,7 @@ struct ConfigImportSheet: View {
             Text("This pack comes from a folder marked work, and this one isn't. Check it carries nothing that names work: people, products, endpoints, internal repos.")
                 .font(.caption.weight(.semibold)).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
         }
-        if FileManager.default.fileExists(atPath: (state.seat as NSString).appendingPathComponent(".git")) {
+        if !state.sample, FileManager.default.fileExists(atPath: (state.seat as NSString).appendingPathComponent(".git")) {
             Text("This folder is a git clone: its next sync commits what the import writes.")
                 .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
         }
