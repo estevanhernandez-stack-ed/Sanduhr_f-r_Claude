@@ -607,8 +607,7 @@ public sealed class ToolLogic
         VaultWindow window;
         try
         {
-            var reader = new VaultReader(new VaultStore(_config.VaultDir));
-            window = reader.ReadWindow(rootNames, from, today.AddDays(1));
+            window = ReadVaultOverlay(rootNames, from, today.AddDays(1));
         }
         catch (Exception)
         {
@@ -653,6 +652,58 @@ public sealed class ToolLogic
             ["caveat"] = "Vault rollups cover days the widget has ingested; today may be partial or absent - " +
                          "use get_usage for live burn. Absent days are no-record, never zero. " + BurnCaveat,
         };
+    }
+
+    /// <summary>Read the window across <c>VaultDirs</c>, per root and calendar month: the
+    /// first directory that holds the rollup shard for that root+month supplies the month
+    /// (the Store build's LocalCache copy shadows the real one, as it does for the widget).
+    /// Slices are summed across months. No directory with a shard = nothing for that month.</summary>
+    private VaultWindow ReadVaultOverlay(IReadOnlyList<string> roots, DateOnly from, DateOnly toExclusive)
+    {
+        var dirs = _config.VaultDirs;
+        var readers = new List<VaultReader>(dirs.Count);
+        foreach (var d in dirs)
+            readers.Add(new VaultReader(new VaultStore(d)));
+
+        var byDay = new Dictionary<DateOnly, long>();
+        var byProject = new Dictionary<string, long>();
+        var bySkill = new Dictionary<string, long>();
+        var byDayInput = new Dictionary<DateOnly, long>();
+        var byDayOutput = new Dictionary<DateOnly, long>();
+
+        foreach (var root in roots)
+        {
+            var cursor = new DateOnly(from.Year, from.Month, 1);
+            while (cursor < toExclusive)
+            {
+                var next = cursor.AddMonths(1);
+                string month = cursor.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+                for (int i = 0; i < dirs.Count; i++)
+                {
+                    // Mirrors VaultStore's rollup shard name (rollups-<yyyy-MM>.json) under
+                    // <vault>\<root>; the store's path helper is private.
+                    if (!File.Exists(Path.Combine(dirs[i], root, $"rollups-{month}.json")))
+                        continue;
+                    var lo = cursor > from ? cursor : from;
+                    var hi = next < toExclusive ? next : toExclusive;
+                    var slice = readers[i].ReadWindow(new[] { root }, lo, hi);
+                    Add(byDay, slice.ByDay);
+                    Add(byProject, slice.ByProjectName);
+                    Add(bySkill, slice.BySkill);
+                    Add(byDayInput, slice.ByDayInput);
+                    Add(byDayOutput, slice.ByDayOutput);
+                    break;
+                }
+                cursor = next;
+            }
+        }
+        return new VaultWindow(byDay, byProject, bySkill, byDayInput, byDayOutput);
+    }
+
+    private static void Add<TKey>(Dictionary<TKey, long> into, Dictionary<TKey, long> from) where TKey : notnull
+    {
+        foreach (var (k, v) in from)
+            into[k] = into.GetValueOrDefault(k) + v;
     }
 
     // -- publish_usage --------------------------------------------------------
@@ -708,10 +759,10 @@ public sealed class ToolLogic
             return Refusal("no_data", "invalid_params", "date must be YYYY-MM-DD");
         }
 
-        if (_config.SettingsPath is null || _config.PublishRequestPath is null || _config.PublishResultPath is null)
+        if (_config.McpSettingsPath is null || _config.PublishRequestPath is null || _config.PublishResultPath is null)
             return Refusal("no_data", "unavailable", "Publishing is not wired on this server configuration.");
 
-        var (enabled, hasEndpoint, tokenStored) = ReadPublishSettings(_config.SettingsPath);
+        var (enabled, hasEndpoint, tokenStored) = ReadPublishSettings(_config.McpSettingsPath);
         if (!enabled)
             return Refusal("disabled", "publishing_off",
                 "Publishing is off. Turn on 'Publish daily' in the Sanduhr widget (Settings > Publish usage) and tick the homes to share.");
@@ -850,31 +901,23 @@ public sealed class ToolLogic
         return true;
     }
 
-    /// <summary>The refusal inputs, read from settings.json's <c>publish</c>
-    /// group (mirrors Core's PublishSettingsJson vocabulary literally — this
-    /// project cannot link that file). <c>CredentialReady</c> is true when a
-    /// token is stored OR the auth scheme is <c>none</c>. The pre-3.5
-    /// <c>publish_626</c> group is honored read-only until the widget migrates
-    /// it (it described the 626 Labs endpoint, so the endpoint counts as set).
-    /// Anything unreadable fails closed.</summary>
-    private static (bool Enabled, bool HasEndpoint, bool CredentialReady) ReadPublishSettings(string settingsPath)
+    /// <summary>The refusal inputs, read from the widget's <c>mcp-settings.json</c>
+    /// projection: <c>publish.enabled</c>, <c>publish.has_endpoint</c>,
+    /// <c>publish.credential_ready</c> (the widget folds token-stored and auth scheme
+    /// <c>none</c> into the last). Only <c>schema_version</c> 1 is read; anything
+    /// else, or unreadable, fails closed.</summary>
+    private static (bool Enabled, bool HasEndpoint, bool CredentialReady) ReadPublishSettings(string projectionPath)
     {
         try
         {
-            if (!File.Exists(settingsPath))
+            if (!File.Exists(projectionPath))
                 return (false, false, false);
-            if (JsonNode.Parse(File.ReadAllText(settingsPath)) is not JsonObject root)
+            if (JsonNode.Parse(File.ReadAllText(projectionPath)) is not JsonObject root)
+                return (false, false, false);
+            if (!McpConfig.IsSchemaV1(root["schema_version"]))
                 return (false, false, false);
             if (root["publish"] is JsonObject group)
-            {
-                bool enabled = ReadBool(group["enabled"]);
-                bool hasEndpoint = !string.IsNullOrWhiteSpace(ReadString(group["endpoint_url"]));
-                bool tokenStored = ReadBool(group["token_stored"]);
-                bool noAuth = string.Equals(ReadString(group["auth_scheme"])?.Trim(), "none", StringComparison.OrdinalIgnoreCase);
-                return (enabled, hasEndpoint, tokenStored || noAuth);
-            }
-            if (root["publish_626"] is JsonObject legacy)
-                return (ReadBool(legacy["enabled"]), true, ReadBool(legacy["key_stored"]));
+                return (ReadBool(group["enabled"]), ReadBool(group["has_endpoint"]), ReadBool(group["credential_ready"]));
             return (false, false, false);
         }
         catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
@@ -887,12 +930,6 @@ public sealed class ToolLogic
     {
         try { return node?.GetValue<bool>() ?? false; }
         catch { return false; }
-    }
-
-    private static string? ReadString(JsonNode? node)
-    {
-        try { return node?.GetValue<string>(); }
-        catch { return null; }
     }
 
     private static JsonObject? TryReadResult(string resultPath, string id)
