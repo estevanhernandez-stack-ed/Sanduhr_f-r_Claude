@@ -1,0 +1,51 @@
+<Window x:Class="Sanduhr.App.Views.LauncherLinkWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Add link"
+        Width="440" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{DynamicResource Sanduhr.Brush.GlassChrome}"
+        FontFamily="Segoe UI Variable Display, Segoe UI"
+        UseLayoutRounding="True"
+        AutomationProperties.Name="Add link">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="LauncherDialogStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+    <StackPanel Margin="20">
+        <TextBlock Text="Add link" FontSize="15" FontWeight="SemiBold"
+                   Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+
+        <TextBlock Text="Link address" FontSize="11" Margin="0,14,0,4"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+        <TextBox x:Name="UrlBox" Style="{StaticResource DialogInput}" Text="https://"
+                 AutomationProperties.Name="Link address"
+                 TextChanged="OnChanged" />
+
+        <TextBlock Text="Label (optional, 24 characters at most)" FontSize="11" Margin="0,12,0,4"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+        <TextBox x:Name="LabelBox" Style="{StaticResource DialogInput}" MaxLength="24"
+                 AutomationProperties.Name="Label"
+                 TextChanged="OnChanged" />
+
+        <TextBlock x:Name="ProblemText" FontSize="11" TextWrapping="Wrap" Margin="0,10,0,0" MinHeight="16"
+                   AutomationProperties.LiveSetting="Polite"
+                   Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" />
+        <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                   Text="Only https links. The link opens in your default browser when you choose the button; Sanduhr never visits it, and never fetches its icon." />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Cancel" Style="{StaticResource DialogButton}" IsCancel="True" Click="OnCancelClick"
+                    AutomationProperties.Name="Cancel" />
+            <Button x:Name="AddButton" Content="Add" Style="{StaticResource DialogAccentButton}" IsDefault="True"
+                    IsEnabled="False" Click="OnAddClick" AutomationProperties.Name="Add the link" />
+        </StackPanel>
+    </StackPanel>
+</Window>

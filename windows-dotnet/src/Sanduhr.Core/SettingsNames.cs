@@ -137,6 +137,10 @@ public static class SettingsNames
     public const string DeskWatchers = "Watchers";
     /// <summary>Desk, Where each piece sits: the Launcher, buttons that open apps and links from the desktop.</summary>
     public const string DeskLauncher = "Launcher";
+    /// <summary>Desk, Launcher: opens the app picker.</summary>
+    public const string LauncherAddApp = "Add app…";
+    /// <summary>Desk, Launcher: asks for an https link and a label.</summary>
+    public const string LauncherAddLink = "Add link…";
     /// <summary>Desk: lets agents put watchers up through the MCP server (settings.json "watchers_agents", off by default).</summary>
     public const string WatchersSwitch = "Let agents show watchers";
     /// <summary>Desk: starts Arrange mode on the desktop (spec 7.3).</summary>
@@ -201,6 +205,8 @@ public static class SettingsNames
         (DeskPieceClicksSwitch, SettingsPage.Desk),
         (DeskPlateSwitch, SettingsPage.Desk),
         (WatchersSwitch, SettingsPage.Desk),
+        (LauncherAddApp, SettingsPage.Desk),
+        (LauncherAddLink, SettingsPage.Desk),
         (SignInReminders, SettingsPage.Alerts),
         (NowPlayingInWidget, SettingsPage.NowPlaying),
         (WeatherLookUp, SettingsPage.Weather),

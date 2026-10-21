@@ -34,6 +34,7 @@ public partial class App : Application
     private Desk.DeskMessageSource? _messages;
     private Desk.DeskMessageHandoffService? _handoff;
     private Desk.WatcherStore? _watchers;
+    private LauncherAppCache? _launcherApps;
     private MenuItem? _endDemoItem;
 
     /// <summary>Where this install stands with the welcome tour, decided once at launch.</summary>
@@ -438,6 +439,7 @@ public partial class App : Application
         {
             case Desk.DeskMenuAction.EditMessages: _ = ShowSettingsAsync(SettingsPage.DeskMessage); break;
             case Desk.DeskMenuAction.DeskSettings: _ = ShowSettingsAsync(SettingsPage.Desk); break;
+            case Desk.DeskMenuAction.LauncherSettings: _ = ShowSettingsAsync(SettingsPage.Desk, Sanduhr.Core.SettingsIndex.DeskLauncher); break;
             case Desk.DeskMenuAction.Arrange: _desk?.BeginArrange(); break;
             case Desk.DeskMenuAction.TurnOffDesk:
                 try
@@ -452,6 +454,17 @@ public partial class App : Application
                 _desk?.Reload();
                 _settingsWindow?.ViewModel.Desk.Reload();
                 break;
+        }
+    }
+
+    /// <summary>A Launcher button for an app that is no longer installed was chosen: Settings, Desk, Launcher opens at that button.</summary>
+    private void OnLauncherMissing(int index)
+    {
+        _ = ShowSettingsAsync(SettingsPage.Desk, Sanduhr.Core.SettingsIndex.DeskLauncher);
+        if (_settingsWindow?.ViewModel.Desk.Launcher is { } launcher)
+        {
+            launcher.Reload();
+            launcher.Select(index);
         }
     }
 
@@ -499,11 +512,15 @@ public partial class App : Application
             if (_desk is { Running: true, WatchersPlaced: true }) _glow?.Preview(ClaudeCodeEvent.Waiting);
         };
         _watchers.Start();
+        // The Launcher (spec, Desk Launcher): one in-memory view of the Start menu for the Desk and Settings.
+        _launcherApps = new LauncherAppCache();
+        LauncherAppCache.Current = _launcherApps;
         _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
-            () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers)
+            () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers, paths, _launcherApps)
         {
             ThemeText = ThemeTextHex,
         };
+        _desk.LauncherMissingClicked += OnLauncherMissing;
         _vm.DeskUsageChanged += _desk.UsageChanged;
         // The glow's Desk spot (spec 7.3): the glow service asks the Desk first and falls back to the window.
         if (_glow is not null) _glow.DeskGlow = c => _desk?.Glow(c) == true;
@@ -562,7 +579,7 @@ public partial class App : Application
     /// non-modal so a live account switch from here reflects in the widget at once.
     /// Re-invoking focuses the existing window and refreshes its account list.
     /// </summary>
-    private Task ShowSettingsAsync(SettingsPage? page = null)
+    private Task ShowSettingsAsync(SettingsPage? page = null, string? anchor = null)
     {
         if (_vm is null)
             return Task.CompletedTask;
@@ -571,7 +588,7 @@ public partial class App : Application
         {
             _settingsWindow.ViewModel.Accounts.Reload();
             if (page is { } p)
-                _settingsWindow.SelectPage(p);
+                _settingsWindow.SelectPage(p, anchor);
             _settingsWindow.Activate();
             return Task.CompletedTask;
         }
@@ -617,7 +634,7 @@ public partial class App : Application
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
         if (page is { } first)
-            _settingsWindow.SelectPage(first);
+            _settingsWindow.SelectPage(first, anchor);
         _settingsWindow.Activate();
         return Task.CompletedTask;
     }
@@ -879,6 +896,7 @@ public partial class App : Application
         WhatsNewWindow.Quitting = true;
         _glow?.Dispose();
         _desk?.Dispose();
+        _launcherApps?.Dispose();
         _messages?.Dispose();
         _handoff?.Dispose();
         _watchers?.Dispose();
@@ -903,6 +921,7 @@ public partial class App : Application
         WhatsNewWindow.Quitting = true;
         _glow?.Dispose();
         _desk?.Dispose();
+        _launcherApps?.Dispose();
         _messages?.Dispose();
         _handoff?.Dispose();
         _watchers?.Dispose();

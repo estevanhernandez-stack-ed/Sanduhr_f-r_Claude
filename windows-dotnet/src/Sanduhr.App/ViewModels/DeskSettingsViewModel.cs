@@ -103,11 +103,19 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             new DeskPieceRow(this, "telemetry", SettingsNames.DeskTelemetry),
             new DeskPieceRow(this, "weather", SettingsNames.DeskWeather),
             new DeskPieceRow(this, "watchers", SettingsNames.DeskWatchers),
+            new DeskPieceRow(this, "launcher", SettingsNames.DeskLauncher),
             new DeskPieceRow(this, "glow", SettingsNames.DeskGlow),
         ];
+        Launcher = new LauncherSettingsViewModel(store, new Paths(), () => Pieces.FirstOrDefault(p => p.Widget == "launcher")?.IsPlaced == true)
+        {
+            Changed = () => Changed?.Invoke(),
+        };
         Load();
         LoadInk();
     }
+
+    /// <summary>Settings, Desk, Launcher: the buttons, their pictures and the pickers (spec, Desk Launcher).</summary>
+    public LauncherSettingsViewModel Launcher { get; }
 
     /// <summary>Called after every saved change (App re-applies the Desk).</summary>
     public Action? Changed { get; set; }
@@ -305,6 +313,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         var a = new DeskArrangement(_saved.Layout);
         foreach (var row in Pieces) row.Load(a.Placement(row.Widget));
         _loading = false;
+        Launcher?.PlacementChanged();
     }
 
     /// <summary>Change the layout through <see cref="DeskArrangement"/> and save.</summary>
@@ -316,6 +325,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         _loading = true;
         foreach (var row in Pieces) row.Load(a.Placement(row.Widget));
         _loading = false;
+        Launcher.PlacementChanged();
     }
 
     partial void OnEnabledChanged(bool value)

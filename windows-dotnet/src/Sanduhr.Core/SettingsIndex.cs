@@ -78,6 +78,7 @@ public static class SettingsIndex
     public const string DeskClicks = "desk-clicks";
     public const string DeskPlate = "desk-plate";
     public const string DeskWatchers = "desk-watchers";
+    public const string DeskLauncher = "desk-launcher";
     // Desk: Message, Now playing, Weather (S6)
     public const string MessageLines = "lines";
     public const string MessageRotation = "rotation";
@@ -185,6 +186,9 @@ public static class SettingsIndex
             ["click", "click-through", "right-click", "menu", "desktop icons", "clock", "message"]),
         E(SettingsNames.WatchersSwitch, SettingsPage.Desk, DeskWatchers,
             ["watcher", "watchers", "agent", "agents", "MCP", "watch_start", "CI", "deploy", "progress", "card", "claude code"]),
+        E(SettingsNames.DeskLauncher, SettingsPage.Desk, DeskLauncher,
+            ["launcher", "button", "buttons", "shortcut", "shortcuts", "app", "apps", "link", "TouchButton", "Rainmeter",
+             SettingsNames.LauncherAddApp, SettingsNames.LauncherAddLink, "image", "label", "PNG", "Chrome app", "PWA"]),
         E("Where each piece sits", SettingsPage.Desk, DeskPieces,
             ["layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor"]),
         E("Look", SettingsPage.Desk, DeskLook,
@@ -247,6 +251,8 @@ public static class SettingsIndex
         [SettingsNames.DeskPieceClicksSwitch] = DeskClicks,
         [SettingsNames.DeskPlateSwitch] = DeskPlate,
         [SettingsNames.WatchersSwitch] = DeskWatchers,
+        [SettingsNames.LauncherAddApp] = DeskLauncher,
+        [SettingsNames.LauncherAddLink] = DeskLauncher,
         [SettingsNames.NowPlayingInWidget] = NowPlayingWidget,
         [SettingsNames.WeatherLookUp] = WeatherPlace,
         [SettingsNames.GlowWhere] = GlowWhere,
