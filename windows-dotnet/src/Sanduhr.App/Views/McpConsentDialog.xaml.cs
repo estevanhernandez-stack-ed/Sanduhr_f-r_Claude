@@ -63,7 +63,7 @@ internal partial class McpConsentDialog : Window
         if (home is null || DetailsText is null)
             return;
         DetailsText.Text =
-            $"What gets written: the server files under %APPDATA%\\Sanduhr\\mcp\\, a launcher at {launcherPath}, " +
+            $"What gets written: the server files under %USERPROFILE%\\.sanduhr\\mcp\\, a launcher at {launcherPath}, " +
             $"and a 'sanduhr' entry in {configPathFor(home)} (a timestamped backup is saved beside it first). " +
             "The helper is read-only: it can see your usage percentages and - only for homes checked above - " +
             "project-level token totals. It cannot see your keys, your accounts, or conversation content. " +

@@ -44,12 +44,12 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // Store installs only: bring data an older, virtualized Store build left in the
-        // package's LocalCache to the real AppData paths. Must run before anything below
-        // constructs Paths or reads settings. One-shot, never throws.
-        PackagedDataMigrationRunner.RunIfPackaged();
         // Settings whose shape changed (S6: hotkey_settings as a per-action map), once, before any read.
-        new SettingsStore(new Sanduhr.Core.Paths()).RunMigrations();
+        var startupSettings = new SettingsStore(new Sanduhr.Core.Paths());
+        startupSettings.RunMigrations();
+        // The projection sanduhr-mcp reads (consent, publish readiness) lives outside AppData; bring it
+        // in line with settings.json now, whatever wrote settings last.
+        startupSettings.SyncMcpExport();
 
         _vm = new WidgetViewModel();
         // Apply the saved theme's palette to the Application resources before the
@@ -132,30 +132,48 @@ public partial class App : Application
             catch { }
         }));
 
-        // Statusline bridge (WS-E): the script has no update channel of its own —
-        // the widget is its updater. Refresh the installed copy on every start
-        // while the integration is enabled (idempotent single-file write).
-        if (_vm.LoadStatuslineEnabled())
+        // Background, in order, each step on its own: the one-time re-point of pre-3.5.0 registrations to
+        // %USERPROFILE%\.sanduhr, then the statusline bridge (WS-E) and the MCP integration refresh. The
+        // widget is the updater for both: the script and the server have no update channel of their own,
+        // so a newer build rewrites the installed copy on start while the integration is enabled
+        // (version-dir indirection means running sessions keep their pinned copy, no lock fight).
+        // Nothing here may throw out of the task, and none of it delays the first paint.
+        bool statuslineEnabled = _vm.LoadStatuslineEnabled();
+        bool mcpEnabled = _vm.LoadMcpEnabled();
+        string statuslineBinDir = _vm.StatuslineBinDir;
+        string externalDir = _vm.SanduhrExternalDir;
+        string appDataDir = _vm.SanduhrAppDataDir;
+        _ = Task.Run(() =>
         {
-            new StatuslineInstaller(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                _vm.StatuslineBinDir).InstallScript();
-        }
+            try { ExternalDirMigrationRunner.Run(startupSettings, new Sanduhr.Core.Paths()); }
+            catch { }
 
-        // MCP integration (WS-E registration slice): same widget-as-updater rule.
-        // A newer app build carries a newer server; refresh the version dir +
-        // launcher so new Claude Code sessions get it. Version-dir indirection
-        // means running sessions keep their pinned copy — no lock fight.
-        if (_vm.LoadMcpEnabled())
-        {
-            string mcpSource = System.IO.Path.Combine(AppContext.BaseDirectory, "mcp");
-            if (System.IO.Directory.Exists(mcpSource))
+            if (statuslineEnabled)
             {
-                new McpIntegrationInstaller(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    _vm.SanduhrAppDataDir).RefreshInstall(mcpSource);
+                try
+                {
+                    new StatuslineInstaller(
+                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                        statuslineBinDir).InstallScript();
+                }
+                catch { }
             }
-        }
+
+            if (mcpEnabled)
+            {
+                try
+                {
+                    string mcpSource = System.IO.Path.Combine(AppContext.BaseDirectory, "mcp");
+                    if (System.IO.Directory.Exists(mcpSource))
+                    {
+                        new McpIntegrationInstaller(
+                            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                            appDataDir, externalDir: externalDir).RefreshInstall(mcpSource);
+                    }
+                }
+                catch { }
+            }
+        });
 
         // Load the active account's stored credential + fetch real usage now.
         _vm.Start();
