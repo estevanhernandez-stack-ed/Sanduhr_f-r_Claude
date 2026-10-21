@@ -122,6 +122,13 @@ extension CCLogFileSystem {
 /// (`/private/var` for `/var`). The burn reader, the vault's walk and the per-seat activity
 /// check all walk through here.
 enum CCLogBulkWalk {
+    /// Path order is the bytes of the UTF-8 form, not Swift's Unicode comparison, which is slow and
+    /// buys nothing here: the reader keys its cache by path and the vault sorts only for a stable
+    /// order.
+    static func pathPrecedes(_ a: String, _ b: String) -> Bool {
+        a.utf8.lexicographicallyPrecedes(b.utf8)
+    }
+
     static func each(under dir: String, _ body: (_ path: String, _ size: Int, _ modified: Date) -> Void) {
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
         guard let walker = FileManager.default.enumerator(at: URL(fileURLWithPath: dir),
@@ -145,7 +152,7 @@ struct LocalCCLogFileSystem: CCLogFileSystem {
 
     func subdirectories(of path: String) -> [String] {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? []
-        return names.sorted()
+        return names.sorted(by: CCLogBulkWalk.pathPrecedes)
             .map { (path as NSString).appendingPathComponent($0) }
             .filter(isDirectory)
     }
@@ -161,7 +168,7 @@ struct LocalCCLogFileSystem: CCLogFileSystem {
                 out.append(full)
             }
         }
-        return out.sorted()
+        return out.sorted(by: CCLogBulkWalk.pathPrecedes)
     }
 
     /// The walk with the attributes fetched in bulk (CCLogBulkWalk): on a seat with 750 logs,
@@ -171,7 +178,7 @@ struct LocalCCLogFileSystem: CCLogFileSystem {
         CCLogBulkWalk.each(under: path) { file, size, modified in
             out.append(CCLogFile(path: file, stat: CCLogFileStat(size: UInt64(size), modified: modified)))
         }
-        return out.sorted { $0.path < $1.path }
+        return out.sorted { CCLogBulkWalk.pathPrecedes($0.path, $1.path) }
     }
 
     func stat(_ path: String) -> CCLogFileStat? {
