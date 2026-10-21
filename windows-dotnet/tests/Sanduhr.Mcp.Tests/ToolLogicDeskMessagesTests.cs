@@ -11,6 +11,20 @@ namespace Sanduhr.Mcp.Tests;
 /// propose_desk_messages (the widget's own checks first, then the request handoff). Temp folders only.</summary>
 public class ToolLogicDeskMessagesTests
 {
+    /// <summary>The fake widget's read: waits for the request and retries while the server's rename
+    /// into place still holds it (a sharing violation on a Windows runner would kill the task and
+    /// leave the server to time out).</summary>
+    private static async Task<byte[]> ReadWhenReady(string path)
+    {
+        while (true)
+        {
+            await Task.Delay(10);
+            if (!File.Exists(path)) continue;
+            try { return File.ReadAllBytes(path); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        }
+    }
+
     private static McpConfig DeskConfig(TempDir tmp, TimeSpan? wait = null) => new()
     {
         SnapshotPath = Path.Combine(tmp.Path, "snapshot.json"),
@@ -223,8 +237,7 @@ public class ToolLogicDeskMessagesTests
         // Play the widget: take the request, check it with the widget's own decoder, answer pending.
         var widget = Task.Run(async () =>
         {
-            while (!File.Exists(cfg.DeskRequestPath!)) await Task.Delay(10);
-            var decoded = MessageProposal.Decode(File.ReadAllBytes(cfg.DeskRequestPath!), Now);
+            var decoded = MessageProposal.Decode(await ReadWhenReady(cfg.DeskRequestPath!), Now);
             Assert.Equal(MessageDecodedKind.Proposal, decoded.Kind);
             var p = decoded.Proposal!;
             Assert.Equal(["03-14: {ink:#ff7e5f,#feb47b} happy birthday, Sam.", "keep going."], p.Lines);
@@ -253,8 +266,7 @@ public class ToolLogicDeskMessagesTests
         var logic = new ToolLogic(cfg, () => Now);
         var widget = Task.Run(async () =>
         {
-            while (!File.Exists(cfg.DeskRequestPath!)) await Task.Delay(10);
-            var p = MessageProposal.Decode(File.ReadAllBytes(cfg.DeskRequestPath!), Now).Proposal!;
+            var p = MessageProposal.Decode(await ReadWhenReady(cfg.DeskRequestPath!), Now).Proposal!;
             File.WriteAllBytes(cfg.DeskResultPath!, MessageProposal.ResultJson(p.Id, MessageProposalStatus.Applied,
                 p.Mode, applied: new MessageApplied("x\n", 1, 1), now: Now));
         });
