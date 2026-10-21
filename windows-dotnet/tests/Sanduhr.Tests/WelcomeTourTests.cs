@@ -19,14 +19,14 @@ public class WelcomeTourTests
     private static TourCard ById(string id) => WelcomeTour.Table.Single(c => c.Id == id);
 
     [Fact]
-    public void DefaultTable_IsFourStepsNumberedOneThreeFourFive()
+    public void DefaultTable_IsFiveStepsNumberedOneToFive()
     {
-        var expected = new[] { new[] { "paced" }, ["tray"], ["accounts"], ["claude-code"] };
+        var expected = new[] { new[] { "paced" }, ["desk"], ["tray"], ["accounts"], ["claude-code"] };
         foreach (var features in new[] { None, WithDesk })
         {
             var steps = WelcomeTour.Steps(features);
             Assert.Equal(expected, Ids(steps));
-            Assert.Equal([1, 3, 4, 5], steps.Select(s => s[0].Step).ToArray());
+            Assert.Equal([1, 2, 3, 4, 5], steps.Select(s => s[0].Step).ToArray());
         }
     }
 
@@ -59,6 +59,7 @@ public class WelcomeTourTests
         Assert.Equal("At a glance", ById("tray").Card.Title);
         Assert.Equal("More than one account", ById("accounts").Card.Title);
         Assert.Equal("Claude Code, connected", ById("claude-code").Card.Title);
+        Assert.Equal("On your desktop", ById("desk").Card.Title);
         Assert.Equal(TourChoice.TrayMode, ById("tray").Choice);
         Assert.Equal(["tray"], WelcomeTour.Table.Where(c => c.Choice != TourChoice.None).Select(c => c.Id).ToArray());
         Assert.DoesNotContain(WelcomeTour.Table, c => c.Requires is not null);
@@ -68,17 +69,74 @@ public class WelcomeTourTests
     public void ShowMeDestinations()
     {
         Assert.Equal(SettingsPage.Widget, ById("paced").Card.Destination);
+        Assert.Equal(SettingsPage.Desk, ById("desk").Card.Destination);
         Assert.Equal(SettingsPage.General, ById("tray").Card.Destination);
         Assert.Equal(SettingsPage.Accounts, ById("accounts").Card.Destination);
         Assert.Equal(SettingsPage.ClaudeCode, ById("claude-code").Card.Destination);
     }
 
     [Fact]
+    public void DeskOnly_IsThreeStepsEndingInSignIn()
+    {
+        var steps = WelcomeTour.Steps(None, WelcomeTour.DeskOnly);
+        Assert.Equal(new[] { new[] { "desk" }, ["tray"], ["sign-in"] }, Ids(steps));
+        Assert.Equal([1, 2, 3], steps.Select(s => s[0].Step).ToArray());
+        Assert.DoesNotContain(WelcomeTour.DeskOnly, c => c.Id is "paced" or "accounts" or "claude-code");
+    }
+
+    [Fact]
+    public void DeskOnly_ReusesTheDeskAndTrayCardsAndRewritesTheTrayBody()
+    {
+        var desk = WelcomeTour.DeskOnly.Single(c => c.Id == "desk");
+        Assert.Equal(ById("desk").Card, desk.Card);
+        var tray = WelcomeTour.DeskOnly.Single(c => c.Id == "tray");
+        Assert.Equal(ById("tray").Card.Title, tray.Card.Title);
+        Assert.Equal(ById("tray").Card.Preview, tray.Card.Preview);
+        Assert.Equal(ById("tray").Choice, tray.Choice);
+        Assert.NotEqual(ById("tray").Card.Body, tray.Card.Body);
+    }
+
+    [Fact]
+    public void DeskOnly_SignInCardOpensAccounts()
+    {
+        var card = WelcomeTour.DeskOnly.Single(c => c.Id == "sign-in");
+        Assert.Equal("Sign in any time", card.Card.Title);
+        Assert.Equal(SettingsPage.Accounts, card.Card.Destination);
+        Assert.Equal("Accounts", card.ShowMeTitle);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void StepsFor_JustTheDeskPicksTheDeskOnlyTour(bool signedIn)
+    {
+        Assert.Equal(new[] { new[] { "desk" }, ["tray"], ["sign-in"] },
+            Ids(WelcomeTour.StepsFor(true, None, signedIn)));
+        Assert.Equal(Ids(WelcomeTour.Steps(None, signedIn: signedIn)),
+            Ids(WelcomeTour.StepsFor(false, None, signedIn)));
+        // The Desk-only tour has no meters step to sign out of: its desk card never turns into a sign-in.
+        Assert.Equal(WelcomeTour.DeskOnly[0], WelcomeTour.StepsFor(true, None, signedIn)[0][0]);
+    }
+
+    [Theory]
+    [InlineData(TourState.Pending, false, true)]
+    [InlineData(TourState.Pending, true, false)]
+    [InlineData(TourState.Finished, false, false)]
+    [InlineData(TourState.Skipped, false, false)]
+    [InlineData(TourState.NotOffered, false, false)]
+    public void ShowsForJustTheDesk_OnlyPendingOncePerLaunch(TourState state, bool offered, bool expected) =>
+        Assert.Equal(expected, WelcomeTour.ShowsForJustTheDesk(state, offered));
+
+    [Fact]
+    public void ShowsForJustTheDesk_NoStateIsNotOffered() =>
+        Assert.False(WelcomeTour.ShowsForJustTheDesk(null, false));
+
+    [Fact]
     public void CopyIsShortAndPlain()
     {
         var banned = new[] { "seamless", "powerful", "unlock", "leverage", "delightful" };
         Assert.Equal(WelcomeTour.Table.Count, WelcomeTour.Table.Select(c => c.Id).Distinct().Count());
-        foreach (var c in WelcomeTour.Table)
+        foreach (var c in WelcomeTour.Table.Concat(WelcomeTour.DeskOnly))
         {
             var title = c.Card.Title;
             var body = c.Card.Body;

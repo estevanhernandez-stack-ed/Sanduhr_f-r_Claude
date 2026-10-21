@@ -285,7 +285,7 @@ public partial class App : Application
         try
         {
             var signedIn = _vm.ActiveAccount is not null || _vm.IsDemo;
-            var steps = WelcomeTour.Steps(new HashSet<TourFeature>(), signedIn: signedIn);
+            var steps = WelcomeTour.StepsFor(_vm.JustTheDesk, new HashSet<TourFeature>(), signedIn);
             WhatsNewWindow.ShowTour(new WelcomeTourViewModel(steps, _vm), page =>
             {
                 if (page == SettingsPage.Widget)
@@ -728,6 +728,18 @@ public partial class App : Application
         _desk?.Reload();
         vm.RefreshDesk();
         _window?.Hide();
+
+        // No fetch is coming to offer a pending tour, so it opens a moment after the choice instead.
+        if (!WelcomeTour.ShowsForJustTheDesk(_tourState, _tourOfferedThisLaunch))
+            return;
+        _tourOfferedThisLaunch = true;
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            ShowTour();
+        };
+        timer.Start();
     }
 
     private void OnTrayReadingChanged(TrayReading? reading)
