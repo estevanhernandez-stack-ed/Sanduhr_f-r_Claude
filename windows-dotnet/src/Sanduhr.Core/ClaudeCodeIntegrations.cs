@@ -47,6 +47,16 @@ public enum ModUpdateOutcome
     Updated,
 }
 
+/// <summary>What re-pointing one pre-3.5.0 registration did.</summary>
+public enum RepointOutcome
+{
+    /// <summary>No registration of Sanduhr's names the old location (or it is no longer Sanduhr's).</summary>
+    NothingToDo,
+    Repointed,
+    /// <summary>The registration is Sanduhr's and old, and could not be moved; a later run retries.</summary>
+    Failed,
+}
+
 public sealed record ModUpdateResult(bool Ok, string Message, ModUpdateOutcome Outcome, IntegrationFailure Failure = IntegrationFailure.None);
 
 /// <summary>Where Sanduhr's own mod stands in one Claude Code folder, read from its settings.json and Sanduhr's receipt.</summary>
@@ -96,6 +106,7 @@ public sealed class ClaudeCodeIntegrations
 
     private readonly string _profileDir;
     private readonly string _sanduhrDir;
+    private readonly string _externalDir;
     private readonly ConfigCommit _commit;
     private readonly ReceiptStore _receipts;
     private readonly Action<string>? _log;
@@ -107,20 +118,28 @@ public sealed class ClaudeCodeIntegrations
     public string? ModSourceDir { get; set; }
 
     /// <param name="profileDir">The user-profile directory Claude Code folders are discovered under.</param>
-    /// <param name="sanduhrDir"><c>%APPDATA%\Sanduhr</c> in app code.</param>
+    /// <param name="sanduhrDir"><c>%APPDATA%\Sanduhr</c> in app code: backups and receipts live here.</param>
     /// <param name="modSourceDir">The mod's source folder; may be set later.</param>
     /// <param name="log">Operation and exception type only.</param>
-    public ClaudeCodeIntegrations(string profileDir, string sanduhrDir, string? modSourceDir = null, Action<string>? log = null)
+    /// <param name="externalDir"><c>%USERPROFILE%\.sanduhr</c> in app code: the mod's copies (<c>mods\</c>) live here, where Claude Code can read them. Defaults to <paramref name="sanduhrDir"/>.</param>
+    public ClaudeCodeIntegrations(string profileDir, string sanduhrDir, string? modSourceDir = null, Action<string>? log = null, string? externalDir = null)
     {
         _profileDir = profileDir;
         _sanduhrDir = sanduhrDir;
+        _externalDir = externalDir ?? sanduhrDir;
         ModSourceDir = modSourceDir;
         _commit = new ConfigCommit(Path.Combine(sanduhrDir, "backups"));
         _receipts = new ReceiptStore(Path.Combine(sanduhrDir, "integrations", "installs.json"));
         _log = log;
     }
 
-    public string ModsRoot => Path.Combine(_sanduhrDir, "mods");
+    public string ModsRoot => Path.Combine(_externalDir, "mods");
+
+    /// <summary>
+    /// Older mods roots whose entries are still Sanduhr's (the pre-3.5.0 <c>%APPDATA%\Sanduhr\mods</c>). An entry under one
+    /// reads as Sanduhr's, Outdated, and is replaced in place by the next install. Nothing is ever copied there.
+    /// </summary>
+    public IReadOnlyList<string> LegacyModsRoots { get; set; } = [];
     public string ReceiptsPath => _receipts.Path;
 
     // ------------------------------------------------------------------ paths and entries
@@ -142,11 +161,16 @@ public sealed class ClaudeCodeIntegrations
 
     public string ModPathFor(string stamp) => Path.Combine(ModsRoot, stamp, ModName);
 
-    /// <summary>One entry of the plugin folders list that is Sanduhr's mod: <c>&lt;sanduhrDir&gt;\mods\&lt;stamp&gt;\sanduhr-meters</c>.</summary>
-    public bool IsOurModEntry(string entry)
+    /// <summary>One entry of the plugin folders list that is Sanduhr's mod: <c>&lt;externalDir&gt;\mods\&lt;stamp&gt;\sanduhr-meters</c>, or the same shape under a legacy root.</summary>
+    public bool IsOurModEntry(string entry) => UnderRoot(entry, ModsRoot) || LegacyModsRoots.Any(r => UnderRoot(entry, r));
+
+    /// <summary>An entry under a legacy mods root (and so not under the current one).</summary>
+    public bool IsLegacyModEntry(string entry) => !UnderRoot(entry, ModsRoot) && LegacyModsRoots.Any(r => UnderRoot(entry, r));
+
+    private static bool UnderRoot(string entry, string modsRoot)
     {
         var e = entry.Trim().Replace('/', '\\').TrimEnd('\\');
-        var root = ModsRoot.Replace('/', '\\').TrimEnd('\\') + "\\";
+        var root = modsRoot.Replace('/', '\\').TrimEnd('\\') + "\\";
         if (!e.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return false;
         var rest = e[root.Length..].Split('\\');
         return rest.Length == 2 && IsStampName(rest[0]) && string.Equals(rest[1], ModName, StringComparison.OrdinalIgnoreCase);
@@ -339,9 +363,21 @@ public sealed class ClaudeCodeIntegrations
 
     // ------------------------------------------------------------------ hooks: the entries
 
-    /// <summary>The command a glow hook runs: touches <c>%APPDATA%\Sanduhr\&lt;signal&gt;</c> when that folder exists.</summary>
+    /// <summary>The command a glow hook runs: touches <c>%USERPROFILE%\.sanduhr\&lt;signal&gt;</c> when that folder exists.</summary>
     public static string HookCommand(string signal)
+        => "$d = Join-Path $env:USERPROFILE '.sanduhr'; if (Test-Path -LiteralPath $d) { [IO.File]::WriteAllText((Join-Path $d '" + signal + "'), '') }";
+
+    /// <summary>The command pre-3.5.0 builds wrote (touches <c>%APPDATA%\Sanduhr\&lt;signal&gt;</c>). Still recognised as Sanduhr's: Status reads it Outdated, Install replaces it, Remove takes it out.</summary>
+    public static string LegacyHookCommand(string signal)
         => "$d = Join-Path $env:APPDATA 'Sanduhr'; if (Test-Path -LiteralPath $d) { [IO.File]::WriteAllText((Join-Path $d '" + signal + "'), '') }";
+
+    private static bool IsLegacyHookGroup(JsonNode? group)
+    {
+        if (!IsOurHookGroup(group)) return false;
+        var o = (JsonObject)group!;
+        var cmd = Str(((JsonObject)((JsonArray)o["hooks"]!)[0]!)["command"]);
+        return HookEvents.Any(e => string.Equals(cmd, LegacyHookCommand(e.Signal), StringComparison.Ordinal));
+    }
 
     // The per-hook "shell" ("bash" or "powershell") and "async" (true runs the hook in the background)
     // fields and the timeout in seconds are from the Claude Code hooks docs:
@@ -385,7 +421,8 @@ public sealed class ClaudeCodeIntegrations
         if (Str(hook["type"]) != "command" || Str(hook["shell"]) != "powershell" || Str(hook["command"]) is not { } cmd) return false;
         foreach (var (name, signal) in HookEvents)
         {
-            if (!string.Equals(cmd, HookCommand(signal), StringComparison.Ordinal)) continue;
+            if (!string.Equals(cmd, HookCommand(signal), StringComparison.Ordinal)
+                && !string.Equals(cmd, LegacyHookCommand(signal), StringComparison.Ordinal)) continue;
             var matcher = o["matcher"];
             return name == "Notification" ? Str(matcher) == WaitingMatcher : matcher is null;
         }
@@ -417,7 +454,7 @@ public sealed class ClaudeCodeIntegrations
         if (Str(env[PluginDirsKey]) is not { } list) return IntegrationStatus.Unreadable;
         var ours = list.Split(PluginDirsSeparator).Where(IsOurModEntry).Select(p => p.Trim()).ToList();
         if (ours.Count == 0) return IntegrationStatus.NotInstalled;
-        if (ours.Count != 1 || !Directory.Exists(ours[0])) return IntegrationStatus.Outdated;
+        if (ours.Count != 1 || !Directory.Exists(ours[0]) || IsLegacyModEntry(ours[0])) return IntegrationStatus.Outdated;
         var stamp = CurrentModStamp();
         return stamp is null || SamePath(ours[0], ModPathFor(stamp)) ? IntegrationStatus.Installed : IntegrationStatus.Outdated;
     }
@@ -831,6 +868,45 @@ public sealed class ClaudeCodeIntegrations
         });
         message = res.Message;
         return new ModUpdateResult(res.Ok, message, outcome, res.Failure);
+    }
+
+    /// <summary>
+    /// Re-points a pre-3.5.0 registration (meters: a plugin folders entry under a legacy mods root; hooks: a group running the
+    /// <see cref="LegacyHookCommand"/>) at the current location, through the same install engine (backup, receipts). Anything
+    /// that is not a legacy entry of Sanduhr's is <see cref="RepointOutcome.NothingToDo"/>. Never throws.
+    /// </summary>
+    public RepointOutcome RepointLegacy(IntegrationKind kind, string folder)
+    {
+        try
+        {
+            RequireKind(kind);
+            if (kind == IntegrationKind.Meters)
+            {
+                var state = OwnModStateOf(folder);
+                if (!state.Readable || state.Entry is not { } entry || !IsLegacyModEntry(entry)) return RepointOutcome.NothingToDo;
+                if (RefreshModFiles() is null || CurrentModStamp() is not { } stamp) return RepointOutcome.Failed;
+                var res = Run("repoint", () => { InstallEntry(IntegrationKind.Meters, folder, stamp); return ""; });
+                return res.Ok ? RepointOutcome.Repointed : RepointOutcome.Failed;
+            }
+            if (!HasLegacyHookGroup(folder)) return RepointOutcome.NothingToDo;
+            return Install(IntegrationKind.Hooks, folder).Ok ? RepointOutcome.Repointed : RepointOutcome.Failed;
+        }
+        catch (Exception e)
+        {
+            _log?.Invoke($"repoint failed ({e.GetType().Name})");
+            return RepointOutcome.Failed;
+        }
+    }
+
+    private bool HasLegacyHookGroup(string folder)
+    {
+        var data = ReadFile(SettingsFile(folder));
+        if (data is null) return false;
+        JsonObject root;
+        try { root = ParseObject(data); }
+        catch (IntegrationException) { return false; }
+        return root[HooksKey] is JsonObject hooks
+            && HookEvents.Any(e => hooks[e.Name] is JsonArray l && l.Any(IsLegacyHookGroup));
     }
 
     /// <summary>Takes out what the switch wrote, back to the member's old bytes. A member someone changed since is left as it is; the switch's record goes either way.</summary>

@@ -15,12 +15,12 @@ public readonly record struct McpRegisterResult(bool Ok, string? PriorCommand);
 /// Installs / removes the Sanduhr MCP server integration for Claude Code
 /// (WS-E registration slice). Three moving parts, all under user-owned paths:
 ///
-/// 1. <b>Versioned server dirs</b> — <c>%APPDATA%\Sanduhr\mcp\&lt;stamp&gt;\</c>.
+/// 1. <b>Versioned server dirs</b> — <c>%USERPROFILE%\.sanduhr\mcp\&lt;stamp&gt;\</c>.
 ///    Every install copies the server build into a NEW stamped folder. This is
 ///    the update-under-lock answer: parallel Claude Code sessions pin the exe
 ///    they launched, so updating in place would fail — a new folder never
 ///    fights the lock, and stale folders get pruned once unpinned.
-/// 2. <b>One launcher</b> — <c>%APPDATA%\Sanduhr\bin\sanduhr-mcp.cmd</c>, the
+/// 2. <b>One launcher</b> — <c>%USERPROFILE%\.sanduhr\bin\sanduhr-mcp.cmd</c>, the
 ///    single registration string across channels. Rewritten to point at the
 ///    current version dir on every install / health-check (the widget is the
 ///    integration's updater, statusline precedent).
@@ -38,19 +38,22 @@ public sealed class McpIntegrationInstaller
 {
     private readonly string _homeDir;
     private readonly string _sanduhrDir;
+    private readonly string _externalDir;
     private readonly Action<string>? _logBestEffort;
 
     /// <param name="homeDir">User-profile dir the CC homes live under (test-injectable).</param>
-    /// <param name="sanduhrDir">The Sanduhr app-data dir (<c>%APPDATA%\Sanduhr</c> in app code).</param>
-    public McpIntegrationInstaller(string homeDir, string sanduhrDir, Action<string>? logBestEffort = null)
+    /// <param name="sanduhrDir">The Sanduhr app-data dir (<c>%APPDATA%\Sanduhr</c> in app code): backups live here.</param>
+    /// <param name="externalDir"><c>%USERPROFILE%\.sanduhr</c> in app code: the server copies and the launcher live here, where Claude Code can run them. Defaults to <paramref name="sanduhrDir"/>.</param>
+    public McpIntegrationInstaller(string homeDir, string sanduhrDir, Action<string>? logBestEffort = null, string? externalDir = null)
     {
         _homeDir = homeDir;
         _sanduhrDir = sanduhrDir;
+        _externalDir = externalDir ?? sanduhrDir;
         _logBestEffort = logBestEffort;
     }
 
-    public string VersionsDir => Path.Combine(_sanduhrDir, "mcp");
-    public string LauncherPath => Path.Combine(_sanduhrDir, "bin", "sanduhr-mcp.cmd");
+    public string VersionsDir => Path.Combine(_externalDir, "mcp");
+    public string LauncherPath => Path.Combine(_externalDir, "bin", "sanduhr-mcp.cmd");
 
     /// <summary>The .claude.json Claude Code reads for a home: one placement rule,
     /// <see cref="ClaudeCodeHomes.ConfigFile"/>. Any home but <c>.claude</c> keeps it
@@ -281,6 +284,55 @@ public sealed class McpIntegrationInstaller
             _logBestEffort?.Invoke($"mcp register aborted ({e.GetType().Name})");
             return new McpRegisterResult(false, null);
         }
+    }
+
+    /// <summary>Re-points a pre-3.5.0 registration: when <c>mcpServers.sanduhr.command</c> in <paramref name="configPath"/> is exactly
+    /// <paramref name="legacyLauncher"/>, only that string becomes <see cref="LauncherPath"/> (an exact splice; the entry's other
+    /// members and every other byte stay). Anything else is <see cref="RepointOutcome.NothingToDo"/>; a file that cannot be read or
+    /// parsed is <see cref="RepointOutcome.Failed"/> and never overwritten. Never throws.</summary>
+    public RepointOutcome RepointFile(string configPath, string legacyLauncher)
+    {
+        bool bad = false;
+
+        byte[]? Plan(byte[]? original)
+        {
+            bad = false;
+            if (original is null) return null;
+            if (!JsonEdit.IsObject(original))
+            {
+                try { JsonNode.Parse(Utf8Text(original)); } // valid JSON that is not an object is not ours; broken JSON is a failure
+                catch (JsonException) { bad = true; }
+                return null;
+            }
+            var top = JsonEdit.TopObject(original);
+            if (top.Member("mcpServers") is not { } sm || !IsObjectAt(original, sm.ValueStart)) return null;
+            var servers = JsonEdit.Object(original, sm.ValueStart);
+            if (servers.Member("sanduhr") is not { } entry || !IsObjectAt(original, entry.ValueStart)) return null;
+            var entryObject = JsonEdit.Object(original, entry.ValueStart);
+            if (entryObject.Member("command") is null) return null;
+            if (CommandOf(JsonEdit.Text(original, entry)) is not { } cmd || !SamePathText(cmd, legacyLauncher)) return null;
+            var result = JsonEdit.Set(original, entryObject, "command", JsonEdit.Value.Str(LauncherPath)).Bytes;
+            return result.AsSpan().SequenceEqual(original) ? null : result;
+        }
+
+        try
+        {
+            var outcome = Commit.RetryCommit(configPath, Plan, backup: true);
+            if (bad) { _logBestEffort?.Invoke("mcp repoint failed (JsonException)"); return RepointOutcome.Failed; }
+            if (outcome == CommitOutcome.Conflict) { _logBestEffort?.Invoke("mcp repoint gave up (.claude.json kept changing)"); return RepointOutcome.Failed; }
+            return outcome == CommitOutcome.Written ? RepointOutcome.Repointed : RepointOutcome.NothingToDo;
+        }
+        catch (Exception e)
+        {
+            _logBestEffort?.Invoke($"mcp repoint failed ({e.GetType().Name})");
+            return RepointOutcome.Failed;
+        }
+    }
+
+    private static bool SamePathText(string a, string b)
+    {
+        try { return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase); }
+        catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException) { return false; }
     }
 
     /// <summary>Remove <c>mcpServers.sanduhr</c> — only when it points at a
