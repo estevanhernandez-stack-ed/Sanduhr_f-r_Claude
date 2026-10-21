@@ -322,6 +322,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         if (on && InSight("telemetry")) _telemetry.Start(); else _telemetry.Stop();
         _nowPlaying.Want(this, on && Placed("nowPlaying"));
         bool bars = on && !Arranging && _np.Bars && InSight("nowPlaying") && track?.State == NowPlayingState.Playing;
+        _audio.Follow(track?.AppId);
         if (bars) _audio.Start(); else if (_audio.Running) _audio.Stop();
         if (on && Placed("weather") && _weatherSettings.Place is { } place)
             _weather.Start(place, _weatherSettings.UnitOr(RegionInfo.CurrentRegion.IsMetric));

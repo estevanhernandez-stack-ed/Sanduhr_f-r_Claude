@@ -1,9 +1,10 @@
 namespace Sanduhr.Core;
 
 /// <summary>
-/// State for the Desk audio visualizer (spec 6.6): a short history of system output peak levels,
-/// newest at the right, with fast attack and slow decay. It only ever sees peak values (0 to 1)
-/// from the render endpoint's meter; no audio is captured. New for Windows; the Mac has no visualizer.
+/// State for the Desk audio visualizer (spec 6.6): a short history of peak levels, newest at the right,
+/// with fast attack and slow decay. It only ever sees peak values (0 to 1) from the playing app's audio
+/// session meter (<see cref="AudioSessionMatch"/> picks the session; System Sounds never reach it); no
+/// audio is captured. New for Windows; the Mac has no visualizer.
 /// </summary>
 public sealed class AudioBars
 {
