@@ -317,4 +317,30 @@ public class DeskArrangementTests
         Assert.Equal(DeskRow.Middle, DeskAnchors.Row(DeskAnchor.MR));
         Assert.Equal(DeskRow.Bottom, DeskAnchors.Row(DeskAnchor.BL));
     }
+
+    // Auto-place (the Launcher's first button)
+
+    [Theory]
+    [InlineData("", DeskAnchor.BL)]                                    // nothing placed: bottom left
+    [InlineData("clock:bl claude:bl", DeskAnchor.BR)]                  // the standard layout fills bottom left
+    [InlineData("clock:bl message:br", DeskAnchor.TL)]
+    [InlineData("clock:bl message:br weather:tl", DeskAnchor.TR)]
+    [InlineData("clock:bc claude:ml", DeskAnchor.BL)]                  // only corners count
+    [InlineData("clock:br", DeskAnchor.BL)]
+    [InlineData("clock:bl glow:br message:tl telemetry:tr", DeskAnchor.BL)]   // every corner taken: bottom left, stacked
+    public void TheFirstFreeCornerIsBottomLeftBottomRightTopLeftTopRight(string layout, DeskAnchor expected) =>
+        Assert.Equal(expected, new DeskArrangement(layout).FirstFreeAnchor());
+
+    [Fact]
+    public void AutoPlacingTheLauncherSeatsItAmongItsNeighbors()
+    {
+        var a = new DeskArrangement("clock:bl claude:bl");
+        a.Place("launcher", a.FirstFreeAnchor());
+        Assert.Equal(DeskAnchor.BR, a.Placement("launcher")!.Anchor);
+        Assert.Equal("clock:bl claude:bl launcher:br", a.Layout);
+
+        var full = new DeskArrangement("message:tl clock:bl telemetry:tr claude:br");
+        full.Place("launcher", full.FirstFreeAnchor());
+        Assert.Equal(["clock", "launcher"], full.Stack(DeskAnchor.BL).Select(p => p.Widget));
+    }
 }

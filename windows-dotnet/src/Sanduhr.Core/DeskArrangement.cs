@@ -243,6 +243,16 @@ public sealed class DeskArrangement
         else _pieces.Insert(Math.Min(from, _pieces.Count), piece);
     }
 
+    /// <summary>The anchors a newly added piece (the Launcher's first button) is offered, in order: the four corners, bottom left first.</summary>
+    public static readonly IReadOnlyList<DeskAnchor> AutoPlaceOrder = [DeskAnchor.BL, DeskAnchor.BR, DeskAnchor.TL, DeskAnchor.TR];
+
+    /// <summary>
+    /// Where to put a piece that has no place yet: the first of <see cref="AutoPlaceOrder"/> (bottom left, bottom right,
+    /// top left, top right) with no piece in it, else bottom left, to stack with what is there.
+    /// </summary>
+    public DeskAnchor FirstFreeAnchor() =>
+        AutoPlaceOrder.Cast<DeskAnchor?>().FirstOrDefault(a => !_pieces.Any(p => p.Anchor == a)) ?? DeskAnchor.BL;
+
     /// <summary>Takes <paramref name="widget"/> off the Desk, its size and all; the rest keep theirs.</summary>
     public void Hide(string widget) => Place(widget, null);
 

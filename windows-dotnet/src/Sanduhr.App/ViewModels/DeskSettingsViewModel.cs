@@ -106,7 +106,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             new DeskPieceRow(this, "launcher", SettingsNames.DeskLauncher),
             new DeskPieceRow(this, "glow", SettingsNames.DeskGlow),
         ];
-        Launcher = new LauncherSettingsViewModel(store, new Paths(), () => Pieces.FirstOrDefault(p => p.Widget == "launcher")?.IsPlaced == true)
+        Launcher = new LauncherSettingsViewModel(store, new Paths(), () => Pieces.FirstOrDefault(p => p.Widget == "launcher")?.IsPlaced == true, PlaceLauncherIfHidden)
         {
             Changed = () => Changed?.Invoke(),
         };
@@ -314,6 +314,19 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         foreach (var row in Pieces) row.Load(a.Placement(row.Widget));
         _loading = false;
         Launcher?.PlacementChanged();
+    }
+
+    /// <summary>
+    /// The Launcher's first button was added while the piece has no place: puts it at the first free corner
+    /// (<see cref="DeskArrangement.FirstFreeAnchor"/>) and returns that corner's name in lower case ("bottom left"),
+    /// or null when the piece already has a place.
+    /// </summary>
+    internal string? PlaceLauncherIfHidden()
+    {
+        if (Pieces.FirstOrDefault(p => p.Widget == "launcher")?.IsPlaced == true) return null;
+        var anchor = new DeskArrangement(_saved.Layout).FirstFreeAnchor();
+        Edit(a => a.Place("launcher", anchor));
+        return DeskAnchors.Name(anchor).ToLowerInvariant();
     }
 
     /// <summary>Change the layout through <see cref="DeskArrangement"/> and save.</summary>

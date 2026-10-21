@@ -128,13 +128,16 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
     private readonly SettingsStore _store;
     private readonly Paths _paths;
     private readonly Func<bool> _isPlaced;
+    private readonly Func<string?>? _autoPlace;
+    private string _autoNote = "";
     private LauncherAppCache? _apps;
     private LauncherModel _model;
     private Window? _owner;
     private bool _loading;
 
-    public LauncherSettingsViewModel(SettingsStore store, Paths paths, Func<bool> isPlaced)
+    public LauncherSettingsViewModel(SettingsStore store, Paths paths, Func<bool> isPlaced, Func<string?>? autoPlace = null)
     {
+        _autoPlace = autoPlace;
         _store = store;
         _paths = paths;
         _isPlaced = isPlaced;
@@ -159,14 +162,20 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
     public string CountText => $"{Rows.Count} of {LauncherModel.MaxButtons} buttons";
 
     /// <summary>Shown when there are buttons but the piece has no place on the Desk.</summary>
-    public string PlacementNote => HasButtons && !_isPlaced()
-        ? "The Launcher is hidden. Pick a place for it under Where each piece sits."
-        : "";
+    public string PlacementNote => !HasButtons ? ""
+        : !_isPlaced() ? "The Launcher is hidden. Pick a place for it under Where each piece sits."
+        : _autoNote;
 
     public bool HasPlacementNote => PlacementNote.Length > 0;
 
-    /// <summary>Tells the page the piece's place changed (the note under the list follows).</summary>
+    /// <summary>Tells the page the piece's place changed (the note under the list follows). A place chosen by hand ends the "Placed at" note.</summary>
     public void PlacementChanged()
+    {
+        _autoNote = "";
+        RaiseNote();
+    }
+
+    private void RaiseNote()
     {
         OnPropertyChanged(nameof(PlacementNote));
         OnPropertyChanged(nameof(HasPlacementNote));
@@ -234,7 +243,7 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(CanAdd));
         OnPropertyChanged(nameof(CountText));
         OnPropertyChanged(nameof(SelectedOrientation));
-        PlacementChanged();
+        RaiseNote();
         AddAppCommand.NotifyCanExecuteChanged();
         AddLinkCommand.NotifyCanExecuteChanged();
     }
@@ -277,7 +286,7 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
         else
         {
             OnPropertyChanged(nameof(CountText));
-            PlacementChanged();
+            RaiseNote();
         }
         Changed?.Invoke();
     }
@@ -342,8 +351,14 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
         if (button.Kind == LauncherKind.App && !(Apps.Known && !Apps.IsMissing(button.Target))) { Problem = refusal; return; }
         var next = _model.Add(button);
         if (ReferenceEquals(next, _model)) { Problem = $"The Launcher holds {LauncherModel.MaxButtons} buttons at most."; return; }
+        var first = _model.Buttons.Count == 0;
         Commit(next, rebuild: true);
         Select(Rows.Count - 1);
+        if (first && !_isPlaced() && _autoPlace?.Invoke() is { } where)
+        {
+            _autoNote = $"Placed at {where}. Move it under Where each piece sits.";
+            RaiseNote();
+        }
     }
 
     [RelayCommand]

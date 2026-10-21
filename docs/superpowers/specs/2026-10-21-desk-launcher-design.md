@@ -70,7 +70,9 @@ can later propose a Launcher (sub-project A) without being able to run anything 
 - `settings.json` key `desk_launcher`: `{ "orientation": "row" | "column", "buttons": [ { "kind":
   "app" | "link", "target": "<AUMID or https URL>", "image": null | "<file name in launcher\\>",
   "label": null | "<text>", "glow": null | "#rrggbb" } ] }`. Absent key: no buttons; the piece is
-  not placed by default.
+  not placed by default; adding the first button while it is unplaced places it at the first free
+  corner among bottom left, bottom right, top left, top right (else bottom left, stacked), and
+  Settings says so ("Placed at bottom left. Move it under Where each piece sits.").
 - Images live in `%APPDATA%\Sanduhr\launcher\` (package storage on the Store build), named by a
   hash; removed when their button is removed and by Reset ("Settings" part).
 

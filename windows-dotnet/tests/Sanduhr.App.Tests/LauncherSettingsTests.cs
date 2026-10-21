@@ -99,7 +99,7 @@ public sealed class LauncherSettingsTests : IDisposable
     }
 
 
-    // ---- membership ----
+    // ---- membership and auto-place on the first button ----
 
     private sealed class FakeCatalog(params LauncherAppInfo[] apps) : Sanduhr.App.Interop.ILauncherAppCatalog
     {
@@ -157,6 +157,49 @@ public sealed class LauncherSettingsTests : IDisposable
             vm.Add(LauncherButton.Create(LauncherKind.Link, "https://example.com")!, "refused");
             Assert.Single(_store.LoadLauncher().Buttons);
         });
+    }
+
+    [Fact]
+    public void TheFirstButtonPlacesAHiddenLauncherAndSaysWhere()
+    {
+        WithListing([new LauncherAppInfo("A", "A")], () =>
+        {
+            int placedCalls = 0;
+            bool placed = false;
+            var vm = new LauncherSettingsViewModel(_store, _paths, () => placed, () => { placedCalls++; placed = true; return "bottom right"; });
+            vm.Add(App("A"), "refused");
+            Assert.Equal(1, placedCalls);
+            Assert.True(vm.HasPlacementNote);
+            Assert.Equal("Placed at bottom right. Move it under Where each piece sits.", vm.PlacementNote);
+
+            vm.Add(LauncherButton.Create(LauncherKind.Link, "https://example.com")!, "refused");   // the second button places nothing
+            Assert.Equal(1, placedCalls);
+
+            vm.PlacementChanged();                                       // the person moved it by hand: the note goes
+            Assert.False(vm.HasPlacementNote);
+        });
+    }
+
+    [Fact]
+    public void AnAlreadyPlacedLauncherIsLeftWhereItIs()
+    {
+        WithListing([new LauncherAppInfo("A", "A")], () =>
+        {
+            int placedCalls = 0;
+            var vm = new LauncherSettingsViewModel(_store, _paths, () => true, () => { placedCalls++; return "bottom left"; });
+            vm.Add(App("A"), "refused");
+            Assert.Equal(0, placedCalls);
+            Assert.False(vm.HasPlacementNote);
+        });
+    }
+
+    [Fact]
+    public void TheDeskSettingsPicksTheFirstFreeCornerAndSavesIt()
+    {
+        var desk = new DeskSettingsViewModel(_store, []);
+        Assert.Equal("bottom right", desk.PlaceLauncherIfHidden());   // the standard layout fills bottom left
+        Assert.Equal(DeskAnchor.BR, new DeskArrangement(_store.LoadDesk().Layout).Placement("launcher")!.Anchor);
+        Assert.Null(desk.PlaceLauncherIfHidden());                    // already placed: nothing moves
     }
 
     // ---- the rows ----
