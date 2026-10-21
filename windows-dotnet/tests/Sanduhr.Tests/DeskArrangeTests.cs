@@ -353,7 +353,7 @@ public class DeskArrangeTests
         a.Hide("clock");
         Assert.Null(a.Placement("clock"));
         Assert.Equal("message:tl claude:bl", a.Layout);
-        Assert.Equal(["clock", "meters", "nowPlaying", "telemetry", "weather", "watchers", "meetings", "glow"], a.Hidden());
+        Assert.Equal(["clock", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "meetings", "glow"], a.Hidden());
         // Limited to what the Desk draws: no meetings.
         Assert.Equal(["clock", "meters"], a.Hidden(["clock", "claude", "meters"]));
     }
@@ -422,7 +422,7 @@ public class DeskArrangeTests
         Assert.Equal("Show a piece first, or Cancel.", DeskArrangeCopy.NothingPlaced);
     }
 
-    private static readonly string[] DeskView_Drawn = ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "glow"];
+    private static readonly string[] DeskView_Drawn = ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "glow"];
 
     [Fact]
     public void HidingThenShowingAPieceIsNotAChangeWhenItWasAtItsStandardAnchor()

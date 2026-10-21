@@ -90,7 +90,7 @@ public sealed class DeskArrangement
     /// <summary>The widget words this build knows, in Settings order (also the order a newly placed piece takes among its neighbors):
     /// the Mac's list with Windows' telemetry and weather (S6, after Este's Knighthawk skins) before watchers.</summary>
     public static readonly IReadOnlyList<string> Known =
-        ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "meetings", "glow"];
+        ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "meetings", "glow"];
 
     /// <summary>The widgets Stage 5 draws.</summary>
     public static readonly IReadOnlyList<string> DrawnInS5 = ["clock", "claude", "meters"];

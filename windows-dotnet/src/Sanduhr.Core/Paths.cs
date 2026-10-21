@@ -137,6 +137,10 @@ public sealed class Paths
     /// Not auto-created here — the theme loader creates it on scan.</summary>
     public string ThemesDir => Path.Combine(AppDataDir, "themes");
 
+    /// <summary>The Desk Launcher's button images: <c>%APPDATA%\Sanduhr\launcher</c> (package storage on the Store
+    /// build), PNGs named by a hash. Not auto-created; the import creates it when the first image arrives.</summary>
+    public string LauncherDir => Path.Combine(AppDataDir, "launcher");
+
     /// <summary>Generated-chime cache folder: <c>%APPDATA%\Sanduhr\sounds</c>.
     /// Parity with <c>sounds._sounds_dir</c>. Not auto-created here — the player
     /// creates it lazily on first play.</summary>

@@ -186,6 +186,8 @@ public static partial class ResetPlan
         AddFile(settings, Path.Combine(app, "messages.txt"));
         AddFile(settings, Path.Combine(app, "messages.txt.previous"));
         AddFile(settings, paths.SettingsFile);
+        // The Launcher's button images (spec, Desk Launcher) are chosen settings, kept and removed with them.
+        AddDir(settings, paths.LauncherDir);
         // A stale projection must not outlive the consent it copies; the watchers switch is a copy of one too.
         AddFile(settings, Path.Combine(ext, McpSettingsName));
         AddFile(settings, Path.Combine(ext, WatcherRequest.SwitchFile));

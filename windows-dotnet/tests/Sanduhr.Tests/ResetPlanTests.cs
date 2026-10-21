@@ -81,6 +81,7 @@ public class ResetPlanTests : IDisposable
             "webview2-0a1b2c3d\\Default\\Cookies", "webview2-fetch\\x", "webview2\\guid\\x",
             "backups\\keep-me.json", "backups\\sub\\also.json",
             "messages.txt", "messages.txt.previous", "desk-messages-request.json", "watch-request-1-2-w1.json",
+            "launcher\\" + new string('a', 64) + ".png",
         ];
         // The AppData tree above is what a pre-3.5.0 build left; the same names exist in ~\.sanduhr now.
         string ext = paths.ExternalDirPath;
@@ -128,7 +129,7 @@ public class ResetPlanTests : IDisposable
             Assert.Contains(expected, hist);
 
         Assert.Equal(["themes"], inv[ResetPart.Themes].Select(Rel));
-        Assert.Equal(["messages.txt", "messages.txt.previous", "settings.json", "~\\mcp-settings.json", "~\\watchers.json"],
+        Assert.Equal(["messages.txt", "messages.txt.previous", "settings.json", "launcher", "~\\mcp-settings.json", "~\\watchers.json"],
             inv[ResetPart.Settings].Select(Rel));
 
         string backups = Path.Combine(app, "backups");

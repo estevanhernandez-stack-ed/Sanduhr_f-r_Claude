@@ -1,7 +1,7 @@
 namespace Sanduhr.Core;
 
 /// <summary>The Desk pieces that take clicks.</summary>
-public enum DeskElementKind { NowPlaying, WeatherCredit, Clock, Message, ClaudeLine }
+public enum DeskElementKind { NowPlaying, WeatherCredit, Clock, Message, ClaudeLine, LauncherButton }
 
 /// <summary>
 /// One interactive piece of the Desk as the clicks see it: its kind, a key (never a title or a
@@ -22,13 +22,15 @@ public static class DeskHitTest
 {
     /// <summary>First match wins, in this order. The Claude line comes last: the account name sits inside it.</summary>
     public static readonly IReadOnlyList<DeskElementKind> Priority =
-        [DeskElementKind.NowPlaying, DeskElementKind.WeatherCredit, DeskElementKind.Clock, DeskElementKind.Message, DeskElementKind.ClaudeLine];
+        [DeskElementKind.LauncherButton, DeskElementKind.NowPlaying, DeskElementKind.WeatherCredit, DeskElementKind.Clock, DeskElementKind.Message, DeskElementKind.ClaudeLine];
 
     /// <summary>How far past its frame each kind still takes the click (horizontal, vertical): a little slack, so the gaps between letters and the line above or below still count.</summary>
     public static (double W, double H) Slack(DeskElementKind kind) => kind switch
     {
         DeskElementKind.NowPlaying or DeskElementKind.Clock or DeskElementKind.Message => (8, 4),
         DeskElementKind.ClaudeLine => (8, 2),
+        // A Launcher button takes exactly its frame: the gaps between buttons pass clicks to the desktop.
+        DeskElementKind.LauncherButton => (0, 0),
         _ => (4, 2),
     };
 
@@ -54,9 +56,9 @@ public static class DeskHitTest
         return null;
     }
 
-    /// <summary>True when a right click on the element opens a Desk menu: the clock, the message and the Claude line.</summary>
+    /// <summary>True when a right click on the element opens a Desk menu: the clock, the message, the Claude line and a Launcher button.</summary>
     public static bool HasMenu(DeskElement? element) =>
-        element?.Kind is DeskElementKind.Clock or DeskElementKind.Message or DeskElementKind.ClaudeLine;
+        element?.Kind is DeskElementKind.Clock or DeskElementKind.Message or DeskElementKind.ClaudeLine or DeskElementKind.LauncherButton;
 }
 
 /// <summary>What the Desk draws that can take clicks, with the frames the view reported.</summary>
@@ -71,6 +73,7 @@ public static class DeskHitTest
 /// <param name="MessageFrame">Its frame.</param>
 /// <param name="ClaudeLineDrawn">The Claude line draws something.</param>
 /// <param name="ClaudeLineFrame">Its frame.</param>
+/// <param name="LauncherFrames">The frames of the Launcher's drawn buttons, in button order (null or empty: none drawn).</param>
 public sealed record DeskElementsInput(
     IReadOnlySet<string> Placed,
     bool NowPlayingDrawn = false,
@@ -82,7 +85,8 @@ public sealed record DeskElementsInput(
     bool MessageDrawn = false,
     DeskRect MessageFrame = default,
     bool ClaudeLineDrawn = false,
-    DeskRect ClaudeLineFrame = default);
+    DeskRect ClaudeLineFrame = default,
+    IReadOnlyList<DeskRect>? LauncherFrames = null);
 
 /// <summary>
 /// What the Desk draws, worked out from the same settings it reads, so a piece that is drawn but
@@ -91,13 +95,17 @@ public sealed record DeskElementsInput(
 public static class DeskElements
 {
     /// <summary>
-    /// Every element the Desk draws. Now playing and the weather credit always, when drawn. The clock,
+    /// Every element the Desk draws. The Launcher's buttons, now playing and the weather credit always, when drawn
+    /// (a button is keyed by its index in the Launcher, as text). The clock,
     /// the message and the Claude line only while <see cref="DeskElementsInput.PiecesTakeClicks"/> and
     /// placed (the message and the line also drawn).
     /// </summary>
     public static IReadOnlyList<DeskElement> Build(DeskElementsInput input)
     {
         var list = new List<DeskElement>();
+        if (input.LauncherFrames is { } buttons)
+            for (int i = 0; i < buttons.Count; i++)
+                list.Add(new DeskElement(DeskElementKind.LauncherButton, i.ToString(System.Globalization.CultureInfo.InvariantCulture), buttons[i]));
         if (input.NowPlayingDrawn)
             list.Add(new DeskElement(DeskElementKind.NowPlaying, null, input.NowPlayingFrame));
         if (input.WeatherCreditDrawn)

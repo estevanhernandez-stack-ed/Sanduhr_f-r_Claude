@@ -38,6 +38,7 @@ public class SettingsKeysContractTests
         "desk_enabled",
         "desk_font",
         "desk_ink",
+        "desk_launcher",
         "desk_layout",
         "desk_margins",
         "desk_message",

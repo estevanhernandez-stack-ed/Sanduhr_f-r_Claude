@@ -135,6 +135,8 @@ public static class SettingsNames
     public const string DeskGlow = "Claude Code glow";
     /// <summary>Desk, Where each piece sits: the watchers (spec 6.9), live cards for work an agent is watching.</summary>
     public const string DeskWatchers = "Watchers";
+    /// <summary>Desk, Where each piece sits: the Launcher, buttons that open apps and links from the desktop.</summary>
+    public const string DeskLauncher = "Launcher";
     /// <summary>Desk: lets agents put watchers up through the MCP server (settings.json "watchers_agents", off by default).</summary>
     public const string WatchersSwitch = "Let agents show watchers";
     /// <summary>Desk: starts Arrange mode on the desktop (spec 7.3).</summary>
@@ -155,6 +157,7 @@ public static class SettingsNames
         "weather" => DeskWeather,
         "glow" => DeskGlow,
         "watchers" => DeskWatchers,
+        "launcher" => DeskLauncher,
         _ => widget,
     };
     /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7).</summary>

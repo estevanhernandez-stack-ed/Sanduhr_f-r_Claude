@@ -759,6 +759,19 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>The Desk Launcher (spec, Desk Launcher): <c>desk_launcher</c> {orientation, buttons[]}. Absent, or
+    /// an object with nothing usable in it, reads as no buttons in a row.</summary>
+    public LauncherModel LoadLauncher() => LauncherModel.Parse(Read()["desk_launcher"]);
+
+    public void SaveLauncher(LauncherModel launcher)
+    {
+        var root = Read();
+        // No buttons in a row is the same as absent: the key goes away rather than hold an empty shell.
+        if (launcher.IsEmpty && launcher.Orientation == LauncherOrientation.Row) root.Remove("desk_launcher");
+        else root["desk_launcher"] = launcher.ToJson();
+        Write(root);
+    }
+
     /// <summary>"Plate behind the text": <c>desk_plate</c>, absent = off (<see cref="DeskPlate"/>).</summary>
     public bool LoadDeskPlate() => DeskPlate.Read(Read());
 

@@ -15,10 +15,10 @@ public class DeskHitTestTests
     private static readonly IReadOnlyList<DeskElement> All = [Playing, Credit, Clock, Line, Message];
 
     [Fact]
-    public void PriorityIsNowPlayingCreditClockMessageLine()
+    public void PriorityIsLauncherNowPlayingCreditClockMessageLine()
     {
         Assert.Equal(
-            [DeskElementKind.NowPlaying, DeskElementKind.WeatherCredit, DeskElementKind.Clock, DeskElementKind.Message, DeskElementKind.ClaudeLine],
+            [DeskElementKind.LauncherButton, DeskElementKind.NowPlaying, DeskElementKind.WeatherCredit, DeskElementKind.Clock, DeskElementKind.Message, DeskElementKind.ClaudeLine],
             DeskHitTest.Priority);
     }
 
