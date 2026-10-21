@@ -42,12 +42,14 @@ struct ProgressBarView: View {
                 // Breathing glass — subliminal accent-tinted pulse over the
                 // fill only, scoped inside the clipShape so empty tracks
                 // (utilization=0) stay pure. Period driven by the theme so
-                // Matrix pulses faster than the other themes.
+                // Matrix pulses faster than the other themes. A Core Animation
+                // layer breathes on the render server (BreathLayerView); a
+                // timeline view here cost most of the app's idle CPU.
                 if utilization > 0 {
-                    TimelineView(.animation(minimumInterval: 0.066)) { context in
-                        breathOverlay(width: fillWidth, at: context.date)
-                    }
-                    .allowsHitTesting(false)
+                    BreathLayerView(color: NSColor(palette.accent),
+                                    pulse: BreathPulse(periodMs: palette.breathPeriodMs, amplitude: breathAmp))
+                        .frame(width: fillWidth)
+                        .allowsHitTesting(false)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
@@ -106,17 +108,5 @@ struct ProgressBarView: View {
     /// The Desk ink run left to right, as Desk's meters draw it.
     private func inkRun(_ ink: Theme.Palette.Ink) -> LinearGradient {
         LinearGradient(colors: ink.stops, startPoint: .leading, endPoint: .trailing)
-    }
-
-    /// One frame of the breathing-glass shimmer. Alpha oscillates via
-    /// `amp + amp*sin(phase)`, so it never exceeds the rest state's
-    /// brightness by more than 2×amp.
-    @ViewBuilder
-    private func breathOverlay(width w: CGFloat, at date: Date) -> some View {
-        let periodMs = Double(palette.breathPeriodMs)
-        let ms = date.timeIntervalSinceReferenceDate * 1000
-        let phase = ms.truncatingRemainder(dividingBy: periodMs) / periodMs * 2.0 * .pi
-        let alpha = breathAmp + breathAmp * sin(phase)
-        palette.accent.opacity(alpha).frame(width: w)
     }
 }
