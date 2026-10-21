@@ -71,6 +71,7 @@ internal partial class IntegrationConsentDialog : Window
     private ConsentChoice Choice()
     {
         var segments = new List<string>();
+        if (AccountBox.IsChecked == true) segments.Add("account");
         if (SessionBox.IsChecked == true) segments.Add("session");
         if (WeeklyBox.IsChecked == true) segments.Add("weekly");
         if (ResetsBox.IsChecked == true) segments.Add("resets");

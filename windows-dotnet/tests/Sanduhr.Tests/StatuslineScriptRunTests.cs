@@ -124,6 +124,7 @@ public class StatuslineScriptRunTests : IDisposable
         psi.Environment["APPDATA"] = _appData;
         psi.Environment["USERPROFILE"] = _profile;
         psi.Environment.Remove("CLAUDE_CONFIG_DIR");
+        psi.Environment.Remove("SANDUHR_LABEL");
         psi.Environment.Remove("SANDUHR_CHAIN_DEPTH");
         // Windows PowerShell takes 1 to 2 s to start, which is the whole of their command's 2 s budget on a
         // slow machine: the run tests give it room, and the timeout test puts the default back.
@@ -198,6 +199,89 @@ public class StatuslineScriptRunTests : IDisposable
     {
         WriteSanduhr("snapshot.json", Snapshot(42, 17, status: "error").Replace("\"status\":\"error\"", "\"status\":\"error\",\"error_kind\":\"session_expired\""));
         Assert.StartsWith("sanduhr: reauth needed | last 5h 42% | wk 17%", RunScript([]).Text);
+    }
+
+    // -- the folder's label ---------------------------------------------------
+
+    private static Dictionary<string, string?> Config(string folder) => new() { ["CLAUDE_CONFIG_DIR"] = folder };
+
+    [PowerShellFact]
+    public void The_line_leads_with_the_config_folders_name_after_the_dot_claude_dash()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        var folder = Path.Combine(_profile, ".claude-personal");
+        Assert.StartsWith("personal | 5h 42% | wk 17% | wk resets ", RunScript([], env: Config(folder)).Text);
+        // Trailing separators, any case of the prefix, and a bare dot-name all read the same way.
+        Assert.StartsWith("personal | 5h 42% |", RunScript([], env: Config(folder + "\\")).Text);
+        Assert.StartsWith("Work | 5h 42% |", RunScript([], env: Config(Path.Combine(_profile, ".CLAUDE-Work"))).Text);
+        Assert.StartsWith("work | 5h 42% |", RunScript([], env: Config(Path.Combine(_profile, ".work"))).Text);
+        Assert.StartsWith("seat-a | 5h 42% |", RunScript([], env: Config(Path.Combine(_root.Path, "seat-a"))).Text);
+    }
+
+    [PowerShellFact]
+    public void Plain_dot_claude_an_unset_dir_and_a_dash_with_nothing_after_it_show_no_label()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        Assert.StartsWith("5h 42% | wk 17% | wk resets ", RunScript([], env: Config(Path.Combine(_profile, ".claude"))).Text);
+        Assert.StartsWith("5h 42% | wk 17% | wk resets ", RunScript([], env: Config(Path.Combine(_profile, ".claude") + "\\")).Text);
+        Assert.StartsWith("5h 42% | wk 17% | wk resets ", RunScript([], env: Config(Path.Combine(_profile, ".claude-"))).Text);
+        Assert.StartsWith("5h 42% | wk 17% | wk resets ", RunScript([], env: Config("   ")).Text);
+        Assert.StartsWith("5h 42% | wk 17% | wk resets ", RunScript([]).Text);
+    }
+
+    [PowerShellFact]
+    public void Sanduhr_label_from_the_environment_wins_and_is_cleaned()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        var folder = Path.Combine(_profile, ".claude-personal");
+        Assert.StartsWith("Work | 5h 42% |", RunScript([], env: new() { ["CLAUDE_CONFIG_DIR"] = folder, ["SANDUHR_LABEL"] = "Work" }).Text);
+        // Trimmed, control characters out, capped at 24 characters.
+        Assert.StartsWith("Side gig | 5h 42% |", RunScript([], env: new() { ["SANDUHR_LABEL"] = "  Side\u0007 g\tig  " }).Text);
+        Assert.StartsWith("abcdefghijklmnopqrstuvwx | 5h 42% |", RunScript([], env: new() { ["SANDUHR_LABEL"] = "abcdefghijklmnopqrstuvwxyz0123" }).Text);
+        // Blank (or nothing but control characters) is not a label: the folder's name is used.
+        Assert.StartsWith("personal | 5h 42% |", RunScript([], env: new() { ["CLAUDE_CONFIG_DIR"] = folder, ["SANDUHR_LABEL"] = "  \u0007 " }).Text);
+    }
+
+    [PowerShellFact]
+    public void A_non_ascii_label_comes_out_as_utf8()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        var run = RunScript([], env: new() { ["SANDUHR_LABEL"] = "Café ✓" });
+        Assert.StartsWith("Café ✓ | 5h 42% | wk 17% | wk resets ", run.Text);
+    }
+
+    [PowerShellFact]
+    public void A_segment_list_picked_before_without_account_renders_exactly_as_before()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        var env = new Dictionary<string, string?> { ["CLAUDE_CONFIG_DIR"] = Path.Combine(_profile, ".claude-personal"), ["SANDUHR_LABEL"] = "Work" };
+        Assert.Equal("5h 42% | wk 17%\n", RunScript(["-Mine", "session,weekly"], env: env).Text);
+        Assert.Equal("wk 17%\n", RunScript(["-Mine", "weekly"], env: env).Text);
+        Assert.StartsWith("5h 42% | wk 17% | wk resets ", RunScript(["-Mine", "session,weekly,resets"], env: env).Text);
+        // Asked for by name, it leads whatever else was picked.
+        Assert.Equal("Work | wk 17%\n", RunScript(["-Mine", "account,weekly"], env: env).Text);
+    }
+
+    [PowerShellFact]
+    public void A_line_with_no_numbers_stays_empty_and_the_label_never_prints_alone()
+    {
+        var env = new Dictionary<string, string?> { ["SANDUHR_LABEL"] = "Work" };
+        // No snapshot at all.
+        Assert.Equal("", RunScript([], env: env).Text);
+        // Only the account segment picked: nothing but the label would print, so nothing does.
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        Assert.Equal("", RunScript(["-Mine", "account"], env: env).Text);
+        // A dead snapshot is the explicit start-the-widget line, unlabeled.
+        WriteSanduhr("snapshot.json", Snapshot(42, 17, capturedSecondsAgo: 1200));
+        Assert.Equal("sanduhr: stale 20m - start widget\n", RunScript([], env: env).Text);
+    }
+
+    [PowerShellFact]
+    public void Rendering_a_label_writes_nothing_to_the_sanduhr_folder()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        RunScript([], env: new() { ["CLAUDE_CONFIG_DIR"] = Path.Combine(_profile, ".claude-personal"), ["SANDUHR_LABEL"] = "Work" });
+        Assert.Equal("snapshot.json", Assert.Single(Directory.GetFileSystemEntries(_sanduhr).Select(p => Path.GetFileName(p))));
     }
 
     // -- seats ----------------------------------------------------------------

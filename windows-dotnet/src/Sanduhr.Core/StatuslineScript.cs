@@ -20,7 +20,7 @@ public static class StatuslineScript
 {
     /// <summary>Bumped when the script body changes; the installer re-writes the
     /// script whenever the installed copy differs from this source.</summary>
-    public const int Version = 4;
+    public const int Version = 5;
 
     /// <summary>PowerShell 5.1-compatible script body. Reads the snapshot per the
     /// reader contract (one-shot read, any parse failure = missing), renders per
@@ -38,7 +38,11 @@ public static class StatuslineScript
 # stale on disk.
 #   -Chain <base64>   the user's own statusline command (UTF-8): run it first, print both
 #   -Join line|same   Sanduhr's line on its own row, or appended to their last row
-#   -Mine a,b,c       Sanduhr's segments: session, weekly, resets (default: all three)
+#   -Mine a,b,c       Sanduhr's segments: account, session, weekly, resets (default: all four)
+# The account segment leads the line with the Claude Code folder's label. It is worked out
+# here, when the line renders, and written nowhere: SANDUHR_LABEL from the session's
+# environment (the folder's own settings.json env block), else the CLAUDE_CONFIG_DIR folder's
+# name (.claude-personal reads personal; plain .claude has none), else no label.
 param(
   [string]$Chain = '',
   [string]$Join = 'line',
@@ -93,13 +97,40 @@ function Get-SnapshotName {
   return $fallback
 }
 
+# ---- the folder's label (computed here, never stored anywhere) ------------------
+# Control characters out, trimmed, at most 24 characters; $null when nothing is left.
+function Clean-Label([string]$text) {
+  if ([string]::IsNullOrEmpty($text)) { return $null }
+  $text = ([regex]::Replace($text, '[\x00-\x1F\x7F-\x9F]', '')).Trim()
+  if ($text.Length -gt 24) {
+    $cut = 24
+    if ([char]::IsHighSurrogate($text[23])) { $cut = 23 }
+    $text = $text.Substring(0, $cut).TrimEnd()
+  }
+  if ($text) { return $text }
+  return $null
+}
+
+function Get-FolderLabel {
+  $own = Clean-Label $env:SANDUHR_LABEL
+  if ($own) { return $own }
+  $config = $env:CLAUDE_CONFIG_DIR
+  if ([string]::IsNullOrWhiteSpace($config)) { return $null }
+  $leaf = @($config.Trim().TrimEnd('\', '/').Split(@('\', '/')))[-1]
+  if ([string]::IsNullOrEmpty($leaf)) { return $null }
+  if ($leaf.StartsWith('.claude-', [System.StringComparison]::OrdinalIgnoreCase)) { return (Clean-Label $leaf.Substring(8)) }
+  if ($leaf -ieq '.claude') { return $null }
+  return (Clean-Label $leaf.TrimStart('.'))
+}
+
 # ---- Sanduhr's own line (null = nothing of Sanduhr's to print) -----------------
 function Get-OurLine {
-  $segments = @('session', 'weekly', 'resets')
+  $segments = @('account', 'session', 'weekly', 'resets')
   if ($Mine) {
-    $picked = @($Mine.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { @('session', 'weekly', 'resets') -contains $_ })
+    $picked = @($Mine.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { @('account', 'session', 'weekly', 'resets') -contains $_ })
     if ($picked.Count -gt 0) { $segments = $picked }
   }
+  $showAccount = $segments -contains 'account'
   $showSession = $segments -contains 'session'
   $showWeekly = $segments -contains 'weekly'
   $showResets = $segments -contains 'resets'
@@ -171,7 +202,11 @@ function Get-OurLine {
     return ('sanduhr: {0}' -f $kind)
   }
 
-  if (-not $line) { return $null }
+  if (-not $line) { return $null }   # no numbers: the label never prints on its own
+  if ($showAccount) {
+    $folderLabel = Get-FolderLabel
+    if ($folderLabel) { $line = $folderLabel + ' | ' + $line }   # the label may be non-ASCII; Emit writes UTF-8
+  }
   if ($age -ge 450) { $line = $line + (' ({0}m ago)' -f [int][Math]::Floor($age / 60)) }
   return $line
 }

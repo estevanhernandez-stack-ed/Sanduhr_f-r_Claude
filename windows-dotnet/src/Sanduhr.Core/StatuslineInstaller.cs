@@ -51,7 +51,7 @@ public sealed class StatuslineInstaller
     public const string JoinSame = "same";
 
     /// <summary>The segments Sanduhr's line prints without <c>-Mine</c>, in the order they print.</summary>
-    public static IReadOnlyList<string> DefaultSegments { get; } = ["session", "weekly", "resets"];
+    public static IReadOnlyList<string> DefaultSegments { get; } = ["account", "session", "weekly", "resets"];
 
     private const string CommandPrefix = "powershell -NoProfile -ExecutionPolicy Bypass -File \"";
 
@@ -132,7 +132,7 @@ public sealed class StatuslineInstaller
     /// <summary>
     /// The command line for a mode. <paramref name="chain"/> is the user's own command (combine): it travels
     /// as base64 of its UTF-8 bytes after <c>-Chain</c>, with <c>-Join line|same</c>. <paramref name="segments"/>
-    /// are reduced to the known names in the fixed order (session, weekly, resets); <c>-Mine</c> is added only
+    /// are reduced to the known names in the fixed order (account, session, weekly, resets); <c>-Mine</c> is added only
     /// when that differs from the default.
     /// </summary>
     public string BuildCommand(string? chain, string join, IReadOnlyList<string> segments)
@@ -317,7 +317,7 @@ public sealed class StatuslineInstaller
     /// own line is still what Remove restores. Needs a <c>sanduhrDir</c>; false (nothing written) without one,
     /// when the file can't be read as a JSON object, or when it kept changing under the write.
     /// </summary>
-    /// <param name="segments">Sanduhr's segments: session, weekly, resets.</param>
+    /// <param name="segments">Sanduhr's segments: account, session, weekly, resets.</param>
     /// <param name="join">"line" (own row) or "same" (appended to their last row); only used by combine.</param>
     public bool Install(string ccHomeName, StatuslineMode mode, IReadOnlyList<string> segments, string join)
     {

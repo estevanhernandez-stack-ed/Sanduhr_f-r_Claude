@@ -12,7 +12,9 @@ public sealed record Seat(string Folder, string AccountRef);
 /// <c>snapshot.json</c> (still the active account's) Sanduhr writes <c>snapshot.&lt;account_ref&gt;.json</c>
 /// (the same schema 1, one per linked account) and <c>seats.json</c>
 /// <c>{"schema_version": 1, "seats": [{"folder", "account_ref"}]}</c>. Neither ever holds a label,
-/// an email or a key. With no link, neither file exists. Every write is a sibling temp file moved
+/// an email or a key (unlike the Mac, whose seats.json carries account names): the statusline's
+/// Account segment works its label out from the session's folder when it renders, and Sanduhr
+/// writes it nowhere. With no link, neither file exists. Every write is a sibling temp file moved
 /// over the target, so a reader never sees half a file.
 /// </summary>
 public static class SeatFiles
