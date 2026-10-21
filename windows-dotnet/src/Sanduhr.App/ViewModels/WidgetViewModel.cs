@@ -474,7 +474,14 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         _settings.SaveStatuslineEnabled(on);
         _statuslineEnabled = on;
-        if (!on)
+        ApplySnapshotWanted();
+    }
+
+    /// <summary>Writes the snapshot from the cached fetch while it is wanted (the statusline, the meters
+    /// mod or the MCP server is on) and deletes it when none is.</summary>
+    private void ApplySnapshotWanted()
+    {
+        if (!SnapshotConsumers.SnapshotWanted(_statuslineEnabled, _mcpEnabled))
             _snapshotWriter?.Delete();
         else if (_lastData is not null)
             WriteSnapshotOk(_lastData);
@@ -506,7 +513,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     // -- WS-E MCP integration facade -------------------------------------------
 
     public bool LoadMcpEnabled() => _settings.LoadMcpEnabled();
-    public void SaveMcpEnabled(bool on) => _settings.SaveMcpEnabled(on);
+    public void SaveMcpEnabled(bool on)
+    {
+        _settings.SaveMcpEnabled(on);
+        _mcpEnabled = on;
+        ApplySnapshotWanted();
+    }
     public string? LoadMcpCcHome() => _settings.LoadMcpCcHome();
     public void SaveMcpCcHome(string ccHomeName) => _settings.SaveMcpCcHome(ccHomeName);
     public IReadOnlyDictionary<string, bool> LoadMcpRoots() => _settings.LoadMcpRoots();
@@ -527,7 +539,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void WriteSnapshotOk(JsonObject data)
     {
         // Demo mode never reaches snapshot.json (the statusline and the MCP read it).
-        if (!_statuslineEnabled || IsDemo || ResetGuard.Done)
+        if (!SnapshotConsumers.SnapshotWanted(_statuslineEnabled, _mcpEnabled) || IsDemo || ResetGuard.Done)
             return;
         try
         {
@@ -545,7 +557,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// statusline can say "reauth needed" instead of going silently stale.</summary>
     private void WriteSnapshotError(string errorKind)
     {
-        if (!_statuslineEnabled || IsDemo || ResetGuard.Done)
+        if (!SnapshotConsumers.SnapshotWanted(_statuslineEnabled, _mcpEnabled) || IsDemo || ResetGuard.Done)
             return;
         try
         {
@@ -584,10 +596,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private bool _ccScanRunning;
 
     /// <summary>WS-E statusline bridge: the one writer of snapshot.json. Gated
-    /// by <see cref="_statuslineEnabled"/> — the file exists only while the
-    /// integration is installed and on.</summary>
+    /// by <see cref="_statuslineEnabled"/> or <see cref="_mcpEnabled"/> — the file exists only while a
+    /// statusline, the meters mod or the MCP server is installed and on.</summary>
     private SnapshotWriter? _snapshotWriter;
     private bool _statuslineEnabled;
+    private bool _mcpEnabled;
 
     /// <summary>The usage-vault service, attached by App AFTER the consent
     /// prompt resolves (never before — attach order IS the consent gate).
@@ -669,6 +682,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
         _snapshotWriter = new SnapshotWriter(_paths.SnapshotFile, LogSnapshotFailure, AppVersion);
         _statuslineEnabled = _settings.LoadStatuslineEnabled();
+        _mcpEnabled = _settings.LoadMcpEnabled();
 
         // Account follow and per-seat meters (spec 4.6). Inactive accounts are read through their own
         // WebView2 profiles, one at a time, and disposed after each read.

@@ -200,7 +200,8 @@ The Claude Code side (`docs/spec.md` Stage 4, `../docs/mods-and-config-spec.md`)
   `ClaudeCodeHomes.cs`); `publish_usage` hands its request over atomically.
 
 `statusline_enabled` now means "the statusline or the meters mod is installed in some folder", so
-`snapshot.json` is written while either is.
+`snapshot.json` is written while either is, or while the MCP server is installed (`mcp_enabled`:
+`get_usage` reads the snapshot, and an MCP-only install has nothing else on the Store build).
 
 ### Since 3.4.3: Mac parity, Stages 5 and 6
 

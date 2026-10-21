@@ -89,6 +89,14 @@ public class SnapshotConsumersTests
         Assert.Empty(SnapshotConsumers.ReadReceipts(Path.Combine(sanduhr.Path, "integrations", "installs.json")).Receipts);
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public void The_snapshot_is_wanted_while_the_statusline_or_the_mcp_is_on(bool statusline, bool mcp, bool wanted)
+        => Assert.Equal(wanted, SnapshotConsumers.SnapshotWanted(statusline, mcp));
+
     [Fact]
     public void A_missing_receipts_file_reads_as_empty_and_known()
     {
