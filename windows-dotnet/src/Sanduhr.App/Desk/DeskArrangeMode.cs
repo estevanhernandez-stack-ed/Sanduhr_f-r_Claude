@@ -35,6 +35,11 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     private readonly DeskFrame _frame;
     private readonly DeskArrangement _working;
     private readonly Canvas _adorn = new() { IsHitTestVisible = false };
+    /// <summary>The Hide buttons: the one part of the outlines that takes clicks and the keyboard.</summary>
+    private readonly Canvas _controls = new();
+    /// <summary>The Hidden strip (primary surface only): the pieces the layout leaves out, each with a Show button.</summary>
+    private readonly Border _strip = new() { Visibility = Visibility.Collapsed };
+    private readonly Dictionary<string, Button> _buttons = [];
     private readonly Dictionary<DeskAnchor, (Ellipse Dot, double X, double Y)> _dots = [];
     private DeskView? _view;
     private IReadOnlyDictionary<string, Rect> _rects = new Dictionary<string, Rect>();
@@ -78,8 +83,16 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         Cursor = Cursors.Arrow;
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Ideal);
         Children.Add(_adorn);
+        Children.Add(_controls);
+        KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Cycle);
         if (primary)
         {
+            _strip.HorizontalAlignment = HorizontalAlignment.Center;
+            _strip.VerticalAlignment = VerticalAlignment.Bottom;
+            // Above the taskbar's room, so it sits inside the work area the scrim covers.
+            var below = (screen.Bounds.Y + screen.Bounds.Height - (screen.Work.Y + screen.Work.Height)) / screen.Scale;
+            _strip.Margin = new Thickness(0, 0, 0, Math.Max(0, below) + 24);
+            Children.Add(_strip);
             Bar = new DeskArrangeBar { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             Bar.DoneRequested += () => EndRequested?.Invoke(DeskArrangeEnd.Done);
             Bar.CancelRequested += () => EndRequested?.Invoke(DeskArrangeEnd.Cancel);
@@ -93,6 +106,24 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
 
     /// <summary>A piece was dropped and the working arrangement changed (or was put back where it was).</summary>
     public event Action? Dropped;
+
+    /// <summary>A Hide or Show button changed the working arrangement; the argument is the key of the control
+    /// that should take the keyboard next (<see cref="HideKey"/> or <see cref="ShowKey"/>).</summary>
+    public event Action<string>? Toggled;
+
+    public static string HideKey(string widget) => "hide:" + widget;
+    public static string ShowKey(string widget) => "show:" + widget;
+
+    /// <summary>The Hide and Show buttons by key (the live check clicks them).</summary>
+    internal IReadOnlyDictionary<string, Button> Buttons => _buttons;
+
+    /// <summary>Puts the keyboard on the control with <paramref name="key"/> when this surface has it.</summary>
+    public bool TryFocus(string key)
+    {
+        if (!_buttons.TryGetValue(key, out var b)) return false;
+        b.UpdateLayout();
+        return b.Focus();
+    }
 
     /// <summary>Done or Cancel was asked for here (the bar, Return or Escape).</summary>
     public event Action<DeskArrangeEnd>? EndRequested;
@@ -132,6 +163,136 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         _view = view;
         Children.Insert(1, view); // above the scrim (child 0), below the outlines and the bar
         BuildAdorners();
+        BuildControls();
+    }
+
+    /// <summary>The pieces the Desk draws that the working layout leaves out, in Settings order.</summary>
+    private IReadOnlyList<string> HiddenPieces => _working.Hidden(DeskView.Drawn);
+
+    private Button ChromeButton(string text, string accessibleName)
+    {
+        var button = new Button
+        {
+            Content = text,
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Padding = new Thickness(7, 2, 7, 2),
+            Cursor = Cursors.Hand,
+            Focusable = true,
+            Template = ChromeTemplate,
+        };
+        Ref(button, Control.ForegroundProperty, "Sanduhr.Brush.Text");
+        Ref(button, Control.BackgroundProperty, "Sanduhr.Brush.Bg");
+        Ref(button, Control.BorderBrushProperty, "Sanduhr.Brush.Border");
+        AutomationProperties.SetName(button, accessibleName);
+        ToolTipService.SetToolTip(button, accessibleName);
+        return button;
+    }
+
+    /// <summary>A rounded chip with the bar's keyboard-focus ring (a 2 px border).</summary>
+    private static readonly ControlTemplate ChromeTemplate = BuildChromeTemplate();
+
+    private static ControlTemplate BuildChromeTemplate()
+    {
+        var border = new FrameworkElementFactory(typeof(Border), "bg");
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(5));
+        border.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+        border.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
+        border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+        border.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
+        var content = new FrameworkElementFactory(typeof(ContentPresenter));
+        content.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        content.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        border.AppendChild(content);
+        var template = new ControlTemplate(typeof(Button)) { VisualTree = border };
+        var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+        hover.Setters.Add(new Setter(UIElement.OpacityProperty, 0.85, "bg"));
+        var focused = new Trigger { Property = UIElement.IsKeyboardFocusedProperty, Value = true };
+        focused.Setters.Add(new Setter(Border.BorderThicknessProperty, new Thickness(2), "bg"));
+        template.Triggers.Add(hover);
+        template.Triggers.Add(focused);
+        template.Seal();
+        return template;
+    }
+
+    /// <summary>
+    /// Each piece's Hide button beside its name tag, and on the primary surface the Hidden strip. A press edits the
+    /// working arrangement only: Done writes it once, Cancel drops it (<see cref="DeskArrangeSession"/>).
+    /// </summary>
+    private void BuildControls()
+    {
+        _controls.Children.Clear();
+        _buttons.Clear();
+        foreach (var (widget, r) in _rects)
+        {
+            var name = SettingsNames.DeskPieceName(widget);
+            var hide = ChromeButton("Hide", DeskArrangeCopy.HideLabel(name));
+            var w = widget;
+            hide.Click += (_, _) => Toggle(w, hide: true);
+            hide.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            // Beside the name tag, which BuildAdorners sat above the outline (or below it when there is no room above).
+            var tag = new TextBlock { Text = name, FontSize = 12, FontWeight = FontWeights.SemiBold };
+            tag.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            double tagWidth = tag.DesiredSize.Width + 14, tagHeight = tag.DesiredSize.Height + 4;
+            double y = r.Y - OutlinePad - tagHeight - 3;
+            if (y < 2) y = r.Bottom + OutlinePad + 3;
+            Canvas.SetLeft(hide, Math.Max(2, r.X - OutlinePad) + tagWidth + 4);
+            Canvas.SetTop(hide, y + (tagHeight - hide.DesiredSize.Height) / 2);
+            _controls.Children.Add(hide);
+            _buttons[HideKey(widget)] = hide;
+        }
+        BuildStrip();
+    }
+
+    private void BuildStrip()
+    {
+        var hidden = Bar is null ? [] : HiddenPieces;
+        if (hidden.Count == 0)
+        {
+            _strip.Visibility = Visibility.Collapsed;
+            _strip.Child = null;
+            return;
+        }
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        var title = new TextBlock
+        {
+            Text = DeskArrangeCopy.HiddenStrip,
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 8, 0),
+        };
+        Ref(title, TextBlock.ForegroundProperty, "Sanduhr.Brush.Text");
+        row.Children.Add(title);
+        foreach (var widget in hidden)
+        {
+            var name = SettingsNames.DeskPieceName(widget);
+            var label = new TextBlock { Text = name, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
+            Ref(label, TextBlock.ForegroundProperty, "Sanduhr.Brush.TextSecondary");
+            var show = ChromeButton("Show", DeskArrangeCopy.ShowLabel(name));
+            var w = widget;
+            show.Click += (_, _) => Toggle(w, hide: false);
+            var item = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 12, 0) };
+            item.Children.Add(label);
+            item.Children.Add(show);
+            row.Children.Add(item);
+            _buttons[ShowKey(widget)] = show;
+        }
+        _strip.Child = row;
+        _strip.CornerRadius = new CornerRadius(8);
+        _strip.BorderThickness = new Thickness(1);
+        _strip.Padding = new Thickness(12, 6, 0, 6);
+        Ref(_strip, Border.BackgroundProperty, "Sanduhr.Brush.Bg");
+        Ref(_strip, Border.BorderBrushProperty, "Sanduhr.Brush.Border");
+        AutomationProperties.SetName(_strip, DeskArrangeCopy.HiddenStrip);
+        _strip.Visibility = Visibility.Visible;
+    }
+
+    private void Toggle(string widget, bool hide)
+    {
+        if (hide) _working.Hide(widget);
+        else _working.Show(widget);
+        Toggled?.Invoke(hide ? ShowKey(widget) : HideKey(widget));
     }
 
     private void Ref(FrameworkElement el, DependencyProperty dp, string key) => el.SetResourceReference(dp, key);
@@ -215,10 +376,11 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
 
     private bool IsInBar(object? source)
     {
-        if (Bar is null || source is not DependencyObject d) return false;
+        if (source is not DependencyObject d) return false;
         while (d is not null)
         {
-            if (ReferenceEquals(d, Bar)) return true;
+            // The bar, the Hide buttons and the Hidden strip take their own clicks: no drag starts there.
+            if (ReferenceEquals(d, Bar) || ReferenceEquals(d, _controls) || ReferenceEquals(d, _strip)) return true;
             d = d is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d);
         }
         return false;
@@ -405,6 +567,7 @@ internal sealed class DeskArrangeMode : IDisposable
             barPlaced |= bar;
             var content = new DeskArrangeContent(screen, settings, fonts, frame, working, bar);
             content.Dropped += OnDropped;
+            content.Toggled += OnToggled;
             content.EndRequested += Request;
             var source = Create(screen, content);
             _surfaces.Add(new Surface(screen, source, content));
@@ -508,6 +671,16 @@ internal sealed class DeskArrangeMode : IDisposable
         _changed();
     }
 
+    /// <summary>A piece was hidden or shown: every surface lays out again, and the keyboard lands on the control that
+    /// undoes the edit (the Show button of a piece just hidden, the Hide button of one just shown).</summary>
+    private void OnToggled(string focusKey)
+    {
+        OnDropped();
+        foreach (var s in _surfaces)
+            if (s.Content.TryFocus(focusKey)) return;
+        Activate(); // the control is gone (nothing is left to undo): never leave the keys nowhere
+    }
+
     private void Request(DeskArrangeEnd how)
     {
         if (_requested || _disposed) return;
@@ -525,6 +698,7 @@ internal sealed class DeskArrangeMode : IDisposable
         foreach (var s in _surfaces)
         {
             s.Content.Dropped -= OnDropped;
+            s.Content.Toggled -= OnToggled;
             s.Content.EndRequested -= Request;
             s.Content.CancelDrag();
             if (!s.Source.IsDisposed) s.Source.RootVisual = null;

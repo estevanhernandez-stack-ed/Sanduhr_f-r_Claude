@@ -344,6 +344,88 @@ public class DeskArrangeTests
         Assert.Null(s.ToWrite);
     }
 
+    // Hide and restore while arranging
+
+    [Fact]
+    public void HideTakesAPieceOffAndTheHiddenListNamesItInSettingsOrder()
+    {
+        var a = new DeskArrangement("message:tl clock:bl:1.2 claude:bl");
+        a.Hide("clock");
+        Assert.Null(a.Placement("clock"));
+        Assert.Equal("message:tl claude:bl", a.Layout);
+        Assert.Equal(["clock", "meters", "nowPlaying", "telemetry", "weather", "watchers", "meetings", "glow"], a.Hidden());
+        // Limited to what the Desk draws: no meetings.
+        Assert.Equal(["clock", "meters"], a.Hidden(["clock", "claude", "meters"]));
+    }
+
+    [Fact]
+    public void ShowSeatsAHiddenPieceAtItsStandardAnchorAtSizeOne()
+    {
+        var a = new DeskArrangement("message:tl clock:bl:1.2 claude:bl");
+        a.Hide("clock");
+        a.Show("clock");
+        Assert.Equal(DeskAnchor.BL, a.Placement("clock")!.Anchor);
+        Assert.Equal(1, a.Placement("clock")!.Scale);
+        a.Hide("message");
+        a.Show("message");
+        Assert.Equal(DeskAnchor.TL, a.Placement("message")!.Anchor);
+        a.Show("weather");
+        Assert.Equal(DeskAnchor.MR, a.Placement("weather")!.Anchor);
+    }
+
+    [Fact]
+    public void ShowLeavesAPlacedPieceAndAnUnknownWordAlone()
+    {
+        var a = new DeskArrangement("clock:tr:1.3 claude:bl");
+        a.Show("clock");
+        a.Show("nope");
+        Assert.Equal("clock:tr:1.3 claude:bl", a.Layout);
+        a.Hide("nope");
+        Assert.Equal("clock:tr:1.3 claude:bl", a.Layout);
+    }
+
+    [Fact]
+    public void DoneKeepsAHiddenPieceHiddenAndWritesOnce()
+    {
+        var s = new DeskArrangeSession(Start);
+        var piece = s.Working.Pieces[0].Widget;
+        s.Working.Hide(piece);
+        Assert.True(s.Changed);
+        Assert.Equal(s.Working.Layout, s.ToWrite);
+        Assert.DoesNotContain(piece + ":", s.ToWrite);
+        Assert.Equal(Start, s.Saved);
+        Assert.Contains(piece, new DeskArrangement(s.ToWrite).Hidden());
+    }
+
+    [Fact]
+    public void CancelBringsHiddenPiecesBackBecauseTheSavedStringIsUntouched()
+    {
+        var s = new DeskArrangeSession(Start);
+        foreach (var p in s.Working.Pieces.Select(p => p.Widget).ToList()) s.Working.Hide(p);
+        Assert.Equal("", s.Working.Layout);
+        Assert.Equal(Start, s.Saved);
+        // The next edit starts from what was saved: everything is back.
+        Assert.Equal(new DeskArrangement(Start).Layout, new DeskArrangeSession(s.Saved).Working.Layout);
+    }
+
+    [Fact]
+    public void HidingThenShowingAPieceIsNotAChangeWhenItWasAtItsStandardAnchor()
+    {
+        var s = new DeskArrangeSession("clock:bl claude:bl");
+        s.Working.Hide("clock");
+        s.Working.Show("clock");
+        Assert.False(s.Changed);
+        Assert.Null(s.ToWrite);
+    }
+
+    [Fact]
+    public void ArrangeCopyNamesTheControlsForAScreenReader()
+    {
+        Assert.Equal("Hidden:", DeskArrangeCopy.HiddenStrip);
+        Assert.Equal("Hide while arranging: Clock", DeskArrangeCopy.HideLabel("Clock"));
+        Assert.Equal("Show Clock", DeskArrangeCopy.ShowLabel("Clock"));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

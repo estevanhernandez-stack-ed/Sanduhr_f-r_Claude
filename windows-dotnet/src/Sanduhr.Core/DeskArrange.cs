@@ -161,6 +161,18 @@ public static class DeskArrangeCopy
     public const string SettingsArranging = "Arranging on the desktop. Finish there with Done or Cancel.";
     public const string SettingsDeskOff = "Turn on the Desk to arrange it on the desktop.";
 
+    /// <summary>The Hidden strip's label.</summary>
+    public const string HiddenStrip = "Hidden:";
+
+    /// <summary>The control on a piece that takes it off the Desk until Done or Cancel.</summary>
+    public const string HideWhileArranging = "Hide while arranging";
+
+    /// <summary>A piece's Hide control, named for a screen reader.</summary>
+    public static string HideLabel(string piece) => $"{HideWhileArranging}: {piece}";
+
+    /// <summary>A hidden piece's Show control, named for a screen reader.</summary>
+    public static string ShowLabel(string piece) => $"Show {piece}";
+
     /// <summary>The tray's entry while arranging.</summary>
     public const string TrayFinish = "Finish arranging";
 }
