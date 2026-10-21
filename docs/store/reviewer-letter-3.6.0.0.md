@@ -4,8 +4,8 @@
 > for certification (~2000-char cap). This field never goes through the Store Listing Console API,
 > so it is confirmed in Partner Center or not at all.
 >
-> Framing: the live version is 3.5.0.0 if its resubmission (keyword "Fable 5" removed, 2026-10-21)
-> certifies; otherwise 3.4.2.0. **Fix the first line to whichever is live before pasting.** 3.6.0
+> Framing: the live version is 3.5.0.0 (its resubmission, with the keyword "Fable 5" removed,
+> certified on 2026-10-21), so the letter's first line stands. 3.6.0
 > adds no capability, no outbound destination and no data leaving the PC. The disclosure surface
 > gains local files only: requests between the MCP server and the widget in
 > `%USERPROFILE%\.sanduhr`. Every new feature is off by default or waits for the user. Model names
@@ -54,7 +54,7 @@ Estevan Hernandez
 
 ## Pre-submission sanity check (v3.6.0.0)
 
-- [ ] First line names the live version (3.5.0.0 or 3.4.2.0)
+- [x] First line names the live version (3.5.0.0, certified 2026-10-21)
 - [ ] Version trio in csproj + `<Identity Version>` = `3.6.0.0`; `Sanduhr.Mcp.csproj` at 3.6.0
 - [ ] `Package.appxmanifest` declares `runFullTrust` only (`PackageManifestTests` green)
 - [ ] What's New cards tagged `3.6.0` show after the update
