@@ -42,6 +42,7 @@ public class SettingsKeysContractTests
         "desk_margins",
         "desk_message",
         "desk_pieces_take_clicks",
+        "desk_plate",
         "desk_sign_in_reminder",
         "desk_time_size",
         "desk_weather",

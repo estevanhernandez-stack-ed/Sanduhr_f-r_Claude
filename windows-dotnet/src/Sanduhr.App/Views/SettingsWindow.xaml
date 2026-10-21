@@ -2378,6 +2378,19 @@
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
+                            <StackPanel views:SettingsAnchor.Id="desk-plate">
+                                <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                          Content="{x:Static core:SettingsNames.DeskPlateSwitch}"
+                                          IsChecked="{Binding Plate, Mode=TwoWay}"
+                                          AutomationProperties.Name="{x:Static core:SettingsNames.DeskPlateSwitch}"
+                                          AutomationProperties.HelpText="{x:Static core:DeskPlate.Caption}" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="{x:Static core:DeskPlate.Caption}" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
                             <StackPanel views:SettingsAnchor.Id="ink">
                                 <TextBlock Text="{x:Static core:SettingsNames.DeskInk}" FontSize="13" FontWeight="SemiBold"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />

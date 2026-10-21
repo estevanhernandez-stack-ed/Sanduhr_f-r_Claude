@@ -74,6 +74,7 @@ public static class SettingsIndex
     public const string DeskInk = "ink";
     public const string DeskArrange = "arrange";
     public const string DeskClicks = "desk-clicks";
+    public const string DeskPlate = "desk-plate";
     // Desk: Message, Now playing, Weather (S6)
     public const string MessageLines = "lines";
     public const string MessageRotation = "rotation";
@@ -181,6 +182,8 @@ public static class SettingsIndex
             ["layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor"]),
         E("Look", SettingsPage.Desk, DeskLook,
             ["font", "EsteFont", "EsteFont Pro", "EsteFont 26", "clock size", "time size", "typeface", "Segoe UI"]),
+        E(SettingsNames.DeskPlateSwitch, SettingsPage.Desk, DeskPlate,
+            ["plate", "backdrop", "background", "contrast", "readable", "desktop icons", "files", "dark plate", "behind the text"]),
         E("Margins", SettingsPage.Desk, DeskMargins,
             ["margin", "edge", "padding", "taskbar", "inset", "spacing"]),
         E("Layout map", SettingsPage.Desk, DeskMap,
@@ -235,6 +238,7 @@ public static class SettingsIndex
         [SettingsNames.DeskInk] = DeskInk,
         [SettingsNames.ArrangeDesk] = DeskArrange,
         [SettingsNames.DeskPieceClicksSwitch] = DeskClicks,
+        [SettingsNames.DeskPlateSwitch] = DeskPlate,
         [SettingsNames.NowPlayingInWidget] = NowPlayingWidget,
         [SettingsNames.WeatherLookUp] = WeatherPlace,
         [SettingsNames.GlowWhere] = GlowWhere,

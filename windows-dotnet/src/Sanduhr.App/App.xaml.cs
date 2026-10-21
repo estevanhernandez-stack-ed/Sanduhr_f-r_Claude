@@ -232,6 +232,9 @@ public partial class App : Application
 
             if (fresh)
                 store.SaveWhatsNewInstalledVersion(current);
+            // The plate behind the Desk's text is on for a fresh install, whose desktop may be full of
+            // files; an existing install has no key and reads off, so its Desk looks as it did.
+            store.SeedDeskPlate(fresh);
             if (decision.Record)
                 store.SaveWhatsNewLastSeen(current);
             if (decision.Show.Count == 0)

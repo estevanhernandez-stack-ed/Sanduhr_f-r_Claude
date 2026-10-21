@@ -134,6 +134,8 @@ public static class SettingsNames
     public const string ArrangeDesk = DeskArrangeCopy.SettingsButton;
     /// <summary>Desk: the clock, message and Claude line take clicks (spec 7.4).</summary>
     public const string DeskPieceClicksSwitch = DeskPieceClicks.Title;
+    /// <summary>Desk, Look: a soft plate behind each piece.</summary>
+    public const string DeskPlateSwitch = DeskPlate.Title;
     /// <summary>The name a Desk piece goes by on the layout map and in Arrange mode; an unknown piece goes by its key.</summary>
     public static string DeskPieceName(string widget) => widget switch
     {
@@ -186,6 +188,7 @@ public static class SettingsNames
         (DeskInk, SettingsPage.Desk),
         (ArrangeDesk, SettingsPage.Desk),
         (DeskPieceClicksSwitch, SettingsPage.Desk),
+        (DeskPlateSwitch, SettingsPage.Desk),
         (SignInReminders, SettingsPage.Alerts),
         (NowPlayingInWidget, SettingsPage.NowPlaying),
         (WeatherLookUp, SettingsPage.Weather),

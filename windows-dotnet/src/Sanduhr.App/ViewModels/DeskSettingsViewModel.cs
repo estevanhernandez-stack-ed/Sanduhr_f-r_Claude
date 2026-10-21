@@ -201,6 +201,19 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         }
     }
 
+    /// <summary>"Plate behind the text" (Desk Look): saved at once, and the Desk follows.</summary>
+    public bool Plate
+    {
+        get => _store.LoadDeskPlate();
+        set
+        {
+            if (value == Plate) return;
+            _store.SaveDeskPlate(value);
+            OnPropertyChanged();
+            Changed?.Invoke();
+        }
+    }
+
     private void LoadInk()
     {
         _loadingInk = true;

@@ -331,7 +331,33 @@ internal sealed class DeskView : Grid, IDisposable
         // piece takes the ink's shadow.
         if (p.Widget is not ("message" or "nowPlaying" or "glow") && _ink.ShadowOpacity > 0)
             piece.Effect = Shadow(_ink);
-        return piece;
+        return _settings.Plate && p.Widget != "glow" ? Plated(piece, align) : piece;
+    }
+
+    /// <summary>
+    /// "Plate behind the text" (<see cref="DeskPlate"/>): the piece over a soft rounded plate that
+    /// reaches past it, black behind light ink and white behind dark ink. The plate sits under the
+    /// ink's own opacity and shadow and takes no hit of its own: the piece keeps its tag and its
+    /// click plate, and the wrapper's frame is the piece's.
+    /// </summary>
+    private FrameworkElement Plated(FrameworkElement piece, HorizontalAlignment align)
+    {
+        var fill = new SolidColorBrush(Color.FromArgb((byte)Math.Round(DeskPlate.Opacity * 255), 0, 0, 0));
+        var c = Rgb(DeskPlate.ColorHex(_ink.DarkInk));
+        fill.Color = Color.FromArgb(fill.Color.A, c.R, c.G, c.B);
+        fill.Freeze();
+        var plate = new Border
+        {
+            Background = fill,
+            CornerRadius = new CornerRadius(DeskPlate.CornerRadius),
+            Margin = new Thickness(-DeskPlate.Reach),
+            Effect = new BlurEffect { Radius = DeskPlate.Blur, KernelType = KernelType.Gaussian },
+            IsHitTestVisible = false,
+        };
+        var wrap = new Grid { HorizontalAlignment = align };
+        wrap.Children.Add(plate);
+        wrap.Children.Add(piece);
+        return wrap;
     }
 
     /// <summary>

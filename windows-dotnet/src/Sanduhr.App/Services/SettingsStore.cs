@@ -736,7 +736,8 @@ public sealed class SettingsStore
                 ReadDouble(m, "left", d.Margins.Left), ReadDouble(m, "right", d.Margins.Right),
                 ReadDouble(m, "top", d.Margins.Top), ReadDouble(m, "bottom", d.Margins.Bottom)),
             font,
-            ReadDouble(root, "desk_time_size", d.TimeSize)).Normalized();
+            ReadDouble(root, "desk_time_size", d.TimeSize),
+            DeskPlate.Read(root)).Normalized();
     }
 
     public void SaveDesk(DeskSettings desk)
@@ -756,6 +757,24 @@ public sealed class SettingsStore
         else root["desk_font"] = d.Font;
         root["desk_time_size"] = d.TimeSize;
         Write(root);
+    }
+
+    /// <summary>"Plate behind the text": <c>desk_plate</c>, absent = off (<see cref="DeskPlate"/>).</summary>
+    public bool LoadDeskPlate() => DeskPlate.Read(Read());
+
+    public void SaveDeskPlate(bool on)
+    {
+        var root = Read();
+        if (on) root["desk_plate"] = true;
+        else root.Remove("desk_plate");
+        Write(root);
+    }
+
+    /// <summary>A fresh install's first launch writes the plate on; an existing install keeps what it has.</summary>
+    public void SeedDeskPlate(bool freshInstall)
+    {
+        var root = Read();
+        if (DeskPlate.Seed(root, freshInstall)) Write(root);
     }
 
     /// <summary>"Clock and message take clicks" (spec 7.4): <c>desk_pieces_take_clicks</c>, absent = on.</summary>
