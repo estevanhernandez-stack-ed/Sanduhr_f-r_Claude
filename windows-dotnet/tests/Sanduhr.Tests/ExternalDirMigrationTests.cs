@@ -411,6 +411,70 @@ public sealed class ExternalDirMigrationTests : IDisposable
         Assert.Equal(backups, BackupCount);
     }
 
+    private static readonly string[] OldNames =
+    [
+        "snapshot.json", "snapshot.ab12cd34.json", "seats.json", "glow-waiting.signal", "glow-done.signal",
+        "publish-request.json", "publish-result.json", "theme-request.json", "theme-result.json",
+        "desk-messages-1.json", "watch-request-2.json",
+    ];
+
+    private void SeedOldCopies()
+    {
+        Directory.CreateDirectory(AppData);
+        foreach (var n in OldNames) File.WriteAllText(Path.Combine(AppData, n), "old");
+        File.WriteAllText(Path.Combine(AppData, "history.json"), "keep");
+        File.WriteAllText(Path.Combine(AppData, "history.Personal.json"), "keep");
+        File.WriteAllText(Path.Combine(AppData, "settings.json"), "keep");
+        File.WriteAllText(Path.Combine(AppData, "sanduhr.log"), "keep");
+        Directory.CreateDirectory(Path.Combine(AppData, "bin"));
+        File.WriteAllText(Path.Combine(AppData, "bin", "sanduhr-mcp.cmd"), "keep");
+        Directory.CreateDirectory(Path.Combine(AppData, "mcp", "v1"));
+        Directory.CreateDirectory(Path.Combine(AppData, "mods", "s1"));
+    }
+
+    [Fact]
+    public void Old_AppData_copies_are_removed_and_history_settings_logs_and_pinned_trees_stay()
+    {
+        SeedOldCopies();
+
+        var r = new ExternalDirMigration().Run(Inputs() with { LegacyDir = AppData });
+
+        Assert.True(r.Completed);
+        Assert.All(OldNames, n => Assert.False(File.Exists(Path.Combine(AppData, n)), n));
+        Assert.All(new[] { "history.json", "history.Personal.json", "settings.json", "sanduhr.log" },
+            n => Assert.True(File.Exists(Path.Combine(AppData, n)), n));
+        Assert.True(File.Exists(Path.Combine(AppData, "bin", "sanduhr-mcp.cmd")));
+        Assert.True(Directory.Exists(Path.Combine(AppData, "mcp", "v1")));
+        Assert.True(Directory.Exists(Path.Combine(AppData, "mods", "s1")));
+    }
+
+    [Fact]
+    public void Without_a_legacy_dir_nothing_is_cleaned()
+    {
+        SeedOldCopies();
+        new ExternalDirMigration().Run(Inputs());
+        Assert.All(OldNames, n => Assert.True(File.Exists(Path.Combine(AppData, n)), n));
+    }
+
+    [Fact]
+    public void A_delete_that_fails_is_logged_by_type_and_does_not_fail_the_migration()
+    {
+        SeedOldCopies();
+        var logs = new List<string>();
+        string locked = Path.Combine(AppData, "seats.json");
+        using (new FileStream(locked, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            var r = new ExternalDirMigration(logs.Add).Run(Inputs() with { LegacyDir = AppData });
+            Assert.True(r.Completed);
+            Assert.Equal(0, r.Failed);
+        }
+        Assert.Equal("done", File.ReadAllText(Marker));
+        Assert.True(File.Exists(locked));
+        Assert.False(File.Exists(Path.Combine(AppData, "snapshot.json")));
+        Assert.Contains(logs, l => l.Contains("legacy delete failed (IOException)"));
+        Assert.All(logs, l => Assert.DoesNotContain(Root, l));
+    }
+
     [Fact]
     public void Mcp_is_skipped_and_not_done_when_there_is_no_server_to_copy_then_a_later_run_finishes()
     {

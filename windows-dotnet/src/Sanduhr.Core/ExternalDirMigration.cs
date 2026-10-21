@@ -7,6 +7,8 @@ namespace Sanduhr.Core;
 /// <param name="LegacyStatuslineScript">The pre-3.5.0 <c>%APPDATA%\Sanduhr\bin\sanduhr-statusline.ps1</c>.</param>
 /// <param name="LegacyMcpLauncher">The pre-3.5.0 <c>%APPDATA%\Sanduhr\bin\sanduhr-mcp.cmd</c>.</param>
 /// <param name="McpSourceDir">The app's bundled server folder; null or missing means the MCP re-point is skipped and retried.</param>
+/// <param name="LegacyDir">The pre-3.5.0 AppData folder (<c>%APPDATA%\Sanduhr</c>): its old copies of the files that moved out are
+/// deleted, best-effort, as part of the run. Null means no clean-up. The caller never passes the external folder itself.</param>
 public sealed record ExternalDirMigrationInputs(
     string MarkerPath,
     IReadOnlyList<string> Folders,
@@ -16,7 +18,8 @@ public sealed record ExternalDirMigrationInputs(
     StatuslineInstaller StatuslineInstaller,
     McpIntegrationInstaller McpIntegrationInstaller,
     ClaudeCodeIntegrations ClaudeCodeIntegrations,
-    string? McpSourceDir);
+    string? McpSourceDir,
+    string? LegacyDir = null);
 
 /// <param name="ShortCircuited">The marker said done (or the attempt cap), so nothing ran.</param>
 /// <param name="Completed">Ran with no failure; the marker now says done.</param>
@@ -64,6 +67,8 @@ public sealed class ExternalDirMigration(Action<string>? log = null, int maxAtte
             foreach (var f in folders)
                 Step(() => inputs.ClaudeCodeIntegrations.RepointLegacy(IntegrationKind.Hooks, f), ref t.Hooks, t);
 
+            DeleteLegacyCopies(inputs.LegacyDir);
+
             bool completed = t.Failed == 0;
             WriteMarker(inputs.MarkerPath, completed ? "done" : $"attempt {attempts + 1}");
             log?.Invoke($"{Prefix}: statusline {t.Statusline}, mcp {t.Mcp}, meters {t.Meters}, hooks {t.Hooks}, failed {t.Failed}, {(completed ? "done" : $"attempt {attempts + 1}")}");
@@ -74,6 +79,42 @@ public sealed class ExternalDirMigration(Action<string>? log = null, int maxAtte
             log?.Invoke($"{Prefix}: aborted ({e.GetType().Name})");
             return new ExternalDirMigrationResult(false, false, 0, 0, 0, 0, 1);
         }
+    }
+
+    /// <summary>The names that moved to <c>~\.sanduhr</c>, as they were in the old AppData folder. NOT history, settings, logs,
+    /// <c>bin</c>, <c>mcp</c> or <c>mods</c>: a pinned session may still run those, and Reset removes them.</summary>
+    private static readonly string[] LegacyPatterns =
+    [
+        "snapshot.json", "snapshot.*.json", "seats.json", "glow-*.signal",
+        "publish-request.json", "publish-result.json", "theme-request.json", "theme-result.json",
+        "desk-messages-*.json", "watch-request-*.json",
+    ];
+
+    /// <summary>Best-effort: a failure is logged by exception type and does not count against the migration.</summary>
+    private void DeleteLegacyCopies(string? legacyDir)
+    {
+        if (string.IsNullOrWhiteSpace(legacyDir)) return;
+        int removed = 0, failed = 0;
+        foreach (var pattern in LegacyPatterns)
+        {
+            string[] files;
+            try { files = Directory.Exists(legacyDir) ? Directory.GetFiles(legacyDir, pattern, SearchOption.TopDirectoryOnly) : []; }
+            catch (Exception e)
+            {
+                log?.Invoke($"{Prefix}: legacy listing failed ({e.GetType().Name})");
+                continue;
+            }
+            foreach (var file in files)
+            {
+                try { File.Delete(file); removed++; }
+                catch (Exception e)
+                {
+                    failed++;
+                    log?.Invoke($"{Prefix}: legacy delete failed ({e.GetType().Name})");
+                }
+            }
+        }
+        log?.Invoke($"{Prefix}: legacy copies removed {removed}, failed {failed}");
     }
 
     private sealed class Tally { public int Statusline, Mcp, Meters, Hooks, Failed; }

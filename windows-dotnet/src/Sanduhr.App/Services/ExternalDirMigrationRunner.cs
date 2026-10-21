@@ -75,6 +75,8 @@ public static class ExternalDirMigrationRunner
             StatuslineInstaller: new StatuslineInstaller(profile, paths.StatuslineBinDir, null, appData),
             McpIntegrationInstaller: new McpIntegrationInstaller(profile, appData, externalDir: external),
             ClaudeCodeIntegrations: integrations,
-            McpSourceDir: Directory.Exists(mcpSource) ? mcpSource : null);
+            McpSourceDir: Directory.Exists(mcpSource) ? mcpSource : null,
+            LegacyDir: string.Equals(Path.GetFullPath(appData).TrimEnd('\\'), Path.GetFullPath(external).TrimEnd('\\'),
+                StringComparison.OrdinalIgnoreCase) ? null : paths.AppDataDir);
     }
 }
