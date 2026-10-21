@@ -26,7 +26,7 @@
 
 - **The Desk under desktop icons** (the Mac's 2.27). A spike on Windows 11 build 26220 showed pieces drawn below the icons appear only with opaque painting, losing the Desk's soft shadows and anti-aliased ink; the shipping Desk already lets icons show and click through its transparent pixels. Findings in `windows-dotnet/docs/spec.md` 5.0b.
 
-## Unreleased (mac)
+## v2.31.0-mac — 2026-10-21
 
 - **The glass breathes for free.** The widget's breathing-glass pulse redrew every filled bar fifteen times a second through a timeline view, forever, a hidden widget included, and that was most of Sanduhr's idle CPU. The pulse is now a Core Animation layer the render server animates; under Reduce Motion it holds its rest tint. Measured on the same build with the meters filled: 4.45 percent of a core before, 0.59 after.
 
