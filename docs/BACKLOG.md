@@ -259,3 +259,13 @@ Plan:
    process when nothing changed.
 4. Re-measure by CPU seconds per minute on both Macs. Done when the newer Mac idles under 1 percent
    and the 2019 i5 under 2, with the Desk, the pill and a watcher on.
+
+**Found 2026-10-21, after 2.30.0 shipped the bulk walks and measured flat (6.4 percent):** the cost
+was the widget's breathing glass. `ProgressBarView` drew the pulse through a
+`TimelineView(.animation(minimumInterval: 0.066))` on every filled bar, fifteen frames a second,
+forever, and a hidden widget window still ran it. A 60 s sample put two thirds of the main thread's
+busy time in CoreAnimation commits with no app frame above them, and a dev build in demo mode
+measured 4.45 percent before and 0.59 percent after moving the pulse to a Core Animation layer
+(`BreathLayerView`, the render server animates opacity; Reduce Motion holds the rest opacity).
+Still worth a look: the bulk walk sorts paths with Unicode comparison (about 0.2 percent); the
+Desk's per-second watcher rows and the menu bar rotation are the next timers.
