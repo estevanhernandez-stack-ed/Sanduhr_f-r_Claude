@@ -23,14 +23,14 @@
   Verify: `dotnet test windows-dotnet` green; the Desk render harness (or the app in `--demo`) shows the plate on and off.
   Stop class: go
 
-- [ ] **4. Quit from Settings, and hide/show pieces while arranging the Desk**
+- [x] **4. Quit from Settings, and hide/show pieces while arranging the Desk**
   Spec ref: `CHANGELOG.md > v2.19.0-mac "Quit from any Settings page"`; `CHANGELOG.md > v2.27.0-mac "Arrange Desk hides and shows pieces"`; `src/Sanduhr.App/App.xaml.cs:408` (tray Quit); `src/Sanduhr.Core/DeskArrangement.cs:188`; `src/Sanduhr.App/Desk/DeskArrangeBar.xaml`; `mac/Sources/Sanduhr/Desk/DeskArrange.swift`
   What to build: (a) **Quit Sanduhr** at the foot of the Settings sidebar, same path as the tray Quit, with an accessible name. (b) In Arrange Desk, each piece gets Hide while arranging, and a Hidden strip brings a piece back; Done writes the layout once, Cancel drops it. Size S + S-M.
   Acceptance: Done when Settings has a working Quit at the sidebar foot (accessible name set), arranging can hide and restore pieces, Done persists hidden pieces and Cancel discards them (Core tests on the arrangement draft), and keyboard navigation reaches the new controls.
   Verify: `dotnet test windows-dotnet` green; app run: hide a piece, Cancel (piece back), hide, Done (piece gone, layout saved), Quit from Settings exits.
   Stop class: go
 
-- [ ] **5. The statusline names its folder**
+- [x] **5. The statusline names its folder**
   Spec ref: `CHANGELOG.md > v2.19.0-mac "The statusline names the account"` (behavior), decision `jKcxlY6KNcch787LzH5y` (Windows design differs: no label on disk); `src/Sanduhr.Core/StatuslineScript.cs:123`; `src/Sanduhr.Core/SeatFiles.cs:14`; `docs/PRIVACY.md`
   What to build: A new **Account** segment in the statusline script, computed at render time: `env.SANDUHR_LABEL` from the session's environment when set, else the basename of `CLAUDE_CONFIG_DIR` with a leading `.claude-` stripped (`.claude-personal` → `personal`); plain `.claude` or no `CLAUDE_CONFIG_DIR` shows no label. It leads the line (`personal | 5h 4% | …`), is a selectable segment like the others, and a combined statusline whose segments were picked before keeps exactly those. `seats.json` and snapshots stay label-free. PRIVACY.md gains one sentence: the statusline shows the folder's name or the label you set in that folder's settings. Size S-M.
   Acceptance: Done when the script renders the label per the rules (Core tests over the generated script's logic or a pwsh run in tests), existing picked-segment installs are unchanged, nothing new is written to `~\.sanduhr`, and PRIVACY.md is updated.
