@@ -51,6 +51,12 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// minute repaints one island instead of every one.</summary>
     private static readonly TimeSpan FullEvery = TimeSpan.FromMinutes(5);
     private string? _trackKey;
+    /// <summary>The last track drawn, kept while the piece fades out (the session may already have
+    /// stopped); forgotten once it is gone. Memory only, like the title it holds.</summary>
+    private NowPlayingInfo? _lastTrack;
+    /// <summary>Drives the now-playing piece's fade and reflow while its presence moves (30 frames a
+    /// second, about a second at most, then off).</summary>
+    private readonly DispatcherTimer _pump;
     private bool _stopped;
     private DeskArrangeSession? _session;
     private DeskArrangeMode? _arrangeMode;
@@ -66,10 +72,13 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _watchers = watchers;
         _minute = new DispatcherTimer(DispatcherPriority.Background);
         _minute.Tick += (_, _) => OnMinute();
+        _pump = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) };
+        _pump.Tick += (_, _) => Pump();
         _weather.Updated += () => Render();
         _messages.Changed += () => Render();
         if (_watchers is not null) _watchers.Changed += () => Render();
         _nowPlaying.Changed += OnTrackChanged;
+        _nowPlaying.PresenceChanged += OnPresenceChanged;
     }
 
     /// <summary>True when the Watchers piece has a place on the Desk (the watcher glow fires only then).</summary>
@@ -130,6 +139,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _settings = _store.LoadDesk();
         _ink = _store.LoadDeskInk();
         _np = _store.LoadNowPlaying();
+        _nowPlaying.Configure(_np.Prefs);
         _weatherSettings = _store.LoadDeskWeather();
         _piecesTakeClicks = _store.LoadDeskPiecesTakeClicks();
         _messages.Reload();
@@ -174,6 +184,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _stopped = true;
         StopHost();
         _nowPlaying.Changed -= OnTrackChanged;
+        _nowPlaying.PresenceChanged -= OnPresenceChanged;
+        _pump.Stop();
         _audio.Dispose();
         _weather.Dispose();
     }
@@ -214,7 +226,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _fonts ??= new DeskFonts();
         var session = new DeskArrangeSession(_settings.Layout);
         var now = DateTimeOffset.Now;
-        var track = _np.Prefs.Visible(_nowPlaying.Shown);
+        var track = TrackToDraw(now);
         var frame = new DeskFrame
         {
             Usage = _usage,
@@ -321,8 +333,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         bool on = _host is not null && !_stopped;
         if (on && InSight("telemetry")) _telemetry.Start(); else _telemetry.Stop();
         _nowPlaying.Want(this, on && Placed("nowPlaying"));
-        bool bars = on && !Arranging && _np.Bars && InSight("nowPlaying") && track?.State == NowPlayingState.Playing;
-        _audio.Follow(track?.AppId);
+        // The bars run only while the piece is wanted (the session is playing): not through its fade-out.
+        bool bars = on && !Arranging && _np.Bars && InSight("nowPlaying") && _nowPlaying.Presence.Wanted
+            && track?.State == NowPlayingState.Playing;
         _audio.Follow(track?.AppId);
         if (bars) _audio.Start(); else if (_audio.Running) _audio.Stop();
         if (on && Placed("weather") && _weatherSettings.Place is { } place)
@@ -350,7 +363,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         if (_host is null || _stopped) return;
         ApplyCoverage();
-        SyncSources(_np.Prefs.Visible(_nowPlaying.Shown));
+        SyncSources(TrackToDraw(DateTimeOffset.Now));
     }
 
     /// <summary>A full redraw is due only when what the line says changes (the track, its app or
@@ -358,10 +371,62 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private void OnTrackChanged()
     {
         if (_host is null || _stopped) return;
-        var t = _np.Prefs.Visible(_nowPlaying.Shown);
-        var key = t is null ? null : $"{t.State}|{t.Title}|{t.Artist}|{t.AppId}|{t.Duration}";
-        if (key == _trackKey) return;
+        if (TrackKey(TrackToDraw(DateTimeOffset.Now)) == _trackKey) return;
         Render();
+    }
+
+    private static string? TrackKey(NowPlayingInfo? t) =>
+        t is null ? null : $"{t.State}|{t.Title}|{t.Artist}|{t.AppId}|{t.Duration}";
+
+    /// <summary>
+    /// The track the piece draws now: the session's, or while the piece is still fading out (the
+    /// session may have stopped by then) the last one drawn; null once the piece is gone, so a title
+    /// never outlives it.
+    /// </summary>
+    private NowPlayingInfo? TrackToDraw(DateTimeOffset now)
+    {
+        if (!_nowPlaying.Presence.OnScreen(now))
+        {
+            _lastTrack = null;
+            return null;
+        }
+        var t = _np.Prefs.Visible(_nowPlaying.Shown);
+        if (t is not null) _lastTrack = t;
+        return t ?? _lastTrack;
+    }
+
+    /// <summary>The session started or stopped asking for the piece. Up: lay out with it (starting
+    /// closed) and let it grow in. Down: it fades out in place, the pieces beside it closing the gap,
+    /// and the layout drops it when it is gone.</summary>
+    private void OnPresenceChanged()
+    {
+        if (_host is null || _stopped) return;
+        if (_nowPlaying.Presence.Wanted) Render();
+        else SyncSources(TrackToDraw(DateTimeOffset.Now));
+        Pump();
+    }
+
+    /// <summary>One frame of the fade and reflow: the presence's amount goes to every view's piece in
+    /// place. Runs while the amount moves; when it has faded all the way the layout is built again
+    /// without the piece (the same picture, in a window fitted to what is left).</summary>
+    private void Pump()
+    {
+        var presence = _nowPlaying.Presence;
+        var now = DateTimeOffset.Now;
+        if (_host is null || _stopped || Arranging)
+        {
+            _pump.Stop();
+            return;
+        }
+        double amount = presence.Amount(now);
+        foreach (var v in _views) v.SetPresence(amount);
+        if (presence.IsMoving(now))
+        {
+            if (!_pump.IsEnabled) _pump.Start();
+            return;
+        }
+        _pump.Stop();
+        if (!presence.OnScreen(now)) Render();
     }
 
     /// <summary>Lays each screen out afresh and hands the host its islands; the host keeps its windows
@@ -379,16 +444,17 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         _fonts ??= new DeskFonts();
         var now = DateTimeOffset.Now;
-        var track = _np.Prefs.Visible(_nowPlaying.Shown);
-        _trackKey = track is null ? null : $"{track.State}|{track.Title}|{track.Artist}|{track.AppId}|{track.Duration}";
+        var track = TrackToDraw(now);
+        _trackKey = TrackKey(track);
         SyncSources(track);
         var frame = new DeskFrame
         {
             Usage = _usage,
             Now = now,
             Message = PlayedFor(_messages.Frame(now, _settings)),
-            TrackNow = () => _np.Prefs.Visible(_nowPlaying.Shown),
+            TrackNow = () => _np.Prefs.Visible(_nowPlaying.Shown) ?? _lastTrack,
             Track = track,
+            Presence = track is null ? 0 : _nowPlaying.Presence.Amount(now),
             Bars = _np.Bars,
             Audio = _audio,
             Telemetry = Placed("telemetry") ? _telemetry : null,
@@ -425,6 +491,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         // The new islands start in sight: take the host's reading and let the sources follow it.
         ApplyCoverage();
         SyncSources(track);
+        // A redraw in the middle of a fade or a reflow carries on from where it stands.
+        if (track is not null && _nowPlaying.Presence.IsMoving(DateTimeOffset.Now) && !_pump.IsEnabled) _pump.Start();
     }
 
     /// <summary>
@@ -501,6 +569,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         if (Arranging) EndArrangeCore(DeskArrangeEnd.Cancel, reload: false);
         _minute.Stop();
+        _pump.Stop();
         _screens = [];
         foreach (var v in _views) v.Dispose();
         _views.Clear();

@@ -7,6 +7,7 @@
   <!-- The off-screen render harness (tools/) draws the Desk's internal view for the spec's pictures. -->
   <ItemGroup>
     <InternalsVisibleTo Include="Sanduhr.RenderHarness" />
+    <InternalsVisibleTo Include="Sanduhr.App.Tests" />
   </ItemGroup>
 
   <ItemGroup>

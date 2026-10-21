@@ -125,6 +125,8 @@ internal static class DeskClicks
     {
         switch (e)
         {
+            // The now-playing piece's host holds the real piece: the plate goes on that.
+            case DeskView.ReflowHost { Child: FrameworkElement inner }: SetPlate(inner); break;
             case Panel p when p.Background is null: p.Background = Plate; break;
             case TextBlock t when t.Background is null: t.Background = Plate; break;
             case Border b when b.Background is null: b.Background = Plate; break;

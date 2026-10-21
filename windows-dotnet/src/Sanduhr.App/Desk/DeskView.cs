@@ -33,6 +33,10 @@ internal sealed record DeskFrame
     /// <summary>The track as it stands now, for the position bar's tick (a seek moves the anchor
     /// without a redraw); null uses <see cref="Track"/>.</summary>
     public Func<NowPlayingInfo?>? TrackNow { get; init; }
+    /// <summary>How far the now-playing piece is up, 0 (gone) to 1 (up): its opacity and the share of its
+    /// height the stack leaves it (<see cref="NowPlayingPresence.Amount"/>). The live value then arrives
+    /// through <see cref="DeskView.SetPresence"/>; this is where a redraw starts.</summary>
+    public double Presence { get; init; } = 1;
     /// <summary>Draw the bars beside the track (spec 6.6).</summary>
     public bool Bars { get; init; }
     public AudioLevelSource? Audio { get; init; }
@@ -74,6 +78,10 @@ internal sealed class DeskView : Grid, IDisposable
     private ResolvedInk _ink = DeskInkMap.Light.Default;
     private readonly Dictionary<string, FrameworkElement> _pieces = new(StringComparer.Ordinal);
     private readonly List<(Rectangle Pill, RadialGradientBrush Brush)> _glows = [];
+    /// <summary>The now-playing pieces whose size follows the presence (one per view), and what else
+    /// follows it (a plate that would be left behind as an empty blur).</summary>
+    private readonly List<ReflowHost> _hosts = [];
+    private readonly List<Action<double>> _presenceSinks = [];
     private DeskRect _content = new(0, 0, 0, 0);
 
     /// <summary>
@@ -169,6 +177,7 @@ internal sealed class DeskView : Grid, IDisposable
             FrameworkElement top = stack.Parent is PlateHost host ? host : stack;
             if (stack.Children.Count == 0 || top.Parent is not Panel parent) continue;
             var r = stack.TransformToAncestor(this).TransformBounds(new Rect(stack.RenderSize));
+            var hosts = _hosts.Where(rh => ReferenceEquals(rh.Parent, stack)).ToList();
             double x = column switch
             {
                 DeskColumn.Left => r.Left,
@@ -197,7 +206,18 @@ internal sealed class DeskView : Grid, IDisposable
                 ? col.MaxWidth : (parent as FrameworkElement)?.ActualWidth ?? r.Width;
             parent.Children.Remove(top);
             stack.MaxWidth = maxWidth;
-            islands.Add(new DeskIsland(top, new Point(x, y), h, v) { Pause = pause, Widgets = widgets });
+            FrameworkElement content = top;
+            if (hosts.Count > 0)
+            {
+                // The island's window is sized once, for the stack with the now-playing piece fully up,
+                // and the stack sits against its anchor edge inside it: the piece growing or shrinking
+                // moves the neighbours inside the window, never the window.
+                double openHeight = top.DesiredSize.Height;
+                foreach (var rh in hosts) openHeight += rh.FullHeight - rh.DesiredSize.Height;
+                openHeight = Math.Ceiling(openHeight);
+                content = new ReserveFrame(top, openHeight, v);
+            }
+            islands.Add(new DeskIsland(content, new Point(x, y), h, v) { Pause = pause, Widgets = widgets });
         }
         Children.Clear();
         _stacks.Clear();
@@ -209,6 +229,17 @@ internal sealed class DeskView : Grid, IDisposable
     public void Tick(DateTimeOffset now)
     {
         foreach (var t in _ticks) t(now);
+    }
+
+    /// <summary>
+    /// Moves the now-playing piece to <paramref name="amount"/> (0 gone, 1 up) in place: it fades, and the
+    /// pieces beside it close the gap or open it (the stack reflows inside the island's window; nothing
+    /// is laid out again and no window moves).
+    /// </summary>
+    public void SetPresence(double amount)
+    {
+        foreach (var host in _hosts) host.Presence = amount;
+        foreach (var sink in _presenceSinks) sink(amount);
     }
 
     /// <summary>Unhooks the live pieces (their timers and sources).</summary>
@@ -227,6 +258,8 @@ internal sealed class DeskView : Grid, IDisposable
         _stacks.Clear();
         _pieces.Clear();
         _glows.Clear();
+        _hosts.Clear();
+        _presenceSinks.Clear();
         var arrangement = new DeskArrangement(_settings.Layout);
         var stacks = arrangement.Stacks(Drawn);
         var m = _settings.Margins;
@@ -298,17 +331,52 @@ internal sealed class DeskView : Grid, IDisposable
             foreach (var p in rows[i].Pieces)
                 if (Piece(p, align, width) is { } piece)
                 {
-                    piece.Margin = new Thickness(0, stack.Children.Count > 0 ? TimeSize * 0.12 : 0, 0, 0);
                     stack.Children.Add(piece);
                     widgets.Add(p.Widget);
                     _pieces[p.Widget] = piece;
                     kinds.Add((p.Widget == "glow", piece.Height));
                 }
+            SpaceOut(stack);
             FrameworkElement placed = _settings.Plate ? Plated(stack, kinds, align) : stack;
+            // A stack whose only real piece is the now-playing one has nothing else to hold its plate
+            // up: the plate fades with the piece instead of lingering as an empty blur.
+            if (stack.Children.OfType<ReflowHost>().FirstOrDefault() is { } reflow
+                && kinds.Count(k => !k.Glow) == 1
+                && placed is PlateHost { Children.Count: > 0 } wrap && wrap.Children[0] is Border plate)
+            {
+                plate.Opacity = reflow.Presence;
+                _presenceSinks.Add(v => plate.Opacity = v);
+            }
             SetRow(placed, i);
             grid.Children.Add(placed);
         }
         return grid;
+    }
+
+    /// <summary>
+    /// The gap between neighbours: <c>TimeSize * 0.12</c> above every piece but the first. A now-playing
+    /// piece (<see cref="ReflowHost"/>) carries its own gap so it closes with the piece: the gap above it
+    /// when it is not first, the gap below it when it is first (then the piece after it takes none, as it
+    /// is the first once the piece is gone). Fully gone, the stack is exactly the stack drawn without it.
+    /// </summary>
+    private void SpaceOut(StackPanel stack)
+    {
+        double gap = TimeSize * 0.12;
+        for (int i = 0; i < stack.Children.Count; i++)
+        {
+            var e = (FrameworkElement)stack.Children[i];
+            if (e is ReflowHost host)
+            {
+                host.Margin = new Thickness(0);
+                host.LeadGap = i > 0 ? gap : 0;
+                host.TrailGap = i == 0 && stack.Children.Count > 1 ? gap : 0;
+            }
+            else
+            {
+                bool afterFirstHost = i == 1 && stack.Children[0] is ReflowHost;
+                e.Margin = new Thickness(0, i > 0 && !afterFirstHost ? gap : 0, 0, 0);
+            }
+        }
     }
 
     private FrameworkElement? Piece(DeskPlacement p, HorizontalAlignment align, double width)
@@ -686,13 +754,20 @@ internal sealed class DeskView : Grid, IDisposable
             _live.Add(new Unhook(() => { tick.Stop(); gate.Changed -= OnGate; }));
         }
 
-        if (!_frame.Bars || _frame.Audio is not { } audio) return column;
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
-        var bars = BarsPiece(size, audio);
-        bars.Margin = new Thickness(align == HorizontalAlignment.Right ? 0 : 0, 0, size * 0.6, 0);
-        if (align == HorizontalAlignment.Right) { row.Children.Add(column); bars.Margin = new Thickness(size * 0.6, 0, 0, 0); row.Children.Add(bars); }
-        else { row.Children.Add(bars); row.Children.Add(column); }
-        return row;
+        FrameworkElement content = column;
+        if (_frame.Bars && _frame.Audio is { } audio)
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            var bars = BarsPiece(size, audio);
+            bars.Margin = new Thickness(align == HorizontalAlignment.Right ? 0 : 0, 0, size * 0.6, 0);
+            if (align == HorizontalAlignment.Right) { row.Children.Add(column); bars.Margin = new Thickness(size * 0.6, 0, 0, 0); row.Children.Add(bars); }
+            else { row.Children.Add(bars); row.Children.Add(column); }
+            content = row;
+        }
+        // Whole piece in a host that fades it and gives its height back to the stack as it goes.
+        var host = new ReflowHost { Child = content, Presence = Math.Clamp(_frame.Presence, 0, 1) };
+        _hosts.Add(host);
+        return host;
     }
 
     /// <summary>The Command Center-style bars: the output peak level's recent history, in the ink,
@@ -747,6 +822,98 @@ internal sealed class DeskView : Grid, IDisposable
             panel.Children.Add(card);
         }
         return panel;
+    }
+
+    /// <summary>
+    /// The now-playing piece's wrapper: opacity and height follow <see cref="Presence"/> (0 gone, 1 up).
+    /// Its layout height is the piece's (plus the gap it owns, <see cref="LeadGap"/> or
+    /// <see cref="TrailGap"/>) times the presence, so the pieces beside it move up to close the gap as it
+    /// fades and move back down as it returns. The content keeps its full size and is clipped to the
+    /// shrinking frame (only while it shrinks). Width never changes.
+    /// </summary>
+    internal sealed class ReflowHost : Decorator
+    {
+        public static readonly DependencyProperty PresenceProperty = DependencyProperty.Register(
+            nameof(Presence), typeof(double), typeof(ReflowHost),
+            new FrameworkPropertyMetadata(1.0, FrameworkPropertyMetadataOptions.AffectsMeasure | FrameworkPropertyMetadataOptions.AffectsArrange,
+                (d, e) => ((ReflowHost)d).Apply((double)e.NewValue)));
+
+        public double Presence
+        {
+            get => (double)GetValue(PresenceProperty);
+            set => SetValue(PresenceProperty, Math.Clamp(value, 0, 1));
+        }
+
+        /// <summary>The gap above the piece that closes with it (when it is not first in its stack).</summary>
+        public double LeadGap { get; set; }
+
+        /// <summary>The gap below the piece that closes with it (when it is first and has company).</summary>
+        public double TrailGap { get; set; }
+
+        /// <summary>The height this host takes fully up: the piece and its gap.</summary>
+        public double FullHeight => Child is null ? 0 : LeadGap + Child.DesiredSize.Height + TrailGap;
+
+        private void Apply(double p)
+        {
+            Opacity = p;
+            ClipToBounds = p < 1;
+        }
+
+        protected override Size MeasureOverride(Size constraint)
+        {
+            if (Child is null) return default;
+            Child.Measure(new Size(constraint.Width, double.PositiveInfinity));
+            var d = Child.DesiredSize;
+            return new Size(d.Width, FullHeight * Presence);
+        }
+
+        protected override Size ArrangeOverride(Size arrange)
+        {
+            if (Child is { } child)
+                child.Arrange(new Rect(0, LeadGap * Presence, Math.Max(arrange.Width, child.DesiredSize.Width), child.DesiredSize.Height));
+            return arrange;
+        }
+    }
+
+    /// <summary>
+    /// The island's frame when a now-playing piece can move in it: as tall as the stack with the piece
+    /// fully up, with the stack against its anchor edge (top, bottom or middle). The window is fitted to
+    /// this once; the stack growing or shrinking inside never moves the window.
+    /// </summary>
+    internal sealed class ReserveFrame : Decorator
+    {
+        private readonly double _height;
+        private readonly VerticalAlignment _anchor;
+
+        public ReserveFrame(FrameworkElement stack, double height, VerticalAlignment anchor)
+        {
+            _height = height;
+            _anchor = anchor;
+            Child = stack;
+        }
+
+        protected override Size MeasureOverride(Size constraint)
+        {
+            if (Child is null) return default;
+            Child.Measure(constraint);
+            return new Size(Child.DesiredSize.Width, Math.Max(Child.DesiredSize.Height, _height));
+        }
+
+        protected override Size ArrangeOverride(Size arrange)
+        {
+            if (Child is { } child)
+            {
+                double h = child.DesiredSize.Height;
+                double y = _anchor switch
+                {
+                    VerticalAlignment.Bottom => arrange.Height - h,
+                    VerticalAlignment.Center => (arrange.Height - h) / 2,
+                    _ => 0,
+                };
+                child.Arrange(new Rect(0, Math.Max(0, y), Math.Max(arrange.Width, child.DesiredSize.Width), h));
+            }
+            return arrange;
+        }
     }
 
     private sealed class Unhook(Action undo) : IDisposable
