@@ -3,8 +3,8 @@ using System.Text.Json.Nodes;
 namespace Sanduhr.Core;
 
 /// <summary>
-/// "Plate behind the text" (Settings, Desk Look; the Mac's <c>DeskPlate</c>). On, each Desk piece draws a
-/// soft rounded plate behind it, for a desktop with files under it: the text reads over file names
+/// "Plate behind the text" (Settings, Desk Look; the Mac's <c>DeskPlate</c>). On, each Desk stack draws one
+/// soft rounded plate behind its pieces, for a desktop with files under it: the text reads over file names
 /// instead of landing on them. Off when the key is absent, so every Desk from before the plate looks
 /// exactly as it did; a fresh install writes it on (<see cref="Seed"/>).
 /// </summary>
@@ -32,7 +32,25 @@ public static class DeskPlate
     /// <summary>The plate fill's opacity, as the Mac's soft style.</summary>
     public const double Opacity = 0.30;
 
-    /// <summary>The plate's color hex: black behind light ink, white behind dark ink so the text keeps its contrast.</summary>
+    /// <summary>
+    /// The pieces of one stack a single plate covers: first to last, glow slots at either end left out
+    /// (the glow's spot stays clear). One plate per stack, never one per piece: neighbouring per-piece
+    /// plates overlap, and their 30% fills double into a bright seam. A glow between two other pieces
+    /// stays inside the span (one plate cannot have a hole). Null when the stack has nothing to plate.
+    /// </summary>
+    public static (int First, int Last)? Span(IReadOnlyList<bool> isGlow)
+    {
+        int first = -1, last = -1;
+        for (int i = 0; i < isGlow.Count; i++)
+        {
+            if (isGlow[i]) continue;
+            if (first < 0) first = i;
+            last = i;
+        }
+        return first < 0 ? null : (first, last);
+    }
+
+    /// <summary>The plate's color hex:black behind light ink, white behind dark ink so the text keeps its contrast.</summary>
     public static string ColorHex(bool darkInk) => darkInk ? "ffffff" : "000000";
 
     /// <summary>Whether the plate is on in <paramref name="root"/> (the settings.json object); a missing or odd value is off.</summary>

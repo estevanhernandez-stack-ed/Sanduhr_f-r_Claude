@@ -165,7 +165,9 @@ internal sealed class DeskView : Grid, IDisposable
         var islands = new List<DeskIsland>();
         foreach (var (stack, column, row, pause, widgets) in _stacks)
         {
-            if (stack.Children.Count == 0 || stack.Parent is not Panel parent) continue;
+            // With the plate on, the stack sits in a PlateHost (same frame); the host is what moves.
+            FrameworkElement top = stack.Parent is PlateHost host ? host : stack;
+            if (stack.Children.Count == 0 || top.Parent is not Panel parent) continue;
             var r = stack.TransformToAncestor(this).TransformBounds(new Rect(stack.RenderSize));
             double x = column switch
             {
@@ -191,11 +193,11 @@ internal sealed class DeskView : Grid, IDisposable
                 DeskRow.Bottom => VerticalAlignment.Bottom,
                 _ => VerticalAlignment.Center,
             };
-            double maxWidth = stack.Parent is FrameworkElement col && col.MaxWidth is > 0 and < double.PositiveInfinity
+            double maxWidth = top.Parent is FrameworkElement col && col.MaxWidth is > 0 and < double.PositiveInfinity
                 ? col.MaxWidth : (parent as FrameworkElement)?.ActualWidth ?? r.Width;
-            parent.Children.Remove(stack);
+            parent.Children.Remove(top);
             stack.MaxWidth = maxWidth;
-            islands.Add(new DeskIsland(stack, new Point(x, y), h, v) { Pause = pause, Widgets = widgets });
+            islands.Add(new DeskIsland(top, new Point(x, y), h, v) { Pause = pause, Widgets = widgets });
         }
         Children.Clear();
         _stacks.Clear();
@@ -292,6 +294,7 @@ internal sealed class DeskView : Grid, IDisposable
             _stacks.Add((stack, column, row, pause, widgets));
             _gate = pause;
             if (DeskAnchors.At(column, row) is { } anchor) _ink = _inks.For(anchor);
+            var kinds = new List<(bool Glow, double Height)>();
             foreach (var p in rows[i].Pieces)
                 if (Piece(p, align, width) is { } piece)
                 {
@@ -299,9 +302,11 @@ internal sealed class DeskView : Grid, IDisposable
                     stack.Children.Add(piece);
                     widgets.Add(p.Widget);
                     _pieces[p.Widget] = piece;
+                    kinds.Add((p.Widget == "glow", piece.Height));
                 }
-            SetRow(stack, i);
-            grid.Children.Add(stack);
+            FrameworkElement placed = _settings.Plate ? Plated(stack, kinds, align) : stack;
+            SetRow(placed, i);
+            grid.Children.Add(placed);
         }
         return grid;
     }
@@ -331,17 +336,24 @@ internal sealed class DeskView : Grid, IDisposable
         // piece takes the ink's shadow.
         if (p.Widget is not ("message" or "nowPlaying" or "glow") && _ink.ShadowOpacity > 0)
             piece.Effect = Shadow(_ink);
-        return _settings.Plate && p.Widget != "glow" ? Plated(piece, align) : piece;
+        return piece;
     }
 
     /// <summary>
-    /// "Plate behind the text" (<see cref="DeskPlate"/>): the piece over a soft rounded plate that
-    /// reaches past it, black behind light ink and white behind dark ink. The plate sits under the
-    /// ink's own opacity and shadow and takes no hit of its own: the piece keeps its tag and its
-    /// click plate, and the wrapper's frame is the piece's.
+    /// "Plate behind the text" (<see cref="DeskPlate"/>): ONE soft rounded plate behind the whole stack
+    /// (not one per piece: neighbouring per-piece plates overlap and the 30% fills double into a bright
+    /// seam). It reaches <see cref="DeskPlate.Reach"/> past the pieces, black behind light ink and white
+    /// behind dark ink; a glow slot at the stack's top or bottom is left out of it
+    /// (<see cref="DeskPlate.Span"/>). The plate takes no hit of its own and the wrapper's frame is the
+    /// stack's, so the pieces keep their tags and click plates. A stack with nothing to plate comes back as is.
     /// </summary>
-    private FrameworkElement Plated(FrameworkElement piece, HorizontalAlignment align)
+    private FrameworkElement Plated(StackPanel stack, List<(bool Glow, double Height)> kinds, HorizontalAlignment align)
     {
+        if (DeskPlate.Span(kinds.Select(k => k.Glow).ToList()) is not { } span) return stack;
+        // Pieces before the span and after it are glow slots: each is its height plus the gap above it.
+        double gap = TimeSize * 0.12, topTrim = 0, bottomTrim = 0;
+        for (int i = 0; i < span.First; i++) topTrim += kinds[i].Height + gap;
+        for (int i = span.Last + 1; i < kinds.Count; i++) bottomTrim += kinds[i].Height + gap;
         var fill = new SolidColorBrush(Color.FromArgb((byte)Math.Round(DeskPlate.Opacity * 255), 0, 0, 0));
         var c = Rgb(DeskPlate.ColorHex(_ink.DarkInk));
         fill.Color = Color.FromArgb(fill.Color.A, c.R, c.G, c.B);
@@ -350,15 +362,18 @@ internal sealed class DeskView : Grid, IDisposable
         {
             Background = fill,
             CornerRadius = new CornerRadius(DeskPlate.CornerRadius),
-            Margin = new Thickness(-DeskPlate.Reach),
+            Margin = new Thickness(-DeskPlate.Reach, topTrim - DeskPlate.Reach, -DeskPlate.Reach, bottomTrim - DeskPlate.Reach),
             Effect = new BlurEffect { Radius = DeskPlate.Blur, KernelType = KernelType.Gaussian },
             IsHitTestVisible = false,
         };
-        var wrap = new Grid { HorizontalAlignment = align };
+        var wrap = new PlateHost { HorizontalAlignment = align };
         wrap.Children.Add(plate);
-        wrap.Children.Add(piece);
+        wrap.Children.Add(stack);
         return wrap;
     }
+
+    /// <summary>A stack and the one plate behind it; <see cref="TakeIslands"/> hands the pair out as the island.</summary>
+    private sealed class PlateHost : Grid;
 
     /// <summary>
     /// The glow's spot (spec 7.3): a fixed-size slot, so a glow never moves its stack-mates, fully clear

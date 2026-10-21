@@ -85,6 +85,40 @@ public class DeskPlateTests
     }
 
     [Fact]
+    public void ATwoPieceStackGetsOnePlateNotOnePerPiece()
+    {
+        // One span over both pieces: a single plate, so no two plates overlap into a brighter seam.
+        Assert.Equal((0, 1), DeskPlate.Span([false, false]));
+    }
+
+    [Fact]
+    public void ASinglePieceStillGetsItsPlate()
+    {
+        Assert.Equal((0, 0), DeskPlate.Span([false]));
+    }
+
+    [Fact]
+    public void TheGlowSpotAtEitherEndIsLeftOutOfThePlate()
+    {
+        Assert.Equal((1, 2), DeskPlate.Span([true, false, false]));
+        Assert.Equal((0, 1), DeskPlate.Span([false, false, true]));
+        Assert.Equal((1, 1), DeskPlate.Span([true, false, true]));
+    }
+
+    [Fact]
+    public void AGlowBetweenPiecesStaysInsideTheSingleSpan()
+    {
+        Assert.Equal((0, 2), DeskPlate.Span([false, true, false]));
+    }
+
+    [Fact]
+    public void AStackOfOnlyTheGlowOrNothingDrawsNoPlate()
+    {
+        Assert.Null(DeskPlate.Span([true]));
+        Assert.Null(DeskPlate.Span([]));
+    }
+
+    [Fact]
     public void ReachAndBlurFitTheRoomADeskWindowLeaves()
     {
         Assert.True(DeskPlate.Reach + DeskPlate.Blur <= 16);
