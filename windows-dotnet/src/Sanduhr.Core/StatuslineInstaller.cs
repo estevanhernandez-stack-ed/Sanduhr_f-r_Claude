@@ -409,6 +409,32 @@ public sealed class StatuslineInstaller
         }
     }
 
+    /// <summary>
+    /// Re-points a pre-3.5.0 statusline: when <paramref name="ccHomeName"/>'s <c>statusLine</c> is Sanduhr's and runs exactly
+    /// <paramref name="legacyScriptPath"/>, writes the script to its new place and reinstalls with the same mode, chain, join and
+    /// segments (the first receipt stays). Anything else is <see cref="RepointOutcome.NothingToDo"/>. Never throws.
+    /// </summary>
+    public RepointOutcome RepointLegacy(string ccHomeName, string legacyScriptPath)
+    {
+        try
+        {
+            var bytes = ReadFile(SettingsPathFor(ccHomeName));
+            if (bytes is null || !JsonEdit.IsObject(bytes)) return RepointOutcome.NothingToDo;
+            if (JsonEdit.TopObject(bytes).Member(KeyName) is not { } member) return RepointOutcome.NothingToDo;
+            if (TryParseCommand(CommandOf(JsonEdit.Text(bytes, member))) is not { } parsed) return RepointOutcome.NothingToDo;
+            if (!string.Equals(Path.GetFullPath(parsed.ScriptPath), Path.GetFullPath(legacyScriptPath), StringComparison.OrdinalIgnoreCase))
+                return RepointOutcome.NothingToDo;
+            if (!InstallScript()) return RepointOutcome.Failed;
+            return Install(ccHomeName, parsed.Chain is null ? StatuslineMode.Replace : StatuslineMode.Combine, parsed.Segments, parsed.Join)
+                ? RepointOutcome.Repointed : RepointOutcome.Failed;
+        }
+        catch (Exception e)
+        {
+            _logBestEffort?.Invoke($"statusline repoint failed ({e.GetType().Name})");
+            return RepointOutcome.Failed;
+        }
+    }
+
     /// <summary>Register the statusline in <paramref name="ccHomeName"/>'s
     /// settings.json: a replace with the default segments. Returns false (and writes
     /// nothing) when the existing file can't be parsed — never stomp a config we

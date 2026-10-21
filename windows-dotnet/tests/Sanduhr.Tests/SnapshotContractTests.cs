@@ -67,7 +67,9 @@ public class SnapshotContractTests
     {
         Assert.Contains("schema_version", StatuslineScript.Content);
         Assert.Contains("update statusline", StatuslineScript.Content); // higher-major refusal
-        Assert.Contains(@"Sanduhr\snapshot.json", StatuslineScript.Content);
+        Assert.Contains(@"%USERPROFILE%\.sanduhr\snapshot.json", StatuslineScript.Content);
+        Assert.Contains("Join-Path $env:USERPROFILE '.sanduhr'", StatuslineScript.Content);
+        Assert.DoesNotContain("$env:APPDATA", StatuslineScript.Content);
     }
 
     [Fact]
