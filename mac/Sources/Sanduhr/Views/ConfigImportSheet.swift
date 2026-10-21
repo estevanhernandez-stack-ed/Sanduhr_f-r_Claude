@@ -24,6 +24,9 @@ struct ConfigImportState: Identifiable {
     var cliFailures: [String] = []
     /// Opened from Claude's `propose_config` (slice K): its record, decided by the import.
     var proposalID: String?
+    /// The invented pack the `mods-config import-sample` debug hook opens for screenshots: its
+    /// rows are built in code, never planned against a folder, and Import writes nothing.
+    var sample = false
 
     var label: String { pack.manifest["label"] as? String ?? "Config" }
 
@@ -31,6 +34,7 @@ struct ConfigImportState: Identifiable {
     var hasSeat: Bool { !seat.isEmpty }
 
     mutating func plan(home: String = NSHomeDirectory()) {
+        guard !sample else { return }
         guard hasSeat else { rows = []; chosen = []; return }
         rows = ConfigImport.plan(pack, seat: seat, home: home, cli: cli)
         chosen = Set(rows.filter { $0.choosable && $0.kind != .instructions }.map(\.id))
@@ -124,6 +128,8 @@ extension ModsPageModel {
     /// refused when a session runs in the seat by now.
     func finishConfigImport(_ given: ConfigImportState) async -> ConfigImportState {
         var state = given
+        // The debug sample writes nothing: Import just closes the sheet.
+        if state.sample { configImport = nil; return state }
         let chosen = state.rows.filter { state.chosen.contains($0.id) }
         var (record, failure) = ConfigImport.apply(chosen.filter { $0.kind != .keptMod }, env: state.env, seat: state.seat,
                                                    label: state.label, packSHA256: state.packSHA256)

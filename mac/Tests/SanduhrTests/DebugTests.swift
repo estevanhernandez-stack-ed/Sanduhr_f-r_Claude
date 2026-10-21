@@ -25,6 +25,27 @@ struct DebugGateTests {
 struct DebugLinkTests {
     func parse(_ s: String) -> DebugRequest { DebugLink.parse(URL(string: s)!) }
 
+    @Test func modsConfigOpensTheTwoSheetsAndRefusesOtherWords() {
+        #expect((try? DebugLink.action("mods-config", arg: "export").get()) == .modsSheet(.export))
+        #expect((try? DebugLink.action("mods-config", arg: "import-sample").get()) == .modsSheet(.importSample))
+        if case .success = DebugLink.action("mods-config", arg: "import") { Issue.record("import parsed") }
+        if case .success = DebugLink.action("mods-config", arg: "export now") { Issue.record("export now parsed") }
+    }
+
+    @Test func theSamplePackIsInventedAndShowsSeveralDifferences() {
+        let state = SampleConfigPack.state(seat: SampleConfigPack.fallbackSeat)
+        #expect(state.sample)
+        #expect(state.rows.filter { $0.status != .same }.count >= 3)
+        #expect(state.chosen.count >= 3)
+        let text = state.rows.map { $0.name + $0.detail } + [state.fileName, state.label]
+            + (state.pack.manifest["carry"] as? [[String: String]] ?? []).flatMap { $0.values }
+        #expect(!text.contains { $0.contains("/Users/") || $0.contains("/home/") })
+        // plan() leaves a sample's rows alone.
+        var again = state
+        again.plan()
+        #expect(again.rows.count == state.rows.count)
+    }
+
     @Test func onlySanduhrDebugLinks() {
         #expect(DebugLink.isDebug(URL(string: "sanduhr://debug/snapshot?dir=/tmp/x")!))
         #expect(DebugLink.isDebug(URL(string: "SANDUHR://Debug/action?name=refresh")!))
