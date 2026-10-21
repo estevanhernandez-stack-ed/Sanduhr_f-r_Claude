@@ -162,7 +162,11 @@ private struct NotchTabCanvas: View {
         let shown = model.avIndicators
         VStack(spacing: 12) {
             ZStack(alignment: .top) {
-                MenuBarStrip(height: geometry.bar)
+                if NotchPill.previewDrawsStrip(pill: pill, indicators: shown.any) {
+                    MenuBarStrip(height: geometry.bar)
+                } else {
+                    Color.clear.frame(height: geometry.bar)
+                }
                 if pill {
                     pillView
                 } else if shown.any {
@@ -172,7 +176,7 @@ private struct NotchTabCanvas: View {
             }
             .frame(width: 520)
             Text(pill ? "No notch on this Mac's screens: the island draws as a pill at the top center."
-                      : "No notch on this Mac's screens: the island stays off.")
+                      : "No notch on this Mac's screens: the island stays off. Turn on Top-center island below to draw it as a pill.")
                 .font(.system(size: 13))
                 .foregroundStyle(.white.opacity(0.75))
         }
