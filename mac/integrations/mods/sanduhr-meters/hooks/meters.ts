@@ -4,7 +4,7 @@ import type { MetersSnapshot, MetersTier } from '../types'
 // toast decisions. No engine calls here, so every edge is a plain test.
 //
 // The snapshot contract is Sanduhr's (schema_version 1): the macOS widget writes
-// ~/Library/Application Support/Sanduhr/snapshot.json, the Windows widget %APPDATA%\Sanduhr\snapshot.json.
+// ~/Library/Application Support/Sanduhr/snapshot.json, the Windows widget %USERPROFILE%\.sanduhr\snapshot.json.
 // Freshness bands, the reset-crossed rule and the newer-schema refusal follow the statusline
 // script; the pace math and the bar colors follow the widget, so the band shows its numbers.
 

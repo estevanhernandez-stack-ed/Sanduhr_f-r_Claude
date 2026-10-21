@@ -350,14 +350,14 @@ test('full style folds to one line when the band is short', { options: { style: 
   expect((await ui.find({ key: 'sm-seven_day' }))?.text).toContain('resets Tue')
 })
 
-test('Windows reads the snapshot under APPDATA', async ($, on) => {
+test('Windows reads the snapshot under the profile .sanduhr folder', async ($, on) => {
   mock.clock(on, { now: NOW })
-  const appData = 'C:\\Users\\someone\\AppData\\Roaming'
-  const world = beneath(on, { [`${appData}\\Sanduhr\\snapshot.json`]: NORMAL }, { OS: 'Windows_NT', APPDATA: appData })
+  const profile = 'C:\\Users\\someone'
+  const world = beneath(on, { [`${profile}\\.sanduhr\\snapshot.json`]: NORMAL }, { OS: 'Windows_NT', USERPROFILE: profile })
   await $.session.start(START)
 
   expect(world.reads.length).toBeGreaterThan(0)
-  expect(world.reads.every(p => p.endsWith(`${appData}\\Sanduhr\\snapshot.json`) || p.endsWith(`${appData}\\Sanduhr\\band.json`))).toBe(true)
+  expect(world.reads.every(p => p.endsWith(`${profile}\\.sanduhr\\snapshot.json`) || p.endsWith(`${profile}\\.sanduhr\\band.json`))).toBe(true)
   expect(await textOf(await $.ui.mount(band()))).toContain('61%')
 })
 

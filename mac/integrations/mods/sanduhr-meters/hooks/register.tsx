@@ -84,9 +84,9 @@ async function sanduhrFile($: EngineInterface, name: string, named: string | und
   }
 
   if ((await $.env.get('OS')) === 'Windows_NT') {
-    const appData = await $.env.get('APPDATA')
+    const profile = await $.env.get('USERPROFILE')
 
-    return appData === undefined || appData === '' ? null : `${appData}\\Sanduhr\\${name}`
+    return profile === undefined || profile === '' ? null : `${profile}\\.sanduhr\\${name}`
   }
 
   const home = await $.env.get('HOME')
