@@ -16,6 +16,7 @@
 - **Follow the account I'm using** switches the widget to the account you are actually burning through. Off by default.
 - **Reset Sanduhr…** in Settings ▸ About removes what you pick (Claude Code entries, accounts, history and the vault, themes, settings and the Desk messages), then quits.
 - **Demo mode** (`--demo`) shows sample accounts for screenshots and never touches your real data.
+- **Claude Code integration files moved.** The files Claude Code reads (the statusline, the MCP server, the meters mod, the glow hooks and the usage snapshot) now live in `%USERPROFILE%\.sanduhr`, so they work the same on the Store and Setup.exe builds. Existing setups move on the first launch; your own entries are left alone. Reset Sanduhr… cleans up the folder, and Settings ▸ About shows where it is.
 
 The full list is in the changelog.
 

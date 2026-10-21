@@ -74,7 +74,7 @@ Everything is on your machine, under your Windows user account. The full data ta
 | Settings, theme, window position, alert thresholds, publish destination | `%APPDATA%\Sanduhr\settings.json` |
 | 30-day usage history per account | `%APPDATA%\Sanduhr\history.{Account}.json` |
 | User themes and sound drop-ins | `%APPDATA%\Sanduhr\themes\`, `%APPDATA%\Sanduhr\sounds\` |
-| Claude Code statusline snapshot + helper script (opt-in) | `%APPDATA%\Sanduhr\snapshot.json`, `%APPDATA%\Sanduhr\bin\` |
+| Claude Code integration files (opt-in): snapshot, statusline script, MCP server and launcher, meters mod, glow signals | `%USERPROFILE%\.sanduhr\` (outside AppData so Claude Code can read it on the Store build too) |
 | Claude Code usage vault (opt-in, kept until you erase it) | `%LOCALAPPDATA%\Sanduhr\vault\` |
 | Operational log (no keys, labels, or paths) | `%APPDATA%\Sanduhr\sanduhr.log` |
 
@@ -98,8 +98,12 @@ channel. Per [docs/PRIVACY.md](docs/PRIVACY.md):
 - Uninstall removes the installed app files only. It does **not** delete the Credential Manager
   entries under `com.626labs.sanduhr`, on either the Store or the Setup.exe install. Sign out
   first, or remove them yourself: Start → Credential Manager → Windows Credentials.
-- A Store uninstall also leaves `%LOCALAPPDATA%\Sanduhr` (the usage vault) behind. Delete
-  `%APPDATA%\Sanduhr\` and `%LOCALAPPDATA%\Sanduhr\` by hand if you want every trace gone.
+- A Store uninstall removes Sanduhr's private data (settings, history, themes, the vault), which
+  Windows keeps in the app's package storage. It leaves `%USERPROFILE%\.sanduhr` and Sanduhr's
+  entries in your Claude Code folders. Run **Settings ▸ About ▸ Reset Sanduhr…** before
+  uninstalling: it takes those out, and removes `.sanduhr` only if nothing else is in it. The
+  Setup.exe install keeps its private data at `%APPDATA%\Sanduhr\` and `%LOCALAPPDATA%\Sanduhr\`;
+  delete them by hand if you want every trace gone.
 - If you installed the Claude Code statusline, use **Remove statusline** in Settings ▸ Claude
   Usage before uninstalling; it reverts the `settings.json` entry in your Claude Code home.
 

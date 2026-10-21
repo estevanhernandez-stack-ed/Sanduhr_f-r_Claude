@@ -150,10 +150,18 @@ Open questions, answered 2026-10-19: the Keychain prompt path stays (the launch'
 its partition list, see `CLAUDE.md`), and the tour has a Desk-only variant (`WelcomeTour.deskOnly`,
 three steps, offered once after the choice).
 
-## #5 — Windows Store build: AppData writes are invisible outside the package (fixed in 3.4.3)
+## #5 — Windows Store build: AppData writes are invisible outside the package (fixed in 3.5.0)
 
-**Fixed in 3.4.3** (PR #192, merged 2026-10-11; Store submission 1152921505702097635 in
-certification at the time of writing). Fix candidate 1 below shipped: `desktop6:FileSystemWriteVirtualization`
+**Fixed in 3.5.0, without the capability.** Microsoft denied the `rescap:unvirtualizedResources`
+request on 2026-10-20, so 3.4.3 (fix candidate 1) never shipped to the Store. 3.5.0 declares only
+`runFullTrust`, withdraws the request, takes MinVersion back to 10.0.17763.0, and takes fix
+candidate 2 instead: every file a process outside the package reads or writes lives in
+`%USERPROFILE%\.sanduhr`, outside AppData, where nothing is redirected. Private data (settings,
+history, themes, receipts, the vault) stays in AppData and goes with a Store uninstall. Existing
+registrations move on first launch. See "Plan B" in `windows-dotnet/docs/spec.md`.
+
+Historical note on the 3.4.3 attempt (PR #192, merged 2026-10-11; Store submission
+1152921505702097635; denied before release). Fix candidate 1 below was built: `desktop6:FileSystemWriteVirtualization`
 `disabled` with `rescap:unvirtualizedResources`, scoped on Windows 11 (build 20348+) to
 `%APPDATA%\Sanduhr` and `%LOCALAPPDATA%\Sanduhr` through `virtualization:ExcludedDirectories`;
 MinVersion raised to 10.0.18362.0; a one-time migration (`PackagedDataMigration`) copies older
