@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.31.0-mac — 2026-10-21
 
 - **The glass breathes for free.** The widget's breathing-glass pulse redrew every filled bar fifteen times a second through a timeline view, forever, a hidden widget included, and that was most of Sanduhr's idle CPU. The pulse is now a Core Animation layer the render server animates; under Reduce Motion it holds its rest tint. Measured on the same build with the meters filled: 4.45 percent of a core before, 0.59 after.
 
