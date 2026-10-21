@@ -9,7 +9,7 @@
   Verify: Screenshot of the desktop showing the test piece behind an icon; a logged click reaching the click layer; `dotnet test windows-dotnet` still green. STOP for Este with the verdict.
   Stop class: go
 
-- [ ] **2. The tour knows the Desk: a Desk card and a Desk-only tour after Just the Desk**
+- [x] **2. The tour knows the Desk: a Desk card and a Desk-only tour after Just the Desk**
   Spec ref: `CHANGELOG.md > v2.29.0-mac "A tour for the Desk on its own"`; `docs/welcome-tour-spec.md`; `mac/Sources/Sanduhr/Models/WelcomeTour.swift`, `WelcomeTourSteps.swift`; `src/Sanduhr.Core/WelcomeTour.cs:36` (stale "The Desk is not on Windows yet")
   What to build: Add the Desk card to the full tour (Windows equivalent of the Mac's step: the desktop, with a Show me that opens Settings ▸ Desk). Add the Desk-only variant: chosen Just the Desk opens a short tour a moment later (the desktop, the tray, Sign in any time whose button opens Accounts); Take the Tour… shows the Desk-only steps while Just the Desk is on. Fix the stale comment. Trademark notice wherever the card names Claude. Size S.
   Acceptance: Done when the full tour includes the Desk card, a Just the Desk first run opens the Desk-only tour, Take the Tour… picks the variant from the Just the Desk state, and Core tests cover step lists for both variants.

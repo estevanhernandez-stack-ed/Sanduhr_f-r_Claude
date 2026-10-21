@@ -65,7 +65,7 @@ public static class WelcomeTour
     [
         Moved(ById("desk"), 1),
         Moved(ById("tray"), 2,
-            "The hourglass in the tray is the way back to Settings and the Desk's pages. Once you sign in it shows a percent of your limits."),
+            "Right-click the hourglass in the tray for Settings and Arrange Desk; a click brings back the widget. Once you sign in it shows a percent of your limits."),
         new(3, new WhatsNewCard([], "sign-in", "Sign in any time",
             "The Desk works without a Claude account. Sign in from Settings, Accounts whenever you have one, and the meters fill in on the desktop.",
             "", WhatsNewPreview.None, SettingsPage.Accounts), ShowMeTitle: "Accounts"),
