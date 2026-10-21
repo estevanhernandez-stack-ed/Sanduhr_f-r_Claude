@@ -61,6 +61,21 @@
     <Compile Include="..\Sanduhr.Core\VaultStore.cs" Link="Core\VaultStore.cs" />
     <Compile Include="..\Sanduhr.Core\VaultJson.cs" Link="Core\VaultJson.cs" />
     <Compile Include="..\Sanduhr.Core\VaultReader.cs" Link="Core\VaultReader.cs" />
+    <!-- Watchers and Desk messages (3.6.0, Este's ruling 2026-10-21): the five tools
+         watch_start, watch_update, watch_end, propose_desk_messages and get_desk_messages
+         validate with the widget's own code so server and widget agree byte for byte. Six
+         files, all pure (text, JSON, regex; no IO, no network, no credentials, no process):
+         Watchers + WatcherRequest (the limits, the commands, the request and switch file
+         shapes), MessageProposal + DeskMessages + MessageEffects + LetterMap (the line
+         checks, the request decode, the "today" pick). The widget owns every write that
+         matters (messages.txt, the board); the server queues request files only, as
+         propose_theme does. -->
+    <Compile Include="..\Sanduhr.Core\Watchers.cs" Link="Core\Watchers.cs" />
+    <Compile Include="..\Sanduhr.Core\WatcherRequest.cs" Link="Core\WatcherRequest.cs" />
+    <Compile Include="..\Sanduhr.Core\MessageProposal.cs" Link="Core\MessageProposal.cs" />
+    <Compile Include="..\Sanduhr.Core\DeskMessages.cs" Link="Core\DeskMessages.cs" />
+    <Compile Include="..\Sanduhr.Core\MessageEffects.cs" Link="Core\MessageEffects.cs" />
+    <Compile Include="..\Sanduhr.Core\LetterMap.cs" Link="Core\LetterMap.cs" />
   </ItemGroup>
 
 </Project>

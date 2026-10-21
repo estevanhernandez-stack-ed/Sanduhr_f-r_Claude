@@ -787,6 +787,18 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>"Let agents show watchers" (spec 6.9): <c>watchers_agents</c>, absent = off. The MCP tools
+    /// <c>watch_start</c>, <c>watch_update</c> and <c>watch_end</c> write nothing while it is off.</summary>
+    public bool LoadWatchersAgents() => ReadBool(Read(), "watchers_agents", false);
+
+    public void SaveWatchersAgents(bool on)
+    {
+        var root = Read();
+        if (on) root["watchers_agents"] = true;
+        else root.Remove("watchers_agents");
+        Write(root);
+    }
+
     /// <summary>The Desk's sign-in reminder switch (spec 7.5): "desk_sign_in_reminder". Absent reads as on.</summary>
     public bool LoadDeskSignInReminder() => ReadBool(Read(), "desk_sign_in_reminder", SignInReminder.DefaultOn);
 

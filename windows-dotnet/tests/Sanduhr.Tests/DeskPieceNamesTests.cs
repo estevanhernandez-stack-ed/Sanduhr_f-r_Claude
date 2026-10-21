@@ -15,6 +15,7 @@ public class DeskPieceNamesTests
     [InlineData("telemetry", "System (CPU, RAM, disk)")]
     [InlineData("weather", "Weather")]
     [InlineData("glow", "Claude Code glow")]
+    [InlineData("watchers", "Watchers")]
     public void EachDrawnPieceHasItsName(string widget, string name) =>
         Assert.Equal(name, SettingsNames.DeskPieceName(widget));
 

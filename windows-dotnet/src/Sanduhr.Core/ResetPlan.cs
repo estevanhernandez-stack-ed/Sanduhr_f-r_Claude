@@ -186,8 +186,9 @@ public static partial class ResetPlan
         AddFile(settings, Path.Combine(app, "messages.txt"));
         AddFile(settings, Path.Combine(app, "messages.txt.previous"));
         AddFile(settings, paths.SettingsFile);
-        // A stale projection must not outlive the consent it copies.
+        // A stale projection must not outlive the consent it copies; the watchers switch is a copy of one too.
         AddFile(settings, Path.Combine(ext, McpSettingsName));
+        AddFile(settings, Path.Combine(ext, WatcherRequest.SwitchFile));
         map[ResetPart.Settings] = Finish(settings, backups);
 
         return map;

@@ -2332,6 +2332,18 @@
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
+                            <StackPanel views:SettingsAnchor.Id="desk-watchers">
+                                <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                          Content="{x:Static core:SettingsNames.WatchersSwitch}"
+                                          IsChecked="{Binding WatchersAgents, Mode=TwoWay}"
+                                          AutomationProperties.Name="{x:Static core:SettingsNames.WatchersSwitch}" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="Off by default. With the Sanduhr MCP server installed, Claude Code can put a live card on the Desk for work it is watching (a CI run, a deploy): a title, progress and a one-line note. Cards live in memory only, fade or stay as the work ends, and are gone when you quit. They show where you place Watchers under Where each piece sits." />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
                             <StackPanel views:SettingsAnchor.Id="pieces" IsEnabled="{Binding NotArranging}">
                                 <TextBlock Text="Where each piece sits" FontSize="13" FontWeight="SemiBold"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />

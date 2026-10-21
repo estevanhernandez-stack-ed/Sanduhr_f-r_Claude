@@ -33,6 +33,7 @@ public partial class App : Application
     private Desk.NowPlayingHub? _nowPlaying;
     private Desk.DeskMessageSource? _messages;
     private Desk.DeskMessageHandoffService? _handoff;
+    private Desk.WatcherStore? _watchers;
     private MenuItem? _endDemoItem;
 
     /// <summary>Where this install stands with the welcome tour, decided once at launch.</summary>
@@ -487,11 +488,19 @@ public partial class App : Application
         _nowPlaying = new Desk.NowPlayingHub();
         Desk.NowPlayingHub.Current = _nowPlaying;
         _messages = new Desk.DeskMessageSource(store, paths);
-        _handoff = new Desk.DeskMessageHandoffService(paths, _messages.FilePath);
+        _handoff = new Desk.DeskMessageHandoffService(paths, _messages.FilePath, store);
         Desk.DeskMessageHandoffService.Current = _handoff;
-        _handoff.Start(); // watches nothing until the MCP tool ships (spec 6.9)
+        _handoff.Start(); // Claude's suggested Desk messages (spec 6.9)
+        // Watchers (spec 6.9): agents' cards, only while "Let agents show watchers" is on; in memory only.
+        _watchers = new Desk.WatcherStore(paths, store.LoadWatchersAgents, () => vm.IsDemo);
+        _watchers.WaitingStarted += () =>
+        {
+            // A watcher waiting on you glows once, but only where its card can be seen.
+            if (_desk is { Running: true, WatchersPlaced: true }) _glow?.Preview(ClaudeCodeEvent.Waiting);
+        };
+        _watchers.Start();
         _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
-            () => vm.CurrentDeskUsage, _nowPlaying, _messages)
+            () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers)
         {
             ThemeText = ThemeTextHex,
         };
@@ -579,7 +588,8 @@ public partial class App : Application
         svm.Desk.ArrangingLayout = _desk?.Session?.Working.Layout;
         svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); };
         svm.WeatherPage.Changed = () => _desk?.Reload();
-        svm.MessageChanged = () => _desk?.Reload();
+        svm.MessageChanged = () => { _desk?.Reload(); _handoff?.PublishState(); };
+        svm.Desk.WatchersChanged = () => _watchers?.SwitchChanged();
         svm.QuitRequested = QuitApp;
         svm.ResetRequested = () =>
         {
@@ -854,6 +864,7 @@ public partial class App : Application
                 vm.StopBackgroundWork();
                 _glow?.Stop();
                 _desk?.StopForReset();
+                _watchers?.Dispose();
                 _vm?.NowPlaying?.Dispose();
             },
             vm.InactiveReader.DeleteAllProfilesAsync,
@@ -870,6 +881,7 @@ public partial class App : Application
         _desk?.Dispose();
         _messages?.Dispose();
         _handoff?.Dispose();
+        _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();
         _hotKeys?.Dispose();
@@ -893,6 +905,7 @@ public partial class App : Application
         _desk?.Dispose();
         _messages?.Dispose();
         _handoff?.Dispose();
+        _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();
         _hotKeys?.Dispose();

@@ -92,6 +92,7 @@ public class SettingsKeysContractTests
         "vault_prompted",
         "vault_roots",
         "vault_store_full_paths",
+        "watchers_agents",
         "whats_new_hide_after_updates",
         "whats_new_installed_version",
         "whats_new_last_seen",

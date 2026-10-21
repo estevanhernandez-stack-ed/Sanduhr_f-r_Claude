@@ -44,7 +44,7 @@
   Verify: `dotnet test windows-dotnet` green; live run on Neb with screenshots on and off; `taskkill /f /im explorer.exe` and restart, Desk returns.
   Stop class: go (dropped if item 1 fails)
 
-- [ ] **7. Watchers and Desk-message suggestions over MCP (one trust-boundary change)**
+- [x] **7. Watchers and Desk-message suggestions over MCP (one trust-boundary change)**
   Spec ref: `windows-dotnet/docs/spec.md:362` ("Held for Este"); `src/Sanduhr.App/Desk/DeskHandoffSeams.cs:20,70` (`Enabled = false`); `src/Sanduhr.Mcp/ToolCatalog.cs`, `ToolLogic.cs`; `tests/*/TrustBoundaryTests.cs`; `mac/integrations/sanduhr_mcp.py` (`watch_start`, `watch_update`, `watch_end`, `propose_desk_messages`, `get_desk_messages`); `docs/PRIVACY.md`
   What to build: Add the five MCP tools with the Mac's argument shapes and limits, writing request files into `%USERPROFILE%\.sanduhr` the way `propose_theme` does (temp-then-rename, size caps, no network). Turn both seams' `Enabled` on. Widen the `Sanduhr.Mcp.csproj` source-link allowlist only by the Core files these tools need, and update `TrustBoundaryTests` to the new allowlist. PRIVACY.md rows for the request and result files. smoke-mcp gains the new tools (a rejected bad request each). Size S-M.
   Acceptance: Done when the five tools appear in `tools/list`, a watch shows on the Desk's watchers piece and fades on end, a proposed message reaches Settings ▸ Message for Add/Review/Dismiss, the MCP stays network-free with no ProjectReference/PackageReference, TrustBoundaryTests passes on the new allowlist, and PRIVACY.md covers the files.

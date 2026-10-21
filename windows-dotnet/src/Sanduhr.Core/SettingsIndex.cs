@@ -77,6 +77,7 @@ public static class SettingsIndex
     public const string DeskArrange = "arrange";
     public const string DeskClicks = "desk-clicks";
     public const string DeskPlate = "desk-plate";
+    public const string DeskWatchers = "desk-watchers";
     // Desk: Message, Now playing, Weather (S6)
     public const string MessageLines = "lines";
     public const string MessageRotation = "rotation";
@@ -182,6 +183,8 @@ public static class SettingsIndex
             ["drag", "move", "rearrange", "arrange", "reorder", "on the desktop", "layout"]),
         E(SettingsNames.DeskPieceClicksSwitch, SettingsPage.Desk, DeskClicks,
             ["click", "click-through", "right-click", "menu", "desktop icons", "clock", "message"]),
+        E(SettingsNames.WatchersSwitch, SettingsPage.Desk, DeskWatchers,
+            ["watcher", "watchers", "agent", "agents", "MCP", "watch_start", "CI", "deploy", "progress", "card", "claude code"]),
         E("Where each piece sits", SettingsPage.Desk, DeskPieces,
             ["layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor"]),
         E("Look", SettingsPage.Desk, DeskLook,
@@ -243,6 +246,7 @@ public static class SettingsIndex
         [SettingsNames.ArrangeDesk] = DeskArrange,
         [SettingsNames.DeskPieceClicksSwitch] = DeskClicks,
         [SettingsNames.DeskPlateSwitch] = DeskPlate,
+        [SettingsNames.WatchersSwitch] = DeskWatchers,
         [SettingsNames.NowPlayingInWidget] = NowPlayingWidget,
         [SettingsNames.WeatherLookUp] = WeatherPlace,
         [SettingsNames.GlowWhere] = GlowWhere,
