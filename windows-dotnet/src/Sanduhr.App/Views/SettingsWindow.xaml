@@ -70,6 +70,39 @@
             </Setter>
         </Style>
 
+        <!-- The sidebar foot's Quit: a FlatButton that shows keyboard focus. -->
+        <Style x:Key="SidebarQuitButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg" CornerRadius="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                <Setter TargetName="bg" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Primary accent button — accent fill, theme-bg ink. -->
         <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource FlatButton}">
             <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
@@ -652,7 +685,15 @@
                             <Border Grid.Column="0" Background="{DynamicResource Sanduhr.Brush.TitleBg}"
                                     BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="0,0,1,0">
                                 <DockPanel Margin="10,12,10,12">
-                                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                                    <!-- The foot of the sidebar: Quit Sanduhr, on every page, the tray's quit. -->
+                                    <Button x:Name="QuitButton" DockPanel.Dock="Bottom" Style="{StaticResource SidebarQuitButton}"
+                                            Margin="0,8,0,0" Padding="10,5" HorizontalAlignment="Stretch"
+                                            KeyboardNavigation.TabIndex="1"
+                                            Content="Quit Sanduhr" Command="{Binding QuitCommand}"
+                                            AutomationProperties.Name="Quit Sanduhr"
+                                            AutomationProperties.HelpText="Closes the widget, the Desk and everything else Sanduhr is showing."
+                                            ToolTip="Quit Sanduhr" />
+                                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8" KeyboardNavigation.TabIndex="0">
                                         <TextBox x:Name="SearchBox" Style="{StaticResource Input}"
                                                  Text="{Binding Search.Query, UpdateSourceTrigger=PropertyChanged}"
                                                  AutomationProperties.Name="Search settings"
@@ -672,7 +713,7 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                     </Grid>
-                                    <Grid>
+                                    <Grid KeyboardNavigation.TabIndex="0">
                                         <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
                                             <ScrollViewer.Style>
                                                 <Style TargetType="ScrollViewer">

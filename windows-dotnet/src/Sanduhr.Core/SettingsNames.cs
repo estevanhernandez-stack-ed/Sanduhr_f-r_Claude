@@ -109,6 +109,9 @@ public static class SettingsNames
     public const string ThirdPartyNotices = "Third-party notices";
     /// <summary>About: removes what Sanduhr keeps on this PC (spec 4.7).</summary>
     public const string ResetSanduhr = "Reset Sanduhr…";
+
+    /// <summary>The Quit button at the foot of the sidebar (not on a page, so not in <see cref="Table"/>).</summary>
+    public const string QuitSanduhr = "Quit Sanduhr";
     /// <summary>Claude Code: picks a folder Sanduhr did not find.</summary>
     public const string AddFolder = "Add folder…";
     /// <summary>Claude Code: drops a folder that was added by hand.</summary>

@@ -580,6 +580,7 @@ public partial class App : Application
         svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); };
         svm.WeatherPage.Changed = () => _desk?.Reload();
         svm.MessageChanged = () => _desk?.Reload();
+        svm.QuitRequested = QuitApp;
         svm.ResetRequested = () =>
         {
             ShowReset();

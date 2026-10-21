@@ -26,6 +26,8 @@ public static class SettingsIndex
     public const string Tray = "tray";
     public const string Startup = "startup";
     public const string Shortcuts = "shortcuts";
+    /// <summary>Quit Sanduhr sits at the foot of the sidebar, not on General; search focuses it there.</summary>
+    public const string Quit = "quit";
     // Accounts
     public const string AccountList = "accounts";
     public const string Follow = "follow";
@@ -111,6 +113,8 @@ public static class SettingsIndex
             ["start with Windows", "sign-in", "login", "launch", "auto-start", "Startup apps"]),
         E("Shortcuts", SettingsPage.General, Shortcuts,
             [SettingsNames.ShortcutToOpenSettings, "hotkey", "keyboard", "keys", "Ctrl+Alt+S", "record", "global shortcut"]),
+        E(SettingsNames.QuitSanduhr, SettingsPage.General, Quit,
+            ["quit", "exit", "close", "close Sanduhr", "stop", "shut down", "end", "sidebar"]),
 
         E("Accounts", SettingsPage.Accounts, AccountList,
             ["sign in", "sign out", "add account", "rename", "update sign-in", "remove account", "switch",

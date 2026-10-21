@@ -352,6 +352,14 @@ internal partial class SettingsWindow : Window
     /// <summary>A chosen result: the search closes and the page opens at the section.</summary>
     private void OpenSearchRow(SettingsSearchRow row)
     {
+        if (row.Anchor == SettingsIndex.Quit)
+        {
+            // Quit lives at the sidebar's foot: show the list, put the keyboard on the button.
+            ViewModel.Search.Clear();
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+                (Tabs.Template?.FindName("QuitButton", Tabs) as Button)?.Focus()));
+            return;
+        }
         SelectPage(row.Page, row.Anchor);
         if (row.Anchor is null)
             (Tabs.SelectedItem as TabItem)?.Focus();
