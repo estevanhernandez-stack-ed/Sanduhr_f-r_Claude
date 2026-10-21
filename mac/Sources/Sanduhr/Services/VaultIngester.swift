@@ -285,7 +285,11 @@ final class VaultIngester: @unchecked Sendable {
                                      mtimeTicks: VaultTime.ticks(modified)))
             }
         }
-        files.sort { ($0.mtimeTicks, $0.path) < ($1.mtimeTicks, $1.path) }
+        files.sort {
+            $0.mtimeTicks != $1.mtimeTicks
+                ? $0.mtimeTicks < $1.mtimeTicks
+                : CCLogBulkWalk.pathPrecedes($0.path, $1.path)
+        }
         return files
     }
 
