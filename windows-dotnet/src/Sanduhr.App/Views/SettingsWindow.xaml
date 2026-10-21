@@ -2569,11 +2569,11 @@
                                           Content="{x:Static core:SettingsNames.NowPlayingInWidget}" IsChecked="{Binding Widget, Mode=TwoWay}"
                                           AutomationProperties.Name="{x:Static core:SettingsNames.NowPlayingInWidget}" />
                                 <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,8,0,0"
-                                          Content="Hide while paused" IsChecked="{Binding HidePaused, Mode=TwoWay}"
-                                          AutomationProperties.Name="Hide while paused" />
+                                          Content="Keep showing while paused" IsChecked="{Binding KeepPaused, Mode=TwoWay}"
+                                          AutomationProperties.Name="Keep showing while paused" />
                                 <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                           Text="Title and artist from the Windows media controls (Spotify, browsers and most players). A click on the line plays or pauses; Next shows while paused. What is playing stays in memory: Sanduhr never saves or logs it. To show it on the Desk, place Now playing on the Desk page." />
+                                           Text="Title and artist from the Windows media controls (Spotify, browsers and most players). It shows while something plays and fades out 5 seconds after playback stops or pauses; Windows sounds never bring it up. Tick Keep showing while paused to hold it through a pause. A click on the line plays or pauses; Next shows while paused. What is playing stays in memory: Sanduhr never saves or logs it. To show it on the Desk, place Now playing on the Desk page." />
                                 <TextBlock Text="{Binding Status}" FontSize="11" Margin="0,8,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                             </StackPanel>
@@ -2601,7 +2601,7 @@
                                           AutomationProperties.Name="Bars beside it on the Desk" />
                                 <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                           Text="The bars follow the loudness of what is playing, read from the Windows output level meter. Sanduhr never records or captures audio, and the bars stop while nothing plays." />
+                                           Text="The bars follow the loudness of the app that is playing, read from that app's Windows volume mixer level. Windows system sounds are ignored. Sanduhr never records or captures audio, and the bars stop while nothing plays." />
                             </StackPanel>
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
                             <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"

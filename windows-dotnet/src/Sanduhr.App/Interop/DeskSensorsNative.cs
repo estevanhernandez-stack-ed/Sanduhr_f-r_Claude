@@ -1,12 +1,14 @@
 using System.IO;
 using System.Runtime.InteropServices;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.Interop;
 
 /// <summary>
 /// The Desk's local readings (spec 6.4, 6.6, 6.7), by hand-written interop as <see cref="DeskNative"/>:
-/// CPU, memory and disk from kernel32; the system output peak level from the Core Audio endpoint meter
-/// (<c>IAudioMeterInformation</c>, a level only: nothing here captures or records audio); and the
+/// CPU, memory and disk from kernel32; the playing app's output peak level from its Core Audio session
+/// meter (<c>IAudioSessionManager2</c> and <c>IAudioMeterInformation</c>, a level only: nothing here
+/// captures or records audio); and the
 /// wallpaper's path, placement and background color from <c>IDesktopWallpaper</c> (the wallpaper file,
 /// never the screen). Every call is cheap, never throws to the caller, and reports failure as null.
 /// </summary>
@@ -59,13 +61,14 @@ internal static class DeskSensorsNative
         }
     }
 
-    // ---- The output peak meter ----
+    // ---- The playing app's peak meter ----
 
     private static readonly Guid CLSID_MMDeviceEnumerator = new("BCDE0395-E52F-467C-8E3D-C4579291692E");
-    private static readonly Guid IID_IAudioMeterInformation = new("C02216F6-8C67-4B5B-9D00-D008E73E0064");
+    private static readonly Guid IID_IAudioSessionManager2 = new("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F");
     private const int eRender = 0;
     private const int eConsole = 0;
     private const int CLSCTX_ALL = 0x17;
+    private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
 
     [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IMMDeviceEnumerator
@@ -80,89 +83,190 @@ internal static class DeskSensorsNative
         [PreserveSig] int Activate(ref Guid iid, int clsCtx, IntPtr activationParams, [MarshalAs(UnmanagedType.IUnknown)] out object iface);
     }
 
+    // IAudioSessionManager2 derives from IAudioSessionManager: its two methods hold their slots.
+    [ComImport, Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IAudioSessionManager2
+    {
+        [PreserveSig] int GetAudioSessionControl(IntPtr audioSessionGuid, uint streamFlags, out IntPtr sessionControl);
+        [PreserveSig] int GetSimpleAudioVolume(IntPtr audioSessionGuid, uint streamFlags, out IntPtr audioVolume);
+        [PreserveSig] int GetSessionEnumerator(out IAudioSessionEnumerator sessionEnum);
+    }
+
+    [ComImport, Guid("E2F5BB11-0570-40CA-ACDD-3AA01277DEE8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IAudioSessionEnumerator
+    {
+        [PreserveSig] int GetCount(out int count);
+        [PreserveSig] int GetSession(int index, out IAudioSessionControl2 session);
+    }
+
+    // IAudioSessionControl2 derives from IAudioSessionControl: its nine methods hold their slots.
+    [ComImport, Guid("BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IAudioSessionControl2
+    {
+        [PreserveSig] int GetState(out int state);
+        [PreserveSig] int GetDisplayName([MarshalAs(UnmanagedType.LPWStr)] out string name);
+        [PreserveSig] int SetDisplayName([MarshalAs(UnmanagedType.LPWStr)] string name, ref Guid context);
+        [PreserveSig] int GetIconPath([MarshalAs(UnmanagedType.LPWStr)] out string path);
+        [PreserveSig] int SetIconPath([MarshalAs(UnmanagedType.LPWStr)] string path, ref Guid context);
+        [PreserveSig] int GetGroupingParam(out Guid param);
+        [PreserveSig] int SetGroupingParam(ref Guid param, ref Guid context);
+        [PreserveSig] int RegisterAudioSessionNotification(IntPtr events);
+        [PreserveSig] int UnregisterAudioSessionNotification(IntPtr events);
+        [PreserveSig] int GetSessionIdentifier([MarshalAs(UnmanagedType.LPWStr)] out string id);
+        [PreserveSig] int GetSessionInstanceIdentifier([MarshalAs(UnmanagedType.LPWStr)] out string id);
+        [PreserveSig] int GetProcessId(out uint processId);
+        [PreserveSig] int IsSystemSoundsSession();
+        [PreserveSig] int SetDuckingPreference([MarshalAs(UnmanagedType.Bool)] bool optOut);
+    }
+
     [ComImport, Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IAudioMeterInformation
     {
         [PreserveSig] int GetPeakValue(out float peak);
     }
 
-    /// <summary>
-    /// The default playback device's peak meter: the loudest sample level of what is playing, 0 to 1,
-    /// as the volume mixer's bar shows it. It reads a level only; it opens no audio stream, so nothing
-    /// is captured, recorded or heard. Re-acquired when a read fails (the default device changed or
-    /// went away). Release it when nothing plays.
-    /// </summary>
-    internal sealed class PeakMeter : IDisposable
-    {
-        private IAudioMeterInformation? _meter;
-        private DateTime _retryAfter = DateTime.MinValue;
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint access, [MarshalAs(UnmanagedType.Bool)] bool inherit, uint pid);
 
-        /// <summary>The peak now, or null when no output device is available.</summary>
-        public float? Read()
+    [DllImport("kernel32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool QueryFullProcessImageNameW(IntPtr process, uint flags, char[] name, ref uint size);
+
+    /// <summary>A process's image name without the path or ".exe" ("Spotify", "chrome"), null when it
+    /// cannot be read (gone, protected).</summary>
+    private static string? ProcessName(uint pid)
+    {
+        if (pid == 0) return null;
+        var h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (h == IntPtr.Zero) return null;
+        try
         {
-            if (_meter is null && !Acquire()) return null;
-            try
+            var buffer = new char[1024];
+            uint size = (uint)buffer.Length;
+            return QueryFullProcessImageNameW(h, 0, buffer, ref size)
+                ? Path.GetFileNameWithoutExtension(new string(buffer, 0, (int)size))
+                : null;
+        }
+        catch (ArgumentException) { return null; }
+        finally { CloseHandle(h); }
+    }
+
+    /// <summary>
+    /// The peak level of the app that is playing, from the default output device's audio sessions (the
+    /// volume mixer's per-app bars). Each session is one app's stream; this reads each session's meter
+    /// (a level only: no stream is opened, so nothing is captured, recorded or heard), skips the
+    /// "System Sounds" session (chimes and dings) and Sanduhr's own, and hands the rest to
+    /// <see cref="AudioSessionMatch.Pick"/>: the sessions of the playing app, or when none is found the
+    /// loudest of the others. The device's whole-output meter is never read. The session list is read
+    /// again each second (a player's session appears when it starts; the default device may change),
+    /// the meters every frame. Release it when nothing plays.
+    /// </summary>
+    internal sealed class SessionPeakMeter : IDisposable
+    {
+        private static readonly TimeSpan RefreshEvery = TimeSpan.FromSeconds(1);
+        private readonly uint _ownPid = (uint)Environment.ProcessId;
+        private readonly List<Entry> _entries = [];
+        private DateTime _refreshAt = DateTime.MinValue;
+        private bool _device;
+
+        private sealed record Entry(IAudioSessionControl2 Control, IAudioMeterInformation Meter, string? Name, bool SystemSounds, bool Own);
+
+        /// <summary>The level for the app with this AppUserModelId now, and whether its sessions were
+        /// found; null when no output device is available.</summary>
+        public AudioSessionPick? Read(string? appId)
+        {
+            if (DateTime.UtcNow >= _refreshAt) Refresh();
+            if (!_device) return null;
+            var readings = new List<AudioSessionReading>(_entries.Count);
+            bool stale = false;
+            foreach (var e in _entries)
             {
-                if (_meter!.GetPeakValue(out var peak) == 0) return peak;
+                try
+                {
+                    if (e.Meter.GetPeakValue(out var peak) == 0)
+                        readings.Add(new AudioSessionReading(e.Name, e.SystemSounds, e.Own, peak));
+                }
+                catch (Exception ex) when (ex is COMException or InvalidComObjectException) { stale = true; }
             }
-            catch (Exception e) when (e is COMException or InvalidComObjectException) { }
-            Release();
-            try
-            {
-                return Acquire() && _meter!.GetPeakValue(out var again) == 0 ? again : null;
-            }
-            catch (Exception e) when (e is COMException or InvalidComObjectException)
-            {
-                Release();
-                return null;
-            }
+            if (stale) _refreshAt = DateTime.MinValue; // a session went away under us: list again next frame
+            return AudioSessionMatch.Pick(appId, readings);
         }
 
-        private bool Acquire()
+        private void Refresh()
         {
-            if (DateTime.UtcNow < _retryAfter) return false;
+            ReleaseEntries();
+            _refreshAt = DateTime.UtcNow + RefreshEvery;
+            _device = false;
+            object? enumerator = null;
+            IMMDevice? device = null;
             try
             {
                 var type = Type.GetTypeFromCLSID(CLSID_MMDeviceEnumerator);
-                if (type is null || Activator.CreateInstance(type) is not IMMDeviceEnumerator en) return Fail();
+                if (type is null || (enumerator = Activator.CreateInstance(type)) is not IMMDeviceEnumerator en) return;
+                if (en.GetDefaultAudioEndpoint(eRender, eConsole, out device) != 0 || device is null) return;
+                var iid = IID_IAudioSessionManager2;
+                if (device.Activate(ref iid, CLSCTX_ALL, IntPtr.Zero, out var o) != 0 || o is not IAudioSessionManager2 manager) return;
+                _device = true;
                 try
                 {
-                    if (en.GetDefaultAudioEndpoint(eRender, eConsole, out var device) != 0 || device is null) return Fail();
+                    if (manager.GetSessionEnumerator(out var sessions) != 0 || sessions is null) return;
                     try
                     {
-                        var iid = IID_IAudioMeterInformation;
-                        if (device.Activate(ref iid, CLSCTX_ALL, IntPtr.Zero, out var o) != 0 || o is not IAudioMeterInformation m)
-                            return Fail();
-                        _meter = m;
-                        return true;
+                        if (sessions.GetCount(out int count) != 0) return;
+                        for (int i = 0; i < count; i++)
+                        {
+                            if (sessions.GetSession(i, out var control) != 0 || control is null) continue;
+                            Add(control);
+                        }
                     }
-                    finally { Marshal.ReleaseComObject(device); }
+                    finally { Marshal.ReleaseComObject(sessions); }
                 }
-                finally { Marshal.ReleaseComObject(en); }
+                finally { Marshal.ReleaseComObject(manager); }
             }
             catch (Exception e) when (e is COMException or InvalidCastException or InvalidComObjectException)
             {
-                return Fail();
+                // Core Audio unavailable or the device went away mid-read: no sessions until the next refresh.
             }
-        }
-
-        // No device (or Core Audio unavailable): try again in a few seconds rather than every frame.
-        private bool Fail()
-        {
-            _retryAfter = DateTime.UtcNow.AddSeconds(5);
-            return false;
-        }
-
-        private void Release()
-        {
-            if (_meter is not null)
+            finally
             {
-                try { Marshal.ReleaseComObject(_meter); } catch (ArgumentException) { }
-                _meter = null;
+                if (device is not null) Marshal.ReleaseComObject(device);
+                if (enumerator is not null && Marshal.IsComObject(enumerator)) Marshal.ReleaseComObject(enumerator);
             }
         }
 
-        public void Dispose() => Release();
+        private void Add(IAudioSessionControl2 control)
+        {
+            try
+            {
+                // The session object also answers as its own meter.
+                if (control is not IAudioMeterInformation meter) { Marshal.ReleaseComObject(control); return; }
+                bool system = control.IsSystemSoundsSession() == 0; // S_OK: it is the System Sounds session
+                control.GetProcessId(out var pid);
+                _entries.Add(new Entry(control, meter, system ? null : ProcessName(pid), system, pid == _ownPid));
+            }
+            catch (Exception e) when (e is COMException or InvalidCastException or InvalidComObjectException)
+            {
+                try { Marshal.ReleaseComObject(control); } catch (ArgumentException) { }
+            }
+        }
+
+        private void ReleaseEntries()
+        {
+            foreach (var e in _entries)
+            {
+                try { Marshal.ReleaseComObject(e.Control); } catch (ArgumentException) { }
+            }
+            _entries.Clear();
+        }
+
+        public void Dispose()
+        {
+            ReleaseEntries();
+            _device = false;
+            _refreshAt = DateTime.MinValue;
+        }
     }
 
     // ---- The wallpaper ----

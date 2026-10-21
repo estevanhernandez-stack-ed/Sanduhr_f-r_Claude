@@ -1,6 +1,6 @@
 # Changelog
 
-## v3.6.0 — unreleased
+## v3.6.0 — 2026-10-21
 
 **Platform:** Windows (.NET 10 / WPF). A Mac-parity slice: the tour learns the Desk, the Desk gets its plate and a better Arrange, the statusline says which folder it is in, and Claude Code can watch work and suggest Desk messages through `sanduhr-mcp`. `Sanduhr.Mcp` to 3.6.0. No new capability, no new outbound destination; the manifest still declares `runFullTrust` only.
 
@@ -9,6 +9,13 @@
 - **A plate behind the text.** Settings ▸ Desk gains **Plate behind the text**: a soft rounded plate behind each stack of pieces, dark behind light ink and light behind dark ink, for a desktop with files under it. On for a new install, untouched for an existing one.
 - **Arrange Desk hides and shows pieces.** Each piece has **Hide** while arranging, and a **Hidden** strip brings one back. Done writes the layout once; Cancel drops every change. Done waits while every piece is hidden ("Show a piece first, or Cancel."). The Margins section waits while you arrange.
 - **Watchers on the Desk.** Turn on **Let agents show watchers** (Settings ▸ Desk, off by default) and place **Watchers**: Claude Code can put a live card on the Desk for work it is watching, with a title, progress and a short note, "waiting on you" when it needs you, fading when it passes. Cards live in memory only.
+
+### Now playing
+
+- **Shows only while something plays.** Now playing appears the moment a media app reports Playing and fades away 5 seconds after a pause or stop; resuming inside those 5 seconds never hides it. The rule reads the media session's own state, never the sound level, so a system chime can't open it. **Keep showing while paused** (Settings ▸ Now playing, off by default) replaces the old hide-while-paused switch. The widget's now-playing line follows the same rule.
+- **No hole left behind.** When it hides, the other pieces in its stack slide to close the gap (about 0.6 s), and slide back as it returns (about 1 s), inside a Desk window that never resizes mid-move. With Windows animations off, it snaps.
+- **The bars follow the music, not the dings.** The visualizer reads the playing app's own audio-session peak meter (Spotify, browsers, Media Player, Apple Music and more, matched by app), never the System Sounds session or Sanduhr's own chimes, and never the whole output device. Still peak values only, in memory, nothing captured.
+- **Whichever app is playing wins.** With several media sessions open, a playing one beats a paused one that Windows calls current, so a paused browser tab can't hide your music.
 
 ### Claude Code
 

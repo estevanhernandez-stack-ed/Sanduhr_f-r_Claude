@@ -694,7 +694,7 @@ public sealed class SettingsStore
         Write(root);
     }
 
-    /// <summary>Now playing (spec 6.3): "now_playing" {widget, hide_paused, excluded, visualizer}.
+    /// <summary>Now playing (spec 6.3): "now_playing" {widget, keep_paused, excluded, visualizer}.
     /// App ids only; a title is never stored.</summary>
     public NowPlayingSettings LoadNowPlaying() => NowPlayingSettings.Decode(Read()["now_playing"]);
 

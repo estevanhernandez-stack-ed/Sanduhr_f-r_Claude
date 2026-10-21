@@ -22,6 +22,7 @@ public sealed partial class NowPlayingLineViewModel : ObservableObject, IDisposa
         _hub = hub;
         _store = store;
         _hub.Changed += Refresh;
+        _hub.PresenceChanged += Refresh;
         Reload();
     }
 
@@ -38,13 +39,16 @@ public sealed partial class NowPlayingLineViewModel : ObservableObject, IDisposa
     public void Reload()
     {
         _settings = _store.LoadNowPlaying();
+        _hub.Configure(_settings.Prefs);
         _hub.Want(this, _settings.Widget);
         Refresh();
     }
 
     private void Refresh()
     {
-        var info = _settings.Widget ? _settings.Prefs.Visible(_hub.Shown) : null;
+        // Up only while the hub's presence rule wants it (playing, or paused and kept, or inside the
+        // 5 s grace): the same rule the Desk piece follows.
+        var info = _settings.Widget && _hub.Presence.Wanted ? _settings.Prefs.Visible(_hub.Shown) : null;
         var line = NowPlayingText.Line(info);
         Visible = line is not null;
         Text = line ?? "";
@@ -60,6 +64,7 @@ public sealed partial class NowPlayingLineViewModel : ObservableObject, IDisposa
     public void Dispose()
     {
         _hub.Changed -= Refresh;
+        _hub.PresenceChanged -= Refresh;
         _hub.Want(this, false);
     }
 }

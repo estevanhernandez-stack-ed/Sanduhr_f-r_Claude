@@ -34,7 +34,7 @@ public sealed partial class NowPlayingAppRow : ObservableObject
 }
 
 /// <summary>
-/// Settings, Now playing (spec 6.3, 6.6): the widget line, hide while paused, the apps seen this
+/// Settings, Now playing (spec 6.3, 6.6): the widget line, keep showing while paused, the apps seen this
 /// session with a switch each (an excluded app stays listed so it can come back), the bars beside the
 /// Desk piece, and a status line that never shows the title.
 /// </summary>
@@ -58,7 +58,7 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
     public Action? Changed { get; set; }
 
     [ObservableProperty] private bool _widget;
-    [ObservableProperty] private bool _hidePaused;
+    [ObservableProperty] private bool _keepPaused;
     [ObservableProperty] private bool _bars;
     [ObservableProperty] private string _status = "";
 
@@ -70,7 +70,7 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
     {
         _loading = true;
         Widget = _saved.Widget;
-        HidePaused = _saved.HidePaused;
+        KeepPaused = _saved.KeepPaused;
         Bars = _saved.Bars;
         _loading = false;
         Refresh();
@@ -99,7 +99,7 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
     }
 
     partial void OnWidgetChanged(bool value) { if (!_loading) Save(_saved with { Widget = value }); }
-    partial void OnHidePausedChanged(bool value) { if (!_loading) Save(_saved with { HidePaused = value }); }
+    partial void OnKeepPausedChanged(bool value) { if (!_loading) Save(_saved with { KeepPaused = value }); }
     partial void OnBarsChanged(bool value) { if (!_loading) Save(_saved with { Bars = value }); }
 
     private void Save(NowPlayingSettings next)

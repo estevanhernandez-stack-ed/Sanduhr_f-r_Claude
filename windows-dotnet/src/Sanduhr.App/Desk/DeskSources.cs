@@ -71,17 +71,19 @@ internal sealed class TelemetrySource : IDisposable
 }
 
 /// <summary>
-/// The bars beside now playing (spec 6.6): the default output's peak level, sampled every
-/// <see cref="AudioBars.FrameInterval"/> only while <see cref="Start"/>ed (the controller starts it only
-/// while a track plays and the piece is on screen). After <see cref="AudioBars"/> says idle, it drops to
-/// one check a second until sound returns. Stopped, the meter is released and nothing ticks. A level
-/// only: no audio is captured.
+/// The bars beside now playing (spec 6.6): the peak level of the playing app's audio session (not the
+/// whole output, so a Windows chime never moves them), sampled every <see cref="AudioBars.FrameInterval"/>
+/// only while <see cref="Start"/>ed (the controller starts it only while a track plays and the piece is on
+/// screen). <see cref="Follow"/> names the app (the media session's AppUserModelId, held in memory only).
+/// After <see cref="AudioBars"/> says idle, it drops to one check a second until sound returns. Stopped,
+/// the meter is released and nothing ticks. A level only: no audio is captured.
 /// </summary>
 internal sealed class AudioLevelSource : IDisposable
 {
     private static readonly TimeSpan IdleCheck = TimeSpan.FromSeconds(1);
     private readonly DispatcherTimer _timer;
-    private DeskSensorsNative.PeakMeter? _meter;
+    private DeskSensorsNative.SessionPeakMeter? _meter;
+    private string? _appId;
 
     public AudioLevelSource()
     {
@@ -96,6 +98,14 @@ internal sealed class AudioLevelSource : IDisposable
 
     public bool Running => _timer.IsEnabled;
 
+    /// <summary>True when the last frame found the playing app's own audio session; false when it fell
+    /// back to the loudest other session (the live check reads it). Never a title or an app id.</summary>
+    internal bool FollowingApp { get; private set; }
+
+    /// <summary>Which app's audio the bars follow: the playing media session's AppUserModelId. Null
+    /// follows the loudest session that is not System Sounds.</summary>
+    public void Follow(string? appId) => _appId = appId;
+
     /// <summary>Previews and the cost runner: one frame from a given level, without the meter.</summary>
     internal void Pump(float peak)
     {
@@ -106,7 +116,7 @@ internal sealed class AudioLevelSource : IDisposable
     public void Start()
     {
         if (_timer.IsEnabled) return;
-        _meter ??= new DeskSensorsNative.PeakMeter();
+        _meter ??= new DeskSensorsNative.SessionPeakMeter();
         _timer.Interval = AudioBars.FrameInterval;
         _timer.Start();
     }
@@ -123,7 +133,9 @@ internal sealed class AudioLevelSource : IDisposable
     private void Tick()
     {
         var now = DateTimeOffset.Now;
-        float peak = _meter?.Read() ?? 0f;
+        var pick = _meter?.Read(_appId);
+        FollowingApp = pick?.Matched == true;
+        float peak = pick?.Peak ?? 0f;
         bool wasIdle = Bars.IsIdle(now);
         Bars.Push(peak, now);
         bool idle = Bars.IsIdle(now);

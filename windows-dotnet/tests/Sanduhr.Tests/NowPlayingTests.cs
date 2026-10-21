@@ -214,11 +214,35 @@ public class NowPlayingTests
     }
 
     [Fact]
-    public void Visible_HideWhilePaused()
+    public void Visible_PausedStillDrawsDuringTheGrace()
     {
-        var prefs = new NowPlayingPrefs { HideWhilePaused = true };
-        Assert.Null(prefs.Visible(Paused));
+        // Whether a paused track holds the piece up is IsActive's business, not Visible's.
+        var prefs = new NowPlayingPrefs();
+        Assert.Equal(Paused, prefs.Visible(Paused));
         Assert.Equal(Playing, prefs.Visible(Playing));
+    }
+
+    [Fact]
+    public void IsActive_PlayingYes_PausedOnlyWhenKept_NothingNever()
+    {
+        var prefs = new NowPlayingPrefs();
+        Assert.True(prefs.IsActive(Playing));
+        Assert.False(prefs.IsActive(Paused));
+        Assert.False(prefs.IsActive(null));
+        Assert.False(prefs.IsActive(new NowPlayingInfo()));
+
+        var keep = new NowPlayingPrefs { KeepWhilePaused = true };
+        Assert.True(keep.IsActive(Playing));
+        Assert.True(keep.IsActive(Paused));
+        Assert.False(keep.IsActive(new NowPlayingInfo()));
+    }
+
+    [Fact]
+    public void IsActive_ExcludedAppNeverHoldsThePieceUp()
+    {
+        var prefs = new NowPlayingPrefs { Excluded = ["chrome"], KeepWhilePaused = true };
+        Assert.False(prefs.IsActive(Playing));
+        Assert.False(prefs.IsActive(Paused));
     }
 
     [Fact]
@@ -239,7 +263,7 @@ public class NowPlayingTests
     public void Prefs_Defaults()
     {
         var p = new NowPlayingPrefs();
-        Assert.False(p.HideWhilePaused);
+        Assert.False(p.KeepWhilePaused);
         Assert.Empty(p.Excluded);
     }
 
