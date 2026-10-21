@@ -121,6 +121,8 @@ public class SettingsSourceScanTests
         var missing = new List<string>();
         foreach (var e in SettingsIndex.Anchors)
         {
+            // Quit is the sidebar foot's button, not a section of General: its own test finds it.
+            if (e.Anchor == SettingsIndex.Quit) continue;
             var tag = e.Page.ToString();
             var marker = $"views:SettingsAnchor.Id=\"{e.Anchor}\"";
             if (!ranges.TryGetValue(tag, out var found))
@@ -129,6 +131,19 @@ public class SettingsSourceScanTests
                 missing.Add($"{tag}/{e.Anchor}");
         }
         Assert.True(missing.Count == 0, "Anchors not marked: " + string.Join(", ", missing));
+    }
+
+    [Fact]
+    public void Quit_sits_at_the_sidebar_foot_named_and_wired_to_the_quit_command()
+    {
+        var xaml = File.ReadAllText(Path.Combine(AppDir(), "Views", "SettingsWindow.xaml"));
+        var button = Regex.Match(xaml, "<Button x:Name=\"QuitButton\"[^>]*>", RegexOptions.Singleline);
+        Assert.True(button.Success, "no QuitButton in the sidebar template");
+        Assert.Contains($"AutomationProperties.Name=\"{SettingsNames.QuitSanduhr}\"", button.Value);
+        Assert.Contains("Command=\"{Binding QuitCommand}\"", button.Value);
+        // Search finds it, and Enter on the hit puts the keyboard on the button.
+        Assert.Contains(SettingsIndex.Search("quit"), h => h.Entry.Anchor == SettingsIndex.Quit);
+        Assert.Contains(SettingsIndex.Search("exit"), h => h.Entry.Anchor == SettingsIndex.Quit);
     }
 
     [Fact]

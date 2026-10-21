@@ -1,5 +1,31 @@
 # Changelog
 
+## v3.6.0 — unreleased
+
+**Platform:** Windows (.NET 10 / WPF). A Mac-parity slice: the tour learns the Desk, the Desk gets its plate and a better Arrange, the statusline says which folder it is in, and Claude Code can watch work and suggest Desk messages through `sanduhr-mcp`. `Sanduhr.Mcp` to 3.6.0. No new capability, no new outbound destination; the manifest still declares `runFullTrust` only.
+
+### The Desk
+
+- **A plate behind the text.** Settings ▸ Desk gains **Plate behind the text**: a soft rounded plate behind each stack of pieces, dark behind light ink and light behind dark ink, for a desktop with files under it. On for a new install, untouched for an existing one.
+- **Arrange Desk hides and shows pieces.** Each piece has **Hide** while arranging, and a **Hidden** strip brings one back. Done writes the layout once; Cancel drops every change. Done waits while every piece is hidden ("Show a piece first, or Cancel."). The Margins section waits while you arrange.
+- **Watchers on the Desk.** Turn on **Let agents show watchers** (Settings ▸ Desk, off by default) and place **Watchers**: Claude Code can put a live card on the Desk for work it is watching, with a title, progress and a short note, "waiting on you" when it needs you, fading when it passes. Cards live in memory only.
+
+### Claude Code
+
+- **Five new MCP tools.** `watch_start`, `watch_update` and `watch_end` drive the Desk's watcher cards; `get_desk_messages` reads your Desk messages and `propose_desk_messages` suggests lines, which wait on Settings ▸ Message for **Add**, **Review** or **Dismiss**. Nothing changes your messages without Add. Requests travel as files in `%USERPROFILE%\.sanduhr`; the server stays network-free.
+- **The trust boundary, widened on purpose.** `sanduhr-mcp` now source-links 17 Core files (was 11): the widget's own watcher and Desk-message validators, so the server refuses exactly what the widget would. Still no project or package reference; `TrustBoundaryTests` pins the list and reads the new files for IO, network and process names.
+- **The statusline names its folder.** Sanduhr's line can start with an **Account** segment: the Claude Code folder's name (`.claude-personal` shows `personal`), or the `SANDUHR_LABEL` you set in that folder's own settings. Worked out when the line renders; Sanduhr stores no name anywhere, and `seats.json` still holds none. A plain `.claude` folder shows no label, and a segment list you picked before is kept exactly.
+
+### Tour and Settings
+
+- **The tour knows the Desk.** The full tour gains an **On your desktop** card whose Show me opens Settings ▸ Desk. Choosing **Just the Desk** opens a three-step Desk-only tour, and Take the tour… shows it while Just the Desk is on.
+- **Quit from any Settings page.** **Quit Sanduhr** sits at the foot of the Settings sidebar, the same quit as the tray's. Search finds it as "quit", "exit" or "close".
+- **The sidebar's search box and Quit are visible to screen readers**, along with the page list.
+
+### Considered and dropped
+
+- **The Desk under desktop icons** (the Mac's 2.27). A spike on Windows 11 build 26220 showed pieces drawn below the icons appear only with opaque painting, losing the Desk's soft shadows and anti-aliased ink; the shipping Desk already lets icons show and click through its transparent pixels. Findings in `windows-dotnet/docs/spec.md` 5.0b.
+
 ## v2.31.0-mac — 2026-10-21
 
 - **The glass breathes for free.** The widget's breathing-glass pulse redrew every filled bar fifteen times a second through a timeline view, forever, a hidden widget included, and that was most of Sanduhr's idle CPU. The pulse is now a Core Animation layer the render server animates; under Reduce Motion it holds its rest tint. Measured on the same build with the meters filled: 4.45 percent of a core before, 0.59 after.

@@ -15,7 +15,7 @@ namespace Sanduhr.Mcp;
 /// math. Reset-crossing is checked before serving any tier: a fresh-by-age
 /// snapshot is arbitrarily wrong across a boundary, and five_hour crosses daily.
 /// </summary>
-public sealed class ToolLogic
+public sealed partial class ToolLogic
 {
     private readonly McpConfig _config;
     private readonly Func<DateTimeOffset> _clock;
@@ -715,11 +715,14 @@ public sealed class ToolLogic
     /// handle is open on the target, even one that shares delete, and the widget may be
     /// mid-read. When the target vanishes first (the widget clears it), a plain move
     /// lands the file.</summary>
-    private static void WriteRequestAtomically(string path, JsonObject request)
+    private static void WriteRequestAtomically(string path, JsonObject request) =>
+        WriteRequestAtomically(path, request.ToJsonString());
+
+    private static void WriteRequestAtomically(string path, string text)
     {
         // A name per write: two sessions' servers may queue at the same moment.
         string tmp = $"{path}.{Guid.NewGuid():N}.tmp";
-        File.WriteAllText(tmp, request.ToJsonString());
+        File.WriteAllText(tmp, text);
         try
         {
             if (File.Exists(path))

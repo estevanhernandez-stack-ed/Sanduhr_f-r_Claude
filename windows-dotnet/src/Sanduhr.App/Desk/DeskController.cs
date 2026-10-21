@@ -26,6 +26,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private readonly Func<DeskUsage> _usageSource;
     private readonly NowPlayingHub _nowPlaying;
     private readonly DeskMessageSource _messages;
+    private readonly WatcherStore? _watchers;
     private readonly DispatcherTimer _minute;
     private readonly TelemetrySource _telemetry = new();
     private readonly AudioLevelSource _audio = new();
@@ -55,19 +56,27 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private DeskArrangeMode? _arrangeMode;
 
     public DeskController(SettingsStore store, Func<IDeskHost> hostFactory, Func<DeskUsage> usageSource,
-        NowPlayingHub nowPlaying, DeskMessageSource messages)
+        NowPlayingHub nowPlaying, DeskMessageSource messages, WatcherStore? watchers = null)
     {
         _store = store;
         _hostFactory = hostFactory;
         _usageSource = usageSource;
         _nowPlaying = nowPlaying;
         _messages = messages;
+        _watchers = watchers;
         _minute = new DispatcherTimer(DispatcherPriority.Background);
         _minute.Tick += (_, _) => OnMinute();
         _weather.Updated += () => Render();
         _messages.Changed += () => Render();
+        if (_watchers is not null) _watchers.Changed += () => Render();
         _nowPlaying.Changed += OnTrackChanged;
     }
+
+    /// <summary>True when the Watchers piece has a place on the Desk (the watcher glow fires only then).</summary>
+    internal bool WatchersPlaced => Placed("watchers");
+
+    /// <summary>The cards to draw: the board's, when the piece is placed.</summary>
+    private IReadOnlyList<Watcher> WatchersNow() => _watchers is not null && Placed("watchers") ? _watchers.Shown : [];
 
     private bool _piecesTakeClicks = DeskPieceClicks.DefaultOn;
 
@@ -216,6 +225,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             WeatherOn = Placed("weather"),
             Place = _weatherSettings.Place,
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
+            Watchers = WatchersNow(),
         };
         DeskArrangeMode mode;
         try
@@ -250,6 +260,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private void EndArrangeCore(DeskArrangeEnd how, bool reload)
     {
         if (_session is not { } session) return;
+        // Done waits while every drawn piece is hidden; Cancel (and a forced end) still ends the mode.
+        if (how == DeskArrangeEnd.Done && reload && !session.CanFinish(DeskView.Drawn)) return;
         var mode = _arrangeMode;
         _arrangeMode = null;
         _session = null;
@@ -381,6 +393,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             WeatherOn = Placed("weather"),
             Place = _weatherSettings.Place,
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
+            Watchers = WatchersNow(),
         };
         _fullAt = now;
         foreach (var old in _views) old.Dispose();

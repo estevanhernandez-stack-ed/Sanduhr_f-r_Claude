@@ -17,10 +17,10 @@ public readonly record struct DeskMarginSettings(double Left, double Right, doub
 /// The Desk's settings (spec 5.1): <c>desk_enabled</c> (off), <c>desk_layout</c> (the layout string,
 /// <see cref="DeskArrangement.Standard"/>), <c>desk_margins</c>, <c>desk_font</c> (null = EsteFont
 /// Pro, "" = the system font) and <c>desk_time_size</c> (the clock's size; every piece but a message
-/// scales from it). A missing or unreadable key is its default, so an existing install reads unchanged
+/// scales from it), and <c>desk_plate</c> (<see cref="DeskPlate"/>, off). A missing or unreadable key is its default, so an existing install reads unchanged
 /// and the Desk stays off until switched on.
 /// </summary>
-public sealed record DeskSettings(bool Enabled, string Layout, DeskMarginSettings Margins, string? Font, double TimeSize)
+public sealed record DeskSettings(bool Enabled, string Layout, DeskMarginSettings Margins, string? Font, double TimeSize, bool Plate = false)
 {
     public const double DefaultTimeSize = 112;
     public const double MinTimeSize = 48;

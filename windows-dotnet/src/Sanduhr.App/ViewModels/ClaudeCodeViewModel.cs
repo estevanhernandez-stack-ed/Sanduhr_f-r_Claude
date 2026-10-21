@@ -545,7 +545,8 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 "What gets written: the render script at %USERPROFILE%\\.sanduhr\\bin, a statusLine entry in this folder's "
                 + "settings.json (a copy of the file is saved under %APPDATA%\\Sanduhr\\backups first), and a usage "
                 + "snapshot at %USERPROFILE%\\.sanduhr\\snapshot.json with percentages and reset times only, never your "
-                + "account name or keys. Remove brings back the statusline that was here before.",
+                + "account name or keys. The line can start with this folder's name (or the SANDUHR_LABEL you set in its "
+                + "settings), worked out when it renders and never stored. Remove brings back the statusline that was here before.",
                 "Install", theirs, OfferSegments: true));
             if (choice is null) return;
             if (!installer.InstallScript())

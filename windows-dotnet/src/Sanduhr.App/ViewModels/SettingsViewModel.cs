@@ -111,6 +111,12 @@ public sealed class SettingsViewModel
     /// <summary>Connected by the orchestrator: opens the reset dialog. Null does nothing.</summary>
     public Func<Task>? ResetRequested { get; set; }
 
+    /// <summary>The sidebar foot's "Quit Sanduhr": runs the tray's quit path.</summary>
+    public ICommand QuitCommand { get; }
+
+    /// <summary>Connected by the orchestrator: the same quit the tray's Quit runs. Null does nothing.</summary>
+    public Action? QuitRequested { get; set; }
+
     /// <summary>Backs the General tab's Shortcuts section (global shortcut + recorder).</summary>
     public ShortcutsViewModel Shortcuts { get; }
 
@@ -159,6 +165,7 @@ public sealed class SettingsViewModel
         ShowInExplorerCommand = new RelayCommand<string>(OpenFolder,
             folder => !string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder));
         OpenLinkCommand = new RelayCommand<string>(OpenLink);
+        QuitCommand = new RelayCommand(() => QuitRequested?.Invoke());
         ResetSanduhrCommand = new RelayCommand(async () =>
         {
             try { if (ResetRequested is { } reset) await reset(); }

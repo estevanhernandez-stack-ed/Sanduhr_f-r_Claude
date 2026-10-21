@@ -26,6 +26,8 @@ public static class SettingsIndex
     public const string Tray = "tray";
     public const string Startup = "startup";
     public const string Shortcuts = "shortcuts";
+    /// <summary>Quit Sanduhr sits at the foot of the sidebar, not on General; search focuses it there.</summary>
+    public const string Quit = "quit";
     // Accounts
     public const string AccountList = "accounts";
     public const string Follow = "follow";
@@ -74,6 +76,8 @@ public static class SettingsIndex
     public const string DeskInk = "ink";
     public const string DeskArrange = "arrange";
     public const string DeskClicks = "desk-clicks";
+    public const string DeskPlate = "desk-plate";
+    public const string DeskWatchers = "desk-watchers";
     // Desk: Message, Now playing, Weather (S6)
     public const string MessageLines = "lines";
     public const string MessageRotation = "rotation";
@@ -110,6 +114,8 @@ public static class SettingsIndex
             ["start with Windows", "sign-in", "login", "launch", "auto-start", "Startup apps"]),
         E("Shortcuts", SettingsPage.General, Shortcuts,
             [SettingsNames.ShortcutToOpenSettings, "hotkey", "keyboard", "keys", "Ctrl+Alt+S", "record", "global shortcut"]),
+        E(SettingsNames.QuitSanduhr, SettingsPage.General, Quit,
+            ["quit", "exit", "close", "close Sanduhr", "stop", "shut down", "end", "sidebar"]),
 
         E("Accounts", SettingsPage.Accounts, AccountList,
             ["sign in", "sign out", "add account", "rename", "update sign-in", "remove account", "switch",
@@ -177,10 +183,14 @@ public static class SettingsIndex
             ["drag", "move", "rearrange", "arrange", "reorder", "on the desktop", "layout"]),
         E(SettingsNames.DeskPieceClicksSwitch, SettingsPage.Desk, DeskClicks,
             ["click", "click-through", "right-click", "menu", "desktop icons", "clock", "message"]),
+        E(SettingsNames.WatchersSwitch, SettingsPage.Desk, DeskWatchers,
+            ["watcher", "watchers", "agent", "agents", "MCP", "watch_start", "CI", "deploy", "progress", "card", "claude code"]),
         E("Where each piece sits", SettingsPage.Desk, DeskPieces,
             ["layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor"]),
         E("Look", SettingsPage.Desk, DeskLook,
             ["font", "EsteFont", "EsteFont Pro", "EsteFont 26", "clock size", "time size", "typeface", "Segoe UI"]),
+        E(SettingsNames.DeskPlateSwitch, SettingsPage.Desk, DeskPlate,
+            ["plate", "backdrop", "background", "contrast", "readable", "desktop icons", "files", "dark plate", "behind the text"]),
         E("Margins", SettingsPage.Desk, DeskMargins,
             ["margin", "edge", "padding", "taskbar", "inset", "spacing"]),
         E("Layout map", SettingsPage.Desk, DeskMap,
@@ -235,6 +245,8 @@ public static class SettingsIndex
         [SettingsNames.DeskInk] = DeskInk,
         [SettingsNames.ArrangeDesk] = DeskArrange,
         [SettingsNames.DeskPieceClicksSwitch] = DeskClicks,
+        [SettingsNames.DeskPlateSwitch] = DeskPlate,
+        [SettingsNames.WatchersSwitch] = DeskWatchers,
         [SettingsNames.NowPlayingInWidget] = NowPlayingWidget,
         [SettingsNames.WeatherLookUp] = WeatherPlace,
         [SettingsNames.GlowWhere] = GlowWhere,

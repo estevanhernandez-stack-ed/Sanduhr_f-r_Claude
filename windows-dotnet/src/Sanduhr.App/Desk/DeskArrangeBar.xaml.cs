@@ -19,6 +19,14 @@ public sealed partial class DeskArrangeBar : UserControl
     /// <summary>Cancel was pressed.</summary>
     public event Action? CancelRequested;
 
+    /// <summary>Shows or clears the line that says Done waits (every piece is hidden).</summary>
+    public void ShowNothingPlaced(bool on)
+    {
+        Notice.Text = on ? DeskArrangeCopy.NothingPlaced : "";
+        Notice.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        AutomationProperties.SetName(Notice, Notice.Text);
+    }
+
     public DeskArrangeBar()
     {
         InitializeComponent();

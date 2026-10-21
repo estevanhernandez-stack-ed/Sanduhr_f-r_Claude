@@ -197,7 +197,10 @@ The Claude Code side (`docs/spec.md` Stage 4, `../docs/mods-and-config-spec.md`)
   launch. See "Plan B" in `docs/spec.md`.
 - **Reset Sanduhr…** on About: five parts, all checked, then quit.
 - **The MCP** reads discovered folders behind the `mcp_roots` consent (it now source-links
-  `ClaudeCodeHomes.cs`); `publish_usage` hands its request over atomically.
+  `ClaudeCodeHomes.cs`); `publish_usage` hands its request over atomically. Since 3.6.0 it also reads
+  the Desk messages (`get_desk_messages`) and hands the widget suggested messages
+  (`propose_desk_messages`) and watcher cards (`watch_start`, `watch_update`, `watch_end`), each a
+  request file the widget checks again; the link list grew by six pure Core files (spec 6.9).
 
 `statusline_enabled` now means "the statusline or the meters mod is installed in some folder", so
 `snapshot.json` is written while either is, or while the MCP server is installed (`mcp_enabled`:
@@ -213,7 +216,7 @@ The Desk (`docs/spec.md` Stages 5 and 6), off until **Settings, Desk** turns it 
   `%APPDATA%\Sanduhr`, the Mac's grammar and effects, special days that stack, take turns or
   scroll, edited on **Settings, Message**), **now playing** with bars from the output peak meter,
   **system** readings (CPU, RAM, disk) and **weather** from Open-Meteo for a city you pick
-  (**Settings, Weather**). Watchers are drawn from the harness only until their MCP tools ship.
+  (**Settings, Weather**), and **watchers**: live cards for work an agent is watching, shown when you turn on "Let agents show watchers" (**Settings, Desk**) and place the piece.
 - **Ink**: Automatic (from the wallpaper image behind each piece, never the screen), Light, Dark,
   the theme's color or Custom (`desk_ink`).
 - **Now playing in the widget**: a line under the cards (`now_playing.widget`, off by default).

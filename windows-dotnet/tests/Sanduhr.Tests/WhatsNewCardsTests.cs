@@ -9,13 +9,29 @@ public class WhatsNewCardsTests
     private static IReadOnlyList<WhatsNewCard> Table => WhatsNewCards.Table;
 
     [Fact]
-    public void Table_HasTheNineCardsInOrder()
+    public void Table_HasBothReleasesNewestFirst()
     {
         Assert.Equal(
-            ["desk", "settings-redesigned", "claude-code-page",
+            ["watchers", "suggested-messages", "desk-plate", "arrange-hide", "statusline-label",
+             "desk", "settings-redesigned", "claude-code-page",
              "shortcut-keys", "tray-shows", "limits-come-and-go", "every-folder", "steady-sparklines", "whats-new"],
             Table.Select(c => c.Id));
     }
+
+    [Fact]
+    public void Release360_ShowsOnlyItsOwnFiveCardsAfterTheUpdate()
+    {
+        var shown = WhatsNew.Cards("3.5.0", "3.6.0");
+        Assert.Equal(["watchers", "suggested-messages", "desk-plate", "arrange-hide", "statusline-label"], shown.Select(c => c.Id));
+        Assert.All(shown, c => Assert.Equal("3.6.0", c.Version));
+    }
+
+    [Theory]
+    [InlineData("watchers", SettingsPage.Desk)]
+    [InlineData("suggested-messages", SettingsPage.DeskMessage)]
+    [InlineData("statusline-label", SettingsPage.ClaudeCode)]
+    public void Release360_ShowMeOpensTheirPage(string id, SettingsPage page) =>
+        Assert.Equal(page, Table.Single(c => c.Id == id).Destination);
 
     [Fact]
     public void Release350_LeadsWithTheDeskSettingsAndClaudeCode()
@@ -49,7 +65,7 @@ public class WhatsNewCardsTests
         Assert.Equal(WhatsNew.Cap, atLaunch.Count);
         Assert.DoesNotContain(atLaunch, c => c.Id == "whats-new");
         var (menu, header) = WhatsNew.ForMenu("3.5.0", "3.5.0");
-        Assert.Equal(Table.Count, menu.Count);
+        Assert.Equal(Table.Count(c => c.Version == "3.5.0"), menu.Count);
         Assert.Equal("Highlights in 3.5.0", header);
     }
 

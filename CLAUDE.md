@@ -74,7 +74,9 @@ not connected, append to `docs/decisions/_pending-dashboard-log.md` and let the 
   creates, reads and deletes only its own names in it, never the folder wholesale; Reset removes
   the folder only when it is empty.
 - The MCP process is network-free by contract: `Sanduhr.Mcp.csproj` has no ProjectReference or
-  PackageReference, source-links four Core files, and `TrustBoundaryTests` pins the allowlist.
+  PackageReference, source-links an allowlist of pure Core files (the usage readers, theme lint, the
+  vault readers and, since 3.6.0, the Desk message and watcher validators), and `TrustBoundaryTests`
+  pins the allowlist and reads the newest files for IO, network and process names.
   `publish_usage` hands uploads to the widget through request/result files under `%USERPROFILE%\.sanduhr`.
   Widening the link list is a design decision that must break CI.
 - The publish token lives in Credential Manager slot `publish:token` (service `com.626labs.sanduhr`);

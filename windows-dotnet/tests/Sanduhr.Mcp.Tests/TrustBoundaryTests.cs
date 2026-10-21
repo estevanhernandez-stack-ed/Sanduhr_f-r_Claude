@@ -44,6 +44,13 @@ public class TrustBoundaryTests
                 // Root discovery only (2026-10-11 ruling, decision 6h5YrnXr0YVjPqlqqi8i): folder
                 // names under the profile. Consent (mcp_roots) still gates every root.
                 "ClaudeCodeHomes.cs",
+                // Watchers and Desk messages (3.6.0, Este's ruling 2026-10-21). All pure text, JSON and
+                // regex; no IO, network, credentials or process. The server validates with the widget's
+                // own code and queues request files only; the widget owns messages.txt and the board.
+                //   DeskMessages, MessageEffects, LetterMap: the line grammar and the "today" pick.
+                //   MessageProposal: the line checks and the request decode (the widget's authority).
+                //   Watchers, WatcherRequest: the limits, the commands, the request and switch files.
+                "DeskMessages.cs", "LetterMap.cs", "MessageEffects.cs", "MessageProposal.cs",
                 "Pacing.cs", "SnapshotContract.cs",
                 // propose_theme: the lint and the model it builds, both pure. The
                 // widget owns every write under the themes folder.
@@ -52,8 +59,36 @@ public class TrustBoundaryTests
                 // MCP-side vault writes; VaultStore's write methods have no call
                 // sites in the server (cold-verified tool surface).
                 "VaultJson.cs", "VaultModels.cs", "VaultReader.cs", "VaultStore.cs",
+                "WatcherRequest.cs", "Watchers.cs",
             },
             linked);
+    }
+
+    /// <summary>
+    /// The linked files are the trust boundary, so each one is read for what it can do. Any of these
+    /// names in a linked file would let the server reach out of its lane. Checks the files the 3.6.0
+    /// widening added (the older slice is covered by the type checks below and the cold verify).
+    /// </summary>
+    [Theory]
+    [InlineData("Watchers.cs")]
+    [InlineData("WatcherRequest.cs")]
+    [InlineData("MessageProposal.cs")]
+    [InlineData("DeskMessages.cs")]
+    [InlineData("MessageEffects.cs")]
+    [InlineData("LetterMap.cs")]
+    public void Files_linked_for_watchers_and_desk_messages_are_pure(string file)
+    {
+        string path = Path.Combine(Path.GetDirectoryName(McpCsprojPath())!, "..", "Sanduhr.Core", file);
+        string text = File.ReadAllText(path);
+        foreach (var forbidden in new[]
+        {
+            "HttpClient", "System.Net", "Socket", "WebView", "Process.Start", "ProcessStartInfo", "DllImport",
+            "LibraryImport", "File.", "Directory.", "FileStream", "StreamReader", "StreamWriter", "Environment.",
+            "Registry", "Credential",
+        })
+        {
+            Assert.DoesNotContain(forbidden, text);
+        }
     }
 
     [Fact]

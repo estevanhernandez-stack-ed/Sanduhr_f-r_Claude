@@ -161,6 +161,21 @@ public static class DeskArrangeCopy
     public const string SettingsArranging = "Arranging on the desktop. Finish there with Done or Cancel.";
     public const string SettingsDeskOff = "Turn on the Desk to arrange it on the desktop.";
 
+    /// <summary>The Hidden strip's label.</summary>
+    public const string HiddenStrip = "Hidden:";
+
+    /// <summary>The control on a piece that takes it off the Desk until Done or Cancel.</summary>
+    public const string HideWhileArranging = "Hide while arranging";
+
+    /// <summary>A piece's Hide control, named for a screen reader.</summary>
+    public static string HideLabel(string piece) => $"{HideWhileArranging}: {piece}";
+
+    /// <summary>A hidden piece's Show control, named for a screen reader.</summary>
+    public static string ShowLabel(string piece) => $"Show {piece}";
+
+    /// <summary>The bar's line while every piece is hidden: Done waits, Cancel still works.</summary>
+    public const string NothingPlaced = "Show a piece first, or Cancel.";
+
     /// <summary>The tray's entry while arranging.</summary>
     public const string TrayFinish = "Finish arranging";
 }
@@ -187,6 +202,12 @@ public sealed class DeskArrangeSession
 
     /// <summary>True when the working layout differs from the saved one (compared as canonical layout strings).</summary>
     public bool Changed => Working.Layout != new DeskArrangement(Saved).Layout;
+
+    /// <summary>
+    /// False while every piece in <paramref name="drawn"/> is hidden: Done waits (a blank layout would read
+    /// back as the standard one), Cancel still works.
+    /// </summary>
+    public bool CanFinish(IEnumerable<string>? drawn = null) => !Working.PlacesNothing(drawn);
 
     /// <summary>The string Done writes, null when nothing changed (an older string stays as it was).</summary>
     public string? ToWrite => Changed ? Working.Layout : null;

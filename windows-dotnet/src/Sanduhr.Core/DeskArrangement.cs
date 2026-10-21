@@ -243,6 +243,33 @@ public sealed class DeskArrangement
         else _pieces.Insert(Math.Min(from, _pieces.Count), piece);
     }
 
+    /// <summary>Takes <paramref name="widget"/> off the Desk, its size and all; the rest keep theirs.</summary>
+    public void Hide(string widget) => Place(widget, null);
+
+    /// <summary>
+    /// Puts a hidden <paramref name="widget"/> back at its standard anchor at size 1, seated by Settings
+    /// order. A placed piece stays where it is; a word this build does not know is ignored.
+    /// </summary>
+    public void Show(string widget)
+    {
+        if (Placement(widget) is not null || !Known.Contains(widget, StringComparer.Ordinal)) return;
+        Place(widget, DefaultAnchor(widget));
+    }
+
+    /// <summary>
+    /// The pieces the layout leaves out, in Settings order (Arrange mode's Hidden strip). Limited to
+    /// <paramref name="among"/> when given (the pieces the Desk draws), else every known piece.
+    /// </summary>
+    public IReadOnlyList<string> Hidden(IEnumerable<string>? among = null)
+    {
+        var offered = among is null ? Known : Known.Where(new HashSet<string>(among, StringComparer.Ordinal).Contains).ToList();
+        return offered.Where(w => Placement(w) is null).ToList();
+    }
+
+    /// <summary>True when none of the pieces in <paramref name="among"/> (default: every known one) is placed.</summary>
+    public bool PlacesNothing(IEnumerable<string>? among = null) =>
+        !(among ?? Known).Any(w => Placement(w) is not null);
+
     /// <summary>Sets a placed piece's size (snapped and kept within range). A hidden piece has none.</summary>
     public void SetScale(string widget, double scale)
     {

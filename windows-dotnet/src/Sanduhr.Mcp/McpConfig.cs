@@ -83,6 +83,29 @@ public sealed class McpConfig
     public TimeSpan ThemeWaitTimeout { get; init; } = TimeSpan.FromSeconds(20);
     public TimeSpan ThemePollInterval { get; init; } = TimeSpan.FromMilliseconds(250);
 
+    /// <summary>The widget's external folder (<c>%USERPROFILE%\.sanduhr</c>): where the watcher
+    /// requests are queued and <c>watchers.json</c> (the user's switch) is read. Null = unavailable.</summary>
+    public string? ExternalDir { get; init; }
+
+    /// <summary>The Desk messages handoff (see Core's MessageProposal): propose_desk_messages writes the
+    /// request, the widget checks it again and answers in the result; get_desk_messages reads the state
+    /// file the widget keeps of the pin and rotation. Null = handoff unavailable.</summary>
+    public string? DeskRequestPath { get; init; }
+    public string? DeskResultPath { get; init; }
+    public string? DeskStatePath { get; init; }
+
+    /// <summary>Where the user's <c>messages.txt</c> may be, in search order: read, never written, by
+    /// get_desk_messages. On the Store build the widget's file lives in the package's LocalCache (MSIX
+    /// AppData virtualization, the vault's rule: per file the cache copy shadows the real one), which a
+    /// process outside the package does not see through <c>%APPDATA%</c>; so the cache copy is looked
+    /// at first, then <c>%APPDATA%\Sanduhr\messages.txt</c>. Null = unavailable.</summary>
+    public IReadOnlyList<string>? DeskMessagesPaths { get; init; }
+
+    /// <summary>How long propose_desk_messages waits for the widget's first answer (it answers
+    /// pending_approval at once when it is running).</summary>
+    public TimeSpan DeskWaitTimeout { get; init; } = TimeSpan.FromSeconds(10);
+    public TimeSpan DeskPollInterval { get; init; } = TimeSpan.FromMilliseconds(250);
+
     public static McpConfig Resolve()
     {
         string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -179,6 +202,20 @@ public sealed class McpConfig
             // Same mirror discipline for Core's ThemeHandoff file names.
             ThemeRequestPath = Path.Combine(externalDir, "theme-request.json"),
             ThemeResultPath = Path.Combine(externalDir, "theme-result.json"),
+            // The watchers and Desk messages handoffs: the file names come from the linked Core
+            // types (WatcherRequest, MessageProposal); the folders are fixed, never from a file.
+            ExternalDir = externalDir,
+            DeskRequestPath = Path.Combine(externalDir, MessageProposal.RequestFile),
+            DeskResultPath = Path.Combine(externalDir, MessageProposal.ResultFile),
+            DeskStatePath = Path.Combine(externalDir, MessageProposal.StateFile),
+            DeskMessagesPaths = env("SANDUHR_VAULT_DIR") is { Length: > 0 }
+                ? new[] { Path.Combine(appDataSanduhrDir, "messages.txt") }
+                : new[]
+                {
+                    Path.Combine(localAppData, "Packages", "626LabsLLC.SanduhrfrClaude_wz1chhb2h2v4a",
+                        "LocalCache", "Roaming", "Sanduhr", "messages.txt"),
+                    Path.Combine(appDataSanduhrDir, "messages.txt"),
+                },
         };
     }
 

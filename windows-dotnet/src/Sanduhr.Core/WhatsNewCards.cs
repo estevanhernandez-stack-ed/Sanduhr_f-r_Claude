@@ -7,7 +7,31 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class WhatsNewCards
 {
-    public static IReadOnlyList<WhatsNewCard> Table { get; } = [.. Release350()];
+    public static IReadOnlyList<WhatsNewCard> Table { get; } = [.. Release360(), .. Release350()];
+
+    private static WhatsNewCard[] Release360() =>
+    [
+        WhatsNewCard.Of("3.6.0", "watchers", "Watchers on the Desk",
+            "Claude Code can show a live card on your Desk for work it's watching, and say when it needs you. Turn it on in Settings, Desk, then place Watchers.",
+            "", // Stopwatch
+            WhatsNewPreview.None, SettingsPage.Desk),
+        WhatsNewCard.Of("3.6.0", "suggested-messages", "Claude can suggest Desk messages",
+            "Ask Claude Code for a line or two. Suggestions wait in Settings, Message until you add them.",
+            "", // Message
+            WhatsNewPreview.None, SettingsPage.DeskMessage),
+        WhatsNewCard.Of("3.6.0", "desk-plate", "A plate behind the text",
+            "A soft plate behind the Desk's pieces keeps them readable over a busy desktop. Turn it on in Settings, Desk.",
+            "", // Color
+            WhatsNewPreview.None, SettingsPage.Desk),
+        WhatsNewCard.Of("3.6.0", "arrange-hide", "Hide pieces while arranging",
+            "Arrange Desk can hide a piece and bring it back from the Hidden strip. Cancel puts everything back.",
+            "", // RedEye
+            WhatsNewPreview.None, SettingsPage.Desk),
+        WhatsNewCard.Of("3.6.0", "statusline-label", "The statusline names its folder",
+            "In a folder like .claude-personal, Sanduhr's statusline starts with personal. Set SANDUHR_LABEL in that folder's settings to choose your own.",
+            "", // CommandPrompt
+            WhatsNewPreview.None, SettingsPage.ClaudeCode),
+    ];
 
     private static WhatsNewCard[] Release350() =>
     [

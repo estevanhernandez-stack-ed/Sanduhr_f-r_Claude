@@ -102,6 +102,8 @@
                 <TextBlock Text="Meters to show" FontSize="11" Margin="0,0,0,6"
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                 <StackPanel Orientation="Horizontal">
+                    <CheckBox x:Name="AccountBox" Content="Account" IsChecked="True" Style="{StaticResource ConsentCheckBox}"
+                              Margin="0,0,16,6" AutomationProperties.Name="Show the folder's label" />
                     <CheckBox x:Name="SessionBox" Content="Session" IsChecked="True" Style="{StaticResource ConsentCheckBox}"
                               Margin="0,0,16,6" AutomationProperties.Name="Show the session meter" />
                     <CheckBox x:Name="WeeklyBox" Content="Weekly" IsChecked="True" Style="{StaticResource ConsentCheckBox}"

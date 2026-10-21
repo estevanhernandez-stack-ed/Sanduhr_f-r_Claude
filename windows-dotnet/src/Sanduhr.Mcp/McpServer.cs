@@ -157,6 +157,21 @@ public sealed class McpServer
                 catch { /* non-bool stays default true */ }
                 payload = _tools.BuildProposeTheme(theme, saveAs, apply);
                 break;
+            case "get_desk_messages":
+                payload = _tools.BuildDeskMessages();
+                break;
+            case "propose_desk_messages":
+                payload = _tools.BuildProposeDeskMessages(args);
+                break;
+            case "watch_start":
+                payload = _tools.BuildWatchStart(args);
+                break;
+            case "watch_update":
+                payload = _tools.BuildWatchUpdate(args);
+                break;
+            case "watch_end":
+                payload = _tools.BuildWatchEnd(args);
+                break;
             default:
                 WriteError(id, -32602, $"unknown tool: {name}");
                 return;

@@ -736,7 +736,8 @@ public sealed class SettingsStore
                 ReadDouble(m, "left", d.Margins.Left), ReadDouble(m, "right", d.Margins.Right),
                 ReadDouble(m, "top", d.Margins.Top), ReadDouble(m, "bottom", d.Margins.Bottom)),
             font,
-            ReadDouble(root, "desk_time_size", d.TimeSize)).Normalized();
+            ReadDouble(root, "desk_time_size", d.TimeSize),
+            DeskPlate.Read(root)).Normalized();
     }
 
     public void SaveDesk(DeskSettings desk)
@@ -758,6 +759,24 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>"Plate behind the text": <c>desk_plate</c>, absent = off (<see cref="DeskPlate"/>).</summary>
+    public bool LoadDeskPlate() => DeskPlate.Read(Read());
+
+    public void SaveDeskPlate(bool on)
+    {
+        var root = Read();
+        if (on) root["desk_plate"] = true;
+        else root.Remove("desk_plate");
+        Write(root);
+    }
+
+    /// <summary>A fresh install's first launch writes the plate on; an existing install keeps what it has.</summary>
+    public void SeedDeskPlate(bool freshInstall)
+    {
+        var root = Read();
+        if (DeskPlate.Seed(root, freshInstall)) Write(root);
+    }
+
     /// <summary>"Clock and message take clicks" (spec 7.4): <c>desk_pieces_take_clicks</c>, absent = on.</summary>
     public bool LoadDeskPiecesTakeClicks() => ReadBool(Read(), DeskPieceClicks.Key, DeskPieceClicks.DefaultOn);
 
@@ -765,6 +784,18 @@ public sealed class SettingsStore
     {
         var root = Read();
         root["desk_pieces_take_clicks"] = on;
+        Write(root);
+    }
+
+    /// <summary>"Let agents show watchers" (spec 6.9): <c>watchers_agents</c>, absent = off. The MCP tools
+    /// <c>watch_start</c>, <c>watch_update</c> and <c>watch_end</c> write nothing while it is off.</summary>
+    public bool LoadWatchersAgents() => ReadBool(Read(), "watchers_agents", false);
+
+    public void SaveWatchersAgents(bool on)
+    {
+        var root = Read();
+        if (on) root["watchers_agents"] = true;
+        else root.Remove("watchers_agents");
         Write(root);
     }
 

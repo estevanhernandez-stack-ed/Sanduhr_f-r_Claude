@@ -1,0 +1,51 @@
+2026-10-21 13:56:12.652  under-icons spike starting, pid 59016, 7s, log C:\Users\estev\Projects\Sanduhr_f-r_Claude\docs\cart-runs\2026-10-21-mac-parity-3-6-0\spike\under-icons-attr.log
+2026-10-21 13:56:12.663  OS 10.0.26220.0, process DPI awareness via manifest (PerMonitorV2)
+2026-10-21 13:56:12.664  primary monitor 0,0 3440x1440, work 0,0 3440x1392; piece target (3700,700) 360x120
+2026-10-21 13:56:12.670  build: Progman Progman[0x1016E] rect (0,0) 5360x1440, DefView SHELLDLL_DefView[0x10176], WorkerW WorkerW[0xB133E] rect (0,0) 5360x1440 exstyle 0x0
+2026-10-21 13:56:12.690  piece: created 0x1E111CA WM_PAINT (mode attr), rect (3700,700) 360x120, parent WorkerW[0xB133E], visible True
+2026-10-21 13:56:12.694  click layer: created 0x66111A rect (3700,700) 360x120, owner Progman[0x1016E], exstyle 0x8080080, visible True
+2026-10-21 13:56:12.695  --- structure [after build] ---
+2026-10-21 13:56:12.695  shell window Progman[0x1016E] rect (0,0) 5360x1440 exstyle 0x200080
+2026-10-21 13:56:12.695    Progman child #0 (top to bottom): SHELLDLL_DefView[0x10176] rect (0,0) 5360x1440 visible True exstyle 0x80000
+2026-10-21 13:56:12.695    Progman child #1 (top to bottom): WorkerW[0xB133E] rect (0,0) 5360x1440 visible True exstyle 0x0
+2026-10-21 13:56:12.695  piece parent chain: UnderIconsPiece[0x1E111CA] -> WorkerW[0xB133E] -> Progman[0x1016E]
+2026-10-21 13:56:12.695  piece rect (3700,700) 360x120, layered False, visible True, DPI 96
+2026-10-21 13:56:12.695  desktop icon count (LVM_GETITEMCOUNT) 45
+2026-10-21 13:56:12.696  click layer UnderIconsClick[0x66111A] rect (3700,700) 360x120 (piece rect (3700,700) 360x120), owner Progman[0x1016E]
+2026-10-21 13:56:12.696  top-level z-order: 713 windows; click layer index 711, Progman (SHELLDLL_DefView's host) index 712; click layer ABOVE Progman: True
+2026-10-21 13:56:12.696  z-order around click layer: MSCTFIME UI[0x101A2] | IME[0x10104] | [CLICK] UnderIconsClick[0x66111A] | Progman[0x1016E] [PROGMAN] | 
+2026-10-21 13:56:12.697  hit test, piece centre (3880,760): WindowFromPoint UnderIconsClick[0x66111A] (root UnderIconsClick[0x66111A]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 1
+2026-10-21 13:56:12.697  hit test, outside, right of piece (+80px) (4140,760): WindowFromPoint SysListView32[0x10178] (root Progman[0x1016E]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:56:12.697  hit test, outside, below piece (+80px) (3880,900): WindowFromPoint SysListView32[0x10178] (root Progman[0x1016E]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:56:14.688  --- structure [after 2s settle] ---
+2026-10-21 13:56:14.689  shell window Progman[0x1016E] rect (0,0) 5360x1440 exstyle 0x200080
+2026-10-21 13:56:14.689    Progman child #0 (top to bottom): SHELLDLL_DefView[0x10176] rect (0,0) 5360x1440 visible True exstyle 0x80000
+2026-10-21 13:56:14.689    Progman child #1 (top to bottom): WorkerW[0xB133E] rect (0,0) 5360x1440 visible True exstyle 0x0
+2026-10-21 13:56:14.689  piece parent chain: UnderIconsPiece[0x1E111CA] -> WorkerW[0xB133E] -> Progman[0x1016E]
+2026-10-21 13:56:14.689  piece rect (3700,700) 360x120, layered False, visible True, DPI 96
+2026-10-21 13:56:14.689  desktop icon count (LVM_GETITEMCOUNT) 45
+2026-10-21 13:56:14.689  click layer UnderIconsClick[0x66111A] rect (3700,700) 360x120 (piece rect (3700,700) 360x120), owner Progman[0x1016E]
+2026-10-21 13:56:14.689  top-level z-order: 713 windows; click layer index 711, Progman (SHELLDLL_DefView's host) index 712; click layer ABOVE Progman: True
+2026-10-21 13:56:14.689  z-order around click layer: MSCTFIME UI[0x101A2] | IME[0x10104] | [CLICK] UnderIconsClick[0x66111A] | Progman[0x1016E] [PROGMAN] | 
+2026-10-21 13:56:14.689  hit test, piece centre (3880,760): WindowFromPoint UnderIconsClick[0x66111A] (root UnderIconsClick[0x66111A]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 1
+2026-10-21 13:56:14.689  hit test, outside, right of piece (+80px) (4140,760): WindowFromPoint SysListView32[0x10178] (root Progman[0x1016E]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:56:14.689  hit test, outside, below piece (+80px) (3880,900): WindowFromPoint SysListView32[0x10178] (root Progman[0x1016E]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:56:16.808  screenshot C:\Users\estev\Projects\Sanduhr_f-r_Claude\docs\cart-runs\2026-10-21-mac-parity-3-6-0\spike\screen-neb-attr.png (5360x1440 at 0,0); magenta samples in the piece rect 22/22; topmost window at piece centre: UnderIconsClick[0x66111A]
+2026-10-21 13:56:16.808  screenshot: magenta pixels ARE present in the piece rect
+2026-10-21 13:56:19.687  timed run over (7s)
+2026-10-21 13:56:19.687  --- structure [final] ---
+2026-10-21 13:56:19.687  shell window Progman[0x1016E] rect (0,0) 5360x1440 exstyle 0x200080
+2026-10-21 13:56:19.687    Progman child #0 (top to bottom): SHELLDLL_DefView[0x10176] rect (0,0) 5360x1440 visible True exstyle 0x80000
+2026-10-21 13:56:19.687    Progman child #1 (top to bottom): WorkerW[0xB133E] rect (0,0) 5360x1440 visible True exstyle 0x0
+2026-10-21 13:56:19.687  piece parent chain: UnderIconsPiece[0x1E111CA] -> WorkerW[0xB133E] -> Progman[0x1016E]
+2026-10-21 13:56:19.687  piece rect (3700,700) 360x120, layered False, visible True, DPI 96
+2026-10-21 13:56:19.687  desktop icon count (LVM_GETITEMCOUNT) 45
+2026-10-21 13:56:19.688  click layer UnderIconsClick[0x66111A] rect (3700,700) 360x120 (piece rect (3700,700) 360x120), owner Progman[0x1016E]
+2026-10-21 13:56:19.688  top-level z-order: 713 windows; click layer index 711, Progman (SHELLDLL_DefView's host) index 712; click layer ABOVE Progman: True
+2026-10-21 13:56:19.688  z-order around click layer: MSCTFIME UI[0x101A2] | IME[0x10104] | [CLICK] UnderIconsClick[0x66111A] | Progman[0x1016E] [PROGMAN] | 
+2026-10-21 13:56:19.688  hit test, piece centre (3880,760): WindowFromPoint UnderIconsClick[0x66111A] (root UnderIconsClick[0x66111A]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 1
+2026-10-21 13:56:19.688  hit test, outside, right of piece (+80px) (4140,760): WindowFromPoint SysListView32[0x10178] (root Progman[0x1016E]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:56:19.688  hit test, outside, below piece (+80px) (3880,900): WindowFromPoint SysListView32[0x10178] (root Progman[0x1016E]); ChildWindowFromPointEx(Progman) all SHELLDLL_DefView[0x10176], skip-invisible+transparent SHELLDLL_DefView[0x10176]; RealChildWindowFromPoint SHELLDLL_DefView[0x10176]; WM_NCHITTEST DefView 1 (1=HTCLIENT), click layer 0
+2026-10-21 13:56:19.688  closing
+2026-10-21 13:56:19.691  cleanup: windows destroyed, GDI objects released
+2026-10-21 13:56:19.691  exit: clicks on click layer 0, clicks on piece 0, rebuilds 0

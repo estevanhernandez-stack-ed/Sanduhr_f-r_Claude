@@ -33,6 +33,7 @@ public partial class App : Application
     private Desk.NowPlayingHub? _nowPlaying;
     private Desk.DeskMessageSource? _messages;
     private Desk.DeskMessageHandoffService? _handoff;
+    private Desk.WatcherStore? _watchers;
     private MenuItem? _endDemoItem;
 
     /// <summary>Where this install stands with the welcome tour, decided once at launch.</summary>
@@ -232,6 +233,9 @@ public partial class App : Application
 
             if (fresh)
                 store.SaveWhatsNewInstalledVersion(current);
+            // The plate behind the Desk's text is on for a fresh install, whose desktop may be full of
+            // files; an existing install has no key and reads off, so its Desk looks as it did.
+            store.SeedDeskPlate(fresh);
             if (decision.Record)
                 store.SaveWhatsNewLastSeen(current);
             if (decision.Show.Count == 0)
@@ -285,7 +289,7 @@ public partial class App : Application
         try
         {
             var signedIn = _vm.ActiveAccount is not null || _vm.IsDemo;
-            var steps = WelcomeTour.Steps(new HashSet<TourFeature>(), signedIn: signedIn);
+            var steps = WelcomeTour.StepsFor(_vm.JustTheDesk, new HashSet<TourFeature>(), signedIn);
             WhatsNewWindow.ShowTour(new WelcomeTourViewModel(steps, _vm), page =>
             {
                 if (page == SettingsPage.Widget)
@@ -484,11 +488,19 @@ public partial class App : Application
         _nowPlaying = new Desk.NowPlayingHub();
         Desk.NowPlayingHub.Current = _nowPlaying;
         _messages = new Desk.DeskMessageSource(store, paths);
-        _handoff = new Desk.DeskMessageHandoffService(paths, _messages.FilePath);
+        _handoff = new Desk.DeskMessageHandoffService(paths, _messages.FilePath, store);
         Desk.DeskMessageHandoffService.Current = _handoff;
-        _handoff.Start(); // watches nothing until the MCP tool ships (spec 6.9)
+        _handoff.Start(); // Claude's suggested Desk messages (spec 6.9)
+        // Watchers (spec 6.9): agents' cards, only while "Let agents show watchers" is on; in memory only.
+        _watchers = new Desk.WatcherStore(paths, store.LoadWatchersAgents, () => vm.IsDemo);
+        _watchers.WaitingStarted += () =>
+        {
+            // A watcher waiting on you glows once, but only where its card can be seen.
+            if (_desk is { Running: true, WatchersPlaced: true }) _glow?.Preview(ClaudeCodeEvent.Waiting);
+        };
+        _watchers.Start();
         _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
-            () => vm.CurrentDeskUsage, _nowPlaying, _messages)
+            () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers)
         {
             ThemeText = ThemeTextHex,
         };
@@ -576,7 +588,9 @@ public partial class App : Application
         svm.Desk.ArrangingLayout = _desk?.Session?.Working.Layout;
         svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); };
         svm.WeatherPage.Changed = () => _desk?.Reload();
-        svm.MessageChanged = () => _desk?.Reload();
+        svm.MessageChanged = () => { _desk?.Reload(); _handoff?.PublishState(); };
+        svm.Desk.WatchersChanged = () => _watchers?.SwitchChanged();
+        svm.QuitRequested = QuitApp;
         svm.ResetRequested = () =>
         {
             ShowReset();
@@ -728,6 +742,18 @@ public partial class App : Application
         _desk?.Reload();
         vm.RefreshDesk();
         _window?.Hide();
+
+        // No fetch is coming to offer a pending tour, so it opens a moment after the choice instead.
+        if (!WelcomeTour.ShowsForJustTheDesk(_tourState, _tourOfferedThisLaunch))
+            return;
+        _tourOfferedThisLaunch = true;
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            ShowTour();
+        };
+        timer.Start();
     }
 
     private void OnTrayReadingChanged(TrayReading? reading)
@@ -838,6 +864,7 @@ public partial class App : Application
                 vm.StopBackgroundWork();
                 _glow?.Stop();
                 _desk?.StopForReset();
+                _watchers?.Dispose();
                 _vm?.NowPlaying?.Dispose();
             },
             vm.InactiveReader.DeleteAllProfilesAsync,
@@ -854,6 +881,7 @@ public partial class App : Application
         _desk?.Dispose();
         _messages?.Dispose();
         _handoff?.Dispose();
+        _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();
         _hotKeys?.Dispose();
@@ -877,6 +905,7 @@ public partial class App : Application
         _desk?.Dispose();
         _messages?.Dispose();
         _handoff?.Dispose();
+        _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();
         _hotKeys?.Dispose();

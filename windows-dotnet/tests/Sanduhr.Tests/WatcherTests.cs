@@ -536,6 +536,37 @@ public class WatcherTests
         Assert.Equal("waiting", WatcherState.Waiting.Wire());
     }
 
+    // The switch file and the request file names (the MCP server reads the first and writes the second)
+
+    [Fact]
+    public void TheSwitchFileSaysOnOnlyWhenSchema1AndAgentsTrue()
+    {
+        Assert.Equal("""{"agents":true,"schema_version":1}""", System.Text.Encoding.UTF8.GetString(WatcherRequest.SwitchJson(true)));
+        Assert.Equal("""{"agents":false,"schema_version":1}""", System.Text.Encoding.UTF8.GetString(WatcherRequest.SwitchJson(false)));
+        Assert.True(WatcherRequest.SwitchAllows(WatcherRequest.SwitchJson(true)));
+        Assert.False(WatcherRequest.SwitchAllows(WatcherRequest.SwitchJson(false)));
+        Assert.False(WatcherRequest.SwitchAllows(null));
+        Assert.False(WatcherRequest.SwitchAllows(Bytes("""{"agents":true}""")));
+        Assert.False(WatcherRequest.SwitchAllows(Bytes("""{"schema_version":2,"agents":true}""")));
+        Assert.False(WatcherRequest.SwitchAllows(Bytes("""{"schema_version":1,"agents":"true"}""")));
+        Assert.False(WatcherRequest.SwitchAllows(Bytes("""{"schema_version":1,"agents":1}""")));
+        Assert.False(WatcherRequest.SwitchAllows(Bytes("[true]")));
+        Assert.False(WatcherRequest.SwitchAllows(Bytes("not json")));
+        Assert.False(WatcherRequest.SwitchAllows(new byte[WatcherRequest.MaxBytes + 1]));
+    }
+
+    [Fact]
+    public void RequestFileNamesSortByTimeThenCallAndMatchThePattern()
+    {
+        Assert.Equal("watchers.json", WatcherRequest.SwitchFile);
+        Assert.Equal("watch-request-*.json", WatcherRequest.RequestPattern);
+        var a = WatcherRequest.RequestFileName(T0, 2, "w0123456789ab");
+        var b = WatcherRequest.RequestFileName(T0, 10, "w0123456789ab");
+        var c = WatcherRequest.RequestFileName(T0.AddMilliseconds(1), 1, "w0123456789ab");
+        Assert.Matches(@"^watch-request-\d{13}-\d{6}-w0123456789ab\.json$", a);
+        Assert.True(string.CompareOrdinal(a, b) < 0 && string.CompareOrdinal(b, c) < 0);
+    }
+
     [Fact]
     public void ProgressClampsToTheTotal()
     {

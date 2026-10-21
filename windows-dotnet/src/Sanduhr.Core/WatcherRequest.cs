@@ -35,6 +35,46 @@ public static partial class WatcherRequest
     /// <summary>Largest file either kind may be.</summary>
     public const int MaxBytes = 64 * 1024;
 
+    /// <summary>The prefix of an agent request's file name; the widget watches <see cref="RequestPattern"/>.</summary>
+    public const string RequestPrefix = "watch-request-";
+
+    public const string RequestPattern = RequestPrefix + "*.json";
+
+    /// <summary>The switch the widget writes beside the requests: the MCP tools write nothing and refuse
+    /// with <c>watchers_off</c> unless it holds <c>"agents": true</c> (Settings, Desk, "Let agents show
+    /// watchers", off by default).</summary>
+    public const string SwitchFile = "watchers.json";
+
+    /// <summary>An agent request's file name: <c>watch-request-&lt;ms&gt;-&lt;seq&gt;-&lt;id&gt;.json</c> (the Mac's
+    /// shape; sorting by name is sorting by time, then by call).</summary>
+    public static string RequestFileName(DateTimeOffset at, int seq, string id) =>
+        string.Create(CultureInfo.InvariantCulture, $"{RequestPrefix}{at.ToUnixTimeMilliseconds():D13}-{seq:D6}-{id}.json");
+
+    /// <summary>The switch file's contents, keys sorted: <c>{"agents":true,"schema_version":1}</c>.</summary>
+    public static byte[] SwitchJson(bool agents)
+    {
+        using var ms = new MemoryStream();
+        using (var w = new Utf8JsonWriter(ms))
+        {
+            w.WriteStartObject();
+            w.WriteBoolean("agents", agents);
+            w.WriteNumber("schema_version", SchemaVersion);
+            w.WriteEndObject();
+        }
+        return ms.ToArray();
+    }
+
+    /// <summary>True only for a switch file of schema 1 that says <c>"agents": true</c>. A missing,
+    /// unreadable or other-schema file reads as off (fail closed).</summary>
+    public static bool SwitchAllows(byte[]? data)
+    {
+        if (data is null || data.Length > MaxBytes) return false;
+        using var doc = Parse(data);
+        if (doc is null) return false;
+        var o = doc.RootElement;
+        return Int(Get(o, "schema_version")) == SchemaVersion && Get(o, "agents") is { ValueKind: JsonValueKind.True };
+    }
+
     /// <summary>A decoded request. <paramref name="Folder"/> is the Claude Code folder the agent runs
     /// with, for the work tag; null for the default. Only an absolute Windows path is kept (the Mac
     /// keeps only absolute POSIX paths).</summary>

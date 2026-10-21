@@ -8,6 +8,7 @@
         xmlns:vm="clr-namespace:Sanduhr.App.ViewModels"
         xmlns:views="clr-namespace:Sanduhr.App.Views"
         xmlns:conv="clr-namespace:Sanduhr.App.Converters"
+        xmlns:controls="clr-namespace:Sanduhr.App.Controls"
         xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
@@ -63,6 +64,39 @@
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The sidebar foot's Quit: a FlatButton that shows keyboard focus. -->
+        <Style x:Key="SidebarQuitButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg" CornerRadius="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                <Setter TargetName="bg" Property="BorderThickness" Value="2" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -640,7 +674,7 @@
             <!-- Pages: a TabControl drawn as a grouped sidebar (Settings v2). Each TabItem's Tag is
                  its SettingsPage, which the router (SelectPage) and the search use. The search box
                  sits above the pages; while it has a query, its results replace the page list. -->
-            <TabControl x:Name="Tabs" Background="Transparent" TabStripPlacement="Left"
+            <controls:SidebarTabControl x:Name="Tabs" Background="Transparent" TabStripPlacement="Left"
                         SelectionChanged="Tabs_SelectionChanged">
                 <TabControl.Template>
                     <ControlTemplate TargetType="TabControl">
@@ -652,7 +686,15 @@
                             <Border Grid.Column="0" Background="{DynamicResource Sanduhr.Brush.TitleBg}"
                                     BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="0,0,1,0">
                                 <DockPanel Margin="10,12,10,12">
-                                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                                    <!-- The foot of the sidebar: Quit Sanduhr, on every page, the tray's quit. -->
+                                    <Button x:Name="QuitButton" DockPanel.Dock="Bottom" Style="{StaticResource SidebarQuitButton}"
+                                            Margin="0,8,0,0" Padding="10,5" HorizontalAlignment="Stretch"
+                                            KeyboardNavigation.TabIndex="1"
+                                            Content="Quit Sanduhr" Command="{Binding QuitCommand}"
+                                            AutomationProperties.Name="Quit Sanduhr"
+                                            AutomationProperties.HelpText="Closes the widget, the Desk and everything else Sanduhr is showing."
+                                            ToolTip="Quit Sanduhr" />
+                                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8" KeyboardNavigation.TabIndex="0">
                                         <TextBox x:Name="SearchBox" Style="{StaticResource Input}"
                                                  Text="{Binding Search.Query, UpdateSourceTrigger=PropertyChanged}"
                                                  AutomationProperties.Name="Search settings"
@@ -672,7 +714,7 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                     </Grid>
-                                    <Grid>
+                                    <Grid KeyboardNavigation.TabIndex="0">
                                         <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
                                             <ScrollViewer.Style>
                                                 <Style TargetType="ScrollViewer">
@@ -716,7 +758,7 @@
                                                     </DataTemplate>
                                                 </ListBox.ItemTemplate>
                                             </ListBox>
-                                            <TextBlock Text="No setting by that name." FontSize="11" Margin="4,4,0,0"
+                                            <TextBlock x:Name="NoResultsText" Text="No setting by that name." FontSize="11" Margin="4,4,0,0"
                                                        AutomationProperties.LiveSetting="Polite"
                                                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                                        Visibility="{Binding Search.HasNoResults, Converter={StaticResource BoolVis}}" />
@@ -2291,6 +2333,18 @@
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
+                            <StackPanel views:SettingsAnchor.Id="desk-watchers">
+                                <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                          Content="{x:Static core:SettingsNames.WatchersSwitch}"
+                                          IsChecked="{Binding WatchersAgents, Mode=TwoWay}"
+                                          AutomationProperties.Name="{x:Static core:SettingsNames.WatchersSwitch}" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="Off by default. With the Sanduhr MCP server installed, Claude Code can put a live card on the Desk for work it is watching (a CI run, a deploy): a title, progress and a one-line note. Cards live in memory only, fade or stay as the work ends, and are gone when you quit. They show where you place Watchers under Where each piece sits." />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
                             <StackPanel views:SettingsAnchor.Id="pieces" IsEnabled="{Binding NotArranging}">
                                 <TextBlock Text="Where each piece sits" FontSize="13" FontWeight="SemiBold"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
@@ -2378,6 +2432,19 @@
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
+                            <StackPanel views:SettingsAnchor.Id="desk-plate">
+                                <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                          Content="{x:Static core:SettingsNames.DeskPlateSwitch}"
+                                          IsChecked="{Binding Plate, Mode=TwoWay}"
+                                          AutomationProperties.Name="{x:Static core:SettingsNames.DeskPlateSwitch}"
+                                          AutomationProperties.HelpText="{x:Static core:DeskPlate.Caption}" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="{x:Static core:DeskPlate.Caption}" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
                             <StackPanel views:SettingsAnchor.Id="ink">
                                 <TextBlock Text="{x:Static core:SettingsNames.DeskInk}" FontSize="13" FontWeight="SemiBold"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
@@ -2420,7 +2487,7 @@
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
-                            <StackPanel views:SettingsAnchor.Id="margins">
+                            <StackPanel views:SettingsAnchor.Id="margins" IsEnabled="{Binding NotArranging}">
                                 <TextBlock Text="Margins" FontSize="13" FontWeight="SemiBold"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
                                 <Grid>
@@ -2824,7 +2891,7 @@
                         </ScrollViewer>
                     </Border>
                 </TabItem>
-            </TabControl>
+            </controls:SidebarTabControl>
         </DockPanel>
     </Border>
 </Window>

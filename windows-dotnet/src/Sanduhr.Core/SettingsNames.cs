@@ -109,6 +109,9 @@ public static class SettingsNames
     public const string ThirdPartyNotices = "Third-party notices";
     /// <summary>About: removes what Sanduhr keeps on this PC (spec 4.7).</summary>
     public const string ResetSanduhr = "Reset Sanduhr…";
+
+    /// <summary>The Quit button at the foot of the sidebar (not on a page, so not in <see cref="Table"/>).</summary>
+    public const string QuitSanduhr = "Quit Sanduhr";
     /// <summary>Claude Code: picks a folder Sanduhr did not find.</summary>
     public const string AddFolder = "Add folder…";
     /// <summary>Claude Code: drops a folder that was added by hand.</summary>
@@ -130,10 +133,16 @@ public static class SettingsNames
     public const string DeskWeather = "Weather";
     /// <summary>Desk, Where each piece sits: the glow's spot (spec 7.3), named as Arrange mode labels it.</summary>
     public const string DeskGlow = "Claude Code glow";
+    /// <summary>Desk, Where each piece sits: the watchers (spec 6.9), live cards for work an agent is watching.</summary>
+    public const string DeskWatchers = "Watchers";
+    /// <summary>Desk: lets agents put watchers up through the MCP server (settings.json "watchers_agents", off by default).</summary>
+    public const string WatchersSwitch = "Let agents show watchers";
     /// <summary>Desk: starts Arrange mode on the desktop (spec 7.3).</summary>
     public const string ArrangeDesk = DeskArrangeCopy.SettingsButton;
     /// <summary>Desk: the clock, message and Claude line take clicks (spec 7.4).</summary>
     public const string DeskPieceClicksSwitch = DeskPieceClicks.Title;
+    /// <summary>Desk, Look: a soft plate behind each piece.</summary>
+    public const string DeskPlateSwitch = DeskPlate.Title;
     /// <summary>The name a Desk piece goes by on the layout map and in Arrange mode; an unknown piece goes by its key.</summary>
     public static string DeskPieceName(string widget) => widget switch
     {
@@ -145,6 +154,7 @@ public static class SettingsNames
         "telemetry" => DeskTelemetry,
         "weather" => DeskWeather,
         "glow" => DeskGlow,
+        "watchers" => DeskWatchers,
         _ => widget,
     };
     /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7).</summary>
@@ -186,6 +196,8 @@ public static class SettingsNames
         (DeskInk, SettingsPage.Desk),
         (ArrangeDesk, SettingsPage.Desk),
         (DeskPieceClicksSwitch, SettingsPage.Desk),
+        (DeskPlateSwitch, SettingsPage.Desk),
+        (WatchersSwitch, SettingsPage.Desk),
         (SignInReminders, SettingsPage.Alerts),
         (NowPlayingInWidget, SettingsPage.NowPlaying),
         (WeatherLookUp, SettingsPage.Weather),

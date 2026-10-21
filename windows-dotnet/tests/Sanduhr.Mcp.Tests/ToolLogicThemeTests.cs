@@ -73,9 +73,16 @@ public class ToolLogicThemeTests
         // Play the widget: answer as soon as the request lands.
         var widget = Task.Run(async () =>
         {
-            while (!File.Exists(cfg.ThemeRequestPath!))
+            // Retry the read: on a Windows runner the server's rename into place can still hold the
+            // file for a moment after it appears, and a throw here would leave the server to time out.
+            JsonObject? req = null;
+            while (req is null)
+            {
                 await Task.Delay(10);
-            var req = (JsonObject)JsonNode.Parse(File.ReadAllText(cfg.ThemeRequestPath!))!;
+                if (!File.Exists(cfg.ThemeRequestPath!)) continue;
+                try { req = (JsonObject)JsonNode.Parse(File.ReadAllText(cfg.ThemeRequestPath!))!; }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { }
+            }
             Assert.Equal("Nebula", (string?)req["theme"]!["name"]);
             Assert.Equal("nebula-x", (string?)req["save_as"]);
             Assert.False(req["apply"]!.GetValue<bool>());

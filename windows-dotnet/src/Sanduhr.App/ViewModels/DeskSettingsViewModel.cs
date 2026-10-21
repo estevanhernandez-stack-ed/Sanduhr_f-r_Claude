@@ -102,6 +102,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             new DeskPieceRow(this, "nowPlaying", SettingsNames.DeskNowPlaying),
             new DeskPieceRow(this, "telemetry", SettingsNames.DeskTelemetry),
             new DeskPieceRow(this, "weather", SettingsNames.DeskWeather),
+            new DeskPieceRow(this, "watchers", SettingsNames.DeskWatchers),
             new DeskPieceRow(this, "glow", SettingsNames.DeskGlow),
         ];
         Load();
@@ -188,6 +189,22 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
 
     public bool IsCustomInk => InkChoice.Mode == DeskInkMode.Custom;
 
+    /// <summary>Raised after "Let agents show watchers" is saved (App writes watchers.json and, off, clears the cards).</summary>
+    public Action? WatchersChanged { get; set; }
+
+    /// <summary>"Let agents show watchers" (spec 6.9): off by default; saved at once.</summary>
+    public bool WatchersAgents
+    {
+        get => _store.LoadWatchersAgents();
+        set
+        {
+            if (value == WatchersAgents) return;
+            _store.SaveWatchersAgents(value);
+            OnPropertyChanged();
+            WatchersChanged?.Invoke();
+        }
+    }
+
     /// <summary>"Clock and message take clicks" (spec 7.4): saved at once, and the Desk follows.</summary>
     public bool PiecesTakeClicks
     {
@@ -196,6 +213,19 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         {
             if (value == PiecesTakeClicks) return;
             _store.SaveDeskPiecesTakeClicks(value);
+            OnPropertyChanged();
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>"Plate behind the text" (Desk Look): saved at once, and the Desk follows.</summary>
+    public bool Plate
+    {
+        get => _store.LoadDeskPlate();
+        set
+        {
+            if (value == Plate) return;
+            _store.SaveDeskPlate(value);
             OnPropertyChanged();
             Changed?.Invoke();
         }

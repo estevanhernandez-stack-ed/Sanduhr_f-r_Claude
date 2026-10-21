@@ -33,12 +33,13 @@ public class McpServerTests
     }
 
     [Fact]
-    public void Tools_list_has_five_read_only_tools_plus_publish_usage_and_propose_theme()
+    public void Tools_list_has_the_read_tools_and_the_tools_that_hand_the_widget_a_request()
     {
         using var tmp = new TempDir();
         var res = Run(tmp, Req(1, "tools/list"));
         var tools = (JsonArray)((JsonObject)res.Single()["result"]!)["tools"]!;
-        Assert.Equal(new[] { "get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping", "publish_usage", "propose_theme" },
+        Assert.Equal(new[] { "get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping", "publish_usage", "propose_theme",
+                "get_desk_messages", "propose_desk_messages", "watch_start", "watch_update", "watch_end" },
             tools.Select(t => (string?)t!["name"]).ToArray());
         Assert.All(tools.Take(5), t => Assert.True(t!["annotations"]!["readOnlyHint"]!.GetValue<bool>()));
         // publish_usage queues an upload (performed by the widget) — honestly not read-only.
@@ -48,6 +49,18 @@ public class McpServerTests
         Assert.False(tools[6]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
         Assert.False(tools[6]!["annotations"]!["destructiveHint"]!.GetValue<bool>());
         Assert.Contains("rejected with findings", (string?)tools[6]!["description"]);
+        // get_desk_messages only reads; the four that queue a request file for the widget are honestly not
+        // read-only, and none of them reaches the network (openWorldHint false).
+        Assert.True(tools[7]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
+        foreach (int i in new[] { 8, 9, 10, 11 })
+        {
+            Assert.False(tools[i]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
+            Assert.False(tools[i]!["annotations"]!["destructiveHint"]!.GetValue<bool>());
+            Assert.False(tools[i]!["annotations"]!["openWorldHint"]!.GetValue<bool>());
+            Assert.False(tools[i]!["inputSchema"]!["additionalProperties"]!.GetValue<bool>());
+        }
+        Assert.Contains("watchers_off", (string?)tools[9]!["description"]);
+        Assert.Contains("pending_approval", (string?)tools[8]!["description"]);
         // The behavioral trigger IS the feature (review: without it, never fires).
         Assert.Contains("Call BEFORE", (string?)tools[0]!["description"]);
         Assert.Contains("never assume budget", (string?)tools[0]!["description"]);

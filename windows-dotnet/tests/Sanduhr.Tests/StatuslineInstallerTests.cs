@@ -388,7 +388,9 @@ public class StatuslineInstallerSpliceTests
         var installer = new StatuslineInstaller(home.Path, bin.Path);
         var cases = new (string? Chain, string Join, string[] Segments)[]
         {
+            (null, "line", ["account", "session", "weekly", "resets"]),
             (null, "line", ["session", "weekly", "resets"]),
+            (null, "line", ["account", "weekly"]),
             (null, "line", ["weekly"]),
             ("bash ~/s.sh | head -1", "same", ["session", "resets"]),
             ("echo \"h\u00e9llo\" ; date", "line", ["session", "weekly", "resets"]),
@@ -403,7 +405,9 @@ public class StatuslineInstallerSpliceTests
             Assert.Equal(installer.ScriptPath, parsed.ScriptPath);
         }
         // Unknown names drop out, and what is left being the default writes no -Mine.
-        Assert.DoesNotContain("-Mine", installer.BuildCommand(null, "line", ["weekly", "resets", "session", "bogus"]));
+        Assert.DoesNotContain("-Mine", installer.BuildCommand(null, "line", ["weekly", "resets", "session", "account", "bogus"]));
+        // A list picked before Account existed keeps exactly its segments: it now names them.
+        Assert.Contains("-Mine session,weekly,resets", installer.BuildCommand(null, "line", ["weekly", "resets", "session", "bogus"]));
         Assert.Contains("-Mine weekly", installer.BuildCommand(null, "line", ["weekly"]));
     }
 

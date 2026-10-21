@@ -1,0 +1,4 @@
+# Full-screen shots show the whole desktop; keep them local. The small crop is the evidence.
+*.png
+!crop-*.png
+under-icons-run.log
