@@ -43,7 +43,10 @@ public class ToolLogicPublishTests
     [Fact]
     public void Handoff_file_names_mirror_core_publish_handoff()
     {
-        var cfg = McpConfig.Resolve();
+        using var tmp = new TempDir();
+        string home = Path.Combine(tmp.Path, "home");
+        var cfg = McpConfig.Resolve(home, Path.Combine(home, ".sanduhr"), Path.Combine(tmp.Path, "appdata", "Sanduhr"),
+            Path.Combine(tmp.Path, "localappdata"), _ => null);
         Assert.EndsWith("publish-request.json", cfg.PublishRequestPath);
         Assert.EndsWith("publish-result.json", cfg.PublishResultPath);
         Assert.EndsWith("mcp-settings.json", cfg.McpSettingsPath);
