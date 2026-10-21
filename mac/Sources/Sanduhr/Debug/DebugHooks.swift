@@ -177,8 +177,10 @@ enum DebugHooks {
                 switch sheet {
                 case .export:
                     if let seat = mods.shownSeat(demo: demo) { await mods.startConfigExport(seat) }
+                case .exportSample:
+                    mods.configExport = SampleConfigPack.exportState()
                 case .importSample:
-                    mods.configImport = SampleConfigPack.state(seat: mods.shownSeat(demo: demo)?.path ?? SampleConfigPack.fallbackSeat)
+                    mods.configImport = SampleConfigPack.state(seat: SampleConfigPack.seat)
                 }
             }
         case .resetDryRun:

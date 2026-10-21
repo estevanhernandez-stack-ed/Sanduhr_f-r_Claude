@@ -113,11 +113,12 @@ enum DebugAction: Equatable {
     /// picker on the nth seat (from 1; the first when left out). Reads only.
     case modsConfig(ModsTab, seat: Int?)
     /// Settings, Mods & Config with a sheet open for a screenshot: `export` is the Export Config
-    /// sheet of the shown seat, `import-sample` is Compare on import over an invented pack. The
-    /// sample's Import closes the sheet and writes nothing.
+    /// sheet of the shown seat, `export-sample` the same sheet over invented rows, `import-sample` is
+    /// Compare on import over an invented pack into one invented folder. A sample's Export and
+    /// Import close the sheet and write nothing.
     case modsSheet(ModsSheet)
 
-    enum ModsSheet: Equatable { case export, importSample }
+    enum ModsSheet: Equatable { case export, exportSample, importSample }
 
     static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "notch-pill", "just-the-desk", "camera-light", "glow",
@@ -304,8 +305,9 @@ enum DebugLink {
             case "compare" where words.count == 1: return .success(.modsConfig(.compare, seat: nil))
             case "seat" where words.count == 2 && (Int(words[1]) ?? 0) >= 1: return .success(.modsConfig(.bySeat, seat: Int(words[1])))
             case "export" where words.count == 1: return .success(.modsSheet(.export))
+            case "export-sample" where words.count == 1: return .success(.modsSheet(.exportSample))
             case "import-sample" where words.count == 1: return .success(.modsSheet(.importSample))
-            default: return bad("mods-config needs arg=catalog, compare, export, import-sample, seat or seat <n> (from 1)")
+            default: return bad("mods-config needs arg=catalog, compare, export, export-sample, import-sample, seat or seat <n> (from 1)")
             }
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")

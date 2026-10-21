@@ -710,9 +710,20 @@ private struct DataDefaultsPreview: View {
 
 // MARK: - Demo mode
 
-/// Demo mode (slice 4): the two sample accounts as the list shows them, and nothing to change.
+/// What the demo Accounts page draws: the sample accounts and the Follow switch the real page
+/// shows from two accounts on. Pure, so a test pins it.
+enum DemoAccountsLayout {
+    static var labels: [String] { DemoMode.accounts }
+    static var showsFollow: Bool { labels.count > 1 }
+}
+
+/// Demo mode (slice 4): the real Accounts layout over the sample accounts. Every account action
+/// is inert: the detail pane and the buttons ignore clicks, the Follow switch is a local state
+/// that never reaches the view model, and the Data section (which reads real folders) is left out.
 private struct DemoAccounts: View {
     var vm: UsageViewModel
+    @State private var selection: String?
+    @State private var follow = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -720,13 +731,62 @@ private struct DemoAccounts: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(vm.accountLabels, id: \.self) { label in
-                    AccountRow(label: label, active: label == vm.activeAccount, signedIn: true)
+            HStack(alignment: .top, spacing: 16) {
+                list.frame(width: 190)
+                detail
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .allowsHitTesting(false)
+            }
+            if DemoAccountsLayout.showsFollow {
+                Divider()
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("Follow the account I'm using", isOn: $follow)
+                        .allowsHitTesting(false)
+                    Text("Every 15 minutes Sanduhr checks your other signed-in accounts and switches to the one whose session meter is climbing, when the active one is idle. Switching by hand pauses it for up to 3 hours.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .frame(width: 190, alignment: .leading)
             Spacer(minLength: 0)
+        }
+        .onAppear { selection = selection ?? vm.activeAccount }
+    }
+
+    /// Picking a row only changes which account the pane shows; the active account stays.
+    private var list: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            List(DemoAccountsLayout.labels, id: \.self, selection: $selection) { label in
+                AccountRow(label: label, active: label == vm.activeAccount, signedIn: true).tag(label)
+            }
+            .frame(height: 180)
+            Button("Add Account…") {}.allowsHitTesting(false)
+        }
+    }
+
+    @ViewBuilder private var detail: some View {
+        let label = selection ?? vm.activeAccount ?? DemoMode.active
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Text(label).font(.title3.weight(.semibold))
+                if label == vm.activeAccount { AccountPill.active }
+                AccountPill.status(hasKey: true, expired: false)
+                Spacer()
+                if label != vm.activeAccount { Button("Make Active") {} }
+            }
+            DisclosureGroup("Change Sign-In") { EmptyView() }
+            Divider()
+            HStack {
+                TextField("Label", text: .constant(label)).textFieldStyle(.roundedBorder).frame(maxWidth: 220)
+                Button("Rename") {}.disabled(true)
+                Spacer()
+            }
+            Divider()
+            HStack {
+                Button("Sign Out", role: .destructive) {}
+                Spacer()
+                Button("Remove Account…", role: .destructive) {}
+            }
         }
     }
 }

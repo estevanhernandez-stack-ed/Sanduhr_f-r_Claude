@@ -153,8 +153,10 @@ and the selftest fails a scenario whose `reset` step is anything but `--dry-run`
 bar picks it; `seat 2` opens By Folder at the second folder; the hook's word stays `seat` while the tab says
 By Folder since 2026-10-17. Reads only, changes no folder and no preference). `mods-config export` opens the Export
 Config sheet on the shown folder, as its button does; `mods-config import-sample` opens Compare on import (the Open
-Config Pack sheet) over an invented pack (`SampleConfigPack`: made-up names, no paths, seven rows). Its Import closes
-the sheet and writes nothing. Both sheets open after the page has read the folders, a beat after the action returns,
+Config Pack sheet) over an invented pack (`SampleConfigPack`: made-up names, no paths, seven rows) whose Into list is
+one invented folder, `Sample`, `~/.claude-sample`; `mods-config export-sample` opens Export Config over invented rows
+(two that can't travel, an MCP server with a `${NAME}`). A sample's Import and Export close the sheet and write
+nothing. The sheets open after the page has read the folders, a beat after the action returns,
 so add a `wait` before the snapshot; state.yaml has no key for them.
 
 ## Scenarios
