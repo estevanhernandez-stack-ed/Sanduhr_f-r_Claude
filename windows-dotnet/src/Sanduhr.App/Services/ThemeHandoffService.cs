@@ -7,7 +7,7 @@ namespace Sanduhr.App.Services;
 
 /// <summary>
 /// App-side owner of <c>propose_theme</c>: <c>sanduhr-mcp</c> drops
-/// <c>theme-request.json</c> under <c>%APPDATA%\Sanduhr</c>; this service lints
+/// <c>theme-request.json</c> under <c>%USERPROFILE%\.sanduhr</c>; this service lints
 /// it again (the widget is the authority), saves it under the themes folder,
 /// applies it when asked, and answers through <c>theme-result.json</c>. A
 /// <see cref="FileSystemWatcher"/> makes an interactive proposal land within a
@@ -47,8 +47,8 @@ public sealed class ThemeHandoffService : IDisposable
     {
         try
         {
-            Directory.CreateDirectory(_paths.AppDataDir);
-            _watcher = new FileSystemWatcher(_paths.AppDataDir, ThemeHandoff.RequestFileName)
+            Directory.CreateDirectory(_paths.ExternalDir);
+            _watcher = new FileSystemWatcher(_paths.ExternalDir,ThemeHandoff.RequestFileName)
             {
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
                 IncludeSubdirectories = false,
@@ -88,8 +88,8 @@ public sealed class ThemeHandoffService : IDisposable
         _handling = true;
         try
         {
-            string reqPath = Path.Combine(_paths.AppDataDir, ThemeHandoff.RequestFileName);
-            string resPath = Path.Combine(_paths.AppDataDir, ThemeHandoff.ResultFileName);
+            string reqPath = Path.Combine(_paths.ExternalDir, ThemeHandoff.RequestFileName);
+            string resPath = Path.Combine(_paths.ExternalDir, ThemeHandoff.ResultFileName);
             if (ThemeHandoff.TryReadRequest(reqPath, DateTimeOffset.Now) is not { } request)
                 return;
 

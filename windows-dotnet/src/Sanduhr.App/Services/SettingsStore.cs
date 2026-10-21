@@ -29,8 +29,23 @@ public readonly record struct WindowFrame(double X, double Y, double Width, doub
 public sealed class SettingsStore
 {
     private readonly string _path;
+    private readonly string _mcpSettingsPath;
 
-    public SettingsStore(Paths paths) => _path = paths.SettingsFile;
+    public SettingsStore(Paths paths)
+    {
+        _path = paths.SettingsFile;
+        // The projection sanduhr-mcp reads, in %USERPROFILE%\.sanduhr (spec Plan B, B.2).
+        _mcpSettingsPath = paths.McpSettingsFile;
+    }
+
+    /// <summary>Brings <c>mcp-settings.json</c> in line with the current settings.json (start-up, and after
+    /// any write). Never throws.</summary>
+    public void SyncMcpExport()
+    {
+        if (ResetGuard.Done)
+            return;
+        McpSettingsExport.Sync(Read(), _mcpSettingsPath);
+    }
 
     private JsonObject Read()
     {
@@ -57,7 +72,9 @@ public sealed class SettingsStore
         catch (IOException)
         {
             // Best-effort persistence — a failed write must never take down the UI.
+            return;
         }
+        McpSettingsExport.Sync(root, _mcpSettingsPath);
     }
 
     /// <summary>The saved frame, or null when none has been persisted yet.

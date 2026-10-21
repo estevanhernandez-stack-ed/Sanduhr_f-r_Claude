@@ -87,11 +87,17 @@ public sealed class SettingsViewModel
     public IReadOnlyList<ThirdPartyFont> Fonts => ThirdPartyNotices.Fonts;
     public IReadOnlyList<ThirdPartyPackage> DataServices => ThirdPartyNotices.DataServices;
 
-    /// <summary>About, Where settings live: the roaming folder (settings, history, themes, logs).</summary>
+    /// <summary>About, Where settings live: the folder holding settings, history, themes and logs. On a Store
+    /// install, the package's LocalCache copy when it exists (see <see cref="DataFolders"/>).</summary>
     public string SettingsFolder { get; }
 
-    /// <summary>About, Where settings live: the usage vault (PRIVACY.md: <c>%LOCALAPPDATA%\Sanduhr\vault\</c>).</summary>
+    /// <summary>About, Where settings live: the usage vault (PRIVACY.md: <c>%LOCALAPPDATA%\Sanduhr\vault\</c>,
+    /// or the package's LocalCache copy on a Store install).</summary>
     public string LocalFolder { get; }
+
+    /// <summary>About, Where settings live: <c>%USERPROFILE%\.sanduhr</c>, the files Claude Code, the MCP server,
+    /// the statusline and the hooks read.</summary>
+    public string ClaudeCodeFilesFolder { get; }
 
     /// <summary>Opens a folder from About in File Explorer.</summary>
     public ICommand ShowInExplorerCommand { get; }
@@ -146,8 +152,10 @@ public sealed class SettingsViewModel
 
         // The real folders this build uses (a dev build's SANDUHR_DEV_PROFILE included).
         var paths = new Paths();
-        SettingsFolder = paths.AppDataDir;
-        LocalFolder = paths.VaultDir;
+        var folders = DataFolders.Resolve(paths);
+        SettingsFolder = folders.Settings;
+        LocalFolder = folders.Vault;
+        ClaudeCodeFilesFolder = paths.ExternalDir;
         ShowInExplorerCommand = new RelayCommand<string>(OpenFolder,
             folder => !string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder));
         OpenLinkCommand = new RelayCommand<string>(OpenLink);

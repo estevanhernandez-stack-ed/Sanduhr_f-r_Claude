@@ -113,7 +113,11 @@ public sealed partial class ModsConfigViewModel : ObservableObject
     private static string Profile => ClaudeCodeProfile.Dir;
 
     private ClaudeCodeIntegrations MakeIntegrations() => new(
-        Profile, _widget.SanduhrAppDataDir, Path.Combine(AppContext.BaseDirectory, "mods", ClaudeCodeIntegrations.ModName));
+        Profile, _widget.SanduhrAppDataDir, Path.Combine(AppContext.BaseDirectory, "mods", ClaudeCodeIntegrations.ModName),
+        externalDir: _widget.SanduhrExternalDir)
+    {
+        LegacyModsRoots = [_widget.SanduhrLegacyModsRoot],
+    };
 
     /// <summary>Re-reads the folder list (the Claude Code page added or forgot one) and then the selected folder.</summary>
     public void ReloadFolders()

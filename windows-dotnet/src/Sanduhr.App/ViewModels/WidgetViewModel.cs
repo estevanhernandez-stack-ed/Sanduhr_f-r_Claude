@@ -494,6 +494,15 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// launcher (bin\) and versioned server dirs (mcp\).</summary>
     public string SanduhrAppDataDir => _paths.AppDataDir;
 
+    /// <summary><c>%USERPROFILE%\.sanduhr</c>: where the server copies, the launcher, the mod and every
+    /// file a process outside the package reads live (spec Plan B). The installers take it as
+    /// <c>externalDir</c>.</summary>
+    public string SanduhrExternalDir => _paths.ExternalDir;
+
+    /// <summary>The pre-3.5.0 meters mod root (<c>%APPDATA%\Sanduhr\mods</c>): entries under it still read as
+    /// Sanduhr's, so Install, Status and Reset handle them.</summary>
+    public string SanduhrLegacyModsRoot => _paths.LegacyModsRoot;
+
     // -- WS-E MCP integration facade -------------------------------------------
 
     public bool LoadMcpEnabled() => _settings.LoadMcpEnabled();
@@ -673,7 +682,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             OnReadings = () => InUseChanged?.Invoke(),
             OnResult = (label, reading) => _seatMeters!.FollowerAnswered(label, reading),
         };
-        _seatMeters = new SeatMeters(_paths.AppDataDir, RefreshInterval, _inactiveReader, AppVersion, LogSnapshotFailure)
+        _seatMeters = new SeatMeters(_paths.ExternalDir,RefreshInterval, _inactiveReader, AppVersion, LogSnapshotFailure)
         {
             Context = SeatContextNow,
             CredentialsOf = _accounts.LoadCredentials,

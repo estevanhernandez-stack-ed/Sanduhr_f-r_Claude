@@ -149,8 +149,8 @@ public sealed class UsagePublishService
     /// A request that arrives while an upload is in flight waits for the next tick.</summary>
     private async Task HandleHandoffAsync(DateTimeOffset nowLocal)
     {
-        string reqPath = Path.Combine(_paths.AppDataDir, PublishHandoff.RequestFileName);
-        string resPath = Path.Combine(_paths.AppDataDir, PublishHandoff.ResultFileName);
+        string reqPath = Path.Combine(_paths.ExternalDir, PublishHandoff.RequestFileName);
+        string resPath = Path.Combine(_paths.ExternalDir, PublishHandoff.ResultFileName);
         if (PublishHandoff.TryReadRequest(reqPath, nowLocal) is not { } request)
             return;
         if (Volatile.Read(ref _publishRunning) != 0)

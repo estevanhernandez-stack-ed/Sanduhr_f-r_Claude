@@ -273,11 +273,15 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     private string Profile => ClaudeCodeProfile.Dir;
 
     private ClaudeCodeIntegrations MakeIntegrations() => new(
-        Profile, _widget.SanduhrAppDataDir, Path.Combine(AppContext.BaseDirectory, "mods", ClaudeCodeIntegrations.ModName));
+        Profile, _widget.SanduhrAppDataDir, Path.Combine(AppContext.BaseDirectory, "mods", ClaudeCodeIntegrations.ModName),
+        externalDir: _widget.SanduhrExternalDir)
+    {
+        LegacyModsRoots = [_widget.SanduhrLegacyModsRoot],
+    };
 
     private StatuslineInstaller MakeStatusline() => new(Profile, _widget.StatuslineBinDir, null, _widget.SanduhrAppDataDir);
 
-    private McpIntegrationInstaller MakeMcp() => new(Profile, _widget.SanduhrAppDataDir);
+    private McpIntegrationInstaller MakeMcp() => new(Profile, _widget.SanduhrAppDataDir, externalDir: _widget.SanduhrExternalDir);
 
     private static string McpSourceDir => Path.Combine(AppContext.BaseDirectory, "mcp");
 
@@ -538,9 +542,9 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 "Show usage under the Claude Code prompt?",
                 "Sanduhr adds a statusline with your live session and weekly meters, right where the tokens burn.",
                 row.Display,
-                "What gets written: the render script at %APPDATA%\\Sanduhr\\bin, a statusLine entry in this folder's "
+                "What gets written: the render script at %USERPROFILE%\\.sanduhr\\bin, a statusLine entry in this folder's "
                 + "settings.json (a copy of the file is saved under %APPDATA%\\Sanduhr\\backups first), and a usage "
-                + "snapshot at %APPDATA%\\Sanduhr\\snapshot.json with percentages and reset times only, never your "
+                + "snapshot at %USERPROFILE%\\.sanduhr\\snapshot.json with percentages and reset times only, never your "
                 + "account name or keys. Remove brings back the statusline that was here before.",
                 "Install", theirs, OfferSegments: true));
             if (choice is null) return;
@@ -646,7 +650,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 "Draw your meters above the Claude Code prompt?",
                 "Sanduhr adds a mod that draws your session and weekly meters in a band above the prompt.",
                 row.Display,
-                "What gets written: the mod's folder, copied under %APPDATA%\\Sanduhr\\mods, and one entry in this "
+                "What gets written: the mod's folder, copied under %USERPROFILE%\\.sanduhr\\mods, and one entry in this "
                 + "folder's settings.json under env, CLAUDE_CODE_PLUGIN_DIRS. The mod reads only Sanduhr's snapshot "
                 + "file. Remove takes out only Sanduhr's entry and leaves any other folder in that list alone.",
                 "Install"));
@@ -687,7 +691,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 "Sanduhr lights the top edge of your window when Claude Code waits on you or finishes.",
                 row.Display,
                 "What gets written: one Notification hook and one Stop hook in this folder's settings.json. Each only "
-                + "touches a signal file under %APPDATA%\\Sanduhr. Nothing from Claude Code is passed on or read. "
+                + "touches a signal file under %USERPROFILE%\\.sanduhr. Nothing from Claude Code is passed on or read. "
                 + "Remove takes out only those two hooks.",
                 "Install"));
             if (choice is null) return;
@@ -750,7 +754,10 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
 
         try
         {
-            var integ = new ClaudeCodeIntegrations(profile, sanduhrDir);
+            var integ = new ClaudeCodeIntegrations(profile, sanduhrDir, externalDir: widget.SanduhrExternalDir)
+            {
+                LegacyModsRoots = [widget.SanduhrLegacyModsRoot],
+            };
             if (integ.UndoAll().Any(r => !r.Ok))
                 failures.Add("a Claude Code entry");
         }
@@ -783,7 +790,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
 
         try
         {
-            var mcp = new McpIntegrationInstaller(profile, sanduhrDir);
+            var mcp = new McpIntegrationInstaller(profile, sanduhrDir, externalDir: widget.SanduhrExternalDir);
             var homes = folders.Where(f => f.Discovered).Select(f => f.Name)
                 .Concat(widget.LoadMcpCcHome() is { Length: > 0 } saved ? [saved] : [])
                 .Distinct(StringComparer.OrdinalIgnoreCase);

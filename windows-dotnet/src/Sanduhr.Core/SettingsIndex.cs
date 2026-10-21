@@ -209,7 +209,7 @@ public static class SettingsIndex
         E("Trademark", SettingsPage.About, Trademark, ["Anthropic", "trademark", "disclaimer", "affiliated"]),
         E(SettingsNames.ThirdPartyNotices, SettingsPage.About, Notices, ["license", "licence", "credits", "open source"]),
         E(SettingsNames.WhereSettingsLive, SettingsPage.About, Where,
-            ["settings.json", "folder", "AppData", "files", "data", "Credential Manager", "Show in Explorer"]),
+            ["settings.json", "folder", "AppData", "files", "data", "Credential Manager", "Show in Explorer", ".sanduhr", "Claude Code files"]),
         E(SettingsNames.ResetSanduhr, SettingsPage.About, Reset,
             ["reset", "uninstall", "erase", "start over"]),
     ];

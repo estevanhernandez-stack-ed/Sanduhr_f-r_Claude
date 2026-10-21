@@ -51,7 +51,7 @@
 
   <!-- The meters mod is shared with the Mac: mac\integrations\mods\sanduhr-meters is copied into
        the output (and the publish output) as mods\sanduhr-meters\. Install copies it from there
-       into %APPDATA%\Sanduhr\mods\<stamp>\. Tests, the repo's .gitignore and Claude Code's
+       into %USERPROFILE%\.sanduhr\mods\<stamp>\. Tests, the repo's .gitignore and Claude Code's
        generated .claude-plugin\types\ stay out, as on the Mac. -->
   <ItemGroup>
     <Content Include="..\..\..\mac\integrations\mods\sanduhr-meters\**\*"

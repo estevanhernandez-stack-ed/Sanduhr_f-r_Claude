@@ -49,7 +49,7 @@ internal sealed class ResetService
         // re-reads a key that is about to go. A stop that throws must not block the reset.
         try { _stopBackgroundWork(); } catch { /* the steps still run */ }
 
-        return await ResetPlan.RunAsync(ResetPlan.Steps(choices), async part =>
+        var results = await ResetPlan.RunAsync(ResetPlan.Steps(choices), async part =>
         {
             started?.Invoke(part);
             return part switch
@@ -59,6 +59,26 @@ internal sealed class ResetService
                 _ => await DeleteInventoryAsync(part),
             };
         });
+        RemoveExternalDirIfEmpty();
+        return results;
+    }
+
+    /// <summary>
+    /// <c>%USERPROFILE%\.sanduhr</c> is shared ground: other tools keep their own names in it. After the
+    /// parts ran it is removed only when nothing is left in it, never recursively, and a failure is swallowed.
+    /// </summary>
+    private void RemoveExternalDirIfEmpty()
+    {
+        try
+        {
+            string dir = _paths.ExternalDirPath;
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, recursive: false);
+        }
+        catch (Exception)
+        {
+            // Not empty, in use, or not ours to remove: leave it.
+        }
     }
 
     private async Task<ResetStepResult> ClaudeCodeEntriesAsync()
