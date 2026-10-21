@@ -1,7 +1,7 @@
 namespace Sanduhr.Core;
 
 /// <summary>Where the handoff's files live: Sanduhr's folder for the request, result and state, and messages.txt.</summary>
-/// <param name="Support">%APPDATA%\Sanduhr: the request, result and state files.</param>
+/// <param name="Support">%USERPROFILE%\.sanduhr: the request, result and state files.</param>
 /// <param name="Messages">messages.txt.</param>
 public sealed record DeskMessagePaths(string Support, string Messages)
 {

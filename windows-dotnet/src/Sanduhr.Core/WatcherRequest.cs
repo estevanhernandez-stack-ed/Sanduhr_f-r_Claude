@@ -7,7 +7,7 @@ namespace Sanduhr.Core;
 /// <summary>
 /// The files that bring watchers in, decoded and checked again (the Mac's <c>WatcherRequest</c>).
 /// Pure: bytes in, a command or a report out, nothing kept. An agent's request,
-/// <c>watch-request-*.json</c> in <c>%APPDATA%\Sanduhr</c>, is written by the MCP tools
+/// <c>watch-request-*.json</c> in <c>%USERPROFILE%\.sanduhr</c>, is written by the MCP tools
 /// <c>watch_start</c>, <c>watch_update</c> and <c>watch_end</c>:
 /// <code>
 /// { "schema_version": 1, "op": "start", "id": "w0123456789ab", "requested_at": "2026-10-11T12:00:00Z",
