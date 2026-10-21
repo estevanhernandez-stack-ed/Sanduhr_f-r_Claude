@@ -25,6 +25,101 @@ public class LauncherTargetTests
         Assert.NotEmpty(over.Reason);
     }
 
+    // ---- the path form: Start-menu desktop programs listed as {GUID}\folder\file.exe ----
+
+    private const string G = "{6D809377-6AF0-444B-8957-A3773F02200E}";
+
+    [Theory]
+    [InlineData(@"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\cmd.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\7-Zip\7zFM.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\Android\Android Studio\bin\studio64.exe")]
+    [InlineData(@"{7C5A40EF-A0FB-4BFC-874A-C0F2E0B9FA8E}\Battle.net\Battle.net Launcher.EXE")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\Blender Foundation\Blender 4.2 (x64)\blender-launcher.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\Foo - Bar\Baz.exe")]    // a spaced dash is a name
+    public void StartMenuDesktopProgramPathsPass(string id) =>
+        Assert.True(LauncherTarget.Validate(LauncherKind.App, id).Ok, id);
+
+    [Theory]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\..\evil.exe")]               // up a level
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\a\..\..\evil.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\.\x.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\a\\b.exe")]                 // an empty segment
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\""a"".exe")]                  // quotes
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\a'b.exe")]
+    [InlineData(@"\\server\share\tool.exe")]                                         // UNC
+    [InlineData(@"\\{6D809377-6AF0-444B-8957-A3773F02200E}\x.exe")]
+    [InlineData(@"C:\{6D809377-6AF0-444B-8957-A3773F02200E}\x.exe")]                  // a drive letter
+    [InlineData(@"C:\Program Files\x\x.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\C:\x.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}/x/y.exe")]                   // forward slashes
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\y.exe & calc")]            // metacharacters
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x&calc\y.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x|calc\y.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x<y\z.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x>y\z.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x^y\z.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\%TEMP%\z.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x;y\z.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x*\z.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\z?.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\run.bat")]                 // not an .exe
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\run.cmd")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\run.ps1")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\run.lnk")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\run.exe.bat")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\run")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\run.exe -c calc")]         // trailing arguments
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\run.exe /c calc")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\run.exe -c.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\run -c.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\run.exe ")]                // trailing space
+    [InlineData(@" {6D809377-6AF0-444B-8957-A3773F02200E}\x\run.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\ x\run.exe")]                // a segment with spaces at its ends
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x \run.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x.\run.exe")]
+    [InlineData("{6D809377-6AF0-444B-8957-A3773F02200E}\\x\\run.exe\n")]              // control characters
+    [InlineData("{6D809377-6AF0-444B-8957-A3773F02200E}\\x\\ru\tn.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200}\x.exe")]                      // a short GUID
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200Z}\x.exe")]                     // not hex
+    [InlineData(@"6D809377-6AF0-444B-8957-A3773F02200E\x.exe")]                       // no braces
+    [InlineData(@"x\{6D809377-6AF0-444B-8957-A3773F02200E}\x.exe")]                   // GUID not first
+    [InlineData(@"Folder\file.exe")]                                                  // no GUID
+    [InlineData(@"shell:AppsFolder\{6D809377-6AF0-444B-8957-A3773F02200E}\x.exe")]    // a shell path
+    public void HostilePathFormsAreRefusedWithAReason(string id)
+    {
+        var check = LauncherTarget.Validate(LauncherKind.App, id);
+        Assert.False(check.Ok, id);
+        Assert.False(string.IsNullOrWhiteSpace(check.Reason));
+    }
+
+    [Fact]
+    public void APathFormAtTheLimitPassesAndOneOverDoesNot()
+    {
+        var prefix = G + @"\";
+        var atLimit = prefix + new string('a', LauncherTarget.MaxPathFormLength - prefix.Length - 4) + ".exe";
+        Assert.Equal(LauncherTarget.MaxPathFormLength, atLimit.Length);
+        Assert.True(LauncherTarget.Validate(LauncherKind.App, atLimit).Ok);
+        Assert.False(LauncherTarget.Validate(LauncherKind.App, atLimit.Replace(".exe", "a.exe")).Ok);
+    }
+
+    [Fact]
+    public void OnlyAnApprovedPathFormGetsAShellPath()
+    {
+        Assert.Equal(@"shell:AppsFolder\" + G + @"\7-Zip\7zFM.exe", LauncherTarget.AppShellPath(G + @"\7-Zip\7zFM.exe"));
+        Assert.Null(LauncherTarget.AppShellPath(G + @"\..\x.exe"));
+        Assert.Null(LauncherTarget.AppShellPath(@"C:\Windows\notepad.exe"));
+    }
+
+    [Fact]
+    public void IsPathFormIsTrueForAnythingWithABackslash()
+    {
+        Assert.True(LauncherTarget.IsPathForm(G + @"\x.exe"));
+        Assert.False(LauncherTarget.IsPathForm("Spotify"));
+        Assert.False(LauncherTarget.IsPathForm(null));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -35,7 +130,6 @@ public class LauncherTargetTests
     [InlineData("Some App")]                                   // a space
     [InlineData(@"C:\Windows\System32\cmd.exe")]               // a drive path
     [InlineData(@"\\server\share\tool.exe")]                   // a UNC path
-    [InlineData(@"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\cmd.exe")] // a known-folder path form
     [InlineData("C:/Windows/notepad.exe")]
     [InlineData("../../evil.exe")]
     [InlineData("/usr/bin/x")]

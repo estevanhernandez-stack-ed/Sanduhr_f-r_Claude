@@ -19,8 +19,10 @@ public readonly record struct LauncherTargetCheck(bool Ok, string Reason)
 
 /// <summary>
 /// The Launcher's safety property (spec, Desk Launcher): a button opens an installed Start-menu app or an
-/// https link, and nothing else. No command lines, no file paths, no arguments, no <c>.lnk</c> or
-/// <c>.exe</c> targets, so a button Claude later proposes cannot run anything the person didn't install.
+/// https link, and nothing else. No command lines and no arguments; the only path-like ID is a Start-menu desktop
+/// program's own <c>{GUID}\Folder\File.exe</c> listing, and it is used only while the live <c>shell:AppsFolder</c>
+/// enumeration contains it (membership, checked where the button is saved and again when it is opened), so a button
+/// Claude later proposes cannot run anything the person didn't install.
 /// One pure gate for settings.json parsing, the Settings controls and the launch itself.
 /// </summary>
 public static class LauncherTarget
@@ -46,7 +48,8 @@ public static class LauncherTarget
     /// May this be a target of this kind? An app is an AUMID shape: letters, digits and <c>. _ ! - { } +</c> only
     /// (the packaged form <c>Publisher.App_hash!App</c>, a dotted desktop-app ID, the <c>Chrome._crx_...</c> PWA
     /// form), 1 to <see cref="MaxAppIdLength"/> characters, with no path separator, drive or UNC prefix, space,
-    /// quote or argument character anywhere. A link is an absolute <c>https://</c> URL with a host, at most
+    /// quote or argument character anywhere. Or the path form <c>{GUID}\Folder\Program.exe</c> (see <see cref="IsPathForm"/>).
+    /// A link is an absolute <c>https://</c> URL with a host, at most
     /// <see cref="MaxLinkLength"/> characters, with no whitespace, quote or backslash and no sign-in part.
     /// </summary>
     public static LauncherTargetCheck Validate(LauncherKind kind, string? target) => kind switch
@@ -56,9 +59,17 @@ public static class LauncherTarget
         _ => LauncherTargetCheck.Refused("Unknown kind of button."),
     };
 
+    /// <summary>The longest path-form app ID accepted (Windows' MAX_PATH).</summary>
+    public const int MaxPathFormLength = 260;
+
+    /// <summary>True when the ID has the path form <c>{GUID}\folder\file.exe</c> (it contains a backslash); the shape
+    /// is checked by <see cref="Validate"/>, and the Launcher only ever uses one the Start menu itself lists.</summary>
+    public static bool IsPathForm(string? id) => id is not null && id.Contains('\\');
+
     private static LauncherTargetCheck ValidateApp(string? id)
     {
         if (string.IsNullOrEmpty(id)) return LauncherTargetCheck.Refused("Choose an app.");
+        if (IsPathForm(id)) return ValidatePathForm(id);
         if (id.Length > MaxAppIdLength) return LauncherTargetCheck.Refused("That app ID is too long.");
         if (id.Trim() != id || id.Any(char.IsWhiteSpace) || id.Any(char.IsControl))
             return LauncherTargetCheck.Refused("An app ID has no spaces.");
@@ -71,6 +82,40 @@ public static class LauncherTarget
         if (!id.Any(char.IsAsciiLetterOrDigit)) return LauncherTargetCheck.Refused("That is not an app ID.");
         return LauncherTargetCheck.Valid;
     }
+
+    /// <summary>
+    /// The path form the Start menu gives classic desktop programs that have no AppUserModelID: a known-folder GUID in
+    /// braces, then backslash-separated folder names, ending in a <c>.exe</c> file name, at most 260 characters. Spaces
+    /// are fine inside names; a drive letter, a UNC prefix, <c>..</c>, quotes, shell metacharacters, control
+    /// characters, empty or space-or-dot-ended segments, and an argument (a space then a dash and a letter) are not.
+    /// The shape is not the safety property: the Launcher also requires the ID to be in the live
+    /// <c>shell:AppsFolder</c> listing before it saves or opens it.
+    /// </summary>
+    private static LauncherTargetCheck ValidatePathForm(string id)
+    {
+        var refusal = LauncherTargetCheck.Refused("That is not a Start-menu program.");
+        if (id.Length > MaxPathFormLength) return LauncherTargetCheck.Refused("That app ID is too long.");
+        if (id.Any(char.IsControl)) return refusal;
+        // {GUID}\
+        if (id.Length < 40 || id[0] != '{' || id[37] != '}' || id[38] != '\\') return refusal;
+        if (!Guid.TryParseExact(id.AsSpan(1, 36), "D", out _)) return refusal;
+        var segments = id[39..].Split('\\');
+        foreach (var s in segments)
+        {
+            if (s.Length == 0 || s != s.Trim() || s.EndsWith('.')) return refusal;
+            if (s.All(c => c == '.')) return refusal;
+            foreach (var c in s)
+                if (!IsPathSegmentChar(c)) return refusal;
+            for (var i = 0; i + 2 < s.Length; i++)
+                if (char.IsWhiteSpace(s[i]) && s[i + 1] == '-' && s[i + 2] != ' ') return refusal;   // "name -arg"
+        }
+        var file = segments[^1];
+        if (!file.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || file.Length <= 4) return refusal;
+        return LauncherTargetCheck.Valid;
+    }
+
+    private static bool IsPathSegmentChar(char c) =>
+        char.IsLetterOrDigit(c) || c is ' ' or '.' or '_' or '-' or '(' or ')' or '+' or ',' or '#' or '@' or '[' or ']' or '{' or '}' or '=' or '~';
 
     private static bool IsAppIdChar(char c) =>
         char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '!' or '-' or '{' or '}' or '+';

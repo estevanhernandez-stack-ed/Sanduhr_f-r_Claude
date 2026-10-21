@@ -335,9 +335,11 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
         Add(LauncherButton.Create(LauncherKind.Link, prompt.Url, null, prompt.LinkLabel, null), "That link can't be added.");
     }
 
-    private void Add(LauncherButton? button, string refusal)
+    internal void Add(LauncherButton? button, string refusal)
     {
         if (button is null) { Problem = refusal; return; }
+        // Membership: an app button is saved only while the live Start-menu listing has the app.
+        if (button.Kind == LauncherKind.App && !(Apps.Known && !Apps.IsMissing(button.Target))) { Problem = refusal; return; }
         var next = _model.Add(button);
         if (ReferenceEquals(next, _model)) { Problem = $"The Launcher holds {LauncherModel.MaxButtons} buttons at most."; return; }
         Commit(next, rebuild: true);

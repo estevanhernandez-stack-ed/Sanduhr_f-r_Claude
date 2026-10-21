@@ -42,6 +42,23 @@ public class LauncherAppsTests
     }
 
     [Fact]
+    public void DesktopProgramsAreListedByTheirPathFormAndOpenedOnlyByListing()
+    {
+        using var apps = new LauncherApps();
+        var list = apps.Enumerate();
+        var paths = list.Where(a => LauncherTarget.IsPathForm(a.Aumid)).ToList();
+        if (Environment.GetEnvironmentVariable("SANDUHR_LAUNCHER_COUNT") is { Length: > 0 } file)
+            File.WriteAllText(file, $"total={list.Count} pathForm={paths.Count}");
+        Assert.All(paths, a => Assert.EndsWith(".exe", a.Aumid, StringComparison.OrdinalIgnoreCase));
+        if (paths.Count > 0) Assert.True(apps.Exists(paths[0].Aumid));
+
+        // Well-formed, but not in the listing: refused even if the shell can resolve it.
+        Assert.False(apps.Exists(@"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\cmd.exe.NotListed.exe"));
+        Assert.False(apps.Exists(@"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\..\cmd.exe"));
+        Assert.False(apps.Exists(@"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\cmd.bat"));
+    }
+
+    [Fact]
     public void AnUnknownOrRefusedIdIsAbsent()
     {
         using var apps = new LauncherApps();

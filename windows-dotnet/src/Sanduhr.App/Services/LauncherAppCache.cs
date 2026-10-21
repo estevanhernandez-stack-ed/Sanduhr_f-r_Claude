@@ -121,7 +121,7 @@ internal sealed class LauncherAppCache : IDisposable
                 var apps = catalog.Enumerate();
                 var present = new HashSet<string>(apps.Select(a => a.Aumid), StringComparer.Ordinal);
                 foreach (var id in wanted)
-                    if (!present.Contains(id) && catalog.Exists(id)) present.Add(id);
+                    if (!present.Contains(id) && !LauncherTarget.IsPathForm(id) && catalog.Exists(id)) present.Add(id);   // a path form is present only by listing
                 bool changed;
                 lock (_gate)
                 {

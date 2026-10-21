@@ -35,7 +35,9 @@ internal interface ILauncherAppCatalog
 /// icon. Enumeration walks the folder with <c>IEnumShellItems</c>, taking the display name and the parsing name (which
 /// for this folder is the ID); an icon comes from <c>IShellItemImageFactory</c>; existence is
 /// <c>SHCreateItemFromParsingName("shell:AppsFolder\&lt;id&gt;")</c>. Items whose ID the Launcher would refuse
-/// (the path-shaped IDs some classic programs get) are left out of the list, so nothing offered can fail the gate.
+/// (a malformed one) are left out of the list, so nothing offered can fail the gate. Classic desktop programs with no
+/// AppUserModelID are listed under their path form, <c>{GUID}\Folder\File.exe</c>; such an ID is used only while this
+/// listing contains it (membership), and it is opened through <c>explorer.exe shell:AppsFolder\&lt;id&gt;</c>, never by its exe path.
 /// All shell work runs on one private STA thread, one job at a time, so the COM objects never cross threads.
 /// </summary>
 [SupportedOSPlatform("windows")]
@@ -83,7 +85,10 @@ internal sealed class LauncherApps : ILauncherAppCatalog, IDisposable
 
     public IReadOnlyList<LauncherAppInfo> Enumerate() => Run<IReadOnlyList<LauncherAppInfo>>(EnumerateCore, []);
 
-    public bool Exists(string aumid) => LauncherTarget.AppShellPath(aumid) is { } path && Run(() => ItemExists(path), false);
+    /// <summary>True when the Start menu still has this app. A path-form ID (<c>{GUID}\Folder\File.exe</c>) counts only if the
+    /// live <c>shell:AppsFolder</c> listing itself contains it: membership, not just something the shell can resolve.</summary>
+    public bool Exists(string aumid) => LauncherTarget.AppShellPath(aumid) is { } path
+        && Run(() => ItemExists(path) && (!LauncherTarget.IsPathForm(aumid) || EnumerateCore().Any(a => a.Aumid == aumid)), false);
 
     public BitmapSource? Icon(string aumid, int px) =>
         LauncherTarget.AppShellPath(aumid) is { } path ? Run(() => IconCore(path, Math.Clamp(px, 16, 512)), null) : null;
@@ -186,7 +191,9 @@ internal sealed class LauncherApps : ILauncherAppCatalog, IDisposable
                 if (LauncherTarget.AppShellPath(button.Target) is not { } shellPath) return OpenResult.Refused;
                 if (exists is not null && !exists(button.Target)) return OpenResult.Missing;
                 var explorer = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
-                using var p = Process.Start(new ProcessStartInfo(explorer) { UseShellExecute = false, CreateNoWindow = true, Arguments = shellPath });
+                var start = new ProcessStartInfo(explorer) { UseShellExecute = false, CreateNoWindow = true };
+                start.ArgumentList.Add(shellPath);   // one argument, quoted for us when the path has spaces; never the exe itself
+                using var p = Process.Start(start);
                 return OpenResult.Opened;
             }
             if (LauncherTarget.LinkUrl(button.Target) is not { } url) return OpenResult.Refused;

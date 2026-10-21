@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json.Nodes;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Sanduhr.App.Interop;
 using Sanduhr.App.Services;
 using Sanduhr.App.ViewModels;
 using Sanduhr.Core;
@@ -95,6 +96,67 @@ public sealed class LauncherSettingsTests : IDisposable
         Assert.Equal(LauncherOrientation.Column, m.Orientation);
         Assert.Equal(["https://example.com", "Spotify"], m.Buttons.Select(b => b.Target));
         Assert.All(m.Buttons, b => Assert.Null(b.Image));
+    }
+
+
+    // ---- membership ----
+
+    private sealed class FakeCatalog(params LauncherAppInfo[] apps) : Sanduhr.App.Interop.ILauncherAppCatalog
+    {
+        public IReadOnlyList<LauncherAppInfo> Enumerate() => apps;
+        public bool Exists(string aumid) => apps.Any(a => a.Aumid == aumid);
+        public BitmapSource? Icon(string aumid, int px) => null;
+    }
+
+    private const string Gui = "{6D809377-6AF0-444B-8957-A3773F02200E}";
+
+    /// <summary>Runs <paramref name="body"/> with the app's shared cache holding exactly these apps (as the shell listed them).</summary>
+    private static void WithListing(LauncherAppInfo[] apps, Action body)
+    {
+        var cache = new LauncherAppCache(() => new FakeCatalog(apps));
+        var saved = LauncherAppCache.Current;
+        LauncherAppCache.Current = cache;
+        try
+        {
+            cache.Refresh([], force: true);
+            for (int i = 0; i < 200 && !cache.Known; i++) Thread.Sleep(25);
+            Assert.True(cache.Known);
+            body();
+        }
+        finally
+        {
+            LauncherAppCache.Current = saved;
+            cache.Dispose();
+        }
+    }
+
+    [Fact]
+    public void AnAppIsSavedOnlyWhileTheStartMenuListingHasIt()
+    {
+        var listed = new LauncherAppInfo("7-Zip File Manager", Gui + @"\7-Zip\7zFM.exe");
+        WithListing([listed], () =>
+        {
+            var vm = Open(placed: true);
+            vm.Add(App(Gui + @"\Other\other.exe"), "refused");           // well-formed, not listed
+            Assert.Empty(_store.LoadLauncher().Buttons);
+            Assert.Equal("refused", vm.Problem);
+            vm.Add(App("Sanduhr.NotListed"), "refused");                 // an AUMID, not listed
+            Assert.Empty(_store.LoadLauncher().Buttons);
+
+            vm.Add(App(listed.Aumid), "refused");                        // the listed path form
+            Assert.Equal([listed.Aumid], _store.LoadLauncher().Buttons.Select(b => b.Target));
+        });
+    }
+
+    [Fact]
+    public void ALinkNeedsNoListing()
+    {
+        WithListing([], () =>
+        {
+            var vm = Open(placed: true);
+            vm.Add(LauncherButton.Create(LauncherKind.Link, "https://example.com")!, "refused");
+            Assert.Single(_store.LoadLauncher().Buttons);
+        });
     }
 
     // ---- the rows ----
