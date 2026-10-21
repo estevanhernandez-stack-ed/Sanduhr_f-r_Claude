@@ -91,7 +91,6 @@ struct ModsCatalogView: View {
             ForEach(model.unreadableNotes(demo: demo), id: \.self) { note in
                 Text(note).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
             }
-            if model.loaded { SessionLoadPanel(loads: model.shownLoads(demo: demo)) }
             let proposed = ModProposalStore.shared.pendingFromClaude.count + ModProposalStore.shared.pendingInstalls.count
             if proposed > 0 {
                 HStack(spacing: 8) {
@@ -161,7 +160,7 @@ struct ModsCatalogView: View {
 /// What a new session in each seat starts with before anything is typed (slice 1c), estimated
 /// from the files. Claude Code shows no such figure across seats; `/context` and `/doctor` give
 /// it for the session they run in.
-private struct SessionLoadPanel: View {
+struct SessionLoadPanel: View {
     let loads: [(seat: Seat, load: SessionLoad)]
 
     var body: some View {

@@ -84,6 +84,8 @@ enum SettingsAnchor {
     /// Sanduhr's own mod, Meters above the prompt, at the top (its one home since 2026-10-08).
     static let metersMod = "meters"
     static let inventory = "inventory"
+    /// Mods & Config, the "What a new session starts with" card above the tabs.
+    static let sessionLoad = "session-load"
     // Widget
     /// Widget, Pacing calculators (was the Pacing & Focus page, raw value `pacing`).
     static let pacing = "pacing"
@@ -198,6 +200,8 @@ enum SettingsAnchor {
         SettingsEntry(title: SettingsNames.metersAbovePrompt, page: .mods, anchor: metersMod,
                       synonyms: [IntegrationScripts.modName, "Sanduhr's own mod", "mod", "band", "bars", "animated",
                                  "Update", "Remove", "enabledPlugins"]),
+        SettingsEntry(title: "What a new session starts with", page: .mods, anchor: sessionLoad,
+                      synonyms: ["session start", "tokens before you type", "skill list", "context", "budget"]),
         SettingsEntry(title: "Mods and plugins", page: .mods, anchor: inventory,
                       synonyms: ["mods", "plugins", "Check", "risk", "Catalog", SettingsNames.byFolder, "seat", "marketplace", "skills", "agents",
                                  "commands", "output styles", "MCP servers", "work", "personal", "label",
