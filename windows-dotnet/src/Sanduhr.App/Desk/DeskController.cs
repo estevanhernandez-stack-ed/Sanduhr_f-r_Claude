@@ -250,6 +250,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private void EndArrangeCore(DeskArrangeEnd how, bool reload)
     {
         if (_session is not { } session) return;
+        // Done waits while every drawn piece is hidden; Cancel (and a forced end) still ends the mode.
+        if (how == DeskArrangeEnd.Done && reload && !session.CanFinish(DeskView.Drawn)) return;
         var mode = _arrangeMode;
         _arrangeMode = null;
         _session = null;

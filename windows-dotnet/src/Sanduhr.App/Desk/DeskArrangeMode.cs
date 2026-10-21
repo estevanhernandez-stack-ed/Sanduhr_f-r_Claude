@@ -94,7 +94,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
             _strip.Margin = new Thickness(0, 0, 0, Math.Max(0, below) + 24);
             Children.Add(_strip);
             Bar = new DeskArrangeBar { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-            Bar.DoneRequested += () => EndRequested?.Invoke(DeskArrangeEnd.Done);
+            Bar.DoneRequested += () => { if (CanFinish) EndRequested?.Invoke(DeskArrangeEnd.Done); };
             Bar.CancelRequested += () => EndRequested?.Invoke(DeskArrangeEnd.Cancel);
             Children.Add(Bar);
         }
@@ -164,7 +164,11 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         Children.Insert(1, view); // above the scrim (child 0), below the outlines and the bar
         BuildAdorners();
         BuildControls();
+        Bar?.ShowNothingPlaced(!CanFinish);
     }
+
+    /// <summary>False while every drawn piece is hidden: Done and Return wait, Cancel works.</summary>
+    private bool CanFinish => !_working.PlacesNothing(DeskView.Drawn);
 
     /// <summary>The pieces the Desk draws that the working layout leaves out, in Settings order.</summary>
     private IReadOnlyList<string> HiddenPieces => _working.Hidden(DeskView.Drawn);
@@ -513,6 +517,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
             return true;
         }
         if (DeskArrange.EndKey(keyName) is not { } how) return false;
+        if (how == DeskArrangeEnd.Done && !CanFinish) return true; // used, but Done waits
         EndRequested?.Invoke(how);
         return true;
     }

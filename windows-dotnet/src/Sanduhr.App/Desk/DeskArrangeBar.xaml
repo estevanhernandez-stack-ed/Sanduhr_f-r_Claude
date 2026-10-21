@@ -58,6 +58,9 @@
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
             <TextBlock x:Name="Keys" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"
                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+            <TextBlock x:Name="Notice" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0"
+                       Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"
+                       Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
                 <Button x:Name="CancelButton" Style="{StaticResource BarButton}" Content="Cancel" />
                 <Button x:Name="DoneButton" Style="{StaticResource BarPrimary}" Content="Done" IsDefault="True" />

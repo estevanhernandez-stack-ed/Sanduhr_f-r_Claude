@@ -266,6 +266,10 @@ public sealed class DeskArrangement
         return offered.Where(w => Placement(w) is null).ToList();
     }
 
+    /// <summary>True when none of the pieces in <paramref name="among"/> (default: every known one) is placed.</summary>
+    public bool PlacesNothing(IEnumerable<string>? among = null) =>
+        !(among ?? Known).Any(w => Placement(w) is not null);
+
     /// <summary>Sets a placed piece's size (snapped and kept within range). A hidden piece has none.</summary>
     public void SetScale(string widget, double scale)
     {

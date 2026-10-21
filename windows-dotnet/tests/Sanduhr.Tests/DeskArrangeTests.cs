@@ -409,6 +409,22 @@ public class DeskArrangeTests
     }
 
     [Fact]
+    public void DoneWaitsWhileEveryDrawnPieceIsHiddenAndWritesOnceOneIsShownBack()
+    {
+        var s = new DeskArrangeSession(Start);
+        Assert.True(s.CanFinish(DeskView_Drawn));
+        foreach (var p in s.Working.Pieces.Select(p => p.Widget).ToList()) s.Working.Hide(p);
+        Assert.False(s.CanFinish(DeskView_Drawn));
+        Assert.Equal(Start, s.Saved); // nothing was written
+        s.Working.Show("clock");
+        Assert.True(s.CanFinish(DeskView_Drawn));
+        Assert.Equal("clock:bl", s.ToWrite);
+        Assert.Equal("Show a piece first, or Cancel.", DeskArrangeCopy.NothingPlaced);
+    }
+
+    private static readonly string[] DeskView_Drawn = ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "glow"];
+
+    [Fact]
     public void HidingThenShowingAPieceIsNotAChangeWhenItWasAtItsStandardAnchor()
     {
         var s = new DeskArrangeSession("clock:bl claude:bl");
