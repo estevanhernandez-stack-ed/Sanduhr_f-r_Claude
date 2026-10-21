@@ -9,9 +9,10 @@ namespace Sanduhr.Mcp;
 /// fixtures ONLY (read-redirection, dev-tier — never set by shipped config):
 /// <c>SANDUHR_SNAPSHOT_PATH</c> redirects the snapshot read;
 /// <c>SANDUHR_CC_ROOTS</c> (';'-separated directory list) replaces root
-/// discovery + consent. Without them the server reads the real
-/// <c>%APPDATA%\Sanduhr</c> paths and honors the <c>mcp_roots</c> consent map
-/// in settings.json. Roots are the folders <c>ClaudeCodeHomes.Discover</c> finds
+/// discovery + consent. Without them the server reads the plan B external
+/// folder <c>%USERPROFILE%\.sanduhr</c> (snapshot, handoffs, the
+/// <c>mcp-settings.json</c> projection) and honors that projection's
+/// <c>mcp_roots</c> consent map. Roots are the folders <c>ClaudeCodeHomes.Discover</c> finds
 /// (<c>~/.claude</c>, <c>~/.claude-*</c>, the <c>CLAUDE_CONFIG_DIR</c> folder when it
 /// sits in the profile); a root absent from the map (or the map absent entirely)
 /// is NOT consented; the burn surfaces return <c>no_data/disabled</c>.
@@ -21,9 +22,23 @@ public sealed class McpConfig
     /// <summary>Full path of snapshot.json.</summary>
     public required string SnapshotPath { get; init; }
 
-    /// <summary>The usage-vault root (%LOCALAPPDATA%\Sanduhr\vault, or the
-    /// SANDUHR_VAULT_DIR dev override). Read-only from this process.</summary>
+    /// <summary>The real usage-vault root (%LOCALAPPDATA%\Sanduhr\vault, or the
+    /// SANDUHR_VAULT_DIR dev override). Read-only from this process. Reads go
+    /// through <see cref="VaultDirs"/>.</summary>
     public required string VaultDir { get; init; }
+
+    private IReadOnlyList<string>? _vaultDirs;
+
+    /// <summary>Vault directories in search order. The Store build's NEW vault files are
+    /// virtualized into the package's LocalCache; per file the LocalCache copy shadows the
+    /// real one for the widget (measured 2026-10-20), so the server applies the same rule:
+    /// per root and month, the first directory holding the rollup shard wins. Defaults to
+    /// just <see cref="VaultDir"/>.</summary>
+    public IReadOnlyList<string> VaultDirs
+    {
+        get => _vaultDirs ?? new[] { VaultDir };
+        init => _vaultDirs = value;
+    }
 
     /// <summary>Consented CC roots: name → full path. Order is stable
     /// (.claude first, then .claude-* in natural order). Empty = nothing consented.</summary>
@@ -35,13 +50,16 @@ public sealed class McpConfig
 
     /// <summary>Directory holding <c>history.&lt;account&gt;.json</c> — the widget's
     /// per-fetch append log, read as the fallback source when the snapshot is
-    /// missing or dead (issue #63). Null = the snapshot's own directory.</summary>
+    /// missing or dead (issue #63). History stays private in AppData
+    /// (<c>%APPDATA%\Sanduhr</c>; it serves pre-snapshot widgets that write there),
+    /// except when SANDUHR_SNAPSHOT_PATH redirects the snapshot: then it follows
+    /// that file's directory. Null = the snapshot's own directory.</summary>
     public string? HistoryDir { get; init; }
 
-    /// <summary>settings.json — read (never written) by publish_usage for the
-    /// publish group's toggle, endpoint URL, auth scheme and token-present
-    /// mirror. Null = unavailable.</summary>
-    public string? SettingsPath { get; init; }
+    /// <summary><c>mcp-settings.json</c> in the external folder — the projection the
+    /// widget writes of settings.json (schema_version 1, mcp_roots, publish readiness).
+    /// Read (never written) for consent and by publish_usage. Null = unavailable.</summary>
+    public string? McpSettingsPath { get; init; }
 
     /// <summary>The publish handoff files (see Core's PublishHandoff): the tool
     /// writes the request, the widget writes the result. Null = handoff unavailable.</summary>
@@ -71,6 +89,7 @@ public sealed class McpConfig
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         return Resolve(
             home,
+            Path.Combine(home, ".sanduhr"),
             Path.Combine(appData, "Sanduhr"),
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             Environment.GetEnvironmentVariable);
@@ -80,20 +99,37 @@ public sealed class McpConfig
     /// parameter. <paramref name="env"/> reads <c>SANDUHR_SNAPSHOT_PATH</c>,
     /// <c>SANDUHR_VAULT_DIR</c>, <c>SANDUHR_CC_ROOTS</c> and <c>CLAUDE_CONFIG_DIR</c>.
     /// Public because the server assembly declares no InternalsVisibleTo.</summary>
-    public static McpConfig Resolve(string home, string sanduhrDir, string localAppData,
-        Func<string, string?> env)
+    public static McpConfig Resolve(string home, string externalDir, string appDataSanduhrDir,
+        string localAppData, Func<string, string?> env)
     {
-
+        bool snapOverride = env("SANDUHR_SNAPSHOT_PATH") is { Length: > 0 };
         string snapshotPath = env("SANDUHR_SNAPSHOT_PATH")
             is { Length: > 0 } envSnap
             ? envSnap
-            : Path.Combine(sanduhrDir, "snapshot.json");
+            : Path.Combine(externalDir, "snapshot.json");
 
-        string vaultDir = env("SANDUHR_VAULT_DIR")
-            is { Length: > 0 } envVault
-            ? envVault
-            : Path.Combine(
-                localAppData, "Sanduhr", "vault");
+        string realVault = Path.Combine(localAppData, "Sanduhr", "vault");
+        IReadOnlyList<string> vaultDirs;
+        string vaultDir;
+        if (env("SANDUHR_VAULT_DIR") is { Length: > 0 } envVault)
+        {
+            vaultDir = envVault;
+            vaultDirs = new[] { envVault };
+        }
+        else
+        {
+            // Fixed paths only, no path from a file. The Store build's new vault files
+            // are virtualized into the package's LocalCache; per file the LocalCache copy
+            // shadows the real one for the widget (measured 2026-10-20), so the server
+            // applies the same rule: cache first, then real.
+            string cacheVault = Path.Combine(localAppData, "Packages",
+                "626LabsLLC.SanduhrfrClaude_wz1chhb2h2v4a", "LocalCache", "Local", "Sanduhr", "vault");
+            vaultDir = realVault;
+            vaultDirs = new[] { cacheVault, realVault };
+        }
+
+        // Mirrors Core's external-folder file name for the consent/publish projection.
+        string mcpSettingsPath = Path.Combine(externalDir, "mcp-settings.json");
 
         // Discovery gives names only; a path is built solely from a discovered name.
         var found = ClaudeCodeHomes.Discover(home, env("CLAUDE_CONFIG_DIR"));
@@ -117,7 +153,7 @@ public sealed class McpConfig
             // only looked up BY a discovered name, so a key that is not one is ignored, and
             // folders added by hand in the widget never reach this process (design review:
             // the file-oracle guard; 2026-10-11 ruling).
-            var consentMap = ReadMcpRootsConsent(Path.Combine(sanduhrDir, "settings.json"));
+            var consentMap = ReadMcpRootsConsent(mcpSettingsPath);
             foreach (var name in found)
             {
                 if (consentMap.TryGetValue(name, out bool on) && on)
@@ -129,30 +165,41 @@ public sealed class McpConfig
         {
             SnapshotPath = snapshotPath,
             VaultDir = vaultDir,
-            // Follows the snapshot: the dev-tier redirect moves both together.
-            HistoryDir = Path.GetDirectoryName(snapshotPath),
+            VaultDirs = vaultDirs,
+            // History stays private in AppData (pre-snapshot widgets write it there);
+            // the dev-tier snapshot redirect moves it with the snapshot.
+            HistoryDir = snapOverride ? Path.GetDirectoryName(snapshotPath) : appDataSanduhrDir,
             ConsentedRoots = consented,
             RootsFound = found,
-            SettingsPath = Path.Combine(sanduhrDir, "settings.json"),
+            McpSettingsPath = mcpSettingsPath,
             // Mirrors Core's PublishHandoff.RequestFileName/ResultFileName literally
             // (this project cannot link that file without widening its allowlist).
-            PublishRequestPath = Path.Combine(sanduhrDir, "publish-request.json"),
-            PublishResultPath = Path.Combine(sanduhrDir, "publish-result.json"),
+            PublishRequestPath = Path.Combine(externalDir, "publish-request.json"),
+            PublishResultPath = Path.Combine(externalDir, "publish-result.json"),
             // Same mirror discipline for Core's ThemeHandoff file names.
-            ThemeRequestPath = Path.Combine(sanduhrDir, "theme-request.json"),
-            ThemeResultPath = Path.Combine(sanduhrDir, "theme-result.json"),
+            ThemeRequestPath = Path.Combine(externalDir, "theme-request.json"),
+            ThemeResultPath = Path.Combine(externalDir, "theme-result.json"),
         };
     }
 
-    private static Dictionary<string, bool> ReadMcpRootsConsent(string settingsPath)
+    /// <summary>True only for the JSON number 1. Shared by every projection reader.</summary>
+    internal static bool IsSchemaV1(JsonNode? node)
+    {
+        try { return node is JsonValue v && v.TryGetValue<int>(out int n) && n == 1; }
+        catch { return false; }
+    }
+
+    private static Dictionary<string, bool> ReadMcpRootsConsent(string projectionPath)
     {
         var result = new Dictionary<string, bool>(StringComparer.Ordinal);
         try
         {
-            if (!File.Exists(settingsPath))
+            if (!File.Exists(projectionPath))
                 return result;
-            if (JsonNode.Parse(File.ReadAllText(settingsPath)) is not JsonObject root)
+            if (JsonNode.Parse(File.ReadAllText(projectionPath)) is not JsonObject root)
                 return result;
+            if (!IsSchemaV1(root["schema_version"]))
+                return result;   // another schema = nothing consented (fail closed)
             if (root["mcp_roots"] is not JsonObject map)
                 return result;
             foreach (var (name, node) in map)

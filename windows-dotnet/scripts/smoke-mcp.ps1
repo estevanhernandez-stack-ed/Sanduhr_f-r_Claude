@@ -10,7 +10,8 @@
   get_local_burn_by_project, get_model_usage, get_usage_history, and a propose_theme that must be
   rejected without touching the widget) over stdin, with no environment overrides, and fails on
   a crash, a missing tool, or a malformed reply. It reads this machine's real
-  %APPDATA%\Sanduhr paths and writes nothing.
+  %USERPROFILE%\.sanduhr paths (snapshot, handoffs, the mcp-settings.json projection;
+  the vault and history stay private in AppData) and writes nothing.
 
 .PARAMETER Exe
   Path to the published exe. Defaults to windows-dotnet\dist\publish\mcp\sanduhr-mcp.exe
@@ -109,6 +110,6 @@ $theme = $replies[8].result.content[0].text | ConvertFrom-Json
 $fields = @($theme.findings | ForEach-Object field)
 Write-Host "[smoke-mcp] propose_theme (broken accent): status=$($theme.status) reason=$($theme.reason) findings=$($fields -join ',')"
 if ($theme.status -ne 'rejected' -or $fields -notcontains 'accent') { throw 'propose_theme did not reject the broken palette on the accent field.' }
-if (Test-Path (Join-Path $env:APPDATA 'Sanduhr\theme-request.json')) { throw 'propose_theme wrote a request for a palette it should have rejected.' }
+if (Test-Path (Join-Path $env:USERPROFILE '.sanduhr\theme-request.json')) { throw 'propose_theme wrote a request for a palette it should have rejected.' }
 
 Write-Host '[smoke-mcp] OK' -ForegroundColor Green

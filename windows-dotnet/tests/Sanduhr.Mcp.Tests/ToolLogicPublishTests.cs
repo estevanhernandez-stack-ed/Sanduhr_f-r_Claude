@@ -16,23 +16,28 @@ public class ToolLogicPublishTests
         VaultDir = Path.Combine(tmp.Path, "vault"),
         ConsentedRoots = Array.Empty<(string, string)>(),
         RootsFound = Array.Empty<string>(),
-        SettingsPath = Path.Combine(tmp.Path, "settings.json"),
+        McpSettingsPath = Path.Combine(tmp.Path, "mcp-settings.json"),
         PublishRequestPath = Path.Combine(tmp.Path, "publish-request.json"),
         PublishResultPath = Path.Combine(tmp.Path, "publish-result.json"),
         PublishWaitTimeout = wait ?? TimeSpan.FromMilliseconds(300),
         PublishPollInterval = TimeSpan.FromMilliseconds(20),
     };
 
-    private static void WriteSettings(TempDir tmp, bool? enabled, bool? tokenStored,
-        string? endpointUrl = "https://collector.example/usage", string? authScheme = null)
+    /// <summary>Write the widget's mcp-settings.json projection (schema 1).</summary>
+    private static void WriteSettings(TempDir tmp, bool? enabled, bool? credentialReady,
+        bool? hasEndpoint = true, int schema = 1)
     {
         var group = new JsonObject();
         if (enabled is { } e) group["enabled"] = e;
-        if (tokenStored is { } k) group["token_stored"] = k;
-        if (endpointUrl is { } u) group["endpoint_url"] = u;
-        if (authScheme is { } a) group["auth_scheme"] = a;
-        File.WriteAllText(Path.Combine(tmp.Path, "settings.json"),
-            new JsonObject { ["theme"] = "obsidian", ["publish"] = group }.ToJsonString());
+        if (hasEndpoint is { } h) group["has_endpoint"] = h;
+        if (credentialReady is { } k) group["credential_ready"] = k;
+        File.WriteAllText(Path.Combine(tmp.Path, "mcp-settings.json"),
+            new JsonObject
+            {
+                ["schema_version"] = schema,
+                ["mcp_roots"] = new JsonObject(),
+                ["publish"] = group,
+            }.ToJsonString());
     }
 
     [Fact]
@@ -41,7 +46,8 @@ public class ToolLogicPublishTests
         var cfg = McpConfig.Resolve();
         Assert.EndsWith("publish-request.json", cfg.PublishRequestPath);
         Assert.EndsWith("publish-result.json", cfg.PublishResultPath);
-        Assert.EndsWith("settings.json", cfg.SettingsPath);
+        Assert.EndsWith("mcp-settings.json", cfg.McpSettingsPath);
+        Assert.Contains(".sanduhr", cfg.PublishRequestPath);
     }
 
     [Fact]
@@ -69,7 +75,7 @@ public class ToolLogicPublishTests
     public void Enabled_without_an_endpoint_is_no_endpoint_with_remedy()
     {
         using var tmp = new TempDir();
-        WriteSettings(tmp, enabled: true, tokenStored: true, endpointUrl: "");
+        WriteSettings(tmp, enabled: true, credentialReady: true, hasEndpoint: false);
         var r = new ToolLogic(PublishConfig(tmp), () => Now).BuildPublish(null);
         Assert.Equal("no_endpoint", (string?)r["status"]);
         Assert.Equal("no_endpoint_url", (string?)r["reason"]);
@@ -82,7 +88,7 @@ public class ToolLogicPublishTests
     public void Endpoint_absent_from_the_group_is_no_endpoint_too()
     {
         using var tmp = new TempDir();
-        WriteSettings(tmp, enabled: true, tokenStored: true, endpointUrl: null);
+        WriteSettings(tmp, enabled: true, credentialReady: true, hasEndpoint: null);
         var r = new ToolLogic(PublishConfig(tmp), () => Now).BuildPublish(null);
         Assert.Equal("no_endpoint", (string?)r["status"]);
     }
@@ -91,7 +97,7 @@ public class ToolLogicPublishTests
     public void Enabled_with_endpoint_but_no_token_is_no_token_with_remedy()
     {
         using var tmp = new TempDir();
-        WriteSettings(tmp, enabled: true, tokenStored: false);
+        WriteSettings(tmp, enabled: true, credentialReady: false);
         var r = new ToolLogic(PublishConfig(tmp), () => Now).BuildPublish(null);
         Assert.Equal("no_token", (string?)r["status"]);
         Assert.Equal("no_publish_token", (string?)r["reason"]);
@@ -102,10 +108,10 @@ public class ToolLogicPublishTests
     }
 
     [Fact]
-    public void Auth_scheme_none_needs_no_token_and_queues()
+    public void Ready_projection_queues()
     {
         using var tmp = new TempDir();
-        WriteSettings(tmp, enabled: true, tokenStored: false, authScheme: "none");
+        WriteSettings(tmp, enabled: true, credentialReady: true);
         var r = new ToolLogic(PublishConfig(tmp), () => Now).BuildPublish(null);
         Assert.Equal("queued", (string?)r["status"]);
         Assert.True(File.Exists(Path.Combine(tmp.Path, "publish-request.json")));
@@ -115,35 +121,44 @@ public class ToolLogicPublishTests
     public void Refusal_order_is_disabled_then_endpoint_then_token()
     {
         using var tmp = new TempDir();
-        WriteSettings(tmp, enabled: false, tokenStored: false, endpointUrl: "");
+        WriteSettings(tmp, enabled: false, credentialReady: false, hasEndpoint: false);
         Assert.Equal("disabled", (string?)new ToolLogic(PublishConfig(tmp), () => Now).BuildPublish(null)["status"]);
-        WriteSettings(tmp, enabled: true, tokenStored: false, endpointUrl: "");
+        WriteSettings(tmp, enabled: true, credentialReady: false, hasEndpoint: false);
         Assert.Equal("no_endpoint", (string?)new ToolLogic(PublishConfig(tmp), () => Now).BuildPublish(null)["status"]);
     }
 
     [Fact]
-    public void A_not_yet_migrated_publish_626_group_is_honored_read_only()
+    public void Other_schema_version_fails_closed_as_disabled()
     {
         using var tmp = new TempDir();
-        var legacy = new JsonObject { ["enabled"] = true, ["key_stored"] = false };
-        File.WriteAllText(Path.Combine(tmp.Path, "settings.json"),
-            new JsonObject { ["publish_626"] = legacy }.ToJsonString());
-
+        WriteSettings(tmp, enabled: true, credentialReady: true, schema: 2);
         var r = new ToolLogic(PublishConfig(tmp), () => Now).BuildPublish(null);
+        Assert.Equal("disabled", (string?)r["status"]);
+        Assert.False(File.Exists(Path.Combine(tmp.Path, "publish-request.json")));
+    }
 
-        // The legacy group described the 626 Labs endpoint, so it counts as set; the token does not.
-        Assert.Equal("no_token", (string?)r["status"]);
-        // Read-only: the server never rewrites settings.json.
-        var after = (JsonObject)JsonNode.Parse(File.ReadAllText(Path.Combine(tmp.Path, "settings.json")))!;
-        Assert.NotNull(after["publish_626"]);
-        Assert.Null(after["publish"]);
+    [Fact]
+    public void Projection_without_a_publish_group_is_disabled()
+    {
+        using var tmp = new TempDir();
+        File.WriteAllText(Path.Combine(tmp.Path, "mcp-settings.json"), """{"schema_version":1,"mcp_roots":{}}""");
+        Assert.Equal("disabled", (string?)new ToolLogic(PublishConfig(tmp), () => Now).BuildPublish(null)["status"]);
+    }
+
+    [Fact]
+    public void Settings_json_beside_the_projection_is_not_consulted()
+    {
+        using var tmp = new TempDir();
+        File.WriteAllText(Path.Combine(tmp.Path, "settings.json"),
+            """{"publish":{"enabled":true,"token_stored":true,"endpoint_url":"https://x.example"}}""");
+        Assert.Equal("disabled", (string?)new ToolLogic(PublishConfig(tmp), () => Now).BuildPublish(null)["status"]);
     }
 
     [Fact]
     public void Queues_a_request_for_yesterday_by_default_and_reports_queued_when_the_widget_is_silent()
     {
         using var tmp = new TempDir();
-        WriteSettings(tmp, enabled: true, tokenStored: true);
+        WriteSettings(tmp, enabled: true, credentialReady: true);
         var r = new ToolLogic(PublishConfig(tmp), () => Now).BuildPublish(null);
 
         Assert.Equal("queued", (string?)r["status"]);
@@ -163,7 +178,7 @@ public class ToolLogicPublishTests
     public async Task Returns_the_widgets_result_when_it_answers_the_matching_request()
     {
         using var tmp = new TempDir();
-        WriteSettings(tmp, enabled: true, tokenStored: true);
+        WriteSettings(tmp, enabled: true, credentialReady: true);
         var cfg = PublishConfig(tmp, wait: TimeSpan.FromSeconds(5));
         string reqPath = cfg.PublishRequestPath!;
         string resPath = cfg.PublishResultPath!;
@@ -219,7 +234,7 @@ public class ToolLogicPublishTests
     public void Unreadable_settings_fail_closed_as_disabled()
     {
         using var tmp = new TempDir();
-        File.WriteAllText(Path.Combine(tmp.Path, "settings.json"), "{ nope");
+        File.WriteAllText(Path.Combine(tmp.Path, "mcp-settings.json"), "{ nope");
         var r = new ToolLogic(PublishConfig(tmp), () => Now).BuildPublish(null);
         Assert.Equal("disabled", (string?)r["status"]);
     }
@@ -231,7 +246,7 @@ public class ToolLogicPublishTests
         // rewrite truncates under the reader (a torn, unparseable file); a temp sibling
         // plus replace leaves the reader's handle on the old bytes.
         using var tmp = new TempDir();
-        WriteSettings(tmp, enabled: true, tokenStored: true);
+        WriteSettings(tmp, enabled: true, credentialReady: true);
         var cfg = PublishConfig(tmp);
         string path = cfg.PublishRequestPath!;
         byte[] oldBytes = System.Text.Encoding.UTF8.GetBytes("{\"id\":\"old\",\"date\":\"2026-01-01\",\"requested_at\":\"2026-01-02T00:00:00Z\"}");
