@@ -2,14 +2,14 @@
 
 > Paste the block between the `---` markers into Partner Center → Submission options → Notes
 > for certification (~2000-char cap; front-loaded per playbook gotcha #8; this block is about
-> 1,430 characters; the fallback about 620). This field never goes through the Store Listing Console API, so it is
+> 1,700 characters; the fallback about 710). This field never goes through the Store Listing Console API, so it is
 > confirmed in Partner Center or not at all.
 >
-> Framing: v3.4.3.0 is the version before this one (in certification when this letter was
-> written; if it is not approved by the time 3.5.0.0 goes up, change the first line to the last
-> approved version). v3.5.0 is a feature release, the Windows parity cycle, and **no new
-> capability**: `Package.appxmanifest` is unchanged between the `v3.4.3` tag and this release
-> except for `Identity Version` (verified against the diff). The disclosure surface gains one
+> Framing: v3.4.2.0 is the version before this one. 3.4.3 never shipped to the Store: Microsoft
+> denied its `unvirtualizedResources` request on 2026-10-20, and 3.5.0 withdraws it. v3.5.0 is
+> a feature release, the Windows parity cycle, and declares **only `runFullTrust`**, with
+> `TargetDeviceFamily MinVersion` back to 10.0.17763.0. Files Claude Code reads live in
+> `%USERPROFILE%\.sanduhr` instead of AppData. The disclosure surface gains one
 > opt-in outbound destination, Open-Meteo for the Desk's weather, and nothing stored at rest
 > beyond Sanduhr's own folders. The letter leads with the Desk, since it draws on the desktop,
 > then names the reviewer-visible behaviours (Just the Desk hides the widget, Reset removes the
@@ -21,9 +21,14 @@
 ```
 Hello reviewer,
 
-This updates v3.4.3.0: same Identity (626LabsLLC.SanduhrfrClaude),
-Publisher CN and listing. No new capabilities since 3.4.3 (verified
-against the diff of Package.appxmanifest). No telemetry.
+This updates v3.4.2.0: same Identity (626LabsLLC.SanduhrfrClaude),
+Publisher CN and listing. The only capability is runFullTrust. We
+withdrew the rescap:unvirtualizedResources request that was denied;
+the manifest declares nothing else. No telemetry.
+
+Files that Claude Code reads (statusline, MCP server, usage snapshot)
+live in %USERPROFILE%\.sanduhr, outside the package. Sanduhr's private
+data stays in package storage and is removed on uninstall.
 
 New, the Desk: Sanduhr's optional Desk draws a clock and your usage
 meters on the desktop behind your windows. It is off by default; turn it
@@ -57,8 +62,9 @@ Estevan Hernandez
 ## If the field is shorter (sub-1000 char fallback)
 
 ```
-Updates v3.4.3.0, same Identity and Publisher CN. No new capabilities
-(verified against the manifest diff). No telemetry.
+Updates v3.4.2.0, same Identity and Publisher CN. Only runFullTrust is
+declared; the denied unvirtualizedResources request is withdrawn. Claude
+Code integration files live in %USERPROFILE%\.sanduhr. No telemetry.
 
 New: an optional Desk draws a clock and usage meters on the desktop
 behind windows; off by default, Settings > Desk. Optional weather from
@@ -77,10 +83,10 @@ Estevan Hernandez, 626 Labs LLC
 
 ## Pre-submission sanity check (v3.5.0.0)
 
-- [ ] 3.4.3.0 approved and live before 3.5.0.0 is submitted (if not, fix the letter's first line)
+- [ ] 3.4.2.0 is the live version (3.4.3.0 never shipped; if that changes, fix the letter's first line)
 - [ ] Version trio in csproj + `<Identity Version>` = `3.5.0.0` (4th component `.0`); `Sanduhr.Mcp.csproj` at 3.5.0
-- [ ] `git diff v3.4.3 v3.5.0 -- windows-dotnet/src/Sanduhr.App/Package.appxmanifest` shows only `Identity Version`
-      (capabilities still `runFullTrust` and `unvirtualizedResources`; `PackageManifestTests` green)
+- [ ] `Package.appxmanifest` declares `runFullTrust` only: no `rescap`, `desktop6` or `virtualization`
+      entries, `MinVersion` 10.0.17763.0 (`PackageManifestTests` green)
 - [ ] What's New cards tagged `3.5.0` show after the update (the app reports Major.Minor.Build = 3.5.0)
 - [ ] `dist/Sanduhr-Store-v3.5.0.0.msix` built off the `v3.5.0` tag, unsigned; `mcp\sanduhr-mcp.exe` and
       `mods\sanduhr-meters` present in the staged payload, `scripts/smoke-mcp.ps1` passes
@@ -101,5 +107,5 @@ Estevan Hernandez, 626 Labs LLC
 
 ## Source
 
-Supersedes [`reviewer-letter-3.4.3.0.md`](./reviewer-letter-3.4.3.0.md). GitHub release notes:
+Supersedes [`reviewer-letter-3.4.3.0.md`](./reviewer-letter-3.4.3.0.md) (never submitted). GitHub release notes:
 [`release-notes-3.5.0.0.md`](./release-notes-3.5.0.0.md).

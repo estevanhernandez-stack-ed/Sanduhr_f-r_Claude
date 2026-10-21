@@ -43,7 +43,7 @@ public class StatuslineScriptRunTests : IDisposable
     {
         _appData = Path.Combine(_root.Path, "appdata");
         _profile = Path.Combine(_root.Path, "profile");
-        _sanduhr = Path.Combine(_appData, "Sanduhr");
+        _sanduhr = Path.Combine(_profile, ".sanduhr");
         Directory.CreateDirectory(_sanduhr);
         Directory.CreateDirectory(_profile);
         var installer = new StatuslineInstaller(_profile, Path.Combine(_root.Path, "bin"));

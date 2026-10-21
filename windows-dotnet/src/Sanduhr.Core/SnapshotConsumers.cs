@@ -46,6 +46,11 @@ public static class SnapshotConsumers
         return unknown ? SnapshotDecision.Keep : SnapshotDecision.Off;
     }
 
+    /// <summary>Whether <c>snapshot.json</c> should exist: a statusline or meters piece wants it
+    /// (<c>statusline_enabled</c>), and so does the MCP server (<c>mcp_enabled</c>), whose
+    /// <c>get_usage</c> reads it and has nothing else on the Store build.</summary>
+    public static bool SnapshotWanted(bool statuslineEnabled, bool mcpEnabled) => statuslineEnabled || mcpEnabled;
+
     public static ConsumerState Of(StatuslineStatus status) => status switch
     {
         StatuslineStatus.Installed or StatuslineStatus.Outdated => ConsumerState.Installed,

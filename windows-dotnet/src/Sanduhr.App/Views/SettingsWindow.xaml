@@ -2654,6 +2654,7 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Settings, history, themes" FontSize="12"
@@ -2680,19 +2681,31 @@
                                             AutomationProperties.Name="Show the usage vault folder in File Explorer"
                                             Command="{Binding ShowInExplorerCommand}" CommandParameter="{Binding LocalFolder}" />
 
-                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Sign-in keys" FontSize="12"
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Claude Code files" FontSize="12"
                                                VerticalAlignment="Center" Margin="0,0,12,6"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" FontSize="11" TextWrapping="Wrap"
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ClaudeCodeFilesFolder}" FontSize="11"
+                                               FontFamily="Cascadia Code, Consolas" TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding ClaudeCodeFilesFolder}" VerticalAlignment="Center" Margin="0,0,8,6"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                    <Button Grid.Row="2" Grid.Column="2" Style="{StaticResource FlatButton}" Padding="10,4"
+                                            Margin="0,0,0,6" Content="Show in Explorer"
+                                            AutomationProperties.Name="Show the Claude Code files folder in File Explorer"
+                                            Command="{Binding ShowInExplorerCommand}" CommandParameter="{Binding ClaudeCodeFilesFolder}" />
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Sign-in keys" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,12,6"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" FontSize="11" TextWrapping="Wrap"
                                                VerticalAlignment="Center"
                                                Margin="0,0,0,6"
                                                Text="Windows Credential Manager, under com.626labs.sanduhr"
                                                Foreground="{DynamicResource Sanduhr.Brush.Text}" />
 
-                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Account profiles" FontSize="12"
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Account profiles" FontSize="12"
                                                VerticalAlignment="Center" Margin="0,0,12,0"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" FontSize="11" TextWrapping="Wrap"
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" FontSize="11" TextWrapping="Wrap"
                                                VerticalAlignment="Center"
                                                Text="One browser profile per account Sanduhr checks while following, at %APPDATA%\Sanduhr\webview2-&lt;account_ref&gt;. Removing an account or resetting deletes its profile."
                                                Foreground="{DynamicResource Sanduhr.Brush.Text}" />

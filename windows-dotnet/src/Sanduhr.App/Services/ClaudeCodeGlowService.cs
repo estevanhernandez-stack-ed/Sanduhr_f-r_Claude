@@ -11,7 +11,7 @@ namespace Sanduhr.App.Services;
 
 /// <summary>
 /// Claude Code's hooks touch <c>glow-waiting.signal</c> / <c>glow-done.signal</c> under
-/// <c>%APPDATA%\Sanduhr</c>. This watches those two names (never reading what is in them), applies the
+/// <c>%USERPROFILE%\.sanduhr</c>. This watches those two names (never reading what is in them), applies the
 /// switches, the terminal rule and the limiter, then lights the top edge of the window in use and
 /// flashes the widget's taskbar button. Stage 4.5.
 /// </summary>
@@ -45,7 +45,7 @@ internal sealed class ClaudeCodeGlowService : IDisposable
         Reload();
         try
         {
-            string dir = _paths.AppDataDir;
+            string dir = _paths.ExternalDir;
             Directory.CreateDirectory(dir);
             _watcher = new FileSystemWatcher(dir, "glow-*.signal")
             {

@@ -5,9 +5,7 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
-  xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
-  xmlns:virtualization="http://schemas.microsoft.com/appx/manifest/virtualization/windows10"
-  IgnorableNamespaces="uap rescap desktop com desktop6 virtualization">
+  IgnorableNamespaces="uap rescap desktop com">
 
   <!-- Identity block: Partner Center-reserved. Carried over UNCHANGED from the Python build's
        MSIX (windows/msix/Package.appxmanifest.template) so the .NET rebuild submits into the
@@ -29,36 +27,20 @@
          Store playbook (10.1.4.4.a). Long-form disclaimer lives in the Store description +
          privacy policy; this is the abbreviated manifest form. -->
     <Description>Native Windows desktop widget that tracks Claude.ai subscription usage with burn-rate projections, pace markers, sparklines, and Win11 Mica glass. "Claude" and "claude.ai" are trademarks of Anthropic PBC, used nominatively; Sanduhr für Claude is an independent third-party tool. A 626 Labs product.</Description>
-    <!-- Turn OFF MSIX AppData write virtualization (needs rescap:unvirtualizedResources below).
-         Full trust alone does NOT do this: a packaged full-trust app's NEW files and folders under
-         %APPDATA% are redirected to %LOCALAPPDATA%\Packages\<PFN>\LocalCache\Roaming, visible
-         only inside the package. Processes outside the package read the real paths: Claude Code
-         launching bin\sanduhr-mcp.cmd and mcp\v<ver>\sanduhr-mcp.exe, sanduhr-mcp reading
-         snapshot.json / history / settings, and the statusline. File system only; HKCU
-         (desktop6:RegistryWriteVirtualization) stays virtualized on purpose.
-         Two declarations, one per OS generation (Microsoft Learn: the old one is used before
-         build 20348, the new one from 20348 on):
-         - desktop6 property, Windows 10 1903 (18362) and up: blanket opt-out for all of AppData.
-         - virtualization:ExcludedDirectories, build 20348 and up: only the two Sanduhr folders
-           are unvirtualized; everything else the app or WebView2 writes stays virtualized and is
-           cleaned up on uninstall. -->
-    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
-    <virtualization:FileSystemWriteVirtualization>
-      <virtualization:ExcludedDirectories>
-        <virtualization:ExcludedDirectory>$(KnownFolder:RoamingAppData)\Sanduhr</virtualization:ExcludedDirectory>
-        <virtualization:ExcludedDirectory>$(KnownFolder:LocalAppData)\Sanduhr</virtualization:ExcludedDirectory>
-      </virtualization:ExcludedDirectories>
-    </virtualization:FileSystemWriteVirtualization>
+    <!-- AppData stays virtualized, on purpose. The Store build's private data (settings, history,
+         themes, logs, WebView2 profiles) lives in package storage, under
+         %LOCALAPPDATA%\Packages\<PFN>\LocalCache, and goes away with the app. Every file that
+         Claude Code, sanduhr-mcp, the statusline, the hooks or the meters mod read or write lives
+         in %USERPROFILE%\.sanduhr instead, outside AppData, which MSIX does not virtualize. No
+         opt-out is declared: Microsoft denied rescap:unvirtualizedResources (2026-10-20) and
+         3.5.0 withdraws it. -->
   </Properties>
 
   <Dependencies>
-    <!-- Windows 10 1903 (build 18362) floor: the first build that honors
-         desktop6:FileSystemWriteVirtualization. Below it the Store build would run virtualized
-         and Claude Code, sanduhr-mcp and the statusline could not see its files (raised from
-         17763 in 3.4.3). Mica requires Win11 22H2+, but the app degrades to a solid-color
-         backdrop on older builds (see spec > Glass / Mica). .NET 10 Desktop Runtime is bundled
-         self-contained by build-msix.ps1, so no framework dependency. -->
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.18362.0" MaxVersionTested="10.0.26100.0" />
+    <!-- Windows 10 1809 (build 17763) floor: Mica requires Win11 22H2+, but the app degrades
+         to a solid-color backdrop on older builds (see spec > Glass / Mica). .NET 10 Desktop
+         Runtime is bundled self-contained by build-msix.ps1, so no framework dependency. -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
   </Dependencies>
 
   <Resources>
@@ -122,16 +104,12 @@
   </Applications>
 
   <Capabilities>
-    <!-- runFullTrust: the WPF app runs outside the AppContainer (DWM API for Mica, Credential
-         Manager, local Claude Code logs). unvirtualizedResources: required by the
-         desktop6:FileSystemWriteVirtualization=disabled property above. Full trust alone still
-         leaves AppData writes virtualized, and the files under %APPDATA%\Sanduhr (settings,
-         history, snapshot.json, the sanduhr-mcp launcher and binary) must sit at their real paths
-         because Claude Code, sanduhr-mcp and the statusline read them from outside the package.
-         Both are rescap capabilities and need a justification on Store submission (see the
-         reviewer letter). No broadFileSystemAccess, no internetClient (outgoing HTTPS needs no
-         declaration for a full-trust desktop app). -->
+    <!-- runFullTrust is the ONLY capability: the WPF app runs outside the AppContainer (DWM API
+         for Mica, Credential Manager, local Claude Code logs, %USERPROFILE%\.sanduhr, the folder
+         Claude Code, sanduhr-mcp, the statusline and the hooks read). It is a rescap capability
+         and needs a justification on Store submission (see the reviewer letter). No
+         unvirtualizedResources (denied by Microsoft 2026-10-20), no broadFileSystemAccess, no
+         internetClient (outgoing HTTPS needs no declaration for a full-trust desktop app). -->
     <rescap:Capability Name="runFullTrust" />
-    <rescap:Capability Name="unvirtualizedResources" />
   </Capabilities>
 </Package>

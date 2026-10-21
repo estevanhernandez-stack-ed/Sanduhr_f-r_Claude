@@ -37,7 +37,14 @@ public sealed class Paths
     /// to <see cref="Environment.SpecialFolder.LocalApplicationData"/>
     /// (== <c>%LOCALAPPDATA%</c>).
     /// </param>
-    public Paths(string? appDataBase = null, string? homeDir = null, string? localAppDataBase = null)
+    /// <param name="externalDir">
+    /// The folder for files processes outside the app package read or write (spec, Plan B).
+    /// Defaults to <c>%USERPROFILE%\.sanduhr</c>. When omitted but <paramref name="homeDir"/> is
+    /// given it is <c>&lt;homeDir&gt;\.sanduhr</c>; when only <paramref name="appDataBase"/> is given
+    /// it is <c>&lt;appDataBase&gt;\.sanduhr</c>, so a test that injects AppData never touches the
+    /// real profile; with <c>SANDUHR_DEV_PROFILE</c> it is <c>&lt;profile&gt;\external</c>.
+    /// </param>
+    public Paths(string? appDataBase = null, string? homeDir = null, string? localAppDataBase = null, string? externalDir = null)
     {
         // Dev-tier override (never set by shipped config): SANDUHR_DEV_PROFILE names a
         // folder that stands in for both AppData bases, so a development build can run
@@ -54,7 +61,50 @@ public sealed class Paths
         _localAppDataBase = localAppDataBase
             ?? (devProfile is null ? null : Path.Combine(devProfile, "local"))
             ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        _externalDir = externalDir
+            ?? (homeDir is null ? null : Path.Combine(homeDir, ExternalDirName))
+            ?? (appDataBase is null ? null : Path.Combine(appDataBase, ExternalDirName))
+            ?? (devProfile is null ? null : Path.Combine(devProfile, "external"))
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ExternalDirName);
     }
+
+    /// <summary>The external folder's name under the user profile.</summary>
+    public const string ExternalDirName = ".sanduhr";
+
+    private readonly string _externalDir;
+
+    /// <summary>
+    /// <c>%USERPROFILE%\.sanduhr</c>, created on first access: every file a process OUTSIDE the
+    /// app package reads or writes (Claude Code, sanduhr-mcp, the statusline, the hooks, the meters
+    /// mod). MSIX virtualizes the Store build's NEW files under AppData into the package's LocalCache,
+    /// where those processes can't see them; writes outside AppData are not virtualized (spec, Plan B).
+    /// One location for both builds. The folder is shared ground (other tools keep their own names
+    /// in it), so Sanduhr only ever creates, reads and deletes its own names inside it.
+    /// </summary>
+    public string ExternalDir
+    {
+        get
+        {
+            Directory.CreateDirectory(_externalDir);
+            return _externalDir;
+        }
+    }
+
+    /// <summary>The external folder's path WITHOUT creating it (Reset, inventory, tests).</summary>
+    public string ExternalDirPath => _externalDir;
+
+    /// <summary>The projection of settings.json sanduhr-mcp reads (consent and publish readiness).</summary>
+    public string McpSettingsFile => Path.Combine(ExternalDir, "mcp-settings.json");
+
+    /// <summary>Before 3.5.0 the external files lived in <c>%APPDATA%\Sanduhr</c> itself. Read by the
+    /// one-time migration and Reset only; nothing new is written there.</summary>
+    public string LegacyStatuslineScriptFile => Path.Combine(AppDataDir, "bin", "sanduhr-statusline.ps1");
+
+    /// <summary>The pre-3.5.0 MCP launcher (see <see cref="LegacyStatuslineScriptFile"/>).</summary>
+    public string LegacyMcpLauncherFile => Path.Combine(AppDataDir, "bin", "sanduhr-mcp.cmd");
+
+    /// <summary>The pre-3.5.0 meters mod root (see <see cref="LegacyStatuslineScriptFile"/>).</summary>
+    public string LegacyModsRoot => Path.Combine(AppDataDir, "mods");
 
     /// <summary>
     /// Return <c>%APPDATA%\Sanduhr</c>, creating it on first access (parity with
@@ -108,14 +158,15 @@ public sealed class Paths
 
     /// <summary>Statusline/MCP rendezvous file (WS-E): the widget's active-account
     /// usage snapshot, written atomically each fetch when the Claude Code
-    /// statusline integration is enabled. Read-only for every consumer.</summary>
-    public string SnapshotFile => Path.Combine(AppDataDir, "snapshot.json");
+    /// statusline integration is enabled. Read-only for every consumer.
+    /// In <see cref="ExternalDir"/>: read from outside the package.</summary>
+    public string SnapshotFile => Path.Combine(ExternalDir, "snapshot.json");
 
-    /// <summary>Helper-script folder: <c>%APPDATA%\Sanduhr\bin</c>. OUTSIDE both
+    /// <summary>Helper-script folder: <c>%USERPROFILE%\.sanduhr\bin</c>. OUTSIDE both
     /// package trees deliberately (WS-E) — the statusline script must survive an
     /// app update swap; the widget re-writes it on install and on start.
     /// Not auto-created; the installer creates it on first install.</summary>
-    public string StatuslineBinDir => Path.Combine(AppDataDir, "bin");
+    public string StatuslineBinDir => Path.Combine(ExternalDir, "bin");
 
     /// <summary>The installed statusline script path.</summary>
     public string StatuslineScriptFile => Path.Combine(StatuslineBinDir, "sanduhr-statusline.ps1");

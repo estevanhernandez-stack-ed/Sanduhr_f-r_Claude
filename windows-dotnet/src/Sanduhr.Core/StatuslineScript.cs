@@ -20,7 +20,7 @@ public static class StatuslineScript
 {
     /// <summary>Bumped when the script body changes; the installer re-writes the
     /// script whenever the installed copy differs from this source.</summary>
-    public const int Version = 3;
+    public const int Version = 4;
 
     /// <summary>PowerShell 5.1-compatible script body. Reads the snapshot per the
     /// reader contract (one-shot read, any parse failure = missing), renders per
@@ -32,7 +32,7 @@ public static class StatuslineScript
     public const string Content = """
 # Sanduhr statusline for Claude Code (snapshot schema v1).
 # Installed and kept up to date by the Sanduhr widget. Do not edit in place.
-# Reads %APPDATA%\Sanduhr\snapshot.json (raw facts only), or the per-seat
+# Reads %USERPROFILE%\.sanduhr\snapshot.json (raw facts only), or the per-seat
 # snapshot.<ref>.json that seats.json maps this session's CLAUDE_CONFIG_DIR to.
 # Age and reset times are derived here at render time so they can never go
 # stale on disk.
@@ -68,7 +68,7 @@ function Get-FolderKey([string]$path, [string]$profileDir) {
 function Get-SnapshotName {
   $fallback = 'snapshot.json'
   try {
-    $seatsPath = Join-Path $env:APPDATA 'Sanduhr\seats.json'
+    $seatsPath = Join-Path $env:USERPROFILE '.sanduhr\seats.json'
     $info = New-Object System.IO.FileInfo($seatsPath)
     if (-not $info.Exists -or $info.Length -gt 65536) { return $fallback }
     $profileDir = $env:USERPROFILE
@@ -104,7 +104,7 @@ function Get-OurLine {
   $showWeekly = $segments -contains 'weekly'
   $showResets = $segments -contains 'resets'
 
-  $snapPath = Join-Path (Join-Path $env:APPDATA 'Sanduhr') (Get-SnapshotName)
+  $snapPath = Join-Path (Join-Path $env:USERPROFILE '.sanduhr') (Get-SnapshotName)
   if (-not (Test-Path -LiteralPath $snapPath)) { return $null }  # missing = invisible (the uninstalled look)
   try { $snap = Get-Content -LiteralPath $snapPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop } catch { return $null }
   if ($null -eq $snap) { return $null }

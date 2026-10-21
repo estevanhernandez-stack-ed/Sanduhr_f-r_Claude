@@ -5,7 +5,7 @@ using System.Text.Json.Nodes;
 namespace Sanduhr.Core;
 
 /// <summary>
-/// The one writer of <c>%APPDATA%\Sanduhr\snapshot.json</c> — the rendezvous
+/// The one writer of <c>%USERPROFILE%\.sanduhr\snapshot.json</c> — the rendezvous
 /// file the Claude Code statusline (and a future MCP server) reads. Raw facts
 /// only: no precomputed pace or countdowns (they decay with wall clock and are
 /// wrong by read time; readers derive age and resets_in at read time).

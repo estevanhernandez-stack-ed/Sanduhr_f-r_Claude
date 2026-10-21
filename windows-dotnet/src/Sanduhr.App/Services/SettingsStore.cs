@@ -29,8 +29,62 @@ public readonly record struct WindowFrame(double X, double Y, double Width, doub
 public sealed class SettingsStore
 {
     private readonly string _path;
+    private readonly string _mcpSettingsPath;
 
-    public SettingsStore(Paths paths) => _path = paths.SettingsFile;
+    public SettingsStore(Paths paths)
+    {
+        _path = paths.SettingsFile;
+        // The projection sanduhr-mcp reads, in %USERPROFILE%\.sanduhr (spec Plan B, B.2).
+        _mcpSettingsPath = paths.McpSettingsFile;
+        _logFile = paths.LogFile;
+    }
+
+    private readonly string _logFile;
+
+    /// <summary>Path-free log line (the PRIVACY log contract: operation + exception type only). Never throws.</summary>
+    private void LogLine(string line)
+    {
+        try { File.AppendAllText(_logFile, $"{DateTime.UtcNow:o} {line}{Environment.NewLine}"); }
+        catch { /* logging must never break the caller */ }
+    }
+
+    /// <summary>Brings <c>mcp-settings.json</c> in line with the current settings.json (start-up, and after
+    /// any write). Never throws.</summary>
+    public void SyncMcpExport()
+    {
+        if (ResetGuard.Done)
+            return;
+        McpSettingsExport.Sync(Read(), _mcpSettingsPath, LogLine);
+    }
+
+    /// <summary>
+    /// Reset Sanduhr…, "Claude Code entries" part: turns <c>mcp_enabled</c> and <c>statusline_enabled</c> off and drops
+    /// <c>mcp_cc_home</c> and <c>statusline_cc_home</c>, so a Reset that leaves "Settings" unchecked doesn't bring the
+    /// projection, the launcher or the script back at the next launch.
+    ///
+    /// This is the ONE write allowed while <see cref="ResetGuard.Done"/> is set (Reset marks it before its steps run),
+    /// and it is narrow on purpose: it only edits an existing settings.json, changes only those four keys, and does NOT
+    /// re-sync <c>mcp-settings.json</c> (the same step deletes that file). Never throws; false when nothing was written.
+    /// </summary>
+    public bool ClearClaudeCodeSwitchesForReset()
+    {
+        try
+        {
+            if (!File.Exists(_path))
+                return false;
+            if (JsonNode.Parse(File.ReadAllText(_path)) is not JsonObject root)
+                return false;
+            if (!ResetSettings.ClearClaudeCodeSwitches(root))
+                return false;
+            File.WriteAllText(_path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
+            return true;
+        }
+        catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
+        {
+            LogLine($"reset: switches not cleared ({e.GetType().Name})");
+            return false;
+        }
+    }
 
     private JsonObject Read()
     {
@@ -57,7 +111,9 @@ public sealed class SettingsStore
         catch (IOException)
         {
             // Best-effort persistence — a failed write must never take down the UI.
+            return;
         }
+        McpSettingsExport.Sync(root, _mcpSettingsPath, LogLine);
     }
 
     /// <summary>The saved frame, or null when none has been persisted yet.

@@ -7,7 +7,7 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Desk;
 
 /// <summary>
-/// Claude's suggested Desk messages, the app side (spec 6.9): watches <c>%APPDATA%\Sanduhr</c> for
+/// Claude's suggested Desk messages, the app side (spec 6.9): watches <c>%USERPROFILE%\.sanduhr</c> for
 /// <c>desk-messages-request.json</c> and hands it to Core's <see cref="DeskMessageHandoff"/>, which checks
 /// it again, holds it for Settings, Message's Add / Review / Dismiss and answers in the result file.
 /// <b>Held for Este:</b> the MCP tool that writes the request (<c>propose_desk_messages</c>) is a
@@ -26,7 +26,7 @@ internal sealed class DeskMessageHandoffService : IDisposable
 
     public DeskMessageHandoffService(Paths paths, string messagesPath)
     {
-        Handoff = new DeskMessageHandoff(new DeskMessagePaths(paths.AppDataDir, messagesPath),
+        Handoff = new DeskMessageHandoff(new DeskMessagePaths(paths.ExternalDir, messagesPath),
             direct: () => false, canWrite: () => !ResetGuard.Done);
     }
 
@@ -57,7 +57,7 @@ internal sealed class DeskMessageHandoffService : IDisposable
 }
 
 /// <summary>
-/// Watchers, the app side (spec 6.9): reads <c>watch-request-*.json</c> from <c>%APPDATA%\Sanduhr</c>,
+/// Watchers, the app side (spec 6.9): reads <c>watch-request-*.json</c> from <c>%USERPROFILE%\.sanduhr</c>,
 /// deletes each as it reads it, keeps the board in memory and ticks it for fades and lost touch.
 /// <b>Held for Este:</b> the MCP tools that write requests (<c>watch_start</c>, <c>watch_update</c>,
 /// <c>watch_end</c>) are not built, so <see cref="Enabled"/> is false: nothing is watched, no switch is
@@ -75,7 +75,7 @@ internal sealed class WatcherStore : IDisposable
 
     public WatcherStore(Paths paths)
     {
-        _dir = paths.AppDataDir;
+        _dir = paths.ExternalDir;
         _tick = new DispatcherTimer(DispatcherPriority.Background);
         _tick.Tick += (_, _) => Tick();
     }

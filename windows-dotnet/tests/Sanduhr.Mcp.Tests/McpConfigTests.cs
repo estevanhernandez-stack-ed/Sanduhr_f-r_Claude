@@ -11,12 +11,15 @@ public sealed class McpConfigTests : IDisposable
 {
     private readonly string _tmp = Path.Combine(Path.GetTempPath(), "sanduhr-mcpcfg-" + Guid.NewGuid().ToString("N"));
     private string Home => Path.Combine(_tmp, "home");
-    private string Sanduhr => Path.Combine(_tmp, "appdata", "Sanduhr");
+    private string External => Path.Combine(_tmp, "home", ".sanduhr");
+    private string AppDataSanduhr => Path.Combine(_tmp, "appdata", "Sanduhr");
+    private string Local => Path.Combine(_tmp, "local");
 
     public McpConfigTests()
     {
         Directory.CreateDirectory(Home);
-        Directory.CreateDirectory(Sanduhr);
+        Directory.CreateDirectory(External);
+        Directory.CreateDirectory(AppDataSanduhr);
     }
 
     public void Dispose()
@@ -29,13 +32,19 @@ public sealed class McpConfigTests : IDisposable
     private void WriteConsent(params (string Key, bool On)[] entries)
     {
         var map = entries.ToDictionary(e => e.Key, e => e.On);
-        File.WriteAllText(Path.Combine(Sanduhr, "settings.json"),
-            JsonSerializer.Serialize(new Dictionary<string, object> { ["mcp_roots"] = map }));
+        File.WriteAllText(Path.Combine(External, "mcp-settings.json"),
+            JsonSerializer.Serialize(new Dictionary<string, object> { ["schema_version"] = 1, ["mcp_roots"] = map }));
     }
 
-    private McpConfig Resolve(string? claudeConfigDir = null)
-        => McpConfig.Resolve(Home, Sanduhr, Path.Combine(_tmp, "local"),
-            n => n == "CLAUDE_CONFIG_DIR" ? claudeConfigDir : null);
+    private McpConfig Resolve(string? claudeConfigDir = null, string? snapshotOverride = null, string? vaultOverride = null)
+        => McpConfig.Resolve(Home, External, AppDataSanduhr, Local,
+            n => n switch
+            {
+                "CLAUDE_CONFIG_DIR" => claudeConfigDir,
+                "SANDUHR_SNAPSHOT_PATH" => snapshotOverride,
+                "SANDUHR_VAULT_DIR" => vaultOverride,
+                _ => null,
+            });
 
     [Fact]
     public void Two_consented_homes_resolve_in_order()
@@ -119,11 +128,74 @@ public sealed class McpConfigTests : IDisposable
     public void Unparseable_settings_consents_nothing()
     {
         MakeHome(".claude");
-        File.WriteAllText(Path.Combine(Sanduhr, "settings.json"), "{ not json");
+        File.WriteAllText(Path.Combine(External, "mcp-settings.json"), "{ not json");
 
         var cfg = Resolve();
 
         Assert.Equal(new[] { ".claude" }, cfg.RootsFound);
         Assert.Empty(cfg.ConsentedRoots);
+    }
+
+    [Fact]
+    public void Consent_comes_from_the_projection_not_settings_json()
+    {
+        MakeHome(".claude");
+        File.WriteAllText(Path.Combine(AppDataSanduhr, "settings.json"), """{"mcp_roots":{".claude":true}}""");
+
+        Assert.Empty(Resolve().ConsentedRoots);
+    }
+
+    [Theory]
+    [InlineData("""{"schema_version":2,"mcp_roots":{".claude":true}}""")]
+    [InlineData("""{"schema_version":"1","mcp_roots":{".claude":true}}""")]
+    [InlineData("""{"mcp_roots":{".claude":true}}""")]
+    [InlineData("""[1,2]""")]
+    [InlineData("""{"schema_version":1,"mcp_roots":[".claude"]}""")]
+    public void Other_schema_or_shape_consents_nothing(string json)
+    {
+        MakeHome(".claude");
+        File.WriteAllText(Path.Combine(External, "mcp-settings.json"), json);
+
+        Assert.Empty(Resolve().ConsentedRoots);
+    }
+
+    [Fact]
+    public void Paths_follow_the_external_folder()
+    {
+        var cfg = Resolve();
+
+        Assert.Equal(Path.Combine(External, "snapshot.json"), cfg.SnapshotPath);
+        Assert.Equal(Path.Combine(External, "mcp-settings.json"), cfg.McpSettingsPath);
+        Assert.Equal(Path.Combine(External, "publish-request.json"), cfg.PublishRequestPath);
+        Assert.Equal(Path.Combine(External, "publish-result.json"), cfg.PublishResultPath);
+        Assert.Equal(Path.Combine(External, "theme-request.json"), cfg.ThemeRequestPath);
+        Assert.Equal(Path.Combine(External, "theme-result.json"), cfg.ThemeResultPath);
+    }
+
+    [Fact]
+    public void History_dir_is_appdata_without_the_override_and_follows_it_with_one()
+    {
+        Assert.Equal(AppDataSanduhr, Resolve().HistoryDir);
+
+        string snap = Path.Combine(_tmp, "fixture", "snap.json");
+        var cfg = Resolve(snapshotOverride: snap);
+        Assert.Equal(snap, cfg.SnapshotPath);
+        Assert.Equal(Path.Combine(_tmp, "fixture"), cfg.HistoryDir);
+    }
+
+    [Fact]
+    public void Vault_dirs_are_cache_then_real_unless_overridden()
+    {
+        var cfg = Resolve();
+        string real = Path.Combine(Local, "Sanduhr", "vault");
+        string cache = Path.Combine(Local, "Packages", "626LabsLLC.SanduhrfrClaude_wz1chhb2h2v4a",
+            "LocalCache", "Local", "Sanduhr", "vault");
+        Assert.Equal(new[] { cache, real }, cfg.VaultDirs);
+        Assert.Equal(real, cfg.VaultDir);
+
+        string fixture = Path.Combine(_tmp, "vault-fixture");
+        var over = Resolve(vaultOverride: fixture);
+        Assert.Equal(new[] { fixture }, over.VaultDirs);
+        Assert.Equal(fixture, over.VaultDir);
     }
 }

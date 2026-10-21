@@ -500,6 +500,66 @@ Recorded in the report as a release-note line; `docs/store` is not edited.
 - **Render harness**, dark and light: the arrange overlay (a piece mid-drag, an anchor lit, the bar), the Desk page with Arrange Desk… and the clicks switch, the Alerts switch, the first-run card with Just the Desk, the Claude Code page's four glow targets, the glow spot lit.
 - **Live check (Este runs it; S7 does not merge before it passes).** `s7-runner` extends S5's `DeskRunner`: (b) still passes with clicks on (empty space between pieces reaches the desktop, a left click on the clock lands on the island and activates nothing), an arrange drag (begin, drag the clock to the top right, Return, the layout string changed, then restored), a covered-island pause (a normal window over the readings island stops telemetry and the message motion; removing it resumes), and e1/e2 still pass. Its `--cost` mode needs no input.
 
+## Plan B: external files outside AppData (3.5.0, approved 2026-10-20)
+
+Microsoft denied `rescap:unvirtualizedResources` (decision 5p8RPXHEljLOSQJJzr19), so 3.4.3's opt-out never ships. 3.5.0 declares `runFullTrust` only, leaves MSIX AppData virtualization on, and moves every file a process outside the package reads or writes out of AppData.
+
+### B.0 What Windows does (measured on Dunder, build 26220, Store 3.4.2 identity, 2026-10-20)
+- A NEW file the package writes under `%APPDATA%` lands in `%LOCALAPPDATA%\Packages\626LabsLLC.SanduhrfrClaude_wz1chhb2h2v4a\LocalCache\Roaming`. A write under `%USERPROFILE%\.sanduhr-probe` landed at the real path: outside AppData nothing is redirected.
+- The package reads a merged view: a file only in real AppData is read from there; a file in both is read from LocalCache (the cache copy shadows the real one).
+- The package rewriting an EXISTING real-AppData file writes the real file in place (no copy-on-write). Deleting a file present in both removes the LocalCache copy and the real one shows again.
+
+### B.1 The rule
+`Paths.ExternalDir` is `%USERPROFILE%\.sanduhr`, one constant for both builds (Velopack and Store), so the MCP, the statusline, the hooks and the mod have one location. Everything an outside process reads or writes lives there; everything else stays in `Paths.AppDataDir` / `VaultDir`, which on the Store build is package storage that Windows removes on uninstall. With `SANDUHR_DEV_PROFILE` set, `ExternalDir` is `<profile>\external`, so a dev build stays isolated as before. Tests that inject an AppData base get `<base>\.sanduhr` unless they pass a home or an external dir: no test can touch the real profile.
+
+With `SANDUHR_DEV_PROFILE` set, only the widget's own files move to `<profile>\external`. A dev build's integrations still point Claude Code at `%USERPROFILE%\.sanduhr` (the hook, the script, the mod and the MCP launcher name it literally), as they pointed at `%APPDATA%` before; a dev build that installs an integration therefore writes into the real profile's Claude Code folder, as it always did.
+
+`%USERPROFILE%\.sanduhr` is shared ground: another estate tool already keeps `~\.sanduhr\time\` there (seen on Dunder). Sanduhr only ever creates, reads and deletes its own names inside it, never the folder wholesale. Some of those names are generic: Reset deletes `bin`, `mcp` and `mods` inside `~\.sanduhr` as Sanduhr's own (nothing else is expected under those three names there).
+
+### B.2 The file split
+
+| `%USERPROFILE%\.sanduhr` (external) | Reader / writer outside the package |
+|---|---|
+| `snapshot.json` (written while the statusline, the meters mod or the MCP server is installed: `statusline_enabled` OR `mcp_enabled`) | statusline script, sanduhr-mcp, meters mod |
+| `snapshot.<ref>.json`, `seats.json` | statusline script (per-seat meters) |
+| `mcp-settings.json` (new: a projection of settings.json) | sanduhr-mcp (consent and publish readiness) |
+| `publish-request.json` / `publish-result.json` | sanduhr-mcp `publish_usage` |
+| `theme-request.json` / `theme-result.json` | sanduhr-mcp `propose_theme` |
+| `glow-waiting.signal` / `glow-done.signal` | the glow hook commands Claude Code runs |
+| `desk-messages-*.json`, `watch-request-*.json` | held MCP tools (spec 6.9, off); moved now so the rule has no exception |
+| `mcp\v<ver>-<stamp>\` | Claude Code launches the server copy |
+| `bin\sanduhr-mcp.cmd`, `bin\sanduhr-statusline.ps1` | Claude Code runs both |
+| `mods\<stamp>\sanduhr-meters\` | Claude Code loads the mod |
+
+Stays private in AppData: `settings.json`, `history.*.json`, `themes\`, `sounds\`, every WebView2 profile, `sanduhr.log*`, `last_error.json`, the debug logs, `messages.txt` (+ `.previous`), `integrations\installs.json` (receipts), `backups\`, the migration marker, and the vault (`%LOCALAPPDATA%\Sanduhr\vault`).
+- **Receipts and backups stay private.** Only the widget reads receipts. Backups are whole copies of Claude Code files (a `.claude.json` backup holds its sign-in block), so they belong in storage Windows deletes with the app, not in a folder that outlives it. Cost: after a Store uninstall and reinstall the receipts are gone, and Remove falls back to what it already does without a receipt (take out only what still points at Sanduhr's files).
+- **`mcp-settings.json`** exists only while `mcp_enabled` is true: `{"schema_version":1,"mcp_roots":{...},"publish":{"enabled","has_endpoint","credential_ready"}}`. The widget rewrites it whenever settings.json is written (only when its bytes change) and at start; never the endpoint URL, never a token. The consent check stays inside the MCP: a root counts only when it is a discovered name AND the projection says true; missing, unreadable or another schema means nothing is consented and publishing is off (fail closed).
+- **History stays private.** `get_usage`'s history fallback exists for widgets older than the snapshot writer, which write history in `%APPDATA%\Sanduhr`; the server keeps reading it there. A 3.5.0 widget with the MCP registered always writes the snapshot.
+- **The vault stays private, and the MCP reads it where the widget does.** `get_usage_history` reads the vault. Per root and month the server picks the package's `LocalCache\Local\Sanduhr\vault` shard when it exists, else the real `%LOCALAPPDATA%\Sanduhr\vault` one: the same shadowing rule Windows applies to the widget (B.0), so Store, Velopack and a machine that ran 3.4.3 all read what the widget sees. Fixed paths only, no path from a file; `SANDUHR_VAULT_DIR` still overrides for fixtures.
+- **`~\.sanduhr` is created on start** (the glow and theme watchers need it). It holds nothing until an integration is turned on.
+
+### B.3 Manifest
+No `rescap:unvirtualizedResources`, no `desktop6:FileSystemWriteVirtualization`, no `virtualization:ExcludedDirectories`, neither namespace; `runFullTrust` is the only capability; `TargetDeviceFamily MinVersion` back to `10.0.17763.0`. `PackageManifestTests` pins exactly that.
+
+### B.4 Migrations
+- **3.4.3's `PackagedDataMigration` is removed** (class, runner, call). Store users on 3.4.2 never got 3.4.3, and their private data correctly stays in package storage. A test pins that the type is gone and App startup names no LocalCache copy.
+- **New `ExternalDirMigration`** (once, marker `.external-dir-migration` in AppData; `done`, or `attempt N` with a cap of 3; runs on a background task after the window shows; never throws, never blocks startup). For every Claude Code folder Sanduhr knows (the discovered and added folders plus every receipt's folder) and every MCP home (discovered plus the saved `mcp_cc_home`), it re-points registrations that are still Sanduhr's and still name the OLD location, through the existing engines (JsonEdit splice, ConfigCommit compare-and-swap with a backup, receipts updated):
+  - statusLine: a command `TryParseCommand` reads whose script is exactly `%APPDATA%\Sanduhr\bin\sanduhr-statusline.ps1` is reinstalled with the same mode, chain, join and segments after the script is written to `~\.sanduhr\bin`.
+  - `mcpServers.sanduhr`: an entry whose command is exactly the old launcher, in whichever candidate `.claude.json` holds it, after the server copy and launcher are refreshed under `~\.sanduhr` (skipped and retried when this build has no server to copy).
+  - `CLAUDE_CODE_PLUGIN_DIRS`: an entry under the old `%APPDATA%\Sanduhr\mods\<stamp>\sanduhr-meters` is replaced in place by the new stamped copy; the switch in `enabledPlugins` is untouched.
+  - glow hooks: a group whose command is byte for byte the old `$env:APPDATA` command is replaced by the new `$env:USERPROFILE\.sanduhr` one.
+  - An entry that is no longer Sanduhr's (another shape, another path) is left alone. The engines recognise the old forms as Sanduhr's (old mods root, old hook command), so Install, Status (Outdated), Remove and Reset handle them even without the migration.
+  - Old files under `%APPDATA%\Sanduhr\{bin,mcp,mods}` are left (a running session may pin them); Reset removes them.
+  - The old AppData copies of the names that moved out are deleted, best-effort, as part of the run before `done` is written: `snapshot.json`, `snapshot.*.json`, `seats.json`, `glow-*.signal`, `publish-request.json`, `publish-result.json`, `theme-request.json`, `theme-result.json`, `desk-messages-*.json`, `watch-request-*.json`. Not history, settings, logs, `bin`, `mcp` or `mods`. A delete that fails is logged by exception type name and does not count as a migration failure.
+  - `RepointLegacy(Hooks)` reinstalls both glow events, so a group the user removed by hand comes back when the other event still holds a legacy group. The receipts file has no cross-process lock, so an install clicked in the window during the first-launch migration could race it (accepted, low odds: the migration runs seconds after launch and each write is a compare-and-swap).
+- **Machines that ran 3.4.3** (Neb and Dunder sideloads only): 3.4.3 copied LocalCache into real AppData and kept the cache copies as a rollback; under 3.5.0 those older cache copies would shadow the newer real files (B.0). No code ships for two dev machines: the test plan moves `LocalCache\{Roaming,Local}\Sanduhr` aside before installing 3.5.0.
+
+### B.5 Everything else that names the paths
+- **Reset.** Each part deletes its own names in both places: Claude Code entries take the receipts, `~\.sanduhr\{mods,mcp,bin}`, `mcp-settings.json` and the old `%APPDATA%\Sanduhr\{mods,mcp,bin}`; History takes the snapshots, `seats.json`, handoff and signal files in `~\.sanduhr` and their old AppData copies; Settings also takes `mcp-settings.json` (a stale projection must not outlive the consent it copies). After the run `~\.sanduhr` is removed only if it is empty.
+- **About, Where settings live** shows the folder the data is really in (on the Store build, the package's LocalCache folders when they exist) and a new row, Claude Code files, for `~\.sanduhr`.
+- **Statusline script** (version 4), **hook command**, **meters mod** (Windows branch) and **sanduhr-mcp** all read `%USERPROFILE%\.sanduhr`.
+- **The MCP trust boundary is unchanged**: no file joins the source-link allowlist, no package or project reference; the server mirrors file names literally as before.
+
 ## Data Model
 All new state is keys in `settings.json`, defaults on absence:
 

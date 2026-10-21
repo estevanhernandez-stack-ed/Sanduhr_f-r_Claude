@@ -13,7 +13,7 @@ public enum ClaudeCodeEvent
     Done,
 }
 
-/// <summary>The two signal files the hooks touch under <c>%APPDATA%\Sanduhr</c>.</summary>
+/// <summary>The two signal files the hooks touch under <c>%USERPROFILE%\.sanduhr</c>.</summary>
 public static class ClaudeCodeSignals
 {
     public const string WaitingFileName = "glow-waiting.signal";
