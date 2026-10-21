@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **The glass breathes for free.** The widget's breathing-glass pulse redrew every filled bar fifteen times a second through a timeline view, forever, a hidden widget included, and that was most of Sanduhr's idle CPU. The pulse is now a Core Animation layer the render server animates; under Reduce Motion it holds its rest tint. Measured on the same build with the meters filled: 4.45 percent of a core before, 0.59 after.
+
 ## v2.30.0-mac — 2026-10-20
 
 - **Camera and mic on the pill.** On a Mac without a notch the camera and mic indicators counted only the notch wings as the island, so with the pill up they fell back to their own tab at the top center, under the pill. They now draw beside the pill's text, or in a chosen place, and the Settings Notch preview draws the pill in the tab's place. From the first measurements on a notchless Mac, the pill's width cap goes from 0.36 to 0.30 of the screen, so it always keeps clear of the status items; the hide while the pointer is in the menu bar stays.
