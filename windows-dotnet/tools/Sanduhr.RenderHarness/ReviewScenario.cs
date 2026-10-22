@@ -85,6 +85,14 @@ public static partial class Program
             swType.GetMethod("SelectPage")!.Invoke(sw, [SettingsPage.Desk, SettingsIndex.DeskDesigns]);
             await Settle();
             Save((FrameworkElement)sw.Content, "review-settings-designs");
+            // Where each piece sits, with the Monitor dropdown (this PC's own monitors).
+            store.SaveDesk(DeskSettings.Default with { Enabled = true, Layout = "clock:bl claude:bl@main launcher:tr meters:tl" });
+            svm.Desk.Reload();
+            sw.Height = 2700;
+            swType.GetMethod("SelectPage")!.Invoke(sw, [SettingsPage.Desk, SettingsIndex.DeskPieces]);
+            await Settle();
+            if (Descendants<Sanduhr.App.Views.DeskPiecesPanel>(sw).FirstOrDefault() is { } piecesPanel) Save(piecesPanel, "monitor-settings-pieces");
+            Log.Add($"review: monitors={string.Join("|", svm.Desk.Monitors.Select(m => m.Name))}");
             Log.Add($"review: status='{svm.Desk.Designs.Status}' rows={svm.Desk.Designs.Rows.Count} canPutBack={svm.Desk.Designs.CanPutBack}");
             sw.Close();
             await Settle();
