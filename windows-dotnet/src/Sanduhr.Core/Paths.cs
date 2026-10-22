@@ -141,6 +141,10 @@ public sealed class Paths
     /// build), PNGs named by a hash. Not auto-created; the import creates it when the first image arrives.</summary>
     public string LauncherDir => Path.Combine(AppDataDir, "launcher");
 
+    /// <summary>The saved Desk designs: <c>%APPDATA%\Sanduhr\designs</c> (package storage on the Store build), one JSON file
+    /// per design named by its id. Not auto-created; the first save creates it.</summary>
+    public string DesignsDir => Path.Combine(AppDataDir, "designs");
+
     /// <summary>Generated-chime cache folder: <c>%APPDATA%\Sanduhr\sounds</c>.
     /// Parity with <c>sounds._sounds_dir</c>. Not auto-created here — the player
     /// creates it lazily on first play.</summary>

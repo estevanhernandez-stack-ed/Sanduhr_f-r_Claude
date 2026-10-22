@@ -480,6 +480,12 @@ public partial class App : Application
         _arrangeItem.Header = arranging ? DeskArrangeCopy.TrayFinish : DeskArrangeCopy.MenuItem;
     }
 
+    /// <summary>A design was applied: an open Settings window re-reads the Desk page and the Launcher.</summary>
+    private void FollowDesignChange()
+    {
+        _settingsWindow?.ViewModel.Desk.RefreshFromStore();
+    }
+
     /// <summary>Arrange mode began, dropped a piece or ended: the tray entry and an open Settings window follow
     /// (the Desk page's note, the live map, and after Done the saved rows).</summary>
     private void OnArrangeChanged()
@@ -526,6 +532,8 @@ public partial class App : Application
         {
             ThemeText = ThemeTextHex,
         };
+        // The live review of Claude's Desk designs: the Desk and widget draw a design from memory, the floating bar asks Apply or Dismiss.
+        _deskDesign.Host = new Desk.DeskDesignHost(_desk, () => _vm, FollowDesignChange);
         _desk.LauncherMissingClicked += OnLauncherMissing;
         _vm.DeskUsageChanged += _desk.UsageChanged;
         // The glow's Desk spot (spec 7.3): the glow service asks the Desk first and falls back to the window.

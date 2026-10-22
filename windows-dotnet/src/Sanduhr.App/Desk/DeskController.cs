@@ -66,6 +66,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private bool _stopped;
     private DeskArrangeSession? _session;
     private DeskArrangeMode? _arrangeMode;
+    /// <summary>A design under review (the live review): drawn from memory in place of the saved layout, font, plate, ink and Launcher.
+    /// Nothing is written; <see cref="EndPreview"/> draws the saved ones again.</summary>
+    private DeskDesignSettings? _preview;
 
     public DeskController(SettingsStore store, Func<IDeskHost> hostFactory, Func<DeskUsage> usageSource,
         NowPlayingHub nowPlaying, DeskMessageSource messages, WatcherStore? watchers = null,
@@ -239,6 +242,13 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _weatherSettings = _store.LoadDeskWeather();
         _piecesTakeClicks = _store.LoadDeskPiecesTakeClicks();
         _launcher = _store.LoadLauncher();
+        if (_preview is { } preview)
+        {
+            // A design under review: shown even where the Desk is off (the review says so), never saved.
+            _settings = preview.Desk with { Enabled = true };
+            _ink = preview.Ink;
+            _launcher = preview.Launcher;
+        }
         _messages.Reload();
         if (!_settings.Enabled)
         {
@@ -252,6 +262,29 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             _host.CoverageChanged += OnCoverageChanged;
         }
         Rebuild();
+    }
+
+    /// <summary>True while a design is drawn from memory for review.</summary>
+    public bool Previewing => _preview is not null;
+
+    /// <summary>
+    /// Draws a design under review (the live review): the layout, font, plate, ink and Launcher in <paramref name="design"/> replace the
+    /// saved ones on every screen until <see cref="EndPreview"/>. Nothing is saved; Arrange mode, if it runs, ends as Cancel.
+    /// </summary>
+    public void ShowPreview(DeskDesignSettings design)
+    {
+        if (_stopped) return;
+        if (Arranging) EndArrangeCore(DeskArrangeEnd.Cancel, reload: false);
+        _preview = design;
+        Reload();
+    }
+
+    /// <summary>The review is over (Dismiss, or Apply wrote the design): the saved Desk is drawn again.</summary>
+    public void EndPreview()
+    {
+        if (_preview is null) return;
+        _preview = null;
+        Reload();
     }
 
     /// <summary>The widget's theme changed: Theme ink follows it.</summary>

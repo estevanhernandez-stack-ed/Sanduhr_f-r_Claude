@@ -818,6 +818,34 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>"Let Claude change the Desk directly" (spec, the agent-designed Desk): <c>desk_direct</c>, absent = off. On, a design Claude
+    /// proposes is applied without the review bar (the Desk it replaces is still saved first).</summary>
+    public bool LoadDeskDirect() => ReadBool(Read(), "desk_direct", false);
+
+    public void SaveDeskDirect(bool on)
+    {
+        var root = Read();
+        if (on) root["desk_direct"] = true;
+        else root.Remove("desk_direct");
+        Write(root);
+    }
+
+    /// <summary>The id of the saved design "Put my Desk back" switches to: <c>desk_put_back</c>, the Desk as it was before the last change.
+    /// Null when there is none.</summary>
+    public string? LoadDeskPutBack()
+    {
+        try { return Read()["desk_put_back"]?.GetValue<string>() is { } id && SavedDesign.IsValidId(id) ? id : null; }
+        catch (Exception e) when (e is InvalidOperationException or FormatException) { return null; }
+    }
+
+    public void SaveDeskPutBack(string? id)
+    {
+        var root = Read();
+        if (id is not null && SavedDesign.IsValidId(id)) root["desk_put_back"] = id;
+        else root.Remove("desk_put_back");
+        Write(root);
+    }
+
     /// <summary>The Desk's sign-in reminder switch (spec 7.5): "desk_sign_in_reminder". Absent reads as on.</summary>
     public bool LoadDeskSignInReminder() => ReadBool(Read(), "desk_sign_in_reminder", SignInReminder.DefaultOn);
 

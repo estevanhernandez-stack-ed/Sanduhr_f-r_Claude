@@ -30,7 +30,7 @@ public sealed record DeskAnswer(
     /// <summary>The answer for a design that failed the rules.</summary>
     public static DeskAnswer Refused(IReadOnlyList<DeskReason> reasons) => new(Rejected, Reasons: reasons);
 
-    /// <summary>What phase 1 of the Desk design answers a good proposal: the preview is not built in this version yet.</summary>
+    /// <summary>What a Sanduhr with no review wired answers a good proposal (tests and the harness).</summary>
     public static DeskAnswer NotReady { get; } = new(Rejected, "not_ready",
         [new DeskReason("design", "not_ready: this version of Sanduhr checks designs but cannot preview them yet")]);
 }
@@ -52,7 +52,9 @@ public sealed record DeskRequest(DeskRequestKind Kind, string? Id, DeskValidatio
 /// <c>desk-design-result.json</c>: <c>{id, completed_at, result: {status, ...}}</c>, written through a temp sibling and a
 /// replace. A request older than ten minutes (the widget was not running) is dropped without an answer.
 ///
-/// Phase 1's handler answers every valid design <see cref="DeskAnswer.NotReady"/>; the live preview replaces it.
+/// The App's Desk design service sets <see cref="Handler"/>: it previews a valid design for the user to review, or applies it when
+/// the user allows Claude to change the Desk directly. With none set (tests, the harness) every valid design is answered
+/// <see cref="DeskAnswer.NotReady"/>.
 /// Not thread-safe: call it from one thread.
 /// </summary>
 public sealed class DeskDesignHandoff
@@ -73,7 +75,7 @@ public sealed class DeskDesignHandoff
 
     public DeskDesignPaths Paths { get; }
 
-    /// <summary>What to tell the caller about a design that passed the rules (the request id, the verdict). Phase 1: <see cref="DeskAnswer.NotReady"/>.</summary>
+    /// <summary>What to tell the caller about a design that passed the rules (the request id, the verdict). Until the App sets one: <see cref="DeskAnswer.NotReady"/>.</summary>
     public Func<string, DeskValidation, DeskAnswer> Handler { get; set; } = (_, _) => DeskAnswer.NotReady;
 
     /// <summary>Takes a waiting request, if there is one, and answers it.</summary>
@@ -158,6 +160,10 @@ public sealed class DeskDesignHandoff
     }
 
     private void WriteResult(string id, DeskAnswer answer) => TryWrite(Paths.Result, ResultJson(id, answer, _now()));
+
+    /// <summary>Answers a request now or later (a previewing design the user dismissed or applied, or a newer proposal replaced).
+    /// The result file holds the latest answer; the server reads the one that carries its request id. False when the write failed.</summary>
+    public bool Answer(string id, DeskAnswer answer) => TryWrite(Paths.Result, ResultJson(id, answer, _now()));
 
     /// <summary>
     /// Writes <c>desk-state.json</c> (only when its bytes changed since the last write here). Never throws; false when the

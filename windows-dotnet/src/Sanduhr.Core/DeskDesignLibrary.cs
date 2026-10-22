@@ -88,3 +88,94 @@ public static class DeskDesignLibrary
     public static DeskPrune Add(IEnumerable<SavedDesign> existing, SavedDesign added, int keep = Keep) =>
         Prune(existing.Where(d => d.Id != added.Id).Append(added), keep);
 }
+
+/// <summary>Saved designs, the rules around the files (spec, the agent-designed Desk, saved designs). Pure.</summary>
+public static class DeskDesigns
+{
+    /// <summary>What a name is cut to.</summary>
+    public const int NameMax = DeskDesign.NameMax;
+
+    /// <summary>A name as stored: control characters dropped, trimmed, cut to <see cref="NameMax"/> characters (never inside a
+    /// surrogate pair); null when nothing is left.</summary>
+    public static string? NormalizeName(string? raw)
+    {
+        if (raw is null) return null;
+        var clean = new string(raw.Where(c => !char.IsControl(c)).ToArray()).Trim();
+        if (clean.Length > NameMax)
+        {
+            int cut = NameMax;
+            if (char.IsHighSurrogate(clean[cut - 1])) cut--;
+            clean = clean[..cut].TrimEnd();
+        }
+        return clean.Length == 0 ? null : clean;
+    }
+
+    /// <summary>The name for the Desk a change replaces: "Before &lt;the incoming design's name&gt;", cut to fit.</summary>
+    public static string BeforeName(string? incoming) =>
+        NormalizeName("Before " + (NormalizeName(incoming) ?? "a change")) ?? "Before a change";
+
+    /// <summary>
+    /// A design as one comparable string: the look itself, without its name and note, with the pieces in key order and every
+    /// default spelled out, and the theme in its canonical shape. Messages are not part of a saved design.
+    /// </summary>
+    public static string Canonical(DeskDesign design)
+    {
+        var o = design.ToJson();
+        o.Remove("name");
+        o.Remove("note");
+        o.Remove("messages");
+        if (design.Layout is { } layout)
+        {
+            var sorted = new JsonObject();
+            foreach (var p in layout.OrderBy(p => p.Piece, StringComparer.Ordinal))
+            {
+                sorted[p.Piece] = p.IsHidden
+                    ? new JsonObject { ["hidden"] = true }
+                    : new JsonObject
+                    {
+                        ["anchor"] = DeskAnchors.Word(p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece)),
+                        ["size"] = DeskArrangement.ClampScale(p.Size ?? 1),
+                    };
+            }
+            o["layout"] = sorted;
+        }
+        if (design.Theme is { } theme) o["theme"] = DesignTheme.Canonical(theme);
+        return o.ToJsonString();
+    }
+
+    /// <summary>The saved design that is this look, if one is (newest first), so a look is never saved twice.</summary>
+    public static SavedDesign? FindSame(IEnumerable<SavedDesign> designs, DeskDesign design)
+    {
+        string key = Canonical(design);
+        return designs.OrderByDescending(d => d.AppliedAt).ThenBy(d => d.Id, StringComparer.Ordinal)
+            .FirstOrDefault(d => Canonical(d.Design) == key);
+    }
+
+    /// <summary>The Launcher image files any of the designs uses.</summary>
+    public static IReadOnlySet<string> UsedImages(IEnumerable<SavedDesign> designs) =>
+        designs.Where(d => d.Design.Launcher is not null).SelectMany(d => d.Design.Launcher!.Images).ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The Launcher images to delete once <paramref name="gone"/> designs are removed: those they used that no remaining design
+    /// and not the Launcher now uses.
+    /// </summary>
+    public static IReadOnlyList<string> ImagesToDelete(IEnumerable<SavedDesign> gone, IEnumerable<SavedDesign> remaining, LauncherModel current)
+    {
+        var keep = UsedImages(remaining).ToHashSet(StringComparer.Ordinal);
+        keep.UnionWith(current.Images);
+        return [.. UsedImages(gone).Where(i => !keep.Contains(i)).OrderBy(i => i, StringComparer.Ordinal)];
+    }
+
+    /// <summary>Launcher buttons whose stored image is gone lose the image (the button shows its app's icon or the link icon);
+    /// everything else is kept. Used when a saved design comes back after its image file went.</summary>
+    public static DeskDesign WithoutMissingImages(DeskDesign design, Func<string, bool> imageExists)
+    {
+        if (design.Launcher is not { } launcher) return design;
+        var buttons = launcher.Buttons.Select(b => b.Image is { } i && !imageExists(i) ? b with { Image = null } : b).ToList();
+        return design with { Launcher = launcher with { Buttons = buttons } };
+    }
+
+    /// <summary>The Launcher images a design names that are not on disk.</summary>
+    public static IReadOnlyList<string> MissingImages(DeskDesign design, Func<string, bool> imageExists) =>
+        design.Launcher is null ? [] : [.. design.Launcher.Images.Where(i => !imageExists(i)).OrderBy(i => i, StringComparer.Ordinal)];
+}

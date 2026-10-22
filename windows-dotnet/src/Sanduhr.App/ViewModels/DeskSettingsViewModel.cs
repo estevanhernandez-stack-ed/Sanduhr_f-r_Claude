@@ -155,6 +155,16 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(Settings));
     }
 
+    /// <summary>Everything on the page is read again from the settings (a design was applied or switched to): the pieces, the font, the
+    /// ink, the plate and the Launcher.</summary>
+    public void RefreshFromStore()
+    {
+        Reload();
+        LoadInk();
+        Launcher.Reload();
+        OnPropertyChanged(nameof(Plate));
+    }
+
     /// <summary>Slider drags (clock size, margins) settle for this long before they save, so a drag
     /// writes settings.json and rebuilds the Desk once, not on every tick (PR #209 review, 6).</summary>
     public static readonly TimeSpan SettleFor = TimeSpan.FromMilliseconds(200);
