@@ -30,6 +30,10 @@ public class ToolLogicNowPlayingLooksTests
         ConsentedRoots = Array.Empty<(string, string)>(),
         RootsFound = Array.Empty<string>(),
         DesignStatePath = Path.Combine(tmp.Path, "ext", DeskDesign.StateFile),
+        DesignRequestPath = Path.Combine(tmp.Path, "ext", DeskDesign.RequestFile),
+        DesignResultPath = Path.Combine(tmp.Path, "ext", DeskDesign.ResultFile),
+        DesignWaitTimeout = wait ?? TimeSpan.FromMilliseconds(300),
+        DesignPollInterval = TimeSpan.FromMilliseconds(20),
         LooksRequestPath = Path.Combine(tmp.Path, "ext", NowPlayingLookProposal.RequestFile),
         LooksResultPath = Path.Combine(tmp.Path, "ext", NowPlayingLookProposal.ResultFile),
         LooksWaitTimeout = wait ?? TimeSpan.FromMilliseconds(300),
@@ -229,6 +233,34 @@ public class ToolLogicNowPlayingLooksTests
         var r = Propose(cfg, Look(ink: """["#101010"]"""));
         Assert.Equal("queued", (string?)r["status"]);
         Assert.True(File.Exists(cfg.LooksRequestPath!));
+    }
+
+    // -- a design that brings looks -------------------------------------------
+
+    [Fact]
+    public void A_design_may_bring_looks_and_they_meet_the_same_checks()
+    {
+        using var tmp = new TempDir();
+        var cfg = LooksConfig(tmp);
+        WriteState(cfg, brightness: 0.03);
+        var logic = new ToolLogic(cfg, () => Now);
+
+        string Design(string looks) => "{\"design\":{\"plate\":true,\"looks\":[" + looks + "]}}";
+
+        var bad = logic.BuildProposeDesk(Args(Design(Look(ink: """["nope"]"""))));
+        Assert.Equal("rejected", (string?)bad["status"]);
+        Assert.Equal("looks", (string?)bad["reasons"]![0]!["field"]);
+        Assert.StartsWith("look 1 ink must be", (string?)bad["reasons"]![0]!["message"], StringComparison.Ordinal);
+
+        var dim = logic.BuildProposeDesk(Args(Design(Look(ink: """["#202020"]"""))));
+        Assert.Equal("rejected", (string?)dim["status"]);
+        Assert.Contains("too dark for this spot", (string?)dim["reasons"]![0]!["message"]);
+        Assert.False(File.Exists(cfg.DesignRequestPath!));
+
+        var good = logic.BuildProposeDesk(Args(Design(Look())));
+        Assert.Equal("queued", (string?)good["status"]);   // nobody answers in this test; it passed the checks
+        var request = (JsonObject)JsonNode.Parse(File.ReadAllText(cfg.DesignRequestPath!))!;
+        Assert.Equal("Blinding Lights", (string?)request["design"]!["looks"]![0]!["title"]);
     }
 
     // -- the handoff ----------------------------------------------------------

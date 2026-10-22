@@ -285,6 +285,11 @@ public static class ToolCatalog
                                 ["type"] = "object",
                                 ["description"] = "{lines: [...], mode: add|replace}, the lines as propose_desk_messages takes them.",
                             },
+                            ["looks"] = new JsonObject
+                            {
+                                ["type"] = "array",
+                                ["description"] = "Per-song looks for the now playing line, up to 20 of {title, artist, ink, style, mood}, as propose_now_playing_looks takes them.",
+                            },
                             ["theme"] = new JsonObject
                             {
                                 ["type"] = "object",
@@ -547,7 +552,10 @@ public static class ToolCatalog
         "launcher {orientation row or column, buttons: up to 8 of {kind app or link, target, label up to 24 characters, " +
         "glow #rrggbb}}, where an app target is an id from get_desk start_menu_apps (a button opens only what the Start " +
         "menu lists; there are no command lines) and a link target is an https link; messages {lines, mode add or " +
-        "replace}, the lines as propose_desk_messages takes them (see its description for the syntax); theme (a widget " +
+        "replace}, the lines as propose_desk_messages takes them (see its description for the syntax); looks (up to 20 " +
+        "per-song looks for the now playing line, {title, artist, ink, style, mood} as propose_now_playing_looks takes " +
+        "them, saved with the design when it is applied; each color must keep 3:1 against what is behind the now " +
+        "playing piece, and they show while the user's Style what's playing is on); theme (a widget " +
         "palette: name and the fourteen #rrggbb colors, per docs/themes/AGENT_PROMPT.md, as propose_theme takes it). " +
         "The server checks before anything is sent: every field's shape and range; ink against the wallpaper (each " +
         "placed piece's ink must keep a WCAG contrast of at least 3:1 against the wallpaper brightness under its anchor " +
