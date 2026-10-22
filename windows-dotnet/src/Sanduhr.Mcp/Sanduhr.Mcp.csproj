@@ -93,6 +93,12 @@
     <Compile Include="..\Sanduhr.Core\DeskFont.cs" Link="Core\DeskFont.cs" />
     <Compile Include="..\Sanduhr.Core\LauncherTarget.cs" Link="Core\LauncherTarget.cs" />
     <Compile Include="..\Sanduhr.Core\LauncherModel.cs" Link="Core\LauncherModel.cs" />
+    <!-- propose_now_playing_looks (3.7.0, a look per song): one more file, pure like the rest (text, JSON, regex, math; no IO, no
+         network, no credentials, no process). NowPlayingLook.cs holds the look model, the song key, the checks (shape and the
+         contrast rule against the wallpaper in desk-state.json), the request decode and the result shape, so the server refuses
+         exactly what the widget would. The widget owns every write: the saved looks, the handoff files and the file for the mod
+         are NowPlayingLookStore and NowPlayingLookHandoff, which stay out of the server. -->
+    <Compile Include="..\Sanduhr.Core\NowPlayingLook.cs" Link="Core\NowPlayingLook.cs" />
   </ItemGroup>
 
 </Project>

@@ -117,6 +117,15 @@ public sealed class McpConfig
     public TimeSpan DesignWaitTimeout { get; init; } = TimeSpan.FromSeconds(10);
     public TimeSpan DesignPollInterval { get; init; } = TimeSpan.FromMilliseconds(250);
 
+    /// <summary>The song looks handoff (see Core's NowPlayingLookProposal): propose_now_playing_looks writes the request and the
+    /// widget checks it again and answers in the result. Null = unavailable.</summary>
+    public string? LooksRequestPath { get; init; }
+    public string? LooksResultPath { get; init; }
+
+    /// <summary>How long propose_now_playing_looks waits for the widget's first answer (it answers at once when it is running).</summary>
+    public TimeSpan LooksWaitTimeout { get; init; } = TimeSpan.FromSeconds(10);
+    public TimeSpan LooksPollInterval { get; init; } = TimeSpan.FromMilliseconds(250);
+
     public static McpConfig Resolve()
     {
         string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -223,6 +232,9 @@ public sealed class McpConfig
             DesignStatePath = Path.Combine(externalDir, DeskDesign.StateFile),
             DesignRequestPath = Path.Combine(externalDir, DeskDesign.RequestFile),
             DesignResultPath = Path.Combine(externalDir, DeskDesign.ResultFile),
+            // The song looks handoff: file names from the linked Core type (NowPlayingLookProposal); the folder is fixed.
+            LooksRequestPath = Path.Combine(externalDir, NowPlayingLookProposal.RequestFile),
+            LooksResultPath = Path.Combine(externalDir, NowPlayingLookProposal.ResultFile),
             DeskMessagesPaths = env("SANDUHR_VAULT_DIR") is { Length: > 0 }
                 ? new[] { Path.Combine(appDataSanduhrDir, "messages.txt") }
                 : new[]

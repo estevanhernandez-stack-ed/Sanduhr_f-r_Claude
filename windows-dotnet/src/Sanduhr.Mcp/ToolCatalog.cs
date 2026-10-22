@@ -7,7 +7,7 @@ namespace Sanduhr.Mcp;
 /// <c>get_desk_messages</c> and <c>get_desk</c>) plus the tools that hand a request file to the widget
 /// and never act themselves: <c>publish_usage</c> (the widget owns the key and the
 /// network; this server posts nothing), <c>propose_theme</c>,
-/// <c>propose_desk_messages</c>, <c>propose_desk</c> (3.7.0) and <c>watch_start</c> / <c>watch_update</c> /
+/// <c>propose_desk_messages</c>, <c>propose_desk</c> and <c>propose_now_playing_looks</c> (3.7.0) and <c>watch_start</c> / <c>watch_update</c> /
 /// <c>watch_end</c> (3.6.0; the widget owns messages.txt and the board, checks every
 /// request again, and the user's switches gate them). The design review's
 /// must-fix #3 still holds: no strict-subset tools like get_reset_schedule; the
@@ -400,6 +400,57 @@ public static class ToolCatalog
                 ["required"] = new JsonArray("id", "result"),
                 ["additionalProperties"] = false,
             },
+            readOnly: false, openWorld: false),
+        Tool(
+            "propose_now_playing_looks",
+            LooksGuide,
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["looks"] = new JsonObject
+                    {
+                        ["type"] = "array",
+                        ["minItems"] = 1,
+                        ["maxItems"] = 20,
+                        ["description"] = "One look per song.",
+                        ["items"] = new JsonObject
+                        {
+                            ["type"] = "object",
+                            ["properties"] = new JsonObject
+                            {
+                                ["title"] = new JsonObject { ["type"] = "string", ["maxLength"] = 200 },
+                                ["artist"] = new JsonObject { ["type"] = "string", ["maxLength"] = 100 },
+                                ["ink"] = new JsonObject
+                                {
+                                    ["type"] = "array",
+                                    ["minItems"] = 1,
+                                    ["maxItems"] = 4,
+                                    ["items"] = new JsonObject { ["type"] = "string", ["pattern"] = "^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$" },
+                                    ["description"] = "1 to 4 hex colors, left to right, each 3:1 or better on what is behind the now playing piece.",
+                                },
+                                ["style"] = new JsonObject
+                                {
+                                    ["type"] = "string",
+                                    ["enum"] = new JsonArray("plain", "bold", "italic", "bolditalic", "smallcaps"),
+                                },
+                                ["mood"] = new JsonObject { ["type"] = "string", ["maxLength"] = 40, ["description"] = "A few words for the user (\"neon night drive\")." },
+                            },
+                            ["required"] = new JsonArray("title", "ink"),
+                            ["additionalProperties"] = false,
+                        },
+                    },
+                    ["note"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["maxLength"] = 200,
+                        ["description"] = "One short sentence for the user on why these looks (shown beside the suggestion).",
+                    },
+                },
+                ["required"] = new JsonArray("looks"),
+                ["additionalProperties"] = false,
+            },
             readOnly: false, openWorld: false));
 
     // The Desk and watcher descriptions are the Mac server's, adapted to this machine's paths and
@@ -509,6 +560,24 @@ public static class ToolCatalog
         "needs_font lists the fonts (family, link) the user must install first, queued means the widget did not answer " +
         "and will show it when it starts. Every applied look is saved and can be switched back to in Sanduhr's " +
         "settings. This server never changes the Desk itself.";
+
+    private const string LooksGuide =
+        "Suggest a look for songs the user plays: a gradient and a letter style per song, drawn on the now playing line " +
+        "of the user's Windows Desk while Sanduhr's Style what's playing is on (Settings, Now playing, Looks). Until a " +
+        "song has a look it wears one picked from its name out of eight palettes. Pass looks: 1 to 20 of {title, artist, " +
+        "ink, style, mood}: title and artist exactly as the player shows them (matched ignoring case, extra spaces and a " +
+        "trailing Remastered mark), ink 1 to 4 #rrggbb colors left to right (a gradient across the line), style one of " +
+        "plain, bold, italic, bolditalic or smallcaps (omit for plain; drawn in the Desk's own font), mood up to 40 " +
+        "characters for the user ('neon night drive'). Every color must keep a WCAG contrast of 3:1 against what is behind " +
+        "the now playing piece, the wallpaper under its anchor or the plate when the plate is on, so no dark shades on a " +
+        "dark wallpaper and no pale ones on a bright one; read get_desk (wallpaper summary and layout) first. Refused " +
+        "looks come back as rejected with reasons, each starting with the look's number, and nothing is sent. Pick songs " +
+        "you know the user plays (they said so, or ask them); a look should feel like the song: its era, its cover, its " +
+        "energy. Sanduhr checks the looks again and, unless the user lets Claude style songs directly, shows them as a " +
+        "card to Save or Dismiss: pending_approval means the user decides, applied means they are saved (looks_saved), " +
+        "rejected comes with reasons. style_on says whether Style what's playing is on; when it is false, tell the user " +
+        "where to switch it on (Settings, Now playing, Looks). A saved look replaces an older one for the same song. " +
+        "queued means Sanduhr did not answer: it is not running. This server never saves a look and never reads what is playing.";
 
     private const string WatchGuideStart =
         "Put up a watcher: a live card on the user's Desk for work you are keeping an eye on " +

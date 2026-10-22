@@ -65,6 +65,11 @@ public class TrustBoundaryTests
                 //     or an https link; membership is checked against desk-state.json's list).
                 "LauncherModel.cs", "LauncherTarget.cs",
                 "LetterMap.cs", "MessageEffects.cs", "MessageProposal.cs",
+                // propose_now_playing_looks (3.7.0, a look per song). One file, pure (text, JSON, regex and math; no IO, network,
+                // credentials or process): the look model, the song key (FNV-1a 64), the checks with the contrast rule, the request
+                // decode and the result shape, so the server refuses exactly what the widget would. The widget owns every write
+                // (the saved looks, the handoff files, the file for the mod); the server queues the request file only.
+                "NowPlayingLook.cs",
                 "Pacing.cs", "SnapshotContract.cs",
                 // propose_theme: the lint and the model it builds, both pure. The
                 // widget owns every write under the themes folder.
@@ -100,6 +105,7 @@ public class TrustBoundaryTests
     [InlineData("DeskFont.cs")]
     [InlineData("LauncherTarget.cs")]
     [InlineData("LauncherModel.cs")]
+    [InlineData("NowPlayingLook.cs")]
     public void Files_linked_for_watchers_desk_messages_and_desk_designs_are_pure(string file)
     {
         string path = Path.Combine(Path.GetDirectoryName(McpCsprojPath())!, "..", "Sanduhr.Core", file);
@@ -124,6 +130,17 @@ public class TrustBoundaryTests
         foreach (var name in new[] { "DeskDesignHandoff", "DeskDesignLibrary", "SavedDesign", "WallpaperRender", "WallpaperSampler", "DeskSettings", "SettingsNames" })
             Assert.DoesNotContain(name, typeNames);
         Assert.Contains("DeskDesign", typeNames);   // and the validator it composes is
+    }
+
+    /// <summary>The widget's half of the song looks (the saved-looks file, the handoff, the file for the mod) stays out of the
+    /// server: it checks, queues the request file and reads desk-state.json, and never saves a look.</summary>
+    [Fact]
+    public void The_widgets_half_of_the_song_looks_is_not_in_the_mcp_assembly()
+    {
+        var typeNames = typeof(Sanduhr.Mcp.McpServer).Assembly.GetTypes().Select(t => t.Name).ToHashSet();
+        foreach (var name in new[] { "NowPlayingLookStore", "NowPlayingLookHandoff", "NowPlayingLookPaths", "MessageFileIo" })
+            Assert.DoesNotContain(name, typeNames);
+        Assert.Contains("NowPlayingLookCheck", typeNames);   // and the checks are
     }
 
     [Fact]
