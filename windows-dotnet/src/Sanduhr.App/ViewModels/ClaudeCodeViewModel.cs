@@ -75,25 +75,47 @@ public sealed partial class CcPieceViewModel : ObservableObject
     [ObservableProperty] private bool _isInstalled;
     /// <summary>The piece can be installed in the selected folder.</summary>
     [ObservableProperty] private bool _canInstall = true;
-    [ObservableProperty] private string _installLabel = "Install…";
+
+    private readonly string _installedVerb;
+    private readonly string _installedHelp;
 
     public IRelayCommand InstallCommand { get; }
     public IRelayCommand RemoveCommand { get; }
-    public string InstallName { get; }
     public string RemoveName { get; }
 
-    public CcPieceViewModel(string title, string description, Action install, Action remove)
+    /// <param name="installedVerb">What the install button says once the piece is in the folder: running it
+    /// again copies the current files and refreshes Sanduhr's entry, so "Update…" unless the piece offers a
+    /// choice ("Change…" for the statusline).</param>
+    /// <param name="installedHelp">The button's help text once installed: what pressing it does.</param>
+    public CcPieceViewModel(string title, string description, Action install, Action remove,
+        string installedVerb = "Update…", string? installedHelp = null)
     {
         Title = title;
         Description = description;
         InstallCommand = new RelayCommand(install);
         RemoveCommand = new RelayCommand(remove);
-        InstallName = $"Install {title}";
+        _installedVerb = installedVerb;
+        _installedHelp = installedHelp ?? $"Asks first, then copies the current {title} files again and refreshes Sanduhr's entry in this folder.";
         RemoveName = $"Remove {title}";
     }
 
+    /// <summary>"Install…" while the piece is absent from the folder, the installed verb ("Update…", "Change…") once it is there.</summary>
+    public string InstallLabel => IsInstalled ? _installedVerb : "Install…";
+
+    /// <summary>The install button's accessible name: "Install MCP server", "Update MCP server".</summary>
+    public string InstallName => $"{InstallLabel.TrimEnd('…')} {Title}";
+
+    /// <summary>What the install button does right now, for screen readers.</summary>
+    public string InstallHelp => IsInstalled ? _installedHelp : $"Asks first, then adds {Title} to the selected folder.";
+
     public bool NotInstalled => !IsInstalled;
-    partial void OnIsInstalledChanged(bool value) => OnPropertyChanged(nameof(NotInstalled));
+    partial void OnIsInstalledChanged(bool value)
+    {
+        OnPropertyChanged(nameof(NotInstalled));
+        OnPropertyChanged(nameof(InstallLabel));
+        OnPropertyChanged(nameof(InstallName));
+        OnPropertyChanged(nameof(InstallHelp));
+    }
 }
 
 /// <summary>
@@ -152,16 +174,20 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         _widget = widget;
         Statusline = new CcPieceViewModel("Statusline",
             "Shows your session and weekly meters under the Claude Code prompt.",
-            InstallStatusline, RemoveStatusline);
+            InstallStatusline, RemoveStatusline, "Change…",
+            "Asks first, then lets you replace or adjust the statusline in this folder.");
         Mcp = new CcPieceViewModel("MCP server",
             "Lets Claude Code ask for your live headroom before it spawns agents. Read-only.",
-            InstallMcp, RemoveMcp);
+            InstallMcp, RemoveMcp, "Update…",
+            "Asks first, then copies the current server files again and refreshes Sanduhr's entry in this folder's .claude.json.");
         Meters = new CcPieceViewModel("Meters above the prompt",
             "A mod that draws your meters in a band above the prompt.",
-            InstallMeters, RemoveMeters);
+            InstallMeters, RemoveMeters, "Update…",
+            "Asks first, then copies the current mod files again and points this folder's entry at them.");
         Hooks = new CcPieceViewModel("Glow when Claude needs you",
             "Two hooks that light the edge of your window when Claude Code waits on you or finishes.",
-            InstallHooks, RemoveHooks);
+            InstallHooks, RemoveHooks, "Update…",
+            "Asks first, then writes Sanduhr's two hooks into this folder's settings.json again.");
         Reload();
         _loading = true;
         var glow = _widget.LoadClaudeCodeGlow();
@@ -438,7 +464,6 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             var sl = statusline.Status(row.Path);
             Statusline.CanInstall = sl != StatuslineStatus.Unreadable;
             Statusline.IsInstalled = sl is StatuslineStatus.Installed or StatuslineStatus.Outdated;
-            Statusline.InstallLabel = Statusline.IsInstalled ? "Change…" : "Install…";
             Statusline.StatusText = sl switch
             {
                 StatuslineStatus.Installed => "Installed.",
