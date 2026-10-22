@@ -143,6 +143,8 @@ public static class SettingsNames
     public const string LauncherAddLink = "Add link…";
     /// <summary>Desk: lets agents put watchers up through the MCP server (settings.json "watchers_agents", off by default).</summary>
     public const string WatchersSwitch = "Let agents show watchers";
+    /// <summary>Desk: lets Claude apply a Desk design without the review bar (settings.json "desk_direct", off by default).</summary>
+    public const string DeskDirectSwitch = "Let Claude change the Desk directly";
     /// <summary>Desk, Designs: the section that lists the Desk designs kept (ten, pinned ones never dropped).</summary>
     public const string DeskDesigns = "Designs";
     /// <summary>Desk, Designs, and the tray: switches to the design saved before the last change.</summary>
@@ -209,6 +211,7 @@ public static class SettingsNames
         (DeskPieceClicksSwitch, SettingsPage.Desk),
         (DeskPlateSwitch, SettingsPage.Desk),
         (WatchersSwitch, SettingsPage.Desk),
+        (DeskDirectSwitch, SettingsPage.Desk),
         (PutMyDeskBack, SettingsPage.Desk),
         (LauncherAddApp, SettingsPage.Desk),
         (LauncherAddLink, SettingsPage.Desk),

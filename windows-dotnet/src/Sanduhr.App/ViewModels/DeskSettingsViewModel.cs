@@ -167,6 +167,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         LoadInk();
         Launcher.Reload();
         OnPropertyChanged(nameof(Plate));
+        OnPropertyChanged(nameof(DirectDesign));
         Designs.Reload();
     }
 
@@ -225,6 +226,19 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             _store.SaveWatchersAgents(value);
             OnPropertyChanged();
             WatchersChanged?.Invoke();
+        }
+    }
+
+    /// <summary>"Let Claude change the Desk directly" (spec, the agent-designed Desk): off by default; saved at once. On, a design Claude
+    /// proposes is applied without the review bar; the Desk it replaces is still saved first.</summary>
+    public bool DirectDesign
+    {
+        get => _store.LoadDeskDirect();
+        set
+        {
+            if (value == DirectDesign) return;
+            _store.SaveDeskDirect(value);
+            OnPropertyChanged();
         }
     }
 

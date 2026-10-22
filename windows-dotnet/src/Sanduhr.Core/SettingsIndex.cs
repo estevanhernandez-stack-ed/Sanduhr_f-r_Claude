@@ -79,6 +79,7 @@ public static class SettingsIndex
     public const string DeskPlate = "desk-plate";
     public const string DeskWatchers = "desk-watchers";
     public const string DeskLauncher = "desk-launcher";
+    public const string DeskDirect = "desk-direct";
     public const string DeskDesigns = "desk-designs";
     // Desk: Message, Now playing, Weather (S6)
     public const string MessageLines = "lines";
@@ -187,6 +188,8 @@ public static class SettingsIndex
             ["click", "click-through", "right-click", "menu", "desktop icons", "clock", "message"]),
         E(SettingsNames.WatchersSwitch, SettingsPage.Desk, DeskWatchers,
             ["watcher", "watchers", "agent", "agents", "MCP", "watch_start", "CI", "deploy", "progress", "card", "claude code"]),
+        E(SettingsNames.DeskDirectSwitch, SettingsPage.Desk, DeskDirect,
+            ["Claude", "agent", "agents", "MCP", "propose_desk", "design", "designs", "review", "apply", "without asking", "wallpaper", "off by default"]),
         E(SettingsNames.DeskDesigns, SettingsPage.Desk, DeskDesigns,
             ["design", "designs", "undo", "put back", SettingsNames.PutMyDeskBack, "restore", "switch", "switch to", "rename", "pin", "delete", "saved looks", "Before", "history", "Claude"]),
         E(SettingsNames.DeskLauncher, SettingsPage.Desk, DeskLauncher,
@@ -254,6 +257,7 @@ public static class SettingsIndex
         [SettingsNames.DeskPieceClicksSwitch] = DeskClicks,
         [SettingsNames.DeskPlateSwitch] = DeskPlate,
         [SettingsNames.WatchersSwitch] = DeskWatchers,
+        [SettingsNames.DeskDirectSwitch] = DeskDirect,
         [SettingsNames.PutMyDeskBack] = DeskDesigns,
         [SettingsNames.LauncherAddApp] = DeskLauncher,
         [SettingsNames.LauncherAddLink] = DeskLauncher,
