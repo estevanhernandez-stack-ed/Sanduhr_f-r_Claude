@@ -220,13 +220,13 @@ describe('caveats, compare and footer', () => {
     );
     expect(buildPanelModel([day(today, { youMs: MIN }, [], 1)], open, today).caveats).toMatch(/^1 transcript line could/);
   });
-  it('builds the WakaTime line from you plus both, with a signed difference', () => {
+  it('compares WakaTime (all machines) with the full total on this machine, yours beside it', () => {
     const d = [day(today, { youMs: H, claudeMs: H, bothMs: 10 * MIN })];
-    expect(buildPanelModel(d, open, today, { wakatimeSeconds: 70 * 60 }).compare).toBe(
-      'WakaTime 1h 10m · Sanduhr editor time 1h 10m · difference 0m',
+    expect(buildPanelModel(d, open, today, { wakatimeSeconds: 130 * 60 }).compare).toBe(
+      'WakaTime 2h 10m (all machines) · Sanduhr 2h 10m on this machine (yours 1h 10m) · difference 0m',
     );
-    expect(buildPanelModel(d, open, today, { wakatimeSeconds: 60 * 60 }).compare).toMatch(/difference \+10m$/);
-    expect(buildPanelModel(d, open, today, { wakatimeSeconds: 80 * 60 }).compare).toMatch(/difference -10m$/);
+    expect(buildPanelModel(d, open, today, { wakatimeSeconds: 120 * 60 }).compare).toMatch(/difference \+10m$/);
+    expect(buildPanelModel(d, open, today, { wakatimeSeconds: 140 * 60 }).compare).toMatch(/difference -10m$/);
     expect(buildPanelModel(d, open, today).compare).toBeNull();
   });
   it('always carries the trademark footer', () => {

@@ -27,6 +27,8 @@ export interface CompareLine {
   date: string;
   wakatimeSeconds: number;
   oursEditorSeconds: number;
+  /** This machine's full total (you, Claude and both), the like-for-like figure; absent on lines from 0.1.0. */
+  oursTotalSeconds?: number;
   at: string;
 }
 
@@ -241,7 +243,13 @@ export function readCompareLines(dir: string): CompareLine[] {
     try {
       const j = JSON.parse(line) as Partial<CompareLine>;
       if (typeof j.date === 'string' && typeof j.wakatimeSeconds === 'number' && typeof j.oursEditorSeconds === 'number') {
-        out.push({ date: j.date, wakatimeSeconds: j.wakatimeSeconds, oursEditorSeconds: j.oursEditorSeconds, at: String(j.at ?? '') });
+        out.push({
+          date: j.date,
+          wakatimeSeconds: j.wakatimeSeconds,
+          oursEditorSeconds: j.oursEditorSeconds,
+          ...(typeof j.oursTotalSeconds === 'number' ? { oursTotalSeconds: j.oursTotalSeconds } : {}),
+          at: String(j.at ?? ''),
+        });
       }
     } catch {
       /* skip an unreadable line */
@@ -335,6 +343,7 @@ export class Comparison {
         date,
         wakatimeSeconds: Math.round(result.seconds),
         oursEditorSeconds: today ? Math.round((today.totals.youMs + today.totals.bothMs) / 1000) : 0,
+        oursTotalSeconds: today ? Math.round(today.totals.totalMs / 1000) : 0,
         at: new Date(d.now()).toISOString(),
       });
       return result;

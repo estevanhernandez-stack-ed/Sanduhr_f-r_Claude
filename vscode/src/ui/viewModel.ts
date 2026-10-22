@@ -220,10 +220,13 @@ export function buildPanelModel(
   let compareLine: string | null = null;
   if (compare && Number.isFinite(compare.wakatimeSeconds)) {
     const wakaMs = compare.wakatimeSeconds * 1000;
-    const oursMs = t.youMs + t.bothMs;
-    const diff = oursMs - wakaMs;
+    // wakatime-cli --today totals every machine on the account and counts files any tool writes,
+    // so the like-for-like figure here is this machine's full total; yours is shown beside it.
+    const diff = t.totalMs - wakaMs;
     const sign = diff > 0 ? '+' : diff < 0 ? '-' : '';
-    compareLine = `WakaTime ${formatDuration(wakaMs)} · Sanduhr editor time ${formatDuration(oursMs)} · difference ${sign}${formatDuration(Math.abs(diff))}`;
+    compareLine =
+      `WakaTime ${formatDuration(wakaMs)} (all machines) · Sanduhr ${formatDuration(t.totalMs)} on this machine` +
+      ` (yours ${formatDuration(t.youMs + t.bothMs)}) · difference ${sign}${formatDuration(Math.abs(diff))}`;
   }
 
   const remote = opts.remote === true;
