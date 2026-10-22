@@ -9,14 +9,43 @@ public class WhatsNewCardsTests
     private static IReadOnlyList<WhatsNewCard> Table => WhatsNewCards.Table;
 
     [Fact]
-    public void Table_HasBothReleasesNewestFirst()
+    public void Table_HasEveryReleaseNewestFirst()
     {
         Assert.Equal(
-            ["now-playing-steps-aside", "watchers", "suggested-messages", "desk-plate", "arrange-hide", "statusline-label",
+            ["desk-design", "launcher", "per-monitor", "song-looks", "oled-care", "saved-designs",
+             "now-playing-steps-aside", "watchers", "suggested-messages", "desk-plate", "arrange-hide", "statusline-label",
              "desk", "settings-redesigned", "claude-code-page",
              "shortcut-keys", "tray-shows", "limits-come-and-go", "every-folder", "steady-sparklines", "whats-new"],
             Table.Select(c => c.Id));
     }
+
+    [Fact]
+    public void Release370_ShowsOnlyItsOwnSixCardsAfterTheUpdate()
+    {
+        var shown = WhatsNew.Cards("3.6.0", "3.7.0");
+        Assert.Equal(["desk-design", "launcher", "per-monitor", "song-looks", "oled-care", "saved-designs"], shown.Select(c => c.Id));
+        Assert.All(shown, c => Assert.Equal("3.7.0", c.Version));
+    }
+
+    /// <summary>The Store jumps 3.5.0 to 3.7.0: the six 3.7.0 cards lead, the cap of eight keeps two of 3.6.0's.</summary>
+    [Fact]
+    public void Release370_FromTheStoreVersion_LeadsWithItsSixAndCapsAtEight()
+    {
+        var shown = WhatsNew.Cards("3.5.0", "3.7.0");
+        Assert.Equal(WhatsNew.Cap, shown.Count);
+        Assert.Equal(6, shown.Count(c => c.Version == "3.7.0"));
+        Assert.All(shown.Take(6), c => Assert.Equal("3.7.0", c.Version));
+    }
+
+    [Theory]
+    [InlineData("desk-design", SettingsPage.Desk)]
+    [InlineData("launcher", SettingsPage.Desk)]
+    [InlineData("per-monitor", SettingsPage.Desk)]
+    [InlineData("song-looks", SettingsPage.NowPlaying)]
+    [InlineData("oled-care", SettingsPage.Desk)]
+    [InlineData("saved-designs", SettingsPage.Desk)]
+    public void Release370_ShowMeOpensTheirPage(string id, SettingsPage page) =>
+        Assert.Equal(page, Table.Single(c => c.Id == id).Destination);
 
     [Fact]
     public void Release360_ShowsOnlyItsOwnSixCardsAfterTheUpdate()
