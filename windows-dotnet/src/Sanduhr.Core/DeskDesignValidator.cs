@@ -10,11 +10,13 @@ namespace Sanduhr.Core;
 /// <param name="Wallpaper">What the wallpaper looks like behind each anchor.</param>
 /// <param name="StartMenuApps">The IDs of the apps the Start menu lists (the Launcher's membership rule).</param>
 /// <param name="Current">The Desk as it is now, so a partial design is judged as it would look once merged.</param>
+/// <param name="Monitors">The monitors connected now (their ids are what a layout piece's <c>monitor</c> may name).</param>
 public sealed record DeskDesignContext(
     IReadOnlyCollection<string>? InstalledFonts = null,
     WallpaperOverview? Wallpaper = null,
     IReadOnlyCollection<string>? StartMenuApps = null,
-    DeskDesign? Current = null)
+    DeskDesign? Current = null,
+    IReadOnlyList<DeskMonitorInfo>? Monitors = null)
 {
     public static DeskDesignContext Unknown { get; } = new();
 }
@@ -102,6 +104,7 @@ public sealed partial record DeskDesign
 
         var reasons = new List<DeskReason>();
         CheckMembership(d, context, reasons);
+        CheckMonitors(d, context, reasons);
         CheckContrast(d, context, reasons);
         if (reasons.Count > 0) return Rejected(reasons, parsed.Warnings, d);
 
@@ -130,6 +133,18 @@ public sealed partial record DeskDesign
             if (b.Kind == LauncherKind.App && !listed.Contains(b.Target))
                 reasons.Add(new DeskReason($"launcher.buttons[{i}].target",
                     "is not an app this PC's Start menu lists; use an id from start_menu_apps in get_desk. A button opens only what the Start menu offers."));
+        }
+    }
+
+    private static void CheckMonitors(DeskDesign d, DeskDesignContext ctx, List<DeskReason> reasons)
+    {
+        if (d.Layout is null || ctx.Monitors is not { } monitors) return;
+        foreach (var p in d.Layout)
+        {
+            if (!DeskMonitors.IsId(p.Monitor)) continue;
+            if (monitors.Any(m => string.Equals(m.Id, p.Monitor, StringComparison.OrdinalIgnoreCase))) continue;
+            reasons.Add(new DeskReason($"layout.{p.Piece}.monitor",
+                "is not a monitor connected to this PC; use \"all\", \"main\" or an id from monitors in get_desk."));
         }
     }
 
@@ -178,7 +193,7 @@ public sealed partial record DeskDesign
 
             var anchor = p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece);
             double worst = double.MaxValue, worstBg = 0;
-            foreach (var m in wall.Monitors)
+            foreach (var m in MonitorsOf(wall, p.Monitor))
             {
                 double under = m.Summary.At(anchor)?.Brightness ?? m.Summary.Brightness;
                 if (plate) under = UnderPlate(under, ink.DarkInk);
@@ -199,6 +214,21 @@ public sealed partial record DeskDesign
                 + $"(brightness {worstBg.ToString("0.00", CultureInfo.InvariantCulture)}{(plate ? ", with the plate on" : "")}); "
                 + $"the Desk needs {MinContrast.ToString("0", CultureInfo.InvariantCulture)}:1. Choose {fix}, {(plate ? "" : "turn the plate on, ")}or move the piece."));
             found++;
+        }
+    }
+
+    /// <summary>The wallpaper monitors a piece is judged against: every one for "all monitors"; the primary for "main"; the one with that id.
+    /// A monitor the summary does not know (unplugged, or an older state with no ids) is judged against all of them, the safe side.</summary>
+    private static IEnumerable<WallpaperMonitorSummary> MonitorsOf(WallpaperOverview wall, string? monitor)
+    {
+        switch (DeskMonitors.FromWord(monitor))
+        {
+            case null:
+                return wall.Monitors;
+            case DeskMonitors.Main:
+                return wall.Monitors.Where(m => m.Primary) is var main && main.Any() ? main : wall.Monitors;
+            case var id:
+                return wall.Monitors.Where(m => string.Equals(m.Id, id, StringComparison.OrdinalIgnoreCase)) is var one && one.Any() ? one : wall.Monitors;
         }
     }
 

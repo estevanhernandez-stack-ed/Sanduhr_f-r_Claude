@@ -196,7 +196,7 @@ public static class SettingsIndex
             ["launcher", "button", "buttons", "shortcut", "shortcuts", "app", "apps", "link", "TouchButton", "Rainmeter",
              SettingsNames.LauncherAddApp, SettingsNames.LauncherAddLink, "image", "label", "PNG", "Chrome app", "PWA"]),
         E("Where each piece sits", SettingsPage.Desk, DeskPieces,
-            ["layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor"]),
+            ["layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor", "monitor", "monitors", "screen", "display", "main monitor", "all monitors", "second monitor", "per monitor"]),
         E("Look", SettingsPage.Desk, DeskLook,
             ["font", "EsteFont", "EsteFont Pro", "EsteFont 26", "clock size", "time size", "typeface", "Segoe UI"]),
         E(SettingsNames.DeskPlateSwitch, SettingsPage.Desk, DeskPlate,

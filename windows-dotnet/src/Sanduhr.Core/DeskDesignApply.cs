@@ -30,7 +30,7 @@ public static class DeskDesignApply
     {
         var placed = pieces
             .Where(p => !p.IsHidden && DeskArrangement.Known.Contains(p.Piece, StringComparer.Ordinal))
-            .Select(p => new DeskPlacement(p.Piece, p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece), DeskArrangement.ClampScale(p.Size ?? 1)));
+            .Select(p => new DeskPlacement(p.Piece, p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece), DeskArrangement.ClampScale(p.Size ?? 1), DeskMonitors.FromWord(p.Monitor)));
         return new DeskArrangement(placed).Layout;
     }
 

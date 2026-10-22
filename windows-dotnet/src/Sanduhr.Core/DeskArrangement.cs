@@ -68,12 +68,128 @@ public static class DeskAnchors
     }
 }
 
-/// <summary>One placed piece: its widget word, its anchor and its size (1 is the piece's own size).</summary>
-public sealed record DeskPlacement(string Widget, DeskAnchor Anchor, double Scale = 1);
+/// <summary>One placed piece: its widget word, its anchor, its size (1 is the piece's own size) and the monitor it is drawn on:
+/// null for every monitor (what every layout written before monitors meant), <see cref="DeskMonitors.Main"/>, or a monitor's
+/// device path (the id <c>IDesktopWallpaper</c> uses).</summary>
+public sealed record DeskPlacement(string Widget, DeskAnchor Anchor, double Scale = 1, string? Monitor = null);
+
+/// <summary>A monitor as the Desk and <c>get_desk</c> know it. <paramref name="Id"/> is its device path, stable across restarts and
+/// resolution changes; <paramref name="Name"/> is how a person is told which one it is ("3440×1440, main"); the size is in physical
+/// pixels and the position is where its top-left sits on the virtual screen.</summary>
+public sealed record DeskMonitorInfo(string Id, string Name, int Width, int Height, bool Primary, int Left, int Top);
+
+/// <summary>A screen the Desk draws on, as far as monitor placement cares: its id (null when Windows would not say) and whether it is the main one.</summary>
+public sealed record DeskScreenRef(string? Id, bool Primary);
+
+/// <summary>
+/// Which monitor a piece is on (spec, Desk pieces per monitor). A placement's monitor is null (every monitor), <see cref="Main"/>
+/// (whichever is primary now) or a device path. Pure: the screens the Desk has now are passed in.
+/// </summary>
+public static class DeskMonitors
+{
+    /// <summary>The word for the main monitor, in a layout string and in a design.</summary>
+    public const string Main = "main";
+
+    /// <summary>The word for every monitor, in a design (a layout string writes nothing).</summary>
+    public const string All = "all";
+
+    /// <summary>The longest monitor id a layout or a design may carry.</summary>
+    public const int MaxIdLength = 300;
+
+    /// <summary>A design's or a layout's word as a placement monitor: "all", blank or null is every monitor (null); "main" is
+    /// <see cref="Main"/>; anything else is an id, kept as given.</summary>
+    public static string? FromWord(string? word)
+    {
+        if (string.IsNullOrWhiteSpace(word)) return null;
+        var t = word.Trim();
+        if (string.Equals(t, All, StringComparison.OrdinalIgnoreCase)) return null;
+        if (string.Equals(t, Main, StringComparison.OrdinalIgnoreCase)) return Main;
+        return t;
+    }
+
+    /// <summary>A placement monitor as a design's word: "all", "main" or the id.</summary>
+    public static string Word(string? monitor) => FromWord(monitor) ?? All;
+
+    /// <summary>True for a device path (neither every monitor nor the main one).</summary>
+    public static bool IsId(string? monitor) => FromWord(monitor) is { } m && m != Main;
+
+    /// <summary>Whether two monitor words name the same monitor ("all" is null; ids compare without regard to case).</summary>
+    public static bool Same(string? a, string? b) => string.Equals(FromWord(a), FromWord(b), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether a piece placed on <paramref name="monitor"/> is drawn on <paramref name="screen"/>. Every monitor: always. Main: on the
+    /// primary one. A device path: on the screen with that id; and while no connected screen has that id (the monitor is unplugged,
+    /// or Windows did not say) on the primary screen, so nothing disappears. This is resolution only: the stored layout is never rewritten.
+    /// </summary>
+    public static bool ShowsOn(string? monitor, DeskScreenRef screen, IReadOnlyCollection<string> connectedIds)
+    {
+        var m = FromWord(monitor);
+        if (m is null) return true;
+        if (m == Main) return screen.Primary;
+        if (IsConnected(m, connectedIds))
+            return screen.Id is not null && string.Equals(screen.Id, m, StringComparison.OrdinalIgnoreCase);
+        return screen.Primary;
+    }
+
+    /// <summary>The value that puts a piece on this one screen: the word for the main monitor on the primary screen (it then follows the
+    /// primary), else the screen's own device path; the main monitor again when Windows gave it no id.</summary>
+    public static string ThisScreen(DeskScreenRef screen) => screen.Primary || screen.Id is null ? Main : screen.Id;
+
+    /// <summary>What "Show on" does to a piece's monitor in Arrange mode: a piece on every monitor goes to this screen only; a piece on one
+    /// monitor goes back to every monitor.</summary>
+    public static string? ToggleShowOn(string? current, DeskScreenRef screen) => FromWord(current) is null ? ThisScreen(screen) : null;
+
+    /// <summary>Whether a device path is one of the connected monitors.</summary>
+    public static bool IsConnected(string? monitor, IReadOnlyCollection<string> connectedIds) =>
+        FromWord(monitor) is { } m && m != Main && connectedIds.Contains(m, StringComparer.OrdinalIgnoreCase);
+
+    // What a layout word carries as it is: printable ASCII but the characters that separate words, pieces and fields.
+    private static bool Plain(int c) => c is > ' ' and < 0x7F && c is not ('%' or ',' or ':' or '@');
+
+    /// <summary>A monitor id made safe for a layout word: a space, a comma, a colon, an at sign, a percent sign, a control character or a
+    /// non-ASCII character becomes %XX of its UTF-8 bytes, so nothing in an id can break the list.</summary>
+    public static string Escape(string id)
+    {
+        var sb = new System.Text.StringBuilder(id.Length + 8);
+        Span<byte> bytes = stackalloc byte[4];
+        foreach (var rune in id.EnumerateRunes())
+        {
+            if (Plain(rune.Value)) { sb.Append((char)rune.Value); continue; }
+            int n = rune.EncodeToUtf8(bytes);
+            for (int i = 0; i < n; i++) sb.Append('%').Append(bytes[i].ToString("X2", CultureInfo.InvariantCulture));
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>The id back from <see cref="Escape"/>. A % that is not followed by two hex digits stays as it is.</summary>
+    public static string Unescape(string word)
+    {
+        if (!word.Contains('%')) return word;
+        var bytes = new List<byte>(word.Length);
+        for (int i = 0; i < word.Length; i++)
+        {
+            if (word[i] == '%' && i + 2 < word.Length &&Uri.IsHexDigit(word[i + 1]) && Uri.IsHexDigit(word[i + 2]))
+            {
+                bytes.Add(byte.Parse(word.AsSpan(i + 1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+                i += 2;
+            }
+            else
+            {
+                int len = char.IsHighSurrogate(word[i]) && i + 1 < word.Length ? 2 : 1;
+                bytes.AddRange(System.Text.Encoding.UTF8.GetBytes(word.Substring(i, len)));
+                i += len - 1;
+            }
+        }
+        return System.Text.Encoding.UTF8.GetString([.. bytes]);
+    }
+}
 
 /// <summary>
 /// The Desk layout string read and written. Each word is <c>widget:anchor</c> or
-/// <c>widget:anchor:scale</c>; within an anchor, pieces stack top to bottom in the string order.
+/// <c>widget:anchor:scale</c>, with an optional <c>@monitor</c> at its end (<c>clock:tl@main</c>, or a monitor's device path with
+/// <c>,</c> <c>:</c> <c>@</c> <c>%</c> and spaces escaped as %XX; no suffix is every monitor, so every older layout reads and writes
+/// unchanged); within an anchor, pieces stack top to bottom in the string order, and a screen draws only the pieces
+/// <see cref="ForScreen"/> gives it.
 /// A word for a widget this build does not know is dropped; an anchor it does not know puts the
 /// piece at its default anchor instead of hiding it; a size it cannot read is 1. A widget named
 /// twice keeps its last word. A size of 1 is not written. Ported from the Mac DeskArrangement.
@@ -110,7 +226,11 @@ public sealed class DeskArrangement
         if (string.IsNullOrEmpty(layout)) return;
         foreach (var word in layout.Split(' ', StringSplitOptions.RemoveEmptyEntries))
         {
-            var bits = word.Split(':', StringSplitOptions.RemoveEmptyEntries);
+            // An optional "@monitor" ends the word (an escaped id, or "main"); no suffix is every monitor, as every older layout meant.
+            int at = word.IndexOf('@');
+            string head = at < 0 ? word : word[..at];
+            string? monitor = at < 0 ? null : DeskMonitors.FromWord(DeskMonitors.Unescape(word[(at + 1)..]));
+            var bits = head.Split(':', StringSplitOptions.RemoveEmptyEntries);
             if (bits.Length < 2 || !Known.Contains(bits[0], StringComparer.Ordinal)) continue;
             var anchor = DeskAnchors.Parse(bits[1]) ?? DefaultAnchor(bits[0]);
             var scale = 1.0;
@@ -118,7 +238,7 @@ public sealed class DeskArrangement
                 double.TryParse(bits[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var s))
                 scale = ClampScale(s);
             _pieces.RemoveAll(p => p.Widget == bits[0]);
-            _pieces.Add(new DeskPlacement(bits[0], anchor, scale));
+            _pieces.Add(new DeskPlacement(bits[0], anchor, scale, monitor));
         }
     }
 
@@ -160,7 +280,23 @@ public sealed class DeskArrangement
     {
         var head = $"{p.Widget}:{DeskAnchors.Word(p.Anchor)}";
         // The Mac writes the size with printf "%g": six significant digits, no trailing zeros.
-        return p.Scale == 1 ? head : head + ":" + p.Scale.ToString("G6", CultureInfo.InvariantCulture);
+        var word = p.Scale == 1 ? head : head + ":" + p.Scale.ToString("G6", CultureInfo.InvariantCulture);
+        // Every monitor writes nothing, so a layout that never named a monitor reads and writes exactly as before.
+        return DeskMonitors.FromWord(p.Monitor) is { } monitor ? word + "@" + DeskMonitors.Escape(monitor) : word;
+    }
+
+    /// <summary>The pieces drawn on one screen: those on every monitor, those on the main monitor when this is it, and those on this
+    /// screen's own monitor (or, while that monitor is not connected, on the main one). The order is the layout's. The stored layout is untouched.</summary>
+    public DeskArrangement ForScreen(DeskScreenRef screen, IReadOnlyCollection<string> connectedIds) =>
+        new(_pieces.Where(p => DeskMonitors.ShowsOn(p.Monitor, screen, connectedIds)));
+
+    /// <summary>Puts a placed piece on <paramref name="monitor"/> (null: every monitor; <see cref="DeskMonitors.Main"/>; a device path).
+    /// Its anchor, size and place in the stack stay. Nothing changes for a piece that is not placed.</summary>
+    public void SetMonitor(string widget, string? monitor)
+    {
+        var i = _pieces.FindIndex(p => p.Widget == widget);
+        if (i < 0) return;
+        _pieces[i] = _pieces[i] with { Monitor = DeskMonitors.FromWord(monitor) };
     }
 
     public DeskPlacement? Placement(string widget) => _pieces.FirstOrDefault(p => p.Widget == widget);
@@ -199,7 +335,7 @@ public sealed class DeskArrangement
             return;
         }
         if (old?.Anchor == a) return;
-        var moved = new DeskPlacement(widget, a, old?.Scale ?? 1);
+        var moved = new DeskPlacement(widget, a, old?.Scale ?? 1, old?.Monitor);
         var rank = Rank(widget);
         if (!_pieces.Any(p => p.Anchor == a))
         {

@@ -63,9 +63,9 @@ public sealed record DeskReviewModel(
     public static DeskReviewModel Build(
         DeskDesign proposal, DeskDesign current, DeskDesign merged, IEnumerable<MissingFont> fonts,
         Func<string, bool> fontInstalled, bool deskOn, Func<string, string>? pieceName = null,
-        IEnumerable<DeskReason>? warnings = null)
+        IEnumerable<DeskReason>? warnings = null, Func<string, string?>? monitorName = null)
     {
-        var changes = DeskDesign.Diff(current, merged, pieceName).ToList();
+        var changes = DeskDesign.Diff(current, merged, pieceName, monitorName).ToList();
         if (changes.Count == 0) changes.Add(DeskReviewCopy.NothingChanges);
         var missing = fonts
             .Where(f => !fontInstalled(f.Family))

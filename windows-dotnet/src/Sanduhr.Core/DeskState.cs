@@ -21,7 +21,8 @@ public static class DeskState
         var arrangement = new DeskArrangement(desk.Layout);
         return new DeskDesign
         {
-            Layout = DeskDesign.FromArrangement(arrangement),
+            // Every placed piece says where it is drawn ("all", "main" or a monitor id), so Claude never has to guess the default.
+            Layout = [.. DeskDesign.FromArrangement(arrangement).Select(p => p.IsHidden ? p : p with { Monitor = DeskMonitors.Word(p.Monitor) })],
             Font = new DeskFontChoice(desk.Font ?? DeskFont.DefaultFamily),
             Ink = InkChoice(ink),
             Plate = desk.Plate,
@@ -59,7 +60,8 @@ public static class DeskState
         bool direct,
         string writerVersion,
         string? wallpaperSource = null,
-        bool? wallpaperIsImage = null)
+        bool? wallpaperIsImage = null,
+        IEnumerable<DeskMonitorInfo>? monitors = null)
     {
         var pieces = new JsonArray();
         foreach (var p in DeskArrangement.Known) pieces.Add((JsonNode?)p);
@@ -86,6 +88,14 @@ public static class DeskState
             wall["summary"] = wallpaper.ToJson();
         }
 
+        var monitorList = new JsonArray();
+        foreach (var m in monitors ?? [])
+            monitorList.Add((JsonNode?)new JsonObject
+            {
+                ["id"] = m.Id, ["name"] = m.Name, ["width"] = m.Width, ["height"] = m.Height,
+                ["primary"] = m.Primary, ["left"] = m.Left, ["top"] = m.Top,
+            });
+
         var state = new JsonObject
         {
             ["schema_version"] = SchemaVersion,
@@ -94,6 +104,7 @@ public static class DeskState
             ["pieces"] = pieces,
             ["anchors"] = anchors,
             ["fonts"] = new JsonObject { ["installed"] = installed, ["bundled"] = bundled },
+            ["monitors"] = monitorList,
             ["wallpaper"] = wall,
             ["designs"] = list,
             ["direct"] = direct,

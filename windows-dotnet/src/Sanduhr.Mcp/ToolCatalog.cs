@@ -263,7 +263,7 @@ public static class ToolCatalog
                             ["layout"] = new JsonObject
                             {
                                 ["type"] = "object",
-                                ["description"] = "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean}.",
+                                ["description"] = "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean, monitor: all|main|a monitor id from get_desk monitors}.",
                             },
                             ["font"] = new JsonObject
                             {
@@ -488,7 +488,7 @@ public static class ToolCatalog
         "Propose a look for the user's Desk, and optionally the widget's color theme. The design is PARTIAL: send only " +
         "the fields to change; everything absent stays as it is. Fields, all optional: name (up to 40 characters); " +
         "note (one sentence for the user, up to 200); layout {piece: {anchor, size, hidden}}, where piece is a key from " +
-        "get_desk pieces, anchor is tl tc tr ml mr bl bc br, size is 0.6 to 1.6 and hidden removes the piece; font (a " +
+        "get_desk pieces, anchor is tl tc tr ml mr bl bc br, size is 0.6 to 1.6, hidden removes the piece and monitor puts it on \"all\" monitors (the default), the \"main\" monitor or one monitor by the id in get_desk monitors (a piece on a monitor that is unplugged shows on the main one meanwhile); font (a " +
         "family from get_desk fonts.installed or the bundled EsteFont Pro or EsteFont 26, or {family, link} with an " +
         "https link to get a font the user lacks: Sanduhr never downloads it, the review shows the link and Apply waits " +
         "for the font, status needs_font); ink (auto, light, dark, theme, one #rrggbb, or a list of 2 to 4 #rrggbb for a " +

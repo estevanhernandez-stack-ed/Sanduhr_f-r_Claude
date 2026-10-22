@@ -292,7 +292,7 @@ public class DeskArrangeTests
         Assert.Contains("Return or Done keeps the new layout; Escape or Cancel puts it back", DeskArrangeCopy.SettingsNote);
         Assert.DoesNotContain("Escape or Done", DeskArrangeCopy.BarKeys);
         Assert.DoesNotContain("handle", DeskArrangeCopy.BarHint);
-        Assert.Equal("Drag a piece to any of the eight places, or up and down its stack.", DeskArrangeCopy.BarHint);
+        Assert.Equal("Drag a piece to any of the eight places, or up and down its stack, or onto another monitor.", DeskArrangeCopy.BarHint);
         Assert.Equal("Turn on the Desk to arrange it on the desktop.", DeskArrangeCopy.SettingsDeskOff);
         Assert.Equal("Finish arranging", DeskArrangeCopy.TrayFinish);
         Assert.Equal("Arrange Desk", DeskArrangeCopy.BarTitle);

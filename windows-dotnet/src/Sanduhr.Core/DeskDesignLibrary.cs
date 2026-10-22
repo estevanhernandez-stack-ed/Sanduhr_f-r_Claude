@@ -135,6 +135,7 @@ public static class DeskDesigns
                     {
                         ["anchor"] = DeskAnchors.Word(p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece)),
                         ["size"] = DeskArrangement.ClampScale(p.Size ?? 1),
+                        ["monitor"] = DeskMonitors.Word(p.Monitor),
                     };
             }
             o["layout"] = sorted;

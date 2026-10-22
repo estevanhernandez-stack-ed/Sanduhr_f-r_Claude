@@ -19,7 +19,7 @@ public sealed partial class ToolLogic
 
     /// <summary>What get_desk passes on from the state file: these keys, nothing else.</summary>
     private static readonly string[] DesignStateKeys =
-        ["design", "pieces", "anchors", "fonts", "wallpaper", "designs", "direct", "limits", "start_menu_apps"];
+        ["design", "pieces", "anchors", "fonts", "monitors", "wallpaper", "designs", "direct", "limits", "start_menu_apps"];
 
     private static readonly string[] DesignAnswerStatuses =
         ["previewing", "applied", "rejected", "needs_font"];
@@ -111,9 +111,25 @@ public sealed partial class ToolLogic
         if (state["start_menu_apps"] is JsonArray appArray)
             apps = Strings(appArray, 5000, "id");
 
+        IReadOnlyList<DeskMonitorInfo>? monitors = state["monitors"] is JsonArray monitorArray ? ReadMonitors(monitorArray) : null;
         WallpaperOverview? wallpaper = state["wallpaper"] is JsonObject wo ? WallpaperOverview.FromJson(wo["summary"]) : null;
         DeskDesign? current = state["design"] is JsonObject d ? DeskDesign.Parse(d).Design : null;
-        return new DeskDesignContext(fonts, wallpaper, apps, current);
+        return new DeskDesignContext(fonts, wallpaper, apps, current, monitors);
+    }
+
+    /// <summary>The monitors the widget reported: id, name and geometry. An entry without an id is skipped.</summary>
+    private static List<DeskMonitorInfo> ReadMonitors(JsonArray array)
+    {
+        var list = new List<DeskMonitorInfo>();
+        foreach (var item in array.Take(32))
+        {
+            if (item is not JsonObject o || o["id"] is not JsonValue idv || !idv.TryGetValue<string>(out var id) || id.Length is 0 or > DeskMonitors.MaxIdLength) continue;
+            string name = o["name"] is JsonValue nv && nv.TryGetValue<string>(out var n) ? n : id;
+            int Int(string key) => o[key] is JsonValue v && v.TryGetValue<int>(out var i) ? i : 0;
+            bool primary = o["primary"] is JsonValue pv && pv.TryGetValue<bool>(out var p) && p;
+            list.Add(new DeskMonitorInfo(id, name, Int("width"), Int("height"), primary, Int("left"), Int("top")));
+        }
+        return list;
     }
 
     private static List<string> Strings(JsonArray array, int max, string? member)

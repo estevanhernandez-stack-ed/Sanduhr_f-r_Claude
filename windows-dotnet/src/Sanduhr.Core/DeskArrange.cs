@@ -156,13 +156,26 @@ public static class DeskArrangeCopy
     public const string SettingsButton = "Arrange Desk…";
     public const string SettingsNote = "Move and reorder the pieces on the desktop itself. Return or Done keeps the new layout; Escape or Cancel puts it back as it was.";
     public const string BarTitle = "Arrange Desk";
-    public const string BarHint = "Drag a piece to any of the eight places, or up and down its stack.";
+    public const string BarHint = "Drag a piece to any of the eight places, or up and down its stack, or onto another monitor.";
     public const string BarKeys = "Return or Done keeps the new layout. Escape or Cancel puts it back.";
     public const string SettingsArranging = "Arranging on the desktop. Finish there with Done or Cancel.";
     public const string SettingsDeskOff = "Turn on the Desk to arrange it on the desktop.";
 
     /// <summary>The Hidden strip's label.</summary>
     public const string HiddenStrip = "Hidden:";
+
+    /// <summary>The control on a piece that says which monitors show it ("Show on: All monitors" or "Show on: This monitor").</summary>
+    public const string ShowOn = "Show on";
+    public const string AllMonitors = "All monitors";
+    public const string ThisMonitor = "This monitor";
+
+    /// <summary>The Show on control's words: "Show on: All monitors" while the piece is on every monitor, else "Show on: This monitor".</summary>
+    public static string ShowOnText(bool everyMonitor) => $"{ShowOn}: {(everyMonitor ? AllMonitors : ThisMonitor)}";
+
+    /// <summary>The Show on control, named for a screen reader: the piece, where it shows now, and what pressing does.</summary>
+    public static string ShowOnLabel(string piece, bool everyMonitor) => everyMonitor
+        ? $"{ShowOn}: {piece}, now all monitors. Press to show it on this monitor only"
+        : $"{ShowOn}: {piece}, now this monitor only. Press to show it on all monitors";
 
     /// <summary>The control on a piece that takes it off the Desk until Done or Cancel.</summary>
     public const string HideWhileArranging = "Hide while arranging";

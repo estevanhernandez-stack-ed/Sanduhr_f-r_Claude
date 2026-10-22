@@ -99,6 +99,14 @@ public class ToolLogicDeskDesignTests
         };
     }
 
+    private const string MainId = @"\\?\DISPLAY#GSM5B09#5&2c9d3a1&0&UID4352#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}";
+    private const string SideId = @"\\?\DISPLAY#DEL4167#5&2c9d3a1&0&UID4353#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}";
+
+    /// <summary>A state that lists two monitors, as the widget writes them.</summary>
+    private static void WriteTwoMonitors(McpConfig cfg) => WriteState(cfg, s => s["monitors"] = new JsonArray(
+        (JsonNode)new JsonObject { ["id"] = MainId, ["name"] = "3440\u00D71440, main", ["width"] = 3440, ["height"] = 1440, ["primary"] = true, ["left"] = 0, ["top"] = 0 },
+        (JsonNode)new JsonObject { ["id"] = SideId, ["name"] = "1920\u00D71080, right of main", ["width"] = 1920, ["height"] = 1080, ["primary"] = false, ["left"] = 3440, ["top"] = 0 }));
+
     private static void AssertNoRequest(McpConfig cfg) => Assert.False(File.Exists(cfg.DesignRequestPath!), "a refused design must leave no request file");
 
     // -- get_desk -------------------------------------------------------------
@@ -541,6 +549,85 @@ public class ToolLogicDeskDesignTests
         Propose(cfg, """{"plate":false}""");
         Assert.Single(Directory.GetFiles(Path.GetDirectoryName(cfg.DesignRequestPath!)!));
         Assert.False((bool)((JsonObject)JsonNode.Parse(File.ReadAllText(cfg.DesignRequestPath!))!)["design"]!["plate"]!);
+    }
+
+    // -- monitors ---------------------------------------------------------------
+
+    [Fact]
+    public void Get_passes_the_monitors_on()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteTwoMonitors(cfg);
+        var r = new ToolLogic(cfg, () => Now).BuildGetDesk();
+        var monitors = r["monitors"]!.AsArray();
+        Assert.Equal(2, monitors.Count);
+        Assert.Equal(SideId, (string?)monitors[1]!["id"]);
+        Assert.Equal("1920\u00D71080, right of main", (string?)monitors[1]!["name"]);
+        Assert.Equal(3440, (int)monitors[1]!["left"]!);
+    }
+
+    [Fact]
+    public void A_piece_on_a_monitor_that_is_connected_is_sent_with_its_monitor()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteTwoMonitors(cfg);
+        var r = Propose(cfg, "{\"layout\":{\"clock\":{\"anchor\":\"bl\",\"monitor\":" + JsonValue.Create(SideId)!.ToJsonString() + "},\"claude\":{\"monitor\":\"main\"}}}");
+        Assert.Equal("queued", (string?)r["status"]);   // valid: nobody answers, so it is queued
+        var request = (JsonObject)JsonNode.Parse(File.ReadAllText(cfg.DesignRequestPath!))!;
+        Assert.Equal(SideId, (string?)request["design"]!["layout"]!["clock"]!["monitor"]);
+        Assert.Equal("main", (string?)request["design"]!["layout"]!["claude"]!["monitor"]);
+    }
+
+    [Fact]
+    public void A_monitor_id_the_widget_did_not_list_is_refused_without_a_request()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteTwoMonitors(cfg);
+        var r = Propose(cfg, """{"layout":{"clock":{"anchor":"bl","monitor":"\\\\?\\DISPLAY#GONE#1"}}}""");
+        Assert.Equal("rejected", (string?)r["status"]);
+        Assert.Equal("layout.clock.monitor", (string?)r["reasons"]![0]!["field"]);
+        AssertNoRequest(cfg);
+    }
+
+    [Fact]
+    public void Without_monitors_in_the_state_an_id_is_refused_but_all_and_main_still_pass()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg, s => s["monitors"] = new JsonArray());
+        Assert.Equal("rejected", (string?)Propose(cfg, """{"layout":{"clock":{"anchor":"bl","monitor":"abc"}}}""")["status"]);
+        Assert.Equal("queued", (string?)Propose(cfg, """{"layout":{"clock":{"anchor":"bl","monitor":"main"}}}""")["status"]);
+        File.Delete(cfg.DesignRequestPath!);
+        Assert.Equal("queued", (string?)Propose(cfg, """{"layout":{"clock":{"anchor":"bl","monitor":"all"}}}""")["status"]);
+    }
+
+    [Fact]
+    public void Contrast_is_judged_against_the_monitor_the_piece_is_on()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg, s =>
+        {
+            var dark = Wallpaper(0.02, 0.02);
+            var bright = Wallpaper(0.9, 0.9);
+            ((JsonObject)dark["monitors"]![0]!)["id"] = MainId;
+            var side = (JsonObject)bright["monitors"]![0]!.DeepClone();
+            side["index"] = 1;
+            side["primary"] = false;
+            side["id"] = SideId;
+            dark["monitors"]!.AsArray().Add(side);
+            s["wallpaper"] = new JsonObject { ["path"] = @"C:\p.png", ["summary"] = dark };
+            s["monitors"] = new JsonArray(
+                (JsonNode)new JsonObject { ["id"] = MainId, ["name"] = "main", ["width"] = 2560, ["height"] = 1440, ["primary"] = true, ["left"] = 0, ["top"] = 0 },
+                (JsonNode)new JsonObject { ["id"] = SideId, ["name"] = "side", ["width"] = 2560, ["height"] = 1440, ["primary"] = false, ["left"] = 2560, ["top"] = 0 });
+        });
+        Assert.Equal("queued", (string?)Propose(cfg, """{"ink":"light","layout":{"clock":{"anchor":"bl","monitor":"main"},"claude":{"hidden":true}}}""")["status"]);
+        File.Delete(cfg.DesignRequestPath!);
+        Assert.Equal("rejected", (string?)Propose(cfg, "{\"ink\":\"light\",\"layout\":{\"clock\":{\"anchor\":\"bl\",\"monitor\":" + JsonValue.Create(SideId)!.ToJsonString() + "},\"claude\":{\"hidden\":true}}}")["status"]);
+        AssertNoRequest(cfg);
     }
 
     [Fact]

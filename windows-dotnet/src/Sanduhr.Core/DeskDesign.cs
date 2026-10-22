@@ -30,8 +30,8 @@ public sealed record DeskInkChoice(DeskInkKind Kind, IReadOnlyList<string> Color
 public sealed record DeskFontChoice(string Family, string? Link = null);
 
 /// <summary>One piece's part of a design's layout. Every member but <see cref="Piece"/> is optional: absent leaves the
-/// current value alone. A hidden piece has no anchor and no size.</summary>
-public sealed record DeskPieceLayout(string Piece, DeskAnchor? Anchor, double? Size, bool? Hidden)
+/// current value alone. A hidden piece has no anchor, no size and no monitor. <c>Monitor</c> is "all", "main" or a monitor id.</summary>
+public sealed record DeskPieceLayout(string Piece, DeskAnchor? Anchor, double? Size, bool? Hidden, string? Monitor = null)
 {
     public bool IsHidden => Hidden == true || (Anchor is null && Hidden != false);
 }
@@ -220,8 +220,8 @@ public sealed partial record DeskDesign
                 r.Add(new DeskReason(field, "must be an object with anchor, size and hidden"));
                 continue;
             }
-            foreach (var bad in po.Select(kv => kv.Key).Where(k => k is not ("anchor" or "size" or "hidden")).Order(StringComparer.Ordinal).Take(3))
-                r.Add(new DeskReason(field, $"unknown member '{Clip(bad, 20)}'; use anchor, size and hidden"));
+            foreach (var bad in po.Select(kv => kv.Key).Where(k => k is not ("anchor" or "size" or "hidden" or "monitor")).Order(StringComparer.Ordinal).Take(3))
+                r.Add(new DeskReason(field, $"unknown member '{Clip(bad, 20)}'; use anchor, size, hidden and monitor"));
 
             DeskAnchor? anchor = null;
             if (po["anchor"] is { } an)
@@ -242,10 +242,26 @@ public sealed partial record DeskDesign
                 if (hn is JsonValue hv && hv.TryGetValue<bool>(out var h)) hidden = h;
                 else r.Add(new DeskReason(field + ".hidden", "must be true or false"));
             }
-            if (hidden == true) { anchor = null; size = null; }
-            pieces.Add(new DeskPieceLayout(key, anchor, size, hidden));
+            string? monitor = null;
+            if (po["monitor"] is { } mn)
+            {
+                if (TryStr(mn, out var mword) && MonitorProblem(mword) is null) monitor = DeskMonitors.Word(mword);
+                else r.Add(new DeskReason(field + ".monitor", "must be \"all\", \"main\" or a monitor id from get_desk monitors"));
+            }
+            if (hidden == true) { anchor = null; size = null; monitor = null; }
+            pieces.Add(new DeskPieceLayout(key, anchor, size, hidden, monitor));
         }
         return r.Count > before ? null : pieces;
+    }
+
+    /// <summary>Why a monitor word is refused, or null: it is "all", "main" or an id, a short string with no control characters.</summary>
+    private static string? MonitorProblem(string word)
+    {
+        var t = word.Trim();
+        if (t.Length == 0 || t.Length > DeskMonitors.MaxIdLength) return "length";
+        foreach (var rune in t.EnumerateRunes())
+            if (IsControl(rune)) return "control";
+        return null;
     }
 
     /// <summary>Why a font family name is refused, or null. A family is a name as the font picker shows it: letters, digits,
@@ -487,6 +503,7 @@ public sealed partial record DeskDesign
                 if (p.Anchor is { } a) po["anchor"] = DeskAnchors.Word(a);
                 if (p.Size is { } s) po["size"] = s;
                 if (p.Hidden is { } h) po["hidden"] = h;
+                if (p.Monitor is { } mo) po["monitor"] = mo;
                 lo[p.Piece] = po;
             }
             o["layout"] = lo;
@@ -561,14 +578,14 @@ public sealed partial record DeskDesign
         var arr = new DeskArrangement();
         if (layout is null) return arr;
         var placed = layout.Where(p => !p.IsHidden && DeskArrangement.Known.Contains(p.Piece, StringComparer.Ordinal))
-            .Select(p => new DeskPlacement(p.Piece, p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece), p.Size ?? 1));
+            .Select(p => new DeskPlacement(p.Piece, p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece), p.Size ?? 1, DeskMonitors.FromWord(p.Monitor)));
         return new DeskArrangement(placed);
     }
 
     /// <summary>Every known piece: the placed ones in layout order, then the hidden ones in Settings order.</summary>
     public static List<DeskPieceLayout> FromArrangement(DeskArrangement arr)
     {
-        var list = arr.Pieces.Select(p => new DeskPieceLayout(p.Widget, p.Anchor, p.Scale, false)).ToList();
+        var list = arr.Pieces.Select(p => new DeskPieceLayout(p.Widget, p.Anchor, p.Scale, false, p.Monitor)).ToList();
         foreach (var w in DeskArrangement.Known)
             if (arr.Placement(w) is null) list.Add(new DeskPieceLayout(w, null, null, true));
         return list;
@@ -584,6 +601,7 @@ public sealed partial record DeskDesign
             if (p.Anchor is { } a) arr.Place(p.Piece, a);
             else if (p.Hidden == false && arr.Placement(p.Piece) is null) arr.Show(p.Piece);
             if (p.Size is { } s) arr.SetScale(p.Piece, s);
+            if (p.Monitor is not null) arr.SetMonitor(p.Piece, p.Monitor);
         }
         return FromArrangement(arr);
     }
@@ -591,10 +609,17 @@ public sealed partial record DeskDesign
     /// <summary>
     /// The "what changed" lines for the review bar: what <paramref name="b"/> sets that differs from
     /// <paramref name="a"/>, one plain sentence each. A field <paramref name="b"/> leaves null is not mentioned.
-    /// <paramref name="pieceName"/> turns a piece key into the name Settings shows.
+    /// <paramref name="pieceName"/> turns a piece key into the name Settings shows; <paramref name="monitorName"/> turns a monitor id into
+    /// how a person knows it ("1920×1080, right of main"), null for an id it cannot name.
     /// </summary>
-    public static IReadOnlyList<string> Diff(DeskDesign a, DeskDesign b, Func<string, string>? pieceName = null)
+    public static IReadOnlyList<string> Diff(DeskDesign a, DeskDesign b, Func<string, string>? pieceName = null, Func<string, string?>? monitorName = null)
     {
+        string M(string? monitor) => DeskMonitors.FromWord(monitor) switch
+        {
+            null => "all monitors",
+            DeskMonitors.Main => "the main monitor",
+            var id => monitorName?.Invoke(id) ?? "another monitor",
+        };
         string P(string key) => pieceName?.Invoke(key) ?? key;
         var lines = new List<string>();
 
@@ -617,11 +642,14 @@ public sealed partial record DeskDesign
                     if (from != anchor) lines.Add($"{P(p.Piece)}: moved from {DeskAnchors.Name(from).ToLowerInvariant()} to {DeskAnchors.Name(anchor).ToLowerInvariant()}");
                     if (Math.Abs((was.Size ?? 1) - (p.Size ?? 1)) > 1e-9)
                         lines.Add($"{P(p.Piece)}: size {Percent(was.Size ?? 1)} to {Percent(p.Size ?? 1)}");
+                    if (!DeskMonitors.Same(was.Monitor, p.Monitor))
+                        lines.Add(DeskMonitors.FromWord(p.Monitor) is null ? $"{P(p.Piece)}: now on all monitors" : $"{P(p.Piece)}: moved to {M(p.Monitor)}");
                 }
                 else
                 {
                     lines.Add($"{P(p.Piece)}: shown at {DeskAnchors.Name(anchor).ToLowerInvariant()}"
-                        + (Math.Abs((p.Size ?? 1) - 1) > 1e-9 ? $", size {Percent(p.Size ?? 1)}" : ""));
+                        + (Math.Abs((p.Size ?? 1) - 1) > 1e-9 ? $", size {Percent(p.Size ?? 1)}" : "")
+                        + (DeskMonitors.FromWord(p.Monitor) is null ? "" : $", on {M(p.Monitor)}"));
                 }
             }
         }

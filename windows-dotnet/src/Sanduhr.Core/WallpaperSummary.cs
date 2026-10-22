@@ -198,7 +198,8 @@ public sealed record WallpaperSummary(IReadOnlyList<DominantColor> Dominant, dou
 }
 
 /// <summary>One monitor's summary, with where it sits among the monitors.</summary>
-public sealed record WallpaperMonitorSummary(int Index, bool Primary, int Width, int Height, WallpaperSummary Summary);
+/// <param name="Id">The monitor's device path, the id a design's layout piece names; null when Windows would not say.</param>
+public sealed record WallpaperMonitorSummary(int Index, bool Primary, int Width, int Height, WallpaperSummary Summary, string? Id = null);
 
 /// <summary>
 /// The wallpaper across every monitor, as <c>get_desk</c> reports it: an overall brightness and dominant colors, and each
@@ -251,7 +252,7 @@ public sealed record WallpaperOverview(IReadOnlyList<DominantColor> Dominant, do
             var anchors = new JsonObject();
             foreach (var a in m.Summary.Anchors)
                 anchors[DeskAnchors.Word(a.Anchor)] = new JsonObject { ["brightness"] = a.Brightness, ["busyness"] = a.Busyness };
-            monitors.Add((JsonNode?)new JsonObject
+            var item = new JsonObject
             {
                 ["index"] = m.Index,
                 ["primary"] = m.Primary,
@@ -260,7 +261,9 @@ public sealed record WallpaperOverview(IReadOnlyList<DominantColor> Dominant, do
                 ["brightness"] = m.Summary.Brightness,
                 ["dominant"] = DominantJson(m.Summary.Dominant),
                 ["anchors"] = anchors,
-            });
+            };
+            if (m.Id is not null) item["id"] = m.Id;
+            monitors.Add((JsonNode?)item);
         }
         return new JsonObject
         {
@@ -303,8 +306,9 @@ public sealed record WallpaperOverview(IReadOnlyList<DominantColor> Dominant, do
                     int index = (int)(Num(mo["index"], out double ix) ? ix : monitors.Count);
                     bool primary = mo["primary"] is JsonValue pv && pv.TryGetValue<bool>(out var p) && p;
                     int w = (int)(Num(mo["width"], out double wv) ? wv : 0), h = (int)(Num(mo["height"], out double hv) ? hv : 0);
+                    string? id = mo["id"] is JsonValue idv && idv.TryGetValue<string>(out var idText) && idText.Length is > 0 and <= DeskMonitors.MaxIdLength ? idText : null;
                     monitors.Add(new WallpaperMonitorSummary(index, primary, w, h,
-                        new WallpaperSummary(ReadDominant(mo["dominant"]), Math.Clamp(mb, 0, 1), readings)));
+                        new WallpaperSummary(ReadDominant(mo["dominant"]), Math.Clamp(mb, 0, 1), readings), id));
                 }
             }
             return new WallpaperOverview(ReadDominant(o["dominant"]), Math.Clamp(brightness, 0, 1), monitors);
