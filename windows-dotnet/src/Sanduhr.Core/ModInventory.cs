@@ -136,6 +136,13 @@ public static class ModInventory
             retention);
     }
 
+    /// <summary>How many plugins the folder's settings.json switches on. Settings only; 0 when it is missing or unreadable.</summary>
+    public static int EnabledPluginCount(string folder)
+    {
+        var (_, settings) = ReadSettings(folder);
+        return EnabledPlugins(settings).Count(p => p.Value);
+    }
+
     private static (SettingsState, JsonElement?) ReadSettings(string folder)
     {
         var path = System.IO.Path.Combine(folder, "settings.json");

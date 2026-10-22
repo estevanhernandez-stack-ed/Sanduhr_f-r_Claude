@@ -12,6 +12,22 @@ namespace Sanduhr.App.ViewModels;
 /// <summary>A folder in the Mods &amp; Config picker.</summary>
 public sealed record ModsFolderOption(string Path, string Display);
 
+/// <summary>What Mods &amp; Config needs from the app, so the page can be built over a scratch profile.</summary>
+internal sealed record ModsConfigHost(
+    string Profile,
+    string? ConfigDir,
+    Func<IReadOnlyList<string>> AddedFolders,
+    string SanduhrAppDataDir,
+    string SanduhrExternalDir,
+    string SanduhrLegacyModsRoot,
+    Func<string?> ActiveAccountFolder)
+{
+    public static ModsConfigHost For(WidgetViewModel widget) => new(
+        ClaudeCodeProfile.Dir, ClaudeCodeProfile.ConfigDir, widget.LoadCcFoldersAdded,
+        widget.SanduhrAppDataDir, widget.SanduhrExternalDir, widget.SanduhrLegacyModsRoot,
+        () => widget.ShownActiveAccount is { } label ? widget.AccountFolder(label) : null);
+}
+
 /// <summary>One line under a section: a name and what it says.</summary>
 public sealed record ModsLine(string Name, string Text);
 
@@ -71,9 +87,15 @@ public sealed partial class ModRowViewModel : ObservableObject
 /// </summary>
 public sealed partial class ModsConfigViewModel : ObservableObject
 {
-    private readonly WidgetViewModel _widget;
+    private readonly ModsConfigHost _host;
     private Window? _owner;
     private bool _loading;
+
+    /// <summary>The folder picked on this page earlier in the session. The Settings window is rebuilt each time it
+    /// opens; this is what keeps the choice.</summary>
+    private static string? s_sessionFolder;
+
+    internal static void ForgetSessionChoice() => s_sessionFolder = null;
 
     public ObservableCollection<ModsFolderOption> Folders { get; } = new();
     public ObservableCollection<ModsLine> HookLines { get; } = new();
@@ -102,41 +124,47 @@ public sealed partial class ModsConfigViewModel : ObservableObject
     /// <summary>Raised after the meters mod was switched, updated or removed here, so the Claude Code page re-reads.</summary>
     public event Action? OwnModChanged;
 
-    public ModsConfigViewModel(WidgetViewModel widget)
+    public ModsConfigViewModel(WidgetViewModel widget) : this(ModsConfigHost.For(widget)) { }
+
+    internal ModsConfigViewModel(ModsConfigHost host)
     {
-        _widget = widget;
+        _host = host;
         ReloadFolders();
     }
 
     public void AttachOwner(Window owner) => _owner = owner;
 
-    private static string Profile => ClaudeCodeProfile.Dir;
+    private string Profile => _host.Profile;
 
     private ClaudeCodeIntegrations MakeIntegrations() => new(
-        Profile, _widget.SanduhrAppDataDir, Path.Combine(AppContext.BaseDirectory, "mods", ClaudeCodeIntegrations.ModName),
-        externalDir: _widget.SanduhrExternalDir)
+        Profile, _host.SanduhrAppDataDir, Path.Combine(AppContext.BaseDirectory, "mods", ClaudeCodeIntegrations.ModName),
+        externalDir: _host.SanduhrExternalDir)
     {
-        LegacyModsRoots = [_widget.SanduhrLegacyModsRoot],
+        LegacyModsRoots = [_host.SanduhrLegacyModsRoot],
     };
 
     /// <summary>Re-reads the folder list (the Claude Code page added or forgot one) and then the selected folder.</summary>
     public void ReloadFolders()
     {
-        var keep = SelectedFolder?.Path;
+        var keep = SelectedFolder?.Path ?? s_sessionFolder;
         _loading = true;
         Folders.Clear();
-        foreach (var f in ClaudeCodeFolders.Build(Profile, ClaudeCodeProfile.ConfigDir, _widget.LoadCcFoldersAdded()))
+        foreach (var f in ClaudeCodeFolders.Build(Profile, _host.ConfigDir, _host.AddedFolders()))
             Folders.Add(new ModsFolderOption(f.Path, ClaudeCodeFolders.Display(f.Path, Profile)));
         HasFolders = Folders.Count > 0;
-        SelectedFolder = Folders.FirstOrDefault(f => keep is not null && ClaudeCodeFolders.Same(f.Path, keep))
-                         ?? Folders.FirstOrDefault();
+        string? active = null;
+        try { active = _host.ActiveAccountFolder(); } catch (Exception) { }
+        var pick = ModsFolderChoice.Pick([.. Folders.Select(f => f.Path)], keep, _host.ConfigDir, active, ModInventory.EnabledPluginCount);
+        SelectedFolder = Folders.FirstOrDefault(f => pick is not null && ClaudeCodeFolders.Same(f.Path, pick));
         _loading = false;
         Refresh();
     }
 
     partial void OnSelectedFolderChanged(ModsFolderOption? value)
     {
-        if (!_loading) Refresh();
+        if (_loading) return;
+        if (value is not null) s_sessionFolder = value.Path;
+        Refresh();
     }
 
     /// <summary>Reads the selected folder again. Files only; nothing runs and nothing is written.</summary>
@@ -320,6 +348,6 @@ public sealed partial class ModsConfigViewModel : ObservableObject
         OwnModChanged?.Invoke();
     }
 
-    private static string Short(string message, string fallback) =>
+    private string Short(string message, string fallback) =>
         string.IsNullOrWhiteSpace(message) ? fallback : message.Replace(Profile, "~", StringComparison.OrdinalIgnoreCase);
 }
