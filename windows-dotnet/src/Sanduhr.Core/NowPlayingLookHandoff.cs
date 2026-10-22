@@ -115,12 +115,98 @@ public sealed class NowPlayingLookHandoff
         BookChanged?.Invoke();
     }
 
-    /// <summary>Takes a waiting request and a waiting offer, if there are any.</summary>
+    /// <summary>How long to wait before looking again at an offer that is not whole yet.</summary>
+    public static readonly TimeSpan OfferRetryAfter = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>An offer that stays unreadable this many looks in a row is removed whatever its age (the clocks may disagree).</summary>
+    public const int MaxOfferTries = 6;
+
+    /// <summary>An offer is not whole yet: the caller looks again after this long (one-shot).</summary>
+    public event Action<TimeSpan>? OfferRetryWanted;
+
+    private int _offerTries;
+
+    /// <summary>Takes a waiting request and looks at a waiting offer, if there are any.</summary>
     public void Check()
     {
         if (MessageFileIo.Take(Paths.Request) is { } data) Receive(data);
-        DateTime written = File.Exists(Paths.Offer) ? File.GetLastWriteTimeUtc(Paths.Offer) : DateTime.MinValue;
-        if (MessageFileIo.Take(Paths.Offer) is { } offer) ReceiveOffer(offer, new DateTimeOffset(written, TimeSpan.Zero));
+        CheckOffer();
+    }
+
+    /// <summary>
+    /// The mod writes the offer in place (its engine cannot rename), so the file is read without being taken: whole JSON is handed to
+    /// <see cref="ReceiveOffer"/> and then removed; half of one is left for the writer to finish (see
+    /// <see cref="NowPlayingLookProposal.JudgeOffer"/>), and looked at again on the next change and after <see cref="OfferRetryAfter"/>.
+    /// </summary>
+    private void CheckOffer()
+    {
+        string path = Paths.Offer;
+        DateTime written;
+        long length;
+        try
+        {
+            var info = new FileInfo(path);
+            if (!info.Exists) { _offerTries = 0; return; }
+            written = info.LastWriteTimeUtc;
+            length = info.Length;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
+
+        byte[]? data = null;
+        if (length <= NowPlayingLookProposal.MaxOfferBytes)
+        {
+            try
+            {
+                using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var ms = new MemoryStream();
+                fs.CopyTo(ms);
+                data = ms.ToArray();
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                data = null;   // the writer holds it: the same as half written
+            }
+        }
+
+        var age = _now() - new DateTimeOffset(written, TimeSpan.Zero);
+        var verdict = NowPlayingLookProposal.JudgeOffer(data is not null && NowPlayingLookProposal.OfferIsWhole(data), age, length);
+        if (verdict == NowPlayingLookProposal.OfferVerdict.Keep && ++_offerTries > MaxOfferTries) verdict = NowPlayingLookProposal.OfferVerdict.Discard;
+        switch (verdict)
+        {
+            case NowPlayingLookProposal.OfferVerdict.Keep:
+                OfferRetryWanted?.Invoke(OfferRetryAfter);
+                return;
+            case NowPlayingLookProposal.OfferVerdict.Consume:
+                _offerTries = 0;
+                // Remove it only if it is still the file that was read; a newer write is looked at on its own.
+                if (!RemoveOffer(path, written, length)) { OfferRetryWanted?.Invoke(TimeSpan.Zero); return; }
+                ReceiveOffer(data!, new DateTimeOffset(written, TimeSpan.Zero));
+                return;
+            default:
+                _offerTries = 0;
+                RemoveOffer(path, written, length);
+                return;
+        }
+    }
+
+    /// <summary>Deletes the offer unless it changed since it was read. False when it changed (nothing removed).</summary>
+    private static bool RemoveOffer(string path, DateTime written, long length)
+    {
+        try
+        {
+            var current = new FileInfo(path);
+            if (!current.Exists) return true;
+            if (current.LastWriteTimeUtc != written || current.Length != length) return false;
+            File.Delete(path);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return true;   // it cannot be removed now; the next change looks again
+        }
     }
 
     /// <summary>One request's bytes, as read from the file.</summary>

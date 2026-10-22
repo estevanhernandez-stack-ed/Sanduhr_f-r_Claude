@@ -20,6 +20,7 @@ namespace Sanduhr.App.Desk;
 internal sealed partial class NowPlayingLookService
 {
     private FileSystemWatcher? _offerWatcher;
+    private System.Windows.Threading.DispatcherTimer? _offerRetry;
     private string? _seen;
     private Func<NowPlayingInfo?>? _trackSource;
 
@@ -33,6 +34,7 @@ internal sealed partial class NowPlayingLookService
     partial void StartBridge()
     {
         if (_hub is not null) _hub.Changed += OnHubChanged;
+        Handoff.OfferRetryWanted += OnOfferRetry;
         try
         {
             _offerWatcher = Watch(Handoff.Paths.Support, NowPlayingLookProposal.OfferFile);
@@ -50,6 +52,9 @@ internal sealed partial class NowPlayingLookService
     partial void StopBridge()
     {
         SettingsStore.AnyWritten -= OnSettingsWritten;
+        Handoff.OfferRetryWanted -= OnOfferRetry;
+        _offerRetry?.Stop();
+        _offerRetry = null;
         if (_hub is not null)
         {
             _hub.Changed -= OnHubChanged;
@@ -59,6 +64,24 @@ internal sealed partial class NowPlayingLookService
         _offerWatcher = null;
         // The file says what plays now; with the app gone it would be stale.
         Handoff.DeleteCurrent();
+    }
+
+    /// <summary>The mod writes its offer in place, so one may be half there when the watcher fires: look again shortly (one-shot; the handoff gives up after a few tries).</summary>
+    private void OnOfferRetry(TimeSpan after)
+    {
+        if (_disposed) return;
+        _offerRetry ??= new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background);
+        _offerRetry.Stop();
+        _offerRetry.Interval = after;
+        _offerRetry.Tick -= OnOfferRetryTick;
+        _offerRetry.Tick += OnOfferRetryTick;
+        _offerRetry.Start();
+    }
+
+    private void OnOfferRetryTick(object? sender, EventArgs e)
+    {
+        _offerRetry?.Stop();
+        if (!_disposed && !ResetGuard.Done) Handoff.Check();
     }
 
     private void OnSettingsWritten() => Application.Current?.Dispatcher.BeginInvoke(SyncBridge);

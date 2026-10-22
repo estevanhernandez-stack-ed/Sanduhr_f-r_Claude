@@ -102,11 +102,20 @@ and Style what's playing is on, removed otherwise:
 (`source` is `saved` or `seeded`). No title, no artist. When its `key` equals the mod's key for the song it is
 playing, the mod uses `look` (source `sanduhr`) instead of asking its model.
 
-**`~/.sanduhr/now-playing-look-offer.json`** (the mod writes, atomically through a temp name and a rename; Sanduhr
-reads and deletes it): `{"key":"…","title":"…","artist":"…","look":{"ink":[…],"style":"…","mood":"…"}}`, with an
-optional `"schema_version":1`. Write it only for a song whose key was not the saved one. `key` must be the key of
-`title` and `artist`, or the offer is dropped; an offer older than ten minutes is dropped. Sanduhr treats it as a
-Claude proposal (a card in Settings ▸ Now playing ▸ Looks, or saved directly) and never answers it.
+**`~/.sanduhr/now-playing-look-offer.json`** (the mod writes, Sanduhr reads and deletes it):
+`{"key":"…","title":"…","artist":"…","look":{"ink":[…],"style":"…","mood":"…"}}`, with an optional
+`"schema_version":1`. Write it only for a song whose key was not the saved one. `key` must be the key of `title`
+and `artist`, or the offer is dropped; an offer older than ten minutes is dropped. Sanduhr treats it as a Claude
+proposal (a card in Settings ▸ Now playing ▸ Looks, or saved directly) and never answers it.
+
+The mod's engine can write files but not rename them, so the offer may be written in place, **non-atomically**,
+and Sanduhr tolerates that. It reads the offer without taking it. Whole JSON (an object) is handed to the checks,
+which accept or drop it by their own rules, and the file is then deleted. Anything that does not parse and was
+written less than 2 seconds ago is a write in progress: it is left alone and looked at again on the next change
+and after about 500 ms (a few tries at most). One that still does not parse after 2 seconds, or is larger than
+16 KB, is deleted unread. Write the whole offer in one call where the engine allows it; a second write replaces
+the first, and Sanduhr only ever removes the file it read. The decision is `NowPlayingLookProposal.JudgeOffer`.
+(Tool requests are still written atomically by the server and taken at once.)
 
 **Contrast.** Every stop must keep 3:1 against what is behind the now-playing piece (the wallpaper at its anchor,
 or the plate laid over it); a look that does not is refused with "color #rrggbb is too dark for this spot

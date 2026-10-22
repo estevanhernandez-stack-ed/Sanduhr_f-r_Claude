@@ -671,6 +671,43 @@ public sealed record NowPlayingLookProposal(string Id, DateTimeOffset RequestedA
         return new UTF8Encoding(false).GetBytes(root.ToJsonString());
     }
 
+    /// <summary>An offer larger than this is not one: it is removed unread.</summary>
+    public const int MaxOfferBytes = 16 * 1024;
+
+    /// <summary>The mod's engine cannot rename, so it writes the offer in place: a reader may see half of it. An unreadable offer younger than
+    /// this is left for the writer to finish.</summary>
+    public static readonly TimeSpan OfferSettle = TimeSpan.FromSeconds(2);
+
+    /// <summary>What to do with the offer on disk right now (see <see cref="JudgeOffer"/>).</summary>
+    public enum OfferVerdict
+    {
+        /// <summary>Leave it: it may be half written. Look again soon.</summary>
+        Keep,
+        /// <summary>It is whole JSON: hand it to the checks (which accept or drop it by their own rules) and remove it.</summary>
+        Consume,
+        /// <summary>It will never be one: remove it unread.</summary>
+        Discard,
+    }
+
+    /// <summary>
+    /// Keep, consume or discard the offer on disk. Too large: discard. JSON that reads as an object: consume (whether the checks then take or
+    /// drop it is theirs to say). Anything else is a write in progress while it is younger than <see cref="OfferSettle"/> (keep), and
+    /// litter after that (discard). An age below zero (clocks disagree) counts as new.
+    /// </summary>
+    public static OfferVerdict JudgeOffer(bool parses, TimeSpan age, long length)
+    {
+        if (length > MaxOfferBytes) return OfferVerdict.Discard;
+        if (parses) return OfferVerdict.Consume;
+        return age < OfferSettle ? OfferVerdict.Keep : OfferVerdict.Discard;
+    }
+
+    /// <summary>True when the bytes are JSON whose root is an object: the mark that the writer has finished.</summary>
+    public static bool OfferIsWhole(byte[] data)
+    {
+        try { return JsonNode.Parse(data) is JsonObject; }
+        catch (JsonException) { return false; }
+    }
+
     /// <summary>
     /// Reads the mod's offer, <c>{key, title, artist, look: {ink, style, mood?}}</c> (an optional <c>schema_version</c> must be 1). The
     /// key must be the one the title and artist make. Null (with the reasons) when it breaks a rule.

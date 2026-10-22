@@ -261,6 +261,145 @@ public sealed class NowPlayingLookHandoffTests : IDisposable
         Assert.Null(h.Pending);
     }
 
+    // ---- an offer written in place (the mod's engine cannot rename) ----
+
+    /// <summary>A handoff whose clock the test moves, so the age of the offer on disk is whatever the test says.</summary>
+    private NowPlayingLookHandoff Clocked(Func<DateTimeOffset> now, bool direct = false) => new(_paths, () => true, () => direct, () => null, now);
+
+    private DateTimeOffset Written() => new(File.GetLastWriteTimeUtc(_paths.Offer), TimeSpan.Zero);
+
+    [Fact]
+    public void ATruncatedOfferSurvivesTheWatcherAndIsConsumedOnceCompleted()
+    {
+        var whole = Offer(Song("Offered"));
+        var now = DateTimeOffset.UtcNow;
+        var h = Clocked(() => now);
+        var retries = new List<TimeSpan>();
+        h.OfferRetryWanted += retries.Add;
+
+        // The writer is half way: a watcher event fires and finds half of the JSON.
+        File.WriteAllBytes(_paths.Offer, whole[..(whole.Length / 2)]);
+        now = Written().AddMilliseconds(300);
+        h.Check();
+        Assert.True(File.Exists(_paths.Offer));   // not taken
+        Assert.Null(h.Pending);
+        Assert.Equal([NowPlayingLookHandoff.OfferRetryAfter], retries);
+
+        // Another event while it is still half there: still kept.
+        h.Check();
+        Assert.True(File.Exists(_paths.Offer));
+        Assert.Equal(2, retries.Count);
+
+        // The writer finishes; the next look consumes it, once.
+        File.WriteAllBytes(_paths.Offer, whole);
+        now = Written().AddMilliseconds(100);
+        h.Check();
+        Assert.False(File.Exists(_paths.Offer));
+        Assert.Equal(["Offered"], h.Pending!.Looks.Select(l => l.Title));
+        Assert.True(h.Pending.IsOffer);
+        Assert.Equal(2, retries.Count);   // no retry for a good offer
+        h.Check();
+        Assert.Equal(1, h.Pending.Looks.Count);
+    }
+
+    [Fact]
+    public void AnEmptyJustCreatedOfferIsKeptToo()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var h = Clocked(() => now);
+        File.WriteAllBytes(_paths.Offer, []);
+        now = Written();
+        h.Check();
+        Assert.True(File.Exists(_paths.Offer));
+        Assert.Null(h.Pending);
+    }
+
+    [Fact]
+    public void AnOfferHeldOpenByTheWriterIsKeptNotDropped()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var h = Clocked(() => now);
+        var retries = new List<TimeSpan>();
+        h.OfferRetryWanted += retries.Add;
+        var whole = Offer(Song("Offered"));
+        using (var writer = new FileStream(_paths.Offer, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            writer.Write(whole, 0, whole.Length / 2);
+            writer.Flush();
+            now = Written().AddMilliseconds(100);
+            h.Check();   // cannot even be opened for reading
+        }
+        Assert.True(File.Exists(_paths.Offer));
+        Assert.Null(h.Pending);
+        Assert.Single(retries);
+    }
+
+    [Fact]
+    public void AnOfferThatNeverParsesIsRemovedOnceItIsTwoSecondsOld()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var h = Clocked(() => now);
+        File.WriteAllText(_paths.Offer, "{\"key\":\"abc");
+        now = Written().AddMilliseconds(1_999);
+        h.Check();
+        Assert.True(File.Exists(_paths.Offer));
+        now = Written().AddSeconds(2);
+        h.Check();
+        Assert.False(File.Exists(_paths.Offer));
+        Assert.Null(h.Pending);
+    }
+
+    [Fact]
+    public void AnUnreadableOfferIsRemovedAfterAFewTriesWhateverTheClocksSay()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var h = Clocked(() => now);
+        var retries = 0;
+        h.OfferRetryWanted += _ => retries++;
+        File.WriteAllText(_paths.Offer, "{\"key\":");
+        now = Written().AddHours(-1);   // the clock says it is from the future, so it always looks new
+        for (int i = 0; i < NowPlayingLookHandoff.MaxOfferTries; i++) h.Check();
+        Assert.True(File.Exists(_paths.Offer));
+        Assert.Equal(NowPlayingLookHandoff.MaxOfferTries, retries);
+        h.Check();
+        Assert.False(File.Exists(_paths.Offer));
+    }
+
+    [Fact]
+    public void AnOfferTooLargeIsRemovedUnread()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var h = Clocked(() => now);
+        var big = new JsonObject { ["key"] = "k", ["title"] = new string('t', NowPlayingLookProposal.MaxOfferBytes) };
+        File.WriteAllText(_paths.Offer, big.ToJsonString());
+        now = Written();
+        h.Check();
+        Assert.False(File.Exists(_paths.Offer));
+        Assert.Null(h.Pending);
+    }
+
+    [Fact]
+    public void AWholeOfferTheChecksRefuseIsStillRemoved()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var h = Clocked(() => now);
+        var wrongKey = new JsonObject { ["key"] = "0123456789abcdef", ["title"] = "Song", ["artist"] = "Artist", ["look"] = Song("x").Look.ToJson() };
+        File.WriteAllText(_paths.Offer, wrongKey.ToJsonString());
+        now = Written();
+        h.Check();
+        Assert.False(File.Exists(_paths.Offer));
+        Assert.Null(h.Pending);
+    }
+
+    [Fact]
+    public void RequestsAreStillTakenAtOnceWhetherOrNotTheyParse()
+    {
+        var h = Handoff();
+        File.WriteAllText(_paths.Request, "{\"id\":");
+        h.Check();
+        Assert.False(File.Exists(_paths.Request));
+    }
+
     // ---- Clear Looks and the file for the mod ----
 
     [Fact]

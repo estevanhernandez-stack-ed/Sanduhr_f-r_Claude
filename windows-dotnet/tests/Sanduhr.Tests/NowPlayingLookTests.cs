@@ -576,6 +576,38 @@ public class NowPlayingLookTests
         Assert.Contains("too light for this spot", moved.Reasons[0].Message);
     }
 
+    // ---- an offer written in place ----
+
+    [Theory]
+    [InlineData(true, 0, 100, NowPlayingLookProposal.OfferVerdict.Consume)]
+    [InlineData(true, 60_000, 100, NowPlayingLookProposal.OfferVerdict.Consume)]       // whole, however old: the checks decide
+    [InlineData(true, -5_000, 100, NowPlayingLookProposal.OfferVerdict.Consume)]
+    [InlineData(false, 0, 100, NowPlayingLookProposal.OfferVerdict.Keep)]              // half written, just now
+    [InlineData(false, -5_000, 100, NowPlayingLookProposal.OfferVerdict.Keep)]         // clocks disagree: counts as new
+    [InlineData(false, 1_999, 100, NowPlayingLookProposal.OfferVerdict.Keep)]
+    [InlineData(false, 2_000, 100, NowPlayingLookProposal.OfferVerdict.Discard)]       // never finished
+    [InlineData(false, 60_000, 100, NowPlayingLookProposal.OfferVerdict.Discard)]
+    [InlineData(false, 0, 0, NowPlayingLookProposal.OfferVerdict.Keep)]                // created, nothing written yet
+    [InlineData(true, 0, 16 * 1024, NowPlayingLookProposal.OfferVerdict.Consume)]
+    [InlineData(true, 0, 16 * 1024 + 1, NowPlayingLookProposal.OfferVerdict.Discard)]  // too large, parsed or not
+    [InlineData(false, 0, 16 * 1024 + 1, NowPlayingLookProposal.OfferVerdict.Discard)]
+    public void AnOfferIsKeptConsumedOrDiscardedByWhatItReadsAsAndHowOldItIs(bool parses, int ageMs, long length, NowPlayingLookProposal.OfferVerdict expected) =>
+        Assert.Equal(expected, NowPlayingLookProposal.JudgeOffer(parses, TimeSpan.FromMilliseconds(ageMs), length));
+
+    [Fact]
+    public void AnOfferIsWholeOnlyWhenItIsAJsonObject()
+    {
+        string whole = """{"key":"k","title":"t","artist":"a","look":{"ink":["#ffffff"]}}""";
+        Assert.True(NowPlayingLookProposal.OfferIsWhole(Encoding.UTF8.GetBytes(whole)));
+        for (int n = 0; n < whole.Length; n++)
+            Assert.False(NowPlayingLookProposal.OfferIsWhole(Encoding.UTF8.GetBytes(whole[..n])), "cut at " + n);
+        Assert.False(NowPlayingLookProposal.OfferIsWhole([]));
+        Assert.False(NowPlayingLookProposal.OfferIsWhole(Encoding.UTF8.GetBytes("[]")));
+        Assert.False(NowPlayingLookProposal.OfferIsWhole(Encoding.UTF8.GetBytes("nope")));
+        Assert.Equal(16 * 1024, NowPlayingLookProposal.MaxOfferBytes);
+        Assert.Equal(TimeSpan.FromSeconds(2), NowPlayingLookProposal.OfferSettle);
+    }
+
     // ---- the settings ----
 
     [Fact]
