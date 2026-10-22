@@ -616,8 +616,12 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 Done("The server files are missing from this build. Reinstall Sanduhr.", ok: false);
                 return;
             }
+            var others = KnownFolders()
+                .Where(f => f.Discovered && !ClaudeCodeFolders.Same(f.Path, row.Path) && installer.IsRegistered(f.Name))
+                .Select(f => ClaudeCodeFolders.Display(f.Path, Profile));
             var consent = McpConsentDialog.ShowConsent(
-                _owner, [row.Name], null, installer.LauncherPath, installer.ConfigPathFor);
+                _owner, [row.Name], null, installer.LauncherPath, installer.ConfigPathFor,
+                McpConsentCopy.WontChange(row.Display, others));
             if (consent is null) return;
             if (installer.RefreshInstall(McpSourceDir) is null)
             {
