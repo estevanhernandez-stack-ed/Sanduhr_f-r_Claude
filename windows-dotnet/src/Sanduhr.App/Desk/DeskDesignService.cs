@@ -301,6 +301,16 @@ internal sealed class DeskDesignService : IDisposable
     /// change the Desk directly.</summary>
     private DeskAnswer OnProposal(string id, DeskValidation verdict)
     {
+        try { return OnProposalCore(id, verdict); }
+        catch (Exception e) when (IsRecoverable(e))
+        {
+            Log("proposal", e);
+            return DeskAnswer.Refused([new DeskReason("design", "could not be shown (" + e.GetType().Name + "); nothing was changed")]);
+        }
+    }
+
+    private DeskAnswer OnProposalCore(string id, DeskValidation verdict)
+    {
         if (ResetGuard.Done || verdict.Design is not { } proposal) return DeskAnswer.NotReady;
         var current = CurrentDesign();
         var merged = DeskDesign.Merge(current, proposal);
@@ -331,7 +341,7 @@ internal sealed class DeskDesignService : IDisposable
     {
         if (_review is not { } old) return;
         _review = null;
-        Host?.EndPreview();
+        HostEnd();
         Answer(old.Id, new DeskAnswer(DeskAnswer.Rejected, "replaced", [new DeskReason("design", "replaced by a newer proposal")]));
     }
 
@@ -353,7 +363,8 @@ internal sealed class DeskDesignService : IDisposable
         }
         ThemeDefinition? theme = merged.Theme is { } t && r.Proposal.Theme is not null ? ThemeLint.Lint(t).Theme : null;
 
-        host.ShowPreview(settings, theme, model, ApplyReview, DismissReview);
+        try { host.ShowPreview(settings, theme, model, ApplyReview, DismissReview); }
+        catch (Exception e) when (IsRecoverable(e)) { Log("preview", e); }
     }
 
     /// <summary>Dismiss (the button, or Escape): the Desk and widget go back at once, nothing was written, the caller is told.</summary>
@@ -361,7 +372,7 @@ internal sealed class DeskDesignService : IDisposable
     {
         if (_review is not { } r) return;
         _review = null;
-        Host?.EndPreview();
+        HostEnd();
         Answer(r.Id, new DeskAnswer(DeskAnswer.Rejected, "dismissed", [new DeskReason("design", "dismissed by the user")]));
     }
 
@@ -374,7 +385,7 @@ internal sealed class DeskDesignService : IDisposable
         var merged = DeskDesign.Merge(CurrentDesign(), r.Proposal);
         var changes = DeskDesign.Diff(CurrentDesign(), merged, SettingsNames.DeskPieceName);
         var answer = ApplyDesign(r.Proposal, changes, r.Warnings);
-        Host?.EndPreview();   // the preview gives way to what was written
+        HostEnd();   // the preview gives way to what was written
         Answer(r.Id, answer);
     }
 
@@ -392,6 +403,16 @@ internal sealed class DeskDesignService : IDisposable
     /// under the design's name, and "Put my Desk back" is pointed at the saved previous Desk.
     /// </summary>
     private DeskAnswer ApplyDesign(DeskDesign proposal, IReadOnlyList<string> changes, IReadOnlyList<DeskReason> warnings)
+    {
+        try { return ApplyDesignCore(proposal, changes, warnings); }
+        catch (Exception e) when (IsRecoverable(e))
+        {
+            Log("apply", e);
+            return DeskAnswer.Refused([new DeskReason("design", "could not be applied (" + e.GetType().Name + ")")]);
+        }
+    }
+
+    private DeskAnswer ApplyDesignCore(DeskDesign proposal, IReadOnlyList<string> changes, IReadOnlyList<DeskReason> warnings)
     {
         var before = CurrentDesign();
         var merged = DeskDesign.Merge(before, proposal);
@@ -414,7 +435,7 @@ internal sealed class DeskDesignService : IDisposable
         var after = CurrentDesign();
         KeepApplied(after, proposal.Name);
         _store.SaveDeskPutBack(saved.Id);
-        Host?.Applied(themeKey);
+        HostApplied(themeKey);
         AfterChange();
         return new DeskAnswer(DeskAnswer.Applied, Changes: changes.Count > 0 ? changes : null, Warnings: warn.Count > 0 ? warn : null);
     }
@@ -497,6 +518,29 @@ internal sealed class DeskDesignService : IDisposable
         }
     }
 
+    /// <summary>The host (the Desk, the widget, the bar) failed while following a change that is already written: logged, never fatal.</summary>
+    private void HostApplied(string? themeKey)
+    {
+        try { Host?.Applied(themeKey); }
+        catch (Exception e) when (IsRecoverable(e)) { Log("refresh", e); }
+    }
+
+    private void HostEnd()
+    {
+        try { Host?.EndPreview(); }
+        catch (Exception e) when (IsRecoverable(e)) { Log("end preview", e); }
+    }
+
+    /// <summary>Anything but a process-ending condition: a design applying must never terminate the widget.</summary>
+    private static bool IsRecoverable(Exception e) => e is not (OutOfMemoryException or StackOverflowException or AccessViolationException);
+
+    /// <summary>One line in the log: the operation and the exception type, never design content (PRIVACY.md).</summary>
+    private void Log(string operation, Exception e)
+    {
+        try { File.AppendAllText(_paths.LogFile, $"{DateTime.UtcNow:o} desk design {operation} failed ({e.GetType().Name}){Environment.NewLine}"); }
+        catch (Exception) { /* the log is a courtesy */ }
+    }
+
     private void AfterChange()
     {
         DesignsChanged?.Invoke();
@@ -512,6 +556,16 @@ internal sealed class DeskDesignService : IDisposable
     /// <summary>Switches the Desk to a saved design: the Desk it replaces is saved first (unless a saved design already is that look),
     /// then the design is written and "Put my Desk back" points at what was replaced. A Launcher image that went is dropped from its button.</summary>
     public DesignActionResult SwitchTo(string id)
+    {
+        try { return SwitchToCore(id); }
+        catch (Exception e) when (IsRecoverable(e))
+        {
+            Log("switch", e);
+            return new(false, "That did not work (" + e.GetType().Name + "). Your Desk was left as it is.");
+        }
+    }
+
+    private DesignActionResult SwitchToCore(string id)
     {
         if (_disposed || ResetGuard.Done) return new(false, "Sanduhr is closing.");
         var target = _designs.Load(id);
@@ -535,7 +589,7 @@ internal sealed class DeskDesignService : IDisposable
         }
         _designs.Add(target with { AppliedAt = Clock() }, _store.LoadLauncher());
         _store.SaveDeskPutBack(previous.Id);
-        Host?.Applied(themeKey);
+        HostApplied(themeKey);
         AfterChange();
         return new(true, $"Switched to {target.Name}.");
     }
@@ -590,7 +644,7 @@ internal sealed class DeskDesignService : IDisposable
         SystemEvents.InstalledFontsChanged -= OnFontsChanged;
         _watcher?.Dispose();
         _watcher = null;
-        if (_review is not null) Host?.EndPreview();
+        if (_review is not null) HostEnd();
         _review = null;
         (Host as IDisposable)?.Dispose();
     }

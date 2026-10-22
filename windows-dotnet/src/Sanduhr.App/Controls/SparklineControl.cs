@@ -103,7 +103,7 @@ public sealed class SparklineControl : FrameworkElement
 
         var wash = new SolidColorBrush(Color.FromArgb((byte)Math.Round(0.12 * 255), c.R, c.G, c.B));
         wash.Freeze();
-        dc.DrawRectangle(wash, null, new Rect(0, y, w, h - y));
+        dc.DrawRectangle(wash, null, new Rect(0, y, Math.Max(0, w), Math.Max(0, h - y)));
 
         var line = new SolidColorBrush(Color.FromArgb((byte)Math.Round(0.85 * 255), c.R, c.G, c.B));
         line.Freeze();
@@ -122,7 +122,7 @@ public sealed class SparklineControl : FrameworkElement
         {
             var brush = new SolidColorBrush(Color.FromArgb((byte)(bar.Alpha * 255), c.R, c.G, c.B));
             brush.Freeze();
-            dc.DrawRectangle(brush, null, new Rect(bar.X, bar.Y, bar.Width, bar.Height));
+            dc.DrawRectangle(brush, null, new Rect(bar.X, bar.Y, Math.Max(0, bar.Width), Math.Max(0, bar.Height)));
         }
     }
 }
