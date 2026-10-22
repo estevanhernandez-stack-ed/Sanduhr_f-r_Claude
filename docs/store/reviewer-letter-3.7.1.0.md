@@ -1,12 +1,13 @@
-# Notes for certification — reviewer letter (v3.7.0.0)
+# Notes for certification — reviewer letter (v3.7.1.0)
 
 > Paste the block between the `---` markers into Partner Center → Submission options → Notes
 > for certification (~2000-char cap; this block is about 1,700 characters, the fallback about 730). This field never goes
 > through the Store Listing Console API, so it is confirmed in Partner Center or not at all.
 >
 > Framing: the live version is 3.5.0.0 (certified 2026-10-21). 3.6.0 shipped on GitHub only, so this
-> letter covers both releases; the 3.6.0 changes (watchers, suggested Desk messages, the plate, Arrange
-> hide/show, the statusline folder name) are inside "local files" below. 3.7.0 adds **no capability and
+> letter covers both releases. 3.7.1.0 replaces a 3.7.0.0 package that was never published (Partner Center needed a new
+> version number); 3.7.0 was never released anywhere; the 3.6.0 changes (watchers, suggested Desk messages, the plate, Arrange
+> hide/show, the statusline folder name) are inside "local files" below. 3.7.1 adds **no capability and
 > no outbound destination**; the manifest changes only its version and still declares `runFullTrust` only.
 > The disclosure surface gains local files only: the Desk state, a design request and result, a scaled
 > copy of the wallpaper, song-look files and the watcher and Desk-message files, all in
@@ -80,13 +81,13 @@ Estevan Hernandez, 626 Labs LLC
 
 ---
 
-## Pre-submission sanity check (v3.7.0.0)
+## Pre-submission sanity check (v3.7.1.0)
 
 - [ ] First line names the live version (3.5.0.0); 3.6.0 was GitHub-only and is covered here
-- [ ] Version trio in csproj + `<Identity Version>` = `3.7.0.0`; `Sanduhr.Mcp.csproj` at 3.7.0
+- [ ] Version trio in csproj + `<Identity Version>` = `3.7.1.0`; `Sanduhr.Mcp.csproj` at 3.7.1
 - [ ] `Package.appxmanifest` declares `runFullTrust` only (`PackageManifestTests` green)
-- [ ] What's New cards tagged `3.7.0` show after the update; a 3.5.0 install sees six 3.7.0 cards and two of 3.6.0 (cap 8)
-- [ ] `dist/Sanduhr-Store-v3.7.0.0.msix` built off the `v3.7.0` tag, unsigned; `mcp\sanduhr-mcp.exe` trimmed; `scripts/smoke-mcp.ps1` passes and lists `get_desk`, `propose_desk` and `propose_now_playing_looks`
+- [ ] What's New cards tagged `3.7.1` show after the update; a 3.5.0 install sees six 3.7.1 cards and two of 3.6.0 (cap 8)
+- [ ] `dist/Sanduhr-Store-v3.7.1.0.msix` built off the `v3.7.1` tag, unsigned; `mcp\sanduhr-mcp.exe` trimmed; `scripts/smoke-mcp.ps1` passes and lists `get_desk`, `propose_desk` and `propose_now_playing_looks`
 - [ ] **Everything off by default on a fresh install:** direct Desk changes, direct song styling, Style what's playing, OLED care, a Launcher with no buttons
 - [ ] **A proposal changes nothing until Apply** (or Save for song looks); Dismiss restores the Desk at once
 - [ ] **No new outbound call:** a design naming a missing font shows its link and fetches nothing; Launcher buttons open only on click and only what the Start menu lists
@@ -94,11 +95,11 @@ Estevan Hernandez, 626 Labs LLC
 - [ ] Store keywords: no model names (Fable, Opus, Sonnet, Haiku), the 3.5.0 failure
 - [ ] Trademark disclaimer on all six surfaces plus What's New, the tour and the Desk pages
 - [ ] `docs/PRIVACY.md` rows (desk-state.json, wallpaper-preview.png, design request/result, saved designs, saved song looks, song look request/result, `now-playing-look.json`, the Launcher); the hosted policy at 626labs.dev/privacy.html#privacy-sanduhr matches **before commit** (open a hub issue after #258 and curl-check the live page for the new file names)
-- [ ] "What's new" through the Store Listing Console from `store-listing-console/apps/sanduhr/copy/whats-new-3.7.0.0.md`; Notes for certification pasted by hand from the block above
+- [ ] "What's new" through the Store Listing Console from `store-listing-console/apps/sanduhr/copy/whats-new-3.7.1.0.md`; Notes for certification pasted by hand from the block above
 - [ ] `dotnet test windows-dotnet` green
 
 ## Source
 
 Follows [`reviewer-letter-3.6.0.0.md`](./reviewer-letter-3.6.0.0.md) (GitHub only) and
 [`reviewer-letter-3.5.0.0.md`](./reviewer-letter-3.5.0.0.md) (live). GitHub release notes:
-[`release-notes-3.7.0.0.md`](./release-notes-3.7.0.0.md).
+[`release-notes-3.7.1.0.md`](./release-notes-3.7.1.0.md).

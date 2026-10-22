@@ -20,21 +20,21 @@ public class WhatsNewCardsTests
     }
 
     [Fact]
-    public void Release370_ShowsOnlyItsOwnSixCardsAfterTheUpdate()
+    public void Release371_ShowsOnlyItsOwnSixCardsAfterTheUpdate()
     {
-        var shown = WhatsNew.Cards("3.6.0", "3.7.0");
+        var shown = WhatsNew.Cards("3.6.0", "3.7.1");
         Assert.Equal(["desk-design", "launcher", "per-monitor", "song-looks", "oled-care", "saved-designs"], shown.Select(c => c.Id));
-        Assert.All(shown, c => Assert.Equal("3.7.0", c.Version));
+        Assert.All(shown, c => Assert.Equal("3.7.1", c.Version));
     }
 
-    /// <summary>The Store jumps 3.5.0 to 3.7.0: the six 3.7.0 cards lead, the cap of eight keeps two of 3.6.0's.</summary>
+    /// <summary>The Store jumps 3.5.0 to 3.7.1: the six 3.7.1 cards lead, the cap of eight keeps two of 3.6.0's.</summary>
     [Fact]
-    public void Release370_FromTheStoreVersion_LeadsWithItsSixAndCapsAtEight()
+    public void Release371_FromTheStoreVersion_LeadsWithItsSixAndCapsAtEight()
     {
-        var shown = WhatsNew.Cards("3.5.0", "3.7.0");
+        var shown = WhatsNew.Cards("3.5.0", "3.7.1");
         Assert.Equal(WhatsNew.Cap, shown.Count);
-        Assert.Equal(6, shown.Count(c => c.Version == "3.7.0"));
-        Assert.All(shown.Take(6), c => Assert.Equal("3.7.0", c.Version));
+        Assert.Equal(6, shown.Count(c => c.Version == "3.7.1"));
+        Assert.All(shown.Take(6), c => Assert.Equal("3.7.1", c.Version));
     }
 
     [Theory]
@@ -44,7 +44,7 @@ public class WhatsNewCardsTests
     [InlineData("song-looks", SettingsPage.NowPlaying)]
     [InlineData("oled-care", SettingsPage.Desk)]
     [InlineData("saved-designs", SettingsPage.Desk)]
-    public void Release370_ShowMeOpensTheirPage(string id, SettingsPage page) =>
+    public void Release371_ShowMeOpensTheirPage(string id, SettingsPage page) =>
         Assert.Equal(page, Table.Single(c => c.Id == id).Destination);
 
     [Fact]

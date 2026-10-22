@@ -1,8 +1,8 @@
 # Changelog
 
-## v3.7.0 — 2026-10-21
+## v3.7.1 — 2026-10-21
 
-**Platform:** Windows (.NET 10 / WPF). Claude designs your Desk, the Desk gets a Launcher, every piece can live on its own monitor, every song can wear its own look, and the Desk learns to go easy on an OLED screen. This is the Microsoft Store release: the Store was on 3.5.0, and 3.6.0 shipped on GitHub only, so the Store update carries 3.6.0's changes too. `Sanduhr.Mcp` to 3.7.0. No new capability and no new outbound destination; the manifest still declares `runFullTrust` only.
+**Platform:** Windows (.NET 10 / WPF). Claude designs your Desk, the Desk gets a Launcher, every piece can live on its own monitor, every song can wear its own look, and the Desk learns to go easy on an OLED screen. This is the Microsoft Store release: the Store was on 3.5.0, and 3.6.0 shipped on GitHub only, so the Store update carries 3.6.0's changes too. `Sanduhr.Mcp` to 3.7.1. No new capability and no new outbound destination; the manifest still declares `runFullTrust` only.
 
 ### The Desk, designed by Claude
 
@@ -37,6 +37,7 @@
 - **Automatic ink and the wallpaper read follow the picture Windows still draws.** When the wallpaper's original file was deleted or moved, Sanduhr reads the copy Windows keeps (`TranscodedWallpaper`) instead of falling back to a default.
 - **No crash when a theme change redrew a Settings calendar that was never laid out.**
 - **The Designs rows are named for screen readers**, and their buttons are exposed to UI Automation.
+- **Settings fixes.** Claude Code offers **Update…**, not Install, for a piece already in the folder, and the MCP install says which other folders keep their server and that account links don't change. Mods & Config opens on the folder Claude Code runs from, calls plugins plugins (with a small "mod" tag on the real mods and counts that add up), shows no "vunknown", and every list row in Settings reads out by name instead of by type.
 - **A half-written offer from the now-playing mod is waited out** instead of dropped.
 
 ## v3.6.0 — 2026-10-21

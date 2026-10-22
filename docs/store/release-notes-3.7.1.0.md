@@ -1,6 +1,6 @@
-## Sanduhr für Claude 3.7.0 (Windows)
+## Sanduhr für Claude 3.7.1 (Windows)
 
-**Download:** [`626Labs.Sanduhr-win-Setup.exe`](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v3.7.0/626Labs.Sanduhr-win-Setup.exe) (per-user install, updates itself). Existing Setup.exe installs update on their own within about a day. **This release goes to the Microsoft Store too:** Store installs update through the Store once it clears certification, from 3.5.0 straight to 3.7.0, so they get 3.6.0's changes as well. The `.msix` on this page is an unsigned build artifact and will not install by double-click; see [INSTALL.md](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/blob/main/INSTALL.md).
+**Download:** [`626Labs.Sanduhr-win-Setup.exe`](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v3.7.1/626Labs.Sanduhr-win-Setup.exe) (per-user install, updates itself). Existing Setup.exe installs update on their own within about a day. **This release goes to the Microsoft Store too:** Store installs update through the Store once it clears certification, from 3.5.0 straight to 3.7.1, so they get 3.6.0's changes as well. The `.msix` on this page is an unsigned build artifact and will not install by double-click; see [INSTALL.md](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/blob/main/INSTALL.md).
 
 ### What's new
 
@@ -11,7 +11,7 @@
 - **A piece on each monitor.** Put each Desk piece on all monitors, the main one or a monitor you pick, from Settings ▸ Desk ▸ Where each piece sits or by dragging in Arrange Desk.
 - **A look per song.** Turn on **Style what's playing** (Settings ▸ Now playing ▸ Looks, off by default) and each song is drawn in its own gradient and letter style, with the bars to match. Claude can suggest looks for your songs; they wait for your **Save**. The Claude Code now-playing mod shares the same looks.
 - **OLED care.** The Desk and widget drift a few pixels every 3 minutes, dim after 5 minutes away and never hold pure white. Settings ▸ Desk ▸ OLED care, off by default.
-- **Fixes.** Automatic ink and the wallpaper read use the picture Windows still draws when the original file is gone. A theme change no longer crashes Settings when the calendar was never opened. Screen readers hear the Designs rows by name.
+- **Fixes.** Automatic ink and the wallpaper read use the picture Windows still draws when the original file is gone. A theme change no longer crashes Settings when the calendar was never opened. Screen readers hear every Settings list by name, not by type. Claude Code offers Update, not Install, for a piece already installed. Mods & Config opens on the folder Claude Code runs from and calls plugins plugins.
 
 Claude Code needs the Sanduhr MCP server installed (Settings ▸ Claude Code) for designs and song looks.
 
@@ -23,6 +23,6 @@ The full list is in the changelog.
 - Store installs: if the update won't install (error 0x80073D02), restart Windows and try again. A WebView2 process left behind by the previous version can keep running after the widget quits, and Windows waits for it to close.
 - Setup.exe is not code-signed, so SmartScreen shows "Windows protected your PC" on first install: More info → Run anyway. The Microsoft Store package is the signed path.
 
-Full changelog: [CHANGELOG.md](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/blob/main/CHANGELOG.md#v370--2026-10-21)
+Full changelog: [CHANGELOG.md](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/blob/main/CHANGELOG.md#v371--2026-10-21)
 
 "Claude" and "claude.ai" are trademarks of Anthropic PBC, used nominatively. Sanduhr für Claude is an independent third-party tool, not affiliated with, endorsed by, or associated with Anthropic PBC.
