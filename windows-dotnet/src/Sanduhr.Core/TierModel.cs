@@ -254,6 +254,38 @@ public static class TierModel
     public static string ResetCountdown(string? resetsAt, DateTimeOffset? now = null) =>
         string.IsNullOrEmpty(resetsAt) ? "" : $"Resets in {Pacing.TimeUntil(resetsAt, now)}";
 
+    /// <summary>"3d 5h 30m" as words: "3 days 5 hours 30 minutes". Anything else comes back unchanged.</summary>
+    public static string SpokenDuration(string duration)
+    {
+        static string Unit(System.Text.RegularExpressions.Match m, string one, string many) =>
+            $"{m.Groups[1].Value} {(m.Groups[1].Value == "1" ? one : many)}";
+        var s = System.Text.RegularExpressions.Regex.Replace(duration, @"\b(\d+)d\b", m => Unit(m, "day", "days"));
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\b(\d+)h\b", m => Unit(m, "hour", "hours"));
+        return System.Text.RegularExpressions.Regex.Replace(s, @"\b(\d+)m\b", m => Unit(m, "minute", "minutes"));
+    }
+
+    /// <summary>
+    /// What a screen reader reads for a tier card, in words: "Session (5hr), 12%, resets in 29 minutes, on pace".
+    /// Takes what the card shows; empty parts are left out.
+    /// </summary>
+    public static string CardName(string label, string valueText, string resetCountdown, string paceLabel,
+        string burnText, string localDelta)
+    {
+        var parts = new List<string> { label };
+        if (!string.IsNullOrWhiteSpace(valueText)) parts.Add(valueText);
+        if (!string.IsNullOrWhiteSpace(resetCountdown))
+        {
+            const string lead = "Resets in ";
+            parts.Add(resetCountdown.StartsWith(lead, StringComparison.Ordinal)
+                ? "resets in " + SpokenDuration(resetCountdown[lead.Length..])
+                : resetCountdown);
+        }
+        if (!string.IsNullOrWhiteSpace(paceLabel)) parts.Add(paceLabel.ToLowerInvariant());
+        if (!string.IsNullOrWhiteSpace(burnText)) parts.Add(burnText);
+        if (!string.IsNullOrWhiteSpace(localDelta)) parts.Add($"{localDelta.TrimStart('+')} local tokens since the last refresh");
+        return string.Join(", ", parts);
+    }
+
     // -- hide / reorder model (state, not UI) ---------------------------------
 
     /// <summary>

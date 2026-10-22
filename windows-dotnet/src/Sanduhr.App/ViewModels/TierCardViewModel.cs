@@ -48,6 +48,13 @@ public sealed partial class TierCardViewModel : ObservableObject
     /// <c>tiers.set_local_delta</c>).</summary>
     [ObservableProperty] private bool _hasLocalDelta;
 
+    /// <summary>What a screen reader reads for the card, in words: "Session (5hr), 12%, resets in 29 minutes, on pace".</summary>
+    public string AutomationName =>
+        TierModel.CardName(Label, ValueText, ResetCountdown, PaceLabel, BurnText, LocalDelta);
+
+    /// <summary>The card's list item reads as its name, never as the type behind it.</summary>
+    public override string ToString() => AutomationName;
+
     public TierCardViewModel(string tierKey, ThemePalette palette)
     {
         TierKey = tierKey;
