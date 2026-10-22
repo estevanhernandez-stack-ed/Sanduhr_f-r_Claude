@@ -173,6 +173,7 @@ public static partial class ResetPlan
             AddFile(history, Path.Combine(dir, ThemeHandoff.ResultFileName));
             AddMatchingFiles(history, dir, "glow-*.signal");
             AddMatchingFiles(history, dir, "desk-messages-*.json");
+            AddMatchingFiles(history, dir, "desk-design-*.json");
             AddMatchingFiles(history, dir, "watch-request-*.json");
         }
         map[ResetPart.History] = Finish(history, backups);
@@ -191,6 +192,8 @@ public static partial class ResetPlan
         // A stale projection must not outlive the consent it copies; the watchers switch is a copy of one too.
         AddFile(settings, Path.Combine(ext, McpSettingsName));
         AddFile(settings, Path.Combine(ext, WatcherRequest.SwitchFile));
+        // The Desk state (the design, fonts, wallpaper summary and path, Start-menu apps) is a copy of settings too.
+        AddFile(settings, Path.Combine(ext, DeskDesign.StateFile));
         map[ResetPart.Settings] = Finish(settings, backups);
 
         return map;

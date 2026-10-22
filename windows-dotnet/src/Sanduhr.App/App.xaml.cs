@@ -33,6 +33,7 @@ public partial class App : Application
     private Desk.NowPlayingHub? _nowPlaying;
     private Desk.DeskMessageSource? _messages;
     private Desk.DeskMessageHandoffService? _handoff;
+    private Desk.DeskDesignService? _deskDesign;
     private Desk.WatcherStore? _watchers;
     private LauncherAppCache? _launcherApps;
     private MenuItem? _endDemoItem;
@@ -515,6 +516,11 @@ public partial class App : Application
         // The Launcher (spec, Desk Launcher): one in-memory view of the Start menu for the Desk and Settings.
         _launcherApps = new LauncherAppCache();
         LauncherAppCache.Current = _launcherApps;
+        // The agent-designed Desk (spec 3.7.0): desk-state.json for get_desk while the MCP integration is installed,
+        // and the request/result handoff for propose_desk (phase 1 answers not_ready; the preview is the next phase).
+        _deskDesign = new Desk.DeskDesignService(paths, store, _launcherApps);
+        Desk.DeskDesignService.Current = _deskDesign;
+        _deskDesign.Start();
         _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
             () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers, paths, _launcherApps)
         {
@@ -899,6 +905,7 @@ public partial class App : Application
         _launcherApps?.Dispose();
         _messages?.Dispose();
         _handoff?.Dispose();
+        _deskDesign?.Dispose();
         _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();
@@ -924,6 +931,7 @@ public partial class App : Application
         _launcherApps?.Dispose();
         _messages?.Dispose();
         _handoff?.Dispose();
+        _deskDesign?.Dispose();
         _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();

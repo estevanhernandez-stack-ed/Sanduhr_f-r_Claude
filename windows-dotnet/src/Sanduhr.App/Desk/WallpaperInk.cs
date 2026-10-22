@@ -30,6 +30,81 @@ internal sealed class WallpaperInk
         _images.Clear();
         _info = null;
         _read = false;
+        _summaryKey = null;
+    }
+
+    /// <summary>Reads the shell's wallpaper facts (monitors, image paths, position, color) again on the next ask, keeping
+    /// the decoded images: <see cref="Overview"/> re-reads an image only when its path or write time changed.</summary>
+    public void Refresh()
+    {
+        _info = null;
+        _read = false;
+    }
+
+    private const int SummaryWidth = 256;
+    private string? _summaryKey;
+    private WallpaperOverview? _summary;
+    private string? _summaryPath;
+
+    /// <summary>
+    /// What the wallpaper looks like on each monitor, for <c>get_desk</c> (spec, the agent-designed Desk, B), and the
+    /// primary monitor's image path. Each monitor is drawn from the same decoded image the Automatic ink reads, the way
+    /// Windows lays it out (fit mode, background color), then summarized by Core's pure math. Kept by wallpaper path and
+    /// last-write time, so only a wallpaper, monitor or position change reads again. A monitor whose image cannot be
+    /// decoded is left out; none left answers null. Nothing leaves this process.
+    /// </summary>
+    public (WallpaperOverview? Overview, string? Path) Overview()
+    {
+        try
+        {
+            if (!_read)
+            {
+                _info = DeskSensorsNative.Wallpaper();
+                _read = true;
+            }
+            if (_info is not { } info || info.Monitors.Count == 0) return (null, null);
+
+            string key = string.Join(";", info.Monitors.Select(m =>
+                $"{m.Left},{m.Top},{m.Right},{m.Bottom},{m.Path}|{(m.Path is not null && File.Exists(m.Path) ? File.GetLastWriteTimeUtc(m.Path).Ticks : 0)}"))
+                + $"|{info.Position}|{info.Background}";
+            if (key == _summaryKey) return (_summary, _summaryPath);
+            _images.Clear();   // a different wallpaper: forget the old pictures (a slideshow would otherwise keep them all)
+
+            var virt = VirtualScreen(info.Monitors);
+            var bg = ((byte)(info.Background & 0xFF), (byte)((info.Background >> 8) & 0xFF), (byte)((info.Background >> 16) & 0xFF));
+            var list = new List<WallpaperMonitorSummary>();
+            foreach (var m in info.Monitors)
+            {
+                var monitor = new PxRect(m.Left, m.Top, m.Right - m.Left, m.Bottom - m.Top);
+                if (monitor.IsEmpty) continue;
+                (byte[] Bgra, int Width, int Height)? drawn;
+                if (m.Path is null)
+                {
+                    drawn = WallpaperRender.Flat(bg);   // a plain color desktop
+                }
+                else
+                {
+                    var image = Decode(m.Path);
+                    if (image is null) continue;
+                    drawn = WallpaperRender.Monitor(image.Pixels, image.Width, image.Height, image.Stride,
+                        image.NaturalWidth, image.NaturalHeight, monitor, (WallpaperPosition)info.Position, virt, bg, SummaryWidth);
+                }
+                if (drawn is not { } d) continue;
+                var summary = WallpaperSummary.From(d.Bgra, d.Width, d.Height, d.Width * 4, WallpaperSummary.DefaultAnchors(d.Width, d.Height));
+                if (summary is null) continue;
+                list.Add(new WallpaperMonitorSummary(list.Count, m.Left == 0 && m.Top == 0, monitor.Width, monitor.Height, summary));
+            }
+            _summary = list.Count == 0 ? null : WallpaperOverview.Combine(list);
+            _summaryPath = (info.Monitors.FirstOrDefault(m => m.Left == 0 && m.Top == 0 && m.Path is not null)
+                            ?? info.Monitors.FirstOrDefault(m => m.Path is not null))?.Path;
+            _summaryKey = key;
+            return (_summary, _summaryPath);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
+                                      or InvalidOperationException or ArgumentException or System.Runtime.InteropServices.COMException)
+        {
+            return (null, null);
+        }
     }
 
     /// <summary>The wallpaper's average relative luminance behind <paramref name="region"/> (physical

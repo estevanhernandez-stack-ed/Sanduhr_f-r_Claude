@@ -187,6 +187,7 @@ public sealed class DeskDesignHandoffTests : IDisposable
         Assert.Equal(["EsteFont Pro", "EsteFont 26"], state["fonts"]!["bundled"]!.AsArray().Select(n => (string)n!));
         Assert.Equal(@"C:\Users\me\Pictures\wall.jpg", (string?)state["wallpaper"]!["path"]);
         Assert.NotNull(state["wallpaper"]!["summary"]);
+        Assert.Equal("image", (string?)state["wallpaper"]!["kind"]);
         var row = state["designs"]![0]!;
         Assert.Equal("one", (string?)row["id"]);
         Assert.Equal("Design one", (string?)row["name"]);
@@ -198,12 +199,21 @@ public sealed class DeskDesignHandoffTests : IDisposable
     }
 
     [Fact]
+    public void ADesktopWithNoWallpaperFileIsReportedAsColor()
+    {
+        var current = DeskState.Current(DeskSettings.Default, DeskInkSettings.Default, LauncherModel.Empty, null);
+        var state = DeskState.Build(current, [], WallpaperOverview.Combine([]), null, null, [], direct: false, writerVersion: "3.7.0");
+        Assert.Equal("color", (string?)state["wallpaper"]!["kind"]);
+    }
+
+    [Fact]
     public void TheStateLeavesOutWhatItDoesNotKnow()
     {
         var current = DeskState.Current(DeskSettings.Default, DeskInkSettings.Default, LauncherModel.Empty, null);
         var state = DeskState.Build(current, [], null, null, null, [], direct: false, writerVersion: "3.7.0");
         Assert.Null(state["start_menu_apps"]);
         Assert.Null(state["wallpaper"]!["summary"]);
+        Assert.Null(state["wallpaper"]!["kind"]);
         Assert.Null(state["wallpaper"]!["path"]);
         Assert.Empty(state["designs"]!.AsArray());
     }

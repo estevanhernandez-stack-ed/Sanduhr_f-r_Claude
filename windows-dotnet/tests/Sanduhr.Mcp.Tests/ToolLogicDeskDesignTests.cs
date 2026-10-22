@@ -540,7 +540,7 @@ public class ToolLogicDeskDesignTests
         Propose(cfg, """{"plate":true}""");
         Propose(cfg, """{"plate":false}""");
         Assert.Single(Directory.GetFiles(Path.GetDirectoryName(cfg.DesignRequestPath!)!));
-        Assert.Equal(false, (bool)((JsonObject)JsonNode.Parse(File.ReadAllText(cfg.DesignRequestPath!))!)["design"]!["plate"]!);
+        Assert.False((bool)((JsonObject)JsonNode.Parse(File.ReadAllText(cfg.DesignRequestPath!))!)["design"]!["plate"]!);
     }
 
     [Fact]

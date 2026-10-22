@@ -474,7 +474,8 @@ public static class ToolCatalog
         "color theme. Returns design (the current look as a full design: layout with every piece's anchor, size and " +
         "hidden, font, ink, plate, shadow, launcher, theme), pieces and anchors (the allowed words), fonts (installed " +
         "families, and the bundled handwriting fonts EsteFont Pro and EsteFont 26), wallpaper (path of the wallpaper " +
-        "image, which you can open only if the user allows Claude Code to read that file; and summary: overall " +
+        "image, which you can open only if the user allows Claude Code to read that file; kind image, or color when the shell " +
+        "names no image and the summary is the desktop's background color; and summary: overall " +
         "brightness 0-1, up to five dominant colors with their share, and for each monitor the brightness 0-1 and " +
         "busyness 0-1 (edge density) behind each anchor), designs (saved designs: id, name, pinned, applied_at), " +
         "direct (true when the user lets Claude change the Desk without review), limits, and start_menu_apps (the apps " +

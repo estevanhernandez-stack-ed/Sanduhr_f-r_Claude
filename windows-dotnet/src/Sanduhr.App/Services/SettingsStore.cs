@@ -114,7 +114,13 @@ public sealed class SettingsStore
             return;
         }
         McpSettingsExport.Sync(root, _mcpSettingsPath, LogLine);
+        try { AnyWritten?.Invoke(); }
+        catch (Exception e) when (e is InvalidOperationException or ObjectDisposedException) { /* a subscriber's problem never fails a save */ }
     }
+
+    /// <summary>Raised after any <see cref="SettingsStore"/> wrote settings.json, on whatever thread wrote it (the
+    /// Desk design service listens, to keep <c>desk-state.json</c> current). Static: the app makes several stores.</summary>
+    public static event Action? AnyWritten;
 
     /// <summary>The saved frame, or null when none has been persisted yet.
     /// Reads the modern "geom" key, falling back to the legacy "window" key

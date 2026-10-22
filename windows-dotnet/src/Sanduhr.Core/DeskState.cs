@@ -72,8 +72,14 @@ public static class DeskState
         var list = new JsonArray();
         foreach (var d in designs.OrderByDescending(d => d.AppliedAt).ThenBy(d => d.Id, StringComparer.Ordinal)) list.Add((JsonNode?)d.SummaryJson());
 
+        // kind: "image" when the shell named a wallpaper file; "color" when it named none, in which case the summary is
+        // the desktop's background color (an agent should not read it as a picture).
         var wall = new JsonObject { ["path"] = wallpaperPath };
-        if (wallpaper is not null) wall["summary"] = wallpaper.ToJson();
+        if (wallpaper is not null)
+        {
+            wall["kind"] = wallpaperPath is null ? "color" : "image";
+            wall["summary"] = wallpaper.ToJson();
+        }
 
         var state = new JsonObject
         {
