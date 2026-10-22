@@ -31,7 +31,7 @@ internal sealed record ModsConfigHost(
 /// <summary>One line under a section: a name and what it says.</summary>
 public sealed record ModsLine(string Name, string Text);
 
-/// <summary>One mod or plugin a folder loads.</summary>
+/// <summary>One plugin a folder loads. A plugin that also carries mod hooks is a mod and wears a "mod" tag.</summary>
 public sealed partial class ModRowViewModel : ObservableObject
 {
     private readonly ModsConfigViewModel _owner;
@@ -42,6 +42,8 @@ public sealed partial class ModRowViewModel : ObservableObject
     public string StateText { get; }
     public string Touches { get; }
     public bool IsSanduhr { get; }
+    /// <summary>The plugin is a Claude Code mod (its hooks list modules).</summary>
+    public bool IsMod { get; }
     public bool IsOn { get; }
     public bool IsOff { get; }
     public bool HasDescription => Description.Length > 0;
@@ -63,8 +65,11 @@ public sealed partial class ModRowViewModel : ObservableObject
         VersionText = item.Version is { Length: > 0 } v ? "v" + v.TrimStart('v') : "";
         Description = item.Description;
         IsSanduhr = item.IsSanduhr && own is not null;
+        IsMod = item.IsMod;
         StateText = item.State switch
         {
+            ModState.On when !ModsPageText.HasFiles(item) => "On, no files here",
+            ModState.Off when !ModsPageText.HasFiles(item) => "Off, no files here",
             ModState.On => "On",
             ModState.Off => "Off",
             _ => "Files missing",
@@ -112,7 +117,10 @@ public sealed partial class ModsConfigViewModel : ObservableObject
     [ObservableProperty] private string _statuslineCommand = "";
     [ObservableProperty] private string _hooksSummary = "";
     [ObservableProperty] private string _pluginsSummary = "";
-    [ObservableProperty] private string _modsSummary = "";
+    /// <summary>The list's heading: "Plugins (46 installed, 41 on)".</summary>
+    [ObservableProperty] private string _pluginListTitle = "";
+    /// <summary>Why the list and the settings.json switches differ in size; empty when they agree.</summary>
+    [ObservableProperty] private string _pluginListNote = "";
     [ObservableProperty] private string _mcpSummary = "";
     [ObservableProperty] private string _mcpProjects = "";
     [ObservableProperty] private string _claudeMdSummary = "";
@@ -180,7 +188,7 @@ public sealed partial class ModsConfigViewModel : ObservableObject
             SettingsSummary = "No Claude Code folder found.";
             SettingsDetail = "Add one on the Claude Code page.";
             SettingsUnreadable = false;
-            StatuslineSummary = HooksSummary = PluginsSummary = ModsSummary = McpSummary = ClaudeMdSummary = RetentionSummary = "";
+            StatuslineSummary = HooksSummary = PluginsSummary = PluginListTitle = PluginListNote = McpSummary = ClaudeMdSummary = RetentionSummary = "";
             StatuslineCommand = McpProjects = "";
             RetentionWarning = false;
             return;
@@ -231,15 +239,17 @@ public sealed partial class ModsConfigViewModel : ObservableObject
         foreach (var (name, on) in report.EnabledPlugins.OrderBy(p => p.Key, StringComparer.Ordinal))
             PluginLines.Add(new ModsLine(name, on ? "On" : "Off"));
         int pluginsOn = report.EnabledPlugins.Count(p => p.Value);
-        PluginsSummary = report.EnabledPlugins.Count == 0 ? "None" : $"{pluginsOn} on, {report.EnabledPlugins.Count - pluginsOn} off";
+        int pluginsOff = report.EnabledPlugins.Count - pluginsOn;
+        PluginsSummary = ModsPageText.SwitchSummary(pluginsOn, pluginsOff);
 
-        // Mods
+        // The plugins the folder loads, mods among them
         OwnModState? own = null;
         try { own = MakeIntegrations().OwnModStateOf(folder.Path); } catch (Exception) { }
         foreach (var item in report.Mods)
             Mods.Add(new ModRowViewModel(this, item, own));
-        int modsOn = report.Mods.Count(m => m.State == ModState.On);
-        ModsSummary = report.Mods.Count == 0 ? "None" : $"{report.Mods.Count} found, {modsOn} on";
+        var tally = ModsPageText.Tally(report.Mods, report.EnabledPlugins);
+        PluginListTitle = ModsPageText.ListTitle(tally);
+        PluginListNote = ModsPageText.Reconcile(tally, pluginsOn, pluginsOff);
 
         // MCP servers: names only
         foreach (var n in report.Mcp.UserServers) McpNames.Add(n);

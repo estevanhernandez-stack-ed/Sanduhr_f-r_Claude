@@ -163,8 +163,8 @@ public static class SettingsIndex
 
         E("Settings and statusline", SettingsPage.Mods, ConfigFiles,
             ["settings.json", "folder", "hooks", "statusline", "readable", "unreadable", "refresh", "inventory"]),
-        E("Mods", SettingsPage.Mods, ModList,
-            ["mod", "plugin", "plugins", "enabledPlugins", "sanduhr-meters", "switch", "on", "off", "update", "remove"]),
+        E("Plugins", SettingsPage.Mods, ModList,
+            ["mod", "mods", "plugin", "plugins", "installed", "enabledPlugins", "sanduhr-meters", "switch", "on", "off", "update", "remove"]),
         E("MCP servers", SettingsPage.Mods, McpServers, ["MCP", "servers", "mcpServers", "tools"]),
         E("CLAUDE.md", SettingsPage.Mods, ClaudeMd, ["memory", "instructions", "lines", "size"]),
         E("History kept", SettingsPage.Mods, Retention,
