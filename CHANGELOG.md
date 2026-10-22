@@ -1,5 +1,44 @@
 # Changelog
 
+## v3.7.0 — 2026-10-21
+
+**Platform:** Windows (.NET 10 / WPF). Claude designs your Desk, the Desk gets a Launcher, every piece can live on its own monitor, every song can wear its own look, and the Desk learns to go easy on an OLED screen. This is the Microsoft Store release: the Store was on 3.5.0, and 3.6.0 shipped on GitHub only, so the Store update carries 3.6.0's changes too. `Sanduhr.Mcp` to 3.7.0. No new capability and no new outbound destination; the manifest still declares `runFullTrust` only.
+
+### The Desk, designed by Claude
+
+- **Two new MCP tools, `get_desk` and `propose_desk`.** `get_desk` shows Claude how your Desk looks right now: where each piece sits and how big it is, the monitor it is on, the font, ink, plate and shadow, the Launcher's buttons, your widget theme's colors, the font families installed on this PC and the monitors connected. `propose_desk` hands the widget a whole look: layout, font, ink, plate, Launcher, messages, song looks and a widget theme, as many or as few of those as Claude changes. The server checks every field with the widget's own code first (shapes, ranges, the Launcher's targets, the ink's contrast against your wallpaper), so a design that fails is never written. Claude never runs anything: the request is a file in `%USERPROFILE%\.sanduhr`, and the widget answers in another.
+- **Claude sees your wallpaper as numbers, and as a picture only if you allow it.** Sanduhr works out up to five dominant colors, the overall brightness, and the brightness and busyness behind each of the eight Desk anchors on each monitor, all on your PC. It also writes a copy of your wallpaper scaled to 1600 pixels as `wallpaper-preview.png`; Claude can open it only if you allow Claude Code to read that file. Nothing is uploaded by Sanduhr.
+- **A live review on your real desktop.** A proposed look draws on the Desk and the widget, with a bar at the top of the main monitor: the design's name, Claude's note, what changed, then **Apply** or **Dismiss** (Enter and Escape work). Nothing is written until Apply, and Dismiss puts everything back at once. A font you don't have shows its download link (Sanduhr shows the link and never fetches it), and Apply waits until the font is installed.
+- **Let Claude change the Desk directly** (Settings ▸ Desk, off by default) applies a proposal without the bar. The Desk it replaces is still saved first.
+- **Saved designs, and Put my Desk back.** Every Apply saves the Desk it replaces. Settings ▸ Desk ▸ Designs keeps ten (the oldest unpinned goes first) and lets you Switch to, Rename, Pin or Delete one. **Put my Desk back**, in Settings and in the tray menu, returns to the look before the last change. Reset Sanduhr… removes the folder.
+- **The trust boundary, widened on purpose.** `sanduhr-mcp` now source-links 27 Core files (was 17): the Desk design validator, the wallpaper summary, the piece, ink, plate, font and Launcher rules, and the song look rules. All of them are pure (text, JSON, regex, math). Still no project or package reference and no network; `TrustBoundaryTests` pins the list and scans the new files for IO, network and process names.
+
+### The Launcher
+
+- **Up to eight buttons on the Desk** that open an app or a web page when you click. Settings ▸ Desk ▸ Launcher picks apps from your Start menu, including Chrome and Edge web apps, desktop programs and programs installed on another drive, or takes an `https://` link. A button shows the app's own icon or a PNG you pick (resized on import to a 256 pixel square, never fetched from the web), glows in a color you choose on hover and touch, and is placed on the first button you add.
+- **No command lines, ever.** A button opens only something your Start menu lists, through Windows' own app launcher, and checks that again at the click. No arguments, scripts, shortcuts or file paths. This is also why Claude can propose a Launcher without being able to run anything you didn't install.
+
+### One Desk across many monitors
+
+- **Each piece picks its monitor.** **All monitors**, **Main monitor** or one monitor by name, from the new **Monitor** dropdown in Settings ▸ Desk ▸ Where each piece sits. Arrange Desk gains **Show on** and lets you drag a piece from one monitor to another. When a monitor is unplugged its pieces move to the main monitor, and return when it reconnects; nothing is rewritten.
+
+### A look per song
+
+- **Style what's playing** (Settings ▸ Now playing ▸ Looks, off by default) draws the playing song in a gradient and a letter style, and the bars and the position bar take the gradient. A song with no saved look gets one seeded from its title and artist (eight palettes, five letter styles), so every song has a look the moment it plays.
+- **A tool for Claude, `propose_now_playing_looks`.** Claude can suggest looks for up to 20 songs. They wait on Settings ▸ Now playing for **Save** or **Dismiss**, each drawn in its look, and a look too dim for the spot it sits in is refused. **Let Claude style songs directly** (off by default) saves them on arrival. **Clear Looks…** deletes every saved look.
+- **Shared with the Claude Code now-playing mod.** While the MCP server is installed and Style what's playing is on, Sanduhr writes `now-playing-look.json` with a hash of the song and the look it wears (no title, no artist, no app), and reads `now-playing-look-offer.json` back from the mod, treated as a Claude proposal. The same song wears the same look on the Desk and in Claude Code.
+
+### OLED care
+
+- **Pixel drift, idle dim and no held pure white**, Settings ▸ Desk ▸ OLED care (off by default). The Desk and the widget move a few pixels in a slow figure-eight every 3 minutes, dim after 5 minutes without keyboard or mouse input, and draw pure white ink as a soft off-white (#e6e6e6). The only thing read is the time of the last input; not a key, a click, a program or a place.
+
+### Fixes
+
+- **Automatic ink and the wallpaper read follow the picture Windows still draws.** When the wallpaper's original file was deleted or moved, Sanduhr reads the copy Windows keeps (`TranscodedWallpaper`) instead of falling back to a default.
+- **No crash when a theme change redrew a Settings calendar that was never laid out.**
+- **The Designs rows are named for screen readers**, and their buttons are exposed to UI Automation.
+- **A half-written offer from the now-playing mod is waited out** instead of dropped.
+
 ## v3.6.0 — 2026-10-21
 
 **Platform:** Windows (.NET 10 / WPF). A Mac-parity slice: the tour learns the Desk, the Desk gets its plate and a better Arrange, the statusline says which folder it is in, and Claude Code can watch work and suggest Desk messages through `sanduhr-mcp`. `Sanduhr.Mcp` to 3.6.0. No new capability, no new outbound destination; the manifest still declares `runFullTrust` only.
