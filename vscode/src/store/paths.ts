@@ -13,6 +13,8 @@ export function dataDir(settingValue?: string, env: NodeJS.ProcessEnv = process.
 }
 
 export const spoolDir = (dir: string): string => path.join(dir, 'spool');
+/** The 0.1 and 0.2 Claude spool; still read, never written. */
 export const claudeDir = (dir: string): string => path.join(dir, 'claude');
+export const agentsDir = (dir: string): string => path.join(dir, 'agents');
 export const daysDir = (dir: string): string => path.join(dir, 'days');
 export const stateDir = (dir: string): string => path.join(dir, 'state');

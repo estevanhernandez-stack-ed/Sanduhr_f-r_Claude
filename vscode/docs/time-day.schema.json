@@ -1,13 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://sanduhr.dev/schemas/time-day.v1.json",
-  "title": "Sanduhr Time day file, v1",
-  "description": "days/<date>.json as the merger emits it. All durations are integer milliseconds.",
+  "$id": "https://sanduhr.dev/schemas/time-day.v2.json",
+  "title": "Sanduhr Time day file, v2",
+  "description": "days/<date>.json as the merger emits it since 0.3.0. All durations are integer milliseconds. v1 files (claudeMs, linesClaude, no byAgent) are read by mapping claudeMs to agentsMs and byAgent.claude; see time-usage-spec.md section 5.",
   "type": "object",
   "additionalProperties": false,
   "required": ["v", "date", "machine", "generatedAt", "totals", "projects", "caveats"],
   "properties": {
-    "v": { "const": 1 },
+    "v": { "const": 2 },
     "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Local calendar date." },
     "machine": { "type": "string", "minLength": 1 },
     "generatedAt": { "type": "string", "format": "date-time" },
@@ -26,18 +26,38 @@
   },
   "definitions": {
     "ms": { "type": "integer", "minimum": 0 },
+    "agentTime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wallMs", "streamMs", "lines"],
+      "properties": {
+        "wallMs": { "$ref": "#/definitions/ms", "description": "The agent's own union of intervals." },
+        "streamMs": { "$ref": "#/definitions/ms", "description": "Sum over the agent's streams of each stream's interval length." },
+        "lines": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "byAgent": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Only the agents that ran.",
+      "properties": {
+        "claude": { "$ref": "#/definitions/agentTime" },
+        "codex": { "$ref": "#/definitions/agentTime" }
+      }
+    },
     "totals": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["youMs", "claudeMs", "bothMs", "totalMs", "agentMs", "linesYou", "linesClaude"],
+      "required": ["youMs", "agentsMs", "bothMs", "totalMs", "agentMs", "linesYou", "linesAgents", "byAgent"],
       "properties": {
         "youMs": { "$ref": "#/definitions/ms" },
-        "claudeMs": { "$ref": "#/definitions/ms" },
+        "agentsMs": { "$ref": "#/definitions/ms" },
         "bothMs": { "$ref": "#/definitions/ms" },
         "totalMs": { "$ref": "#/definitions/ms" },
         "agentMs": { "$ref": "#/definitions/ms" },
         "linesYou": { "type": "integer", "minimum": 0 },
-        "linesClaude": { "type": "integer", "minimum": 0 }
+        "linesAgents": { "type": "integer", "minimum": 0 },
+        "byAgent": { "$ref": "#/definitions/byAgent" }
       }
     },
     "project": {
@@ -45,8 +65,8 @@
       "additionalProperties": false,
       "required": [
         "key", "realName", "alias", "masked",
-        "youMs", "claudeMs", "bothMs", "totalMs", "agentMs",
-        "linesYou", "linesClaude", "languages"
+        "youMs", "agentsMs", "bothMs", "totalMs", "agentMs",
+        "linesYou", "linesAgents", "byAgent", "languages"
       ],
       "properties": {
         "key": { "type": "string", "pattern": "^([0-9a-f]{16}|none)$" },
@@ -54,12 +74,13 @@
         "alias": { "type": ["string", "null"] },
         "masked": { "type": "boolean" },
         "youMs": { "$ref": "#/definitions/ms" },
-        "claudeMs": { "$ref": "#/definitions/ms" },
+        "agentsMs": { "$ref": "#/definitions/ms" },
         "bothMs": { "$ref": "#/definitions/ms" },
         "totalMs": { "$ref": "#/definitions/ms" },
         "agentMs": { "$ref": "#/definitions/ms" },
         "linesYou": { "type": "integer", "minimum": 0 },
-        "linesClaude": { "type": "integer", "minimum": 0 },
+        "linesAgents": { "type": "integer", "minimum": 0 },
+        "byAgent": { "$ref": "#/definitions/byAgent" },
         "languages": {
           "type": "array",
           "maxItems": 10,

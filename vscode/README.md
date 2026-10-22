@@ -1,19 +1,20 @@
 # Sanduhr Time
 
-A local-first coding time tracker for VS Code that separates your time from Claude's.
+A local-first coding time tracker for VS Code that separates your time from your agents' (Claude Code and Codex).
 
 <!-- screenshot: the Time panel, dark theme (add before a Marketplace listing) -->
 
-WakaTime shows how long you coded. It does not tell you how much of that day Claude Code spent working while you steered. Sanduhr Time records both sides in one place, per project per day, and never counts the same minute twice.
+WakaTime shows how long you coded. It does not tell you how much of that day Claude Code or Codex spent working while you steered. Sanduhr Time records both sides in one place, per project per day, and never counts the same minute twice.
 
 ## What it tracks
 
 For every project, every day:
 
-- **Your time.** Editor activity in a focused VS Code window (edits, saves, switching files, moving the cursor), plus the time you spent writing prompts to Claude Code.
+- **Your time.** Editor activity in a focused VS Code window (edits, saves, switching files, moving the cursor), plus the time you spent reading answers and writing prompts to Claude Code or Codex.
 - **Claude's time.** Read from Claude Code's own transcripts, in every config home on the machine (`CLAUDE_CONFIG_DIR` and each `~/.claude*` folder that has a `projects/` directory). Subagents count, and parallel sessions show up as agent time next to the split.
-- **The split.** You only, Claude only, and both. The total is the union, so overlapping work counts once.
-- **Lines.** Lines you changed in the editor, and lines Claude added or removed through its edit tools. Disk reloads of a file Claude just changed are not credited to you.
+- **Codex's time.** Read from Codex's rollouts under `sessions/` in `CODEX_HOME` and `~/.codex`. A Codex thread can run for days; each record counts on its own day. Subagent and self-review threads are Codex working, never your prompts.
+- **The split.** You only, agents only, and both. The agents part is the union of every agent, so a minute Claude and Codex share counts once, and so does a minute you and an agent share. Each agent's own time is listed beside it.
+- **Lines.** Lines you changed in the editor, and lines each agent added or removed through its edit tools (Codex's patches included). Disk reloads of a file an agent just changed are not credited to you.
 - **Languages.** Where your editor time went, by language.
 
 A day starts when you install: history before that is not backfilled, so every recorded day has an honest split. Days follow your local calendar, and idle time ends a stretch after 15 minutes (a setting).
@@ -33,7 +34,8 @@ A separate, optional extension (the 626 Labs extension) can read the day totals 
 ```
 ~/.sanduhr/time/
   spool/    editor heartbeats, one file per window
-  claude/   Claude events read from transcripts
+  agents/   agent events read from Claude and Codex transcripts
+  claude/   Claude events from 0.1 and 0.2, still read
   days/     one merged JSON file per day
   state/    install salt, read offsets, lock, caveats, WakaTime comparison
   aliases.json   project aliases, mask flags, streamer mode
@@ -43,7 +45,7 @@ Change the folder with the `sanduhrTime.dataDir` setting or the `SANDUHR_TIME_DI
 
 ## The Time panel and status bar
 
-The status bar shows today's total, for example `3h 12m`. Hover for you, Claude and both; click to open the Time panel. The panel shows today, a 7-day strip, and per project the stacked you/Claude/both bar, agent time, lines and top languages. It follows your color theme.
+The status bar shows today's total, for example `3h 12m`. Hover for you, agents and both; click to open the Time panel. The panel shows today, a 7-day strip, and per project the stacked you/agents/both bar, one row per agent that ran, lines and top languages. It follows your color theme.
 
 ### Streamer mode and masking
 
@@ -75,11 +77,11 @@ If `wakatime-cli` is installed (in `~/.wakatime/` or on your PATH), the tracker 
 
 - VS Code 1.80 or newer, desktop.
 - A local workspace. Remote, WSL and Codespaces windows are not supported: the extension runs on the machine where the transcripts live, and under a remote window it records nothing and says so.
-- Claude Code, to have anything on Claude's side. Without it the tracker still records your time.
+- Claude Code or Codex, to have anything on the agents' side. Without either the tracker still records your time.
 
 ## For integrators
 
-The extension returns a small API from `activate` (`getToday`, `getDays`, `onDayUpdated`, `maskState`, `projectKey`, `normalizeRemote`), and the files on disk are a documented contract: see [`docs/time-usage-spec.md`](docs/time-usage-spec.md). A consumer decides what to show; it should read `maskState()` live and fail closed.
+The extension returns a small API from `activate` (`getToday`, `getDays`, `onDayUpdated`, `maskState`, `projectKey`, `normalizeRemote`), and the files on disk are a documented contract: see [`docs/time-usage-spec.md`](docs/time-usage-spec.md). A consumer decides what to show; it should read `maskState()` live and fail closed. Since 0.3.0 day records are v2 (`agentsMs`, `linesAgents`, `byAgent`); the API still hands out `claudeMs` and `linesClaude` beside them for consumers written for 0.2, and those two now count every agent.
 
 ## Build and test
 
@@ -97,4 +99,4 @@ The last command produces a `.vsix` you can install with `code --install-extensi
 
 ## Not affiliated
 
-Claude is a trademark of Anthropic. Sanduhr Time is not affiliated with or endorsed by Anthropic.
+Claude is a trademark of Anthropic. Codex is a trademark of OpenAI. Sanduhr Time is not affiliated with or endorsed by Anthropic or OpenAI.

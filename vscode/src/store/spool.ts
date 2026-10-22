@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Heartbeat } from '../types';
-import { endsWithNewline, localDate } from './claudeSpool';
+import { endsWithNewline, localDate } from './agentSpool';
 import { spoolDir } from './paths';
 
 const KEEP_DAYS = 90;

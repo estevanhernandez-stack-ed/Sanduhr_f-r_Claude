@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MaskState } from '../store/aliases';
+import { normalizeDay } from '../store/days';
 import { day, project } from './fixtures';
 import {
   EMPTY_MESSAGE,
@@ -36,26 +37,26 @@ describe('formatDuration', () => {
 describe('fractions', () => {
   it('sums to exactly 1 for awkward values', () => {
     for (const t of [
-      { youMs: 1, claudeMs: 1, bothMs: 1 },
-      { youMs: 7, claudeMs: 11, bothMs: 13 },
-      { youMs: 100 * MIN, claudeMs: 125 * MIN, bothMs: 33 * MIN },
-      { youMs: 1, claudeMs: 0, bothMs: 0 },
+      { youMs: 1, agentsMs: 1, bothMs: 1 },
+      { youMs: 7, agentsMs: 11, bothMs: 13 },
+      { youMs: 100 * MIN, agentsMs: 125 * MIN, bothMs: 33 * MIN },
+      { youMs: 1, agentsMs: 0, bothMs: 0 },
     ]) {
       const f = fractions(t);
-      expect(f.you + f.claude + f.both).toBeCloseTo(1, 12);
+      expect(f.you + f.agents + f.both).toBeCloseTo(1, 12);
     }
   });
   it('is all zero with no time and never negative', () => {
-    expect(fractions({ youMs: 0, claudeMs: 0, bothMs: 0 })).toEqual({ you: 0, claude: 0, both: 0 });
-    const f = fractions({ youMs: -5, claudeMs: 10, bothMs: 0 });
+    expect(fractions({ youMs: 0, agentsMs: 0, bothMs: 0 })).toEqual({ you: 0, agents: 0, both: 0 });
+    const f = fractions({ youMs: -5, agentsMs: 10, bothMs: 0 });
     expect(f.you).toBe(0);
-    expect(f.claude).toBe(1);
+    expect(f.agents).toBe(1);
   });
 });
 
 describe('buildStatusBar', () => {
   it('shows the total and the split tooltip', () => {
-    const today = day('2026-10-06', { youMs: 100 * MIN, claudeMs: 125 * MIN, bothMs: 33 * MIN });
+    const today = day('2026-10-06', { youMs: 100 * MIN, agentsMs: 125 * MIN, bothMs: 33 * MIN });
     expect(buildStatusBar(today)).toEqual({
       text: '$(watch) 4h 18m',
       tooltip: 'You 1h 40m · Claude 2h 05m · Both 33m',
@@ -72,15 +73,15 @@ describe('buildPanelModel headline and strip', () => {
   const today = '2026-10-06';
   const days = [
     day('2026-10-02', { youMs: 2 * H }),
-    day('2026-10-05', { youMs: H, claudeMs: H, bothMs: 0 }),
-    day(today, { youMs: 100 * MIN, claudeMs: 125 * MIN, bothMs: 33 * MIN }),
+    day('2026-10-05', { youMs: H, agentsMs: H, bothMs: 0 }),
+    day(today, { youMs: 100 * MIN, agentsMs: 125 * MIN, bothMs: 33 * MIN }),
   ];
 
   it('headline carries total and the three splits for today', () => {
     const m = buildPanelModel(days, open, today);
-    expect(m.headline).toEqual({ total: '4h 18m', you: '1h 40m', claude: '2h 05m', both: '33m' });
+    expect(m.headline).toEqual({ total: '4h 18m', you: '1h 40m', agents: '2h 05m', both: '33m', agentsLabel: 'Claude' });
     const f = m.headlineFractions;
-    expect(f.you + f.claude + f.both).toBeCloseTo(1, 12);
+    expect(f.you + f.agents + f.both).toBeCloseTo(1, 12);
   });
 
   it('strip has seven days ending today, zero-filled, with relative heights', () => {
@@ -93,7 +94,7 @@ describe('buildPanelModel headline and strip', () => {
     expect(m.strip[6].isToday).toBe(true);
     expect(m.strip[6].height).toBe(1);
     expect(m.strip[2].height).toBeCloseTo(120 / 258, 6);
-    expect(m.strip[5].split).toEqual({ total: '2h 00m', you: '1h 00m', claude: '1h 00m', both: '0m' });
+    expect(m.strip[5].split).toEqual({ total: '2h 00m', you: '1h 00m', agents: '1h 00m', both: '0m', agentsLabel: 'Claude' });
     expect(m.strip[6].label).toBe('Tue 10-06');
   });
 
@@ -125,7 +126,7 @@ describe('project rows', () => {
   const today = '2026-10-06';
   const a = project({
     key: 'aaaa', realName: 'Demo App', alias: 'Project Aster',
-    youMs: 30 * MIN, claudeMs: 10 * MIN, bothMs: 5 * MIN, totalMs: 45 * MIN, agentMs: 12 * MIN, linesYou: 40, linesClaude: 220,
+    youMs: 30 * MIN, agentsMs: 10 * MIN, bothMs: 5 * MIN, totalMs: 45 * MIN, agentMs: 12 * MIN, linesYou: 40, linesAgents: 220,
     languages: [{ id: 'ts', ms: 20 * MIN }, { id: 'css', ms: 2 * MIN }, { id: 'json', ms: 9 * MIN }, { id: 'md', ms: 1 * MIN }],
   });
   const b = project({ key: 'bbbb', realName: 'Widget Lab', alias: 'Project Birch', youMs: 2 * H });
@@ -139,11 +140,11 @@ describe('project rows', () => {
   it('carries splits, fractions, agent time, lines and the top three languages', () => {
     const m = buildPanelModel(days, open, today);
     const row = m.projects.find((p) => p.key === 'aaaa')!;
-    expect(row.split).toEqual({ you: '30m', claude: '10m', both: '5m', total: '45m' });
-    expect(row.fractions.you + row.fractions.claude + row.fractions.both).toBeCloseTo(1, 12);
+    expect(row.split).toEqual({ you: '30m', agents: '10m', both: '5m', total: '45m', agentsLabel: 'Claude' });
+    expect(row.fractions.you + row.fractions.agents + row.fractions.both).toBeCloseTo(1, 12);
     expect(row.agent).toBe('12m');
     expect(row.linesYou).toBe(40);
-    expect(row.linesClaude).toBe(220);
+    expect(row.linesAgents).toBe(220);
     expect(row.languages).toEqual([
       { id: 'ts', time: '20m' },
       { id: 'json', time: '9m' },
@@ -216,12 +217,12 @@ describe('caveats, compare and footer', () => {
   it('shows the caveats note only when unreadable lines exist', () => {
     expect(buildPanelModel([day(today, { youMs: MIN })], open, today).caveats).toBeNull();
     expect(buildPanelModel([day(today, { youMs: MIN }, [], 3)], open, today).caveats).toBe(
-      '3 transcript lines could not be read, so Claude time may be slightly low.',
+      '3 transcript lines could not be read, so agent time may be slightly low.',
     );
     expect(buildPanelModel([day(today, { youMs: MIN }, [], 1)], open, today).caveats).toMatch(/^1 transcript line could/);
   });
   it('compares WakaTime (all machines) with the full total on this machine, yours beside it', () => {
-    const d = [day(today, { youMs: H, claudeMs: H, bothMs: 10 * MIN })];
+    const d = [day(today, { youMs: H, agentsMs: H, bothMs: 10 * MIN })];
     expect(buildPanelModel(d, open, today, { wakatimeSeconds: 130 * 60 }).compare).toBe(
       'WakaTime 2h 10m (all machines) · Sanduhr 2h 10m on this machine (yours 1h 10m) · difference 0m',
     );
@@ -231,6 +232,60 @@ describe('caveats, compare and footer', () => {
   });
   it('always carries the trademark footer', () => {
     expect(buildPanelModel([], open, today).footer).toBe(FOOTER);
-    expect(FOOTER).toBe('Claude is a trademark of Anthropic. Sanduhr Time is not affiliated with or endorsed by Anthropic.');
+    expect(FOOTER).toBe(
+      'Claude is a trademark of Anthropic. Codex is a trademark of OpenAI. Sanduhr Time is not affiliated with or endorsed by Anthropic or OpenAI.',
+    );
+  });
+});
+
+describe('agents', () => {
+  const today = '2026-10-06';
+  const both = {
+    claude: { wallMs: 90 * MIN, streamMs: 120 * MIN, lines: 300 },
+    codex: { wallMs: 50 * MIN, streamMs: 50 * MIN, lines: 40 },
+  };
+
+  it('with several agents: the segment reads Agents and today lists one row per agent', () => {
+    const d = [day(today, { youMs: H, agentsMs: 100 * MIN, bothMs: 20 * MIN, agentMs: 170 * MIN, linesAgents: 340, byAgent: both })];
+    const m = buildPanelModel(d, open, today);
+    expect(m.headline).toMatchObject({ agents: '1h 40m', agentsLabel: 'Agents' });
+    expect(m.headlineAgents).toEqual([
+      { id: 'claude', name: 'Claude', time: '1h 30m', streamTime: '2h 00m', lines: 300 },
+      { id: 'codex', name: 'Codex', time: '50m', streamTime: '50m', lines: 40 },
+    ]);
+    expect(buildStatusBar(d[0]).tooltip).toBe('You 1h 00m · Agents 1h 40m (Claude 1h 30m, Codex 50m) · Both 20m');
+  });
+
+  it('with one agent the segment carries its name, Codex included', () => {
+    const codexOnly = { codex: { wallMs: 30 * MIN, streamMs: 30 * MIN, lines: 0 } };
+    const d = [day(today, { youMs: H, agentsMs: 30 * MIN, byAgent: codexOnly })];
+    const m = buildPanelModel(d, open, today);
+    expect(m.headline.agentsLabel).toBe('Codex');
+    expect(m.headlineAgents.map((a) => a.name)).toEqual(['Codex']);
+    expect(buildStatusBar(d[0]).tooltip).toBe('You 1h 00m · Codex 30m · Both 0m');
+  });
+
+  it('a day with no agent at all reads Agents 0m and lists no agent rows', () => {
+    const m = buildPanelModel([day(today, { youMs: H })], open, today);
+    expect(m.headline).toMatchObject({ agents: '0m', agentsLabel: 'Agents' });
+    expect(m.headlineAgents).toEqual([]);
+  });
+
+  it('project rows carry their own agent rows and lines', () => {
+    const p = project({ key: 'aaaa', youMs: H, agentsMs: 100 * MIN, bothMs: 20 * MIN, agentMs: 170 * MIN, linesAgents: 340, byAgent: both });
+    const row = buildPanelModel([day(today, {}, [p])], open, today).projects[0];
+    expect(row.split.agentsLabel).toBe('Agents');
+    expect(row.agents.map((a) => [a.name, a.lines])).toEqual([['Claude', 300], ['Codex', 40]]);
+    expect(row.linesAgents).toBe(340);
+  });
+
+  it('history from a v1 day file shows as Claude in the strip', () => {
+    const v1 = normalizeDay({
+      v: 1, date: '2026-10-05', machine: 'm', generatedAt: '2026-10-05T12:00:00.000Z',
+      totals: { youMs: H, claudeMs: H, bothMs: 0, totalMs: 2 * H, agentMs: H, linesYou: 0, linesClaude: 5 },
+      projects: [], caveats: { unreadableTranscriptLines: 0, readerVersion: '0.2.0', claudeCodeVersions: [] },
+    })!;
+    const m = buildPanelModel([v1], open, today);
+    expect(m.strip[5].split).toEqual({ total: '2h 00m', you: '1h 00m', agents: '1h 00m', both: '0m', agentsLabel: 'Claude' });
   });
 });

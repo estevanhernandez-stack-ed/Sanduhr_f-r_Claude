@@ -14,7 +14,7 @@ import { execFile, type ExecFileException } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { localDate } from '../store/claudeSpool';
+import { localDate } from '../store/agentSpool';
 import { stateDir } from '../store/paths';
 import type { DayRecord } from '../types';
 

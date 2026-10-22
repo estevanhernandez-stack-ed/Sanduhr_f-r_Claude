@@ -1,22 +1,26 @@
 /**
- * The merger: pure, no I/O. Turns one local day of editor heartbeats and Claude events
- * into a DayRecord. Everything runs in epoch milliseconds; spool `time` fields are unix
- * seconds and are converted once, on the way in.
+ * The merger: pure, no I/O. Turns one local day of editor heartbeats and agent events
+ * (Claude, Codex) into a DayRecord. Everything runs in epoch milliseconds; spool `time`
+ * fields are unix seconds and are converted once, on the way in.
  *
  * Interval rules (the usage spec states them as the contract):
  * - Yours, per project: non-reload heartbeat times plus, for each prompt at t, TWO events:
  *   the span's start and t. The start is t - 2 min, or earlier when the prompt's own stream
- *   had Claude activity within idleMinutes before it: then the span reaches back to that
- *   activity, because reading Claude's answer and dictating the next prompt is your time.
+ *   had agent activity within idleMinutes before it: then the span reaches back to that
+ *   activity, because reading the agent's answer and dictating the next prompt is your time.
  *   Consecutive events join when the gap is <= idleMinutes; an interval with a single event
  *   lasts 2 minutes. A prompt with no recent activity in its stream therefore yields exactly
- *   [t - 2 min, t], and a prompt 1 minute after an edit joins it.
- * - Claude's, per project: `activity` and `edit` events (an edit is also activity), gap
- *   5 minutes, lone event 2 minutes. Agent time sums each stream's own intervals.
+ *   [t - 2 min, t], and a prompt 1 minute after an edit joins it. A prompt to any agent counts.
+ * - Each agent's, per project: its `activity` and `edit` events (an edit is also activity),
+ *   gap 5 minutes, lone event 2 minutes. The agents bucket is the union of every agent's
+ *   intervals, so a minute two agents share counts once. Stream time sums each stream's own
+ *   intervals.
  */
 import { clip, intersect, joinEvents, subtract, totalLength, union } from './intervals';
 import type {
-  ClaudeEvent,
+  AgentEvent,
+  AgentName,
+  ByAgent,
   DayCaveats,
   DayRecord,
   DayTotals,
@@ -25,13 +29,14 @@ import type {
   LanguageTime,
   ProjectDay,
 } from './types';
+import { AGENT_NAMES } from './types';
 
 export const MIN_MS = 60_000;
 export const PROMPT_SPAN_MS = 2 * MIN_MS;
 export const LONE_MS = 2 * MIN_MS;
-export const CLAUDE_GAP_MS = 5 * MIN_MS;
+export const AGENT_GAP_MS = 5 * MIN_MS;
 export const DEFAULT_IDLE_MINUTES = 15;
-/** A heartbeat and a Claude edit on the same entity within this many ms is Claude's write. */
+/** A heartbeat and an agent edit on the same entity within this many ms is the agent's write. */
 export const BACKSTOP_MS = 2000;
 /** How much of the previous day's end is read so intervals crossing midnight join. */
 export const TAIL_MS = 60 * MIN_MS;
@@ -51,9 +56,9 @@ export interface MergeInput {
   machine: string;
   /** The date's heartbeats (more are harmless: only this day's window is counted). */
   heartbeats: readonly Heartbeat[];
-  claudeEvents: readonly ClaudeEvent[];
+  agentEvents: readonly AgentEvent[];
   /** The previous day's events, at least its last hour. */
-  previousDayTail?: { heartbeats: readonly Heartbeat[]; claudeEvents: readonly ClaudeEvent[] };
+  previousDayTail?: { heartbeats: readonly Heartbeat[]; agentEvents: readonly AgentEvent[] };
   /** `{ [projectKey]: { alias, masked} }`; a missing key means alias null, masked false. */
   aliases: Readonly<Record<string, AliasEntry>>;
   /** `{ [projectKey]: realName }`, from the resolver. */
@@ -80,19 +85,30 @@ export function dayWindow(date: string): { start: number; end: number } {
 
 const toMs = (seconds: number): number => Math.round(seconds * 1000);
 
+interface AgentPool {
+  /** Activity + edit times, all streams. */
+  times: number[];
+  /** Per stream: activity + edit times. */
+  streams: Map<string, number[]>;
+  lines: number;
+}
+
 interface Pool {
   yourTimes: number[];
-  claudeTimes: number[];
-  /** Per Claude stream: activity + edit times. */
-  streams: Map<string, number[]>;
+  agents: Map<AgentName, AgentPool>;
   /** Non-reload heartbeats, for language stretches. */
   beats: { t: number; language: string }[];
   linesYou: number;
-  linesClaude: number;
 }
 
 function newPool(): Pool {
-  return { yourTimes: [], claudeTimes: [], streams: new Map(), beats: [], linesYou: 0, linesClaude: 0 };
+  return { yourTimes: [], agents: new Map(), beats: [], linesYou: 0 };
+}
+
+function agentPool(p: Pool, agent: AgentName): AgentPool {
+  let a = p.agents.get(agent);
+  if (!a) p.agents.set(agent, (a = { times: [], streams: new Map(), lines: 0 }));
+  return a;
 }
 
 /** Language stretches from heartbeats: [previous, this] goes to the heartbeat that extended it; a lone one gets 2 minutes. */
@@ -120,12 +136,18 @@ function languageStretches(
   return out;
 }
 
-function totalsFrom(u: Interval[], c: Interval[]): Pick<DayTotals, 'youMs' | 'claudeMs' | 'bothMs' | 'totalMs'> {
+function totalsFrom(u: Interval[], c: Interval[]): Pick<DayTotals, 'youMs' | 'agentsMs' | 'bothMs' | 'totalMs'> {
   const youMs = totalLength(subtract(u, c));
-  const claudeMs = totalLength(subtract(c, u));
+  const agentsMs = totalLength(subtract(c, u));
   const bothMs = totalLength(intersect(u, c));
-  return { youMs, claudeMs, bothMs, totalMs: youMs + claudeMs + bothMs };
+  return { youMs, agentsMs, bothMs, totalMs: youMs + agentsMs + bothMs };
 }
+
+/** Agents in display order, keeping only those present. */
+const orderedAgents = (present: Iterable<AgentName>): AgentName[] => {
+  const set = new Set(present);
+  return AGENT_NAMES.filter((a) => set.has(a));
+};
 
 export function merge(input: MergeInput): DayRecord {
   const idleMs = (input.settings.idleMinutes ?? DEFAULT_IDLE_MINUTES) * MIN_MS;
@@ -134,15 +156,15 @@ export function merge(input: MergeInput): DayRecord {
 
   // Pool this day and the previous day's tail; events at or past the next midnight belong to the next day.
   const allBeats = [...(input.previousDayTail?.heartbeats ?? []), ...input.heartbeats];
-  const allClaude = [...(input.previousDayTail?.claudeEvents ?? []), ...input.claudeEvents];
+  const allAgent = [...(input.previousDayTail?.agentEvents ?? []), ...input.agentEvents];
 
   const seenIds = new Set<string>();
-  const claude: { ev: ClaudeEvent; t: number }[] = [];
-  for (const ev of allClaude) {
+  const agentEvents: { ev: AgentEvent; t: number }[] = [];
+  for (const ev of allAgent) {
     if (seenIds.has(ev.id)) continue;
     seenIds.add(ev.id);
     const t = toMs(ev.time);
-    if (t >= readFrom && t < end) claude.push({ ev, t });
+    if (t >= readFrom && t < end) agentEvents.push({ ev, t });
   }
   const beats: { hb: Heartbeat; t: number }[] = [];
   for (const hb of allBeats) {
@@ -150,16 +172,16 @@ export function merge(input: MergeInput): DayRecord {
     if (t >= readFrom && t < end) beats.push({ hb, t });
   }
 
-  // Backstop: an edit heartbeat landing on the same file within 2 s of a Claude edit is Claude's write.
-  const claudeEditTimes = new Map<string, number[]>();
-  for (const { ev, t } of claude) {
+  // Backstop: an edit heartbeat landing on the same file within 2 s of an agent's edit is the agent's write.
+  const agentEditTimes = new Map<string, number[]>();
+  for (const { ev, t } of agentEvents) {
     if (ev.kind !== 'edit' || !ev.entity) continue;
-    const list = claudeEditTimes.get(ev.entity);
+    const list = agentEditTimes.get(ev.entity);
     if (list) list.push(t);
-    else claudeEditTimes.set(ev.entity, [t]);
+    else agentEditTimes.set(ev.entity, [t]);
   }
   const isBackstopped = (hb: Heartbeat, t: number): boolean =>
-    hb.kind === 'edit' && (claudeEditTimes.get(hb.entity)?.some((ct) => Math.abs(ct - t) <= BACKSTOP_MS) ?? false);
+    hb.kind === 'edit' && (agentEditTimes.get(hb.entity)?.some((ct) => Math.abs(ct - t) <= BACKSTOP_MS) ?? false);
 
   const pools = new Map<string, Pool>();
   const poolFor = (key: string): Pool => {
@@ -176,12 +198,14 @@ export function merge(input: MergeInput): DayRecord {
     if (t >= start && !isBackstopped(hb, t)) p.linesYou += hb.human_line_changes;
   }
 
-  // Read-and-dictate gap: a prompt's span reaches back to its own stream's last Claude activity
+  // Read-and-dictate gap: a prompt's span reaches back to its own stream's last agent activity
   // when that is within idleMinutes. Same stream only, so a long subagent run (its own stream)
   // never shortens the gap; a longer gap means the builder stepped away, and keeps the 2 minutes.
   const spanStart = new Map<string, number>();
   const lastActivity = new Map<string, number>();
-  const ordered = [...claude].sort((a, b) => a.t - b.t || (a.ev.kind === 'prompt' ? -1 : 0) - (b.ev.kind === 'prompt' ? -1 : 0));
+  const ordered = [...agentEvents].sort(
+    (a, b) => a.t - b.t || (a.ev.kind === 'prompt' ? -1 : 0) - (b.ev.kind === 'prompt' ? -1 : 0),
+  );
   for (const { ev, t } of ordered) {
     if (ev.kind !== 'prompt') {
       lastActivity.set(ev.stream, t);
@@ -192,30 +216,39 @@ export function merge(input: MergeInput): DayRecord {
     spanStart.set(ev.id, Math.min(read, t - PROMPT_SPAN_MS));
   }
 
-  for (const { ev, t } of claude) {
+  for (const { ev, t } of agentEvents) {
     const p = poolFor(ev.project);
     if (ev.kind === 'prompt') {
       p.yourTimes.push(spanStart.get(ev.id) ?? t - PROMPT_SPAN_MS, t);
       continue;
     }
-    p.claudeTimes.push(t);
-    const s = p.streams.get(ev.stream);
+    const a = agentPool(p, ev.agent ?? 'claude');
+    a.times.push(t);
+    const s = a.streams.get(ev.stream);
     if (s) s.push(t);
-    else p.streams.set(ev.stream, [t]);
-    if (ev.kind === 'edit' && t >= start) p.linesClaude += (ev.linesAdded ?? 0) + (ev.linesRemoved ?? 0);
+    else a.streams.set(ev.stream, [t]);
+    if (ev.kind === 'edit' && t >= start) a.lines += (ev.linesAdded ?? 0) + (ev.linesRemoved ?? 0);
   }
 
   const projects: ProjectDay[] = [];
   const uByProject: Interval[][] = [];
+  /** Per agent, every project's clipped intervals: the day's wall time per agent. */
+  const dayAgentIntervals = new Map<AgentName, Interval[]>();
   const cByProject: Interval[][] = [];
 
   for (const [key, p] of pools) {
     const u = clip(joinEvents(p.yourTimes, idleMs, LONE_MS), start, end);
-    const c = clip(joinEvents(p.claudeTimes, CLAUDE_GAP_MS, LONE_MS), start, end);
-    let agentMs = 0;
-    for (const times of p.streams.values()) {
-      agentMs += totalLength(clip(joinEvents(times, CLAUDE_GAP_MS, LONE_MS), start, end));
+    const perAgent: { agent: AgentName; iv: Interval[]; streamMs: number; lines: number }[] = [];
+    for (const agent of orderedAgents(p.agents.keys())) {
+      const a = p.agents.get(agent)!;
+      const iv = clip(joinEvents(a.times, AGENT_GAP_MS, LONE_MS), start, end);
+      let streamMs = 0;
+      for (const times of a.streams.values()) {
+        streamMs += totalLength(clip(joinEvents(times, AGENT_GAP_MS, LONE_MS), start, end));
+      }
+      perAgent.push({ agent, iv, streamMs, lines: a.lines });
     }
+    const c = union(perAgent.flatMap((a) => a.iv));
 
     const byLang = new Map<string, number>();
     for (const { iv, language } of languageStretches(p.beats, idleMs)) {
@@ -228,9 +261,20 @@ export function merge(input: MergeInput): DayRecord {
       .slice(0, MAX_LANGUAGES);
 
     const t = totalsFrom(u, c);
-    if (t.totalMs === 0 && p.linesYou === 0 && p.linesClaude === 0) continue; // only tail activity, nothing today
+    const linesAgents = perAgent.reduce((s, a) => s + a.lines, 0);
+    if (t.totalMs === 0 && p.linesYou === 0 && linesAgents === 0) continue; // only tail activity, nothing today
     uByProject.push(u);
     cByProject.push(c);
+
+    const byAgent: ByAgent = {};
+    for (const a of perAgent) {
+      const wallMs = totalLength(a.iv);
+      if (wallMs === 0 && a.streamMs === 0 && a.lines === 0) continue; // tail only
+      byAgent[a.agent] = { wallMs, streamMs: a.streamMs, lines: a.lines };
+      const list = dayAgentIntervals.get(a.agent);
+      if (list) list.push(...a.iv);
+      else dayAgentIntervals.set(a.agent, [...a.iv]);
+    }
 
     const alias = input.aliases[key];
     projects.push({
@@ -240,9 +284,10 @@ export function merge(input: MergeInput): DayRecord {
       alias: alias?.alias ?? null,
       masked: alias?.masked ?? false,
       ...t,
-      agentMs,
+      agentMs: perAgent.reduce((s, a) => s + a.streamMs, 0),
       linesYou: p.linesYou,
-      linesClaude: p.linesClaude,
+      linesAgents,
+      byAgent,
       languages,
     });
   }
@@ -252,11 +297,22 @@ export function merge(input: MergeInput): DayRecord {
   // Day totals pool every project's intervals, so a minute is counted once at day level.
   const uAll = union(uByProject.flat());
   const cAll = union(cByProject.flat());
+  const dayByAgent: ByAgent = {};
+  for (const agent of orderedAgents(dayAgentIntervals.keys())) {
+    let streamMs = 0;
+    let lines = 0;
+    for (const p of projects) {
+      streamMs += p.byAgent[agent]?.streamMs ?? 0;
+      lines += p.byAgent[agent]?.lines ?? 0;
+    }
+    dayByAgent[agent] = { wallMs: totalLength(union(dayAgentIntervals.get(agent)!)), streamMs, lines };
+  }
   const totals: DayTotals = {
     ...totalsFrom(uAll, cAll),
     agentMs: projects.reduce((s, p) => s + p.agentMs, 0),
     linesYou: projects.reduce((s, p) => s + p.linesYou, 0),
-    linesClaude: projects.reduce((s, p) => s + p.linesClaude, 0),
+    linesAgents: projects.reduce((s, p) => s + p.linesAgents, 0),
+    byAgent: dayByAgent,
   };
 
   const caveats: DayCaveats = {
@@ -265,5 +321,5 @@ export function merge(input: MergeInput): DayRecord {
     claudeCodeVersions: input.caveats.claudeCodeVersions ?? [],
   };
 
-  return { v: 1, date: input.date, machine: input.machine, generatedAt: input.generatedAt, totals, projects, caveats };
+  return { v: 2, date: input.date, machine: input.machine, generatedAt: input.generatedAt, totals, projects, caveats };
 }

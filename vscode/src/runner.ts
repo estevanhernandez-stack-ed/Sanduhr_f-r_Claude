@@ -5,16 +5,17 @@
  * the reader are injected, so tests drive two runners on one data dir with fake time.
  * Window close does nothing here beyond `dispose()`; no pass and no merge at deactivate.
  */
-import { readPass as realReadPass, type ReadPassOptions, type ReadPassResult } from './claude/reader';
+import type { ReadPassResult } from './claude/reader';
+import { readAgentsPass, type AgentPassOptions } from './readAgents';
 import { dayWindow, merge, NO_PROJECT_KEY, NO_PROJECT_NAME, TAIL_MS } from './merge';
 import { AliasStoreUnavailable, type AliasStore } from './store/aliases';
 import { recordCaveats } from './store/caveats';
-import { localDate, pruneClaudeSpool, readClaudeDay } from './store/claudeSpool';
+import { localDate, pruneAgentSpool, readAgentDay } from './store/agentSpool';
 import { writeDay } from './store/days';
 import { stateDir } from './store/paths';
 import { pruneSpool, readSpoolDay } from './store/spool';
 import { acquireLock, type LockOptions } from './store/state';
-import type { ClaudeEvent, DayRecord, Heartbeat, InstalledState } from './types';
+import type { AgentEvent, DayRecord, Heartbeat, InstalledState } from './types';
 
 export const TICK_MS = 5 * 60 * 1000;
 export const REFRESH_MS = 30 * 1000;
@@ -53,10 +54,10 @@ export interface RunnerDeps {
   now: () => number;
   timers?: RunnerTimers;
   lockOptions?: LockOptions;
-  /** Transcript reader; default is the real `readPass`. */
-  readPass?: (opts: ReadPassOptions) => Promise<ReadPassResult>;
+  /** Transcript reader; default is `readAgentsPass` (Claude, then Codex). */
+  readPass?: (opts: AgentPassOptions) => Promise<ReadPassResult>;
   /** Extra reader options (homes, byte budget). `dir` and `installed` are filled in. */
-  readerOptions?: Partial<Omit<ReadPassOptions, 'dir' | 'installed'>>;
+  readerOptions?: Partial<Omit<AgentPassOptions, 'dir' | 'installed'>>;
   /** `sanduhrTime.idleMinutes`, read fresh at each merge. */
   idleMinutes?: () => number;
   /** Real names the resolver has seen, by project key. */
@@ -96,7 +97,7 @@ export class Runner {
     const now = new Date(this.deps.now());
     try {
       pruneSpool(this.deps.dir, now);
-      pruneClaudeSpool(this.deps.dir, now);
+      pruneAgentSpool(this.deps.dir, now);
     } catch (err) {
       this.deps.onError?.(err);
     }
@@ -154,7 +155,7 @@ export class Runner {
 
   private async runLocked(): Promise<TickResult> {
     const { deps } = this;
-    const read = deps.readPass ?? realReadPass;
+    const read = deps.readPass ?? readAgentsPass;
     const pass = await read({ ...deps.readerOptions, dir: deps.dir, installed: deps.installed });
     const caveats = recordCaveats(stateDir(deps.dir), pass, deps.now());
 
@@ -181,18 +182,18 @@ export class Runner {
     const tailFromSec = (dayWindow(date).start - TAIL_MS) / 1000;
 
     const heartbeats: Heartbeat[] = readSpoolDay(deps.dir, date, deps.machine);
-    const claudeEvents: ClaudeEvent[] = readClaudeDay(deps.dir, date);
+    const agentEvents: AgentEvent[]  = readAgentDay(deps.dir, date);
     const prevBeats = readSpoolDay(deps.dir, prev, deps.machine).filter((h) => h.time >= tailFromSec);
-    const prevClaude = readClaudeDay(deps.dir, prev).filter((e) => e.time >= tailFromSec);
+    const prevAgent = readAgentDay(deps.dir, prev).filter((e) => e.time >= tailFromSec);
 
     // Every project key seen: aliases are assigned here, under the lock this tick already holds.
     const names = deps.knownNames?.() ?? new Map<string, string>();
     const wanted = new Map<string, string | undefined>();
     for (const key of [
       ...heartbeats.map((h) => h.project),
-      ...claudeEvents.map((e) => e.project),
+      ...agentEvents.map((e) => e.project),
       ...prevBeats.map((h) => h.project),
-      ...prevClaude.map((e) => e.project),
+      ...prevAgent.map((e) => e.project),
     ]) {
       wanted.set(key, key === NO_PROJECT_KEY ? NO_PROJECT_NAME : names.get(key));
     }
@@ -223,8 +224,8 @@ export class Runner {
       date,
       machine: deps.machine,
       heartbeats,
-      claudeEvents,
-      previousDayTail: { heartbeats: prevBeats, claudeEvents: prevClaude },
+      agentEvents,
+      previousDayTail: { heartbeats: prevBeats, agentEvents: prevAgent },
       aliases,
       realNames,
       settings: { idleMinutes: deps.idleMinutes?.() },

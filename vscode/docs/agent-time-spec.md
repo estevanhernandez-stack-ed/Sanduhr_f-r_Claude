@@ -1,6 +1,7 @@
 # Spec: unified agent time (Codex, then Copilot CLI, alongside Claude)
 
-Status: draft for review, 2026-10-22. Dashboard task "Sanduhr Time: unified agent time".
+Status: steps 1 to 4 built in Sanduhr Time 0.3.0 (2026-10-22); steps 5 and 6 open. Dashboard task
+"Sanduhr Time: unified agent time". The on-disk contract is `time-usage-spec.md` (sections 4, 5, 8).
 
 ## Why
 
@@ -99,13 +100,43 @@ made-up text; no real transcript content enters the repo.
 
 ## Order of work
 
-1. The Codex reader with fixtures and tests, using the rule above (reader only, no merge change).
-2. Agent events and spool v2 with the `agent` field; Claude's reader writes `agent: claude`.
-3. The merger: agents bucket, `byAgent`, day schema v2 with the v1 mapping, tests for overlap
-   between Claude and Codex running together.
-4. Panel rows per agent; WakaTime comparison unchanged (it already compares full totals).
+1. **Built (0.3.0).** The Codex reader with fixtures and tests, using the rule above (reader only,
+   no merge change).
+2. **Built (0.3.0).** Agent events and spool v2 with the `agent` field; Claude's reader writes
+   `agent: claude`.
+3. **Built (0.3.0).** The merger: agents bucket, `byAgent`, day schema v2 with the v1 mapping,
+   tests for overlap between Claude and Codex running together.
+4. **Built (0.3.0).** Panel rows per agent; WakaTime comparison unchanged (it already compares full
+   totals).
 5. The 626 extension's publisher and `manage_time` / bulletin carry `byAgent` (626 Labs repo).
 6. Copilot CLI, once measured.
+
+## As built (0.3.0)
+
+Where the build went past or around the draft:
+
+- **apply_patch arrives inside `exec`.** On Neb's Codex Desktop no tool call is named `apply_patch`:
+  all 166 patches came inside `exec` custom tool calls as `tools.apply_patch("...")`, newlines
+  escaped. The reader finds a patch body in any custom tool call's input or function call's
+  arguments, unescapes a quoted body once, and counts it the same. Codex also writes
+  `event_msg` `item_completed` items of type `FileChange` with structured diffs; they are not used
+  for lines, so nothing counts twice.
+- **Segment state lives with the offset.** A pass that resumes mid-rollout needs the segment in
+  force, so `offsets.json` entries for rollouts carry `codex: { stream, threadSource, cwd }`.
+- **Each agent joins on its own** (5-minute gap), then the agents bucket is the union. A Claude
+  event and a Codex event three minutes apart no longer bridge into one interval.
+- **Lines per agent.** `linesClaude` became `linesAgents`, and `byAgent` entries carry `lines` beside
+  `wallMs` and `streamMs`.
+- **`item_completed` for a `UserMessage`** is neither a prompt nor activity.
+- **API compatibility.** The extension API stays version 1. Every record it returns also carries
+  `claudeMs` (= `agentsMs`) and `linesClaude` (= `linesAgents`), so 0.2 consumers keep working; those
+  two now count every agent. Step 5 should read `agentsMs` and `byAgent` instead.
+- **Backfill.** A rollout first seen with an mtime after the install is read from its start, so a
+  machine that installed before 0.3.0 gains Codex time for days since its install date. Records
+  before the install are still dropped.
+
+Over Neb's real Codex history the reader finds the 54 human prompts the probe counted and no
+unreadable lines.
 
 ## Open questions
 

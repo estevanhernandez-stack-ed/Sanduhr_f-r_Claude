@@ -4,7 +4,7 @@ import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import { afterAll, describe, expect, it } from 'vitest';
 import { dayWindow, merge, type MergeInput } from './merge';
-import type { ClaudeEvent, DayRecord, Heartbeat } from './types';
+import type { AgentEvent, DayRecord, Heartbeat } from './types';
 
 const MIN = 60_000;
 const DATE = '2026-06-10';
@@ -36,8 +36,8 @@ function hb(time: number, over: Partial<Heartbeat> = {}): Heartbeat {
     ...over,
   };
 }
-function ce(time: number, kind: ClaudeEvent['kind'], over: Partial<ClaudeEvent> = {}): ClaudeEvent {
-  return { v: 1, id: `id-${seq++}`, time, project: A, stream: 's1', kind, ...over };
+function ce(time: number, kind: AgentEvent['kind'], over: Partial<AgentEvent> = {}): AgentEvent {
+  return { v: 2, agent: 'claude', id: `id-${seq++}`, time, project: A, stream: 's1', kind, ...over };
 }
 
 function run(over: Partial<MergeInput> = {}): DayRecord {
@@ -45,7 +45,7 @@ function run(over: Partial<MergeInput> = {}): DayRecord {
     date: DATE,
     machine: 'machine-1',
     heartbeats: [],
-    claudeEvents: [],
+    agentEvents: [],
     aliases: {},
     realNames: { [A]: 'alpha', [B]: 'beta' },
     settings: { idleMinutes: 15 },
@@ -70,19 +70,141 @@ function expectValid(d: DayRecord): void {
   expect(validate.errors ?? []).toEqual([]);
   expect(ok).toBe(true);
   // Invariant the schema cannot express: total is the sum of the three parts.
-  for (const t of [d.totals, ...d.projects]) expect(t.totalMs).toBe(t.youMs + t.claudeMs + t.bothMs);
+  for (const t of [d.totals, ...d.projects]) {
+    expect(t.totalMs).toBe(t.youMs + t.agentsMs + t.bothMs);
+    // byAgent splits stream time and lines exactly; each agent's wall time fits inside the agents' union.
+    const shares = Object.values(t.byAgent);
+    expect(shares.reduce((s, a) => s + a!.streamMs, 0)).toBe(t.agentMs);
+    expect(shares.reduce((s, a) => s + a!.lines, 0)).toBe(t.linesAgents);
+    for (const a of shares) expect(a!.wallMs).toBeLessThanOrEqual(t.agentsMs + t.bothMs);
+  }
 }
+
+const codex = (time: number, kind: AgentEvent['kind'], over: Partial<AgentEvent> = {}): AgentEvent =>
+  ce(time, kind, { agent: 'codex', stream: 'x1', ...over });
+
+describe('agents: Claude and Codex together', () => {
+  it('the agents bucket is the union; byAgent holds each agent\'s own wall and stream time', () => {
+    const d = run({
+      agentEvents: [
+        ce(at(10, 0), 'activity'), ce(at(10, 4), 'activity'),
+        codex(at(10, 2), 'activity'), codex(at(10, 6), 'activity'),
+      ],
+    });
+    const p = proj(d, A);
+    expect(p.agentsMs).toBe(6 * MIN); // [10:00, 10:06], the shared minutes once
+    expect(p.agentMs).toBe(8 * MIN); // 4 + 4
+    expect(p.byAgent).toEqual({ claude: { wallMs: 4 * MIN, streamMs: 4 * MIN, lines: 0 }, codex: { wallMs: 4 * MIN, streamMs: 4 * MIN, lines: 0 } });
+    expect(d.totals.byAgent).toEqual(p.byAgent);
+    expectValid(d);
+  });
+
+  it('wallMs is an agent\'s union, streamMs the sum of its parallel streams', () => {
+    const d = run({
+      agentEvents: [
+        codex(at(10, 0), 'activity', { stream: 'x1' }), codex(at(10, 4), 'activity', { stream: 'x1' }),
+        codex(at(10, 0), 'activity', { stream: 'x2' }), codex(at(10, 4), 'activity', { stream: 'x2' }),
+      ],
+    });
+    expect(d.totals.byAgent).toEqual({ codex: { wallMs: 4 * MIN, streamMs: 8 * MIN, lines: 0 } });
+    expect(d.totals.agentsMs).toBe(4 * MIN);
+    expectValid(d);
+  });
+
+  it('each agent joins its own events: two lone events of different agents never bridge each other', () => {
+    const d = run({ agentEvents: [ce(at(10, 0), 'activity'), codex(at(10, 3), 'activity')] });
+    expect(d.totals.agentsMs).toBe(4 * MIN); // [10:00, 10:02] and [10:03, 10:05]
+  });
+
+  it('a prompt to Codex is your time, never agent time', () => {
+    const d = run({ agentEvents: [codex(at(10, 30), 'prompt')] });
+    expect(proj(d, A)).toMatchObject({ youMs: 2 * MIN, agentsMs: 0, agentMs: 0, byAgent: {} });
+    expectValid(d);
+  });
+
+  it('the read-and-dictate gap (#175) is measured inside the Codex prompt\'s own stream', () => {
+    const d = run({
+      agentEvents: [
+        codex(at(10, 0), 'activity'),
+        codex(at(10, 5), 'activity'),
+        ce(at(10, 12), 'activity', { stream: 'claude-main' }), // another agent's stream never shortens it
+        codex(at(10, 12), 'activity', { stream: 'guardian' }), // nor a guardian_review segment's
+        codex(at(10, 13), 'prompt'),
+      ],
+    });
+    const p = proj(d, A);
+    expect(p.youMs + p.bothMs).toBe(8 * MIN); // [10:05, 10:13]
+    expectValid(d);
+  });
+
+  it('guardian and subagent streams are activity: they add agent time and never your time', () => {
+    const d = run({ agentEvents: [codex(at(10, 0), 'activity', { stream: 'guardian' }), codex(at(10, 3), 'activity', { stream: 'subagent' })] });
+    expect(proj(d, A)).toMatchObject({ youMs: 0, bothMs: 0, agentsMs: 3 * MIN, agentMs: 4 * MIN }); // one agent: its streams join
+  });
+
+  it('Codex edits count as agent lines and trip the reload backstop', () => {
+    const E = 'c'.repeat(24);
+    const d = run({
+      heartbeats: [hb(at(10, 0, 1), { entity: E, human_line_changes: 5 })],
+      agentEvents: [
+        codex(at(10, 0, 0), 'edit', { entity: E, linesAdded: 3, linesRemoved: 1 }),
+        ce(at(10, 1), 'edit', { entity: 'd'.repeat(24), linesAdded: 2, linesRemoved: 0 }),
+      ],
+    });
+    expect(d.totals.linesYou).toBe(0);
+    expect(d.totals.linesAgents).toBe(6);
+    expect(d.totals.byAgent.codex!.lines).toBe(4);
+    expect(d.totals.byAgent.claude!.lines).toBe(2);
+    expectValid(d);
+  });
+
+  it('day byAgent pools projects: Claude in A and Codex in B at the same minutes', () => {
+    const d = run({
+      agentEvents: [
+        ce(at(10, 0), 'activity', { project: A }), ce(at(10, 4), 'activity', { project: A }),
+        codex(at(10, 0), 'activity', { project: B }), codex(at(10, 4), 'activity', { project: B }),
+        codex(at(11, 0), 'activity', { project: A, stream: 'x9' }), codex(at(11, 2), 'activity', { project: A, stream: 'x9' }),
+      ],
+    });
+    expect(d.totals.agentsMs).toBe(6 * MIN); // [10:00, 10:04] once, plus [11:00, 11:02]
+    expect(d.totals.byAgent).toEqual({
+      claude: { wallMs: 4 * MIN, streamMs: 4 * MIN, lines: 0 },
+      codex: { wallMs: 6 * MIN, streamMs: 6 * MIN, lines: 0 },
+    });
+    expect(proj(d, A).byAgent).toEqual({
+      claude: { wallMs: 4 * MIN, streamMs: 4 * MIN, lines: 0 },
+      codex: { wallMs: 2 * MIN, streamMs: 2 * MIN, lines: 0 },
+    });
+    expectValid(d);
+  });
+
+  it('an agent active only in the previous day\'s tail gets no byAgent entry', () => {
+    const d = run({
+      agentEvents: [ce(at(10, 0), 'activity')],
+      previousDayTail: { heartbeats: [], agentEvents: [codex(at(23, 50, 0, '2026-06-09'), 'activity')] },
+    });
+    expect(Object.keys(d.totals.byAgent)).toEqual(['claude']);
+    expectValid(d);
+  });
+
+  it('an event without an agent (a hand-built one) is Claude\'s', () => {
+    const { agent: _drop, ...bare } = ce(at(10, 0), 'activity');
+    void _drop;
+    const d = run({ agentEvents: [bare as AgentEvent] });
+    expect(Object.keys(d.totals.byAgent)).toEqual(['claude']);
+  });
+});
 
 describe('overlap', () => {
   it('both is the intersection of you and Claude in one project', () => {
     const d = run({
       heartbeats: [hb(at(10, 0)), hb(at(10, 5)), hb(at(10, 10))],
-      claudeEvents: [ce(at(10, 8), 'activity'), ce(at(10, 12), 'activity'), ce(at(10, 14), 'activity')],
+      agentEvents: [ce(at(10, 8), 'activity'), ce(at(10, 12), 'activity'), ce(at(10, 14), 'activity')],
     });
     const p = proj(d, A);
     expect(p.bothMs).toBe(2 * MIN); // 10:08 to 10:10
     expect(p.youMs).toBe(8 * MIN);
-    expect(p.claudeMs).toBe(4 * MIN);
+    expect(p.agentsMs).toBe(4 * MIN);
     expect(p.totalMs).toBe(14 * MIN);
     expect(d.totals.bothMs).toBe(2 * MIN);
     expectValid(d);
@@ -90,16 +212,16 @@ describe('overlap', () => {
 
   it('an edit event counts as Claude activity', () => {
     const d = run({
-      claudeEvents: [ce(at(9, 0), 'activity'), ce(at(9, 4), 'edit', { entity: 'x'.repeat(24), linesAdded: 1, linesRemoved: 0 })],
+      agentEvents: [ce(at(9, 0), 'activity'), ce(at(9, 4), 'edit', { entity: 'x'.repeat(24), linesAdded: 1, linesRemoved: 0 })],
     });
-    expect(proj(d, A).claudeMs).toBe(4 * MIN);
+    expect(proj(d, A).agentsMs).toBe(4 * MIN);
   });
 });
 
 describe('streams and agent minutes', () => {
-  it('claudeMs is the union of parallel streams, agentMs is the sum', () => {
+  it('agentsMs is the union of parallel streams, agentMs is the sum', () => {
     const d = run({
-      claudeEvents: [
+      agentEvents: [
         ce(at(10, 0), 'activity', { stream: 's1' }),
         ce(at(10, 4), 'activity', { stream: 's1' }),
         ce(at(10, 2), 'activity', { stream: 's2' }),
@@ -107,16 +229,16 @@ describe('streams and agent minutes', () => {
       ],
     });
     const p = proj(d, A);
-    expect(p.claudeMs).toBe(6 * MIN); // [10:00, 10:06]
+    expect(p.agentsMs).toBe(6 * MIN); // [10:00, 10:06]
     expect(p.agentMs).toBe(8 * MIN); // 4 + 4
-    expect(d.totals.claudeMs).toBe(6 * MIN);
+    expect(d.totals.agentsMs).toBe(6 * MIN);
     expect(d.totals.agentMs).toBe(8 * MIN);
     expectValid(d);
   });
 
   it('day agentMs sums across projects', () => {
     const d = run({
-      claudeEvents: [
+      agentEvents: [
         ce(at(10, 0), 'activity', { stream: 's1', project: A }),
         ce(at(10, 3), 'activity', { stream: 's1', project: A }),
         ce(at(10, 0), 'activity', { stream: 's2', project: B }),
@@ -124,13 +246,13 @@ describe('streams and agent minutes', () => {
       ],
     });
     expect(d.totals.agentMs).toBe(7 * MIN);
-    expect(d.totals.claudeMs).toBe(4 * MIN); // pooled union [10:00, 10:04]
+    expect(d.totals.agentsMs).toBe(4 * MIN); // pooled union [10:00, 10:04]
   });
 
   it('duplicate Claude event ids count once', () => {
     const e = ce(at(10, 0), 'edit', { entity: 'x'.repeat(24), linesAdded: 2, linesRemoved: 1 });
-    const d = run({ claudeEvents: [e, { ...e }] });
-    expect(d.totals.linesClaude).toBe(3);
+    const d = run({ agentEvents: [e, { ...e }] });
+    expect(d.totals.linesAgents).toBe(3);
   });
 });
 
@@ -139,9 +261,9 @@ describe('lone-event rule', () => {
     expect(proj(run({ heartbeats: [hb(at(10, 0))] }), A).youMs).toBe(2 * MIN);
   });
   it('a single Claude event lasts 2 minutes, two far apart last 2 + 2', () => {
-    expect(proj(run({ claudeEvents: [ce(at(10, 0), 'activity')] }), A).claudeMs).toBe(2 * MIN);
-    const d = run({ claudeEvents: [ce(at(10, 0), 'activity'), ce(at(10, 6), 'activity')] });
-    expect(proj(d, A).claudeMs).toBe(4 * MIN);
+    expect(proj(run({ agentEvents: [ce(at(10, 0), 'activity')] }), A).agentsMs).toBe(2 * MIN);
+    const d = run({ agentEvents: [ce(at(10, 0), 'activity'), ce(at(10, 6), 'activity')] });
+    expect(proj(d, A).agentsMs).toBe(4 * MIN);
   });
   it('a joined interval spans first to last event with no tail', () => {
     expect(proj(run({ heartbeats: [hb(at(10, 0)), hb(at(10, 14))] }), A).youMs).toBe(14 * MIN);
@@ -155,24 +277,24 @@ describe('lone-event rule', () => {
 
 describe('prompt spans', () => {
   it('a lone prompt is the 2 minutes before it', () => {
-    const d = run({ claudeEvents: [ce(at(10, 30), 'prompt')] });
+    const d = run({ agentEvents: [ce(at(10, 30), 'prompt')] });
     expect(proj(d, A).youMs).toBe(2 * MIN);
-    expect(proj(d, A).claudeMs).toBe(0);
+    expect(proj(d, A).agentsMs).toBe(0);
   });
   it('a prompt 1 minute after an edit joins it into one interval', () => {
     const d = run({
       heartbeats: [hb(at(10, 0)), hb(at(10, 10))],
-      claudeEvents: [ce(at(10, 11), 'prompt')],
+      agentEvents: [ce(at(10, 11), 'prompt')],
     });
     expect(proj(d, A).youMs).toBe(11 * MIN); // [10:00, 10:11]
   });
   it('the span start joins an edit up to idleMinutes before it', () => {
-    const d = run({ heartbeats: [hb(at(10, 0))], claudeEvents: [ce(at(10, 16), 'prompt')] });
+    const d = run({ heartbeats: [hb(at(10, 0))], agentEvents: [ce(at(10, 16), 'prompt')] });
     expect(proj(d, A).youMs).toBe(16 * MIN); // span start 10:14 is 14 minutes after the edit
   });
   it('a prompt is not Claude activity', () => {
-    const d = run({ claudeEvents: [ce(at(10, 0), 'prompt')] });
-    expect(d.totals.claudeMs).toBe(0);
+    const d = run({ agentEvents: [ce(at(10, 0), 'prompt')] });
+    expect(d.totals.agentsMs).toBe(0);
     expect(d.totals.agentMs).toBe(0);
   });
 });
@@ -181,32 +303,32 @@ describe('the read-and-dictate gap (#175)', () => {
   const yours = (d: DayRecord) => proj(d, A).youMs + proj(d, A).bothMs;
 
   it('reaches back to the stream\'s last Claude activity within idleMinutes', () => {
-    const d = run({ claudeEvents: [ce(at(10, 0), 'activity'), ce(at(10, 5), 'activity'), ce(at(10, 13), 'prompt')] });
+    const d = run({ agentEvents: [ce(at(10, 0), 'activity'), ce(at(10, 5), 'activity'), ce(at(10, 13), 'prompt')] });
     expect(yours(d)).toBe(8 * MIN); // [10:05, 10:13]: reading the answer and dictating the next prompt
-    expect(proj(d, A).claudeMs).toBe(5 * MIN);
+    expect(proj(d, A).agentsMs).toBe(5 * MIN);
     expect(proj(d, A).totalMs).toBe(13 * MIN);
     expectValid(d);
   });
 
   it('a gap longer than idleMinutes keeps the 2-minute span', () => {
-    const d = run({ claudeEvents: [ce(at(10, 0), 'activity'), ce(at(10, 20), 'prompt')] });
+    const d = run({ agentEvents: [ce(at(10, 0), 'activity'), ce(at(10, 20), 'prompt')] });
     expect(yours(d)).toBe(2 * MIN);
   });
 
   it('the gap follows idleMinutes', () => {
     const evs = [ce(at(10, 0), 'activity'), ce(at(10, 8), 'prompt')];
-    expect(yours(run({ claudeEvents: evs, settings: { idleMinutes: 5 } }))).toBe(2 * MIN);
-    expect(yours(run({ claudeEvents: evs, settings: { idleMinutes: 10 } }))).toBe(8 * MIN);
+    expect(yours(run({ agentEvents: evs, settings: { idleMinutes: 5 } }))).toBe(2 * MIN);
+    expect(yours(run({ agentEvents: evs, settings: { idleMinutes: 10 } }))).toBe(8 * MIN);
   });
 
   it('a gap shorter than 2 minutes keeps the 2-minute span', () => {
-    const d = run({ claudeEvents: [ce(at(10, 0), 'activity'), ce(at(10, 1), 'prompt')] });
+    const d = run({ agentEvents: [ce(at(10, 0), 'activity'), ce(at(10, 1), 'prompt')] });
     expect(yours(d)).toBe(2 * MIN);
   });
 
   it('a subagent stream\'s activity does not shorten the gap', () => {
     const d = run({
-      claudeEvents: [
+      agentEvents: [
         ce(at(10, 0), 'activity', { stream: 'main' }),
         ce(at(10, 12), 'activity', { stream: 'subagent' }),
         ce(at(10, 13), 'prompt', { stream: 'main' }),
@@ -216,13 +338,13 @@ describe('the read-and-dictate gap (#175)', () => {
   });
 
   it('the first prompt of a session has no answer to read', () => {
-    const d = run({ claudeEvents: [ce(at(9, 50), 'activity', { stream: 'other' }), ce(at(10, 0), 'prompt', { stream: 'new' })] });
+    const d = run({ agentEvents: [ce(at(9, 50), 'activity', { stream: 'other' }), ce(at(10, 0), 'prompt', { stream: 'new' })] });
     expect(yours(d)).toBe(2 * MIN);
   });
 
   it('reading while a parallel session works overlaps Claude\'s time', () => {
     const d = run({
-      claudeEvents: [
+      agentEvents: [
         ce(at(10, 0), 'activity', { stream: 's1' }),
         ce(at(10, 3), 'activity', { stream: 's2' }),
         ce(at(10, 8), 'activity', { stream: 's2' }),
@@ -237,8 +359,8 @@ describe('the read-and-dictate gap (#175)', () => {
 
   it('reaches into the previous day\'s tail, clipped at midnight', () => {
     const d = run({
-      claudeEvents: [ce(at(0, 5), 'prompt')],
-      previousDayTail: { heartbeats: [], claudeEvents: [ce(at(23, 55, 0, '2026-06-09'), 'activity')] },
+      agentEvents: [ce(at(0, 5), 'prompt')],
+      previousDayTail: { heartbeats: [], agentEvents: [ce(at(23, 55, 0, '2026-06-09'), 'activity')] },
     });
     expect(yours(d)).toBe(5 * MIN); // [23:55, 00:05] clipped to [00:00, 00:05]
   });
@@ -247,14 +369,14 @@ describe('the read-and-dictate gap (#175)', () => {
 describe('midnight and the previous-day tail', () => {
   it('joins across midnight, then clips to the day', () => {
     const prev = '2026-06-09';
-    const tail = { heartbeats: [hb(at(23, 50, 0, prev)), hb(at(23, 55, 0, prev))], claudeEvents: [ce(at(23, 58, 0, prev), 'activity')] };
+    const tail = { heartbeats: [hb(at(23, 50, 0, prev)), hb(at(23, 55, 0, prev))], agentEvents: [ce(at(23, 58, 0, prev), 'activity')] };
     const d = run({
       heartbeats: [hb(at(0, 5))],
-      claudeEvents: [ce(at(0, 1), 'activity')],
+      agentEvents: [ce(at(0, 1), 'activity')],
       previousDayTail: tail,
     });
     expect(proj(d, A).youMs + proj(d, A).bothMs).toBe(5 * MIN); // [23:50, 00:05] clipped to [00:00, 00:05]
-    expect(d.totals.claudeMs + d.totals.bothMs).toBe(1 * MIN); // [23:58, 00:01] clipped to [00:00, 00:01]
+    expect(d.totals.agentsMs + d.totals.bothMs).toBe(1 * MIN); // [23:58, 00:01] clipped to [00:00, 00:01]
     expectValid(d);
   });
 
@@ -272,15 +394,15 @@ describe('midnight and the previous-day tail', () => {
       heartbeats: [hb(at(0, 2), { human_line_changes: 2 })],
       previousDayTail: {
         heartbeats: [hb(at(23, 59, 0, prev), { human_line_changes: 50 })],
-        claudeEvents: [ce(at(23, 59, 0, prev), 'edit', { entity: 'z'.repeat(24), linesAdded: 9, linesRemoved: 9 })],
+        agentEvents: [ce(at(23, 59, 0, prev), 'edit', { entity: 'z'.repeat(24), linesAdded: 9, linesRemoved: 9 })],
       },
     });
     expect(d.totals.linesYou).toBe(2);
-    expect(d.totals.linesClaude).toBe(0);
+    expect(d.totals.linesAgents).toBe(0);
   });
 
   it('a project active only before midnight gets no row', () => {
-    const d = run({ previousDayTail: { heartbeats: [hb(at(23, 30, 0, '2026-06-09'), { project: B })], claudeEvents: [] } });
+    const d = run({ previousDayTail: { heartbeats: [hb(at(23, 30, 0, '2026-06-09'), { project: B })], agentEvents: [] } });
     expect(d.projects).toEqual([]);
     expect(d.totals.totalMs).toBe(0);
     expectValid(d);
@@ -306,7 +428,7 @@ describe('pooled day totals', () => {
   it('per-project sums exceed the day total when you edit A while Claude works B', () => {
     const d = run({
       heartbeats: [hb(at(10, 0)), hb(at(10, 10))],
-      claudeEvents: [
+      agentEvents: [
         ce(at(10, 0), 'activity', { project: B }),
         ce(at(10, 3), 'activity', { project: B }),
         ce(at(10, 4), 'activity', { project: B }),
@@ -314,9 +436,9 @@ describe('pooled day totals', () => {
     });
     const a = proj(d, A);
     const b = proj(d, B);
-    expect(a).toMatchObject({ youMs: 10 * MIN, bothMs: 0, claudeMs: 0 });
-    expect(b).toMatchObject({ youMs: 0, bothMs: 0, claudeMs: 4 * MIN });
-    expect(d.totals).toMatchObject({ youMs: 6 * MIN, bothMs: 4 * MIN, claudeMs: 0, totalMs: 10 * MIN });
+    expect(a).toMatchObject({ youMs: 10 * MIN, bothMs: 0, agentsMs: 0 });
+    expect(b).toMatchObject({ youMs: 0, bothMs: 0, agentsMs: 4 * MIN });
+    expect(d.totals).toMatchObject({ youMs: 6 * MIN, bothMs: 4 * MIN, agentsMs: 0, totalMs: 10 * MIN });
     expect(a.totalMs + b.totalMs).toBe(14 * MIN);
     expectValid(d);
   });
@@ -325,13 +447,13 @@ describe('pooled day totals', () => {
 describe('line counts and the backstop rule', () => {
   it('Claude lines are added plus removed on edit events', () => {
     const d = run({
-      claudeEvents: [
+      agentEvents: [
         ce(at(10, 0), 'edit', { entity: 'x'.repeat(24), linesAdded: 3, linesRemoved: 1 }),
         ce(at(10, 1), 'edit', { entity: 'y'.repeat(24), linesAdded: 2, linesRemoved: 0 }),
         ce(at(10, 2), 'activity'),
       ],
     });
-    expect(d.totals.linesClaude).toBe(6);
+    expect(d.totals.linesAgents).toBe(6);
   });
 
   it('drops an edit heartbeat on the same entity within 2 seconds of a Claude edit', () => {
@@ -343,17 +465,17 @@ describe('line counts and the backstop rule', () => {
         hb(at(10, 0, 5), { entity: E, human_line_changes: 2 }), // 5 s away: yours
         hb(at(10, 0, 1), { entity: F, human_line_changes: 5 }), // other file: yours
       ],
-      claudeEvents: [ce(at(10, 0, 0), 'edit', { entity: E, linesAdded: 3, linesRemoved: 1 })],
+      agentEvents: [ce(at(10, 0, 0), 'edit', { entity: E, linesAdded: 3, linesRemoved: 1 })],
     });
     expect(d.totals.linesYou).toBe(7);
-    expect(d.totals.linesClaude).toBe(4);
+    expect(d.totals.linesAgents).toBe(4);
   });
 
   it('the backstopped heartbeat still counts as your time', () => {
     const E = 'c'.repeat(24);
     const d = run({
       heartbeats: [hb(at(10, 0, 1), { entity: E, human_line_changes: 4 })],
-      claudeEvents: [ce(at(10, 0, 0), 'edit', { entity: E, linesAdded: 1, linesRemoved: 0 })],
+      agentEvents: [ce(at(10, 0, 0), 'edit', { entity: E, linesAdded: 1, linesRemoved: 0 })],
     });
     expect(d.totals.linesYou).toBe(0);
     expect(proj(d, A).youMs + proj(d, A).bothMs).toBe(2 * MIN);
@@ -389,7 +511,7 @@ describe('languages', () => {
         hb(at(10, 5), { language: 'typescript' }),
         hb(at(10, 7), { language: 'python' }),
       ],
-      claudeEvents: [ce(at(10, 20), 'prompt')], // span [10:18, 10:20] joins the editor interval
+      agentEvents: [ce(at(10, 20), 'prompt')], // span [10:18, 10:20] joins the editor interval
     });
     const p = proj(d, A);
     expect(p.youMs).toBe(20 * MIN);
@@ -406,7 +528,7 @@ describe('languages', () => {
     expect(p.languages[0]).toEqual({ id: 'lang00', ms: 2 * MIN });
   });
   it('a prompt-only project has no languages', () => {
-    expect(proj(run({ claudeEvents: [ce(at(10, 0), 'prompt')] }), A).languages).toEqual([]);
+    expect(proj(run({ agentEvents: [ce(at(10, 0), 'prompt')] }), A).languages).toEqual([]);
   });
 });
 
@@ -428,14 +550,14 @@ describe('names, caveats and the none project', () => {
   it('passes caveats through', () => {
     const d = run({ caveats: { unreadableTranscriptLines: 3, readerVersion: '0.1.0', claudeCodeVersions: ['9.9.9'] } });
     expect(d.caveats).toEqual({ unreadableTranscriptLines: 3, readerVersion: '0.1.0', claudeCodeVersions: ['9.9.9'] });
-    expect(d.v).toBe(1);
+    expect(d.v).toBe(2);
     expect(d.date).toBe(DATE);
     expectValid(d);
   });
   it('an empty day validates', () => {
     const d = run();
     expect(d.projects).toEqual([]);
-    expect(d.totals).toEqual({ youMs: 0, claudeMs: 0, bothMs: 0, totalMs: 0, agentMs: 0, linesYou: 0, linesClaude: 0 });
+    expect(d.totals).toEqual({ youMs: 0, agentsMs: 0, bothMs: 0, totalMs: 0, agentMs: 0, linesYou: 0, linesAgents: 0, byAgent: {} });
     expectValid(d);
   });
 });
@@ -443,7 +565,7 @@ describe('names, caveats and the none project', () => {
 describe('schema', () => {
   it('rejects non-integer milliseconds, a wrong version and unknown fields', () => {
     const good = run({ heartbeats: [hb(at(10, 0))] });
-    expect(validate({ ...good, v: 2 })).toBe(false);
+    expect(validate({ ...good, v: 1 })).toBe(false);
     expect(validate({ ...good, totals: { ...good.totals, youMs: 1.5 } })).toBe(false);
     expect(validate({ ...good, extra: true })).toBe(false);
     const { caveats: _omit, ...noCaveats } = good;
@@ -480,7 +602,7 @@ describe('time zones and DST', () => {
         hb(new Date(2026, 2, 8, 3, 1).getTime() / 1000),
         hb(new Date(2026, 2, 9, 0, 0).getTime() / 1000), // next local day: excluded
       ],
-      claudeEvents: [],
+      agentEvents: [],
       aliases: {},
       settings: { idleMinutes: 15 },
       generatedAt: '2026-03-09T00:00:00.000Z',
