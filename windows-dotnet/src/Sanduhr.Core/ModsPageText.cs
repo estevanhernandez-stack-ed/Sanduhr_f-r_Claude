@@ -62,16 +62,22 @@ public static class ModsPageText
 
     /// <summary>
     /// What a screen reader reads for one plugin row: "626labs, version 0.1.0, on, mod". <paramref name="state"/> is the
-    /// row's state words ("On", "Off", "On, no files here", "Files missing").
+    /// row's state words ("On", "Off", "On, no files here", "Files missing"). A plugin with files but no known version
+    /// reads "version unknown" here, and only here: the visible row shows nothing.
     /// </summary>
-    public static string RowName(string name, string? version, string state, bool isMod)
+    public static string RowName(string name, string? version, string state, bool isMod, bool hasFiles = true)
     {
         var parts = new List<string> { name };
-        if (!string.IsNullOrWhiteSpace(version)) parts.Add("version " + version.Trim().TrimStart('v'));
+        if (VersionText(version) is { Length: > 0 } shown) parts.Add("version " + shown.TrimStart('v'));
+        else if (hasFiles) parts.Add("version unknown");
         parts.Add(state.ToLowerInvariant());
         if (isMod) parts.Add("mod");
         return string.Join(", ", parts);
     }
+
+    /// <summary>The version as the row shows it: "v0.1.0", or nothing when it is unknown.</summary>
+    public static string VersionText(string? version) =>
+        ModInventory.CleanVersion(version) is { } v ? "v" + v.TrimStart('v', 'V') : "";
 
     /// <summary>The settings.json line: "41 on, 2 off", "None" when there are no switches.</summary>
     public static string SwitchSummary(int on, int off) =>

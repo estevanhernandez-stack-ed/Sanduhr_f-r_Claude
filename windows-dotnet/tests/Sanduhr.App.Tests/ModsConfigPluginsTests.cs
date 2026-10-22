@@ -60,4 +60,20 @@ public sealed class ModsConfigPluginsTests : ModsConfigFixture
         Assert.Equal("On, no files here", page.Mods.Single(m => m.Name == "gamma").StateText);
         Assert.Equal("On", page.Mods.Single(m => m.Name == "alpha").StateText);
     }
+
+    [Fact]
+    public void APluginWithNoVersionShowsNoVersionButItsAccessibleNameSaysUnknown()
+    {
+        var home = Home(".claude-personal");
+        var plugin = Path.Combine(Root, "cache", "tool");
+        Put(plugin, ".claude-plugin/plugin.json", """{"name":"tool"}""");
+        Put(home, "plugins/installed_plugins.json",
+            "{\"version\":2,\"plugins\":{\"tool@m\":[{\"installPath\":\"" + plugin.Replace("\\", "\\\\") + "\",\"version\":\"unknown\"}]}}");
+        Put(home, "settings.json", """{"enabledPlugins":{"tool@m":true}}""");
+
+        var row = Assert.Single(Page(configDir: home).Mods);
+        Assert.Equal("", row.VersionText);
+        Assert.DoesNotContain("unknown", row.VersionText);
+        Assert.Equal("tool, version unknown, on", row.AutomationName);
+    }
 }

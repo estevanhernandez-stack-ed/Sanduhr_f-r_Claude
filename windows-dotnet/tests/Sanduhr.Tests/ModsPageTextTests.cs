@@ -62,6 +62,27 @@ public class ModsPageTextTests
     {
         Assert.Equal("626labs, version 0.1.0, on, mod", ModsPageText.RowName("626labs", "0.1.0", "On", true));
         Assert.Equal("alpha, version 1.2.0, off", ModsPageText.RowName("alpha", "v1.2.0", "Off", false));
-        Assert.Equal("ghost, on, no files here", ModsPageText.RowName("ghost", null, "On, no files here", false));
+        Assert.Equal("ghost, on, no files here", ModsPageText.RowName("ghost", null, "On, no files here", false, hasFiles: false));
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("unknown")]
+    [InlineData("Unknown")]
+    [InlineData("(unknown)")]
+    public void AnUnknownVersionShowsNothingButTheAccessibleNameSaysSo(string? version)
+    {
+        Assert.Equal("", ModsPageText.VersionText(version));
+        Assert.Null(ModInventory.CleanVersion(version));
+        Assert.Equal("tool, version unknown, on", ModsPageText.RowName("tool", version, "On", false));
+    }
+
+    [Theory]
+    [InlineData("0.1.0", "v0.1.0")]
+    [InlineData("v2.0.1", "v2.0.1")]
+    [InlineData(" 1.0 ", "v1.0")]
+    [InlineData("a1b2c3d", "va1b2c3d")]
+    public void AKnownVersionKeepsOneV(string version, string shown) => Assert.Equal(shown, ModsPageText.VersionText(version));
 }

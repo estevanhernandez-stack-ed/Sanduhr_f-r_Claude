@@ -76,7 +76,7 @@ public sealed partial class ModRowViewModel : ObservableObject
     {
         _owner = owner;
         Name = item.Name;
-        VersionText = item.Version is { Length: > 0 } v ? "v" + v.TrimStart('v') : "";
+        VersionText = ModsPageText.VersionText(item.Version);
         Description = item.Description;
         IsSanduhr = item.IsSanduhr && own is not null;
         IsMod = item.IsMod;
@@ -91,7 +91,7 @@ public sealed partial class ModRowViewModel : ObservableObject
         IsOn = IsSanduhr && own!.IsOn;
         IsOff = IsSanduhr && own!.Listed && !own.IsOn;
         Touches = ModsConfigViewModel.DescribeTouches(item.Touches);
-        AutomationName = ModsPageText.RowName(Name, item.Version, StateText, IsMod);
+        AutomationName = ModsPageText.RowName(Name, item.Version, StateText, IsMod, ModsPageText.HasFiles(item));
         TurnOnCommand = new RelayCommand(() => _owner.SwitchOwnMod(true));
         TurnOffCommand = new RelayCommand(() => _owner.SwitchOwnMod(false));
         UpdateCommand = new RelayCommand(_owner.UpdateOwnMod);

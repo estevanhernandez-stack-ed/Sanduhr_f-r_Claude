@@ -128,6 +128,22 @@ public sealed class ModInventoryTests : IDisposable
     }
 
     [Fact]
+    public void AnUnknownVersionIsNoVersion()
+    {
+        // Claude Code writes "unknown" for a plugin whose manifest names no version.
+        var plugin = Path.Combine(_root, "cache", "tool");
+        Put(".claude-plugin/plugin.json", """{"name":"tool"}""", plugin);
+        Put("plugins/installed_plugins.json", $$$"""
+            {"version":2,"plugins":{"tool@m":[{"installPath":"{{{plugin.Replace("\\", "\\\\")}}}","version":"unknown"}]}}
+            """);
+        Put("settings.json", """{"enabledPlugins":{"tool@m":true}}""");
+
+        var tool = Assert.Single(Read().Mods);
+        Assert.Equal("tool", tool.Name);
+        Assert.Null(tool.Version);
+    }
+
+    [Fact]
     public void PluginDirsModsAreScanned()
     {
         var mod = Path.Combine(_root, "mods", "sanduhr-meters");
