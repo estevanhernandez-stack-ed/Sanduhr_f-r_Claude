@@ -1,4 +1,4 @@
-# Sanduhr Time usage spec, v1
+# Sanduhr Time usage spec, v2
 
 The on-disk contract for Sanduhr Time. A second implementation (Sanduhr, a publisher, a script) that follows this document reads and writes the same files and gets the same numbers. Nothing here depends on the code that wrote it; all example values are invented.
 
@@ -7,8 +7,8 @@ Conventions used throughout:
 - **Time units are never mixed.** `time` fields in spool lines are unix **seconds** as a float. Every duration in a day file (`*Ms`) and every interval bound in the algorithms below is **milliseconds** (epoch milliseconds for instants). Convert once, on read: `ms = round(seconds * 1000)`.
 - **Dates are local.** `YYYY-MM-DD` always means the calendar date in the machine's local time zone, never UTC.
 - **Files are JSON Lines or JSON, UTF-8.** A JSONL reader skips blank lines and any line that fails to parse (a torn write); it never fails the whole file.
-- **`v: 1`** marks every record. A reader that sees another `v` skips the record.
-- **Public safety.** No file stores a real path, file content, prompt text or transcript text. Paths are hashed; names live only in the day file and `aliases.json`.
+- **`v`** marks every record: `1` for editor heartbeats and the 0.1/0.2 Claude spool, `2` for agent spool lines and day files since 0.3.0. A reader that sees a `v` it does not know skips the record. A v1 day file is read through the mapping in section 5.
+- **Public safety.** No file stores a real path (`state/offsets.json` excepted, local only), file content, prompt text or transcript text. Paths are hashed; names live only in the day file and `aliases.json`.
 
 ## 1. Directory layout and the data directory
 
@@ -22,20 +22,21 @@ Everything lives under one **data directory**. Resolution order, first non-empty
 <dataDir>/
   aliases.json                              alias store (section 6)
   spool/<date>.<machine>.<window>.jsonl     editor heartbeats (section 3)
-  claude/<date>.jsonl                       Claude events (section 4)
+  agents/<date>.jsonl                       agent events, Claude and Codex (section 4)
+  claude/<date>.jsonl                       Claude events written by 0.1 and 0.2; read, never written (section 4)
   days/<date>.json                          merged day files (section 5)
   state/installed.json                      install time and salt (section 7)
-  state/offsets.json                        transcript read positions (section 7)
+  state/offsets.json                        transcript and rollout read positions (section 7)
   state/merge.lock                          the merge lock (section 7)
   state/caveats.json                        Claude Code versions and unreadable-line counts per date (section 7)
   state/wakatime-compare.jsonl              optional daily comparison (section 7)
 ```
 
-- `<date>` in `spool/` and `claude/` is the local date of the line's `time`. A merge for date D reads D's files plus the last hour of the previous date's files.
+- `<date>` in `spool/`, `agents/` and `claude/` is the local date of the line's `time`. A merge for date D reads D's files plus the last hour of the previous date's files.
 - `<machine>` is the normalized hostname: lowercase, every character outside `[a-z0-9-]` replaced by `-`. It never contains a dot.
 - `<window>` is the first 8 hex characters of sha256 of the VS Code window's session id: one spool file per window, so concurrent windows never write the same file.
-- A merge reads only spool files whose `<machine>` segment equals its own machine label. A data directory synced between machines is therefore never double-counted. Claude spool files carry no machine segment; each machine reads transcripts only from its own disk.
-- Retention: spool files and Claude spool files older than 90 days are deleted. Day files are kept.
+- A merge reads only spool files whose `<machine>` segment equals its own machine label. A data directory synced between machines is therefore never double-counted. Agent spool files carry no machine segment; each machine reads transcripts only from its own disk.
+- Retention: spool files and agent spool files (`agents/` and `claude/`) older than 90 days are deleted. Day files are kept.
 - Writers append whole lines. Before appending, a writer checks that the file ends with a newline and writes one first if it does not, so a torn line never fuses with the next record.
 - Whole-file writes (`days/*.json`, `aliases.json`, `state/*.json`) go to a temporary file in the same folder and are renamed into place.
 
@@ -43,7 +44,7 @@ Everything lives under one **data directory**. Resolution order, first non-empty
 
 ### 2.1 `hashPath(absolutePath, salt)`
 
-The one path hash. Both the editor recorder and the Claude reader use it, so the same file gets the same `entity` on both sides.
+The one path hash. The editor recorder and every agent reader use it, so the same file gets the same `entity` on both sides.
 
 1. Resolve the path to an absolute path using the platform's rules.
 2. Replace every backslash with a forward slash.
@@ -106,7 +107,7 @@ File: `spool/<date>.<machine>.<window>.jsonl`. One JSON object per line:
 | `is_write` | boolean | True for `save` heartbeats. |
 | `reload` | boolean | True when the change was the editor reloading the file from disk. |
 
-The names follow WakaTime where they overlap. There is no `ai_line_changes`: Claude's lines come only from the Claude spool.
+The names follow WakaTime where they overlap. There is no `ai_line_changes`: agents' lines come only from the agent spool.
 
 **Recording rules.** Recording happens only while the window is focused. Only `file` and `untitled` documents are recorded (output panes, git and other virtual documents are ignored); `untitled` files use project `none`. `focus`, `nav` and `save` heartbeats are limited to one per file per kind per 2 minutes. `edit` heartbeats are coalesced: all edits to one file inside a 10-second window become one heartbeat with summed `human_line_changes`, stamped with the time of the last edit.
 
@@ -118,25 +119,32 @@ The names follow WakaTime where they overlap. There is no `ai_line_changes`: Cla
 2. Otherwise, if the document is dirty when the handler runs (read synchronously), it is the human's edit.
 3. Otherwise the event is a *candidate*. If the next event for that document is an empty change with the document dirty and the **same document version**, the candidate was the human's first edit after a clean state, and it is counted as an edit. Any other next event, or 500 ms with no event, makes the candidate a **reload**: it is written with `reload: true`, `human_line_changes: 0`, and never counts as the human's activity.
 
-The single signal "the document is not dirty after the change" is not enough: the first keystroke after every save also reports not dirty. A reload is never activity and never adds lines. As a backstop, the merger also discards an `edit` heartbeat that lands on the same `entity` as a Claude edit within 2 seconds (section 8.4).
+The single signal "the document is not dirty after the change" is not enough: the first keystroke after every save also reports not dirty. A reload is never activity and never adds lines. As a backstop, the merger also discards an `edit` heartbeat that lands on the same `entity` as an agent's edit within 2 seconds (section 8.4).
 
-## 4. The Claude spool line
+## 4. The agent spool line
 
-File: `claude/<date>.jsonl`, written by reading Claude Code's own transcripts (JSONL files under a Claude config home's `projects/` folder, including `subagents/` subfolders). One JSON object per line:
+File: `agents/<date>.jsonl` (since 0.3.0), written by reading each agent's own transcripts: Claude Code's (4.1) and Codex's (4.2). One JSON object per line:
 
 | Field | Type | Meaning |
 |---|---|---|
-| `v` | `1` | Format version. |
-| `id` | string | The transcript entry's `uuid`, or `<stream>:<byte offset>` when the entry has none. Readers de-duplicate on `id`, first occurrence wins. |
+| `v` | `2` | Format version. |
+| `agent` | `"claude"` \| `"codex"` | Which agent's transcript the line came from. |
+| `id` | string | Claude: the transcript entry's `uuid`, or `<stream>:<byte offset>` when the entry has none. Codex: `<stream>:<byte offset>`, plus `:<n>` for the n-th file of a patch. Readers de-duplicate on `id`, first occurrence wins. |
 | `time` | number | Unix seconds, float (the entry's `timestamp`). |
-| `project` | string | Project key of the entry's working directory (`cwd`; a line with none inherits the most recent `cwd` seen in that file). |
-| `stream` | string | First 16 hex of sha256 of the transcript file's real path (backslashes to slashes, lowercased on Windows). One stream per file, so parallel subagents are separate streams even when they share the parent's session id. |
+| `project` | string | Project key of the entry's working directory (4.1, 4.2). |
+| `stream` | string | 16 hex: one Claude transcript file, or one Codex rollout segment (4.1, 4.2). |
 | `kind` | `"prompt"` \| `"activity"` \| `"edit"` | See below. |
 | `linesAdded` | integer | `edit` only. |
 | `linesRemoved` | integer | `edit` only. |
 | `entity` | string | `edit` only: `hashPath` of the edited file. |
 
-Only the fields listed here are extracted from transcript lines; no prompt text or file content is ever stored.
+Only the fields listed here are extracted from transcript lines; no prompt text, file content, credential or account id is ever stored.
+
+**The legacy Claude spool.** Versions 0.1 and 0.2 wrote the same lines without `agent`, with `v: 1`, to `claude/<date>.jsonl`. Readers still read that file for a date, before `agents/<date>.jsonl`, de-duplicating by `id` across both; a line without `agent` is `agent: "claude"`. A line naming an agent the reader does not know is skipped. Nothing writes `claude/` any more, and the transcript offsets in `state/offsets.json` carry over unchanged.
+
+### 4.1 Claude Code
+
+Read from JSONL files under a Claude config home's `projects/` folder, including `subagents/` subfolders. The project is the entry's working directory (`cwd`; a line with none inherits the most recent `cwd` seen in that file). The stream is the first 16 hex of sha256 of the transcript file's real path (backslashes to slashes, lowercased on Windows): one stream per file, so parallel subagents are separate streams even when they share the parent's session id.
 
 **Human-prompt rule.** A transcript entry is the human's prompt (`kind: "prompt"`) when all hold: its `type` is `user`; its message content is a string, or an array containing no `tool_result` part; `isSidechain` is not true; `isMeta` is not true; `isCompactSummary` is not true; and, when an `origin` object is present, `origin.kind` is `"human"`. Machine-written user entries (subagent task prompts, task notifications, peer messages, meta entries, compaction summaries) are therefore never the human's.
 
@@ -151,35 +159,56 @@ An `edit` event is also Claude activity: one transcript entry produces one event
 
 Entries older than the install time (`state/installed.json`) are dropped, so history before install never appears. Lines that are not valid JSON, or have no usable timestamp or working directory, are counted per local date as unreadable (`caveats.unreadableTranscriptLines`).
 
+### 4.2 Codex
+
+Read from `sessions/**/rollout-*.jsonl` under `CODEX_HOME` (when set) and `~/.codex`, de-duplicated by real path; `archived_sessions/` is never read, because a moved thread has a new path and would count twice. One rollout is one thread and grows for days: every record is dated by its own `timestamp` (ISO 8601, UTC), never by the file's folder. Each line is `{ type, timestamp, ordinal, payload, metadata? }`.
+
+- **Segments.** A `session_meta` line starts a segment; a rollout can hold several (a subagent or guardian thread inside the file). The segment's stream is the first 16 hex of sha256 of the rollout's real path (backslashes to slashes, lowercased on Windows), a newline, and `payload.session_id` (`payload.id` when absent). Its `thread_source` is `user`, `subagent` or `guardian_review`. A record before any `session_meta` uses the path alone and is never a prompt.
+- **Project.** The resolver on the latest `turn_context.cwd` in the segment, else the segment's `session_meta.cwd`. A record with neither is unreadable.
+- **Human-prompt rule.** A record is the human's prompt (`kind: "prompt"`) when all hold: `type` is `response_item`; `payload.type` is `message` with `payload.role` `user`; `metadata.user_input_order` is present; and the segment's `thread_source` is `user`. Injected context carries no `user_input_order`, and subagent and guardian prompts are machine-written.
+- **Codex activity rule.** `response_item` with `payload.type` `reasoning`, `agent_message`, `function_call`, `function_call_output`, `custom_tool_call` or `custom_tool_call_output`, or `message` with role `assistant`; `event_msg` with `payload.type` `task_started`, or `item_completed` unless `payload.item.type` is `UserMessage` (that one repeats the prompt). Token, state and settings records are not time.
+- **Codex line rule.** A `custom_tool_call`'s `input` or a `function_call`'s `arguments` may carry an `apply_patch` body (`*** Begin Patch` to `*** End Patch`): as the input itself, or quoted inside other code with its newlines escaped (Codex Desktop's `exec` tool), in which case the body is unescaped once. Each `*** Add File:`, `*** Update File:` or `*** Delete File:` section is one `edit` event, `entity` = `hashPath` of the path resolved against the segment's working directory (the `*** Move to:` path for a move), `linesAdded` = lines starting `+`, `linesRemoved` = lines starting `-` in an Update section. A delete counts 0 lines. Hunk headers (`@@`), context lines and `***` markers never count. A call with no patch is plain activity.
+- **Offsets.** As for Claude (7.2), plus the segment in force at the offset (its stream, `thread_source` and working directory), so a pass that resumes mid-file keeps it. A rollout first seen at an offset past 0 without that state rebuilds it once from its `session_meta` and `turn_context` lines.
+
+Records older than the install time are dropped. Lines that are not valid JSON, or have no usable timestamp, or are prompts or activity with no working directory, are counted per local date as unreadable (`caveats.unreadableTranscriptLines`).
+
 ## 5. The day file
 
-File: `days/<date>.json`, validated by `time-day.schema.json` (JSON Schema draft-07). Durations are integer milliseconds.
+File: `days/<date>.json`, validated by `time-day.schema.json` (JSON Schema draft-07). Durations are integer milliseconds. Version 2 since 0.3.0; v1 files are read through the mapping below.
 
 ```json
 {
-  "v": 1,
+  "v": 2,
   "date": "2026-06-10",
   "machine": "machine-1",
   "generatedAt": "2026-06-10T18:00:00.000Z",
   "totals": {
-    "youMs": 360000, "claudeMs": 240000, "bothMs": 120000, "totalMs": 720000,
-    "agentMs": 480000, "linesYou": 12, "linesClaude": 80
+    "youMs": 360000, "agentsMs": 240000, "bothMs": 120000, "totalMs": 720000,
+    "agentMs": 480000, "linesYou": 12, "linesAgents": 80,
+    "byAgent": {
+      "claude": { "wallMs": 300000, "streamMs": 360000, "lines": 70 },
+      "codex": { "wallMs": 120000, "streamMs": 120000, "lines": 10 }
+    }
   },
   "projects": [
     {
       "key": "<16 hex chars>", "realName": "widget", "alias": "Project Kestrel", "masked": false,
-      "youMs": 360000, "claudeMs": 240000, "bothMs": 120000, "totalMs": 720000,
-      "agentMs": 480000, "linesYou": 12, "linesClaude": 80,
+      "youMs": 360000, "agentsMs": 240000, "bothMs": 120000, "totalMs": 720000,
+      "agentMs": 480000, "linesYou": 12, "linesAgents": 80,
+      "byAgent": {
+        "claude": { "wallMs": 300000, "streamMs": 360000, "lines": 70 },
+        "codex": { "wallMs": 120000, "streamMs": 120000, "lines": 10 }
+      },
       "languages": [ { "id": "typescript", "ms": 300000 } ]
     }
   ],
-  "caveats": { "unreadableTranscriptLines": 0, "readerVersion": "0.1.0", "claudeCodeVersions": [] }
+  "caveats": { "unreadableTranscriptLines": 0, "readerVersion": "0.3.0", "claudeCodeVersions": [] }
 }
 ```
 
 | Field | Meaning |
 |---|---|
-| `v` | `1`. |
+| `v` | `2`. |
 | `date` | The local date. |
 | `machine` | The machine label that wrote it. |
 | `generatedAt` | ISO 8601 timestamp of the merge. |
@@ -190,15 +219,18 @@ File: `days/<date>.json`, validated by `time-day.schema.json` (JSON Schema draft
 | `projects[].alias` | The alias from `aliases.json`, or null when none has been assigned. |
 | `projects[].masked` | The mask flag from `aliases.json`, false when absent. At publish time, read the live store, not this snapshot. |
 | `youMs` | Time only you were active (`|U - C|`). |
-| `claudeMs` | Time only Claude was active (`|C - U|`). |
-| `bothMs` | Time both were active (`|U intersect C|`). |
-| `totalMs` | The union (`|U union C|`); always `youMs + claudeMs + bothMs`. |
-| `agentMs` | Agent time: the sum over Claude streams of each stream's own interval length (parallel streams add). |
-| `linesYou`, `linesClaude` | Line counts (8.4). |
+| `agentsMs` | Time only agents were active (`|C - U|`), `C` being the union of every agent's intervals. |
+| `bothMs` | Time you and any agent were both active (`|U intersect C|`). |
+| `totalMs` | The union (`|U union C|`); always `youMs + agentsMs + bothMs`. |
+| `agentMs` | Stream time: the sum over every agent's streams of each stream's own interval length (parallel streams add). |
+| `linesYou`, `linesAgents` | Line counts (8.4). |
+| `byAgent` | One entry per agent that ran: `wallMs`, that agent's own union of intervals (`|C_a|`); `streamMs`, the sum of its streams (its share of `agentMs`); `lines`, its share of `linesAgents`. Agents can overlap each other, so `wallMs` values can add to more than `agentsMs + bothMs`. |
 | `languages[]` | Up to 10 `{ id, ms }` entries, sorted by `ms` descending then `id`, `ms >= 1`. The publisher sends the top 5. |
-| `caveats.unreadableTranscriptLines` | Unreadable transcript lines for the day. |
+| `caveats.unreadableTranscriptLines` | Unreadable transcript and rollout lines for the day. |
 | `caveats.readerVersion` | The tracker's semver. |
 | `caveats.claudeCodeVersions` | Claude Code versions seen, possibly empty. |
+
+**Reading a v1 file.** Versions 0.1 and 0.2 wrote `v: 1` with `claudeMs` and `linesClaude` and no `byAgent`. A reader maps each totals object (the day's and every project's): `agentsMs = claudeMs`, `linesAgents = linesClaude`, and `byAgent = { "claude": { "wallMs": claudeMs + bothMs, "streamMs": agentMs, "lines": linesClaude } }` (an empty object when all three are 0). `claudeMs + bothMs` is Claude's own union, since Claude was the only agent. `caveats.readerVersion` still says which rule wrote the file.
 
 ## 6. `aliases.json` and the fresh-store rule
 
@@ -248,7 +280,7 @@ Naming rule for publishing: a real name may leave the machine only when the proj
 { "/fixture/home/projects/p1/session.jsonl": { "offset": 12345, "size": 12400, "mtimeMs": 1780000000000 } }
 ```
 
-A map from a transcript file's real path to the position already consumed: `offset` bytes read through the last complete line, and the `size` and `mtimeMs` observed. A file that shrank, or whose `offset` exceeds its size, restarts from 0. A file with no entry whose mtime is before `installedAt` starts at its current size (no catch-up of old history); a newer file starts at 0. This is the one state file that holds real paths; it is local only and never published. Order of operations: append events to the Claude spool first, advance the offset second, so a crash re-reads rather than drops (the spool de-duplicates by `id`).
+A map from a transcript or rollout file's real path to the position already consumed: `offset` bytes read through the last complete line, and the `size` and `mtimeMs` observed. A file that shrank, or whose `offset` exceeds its size, restarts from 0. A file with no entry whose mtime is before `installedAt` starts at its current size (no catch-up of old history); a newer file starts at 0. This is the one state file that holds real paths; it is local only and never published. A Codex rollout's entry also carries `codex: { stream, threadSource, cwd }`, the segment in force at `offset` (4.2). Order of operations: append events to the agent spool first, advance the offset second, so a crash re-reads rather than drops (the spool de-duplicates by `id`).
 
 ### 7.3 `state/merge.lock`
 
@@ -272,13 +304,13 @@ Optional. One line per day: `{ "date", "wakatimeSeconds", "oursEditorSeconds", "
 
 ## 8. Day computation (the merger)
 
-Inputs for date D: D's heartbeats and Claude events, the previous date's events (at least its last hour), the alias map, the real names by key, the idle setting (`idleMinutes`, default 15), and the caveats. The merger is a pure function; it performs no I/O.
+Inputs for date D: D's heartbeats and agent events, the previous date's events (at least its last hour), the alias map, the real names by key, the idle setting (`idleMinutes`, default 15), and the caveats. The merger is a pure function; it performs no I/O.
 
 ### 8.1 The day window
 
 `start` = local midnight at the start of D, `end` = local midnight at the start of D + 1 day. Both are computed with local calendar arithmetic (construct the date for D and for D + 1 in local time), **never by adding 24 hours**, so a daylight-saving day is 23 or 25 hours long. Events at or after `end` belong to the next day and are ignored; events before `start - 1 hour` are ignored. Every interval is clipped to `[start, end]` after joining. Lines count only events with `time >= start`.
 
-Claude events are de-duplicated by `id` across the day and tail inputs before anything else.
+Agent events are de-duplicated by `id` across the day and tail inputs before anything else.
 
 ### 8.2 Joining events into intervals
 
@@ -288,30 +320,30 @@ Claude events are de-duplicated by `id` across the day and tail inputs before an
 
 Per project:
 
-- **Your events:** the `time` of every heartbeat with `reload` false (any kind), plus, for each Claude `prompt` event at `t`, two events: the prompt span's start `s` and `t`. `gap = idleMinutes`, `lone = 2 min`.
-  - **The span start (since 0.2.0, the read-and-dictate gap):** let `a` be the latest Claude `activity` or `edit` event **in the prompt's own stream** strictly before `t`. If `a` exists and `t - a <= idleMinutes`, then `s = min(a, t - 2 min)`: reading Claude's answer, thinking and dictating the next prompt is your time. Otherwise `s = t - 2 min` (the first prompt of a session, or a builder who stepped away). Only the prompt's own stream counts, so a subagent working in its own stream never shortens the gap. Events from the previous day's tail count, and the span is clipped at midnight like every interval.
+- **Your events:** the `time` of every heartbeat with `reload` false (any kind), plus, for each agent `prompt` event at `t` (to any agent), two events: the prompt span's start `s` and `t`. `gap = idleMinutes`, `lone = 2 min`.
+  - **The span start (since 0.2.0, the read-and-dictate gap):** let `a` be the latest agent `activity` or `edit` event **in the prompt's own stream** strictly before `t`. If `a` exists and `t - a <= idleMinutes`, then `s = min(a, t - 2 min)`: reading the agent's answer, thinking and dictating the next prompt is your time. Otherwise `s = t - 2 min` (the first prompt of a session, or a builder who stepped away). Only the prompt's own stream counts, so a subagent, a Codex guardian thread or another agent working in its own stream never shortens the gap. Events from the previous day's tail count, and the span is clipped at midnight like every interval.
   - A prompt with no recent activity in its stream therefore yields `[t - 2 min, t]`; a prompt one minute after an edit joins it into one interval; a prompt joins an earlier edit whenever its span start is within `idleMinutes` of it.
-  - Reading while a parallel session works overlaps that session's Claude time, so it lands in `bothMs`.
+  - Reading while a parallel session works overlaps that session's agent time, so it lands in `bothMs`.
   - Day files written by 0.1.0 used `s = t - 2 min` always; `caveats.readerVersion` says which rule produced a file. Today and yesterday are re-merged automatically; older files keep the rule they were written with.
-- **Claude's events:** the `time` of every Claude event of kind `activity` or `edit` (an edit is also activity). `gap = 5 min`, `lone = 2 min`. Prompts are not Claude activity.
+- **Each agent's events:** the `time` of every event of that agent of kind `activity` or `edit` (an edit is also activity), joined per agent with `gap = 5 min`, `lone = 2 min`. Prompts are not agent activity. Since 0.3.0 each agent joins on its own, so a Claude event and a Codex event a few minutes apart do not bridge into one interval.
 - **Reload heartbeats** are not your activity and add no lines.
 
-Name the clipped results `U_p` (yours) and `C_p` (Claude's, all streams together). For **agent time**, join each stream's own events separately (gap 5 min, lone 2 min), clip, and sum the stream lengths per project: `agentMs = sum over streams of |stream intervals|`. Two streams working in parallel over the same minutes add up to twice the wall-clock time.
+Name the clipped results `U_p` (yours) and `C_{p,a}` (agent `a`'s, all its streams together), and `C_p` = the union of `C_{p,a}` over agents. For **stream time**, join each stream's own events separately (gap 5 min, lone 2 min), clip, and sum the stream lengths per agent (`byAgent[a].streamMs`) and over agents per project (`agentMs`). Two streams working in parallel over the same minutes add up to twice the wall-clock time. `byAgent[a].wallMs = |C_{p,a}|`.
 
 ### 8.4 Totals and lines
 
-Per project: `bothMs = |U_p intersect C_p|`, `youMs = |U_p - C_p|`, `claudeMs = |C_p - U_p|`, `totalMs = |U_p union C_p|`, where `|.|` is total covered milliseconds with overlaps counted once. A project row exists when it has any time or any line in the day.
+Per project: `bothMs = |U_p intersect C_p|`, `youMs = |U_p - C_p|`, `agentsMs = |C_p - U_p|`, `totalMs = |U_p union C_p|`, where `|.|` is total covered milliseconds with overlaps counted once. A project row exists when it has any time or any line in the day.
 
 Lines:
 
-- `linesClaude` = sum of `linesAdded + linesRemoved` over the project's `edit` events.
-- `linesYou` = sum of `human_line_changes` over non-reload heartbeats, **excluding** an `edit` heartbeat whose `entity` equals the `entity` of a Claude `edit` event within 2 seconds of it (the backstop for reloads the recorder could not identify). An excluded heartbeat still counts as your time.
+- `linesAgents` = sum of `linesAdded + linesRemoved` over the project's agent `edit` events; `byAgent[a].lines` the same per agent.
+- `linesYou` = sum of `human_line_changes` over non-reload heartbeats, **excluding** an `edit` heartbeat whose `entity` equals the `entity` of any agent's `edit` event within 2 seconds of it (the backstop for reloads the recorder could not identify). An excluded heartbeat still counts as your time.
 
 ### 8.5 Day totals pool all projects
 
-`U_all` = union of every `U_p`; `C_all` = union of every `C_p`. The day's `youMs`, `claudeMs`, `bothMs` and `totalMs` are computed from `U_all` and `C_all` with the same four formulas. `agentMs` and both line counts are sums over projects.
+`U_all` = union of every `U_p`; `C_all` = union of every `C_p`. The day's `youMs`, `agentsMs`, `bothMs` and `totalMs` are computed from `U_all` and `C_all` with the same four formulas. `agentMs` and both line counts are sums over projects. The day's `byAgent[a].wallMs` is `|union over projects of C_{p,a}|`; its `streamMs` and `lines` are sums over projects. An agent appears in `byAgent` only when it has time or lines in the window.
 
-Consequence: per-project totals can add up to more than the day total. Editing in project A while Claude works in project B is, at the day level, time you and Claude were both active; at the project level it is you-only in A and Claude-only in B. Do not "fix" this by summing rows.
+Consequence: per-project totals can add up to more than the day total. Editing in project A while an agent works in project B is, at the day level, time you and the agents were both active; at the project level it is you-only in A and agents-only in B. Do not "fix" this by summing rows.
 
 ### 8.6 Languages
 

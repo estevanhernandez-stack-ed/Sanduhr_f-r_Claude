@@ -1,7 +1,7 @@
 {
   "name": "sanduhr-time",
   "displayName": "Sanduhr Time",
-  "description": "Local-first coding time tracker that separates your time from Claude's.",
+  "description": "Local-first coding time tracker that separates your time from your agents' (Claude Code and Codex).",
   "version": "0.3.0",
   "publisher": "626labs",
   "license": "MIT",
