@@ -177,6 +177,73 @@ describe('prompt spans', () => {
   });
 });
 
+describe('the read-and-dictate gap (#175)', () => {
+  const yours = (d: DayRecord) => proj(d, A).youMs + proj(d, A).bothMs;
+
+  it('reaches back to the stream\'s last Claude activity within idleMinutes', () => {
+    const d = run({ claudeEvents: [ce(at(10, 0), 'activity'), ce(at(10, 5), 'activity'), ce(at(10, 13), 'prompt')] });
+    expect(yours(d)).toBe(8 * MIN); // [10:05, 10:13]: reading the answer and dictating the next prompt
+    expect(proj(d, A).claudeMs).toBe(5 * MIN);
+    expect(proj(d, A).totalMs).toBe(13 * MIN);
+    expectValid(d);
+  });
+
+  it('a gap longer than idleMinutes keeps the 2-minute span', () => {
+    const d = run({ claudeEvents: [ce(at(10, 0), 'activity'), ce(at(10, 20), 'prompt')] });
+    expect(yours(d)).toBe(2 * MIN);
+  });
+
+  it('the gap follows idleMinutes', () => {
+    const evs = [ce(at(10, 0), 'activity'), ce(at(10, 8), 'prompt')];
+    expect(yours(run({ claudeEvents: evs, settings: { idleMinutes: 5 } }))).toBe(2 * MIN);
+    expect(yours(run({ claudeEvents: evs, settings: { idleMinutes: 10 } }))).toBe(8 * MIN);
+  });
+
+  it('a gap shorter than 2 minutes keeps the 2-minute span', () => {
+    const d = run({ claudeEvents: [ce(at(10, 0), 'activity'), ce(at(10, 1), 'prompt')] });
+    expect(yours(d)).toBe(2 * MIN);
+  });
+
+  it('a subagent stream\'s activity does not shorten the gap', () => {
+    const d = run({
+      claudeEvents: [
+        ce(at(10, 0), 'activity', { stream: 'main' }),
+        ce(at(10, 12), 'activity', { stream: 'subagent' }),
+        ce(at(10, 13), 'prompt', { stream: 'main' }),
+      ],
+    });
+    expect(yours(d)).toBe(13 * MIN); // back to 10:00, not 10:12
+  });
+
+  it('the first prompt of a session has no answer to read', () => {
+    const d = run({ claudeEvents: [ce(at(9, 50), 'activity', { stream: 'other' }), ce(at(10, 0), 'prompt', { stream: 'new' })] });
+    expect(yours(d)).toBe(2 * MIN);
+  });
+
+  it('reading while a parallel session works overlaps Claude\'s time', () => {
+    const d = run({
+      claudeEvents: [
+        ce(at(10, 0), 'activity', { stream: 's1' }),
+        ce(at(10, 3), 'activity', { stream: 's2' }),
+        ce(at(10, 8), 'activity', { stream: 's2' }),
+        ce(at(10, 10), 'prompt', { stream: 's1' }),
+      ],
+    });
+    const p = proj(d, A);
+    expect(p.bothMs).toBe(8 * MIN); // Claude's pooled [10:00, 10:08] inside your [10:00, 10:10]
+    expect(p.youMs).toBe(2 * MIN);
+    expectValid(d);
+  });
+
+  it('reaches into the previous day\'s tail, clipped at midnight', () => {
+    const d = run({
+      claudeEvents: [ce(at(0, 5), 'prompt')],
+      previousDayTail: { heartbeats: [], claudeEvents: [ce(at(23, 55, 0, '2026-06-09'), 'activity')] },
+    });
+    expect(yours(d)).toBe(5 * MIN); // [23:55, 00:05] clipped to [00:00, 00:05]
+  });
+});
+
 describe('midnight and the previous-day tail', () => {
   it('joins across midnight, then clips to the day', () => {
     const prev = '2026-06-09';

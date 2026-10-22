@@ -288,7 +288,11 @@ Claude events are de-duplicated by `id` across the day and tail inputs before an
 
 Per project:
 
-- **Your events:** the `time` of every heartbeat with `reload` false (any kind), plus, for each Claude `prompt` event at `t`, two events: `t - 2 min` and `t` (the prompt span's start and end). `gap = idleMinutes`, `lone = 2 min`. A prompt on its own therefore yields `[t - 2 min, t]`; a prompt one minute after an edit joins it into one interval; a prompt joins an earlier edit whenever its span start is within `idleMinutes` of it.
+- **Your events:** the `time` of every heartbeat with `reload` false (any kind), plus, for each Claude `prompt` event at `t`, two events: the prompt span's start `s` and `t`. `gap = idleMinutes`, `lone = 2 min`.
+  - **The span start (since 0.2.0, the read-and-dictate gap):** let `a` be the latest Claude `activity` or `edit` event **in the prompt's own stream** strictly before `t`. If `a` exists and `t - a <= idleMinutes`, then `s = min(a, t - 2 min)`: reading Claude's answer, thinking and dictating the next prompt is your time. Otherwise `s = t - 2 min` (the first prompt of a session, or a builder who stepped away). Only the prompt's own stream counts, so a subagent working in its own stream never shortens the gap. Events from the previous day's tail count, and the span is clipped at midnight like every interval.
+  - A prompt with no recent activity in its stream therefore yields `[t - 2 min, t]`; a prompt one minute after an edit joins it into one interval; a prompt joins an earlier edit whenever its span start is within `idleMinutes` of it.
+  - Reading while a parallel session works overlaps that session's Claude time, so it lands in `bothMs`.
+  - Day files written by 0.1.0 used `s = t - 2 min` always; `caveats.readerVersion` says which rule produced a file. Today and yesterday are re-merged automatically; older files keep the rule they were written with.
 - **Claude's events:** the `time` of every Claude event of kind `activity` or `edit` (an edit is also activity). `gap = 5 min`, `lone = 2 min`. Prompts are not Claude activity.
 - **Reload heartbeats** are not your activity and add no lines.
 
