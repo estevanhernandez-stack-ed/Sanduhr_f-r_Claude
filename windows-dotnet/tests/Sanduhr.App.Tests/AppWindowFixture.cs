@@ -24,6 +24,8 @@ public abstract class AppWindowFixture : IDisposable
         Directory.CreateDirectory(Path.Combine(Profile, ".claude", "projects"));
         ClaudeCodeProfile.ProfileOverride = Profile;
         ClaudeCodeProfile.ConfigDirOverride = "";
+        ClaudeCodeViewModel.ForgetSessionChoice();
+        ModsConfigViewModel.ForgetSessionChoice();
     }
 
     public void Dispose()
@@ -31,6 +33,8 @@ public abstract class AppWindowFixture : IDisposable
         Environment.SetEnvironmentVariable("SANDUHR_DEV_PROFILE", _oldDev);
         ClaudeCodeProfile.ProfileOverride = null;
         ClaudeCodeProfile.ConfigDirOverride = null;
+        ClaudeCodeViewModel.ForgetSessionChoice();
+        ModsConfigViewModel.ForgetSessionChoice();
         try { Directory.Delete(Root, true); } catch (IOException) { }
     }
 

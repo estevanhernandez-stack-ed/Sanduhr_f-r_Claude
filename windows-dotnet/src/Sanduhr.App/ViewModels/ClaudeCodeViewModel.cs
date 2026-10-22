@@ -141,6 +141,12 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     private Window? _owner;
     private bool _loading;
 
+    /// <summary>The folder picked in the install combo earlier in the session. The Settings window is rebuilt each time
+    /// it opens; this is what keeps the choice.</summary>
+    private static string? s_sessionFolder;
+
+    internal static void ForgetSessionChoice() => s_sessionFolder = null;
+
     public ObservableCollection<CcFolderRowViewModel> Folders { get; } = new();
     public ObservableCollection<string> AccountOptions { get; } = new();
     public ObservableCollection<CcFolderRowViewModel> FolderChoices => Folders;
@@ -320,7 +326,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     /// <summary>Re-reads the folder list, the account choices and every status.</summary>
     public void Reload()
     {
-        var keep = SelectedFolder?.Path;
+        var keep = SelectedFolder?.Path ?? s_sessionFolder;
         _loading = true;
         AccountOptions.Clear();
         AccountOptions.Add(NoAccount);
@@ -338,8 +344,12 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 f.Discovered && roots.GetValueOrDefault(f.Name)));
         }
         HasFolders = Folders.Count > 0;
-        SelectedFolder = Folders.FirstOrDefault(r => keep is not null && ClaudeCodeFolders.Same(r.Path, keep))
-                         ?? Folders.FirstOrDefault();
+        // Your last pick, then the folder Claude Code runs from, then the active account's, then the one with the
+        // most plugins on, then the first (the same order as Mods & Config).
+        string? active = null;
+        try { active = _widget.ShownActiveAccount is { } label ? _widget.AccountFolder(label) : null; } catch (Exception) { }
+        var pick = ModsFolderChoice.Pick([.. Folders.Select(f => f.Path)], keep, ClaudeCodeProfile.ConfigDir, active, ModInventory.EnabledPluginCount);
+        SelectedFolder = Folders.FirstOrDefault(r => pick is not null && ClaudeCodeFolders.Same(r.Path, pick));
         _loading = false;
         RefreshStatuses();
         SyncSnapshotConsumers(forceWrite: false);
@@ -347,7 +357,9 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
 
     partial void OnSelectedFolderChanged(CcFolderRowViewModel? value)
     {
-        if (!_loading) RefreshStatuses();
+        if (_loading) return;
+        if (value is not null) s_sessionFolder = value.Path;
+        RefreshStatuses();
     }
 
     [RelayCommand]
