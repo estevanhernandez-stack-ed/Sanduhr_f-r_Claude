@@ -79,7 +79,7 @@ public class ToolLogicNowPlayingLooksTests
     // -- the checks ----------------------------------------------------------
 
     [Fact]
-    public void A_good_request_is_queued_for_the_widget_and_its_answer_comes_back()
+    public async Task A_good_request_is_queued_for_the_widget_and_its_answer_comes_back()
     {
         using var tmp = new TempDir();
         var cfg = LooksConfig(tmp, TimeSpan.FromSeconds(5));
@@ -101,7 +101,7 @@ public class ToolLogicNowPlayingLooksTests
         });
 
         var r = logic.BuildProposeNowPlayingLooks(Args($$"""{"looks":[{{Look(extra: ""","style":"Bold","mood":"neon" """)}}],"note":"  for tonight  "}"""));
-        widget.GetAwaiter().GetResult();
+        await widget;
 
         Assert.Equal("pending_approval", (string?)r["status"]);
         Assert.True((bool)r["style_on"]!);
@@ -111,7 +111,7 @@ public class ToolLogicNowPlayingLooksTests
     }
 
     [Fact]
-    public void An_applied_answer_carries_looks_saved_and_style_on_and_a_rejected_one_its_reasons()
+    public async Task An_applied_answer_carries_looks_saved_and_style_on_and_a_rejected_one_its_reasons()
     {
         foreach (bool applied in new[] { true, false })
         {
@@ -126,7 +126,7 @@ public class ToolLogicNowPlayingLooksTests
             });
 
             var r = Propose(cfg, Look(), Look("Starboy"));
-            widget.GetAwaiter().GetResult();
+            await widget;
 
             if (applied)
             {
@@ -306,8 +306,8 @@ public class ToolLogicNowPlayingLooksTests
         Assert.Equal(["looks", "note"], props.Select(kv => kv.Key).ToArray());
         var item = (JsonObject)props["looks"]!["items"]!["properties"]!;
         Assert.Equal(["title", "artist", "ink", "style", "mood"], item.Select(kv => kv.Key).ToArray());
-        Assert.Equal(["plain", "bold", "italic", "bolditalic", "smallcaps"], item["style"]!["enum"]!.AsArray().Select(x => (string?)x).ToArray());
-        string description = (string?)tool["description"]!;
+        Assert.Equal(["plain", "bold", "italic", "bolditalic", "smallcaps"], item["style"]!["enum"]!.AsArray().Select(x => (string)x!).ToArray());
+        string description = (string)tool["description"]!;
         foreach (var word in new[] { "pending_approval", "looks_saved", "style_on", "queued", "3:1" })
             Assert.Contains(word, description);
         Assert.True(description.All(c => c < 128), "descriptions are plain ASCII");
