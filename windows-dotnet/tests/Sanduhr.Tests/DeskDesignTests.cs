@@ -159,9 +159,10 @@ public class DeskDesignTests
     }
 
     [Fact]
-    public void PerSongLooksAreRefusedUntilTheyShip()
+    public void PerSongLooksMustBeAListOfGoodLooks()
     {
         AssertRefused("""{"looks":{"a":1}}""", "looks");
+        AssertRefused("""{"looks":[{"title":"x","ink":["#ffffff"],"style":"sans"}]}""", "looks");
     }
 
     [Theory]

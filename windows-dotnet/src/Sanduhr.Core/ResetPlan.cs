@@ -175,6 +175,12 @@ public static partial class ResetPlan
             AddMatchingFiles(history, dir, "desk-messages-*.json");
             AddMatchingFiles(history, dir, "desk-design-*.json");
             AddMatchingFiles(history, dir, "watch-request-*.json");
+            // The look per song handoff (the request, its result, the current look and the mod's offer) is gone with the rest;
+            // the saved looks themselves (now-playing-looks.json) are the user's settings, below.
+            AddFile(history, Path.Combine(dir, NowPlayingLookProposal.RequestFile));
+            AddFile(history, Path.Combine(dir, NowPlayingLookProposal.ResultFile));
+            AddFile(history, Path.Combine(dir, NowPlayingLookProposal.CurrentFile));
+            AddFile(history, Path.Combine(dir, NowPlayingLookProposal.OfferFile));
         }
         map[ResetPart.History] = Finish(history, backups);
 
@@ -191,6 +197,8 @@ public static partial class ResetPlan
         AddDir(settings, paths.LauncherDir);
         // The saved Desk designs (spec, the agent-designed Desk) are the Desk's settings kept for switching back.
         AddDir(settings, paths.DesignsDir);
+        // The saved song looks (spec, a look per song) keep titles for the looks the user kept: they go with the settings.
+        AddFile(settings, Path.Combine(app, NowPlayingLookProposal.StoreFile));
         // A stale projection must not outlive the consent it copies; the watchers switch is a copy of one too.
         AddFile(settings, Path.Combine(ext, McpSettingsName));
         AddFile(settings, Path.Combine(ext, WatcherRequest.SwitchFile));

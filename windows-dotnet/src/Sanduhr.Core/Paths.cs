@@ -145,6 +145,10 @@ public sealed class Paths
     /// per design named by its id. Not auto-created; the first save creates it.</summary>
     public string DesignsDir => Path.Combine(AppDataDir, "designs");
 
+    /// <summary>The user's saved song looks (spec, a look per song): <c>%APPDATA%\Sanduhr\now-playing-looks.json</c> (package storage on the
+    /// Store build). Private to the widget; titles are stored here only for looks the user kept.</summary>
+    public string NowPlayingLooksFile => Path.Combine(AppDataDir, NowPlayingLookProposal.StoreFile);
+
     /// <summary>Generated-chime cache folder: <c>%APPDATA%\Sanduhr\sounds</c>.
     /// Parity with <c>sounds._sounds_dir</c>. Not auto-created here — the player
     /// creates it lazily on first play.</summary>

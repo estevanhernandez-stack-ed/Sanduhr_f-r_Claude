@@ -61,7 +61,8 @@ public sealed record DeskParse(DeskDesign? Design, IReadOnlyList<DeskReason> Rea
 /// JSON, snake_case: <c>name</c>, <c>note</c>, <c>layout</c> ({piece: {anchor, size, hidden}}), <c>font</c> (a family, or
 /// {family, link}), <c>ink</c> ("auto", "light", "dark", "theme", one #hex, or two to four #hex), <c>plate</c>,
 /// <c>shadow</c>, <c>launcher</c> ({orientation, buttons[]}), <c>messages</c> ({lines[], mode}) and <c>theme</c> (a widget
-/// theme object). <c>looks</c> (per-song looks) is reserved and refused until they ship.
+/// theme object). <c>looks</c> is a list of per-song looks (<see cref="NowPlayingLookCheck"/>): they are saved with the design
+/// and never become part of the Desk it reads back.
 /// </summary>
 public sealed partial record DeskDesign
 {
@@ -87,6 +88,8 @@ public sealed partial record DeskDesign
     public LauncherModel? Launcher { get; init; }
     public DeskMessagesChange? Messages { get; init; }
     public JsonObject? Theme { get; init; }
+    /// <summary>Per-song looks for now playing (1 to 20), saved into the user's looks when the design is applied.</summary>
+    public IReadOnlyList<SongLook>? Looks { get; init; }
 
     private static readonly string[] Fields =
         ["name", "note", "layout", "font", "ink", "plate", "shadow", "launcher", "messages", "looks", "theme"];
@@ -112,7 +115,7 @@ public sealed partial record DeskDesign
         var unknown = o.Select(kv => kv.Key).Where(k => !Fields.Contains(k, StringComparer.Ordinal)).Order(StringComparer.Ordinal).ToList();
         if (unknown.Count > 0)
             r.Add(new DeskReason("design", "unknown field(s): " + string.Join(", ", unknown.Take(5).Select(k => Clip(k, 24)))
-                + ". The fields are " + string.Join(", ", Fields.Where(f => f != "looks")) + "."));
+                + ". The fields are " + string.Join(", ", Fields) + "."));
 
         string? name = Text(o, "name", NameMax, r);
         string? note = Text(o, "note", NoteMax, r);
@@ -124,8 +127,13 @@ public sealed partial record DeskDesign
         var launcher = ParseLauncher(o["launcher"], r);
         var messages = ParseMessages(o["messages"], r);
         JsonObject? theme = null;
-        if (o["looks"] is not null)
-            r.Add(new DeskReason("looks", "per-song looks are not supported by this version of Sanduhr yet; leave looks out"));
+        IReadOnlyList<SongLook>? looks = null;
+        if (o["looks"] is { } lk)
+        {
+            var parsedLooks = NowPlayingLookCheck.ParseEntries(lk);
+            foreach (var why in parsedLooks.Reasons) r.Add(new DeskReason("looks", why));
+            if (parsedLooks.Reasons.Count == 0) looks = parsedLooks.Looks;
+        }
         if (o["theme"] is { } t)
             theme = ParseTheme(t, r, warnings);
 
@@ -133,7 +141,7 @@ public sealed partial record DeskDesign
         return new DeskParse(new DeskDesign
         {
             Name = name, Note = note, Layout = layout, Font = font, Ink = ink, Plate = plate, Shadow = shadow,
-            Launcher = launcher, Messages = messages, Theme = theme,
+            Launcher = launcher, Messages = messages, Theme = theme, Looks = looks,
         }, [], warnings);
     }
 
@@ -533,6 +541,12 @@ public sealed partial record DeskDesign
             foreach (var l in Messages.Lines) arr.Add((JsonNode?)l);
             o["messages"] = new JsonObject { ["lines"] = arr, ["mode"] = Word(Messages.Mode) };
         }
+        if (Looks is not null)
+        {
+            var arr = new JsonArray();
+            foreach (var l in Looks) arr.Add((JsonNode?)l.ToJson());
+            o["looks"] = arr;
+        }
         if (Theme is not null) o["theme"] = Theme.DeepClone();
         return o;
     }
@@ -570,6 +584,7 @@ public sealed partial record DeskDesign
             Launcher = launcher,
             Messages = proposal.Messages ?? current?.Messages,
             Theme = proposal.Theme ?? current?.Theme,
+            Looks = proposal.Looks ?? current?.Looks,
         };
     }
 
@@ -668,6 +683,8 @@ public sealed partial record DeskDesign
                 ? $"Messages: adds {n} line{(n == 1 ? "" : "s")}"
                 : $"Messages: replaces the list with {n} line{(n == 1 ? "" : "s")}");
         }
+        if (b.Looks is { Count: > 0 } looks)
+            lines.Add($"Song looks: {looks.Count} song{(looks.Count == 1 ? "" : "s")} styled for now playing");
         if (b.Theme is { } theme && (a.Theme is null || a.Theme.ToJsonString() != theme.ToJsonString()))
         {
             string to = ThemeName(theme) ?? "a new theme";

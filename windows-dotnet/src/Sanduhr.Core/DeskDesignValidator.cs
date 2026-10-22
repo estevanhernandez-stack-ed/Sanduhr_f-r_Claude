@@ -106,6 +106,7 @@ public sealed partial record DeskDesign
         CheckMembership(d, context, reasons);
         CheckMonitors(d, context, reasons);
         CheckContrast(d, context, reasons);
+        CheckLooks(d, context, reasons);
         if (reasons.Count > 0) return Rejected(reasons, parsed.Warnings, d);
 
         var missing = new List<MissingFont>();
@@ -146,6 +147,20 @@ public sealed partial record DeskDesign
             reasons.Add(new DeskReason($"layout.{p.Piece}.monitor",
                 "is not a monitor connected to this PC; use \"all\", \"main\" or an id from monitors in get_desk."));
         }
+    }
+
+    /// <summary>The song looks of a design meet the same contrast rule as <c>propose_now_playing_looks</c>: every stop keeps 3:1 against the
+    /// spot behind the now-playing piece, judged on the Desk the design would leave (layout, plate and ink merged over the current ones).</summary>
+    private static void CheckLooks(DeskDesign d, DeskDesignContext ctx, List<DeskReason> reasons)
+    {
+        if (d.Looks is not { Count: > 0 } looks) return;
+        var merged = Merge(ctx.Current, d);
+        var backgrounds = NowPlayingLookCheck.Backgrounds(ctx with { Current = merged });
+        if (backgrounds.Count == 0) return;
+        for (int i = 0; i < looks.Count; i++)
+            foreach (var stop in looks[i].Look.Ink)
+                if (NowPlayingLookCheck.Contrast(stop, backgrounds) is { } why)
+                    reasons.Add(new DeskReason("looks", $"look {i + 1} color {why}"));
     }
 
     // -- contrast -----------------------------------------------------------------------------------------
@@ -219,7 +234,7 @@ public sealed partial record DeskDesign
 
     /// <summary>The wallpaper monitors a piece is judged against: every one for "all monitors"; the primary for "main"; the one with that id.
     /// A monitor the summary does not know (unplugged, or an older state with no ids) is judged against all of them, the safe side.</summary>
-    private static IEnumerable<WallpaperMonitorSummary> MonitorsOf(WallpaperOverview wall, string? monitor)
+    internal static IEnumerable<WallpaperMonitorSummary> MonitorsOf(WallpaperOverview wall, string? monitor)
     {
         switch (DeskMonitors.FromWord(monitor))
         {

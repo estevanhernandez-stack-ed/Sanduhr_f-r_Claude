@@ -62,9 +62,11 @@ public sealed record DeskMessageSettings(
 /// picked from apps seen this session) and the bars beside the Desk piece (on). Titles are never stored
 /// here or anywhere. The retired <c>hide_paused</c> key is read by nothing: it used to make a paused
 /// track hide at once, and hiding after the grace is now the default for everyone; it is dropped the
-/// next time the page saves.
+/// next time the page saves. <c>style</c> is "Style what's playing" (off): the Desk draws the song in its look (a gradient and a
+/// letter style, saved or seeded from the song). <c>looks_direct</c> is "Let Claude style songs directly" (off): a look Claude
+/// proposes is saved without the card.
 /// </summary>
-public sealed record NowPlayingSettings(bool Widget, bool KeepPaused, IReadOnlyList<string> Excluded, bool Bars)
+public sealed record NowPlayingSettings(bool Widget, bool KeepPaused, IReadOnlyList<string> Excluded, bool Bars, bool Style = false, bool LooksDirect = false)
 {
     public const string Key = "now_playing";
 
@@ -85,16 +87,25 @@ public sealed record NowPlayingSettings(bool Widget, bool KeepPaused, IReadOnlyL
             SettingsJson.Bool(o, "widget", d.Widget),
             SettingsJson.Bool(o, "keep_paused", d.KeepPaused),
             excluded,
-            SettingsJson.Bool(o, "visualizer", d.Bars));
+            SettingsJson.Bool(o, "visualizer", d.Bars),
+            SettingsJson.Bool(o, "style", d.Style),
+            SettingsJson.Bool(o, "looks_direct", d.LooksDirect));
     }
 
-    public JsonObject Encode() => new()
+    public JsonObject Encode()
     {
-        ["widget"] = Widget,
-        ["keep_paused"] = KeepPaused,
-        ["excluded"] = new JsonArray([.. Excluded.Select(e => (JsonNode?)JsonValue.Create(e))]),
-        ["visualizer"] = Bars,
-    };
+        var o = new JsonObject
+        {
+            ["widget"] = Widget,
+            ["keep_paused"] = KeepPaused,
+            ["excluded"] = new JsonArray([.. Excluded.Select(e => (JsonNode?)JsonValue.Create(e))]),
+            ["visualizer"] = Bars,
+        };
+        // The looks switches are written only while on, so a settings file from before them stays as it was.
+        if (Style) o["style"] = true;
+        if (LooksDirect) o["looks_direct"] = true;
+        return o;
+    }
 }
 
 /// <summary>
