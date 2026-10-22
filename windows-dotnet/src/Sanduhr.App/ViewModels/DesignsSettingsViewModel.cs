@@ -17,21 +17,25 @@ public sealed class DesignRow
         Id = design.Id;
         Name = design.Name;
         Pinned = design.Pinned;
-        Date = design.AppliedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+        var local = design.AppliedAt.ToLocalTime();
+        Date = local.ToString(local.Year == DateTime.Now.Year ? "MMM d h:mm tt" : "MMM d, yyyy h:mm tt", CultureInfo.CurrentCulture);
     }
 
     public string Id { get; }
     public string Name { get; }
     public bool Pinned { get; }
 
-    /// <summary>When it was applied, in the PC's own format.</summary>
+    /// <summary>When it was applied, in the PC's own format ("Oct 21 8:15 PM").</summary>
     public string Date { get; }
 
     /// <summary>"Pin" or "Unpin", the button's words.</summary>
     public string PinText => Pinned ? "Unpin" : "Pin";
 
     /// <summary>The line the row reads out: its name, whether it is pinned and when it was applied.</summary>
-    public string Summary => $"{Name}, {(Pinned ? "pinned, " : "")}applied {Date}";
+    public string Summary => $"{Name}, applied {Date}{(Pinned ? ", pinned" : "")}";
+
+    /// <summary>What a screen reader or a debugger shows for the row object: its summary, never the type name.</summary>
+    public override string ToString() => Summary;
 
     public string SwitchName => $"Switch to {Name}";
     public string RenameName => $"Rename {Name}";
