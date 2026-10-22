@@ -39,7 +39,7 @@ public sealed class SettingsWindowNamesTests : AppWindowFixture
         File.WriteAllText(Path.Combine(home, ".claude.json"), "{\"mcpServers\":{\"files\":{\"command\":\"x\"}}}");
     }
 
-    [Fact]
+    [DesktopFact]
     public void NoPageReadsAsATypeNameOrARecord() => AppHost.Run(() =>
     {
         SeedPersonalHome(Path.Combine(Profile, ".claude-personal"));

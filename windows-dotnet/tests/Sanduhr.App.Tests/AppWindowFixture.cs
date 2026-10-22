@@ -8,6 +8,19 @@ using Sanduhr.App.ViewModels;
 namespace Sanduhr.App.Tests;
 
 /// <summary>
+/// A fact that is skipped, with a message, on GitHub's hosted runner. There the items of a list get no automation
+/// names at all, though every one is named on a desktop session; until that is understood these run locally only.
+/// </summary>
+public sealed class DesktopFactAttribute : FactAttribute
+{
+    public DesktopFactAttribute()
+    {
+        if (Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true")
+            Skip = "List items get no automation names on the hosted runner; this test runs on a desktop session only.";
+    }
+}
+
+/// <summary>
 /// Real windows over an invented Claude Code profile and a scratch AppData (SANDUHR_DEV_PROFILE), with the sample
 /// accounts of demo mode, read the way Narrator reads them. Everything runs on <see cref="AppHost"/>'s thread. Nothing
 /// here touches the real profile, settings or vault; Credential Manager is read, never written.
