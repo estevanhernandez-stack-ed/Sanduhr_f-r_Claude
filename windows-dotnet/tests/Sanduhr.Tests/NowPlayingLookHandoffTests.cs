@@ -299,7 +299,7 @@ public sealed class NowPlayingLookHandoffTests : IDisposable
         Assert.True(h.Pending.IsOffer);
         Assert.Equal(2, retries.Count);   // no retry for a good offer
         h.Check();
-        Assert.Equal(1, h.Pending.Looks.Count);
+        Assert.Single(h.Pending.Looks);
     }
 
     [Fact]
