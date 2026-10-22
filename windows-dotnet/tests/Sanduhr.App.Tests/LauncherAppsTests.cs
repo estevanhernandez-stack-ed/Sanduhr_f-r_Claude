@@ -63,9 +63,10 @@ public class LauncherAppsTests
     {
         using var apps = new LauncherApps();
         Assert.False(apps.Exists("Sanduhr.Test.NoSuchApp_0000000000000!Nothing"));
-        Assert.False(apps.Exists(@"C:\Windows\System32\cmd.exe"));   // refused before the shell is asked
+        Assert.False(apps.Exists(@"C:\Windows\..\cmd.exe"));   // refused before the shell is asked
+        Assert.False(apps.Exists(@"C:\Windows\System32\cmd.exe"));   // well-formed, but the Start menu does not list it
         Assert.False(apps.Exists("a b"));
-        Assert.Null(apps.Icon(@"C:\Windows\System32\cmd.exe", 64));
+        Assert.Null(apps.Icon(@"C:\Windows\..\cmd.exe", 64));
     }
 
     [Fact]
@@ -73,7 +74,7 @@ public class LauncherAppsTests
     {
         var calls = new List<string>();
         bool Exists(string id) { calls.Add(id); return true; }
-        Assert.Equal(LauncherApps.OpenResult.Refused, LauncherApps.Open(new LauncherButton(LauncherKind.App, @"C:\Windows\notepad.exe"), Exists));
+        Assert.Equal(LauncherApps.OpenResult.Refused, LauncherApps.Open(new LauncherButton(LauncherKind.App, @"C:\Windows\..\notepad.exe"), Exists));
         Assert.Equal(LauncherApps.OpenResult.Refused, LauncherApps.Open(new LauncherButton(LauncherKind.Link, "http://example.com"), Exists));
         Assert.Equal(LauncherApps.OpenResult.Refused, LauncherApps.Open(new LauncherButton(LauncherKind.Link, "javascript:alert(1)"), Exists));
         Assert.Equal(LauncherApps.OpenResult.Refused, LauncherApps.Open(new LauncherButton(LauncherKind.Link, "file:///C:/Windows/notepad.exe"), Exists));

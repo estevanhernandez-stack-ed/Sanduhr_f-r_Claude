@@ -66,7 +66,7 @@ public class LauncherModelTests
               "not an object", 7, null,
               { "kind": "app" },
               { "kind": "exe", "target": "notepad.exe" },
-              { "kind": "app", "target": "C:\\Windows\\notepad.exe" },
+              { "kind": "app", "target": "C:\\Windows\\..\\notepad.exe" },
               { "kind": "link", "target": "http://example.com" },
               { "kind": "link", "target": "javascript:alert(1)" },
               { "kind": "app", "target": 42 },
@@ -159,7 +159,7 @@ public class LauncherModelTests
     [Fact]
     public void CreateRefusesATargetThatFailsValidation()
     {
-        Assert.Null(LauncherButton.Create(LauncherKind.App, @"C:\x.exe"));
+        Assert.Null(LauncherButton.Create(LauncherKind.App, @"C:\..\x.exe"));
         Assert.Null(LauncherButton.Create(LauncherKind.Link, "http://example.com"));
         Assert.NotNull(LauncherButton.Create(LauncherKind.Link, "https://example.com"));
     }
@@ -181,7 +181,7 @@ public class LauncherModelTests
     public void AddAndReplaceRefuseAButtonThatDoesNotPass()
     {
         var m = Of("A");
-        Assert.Same(m, m.Add(new LauncherButton(LauncherKind.App, @"C:\evil.exe")));
+        Assert.Same(m, m.Add(new LauncherButton(LauncherKind.App, @"C:\..\evil.exe")));
         Assert.Same(m, m.Replace(0, new LauncherButton(LauncherKind.Link, "http://example.com")));
     }
 

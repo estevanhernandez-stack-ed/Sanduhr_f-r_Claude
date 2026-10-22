@@ -284,7 +284,7 @@ public class DeskDesignTests
     [InlineData("""{"launcher":{"buttons":[{"target":"calc.exe"}]}}""", "launcher.buttons[0].kind")]
     [InlineData("""{"launcher":{"buttons":[{"kind":"app"}]}}""", "launcher.buttons[0].target")]
     [InlineData("""{"launcher":{"buttons":[{"kind":"app","target":"cmd.exe /c calc"}]}}""", "launcher.buttons[0].target")]
-    [InlineData("""{"launcher":{"buttons":[{"kind":"app","target":"C:\\Windows\\System32\\calc.exe"}]}}""", "launcher.buttons[0].target")]
+    [InlineData("""{"launcher":{"buttons":[{"kind":"app","target":"C:\\Windows\\..\\calc.exe"}]}}""", "launcher.buttons[0].target")]
     [InlineData("""{"launcher":{"buttons":[{"kind":"app","target":"\\\\server\\share\\x.exe"}]}}""", "launcher.buttons[0].target")]
     [InlineData("""{"launcher":{"buttons":[{"kind":"app","target":"shell:AppsFolder\\x"}]}}""", "launcher.buttons[0].target")]
     [InlineData("""{"launcher":{"buttons":[{"kind":"app","target":"calc & del *"}]}}""", "launcher.buttons[0].target")]

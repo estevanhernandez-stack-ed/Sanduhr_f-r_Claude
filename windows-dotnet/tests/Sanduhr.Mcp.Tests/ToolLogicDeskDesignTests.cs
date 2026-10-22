@@ -239,7 +239,7 @@ public class ToolLogicDeskDesignTests
     [InlineData("""{"layout":{"clock":{"size":9}}}""", "layout.clock.size")]
     [InlineData("""{"font":"C:\\Windows\\Fonts\\evil.ttf"}""", "font")]
     [InlineData("""{"launcher":{"buttons":[{"kind":"app","target":"cmd.exe /c calc"}]}}""", "launcher.buttons[0].target")]
-    [InlineData("""{"launcher":{"buttons":[{"kind":"app","target":"C:\\Windows\\System32\\calc.exe"}]}}""", "launcher.buttons[0].target")]
+    [InlineData("""{"launcher":{"buttons":[{"kind":"app","target":"C:\\Windows\\..\\calc.exe"}]}}""", "launcher.buttons[0].target")]
     [InlineData("""{"launcher":{"buttons":[{"kind":"link","target":"file:///C:/Windows/System32/calc.exe"}]}}""", "launcher.buttons[0].target")]
     [InlineData("""{"launcher":{"buttons":[{"kind":"link","target":"javascript:alert(1)"}]}}""", "launcher.buttons[0].target")]
     [InlineData("""{"launcher":{"buttons":[{"kind":"link","target":"http://example.com"}]}}""", "launcher.buttons[0].target")]

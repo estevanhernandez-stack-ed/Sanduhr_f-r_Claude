@@ -87,7 +87,7 @@ public sealed class LauncherSettingsTests : IDisposable
     {
         File.WriteAllText(_paths.SettingsFile, """
             { "desk_launcher": { "orientation": "column", "buttons": [
-              { "kind": "app", "target": "C:\\Windows\\System32\\cmd.exe" },
+              { "kind": "app", "target": "C:\\Windows\\..\\cmd.exe" },
               { "kind": "link", "target": "javascript:alert(1)" },
               { "kind": "link", "target": "https://example.com", "image": "..\\..\\x.png" },
               { "kind": "app", "target": "Spotify" } ] } }

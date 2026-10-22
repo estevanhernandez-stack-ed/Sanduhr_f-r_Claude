@@ -27,13 +27,13 @@ can later propose a Launcher (sub-project A) without being able to run anything 
     `explorer.exe shell:AppsFolder\<id>` and never by running an exe path. This is the property
     sub-project A relies on.
   - **Two ID forms, one rule.** An app ID is either an AUMID, or the path form the Start menu gives a
-    classic desktop program with no AUMID: `{GUID}\Folder\Program.exe`. Both are accepted only
+    classic desktop program with no AUMID: `{GUID}\Folder\Program.exe`, or `C:\Folder\Program.exe` for
+    a program installed outside Program Files (an ASCII drive letter, the same rules). Both are accepted only
     while the live `shell:AppsFolder` enumeration contains the exact ID: the picker offers only
     listed IDs, saving an app button requires the ID to be listed right now (`LauncherAppCache`), and a
-    click re-checks it live and opens nothing that is not listed. Programs the Start menu lists with a
-    drive-letter path (`C:...`), a document, a URL or a protocol link are not offered (measured on Neb:
-    267 of the 324 Start-menu entries are offered; the rest are 12 drive-letter programs and 45 documents,
-    `.url`, `.msc`, `.chm` and protocol links).
+    click re-checks it live and opens nothing that is not listed. A document, a URL or a protocol link is
+    not offered (measured on Neb: 280 of the 325 Start-menu entries are offered, 12 of them drive-letter
+    programs; the rest are documents, `.url`, `.msc`, `.chm` and protocol links).
   - **Image**: the app's own icon by default (from the shell item); a link defaults to a link glyph.
     Or a PNG the user picks, copied into `%APPDATA%\Sanduhr\launcher\` (private storage; at most
     1 MB, decoded and re-encoded to a 256 px square on import). **No favicon download**: that would
@@ -80,9 +80,10 @@ can later propose a Launcher (sub-project A) without being able to run anything 
 
 - `LauncherTarget.Validate(kind, target)`: app = an AUMID shape (no path separators, no spaces
   around, no quotes, at most 256 chars, `!` or a dotted package form allowed) **or** the path form
-  `{GUID}\Folder\Program.exe` (a braced GUID, then backslash-separated folder names with spaces
-  allowed inside a name, ending in `.exe`; at most 260 chars; no `..`, no empty segment, no drive letter or
-  UNC, none of `" ' | & < > ^ % ; * ? :` or a slash, no control character, no space-then-dash argument
+  `{GUID}\Folder\Program.exe` or `C:\Folder\Program.exe` (a braced GUID, or an ASCII drive letter and
+  colon, then backslash-separated folder names with spaces
+  allowed inside a name, ending in `.exe`; at most 260 chars; no `..`, no empty segment, no UNC, no
+  second colon, none of `" ' | & < > ^ % ; * ? :` or a slash, no control character, no space-then-dash argument
   pattern, no `.bat`/`.cmd`/`.ps1`/`.lnk`). The shape is only the first gate: the safety property is
   membership, enforced in the App layer where the ID is saved and again where it is opened; link = `Uri` absolute,
   scheme exactly `https`, host present, at most 2048 chars. Anything else is refused with a reason.

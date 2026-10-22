@@ -48,9 +48,7 @@ public class LauncherTargetTests
     [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\a'b.exe")]
     [InlineData(@"\\server\share\tool.exe")]                                         // UNC
     [InlineData(@"\\{6D809377-6AF0-444B-8957-A3773F02200E}\x.exe")]
-    [InlineData(@"C:\{6D809377-6AF0-444B-8957-A3773F02200E}\x.exe")]                  // a drive letter
-    [InlineData(@"C:\Program Files\x\x.exe")]
-    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\C:\x.exe")]
+    [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\C:\x.exe")]               // a drive letter inside
     [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}/x/y.exe")]                   // forward slashes
     [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x\y.exe & calc")]            // metacharacters
     [InlineData(@"{6D809377-6AF0-444B-8957-A3773F02200E}\x&calc\y.exe")]
@@ -109,7 +107,89 @@ public class LauncherTargetTests
     {
         Assert.Equal(@"shell:AppsFolder\" + G + @"\7-Zip\7zFM.exe", LauncherTarget.AppShellPath(G + @"\7-Zip\7zFM.exe"));
         Assert.Null(LauncherTarget.AppShellPath(G + @"\..\x.exe"));
-        Assert.Null(LauncherTarget.AppShellPath(@"C:\Windows\notepad.exe"));
+        Assert.Null(LauncherTarget.AppShellPath(@"C:\Windows\..\notepad.exe"));
+        Assert.Equal(@"shell:AppsFolder\C:\Python313\python.exe", LauncherTarget.AppShellPath(@"C:\Python313\python.exe"));
+    }
+
+    // ---- the drive-letter form: Start-menu programs installed outside Program Files (C:\Python313\python.exe) ----
+
+    [Theory]
+    [InlineData(@"C:\Python313\python.exe")]
+    [InlineData(@"c:\python313\python.exe")]
+    [InlineData(@"D:\SteamLibrary\steamapps\common\Some Game\game.exe")]
+    [InlineData(@"E:\Games\Battle Tech (x64)\BattleTech.EXE")]
+    [InlineData(@"C:\Program Files\x\x.exe")]
+    [InlineData(@"C:\Program Files (x86)\Foo - Bar\Baz.exe")]
+    [InlineData(@"Z:\x.exe")]
+    [InlineData(@"C:\{6D809377-6AF0-444B-8957-A3773F02200E}\x.exe")]
+    public void StartMenuDriveLetterProgramsPass(string id) =>
+        Assert.True(LauncherTarget.Validate(LauncherKind.App, id).Ok, id);
+
+    [Theory]
+    [InlineData(@"C:\Windows\..\evil.exe")]                       // up a level
+    [InlineData(@"C:\..\evil.exe")]
+    [InlineData(@"C:\a\.\b.exe")]
+    [InlineData(@"C:\a\\b.exe")]                                  // an empty segment
+    [InlineData(@"C:\\server\share\tool.exe")]                    // UNC dressed as a drive
+    [InlineData(@"\\C:\x.exe")]
+    [InlineData(@"\\server\share\tool.exe")]
+    [InlineData(@"\\?\C:\x.exe")]
+    [InlineData(@"C:x.exe")]                                      // no separator after the colon
+    [InlineData(@"C:")]
+    [InlineData(@"C:\")]
+    [InlineData(@"C:\.exe")]
+    [InlineData(@"1:\x.exe")]                                     // not a drive letter
+    [InlineData(@"é:\x.exe")]
+    [InlineData(@"CC:\x.exe")]
+    [InlineData(@"C:/Windows/x.exe")]                             // forward slashes
+    [InlineData(@"C:\a/b\x.exe")]
+    [InlineData(@"C:\a:b\x.exe")]                                 // a second colon (stream or device)
+    [InlineData(@"C:\x.exe:evil.exe")]
+    [InlineData(@"C:\x\C:\y.exe")]
+    [InlineData(@"C:\""a""\x.exe")]                               // quotes and metacharacters
+    [InlineData(@"C:\a'b\x.exe")]
+    [InlineData(@"C:\x&calc\y.exe")]
+    [InlineData(@"C:\x|calc\y.exe")]
+    [InlineData(@"C:\x<y\z.exe")]
+    [InlineData(@"C:\x>y\z.exe")]
+    [InlineData(@"C:\x^y\z.exe")]
+    [InlineData(@"C:\%TEMP%\z.exe")]
+    [InlineData(@"C:\x;y\z.exe")]
+    [InlineData(@"C:\x*\z.exe")]
+    [InlineData(@"C:\x\z?.exe")]
+    [InlineData(@"C:\x\run.bat")]                                 // not an .exe
+    [InlineData(@"C:\x\run.cmd")]
+    [InlineData(@"C:\x\run.ps1")]
+    [InlineData(@"C:\x\run.lnk")]
+    [InlineData(@"C:\x\run.exe.bat")]
+    [InlineData(@"C:\x\run")]
+    [InlineData(@"C:\x\run.exe -c calc")]                         // arguments
+    [InlineData(@"C:\x\run.exe /c calc")]
+    [InlineData(@"C:\x\run -c.exe")]
+    [InlineData(@"C:\x\run.exe ")]                                // spaces at the ends of a name
+    [InlineData(@" C:\x\run.exe")]
+    [InlineData(@"C:\ x\run.exe")]
+    [InlineData(@"C:\x \run.exe")]
+    [InlineData(@"C:\x.\run.exe")]
+    [InlineData("C:\\x\\run.exe\n")]                              // control characters
+    [InlineData("C:\\x\\ru\tn.exe")]
+    [InlineData(@"shell:AppsFolder\C:\x.exe")]
+    [InlineData(@"""C:\x\run.exe""")]
+    public void HostileDriveLetterFormsAreRefusedWithAReason(string id)
+    {
+        var check = LauncherTarget.Validate(LauncherKind.App, id);
+        Assert.False(check.Ok, id);
+        Assert.False(string.IsNullOrWhiteSpace(check.Reason));
+    }
+
+    [Fact]
+    public void ADriveLetterPathAtTheLimitPassesAndOneOverDoesNot()
+    {
+        const string prefix = @"C:\";
+        var atLimit = prefix + new string('a', LauncherTarget.MaxPathFormLength - prefix.Length - 4) + ".exe";
+        Assert.Equal(LauncherTarget.MaxPathFormLength, atLimit.Length);
+        Assert.True(LauncherTarget.Validate(LauncherKind.App, atLimit).Ok);
+        Assert.False(LauncherTarget.Validate(LauncherKind.App, atLimit.Replace(".exe", "a.exe")).Ok);
     }
 
     [Fact]
@@ -128,7 +208,6 @@ public class LauncherTargetTests
     [InlineData("Spotify ")]
     [InlineData("Spotify\n")]
     [InlineData("Some App")]                                   // a space
-    [InlineData(@"C:\Windows\System32\cmd.exe")]               // a drive path
     [InlineData(@"\\server\share\tool.exe")]                   // a UNC path
     [InlineData("C:/Windows/notepad.exe")]
     [InlineData("../../evil.exe")]
@@ -227,7 +306,7 @@ public class LauncherTargetTests
     public void TheShellPathAndTheUrlAreBuiltOnlyFromValidTargets()
     {
         Assert.Equal(@"shell:AppsFolder\Spotify", LauncherTarget.AppShellPath("Spotify"));
-        Assert.Null(LauncherTarget.AppShellPath(@"C:\x.exe"));
+        Assert.Null(LauncherTarget.AppShellPath(@"C:\x.bat"));
         Assert.Null(LauncherTarget.AppShellPath("a b"));
         Assert.Equal("https://example.com/a", LauncherTarget.LinkUrl("https://example.com/a"));
         Assert.Equal("https://example.com/", LauncherTarget.LinkUrl("HTTPS://EXAMPLE.com"));
