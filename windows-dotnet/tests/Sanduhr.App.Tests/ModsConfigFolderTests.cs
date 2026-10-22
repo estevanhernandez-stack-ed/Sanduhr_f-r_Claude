@@ -1,6 +1,7 @@
 namespace Sanduhr.App.Tests;
 
 /// <summary>Which folder Mods &amp; Config opens on.</summary>
+[Collection("SettingsWindow")] // the session folder choice is static, shared with the window tests
 public sealed class ModsConfigFolderTests : ModsConfigFixture
 {
     private const string Off = """{"enabledPlugins":{"a@m":false}}""";

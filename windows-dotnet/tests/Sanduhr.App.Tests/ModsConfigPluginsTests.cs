@@ -3,6 +3,7 @@ using System.IO;
 namespace Sanduhr.App.Tests;
 
 /// <summary>Mods &amp; Config calls everything a plugin, tags the ones that are mods, and explains its counts.</summary>
+[Collection("SettingsWindow")] // the session folder choice is static, shared with the window tests
 public sealed class ModsConfigPluginsTests : ModsConfigFixture
 {
     /// <summary>A home with: alpha (installed, on, a plain plugin), beta (installed, off), gamma (switched on, no files),
