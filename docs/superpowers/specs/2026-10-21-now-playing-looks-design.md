@@ -65,3 +65,52 @@ and on both surfaces. The rule is written down in this spec and in the mod.
 - WPF: the Looks section's automation names; the suggestion card.
 - Live: play a song with Style on (seeded look on the Desk), ask Claude for looks for it, Save, the
   Desk changes at once; the mod's band shows the same look; Clear Looks; direct on.
+
+## As built (contract for the mod)
+
+Source of truth: `windows-dotnet/src/Sanduhr.Core/NowPlayingLook.cs` (`SongKey`, `NowPlayingLooks`,
+`NowPlayingLookCheck`, `NowPlayingLookProposal`); the tests pin every vector below.
+
+**Song key.** `normalize(s)`: lowercase each Unicode scalar on its own (simple case mapping; U+0130 stays as
+written); collapse each run of JavaScript `\s` whitespace to one space; trim; drop one trailing remaster mark, the
+first match of the regular expression ` - remaster.*$| \(remaster[^)]*\)$` on the whole text; trim again. The key
+is the FNV-1a 64-bit hash (offset `0xcbf29ce484222325`, prime `0x100000001b3`) of the UTF-8 bytes of
+`normalize(title) + "\n" + normalize(artist)`, as 16 lowercase hex digits. A title that normalizes to nothing has no
+key; the artist may be empty.
+
+| title | artist | key |
+|---|---|---|
+| `Blinding Lights` | `The Weeknd` | `ad75f4c29077a9de` (so does `  Blinding   Lights  ` / `THE WEEKND`) |
+| `Song` | `Artist` | `d2a7aa06c42e57bd` (so do `Song - Remastered 2011` and `Song (Remastered 2009)`) |
+| `Café del Mar` | `Energy 52` | `245e2ded93cf9f31` (so does `CAFÉ DEL MAR` / `energy 52`) |
+| `Untitled` | (empty) | `5f31c64688d31616` |
+| `Hey Jude - Remastered 2015` | `The Beatles` | `b0ccc496e92995e4` |
+| `Remaster Me` | `X` | `a31dfc67c5b9c43a` (no space-hyphen-space before it: not a mark) |
+| `A - Remastered` | `B` | `e5beb1190415e670` |
+| `x` | `y` | `be74b5197ee0cbea` |
+
+Raw FNV-1a 64: `""` is `cbf29ce484222325`, `"a"` is `af63dc4c8601ec8c`, `"foobar"` is `85944171f73967e8`.
+
+**A look** is `{ink, style, mood?}`: `ink` 1 to 4 `#rrggbb`, `style` one of `plain bold italic bolditalic
+smallcaps` (the mod maps its other fonts onto these, or onto `plain`), `mood` up to 40 characters. A seeded look
+(the file below carries it as `source: "seeded"`; the mod never has to compute one): palette `h mod 8` over the
+mod's eight, style `[smallcaps, italic, bold, bolditalic][(h div 8) mod 4]`, `h` the key as a 64-bit number.
+
+**`~/.sanduhr/now-playing-look.json`** (Sanduhr writes, the mod reads), only while the MCP integration is installed
+and Style what's playing is on, removed otherwise:
+`{"schema_version":1,"key":"ad75f4c29077a9de","look":{"ink":["#ff2a6d","#05d9e8"],"style":"smallcaps","mood":"neon"},"source":"saved"}`
+(`source` is `saved` or `seeded`). No title, no artist. When its `key` equals the mod's key for the song it is
+playing, the mod uses `look` (source `sanduhr`) instead of asking its model.
+
+**`~/.sanduhr/now-playing-look-offer.json`** (the mod writes, atomically through a temp name and a rename; Sanduhr
+reads and deletes it): `{"key":"…","title":"…","artist":"…","look":{"ink":[…],"style":"…","mood":"…"}}`, with an
+optional `"schema_version":1`. Write it only for a song whose key was not the saved one. `key` must be the key of
+`title` and `artist`, or the offer is dropped; an offer older than ten minutes is dropped. Sanduhr treats it as a
+Claude proposal (a card in Settings ▸ Now playing ▸ Looks, or saved directly) and never answers it.
+
+**Contrast.** Every stop must keep 3:1 against what is behind the now-playing piece (the wallpaper at its anchor,
+or the plate laid over it); a look that does not is refused with "color #rrggbb is too dark for this spot
+(r:1, needs 3.0:1)" (or "too light"). Seeded looks are not judged.
+
+**Saved looks** are `%APPDATA%\Sanduhr\now-playing-looks.json` (500 songs, the oldest going first), private to the
+widget; the server never reads them.
