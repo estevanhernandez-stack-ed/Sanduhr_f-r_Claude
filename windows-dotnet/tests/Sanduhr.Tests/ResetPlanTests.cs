@@ -91,7 +91,7 @@ public class ResetPlanTests : IDisposable
             "publish-request.json", "publish-result.json", "theme-request.json", "theme-result.json",
             "glow-waiting.signal", "glow-done.signal", "desk-messages-request.json", "watch-request-1-2-w1.json",
             "mods\\m\\file.txt", "mcp\\v1\\sanduhr-mcp.exe", "bin\\sanduhr-statusline.ps1", "mcp-settings.json",
-            "watchers.json", "desk-state.json", "desk-design-request.json", "desk-design-result.json",
+            "watchers.json", "desk-state.json", "wallpaper-preview.png", "desk-design-request.json", "desk-design-result.json",
         ];
         foreach (var f in files) Touch(Path.Combine(app, f));
         foreach (var f in externalFiles) Touch(Path.Combine(ext, f));
@@ -130,7 +130,7 @@ public class ResetPlanTests : IDisposable
             Assert.Contains(expected, hist);
 
         Assert.Equal(["themes"], inv[ResetPart.Themes].Select(Rel));
-        Assert.Equal(["messages.txt", "messages.txt.previous", "settings.json", "launcher", "~\\mcp-settings.json", "~\\watchers.json", "~\\desk-state.json"],
+        Assert.Equal(["messages.txt", "messages.txt.previous", "settings.json", "launcher", "~\\mcp-settings.json", "~\\watchers.json", "~\\desk-state.json", "~\\wallpaper-preview.png"],
             inv[ResetPart.Settings].Select(Rel));
 
         string backups = Path.Combine(app, "backups");

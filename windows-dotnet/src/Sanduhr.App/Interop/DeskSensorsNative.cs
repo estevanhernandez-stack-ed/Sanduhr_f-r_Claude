@@ -291,9 +291,11 @@ internal static class DeskSensorsNative
     private static readonly Guid CLSID_DesktopWallpaper = new("C2CF3110-460E-4FC1-B9D0-8A1C0C9CC4BD");
 
     /// <summary>One monitor's wallpaper as Windows draws it: the monitor's rect in physical pixels, the
-    /// image file (null for a plain color or when none is set) and the position mode (Windows uses one
+    /// image file to read (null for a plain color or when none is set; Windows' own cached copy when the file it names is gone,
+    /// see <see cref="WallpaperFallback"/>), where that file came from (<see cref="WallpaperFallback.SourceFile"/>,
+    /// <see cref="WallpaperFallback.SourceCache"/>, null when nothing readable) and the position mode (Windows uses one
     /// mode for every monitor).</summary>
-    internal sealed record WallpaperMonitor(int Left, int Top, int Right, int Bottom, string? Path);
+    internal sealed record WallpaperMonitor(int Left, int Top, int Right, int Bottom, string? Path, string? Source = null);
 
     /// <summary>What <c>IDesktopWallpaper</c> reports: each monitor, the position mode and the
     /// background color as 0x00BBGGRR. Null when the shell's object is unavailable.</summary>
@@ -306,6 +308,8 @@ internal static class DeskSensorsNative
             o = type is null ? null : Activator.CreateInstance(type);
             if (o is not IDesktopWallpaper w) return null;
             var list = new List<WallpaperMonitor>();
+            string themes = WallpaperFallback.ThemesDir(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+            bool plainColor = NoPictureChosen();
             return DeskNative.PerMonitor(() =>
             {
                 if (w.GetMonitorDevicePathCount(out var count) != 0) return ((IReadOnlyList<WallpaperMonitor>, int, uint)?)null;
@@ -314,7 +318,9 @@ internal static class DeskSensorsNative
                     if (w.GetMonitorDevicePathAt(i, out var id) != 0 || id is null) continue;
                     if (w.GetMonitorRECT(id, out var r) != 0) continue; // a detached monitor
                     string? path = w.GetWallpaper(id, out var p) == 0 && !string.IsNullOrWhiteSpace(p) ? p : null;
-                    list.Add(new WallpaperMonitor(r.Left, r.Top, r.Right, r.Bottom, path));
+                    // The file Windows names can be gone (deleted, moved) while Windows still draws its cached copy.
+                    var choice = WallpaperFallback.Choose(path, (int)i, themes, HasContent, plainColor);
+                    list.Add(new WallpaperMonitor(r.Left, r.Top, r.Right, r.Bottom, choice.Path, choice.Source));
                 }
                 int pos = w.GetPosition(out var mode) == 0 ? mode : 4; // Fill, Windows' default
                 uint bg = w.GetBackgroundColor(out var c) == 0 ? c : 0;
@@ -328,6 +334,28 @@ internal static class DeskSensorsNative
         finally
         {
             if (o is not null && Marshal.IsComObject(o)) Marshal.ReleaseComObject(o);
+        }
+    }
+
+    /// <summary>A file that exists and is not empty.</summary>
+    private static bool HasContent(string path)
+    {
+        try { return new FileInfo(path) is { Exists: true, Length: > 0 }; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { return false; }
+    }
+
+    /// <summary>True when the user's desktop has no picture chosen (the registry's Wallpaper value is empty): a solid color. Windows
+    /// leaves its cached copy of an earlier picture behind, which must not be read as the desktop then. Unknown reads as false.</summary>
+    private static bool NoPictureChosen()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop");
+            return key?.GetValue("Wallpaper") is string s && string.IsNullOrWhiteSpace(s);
+        }
+        catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            return false;
         }
     }
 }

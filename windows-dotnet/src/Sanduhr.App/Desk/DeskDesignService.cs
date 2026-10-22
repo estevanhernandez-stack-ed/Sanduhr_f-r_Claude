@@ -35,7 +35,7 @@ internal sealed class DeskDesignService : IDisposable
     /// <summary>How long changes settle before the state is rewritten (a Settings slider writes many times).</summary>
     public static readonly TimeSpan Settle = TimeSpan.FromMilliseconds(1500);
 
-    private sealed record Inputs(DeskDesign Current, IReadOnlyList<string> Fonts, WallpaperOverview? Overview, string? WallpaperPath, IReadOnlyList<StartMenuApp>? Apps);
+    private sealed record Inputs(DeskDesign Current, IReadOnlyList<string> Fonts, WallpaperOverview? Overview, string? WallpaperPath, string? WallpaperSource, IReadOnlyList<StartMenuApp>? Apps);
 
     private readonly Paths _paths;
     private readonly SettingsStore _store;
@@ -43,6 +43,7 @@ internal sealed class DeskDesignService : IDisposable
     private readonly Dispatcher _ui;
     private readonly DispatcherTimer _settle;
     private readonly WallpaperInk _wallpaper = new();
+    private readonly WallpaperPreviewFile _preview = new();
     private FileSystemWatcher? _watcher;
     private IReadOnlyList<string>? _fonts;
     private bool _started;
@@ -142,12 +143,19 @@ internal sealed class DeskDesignService : IDisposable
         if (!Enabled || !_store.LoadMcpEnabled())
         {
             Handoff.DeleteState();   // the integration is off: no state for it to read
+            _preview.Delete(PreviewPath);   // and no copy of the wallpaper
             return;
         }
         var i = Gather();
-        var state = DeskState.Build(i.Current, i.Fonts, i.Overview, i.WallpaperPath, i.Apps, [], direct: false, AppVersion);
+        string? previewPath = i.WallpaperPath is not null && i.WallpaperSource is not null ? _preview.Ensure(i.WallpaperPath, PreviewPath) : null;
+        if (previewPath is null) _preview.Delete(PreviewPath);
+        var state = DeskState.Build(i.Current, i.Fonts, i.Overview, previewPath, i.Apps, [], direct: false, AppVersion,
+            wallpaperSource: previewPath is null ? null : i.WallpaperSource, wallpaperIsImage: i.WallpaperPath is not null);
         Handoff.WriteState(state);
     }
+
+    /// <summary>Where the downscaled wallpaper copy for Claude Code lives.</summary>
+    private string PreviewPath => Path.Combine(Handoff.Paths.Support, WallpaperPreview.FileName);
 
     private Inputs Gather()
     {
@@ -161,7 +169,7 @@ internal sealed class DeskDesignService : IDisposable
             _apps.Refresh([]);   // reads the Start menu in the background when the list is old; Changed follows
             if (_apps.Known) apps = _apps.Apps.Select(a => new StartMenuApp(a.Aumid, a.Name)).ToList();
         }
-        return new Inputs(current, _fonts, overview, path, apps);
+        return new Inputs(current, _fonts, overview, path, _wallpaper.PathSource, apps);
     }
 
     /// <summary>What the widget's own check of a request knows about this PC.</summary>

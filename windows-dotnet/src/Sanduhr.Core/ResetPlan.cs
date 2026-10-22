@@ -194,6 +194,8 @@ public static partial class ResetPlan
         AddFile(settings, Path.Combine(ext, WatcherRequest.SwitchFile));
         // The Desk state (the design, fonts, wallpaper summary and path, Start-menu apps) is a copy of settings too.
         AddFile(settings, Path.Combine(ext, DeskDesign.StateFile));
+        // The wallpaper preview Claude Code can look at is a copy of the wallpaper: it goes with the state.
+        AddFile(settings, Path.Combine(ext, WallpaperPreview.FileName));
         map[ResetPart.Settings] = Finish(settings, backups);
 
         return map;

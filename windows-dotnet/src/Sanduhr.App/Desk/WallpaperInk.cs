@@ -45,6 +45,11 @@ internal sealed class WallpaperInk
     private string? _summaryKey;
     private WallpaperOverview? _summary;
     private string? _summaryPath;
+    private string? _summarySource;
+
+    /// <summary>Where the primary monitor's image came from in the last <see cref="Overview"/>: <see cref="WallpaperFallback.SourceFile"/>
+    /// (the file Windows names), <see cref="WallpaperFallback.SourceCache"/> (Windows' cached copy, because that file is gone) or null.</summary>
+    public string? PathSource => _summarySource;
 
     /// <summary>
     /// What the wallpaper looks like on each monitor, for <c>get_desk</c> (spec, the agent-designed Desk, B), and the
@@ -95,8 +100,10 @@ internal sealed class WallpaperInk
                 list.Add(new WallpaperMonitorSummary(list.Count, m.Left == 0 && m.Top == 0, monitor.Width, monitor.Height, summary));
             }
             _summary = list.Count == 0 ? null : WallpaperOverview.Combine(list);
-            _summaryPath = (info.Monitors.FirstOrDefault(m => m.Left == 0 && m.Top == 0 && m.Path is not null)
-                            ?? info.Monitors.FirstOrDefault(m => m.Path is not null))?.Path;
+            var primary = info.Monitors.FirstOrDefault(m => m.Left == 0 && m.Top == 0 && m.Path is not null)
+                          ?? info.Monitors.FirstOrDefault(m => m.Path is not null);
+            _summaryPath = primary?.Path;
+            _summarySource = primary?.Source;
             _summaryKey = key;
             return (_summary, _summaryPath);
         }

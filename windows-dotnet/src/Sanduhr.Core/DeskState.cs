@@ -57,7 +57,9 @@ public static class DeskState
         IEnumerable<StartMenuApp>? startMenuApps,
         IEnumerable<SavedDesign> designs,
         bool direct,
-        string writerVersion)
+        string writerVersion,
+        string? wallpaperSource = null,
+        bool? wallpaperIsImage = null)
     {
         var pieces = new JsonArray();
         foreach (var p in DeskArrangement.Known) pieces.Add((JsonNode?)p);
@@ -72,12 +74,15 @@ public static class DeskState
         var list = new JsonArray();
         foreach (var d in designs.OrderByDescending(d => d.AppliedAt).ThenBy(d => d.Id, StringComparer.Ordinal)) list.Add((JsonNode?)d.SummaryJson());
 
+        // path: the downscaled copy the widget wrote for Claude Code to look at (longest side 1600 px), null when none was written.
+        // source: "file" when that copy was made from the file Windows names, "cache" when from Windows' cached copy of it.
         // kind: "image" when the shell named a wallpaper file; "color" when it named none, in which case the summary is
         // the desktop's background color (an agent should not read it as a picture).
         var wall = new JsonObject { ["path"] = wallpaperPath };
+        if (wallpaperSource is not null) wall["source"] = wallpaperSource;
         if (wallpaper is not null)
         {
-            wall["kind"] = wallpaperPath is null ? "color" : "image";
+            wall["kind"] = wallpaperIsImage ?? wallpaperPath is not null ? "image" : "color";
             wall["summary"] = wallpaper.ToJson();
         }
 

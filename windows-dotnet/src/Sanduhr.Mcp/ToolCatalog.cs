@@ -473,8 +473,9 @@ public static class ToolCatalog
         "(tl tc tr ml mr bl bc br) with a size, in a font and an ink, optionally on a soft plate, beside the widget's " +
         "color theme. Returns design (the current look as a full design: layout with every piece's anchor, size and " +
         "hidden, font, ink, plate, shadow, launcher, theme), pieces and anchors (the allowed words), fonts (installed " +
-        "families, and the bundled handwriting fonts EsteFont Pro and EsteFont 26), wallpaper (path of the wallpaper " +
-        "image, which you can open only if the user allows Claude Code to read that file; kind image, or color when the shell " +
+        "families, and the bundled handwriting fonts EsteFont Pro and EsteFont 26), wallpaper (path of a copy of the wallpaper " +
+        "image scaled to at most 1600 pixels on its longest side, which you can open only if the user allows Claude Code to read that file; " +
+        "source file, or cache when Windows' cached copy stands in for a wallpaper file that was deleted; kind image, or color when the shell " +
         "names no image and the summary is the desktop's background color; and summary: overall " +
         "brightness 0-1, up to five dominant colors with their share, and for each monitor the brightness 0-1 and " +
         "busyness 0-1 (edge density) behind each anchor), designs (saved designs: id, name, pinned, applied_at), " +
