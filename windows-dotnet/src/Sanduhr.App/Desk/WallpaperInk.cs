@@ -97,7 +97,7 @@ internal sealed class WallpaperInk
                 if (drawn is not { } d) continue;
                 var summary = WallpaperSummary.From(d.Bgra, d.Width, d.Height, d.Width * 4, WallpaperSummary.DefaultAnchors(d.Width, d.Height));
                 if (summary is null) continue;
-                list.Add(new WallpaperMonitorSummary(list.Count, m.Left == 0 && m.Top == 0, monitor.Width, monitor.Height, summary));
+                list.Add(new WallpaperMonitorSummary(list.Count, m.Left == 0 && m.Top == 0, monitor.Width, monitor.Height, summary, m.Id));
             }
             _summary = list.Count == 0 ? null : WallpaperOverview.Combine(list);
             var primary = info.Monitors.FirstOrDefault(m => m.Left == 0 && m.Top == 0 && m.Path is not null)

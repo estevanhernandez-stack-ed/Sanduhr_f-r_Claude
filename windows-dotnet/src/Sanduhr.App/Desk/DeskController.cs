@@ -374,7 +374,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         DeskArrangeMode mode;
         try
         {
-            mode = new DeskArrangeMode(_screens, _settings, _fonts, frame, session.Working,
+            mode = new DeskArrangeMode(_screens, _settings, _fonts, frame, session.Working, ConnectedIds,
                 how => EndArrange(how), () => ArrangeChanged?.Invoke());
         }
         catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception)
@@ -440,6 +440,14 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     }
 
     private IReadOnlyList<DeskScreen> _screens = [];
+
+    /// <summary>The device paths of the screens the Desk has now: a piece placed on a monitor that is not among them draws on the main one.</summary>
+    private IReadOnlyCollection<string> ConnectedIds => [.. _screens.Select(s => s.Id).OfType<string>()];
+
+    /// <summary>The layout string of the pieces drawn on one screen: those on every monitor and those placed on this one
+    /// (<see cref="DeskArrangement.ForScreen"/>). The saved layout is never changed by this.</summary>
+    private string LayoutFor(DeskScreen screen) =>
+        new DeskArrangement(_settings.Layout).ForScreen(screen.Ref, ConnectedIds).Layout;
 
     private bool Placed(string widget) => new DeskArrangement(_settings.Layout).Placement(widget) is not null;
 
@@ -602,7 +610,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         var surfaces = new List<DeskSurface>();
         foreach (var screen in _screens)
         {
-            var view = new DeskView(screen, _settings, _fonts);
+            var view = new DeskView(screen, _settings with { Layout = LayoutFor(screen) }, _fonts);
             view.Update(frame, InkFor(view, screen, frame));
             _views.Add(view);
             surfaces.Add(new DeskSurface(screen, DeskClicks.Prepare(view.TakeIslands(), _piecesTakeClicks, this)));

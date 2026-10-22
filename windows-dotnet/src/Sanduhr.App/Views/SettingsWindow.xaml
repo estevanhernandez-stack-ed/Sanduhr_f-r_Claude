@@ -2520,40 +2520,10 @@
                             <StackPanel views:SettingsAnchor.Id="pieces" IsEnabled="{Binding NotArranging}">
                                 <TextBlock Text="Where each piece sits" FontSize="13" FontWeight="SemiBold"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
-                                <ItemsControl ItemsSource="{Binding Pieces}" Focusable="False">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" MinWidth="150" />
-                                                    <ColumnDefinition Width="150" />
-                                                    <ColumnDefinition Width="12" />
-                                                    <ColumnDefinition Width="90" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" TextTrimming="CharacterEllipsis" />
-                                                <ComboBox Grid.Column="1" Style="{StaticResource ThemedComboBox}"
-                                                          ItemsSource="{x:Static vm:DeskSettingsViewModel.PlaceOptions}"
-                                                          SelectedItem="{Binding Place, Mode=TwoWay}"
-                                                          AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, place'}" />
-                                                <ComboBox Grid.Column="3" Style="{StaticResource ThemedComboBox}"
-                                                          ItemsSource="{x:Static vm:DeskSettingsViewModel.SizeSteps}"
-                                                          SelectedItem="{Binding Size, Mode=TwoWay}"
-                                                          IsEnabled="{Binding IsPlaced}"
-                                                          AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, size'}">
-                                                    <ComboBox.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <TextBlock Text="{Binding StringFormat='{}{0:0%}'}" />
-                                                        </DataTemplate>
-                                                    </ComboBox.ItemTemplate>
-                                                </ComboBox>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                <views:DeskPiecesPanel />
                                 <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                           Text="Eight places: the four corners, the top and bottom centers, and the middle of each side. Size scales a piece from 60% to 160%. Hidden takes a piece off the desktop." />
+                                           Text="Eight places: the four corners, the top and bottom centers, and the middle of each side. Size scales a piece from 60% to 160%. Hidden takes a piece off the desktop. Monitor puts a piece on every monitor, on the main one, or on one monitor; a piece on a monitor that is not connected shows on the main one until it is back." />
                             </StackPanel>
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />

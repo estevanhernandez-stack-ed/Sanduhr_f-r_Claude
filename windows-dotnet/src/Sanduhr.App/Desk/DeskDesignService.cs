@@ -60,7 +60,7 @@ internal sealed class DeskDesignService : IDisposable
     /// <summary>How long changes settle before the state is rewritten (a Settings slider writes many times).</summary>
     public static readonly TimeSpan Settle = TimeSpan.FromMilliseconds(1500);
 
-    private sealed record Inputs(DeskDesign Current, IReadOnlyList<string> Fonts, WallpaperOverview? Overview, string? WallpaperPath, string? WallpaperSource, IReadOnlyList<StartMenuApp>? Apps);
+    private sealed record Inputs(DeskDesign Current, IReadOnlyList<string> Fonts, WallpaperOverview? Overview, string? WallpaperPath, string? WallpaperSource, IReadOnlyList<StartMenuApp>? Apps, IReadOnlyList<DeskMonitorInfo> Monitors);
 
     /// <summary>The proposal being reviewed.</summary>
     private sealed record Review(string Id, DeskDesign Proposal, IReadOnlyList<MissingFont> Fonts, IReadOnlyList<DeskReason> Warnings);
@@ -101,6 +101,12 @@ internal sealed class DeskDesignService : IDisposable
     /// <summary>The Desk and widget side of a review; null where there is none (tests, the harness): a design then waits as <c>not_ready</c>
     /// unless Claude may change the Desk directly.</summary>
     public IDeskDesignHost? Host { get; set; }
+
+    /// <summary>The connected monitors, named (tests set it).</summary>
+    internal Func<IReadOnlyList<DeskMonitorInfo>> Monitors { get; set; } = DeskMonitorSource.Read;
+
+    /// <summary>A monitor id as a person knows it ("1920×1080, right of main"), for the review's lines.</summary>
+    private string? MonitorName(string id) => DeskMonitorNames.NameOf(Monitors(), id);
 
     /// <summary>The installed font families (tests set it).</summary>
     internal Func<IReadOnlyList<string>> InstalledFonts { get; set; } = InstalledFamilies;
@@ -199,7 +205,7 @@ internal sealed class DeskDesignService : IDisposable
         string? previewPath = i.WallpaperPath is not null && i.WallpaperSource is not null ? _preview.Ensure(i.WallpaperPath, PreviewPath) : null;
         if (previewPath is null) _preview.Delete(PreviewPath);
         var state = DeskState.Build(i.Current, i.Fonts, i.Overview, previewPath, i.Apps, _designs.List(), _store.LoadDeskDirect(), AppVersion,
-            wallpaperSource: previewPath is null ? null : i.WallpaperSource, wallpaperIsImage: i.WallpaperPath is not null);
+            wallpaperSource: previewPath is null ? null : i.WallpaperSource, wallpaperIsImage: i.WallpaperPath is not null, monitors: i.Monitors);
         Handoff.WriteState(state);
     }
 
@@ -218,7 +224,7 @@ internal sealed class DeskDesignService : IDisposable
             _apps.Refresh([]);   // reads the Start menu in the background when the list is old; Changed follows
             if (_apps.Known) apps = _apps.Apps.Select(a => new StartMenuApp(a.Aumid, a.Name)).ToList();
         }
-        return new Inputs(current, _fonts, overview, path, _wallpaper.PathSource, apps);
+        return new Inputs(current, _fonts, overview, path, _wallpaper.PathSource, apps, Monitors());
     }
 
     /// <summary>The Desk as it is now, as a full design (the settings and the active theme).</summary>
@@ -230,7 +236,7 @@ internal sealed class DeskDesignService : IDisposable
     {
         var i = Gather();
         return new DeskDesignContext(
-            i.Fonts.Count == 0 ? null : i.Fonts, i.Overview, i.Apps?.Select(a => a.Id).ToList(), i.Current);
+            i.Fonts.Count == 0 ? null : i.Fonts, i.Overview, i.Apps?.Select(a => a.Id).ToList(), i.Current, i.Monitors);
     }
 
     /// <summary>The theme on the widget now, as its JSON document (the saved key resolved against the built-ins and the user's themes).</summary>
@@ -314,7 +320,7 @@ internal sealed class DeskDesignService : IDisposable
         if (ResetGuard.Done || verdict.Design is not { } proposal) return DeskAnswer.NotReady;
         var current = CurrentDesign();
         var merged = DeskDesign.Merge(current, proposal);
-        var changes = DeskDesign.Diff(current, merged, SettingsNames.DeskPieceName);
+        var changes = DeskDesign.Diff(current, merged, SettingsNames.DeskPieceName, MonitorName);
 
         // A Launcher image is a file Sanduhr stored; a design cannot bring one, and one that went is not a design to apply.
         var missingImages = DeskDesigns.MissingImages(proposal, _designs.ImageExists);
@@ -352,7 +358,7 @@ internal sealed class DeskDesignService : IDisposable
         var current = CurrentDesign();
         var merged = DeskDesign.Merge(current, r.Proposal);
         var desk = _store.LoadDesk();
-        var model = DeskReviewModel.Build(r.Proposal, current, merged, r.Fonts, FontInstalled, desk.Enabled, SettingsNames.DeskPieceName, r.Warnings);
+        var model = DeskReviewModel.Build(r.Proposal, current, merged, r.Fonts, FontInstalled, desk.Enabled, SettingsNames.DeskPieceName, r.Warnings, MonitorName);
 
         var settings = DeskDesignApply.Settings(desk, _store.LoadDeskInk(), _store.LoadLauncher(), merged);
         // A font this PC lacks previews in the nearest installed look; the design keeps the family it asked for.
@@ -383,7 +389,7 @@ internal sealed class DeskDesignService : IDisposable
         if (r.Fonts.Any(f => !FontInstalled(f.Family))) return;   // Apply waits for the font
         _review = null;
         var merged = DeskDesign.Merge(CurrentDesign(), r.Proposal);
-        var changes = DeskDesign.Diff(CurrentDesign(), merged, SettingsNames.DeskPieceName);
+        var changes = DeskDesign.Diff(CurrentDesign(), merged, SettingsNames.DeskPieceName, MonitorName);
         var answer = ApplyDesign(r.Proposal, changes, r.Warnings);
         HostEnd();   // the preview gives way to what was written
         Answer(r.Id, answer);

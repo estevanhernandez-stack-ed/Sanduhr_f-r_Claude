@@ -37,6 +37,13 @@ public sealed partial class DeskPieceRow : ObservableObject
     [ObservableProperty] private DeskPlaceOption _place = DeskSettingsViewModel.Hidden;
     [ObservableProperty] private double _size = 1;
 
+    /// <summary>What the Monitor dropdown offers for this piece: All monitors, Main monitor, each connected monitor, and (when the piece is
+    /// on one that is gone) that monitor as "not connected".</summary>
+    [ObservableProperty] private IReadOnlyList<DeskMonitorChoice> _monitorChoices = [];
+
+    /// <summary>The monitor the piece is drawn on.</summary>
+    [ObservableProperty] private DeskMonitorChoice _monitor = new(null, DeskMonitorNames.AllMonitors);
+
     /// <summary>"120%", for the size picker.</summary>
     public string SizeText => $"{Math.Round(Size * 100)}%";
 
@@ -47,6 +54,8 @@ public sealed partial class DeskPieceRow : ObservableObject
         _loading = true;
         Place = p is null ? DeskSettingsViewModel.Hidden : DeskSettingsViewModel.PlaceFor(p.Anchor);
         Size = p?.Scale ?? 1;
+        MonitorChoices = DeskMonitorNames.Choices(_owner.Monitors, p?.Monitor);
+        Monitor = DeskMonitorNames.Select(MonitorChoices, p?.Monitor);
         _loading = false;
     }
 
@@ -54,6 +63,11 @@ public sealed partial class DeskPieceRow : ObservableObject
     {
         OnPropertyChanged(nameof(IsPlaced));
         if (!_loading) _owner.Edit(a => a.Place(Widget, value.Anchor));
+    }
+
+    partial void OnMonitorChanged(DeskMonitorChoice value)
+    {
+        if (!_loading && value is not null) _owner.Edit(a => a.SetMonitor(Widget, value.Value));
     }
 
     partial void OnSizeChanged(double value)
@@ -85,12 +99,16 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     public const string SystemFont = "System font (Segoe UI)";
 
     private readonly SettingsStore _store;
+    private readonly Func<IReadOnlyList<DeskMonitorInfo>> _monitors;
     private DeskSettings _saved;
     private bool _loading;
 
-    public DeskSettingsViewModel(SettingsStore store, IReadOnlyList<string> fontFamilies)
+    /// <param name="monitors">The connected monitors, named (the Monitor dropdown). Default: what Windows reports now.</param>
+    public DeskSettingsViewModel(SettingsStore store, IReadOnlyList<string> fontFamilies, Func<IReadOnlyList<DeskMonitorInfo>>? monitors = null)
     {
         _store = store;
+        _monitors = monitors ?? Sanduhr.App.Desk.DeskMonitorSource.Read;
+        Monitors = _monitors();
         _saved = store.LoadDesk();
         FontChoices = [.. fontFamilies, SystemFont];
         Pieces =
@@ -117,6 +135,9 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
 
     /// <summary>Settings, Desk, Designs: the saved designs and Put my Desk back (spec, the agent-designed Desk).</summary>
     public DesignsSettingsViewModel Designs { get; }
+
+    /// <summary>The monitors connected when the page was loaded (read again by <see cref="Reload"/>).</summary>
+    public IReadOnlyList<DeskMonitorInfo> Monitors { get; private set; }
 
     /// <summary>Settings, Desk, Launcher: the buttons, their pictures and the pickers (spec, Desk Launcher).</summary>
     public LauncherSettingsViewModel Launcher { get; }
@@ -153,6 +174,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     /// glow's place was added): the rows and the map follow.</summary>
     public void Reload()
     {
+        Monitors = _monitors();
         _saved = _store.LoadDesk();
         Load();
         OnPropertyChanged(nameof(Layout));

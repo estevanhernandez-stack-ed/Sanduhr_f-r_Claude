@@ -34,6 +34,9 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     private readonly DeskFonts _fonts;
     private readonly DeskFrame _frame;
     private readonly DeskArrangement _working;
+    private readonly IReadOnlyCollection<string> _connected;
+    /// <summary>More than one monitor: each piece carries the Show on control.</summary>
+    private readonly bool _showOn;
     private readonly Canvas _adorn = new() { IsHitTestVisible = false };
     /// <summary>The Hide buttons: the one part of the outlines that takes clicks and the keyboard.</summary>
     private readonly Canvas _controls = new();
@@ -55,8 +58,10 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     private sealed record Drag(string Widget, Size Size, Vector Grab, DeskAnchor? Own);
 
     public DeskArrangeContent(DeskScreen screen, DeskSettings settings, DeskFonts fonts, DeskFrame frame,
-        DeskArrangement working, bool primary)
+        DeskArrangement working, bool primary, IReadOnlyCollection<string>? connectedIds = null, bool showOn = false)
     {
+        _connected = connectedIds ?? [];
+        _showOn = showOn;
         _screen = screen;
         _settings = settings;
         _fonts = fonts;
@@ -111,6 +116,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     /// that should take the keyboard next (<see cref="HideKey"/> or <see cref="ShowKey"/>).</summary>
     public event Action<string>? Toggled;
 
+    public static string ShowOnKey(string widget) => "showon:" + widget;
     public static string HideKey(string widget) => "hide:" + widget;
     public static string ShowKey(string widget) => "show:" + widget;
 
@@ -146,7 +152,8 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     /// <summary>Lays the Desk out again from the working arrangement and redraws the outlines and points.</summary>
     public void Relayout()
     {
-        var view = new DeskView(_screen, _settings with { Layout = _working.Layout }, _fonts)
+        // Only the pieces this monitor draws: those on every monitor and those placed on it.
+        var view = new DeskView(_screen, _settings with { Layout = _working.ForScreen(_screen.Ref, _connected).Layout }, _fonts)
         {
             Arranging = true,
             IsHitTestVisible = false,
@@ -240,10 +247,28 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
             double tagWidth = tag.DesiredSize.Width + 14, tagHeight = tag.DesiredSize.Height + 4;
             double y = r.Y - OutlinePad - tagHeight - 3;
             if (y < 2) y = r.Bottom + OutlinePad + 3;
-            Canvas.SetLeft(hide, Math.Max(2, r.X - OutlinePad) + tagWidth + 4);
+            double hideLeft = Math.Max(2, r.X - OutlinePad) + tagWidth + 4;
+            Canvas.SetLeft(hide, hideLeft);
             Canvas.SetTop(hide, y + (tagHeight - hide.DesiredSize.Height) / 2);
             _controls.Children.Add(hide);
             _buttons[HideKey(widget)] = hide;
+            if (_showOn && _working.Placement(widget) is { } placed)
+            {
+                // Show on: every monitor or just this one (Desk pieces per monitor).
+                bool every = DeskMonitors.FromWord(placed.Monitor) is null;
+                var showOn = ChromeButton(DeskArrangeCopy.ShowOnText(every), DeskArrangeCopy.ShowOnLabel(name, every));
+                showOn.Click += (_, _) =>
+                {
+                    var now = _working.Placement(w)?.Monitor;
+                    _working.SetMonitor(w, DeskMonitors.ToggleShowOn(now, _screen.Ref));
+                    Toggled?.Invoke(ShowOnKey(w));
+                };
+                showOn.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                Canvas.SetLeft(showOn, hideLeft + hide.DesiredSize.Width + 4);
+                Canvas.SetTop(showOn, y + (tagHeight - showOn.DesiredSize.Height) / 2);
+                _controls.Children.Add(showOn);
+                _buttons[ShowOnKey(widget)] = showOn;
+            }
         }
         BuildStrip();
     }
@@ -428,12 +453,58 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         MoveDrag(at);
     }
 
-    /// <summary>Moves the ghost to <paramref name="at"/> and lights the anchor a drop there would land on.</summary>
+    /// <summary>Finds the other monitor's surface under a point of this one (past this screen's edge, with the mouse still captured here):
+    /// that surface and the point in its own DIPs. Null while the point is on this screen. The mode sets it.</summary>
+    public Func<DeskArrangeContent, Point, (DeskArrangeContent Target, Point Local)?>? Locate { get; set; }
+
+    /// <summary>A drag from another monitor hovers here: a ghost and the anchor a drop would land on light up.</summary>
+    public void Hover(Size size, Vector grab, Point local)
+    {
+        if (_ghost is null)
+        {
+            _ghost = new Rectangle
+            {
+                Width = size.Width + OutlinePad * 2,
+                Height = size.Height + OutlinePad * 2,
+                RadiusX = 8,
+                RadiusY = 8,
+                StrokeThickness = 2,
+                Opacity = 0.85,
+                IsHitTestVisible = false,
+                Fill = GhostFill,
+            };
+            Ref(_ghost, Shape.StrokeProperty, "Sanduhr.Brush.Accent");
+            _adorn.Children.Add(_ghost);
+        }
+        Canvas.SetLeft(_ghost, local.X - grab.X - OutlinePad);
+        Canvas.SetTop(_ghost, local.Y - grab.Y - OutlinePad);
+        SetLit(DeskArrange.Target(local.X, local.Y, _content, DeskArrange.StackBounds(_working, _frames), null));
+    }
+
+    /// <summary>The hover from another monitor ended (the drag moved on, dropped or was cancelled).</summary>
+    public void ClearHover()
+    {
+        if (_drag is not null) return;   // a drag of this surface's own owns the ghost
+        if (_ghost is not null) _adorn.Children.Remove(_ghost);
+        _ghost = null;
+        SetLit(null);
+    }
+
+    /// <summary>Moves the ghost to <paramref name="at"/> and lights the anchor a drop there would land on. Past this monitor's edge
+    /// the other monitor's surface lights its anchor instead.</summary>
     public void MoveDrag(Point at)
     {
         if (_drag is not { } drag || _ghost is null) return;
         Canvas.SetLeft(_ghost, at.X - drag.Grab.X - OutlinePad);
         Canvas.SetTop(_ghost, at.Y - drag.Grab.Y - OutlinePad);
+        var route = Locate?.Invoke(this, at);
+        if (route is { } r)
+        {
+            SetLit(null);
+            r.Target.Hover(drag.Size, drag.Grab, r.Local);
+            return;
+        }
+        CancelHoverElsewhere?.Invoke(this);
         SetLit(DeskArrange.Target(at.X, at.Y, _content, DeskArrange.StackBounds(_working, _frames), drag.Own));
     }
 
@@ -443,14 +514,41 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     {
         // Take the drag first, then release the capture: the loss that release reports finds no drag.
         if (_gesture.Up(() => { if (IsMouseCaptured) ReleaseMouseCapture(); }) is not { } drag) return;
+        // Released over another monitor: the piece lands there, and a piece on one monitor moves to it.
+        if (Locate?.Invoke(this, at) is { } route)
+        {
+            CancelDrag();
+            route.Target.DropFrom(drag.Widget, route.Local);
+            return;
+        }
         var target = DeskArrange.Target(at.X, at.Y, _content, DeskArrange.StackBounds(_working, _frames), drag.Own);
-        var stack = _working.Stack(target)
-            .Where(p => p.Widget != drag.Widget)
-            .Select(p => (p.Widget, _frames.TryGetValue(p.Widget, out var f) ? f : default))
-            .ToList();
-        var before = DeskArrange.PieceAfter(at.Y, stack);
+        var before = BeforeFor(drag.Widget, target, at.Y);
         CancelDrag();
         _working.Put(drag.Widget, target, before);
+        Dropped?.Invoke();
+    }
+
+    /// <summary>The piece a drop at height <paramref name="y"/> in <paramref name="anchor"/>'s stack goes in front of, among the pieces drawn here.</summary>
+    private string? BeforeFor(string widget, DeskAnchor anchor, double y)
+    {
+        var stack = _working.Stack(anchor)
+            .Where(p => p.Widget != widget)
+            .Select(p => (p.Widget, _frames.TryGetValue(p.Widget, out var f) ? f : default))
+            .ToList();
+        return DeskArrange.PieceAfter(y, stack);
+    }
+
+    /// <summary>A piece dragged here from another monitor was dropped at <paramref name="at"/> (this surface's DIPs): it takes the anchor
+    /// there, and a piece that was on one monitor is now on this one (a piece on every monitor stays on every monitor).</summary>
+    public void DropFrom(string widget, Point at)
+    {
+        ClearHover();
+        var own = _frames.ContainsKey(widget) ? _working.Placement(widget)?.Anchor : null;
+        var target = DeskArrange.Target(at.X, at.Y, _content, DeskArrange.StackBounds(_working, _frames), own);
+        var before = BeforeFor(widget, target, at.Y);
+        if (_working.Placement(widget) is { } placed && DeskMonitors.FromWord(placed.Monitor) is not null)
+            _working.SetMonitor(widget, DeskMonitors.ThisScreen(_screen.Ref));
+        _working.Put(widget, target, before);
         Dropped?.Invoke();
     }
 
@@ -462,7 +560,11 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         _gesture.CaptureLost();
         SetLit(null);
         if (IsMouseCaptured) ReleaseMouseCapture();
+        CancelHoverElsewhere?.Invoke(this);
     }
+
+    /// <summary>Told when this surface's drag ends or moves back, so the other surfaces drop the hover it lit. The mode sets it.</summary>
+    public Action<DeskArrangeContent>? CancelHoverElsewhere { get; set; }
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
@@ -559,7 +661,7 @@ internal sealed class DeskArrangeMode : IDisposable
     /// <param name="ended">Done or Cancel was asked for; the owner calls <see cref="Dispose"/> in answer.</param>
     /// <param name="changed">A drop changed the working arrangement.</param>
     public DeskArrangeMode(IReadOnlyList<DeskScreen> screens, DeskSettings settings, DeskFonts fonts, DeskFrame frame,
-        DeskArrangement working, Action<DeskArrangeEnd> ended, Action changed)
+        DeskArrangement working, IReadOnlyCollection<string> connectedIds, Action<DeskArrangeEnd> ended, Action changed)
     {
         _ended = ended;
         _changed = changed;
@@ -570,13 +672,35 @@ internal sealed class DeskArrangeMode : IDisposable
         {
             bool bar = !barPlaced && ReferenceEquals(screen, primary);
             barPlaced |= bar;
-            var content = new DeskArrangeContent(screen, settings, fonts, frame, working, bar);
+            var content = new DeskArrangeContent(screen, settings, fonts, frame, working, bar, connectedIds, showOn: screens.Count > 1);
+            content.Locate = Locate;
+            content.CancelHoverElsewhere = from =>
+            {
+                foreach (var s in _surfaces) if (!ReferenceEquals(s.Content, from)) s.Content.ClearHover();
+            };
             content.Dropped += OnDropped;
             content.Toggled += OnToggled;
             content.EndRequested += Request;
             var source = Create(screen, content);
             _surfaces.Add(new Surface(screen, source, content));
         }
+    }
+
+    /// <summary>The surface under a point that is past <paramref name="from"/>'s screen: the point is in <paramref name="from"/>'s DIPs, is turned
+    /// into physical pixels on the virtual screen, and the screen that contains it (not <paramref name="from"/>'s own) answers with the point in its DIPs.</summary>
+    private (DeskArrangeContent Target, Point Local)? Locate(DeskArrangeContent from, Point p)
+    {
+        var source = _surfaces.FirstOrDefault(s => ReferenceEquals(s.Content, from));
+        if (source is null) return null;
+        var (px, py) = DeskScreenMath.ToPixels(source.Screen.Bounds, source.Screen.Scale, p.X, p.Y);
+        if (DeskScreenMath.Contains(source.Screen.Bounds, px, py)) return null;
+        foreach (var s in _surfaces)
+        {
+            if (ReferenceEquals(s, source) || !DeskScreenMath.Contains(s.Screen.Bounds, px, py)) continue;
+            var (lx, ly) = DeskScreenMath.ToDips(s.Screen.Bounds, s.Screen.Scale, px, py);
+            return (s.Content, new Point(lx, ly));
+        }
+        return null;
     }
 
     /// <summary>The windows' handles, primary first is not promised (the runner may query them).</summary>

@@ -124,8 +124,9 @@ internal sealed class DesktopLayerHost : IDeskHost
     {
         var monitors = DeskNative.Monitors();
         var bars = DeskNative.TaskbarAutoHides() ? DeskNative.TaskbarRects() : [];
+        var ids = DeskMonitorSource.IdsByBounds();
         return [.. monitors.Select(m => new DeskScreen(m.Device, m.Bounds, m.Work, m.Scale, m.Primary,
-            TaskbarClearance.Insets(m.Bounds, m.Work, bars, m.Scale)))];
+            TaskbarClearance.Insets(m.Bounds, m.Work, bars, m.Scale), DeskMonitorSource.IdFor(ids, m.Bounds)))];
     }
 
     public void Show(IReadOnlyList<DeskSurface> surfaces)
