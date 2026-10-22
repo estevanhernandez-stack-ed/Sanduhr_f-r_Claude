@@ -280,7 +280,12 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
         var orphans = LauncherModel.Orphaned(_model, next);
         _store.SaveLauncher(next);
         _model = next;
-        if (orphans.Count > 0) LauncherImages.Delete(_paths, orphans);
+        // A picture a saved design still uses stays on disk (spec, the agent-designed Desk, saved designs).
+        if (orphans.Count > 0)
+        {
+            var used = new DesignStore(_paths).UsedImages();
+            LauncherImages.Delete(_paths, orphans.Where(o => !used.Contains(o)).ToList());
+        }
         Problem = "";
         if (rebuild) Rebuild();
         else

@@ -384,6 +384,11 @@ public partial class App : Application
         };
         menu.Opened += (_, _) => UpdateArrangeItem();
 
+        // Only while a design was saved before the last change: switches to it (spec, the agent-designed Desk).
+        _putBackItem = new MenuItem { Header = SettingsNames.PutMyDeskBack, Visibility = Visibility.Collapsed };
+        _putBackItem.Click += (_, _) => _deskDesign?.PutBack();
+        menu.Opened += (_, _) => _putBackItem.Visibility = _deskDesign?.CanPutBack == true ? Visibility.Visible : Visibility.Collapsed;
+
         var refresh = new MenuItem { Header = "Refresh" };
         refresh.Click += (_, _) => _vm?.RefreshCommand.Execute(null);
 
@@ -420,6 +425,7 @@ public partial class App : Application
         menu.Items.Add(whatsNew);
         menu.Items.Add(tour);
         menu.Items.Add(_arrangeItem);
+        menu.Items.Add(_putBackItem);
         menu.Items.Add(refresh);
         menu.Items.Add(BuildTrayShowsMenu());
         menu.Items.Add(new Separator());
@@ -470,6 +476,7 @@ public partial class App : Application
     }
 
     private MenuItem? _arrangeItem;
+    private MenuItem? _putBackItem;
 
     /// <summary>The tray's Arrange entry follows the Desk: hidden while it is off, "Finish arranging" while arranging.</summary>
     private void UpdateArrangeItem()
@@ -480,10 +487,11 @@ public partial class App : Application
         _arrangeItem.Header = arranging ? DeskArrangeCopy.TrayFinish : DeskArrangeCopy.MenuItem;
     }
 
-    /// <summary>A design was applied: an open Settings window re-reads the Desk page and the Launcher.</summary>
+    /// <summary>A design was applied: an open Settings window re-reads the Desk page, the Launcher and the designs.</summary>
     private void FollowDesignChange()
     {
-        _settingsWindow?.ViewModel.Desk.RefreshFromStore();
+        if (_settingsWindow?.ViewModel.Desk is not { } page) return;
+        page.RefreshFromStore();
     }
 
     /// <summary>Arrange mode began, dropped a piece or ended: the tray entry and an open Settings window follow
@@ -534,6 +542,7 @@ public partial class App : Application
         };
         // The live review of Claude's Desk designs: the Desk and widget draw a design from memory, the floating bar asks Apply or Dismiss.
         _deskDesign.Host = new Desk.DeskDesignHost(_desk, () => _vm, FollowDesignChange);
+        _deskDesign.DesignsChanged += () => _settingsWindow?.ViewModel.Desk.Designs.Reload();
         _desk.LauncherMissingClicked += OnLauncherMissing;
         _vm.DeskUsageChanged += _desk.UsageChanged;
         // The glow's Desk spot (spec 7.3): the glow service asks the Desk first and falls back to the window.

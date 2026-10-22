@@ -110,9 +110,13 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         {
             Changed = () => Changed?.Invoke(),
         };
+        Designs = new DesignsSettingsViewModel(() => Sanduhr.App.Desk.DeskDesignService.Current);
         Load();
         LoadInk();
     }
+
+    /// <summary>Settings, Desk, Designs: the saved designs and Put my Desk back (spec, the agent-designed Desk).</summary>
+    public DesignsSettingsViewModel Designs { get; }
 
     /// <summary>Settings, Desk, Launcher: the buttons, their pictures and the pickers (spec, Desk Launcher).</summary>
     public LauncherSettingsViewModel Launcher { get; }
@@ -156,13 +160,14 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     }
 
     /// <summary>Everything on the page is read again from the settings (a design was applied or switched to): the pieces, the font, the
-    /// ink, the plate and the Launcher.</summary>
+    /// ink, the plate, the Launcher and the designs.</summary>
     public void RefreshFromStore()
     {
         Reload();
         LoadInk();
         Launcher.Reload();
         OnPropertyChanged(nameof(Plate));
+        Designs.Reload();
     }
 
     /// <summary>Slider drags (clock size, margins) settle for this long before they save, so a drag
