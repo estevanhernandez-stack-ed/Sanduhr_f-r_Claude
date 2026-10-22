@@ -34,6 +34,7 @@ public partial class App : Application
     private Desk.DeskMessageSource? _messages;
     private Desk.DeskMessageHandoffService? _handoff;
     private Desk.DeskDesignService? _deskDesign;
+    private Desk.NowPlayingLookService? _looks;
     private Desk.WatcherStore? _watchers;
     private LauncherAppCache? _launcherApps;
     private MenuItem? _endDemoItem;
@@ -535,8 +536,13 @@ public partial class App : Application
         _deskDesign = new Desk.DeskDesignService(paths, store, _launcherApps);
         Desk.DeskDesignService.Current = _deskDesign;
         _deskDesign.Start();
+        // A look per song (spec, a look per song): the gradient and letter style the Desk draws the playing song in, Claude's suggested looks
+        // (the MCP tool and the now-playing mod's offer), and now-playing-look.json for the mod. The contrast rule is judged against the wallpaper.
+        _looks = new Desk.NowPlayingLookService(paths, store, _nowPlaying, () => _deskDesign.LooksContext());
+        Desk.NowPlayingLookService.Current = _looks;
+        _deskDesign.Looks = _looks;
         _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
-            () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers, paths, _launcherApps)
+            () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers, paths, _launcherApps, looks: _looks)
         {
             ThemeText = ThemeTextHex,
         };
@@ -554,6 +560,7 @@ public partial class App : Application
         // The widget's now-playing line (spec 6.3, W8) shares the Desk's media-session listener.
         _vm.NowPlaying = new NowPlayingLineViewModel(_nowPlaying, store);
         _desk.Reload();
+        _looks.Start();
     }
 
     /// <summary>The live widget theme's text color as six hex digits (Theme ink, spec 6.7).</summary>
@@ -627,7 +634,7 @@ public partial class App : Application
         svm.Desk.ArrangeRequested = () => _desk?.BeginArrange();
         svm.Desk.Arranging = _desk?.Arranging == true;
         svm.Desk.ArrangingLayout = _desk?.Session?.Working.Layout;
-        svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); };
+        svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); _looks?.SettingsChanged(); };
         svm.WeatherPage.Changed = () => _desk?.Reload();
         svm.MessageChanged = () => { _desk?.Reload(); _handoff?.PublishState(); };
         svm.Desk.WatchersChanged = () => _watchers?.SwitchChanged();
@@ -920,6 +927,7 @@ public partial class App : Application
         WhatsNewWindow.Quitting = true;
         _glow?.Dispose();
         _desk?.Dispose();
+        _looks?.Dispose();
         _launcherApps?.Dispose();
         _messages?.Dispose();
         _handoff?.Dispose();
@@ -946,6 +954,7 @@ public partial class App : Application
         WhatsNewWindow.Quitting = true;
         _glow?.Dispose();
         _desk?.Dispose();
+        _looks?.Dispose();
         _launcherApps?.Dispose();
         _messages?.Dispose();
         _handoff?.Dispose();

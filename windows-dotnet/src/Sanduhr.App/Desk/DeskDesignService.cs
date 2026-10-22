@@ -102,6 +102,13 @@ internal sealed class DeskDesignService : IDisposable
     /// unless Claude may change the Desk directly.</summary>
     public IDeskDesignHost? Host { get; set; }
 
+    /// <summary>The song looks (spec, a look per song): a design's <c>looks</c> are saved through it when the design is applied. Null where there are
+    /// none (tests, the harness): the looks are then left alone and the answer says so.</summary>
+    public NowPlayingLookService? Looks { get; set; }
+
+    /// <summary>What the widget's own check of a song look knows about this PC (the wallpaper under the now-playing piece, for the contrast rule).</summary>
+    internal DeskDesignContext LooksContext() => Context();
+
     /// <summary>The connected monitors, named (tests set it).</summary>
     internal Func<IReadOnlyList<DeskMonitorInfo>> Monitors { get; set; } = DeskMonitorSource.Read;
 
@@ -432,6 +439,7 @@ internal sealed class DeskDesignService : IDisposable
         {
             themeKey = WriteDesign(merged, proposal.Theme is not null);
             if (proposal.Messages is { } messages && !WriteMessages(messages)) warn.Add(new DeskReason("messages", "messages.txt could not be changed, so the messages were left alone"));
+            if (proposal.Looks is { Count: > 0 } looks) warn.AddRange(SaveLooks(looks));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -497,6 +505,19 @@ internal sealed class DeskDesignService : IDisposable
         }
         _store.SaveTheme(plan.Key);
         return plan.Key;
+    }
+
+    /// <summary>The design's song looks go into the user's saved looks (a song already there takes the new look). What could not be done, or
+    /// that Style what's playing is off so they will not show yet, comes back as warnings.</summary>
+    private IEnumerable<DeskReason> SaveLooks(IReadOnlyList<SongLook> looks)
+    {
+        if (Looks is not { } service)
+            return [new DeskReason("looks", "could not be saved here, so the song looks were left alone")];
+        if (!service.Handoff.Save(looks))
+            return [new DeskReason("looks", "the saved looks could not be written, so the song looks were left alone")];
+        return service.StyleOn
+            ? []
+            : [new DeskReason("looks", $"saved {looks.Count} song look{(looks.Count == 1 ? "" : "s")}, but Style what's playing is off, so they show once it is on (Settings, Now playing, Looks)")];
     }
 
     /// <summary>The design's message lines go into messages.txt the way Add or Replace does it, keeping the old file as messages.txt.previous.</summary>

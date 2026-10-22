@@ -31,6 +31,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private readonly WatcherStore? _watchers;
     private readonly Paths? _paths;
     private readonly LauncherAppCache? _launcherApps;
+    private readonly NowPlayingLookService? _looks;
     private readonly Dispatcher _ui = Dispatcher.CurrentDispatcher;
     private readonly DispatcherTimer _minute;
     private readonly TelemetrySource _telemetry = new();
@@ -75,8 +76,10 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
 
     public DeskController(SettingsStore store, Func<IDeskHost> hostFactory, Func<DeskUsage> usageSource,
         NowPlayingHub nowPlaying, DeskMessageSource messages, WatcherStore? watchers = null,
-        Paths? paths = null, LauncherAppCache? launcherApps = null, OledCareDriver? oled = null)
+        Paths? paths = null, LauncherAppCache? launcherApps = null, OledCareDriver? oled = null, NowPlayingLookService? looks = null)
     {
+        _looks = looks;
+        if (_looks is not null) _looks.Changed += OnLooksChanged;
         _oled = oled ?? new OledCareDriver();
         _oled.DriftStepped += ApplyDrift;
         _oled.DimChanged += OnDim;
@@ -98,6 +101,13 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         if (_watchers is not null) _watchers.Changed += () => Render();
         _nowPlaying.Changed += OnTrackChanged;
         _nowPlaying.PresenceChanged += OnPresenceChanged;
+    }
+
+    /// <summary>"Style what's playing" went on or off, or the saved looks changed: the line is drawn again in the look it now wears.</summary>
+    private void OnLooksChanged()
+    {
+        if (_host is null || _stopped) return;
+        Render();
     }
 
     /// <summary>OLED care's clocks (the live check and the tests drive them).</summary>
@@ -355,6 +365,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _nowPlaying.Changed -= OnTrackChanged;
         _nowPlaying.PresenceChanged -= OnPresenceChanged;
         if (_launcherApps is not null) _launcherApps.Changed -= OnLauncherAppsChanged;
+        if (_looks is not null) _looks.Changed -= OnLooksChanged;
         _pump.Stop();
         _audio.Dispose();
         _weather.Dispose();
@@ -403,6 +414,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Now = now,
             Message = _messages.Frame(now, _settings) is { } m ? m with { Played = new HashSet<string>(m.Played, StringComparer.Ordinal) } : null,
             Track = track,
+            Look = _looks?.DrawFor(track, _oledOn),
             Telemetry = Placed("telemetry") ? _telemetry : null,
             WeatherOn = Placed("weather"),
             Place = _weatherSettings.Place,
@@ -634,6 +646,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Message = PlayedFor(_messages.Frame(now, _settings)),
             TrackNow = () => _np.Prefs.Visible(_nowPlaying.Shown) ?? _lastTrack,
             Track = track,
+            Look = _looks?.DrawFor(track, _oledOn),
             Presence = track is null ? 0 : _nowPlaying.Presence.Amount(now),
             Bars = _np.Bars,
             Audio = _audio,

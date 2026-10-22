@@ -37,6 +37,8 @@ internal sealed record DeskFrame
     /// height the stack leaves it (<see cref="NowPlayingPresence.Amount"/>). The live value then arrives
     /// through <see cref="DeskView.SetPresence"/>; this is where a redraw starts.</summary>
     public double Presence { get; init; } = 1;
+    /// <summary>The look the playing song wears (a gradient and a letter style); null draws the line in the Desk's own ink.</summary>
+    public NowPlayingLookDraw? Look { get; init; }
     /// <summary>Draw the bars beside the track (spec 6.6).</summary>
     public bool Bars { get; init; }
     public AudioLevelSource? Audio { get; init; }
@@ -717,17 +719,27 @@ internal sealed class DeskView : Grid, IDisposable
         if (_frame.Track is not { } track || NowPlayingText.Desk(track) is not { } line) return null;
         double size = ts * 0.17;
         double width = ts * 3.2;
-        var text = Text(line, size, 1, alignment: TextAlign(align));
-        text.TextTrimming = TextTrimming.CharacterEllipsis;
-        text.Width = width;
+        var look = _frame.Look;
         var column = new StackPanel { Width = width };
-        column.Children.Add(text);
+        if (look is null)
+        {
+            var text = Text(line, size, 1, alignment: TextAlign(align));
+            text.TextTrimming = TextTrimming.CharacterEllipsis;
+            text.Width = width;
+            column.Children.Add(text);
+        }
+        else
+        {
+            column.Children.Add(StyledLine(line, size, width, align, look));
+        }
+        // With a look the position bar takes its gradient across the whole bar, however much of it is filled.
+        Brush barInk = look is null ? Ink : AbsoluteGradient(look.Stops, width);
         double barHeight = Math.Max(2, size * 0.14);
         var bar = new Grid { Width = width, Height = barHeight, Margin = new Thickness(0, size * 0.3, 0, 0) };
-        bar.Children.Add(new Rectangle { Fill = Ink, Opacity = 0.22, RadiusX = barHeight / 2, RadiusY = barHeight / 2 });
+        bar.Children.Add(new Rectangle { Fill = barInk, Opacity = 0.22, RadiusX = barHeight / 2, RadiusY = barHeight / 2 });
         var fill = new Rectangle
         {
-            Fill = Ink, Opacity = _ink.TextOpacity, RadiusX = barHeight / 2, RadiusY = barHeight / 2,
+            Fill = barInk, Opacity = _ink.TextOpacity, RadiusX = barHeight / 2, RadiusY = barHeight / 2,
             HorizontalAlignment = HorizontalAlignment.Left,
             Width = width * (track.Progress(_frame.Now) ?? 0),
         };
@@ -761,7 +773,7 @@ internal sealed class DeskView : Grid, IDisposable
         if (_frame.Bars && _frame.Audio is { } audio)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal };
-            var bars = BarsPiece(size, audio);
+            var bars = BarsPiece(size, audio, look);
             bars.Margin = new Thickness(align == HorizontalAlignment.Right ? 0 : 0, 0, size * 0.6, 0);
             if (align == HorizontalAlignment.Right) { row.Children.Add(column); bars.Margin = new Thickness(size * 0.6, 0, 0, 0); row.Children.Add(bars); }
             else { row.Children.Add(bars); row.Children.Add(column); }
@@ -773,9 +785,72 @@ internal sealed class DeskView : Grid, IDisposable
         return host;
     }
 
+    /// <summary>
+    /// The now-playing line in a song's look (spec, a look per song): the play-state glyph stays plain in the Desk's ink; the rest, title and
+    /// artist, draws in the look's gradient and letter style. Bold, italic and bold italic are the Desk font's own weight and slant,
+    /// small caps the phonetic capitals. The gradient runs over the text as drawn, and the text trims with an ellipsis inside the line's
+    /// width. A screen reader reads the plain words.
+    /// </summary>
+    private FrameworkElement StyledLine(string line, double size, double width, HorizontalAlignment align, NowPlayingLookDraw look)
+    {
+        var (glyph, rest) = NowPlayingText.SplitGlyph(line);
+        var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = align };
+        double used = 0;
+        if (glyph is not null)
+        {
+            var g = Text(glyph, size, 1);
+            g.Margin = new Thickness(0, 0, size * 0.4, 0);
+            g.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            used = g.DesiredSize.Width + g.Margin.Right;
+            row.Children.Add(g);
+        }
+        bool bold = LookStyles.IsBold(look.Style), italic = LookStyles.IsItalic(look.Style);
+        var styled = new TextBlock
+        {
+            Text = LookStyles.Text(rest, look.Style),
+            FontFamily = bold ? _bold : _family,
+            FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
+            FontStyle = italic ? FontStyles.Italic : FontStyles.Normal,
+            FontSize = Math.Max(1, size),
+            Foreground = InkBrush(look.Stops),
+            Opacity = _ink.TextOpacity,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxWidth = Math.Max(10, width - used),
+        };
+        System.Windows.Automation.AutomationProperties.SetName(styled, rest);
+        row.Children.Add(styled);
+        // The row is as wide as its words (so the gradient spans them) inside a frame of the line's width.
+        var frame = new Grid { Width = width };
+        frame.Children.Add(row);
+        return frame;
+    }
+
+    /// <summary>A left-to-right gradient over <paramref name="width"/> device-independent pixels that stays put whatever the filled shape's size is.</summary>
+    private static Brush AbsoluteGradient(IReadOnlyList<string> stops, double width)
+    {
+        if (stops.Count < 2 || stops.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1) return InkBrush(stops);
+        var g = new LinearGradientBrush
+        {
+            MappingMode = BrushMappingMode.Absolute,
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(Math.Max(1, width), 0),
+        };
+        for (int i = 0; i < stops.Count; i++)
+            g.GradientStops.Add(new GradientStop(Rgb(stops[i]), (double)i / (stops.Count - 1)));
+        g.Freeze();
+        return g;
+    }
+
+    private static Brush SolidInk(string hex)
+    {
+        var b = new SolidColorBrush(Rgb(hex));
+        b.Freeze();
+        return b;
+    }
+
     /// <summary>The Command Center-style bars: the output peak level's recent history, in the ink,
     /// rising from a baseline, redrawn on each frame of the level source (only while it runs).</summary>
-    private FrameworkElement BarsPiece(double size, AudioLevelSource audio)
+    private FrameworkElement BarsPiece(double size, AudioLevelSource audio, NowPlayingLookDraw? look = null)
     {
         int count = audio.Bars.Levels.Count;
         double barW = Math.Max(2, size * 0.22), gap = Math.Max(1, size * 0.1);
@@ -785,7 +860,9 @@ internal sealed class DeskView : Grid, IDisposable
         var ink = Ink;
         for (int i = 0; i < count; i++)
         {
-            rects[i] = new Rectangle { Width = barW, Height = 1, Fill = ink, Opacity = _ink.TextOpacity, RadiusX = barW / 3, RadiusY = barW / 3 };
+            // With a look each bar takes its place along the gradient, left to right.
+            var fill = look is null ? ink : SolidInk(NowPlayingLooks.ColorAt(look.Stops, count <= 1 ? 0 : (double)i / (count - 1)));
+            rects[i] = new Rectangle { Width = barW, Height = 1, Fill = fill, Opacity = _ink.TextOpacity, RadiusX = barW / 3, RadiusY = barW / 3 };
             Canvas.SetLeft(rects[i], i * (barW + gap));
             Canvas.SetBottom(rects[i], 0);
             canvas.Children.Add(rects[i]);
