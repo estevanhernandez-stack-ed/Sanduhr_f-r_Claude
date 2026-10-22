@@ -201,6 +201,10 @@ The Claude Code side (`docs/spec.md` Stage 4, `../docs/mods-and-config-spec.md`)
   the Desk messages (`get_desk_messages`) and hands the widget suggested messages
   (`propose_desk_messages`) and watcher cards (`watch_start`, `watch_update`, `watch_end`), each a
   request file the widget checks again; the link list grew by six pure Core files (spec 6.9).
+  The agent-designed Desk (3.7.0, in progress) adds `get_desk` (reads the widget's `desk-state.json`:
+  the current design, fonts, the wallpaper's local summary, the Start-menu apps) and `propose_desk`
+  (`DeskDesign.Validate` first, then `desk-design-request.json` / `desk-design-result.json`); the link
+  list grew by nine pure Core files (`docs/superpowers/specs/2026-10-21-desk-design-design.md`).
 
 `statusline_enabled` now means "the statusline or the meters mod is installed in some folder", so
 `snapshot.json` is written while either is, or while the MCP server is installed (`mcp_enabled`:
