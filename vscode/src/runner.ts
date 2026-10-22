@@ -5,7 +5,8 @@
  * the reader are injected, so tests drive two runners on one data dir with fake time.
  * Window close does nothing here beyond `dispose()`; no pass and no merge at deactivate.
  */
-import { readPass as realReadPass, type ReadPassOptions, type ReadPassResult } from './claude/reader';
+import type { ReadPassResult } from './claude/reader';
+import { readAgentsPass, type AgentPassOptions } from './readAgents';
 import { dayWindow, merge, NO_PROJECT_KEY, NO_PROJECT_NAME, TAIL_MS } from './merge';
 import { AliasStoreUnavailable, type AliasStore } from './store/aliases';
 import { recordCaveats } from './store/caveats';
@@ -53,10 +54,10 @@ export interface RunnerDeps {
   now: () => number;
   timers?: RunnerTimers;
   lockOptions?: LockOptions;
-  /** Transcript reader; default is the real `readPass`. */
-  readPass?: (opts: ReadPassOptions) => Promise<ReadPassResult>;
+  /** Transcript reader; default is `readAgentsPass` (Claude, then Codex). */
+  readPass?: (opts: AgentPassOptions) => Promise<ReadPassResult>;
   /** Extra reader options (homes, byte budget). `dir` and `installed` are filled in. */
-  readerOptions?: Partial<Omit<ReadPassOptions, 'dir' | 'installed'>>;
+  readerOptions?: Partial<Omit<AgentPassOptions, 'dir' | 'installed'>>;
   /** `sanduhrTime.idleMinutes`, read fresh at each merge. */
   idleMinutes?: () => number;
   /** Real names the resolver has seen, by project key. */
@@ -154,7 +155,7 @@ export class Runner {
 
   private async runLocked(): Promise<TickResult> {
     const { deps } = this;
-    const read = deps.readPass ?? realReadPass;
+    const read = deps.readPass ?? readAgentsPass;
     const pass = await read({ ...deps.readerOptions, dir: deps.dir, installed: deps.installed });
     const caveats = recordCaveats(stateDir(deps.dir), pass, deps.now());
 

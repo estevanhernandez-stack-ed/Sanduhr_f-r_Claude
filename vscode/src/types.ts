@@ -134,6 +134,20 @@ export interface OffsetEntry {
   offset: number;
   size: number;
   mtimeMs: number;
+  /** Codex rollouts only: the segment in force at `offset`, so a pass resuming mid-file knows it. */
+  codex?: CodexSegmentState;
+}
+
+/**
+ * Where a Codex rollout stands at a byte offset: the current `session_meta` segment's stream
+ * (already hashed), its `thread_source`, and the working directory in force (the latest
+ * `turn_context.cwd`, else the segment's `session_meta.cwd`). Local state only, like every
+ * real path in `offsets.json`.
+ */
+export interface CodexSegmentState {
+  stream?: string;
+  threadSource?: string;
+  cwd?: string;
 }
 
 export type OffsetsState = Record<string, OffsetEntry>;
