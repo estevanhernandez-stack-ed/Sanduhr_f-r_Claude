@@ -5,9 +5,12 @@
  *
  * Interval rules (the usage spec states them as the contract):
  * - Yours, per project: non-reload heartbeat times plus, for each prompt at t, TWO events:
- *   t - 2 min and t (the span's start and end). Consecutive events join when the gap is
- *   <= idleMinutes; an interval with a single event lasts 2 minutes. A prompt on its own
- *   therefore yields exactly [t - 2 min, t], and a prompt 1 minute after an edit joins it.
+ *   the span's start and t. The start is t - 2 min, or earlier when the prompt's own stream
+ *   had Claude activity within idleMinutes before it: then the span reaches back to that
+ *   activity, because reading Claude's answer and dictating the next prompt is your time.
+ *   Consecutive events join when the gap is <= idleMinutes; an interval with a single event
+ *   lasts 2 minutes. A prompt with no recent activity in its stream therefore yields exactly
+ *   [t - 2 min, t], and a prompt 1 minute after an edit joins it.
  * - Claude's, per project: `activity` and `edit` events (an edit is also activity), gap
  *   5 minutes, lone event 2 minutes. Agent time sums each stream's own intervals.
  */
@@ -173,10 +176,26 @@ export function merge(input: MergeInput): DayRecord {
     if (t >= start && !isBackstopped(hb, t)) p.linesYou += hb.human_line_changes;
   }
 
+  // Read-and-dictate gap: a prompt's span reaches back to its own stream's last Claude activity
+  // when that is within idleMinutes. Same stream only, so a long subagent run (its own stream)
+  // never shortens the gap; a longer gap means the builder stepped away, and keeps the 2 minutes.
+  const spanStart = new Map<string, number>();
+  const lastActivity = new Map<string, number>();
+  const ordered = [...claude].sort((a, b) => a.t - b.t || (a.ev.kind === 'prompt' ? -1 : 0) - (b.ev.kind === 'prompt' ? -1 : 0));
+  for (const { ev, t } of ordered) {
+    if (ev.kind !== 'prompt') {
+      lastActivity.set(ev.stream, t);
+      continue;
+    }
+    const last = lastActivity.get(ev.stream);
+    const read = last !== undefined && t - last <= idleMs ? last : t;
+    spanStart.set(ev.id, Math.min(read, t - PROMPT_SPAN_MS));
+  }
+
   for (const { ev, t } of claude) {
     const p = poolFor(ev.project);
     if (ev.kind === 'prompt') {
-      p.yourTimes.push(t - PROMPT_SPAN_MS, t);
+      p.yourTimes.push(spanStart.get(ev.id) ?? t - PROMPT_SPAN_MS, t);
       continue;
     }
     p.claudeTimes.push(t);

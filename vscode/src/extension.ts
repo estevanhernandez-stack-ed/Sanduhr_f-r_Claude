@@ -15,7 +15,7 @@ import type { DayRecord } from './types';
 
 export type { SanduhrTimeApi } from './api';
 
-const READER_VERSION = '0.1.0';
+const READER_VERSION = '0.2.0';
 
 interface Live {
   recorder: Recorder;

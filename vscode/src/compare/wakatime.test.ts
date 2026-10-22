@@ -216,10 +216,15 @@ describe('Comparison', () => {
     expect(runs).toEqual(['/fixture/cli']);
     const lines = readCompareLines(dir);
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatchObject({ date: TODAY, wakatimeSeconds: 3600, oursEditorSeconds: 2700 });
+    expect(lines[0]).toMatchObject({ date: TODAY, wakatimeSeconds: 3600, oursEditorSeconds: 2700, oursTotalSeconds: 2700 });
     expect(new Date(lines[0].at).getTime()).toBe(NOW);
     expect(c.latest(TODAY)?.wakatimeSeconds).toBe(3600);
     expect(await c.provider()).toEqual({ wakatimeSeconds: 3600 });
+  });
+
+  it('reads a 0.1.0 line that has no total', () => {
+    appendCompareLine(dir, { date: TODAY, wakatimeSeconds: 5, oursEditorSeconds: 4, at: 'x' });
+    expect(readCompareLines(dir)[0]).toEqual({ date: TODAY, wakatimeSeconds: 5, oursEditorSeconds: 4, at: 'x' });
   });
 
   it('is gated hourly: 30 minutes apart runs once, 61 minutes apart runs twice', async () => {
