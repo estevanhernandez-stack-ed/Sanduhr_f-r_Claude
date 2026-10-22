@@ -2357,6 +2357,10 @@
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
+                            <views:OledCarePanel views:SettingsAnchor.Id="desk-oled" />
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
                             <views:DesignsSettingsPanel views:SettingsAnchor.Id="desk-designs" DataContext="{Binding Designs}" />
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />

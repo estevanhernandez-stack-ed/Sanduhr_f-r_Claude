@@ -80,6 +80,7 @@ public static class SettingsIndex
     public const string DeskWatchers = "desk-watchers";
     public const string DeskLauncher = "desk-launcher";
     public const string DeskDirect = "desk-direct";
+    public const string DeskOled = "desk-oled";
     public const string DeskDesigns = "desk-designs";
     // Desk: Message, Now playing, Weather (S6)
     public const string MessageLines = "lines";
@@ -190,6 +191,8 @@ public static class SettingsIndex
             ["watcher", "watchers", "agent", "agents", "MCP", "watch_start", "CI", "deploy", "progress", "card", "claude code"]),
         E(SettingsNames.DeskDirectSwitch, SettingsPage.Desk, DeskDirect,
             ["Claude", "agent", "agents", "MCP", "propose_desk", "design", "designs", "review", "apply", "without asking", "wallpaper", "off by default"]),
+        E(SettingsNames.OledCareSwitch, SettingsPage.Desk, DeskOled,
+            ["oled", "burn-in", "burn in", "burnin", "drift", "dim", "idle", "away", "screen", "pixels", "white", "image retention", "off by default"]),
         E(SettingsNames.DeskDesigns, SettingsPage.Desk, DeskDesigns,
             ["design", "designs", "undo", "put back", SettingsNames.PutMyDeskBack, "restore", "switch", "switch to", "rename", "pin", "delete", "saved looks", "Before", "history", "Claude"]),
         E(SettingsNames.DeskLauncher, SettingsPage.Desk, DeskLauncher,
@@ -258,6 +261,7 @@ public static class SettingsIndex
         [SettingsNames.DeskPlateSwitch] = DeskPlate,
         [SettingsNames.WatchersSwitch] = DeskWatchers,
         [SettingsNames.DeskDirectSwitch] = DeskDirect,
+        [SettingsNames.OledCareSwitch] = DeskOled,
         [SettingsNames.PutMyDeskBack] = DeskDesigns,
         [SettingsNames.LauncherAddApp] = DeskLauncher,
         [SettingsNames.LauncherAddLink] = DeskLauncher,

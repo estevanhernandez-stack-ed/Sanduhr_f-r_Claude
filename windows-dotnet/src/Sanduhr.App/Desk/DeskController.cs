@@ -69,11 +69,17 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// <summary>A design under review (the live review): drawn from memory in place of the saved layout, font, plate, ink and Launcher.
     /// Nothing is written; <see cref="EndPreview"/> draws the saved ones again.</summary>
     private DeskDesignSettings? _preview;
+    /// <summary>OLED care (spec 3.7.0): the drift and idle clocks, and whether the switch is on.</summary>
+    private readonly OledCareDriver _oled;
+    private bool _oledOn;
 
     public DeskController(SettingsStore store, Func<IDeskHost> hostFactory, Func<DeskUsage> usageSource,
         NowPlayingHub nowPlaying, DeskMessageSource messages, WatcherStore? watchers = null,
-        Paths? paths = null, LauncherAppCache? launcherApps = null)
+        Paths? paths = null, LauncherAppCache? launcherApps = null, OledCareDriver? oled = null)
     {
+        _oled = oled ?? new OledCareDriver();
+        _oled.DriftStepped += ApplyDrift;
+        _oled.DimChanged += OnDim;
         _paths = paths;
         _launcherApps = launcherApps;
         if (_launcherApps is not null) _launcherApps.Changed += OnLauncherAppsChanged;
@@ -93,6 +99,31 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _nowPlaying.Changed += OnTrackChanged;
         _nowPlaying.PresenceChanged += OnPresenceChanged;
     }
+
+    /// <summary>OLED care's clocks (the live check and the tests drive them).</summary>
+    internal OledCareDriver Oled => _oled;
+
+    /// <summary>OLED care dimmed the widget (true) or woke it (false), easing over the span; the app takes the widget window's content
+    /// to <see cref="OledIdle.WidgetDimmedOpacity"/> or back. Raised whether or not the Desk is on: the care is one switch.</summary>
+    public event Action<bool, TimeSpan>? WidgetDimRequested;
+
+    /// <summary>
+    /// The drift is paused while Arrange mode runs and while a design is under review (the pieces sit at their true anchor then);
+    /// the orbit's point otherwise, null with the care off.
+    /// </summary>
+    private int? DriftNow => _oledOn && !Arranging && _preview is null ? _oled.Step : null;
+
+    private void ApplyDrift() => _host?.SetDrift(DriftNow);
+
+    private void OnDim(bool dim)
+    {
+        var ease = _oled.Ease;
+        _host?.SetDim(dim ? OledIdle.DeskDimmedOpacity : 1.0, ease);
+        WidgetDimRequested?.Invoke(dim, ease);
+    }
+
+    /// <summary>The ink with OLED care's rule on it: nothing held at pure white. Off, the ink as resolved.</summary>
+    private ResolvedInk Care(ResolvedInk ink) => _oledOn ? DeskInk.CapWhite(ink) : ink;
 
     /// <summary>True when the Watchers piece has a place on the Desk (the watcher glow fires only then).</summary>
     internal bool WatchersPlaced => Placed("watchers");
@@ -242,6 +273,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _weatherSettings = _store.LoadDeskWeather();
         _piecesTakeClicks = _store.LoadDeskPiecesTakeClicks();
         _launcher = _store.LoadLauncher();
+        _oledOn = _store.LoadOledCare();
+        _oled.On = _oledOn; // off wakes anything it had dimmed
         if (_preview is { } preview)
         {
             // A design under review: shown even where the Desk is off (the review says so), never saved.
@@ -260,7 +293,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             _host = _hostFactory();
             _host.ScreensChanged += OnScreensChanged;
             _host.CoverageChanged += OnCoverageChanged;
+            if (_oled.Dimmed) _host.SetDim(OledIdle.DeskDimmedOpacity, TimeSpan.Zero);
         }
+        ApplyDrift();
         Rebuild();
     }
 
@@ -306,6 +341,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     public void StopForReset()
     {
         _stopped = true;
+        _oled.On = false;
         StopHost();
     }
 
@@ -313,6 +349,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         _stopped = true;
         StopHost();
+        _oled.DriftStepped -= ApplyDrift;
+        _oled.DimChanged -= OnDim;
+        _oled.Dispose();
         _nowPlaying.Changed -= OnTrackChanged;
         _nowPlaying.PresenceChanged -= OnPresenceChanged;
         if (_launcherApps is not null) _launcherApps.Changed -= OnLauncherAppsChanged;
@@ -384,6 +423,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         }
         _session = session;
         _arrangeMode = mode;
+        ApplyDrift(); // pieces sit at their true anchor while arranging
         // The islands go down while the arrange surfaces are up; coverage and sources have nothing to follow.
         foreach (var v in _views) v.Dispose();
         _views.Clear();
@@ -644,7 +684,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private DeskInkMap InkFor(DeskView view, DeskScreen screen, DeskFrame frame)
     {
         if (_ink.Mode != DeskInkMode.Auto)
-            return new DeskInkMap(DeskInk.Resolve(_ink, ThemeText(), null));
+            return new DeskInkMap(Care(DeskInk.Resolve(_ink, ThemeText(), null)));
         // The sampling pass draws nothing anyone sees: give its message a scratch copy of the played set
         // so the drawn pass still writes a new line in.
         var scratch = frame.Message is { } m ? frame with { Message = m with { Played = new HashSet<string>(m.Played, StringComparer.Ordinal) } } : frame;
@@ -655,9 +695,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             var px = new PxRect(
                 screen.Bounds.X + (int)Math.Round(r.X * screen.Scale), screen.Bounds.Y + (int)Math.Round(r.Y * screen.Scale),
                 Math.Max(1, (int)Math.Round(r.Width * screen.Scale)), Math.Max(1, (int)Math.Round(r.Height * screen.Scale)));
-            by[anchor] = DeskInk.Resolve(_ink, ThemeText(), _wallpaper.Luminance(screen, px));
+            by[anchor] = Care(DeskInk.Resolve(_ink, ThemeText(), _wallpaper.Luminance(screen, px)));
         }
-        return new DeskInkMap(DeskInk.Resolve(_ink, ThemeText(), null), by);
+        return new DeskInkMap(Care(DeskInk.Resolve(_ink, ThemeText(), null)), by);
     }
 
     /// <summary>Hands the message its played set, forgetting lines no longer showing (one that comes back

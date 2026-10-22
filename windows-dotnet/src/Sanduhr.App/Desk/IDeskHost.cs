@@ -70,4 +70,13 @@ internal interface IDeskHost : IDisposable
 
     /// <summary>The <see cref="Coverage"/> flags changed. Nothing is laid out again on this event.</summary>
     event Action? CoverageChanged;
+
+    /// <summary>OLED care's drift (spec 3.7.0): each island's window sits at this point of <see cref="OledDrift"/>'s orbit,
+    /// moved as a whole (its content is not touched) and kept inside its monitor's work area and clear of the taskbar. Null
+    /// puts every window at its true anchor. Kept for windows made later.</summary>
+    void SetDrift(int? step);
+
+    /// <summary>OLED care's idle dim: the islands ease to <paramref name="opacity"/> (1 is full) over <paramref name="ease"/>
+    /// (zero snaps). Kept for windows made later.</summary>
+    void SetDim(double opacity, TimeSpan ease);
 }

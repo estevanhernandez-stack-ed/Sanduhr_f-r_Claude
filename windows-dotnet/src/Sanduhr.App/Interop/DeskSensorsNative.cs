@@ -359,4 +359,26 @@ internal static class DeskSensorsNative
             return false;
         }
     }
+
+    // ---- When the user last touched the keyboard or mouse (OLED care) ----
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
+
+    [DllImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
+
+    /// <summary>
+    /// When the last keyboard or mouse input happened, as a moment on the UTC clock; null when Windows would not say. This is
+    /// the one number <c>GetLastInputInfo</c> gives (the tick of the last input, nothing about what it was or where), read for
+    /// OLED care's idle dim and kept in memory only.
+    /// </summary>
+    public static DateTimeOffset? LastInputAt()
+    {
+        var info = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
+        if (!GetLastInputInfo(ref info)) return null;
+        // Both are 32-bit millisecond ticks since boot; the subtraction survives the wrap.
+        uint idleMs = unchecked((uint)Environment.TickCount - info.dwTime);
+        return DateTimeOffset.UtcNow - TimeSpan.FromMilliseconds(idleMs);
+    }
 }

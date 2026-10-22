@@ -806,6 +806,17 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>"OLED care" (spec 3.7.0): <c>desk_oled_care</c>, absent = off (<see cref="OledCare"/>).</summary>
+    public bool LoadOledCare() => OledCare.Read(Read());
+
+    public void SaveOledCare(bool on)
+    {
+        var root = Read();
+        if (on) root["desk_oled_care"] = true;
+        else root.Remove("desk_oled_care");
+        Write(root);
+    }
+
     /// <summary>"Let agents show watchers" (spec 6.9): <c>watchers_agents</c>, absent = off. The MCP tools
     /// <c>watch_start</c>, <c>watch_update</c> and <c>watch_end</c> write nothing while it is off.</summary>
     public bool LoadWatchersAgents() => ReadBool(Read(), "watchers_agents", false);

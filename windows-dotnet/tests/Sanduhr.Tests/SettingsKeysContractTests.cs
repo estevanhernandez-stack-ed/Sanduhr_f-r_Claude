@@ -43,6 +43,7 @@ public class SettingsKeysContractTests
         "desk_layout",
         "desk_margins",
         "desk_message",
+        "desk_oled_care",
         "desk_pieces_take_clicks",
         "desk_plate",
         "desk_put_back",

@@ -548,6 +548,7 @@ public partial class App : Application
         // The glow's Desk spot (spec 7.3): the glow service asks the Desk first and falls back to the window.
         if (_glow is not null) _glow.DeskGlow = c => _desk?.Glow(c) == true;
         _desk.ArrangeChanged += OnArrangeChanged;
+        _desk.WidgetDimRequested += (dimmed, ease) => _window?.SetCareDim(dimmed, ease);
         _desk.MenuRequested += OnDeskMenu;
         _vm.ThemeChanged += _ => _desk?.ThemeChanged();
         // The widget's now-playing line (spec 6.3, W8) shares the Desk's media-session listener.

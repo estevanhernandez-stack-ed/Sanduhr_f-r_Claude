@@ -153,6 +153,8 @@ public static class SettingsNames
     public const string ArrangeDesk = DeskArrangeCopy.SettingsButton;
     /// <summary>Desk: the clock, message and Claude line take clicks (spec 7.4).</summary>
     public const string DeskPieceClicksSwitch = DeskPieceClicks.Title;
+    /// <summary>Desk: burn-in care for OLED screens (settings.json "desk_oled_care", off by default).</summary>
+    public const string OledCareSwitch = OledCare.Title;
     /// <summary>Desk, Look: a soft plate behind each piece.</summary>
     public const string DeskPlateSwitch = DeskPlate.Title;
     /// <summary>The name a Desk piece goes by on the layout map and in Arrange mode; an unknown piece goes by its key.</summary>
@@ -212,6 +214,7 @@ public static class SettingsNames
         (DeskPlateSwitch, SettingsPage.Desk),
         (WatchersSwitch, SettingsPage.Desk),
         (DeskDirectSwitch, SettingsPage.Desk),
+        (OledCareSwitch, SettingsPage.Desk),
         (PutMyDeskBack, SettingsPage.Desk),
         (LauncherAddApp, SettingsPage.Desk),
         (LauncherAddLink, SettingsPage.Desk),

@@ -264,6 +264,19 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         }
     }
 
+    /// <summary>"OLED care" (spec 3.7.0): off by default; saved at once, and the Desk and the widget follow.</summary>
+    public bool OledCare
+    {
+        get => _store.LoadOledCare();
+        set
+        {
+            if (value == OledCare) return;
+            _store.SaveOledCare(value);
+            OnPropertyChanged();
+            Changed?.Invoke();
+        }
+    }
+
     /// <summary>"Clock and message take clicks" (spec 7.4): saved at once, and the Desk follows.</summary>
     public bool PiecesTakeClicks
     {

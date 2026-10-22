@@ -230,6 +230,14 @@ public partial class MainWindow : Window
         Focus();
     }
 
+    /// <summary>OLED care's idle dim (spec 3.7.0): the widget's content eases to <see cref="OledIdle.WidgetDimmedOpacity"/> while
+    /// the person is away, and back on any input. The content, not the window, so the backdrop and the window itself are untouched.</summary>
+    public void SetCareDim(bool dimmed, TimeSpan ease)
+    {
+        if (Content is UIElement root)
+            Desk.CareOpacity.Ease(root, dimmed ? OledIdle.WidgetDimmedOpacity : 1.0, ease);
+    }
+
     /// <summary>Compact toggled — auto-size the window's HEIGHT to the single remaining
     /// card (width untouched, matching Python), restoring the expanded height on the
     /// way out. Deferred a layout pass so the card collection has settled before we
