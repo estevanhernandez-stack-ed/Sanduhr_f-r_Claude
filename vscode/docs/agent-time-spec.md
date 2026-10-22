@@ -46,7 +46,7 @@ Generalize the Claude event into an agent event; Claude's reader and rules don't
 |---|---|---|
 | `agent` | `claude` (new field, default) | `codex` |
 | `stream` | sha of the transcript path | sha of the rollout path plus `session_id`, so subagent and guardian threads inside one file are their own streams |
-| `kind: prompt` | the human-prompt rule (spec 4) | the Codex human-prompt rule, from the probe |
+| `kind: prompt` | the human-prompt rule (spec 4) | the Codex human-prompt rule below |
 | `kind: activity` | assistant entries, tool results | the activity records above |
 | `kind: edit` | Edit/Write tool calls with hashed path and line counts | `apply_patch` tool calls: one edit per file in the patch, hashed path, lines added/removed counted from the patch |
 | `project` | the resolver on the transcript's cwd | the resolver on `turn_context.cwd` (fallback `session_meta.cwd`) |
@@ -74,20 +74,32 @@ counted once.
 plus "Overlap". The 626 extension's publisher and `manage_time` pass `byAgent` through, and the
 bulletin says "Claude 3h, Codex 1h" when more than one agent ran.
 
-## The probe (step one)
+## The Codex human-prompt rule (probe run 2026-10-22)
 
-The Codex human-prompt rule can't be read off the shapes. Before writing the reader:
+Este sent `sanduhr probe 1` in a fresh Codex thread. In that rollout, the probe was the only `user`
+message carrying `metadata.user_input_order` (with `retained_source`, `client_authored: false` and
+`mcp_attribution`). The two `user` messages Codex injected before it (instructions and context) had
+no metadata at all. Across all of Neb's Codex history:
 
-1. In a fresh Codex thread, Este sends one prompt: `sanduhr probe 1`. Codex answers.
-2. Capture that rollout's records: which `type` / `payload.type` / `role` / `metadata` carries the
-   probe text, and what the injected user-role records (instructions, attachments, tool output)
-   look like next to it.
-3. Write the rule from that, then build fixtures that are **made up** but shaped exactly like it.
-   No real transcript content goes into the repo.
+| thread_source | user_input_order | count | meaning |
+|---|---|---|---|
+| `user` | yes | 54 | your prompts |
+| `user` | no | 16 | injected context; one carried only `mcp_attribution` |
+| `guardian_review` | yes | 63 | Codex's self-review prompts: machine-written |
+| `guardian_review` | no | 1 | injected |
+| `subagent` | no | 4 | task prompts: machine-written |
+
+**Rule.** A Codex record is the human's prompt (`kind: "prompt"`) when all hold: `type` is
+`response_item`; `payload.type` is `message` with `role` `user`; `metadata.user_input_order` is
+present; and the latest `session_meta` above it in the file has `thread_source` `user`. One rollout
+can hold several `session_meta` segments (subagent and guardian threads inside one file), so the
+reader tracks the current segment, and its `session_id` keys the stream. `event_msg`
+`item_completed` repeats the prompt's text and is not counted. Fixtures copy these shapes with
+made-up text; no real transcript content enters the repo.
 
 ## Order of work
 
-1. The probe, then the Codex reader with fixtures and tests (reader only, no merge change).
+1. The Codex reader with fixtures and tests, using the rule above (reader only, no merge change).
 2. Agent events and spool v2 with the `agent` field; Claude's reader writes `agent: claude`.
 3. The merger: agents bucket, `byAgent`, day schema v2 with the v1 mapping, tests for overlap
    between Claude and Codex running together.
