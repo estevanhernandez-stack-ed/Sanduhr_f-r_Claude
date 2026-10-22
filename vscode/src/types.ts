@@ -77,20 +77,35 @@ export interface LanguageTime {
   ms: number;
 }
 
+/** One agent's share of a day or project. All durations in milliseconds. */
+export interface AgentTime {
+  /** That agent's own union of intervals: the wall-clock time it was working. */
+  wallMs: number;
+  /** Sum over that agent's streams of each stream's own interval lengths (parallel streams add). */
+  streamMs: number;
+  /** Lines that agent added plus removed. */
+  lines: number;
+}
+
+/** Per agent, only the agents that ran. */
+export type ByAgent = Partial<Record<AgentName, AgentTime>>;
+
 /** Totals shared by the day and each project. All durations in milliseconds. */
 export interface DayTotals {
-  /** You only (not overlapping Claude). */
+  /** You only (not overlapping any agent). */
   youMs: number;
-  /** Claude only (not overlapping you). */
-  claudeMs: number;
-  /** Overlap of you and Claude. */
+  /** Agents only (not overlapping you): the union of every agent's intervals, minus yours. */
+  agentsMs: number;
+  /** Overlap of you and any agent. */
   bothMs: number;
-  /** Union of both; equals youMs + claudeMs + bothMs. */
+  /** Union of all; equals youMs + agentsMs + bothMs. */
   totalMs: number;
-  /** Sum over Claude streams of each stream's own interval lengths. */
+  /** Sum over every agent's streams of each stream's own interval lengths. */
   agentMs: number;
   linesYou: number;
-  linesClaude: number;
+  /** Lines every agent added plus removed. */
+  linesAgents: number;
+  byAgent: ByAgent;
 }
 
 export interface ProjectDay extends DayTotals {
@@ -108,9 +123,9 @@ export interface DayCaveats {
   claudeCodeVersions: string[];
 }
 
-/** `days/<date>.json`. */
+/** `days/<date>.json`. A v1 file is read as v2 (`claudeMs` becomes `agentsMs` and `byAgent.claude`). */
 export interface DayRecord {
-  v: 1;
+  v: 2;
   /** Local date, YYYY-MM-DD. */
   date: string;
   machine: string;

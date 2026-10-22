@@ -182,18 +182,18 @@ export class Runner {
     const tailFromSec = (dayWindow(date).start - TAIL_MS) / 1000;
 
     const heartbeats: Heartbeat[] = readSpoolDay(deps.dir, date, deps.machine);
-    const claudeEvents: AgentEvent[] = readAgentDay(deps.dir, date);
+    const agentEvents: AgentEvent[]  = readAgentDay(deps.dir, date);
     const prevBeats = readSpoolDay(deps.dir, prev, deps.machine).filter((h) => h.time >= tailFromSec);
-    const prevClaude = readAgentDay(deps.dir, prev).filter((e) => e.time >= tailFromSec);
+    const prevAgent = readAgentDay(deps.dir, prev).filter((e) => e.time >= tailFromSec);
 
     // Every project key seen: aliases are assigned here, under the lock this tick already holds.
     const names = deps.knownNames?.() ?? new Map<string, string>();
     const wanted = new Map<string, string | undefined>();
     for (const key of [
       ...heartbeats.map((h) => h.project),
-      ...claudeEvents.map((e) => e.project),
+      ...agentEvents.map((e) => e.project),
       ...prevBeats.map((h) => h.project),
-      ...prevClaude.map((e) => e.project),
+      ...prevAgent.map((e) => e.project),
     ]) {
       wanted.set(key, key === NO_PROJECT_KEY ? NO_PROJECT_NAME : names.get(key));
     }
@@ -224,8 +224,8 @@ export class Runner {
       date,
       machine: deps.machine,
       heartbeats,
-      claudeEvents,
-      previousDayTail: { heartbeats: prevBeats, claudeEvents: prevClaude },
+      agentEvents,
+      previousDayTail: { heartbeats: prevBeats, agentEvents: prevAgent },
       aliases,
       realNames,
       settings: { idleMinutes: deps.idleMinutes?.() },

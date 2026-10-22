@@ -257,7 +257,7 @@ describe('status bar', () => {
   it('is right-aligned, opens the panel, and updates on merges and the 5-minute tick', async () => {
     vi.useFakeTimers();
     try {
-      let today: DayRecord | undefined = day('2026-10-06', { youMs: 100 * 60_000, claudeMs: 125 * 60_000, bothMs: 33 * 60_000 });
+      let today: DayRecord | undefined = day('2026-10-06', { youMs: 100 * 60_000, agentsMs: 125 * 60_000, bothMs: 33 * 60_000 });
       const sub = createStatusBar({ api: { getToday: async () => today, onDayUpdated }, remote: false });
       const item = statusBarItems[0];
       expect(item.alignment).toBe(vscode.StatusBarAlignment.Right);

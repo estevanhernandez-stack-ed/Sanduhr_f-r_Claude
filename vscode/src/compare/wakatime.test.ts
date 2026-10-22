@@ -168,11 +168,11 @@ describe('runToday', () => {
 
 function day(date: string, youMs: number, bothMs: number): DayRecord {
   return {
-    v: 1,
+    v: 2,
     date,
     machine: 'fixture',
     generatedAt: '2026-01-01T00:00:00.000Z',
-    totals: { youMs, claudeMs: 0, bothMs, totalMs: youMs + bothMs, agentMs: 0, linesYou: 0, linesClaude: 0 },
+    totals: { youMs, agentsMs: 0, bothMs, totalMs: youMs + bothMs, agentMs: 0, linesYou: 0, linesAgents: 0, byAgent: {} },
     projects: [],
     caveats: { unreadableTranscriptLines: 0, readerVersion: '0.1.0', claudeCodeVersions: [] },
   };

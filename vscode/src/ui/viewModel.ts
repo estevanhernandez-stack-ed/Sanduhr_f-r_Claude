@@ -38,17 +38,17 @@ export interface Fractions {
   both: number;
 }
 
-const split = (t: Pick<DayTotals, 'youMs' | 'claudeMs' | 'bothMs' | 'totalMs'>): Split => ({
+const split = (t: Pick<DayTotals, 'youMs' | 'agentsMs' | 'bothMs' | 'totalMs'>): Split => ({
   you: formatDuration(t.youMs),
-  claude: formatDuration(t.claudeMs),
+  claude: formatDuration(t.agentsMs),
   both: formatDuration(t.bothMs),
   total: formatDuration(t.totalMs),
 });
 
 /** Shares of the three parts. They sum to exactly 1, or are all 0 when there is no time. */
-export function fractions(t: Pick<DayTotals, 'youMs' | 'claudeMs' | 'bothMs'>): Fractions {
+export function fractions(t: Pick<DayTotals, 'youMs' | 'agentsMs' | 'bothMs'>): Fractions {
   const you = Math.max(0, t.youMs);
-  const claude = Math.max(0, t.claudeMs);
+  const claude = Math.max(0, t.agentsMs);
   const both = Math.max(0, t.bothMs);
   const sum = you + claude + both;
   if (sum <= 0) return { you: 0, claude: 0, both: 0 };
@@ -73,7 +73,7 @@ export function buildStatusBar(today: DayRecord | undefined, opts: { remote?: bo
   const t = today.totals;
   return {
     text: `$(watch) ${formatDuration(t.totalMs)}`,
-    tooltip: `You ${formatDuration(t.youMs)} · Claude ${formatDuration(t.claudeMs)} · Both ${formatDuration(t.bothMs)}`,
+    tooltip: `You ${formatDuration(t.youMs)} · Claude ${formatDuration(t.agentsMs)} · Both ${formatDuration(t.bothMs)}`,
   };
 }
 
@@ -89,7 +89,7 @@ export interface ProjectRowModel {
   fractions: Fractions;
   agent: string;
   linesYou: number;
-  linesClaude: number;
+  linesAgents: number;
   languages: { id: string; time: string }[];
   totalMs: number;
 }
@@ -175,7 +175,7 @@ export function buildPanelModel(
 ): PanelModel {
   const byDate = new Map(days.map((d) => [d.date, d]));
   const todayRec = byDate.get(today);
-  const zero: DayTotals = { youMs: 0, claudeMs: 0, bothMs: 0, totalMs: 0, agentMs: 0, linesYou: 0, linesClaude: 0 };
+  const zero: DayTotals = { youMs: 0, agentsMs: 0, bothMs: 0, totalMs: 0, agentMs: 0, linesYou: 0, linesAgents: 0, byAgent: {} };
   const t = todayRec?.totals ?? zero;
 
   const dates = Array.from({ length: 7 }, (_, i) => shiftDate(today, i - 6));
@@ -204,7 +204,7 @@ export function buildPanelModel(
         fractions: fractions(p),
         agent: formatDuration(p.agentMs),
         linesYou: p.linesYou,
-        linesClaude: p.linesClaude,
+        linesAgents: p.linesAgents,
         languages: topLanguages(p),
         totalMs: p.totalMs,
       };

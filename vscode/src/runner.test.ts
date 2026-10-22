@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ReadPassResult } from './claude/reader';
+import * as fx from './codex/fixtures';
 import { FOLLOW_UP_MS, REFRESH_MS, Runner, TICK_MS, type RunnerDeps, type RunnerTimers } from './runner';
 import { AliasStore } from './store/aliases';
 import { appendAgentEvents } from './store/agentSpool';
@@ -154,12 +155,49 @@ describe('tick', () => {
     expect(today.projects[0].youMs).toBe(5 * 60_000);
   });
 
+  it('the default pass reads a Codex rollout, and the day holds Codex beside a legacy Claude spool', async () => {
+    const codexHome = path.join(dir, 'codex-home');
+    const rollout = path.join(codexHome, 'sessions', '2026', '06', '10', 'rollout-fixture.jsonl');
+    const iso = (h: number, m: number): string => new Date(2026, 5, 10, h, m).toISOString();
+    fs.mkdirSync(path.dirname(rollout), { recursive: true });
+    fs.writeFileSync(
+      rollout,
+      fx.toJsonl([
+        fx.sessionMeta(iso(12, 0), { sessionId: 'fixture-session', threadSource: 'user', cwd: '/fixture/repos/alpha' }),
+        fx.turnContext(iso(12, 0), '/fixture/repos/alpha'),
+        fx.humanPrompt(iso(12, 1), 1),
+        fx.reasoning(iso(12, 2)),
+        fx.customToolCall(iso(12, 4), 'apply_patch', fx.TWO_FILE_PATCH),
+      ]),
+    );
+    // A 0.2.0 Claude spool file, never migrated: still read as Claude.
+    fs.mkdirSync(path.join(dir, 'claude'), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'claude', '2026-06-10.jsonl'),
+      JSON.stringify({ v: 1, id: 'legacy-1', time: sec(13, 0), project: 'proj-b', stream: 's1', kind: 'activity' }) + '\n',
+    );
+    const { installed } = ensureInstalled(stateDir(dir));
+    const r = rig(10, {
+      readPass: undefined,
+      readerOptions: { homes: [], codexHomes: [codexHome] },
+      installed: { ...installed, installedAt: '2020-01-01T00:00:00.000Z' },
+    });
+    await r.runner.tick();
+    const today = readDay(dir, '2026-06-10')!;
+    expect(today.v).toBe(2);
+    expect(Object.keys(today.totals.byAgent)).toEqual(['claude', 'codex']);
+    expect(today.totals.byAgent.codex).toEqual({ wallMs: 2 * 60_000, streamMs: 2 * 60_000, lines: 6 });
+    expect(today.totals.byAgent.claude!.wallMs).toBe(2 * 60_000);
+    expect(today.totals.youMs + today.totals.bothMs).toBeGreaterThan(0); // the Codex prompt is yours
+    expect(today.caveats.readerVersion).toBe('0.1.0');
+  });
+
   it('includes a touched old date in the merge set', async () => {
     appendAgentEvents(dir, [cev('old1', 'proj-a', sec(9, 0, 1)), cev('old2', 'proj-a', sec(9, 3, 1))]);
     const r = rig(10, { readPass: async () => emptyPass({ touchedDates: ['2026-06-01'] }) });
     const res = await r.runner.tick();
     expect(res.merged).toEqual(['2026-06-01', '2026-06-09', '2026-06-10']);
-    expect(readDay(dir, '2026-06-01')!.projects[0].claudeMs).toBeGreaterThan(0);
+    expect(readDay(dir, '2026-06-01')!.projects[0].agentsMs).toBeGreaterThan(0);
   });
 
   it('feeds the reader versions and unreadable counts into caveats, and remembers them next tick', async () => {
@@ -279,8 +317,8 @@ describe('two runners on one data dir', () => {
     expect(b.store.maskState().projects).toEqual(aliasesBefore);
 
     for (const day of listDays(dir, '2026-06-01', '2026-06-30')) {
-      expect(day.v).toBe(1);
-      expect(day.totals.totalMs).toBe(day.totals.youMs + day.totals.claudeMs + day.totals.bothMs);
+      expect(day.v).toBe(2);
+      expect(day.totals.totalMs).toBe(day.totals.youMs + day.totals.agentsMs + day.totals.bothMs);
     }
     expect(readDay(dir, '2026-06-10')!.projects.map((p) => p.key).sort()).toEqual(['proj-a', 'proj-b']);
     const leftovers = fs.readdirSync(path.join(dir, 'days')).filter((n) => !/^\d{4}-\d{2}-\d{2}\.json$/.test(n));

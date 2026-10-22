@@ -36,18 +36,18 @@ describe('formatDuration', () => {
 describe('fractions', () => {
   it('sums to exactly 1 for awkward values', () => {
     for (const t of [
-      { youMs: 1, claudeMs: 1, bothMs: 1 },
-      { youMs: 7, claudeMs: 11, bothMs: 13 },
-      { youMs: 100 * MIN, claudeMs: 125 * MIN, bothMs: 33 * MIN },
-      { youMs: 1, claudeMs: 0, bothMs: 0 },
+      { youMs: 1, agentsMs: 1, bothMs: 1 },
+      { youMs: 7, agentsMs: 11, bothMs: 13 },
+      { youMs: 100 * MIN, agentsMs: 125 * MIN, bothMs: 33 * MIN },
+      { youMs: 1, agentsMs: 0, bothMs: 0 },
     ]) {
       const f = fractions(t);
       expect(f.you + f.claude + f.both).toBeCloseTo(1, 12);
     }
   });
   it('is all zero with no time and never negative', () => {
-    expect(fractions({ youMs: 0, claudeMs: 0, bothMs: 0 })).toEqual({ you: 0, claude: 0, both: 0 });
-    const f = fractions({ youMs: -5, claudeMs: 10, bothMs: 0 });
+    expect(fractions({ youMs: 0, agentsMs: 0, bothMs: 0 })).toEqual({ you: 0, claude: 0, both: 0 });
+    const f = fractions({ youMs: -5, agentsMs: 10, bothMs: 0 });
     expect(f.you).toBe(0);
     expect(f.claude).toBe(1);
   });
@@ -55,7 +55,7 @@ describe('fractions', () => {
 
 describe('buildStatusBar', () => {
   it('shows the total and the split tooltip', () => {
-    const today = day('2026-10-06', { youMs: 100 * MIN, claudeMs: 125 * MIN, bothMs: 33 * MIN });
+    const today = day('2026-10-06', { youMs: 100 * MIN, agentsMs: 125 * MIN, bothMs: 33 * MIN });
     expect(buildStatusBar(today)).toEqual({
       text: '$(watch) 4h 18m',
       tooltip: 'You 1h 40m · Claude 2h 05m · Both 33m',
@@ -72,8 +72,8 @@ describe('buildPanelModel headline and strip', () => {
   const today = '2026-10-06';
   const days = [
     day('2026-10-02', { youMs: 2 * H }),
-    day('2026-10-05', { youMs: H, claudeMs: H, bothMs: 0 }),
-    day(today, { youMs: 100 * MIN, claudeMs: 125 * MIN, bothMs: 33 * MIN }),
+    day('2026-10-05', { youMs: H, agentsMs: H, bothMs: 0 }),
+    day(today, { youMs: 100 * MIN, agentsMs: 125 * MIN, bothMs: 33 * MIN }),
   ];
 
   it('headline carries total and the three splits for today', () => {
@@ -125,7 +125,7 @@ describe('project rows', () => {
   const today = '2026-10-06';
   const a = project({
     key: 'aaaa', realName: 'Demo App', alias: 'Project Aster',
-    youMs: 30 * MIN, claudeMs: 10 * MIN, bothMs: 5 * MIN, totalMs: 45 * MIN, agentMs: 12 * MIN, linesYou: 40, linesClaude: 220,
+    youMs: 30 * MIN, agentsMs: 10 * MIN, bothMs: 5 * MIN, totalMs: 45 * MIN, agentMs: 12 * MIN, linesYou: 40, linesAgents: 220,
     languages: [{ id: 'ts', ms: 20 * MIN }, { id: 'css', ms: 2 * MIN }, { id: 'json', ms: 9 * MIN }, { id: 'md', ms: 1 * MIN }],
   });
   const b = project({ key: 'bbbb', realName: 'Widget Lab', alias: 'Project Birch', youMs: 2 * H });
@@ -143,7 +143,7 @@ describe('project rows', () => {
     expect(row.fractions.you + row.fractions.claude + row.fractions.both).toBeCloseTo(1, 12);
     expect(row.agent).toBe('12m');
     expect(row.linesYou).toBe(40);
-    expect(row.linesClaude).toBe(220);
+    expect(row.linesAgents).toBe(220);
     expect(row.languages).toEqual([
       { id: 'ts', time: '20m' },
       { id: 'json', time: '9m' },
@@ -221,7 +221,7 @@ describe('caveats, compare and footer', () => {
     expect(buildPanelModel([day(today, { youMs: MIN }, [], 1)], open, today).caveats).toMatch(/^1 transcript line could/);
   });
   it('compares WakaTime (all machines) with the full total on this machine, yours beside it', () => {
-    const d = [day(today, { youMs: H, claudeMs: H, bothMs: 10 * MIN })];
+    const d = [day(today, { youMs: H, agentsMs: H, bothMs: 10 * MIN })];
     expect(buildPanelModel(d, open, today, { wakatimeSeconds: 130 * 60 }).compare).toBe(
       'WakaTime 2h 10m (all machines) · Sanduhr 2h 10m on this machine (yours 1h 10m) · difference 0m',
     );
