@@ -107,6 +107,32 @@ public static class InkHex
     public static double Luminance(int r, int g, int b) =>
         0.2126 * Lin[Math.Clamp(r, 0, 255)] + 0.7152 * Lin[Math.Clamp(g, 0, 255)] + 0.0722 * Lin[Math.Clamp(b, 0, 255)];
 
+    /// <summary>
+    /// <paramref name="hex"/> with its luminance held to <paramref name="maxLuminance"/> (WCAG relative luminance): a color above it
+    /// is scaled toward black in linear light, which keeps its hue, and one at or under it comes back as it was. An invalid color
+    /// reads as white. Six-digit lowercase hex out.
+    /// </summary>
+    public static string CapLuminance(string? hex, double maxLuminance)
+    {
+        var h = Normalize(hex) ?? Fallback;
+        double l = Luminance(h);
+        if (l <= maxLuminance || l <= 0) return h;
+        double f = maxLuminance / l;
+        var sb = new System.Text.StringBuilder(6);
+        for (int i = 0; i < 3; i++)
+        {
+            int c = int.Parse(h.AsSpan(i * 2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            sb.Append(Encode(Lin[c] * f).ToString("x2", CultureInfo.InvariantCulture));
+        }
+        return sb.ToString();
+    }
+
+    private static int Encode(double linear)
+    {
+        double v = linear <= 0.0031308 ? linear * 12.92 : 1.055 * Math.Pow(linear, 1 / 2.4) - 0.055;
+        return Math.Clamp((int)Math.Round(v * 255), 0, 255);
+    }
+
     /// <summary>The 256-entry sRGB to linear table, shared with <see cref="WallpaperSampler"/>.</summary>
     internal static readonly double[] Lin = BuildTable();
 
@@ -182,6 +208,21 @@ public static class DeskInk
                 return Resolve(s with { Mode = dark ? DeskInkMode.Dark : DeskInkMode.Light }, null, null);
         }
     }
+
+    /// <summary>The luminance OLED care holds the Desk's ink to: that of #e6e6e6, so pure white is drawn as #e6e6e6.</summary>
+    public static readonly double WhiteCapLuminance = InkHex.Luminance("e6e6e6");
+
+    /// <summary>
+    /// OLED care's render-time rule: no held pure white. Every ink stop (and the dark ink's white shadow) above
+    /// <see cref="WhiteCapLuminance"/> is scaled down to it, hue kept; everything under it is as it was. What
+    /// <see cref="Resolve"/> returned, and the design that asked for it, are not touched: the Desk just draws a notch dimmer.
+    /// </summary>
+    public static ResolvedInk CapWhite(ResolvedInk ink) =>
+        ink with
+        {
+            Stops = [.. ink.Stops.Select(h => InkHex.CapLuminance(h, WhiteCapLuminance))],
+            ShadowHex = InkHex.CapLuminance(ink.ShadowHex, WhiteCapLuminance),
+        };
 
     private static ResolvedInk Make(IReadOnlyList<string> stops, bool darkInk, bool shadow, double textOpacity) =>
         new(stops, darkInk,
