@@ -163,6 +163,12 @@ public sealed class McpServer
             case "propose_desk_messages":
                 payload = _tools.BuildProposeDeskMessages(args);
                 break;
+            case "get_desk":
+                payload = _tools.BuildGetDesk();
+                break;
+            case "propose_desk":
+                payload = _tools.BuildProposeDesk(args);
+                break;
             case "watch_start":
                 payload = _tools.BuildWatchStart(args);
                 break;

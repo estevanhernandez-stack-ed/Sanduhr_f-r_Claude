@@ -39,7 +39,7 @@ public class McpServerTests
         var res = Run(tmp, Req(1, "tools/list"));
         var tools = (JsonArray)((JsonObject)res.Single()["result"]!)["tools"]!;
         Assert.Equal(new[] { "get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping", "publish_usage", "propose_theme",
-                "get_desk_messages", "propose_desk_messages", "watch_start", "watch_update", "watch_end" },
+                "get_desk_messages", "propose_desk_messages", "get_desk", "propose_desk", "watch_start", "watch_update", "watch_end" },
             tools.Select(t => (string?)t!["name"]).ToArray());
         Assert.All(tools.Take(5), t => Assert.True(t!["annotations"]!["readOnlyHint"]!.GetValue<bool>()));
         // publish_usage queues an upload (performed by the widget) — honestly not read-only.
@@ -49,18 +49,24 @@ public class McpServerTests
         Assert.False(tools[6]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
         Assert.False(tools[6]!["annotations"]!["destructiveHint"]!.GetValue<bool>());
         Assert.Contains("rejected with findings", (string?)tools[6]!["description"]);
-        // get_desk_messages only reads; the four that queue a request file for the widget are honestly not
-        // read-only, and none of them reaches the network (openWorldHint false).
+        // get_desk_messages and get_desk only read; the five that queue a request file for the widget are honestly
+        // not read-only, and none of them reaches the network (openWorldHint false).
         Assert.True(tools[7]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
-        foreach (int i in new[] { 8, 9, 10, 11 })
+        Assert.True(tools[9]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
+        foreach (int i in new[] { 8, 10, 11, 12, 13 })
         {
             Assert.False(tools[i]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
             Assert.False(tools[i]!["annotations"]!["destructiveHint"]!.GetValue<bool>());
             Assert.False(tools[i]!["annotations"]!["openWorldHint"]!.GetValue<bool>());
             Assert.False(tools[i]!["inputSchema"]!["additionalProperties"]!.GetValue<bool>());
         }
-        Assert.Contains("watchers_off", (string?)tools[9]!["description"]);
+        Assert.Contains("watchers_off", (string?)tools[11]!["description"]);
         Assert.Contains("pending_approval", (string?)tools[8]!["description"]);
+        // The Desk design tools: read first, then a partial design the server checks before the widget sees it.
+        Assert.Contains("Call this before", (string?)tools[9]!["description"]);
+        Assert.Contains("PARTIAL", (string?)tools[10]!["description"]);
+        Assert.Contains("3:1", (string?)tools[10]!["description"]);
+        Assert.Equal("design", (string?)tools[10]!["inputSchema"]!["required"]![0]);
         // The behavioral trigger IS the feature (review: without it, never fires).
         Assert.Contains("Call BEFORE", (string?)tools[0]!["description"]);
         Assert.Contains("never assume budget", (string?)tools[0]!["description"]);

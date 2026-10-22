@@ -106,6 +106,17 @@ public sealed class McpConfig
     public TimeSpan DeskWaitTimeout { get; init; } = TimeSpan.FromSeconds(10);
     public TimeSpan DeskPollInterval { get; init; } = TimeSpan.FromMilliseconds(250);
 
+    /// <summary>The Desk design handoff (see Core's DeskDesign): get_desk reads <c>desk-state.json</c> (the widget's
+    /// note of the Desk, the fonts, the wallpaper summary and the Start-menu apps), propose_desk writes the request and
+    /// the widget answers in the result. Null = unavailable.</summary>
+    public string? DesignStatePath { get; init; }
+    public string? DesignRequestPath { get; init; }
+    public string? DesignResultPath { get; init; }
+
+    /// <summary>How long propose_desk waits for the widget's first answer (it answers at once when it is running).</summary>
+    public TimeSpan DesignWaitTimeout { get; init; } = TimeSpan.FromSeconds(10);
+    public TimeSpan DesignPollInterval { get; init; } = TimeSpan.FromMilliseconds(250);
+
     public static McpConfig Resolve()
     {
         string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -208,6 +219,10 @@ public sealed class McpConfig
             DeskRequestPath = Path.Combine(externalDir, MessageProposal.RequestFile),
             DeskResultPath = Path.Combine(externalDir, MessageProposal.ResultFile),
             DeskStatePath = Path.Combine(externalDir, MessageProposal.StateFile),
+            // The design handoff: file names come from the linked Core type (DeskDesign); the folder is fixed.
+            DesignStatePath = Path.Combine(externalDir, DeskDesign.StateFile),
+            DesignRequestPath = Path.Combine(externalDir, DeskDesign.RequestFile),
+            DesignResultPath = Path.Combine(externalDir, DeskDesign.ResultFile),
             DeskMessagesPaths = env("SANDUHR_VAULT_DIR") is { Length: > 0 }
                 ? new[] { Path.Combine(appDataSanduhrDir, "messages.txt") }
                 : new[]

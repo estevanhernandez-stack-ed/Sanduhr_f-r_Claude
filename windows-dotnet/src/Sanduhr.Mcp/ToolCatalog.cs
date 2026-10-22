@@ -3,11 +3,11 @@ using System.Text.Json.Nodes;
 namespace Sanduhr.Mcp;
 
 /// <summary>
-/// The tools/list catalog: six read-only tools (the five usage tools and
-/// <c>get_desk_messages</c>) plus the tools that hand a request file to the widget
+/// The tools/list catalog: seven read-only tools (the five usage tools,
+/// <c>get_desk_messages</c> and <c>get_desk</c>) plus the tools that hand a request file to the widget
 /// and never act themselves: <c>publish_usage</c> (the widget owns the key and the
 /// network; this server posts nothing), <c>propose_theme</c>,
-/// <c>propose_desk_messages</c> and <c>watch_start</c> / <c>watch_update</c> /
+/// <c>propose_desk_messages</c>, <c>propose_desk</c> (3.7.0) and <c>watch_start</c> / <c>watch_update</c> /
 /// <c>watch_end</c> (3.6.0; the widget owns messages.txt and the board, checks every
 /// request again, and the user's switches gate them). The design review's
 /// must-fix #3 still holds: no strict-subset tools like get_reset_schedule; the
@@ -236,6 +236,81 @@ public static class ToolCatalog
             },
             readOnly: false, openWorld: false),
         Tool(
+            "get_desk",
+            DeskDesignGuideRead,
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject(),
+                ["additionalProperties"] = false,
+            }),
+        Tool(
+            "propose_desk",
+            DeskDesignGuidePropose,
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["design"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["description"] = "A partial Desk design: only the fields to change. See the tool description for each field.",
+                        ["properties"] = new JsonObject
+                        {
+                            ["name"] = new JsonObject { ["type"] = "string", ["maxLength"] = 40 },
+                            ["note"] = new JsonObject { ["type"] = "string", ["maxLength"] = 200 },
+                            ["layout"] = new JsonObject
+                            {
+                                ["type"] = "object",
+                                ["description"] = "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean}.",
+                            },
+                            ["font"] = new JsonObject
+                            {
+                                ["description"] = "A font family name, or {family, link} with an https link to get a font the user lacks.",
+                            },
+                            ["ink"] = new JsonObject
+                            {
+                                ["description"] = "auto, light, dark, theme, one #rrggbb color, or a list of 2 to 4 #rrggbb colors (gradient).",
+                            },
+                            ["plate"] = new JsonObject { ["type"] = "boolean" },
+                            ["shadow"] = new JsonObject { ["type"] = "boolean" },
+                            ["launcher"] = new JsonObject
+                            {
+                                ["type"] = "object",
+                                ["description"] = "{orientation: row|column, buttons: up to 8 of {kind: app|link, target, label, glow}}. An app target is an id from get_desk start_menu_apps; a link is https.",
+                            },
+                            ["messages"] = new JsonObject
+                            {
+                                ["type"] = "object",
+                                ["description"] = "{lines: [...], mode: add|replace}, the lines as propose_desk_messages takes them.",
+                            },
+                            ["theme"] = new JsonObject
+                            {
+                                ["type"] = "object",
+                                ["description"] = "A widget palette as propose_theme takes it: name and the fourteen #rrggbb colors.",
+                            },
+                        },
+                        ["additionalProperties"] = false,
+                    },
+                    ["name"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["maxLength"] = 40,
+                        ["description"] = "The design's name (overrides design.name).",
+                    },
+                    ["note"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["maxLength"] = 200,
+                        ["description"] = "One short sentence for the user on why this look (shown in the review bar; overrides design.note).",
+                    },
+                },
+                ["required"] = new JsonArray("design"),
+                ["additionalProperties"] = false,
+            },
+            readOnly: false, openWorld: false),
+        Tool(
             "watch_start",
             WatchGuideStart,
             new JsonObject
@@ -391,6 +466,47 @@ public static class ToolCatalog
         "birthdays, anniversaries or holidays use mode add with one date line each (MM-DD:), never " +
         "replace, so the user's own lines stay. Read the current list first with get_desk_messages. " +
         DeskSyntax + DeskEffects;
+
+    private const string DeskDesignGuideRead =
+        "Read the user's Desk before designing it. The Desk is what Sanduhr draws on the Windows desktop: a clock, Claude " +
+        "usage, a handwritten message, a Launcher of buttons and other pieces, each placed at one of eight anchors " +
+        "(tl tc tr ml mr bl bc br) with a size, in a font and an ink, optionally on a soft plate, beside the widget's " +
+        "color theme. Returns design (the current look as a full design: layout with every piece's anchor, size and " +
+        "hidden, font, ink, plate, shadow, launcher, theme), pieces and anchors (the allowed words), fonts (installed " +
+        "families, and the bundled handwriting fonts EsteFont Pro and EsteFont 26), wallpaper (path of the wallpaper " +
+        "image, which you can open only if the user allows Claude Code to read that file; and summary: overall " +
+        "brightness 0-1, up to five dominant colors with their share, and for each monitor the brightness 0-1 and " +
+        "busyness 0-1 (edge density) behind each anchor), designs (saved designs: id, name, pinned, applied_at), " +
+        "direct (true when the user lets Claude change the Desk without review), limits, and start_menu_apps (the apps " +
+        "a Launcher button may open, as id and name; absent until Sanduhr has read the Start menu). Call this before " +
+        "propose_desk and design from what it says. status no_data with reason missing means the Sanduhr widget is not " +
+        "running or its Claude Code integration is not installed.";
+
+    private const string DeskDesignGuidePropose =
+        "Propose a look for the user's Desk, and optionally the widget's color theme. The design is PARTIAL: send only " +
+        "the fields to change; everything absent stays as it is. Fields, all optional: name (up to 40 characters); " +
+        "note (one sentence for the user, up to 200); layout {piece: {anchor, size, hidden}}, where piece is a key from " +
+        "get_desk pieces, anchor is tl tc tr ml mr bl bc br, size is 0.6 to 1.6 and hidden removes the piece; font (a " +
+        "family from get_desk fonts.installed or the bundled EsteFont Pro or EsteFont 26, or {family, link} with an " +
+        "https link to get a font the user lacks: Sanduhr never downloads it, the review shows the link and Apply waits " +
+        "for the font, status needs_font); ink (auto, light, dark, theme, one #rrggbb, or a list of 2 to 4 #rrggbb for a " +
+        "left-to-right gradient); plate and shadow (true or false; the plate is a soft panel behind each stack of pieces); " +
+        "launcher {orientation row or column, buttons: up to 8 of {kind app or link, target, label up to 24 characters, " +
+        "glow #rrggbb}}, where an app target is an id from get_desk start_menu_apps (a button opens only what the Start " +
+        "menu lists; there are no command lines) and a link target is an https link; messages {lines, mode add or " +
+        "replace}, the lines as propose_desk_messages takes them (see its description for the syntax); theme (a widget " +
+        "palette: name and the fourteen #rrggbb colors, per docs/themes/AGENT_PROMPT.md, as propose_theme takes it). " +
+        "The server checks before anything is sent: every field's shape and range; ink against the wallpaper (each " +
+        "placed piece's ink must keep a WCAG contrast of at least 3:1 against the wallpaper brightness under its anchor " +
+        "on every monitor, or against the plate when the plate is on; auto ink picks its own and is not judged), so read " +
+        "get_desk wallpaper.summary and choose ink, plate and anchors together; the Launcher's targets; the message " +
+        "lines; the theme lint. status rejected comes with reasons, each {field, message}: fix those fields and call " +
+        "again; nothing was written. Otherwise the Sanduhr widget draws the design live on the desktop with a bar where " +
+        "the user chooses Apply or Dismiss: previewing means the user is reviewing it now (do not send the same look " +
+        "again), applied means it is in place (the user allows direct changes; their previous look is saved), " +
+        "needs_font lists the fonts (family, link) the user must install first, queued means the widget did not answer " +
+        "and will show it when it starts. Every applied look is saved and can be switched back to in Sanduhr's " +
+        "settings. This server never changes the Desk itself.";
 
     private const string WatchGuideStart =
         "Put up a watcher: a live card on the user's Desk for work you are keeping an eye on " +

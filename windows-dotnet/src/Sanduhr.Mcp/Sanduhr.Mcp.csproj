@@ -76,6 +76,23 @@
     <Compile Include="..\Sanduhr.Core\DeskMessages.cs" Link="Core\DeskMessages.cs" />
     <Compile Include="..\Sanduhr.Core\MessageEffects.cs" Link="Core\MessageEffects.cs" />
     <Compile Include="..\Sanduhr.Core\LetterMap.cs" Link="Core\LetterMap.cs" />
+    <!-- get_desk and propose_desk (3.7.0, the agent-designed Desk): the design validator and what it composes, so
+         the server refuses exactly what the widget would. Nine files, all pure (text, JSON, regex, math; no IO, no
+         network, no credentials, no process). DeskDesign + DeskDesignValidator: the contract, the rules (contrast,
+         fonts, Start-menu membership), Merge and Diff. WallpaperSummary: the summary types and their JSON, read from
+         desk-state.json. DeskArrangement: the piece keys, anchors and size range. DeskInk (InkHex, DeskInk): the ink
+         parsing and luminance. DeskPlate: the plate's color and opacity. DeskFont: the bundled family names.
+         LauncherTarget + LauncherModel: the button shape rules. The widget owns every write that matters: the server
+         queues request files and reads desk-state.json, nothing else. -->
+    <Compile Include="..\Sanduhr.Core\DeskDesign.cs" Link="Core\DeskDesign.cs" />
+    <Compile Include="..\Sanduhr.Core\DeskDesignValidator.cs" Link="Core\DeskDesignValidator.cs" />
+    <Compile Include="..\Sanduhr.Core\WallpaperSummary.cs" Link="Core\WallpaperSummary.cs" />
+    <Compile Include="..\Sanduhr.Core\DeskArrangement.cs" Link="Core\DeskArrangement.cs" />
+    <Compile Include="..\Sanduhr.Core\DeskInk.cs" Link="Core\DeskInk.cs" />
+    <Compile Include="..\Sanduhr.Core\DeskPlate.cs" Link="Core\DeskPlate.cs" />
+    <Compile Include="..\Sanduhr.Core\DeskFont.cs" Link="Core\DeskFont.cs" />
+    <Compile Include="..\Sanduhr.Core\LauncherTarget.cs" Link="Core\LauncherTarget.cs" />
+    <Compile Include="..\Sanduhr.Core\LauncherModel.cs" Link="Core\LauncherModel.cs" />
   </ItemGroup>
 
 </Project>

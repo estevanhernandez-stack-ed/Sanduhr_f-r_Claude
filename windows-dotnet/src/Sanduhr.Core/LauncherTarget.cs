@@ -20,7 +20,7 @@ public readonly record struct LauncherTargetCheck(bool Ok, string Reason)
 /// <summary>
 /// The Launcher's safety property (spec, Desk Launcher): a button opens an installed Start-menu app or an
 /// https link, and nothing else. No command lines and no arguments; the only path-like ID is a Start-menu desktop
-/// program's own <c>{GUID}\Folder\File.exe</c> listing, and it is used only while the live <c>shell:AppsFolder</c>
+/// program's own <c>{GUID}\Folder\Program.exe</c> listing, and it is used only while the live <c>shell:AppsFolder</c>
 /// enumeration contains it (membership, checked where the button is saved and again when it is opened), so a button
 /// Claude later proposes cannot run anything the person didn't install.
 /// One pure gate for settings.json parsing, the Settings controls and the launch itself.

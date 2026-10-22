@@ -115,7 +115,7 @@ public sealed record LauncherModel(LauncherOrientation Orientation, IReadOnlyLis
         var array = new JsonArray();
         foreach (var b in Buttons)
         {
-            array.Add(new JsonObject
+            array.Add((JsonNode?)new JsonObject
             {
                 ["kind"] = LauncherTarget.Word(b.Kind),
                 ["target"] = b.Target,
