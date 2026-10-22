@@ -139,7 +139,7 @@ public sealed class SettingsViewModel
         MessagePage = new DeskMessagePageViewModel(new SettingsStore(msgPaths), System.IO.Path.Combine(msgPaths.AppDataDir, "messages.txt"),
             () => !ResetGuard.Done, () => MessageChanged?.Invoke(), new Sanduhr.App.Desk.DeskFonts().PickerFamilies(),
             Sanduhr.App.Desk.DeskMessageHandoffService.Current?.Handoff);
-        NowPlayingPage = new NowPlayingPageViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.NowPlayingHub.Current);
+        NowPlayingPage = new NowPlayingPageViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.NowPlayingHub.Current, Sanduhr.App.Desk.NowPlayingLookService.Current);
         WeatherPage = new WeatherPageViewModel(new SettingsStore(new Paths()));
         // The two pages share one folder list and one set of installed pieces.
         ClaudeCodePage.FoldersChanged += Mods.ReloadFolders;

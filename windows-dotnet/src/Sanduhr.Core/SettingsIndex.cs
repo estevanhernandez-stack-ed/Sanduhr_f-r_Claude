@@ -90,6 +90,7 @@ public static class SettingsIndex
     public const string NowPlayingWidget = "np-widget";
     public const string NowPlayingApps = "np-apps";
     public const string NowPlayingBars = "np-bars";
+    public const string NowPlayingLooks = "np-looks";
     public const string WeatherPlace = "weather-place";
     public const string WeatherCredit = "weather-credit";
     // Claude Code (S6)
@@ -222,6 +223,9 @@ public static class SettingsIndex
             ["now playing", "music", "song", "track", "Spotify", "media", "play", "pause", "next", "keep showing while paused", "hide while paused", "hide when nothing plays"]),
         E("Apps", SettingsPage.NowPlaying, NowPlayingApps, ["apps", "exclude", "browser", "player"]),
         E("Bars", SettingsPage.NowPlaying, NowPlayingBars, ["visualizer", "bars", "audio", "level", "equalizer"]),
+        E("Looks", SettingsPage.NowPlaying, NowPlayingLooks,
+            ["looks", "song style", "style", "palette", "gradient", "letter style", "small caps", "bold", "italic", "mood", "saved looks",
+             "propose_now_playing_looks", "Claude styles songs", "suggested looks", "song colors"]),
 
         E(SettingsNames.WeatherLookUp, SettingsPage.Weather, WeatherPlace,
             ["weather", "city", "forecast", "temperature", "Fahrenheit", "Celsius", "Open-Meteo", "location"]),
@@ -266,6 +270,9 @@ public static class SettingsIndex
         [SettingsNames.LauncherAddApp] = DeskLauncher,
         [SettingsNames.LauncherAddLink] = DeskLauncher,
         [SettingsNames.NowPlayingInWidget] = NowPlayingWidget,
+        [SettingsNames.NowPlayingStyle] = NowPlayingLooks,
+        [SettingsNames.NowPlayingLooksDirect] = NowPlayingLooks,
+        [SettingsNames.ClearLooks] = NowPlayingLooks,
         [SettingsNames.WeatherLookUp] = WeatherPlace,
         [SettingsNames.GlowWhere] = GlowWhere,
     };
@@ -284,7 +291,7 @@ public static class SettingsIndex
         [SettingsPage.Themes] = ["theme", "colors", "look"],
         [SettingsPage.Desk] = ["desktop", "wallpaper", "clock", "Rainmeter", "layout", "font", "EsteFont", "margins", "taskbar", "telemetry", "CPU", "RAM", "disk"],
         [SettingsPage.DeskMessage] = ["messages", "messages.txt", "quote", "handwriting"],
-        [SettingsPage.NowPlaying] = ["music", "song", "media", "visualizer"],
+        [SettingsPage.NowPlaying] = ["music", "song", "media", "visualizer", "looks", "song style"],
         [SettingsPage.Weather] = ["forecast", "temperature", "city"],
         [SettingsPage.About] = ["help", "version", "trademark", "privacy"],
     };

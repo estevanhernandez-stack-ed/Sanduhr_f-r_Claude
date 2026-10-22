@@ -180,6 +180,12 @@ public static class SettingsNames
     public const string JustTheDeskButton = JustTheDesk.ButtonTitle;
     /// <summary>Now playing: the widget's line (settings.json "now_playing.widget", off by default).</summary>
     public const string NowPlayingInWidget = "Show what's playing in the widget";
+    /// <summary>Now playing, Looks: the Desk draws the song in its look (settings.json "now_playing.style", off by default).</summary>
+    public const string NowPlayingStyle = "Style what's playing";
+    /// <summary>Now playing, Looks: a look Claude proposes is saved without the card (settings.json "now_playing.looks_direct", off by default).</summary>
+    public const string NowPlayingLooksDirect = "Let Claude style songs directly";
+    /// <summary>Now playing, Looks: forgets every saved look, after a question.</summary>
+    public const string ClearLooks = "Clear Looks…";
     /// <summary>Weather: looks a typed city up with Open-Meteo.</summary>
     public const string WeatherLookUp = "Look up";
     /// <summary>Claude Code: where the glow lands (settings.json "claude_code_glow.target").</summary>
@@ -220,6 +226,9 @@ public static class SettingsNames
         (LauncherAddLink, SettingsPage.Desk),
         (SignInReminders, SettingsPage.Alerts),
         (NowPlayingInWidget, SettingsPage.NowPlaying),
+        (NowPlayingStyle, SettingsPage.NowPlaying),
+        (NowPlayingLooksDirect, SettingsPage.NowPlaying),
+        (ClearLooks, SettingsPage.NowPlaying),
         (WeatherLookUp, SettingsPage.Weather),
         (GlowWhere, SettingsPage.ClaudeCode),
     ];

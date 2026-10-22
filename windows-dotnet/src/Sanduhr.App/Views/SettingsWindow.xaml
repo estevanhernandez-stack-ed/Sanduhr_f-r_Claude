@@ -2750,6 +2750,8 @@
                                            Text="The bars follow the loudness of the app that is playing, read from that app's Windows volume mixer level. Windows system sounds are ignored. Sanduhr never records or captures audio, and the bars stop while nothing plays." />
                             </StackPanel>
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+                            <views:NowPlayingLooksPanel views:SettingsAnchor.Id="np-looks" />
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
                             <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"
                                        TextWrapping="Wrap" FontSize="11"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />

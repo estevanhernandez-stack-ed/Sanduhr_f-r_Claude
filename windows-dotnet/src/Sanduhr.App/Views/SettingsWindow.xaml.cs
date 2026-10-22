@@ -74,6 +74,7 @@ internal partial class SettingsWindow : Window
         ViewModel.ClaudeCodePage.AttachOwner(this);
         ViewModel.Mods.AttachOwner(this);
         ViewModel.Desk.Launcher.AttachOwner(this);
+        ViewModel.NowPlayingPage.AttachOwner(this);
 
         // Bridge the custom-render controls to their VMs.
         ViewModel.History.Changed += RenderHistory;

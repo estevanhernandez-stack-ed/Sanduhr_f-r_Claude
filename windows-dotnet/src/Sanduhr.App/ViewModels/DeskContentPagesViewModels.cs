@@ -1,10 +1,13 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Net.Http;
+using System.Windows;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sanduhr.App.Desk;
 using Sanduhr.App.Services;
+using Sanduhr.App.Views;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
@@ -34,25 +37,76 @@ public sealed partial class NowPlayingAppRow : ObservableObject
 }
 
 /// <summary>
+/// One song of Claude's suggestion, drawn in its look on black (Settings, Now playing, Looks): the title and artist in the look's gradient and
+/// letter style, and its mood. A screen reader reads "Title by Artist, small caps, mood neon", with the plain words.
+/// </summary>
+public sealed class SongLookRow
+{
+    internal SongLookRow(SongLook song)
+    {
+        Title = song.Title;
+        Artist = song.Artist;
+        Style = song.Look.Style;
+        Mood = song.Look.Mood ?? "";
+        string line = song.Artist.Length == 0 ? song.Title : $"{song.Title} · {song.Artist}";
+        Display = LookStyles.Text(line, song.Look.Style);
+        Foreground = DeskView.InkBrush([.. song.Look.Ink.Select(h => InkHex.Normalize(h) ?? InkHex.Fallback)]);
+        FontWeight = LookStyles.IsBold(song.Look.Style) ? FontWeights.Bold : FontWeights.Normal;
+        FontStyle = LookStyles.IsItalic(song.Look.Style) ? FontStyles.Italic : FontStyles.Normal;
+        string by = song.Artist.Length == 0 ? song.Title : $"{song.Title} by {song.Artist}";
+        string style = song.Look.Style == LookStyle.Plain ? "" : ", " + LookStyles.Title(song.Look.Style).ToLowerInvariant();
+        AccessibleName = by + style + (Mood.Length > 0 ? ", mood " + Mood : "");
+    }
+
+    public string Title { get; }
+    public string Artist { get; }
+    public LookStyle Style { get; }
+    public string Mood { get; }
+    /// <summary>The words as drawn (small caps as the phonetic letters).</summary>
+    public string Display { get; }
+    public Brush Foreground { get; }
+    public FontWeight FontWeight { get; }
+    public FontStyle FontStyle { get; }
+    public string AccessibleName { get; }
+    public bool HasMood => Mood.Length > 0;
+}
+
+/// <summary>
 /// Settings, Now playing (spec 6.3, 6.6): the widget line, keep showing while paused, the apps seen this
 /// session with a switch each (an excluded app stays listed so it can come back), the bars beside the
-/// Desk piece, and a status line that never shows the title.
+/// Desk piece, and a status line that never shows the title. Looks (spec, a look per song): "Style what's playing",
+/// "Let Claude style songs directly", how many looks are saved, Clear Looks… (after a question), and the card for Claude's
+/// suggestion with Save and Dismiss, each song drawn in its look.
 /// </summary>
 public sealed partial class NowPlayingPageViewModel : ObservableObject
 {
     private readonly SettingsStore _store;
     private readonly NowPlayingHub? _hub;
+    private readonly NowPlayingLookService? _looks;
     private NowPlayingSettings _saved;
     private bool _loading;
+    private Window? _owner;
 
-    internal NowPlayingPageViewModel(SettingsStore store, NowPlayingHub? hub)
+    internal NowPlayingPageViewModel(SettingsStore store, NowPlayingHub? hub, NowPlayingLookService? looks = null)
     {
         _store = store;
         _hub = hub;
+        _looks = looks;
         _saved = store.LoadNowPlaying();
         Load();
         if (_hub is not null) _hub.Changed += Refresh;
+        if (_looks is not null)
+        {
+            _looks.BookChanged += RefreshLooks;
+            _looks.PendingChanged += RefreshLooks;
+        }
     }
+
+    /// <summary>The Settings window, for the question Clear Looks… asks.</summary>
+    public void AttachOwner(Window owner) => _owner = owner;
+
+    /// <summary>Answers "Clear every saved look?" in place of the dialog (tests set it).</summary>
+    internal Func<bool>? ConfirmClear { get; set; }
 
     /// <summary>Called after every saved change (the widget line and the Desk follow).</summary>
     public Action? Changed { get; set; }
@@ -60,6 +114,8 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
     [ObservableProperty] private bool _widget;
     [ObservableProperty] private bool _keepPaused;
     [ObservableProperty] private bool _bars;
+    [ObservableProperty] private bool _style;
+    [ObservableProperty] private bool _looksDirect;
     [ObservableProperty] private string _status = "";
 
     public ObservableCollection<NowPlayingAppRow> Apps { get; } = [];
@@ -72,8 +128,11 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
         Widget = _saved.Widget;
         KeepPaused = _saved.KeepPaused;
         Bars = _saved.Bars;
+        Style = _saved.Style;
+        LooksDirect = _saved.LooksDirect;
         _loading = false;
         Refresh();
+        RefreshLooks();
     }
 
     /// <summary>The page is shown: re-read the apps seen so far.</summary>
@@ -101,6 +160,55 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
     partial void OnWidgetChanged(bool value) { if (!_loading) Save(_saved with { Widget = value }); }
     partial void OnKeepPausedChanged(bool value) { if (!_loading) Save(_saved with { KeepPaused = value }); }
     partial void OnBarsChanged(bool value) { if (!_loading) Save(_saved with { Bars = value }); }
+    partial void OnStyleChanged(bool value) { if (!_loading) Save(_saved with { Style = value }); }
+    partial void OnLooksDirectChanged(bool value) { if (!_loading) Save(_saved with { LooksDirect = value }); }
+
+    // ---- Looks (spec, a look per song) ----
+
+    /// <summary>"3 saved looks", "1 saved look" or "No saved looks".</summary>
+    [ObservableProperty] private string _savedLooksText = "No saved looks";
+
+    [ObservableProperty] private bool _canClearLooks;
+    [ObservableProperty] private bool _hasSuggestion;
+    [ObservableProperty] private string _suggestionTitle = "";
+    [ObservableProperty] private string _suggestionNote = "";
+
+    /// <summary>The songs of Claude's waiting suggestion, each drawn in its look.</summary>
+    public ObservableCollection<SongLookRow> SuggestionSongs { get; } = [];
+
+    /// <summary>Reads the saved looks and the waiting suggestion again (they change from the files, not from this page).</summary>
+    public void RefreshLooks()
+    {
+        int n = _looks?.Handoff.Book.Count ?? 0;
+        SavedLooksText = n == 0 ? "No saved looks" : n == 1 ? "1 saved look" : $"{n} saved looks";
+        CanClearLooks = n > 0;
+        var pending = _looks?.Handoff.Pending;
+        HasSuggestion = pending is not null;
+        SuggestionTitle = pending?.Title ?? "";
+        SuggestionNote = pending?.Note ?? "";
+        SuggestionSongs.Clear();
+        if (pending is not null)
+            foreach (var song in pending.Looks) SuggestionSongs.Add(new SongLookRow(song));
+    }
+
+    /// <summary>Save: Claude's suggested looks go into the saved looks, and the Desk changes at once.</summary>
+    [RelayCommand]
+    private void SaveSuggestion() => _looks?.Handoff.Approve();
+
+    /// <summary>Dismiss: the suggestion is dropped and Claude hears so.</summary>
+    [RelayCommand]
+    private void DismissSuggestion() => _looks?.Handoff.Dismiss();
+
+    /// <summary>Clear Looks…: after "Clear every saved look?", the saved looks go and every song wears its seeded look again.</summary>
+    [RelayCommand]
+    private void ClearLooks()
+    {
+        if (_looks is null || !CanClearLooks) return;
+        bool yes = ConfirmClear?.Invoke() ?? ThemedDialog.Show(_owner, "Clear every saved look?",
+            "Every song goes back to the look it is given by its name. Looks Claude suggests again can be saved again.",
+            MessageBoxButton.YesNo, ThemedDialogKind.Warning, primaryLabel: "Clear Looks", secondaryLabel: "Cancel") == MessageBoxResult.Yes;
+        if (yes) _looks.Handoff.Clear();
+    }
 
     private void Save(NowPlayingSettings next)
     {
