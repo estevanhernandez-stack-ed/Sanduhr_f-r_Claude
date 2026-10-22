@@ -136,6 +136,13 @@ public static class ModInventory
             retention);
     }
 
+    /// <summary>How many plugins the folder's settings.json switches on. Settings only; 0 when it is missing or unreadable.</summary>
+    public static int EnabledPluginCount(string folder)
+    {
+        var (_, settings) = ReadSettings(folder);
+        return EnabledPlugins(settings).Count(p => p.Value);
+    }
+
     private static (SettingsState, JsonElement?) ReadSettings(string folder)
     {
         var path = System.IO.Path.Combine(folder, "settings.json");
@@ -294,7 +301,7 @@ public static class ModInventory
                 continue;
             }
             var found = ItemAt(record.Path, ModOriginKind.Installed, market, null, enabled, fallback);
-            found = found with { Key = key, Version = found.Version ?? record.Version };
+            found = found with { Key = key, Version = found.Version ?? CleanVersion(record.Version) };
             if (found.State != ModState.Missing) found = found with { State = on ? ModState.On : ModState.Off };
             Add(found);
         }
@@ -375,9 +382,20 @@ public static class ModInventory
         var state = key is not null && enabled.TryGetValue(key, out var on) && !on ? ModState.Off : ModState.On;
         return new ModItem(
             name,
-            Member(manifest, "version") is { ValueKind: JsonValueKind.String } v ? v.GetString() : null,
+            CleanVersion(Member(manifest, "version") is { ValueKind: JsonValueKind.String } v ? v.GetString() : null),
             Member(manifest, "description") is { ValueKind: JsonValueKind.String } d ? d.GetString() ?? "" : "",
             path, origin, marketplace, key, isMod, state, Touches(path, isMod, manifest), sanduhr);
+    }
+
+    /// <summary>
+    /// A version worth showing, or null. Claude Code records <c>"unknown"</c> for a plugin whose manifest names no version;
+    /// showing that as "vunknown" told nobody anything.
+    /// </summary>
+    public static string? CleanVersion(string? version)
+    {
+        var v = version?.Trim();
+        if (string.IsNullOrEmpty(v)) return null;
+        return v.Trim('(', ')').Equals("unknown", StringComparison.OrdinalIgnoreCase) ? null : v;
     }
 
     private static JsonElement? Manifest(string dir)

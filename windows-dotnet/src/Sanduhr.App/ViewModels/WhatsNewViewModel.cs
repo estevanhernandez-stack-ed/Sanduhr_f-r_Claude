@@ -62,6 +62,9 @@ public sealed class WhatsNewCardItem
     public IReadOnlyList<int> SparkValues => SteadyValues;
 
     public string AutomationName => $"{Card.Title}. {Card.Body}";
+
+    /// <summary>The card's list item reads by its title ("Watchers on the Desk"), never as the type behind it.</summary>
+    public override string ToString() => Card.Title;
     public string ShowMeName => $"{ShowMeTitle}: {Card.Title}";
 
     public string ShowMeToolTip => Card.Destination == SettingsPage.Widget

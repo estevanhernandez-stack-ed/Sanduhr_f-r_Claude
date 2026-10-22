@@ -73,6 +73,8 @@ internal partial class SettingsWindow : Window
         ViewModel.Publish.Attach();
         ViewModel.ClaudeCodePage.AttachOwner(this);
         ViewModel.Mods.AttachOwner(this);
+        ViewModel.Desk.Launcher.AttachOwner(this);
+        ViewModel.NowPlayingPage.AttachOwner(this);
 
         // Bridge the custom-render controls to their VMs.
         ViewModel.History.Changed += RenderHistory;
@@ -86,6 +88,7 @@ internal partial class SettingsWindow : Window
         Closed += (_, _) =>
         {
             ViewModel.Desk.Flush();
+            ViewModel.Desk.Launcher.Detach();
             ViewModel.MessagePage.Dispose();
             ViewModel.Shortcuts.Detach();
             ViewModel.General.Detach();

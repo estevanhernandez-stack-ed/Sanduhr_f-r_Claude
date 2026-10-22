@@ -10,7 +10,7 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <!-- Rides the app's release train — bump with the widget so ping's
          server_version means something (the writer_version lesson from #53). -->
-    <Version>3.6.0</Version>
+    <Version>3.7.1</Version>
   </PropertyGroup>
 
   <!-- How the server ships. Any publish with a runtime identifier (the App's
@@ -76,6 +76,29 @@
     <Compile Include="..\Sanduhr.Core\DeskMessages.cs" Link="Core\DeskMessages.cs" />
     <Compile Include="..\Sanduhr.Core\MessageEffects.cs" Link="Core\MessageEffects.cs" />
     <Compile Include="..\Sanduhr.Core\LetterMap.cs" Link="Core\LetterMap.cs" />
+    <!-- get_desk and propose_desk (3.7.0, the agent-designed Desk): the design validator and what it composes, so
+         the server refuses exactly what the widget would. Nine files, all pure (text, JSON, regex, math; no IO, no
+         network, no credentials, no process). DeskDesign + DeskDesignValidator: the contract, the rules (contrast,
+         fonts, Start-menu membership), Merge and Diff. WallpaperSummary: the summary types and their JSON, read from
+         desk-state.json. DeskArrangement: the piece keys, anchors and size range. DeskInk (InkHex, DeskInk): the ink
+         parsing and luminance. DeskPlate: the plate's color and opacity. DeskFont: the bundled family names.
+         LauncherTarget + LauncherModel: the button shape rules. The widget owns every write that matters: the server
+         queues request files and reads desk-state.json, nothing else. -->
+    <Compile Include="..\Sanduhr.Core\DeskDesign.cs" Link="Core\DeskDesign.cs" />
+    <Compile Include="..\Sanduhr.Core\DeskDesignValidator.cs" Link="Core\DeskDesignValidator.cs" />
+    <Compile Include="..\Sanduhr.Core\WallpaperSummary.cs" Link="Core\WallpaperSummary.cs" />
+    <Compile Include="..\Sanduhr.Core\DeskArrangement.cs" Link="Core\DeskArrangement.cs" />
+    <Compile Include="..\Sanduhr.Core\DeskInk.cs" Link="Core\DeskInk.cs" />
+    <Compile Include="..\Sanduhr.Core\DeskPlate.cs" Link="Core\DeskPlate.cs" />
+    <Compile Include="..\Sanduhr.Core\DeskFont.cs" Link="Core\DeskFont.cs" />
+    <Compile Include="..\Sanduhr.Core\LauncherTarget.cs" Link="Core\LauncherTarget.cs" />
+    <Compile Include="..\Sanduhr.Core\LauncherModel.cs" Link="Core\LauncherModel.cs" />
+    <!-- propose_now_playing_looks (3.7.0, a look per song): one more file, pure like the rest (text, JSON, regex, math; no IO, no
+         network, no credentials, no process). NowPlayingLook.cs holds the look model, the song key, the checks (shape and the
+         contrast rule against the wallpaper in desk-state.json), the request decode and the result shape, so the server refuses
+         exactly what the widget would. The widget owns every write: the saved looks, the handoff files and the file for the mod
+         are NowPlayingLookStore and NowPlayingLookHandoff, which stay out of the server. -->
+    <Compile Include="..\Sanduhr.Core\NowPlayingLook.cs" Link="Core\NowPlayingLook.cs" />
   </ItemGroup>
 
 </Project>

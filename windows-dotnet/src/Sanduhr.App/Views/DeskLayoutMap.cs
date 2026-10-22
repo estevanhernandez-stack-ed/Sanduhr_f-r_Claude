@@ -156,7 +156,12 @@ internal sealed class DeskLayoutMap : Canvas
         var c = DeskGeometry.Content(screen.Width, screen.Height, margins, inset);
         var content = new DeskRect(c.X * scale, c.Y * scale, c.Width * scale, c.Height * scale);
 
-        var stacks = new DeskArrangement(_vm?.ArrangingLayout ?? _vm?.Layout ?? settings.Layout).Stacks(Sanduhr.App.Desk.DeskView.Drawn);
+        // The map is the main monitor: the pieces on every monitor and on the main one (a piece on a monitor that is gone falls back to it too).
+        var monitors = _vm?.Monitors ?? [];
+        var main = new DeskScreenRef(monitors.FirstOrDefault(m => m.Primary)?.Id, true);
+        var stacks = new DeskArrangement(_vm?.ArrangingLayout ?? _vm?.Layout ?? settings.Layout)
+            .ForScreen(main, [.. monitors.Select(m => m.Id)])
+            .Stacks(Sanduhr.App.Desk.DeskView.Drawn);
         foreach (var anchor in DeskAnchors.All)
         {
             if (!stacks.TryGetValue(anchor, out var pieces) || pieces.Count == 0) continue;

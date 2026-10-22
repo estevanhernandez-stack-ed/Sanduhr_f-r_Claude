@@ -330,6 +330,9 @@ public sealed partial class MessageRowViewModel : ObservableObject
     /// <summary>The line text for the screen reader.</summary>
     public string Summary => IsStyled ? Line.CleanText : RawText;
 
+    /// <summary>What a screen reader reads for the row: the line itself, never the type name.</summary>
+    public override string ToString() => string.IsNullOrWhiteSpace(Summary) ? "Empty message line" : Summary;
+
     internal void RefreshDerived()
     {
         OnPropertyChanged(nameof(Note));

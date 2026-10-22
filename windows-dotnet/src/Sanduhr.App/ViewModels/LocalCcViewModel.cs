@@ -11,7 +11,11 @@ using Sanduhr.Core;
 namespace Sanduhr.App.ViewModels;
 
 /// <summary>One row in the breakdown tables — display name + compact tokens.</summary>
-public sealed record BreakdownRow(string Name, string Tokens);
+public sealed record BreakdownRow(string Name, string Tokens)
+{
+    /// <summary>What a screen reader reads for the row: "my-project, 1.2M".</summary>
+    public override string ToString() => $"{Name}, {Tokens}";
+}
 
 /// <summary>A per-root vault consent toggle in the stewardship strip.</summary>
 public sealed partial class VaultRootToggleViewModel : ObservableObject
@@ -36,6 +40,8 @@ public sealed partial class VaultRootToggleViewModel : ObservableObject
         if (!_loading)
             _owner.OnRootToggled(Name, value);
     }
+
+    public override string ToString() => Name;
 }
 
 /// <summary>

@@ -29,6 +29,10 @@ public sealed partial class LedgerRowViewModel : ObservableObject
     public DateTimeOffset LastTs => Info.LastTs;
     public string ProjectSort => ProjectText;
 
+    /// <summary>What a screen reader reads for the row: project, last active, models, tokens.</summary>
+    public override string ToString() =>
+        string.Join(", ", new[] { ProjectText, LastActiveText, ModelBadge, ScopedTokensText }.Where(p => !string.IsNullOrWhiteSpace(p)));
+
     /// <summary>Full-path tooltip — non-null ONLY under store_full_paths
     /// (spec: Ledger). A null ToolTip renders nothing in WPF. Group rows carry
     /// no single cwd (Info.Cwd is synthesized null), so this is naturally

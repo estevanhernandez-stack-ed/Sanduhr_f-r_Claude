@@ -7,15 +7,17 @@
   single-file mcp\sanduhr-mcp.exe. Trimming removes code the linker cannot see a use
   for, so the only proof the shipped exe works is running it: this script feeds it the
   JSON-RPC lines Claude Code would (initialize, tools/list, ping, get_usage,
-  get_local_burn_by_project, get_model_usage, get_usage_history, get_desk_messages, and one
-  deliberately bad request for each tool that hands the widget a request file: propose_theme,
-  propose_desk_messages, watch_start, watch_update and watch_end, all of which must be rejected
-  without touching the widget) over stdin, with no environment overrides, and fails on
+  get_local_burn_by_project, get_model_usage, get_usage_history, get_desk_messages, get_desk, and
+  one deliberately bad request for each tool that hands the widget a request file: propose_theme,
+  propose_desk_messages, propose_desk, propose_now_playing_looks, watch_start, watch_update and watch_end, all of which must be
+  rejected without touching the widget) over stdin, with no environment overrides, and fails on
   a crash, a missing tool, or a malformed reply. It reads this machine's real
   %USERPROFILE%\.sanduhr paths (snapshot, handoffs, the mcp-settings.json projection and
   watchers.json; the vault, history and messages.txt stay private in AppData) and writes nothing:
-  the good paths of the watch and Desk message tools queue a request file for the live widget, so
-  they are covered by the unit tests against a temp profile and are not run here.
+  the good paths of the watch, Desk message and Desk design tools queue a request file for the live
+  widget, so they are covered by the unit tests against a temp profile and are not run here.
+  get_desk answers from the widget's desk-state.json: ok when the widget has written it, otherwise
+  no_data / missing with the instruction to start the widget (both are accepted; neither is a crash).
 
 .PARAMETER Exe
   Path to the published exe. Defaults to windows-dotnet\dist\publish\mcp\sanduhr-mcp.exe
@@ -52,6 +54,13 @@ $requests = @(
     '{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"watch_start","arguments":{"title":"smoke","bogus":1}}}'
     '{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"watch_update","arguments":{"id":"w000000000000","bogus":1}}}'
     '{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"watch_end","arguments":{"id":"w000000000000","result":"passed","bogus":1}}}'
+    '{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"get_desk","arguments":{}}}'
+    # A launcher button that would run a command line, an ink that is not a color, and a font that is a path:
+    # refused by the widget's own design checks before any file is written.
+    '{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"propose_desk","arguments":{"design":{"ink":"not-a-color","font":"C:\\Windows\\Fonts\\x.ttf","launcher":{"buttons":[{"kind":"app","target":"cmd.exe /c calc"}]}}}}}'
+    # One look with an ink that is not a color and a style the Desk cannot draw, next to a good one: refused by the widget's own
+    # checks, numbered by look, before any file is written.
+    '{"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"propose_now_playing_looks","arguments":{"looks":[{"title":"Smoke","artist":"Test","ink":["#ff2a6d","#05d9e8"]},{"title":"Smoke 2","ink":["not-a-color"],"style":"sans"}]}}}'
 )
 
 # What is in the real profile's request slots now, so the end can prove nothing new landed there.
@@ -59,7 +68,7 @@ function Get-RequestSlots {
     $dir = Join-Path $env:USERPROFILE '.sanduhr'
     if (-not (Test-Path $dir)) { return @() }
     @(Get-ChildItem -Path $dir -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -like 'watch-request-*' -or $_.Name -in @('desk-messages-request.json', 'theme-request.json', 'publish-request.json') } |
+        Where-Object { $_.Name -like 'watch-request-*' -or $_.Name -in @('desk-messages-request.json', 'desk-design-request.json', 'now-playing-looks-request.json', 'theme-request.json', 'publish-request.json') } |
         ForEach-Object { '{0}|{1}|{2}' -f $_.Name, $_.Length, $_.LastWriteTimeUtc.Ticks } | Sort-Object)
 }
 $slotsBefore = Get-RequestSlots
@@ -93,7 +102,7 @@ foreach ($line in ($stdout -split "`n")) {
     $msg = $line | ConvertFrom-Json
     if ($null -ne $msg.id) { $replies[[int]$msg.id] = $msg }
 }
-foreach ($id in 1..13) {
+foreach ($id in 1..16) {
     if (-not $replies.ContainsKey($id)) { throw "No reply for request id $id." }
     if ($replies[$id].PSObject.Properties['error']) { throw "Request $id returned an error: $($replies[$id].error | ConvertTo-Json -Compress)" }
 }
@@ -103,7 +112,7 @@ Write-Host "[smoke-mcp] initialize: $($server.name) $($server.version)"
 
 $tools = @($replies[2].result.tools | ForEach-Object name)
 $expected = @('get_usage', 'get_local_burn_by_project', 'get_model_usage', 'get_usage_history', 'ping', 'publish_usage', 'propose_theme',
-    'get_desk_messages', 'propose_desk_messages', 'watch_start', 'watch_update', 'watch_end')
+    'get_desk_messages', 'propose_desk_messages', 'get_desk', 'propose_desk', 'watch_start', 'watch_update', 'watch_end', 'propose_now_playing_looks')
 $missing = @($expected | Where-Object { $tools -notcontains $_ })
 if ($missing.Count) { throw "tools/list is missing: $($missing -join ', ') (got: $($tools -join ', '))" }
 Write-Host "[smoke-mcp] tools/list: $($tools -join ', ')"
@@ -148,6 +157,34 @@ foreach ($case in @(@(11, 'watch_start'), @(12, 'watch_update'), @(13, 'watch_en
     Write-Host "[smoke-mcp] $($case[1]) (unknown argument): status=$($r.status) reason=$($r.reason)"
     if ($r.status -ne 'rejected' -or $r.reason -ne 'invalid_params') { throw "$($case[1]) did not reject the unknown argument with invalid_params." }
 }
+
+# get_desk reads the widget's desk-state.json: the Desk when the widget has written it, otherwise a clear
+# "start the widget" answer. Either way it is a typed result, never an error.
+$deskState = $replies[14].result.content[0].text | ConvertFrom-Json
+Write-Host "[smoke-mcp] get_desk: status=$($deskState.status) reason=$($deskState.reason) pieces=$(@($deskState.pieces).Count) anchors=$(@($deskState.anchors).Count)"
+if ($deskState.status -eq 'ok') {
+    if (@($deskState.pieces).Count -lt 1 -or @($deskState.anchors).Count -ne 8 -or -not $deskState.design) { throw 'get_desk said ok but the state has no design, pieces or eight anchors.' }
+} elseif ($deskState.status -eq 'no_data' -and $deskState.reason -eq 'missing') {
+    if ($deskState.remedy -notmatch 'Start the Sanduhr widget') { throw 'get_desk with no desk-state.json did not tell the caller to start the widget.' }
+} else { throw "get_desk returned an unexpected answer: $($deskState | ConvertTo-Json -Compress)" }
+
+# One bad design: refused here with a reason per field, and no request file written.
+$design = $replies[15].result.content[0].text | ConvertFrom-Json
+$designFields = @($design.reasons | ForEach-Object field)
+Write-Host "[smoke-mcp] propose_desk (bad ink, font path, command-line launcher): status=$($design.status) fields=$($designFields -join ',')"
+if ($design.status -ne 'rejected') { throw 'propose_desk did not reject the bad design.' }
+foreach ($f in @('ink', 'font', 'launcher.buttons[0].target')) { if ($designFields -notcontains $f) { throw "propose_desk did not name $f among its reasons." } }
+if ($design.request_id) { throw 'propose_desk queued a request for a design it rejected.' }
+
+# One bad look: refused here, numbered, with a reason per problem, and no request file written.
+$looks = $replies[16].result.content[0].text | ConvertFrom-Json
+$lookReasons = @($looks.reasons)
+Write-Host "[smoke-mcp] propose_now_playing_looks (bad ink, style sans): status=$($looks.status) reasons=$($lookReasons.Count)"
+if ($looks.status -ne 'rejected' -or $lookReasons.Count -lt 2) { throw 'propose_now_playing_looks did not reject the bad look with a reason per problem.' }
+if (($lookReasons -join ' ') -notmatch 'look 2 ink' -or ($lookReasons -join ' ') -notmatch 'look 2 style') { throw 'propose_now_playing_looks did not number the bad look (look 2 ink, look 2 style).' }
+if (($lookReasons -join ' ') -match 'look 1 ') { throw 'propose_now_playing_looks blamed the good look.' }
+if ($looks.request_id) { throw 'propose_now_playing_looks queued a request for a look it rejected.' }
+
 $slotsAfter = Get-RequestSlots
 if (($slotsBefore -join "`n") -ne ($slotsAfter -join "`n")) { throw 'A rejected request changed the request files in the real profile.' }
 Write-Host "[smoke-mcp] request files in the real profile unchanged ($(@($slotsAfter).Count) present before and after)"

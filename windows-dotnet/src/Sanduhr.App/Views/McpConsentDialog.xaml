@@ -79,10 +79,13 @@
                 <TextBlock Text="Let Claude check your usage caps?" FontSize="14" FontWeight="SemiBold"
                            Foreground="{DynamicResource Sanduhr.Brush.Text}" />
             </StackPanel>
-            <TextBlock TextWrapping="Wrap" FontSize="12" Margin="0,0,0,10"
+            <TextBlock x:Name="IntroText" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,10"
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                        Text="Installs a small read-only helper Claude Code can ask for your live headroom before spawning agents or picking a bigger model. Pick which Claude Code home gets it — if one belongs to your employer, choose the other." />
             <StackPanel x:Name="HomesPanel" Margin="0,0,0,10" />
+            <TextBlock x:Name="ScopeText" TextWrapping="Wrap" FontSize="11.5" Margin="0,0,0,10"
+                       Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                       AutomationProperties.Name="What this install leaves alone" />
             <TextBlock TextWrapping="Wrap" FontSize="12" Margin="0,2,0,6"
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                        Text="Optionally, also let it attribute local token burn to projects. Answers become part of your Claude conversations, so each Claude Code home needs its own checkbox — none are on by default:" />

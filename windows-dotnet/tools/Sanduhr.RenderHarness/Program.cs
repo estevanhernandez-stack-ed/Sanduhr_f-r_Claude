@@ -21,7 +21,7 @@ using Sanduhr.Core;
 //
 // Options:
 //   --out <dir>          where PNGs and log.txt go (default ./harness-out)
-//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | desk | arrange | all; repeatable (default all)
+//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | desk | arrange | launcher | review | all; repeatable (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)
 //   --light              write a LIGHT user theme into the dev profile's themes folder and apply
 //                        it, to check dialogs for legibility on a light surface
@@ -37,7 +37,7 @@ using Sanduhr.Core;
 // Not everything is a sample: Claude Code homes are discovered from the real user profile, so the
 // Claude Usage and Publish usage pages can show real folder names, paths (with the Windows user
 // name) and project names. Check those PNGs before sharing them.
-public static class Program
+public static partial class Program
 {
     const string LightThemeKey = "harness-light";
 
@@ -99,7 +99,7 @@ public static class Program
                     return 2;
             }
         }
-        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange" };
+        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange", "launcher", "review" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
         var bad = scenarios.Where(s => !known.Contains(s)).ToList();
@@ -351,6 +351,10 @@ public static class Program
                 await RenderArrange();
             if (scenarios.Contains("settings"))
                 await RenderSettings(vm, asm);
+            if (scenarios.Contains("launcher"))
+                await RenderLauncher(vm, asm, light);
+            if (scenarios.Contains("review"))
+                await RenderReview(vm, asm);
         }
         finally
         {

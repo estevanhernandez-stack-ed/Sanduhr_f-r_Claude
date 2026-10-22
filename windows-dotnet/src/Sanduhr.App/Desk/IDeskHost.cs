@@ -5,11 +5,15 @@ namespace Sanduhr.App.Desk;
 
 /// <summary>
 /// One monitor as the Desk lays out on it: its device name, bounds and work area in physical pixels,
-/// its DPI scale (1.0 at 96 dpi), whether it is the primary one, and the room its taskbar takes on
-/// each side, in DIPs (<see cref="TaskbarClearance.Insets"/>).
+/// its DPI scale (1.0 at 96 dpi), whether it is the primary one, the room its taskbar takes on
+/// each side, in DIPs (<see cref="TaskbarClearance.Insets"/>), and its device path (<paramref name="Id"/>, null when
+/// Windows would not say), the identity a piece placed on one monitor is kept by.
 /// </summary>
-internal sealed record DeskScreen(string Device, PxRect Bounds, PxRect Work, double Scale, bool Primary, DeskInsets Taskbar)
+internal sealed record DeskScreen(string Device, PxRect Bounds, PxRect Work, double Scale, bool Primary, DeskInsets Taskbar, string? Id = null)
 {
+    /// <summary>This screen as monitor placement sees it.</summary>
+    public DeskScreenRef Ref => new(Id, Primary);
+
     /// <summary>The screen's size in DIPs, what a Desk view lays out in.</summary>
     public Size SizeDips => new(Bounds.Width / Scale, Bounds.Height / Scale);
 }
@@ -66,4 +70,13 @@ internal interface IDeskHost : IDisposable
 
     /// <summary>The <see cref="Coverage"/> flags changed. Nothing is laid out again on this event.</summary>
     event Action? CoverageChanged;
+
+    /// <summary>OLED care's drift (spec 3.7.0): each island's window sits at this point of <see cref="OledDrift"/>'s orbit,
+    /// moved as a whole (its content is not touched) and kept inside its monitor's work area and clear of the taskbar. Null
+    /// puts every window at its true anchor. Kept for windows made later.</summary>
+    void SetDrift(int? step);
+
+    /// <summary>OLED care's idle dim: the islands ease to <paramref name="opacity"/> (1 is full) over <paramref name="ease"/>
+    /// (zero snaps). Kept for windows made later.</summary>
+    void SetDim(double opacity, TimeSpan ease);
 }

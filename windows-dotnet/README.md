@@ -201,6 +201,14 @@ The Claude Code side (`docs/spec.md` Stage 4, `../docs/mods-and-config-spec.md`)
   the Desk messages (`get_desk_messages`) and hands the widget suggested messages
   (`propose_desk_messages`) and watcher cards (`watch_start`, `watch_update`, `watch_end`), each a
   request file the widget checks again; the link list grew by six pure Core files (spec 6.9).
+  The agent-designed Desk (3.7.1) adds `get_desk` (reads the widget's `desk-state.json`:
+  the current design, fonts, the wallpaper's local summary, the Start-menu apps) and `propose_desk`
+  (`DeskDesign.Validate` first, then `desk-design-request.json` / `desk-design-result.json`); the link
+  list grew by nine pure Core files (`docs/superpowers/specs/2026-10-21-desk-design-design.md`).
+  A look per song (3.7.1) adds `propose_now_playing_looks` (`NowPlayingLookCheck` first, contrast against the wallpaper
+  included, then `now-playing-looks-request.json` / `now-playing-looks-result.json`); the link list grew by one pure Core
+  file, `NowPlayingLook.cs`. The widget keeps the saved looks (`now-playing-looks.json`, private) and writes
+  `~\.sanduhr\now-playing-look.json` for the Claude Code now-playing mod (`docs/superpowers/specs/2026-10-21-now-playing-looks-design.md`).
 
 `statusline_enabled` now means "the statusline or the meters mod is installed in some folder", so
 `snapshot.json` is written while either is, or while the MCP server is installed (`mcp_enabled`:

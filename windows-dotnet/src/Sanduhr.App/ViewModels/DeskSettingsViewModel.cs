@@ -34,8 +34,17 @@ public sealed partial class DeskPieceRow : ObservableObject
     public string Widget { get; }
     public string Name { get; }
 
+    public override string ToString() => Name;
+
     [ObservableProperty] private DeskPlaceOption _place = DeskSettingsViewModel.Hidden;
     [ObservableProperty] private double _size = 1;
+
+    /// <summary>What the Monitor dropdown offers for this piece: All monitors, Main monitor, each connected monitor, and (when the piece is
+    /// on one that is gone) that monitor as "not connected".</summary>
+    [ObservableProperty] private IReadOnlyList<DeskMonitorChoice> _monitorChoices = [];
+
+    /// <summary>The monitor the piece is drawn on.</summary>
+    [ObservableProperty] private DeskMonitorChoice _monitor = new(null, DeskMonitorNames.AllMonitors);
 
     /// <summary>"120%", for the size picker.</summary>
     public string SizeText => $"{Math.Round(Size * 100)}%";
@@ -47,6 +56,8 @@ public sealed partial class DeskPieceRow : ObservableObject
         _loading = true;
         Place = p is null ? DeskSettingsViewModel.Hidden : DeskSettingsViewModel.PlaceFor(p.Anchor);
         Size = p?.Scale ?? 1;
+        MonitorChoices = DeskMonitorNames.Choices(_owner.Monitors, p?.Monitor);
+        Monitor = DeskMonitorNames.Select(MonitorChoices, p?.Monitor);
         _loading = false;
     }
 
@@ -54,6 +65,11 @@ public sealed partial class DeskPieceRow : ObservableObject
     {
         OnPropertyChanged(nameof(IsPlaced));
         if (!_loading) _owner.Edit(a => a.Place(Widget, value.Anchor));
+    }
+
+    partial void OnMonitorChanged(DeskMonitorChoice value)
+    {
+        if (!_loading && value is not null) _owner.Edit(a => a.SetMonitor(Widget, value.Value));
     }
 
     partial void OnSizeChanged(double value)
@@ -85,12 +101,16 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     public const string SystemFont = "System font (Segoe UI)";
 
     private readonly SettingsStore _store;
+    private readonly Func<IReadOnlyList<DeskMonitorInfo>> _monitors;
     private DeskSettings _saved;
     private bool _loading;
 
-    public DeskSettingsViewModel(SettingsStore store, IReadOnlyList<string> fontFamilies)
+    /// <param name="monitors">The connected monitors, named (the Monitor dropdown). Default: what Windows reports now.</param>
+    public DeskSettingsViewModel(SettingsStore store, IReadOnlyList<string> fontFamilies, Func<IReadOnlyList<DeskMonitorInfo>>? monitors = null)
     {
         _store = store;
+        _monitors = monitors ?? Sanduhr.App.Desk.DeskMonitorSource.Read;
+        Monitors = _monitors();
         _saved = store.LoadDesk();
         FontChoices = [.. fontFamilies, SystemFont];
         Pieces =
@@ -103,11 +123,26 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             new DeskPieceRow(this, "telemetry", SettingsNames.DeskTelemetry),
             new DeskPieceRow(this, "weather", SettingsNames.DeskWeather),
             new DeskPieceRow(this, "watchers", SettingsNames.DeskWatchers),
+            new DeskPieceRow(this, "launcher", SettingsNames.DeskLauncher),
             new DeskPieceRow(this, "glow", SettingsNames.DeskGlow),
         ];
+        Launcher = new LauncherSettingsViewModel(store, new Paths(), () => Pieces.FirstOrDefault(p => p.Widget == "launcher")?.IsPlaced == true, PlaceLauncherIfHidden)
+        {
+            Changed = () => Changed?.Invoke(),
+        };
+        Designs = new DesignsSettingsViewModel(() => Sanduhr.App.Desk.DeskDesignService.Current);
         Load();
         LoadInk();
     }
+
+    /// <summary>Settings, Desk, Designs: the saved designs and Put my Desk back (spec, the agent-designed Desk).</summary>
+    public DesignsSettingsViewModel Designs { get; }
+
+    /// <summary>The monitors connected when the page was loaded (read again by <see cref="Reload"/>).</summary>
+    public IReadOnlyList<DeskMonitorInfo> Monitors { get; private set; }
+
+    /// <summary>Settings, Desk, Launcher: the buttons, their pictures and the pickers (spec, Desk Launcher).</summary>
+    public LauncherSettingsViewModel Launcher { get; }
 
     /// <summary>Called after every saved change (App re-applies the Desk).</summary>
     public Action? Changed { get; set; }
@@ -141,10 +176,23 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     /// glow's place was added): the rows and the map follow.</summary>
     public void Reload()
     {
+        Monitors = _monitors();
         _saved = _store.LoadDesk();
         Load();
         OnPropertyChanged(nameof(Layout));
         OnPropertyChanged(nameof(Settings));
+    }
+
+    /// <summary>Everything on the page is read again from the settings (a design was applied or switched to): the pieces, the font, the
+    /// ink, the plate, the Launcher and the designs.</summary>
+    public void RefreshFromStore()
+    {
+        Reload();
+        LoadInk();
+        Launcher.Reload();
+        OnPropertyChanged(nameof(Plate));
+        OnPropertyChanged(nameof(DirectDesign));
+        Designs.Reload();
     }
 
     /// <summary>Slider drags (clock size, margins) settle for this long before they save, so a drag
@@ -202,6 +250,32 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             _store.SaveWatchersAgents(value);
             OnPropertyChanged();
             WatchersChanged?.Invoke();
+        }
+    }
+
+    /// <summary>"Let Claude change the Desk directly" (spec, the agent-designed Desk): off by default; saved at once. On, a design Claude
+    /// proposes is applied without the review bar; the Desk it replaces is still saved first.</summary>
+    public bool DirectDesign
+    {
+        get => _store.LoadDeskDirect();
+        set
+        {
+            if (value == DirectDesign) return;
+            _store.SaveDeskDirect(value);
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>"OLED care" (spec 3.7.0): off by default; saved at once, and the Desk and the widget follow.</summary>
+    public bool OledCare
+    {
+        get => _store.LoadOledCare();
+        set
+        {
+            if (value == OledCare) return;
+            _store.SaveOledCare(value);
+            OnPropertyChanged();
+            Changed?.Invoke();
         }
     }
 
@@ -305,6 +379,20 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         var a = new DeskArrangement(_saved.Layout);
         foreach (var row in Pieces) row.Load(a.Placement(row.Widget));
         _loading = false;
+        Launcher?.PlacementChanged();
+    }
+
+    /// <summary>
+    /// The Launcher's first button was added while the piece has no place: puts it at the first free corner
+    /// (<see cref="DeskArrangement.FirstFreeAnchor"/>) and returns that corner's name in lower case ("bottom left"),
+    /// or null when the piece already has a place.
+    /// </summary>
+    internal string? PlaceLauncherIfHidden()
+    {
+        if (Pieces.FirstOrDefault(p => p.Widget == "launcher")?.IsPlaced == true) return null;
+        var anchor = new DeskArrangement(_saved.Layout).FirstFreeAnchor();
+        Edit(a => a.Place("launcher", anchor));
+        return DeskAnchors.Name(anchor).ToLowerInvariant();
     }
 
     /// <summary>Change the layout through <see cref="DeskArrangement"/> and save.</summary>
@@ -316,6 +404,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         _loading = true;
         foreach (var row in Pieces) row.Load(a.Placement(row.Widget));
         _loading = false;
+        Launcher.PlacementChanged();
     }
 
     partial void OnEnabledChanged(bool value)

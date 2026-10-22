@@ -135,12 +135,26 @@ public static class SettingsNames
     public const string DeskGlow = "Claude Code glow";
     /// <summary>Desk, Where each piece sits: the watchers (spec 6.9), live cards for work an agent is watching.</summary>
     public const string DeskWatchers = "Watchers";
+    /// <summary>Desk, Where each piece sits: the Launcher, buttons that open apps and links from the desktop.</summary>
+    public const string DeskLauncher = "Launcher";
+    /// <summary>Desk, Launcher: opens the app picker.</summary>
+    public const string LauncherAddApp = "Add app…";
+    /// <summary>Desk, Launcher: asks for an https link and a label.</summary>
+    public const string LauncherAddLink = "Add link…";
     /// <summary>Desk: lets agents put watchers up through the MCP server (settings.json "watchers_agents", off by default).</summary>
     public const string WatchersSwitch = "Let agents show watchers";
+    /// <summary>Desk: lets Claude apply a Desk design without the review bar (settings.json "desk_direct", off by default).</summary>
+    public const string DeskDirectSwitch = "Let Claude change the Desk directly";
+    /// <summary>Desk, Designs: the section that lists the Desk designs kept (ten, pinned ones never dropped).</summary>
+    public const string DeskDesigns = "Designs";
+    /// <summary>Desk, Designs, and the tray: switches to the design saved before the last change.</summary>
+    public const string PutMyDeskBack = "Put my Desk back";
     /// <summary>Desk: starts Arrange mode on the desktop (spec 7.3).</summary>
     public const string ArrangeDesk = DeskArrangeCopy.SettingsButton;
     /// <summary>Desk: the clock, message and Claude line take clicks (spec 7.4).</summary>
     public const string DeskPieceClicksSwitch = DeskPieceClicks.Title;
+    /// <summary>Desk: burn-in care for OLED screens (settings.json "desk_oled_care", off by default).</summary>
+    public const string OledCareSwitch = OledCare.Title;
     /// <summary>Desk, Look: a soft plate behind each piece.</summary>
     public const string DeskPlateSwitch = DeskPlate.Title;
     /// <summary>The name a Desk piece goes by on the layout map and in Arrange mode; an unknown piece goes by its key.</summary>
@@ -155,6 +169,7 @@ public static class SettingsNames
         "weather" => DeskWeather,
         "glow" => DeskGlow,
         "watchers" => DeskWatchers,
+        "launcher" => DeskLauncher,
         _ => widget,
     };
     /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7).</summary>
@@ -165,6 +180,12 @@ public static class SettingsNames
     public const string JustTheDeskButton = JustTheDesk.ButtonTitle;
     /// <summary>Now playing: the widget's line (settings.json "now_playing.widget", off by default).</summary>
     public const string NowPlayingInWidget = "Show what's playing in the widget";
+    /// <summary>Now playing, Looks: the Desk draws the song in its look (settings.json "now_playing.style", off by default).</summary>
+    public const string NowPlayingStyle = "Style what's playing";
+    /// <summary>Now playing, Looks: a look Claude proposes is saved without the card (settings.json "now_playing.looks_direct", off by default).</summary>
+    public const string NowPlayingLooksDirect = "Let Claude style songs directly";
+    /// <summary>Now playing, Looks: forgets every saved look, after a question.</summary>
+    public const string ClearLooks = "Clear Looks…";
     /// <summary>Weather: looks a typed city up with Open-Meteo.</summary>
     public const string WeatherLookUp = "Look up";
     /// <summary>Claude Code: where the glow lands (settings.json "claude_code_glow.target").</summary>
@@ -198,8 +219,16 @@ public static class SettingsNames
         (DeskPieceClicksSwitch, SettingsPage.Desk),
         (DeskPlateSwitch, SettingsPage.Desk),
         (WatchersSwitch, SettingsPage.Desk),
+        (DeskDirectSwitch, SettingsPage.Desk),
+        (OledCareSwitch, SettingsPage.Desk),
+        (PutMyDeskBack, SettingsPage.Desk),
+        (LauncherAddApp, SettingsPage.Desk),
+        (LauncherAddLink, SettingsPage.Desk),
         (SignInReminders, SettingsPage.Alerts),
         (NowPlayingInWidget, SettingsPage.NowPlaying),
+        (NowPlayingStyle, SettingsPage.NowPlaying),
+        (NowPlayingLooksDirect, SettingsPage.NowPlaying),
+        (ClearLooks, SettingsPage.NowPlaying),
         (WeatherLookUp, SettingsPage.Weather),
         (GlowWhere, SettingsPage.ClaudeCode),
     ];

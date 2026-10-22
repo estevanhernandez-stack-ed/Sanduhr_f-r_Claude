@@ -10,6 +10,9 @@ public sealed record MeterPreviewRow(string Label, int Percent, Color BarColor)
     public string PercentText => $"{Percent}%";
     public double Fraction => Math.Clamp(Percent / 100.0, 0, 1);
     public string AutomationName => $"{Label} {Percent}%";
+
+    /// <summary>A meter row reads as "Session (5hr) 12%", never as a record dump.</summary>
+    public override string ToString() => AutomationName;
 }
 
 /// <summary>
@@ -23,6 +26,8 @@ public sealed class TrayChoiceItem : ObservableObject
 
     public TrayMode Mode { get; }
     public string Title => TrayReadout.Title(Mode);
+
+    public override string ToString() => Title;
 
     public TrayChoiceItem(WidgetViewModel widget, TrayMode mode, Action changed)
     {

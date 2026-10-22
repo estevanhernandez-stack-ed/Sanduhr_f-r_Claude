@@ -114,7 +114,13 @@ public sealed class SettingsStore
             return;
         }
         McpSettingsExport.Sync(root, _mcpSettingsPath, LogLine);
+        try { AnyWritten?.Invoke(); }
+        catch (Exception e) when (e is InvalidOperationException or ObjectDisposedException) { /* a subscriber's problem never fails a save */ }
     }
+
+    /// <summary>Raised after any <see cref="SettingsStore"/> wrote settings.json, on whatever thread wrote it (the
+    /// Desk design service listens, to keep <c>desk-state.json</c> current). Static: the app makes several stores.</summary>
+    public static event Action? AnyWritten;
 
     /// <summary>The saved frame, or null when none has been persisted yet.
     /// Reads the modern "geom" key, falling back to the legacy "window" key
@@ -759,6 +765,19 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>The Desk Launcher (spec, Desk Launcher): <c>desk_launcher</c> {orientation, buttons[]}. Absent, or
+    /// an object with nothing usable in it, reads as no buttons in a row.</summary>
+    public LauncherModel LoadLauncher() => LauncherModel.Parse(Read()["desk_launcher"]);
+
+    public void SaveLauncher(LauncherModel launcher)
+    {
+        var root = Read();
+        // No buttons in a row is the same as absent: the key goes away rather than hold an empty shell.
+        if (launcher.IsEmpty && launcher.Orientation == LauncherOrientation.Row) root.Remove("desk_launcher");
+        else root["desk_launcher"] = launcher.ToJson();
+        Write(root);
+    }
+
     /// <summary>"Plate behind the text": <c>desk_plate</c>, absent = off (<see cref="DeskPlate"/>).</summary>
     public bool LoadDeskPlate() => DeskPlate.Read(Read());
 
@@ -787,6 +806,17 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>"OLED care" (spec 3.7.0): <c>desk_oled_care</c>, absent = off (<see cref="OledCare"/>).</summary>
+    public bool LoadOledCare() => OledCare.Read(Read());
+
+    public void SaveOledCare(bool on)
+    {
+        var root = Read();
+        if (on) root["desk_oled_care"] = true;
+        else root.Remove("desk_oled_care");
+        Write(root);
+    }
+
     /// <summary>"Let agents show watchers" (spec 6.9): <c>watchers_agents</c>, absent = off. The MCP tools
     /// <c>watch_start</c>, <c>watch_update</c> and <c>watch_end</c> write nothing while it is off.</summary>
     public bool LoadWatchersAgents() => ReadBool(Read(), "watchers_agents", false);
@@ -796,6 +826,34 @@ public sealed class SettingsStore
         var root = Read();
         if (on) root["watchers_agents"] = true;
         else root.Remove("watchers_agents");
+        Write(root);
+    }
+
+    /// <summary>"Let Claude change the Desk directly" (spec, the agent-designed Desk): <c>desk_direct</c>, absent = off. On, a design Claude
+    /// proposes is applied without the review bar (the Desk it replaces is still saved first).</summary>
+    public bool LoadDeskDirect() => ReadBool(Read(), "desk_direct", false);
+
+    public void SaveDeskDirect(bool on)
+    {
+        var root = Read();
+        if (on) root["desk_direct"] = true;
+        else root.Remove("desk_direct");
+        Write(root);
+    }
+
+    /// <summary>The id of the saved design "Put my Desk back" switches to: <c>desk_put_back</c>, the Desk as it was before the last change.
+    /// Null when there is none.</summary>
+    public string? LoadDeskPutBack()
+    {
+        try { return Read()["desk_put_back"]?.GetValue<string>() is { } id && SavedDesign.IsValidId(id) ? id : null; }
+        catch (Exception e) when (e is InvalidOperationException or FormatException) { return null; }
+    }
+
+    public void SaveDeskPutBack(string? id)
+    {
+        var root = Read();
+        if (id is not null && SavedDesign.IsValidId(id)) root["desk_put_back"] = id;
+        else root.Remove("desk_put_back");
         Write(root);
     }
 

@@ -3,11 +3,11 @@ using System.Text.Json.Nodes;
 namespace Sanduhr.Mcp;
 
 /// <summary>
-/// The tools/list catalog: six read-only tools (the five usage tools and
-/// <c>get_desk_messages</c>) plus the tools that hand a request file to the widget
+/// The tools/list catalog: seven read-only tools (the five usage tools,
+/// <c>get_desk_messages</c> and <c>get_desk</c>) plus the tools that hand a request file to the widget
 /// and never act themselves: <c>publish_usage</c> (the widget owns the key and the
 /// network; this server posts nothing), <c>propose_theme</c>,
-/// <c>propose_desk_messages</c> and <c>watch_start</c> / <c>watch_update</c> /
+/// <c>propose_desk_messages</c>, <c>propose_desk</c> and <c>propose_now_playing_looks</c> (3.7.0) and <c>watch_start</c> / <c>watch_update</c> /
 /// <c>watch_end</c> (3.6.0; the widget owns messages.txt and the board, checks every
 /// request again, and the user's switches gate them). The design review's
 /// must-fix #3 still holds: no strict-subset tools like get_reset_schedule; the
@@ -236,6 +236,86 @@ public static class ToolCatalog
             },
             readOnly: false, openWorld: false),
         Tool(
+            "get_desk",
+            DeskDesignGuideRead,
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject(),
+                ["additionalProperties"] = false,
+            }),
+        Tool(
+            "propose_desk",
+            DeskDesignGuidePropose,
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["design"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["description"] = "A partial Desk design: only the fields to change. See the tool description for each field.",
+                        ["properties"] = new JsonObject
+                        {
+                            ["name"] = new JsonObject { ["type"] = "string", ["maxLength"] = 40 },
+                            ["note"] = new JsonObject { ["type"] = "string", ["maxLength"] = 200 },
+                            ["layout"] = new JsonObject
+                            {
+                                ["type"] = "object",
+                                ["description"] = "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean, monitor: all|main|a monitor id from get_desk monitors}.",
+                            },
+                            ["font"] = new JsonObject
+                            {
+                                ["description"] = "A font family name, or {family, link} with an https link to get a font the user lacks.",
+                            },
+                            ["ink"] = new JsonObject
+                            {
+                                ["description"] = "auto, light, dark, theme, one #rrggbb color, or a list of 2 to 4 #rrggbb colors (gradient).",
+                            },
+                            ["plate"] = new JsonObject { ["type"] = "boolean" },
+                            ["shadow"] = new JsonObject { ["type"] = "boolean" },
+                            ["launcher"] = new JsonObject
+                            {
+                                ["type"] = "object",
+                                ["description"] = "{orientation: row|column, buttons: up to 8 of {kind: app|link, target, label, glow}}. An app target is an id from get_desk start_menu_apps; a link is https.",
+                            },
+                            ["messages"] = new JsonObject
+                            {
+                                ["type"] = "object",
+                                ["description"] = "{lines: [...], mode: add|replace}, the lines as propose_desk_messages takes them.",
+                            },
+                            ["looks"] = new JsonObject
+                            {
+                                ["type"] = "array",
+                                ["description"] = "Per-song looks for the now playing line, up to 20 of {title, artist, ink, style, mood}, as propose_now_playing_looks takes them.",
+                            },
+                            ["theme"] = new JsonObject
+                            {
+                                ["type"] = "object",
+                                ["description"] = "A widget palette as propose_theme takes it: name and the fourteen #rrggbb colors.",
+                            },
+                        },
+                        ["additionalProperties"] = false,
+                    },
+                    ["name"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["maxLength"] = 40,
+                        ["description"] = "The design's name (overrides design.name).",
+                    },
+                    ["note"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["maxLength"] = 200,
+                        ["description"] = "One short sentence for the user on why this look (shown in the review bar; overrides design.note).",
+                    },
+                },
+                ["required"] = new JsonArray("design"),
+                ["additionalProperties"] = false,
+            },
+            readOnly: false, openWorld: false),
+        Tool(
             "watch_start",
             WatchGuideStart,
             new JsonObject
@@ -325,6 +405,57 @@ public static class ToolCatalog
                 ["required"] = new JsonArray("id", "result"),
                 ["additionalProperties"] = false,
             },
+            readOnly: false, openWorld: false),
+        Tool(
+            "propose_now_playing_looks",
+            LooksGuide,
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["looks"] = new JsonObject
+                    {
+                        ["type"] = "array",
+                        ["minItems"] = 1,
+                        ["maxItems"] = 20,
+                        ["description"] = "One look per song.",
+                        ["items"] = new JsonObject
+                        {
+                            ["type"] = "object",
+                            ["properties"] = new JsonObject
+                            {
+                                ["title"] = new JsonObject { ["type"] = "string", ["maxLength"] = 200 },
+                                ["artist"] = new JsonObject { ["type"] = "string", ["maxLength"] = 100 },
+                                ["ink"] = new JsonObject
+                                {
+                                    ["type"] = "array",
+                                    ["minItems"] = 1,
+                                    ["maxItems"] = 4,
+                                    ["items"] = new JsonObject { ["type"] = "string", ["pattern"] = "^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$" },
+                                    ["description"] = "1 to 4 hex colors, left to right, each 3:1 or better on what is behind the now playing piece.",
+                                },
+                                ["style"] = new JsonObject
+                                {
+                                    ["type"] = "string",
+                                    ["enum"] = new JsonArray("plain", "bold", "italic", "bolditalic", "smallcaps"),
+                                },
+                                ["mood"] = new JsonObject { ["type"] = "string", ["maxLength"] = 40, ["description"] = "A few words for the user (\"neon night drive\")." },
+                            },
+                            ["required"] = new JsonArray("title", "ink"),
+                            ["additionalProperties"] = false,
+                        },
+                    },
+                    ["note"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["maxLength"] = 200,
+                        ["description"] = "One short sentence for the user on why these looks (shown beside the suggestion).",
+                    },
+                },
+                ["required"] = new JsonArray("looks"),
+                ["additionalProperties"] = false,
+            },
             readOnly: false, openWorld: false));
 
     // The Desk and watcher descriptions are the Mac server's, adapted to this machine's paths and
@@ -391,6 +522,70 @@ public static class ToolCatalog
         "birthdays, anniversaries or holidays use mode add with one date line each (MM-DD:), never " +
         "replace, so the user's own lines stay. Read the current list first with get_desk_messages. " +
         DeskSyntax + DeskEffects;
+
+    private const string DeskDesignGuideRead =
+        "Read the user's Desk before designing it. The Desk is what Sanduhr draws on the Windows desktop: a clock, Claude " +
+        "usage, a handwritten message, a Launcher of buttons and other pieces, each placed at one of eight anchors " +
+        "(tl tc tr ml mr bl bc br) with a size, in a font and an ink, optionally on a soft plate, beside the widget's " +
+        "color theme. Returns design (the current look as a full design: layout with every piece's anchor, size and " +
+        "hidden, font, ink, plate, shadow, launcher, theme), pieces and anchors (the allowed words), fonts (installed " +
+        "families, and the bundled handwriting fonts EsteFont Pro and EsteFont 26), wallpaper (path of a copy of the wallpaper " +
+        "image scaled to at most 1600 pixels on its longest side, which you can open only if the user allows Claude Code to read that file; " +
+        "source file, or cache when Windows' cached copy stands in for a wallpaper file that was deleted; kind image, or color when the shell " +
+        "names no image and the summary is the desktop's background color; and summary: overall " +
+        "brightness 0-1, up to five dominant colors with their share, and for each monitor the brightness 0-1 and " +
+        "busyness 0-1 (edge density) behind each anchor), designs (saved designs: id, name, pinned, applied_at), " +
+        "direct (true when the user lets Claude change the Desk without review), limits, and start_menu_apps (the apps " +
+        "a Launcher button may open, as id and name; absent until Sanduhr has read the Start menu). Call this before " +
+        "propose_desk and design from what it says. status no_data with reason missing means the Sanduhr widget is not " +
+        "running or its Claude Code integration is not installed.";
+
+    private const string DeskDesignGuidePropose =
+        "Propose a look for the user's Desk, and optionally the widget's color theme. The design is PARTIAL: send only " +
+        "the fields to change; everything absent stays as it is. Fields, all optional: name (up to 40 characters); " +
+        "note (one sentence for the user, up to 200); layout {piece: {anchor, size, hidden}}, where piece is a key from " +
+        "get_desk pieces, anchor is tl tc tr ml mr bl bc br, size is 0.6 to 1.6, hidden removes the piece and monitor puts it on \"all\" monitors (the default), the \"main\" monitor or one monitor by the id in get_desk monitors (a piece on a monitor that is unplugged shows on the main one meanwhile); font (a " +
+        "family from get_desk fonts.installed or the bundled EsteFont Pro or EsteFont 26, or {family, link} with an " +
+        "https link to get a font the user lacks: Sanduhr never downloads it, the review shows the link and Apply waits " +
+        "for the font, status needs_font); ink (auto, light, dark, theme, one #rrggbb, or a list of 2 to 4 #rrggbb for a " +
+        "left-to-right gradient); plate and shadow (true or false; the plate is a soft panel behind each stack of pieces); " +
+        "launcher {orientation row or column, buttons: up to 8 of {kind app or link, target, label up to 24 characters, " +
+        "glow #rrggbb}}, where an app target is an id from get_desk start_menu_apps (a button opens only what the Start " +
+        "menu lists; there are no command lines) and a link target is an https link; messages {lines, mode add or " +
+        "replace}, the lines as propose_desk_messages takes them (see its description for the syntax); looks (up to 20 " +
+        "per-song looks for the now playing line, {title, artist, ink, style, mood} as propose_now_playing_looks takes " +
+        "them, saved with the design when it is applied; each color must keep 3:1 against what is behind the now " +
+        "playing piece, and they show while the user's Style what's playing is on); theme (a widget " +
+        "palette: name and the fourteen #rrggbb colors, per docs/themes/AGENT_PROMPT.md, as propose_theme takes it). " +
+        "The server checks before anything is sent: every field's shape and range; ink against the wallpaper (each " +
+        "placed piece's ink must keep a WCAG contrast of at least 3:1 against the wallpaper brightness under its anchor " +
+        "on every monitor, or against the plate when the plate is on; auto ink picks its own and is not judged), so read " +
+        "get_desk wallpaper.summary and choose ink, plate and anchors together; the Launcher's targets; the message " +
+        "lines; the theme lint. status rejected comes with reasons, each {field, message}: fix those fields and call " +
+        "again; nothing was written. Otherwise the Sanduhr widget draws the design live on the desktop with a bar where " +
+        "the user chooses Apply or Dismiss: previewing means the user is reviewing it now (do not send the same look " +
+        "again), applied means it is in place (the user allows direct changes; their previous look is saved), " +
+        "needs_font lists the fonts (family, link) the user must install first, queued means the widget did not answer " +
+        "and will show it when it starts. Every applied look is saved and can be switched back to in Sanduhr's " +
+        "settings. This server never changes the Desk itself.";
+
+    private const string LooksGuide =
+        "Suggest a look for songs the user plays: a gradient and a letter style per song, drawn on the now playing line " +
+        "of the user's Windows Desk while Sanduhr's Style what's playing is on (Settings, Now playing, Looks). Until a " +
+        "song has a look it wears one picked from its name out of eight palettes. Pass looks: 1 to 20 of {title, artist, " +
+        "ink, style, mood}: title and artist exactly as the player shows them (matched ignoring case, extra spaces and a " +
+        "trailing Remastered mark), ink 1 to 4 #rrggbb colors left to right (a gradient across the line), style one of " +
+        "plain, bold, italic, bolditalic or smallcaps (omit for plain; drawn in the Desk's own font), mood up to 40 " +
+        "characters for the user ('neon night drive'). Every color must keep a WCAG contrast of 3:1 against what is behind " +
+        "the now playing piece, the wallpaper under its anchor or the plate when the plate is on, so no dark shades on a " +
+        "dark wallpaper and no pale ones on a bright one; read get_desk (wallpaper summary and layout) first. Refused " +
+        "looks come back as rejected with reasons, each starting with the look's number, and nothing is sent. Pick songs " +
+        "you know the user plays (they said so, or ask them); a look should feel like the song: its era, its cover, its " +
+        "energy. Sanduhr checks the looks again and, unless the user lets Claude style songs directly, shows them as a " +
+        "card to Save or Dismiss: pending_approval means the user decides, applied means they are saved (looks_saved), " +
+        "rejected comes with reasons. style_on says whether Style what's playing is on; when it is false, tell the user " +
+        "where to switch it on (Settings, Now playing, Looks). A saved look replaces an older one for the same song. " +
+        "queued means Sanduhr did not answer: it is not running. This server never saves a look and never reads what is playing.";
 
     private const string WatchGuideStart =
         "Put up a watcher: a live card on the user's Desk for work you are keeping an eye on " +

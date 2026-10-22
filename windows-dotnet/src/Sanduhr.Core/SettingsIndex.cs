@@ -78,6 +78,10 @@ public static class SettingsIndex
     public const string DeskClicks = "desk-clicks";
     public const string DeskPlate = "desk-plate";
     public const string DeskWatchers = "desk-watchers";
+    public const string DeskLauncher = "desk-launcher";
+    public const string DeskDirect = "desk-direct";
+    public const string DeskOled = "desk-oled";
+    public const string DeskDesigns = "desk-designs";
     // Desk: Message, Now playing, Weather (S6)
     public const string MessageLines = "lines";
     public const string MessageRotation = "rotation";
@@ -86,6 +90,7 @@ public static class SettingsIndex
     public const string NowPlayingWidget = "np-widget";
     public const string NowPlayingApps = "np-apps";
     public const string NowPlayingBars = "np-bars";
+    public const string NowPlayingLooks = "np-looks";
     public const string WeatherPlace = "weather-place";
     public const string WeatherCredit = "weather-credit";
     // Claude Code (S6)
@@ -158,8 +163,8 @@ public static class SettingsIndex
 
         E("Settings and statusline", SettingsPage.Mods, ConfigFiles,
             ["settings.json", "folder", "hooks", "statusline", "readable", "unreadable", "refresh", "inventory"]),
-        E("Mods", SettingsPage.Mods, ModList,
-            ["mod", "plugin", "plugins", "enabledPlugins", "sanduhr-meters", "switch", "on", "off", "update", "remove"]),
+        E("Plugins", SettingsPage.Mods, ModList,
+            ["mod", "mods", "plugin", "plugins", "installed", "enabledPlugins", "sanduhr-meters", "switch", "on", "off", "update", "remove"]),
         E("MCP servers", SettingsPage.Mods, McpServers, ["MCP", "servers", "mcpServers", "tools"]),
         E("CLAUDE.md", SettingsPage.Mods, ClaudeMd, ["memory", "instructions", "lines", "size"]),
         E("History kept", SettingsPage.Mods, Retention,
@@ -185,8 +190,17 @@ public static class SettingsIndex
             ["click", "click-through", "right-click", "menu", "desktop icons", "clock", "message"]),
         E(SettingsNames.WatchersSwitch, SettingsPage.Desk, DeskWatchers,
             ["watcher", "watchers", "agent", "agents", "MCP", "watch_start", "CI", "deploy", "progress", "card", "claude code"]),
+        E(SettingsNames.DeskDirectSwitch, SettingsPage.Desk, DeskDirect,
+            ["Claude", "agent", "agents", "MCP", "propose_desk", "design", "designs", "review", "apply", "without asking", "wallpaper", "off by default"]),
+        E(SettingsNames.OledCareSwitch, SettingsPage.Desk, DeskOled,
+            ["oled", "burn-in", "burn in", "burnin", "drift", "dim", "idle", "away", "screen", "pixels", "white", "image retention", "off by default"]),
+        E(SettingsNames.DeskDesigns, SettingsPage.Desk, DeskDesigns,
+            ["design", "designs", "undo", "put back", SettingsNames.PutMyDeskBack, "restore", "switch", "switch to", "rename", "pin", "delete", "saved looks", "Before", "history", "Claude"]),
+        E(SettingsNames.DeskLauncher, SettingsPage.Desk, DeskLauncher,
+            ["launcher", "button", "buttons", "shortcut", "shortcuts", "app", "apps", "link", "TouchButton", "Rainmeter",
+             SettingsNames.LauncherAddApp, SettingsNames.LauncherAddLink, "image", "label", "PNG", "Chrome app", "PWA"]),
         E("Where each piece sits", SettingsPage.Desk, DeskPieces,
-            ["layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor"]),
+            ["layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor", "monitor", "monitors", "screen", "display", "main monitor", "all monitors", "second monitor", "per monitor"]),
         E("Look", SettingsPage.Desk, DeskLook,
             ["font", "EsteFont", "EsteFont Pro", "EsteFont 26", "clock size", "time size", "typeface", "Segoe UI"]),
         E(SettingsNames.DeskPlateSwitch, SettingsPage.Desk, DeskPlate,
@@ -209,6 +223,9 @@ public static class SettingsIndex
             ["now playing", "music", "song", "track", "Spotify", "media", "play", "pause", "next", "keep showing while paused", "hide while paused", "hide when nothing plays"]),
         E("Apps", SettingsPage.NowPlaying, NowPlayingApps, ["apps", "exclude", "browser", "player"]),
         E("Bars", SettingsPage.NowPlaying, NowPlayingBars, ["visualizer", "bars", "audio", "level", "equalizer"]),
+        E("Looks", SettingsPage.NowPlaying, NowPlayingLooks,
+            ["looks", "song style", "style", "palette", "gradient", "letter style", "small caps", "bold", "italic", "mood", "saved looks",
+             "propose_now_playing_looks", "Claude styles songs", "suggested looks", "song colors"]),
 
         E(SettingsNames.WeatherLookUp, SettingsPage.Weather, WeatherPlace,
             ["weather", "city", "forecast", "temperature", "Fahrenheit", "Celsius", "Open-Meteo", "location"]),
@@ -247,7 +264,15 @@ public static class SettingsIndex
         [SettingsNames.DeskPieceClicksSwitch] = DeskClicks,
         [SettingsNames.DeskPlateSwitch] = DeskPlate,
         [SettingsNames.WatchersSwitch] = DeskWatchers,
+        [SettingsNames.DeskDirectSwitch] = DeskDirect,
+        [SettingsNames.OledCareSwitch] = DeskOled,
+        [SettingsNames.PutMyDeskBack] = DeskDesigns,
+        [SettingsNames.LauncherAddApp] = DeskLauncher,
+        [SettingsNames.LauncherAddLink] = DeskLauncher,
         [SettingsNames.NowPlayingInWidget] = NowPlayingWidget,
+        [SettingsNames.NowPlayingStyle] = NowPlayingLooks,
+        [SettingsNames.NowPlayingLooksDirect] = NowPlayingLooks,
+        [SettingsNames.ClearLooks] = NowPlayingLooks,
         [SettingsNames.WeatherLookUp] = WeatherPlace,
         [SettingsNames.GlowWhere] = GlowWhere,
     };
@@ -266,7 +291,7 @@ public static class SettingsIndex
         [SettingsPage.Themes] = ["theme", "colors", "look"],
         [SettingsPage.Desk] = ["desktop", "wallpaper", "clock", "Rainmeter", "layout", "font", "EsteFont", "margins", "taskbar", "telemetry", "CPU", "RAM", "disk"],
         [SettingsPage.DeskMessage] = ["messages", "messages.txt", "quote", "handwriting"],
-        [SettingsPage.NowPlaying] = ["music", "song", "media", "visualizer"],
+        [SettingsPage.NowPlaying] = ["music", "song", "media", "visualizer", "looks", "song style"],
         [SettingsPage.Weather] = ["forecast", "temperature", "city"],
         [SettingsPage.About] = ["help", "version", "trademark", "privacy"],
     };

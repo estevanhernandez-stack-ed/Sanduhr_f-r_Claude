@@ -60,6 +60,8 @@ public sealed class CcCalendarControl : FrameworkElement
 
         var today = DateOnly.FromDateTime(DateTime.Now);
         double cellW = (w - (Cols - 1) * 2) / Cols;
+        if (!(cellW > 0))
+            return;   // narrower than its own column gaps: nothing sensible to draw
 
         // Weekday header (Monday-start initials).
         string[] initials = { "M", "T", "W", "T", "F", "S", "S" };
@@ -126,6 +128,9 @@ public sealed class CcCalendarControl : FrameworkElement
     {
         double cellW = (w - (Cols - 1) * 2) / Cols;
         double cellH = (h - HeaderBand - (Rows - 1) * 2) / Rows;
+        // Not laid out yet (a Settings page that is not showing has no size), or too small for a cell: no cells, never a negative Rect.
+        if (!(cellW > 0) || !(cellH > 0))
+            yield break;
         int todayDow = ((int)today.DayOfWeek + 6) % 7;          // Monday = 0
         var gridStart = today.AddDays(-todayDow).AddDays(-28);  // 4 weeks before this week's Monday
         for (int i = 0; i < Rows * Cols; i++)

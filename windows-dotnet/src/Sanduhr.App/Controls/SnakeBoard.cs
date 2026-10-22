@@ -72,7 +72,7 @@ public sealed class SnakeBoard : FrameworkElement
             double px = offX + sx * cell;
             double py = offY + sy * cell;
             dc.DrawRoundedRectangle(brush, null,
-                new Rect(px + 1, py + 1, cell - 2, cell - 2), 2, 2);
+                new Rect(px + 1, py + 1, Math.Max(0, cell - 2), Math.Max(0, cell - 2)), 2, 2);
         }
 
         // Food — a soft ink dot.

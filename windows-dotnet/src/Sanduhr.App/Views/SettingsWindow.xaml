@@ -276,7 +276,8 @@
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
                         <Button Style="{StaticResource FlatButton}" Content="{Binding InstallLabel}" Padding="10,5" FontSize="11"
                                 Command="{Binding InstallCommand}" IsEnabled="{Binding CanInstall}"
-                                AutomationProperties.Name="{Binding InstallName}" />
+                                AutomationProperties.Name="{Binding InstallName}"
+                                AutomationProperties.HelpText="{Binding InstallHelp}" />
                         <Button Style="{StaticResource FlatButton}" Content="Remove" Padding="10,5" FontSize="11" Margin="0"
                                 Command="{Binding RemoveCommand}"
                                 AutomationProperties.Name="{Binding RemoveName}"
@@ -1702,6 +1703,11 @@
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                            Visibility="{Binding HasNoFolders, Converter={StaticResource BoolVis}}" />
                                 <ItemsControl ItemsSource="{Binding Folders}" Focusable="False">
+                                    <ItemsControl.ItemContainerStyle>
+                                        <Style TargetType="ContentPresenter">
+                                            <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
+                                        </Style>
+                                    </ItemsControl.ItemContainerStyle>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6" Padding="12,10" Margin="0,0,0,8"
@@ -1896,6 +1902,11 @@
                                                 <Run Text="{Binding HooksSummary, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                             </TextBlock>
                                             <ItemsControl ItemsSource="{Binding HookLines}" Focusable="False" Margin="0,2,0,0">
+                                                <ItemsControl.ItemContainerStyle>
+                                                    <Style TargetType="ContentPresenter">
+                                                        <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
+                                                    </Style>
+                                                </ItemsControl.ItemContainerStyle>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <TextBlock FontSize="10.5" TextWrapping="Wrap" Margin="12,1,0,0"
@@ -1906,10 +1917,15 @@
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
                                             <TextBlock FontSize="11.5" TextWrapping="Wrap" Margin="0,10,0,0">
-                                                <Run Text="Plugins: " Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                <Run Text="Plugin switches: " Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                                 <Run Text="{Binding PluginsSummary, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                             </TextBlock>
                                             <ItemsControl ItemsSource="{Binding PluginLines}" Focusable="False" Margin="0,2,0,0">
+                                                <ItemsControl.ItemContainerStyle>
+                                                    <Style TargetType="ContentPresenter">
+                                                        <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
+                                                    </Style>
+                                                </ItemsControl.ItemContainerStyle>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <TextBlock FontSize="10.5" TextWrapping="Wrap" Margin="12,1,0,0"
@@ -1925,10 +1941,19 @@
 
                                 <!-- Mods -->
                                 <StackPanel views:SettingsAnchor.Id="mods" Margin="0,0,0,16">
-                                    <TextBlock FontSize="12" Margin="0,0,0,6">
-                                        <Run Text="Mods" FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.Text}" /><Run Text="  " /><Run Text="{Binding ModsSummary, Mode=OneWay}" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    </TextBlock>
-                                    <ItemsControl ItemsSource="{Binding Mods}" Focusable="False">
+                                    <TextBlock Text="{Binding PluginListTitle}" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,2"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                    <TextBlock Text="{Binding PluginListNote}" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,6"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                               Visibility="{Binding PluginListNote, Converter={StaticResource StrVis}}" />
+                                    <ItemsControl ItemsSource="{Binding Mods}" Focusable="False"
+                                                  AutomationProperties.Name="Plugins">
+                                        <ItemsControl.ItemContainerStyle>
+                                            <!-- A row reads as "626labs, version 0.1.0, on, mod", not as the type of the item behind it. -->
+                                            <Style TargetType="ContentPresenter">
+                                                <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
+                                            </Style>
+                                        </ItemsControl.ItemContainerStyle>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6" Padding="12,10" Margin="0,0,0,8"
@@ -1936,6 +1961,13 @@
                                                     <StackPanel>
                                                         <TextBlock FontSize="12" TextWrapping="Wrap">
                                                             <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.Text}" /><Run Text="  " /><Run Text="{Binding VersionText, Mode=OneWay}" Foreground="{DynamicResource Sanduhr.Brush.TextDim}" /><Run Text="  " /><Run Text="{Binding StateText, Mode=OneWay}" Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                            <InlineUIContainer BaselineAlignment="Center">
+                                                                <Border Margin="8,0,0,0" Padding="5,0" CornerRadius="3" BorderThickness="1"
+                                                                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                                                                        Visibility="{Binding IsMod, Converter={StaticResource BoolVis}}">
+                                                                    <TextBlock Text="mod" FontSize="9.5" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                                </Border>
+                                                            </InlineUIContainer>
                                                         </TextBlock>
                                                         <TextBlock Text="{Binding Description}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"
                                                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
@@ -2345,43 +2377,189 @@
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
-                            <StackPanel views:SettingsAnchor.Id="pieces" IsEnabled="{Binding NotArranging}">
-                                <TextBlock Text="Where each piece sits" FontSize="13" FontWeight="SemiBold"
+                            <StackPanel views:SettingsAnchor.Id="desk-direct">
+                                <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                          Content="{x:Static core:SettingsNames.DeskDirectSwitch}"
+                                          IsChecked="{Binding DirectDesign, Mode=TwoWay}"
+                                          AutomationProperties.Name="{x:Static core:SettingsNames.DeskDirectSwitch}" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="Off by default. With the Sanduhr MCP server installed, Claude Code can propose a whole look for the Desk and the widget theme. Sanduhr shows it on the desktop first, with Apply and Dismiss, and nothing is saved until you choose Apply. Turn this on and a design is applied at once instead. Either way the Desk it replaces is saved first, and Put my Desk back undoes the change." />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                            <views:OledCarePanel views:SettingsAnchor.Id="desk-oled" />
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                            <views:DesignsSettingsPanel views:SettingsAnchor.Id="desk-designs" DataContext="{Binding Designs}" />
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                            <StackPanel views:SettingsAnchor.Id="desk-launcher" DataContext="{Binding Launcher}">
+                                <TextBlock Text="Launcher" FontSize="13" FontWeight="SemiBold"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
-                                <ItemsControl ItemsSource="{Binding Pieces}" Focusable="False">
+                                <TextBlock FontSize="11" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="Up to eight buttons on the Desk, each opening an app from your Start menu or an https link. Place the Launcher under Where each piece sits. The Desk sits below your windows, so a button works where the Desk shows, or after Show desktop." />
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button Style="{StaticResource FlatButton}" Padding="12,6"
+                                            Content="{x:Static core:SettingsNames.LauncherAddApp}"
+                                            Command="{Binding AddAppCommand}"
+                                            AutomationProperties.Name="{x:Static core:SettingsNames.LauncherAddApp}" />
+                                    <Button Style="{StaticResource FlatButton}" Padding="12,6"
+                                            Content="{x:Static core:SettingsNames.LauncherAddLink}"
+                                            Command="{Binding AddLinkCommand}"
+                                            AutomationProperties.Name="{x:Static core:SettingsNames.LauncherAddLink}" />
+                                    <TextBlock Text="{Binding CountText}" FontSize="11" VerticalAlignment="Center" Margin="4,0,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                </StackPanel>
+                                <Grid Margin="0,10,0,0" HorizontalAlignment="Left">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="150" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Buttons in a" FontSize="12" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <ComboBox Grid.Column="1" Style="{StaticResource ThemedComboBox}"
+                                              ItemsSource="{x:Static vm:LauncherSettingsViewModel.OrientationChoices}"
+                                              SelectedItem="{Binding SelectedOrientation, Mode=TwoWay}"
+                                              AutomationProperties.Name="Launcher buttons in a row or a column" />
+                                </Grid>
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           AutomationProperties.LiveSetting="Polite"
+                                           Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                           Text="{Binding Problem}"
+                                           Visibility="{Binding HasProblem, Converter={StaticResource BoolVis}}" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           AutomationProperties.LiveSetting="Polite"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                           Text="{Binding PlacementNote}"
+                                           Visibility="{Binding HasPlacementNote, Converter={StaticResource BoolVis}}" />
+                                <TextBlock FontSize="11" Margin="0,10,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="No buttons yet. Add an app or a link."
+                                           Visibility="{Binding HasNoButtons, Converter={StaticResource BoolVis}}" />
+
+                                <ItemsControl ItemsSource="{Binding Rows}" Focusable="False" Margin="0,10,0,0"
+                                              AutomationProperties.Name="Launcher buttons">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" MinWidth="150" />
-                                                    <ColumnDefinition Width="150" />
-                                                    <ColumnDefinition Width="12" />
-                                                    <ColumnDefinition Width="90" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" TextTrimming="CharacterEllipsis" />
-                                                <ComboBox Grid.Column="1" Style="{StaticResource ThemedComboBox}"
-                                                          ItemsSource="{x:Static vm:DeskSettingsViewModel.PlaceOptions}"
-                                                          SelectedItem="{Binding Place, Mode=TwoWay}"
-                                                          AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, place'}" />
-                                                <ComboBox Grid.Column="3" Style="{StaticResource ThemedComboBox}"
-                                                          ItemsSource="{x:Static vm:DeskSettingsViewModel.SizeSteps}"
-                                                          SelectedItem="{Binding Size, Mode=TwoWay}"
-                                                          IsEnabled="{Binding IsPlaced}"
-                                                          AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, size'}">
-                                                    <ComboBox.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <TextBlock Text="{Binding StringFormat='{}{0:0%}'}" />
-                                                        </DataTemplate>
-                                                    </ComboBox.ItemTemplate>
-                                                </ComboBox>
-                                            </Grid>
+                                            <Border CornerRadius="6" Padding="10" Margin="0,0,0,8" BorderThickness="1"
+                                                    Background="{DynamicResource Sanduhr.Brush.Bg}">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                                <Setter Property="BorderThickness" Value="2" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <StackPanel>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="46" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Grid Width="38" Height="38" HorizontalAlignment="Left">
+                                                            <Border CornerRadius="6" BorderThickness="1"
+                                                                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}">
+                                                                <TextBlock Text="{Binding Initial}" FontSize="16" HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center"
+                                                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                                            </Border>
+                                                            <Image Source="{Binding Preview}" Stretch="Uniform"
+                                                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                                                        </Grid>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                            <TextBlock Text="{Binding Detail}" FontSize="10.5" TextTrimming="CharacterEllipsis"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                                            <TextBlock FontSize="10.5" TextWrapping="Wrap"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                                                       Text="Not installed any more. Remove this button or add the app back."
+                                                                       Visibility="{Binding IsMissing, Converter={StaticResource BoolVis}}" />
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
+                                                            <Button Style="{StaticResource FlatButton}" Padding="8,4" Margin="0,0,4,0"
+                                                                    Content="Move up"
+                                                                    Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                    CommandParameter="{Binding}" IsEnabled="{Binding CanMoveUp}"
+                                                                    AutomationProperties.Name="{Binding Subject, StringFormat='Move {0} up'}" />
+                                                            <Button Style="{StaticResource FlatButton}" Padding="8,4" Margin="0,0,4,0"
+                                                                    Content="Move down"
+                                                                    Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                    CommandParameter="{Binding}" IsEnabled="{Binding CanMoveDown}"
+                                                                    AutomationProperties.Name="{Binding Subject, StringFormat='Move {0} down'}" />
+                                                            <Button Style="{StaticResource FlatButton}" Padding="8,4" Margin="0"
+                                                                    Content="Remove"
+                                                                    Command="{Binding DataContext.RemoveCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    AutomationProperties.Name="{Binding Subject, StringFormat='Remove {0}'}" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <Grid Margin="0,10,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="150" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="86" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="Label" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                        <TextBox Grid.Column="1" Style="{StaticResource Input}" MaxLength="24"
+                                                                 Text="{Binding Label, UpdateSourceTrigger=LostFocus}"
+                                                                 AutomationProperties.Name="{Binding Subject, StringFormat='Label for {0}'}" />
+                                                        <TextBlock Grid.Column="2" Text="Glow color" FontSize="12" VerticalAlignment="Center" Margin="14,0,8,0"
+                                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                        <TextBox Grid.Column="3" Style="{StaticResource Input}" FontFamily="Cascadia Code, Consolas" MaxLength="7"
+                                                                 Text="{Binding Glow, UpdateSourceTrigger=LostFocus}"
+                                                                 AutomationProperties.Name="{Binding Subject, StringFormat='Glow color for {0}, a hex color like #ff8800, empty for the Desk ink'}" />
+                                                    </Grid>
+                                                    <TextBlock FontSize="10.5" Margin="0,4,0,0"
+                                                               AutomationProperties.LiveSetting="Polite"
+                                                               Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                                               Text="{Binding GlowProblem}"
+                                                               Visibility="{Binding HasGlowProblem, Converter={StaticResource BoolVis}}" />
+                                                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                                        <Button Style="{StaticResource FlatButton}" Padding="10,5"
+                                                                Content="Change image…"
+                                                                Command="{Binding DataContext.ChangeImageCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                CommandParameter="{Binding}"
+                                                                AutomationProperties.Name="{Binding Subject, StringFormat='Change image for {0}'}" />
+                                                        <Button Style="{StaticResource FlatButton}" Padding="10,5" Margin="0"
+                                                                Content="{Binding UseDefaultImageText}"
+                                                                Command="{Binding DataContext.UseDefaultImageCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                CommandParameter="{Binding}" IsEnabled="{Binding CanUseDefaultImage}"
+                                                                AutomationProperties.Name="{Binding UseDefaultImageName}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                                 <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                           Text="Eight places: the four corners, the top and bottom centers, and the middle of each side. Size scales a piece from 60% to 160%. Hidden takes a piece off the desktop." />
+                                           Text="Images are PNG files up to 1 MB, kept in Sanduhr's own folder at 256 pixels. Nothing is downloaded: a link button shows a link icon until you choose an image." />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                            <StackPanel views:SettingsAnchor.Id="pieces" IsEnabled="{Binding NotArranging}">
+                                <TextBlock Text="Where each piece sits" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                                <views:DeskPiecesPanel />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="Eight places: the four corners, the top and bottom centers, and the middle of each side. Size scales a piece from 60% to 160%. Hidden takes a piece off the desktop. Monitor puts a piece on every monitor, on the main one, or on one monitor; a piece on a monitor that is not connected shows on the main one until it is back." />
                             </StackPanel>
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
@@ -2603,6 +2781,8 @@
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                            Text="The bars follow the loudness of the app that is playing, read from that app's Windows volume mixer level. Windows system sounds are ignored. Sanduhr never records or captures audio, and the bars stop while nothing plays." />
                             </StackPanel>
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+                            <views:NowPlayingLooksPanel views:SettingsAnchor.Id="np-looks" />
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
                             <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"
                                        TextWrapping="Wrap" FontSize="11"

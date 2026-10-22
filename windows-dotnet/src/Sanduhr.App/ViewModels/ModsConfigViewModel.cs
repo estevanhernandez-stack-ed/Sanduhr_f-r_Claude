@@ -10,12 +10,37 @@ using Sanduhr.Core;
 namespace Sanduhr.App.ViewModels;
 
 /// <summary>A folder in the Mods &amp; Config picker.</summary>
-public sealed record ModsFolderOption(string Path, string Display);
+public sealed record ModsFolderOption(string Path, string Display)
+{
+    public override string ToString() => Display;
+}
+
+/// <summary>What Mods &amp; Config needs from the app, so the page can be built over a scratch profile.</summary>
+internal sealed record ModsConfigHost(
+    string Profile,
+    string? ConfigDir,
+    Func<IReadOnlyList<string>> AddedFolders,
+    string SanduhrAppDataDir,
+    string SanduhrExternalDir,
+    string SanduhrLegacyModsRoot,
+    Func<string?> ActiveAccountFolder)
+{
+    public static ModsConfigHost For(WidgetViewModel widget) => new(
+        ClaudeCodeProfile.Dir, ClaudeCodeProfile.ConfigDir, widget.LoadCcFoldersAdded,
+        widget.SanduhrAppDataDir, widget.SanduhrExternalDir, widget.SanduhrLegacyModsRoot,
+        () => widget.ShownActiveAccount is { } label ? widget.AccountFolder(label) : null);
+}
 
 /// <summary>One line under a section: a name and what it says.</summary>
-public sealed record ModsLine(string Name, string Text);
+public sealed record ModsLine(string Name, string Text)
+{
+    /// <summary>What a screen reader reads for the line: "Notification, 2 groups", never the record's fields.</summary>
+    public string AutomationName => $"{Name}, {Text}";
 
-/// <summary>One mod or plugin a folder loads.</summary>
+    public override string ToString() => AutomationName;
+}
+
+/// <summary>One plugin a folder loads. A plugin that also carries mod hooks is a mod and wears a "mod" tag.</summary>
 public sealed partial class ModRowViewModel : ObservableObject
 {
     private readonly ModsConfigViewModel _owner;
@@ -24,8 +49,15 @@ public sealed partial class ModRowViewModel : ObservableObject
     public string VersionText { get; }
     public string Description { get; }
     public string StateText { get; }
+
+    /// <summary>What a screen reader reads for the row: "626labs, version 0.1.0, on, mod".</summary>
+    public string AutomationName { get; }
+
+    public override string ToString() => AutomationName;
     public string Touches { get; }
     public bool IsSanduhr { get; }
+    /// <summary>The plugin is a Claude Code mod (its hooks list modules).</summary>
+    public bool IsMod { get; }
     public bool IsOn { get; }
     public bool IsOff { get; }
     public bool HasDescription => Description.Length > 0;
@@ -44,11 +76,14 @@ public sealed partial class ModRowViewModel : ObservableObject
     {
         _owner = owner;
         Name = item.Name;
-        VersionText = item.Version is { Length: > 0 } v ? "v" + v.TrimStart('v') : "";
+        VersionText = ModsPageText.VersionText(item.Version);
         Description = item.Description;
         IsSanduhr = item.IsSanduhr && own is not null;
+        IsMod = item.IsMod;
         StateText = item.State switch
         {
+            ModState.On when !ModsPageText.HasFiles(item) => "On, no files here",
+            ModState.Off when !ModsPageText.HasFiles(item) => "Off, no files here",
             ModState.On => "On",
             ModState.Off => "Off",
             _ => "Files missing",
@@ -56,6 +91,7 @@ public sealed partial class ModRowViewModel : ObservableObject
         IsOn = IsSanduhr && own!.IsOn;
         IsOff = IsSanduhr && own!.Listed && !own.IsOn;
         Touches = ModsConfigViewModel.DescribeTouches(item.Touches);
+        AutomationName = ModsPageText.RowName(Name, item.Version, StateText, IsMod, ModsPageText.HasFiles(item));
         TurnOnCommand = new RelayCommand(() => _owner.SwitchOwnMod(true));
         TurnOffCommand = new RelayCommand(() => _owner.SwitchOwnMod(false));
         UpdateCommand = new RelayCommand(_owner.UpdateOwnMod);
@@ -71,9 +107,15 @@ public sealed partial class ModRowViewModel : ObservableObject
 /// </summary>
 public sealed partial class ModsConfigViewModel : ObservableObject
 {
-    private readonly WidgetViewModel _widget;
+    private readonly ModsConfigHost _host;
     private Window? _owner;
     private bool _loading;
+
+    /// <summary>The folder picked on this page earlier in the session. The Settings window is rebuilt each time it
+    /// opens; this is what keeps the choice.</summary>
+    private static string? s_sessionFolder;
+
+    internal static void ForgetSessionChoice() => s_sessionFolder = null;
 
     public ObservableCollection<ModsFolderOption> Folders { get; } = new();
     public ObservableCollection<ModsLine> HookLines { get; } = new();
@@ -90,7 +132,10 @@ public sealed partial class ModsConfigViewModel : ObservableObject
     [ObservableProperty] private string _statuslineCommand = "";
     [ObservableProperty] private string _hooksSummary = "";
     [ObservableProperty] private string _pluginsSummary = "";
-    [ObservableProperty] private string _modsSummary = "";
+    /// <summary>The list's heading: "Plugins (46 installed, 41 on)".</summary>
+    [ObservableProperty] private string _pluginListTitle = "";
+    /// <summary>Why the list and the settings.json switches differ in size; empty when they agree.</summary>
+    [ObservableProperty] private string _pluginListNote = "";
     [ObservableProperty] private string _mcpSummary = "";
     [ObservableProperty] private string _mcpProjects = "";
     [ObservableProperty] private string _claudeMdSummary = "";
@@ -102,41 +147,47 @@ public sealed partial class ModsConfigViewModel : ObservableObject
     /// <summary>Raised after the meters mod was switched, updated or removed here, so the Claude Code page re-reads.</summary>
     public event Action? OwnModChanged;
 
-    public ModsConfigViewModel(WidgetViewModel widget)
+    public ModsConfigViewModel(WidgetViewModel widget) : this(ModsConfigHost.For(widget)) { }
+
+    internal ModsConfigViewModel(ModsConfigHost host)
     {
-        _widget = widget;
+        _host = host;
         ReloadFolders();
     }
 
     public void AttachOwner(Window owner) => _owner = owner;
 
-    private static string Profile => ClaudeCodeProfile.Dir;
+    private string Profile => _host.Profile;
 
     private ClaudeCodeIntegrations MakeIntegrations() => new(
-        Profile, _widget.SanduhrAppDataDir, Path.Combine(AppContext.BaseDirectory, "mods", ClaudeCodeIntegrations.ModName),
-        externalDir: _widget.SanduhrExternalDir)
+        Profile, _host.SanduhrAppDataDir, Path.Combine(AppContext.BaseDirectory, "mods", ClaudeCodeIntegrations.ModName),
+        externalDir: _host.SanduhrExternalDir)
     {
-        LegacyModsRoots = [_widget.SanduhrLegacyModsRoot],
+        LegacyModsRoots = [_host.SanduhrLegacyModsRoot],
     };
 
     /// <summary>Re-reads the folder list (the Claude Code page added or forgot one) and then the selected folder.</summary>
     public void ReloadFolders()
     {
-        var keep = SelectedFolder?.Path;
+        var keep = SelectedFolder?.Path ?? s_sessionFolder;
         _loading = true;
         Folders.Clear();
-        foreach (var f in ClaudeCodeFolders.Build(Profile, ClaudeCodeProfile.ConfigDir, _widget.LoadCcFoldersAdded()))
+        foreach (var f in ClaudeCodeFolders.Build(Profile, _host.ConfigDir, _host.AddedFolders()))
             Folders.Add(new ModsFolderOption(f.Path, ClaudeCodeFolders.Display(f.Path, Profile)));
         HasFolders = Folders.Count > 0;
-        SelectedFolder = Folders.FirstOrDefault(f => keep is not null && ClaudeCodeFolders.Same(f.Path, keep))
-                         ?? Folders.FirstOrDefault();
+        string? active = null;
+        try { active = _host.ActiveAccountFolder(); } catch (Exception) { }
+        var pick = ModsFolderChoice.Pick([.. Folders.Select(f => f.Path)], keep, _host.ConfigDir, active, ModInventory.EnabledPluginCount);
+        SelectedFolder = Folders.FirstOrDefault(f => pick is not null && ClaudeCodeFolders.Same(f.Path, pick));
         _loading = false;
         Refresh();
     }
 
     partial void OnSelectedFolderChanged(ModsFolderOption? value)
     {
-        if (!_loading) Refresh();
+        if (_loading) return;
+        if (value is not null) s_sessionFolder = value.Path;
+        Refresh();
     }
 
     /// <summary>Reads the selected folder again. Files only; nothing runs and nothing is written.</summary>
@@ -152,7 +203,7 @@ public sealed partial class ModsConfigViewModel : ObservableObject
             SettingsSummary = "No Claude Code folder found.";
             SettingsDetail = "Add one on the Claude Code page.";
             SettingsUnreadable = false;
-            StatuslineSummary = HooksSummary = PluginsSummary = ModsSummary = McpSummary = ClaudeMdSummary = RetentionSummary = "";
+            StatuslineSummary = HooksSummary = PluginsSummary = PluginListTitle = PluginListNote = McpSummary = ClaudeMdSummary = RetentionSummary = "";
             StatuslineCommand = McpProjects = "";
             RetentionWarning = false;
             return;
@@ -203,15 +254,17 @@ public sealed partial class ModsConfigViewModel : ObservableObject
         foreach (var (name, on) in report.EnabledPlugins.OrderBy(p => p.Key, StringComparer.Ordinal))
             PluginLines.Add(new ModsLine(name, on ? "On" : "Off"));
         int pluginsOn = report.EnabledPlugins.Count(p => p.Value);
-        PluginsSummary = report.EnabledPlugins.Count == 0 ? "None" : $"{pluginsOn} on, {report.EnabledPlugins.Count - pluginsOn} off";
+        int pluginsOff = report.EnabledPlugins.Count - pluginsOn;
+        PluginsSummary = ModsPageText.SwitchSummary(pluginsOn, pluginsOff);
 
-        // Mods
+        // The plugins the folder loads, mods among them
         OwnModState? own = null;
         try { own = MakeIntegrations().OwnModStateOf(folder.Path); } catch (Exception) { }
         foreach (var item in report.Mods)
             Mods.Add(new ModRowViewModel(this, item, own));
-        int modsOn = report.Mods.Count(m => m.State == ModState.On);
-        ModsSummary = report.Mods.Count == 0 ? "None" : $"{report.Mods.Count} found, {modsOn} on";
+        var tally = ModsPageText.Tally(report.Mods, report.EnabledPlugins);
+        PluginListTitle = ModsPageText.ListTitle(tally);
+        PluginListNote = ModsPageText.Reconcile(tally, pluginsOn, pluginsOff);
 
         // MCP servers: names only
         foreach (var n in report.Mcp.UserServers) McpNames.Add(n);
@@ -320,6 +373,6 @@ public sealed partial class ModsConfigViewModel : ObservableObject
         OwnModChanged?.Invoke();
     }
 
-    private static string Short(string message, string fallback) =>
+    private string Short(string message, string fallback) =>
         string.IsNullOrWhiteSpace(message) ? fallback : message.Replace(Profile, "~", StringComparison.OrdinalIgnoreCase);
 }

@@ -173,7 +173,14 @@ public static partial class ResetPlan
             AddFile(history, Path.Combine(dir, ThemeHandoff.ResultFileName));
             AddMatchingFiles(history, dir, "glow-*.signal");
             AddMatchingFiles(history, dir, "desk-messages-*.json");
+            AddMatchingFiles(history, dir, "desk-design-*.json");
             AddMatchingFiles(history, dir, "watch-request-*.json");
+            // The look per song handoff (the request, its result, the current look and the mod's offer) is gone with the rest;
+            // the saved looks themselves (now-playing-looks.json) are the user's settings, below.
+            AddFile(history, Path.Combine(dir, NowPlayingLookProposal.RequestFile));
+            AddFile(history, Path.Combine(dir, NowPlayingLookProposal.ResultFile));
+            AddFile(history, Path.Combine(dir, NowPlayingLookProposal.CurrentFile));
+            AddFile(history, Path.Combine(dir, NowPlayingLookProposal.OfferFile));
         }
         map[ResetPart.History] = Finish(history, backups);
 
@@ -186,9 +193,19 @@ public static partial class ResetPlan
         AddFile(settings, Path.Combine(app, "messages.txt"));
         AddFile(settings, Path.Combine(app, "messages.txt.previous"));
         AddFile(settings, paths.SettingsFile);
+        // The Launcher's button images (spec, Desk Launcher) are chosen settings, kept and removed with them.
+        AddDir(settings, paths.LauncherDir);
+        // The saved Desk designs (spec, the agent-designed Desk) are the Desk's settings kept for switching back.
+        AddDir(settings, paths.DesignsDir);
+        // The saved song looks (spec, a look per song) keep titles for the looks the user kept: they go with the settings.
+        AddFile(settings, Path.Combine(app, NowPlayingLookProposal.StoreFile));
         // A stale projection must not outlive the consent it copies; the watchers switch is a copy of one too.
         AddFile(settings, Path.Combine(ext, McpSettingsName));
         AddFile(settings, Path.Combine(ext, WatcherRequest.SwitchFile));
+        // The Desk state (the design, fonts, wallpaper summary and path, Start-menu apps) is a copy of settings too.
+        AddFile(settings, Path.Combine(ext, DeskDesign.StateFile));
+        // The wallpaper preview Claude Code can look at is a copy of the wallpaper: it goes with the state.
+        AddFile(settings, Path.Combine(ext, WallpaperPreview.FileName));
         map[ResetPart.Settings] = Finish(settings, backups);
 
         return map;

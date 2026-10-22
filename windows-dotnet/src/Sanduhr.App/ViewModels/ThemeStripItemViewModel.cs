@@ -25,6 +25,8 @@ public sealed partial class ThemeStripItemViewModel : ObservableObject
     /// <summary>Display name shown on the tile (e.g. "Obsidian").</summary>
     public string Name { get; }
 
+    public override string ToString() => Name;
+
     /// <summary>Tile fill — the theme's glass-on-Mica surface.</summary>
     public Brush GlassBrush { get; }
 

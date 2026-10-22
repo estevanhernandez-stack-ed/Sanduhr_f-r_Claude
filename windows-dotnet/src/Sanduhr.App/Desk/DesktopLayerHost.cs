@@ -57,6 +57,13 @@ internal sealed class DesktopLayerHost : IDeskHost
     /// the next <see cref="Show"/> builds new windows instead of reusing these.</summary>
     private bool _stale;
     private DateTime _fastUntil;
+    /// <summary>Where each window truly belongs (its monitor's physical pixels) and the screen it draws on:
+    /// OLED care's drift is worked out from this, never from where the window happens to sit.</summary>
+    private readonly Dictionary<HwndSource, (PxRect Home, DeskScreen Screen)> _homes = [];
+    /// <summary>OLED care's step on the orbit; null at the true anchor.</summary>
+    private int? _drift;
+    /// <summary>OLED care's idle dim, kept so a window made while dimmed starts dimmed.</summary>
+    private double _dim = 1;
     /// <summary>The sentinel could not be put above the icons host, so z-order cannot tell Show desktop
     /// apart from rest; the lift is never applied (the Desk stays at the bottom, owned by the shell).</summary>
     private bool _sentinelUnreliable;
@@ -124,8 +131,9 @@ internal sealed class DesktopLayerHost : IDeskHost
     {
         var monitors = DeskNative.Monitors();
         var bars = DeskNative.TaskbarAutoHides() ? DeskNative.TaskbarRects() : [];
+        var ids = DeskMonitorSource.IdsByBounds();
         return [.. monitors.Select(m => new DeskScreen(m.Device, m.Bounds, m.Work, m.Scale, m.Primary,
-            TaskbarClearance.Insets(m.Bounds, m.Work, bars, m.Scale)))];
+            TaskbarClearance.Insets(m.Bounds, m.Work, bars, m.Scale), DeskMonitorSource.IdFor(ids, m.Bounds)))];
     }
 
     public void Show(IReadOnlyList<DeskSurface> surfaces)
@@ -250,6 +258,7 @@ internal sealed class DesktopLayerHost : IDeskHost
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Top,
             IsHitTestVisible = !through,
+            Opacity = _dim,
             UseLayoutRounding = true,
             SnapsToDevicePixels = true,
             LayoutTransform = Math.Abs(k - 1) < 0.001 ? Transform.Identity : new ScaleTransform(k, k),
@@ -275,17 +284,68 @@ internal sealed class DesktopLayerHost : IDeskHost
         int y = screen.Bounds.Y + (int)Math.Round(top * screen.Scale);
         int pw = (int)Math.Ceiling(w * screen.Scale), ph = (int)Math.Ceiling(h * screen.Scale);
         var hwnd = src.Handle;
+        var home = new PxRect(x, y, pw, ph);
+        _homes[src] = (home, screen);
+        var at = Drifted(home, screen);
         // Physical pixels in, physical pixels out: the same per-monitor context the monitors were read in.
         DeskNative.PerMonitor(() =>
         {
             if (first)
-                Reorder(() => DeskNative.SetWindowPos(hwnd, DeskNative.HWND_BOTTOM, x, y, pw, ph,
+                Reorder(() => DeskNative.SetWindowPos(hwnd, DeskNative.HWND_BOTTOM, at.X, at.Y, pw, ph,
                     DeskNative.SWP_NOACTIVATE | DeskNative.SWP_SHOWWINDOW));
-            else if (DeskNative.Rect(hwnd) != new PxRect(x, y, pw, ph))
-                DeskNative.SetWindowPos(hwnd, IntPtr.Zero, x, y, pw, ph,
+            else if (DeskNative.Rect(hwnd) != at)
+                DeskNative.SetWindowPos(hwnd, IntPtr.Zero, at.X, at.Y, pw, ph,
                     DeskNative.SWP_NOACTIVATE | DeskNative.SWP_NOZORDER | DeskNative.SWP_NOOWNERZORDER);
             return true;
         });
+    }
+
+    /// <summary>Where a window at <paramref name="home"/> sits with OLED care's drift: the orbit's point, applied to the
+    /// window as a whole. The orbit is held to the content (the window less its shadow room) so a piece never leaves the
+    /// monitor's work area or crosses the taskbar's clearance; the padding rides along.</summary>
+    private PxRect Drifted(PxRect home, DeskScreen screen)
+    {
+        if (_drift is not { } step) return home;
+        int pad = (int)Math.Round(Pad * screen.Scale);
+        var content = new PxRect(home.X + pad, home.Y + pad, Math.Max(1, home.Width - 2 * pad), Math.Max(1, home.Height - 2 * pad));
+        var moved = OledDrift.Drifted(content, step, screen.Work, ExtraClearance(screen));
+        return home with { X = home.X + (moved.X - content.X), Y = home.Y + (moved.Y - content.Y) };
+    }
+
+    /// <summary>The taskbar's reach beyond what the work area already leaves out, in pixels: the work area excludes a shown taskbar
+    /// but not an auto-hidden one, and the Desk keeps clear of both (<see cref="DeskScreen.Taskbar"/>, in DIPs).</summary>
+    private static DeskInsets ExtraClearance(DeskScreen screen)
+    {
+        var reserved = TaskbarClearance.Reserved(screen.Bounds, screen.Work);
+        var t = screen.Taskbar;
+        double s = screen.Scale > 0 ? screen.Scale : 1;
+        return new(Math.Max(0, t.Left * s - reserved.Left), Math.Max(0, t.Top * s - reserved.Top),
+            Math.Max(0, t.Right * s - reserved.Right), Math.Max(0, t.Bottom * s - reserved.Bottom));
+    }
+
+    public void SetDrift(int? step)
+    {
+        if (_drift == step) return;
+        _drift = step;
+        DeskNative.PerMonitor(() =>
+        {
+            foreach (var w in _windows)
+            {
+                if (w.IsDisposed || !_homes.TryGetValue(w, out var h)) continue;
+                var at = Drifted(h.Home, h.Screen);
+                if (DeskNative.Rect(w.Handle) != at)
+                    DeskNative.SetWindowPos(w.Handle, IntPtr.Zero, at.X, at.Y, at.Width, at.Height,
+                        DeskNative.SWP_NOACTIVATE | DeskNative.SWP_NOZORDER | DeskNative.SWP_NOOWNERZORDER | DeskNative.SWP_NOSIZE);
+            }
+            return true;
+        });
+    }
+
+    public void SetDim(double opacity, TimeSpan ease)
+    {
+        _dim = opacity;
+        foreach (var w in _windows)
+            if (!w.IsDisposed && w.RootVisual is Border b) CareOpacity.Ease(b, opacity, ease);
     }
 
     private void CloseWindows()
@@ -297,6 +357,7 @@ internal sealed class DesktopLayerHost : IDeskHost
                 if (!w.IsDisposed) w.Dispose();
             _windows.Clear();
             _screens.Clear();
+            _homes.Clear();
         }
         finally { _closing = false; }
     }

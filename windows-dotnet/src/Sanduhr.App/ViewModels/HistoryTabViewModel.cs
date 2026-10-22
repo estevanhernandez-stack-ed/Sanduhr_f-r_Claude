@@ -16,7 +16,11 @@ namespace Sanduhr.App.ViewModels;
 public sealed record AccountOption(string Display, string? Account);
 
 /// <summary>A legend entry — an account's label and its overlay swatch brush.</summary>
-public sealed record LegendItem(string Label, Brush Swatch);
+public sealed record LegendItem(string Label, Brush Swatch)
+{
+    /// <summary>What a screen reader reads for the legend entry (the swatch is colour only).</summary>
+    public override string ToString() => Label;
+}
 
 /// <summary>
 /// Backs the Settings → History tab — the 30-day usage chart with the per-account

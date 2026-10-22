@@ -28,6 +28,8 @@ public sealed partial class PublishRootToggleViewModel : ObservableObject
         _loading = false;
     }
 
+    public override string ToString() => Name;
+
     partial void OnIsSharedChanged(bool value)
     {
         if (!_loading)

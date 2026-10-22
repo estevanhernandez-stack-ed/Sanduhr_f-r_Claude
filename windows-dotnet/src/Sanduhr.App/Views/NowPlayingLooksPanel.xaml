@@ -1,0 +1,79 @@
+<UserControl x:Class="Sanduhr.App.Views.NowPlayingLooksPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:Sanduhr.App.Converters"
+             xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
+             Focusable="False">
+    <!-- Settings, Now playing, Looks (spec, a look per song): the two switches, how many looks are saved, Clear Looks… and the card for
+         Claude's suggestion. Its own control so the names a screen reader reads can be tested. Hosted inside SettingsWindow, which supplies
+         ThemedCheckBox, AccentButton and FlatButton (found at run time) and the theme brushes. DataContext: NowPlayingPageViewModel. -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolVis" />
+        <conv:StringToVisibilityConverter x:Key="StrVis" />
+    </UserControl.Resources>
+    <StackPanel>
+        <TextBlock Text="Looks" FontSize="13" FontWeight="SemiBold"
+                   Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+
+        <!-- Claude's suggestion: only while one waits. Each song is drawn in its look on black. -->
+        <Border Background="{DynamicResource Sanduhr.Brush.Bg}" BorderBrush="{DynamicResource Sanduhr.Brush.Accent}"
+                BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,0,12"
+                Visibility="{Binding HasSuggestion, Converter={StaticResource BoolVis}}">
+            <StackPanel>
+                <TextBlock Text="{Binding SuggestionTitle}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"
+                           Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0" Text="{Binding SuggestionNote}"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                           Visibility="{Binding SuggestionNote, Converter={StaticResource StrVis}}" />
+                <ItemsControl ItemsSource="{Binding SuggestionSongs}" Focusable="False" Margin="0,8,0,0"
+                              AutomationProperties.Name="The songs Claude styled">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="Black" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Display}" Foreground="{Binding Foreground}"
+                                               FontFamily="Segoe UI" FontSize="14" FontWeight="{Binding FontWeight}" FontStyle="{Binding FontStyle}"
+                                               HorizontalAlignment="Left" TextTrimming="CharacterEllipsis"
+                                               AutomationProperties.Name="{Binding AccessibleName}" />
+                                    <TextBlock Text="{Binding Mood}" FontSize="11" Foreground="#99FFFFFF" Margin="0,2,0,0"
+                                               Visibility="{Binding HasMood, Converter={StaticResource BoolVis}}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <Button Style="{DynamicResource AccentButton}" Content="Save"
+                            Command="{Binding SaveSuggestionCommand}"
+                            AutomationProperties.Name="Save Claude's suggested looks" />
+                    <Button Style="{DynamicResource FlatButton}" Content="Dismiss"
+                            Command="{Binding DismissSuggestionCommand}"
+                            AutomationProperties.Name="Dismiss Claude's suggested looks" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <CheckBox Style="{DynamicResource ThemedCheckBox}"
+                  Content="{x:Static core:SettingsNames.NowPlayingStyle}"
+                  IsChecked="{Binding Style, Mode=TwoWay}"
+                  AutomationProperties.Name="{x:Static core:SettingsNames.NowPlayingStyle}" />
+        <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                   Text="The Desk draws each song in a gradient and a letter style of its own. A song you have no saved look for wears one picked from its name out of eight palettes, so every song has one at once. The play mark stays plain; the position bar and the bars beside it take the gradient." />
+        <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,12,0,0"
+                  Content="{x:Static core:SettingsNames.NowPlayingLooksDirect}"
+                  IsChecked="{Binding LooksDirect, Mode=TwoWay}"
+                  AutomationProperties.Name="{x:Static core:SettingsNames.NowPlayingLooksDirect}" />
+        <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                   Text="Claude can suggest looks for the songs you play (propose_now_playing_looks). By default they wait here for Save or Dismiss; with this on they are saved as they arrive. Sanduhr keeps a song's title and artist only inside a look you keep." />
+        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <TextBlock Text="{Binding SavedLooksText}" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                       AutomationProperties.Name="{Binding SavedLooksText}" />
+            <Button Style="{DynamicResource FlatButton}" Content="{x:Static core:SettingsNames.ClearLooks}"
+                    Command="{Binding ClearLooksCommand}" IsEnabled="{Binding CanClearLooks}"
+                    AutomationProperties.Name="{x:Static core:SettingsNames.ClearLooks}" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

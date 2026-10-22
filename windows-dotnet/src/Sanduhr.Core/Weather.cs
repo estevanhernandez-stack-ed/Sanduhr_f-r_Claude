@@ -20,6 +20,9 @@ public sealed record WeatherPlace(string Name, string? Admin, string? Country, d
     /// <summary>"Fort Worth, Texas, United States", skipping empty parts.</summary>
     public string Label => string.Join(", ", new[] { Name, Admin, Country }.Where(p => !string.IsNullOrWhiteSpace(p)));
 
+    /// <summary>What a screen reader reads for a result row: the place's label, never the record's fields.</summary>
+    public override string ToString() => Label;
+
     internal static double Round2(double v) => Math.Round(v, 2, MidpointRounding.AwayFromZero) + 0.0;
 }
 

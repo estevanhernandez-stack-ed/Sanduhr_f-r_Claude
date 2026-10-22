@@ -19,6 +19,8 @@ public sealed partial class ThemeTokenRowViewModel : ObservableObject
     public string Label { get; }
     public string Job { get; }
 
+    public override string ToString() => $"{Label}, {Hex}";
+
     [ObservableProperty] private string _hex = "";
     [ObservableProperty] private Brush _swatch = Brushes.Transparent;
     [ObservableProperty] private bool _hasError;
@@ -60,7 +62,11 @@ public sealed partial class ThemeTokenRowViewModel : ObservableObject
 }
 
 /// <summary>A lint finding for the list under the rows.</summary>
-public sealed record ThemeFindingViewModel(string Field, string Message, bool IsError);
+public sealed record ThemeFindingViewModel(string Field, string Message, bool IsError)
+{
+    /// <summary>What a screen reader reads for the finding: "bg: not a hex colour".</summary>
+    public override string ToString() => $"{Field}: {Message}";
+}
 
 /// <summary>
 /// The Theme Studio: token-level editing with the widget itself as the live

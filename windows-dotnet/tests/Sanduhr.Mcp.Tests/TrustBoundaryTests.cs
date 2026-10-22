@@ -50,7 +50,26 @@ public class TrustBoundaryTests
                 //   DeskMessages, MessageEffects, LetterMap: the line grammar and the "today" pick.
                 //   MessageProposal: the line checks and the request decode (the widget's authority).
                 //   Watchers, WatcherRequest: the limits, the commands, the request and switch files.
-                "DeskMessages.cs", "LetterMap.cs", "MessageEffects.cs", "MessageProposal.cs",
+                "DeskArrangement.cs", "DeskDesign.cs", "DeskDesignValidator.cs", "DeskFont.cs", "DeskInk.cs",
+                "DeskMessages.cs", "DeskPlate.cs",
+                // get_desk and propose_desk (3.7.0, the agent-designed Desk). Nine files, all pure (text, JSON, regex and
+                // math; no IO, network, credentials or process), so the server validates a design with the widget's own
+                // code. The widget owns every write that matters; the server queues request files and reads desk-state.json.
+                //   DeskDesign, DeskDesignValidator: the design contract, its rules (contrast, fonts, Start-menu
+                //     membership), Merge and Diff.
+                //   WallpaperSummary: the summary types and their JSON, read from desk-state.json.
+                //   DeskArrangement: the piece keys, the anchors, the size range.
+                //   DeskInk: the ink parsing and luminance (InkHex, DeskInk).
+                //   DeskPlate: the plate's color and opacity. DeskFont: the bundled family names.
+                //   LauncherTarget, LauncherModel: the Launcher button shape rules (a button opens only a Start-menu app
+                //     or an https link; membership is checked against desk-state.json's list).
+                "LauncherModel.cs", "LauncherTarget.cs",
+                "LetterMap.cs", "MessageEffects.cs", "MessageProposal.cs",
+                // propose_now_playing_looks (3.7.0, a look per song). One file, pure (text, JSON, regex and math; no IO, network,
+                // credentials or process): the look model, the song key (FNV-1a 64), the checks with the contrast rule, the request
+                // decode and the result shape, so the server refuses exactly what the widget would. The widget owns every write
+                // (the saved looks, the handoff files, the file for the mod); the server queues the request file only.
+                "NowPlayingLook.cs",
                 "Pacing.cs", "SnapshotContract.cs",
                 // propose_theme: the lint and the model it builds, both pure. The
                 // widget owns every write under the themes folder.
@@ -59,6 +78,7 @@ public class TrustBoundaryTests
                 // MCP-side vault writes; VaultStore's write methods have no call
                 // sites in the server (cold-verified tool surface).
                 "VaultJson.cs", "VaultModels.cs", "VaultReader.cs", "VaultStore.cs",
+                "WallpaperSummary.cs",
                 "WatcherRequest.cs", "Watchers.cs",
             },
             linked);
@@ -66,8 +86,8 @@ public class TrustBoundaryTests
 
     /// <summary>
     /// The linked files are the trust boundary, so each one is read for what it can do. Any of these
-    /// names in a linked file would let the server reach out of its lane. Checks the files the 3.6.0
-    /// widening added (the older slice is covered by the type checks below and the cold verify).
+    /// names in a linked file would let the server reach out of its lane. Checks the files the 3.6.0 and
+    /// 3.7.0 widenings added (the older slice is covered by the type checks below and the cold verify).
     /// </summary>
     [Theory]
     [InlineData("Watchers.cs")]
@@ -76,7 +96,17 @@ public class TrustBoundaryTests
     [InlineData("DeskMessages.cs")]
     [InlineData("MessageEffects.cs")]
     [InlineData("LetterMap.cs")]
-    public void Files_linked_for_watchers_and_desk_messages_are_pure(string file)
+    [InlineData("DeskDesign.cs")]
+    [InlineData("DeskDesignValidator.cs")]
+    [InlineData("WallpaperSummary.cs")]
+    [InlineData("DeskArrangement.cs")]
+    [InlineData("DeskInk.cs")]
+    [InlineData("DeskPlate.cs")]
+    [InlineData("DeskFont.cs")]
+    [InlineData("LauncherTarget.cs")]
+    [InlineData("LauncherModel.cs")]
+    [InlineData("NowPlayingLook.cs")]
+    public void Files_linked_for_watchers_desk_messages_and_desk_designs_are_pure(string file)
     {
         string path = Path.Combine(Path.GetDirectoryName(McpCsprojPath())!, "..", "Sanduhr.Core", file);
         string text = File.ReadAllText(path);
@@ -89,6 +119,28 @@ public class TrustBoundaryTests
         {
             Assert.DoesNotContain(forbidden, text);
         }
+    }
+
+    /// <summary>The widget's half of the design handoff, the state builder, the saved-design store and the wallpaper
+    /// renderer stay out of the server: it validates, queues and reads, and never writes a design or draws a wallpaper.</summary>
+    [Fact]
+    public void The_widgets_half_of_the_desk_design_handoff_is_not_in_the_mcp_assembly()
+    {
+        var typeNames = typeof(Sanduhr.Mcp.McpServer).Assembly.GetTypes().Select(t => t.Name).ToHashSet();
+        foreach (var name in new[] { "DeskDesignHandoff", "DeskDesignLibrary", "SavedDesign", "WallpaperRender", "WallpaperSampler", "DeskSettings", "SettingsNames" })
+            Assert.DoesNotContain(name, typeNames);
+        Assert.Contains("DeskDesign", typeNames);   // and the validator it composes is
+    }
+
+    /// <summary>The widget's half of the song looks (the saved-looks file, the handoff, the file for the mod) stays out of the
+    /// server: it checks, queues the request file and reads desk-state.json, and never saves a look.</summary>
+    [Fact]
+    public void The_widgets_half_of_the_song_looks_is_not_in_the_mcp_assembly()
+    {
+        var typeNames = typeof(Sanduhr.Mcp.McpServer).Assembly.GetTypes().Select(t => t.Name).ToHashSet();
+        foreach (var name in new[] { "NowPlayingLookStore", "NowPlayingLookHandoff", "NowPlayingLookPaths", "MessageFileIo" })
+            Assert.DoesNotContain(name, typeNames);
+        Assert.Contains("NowPlayingLookCheck", typeNames);   // and the checks are
     }
 
     [Fact]

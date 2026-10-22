@@ -33,7 +33,10 @@ public partial class App : Application
     private Desk.NowPlayingHub? _nowPlaying;
     private Desk.DeskMessageSource? _messages;
     private Desk.DeskMessageHandoffService? _handoff;
+    private Desk.DeskDesignService? _deskDesign;
+    private Desk.NowPlayingLookService? _looks;
     private Desk.WatcherStore? _watchers;
+    private LauncherAppCache? _launcherApps;
     private MenuItem? _endDemoItem;
 
     /// <summary>Where this install stands with the welcome tour, decided once at launch.</summary>
@@ -382,6 +385,11 @@ public partial class App : Application
         };
         menu.Opened += (_, _) => UpdateArrangeItem();
 
+        // Only while a design was saved before the last change: switches to it (spec, the agent-designed Desk).
+        _putBackItem = new MenuItem { Header = SettingsNames.PutMyDeskBack, Visibility = Visibility.Collapsed };
+        _putBackItem.Click += (_, _) => _deskDesign?.PutBack();
+        menu.Opened += (_, _) => _putBackItem.Visibility = _deskDesign?.CanPutBack == true ? Visibility.Visible : Visibility.Collapsed;
+
         var refresh = new MenuItem { Header = "Refresh" };
         refresh.Click += (_, _) => _vm?.RefreshCommand.Execute(null);
 
@@ -418,6 +426,7 @@ public partial class App : Application
         menu.Items.Add(whatsNew);
         menu.Items.Add(tour);
         menu.Items.Add(_arrangeItem);
+        menu.Items.Add(_putBackItem);
         menu.Items.Add(refresh);
         menu.Items.Add(BuildTrayShowsMenu());
         menu.Items.Add(new Separator());
@@ -438,6 +447,7 @@ public partial class App : Application
         {
             case Desk.DeskMenuAction.EditMessages: _ = ShowSettingsAsync(SettingsPage.DeskMessage); break;
             case Desk.DeskMenuAction.DeskSettings: _ = ShowSettingsAsync(SettingsPage.Desk); break;
+            case Desk.DeskMenuAction.LauncherSettings: _ = ShowSettingsAsync(SettingsPage.Desk, Sanduhr.Core.SettingsIndex.DeskLauncher); break;
             case Desk.DeskMenuAction.Arrange: _desk?.BeginArrange(); break;
             case Desk.DeskMenuAction.TurnOffDesk:
                 try
@@ -455,7 +465,19 @@ public partial class App : Application
         }
     }
 
+    /// <summary>A Launcher button for an app that is no longer installed was chosen: Settings, Desk, Launcher opens at that button.</summary>
+    private void OnLauncherMissing(int index)
+    {
+        _ = ShowSettingsAsync(SettingsPage.Desk, Sanduhr.Core.SettingsIndex.DeskLauncher);
+        if (_settingsWindow?.ViewModel.Desk.Launcher is { } launcher)
+        {
+            launcher.Reload();
+            launcher.Select(index);
+        }
+    }
+
     private MenuItem? _arrangeItem;
+    private MenuItem? _putBackItem;
 
     /// <summary>The tray's Arrange entry follows the Desk: hidden while it is off, "Finish arranging" while arranging.</summary>
     private void UpdateArrangeItem()
@@ -464,6 +486,13 @@ public partial class App : Application
         bool arranging = _desk?.Arranging == true;
         _arrangeItem.Visibility = arranging || _desk?.Running == true ? Visibility.Visible : Visibility.Collapsed;
         _arrangeItem.Header = arranging ? DeskArrangeCopy.TrayFinish : DeskArrangeCopy.MenuItem;
+    }
+
+    /// <summary>A design was applied: an open Settings window re-reads the Desk page, the Launcher and the designs.</summary>
+    private void FollowDesignChange()
+    {
+        if (_settingsWindow?.ViewModel.Desk is not { } page) return;
+        page.RefreshFromStore();
     }
 
     /// <summary>Arrange mode began, dropped a piece or ended: the tray entry and an open Settings window follow
@@ -499,20 +528,39 @@ public partial class App : Application
             if (_desk is { Running: true, WatchersPlaced: true }) _glow?.Preview(ClaudeCodeEvent.Waiting);
         };
         _watchers.Start();
+        // The Launcher (spec, Desk Launcher): one in-memory view of the Start menu for the Desk and Settings.
+        _launcherApps = new LauncherAppCache();
+        LauncherAppCache.Current = _launcherApps;
+        // The agent-designed Desk (spec 3.7.0): desk-state.json for get_desk while the MCP integration is installed,
+        // and the request/result handoff for propose_desk (phase 1 answers not_ready; the preview is the next phase).
+        _deskDesign = new Desk.DeskDesignService(paths, store, _launcherApps);
+        Desk.DeskDesignService.Current = _deskDesign;
+        _deskDesign.Start();
+        // A look per song (spec, a look per song): the gradient and letter style the Desk draws the playing song in, Claude's suggested looks
+        // (the MCP tool and the now-playing mod's offer), and now-playing-look.json for the mod. The contrast rule is judged against the wallpaper.
+        _looks = new Desk.NowPlayingLookService(paths, store, _nowPlaying, () => _deskDesign.LooksContext());
+        Desk.NowPlayingLookService.Current = _looks;
+        _deskDesign.Looks = _looks;
         _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
-            () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers)
+            () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers, paths, _launcherApps, looks: _looks)
         {
             ThemeText = ThemeTextHex,
         };
+        // The live review of Claude's Desk designs: the Desk and widget draw a design from memory, the floating bar asks Apply or Dismiss.
+        _deskDesign.Host = new Desk.DeskDesignHost(_desk, () => _vm, FollowDesignChange);
+        _deskDesign.DesignsChanged += () => _settingsWindow?.ViewModel.Desk.Designs.Reload();
+        _desk.LauncherMissingClicked += OnLauncherMissing;
         _vm.DeskUsageChanged += _desk.UsageChanged;
         // The glow's Desk spot (spec 7.3): the glow service asks the Desk first and falls back to the window.
         if (_glow is not null) _glow.DeskGlow = c => _desk?.Glow(c) == true;
         _desk.ArrangeChanged += OnArrangeChanged;
+        _desk.WidgetDimRequested += (dimmed, ease) => _window?.SetCareDim(dimmed, ease);
         _desk.MenuRequested += OnDeskMenu;
         _vm.ThemeChanged += _ => _desk?.ThemeChanged();
         // The widget's now-playing line (spec 6.3, W8) shares the Desk's media-session listener.
         _vm.NowPlaying = new NowPlayingLineViewModel(_nowPlaying, store);
         _desk.Reload();
+        _looks.Start();
     }
 
     /// <summary>The live widget theme's text color as six hex digits (Theme ink, spec 6.7).</summary>
@@ -562,7 +610,7 @@ public partial class App : Application
     /// non-modal so a live account switch from here reflects in the widget at once.
     /// Re-invoking focuses the existing window and refreshes its account list.
     /// </summary>
-    private Task ShowSettingsAsync(SettingsPage? page = null)
+    private Task ShowSettingsAsync(SettingsPage? page = null, string? anchor = null)
     {
         if (_vm is null)
             return Task.CompletedTask;
@@ -571,7 +619,7 @@ public partial class App : Application
         {
             _settingsWindow.ViewModel.Accounts.Reload();
             if (page is { } p)
-                _settingsWindow.SelectPage(p);
+                _settingsWindow.SelectPage(p, anchor);
             _settingsWindow.Activate();
             return Task.CompletedTask;
         }
@@ -586,7 +634,7 @@ public partial class App : Application
         svm.Desk.ArrangeRequested = () => _desk?.BeginArrange();
         svm.Desk.Arranging = _desk?.Arranging == true;
         svm.Desk.ArrangingLayout = _desk?.Session?.Working.Layout;
-        svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); };
+        svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); _looks?.SettingsChanged(); };
         svm.WeatherPage.Changed = () => _desk?.Reload();
         svm.MessageChanged = () => { _desk?.Reload(); _handoff?.PublishState(); };
         svm.Desk.WatchersChanged = () => _watchers?.SwitchChanged();
@@ -617,7 +665,7 @@ public partial class App : Application
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
         if (page is { } first)
-            _settingsWindow.SelectPage(first);
+            _settingsWindow.SelectPage(first, anchor);
         _settingsWindow.Activate();
         return Task.CompletedTask;
     }
@@ -879,8 +927,11 @@ public partial class App : Application
         WhatsNewWindow.Quitting = true;
         _glow?.Dispose();
         _desk?.Dispose();
+        _looks?.Dispose();
+        _launcherApps?.Dispose();
         _messages?.Dispose();
         _handoff?.Dispose();
+        _deskDesign?.Dispose();
         _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();
@@ -903,8 +954,11 @@ public partial class App : Application
         WhatsNewWindow.Quitting = true;
         _glow?.Dispose();
         _desk?.Dispose();
+        _looks?.Dispose();
+        _launcherApps?.Dispose();
         _messages?.Dispose();
         _handoff?.Dispose();
+        _deskDesign?.Dispose();
         _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();

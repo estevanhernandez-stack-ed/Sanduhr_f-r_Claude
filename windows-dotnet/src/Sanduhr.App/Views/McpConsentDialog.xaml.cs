@@ -25,9 +25,15 @@ internal partial class McpConsentDialog : Window
 
     private McpConsentDialog(
         IReadOnlyList<string> homeNames, string? defaultHome,
-        string launcherPath, Func<string, string> configPathFor)
+        string launcherPath, Func<string, string> configPathFor, string? scopeNote)
     {
         InitializeComponent();
+        if (string.IsNullOrWhiteSpace(scopeNote))
+            ScopeText.Visibility = Visibility.Collapsed;
+        else
+            ScopeText.Text = scopeNote;
+        if (homeNames.Count == 1)
+            IntroText.Text = "Installs a small read-only helper Claude Code can ask for your live headroom before spawning agents or picking a bigger model. It goes into the folder below and no other.";
         foreach (var home in homeNames)
         {
             var rb = new RadioButton
@@ -86,12 +92,13 @@ internal partial class McpConsentDialog : Window
     }
 
     /// <summary>Show the dialog; null when declined/closed. <paramref name="defaultHome"/>
-    /// pre-selects the radio (the statusline's chosen home, when one exists).</summary>
+    /// pre-selects the radio (the statusline's chosen home, when one exists). <paramref name="scopeNote"/> says
+    /// what the install leaves alone (<see cref="Sanduhr.Core.McpConsentCopy"/>).</summary>
     public static McpConsentResult? ShowConsent(
         Window? owner, IReadOnlyList<string> homeNames, string? defaultHome,
-        string launcherPath, Func<string, string> configPathFor)
+        string launcherPath, Func<string, string> configPathFor, string? scopeNote = null)
     {
-        var dlg = new McpConsentDialog(homeNames, defaultHome, launcherPath, configPathFor);
+        var dlg = new McpConsentDialog(homeNames, defaultHome, launcherPath, configPathFor, scopeNote);
         if (owner is not null && owner.IsLoaded)
             dlg.Owner = owner;
         else

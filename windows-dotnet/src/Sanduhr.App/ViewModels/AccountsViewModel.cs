@@ -24,6 +24,9 @@ public sealed partial class AccountItemViewModel : ObservableObject
     public string Marker => IsActive ? "●" : "";
 
     partial void OnIsActiveChanged(bool value) => OnPropertyChanged(nameof(Marker));
+
+    /// <summary>What a screen reader reads for the row: "Work, active", never the type name.</summary>
+    public override string ToString() => IsActive ? Label + ", active" : Label;
 }
 
 /// <summary>

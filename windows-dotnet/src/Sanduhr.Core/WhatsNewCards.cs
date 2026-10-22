@@ -7,7 +7,35 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class WhatsNewCards
 {
-    public static IReadOnlyList<WhatsNewCard> Table { get; } = [.. Release360(), .. Release350()];
+    public static IReadOnlyList<WhatsNewCard> Table { get; } = [.. Release371(), .. Release360(), .. Release350()];
+
+    private static WhatsNewCard[] Release371() =>
+    [
+        WhatsNewCard.Of("3.7.1", "desk-design", "Claude can design your Desk",
+            "Claude Code can read your Desk and wallpaper and propose a whole look. It waits on a bar on your desktop for Apply or Dismiss, unless you let it change the Desk directly.",
+            "", // Edit
+            WhatsNewPreview.None, SettingsPage.Desk),
+        WhatsNewCard.Of("3.7.1", "launcher", "A Launcher on the Desk",
+            "Up to eight buttons on your Desk open Start-menu apps, web apps or https links when you click. Add them in Settings, Desk.",
+            "", // AllApps
+            WhatsNewPreview.None, SettingsPage.Desk),
+        WhatsNewCard.Of("3.7.1", "per-monitor", "A Desk piece on each monitor",
+            "Put each piece on all monitors, the main one or a monitor you pick. Arrange Desk can drag a piece from one monitor to another.",
+            "", // OpenInNewWindow
+            WhatsNewPreview.None, SettingsPage.Desk),
+        WhatsNewCard.Of("3.7.1", "song-looks", "A look for every song",
+            "Turn on Style what's playing and each song gets its own gradient and letter style. Claude can suggest looks, and nothing is saved until you say so.",
+            "", // Font
+            WhatsNewPreview.None, SettingsPage.NowPlaying),
+        WhatsNewCard.Of("3.7.1", "oled-care", "Care for OLED screens",
+            "The Desk drifts a few pixels every 3 minutes, dims after 5 idle minutes, and can hold its ink off pure white. Turn it on in Settings, Desk.",
+            "", // Brightness
+            WhatsNewPreview.None, SettingsPage.Desk),
+        WhatsNewCard.Of("3.7.1", "saved-designs", "Put my Desk back",
+            "Sanduhr keeps your last ten Desk looks, and you can pin the ones you love. Put my Desk back, in Settings and the tray menu, returns to the look before a change.",
+            "", // Undo
+            WhatsNewPreview.None, SettingsPage.Desk),
+    ];
 
     private static WhatsNewCard[] Release360() =>
     [

@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Toolkit.Uwp.Notifications;
+using Sanduhr.App.Interop;
 using Sanduhr.App.Services;
 using Sanduhr.Core;
 
@@ -27,6 +29,10 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private readonly NowPlayingHub _nowPlaying;
     private readonly DeskMessageSource _messages;
     private readonly WatcherStore? _watchers;
+    private readonly Paths? _paths;
+    private readonly LauncherAppCache? _launcherApps;
+    private readonly NowPlayingLookService? _looks;
+    private readonly Dispatcher _ui = Dispatcher.CurrentDispatcher;
     private readonly DispatcherTimer _minute;
     private readonly TelemetrySource _telemetry = new();
     private readonly AudioLevelSource _audio = new();
@@ -39,6 +45,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private NowPlayingSettings _np = NowPlayingSettings.Default;
     private DeskWeatherSettings _weatherSettings = DeskWeatherSettings.Default;
     private DeskUsage _usage = DeskUsage.Empty;
+    private LauncherModel _launcher = LauncherModel.Empty;
     private readonly List<DeskView> _views = [];
     /// <summary>Message lines whose once-only motion has run (spec 6.2), kept across redraws.</summary>
     private readonly HashSet<string> _played = new(StringComparer.Ordinal);
@@ -60,10 +67,25 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private bool _stopped;
     private DeskArrangeSession? _session;
     private DeskArrangeMode? _arrangeMode;
+    /// <summary>A design under review (the live review): drawn from memory in place of the saved layout, font, plate, ink and Launcher.
+    /// Nothing is written; <see cref="EndPreview"/> draws the saved ones again.</summary>
+    private DeskDesignSettings? _preview;
+    /// <summary>OLED care (spec 3.7.0): the drift and idle clocks, and whether the switch is on.</summary>
+    private readonly OledCareDriver _oled;
+    private bool _oledOn;
 
     public DeskController(SettingsStore store, Func<IDeskHost> hostFactory, Func<DeskUsage> usageSource,
-        NowPlayingHub nowPlaying, DeskMessageSource messages, WatcherStore? watchers = null)
+        NowPlayingHub nowPlaying, DeskMessageSource messages, WatcherStore? watchers = null,
+        Paths? paths = null, LauncherAppCache? launcherApps = null, OledCareDriver? oled = null, NowPlayingLookService? looks = null)
     {
+        _looks = looks;
+        if (_looks is not null) _looks.Changed += OnLooksChanged;
+        _oled = oled ?? new OledCareDriver();
+        _oled.DriftStepped += ApplyDrift;
+        _oled.DimChanged += OnDim;
+        _paths = paths;
+        _launcherApps = launcherApps;
+        if (_launcherApps is not null) _launcherApps.Changed += OnLauncherAppsChanged;
         _store = store;
         _hostFactory = hostFactory;
         _usageSource = usageSource;
@@ -81,6 +103,38 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _nowPlaying.PresenceChanged += OnPresenceChanged;
     }
 
+    /// <summary>"Style what's playing" went on or off, or the saved looks changed: the line is drawn again in the look it now wears.</summary>
+    private void OnLooksChanged()
+    {
+        if (_host is null || _stopped) return;
+        Render();
+    }
+
+    /// <summary>OLED care's clocks (the live check and the tests drive them).</summary>
+    internal OledCareDriver Oled => _oled;
+
+    /// <summary>OLED care dimmed the widget (true) or woke it (false), easing over the span; the app takes the widget window's content
+    /// to <see cref="OledIdle.WidgetDimmedOpacity"/> or back. Raised whether or not the Desk is on: the care is one switch.</summary>
+    public event Action<bool, TimeSpan>? WidgetDimRequested;
+
+    /// <summary>
+    /// The drift is paused while Arrange mode runs and while a design is under review (the pieces sit at their true anchor then);
+    /// the orbit's point otherwise, null with the care off.
+    /// </summary>
+    private int? DriftNow => _oledOn && !Arranging && _preview is null ? _oled.Step : null;
+
+    private void ApplyDrift() => _host?.SetDrift(DriftNow);
+
+    private void OnDim(bool dim)
+    {
+        var ease = _oled.Ease;
+        _host?.SetDim(dim ? OledIdle.DeskDimmedOpacity : 1.0, ease);
+        WidgetDimRequested?.Invoke(dim, ease);
+    }
+
+    /// <summary>The ink with OLED care's rule on it: nothing held at pure white. Off, the ink as resolved.</summary>
+    private ResolvedInk Care(ResolvedInk ink) => _oledOn ? DeskInk.CapWhite(ink) : ink;
+
     /// <summary>True when the Watchers piece has a place on the Desk (the watcher glow fires only then).</summary>
     internal bool WatchersPlaced => Placed("watchers");
 
@@ -88,6 +142,92 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private IReadOnlyList<Watcher> WatchersNow() => _watchers is not null && Placed("watchers") ? _watchers.Shown : [];
 
     private bool _piecesTakeClicks = DeskPieceClicks.DefaultOn;
+
+    /// <summary>A click landed on a Launcher button whose app is no longer installed (its index): Settings opens at it.</summary>
+    public event Action<int>? LauncherMissingClicked;
+
+    /// <summary>The Start menu's list or an app's icon arrived: redraw if the Launcher shows.</summary>
+    private void OnLauncherAppsChanged()
+    {
+        if (_host is null || _stopped || !Placed("launcher") || _launcher.IsEmpty) return;
+        Render();
+    }
+
+    /// <summary>What the Launcher piece draws from now: the buttons, the apps the Start menu no longer has, and the
+    /// icons, names and chosen images the shell and the images folder have already given. Null when the piece
+    /// is not placed or has no buttons. Asks the cache to read the Start menu in the background when its list is old.</summary>
+    private DeskLauncherFrame? LauncherNow()
+    {
+        if (_launcher.IsEmpty || !Placed("launcher")) return null;
+        var ids = _launcher.Buttons.Where(b => b.Kind == LauncherKind.App).Select(b => b.Target).Distinct(StringComparer.Ordinal).ToList();
+        _launcherApps?.Refresh(ids);
+        var missing = new HashSet<string>(StringComparer.Ordinal);
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        var icons = new Dictionary<string, System.Windows.Media.ImageSource>(StringComparer.Ordinal);
+        var images = new Dictionary<string, System.Windows.Media.ImageSource>(StringComparer.Ordinal);
+        foreach (var b in _launcher.Buttons)
+        {
+            if (b.Image is { } file && _paths is not null && !images.ContainsKey(file) && LauncherImages.Load(_paths, file) is { } picked)
+                images[file] = picked;
+        }
+        foreach (var b in _launcher.Buttons.Where(b => b.Kind == LauncherKind.App))
+        {
+            if (_launcherApps is null) break;
+            if (_launcherApps.NameOf(b.Target) is { } name) names[b.Target] = name;
+            if (_launcherApps.IsMissing(b.Target)) { missing.Add(b.Target); continue; }
+            bool hasOwnImage = b.Image is { } f && images.ContainsKey(f);
+            if (!hasOwnImage && _launcherApps.IconOf(b.Target) is { } icon) icons[b.Target] = icon;
+        }
+        return new DeskLauncherFrame(_launcher, missing, icons, names, images);
+    }
+
+    /// <summary>
+    /// A Launcher button was clicked, tapped or invoked (spec, Desk Launcher): the app opens through the shell, the
+    /// link in the default browser, off the UI thread, never elevated and never waited for. An app the Start menu no
+    /// longer has sends the click to Settings, at that button; any other failure shows a toast with the button's name.
+    /// </summary>
+    public void LaunchButton(int index)
+    {
+        if (_stopped || index < 0 || index >= _launcher.Buttons.Count) return;
+        var button = _launcher.Buttons[index];
+        var name = button.DisplayName(_launcherApps?.NameOf(button.Target));
+        Func<string, bool>? exists = _launcherApps is null ? null : _launcherApps.ExistsNow;
+        Task.Run(() => LauncherApps.Open(button, exists)).ContinueWith(t =>
+        {
+            var result = t.IsCompletedSuccessfully ? t.Result : LauncherApps.OpenResult.Failed;
+            _ui.BeginInvoke(() =>
+            {
+                if (_stopped) return;
+                switch (result)
+                {
+                    case LauncherApps.OpenResult.Missing:
+                        _launcherApps?.Refresh([], force: true);   // the dim follows what the Start menu says now
+                        LauncherMissingClicked?.Invoke(index);
+                        break;
+                    case LauncherApps.OpenResult.Opened:
+                        break;
+                    default:
+                        ShowOpenFailed(name);
+                        break;
+                }
+            });
+        });
+    }
+
+    private static void ShowOpenFailed(string name)
+    {
+        try
+        {
+            new ToastContentBuilder()
+                .AddText($"Couldn't open {name}")
+                .AddText("Check that it is still there, then try again.")
+                .Show();
+        }
+        catch (Exception e)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Sanduhr] Launcher toast failed: {e.GetType().Name}");
+        }
+    }
 
     /// <summary>A Desk menu item was chosen (spec 7.4); the app opens the page, arranges or turns the Desk off.</summary>
     public event Action<DeskMenuAction>? MenuRequested;
@@ -142,6 +282,16 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _nowPlaying.Configure(_np.Prefs);
         _weatherSettings = _store.LoadDeskWeather();
         _piecesTakeClicks = _store.LoadDeskPiecesTakeClicks();
+        _launcher = _store.LoadLauncher();
+        _oledOn = _store.LoadOledCare();
+        _oled.On = _oledOn; // off wakes anything it had dimmed
+        if (_preview is { } preview)
+        {
+            // A design under review: shown even where the Desk is off (the review says so), never saved.
+            _settings = preview.Desk with { Enabled = true };
+            _ink = preview.Ink;
+            _launcher = preview.Launcher;
+        }
         _messages.Reload();
         if (!_settings.Enabled)
         {
@@ -153,8 +303,33 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             _host = _hostFactory();
             _host.ScreensChanged += OnScreensChanged;
             _host.CoverageChanged += OnCoverageChanged;
+            if (_oled.Dimmed) _host.SetDim(OledIdle.DeskDimmedOpacity, TimeSpan.Zero);
         }
+        ApplyDrift();
         Rebuild();
+    }
+
+    /// <summary>True while a design is drawn from memory for review.</summary>
+    public bool Previewing => _preview is not null;
+
+    /// <summary>
+    /// Draws a design under review (the live review): the layout, font, plate, ink and Launcher in <paramref name="design"/> replace the
+    /// saved ones on every screen until <see cref="EndPreview"/>. Nothing is saved; Arrange mode, if it runs, ends as Cancel.
+    /// </summary>
+    public void ShowPreview(DeskDesignSettings design)
+    {
+        if (_stopped) return;
+        if (Arranging) EndArrangeCore(DeskArrangeEnd.Cancel, reload: false);
+        _preview = design;
+        Reload();
+    }
+
+    /// <summary>The review is over (Dismiss, or Apply wrote the design): the saved Desk is drawn again.</summary>
+    public void EndPreview()
+    {
+        if (_preview is null) return;
+        _preview = null;
+        Reload();
     }
 
     /// <summary>The widget's theme changed: Theme ink follows it.</summary>
@@ -176,6 +351,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     public void StopForReset()
     {
         _stopped = true;
+        _oled.On = false;
         StopHost();
     }
 
@@ -183,8 +359,13 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         _stopped = true;
         StopHost();
+        _oled.DriftStepped -= ApplyDrift;
+        _oled.DimChanged -= OnDim;
+        _oled.Dispose();
         _nowPlaying.Changed -= OnTrackChanged;
         _nowPlaying.PresenceChanged -= OnPresenceChanged;
+        if (_launcherApps is not null) _launcherApps.Changed -= OnLauncherAppsChanged;
+        if (_looks is not null) _looks.Changed -= OnLooksChanged;
         _pump.Stop();
         _audio.Dispose();
         _weather.Dispose();
@@ -233,16 +414,18 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Now = now,
             Message = _messages.Frame(now, _settings) is { } m ? m with { Played = new HashSet<string>(m.Played, StringComparer.Ordinal) } : null,
             Track = track,
+            Look = _looks?.DrawFor(track, _oledOn),
             Telemetry = Placed("telemetry") ? _telemetry : null,
             WeatherOn = Placed("weather"),
             Place = _weatherSettings.Place,
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
             Watchers = WatchersNow(),
+            Launcher = LauncherNow(),
         };
         DeskArrangeMode mode;
         try
         {
-            mode = new DeskArrangeMode(_screens, _settings, _fonts, frame, session.Working,
+            mode = new DeskArrangeMode(_screens, _settings, _fonts, frame, session.Working, ConnectedIds,
                 how => EndArrange(how), () => ArrangeChanged?.Invoke());
         }
         catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception)
@@ -252,6 +435,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         }
         _session = session;
         _arrangeMode = mode;
+        ApplyDrift(); // pieces sit at their true anchor while arranging
         // The islands go down while the arrange surfaces are up; coverage and sources have nothing to follow.
         foreach (var v in _views) v.Dispose();
         _views.Clear();
@@ -308,6 +492,14 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     }
 
     private IReadOnlyList<DeskScreen> _screens = [];
+
+    /// <summary>The device paths of the screens the Desk has now: a piece placed on a monitor that is not among them draws on the main one.</summary>
+    private IReadOnlyCollection<string> ConnectedIds => [.. _screens.Select(s => s.Id).OfType<string>()];
+
+    /// <summary>The layout string of the pieces drawn on one screen: those on every monitor and those placed on this one
+    /// (<see cref="DeskArrangement.ForScreen"/>). The saved layout is never changed by this.</summary>
+    private string LayoutFor(DeskScreen screen) =>
+        new DeskArrangement(_settings.Layout).ForScreen(screen.Ref, ConnectedIds).Layout;
 
     private bool Placed(string widget) => new DeskArrangement(_settings.Layout).Placement(widget) is not null;
 
@@ -454,6 +646,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Message = PlayedFor(_messages.Frame(now, _settings)),
             TrackNow = () => _np.Prefs.Visible(_nowPlaying.Shown) ?? _lastTrack,
             Track = track,
+            Look = _looks?.DrawFor(track, _oledOn),
             Presence = track is null ? 0 : _nowPlaying.Presence.Amount(now),
             Bars = _np.Bars,
             Audio = _audio,
@@ -462,6 +655,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Place = _weatherSettings.Place,
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
             Watchers = WatchersNow(),
+            Launcher = LauncherNow(),
         };
         _fullAt = now;
         foreach (var old in _views) old.Dispose();
@@ -469,7 +663,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         var surfaces = new List<DeskSurface>();
         foreach (var screen in _screens)
         {
-            var view = new DeskView(screen, _settings, _fonts);
+            var view = new DeskView(screen, _settings with { Layout = LayoutFor(screen) }, _fonts);
             view.Update(frame, InkFor(view, screen, frame));
             _views.Add(view);
             surfaces.Add(new DeskSurface(screen, DeskClicks.Prepare(view.TakeIslands(), _piecesTakeClicks, this)));
@@ -503,7 +697,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private DeskInkMap InkFor(DeskView view, DeskScreen screen, DeskFrame frame)
     {
         if (_ink.Mode != DeskInkMode.Auto)
-            return new DeskInkMap(DeskInk.Resolve(_ink, ThemeText(), null));
+            return new DeskInkMap(Care(DeskInk.Resolve(_ink, ThemeText(), null)));
         // The sampling pass draws nothing anyone sees: give its message a scratch copy of the played set
         // so the drawn pass still writes a new line in.
         var scratch = frame.Message is { } m ? frame with { Message = m with { Played = new HashSet<string>(m.Played, StringComparer.Ordinal) } } : frame;
@@ -514,9 +708,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             var px = new PxRect(
                 screen.Bounds.X + (int)Math.Round(r.X * screen.Scale), screen.Bounds.Y + (int)Math.Round(r.Y * screen.Scale),
                 Math.Max(1, (int)Math.Round(r.Width * screen.Scale)), Math.Max(1, (int)Math.Round(r.Height * screen.Scale)));
-            by[anchor] = DeskInk.Resolve(_ink, ThemeText(), _wallpaper.Luminance(screen, px));
+            by[anchor] = Care(DeskInk.Resolve(_ink, ThemeText(), _wallpaper.Luminance(screen, px)));
         }
-        return new DeskInkMap(DeskInk.Resolve(_ink, ThemeText(), null), by);
+        return new DeskInkMap(Care(DeskInk.Resolve(_ink, ThemeText(), null)), by);
     }
 
     /// <summary>Hands the message its played set, forgetting lines no longer showing (one that comes back

@@ -133,6 +133,9 @@ internal partial class ResetWindow : Window
     private sealed record ResultRow(string Name, string Status, Brush StatusBrush, string Detail)
     {
         public Visibility DetailVisibility => Detail.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+        /// <summary>A result row reads as "Meters mod, Done", never as a record dump.</summary>
+        public override string ToString() => $"{Name}, {Status}";
     }
 
     private void Choice_Changed(object sender, RoutedEventArgs e)
