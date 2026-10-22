@@ -28,12 +28,12 @@
     b.setAttribute('role', 'img');
     b.setAttribute(
       'aria-label',
-      'You ' + split.you + ', Claude ' + split.claude + ', Both ' + split.both
+      'You ' + split.you + ', ' + split.agentsLabel + ' ' + split.agents + ', Both ' + split.both
     );
-    ['you', 'claude', 'both'].forEach(function (k) {
+    ['you', 'agents', 'both'].forEach(function (k) {
       var s = el('div', 'seg ' + k);
       s.style.width = pct(fr[k]);
-      s.title = { you: 'You', claude: 'Claude', both: 'Both' }[k] + ' ' + split[k];
+      s.title = { you: 'You', agents: split.agentsLabel, both: 'Both' }[k] + ' ' + split[k];
       b.appendChild(s);
     });
     return b;
@@ -41,11 +41,24 @@
 
   function legend(split) {
     var ul = el('ul', 'split');
-    [['you', 'You'], ['claude', 'Claude'], ['both', 'Both']].forEach(function (p) {
+    [['you', 'You'], ['agents', split.agentsLabel], ['both', 'Both']].forEach(function (p) {
       var li = el('li');
       li.appendChild(el('span', 'swatch ' + p[0]));
       li.appendChild(el('span', null, p[1] + ' ' + split[p[0]]));
       ul.appendChild(li);
+    });
+    return ul;
+  }
+
+  // One row per agent that ran: its own wall time, its session time when parallel sessions
+  // add to it, and (per project) its lines. Agents can overlap each other, so rows need not add up.
+  function agentList(rows, withLines) {
+    var ul = el('ul', 'agents');
+    rows.forEach(function (a) {
+      var text = a.name + ' ' + a.time;
+      if (a.streamTime !== a.time) text += ' (sessions ' + a.streamTime + ')';
+      if (withLines) text += ' · ' + a.lines + ' lines';
+      ul.appendChild(el('li', null, text));
     });
     return ul;
   }
@@ -73,6 +86,7 @@
 
     h.appendChild(legend(m.headline));
     h.appendChild(bar(m.headlineFractions, m.headline, false));
+    if (m.headlineAgents.length > 1) h.appendChild(agentList(m.headlineAgents, false));
     return h;
   }
 
@@ -86,13 +100,13 @@
       var stack = el('div', 'stack' + (d.height > 0 ? '' : ' zero'));
       if (d.height > 0) {
         stack.style.height = Math.max(4, Math.round(d.height * 64)) + 'px';
-        ['both', 'claude', 'you'].forEach(function (k) {
+        ['both', 'agents', 'you'].forEach(function (k) {
           var s = el('div', 'seg ' + k);
           s.style.height = pct(d.fractions[k]);
           stack.appendChild(s);
         });
       }
-      stack.title = 'You ' + d.split.you + ', Claude ' + d.split.claude + ', Both ' + d.split.both;
+      stack.title = 'You ' + d.split.you + ', ' + d.split.agentsLabel + ' ' + d.split.agents + ', Both ' + d.split.both;
       col.appendChild(stack);
       cell.appendChild(col);
       cell.appendChild(el('div', 'day-total', d.split.total));
@@ -125,7 +139,6 @@
       var meta = el('div', 'project-meta');
       meta.appendChild(el('span', null, 'Agent time ' + p.agent));
       meta.appendChild(el('span', null, 'Your lines ' + p.linesYou));
-      meta.appendChild(el('span', null, "Claude's lines " + p.linesClaude));
       if (p.languages.length > 0) {
         meta.appendChild(
           el(
@@ -138,6 +151,7 @@
         );
       }
       li.appendChild(meta);
+      if (p.agents.length > 0) li.appendChild(agentList(p.agents, true));
 
       var actions = el('div', 'project-actions');
       actions.appendChild(

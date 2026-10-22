@@ -4,10 +4,14 @@
  * and formatting rules are testable without a window.
  */
 import type { MaskState } from '../store/aliases';
-import type { DayRecord, DayTotals, ProjectDay } from '../types';
+import { AGENT_NAMES, type AgentName, type ByAgent, type DayRecord, type DayTotals, type ProjectDay } from '../types';
 
 export const MASKED_FALLBACK = 'Masked project';
-export const FOOTER = 'Claude is a trademark of Anthropic. Sanduhr Time is not affiliated with or endorsed by Anthropic.';
+export const FOOTER =
+  'Claude is a trademark of Anthropic. Codex is a trademark of OpenAI. Sanduhr Time is not affiliated with or endorsed by Anthropic or OpenAI.';
+export const AGENT_LABELS: Record<AgentName, string> = { claude: 'Claude', codex: 'Codex' };
+/** The agents segment's label when more than one agent ran (or none is recorded). */
+export const AGENTS_LABEL = 'Agents';
 export const EMPTY_MESSAGE = 'Tracking started. Your first numbers appear after a few minutes of work.';
 export const REMOTE_MESSAGE = 'Local workspaces only. Sanduhr Time records nothing in a remote window.';
 export const UNREADABLE_MESSAGE = 'The alias store is unreadable, so every project name is hidden until it recovers.';
@@ -25,36 +29,69 @@ export function formatDuration(ms: number): string {
   return `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
+/**
+ * The three parts that partition a total: you only, agents only, both. `agentsLabel` names
+ * the agents part: the agent's own name when one agent ran, "Agents" when several did.
+ */
 export interface Split {
   you: string;
-  claude: string;
+  agents: string;
   both: string;
   total: string;
+  agentsLabel: string;
 }
 
 export interface Fractions {
   you: number;
-  claude: number;
+  agents: number;
   both: number;
 }
 
-const split = (t: Pick<DayTotals, 'youMs' | 'agentsMs' | 'bothMs' | 'totalMs'>): Split => ({
+/** One row per agent that ran. Agents can overlap each other, so these do not add up to the agents part. */
+export interface AgentRowModel {
+  id: AgentName;
+  name: string;
+  /** The agent's own wall-clock time. */
+  time: string;
+  /** The sum of its streams (parallel sessions add). */
+  streamTime: string;
+  lines: number;
+}
+
+/** Agents present in a byAgent map, in display order. */
+export function agentRows(byAgent: ByAgent | undefined): AgentRowModel[] {
+  return AGENT_NAMES.filter((a) => byAgent?.[a]).map((a) => ({
+    id: a,
+    name: AGENT_LABELS[a],
+    time: formatDuration(byAgent![a]!.wallMs),
+    streamTime: formatDuration(byAgent![a]!.streamMs),
+    lines: byAgent![a]!.lines,
+  }));
+}
+
+export function agentsLabel(byAgent: ByAgent | undefined): string {
+  const ran = AGENT_NAMES.filter((a) => byAgent?.[a]);
+  return ran.length === 1 ? AGENT_LABELS[ran[0]] : AGENTS_LABEL;
+}
+
+const split = (t: Pick<DayTotals, 'youMs' | 'agentsMs' | 'bothMs' | 'totalMs' | 'byAgent'>): Split => ({
   you: formatDuration(t.youMs),
-  claude: formatDuration(t.agentsMs),
+  agents: formatDuration(t.agentsMs),
   both: formatDuration(t.bothMs),
   total: formatDuration(t.totalMs),
+  agentsLabel: agentsLabel(t.byAgent),
 });
 
 /** Shares of the three parts. They sum to exactly 1, or are all 0 when there is no time. */
 export function fractions(t: Pick<DayTotals, 'youMs' | 'agentsMs' | 'bothMs'>): Fractions {
   const you = Math.max(0, t.youMs);
-  const claude = Math.max(0, t.agentsMs);
+  const agents = Math.max(0, t.agentsMs);
   const both = Math.max(0, t.bothMs);
-  const sum = you + claude + both;
-  if (sum <= 0) return { you: 0, claude: 0, both: 0 };
-  const f = { you: you / sum, claude: claude / sum, both: both / sum };
+  const sum = you + agents + both;
+  if (sum <= 0) return { you: 0, agents: 0, both: 0 };
+  const f = { you: you / sum, agents: agents / sum, both: both / sum };
   // Absorb floating-point residue into the largest part so the sum is exactly 1.
-  const keys = ['you', 'claude', 'both'] as const;
+  const keys = ['you', 'agents', 'both'] as const;
   const largest = keys.reduce((a, b) => (f[b] > f[a] ? b : a));
   const others = keys.filter((k) => k !== largest);
   f[largest] = 1 - f[others[0]] - f[others[1]];
@@ -71,9 +108,13 @@ export function buildStatusBar(today: DayRecord | undefined, opts: { remote?: bo
   if (opts.remote) return { text: '$(watch) off', tooltip: 'Local workspaces only' };
   if (!today) return { text: '$(watch) 0m', tooltip: 'Sanduhr Time: nothing tracked yet today' };
   const t = today.totals;
+  const rows = agentRows(t.byAgent);
+  const each = rows.length > 1 ? ` (${rows.map((r) => `${r.name} ${r.time}`).join(', ')})` : '';
   return {
     text: `$(watch) ${formatDuration(t.totalMs)}`,
-    tooltip: `You ${formatDuration(t.youMs)} · Claude ${formatDuration(t.agentsMs)} · Both ${formatDuration(t.bothMs)}`,
+    tooltip:
+      `You ${formatDuration(t.youMs)} · ${agentsLabel(t.byAgent)} ${formatDuration(t.agentsMs)}${each}` +
+      ` · Both ${formatDuration(t.bothMs)}`,
   };
 }
 
@@ -88,6 +129,8 @@ export interface ProjectRowModel {
   split: Split;
   fractions: Fractions;
   agent: string;
+  /** One row per agent that ran in this project today. */
+  agents: AgentRowModel[];
   linesYou: number;
   linesAgents: number;
   languages: { id: string; time: string }[];
@@ -111,6 +154,8 @@ export interface PanelModel {
   today: string;
   headline: Split;
   headlineFractions: Fractions;
+  /** One row per agent that ran today; empty when none did. */
+  headlineAgents: AgentRowModel[];
   strip: DayStripEntry[];
   projects: ProjectRowModel[];
   streamerMode: boolean;
@@ -203,6 +248,7 @@ export function buildPanelModel(
         split: split(p),
         fractions: fractions(p),
         agent: formatDuration(p.agentMs),
+        agents: agentRows(p.byAgent),
         linesYou: p.linesYou,
         linesAgents: p.linesAgents,
         languages: topLanguages(p),
@@ -214,7 +260,7 @@ export function buildPanelModel(
   const unreadable = todayRec?.caveats.unreadableTranscriptLines ?? 0;
   const caveats =
     unreadable > 0
-      ? `${unreadable} transcript line${unreadable === 1 ? '' : 's'} could not be read, so Claude time may be slightly low.`
+      ? `${unreadable} transcript line${unreadable === 1 ? '' : 's'} could not be read, so agent time may be slightly low.`
       : null;
 
   let compareLine: string | null = null;
@@ -237,6 +283,7 @@ export function buildPanelModel(
     today,
     headline: split(t),
     headlineFractions: fractions(t),
+    headlineAgents: agentRows(t.byAgent),
     strip,
     projects,
     streamerMode: mask.streamerMode,

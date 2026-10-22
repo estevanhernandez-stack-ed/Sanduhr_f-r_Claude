@@ -1,7 +1,7 @@
 /* Sanduhr Time panel. Theme variables only, so dark, light and high-contrast all work. */
 :root {
   --st-you: var(--vscode-charts-blue, #3794ff);
-  --st-claude: var(--vscode-charts-yellow, var(--vscode-charts-orange, #d18616));
+  --st-agents: var(--vscode-charts-yellow, var(--vscode-charts-orange, #d18616));
   --st-both: var(--vscode-charts-purple, #b180d7);
   --st-border: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
   --st-muted: var(--vscode-descriptionForeground, rgba(128, 128, 128, 0.9));
@@ -96,9 +96,9 @@ body {
   background: var(--st-you);
 }
 
-.swatch.claude,
-.seg.claude {
-  background: var(--st-claude);
+.swatch.agents,
+.seg.agents {
+  background: var(--st-agents);
 }
 
 .swatch.both,
@@ -243,6 +243,16 @@ h2 {
   color: var(--st-muted);
 }
 
+.agents {
+  display: flex;
+  gap: 4px 18px;
+  flex-wrap: wrap;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--st-muted);
+}
+
 .project-actions {
   display: flex;
   gap: 8px;
@@ -288,7 +298,7 @@ button:focus-visible {
 .note {
   margin: 18px 0 0;
   padding: 8px 12px;
-  border-left: 3px solid var(--st-claude);
+  border-left: 3px solid var(--st-agents);
   background: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
 }
 
