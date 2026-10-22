@@ -288,3 +288,64 @@ seconds per minute:
 
 `brew upgrade` replaced the bundle but left the old process running on the old Mac; quit and
 relaunch before measuring an update.
+
+## #8 — Set up your Desk with Claude, down to the widgets and mods you make for yourself
+
+**Raised 2026-10-22 by Este**, after moving his own desktop from Rainmeter to the Desk in one
+sitting with Claude Code: *plan the layout and widgets with Claude so well that people end up
+making widgets and mods for themselves while they set up their Desk.* Setting up the Desk should
+be a conversation, and the end of it can be something that didn't exist before: a sprite, an
+effect, a Claude Code band built for that person.
+
+**What already exists (3.7.1 / sanduhr-widgets / sanduhr-mods):**
+
+- The MCP server reads the Desk (`get_desk`: pieces, anchors, fonts, monitors, a wallpaper
+  summary, saved designs, Start-menu apps) and proposes changes through `propose_desk`,
+  `propose_theme`, `propose_desk_messages` and `propose_now_playing_looks`. Every proposal previews
+  live and waits for Apply, unless the user turns on direct changes; every applied look is saved
+  and Put my Desk back undoes it.
+- `sanduhr-widgets` defines packs (`pack`, `sprite`, `palette`, `effects` schemas) with a
+  validator, a deterministic catalog and signing. The hourglass sprite and the OLED Neon packs
+  are built. **Nothing in the app renders a pack yet** (the 3.8 Widgets engine), and the catalog
+  signing key isn't generated.
+- `sanduhr-mods` ships Claude Code mods (now-playing, finish-line, page-pane, decision-logger,
+  agent-comms), and its README carries mods-to-build-yourself as prompts (`d60bb40`).
+  now-playing 0.3.0 already shares per-song looks with the Desk, so a mod and the Desk can work
+  as one design.
+
+**The gaps, in the order they unblock the vision:**
+
+1. **The Widgets engine (3.8).** Render installed packs on the Desk, sprite first (the
+   hourglass), with OLED care's drift applied to them. Without it, nothing a user makes can show.
+2. **`propose_widget`.** Claude authors a pack in the conversation: a sprite's stages and moods,
+   a palette, an effect. It's validated against the same schemas, previewed on the Desk, and kept
+   only on Apply. A user-made pack installs locally, unsigned, with the user's consent; the signed
+   catalog stays for shared packs.
+3. **Art without breaking the image boundary.** Today Claude cannot supply images (a Launcher
+   image proposal is refused by design). Keep that rule. Let packs carry art only in forms the
+   validator can fully check (pixel sprite sheets as palette-indexed data, vector shapes), or art
+   the user adds themselves. Decide this before gap 2 ships.
+4. **A layout language that matches the ambition.** Eight anchors with one stack each is the
+   ceiling today. The fold or perspective, livelier bars and two-face stacks are in #314. Free
+   placement for widgets, and a weather nickname (#315), are the small first steps.
+5. **The design session itself.** A Claude Code skill or prompt in `sanduhr-mods` that runs the
+   setup as an interview: read the Desk and the wallpaper, ask what the person wants to see and
+   where, propose, iterate on the live preview, then offer the widget or mod that would finish it.
+   It ends with the person's own pack or mod, installed.
+6. **Mods from the same conversation.** When the Desk wants something in Claude Code (a band, a
+   statusline, a hook), the session writes it with the plugin-authoring flow and
+   `claude plugin test`, the way the now-playing bridge was built.
+7. **Sharing.** Export a design, a pack or a mod; submit packs to the catalog through the
+   existing validator and CI.
+
+**Boundaries that don't move:** the MCP process stays network-free and propose-only (`TrustBoundaryTests`); nothing
+the user didn't Apply persists; a pack is data, never code; mods follow Claude Code's own install
+and consent. The Store's privacy page and the reviewer letter get any new file before the
+submission that carries it.
+
+**Mac parity:** the Mac Desk takes the same proposals; the pack engine lands on both platforms or
+says which one it is on.
+
+**Done when** a new user, starting from a blank Desk, finishes a single Claude Code session with
+a Desk they designed and at least one widget or mod that Claude made for them, without editing a
+file by hand.
