@@ -21,7 +21,7 @@ using Sanduhr.Core;
 //
 // Options:
 //   --out <dir>          where PNGs and log.txt go (default ./harness-out)
-//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | desk | arrange | launcher | all; repeatable (default all)
+//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | desk | arrange | launcher | review | all; repeatable (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)
 //   --light              write a LIGHT user theme into the dev profile's themes folder and apply
 //                        it, to check dialogs for legibility on a light surface
@@ -99,7 +99,7 @@ public static partial class Program
                     return 2;
             }
         }
-        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange", "launcher" };
+        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange", "launcher", "review" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
         var bad = scenarios.Where(s => !known.Contains(s)).ToList();
@@ -353,6 +353,8 @@ public static partial class Program
                 await RenderSettings(vm, asm);
             if (scenarios.Contains("launcher"))
                 await RenderLauncher(vm, asm, light);
+            if (scenarios.Contains("review"))
+                await RenderReview(vm, asm);
         }
         finally
         {
