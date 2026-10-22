@@ -4,7 +4,7 @@ import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import { afterAll, describe, expect, it } from 'vitest';
 import { dayWindow, merge, type MergeInput } from './merge';
-import type { ClaudeEvent, DayRecord, Heartbeat } from './types';
+import type { AgentEvent, DayRecord, Heartbeat } from './types';
 
 const MIN = 60_000;
 const DATE = '2026-06-10';
@@ -36,8 +36,8 @@ function hb(time: number, over: Partial<Heartbeat> = {}): Heartbeat {
     ...over,
   };
 }
-function ce(time: number, kind: ClaudeEvent['kind'], over: Partial<ClaudeEvent> = {}): ClaudeEvent {
-  return { v: 1, id: `id-${seq++}`, time, project: A, stream: 's1', kind, ...over };
+function ce(time: number, kind: AgentEvent['kind'], over: Partial<AgentEvent> = {}): AgentEvent {
+  return { v: 2, agent: 'claude', id: `id-${seq++}`, time, project: A, stream: 's1', kind, ...over };
 }
 
 function run(over: Partial<MergeInput> = {}): DayRecord {

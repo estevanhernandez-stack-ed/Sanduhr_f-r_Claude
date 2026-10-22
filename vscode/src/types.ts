@@ -42,20 +42,29 @@ export interface Heartbeat {
   reload: boolean;
 }
 
-export type ClaudeEventKind = 'prompt' | 'activity' | 'edit';
+/** The agents whose transcripts Sanduhr Time reads. */
+export type AgentName = 'claude' | 'codex';
+/** Every agent, in display order. */
+export const AGENT_NAMES: readonly AgentName[] = ['claude', 'codex'];
 
-/** One Claude spool line (`claude/<local date>.jsonl`). */
-export interface ClaudeEvent {
-  v: 1;
-  /** Transcript entry uuid, or file hash plus byte offset; the merge de-duplicates on it. */
+export type AgentEventKind = 'prompt' | 'activity' | 'edit';
+
+/**
+ * One agent spool line (`agents/<local date>.jsonl`, `v: 2`). Lines from the 0.1 and 0.2
+ * Claude spool (`claude/<local date>.jsonl`, `v: 1`, no `agent`) are read as `agent: 'claude'`.
+ */
+export interface AgentEvent {
+  v: 2;
+  agent: AgentName;
+  /** Transcript entry uuid, or stream plus byte offset; the merge de-duplicates on it. */
   id: string;
   /** Unix seconds, float. */
   time: number;
   /** Project key (16 hex chars). */
   project: string;
-  /** Transcript file identity (main session or one subagent file). */
+  /** Transcript identity: one Claude transcript file, or one Codex rollout segment. */
   stream: string;
-  kind: ClaudeEventKind;
+  kind: AgentEventKind;
   linesAdded?: number;
   linesRemoved?: number;
   /** `hashPath(filePath)` for edit events. */

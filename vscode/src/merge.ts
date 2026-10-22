@@ -16,7 +16,7 @@
  */
 import { clip, intersect, joinEvents, subtract, totalLength, union } from './intervals';
 import type {
-  ClaudeEvent,
+  AgentEvent,
   DayCaveats,
   DayRecord,
   DayTotals,
@@ -51,9 +51,9 @@ export interface MergeInput {
   machine: string;
   /** The date's heartbeats (more are harmless: only this day's window is counted). */
   heartbeats: readonly Heartbeat[];
-  claudeEvents: readonly ClaudeEvent[];
+  claudeEvents: readonly AgentEvent[];
   /** The previous day's events, at least its last hour. */
-  previousDayTail?: { heartbeats: readonly Heartbeat[]; claudeEvents: readonly ClaudeEvent[] };
+  previousDayTail?: { heartbeats: readonly Heartbeat[]; claudeEvents: readonly AgentEvent[] };
   /** `{ [projectKey]: { alias, masked} }`; a missing key means alias null, masked false. */
   aliases: Readonly<Record<string, AliasEntry>>;
   /** `{ [projectKey]: realName }`, from the resolver. */
@@ -137,7 +137,7 @@ export function merge(input: MergeInput): DayRecord {
   const allClaude = [...(input.previousDayTail?.claudeEvents ?? []), ...input.claudeEvents];
 
   const seenIds = new Set<string>();
-  const claude: { ev: ClaudeEvent; t: number }[] = [];
+  const claude: { ev: AgentEvent; t: number }[] = [];
   for (const ev of allClaude) {
     if (seenIds.has(ev.id)) continue;
     seenIds.add(ev.id);

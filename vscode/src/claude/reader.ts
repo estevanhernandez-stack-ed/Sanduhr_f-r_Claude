@@ -1,25 +1,26 @@
 /**
  * Incremental Claude transcript reader. Walks every config home's transcripts, turns
- * new lines into ClaudeEvents, appends them to the Claude spool and only then advances
- * the file's offset, so a crash re-reads (the spool de-duplicates by id) and never drops.
+ * new lines into agent events (`agent: 'claude'`), appends them to the agent spool and only
+ * then advances the file's offset, so a crash re-reads (the spool de-duplicates by id) and
+ * never drops.
  * The runner calls `readPass` under the merge lock.
  */
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { resolve as resolveProject } from '../project';
-import { appendClaudeEvents, localDate } from '../store/claudeSpool';
+import { appendAgentEvents, localDate } from '../store/agentSpool';
 import { hashPath } from '../store/hash';
+import { readChunk, splitLines } from '../store/lines';
 import { stateDir } from '../store/paths';
 import { readOffsets, writeOffsets } from '../store/state';
-import type { ClaudeEvent, InstalledState, OffsetsState } from '../types';
+import type { AgentEvent, InstalledState, OffsetsState } from '../types';
 import { discoverHomes, type HomeOptions } from './homes';
 
 export const DEFAULT_MAX_BYTES = 8 * 1024 * 1024;
-const EXTEND_CHUNK = 1024 * 1024;
 
 export interface ReadPassOptions extends HomeOptions {
-  /** Data directory (holds `state/`, `claude/`). */
+  /** Data directory (holds `state/`, `agents/`). */
   dir: string;
   installed: InstalledState;
   /** Explicit homes; default is `discoverHomes`. */
@@ -30,7 +31,7 @@ export interface ReadPassOptions extends HomeOptions {
 
 export interface ReadPassResult {
   /** Events appended to the spool this pass. */
-  events: ClaudeEvent[];
+  events: AgentEvent[];
   /** True when the byte budget stopped the pass before every file was caught up. */
   more: boolean;
   /** Unreadable transcript lines, by local date. */
@@ -143,48 +144,12 @@ export function countClaudeLines(r: Json): { added: number; removed: number } {
   return { added, removed };
 }
 
-/** Split a buffer into complete lines with their byte offsets (relative to the buffer). */
-function splitLines(buf: Buffer): { start: number; end: number }[] {
-  const out: { start: number; end: number }[] = [];
-  let start = 0;
-  for (;;) {
-    const nl = buf.indexOf(0x0a, start);
-    if (nl === -1) break;
-    out.push({ start, end: nl });
-    start = nl + 1;
-  }
-  return out;
-}
-
 interface FileCtx {
   stream: string;
   salt: string;
   installedMs: number;
   projectKeys: Map<string, string>;
   fallbackDate: string;
-}
-
-/** Read `[offset, offset+budget)` extended to a newline. Returns the bytes and whether any remain. */
-function readChunk(fd: number, offset: number, size: number, budget: number): Buffer {
-  const want = Math.min(Math.max(budget, 1), size - offset);
-  let buf = Buffer.alloc(want);
-  let got = fs.readSync(fd, buf, 0, want, offset);
-  buf = buf.subarray(0, got);
-  // A line longer than the budget must still be read whole, or the pass would never advance.
-  while (buf.indexOf(0x0a) === -1 && offset + got < size) {
-    const more = Math.min(EXTEND_CHUNK, size - offset - got);
-    const extra = Buffer.alloc(more);
-    const n = fs.readSync(fd, extra, 0, more, offset + got);
-    if (n <= 0) break;
-    buf = Buffer.concat([buf, extra.subarray(0, n)]);
-    got += n;
-  }
-  if (buf.length > want) {
-    // Extension overshoots in whole chunks; keep only through the end of the line that crossed the budget.
-    const nl = buf.indexOf(0x0a, want - 1);
-    if (nl !== -1) buf = buf.subarray(0, nl + 1);
-  }
-  return buf;
 }
 
 function processLines(
@@ -195,8 +160,8 @@ function processLines(
   unreadable: Record<string, number>,
   lastDate: { value: string },
   versions: Record<string, Set<string>>,
-): { events: ClaudeEvent[]; consumed: number } {
-  const events: ClaudeEvent[] = [];
+): { events: AgentEvent[]; consumed: number } {
+  const events: AgentEvent[] = [];
   const lines = splitLines(buf);
   const bump = (date: string): void => {
     unreadable[date] = (unreadable[date] ?? 0) + 1;
@@ -245,7 +210,7 @@ function processLines(
       ctx.projectKeys.set(cwd, project);
     }
     const id = typeof o.uuid === 'string' && o.uuid ? o.uuid : `${ctx.stream}:${baseOffset + start}`;
-    const ev: ClaudeEvent = { v: 1, id, time: ms / 1000, project, stream: ctx.stream, kind: prompt ? 'prompt' : 'activity' };
+    const ev: AgentEvent = { v: 2, agent: 'claude', id, time: ms / 1000, project, stream: ctx.stream, kind: prompt ? 'prompt' : 'activity' };
 
     const r = o.toolUseResult;
     if (!prompt && isObj(r) && typeof r.filePath === 'string' && r.filePath) {
@@ -261,10 +226,10 @@ function processLines(
   return { events, consumed: last ? last.end + 1 : 0 };
 }
 
-const yieldTurn = (): Promise<void> => new Promise((res) => setImmediate(res));
+export const yieldTurn = (): Promise<void> => new Promise((res) => setImmediate(res));
 
 /**
- * One bounded pass over every transcript. For each file: append its events to the Claude
+ * One bounded pass over every transcript. For each file: append its events to the agent
  * spool, then advance and persist its offset. Reads at most `maxBytes` (default 8 MB)
  * across files, yielding between files; `more` says whether work remains.
  */
@@ -275,7 +240,7 @@ export async function readPass(opts: ReadPassOptions): Promise<ReadPassResult> {
   const installedMs = Date.parse(opts.installed.installedAt);
   const offsets: OffsetsState = readOffsets(sdir);
 
-  const events: ClaudeEvent[] = [];
+  const events: AgentEvent[] = [];
   const unreadableByDate: Record<string, number> = {};
   const touched = new Set<string>();
   const versions: Record<string, Set<string>> = {};
@@ -339,7 +304,7 @@ export async function readPass(opts: ReadPassOptions): Promise<ReadPassResult> {
     } catch {
       continue;
     }
-    let fileEvents: ClaudeEvent[];
+    let fileEvents: AgentEvent[];
     let consumed: number;
     try {
       const buf = readChunk(fd, offset, stat.size, budget);
@@ -359,7 +324,7 @@ export async function readPass(opts: ReadPassOptions): Promise<ReadPassResult> {
     }
 
     // Spool first, offsets second.
-    appendClaudeEvents(opts.dir, fileEvents);
+    appendAgentEvents(opts.dir, fileEvents);
     offsets[real] = { offset: offset + consumed, size: stat.size, mtimeMs: stat.mtimeMs };
     writeOffsets(sdir, offsets);
     dirty = false;

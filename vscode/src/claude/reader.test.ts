@@ -3,11 +3,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearProjectCache } from '../project';
-import { readClaudeDay, localDate, appendClaudeEvents, pruneClaudeSpool } from '../store/claudeSpool';
+import { readAgentDay, localDate, appendAgentEvents, pruneAgentSpool } from '../store/agentSpool';
 import { hashPath } from '../store/hash';
 import { readOffsets } from '../store/state';
 import { stateDir } from '../store/paths';
-import type { ClaudeEvent, InstalledState } from '../types';
+import type { AgentEvent, InstalledState } from '../types';
 import { discoverHomes } from './homes';
 import { readPass, streamId } from './reader';
 
@@ -50,17 +50,17 @@ const write = (file: string, lines: string[]): string => {
 };
 const main = (name = `${SESSION}.jsonl`): string => path.join(projDir, name);
 
-const allEvents = (): ClaudeEvent[] => {
-  const dates = fs.existsSync(path.join(data, 'claude'))
-    ? fs.readdirSync(path.join(data, 'claude')).map((f) => f.replace('.jsonl', ''))
+const allEvents = (): AgentEvent[] => {
+  const dates = fs.existsSync(path.join(data, 'agents'))
+    ? fs.readdirSync(path.join(data, 'agents')).map((f) => f.replace('.jsonl', ''))
     : [];
-  return dates.flatMap((d) => readClaudeDay(data, d));
+  return dates.flatMap((d) => readAgentDay(data, d));
 };
 const rawLineCount = (): number =>
-  fs.existsSync(path.join(data, 'claude'))
+  fs.existsSync(path.join(data, 'agents'))
     ? fs
-        .readdirSync(path.join(data, 'claude'))
-        .map((f) => fs.readFileSync(path.join(data, 'claude', f), 'utf8').split('\n').filter(Boolean).length)
+        .readdirSync(path.join(data, 'agents'))
+        .map((f) => fs.readFileSync(path.join(data, 'agents', f), 'utf8').split('\n').filter(Boolean).length)
         .reduce((a, b) => a + b, 0)
     : 0;
 
@@ -164,7 +164,7 @@ describe('streams and ids', () => {
     write(main(), [assistant(0)]);
     const r = await pass({ installed: oldInstall });
     expect(r.touchedDates).toEqual([localDate(Date.parse(ts(0)))]);
-    expect(readClaudeDay(data, r.touchedDates[0])).toHaveLength(1);
+    expect(readAgentDay(data, r.touchedDates[0])).toHaveLength(1);
   });
 });
 
@@ -335,22 +335,53 @@ describe('homes', () => {
 
 describe('claude spool', () => {
   it('de-duplicates by id and tolerates a torn last line', () => {
-    const ev = (id: string, t: number): ClaudeEvent => ({ v: 1, id, time: t, project: 'p', stream: 's', kind: 'activity' });
+    const ev = (id: string, t: number): AgentEvent => ({ v: 2, agent: 'claude', id, time: t, project: 'p', stream: 's', kind: 'activity' });
     const t = Date.parse(ts(0)) / 1000;
-    appendClaudeEvents(data, [ev('a', t), ev('a', t), ev('b', t)]);
-    const file = path.join(data, 'claude', `${localDate(t * 1000)}.jsonl`);
+    appendAgentEvents(data, [ev('a', t), ev('a', t), ev('b', t)]);
+    const file = path.join(data, 'agents', `${localDate(t * 1000)}.jsonl`);
     fs.appendFileSync(file, '{"v":1,"id":"torn'); // crash mid-line
-    appendClaudeEvents(data, [ev('c', t)]);
-    expect(readClaudeDay(data, localDate(t * 1000)).map((e) => e.id)).toEqual(['a', 'b', 'c']);
-    expect(readClaudeDay(data, '1999-01-01')).toEqual([]);
+    appendAgentEvents(data, [ev('c', t)]);
+    expect(readAgentDay(data, localDate(t * 1000)).map((e) => e.id)).toEqual(['a', 'b', 'c']);
+    expect(readAgentDay(data, '1999-01-01')).toEqual([]);
   });
 
-  it('prunes files older than 90 days', () => {
-    fs.mkdirSync(path.join(data, 'claude'), { recursive: true });
-    for (const d of ['2026-01-01', '2026-05-01', '2026-06-09']) fs.writeFileSync(path.join(data, 'claude', `${d}.jsonl`), '');
-    const removed = pruneClaudeSpool(data, new Date(2026, 5, 10, 12));
+  it('prunes files older than 90 days, in the agent and the legacy Claude folder', () => {
+    for (const folder of ['agents', 'claude']) {
+      fs.mkdirSync(path.join(data, folder), { recursive: true });
+      for (const d of ['2026-01-01', '2026-05-01', '2026-06-09']) fs.writeFileSync(path.join(data, folder, `${d}.jsonl`), '');
+    }
+    const removed = pruneAgentSpool(data, new Date(2026, 5, 10, 12));
     expect(removed).toEqual(['2026-01-01']);
+    expect(fs.readdirSync(path.join(data, 'agents')).sort()).toEqual(['2026-05-01.jsonl', '2026-06-09.jsonl']);
     expect(fs.readdirSync(path.join(data, 'claude')).sort()).toEqual(['2026-05-01.jsonl', '2026-06-09.jsonl']);
+  });
+
+  it('the reader writes agent: claude lines to agents/, never to claude/', async () => {
+    write(main(), [user(0, 'hi'), assistant(1)]);
+    const r = await pass({ installed: oldInstall });
+    expect(r.events.map((e) => [e.v, e.agent])).toEqual([[2, 'claude'], [2, 'claude']]);
+    expect(fs.existsSync(path.join(data, 'claude'))).toBe(false);
+    const raw = fs.readFileSync(path.join(data, 'agents', `${r.touchedDates[0]}.jsonl`), 'utf8');
+    expect(raw.split('\n').filter(Boolean).every((l) => JSON.parse(l).agent === 'claude')).toBe(true);
+  });
+
+  it('reads a 0.2 Claude spool file as agent: claude, merged with agents/ and de-duplicated', () => {
+    const t = Date.parse(ts(0)) / 1000;
+    const date = localDate(t * 1000);
+    fs.mkdirSync(path.join(data, 'claude'), { recursive: true });
+    const legacy = (id: string) => JSON.stringify({ v: 1, id, time: t, project: 'p', stream: 's', kind: 'prompt' });
+    fs.writeFileSync(path.join(data, 'claude', `${date}.jsonl`), [legacy('old-1'), legacy('both')].join('\n') + '\n');
+    appendAgentEvents(data, [
+      { v: 2, agent: 'claude', id: 'both', time: t, project: 'p', stream: 's', kind: 'activity' },
+      { v: 2, agent: 'codex', id: 'new-1', time: t, project: 'p', stream: 'x', kind: 'activity' },
+    ]);
+    fs.appendFileSync(path.join(data, 'agents', `${date}.jsonl`), JSON.stringify({ v: 2, agent: 'robot', id: 'r', time: t }) + '\n');
+    const evs = readAgentDay(data, date);
+    expect(evs.map((e) => [e.id, e.agent, e.v, e.kind])).toEqual([
+      ['old-1', 'claude', 2, 'prompt'],
+      ['both', 'claude', 2, 'prompt'], // first occurrence wins
+      ['new-1', 'codex', 2, 'activity'],
+    ]);
   });
 });
 

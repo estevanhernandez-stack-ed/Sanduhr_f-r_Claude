@@ -1,7 +1,7 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { claudeDir, dataDir, daysDir, spoolDir, stateDir } from './paths';
+import { agentsDir, claudeDir, dataDir, daysDir, spoolDir, stateDir } from './paths';
 
 describe('dataDir', () => {
   it('prefers a non-empty setting', () => {
@@ -20,6 +20,7 @@ describe('dataDir', () => {
     const d = path.join('/fixture', 'time');
     expect(spoolDir(d)).toBe(path.join(d, 'spool'));
     expect(claudeDir(d)).toBe(path.join(d, 'claude'));
+    expect(agentsDir(d)).toBe(path.join(d, 'agents'));
     expect(daysDir(d)).toBe(path.join(d, 'days'));
     expect(stateDir(d)).toBe(path.join(d, 'state'));
   });

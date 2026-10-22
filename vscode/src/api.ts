@@ -5,7 +5,7 @@
 import type { Event } from 'vscode';
 import { normalizeRemote, projectKey } from './project';
 import type { AliasStore, MaskState } from './store/aliases';
-import { localDate } from './store/claudeSpool';
+import { localDate } from './store/agentSpool';
 import { listDays, readDay } from './store/days';
 import type { DayRecord } from './types';
 

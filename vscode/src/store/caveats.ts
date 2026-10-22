@@ -5,7 +5,7 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { localDate } from './claudeSpool';
+import { localDate } from './agentSpool';
 import { writeFileAtomic } from './state';
 
 export interface DayCaveatState {

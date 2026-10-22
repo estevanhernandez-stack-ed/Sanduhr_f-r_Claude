@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
 import type { SanduhrTimeApi } from '../api';
-import { localDate } from '../store/claudeSpool';
+import { localDate } from '../store/agentSpool';
 import type { DayRecord } from '../types';
 import { buildPanelModel, type CompareInput, type PanelModel } from './viewModel';
 

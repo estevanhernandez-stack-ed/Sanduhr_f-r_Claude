@@ -9,12 +9,12 @@ import { readPass as realReadPass, type ReadPassOptions, type ReadPassResult } f
 import { dayWindow, merge, NO_PROJECT_KEY, NO_PROJECT_NAME, TAIL_MS } from './merge';
 import { AliasStoreUnavailable, type AliasStore } from './store/aliases';
 import { recordCaveats } from './store/caveats';
-import { localDate, pruneClaudeSpool, readClaudeDay } from './store/claudeSpool';
+import { localDate, pruneAgentSpool, readAgentDay } from './store/agentSpool';
 import { writeDay } from './store/days';
 import { stateDir } from './store/paths';
 import { pruneSpool, readSpoolDay } from './store/spool';
 import { acquireLock, type LockOptions } from './store/state';
-import type { ClaudeEvent, DayRecord, Heartbeat, InstalledState } from './types';
+import type { AgentEvent, DayRecord, Heartbeat, InstalledState } from './types';
 
 export const TICK_MS = 5 * 60 * 1000;
 export const REFRESH_MS = 30 * 1000;
@@ -96,7 +96,7 @@ export class Runner {
     const now = new Date(this.deps.now());
     try {
       pruneSpool(this.deps.dir, now);
-      pruneClaudeSpool(this.deps.dir, now);
+      pruneAgentSpool(this.deps.dir, now);
     } catch (err) {
       this.deps.onError?.(err);
     }
@@ -181,9 +181,9 @@ export class Runner {
     const tailFromSec = (dayWindow(date).start - TAIL_MS) / 1000;
 
     const heartbeats: Heartbeat[] = readSpoolDay(deps.dir, date, deps.machine);
-    const claudeEvents: ClaudeEvent[] = readClaudeDay(deps.dir, date);
+    const claudeEvents: AgentEvent[] = readAgentDay(deps.dir, date);
     const prevBeats = readSpoolDay(deps.dir, prev, deps.machine).filter((h) => h.time >= tailFromSec);
-    const prevClaude = readClaudeDay(deps.dir, prev).filter((e) => e.time >= tailFromSec);
+    const prevClaude = readAgentDay(deps.dir, prev).filter((e) => e.time >= tailFromSec);
 
     // Every project key seen: aliases are assigned here, under the lock this tick already holds.
     const names = deps.knownNames?.() ?? new Map<string, string>();

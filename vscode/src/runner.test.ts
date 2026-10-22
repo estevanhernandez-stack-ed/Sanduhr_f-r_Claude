@@ -5,12 +5,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ReadPassResult } from './claude/reader';
 import { FOLLOW_UP_MS, REFRESH_MS, Runner, TICK_MS, type RunnerDeps, type RunnerTimers } from './runner';
 import { AliasStore } from './store/aliases';
-import { appendClaudeEvents } from './store/claudeSpool';
+import { appendAgentEvents } from './store/agentSpool';
 import { listDays, readDay } from './store/days';
 import { stateDir } from './store/paths';
 import { Spool } from './store/spool';
 import { ensureInstalled } from './store/state';
-import type { ClaudeEvent, DayRecord, Heartbeat } from './types';
+import type { AgentEvent, DayRecord, Heartbeat } from './types';
 
 const MACHINE = 'machine-1';
 const NOW = new Date(2026, 5, 10, 14, 0, 0).getTime(); // local 14:00
@@ -78,8 +78,9 @@ const hb = (project: string, time: number, over: Partial<Heartbeat> = {}): Heart
   ...over,
 });
 
-const cev = (id: string, project: string, time: number, kind: ClaudeEvent['kind'] = 'activity'): ClaudeEvent => ({
-  v: 1,
+const cev = (id: string, project: string, time: number, kind: AgentEvent['kind'] = 'activity'): AgentEvent => ({
+  v: 2,
+  agent: 'claude',
   id,
   time,
   project,
@@ -127,7 +128,7 @@ function rig(pid: number, over: Partial<RunnerDeps> = {}): Rig {
 describe('tick', () => {
   it('merges today and yesterday, assigns aliases, writes day files and fires onDayUpdated', async () => {
     seedSpool([hb('proj-a', sec(13, 0)), hb('proj-a', sec(13, 5))]);
-    appendClaudeEvents(dir, [cev('c1', 'proj-b', sec(13, 2))]);
+    appendAgentEvents(dir, [cev('c1', 'proj-b', sec(13, 2))]);
     const r = rig(10, { knownNames: () => new Map([['proj-a', 'widget']]) });
     const res = await r.runner.tick();
     expect(res).toEqual({ ran: true, merged: ['2026-06-09', '2026-06-10'] });
@@ -154,7 +155,7 @@ describe('tick', () => {
   });
 
   it('includes a touched old date in the merge set', async () => {
-    appendClaudeEvents(dir, [cev('old1', 'proj-a', sec(9, 0, 1)), cev('old2', 'proj-a', sec(9, 3, 1))]);
+    appendAgentEvents(dir, [cev('old1', 'proj-a', sec(9, 0, 1)), cev('old2', 'proj-a', sec(9, 3, 1))]);
     const r = rig(10, { readPass: async () => emptyPass({ touchedDates: ['2026-06-01'] }) });
     const res = await r.runner.tick();
     expect(res.merged).toEqual(['2026-06-01', '2026-06-09', '2026-06-10']);
