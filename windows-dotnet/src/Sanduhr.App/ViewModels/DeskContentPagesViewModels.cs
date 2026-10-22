@@ -31,6 +31,8 @@ public sealed partial class NowPlayingAppRow : ObservableObject
     public string AppId { get; }
     public string Name { get; }
 
+    public override string ToString() => Name;
+
     [ObservableProperty] private bool _shown;
 
     partial void OnShownChanged(bool value) { if (!_loading) _owner.SetExcluded(AppId, !value); }
@@ -69,6 +71,8 @@ public sealed class SongLookRow
     public FontStyle FontStyle { get; }
     public string AccessibleName { get; }
     public bool HasMood => Mood.Length > 0;
+
+    public override string ToString() => AccessibleName;
 }
 
 /// <summary>

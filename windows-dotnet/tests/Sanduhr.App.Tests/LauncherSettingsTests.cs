@@ -14,6 +14,7 @@ namespace Sanduhr.App.Tests;
 /// them saves, the picture files that leave with their button, and the PNG import's checks. The two pickers and the file
 /// dialog are the only parts a person has to drive by hand.
 /// </summary>
+[Collection("SettingsWindow")] // swaps the shared LauncherAppCache.Current, which a whole Settings window also reads
 public sealed class LauncherSettingsTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "sanduhr-launcher-" + Guid.NewGuid().ToString("N")[..8]);

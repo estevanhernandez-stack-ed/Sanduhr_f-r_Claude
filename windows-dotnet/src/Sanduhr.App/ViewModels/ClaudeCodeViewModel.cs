@@ -57,6 +57,8 @@ public sealed partial class CcFolderRowViewModel : ObservableObject
 
     public string AutomationName => $"Folder {Display}";
 
+    public override string ToString() => AutomationName;
+
     /// <summary>The account choices (the page's list), bound directly so the combo never depends on
     /// a RelativeSource walk to the page.</summary>
     public System.Collections.ObjectModel.ObservableCollection<string> AccountOptions => _owner.AccountOptions;

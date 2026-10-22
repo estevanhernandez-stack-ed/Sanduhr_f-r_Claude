@@ -57,6 +57,9 @@ public sealed partial class LauncherButtonRow : ObservableObject
 
     public string Initial => Title.Length > 0 ? Title[..1].ToUpperInvariant() : "?";
 
+    /// <summary>What a screen reader reads for the row: the button's name, never the type name.</summary>
+    public override string ToString() => Title;
+
     [ObservableProperty] private bool _hasImage;
     [ObservableProperty] private bool _isMissing;
     [ObservableProperty] private bool _isSelected;

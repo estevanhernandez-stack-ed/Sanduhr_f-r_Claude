@@ -56,4 +56,12 @@ public class ModsPageTextTests
         Assert.Equal("None", ModsPageText.SwitchSummary(0, 0));
         Assert.Equal("41 on, 2 off", ModsPageText.SwitchSummary(41, 2));
     }
+
+    [Fact]
+    public void ARowReadsAsNameVersionStateAndModTag()
+    {
+        Assert.Equal("626labs, version 0.1.0, on, mod", ModsPageText.RowName("626labs", "0.1.0", "On", true));
+        Assert.Equal("alpha, version 1.2.0, off", ModsPageText.RowName("alpha", "v1.2.0", "Off", false));
+        Assert.Equal("ghost, on, no files here", ModsPageText.RowName("ghost", null, "On, no files here", false));
+    }
 }

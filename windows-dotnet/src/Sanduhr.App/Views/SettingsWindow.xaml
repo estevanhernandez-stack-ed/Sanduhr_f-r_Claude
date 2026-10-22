@@ -1703,6 +1703,11 @@
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                            Visibility="{Binding HasNoFolders, Converter={StaticResource BoolVis}}" />
                                 <ItemsControl ItemsSource="{Binding Folders}" Focusable="False">
+                                    <ItemsControl.ItemContainerStyle>
+                                        <Style TargetType="ContentPresenter">
+                                            <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
+                                        </Style>
+                                    </ItemsControl.ItemContainerStyle>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6" Padding="12,10" Margin="0,0,0,8"
@@ -1897,6 +1902,11 @@
                                                 <Run Text="{Binding HooksSummary, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                             </TextBlock>
                                             <ItemsControl ItemsSource="{Binding HookLines}" Focusable="False" Margin="0,2,0,0">
+                                                <ItemsControl.ItemContainerStyle>
+                                                    <Style TargetType="ContentPresenter">
+                                                        <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
+                                                    </Style>
+                                                </ItemsControl.ItemContainerStyle>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <TextBlock FontSize="10.5" TextWrapping="Wrap" Margin="12,1,0,0"
@@ -1911,6 +1921,11 @@
                                                 <Run Text="{Binding PluginsSummary, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                             </TextBlock>
                                             <ItemsControl ItemsSource="{Binding PluginLines}" Focusable="False" Margin="0,2,0,0">
+                                                <ItemsControl.ItemContainerStyle>
+                                                    <Style TargetType="ContentPresenter">
+                                                        <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
+                                                    </Style>
+                                                </ItemsControl.ItemContainerStyle>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <TextBlock FontSize="10.5" TextWrapping="Wrap" Margin="12,1,0,0"
@@ -1931,7 +1946,14 @@
                                     <TextBlock Text="{Binding PluginListNote}" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,6"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                                Visibility="{Binding PluginListNote, Converter={StaticResource StrVis}}" />
-                                    <ItemsControl ItemsSource="{Binding Mods}" Focusable="False">
+                                    <ItemsControl ItemsSource="{Binding Mods}" Focusable="False"
+                                                  AutomationProperties.Name="Plugins">
+                                        <ItemsControl.ItemContainerStyle>
+                                            <!-- A row reads as "626labs, version 0.1.0, on, mod", not as the type of the item behind it. -->
+                                            <Style TargetType="ContentPresenter">
+                                                <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
+                                            </Style>
+                                        </ItemsControl.ItemContainerStyle>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6" Padding="12,10" Margin="0,0,0,8"

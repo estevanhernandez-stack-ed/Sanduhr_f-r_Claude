@@ -2,11 +2,19 @@ namespace Sanduhr.Core;
 
 /// <summary>One package the Windows app ships with: its name, its license as its NuGet package
 /// declares it, and the project's page.</summary>
-public sealed record ThirdPartyPackage(string Name, string License, string Url);
+public sealed record ThirdPartyPackage(string Name, string License, string Url)
+{
+    /// <summary>What a screen reader reads for the entry: "Velopack, MIT".</summary>
+    public override string ToString() => $"{Name}, {License}";
+}
 
 /// <summary>One font family that ships with the app: its family name, its files, and the copyright
 /// and license records in the fonts' own name tables.</summary>
-public sealed record ThirdPartyFont(string Name, IReadOnlyList<string> Files, string Copyright, string License);
+public sealed record ThirdPartyFont(string Name, IReadOnlyList<string> Files, string Copyright, string License)
+{
+    /// <summary>What a screen reader reads for the entry: the family name.</summary>
+    public override string ToString() => $"{Name} font";
+}
 
 /// <summary>
 /// Settings, About, Third-party notices: every package the App references directly, with the

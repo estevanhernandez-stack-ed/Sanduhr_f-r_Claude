@@ -34,6 +34,8 @@ public sealed partial class DeskPieceRow : ObservableObject
     public string Widget { get; }
     public string Name { get; }
 
+    public override string ToString() => Name;
+
     [ObservableProperty] private DeskPlaceOption _place = DeskSettingsViewModel.Hidden;
     [ObservableProperty] private double _size = 1;
 

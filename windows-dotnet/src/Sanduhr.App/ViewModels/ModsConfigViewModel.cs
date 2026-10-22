@@ -10,7 +10,10 @@ using Sanduhr.Core;
 namespace Sanduhr.App.ViewModels;
 
 /// <summary>A folder in the Mods &amp; Config picker.</summary>
-public sealed record ModsFolderOption(string Path, string Display);
+public sealed record ModsFolderOption(string Path, string Display)
+{
+    public override string ToString() => Display;
+}
 
 /// <summary>What Mods &amp; Config needs from the app, so the page can be built over a scratch profile.</summary>
 internal sealed record ModsConfigHost(
@@ -29,7 +32,13 @@ internal sealed record ModsConfigHost(
 }
 
 /// <summary>One line under a section: a name and what it says.</summary>
-public sealed record ModsLine(string Name, string Text);
+public sealed record ModsLine(string Name, string Text)
+{
+    /// <summary>What a screen reader reads for the line: "Notification, 2 groups", never the record's fields.</summary>
+    public string AutomationName => $"{Name}, {Text}";
+
+    public override string ToString() => AutomationName;
+}
 
 /// <summary>One plugin a folder loads. A plugin that also carries mod hooks is a mod and wears a "mod" tag.</summary>
 public sealed partial class ModRowViewModel : ObservableObject
@@ -40,6 +49,11 @@ public sealed partial class ModRowViewModel : ObservableObject
     public string VersionText { get; }
     public string Description { get; }
     public string StateText { get; }
+
+    /// <summary>What a screen reader reads for the row: "626labs, version 0.1.0, on, mod".</summary>
+    public string AutomationName { get; }
+
+    public override string ToString() => AutomationName;
     public string Touches { get; }
     public bool IsSanduhr { get; }
     /// <summary>The plugin is a Claude Code mod (its hooks list modules).</summary>
@@ -77,6 +91,7 @@ public sealed partial class ModRowViewModel : ObservableObject
         IsOn = IsSanduhr && own!.IsOn;
         IsOff = IsSanduhr && own!.Listed && !own.IsOn;
         Touches = ModsConfigViewModel.DescribeTouches(item.Touches);
+        AutomationName = ModsPageText.RowName(Name, item.Version, StateText, IsMod);
         TurnOnCommand = new RelayCommand(() => _owner.SwitchOwnMod(true));
         TurnOffCommand = new RelayCommand(() => _owner.SwitchOwnMod(false));
         UpdateCommand = new RelayCommand(_owner.UpdateOwnMod);

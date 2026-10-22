@@ -60,6 +60,19 @@ public static class ModsPageText
                "The list differs because " + string.Join("; ", parts) + ".";
     }
 
+    /// <summary>
+    /// What a screen reader reads for one plugin row: "626labs, version 0.1.0, on, mod". <paramref name="state"/> is the
+    /// row's state words ("On", "Off", "On, no files here", "Files missing").
+    /// </summary>
+    public static string RowName(string name, string? version, string state, bool isMod)
+    {
+        var parts = new List<string> { name };
+        if (!string.IsNullOrWhiteSpace(version)) parts.Add("version " + version.Trim().TrimStart('v'));
+        parts.Add(state.ToLowerInvariant());
+        if (isMod) parts.Add("mod");
+        return string.Join(", ", parts);
+    }
+
     /// <summary>The settings.json line: "41 on, 2 off", "None" when there are no switches.</summary>
     public static string SwitchSummary(int on, int off) =>
         on + off == 0 ? "None" : $"{on} on, {off} off";
