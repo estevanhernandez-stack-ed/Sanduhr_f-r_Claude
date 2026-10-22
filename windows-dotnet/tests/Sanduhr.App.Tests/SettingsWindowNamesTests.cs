@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows.Controls;
 using Sanduhr.App.ViewModels;
 using Sanduhr.App.Views;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.Tests;
 
@@ -42,7 +43,8 @@ public sealed class SettingsWindowNamesTests : AppWindowFixture
     public void NoPageReadsAsATypeNameOrARecord() => AppHost.Run(() =>
     {
         SeedPersonalHome(Path.Combine(Profile, ".claude-personal"));
-        var svm = new SettingsViewModel(DemoWidget(), () => Task.CompletedTask, _ => Task.CompletedTask);
+        var widget = DemoWidget();
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
         var window = new SettingsWindow(svm);
         OffScreen(window);
         window.Show();
@@ -63,7 +65,9 @@ public sealed class SettingsWindowNamesTests : AppWindowFixture
         Assert.True(leaks.Count == 0, string.Join(Environment.NewLine, leaks));
 
         // The rows that did leak read as words now, and the seeded Mods & Config rows are there to be named.
-        Assert.Contains("Work, active", seen["Accounts"]);
+        // Demo mode shows its own sample accounts whatever the machine's Credential Manager holds; the active one is marked.
+        foreach (var account in DemoMode.Accounts)
+            Assert.Contains(account == widget.ShownActiveAccount ? account + ", active" : account, seen["Accounts"]);
         Assert.Contains(seen["ClaudeCode"], n => n.StartsWith(@"Folder ~\.claude"));
         Assert.Contains("alpha, version 1.2.0, on", seen["Mods"]);
         Assert.Contains("beta-mod, version 0.1.0, off, mod", seen["Mods"]);

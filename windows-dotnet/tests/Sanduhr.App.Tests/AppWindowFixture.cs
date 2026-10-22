@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Automation.Peers;
+using System.Windows.Controls;
 using Sanduhr.App.Services;
 using Sanduhr.App.ViewModels;
 
@@ -51,11 +52,28 @@ public abstract class AppWindowFixture : IDisposable
         name.Contains("ViewModel") || name.Contains("Sanduhr.App") || name.Contains("Sanduhr.Core") || name.Contains("System.")
         || name.Contains("{ ") || name.Contains(" }") || name.Contains("<>z__");
 
+    /// <summary>
+    /// The peer tree, depth first. A peer for an item whose container went away (a list refilled since the last walk, an
+    /// item collected on a slow runner) throws from GetName; that peer is stale, not a name, so it is skipped. A peer
+    /// that answers is always checked.
+    /// </summary>
     protected static IEnumerable<AutomationPeer> Walk(AutomationPeer peer)
     {
         yield return peer;
-        foreach (var child in peer.GetChildren() ?? [])
+        IList<AutomationPeer>? children = null;
+        try { children = peer.GetChildren(); }
+        catch (NullReferenceException) { /* a stale item peer */ }
+        foreach (var child in children ?? [])
             foreach (var p in Walk(child)) yield return p;
+    }
+
+    /// <summary>Turns virtualization off under <paramref name="root"/> so every item of every list has a container to name.</summary>
+    private static void RealizeEveryItem(DependencyObject root)
+    {
+        if (root is ItemsControl list) VirtualizingPanel.SetIsVirtualizing(list, false);
+        int n = root is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D ? System.Windows.Media.VisualTreeHelper.GetChildrenCount(root) : 0;
+        for (int i = 0; i < n; i++)
+            RealizeEveryItem(System.Windows.Media.VisualTreeHelper.GetChild(root, i));
     }
 
     protected static void Pump() =>
@@ -70,12 +88,23 @@ public abstract class AppWindowFixture : IDisposable
         window.Top = -20000;
     }
 
-    /// <summary>Every UI Automation name under the window, as read now.</summary>
+    /// <summary>Every UI Automation name under the window, as read now, with every list item realized.</summary>
     protected static List<string> NamesOf(FrameworkElement root)
     {
-        root.UpdateLayout();
-        Pump();
-        return Walk(UIElementAutomationPeer.CreatePeerForElement(root)).Select(p => p.GetName() ?? "").ToList();
+        // Twice: realizing a list's items can bring more lists into the tree.
+        for (int pass = 0; pass < 2; pass++)
+        {
+            RealizeEveryItem(root);
+            root.UpdateLayout();
+            Pump();
+        }
+        var names = new List<string>();
+        foreach (var peer in Walk(UIElementAutomationPeer.CreatePeerForElement(root)))
+        {
+            try { names.Add(peer.GetName() ?? ""); }
+            catch (NullReferenceException) { /* a stale item peer: nothing to name */ }
+        }
+        return names;
     }
 
     /// <summary>The names that read as a type or a record dump.</summary>
