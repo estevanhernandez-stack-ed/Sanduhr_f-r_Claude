@@ -71,6 +71,25 @@ public class SingleInstanceTests
     }
 
     [Fact]
+    public async Task A_restart_to_update_that_did_not_happen_answers_launches_again()
+    {
+        var dir = Folder();
+        using var release = new ManualResetEventSlim();
+        using var shown = new ManualResetEventSlim();
+        var (thread, claimed) = HoldOnThread(dir, release, onShow: shown.Set);
+        var first = await claimed;
+
+        first.StopAnswering();  // Restart to update: the relaunch must be able to take over
+        first.ResumeAnswering(); // the install was cancelled: Sanduhr keeps running
+
+        using var second = SingleInstance.Claim(dir, TimeSpan.FromSeconds(5));
+        Assert.False(second.IsPrimary);
+        Assert.True(shown.Wait(1000), "the running instance did not answer after the restart was called off");
+        release.Set();
+        thread.Join();
+    }
+
+    [Fact]
     public async Task Other_data_folders_are_not_blocked()
     {
         using var release = new ManualResetEventSlim();

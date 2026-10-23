@@ -83,6 +83,12 @@ the shipped 2.x Python line.
    with the download link, then "What changed" as outcomes the user feels. Verify each carried-over
    "known issue" still applies (`git log <prev-tag>..HEAD` + a 60-second smoke) before re-pasting —
    stale known-issues are a recurring miss.
+3. **The 0x80073D02 known issue, by version.** 3.8.0's Store notes keep *"If the update won't install
+   (error 0x80073D02), restart Windows and try again."*: the 3.7.1 to 3.8 install runs while 3.7.1's
+   code runs, and 3.7.1 only has Quit and update. **Drop the line in the first Store release after
+   3.8** (3.8.x or 3.9): from 3.8 on, Restart to update closes the WebView2 helpers before the Store
+   installs (`docs/widgets-3.8-spec.md` 8b). Drop it only once Phase 7's restart-to-update check has
+   passed on a real 3.8 install.
 
 ---
 
@@ -246,6 +252,16 @@ reviewer letters stay here because they never go through the API.
    hatch; a cancelled-and-recommitted submission is not uncommittable (also measured 2026-09-12).
 8. After certification, copy the shipped `whats-new-<v>.md` and any changed listing text into
    `docs/store/listing-copy-<v>.md` here, so the archive stays complete.
+9. **Restart to update, proved on the first release after 3.8** (only a real Store update exercises
+   `StoreContext`, Windows' consent dialog and the relaunch). Keep one machine on the Store 3.8.0
+   until 3.8.x is live, then on it: wait for the offer (up to 6 h, or quit and relaunch to check at
+   once) and confirm the toast, the tray item and the widget all say *"Sanduhr 3.8.x is ready.
+   Restart to update?"*; click **Later** once and confirm nothing installs; then click **Restart to
+   update**, cancel Windows' dialog, and confirm Sanduhr keeps running, fetches, and still offers it;
+   then accept. Pass: within a minute the old process is gone, 3.8.x starts by itself (Settings,
+   About), its What's New shows, no `msedgewebview2.exe` from the old version is left, `sanduhr.log`
+   has `restart to update: store 3.8.x, closing browsers` and no `0x80073D02` shows in the Store's
+   downloads page. Fail any step: keep the known-issue line and file it.
 
 ### The 10.1.4.4 acceptance tests (from the Python build's two rejections)
 

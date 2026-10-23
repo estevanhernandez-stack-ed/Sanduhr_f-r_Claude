@@ -74,7 +74,7 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
     private readonly string _sessionKey;
     private readonly string? _cfClearance;
     private readonly string _profileDir;
-    private readonly string _logPath;
+    private string _logPath;
     private readonly Dispatcher _dispatcher;
 
     private readonly ConcurrentDictionary<string, TaskCompletionSource<FetchReply>> _pending = new();
@@ -88,13 +88,45 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
     private Window? _host;
     private WebView2? _web;
     private CoreWebView2Environment? _env;
+    private CoreWebView2? _core;
     private Task? _ready;
+    private bool _alive;
+
+    /// <summary>The error a pending fetch gets when the browser goes away under it.</summary>
+    private const string BrowserGoneError = "browser process exited";
 
     private string? _orgId;
     private JsonObject? _accountNode;
     private bool _disposed;
 
     public AccountPlan? Account { get; private set; }
+
+    /// <summary>
+    /// The browser process behind this transport went away by itself (a crash, End task, an Edge runtime
+    /// update; issue #331), reported once per loss with the exit kind, on the UI thread. The dead host is
+    /// already torn down: the next request builds a new environment and controller. Never raised for a
+    /// teardown Sanduhr asked for (a rebuild, <see cref="Release"/>, <see cref="Dispose"/>).
+    /// </summary>
+    public event Action<string>? TransportLost;
+
+    /// <summary>True while a browser is up and serving this transport.</summary>
+    public bool BrowserAlive => _alive && !_disposed;
+
+    /// <summary>The browser process id while <see cref="BrowserAlive"/>, else 0. For logs and tests.</summary>
+    public int BrowserProcessId
+    {
+        get
+        {
+            try { return _alive && _core is not null ? (int)_core.BrowserProcessId : 0; }
+            catch { return 0; }
+        }
+    }
+
+    /// <summary>Where the hidden page loads. claude.ai in the app; a test can point it at about:blank.</summary>
+    internal string StartPage { get; init; } = Origin;
+
+    /// <summary>The diagnostic log. A test points it at a scratch file.</summary>
+    internal string LogPath { get => _logPath; init => _logPath = value; }
 
     /// <param name="sessionKey">The claude.ai <c>sessionKey</c> cookie value.</param>
     /// <param name="cfClearance">Optional <c>cf_clearance</c> cookie (injected too, though the live browser usually clears CF on its own).</param>
@@ -125,7 +157,39 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
     public Task<RoutineBudget?> GetRoutineBudgetAsync(CancellationToken cancellationToken = default)
         => OnUiAsync(() => GetRoutineBudgetCoreAsync(cancellationToken));
 
-    private async Task<JsonObject> GetUsageCoreAsync(CancellationToken ct)
+    /// <summary>
+    /// Runs <paramref name="work"/> and turns a dead browser into <see cref="TransportLostException"/> after
+    /// tearing the dead host down: the "WebView control is no longer valid" error 3.7.1 showed on the widget
+    /// (issue #331) when the exit event was missed, and a pending fetch the exit cut off.
+    /// </summary>
+    private async Task<T> GuardTransportAsync<T>(Func<Task<T>> work)
+    {
+        try
+        {
+            return await work().ConfigureAwait(true);
+        }
+        catch (TransportLostException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (TransportRecovery.IsDeadBrowserError(ex))
+        {
+            OnBrowserGone("invalid-control");
+            throw new TransportLostException("The usage transport's browser process exited", ex);
+        }
+    }
+
+    /// <summary>Brings the browser up without fetching. For tests and the live recovery check.</summary>
+    internal Task EnsureBrowserAsync(CancellationToken ct = default)
+        => OnUiAsync(async () => { await EnsureReadyOrResetAsync(ct).ConfigureAwait(true); return true; });
+
+    private Task<JsonObject> GetUsageCoreAsync(CancellationToken ct)
+        => GuardTransportAsync(() => GetUsageUnguardedAsync(ct));
+
+    private Task<RoutineBudget?> GetRoutineBudgetCoreAsync(CancellationToken ct)
+        => GuardTransportAsync(() => GetRoutineBudgetUnguardedAsync(ct));
+
+    private async Task<JsonObject> GetUsageUnguardedAsync(CancellationToken ct)
     {
         await EnsureReadyOrResetAsync(ct).ConfigureAwait(true);
 
@@ -149,7 +213,7 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         return data;
     }
 
-    private async Task<RoutineBudget?> GetRoutineBudgetCoreAsync(CancellationToken ct)
+    private async Task<RoutineBudget?> GetRoutineBudgetUnguardedAsync(CancellationToken ct)
     {
         await EnsureReadyOrResetAsync(ct).ConfigureAwait(true);
 
@@ -307,6 +371,12 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         core.Settings.UserAgent = ClaudeSignIn.BrowserUserAgent;
         core.Settings.IsWebMessageEnabled = true;
         core.WebMessageReceived += OnWebMessageReceived;
+        // Issue #331: the browser can go away under us (a crash, End task, an Edge runtime update).
+        // ProcessFailed reports it at once; the environment's BrowserProcessExited follows once the
+        // processes are gone and carries the exit kind. Either tears the dead host down for a rebuild.
+        _core = core;
+        core.ProcessFailed += OnProcessFailed;
+        _env.BrowserProcessExited += OnBrowserProcessExited;
 
         InjectAuthCookies(core);
 
@@ -318,15 +388,108 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         core.NavigationCompleted += OnNav;
         try
         {
-            core.Navigate(Origin);
+            core.Navigate(StartPage);
             var done = await Task.WhenAny(navTcs.Task, Task.Delay(NavTimeout, ct)).ConfigureAwait(true);
             bool navOk = done == navTcs.Task && navTcs.Task.Result;
             Log($"init: nav ok={navOk} host={SafeHost(core.Source)}");
         }
         finally
         {
-            core.NavigationCompleted -= OnNav;
+            try { core.NavigationCompleted -= OnNav; } catch { /* the browser went away during the load */ }
         }
+        // The browser went away while the page loaded: the handlers already tore it down.
+        if (!ReferenceEquals(core, _core))
+            throw new TransportLostException("The usage transport's browser process exited while starting");
+        _alive = true;
+    }
+
+    // -- browser loss (issue #331) ----------------------------------------------
+
+    private void OnProcessFailed(object? sender, CoreWebView2ProcessFailedEventArgs e)
+    {
+        // The browser itself, or the page's renderer: either way this page no longer answers fetches.
+        // Other helpers (GPU, utility) restart on their own and leave the page working.
+        string? kind = e.ProcessFailedKind switch
+        {
+            CoreWebView2ProcessFailedKind.BrowserProcessExited => "browser-exited",
+            CoreWebView2ProcessFailedKind.RenderProcessExited => "render-exited",
+            CoreWebView2ProcessFailedKind.RenderProcessUnresponsive => "render-unresponsive",
+            _ => null,
+        };
+        if (kind is null)
+            return;
+        string detail;
+        try { detail = $" reason={e.Reason} code={e.ExitCode}"; }
+        catch { detail = ""; }
+        OnBrowserGoneFrom(sender, kind + detail);
+    }
+
+    private void OnBrowserProcessExited(object? sender, CoreWebView2BrowserProcessExitedEventArgs e)
+    {
+        // Raised for the environment we built and are still using; our own teardown unsubscribes first.
+        if (!ReferenceEquals(sender, _env))
+            return;
+        OnBrowserGone("exit-" + e.BrowserProcessExitKind.ToString().ToLowerInvariant());
+    }
+
+    private void OnBrowserGoneFrom(object? sender, string kind)
+    {
+        if (sender is not null && !ReferenceEquals(sender, _core))
+            return; // a host already replaced
+        OnBrowserGone(kind);
+    }
+
+    /// <summary>
+    /// The browser is gone: log the kind, fail every pending fetch at once (rather than at its 30 s
+    /// timeout), tear the dead host down and drop the init task so the next request builds a new
+    /// environment and controller. Once per loss; UI thread.
+    /// </summary>
+    private void OnBrowserGone(string kind)
+    {
+        if (!_dispatcher.CheckAccess())
+        {
+            _dispatcher.BeginInvoke(() => OnBrowserGone(kind));
+            return;
+        }
+        if (_disposed || (_core is null && _web is null))
+            return; // already torn down: this is the second report of the same loss
+        Log($"transport: browser gone kind={kind} pending={_pending.Count}");
+        FailPending(BrowserGoneError);
+        var deadEnv = _env;
+        TearDownHostAndWebView();
+        _ready = null;
+        // The environment's own exit report (Normal or Failed) lands once its processes are gone: log it.
+        if (deadEnv is not null)
+        {
+            try { deadEnv.BrowserProcessExited += (_, e) => Log($"transport: dead browser exit kind={e.BrowserProcessExitKind}"); }
+            catch { /* best-effort */ }
+        }
+        TransportLost?.Invoke(kind);
+    }
+
+    private void FailPending(string error)
+    {
+        foreach (var id in _pending.Keys.ToArray())
+            if (_pending.TryRemove(id, out var tcs))
+                tcs.TrySetResult(new FetchReply(0, null, error));
+    }
+
+    /// <summary>
+    /// Restart to update: close this transport's browser now, without disposing the client. Nothing is
+    /// reported as lost; the next request (once browsers may start again) builds a new one.
+    /// </summary>
+    public void Release()
+    {
+        if (_dispatcher.CheckAccess()) ReleaseCore();
+        else _dispatcher.Invoke(ReleaseCore);
+    }
+
+    private void ReleaseCore()
+    {
+        FailPending("transport released");
+        TearDownHostAndWebView();
+        _ready = null;
+        Log("transport: released for restart");
     }
 
     private void InjectAuthCookies(CoreWebView2 core)
@@ -387,7 +550,7 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
     private async Task<FetchReply> FetchAsync(
         string url, IEnumerable<KeyValuePair<string, string>>? headers, CancellationToken ct)
     {
-        if (_web?.CoreWebView2 is null)
+        if (_core is not { } core)
             return new FetchReply(0, null, "WebView2 not initialized");
 
         var id = Guid.NewGuid().ToString("N");
@@ -409,8 +572,11 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
         try
         {
-            await _web.CoreWebView2.ExecuteScriptAsync(BuildFetchScript(id, url, headers)).ConfigureAwait(true);
-            return await tcs.Task.ConfigureAwait(true);
+            await core.ExecuteScriptAsync(BuildFetchScript(id, url, headers)).ConfigureAwait(true);
+            var reply = await tcs.Task.ConfigureAwait(true);
+            if (reply.Error == BrowserGoneError)
+                throw new TransportLostException("The usage transport's browser process exited during a fetch");
+            return reply;
         }
         finally
         {
@@ -585,6 +751,19 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
     /// </summary>
     private void TearDownHostAndWebView()
     {
+        _alive = false;
+        // Unsubscribe the loss handlers first: a teardown Sanduhr asked for is not a loss. _core is kept
+        // apart from _web.CoreWebView2 because the control's getter throws once the browser has died.
+        if (_core is { } core)
+        {
+            try { core.ProcessFailed -= OnProcessFailed; } catch { /* best-effort */ }
+            try { core.WebMessageReceived -= OnWebMessageReceived; } catch { /* best-effort */ }
+        }
+        if (_env is { } env)
+        {
+            try { env.BrowserProcessExited -= OnBrowserProcessExited; } catch { /* best-effort */ }
+        }
+        _core = null;
         try
         {
             if (_web?.CoreWebView2 is not null)
