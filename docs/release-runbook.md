@@ -180,8 +180,10 @@ $repo = 'estevanhernandez-stack-ed/Sanduhr_f-r_Claude'
 
 **Never mark a Windows release Latest.** The repo's Latest slot belongs to the Mac app, so a Windows release marked Latest hands Mac users who follow `/releases/latest` a `Setup.exe`. The Mac release command passes `--latest` explicitly, because GitHub's automatic pick weighs version numbers and `v2.x-mac` sorts below `v3.x`. Link Windows downloads to `/releases?q=v3` (Windows tags only) and Mac downloads to `/releases?q=mac`, never `/releases/latest`; 626labs.dev's Sanduhr page and this repo's landing page do. The Windows updater doesn't need the flag: Velopack's `GithubSource` lists every non-prerelease release and picks the newest with a feed. Untick "Set as the latest release" if you publish from the web UI.
 
-Auto-update rolls out within ~24h of publishing — existing installs poll `releases.win.json` and
-pick up the delta.
+Setup.exe installs before 3.8 never updated themselves (the update check only logged; corrected
+2026-10-22, and the v3.6.0, v3.7.1 and v3.7.2 release notes were fixed). From 3.8 on, an install
+checks `releases.win.json`, downloads the update in the background and offers **Restart to update**;
+nothing applies without that click. A 3.7.x Setup.exe user has to download 3.8's Setup.exe once.
 
 ---
 
