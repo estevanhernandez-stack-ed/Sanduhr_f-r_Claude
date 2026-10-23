@@ -53,12 +53,15 @@ internal sealed class DeskDesignHost : IDeskDesignHost, IDisposable
                 _dismiss();
             };
             _window.SetModel(model);
+            // On the monitor the design changes, not always the primary (#319).
+            _window.Target = _desk.ReviewScreen(settings);
             _window.Show();
             _window.Activate();
         }
         else
         {
             _window.SetModel(model);
+            _window.Target = _desk.ReviewScreen(settings);
         }
     }
 
