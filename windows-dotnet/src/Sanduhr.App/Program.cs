@@ -33,8 +33,24 @@ public static class Program
             })
             .Run();
 
-        var app = new App();
-        app.InitializeComponent();
-        return app.Run();
+        // One Sanduhr per data folder: a second launch shows the running widget and exits. A launch that
+        // meets an instance mid-quit waits for it (up to the handoff) and then starts as usual.
+        using var instance = Services.SingleInstance.Claim(new Sanduhr.Core.Paths().AppDataDir, TimeSpan.FromSeconds(15));
+        if (!instance.IsPrimary)
+            return 0;
+
+        int exitCode;
+        try
+        {
+            var app = new App { Instance = instance };
+            app.InitializeComponent();
+            exitCode = app.Run();
+        }
+        finally
+        {
+            // Closing the job ends any WebView2 browser process still running, so none outlives Sanduhr.
+            Services.BrowserProcessGuard.Current.Dispose();
+        }
+        return exitCode;
     }
 }
