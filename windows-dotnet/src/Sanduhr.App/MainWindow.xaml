@@ -260,15 +260,9 @@
                                 <ScrollViewer.Resources>
                                     <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                                 </ScrollViewer.Resources>
-                                <ItemsControl ItemsSource="{Binding Themes}"
-                                              ItemTemplate="{StaticResource ThemeSwatchTemplate}"
-                                              shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel Orientation="Horizontal" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                </ItemsControl>
+                                <ListBox Style="{StaticResource ThemeSwatchList}" ItemsSource="{Binding Themes}"
+                                         AutomationProperties.Name="Themes"
+                                         shell:WindowChrome.IsHitTestVisibleInChrome="True" />
                             </ScrollViewer>
                         </Border>
                     </Popup>

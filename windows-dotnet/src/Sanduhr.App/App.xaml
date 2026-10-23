@@ -21,7 +21,8 @@
              underline. Hover: brighter underline + a faint backing chip. Click →
              ApplyCommand (live re-tint + persist + soft chime via the widget VM). -->
         <DataTemplate x:Key="ThemeSwatchTemplate" DataType="{x:Type vm:ThemeStripItemViewModel}">
-            <Button Command="{Binding ApplyCommand}" Cursor="Hand" ToolTip="{Binding Name}"
+            <!-- Not a tab stop of its own: the list item around it is (ThemeSwatchList). -->
+            <Button Command="{Binding ApplyCommand}" Cursor="Hand" ToolTip="{Binding Name}" Focusable="False"
                     shell:WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
@@ -56,6 +57,49 @@
                 </Button.Template>
             </Button>
         </DataTemplate>
+
+        <!-- The swatch list (widget quick-switch and Settings, Themes): a ListBox drawn as bare swatches, so UI
+             Automation reads a list of themes with the active one selected. Selecting an item applies its theme
+             (ThemeStripItemViewModel.IsSelected): a click, the arrow keys, or SelectionItemPattern.Select() (#316). -->
+        <Style x:Key="ThemeSwatchList" TargetType="ListBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="SelectionMode" Value="Single" />
+            <Setter Property="KeyboardNavigation.TabNavigation" Value="Once" />
+            <Setter Property="KeyboardNavigation.DirectionalNavigation" Value="Cycle" />
+            <Setter Property="ItemTemplate" Value="{StaticResource ThemeSwatchTemplate}" />
+            <Setter Property="ItemsPanel">
+                <Setter.Value>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBox">
+                        <ItemsPresenter />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                        <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+                        <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
         <!-- Slim themed scrollbar for the theme swatch areas only (scoped in via each
              theme ScrollViewer's local resources — never the app-wide default). A

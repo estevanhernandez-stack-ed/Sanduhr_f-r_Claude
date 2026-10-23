@@ -2078,14 +2078,8 @@
                                     <ScrollViewer.Resources>
                                         <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                                     </ScrollViewer.Resources>
-                                    <ItemsControl ItemsSource="{Binding Themes}"
-                                                  ItemTemplate="{StaticResource ThemeSwatchTemplate}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel Orientation="Horizontal" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                    </ItemsControl>
+                                    <ListBox x:Name="ThemeGallery" Style="{StaticResource ThemeSwatchList}"
+                                             ItemsSource="{Binding Themes}" AutomationProperties.Name="Choose a theme" />
                                 </ScrollViewer>
                             </Border>
 
