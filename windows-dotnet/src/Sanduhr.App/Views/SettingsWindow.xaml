@@ -2367,6 +2367,17 @@
                                 <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                            Text="Off by default. With the Sanduhr MCP server installed, Claude Code can put a live card on the Desk for work it is watching (a CI run, a deploy): a title, progress and a one-line note. Cards live in memory only, fade or stay as the work ends, and are gone when you quit. They show where you place Watchers under Where each piece sits." />
+                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,12,0,0"
+                                          Content="{x:Static core:SettingsNames.CiRunnersSwitch}"
+                                          IsChecked="{Binding WatchersCiRunners, Mode=TwoWay}"
+                                          AutomationProperties.Name="{x:Static core:SettingsNames.CiRunnersSwitch}" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="Off by default. Shows a card for each job a GitHub Actions runner container on this PC runs, however it was started. Sanduhr reads only the runners' log output through Docker's local pipe: no GitHub account, no network, and never a container's settings. Cards live in memory only." />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                                           Text="{Binding CiRunnersStatus}"
+                                           AutomationProperties.LiveSetting="Polite" />
                             </StackPanel>
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />

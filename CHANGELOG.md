@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased (windows)
+
+### CI watchers
+
+- **Show my CI runners' jobs** (Settings ▸ Desk, off by default): a watcher card for every job a GitHub Actions runner container on this PC runs, however it was started. "Running job" puts it up, the result ends it: passed fades, failed stays and glows once, canceled or skipped fades as finished. The companion cheers a passed job.
+- **Local only.** Sanduhr reads the runner containers' log output through Docker's local pipe: no GitHub account, no token, no network. It lists containers and follows logs, and makes no other Docker call; a test pins that, since a runner's settings hold its registration token. Runners are picked by image name, so runners added later show without setup.
+- A status line under the switch names the runners it watches, or says Docker isn't running, that Docker answered but refused the request, or that your account needs the docker-users group. Runners scaled from one Compose service (`--scale`) each keep their own card, shown by container name.
+- Runner cards never go "lost touch" (a runner is silent while a job runs), start with the job's real start time when Sanduhr opens mid-job, and hide in demo mode.
+
 ## v3.8.0 — 2026-10-23
 
 **Platform:** Windows (.NET 10 / WPF). Widgets come to the Desk: signed packs from the 626 Labs catalog, a companion that grows with the days you code, and widgets Claude Code makes with you that install only on Apply. Updates restart on your click. This is the Microsoft Store release: the Store was on 3.7.1, and 3.7.2 shipped on GitHub only, so the Store update carries 3.7.2's fixes too. `Sanduhr.Mcp` to 3.8.0. **One new outbound destination**, GitHub releases of `626Labs-LLC/sanduhr-widgets`, reached only when you open Settings ▸ Widgets or install a pack (PRIVACY has the hosts). No new capability; the manifest still declares `runFullTrust` only and changes only its version.

@@ -86,7 +86,7 @@ internal sealed class DeskMessageHandoffService : IDisposable
 /// refuses with <c>watchers_off</c> unless it says on), applies a request only while the switch is on,
 /// and clears its cards when it goes off. Claude Code's background work (the Stop hook) is not read at all.
 /// </summary>
-internal sealed class WatcherStore : IDisposable
+internal sealed class WatcherStore : IDisposable, IRunnerSink
 {
     /// <summary>On since the MCP tools shipped (3.6.0). A kill switch for a build that must not watch the folder.</summary>
     public const bool Enabled = true;
@@ -116,6 +116,46 @@ internal sealed class WatcherStore : IDisposable
 
     /// <summary>A watcher started waiting on the user (the glow fires once).</summary>
     public event Action? WaitingStarted;
+
+    /// <summary>A runner's job just failed (the glow fires once, spec ci-watchers-3.9).</summary>
+    public event Action? FailedStarted;
+
+    // IRunnerSink: RunnerWatchService calls these from its own threads; each runs on the UI thread.
+    void IRunnerSink.Apply(string key, string runner, RunnerLine line) => OnUi(() => ApplyRunner(key, runner, line));
+    void IRunnerSink.Gone(string key) => OnUi(() => RunnerGone(key));
+    void IRunnerSink.Clear() => OnUi(ClearRunners);
+
+    /// <summary>Always queued, never inline, even from the UI thread: the sink calls then run in the order
+    /// they were made, so a clear cannot overtake an apply posted before it and leave a ghost card.</summary>
+    private static void OnUi(Action a)
+    {
+        var d = Application.Current?.Dispatcher;
+        if (d is null) a();
+        else d.BeginInvoke(a);
+    }
+
+    internal void ApplyRunner(string key, string runner, RunnerLine line)
+    {
+        if (_disposed) return;
+        var change = Board.ApplyRunner(key, runner, line, DateTimeOffset.Now);
+        if (change.Changed) Changed?.Invoke();
+        if (change.Failed) FailedStarted?.Invoke();
+        Schedule();
+    }
+
+    internal void RunnerGone(string key)
+    {
+        if (_disposed) return;
+        if (Board.RunnerGone(key, DateTimeOffset.Now)) Changed?.Invoke();
+        Schedule();
+    }
+
+    internal void ClearRunners()
+    {
+        if (_disposed) return;
+        Board.Clear(WatcherSource.Runner);
+        Changed?.Invoke();
+    }
 
     public IReadOnlyList<Watcher> Shown => WatcherBoard.Shown(Board.Ordered(), _demo());
 

@@ -1,0 +1,13 @@
+# derived: the real line shape with the result word or job name swapped. Replace with real lines when captured.
+2026-10-22T02:00:03.736011454Z 2026-10-22 02:00:03Z: Running job: build
+2026-10-22T02:00:18.054757098Z 2026-10-22 02:00:18Z: Job build completed with result: Failed
+2026-10-22T02:00:31.598577583Z 2026-10-22 02:00:31Z: Running job: docs
+2026-10-22T02:00:40.598577583Z 2026-10-22 02:00:40Z: Job docs completed with result: SucceededWithIssues
+2026-10-22T02:00:41.598577583Z 2026-10-22 02:00:41Z: Running job: deploy
+2026-10-22T02:00:42.598577583Z 2026-10-22 02:00:42Z: Job deploy completed with result: Skipped
+2026-10-22T02:00:43.598577583Z 2026-10-22 02:00:43Z: Running job: e2e
+2026-10-22T02:00:50.598577583Z 2026-10-22 02:00:50Z: Job e2e completed with result: Abandoned
+2026-10-22T02:01:00.598577583Z 2026-10-22 02:01:00Z: Running job: test (ubuntu-latest, 3.12)
+2026-10-22T02:02:00.598577583Z 2026-10-22 02:02:00Z: Job test (ubuntu-latest, 3.12) completed with result: Succeeded
+2026-10-22T02:03:00.598577583Z 2026-10-22 02:03:00Z: Running job: stuck
+2026-10-22T02:09:00.598577583Z 2026-10-22 02:09:00Z: Listening for Jobs

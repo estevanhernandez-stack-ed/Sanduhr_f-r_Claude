@@ -278,6 +278,25 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         }
     }
 
+    /// <summary>Raised after "Show my CI runners' jobs" is saved (App starts or stops the runner watch).</summary>
+    public Action? CiRunnersChanged { get; set; }
+
+    /// <summary>"Show my CI runners' jobs" (spec ci-watchers-3.9): off by default; saved at once.</summary>
+    public bool WatchersCiRunners
+    {
+        get => _store.LoadWatchersCiRunners();
+        set
+        {
+            if (value == WatchersCiRunners) return;
+            _store.SaveWatchersCiRunners(value);
+            OnPropertyChanged();
+            CiRunnersChanged?.Invoke();
+        }
+    }
+
+    /// <summary>The line under the switch: which runners, or why none (a live region).</summary>
+    [ObservableProperty] private string _ciRunnersStatus = "";
+
     /// <summary>"Let Claude change the Desk directly" (spec, the agent-designed Desk): off by default; saved at once. On, a design Claude
     /// proposes is applied without the review bar; the Desk it replaces is still saved first.</summary>
     public bool DirectDesign
