@@ -83,10 +83,19 @@
                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                         <TextBlock Text="{Binding Description}" Style="{StaticResource Dim}" Margin="0,2,0,0" />
                     </StackPanel>
-                    <Button Grid.Column="2" Style="{DynamicResource FlatButton}" VerticalAlignment="Center" Margin="8,0,0,0"
-                            Content="{x:Static core:SettingsNames.WidgetUninstall}" Command="{Binding UninstallCommand}"
-                            IsEnabled="{Binding DataContext.Busy, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={x:Static views:WidgetsPage.Not}}"
-                            AutomationProperties.Name="{Binding UninstallName}" />
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0">
+                        <Button Style="{DynamicResource FlatButton}"
+                                Content="{x:Static core:SettingsNames.WidgetUninstall}" Command="{Binding UninstallCommand}"
+                                IsEnabled="{Binding DataContext.Busy, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={x:Static views:WidgetsPage.Not}}"
+                                AutomationProperties.Name="{Binding UninstallName}" />
+                        <!-- Spec 3.8 section 6: a sprite made here takes the user's own PNG sheets; they stay on this PC. -->
+                        <Button Style="{DynamicResource FlatButton}" Margin="0,6,0,0"
+                                Content="{x:Static core:SettingsNames.WidgetUseOwnArt}" Command="{Binding UseOwnArtCommand}"
+                                Visibility="{Binding CanUseOwnArt, Converter={StaticResource BoolVis}}"
+                                IsEnabled="{Binding DataContext.Busy, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={x:Static views:WidgetsPage.Not}}"
+                                AutomationProperties.Name="{Binding UseOwnArtName}"
+                                AutomationProperties.HelpText="Choose a PNG sprite sheet for each stage. It is copied into the widget and never sent anywhere." />
+                    </StackPanel>
                 </Grid>
             </Border>
         </DataTemplate>

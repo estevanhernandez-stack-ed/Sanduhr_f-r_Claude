@@ -34,6 +34,7 @@ public partial class App : Application
     private Desk.DeskMessageSource? _messages;
     private Desk.DeskMessageHandoffService? _handoff;
     private Desk.DeskDesignService? _deskDesign;
+    private Desk.WidgetReviewService? _widgetReview;
     private Desk.NowPlayingLookService? _looks;
     private Desk.WatcherStore? _watchers;
     private LauncherAppCache? _launcherApps;
@@ -557,6 +558,11 @@ public partial class App : Application
         // The live review of Claude's Desk designs: the Desk and widget draw a design from memory, the floating bar asks Apply or Dismiss.
         _deskDesign.Host = new Desk.DeskDesignHost(_desk, () => _vm, FollowDesignChange);
         _deskDesign.DesignsChanged += () => _settingsWindow?.ViewModel.Desk.Designs.Reload();
+        // Widgets made with Claude (spec 3.8 section 5): propose_widget's pack previews on the Desk and installs only on Apply.
+        _widgetReview = new Desk.WidgetReviewService(paths, store);
+        Desk.WidgetReviewService.Current = _widgetReview;
+        _widgetReview.Host = new Desk.WidgetReviewHost(_desk, store, () => _settingsWindow?.ViewModel.WidgetsPage.ReloadLocal());
+        _widgetReview.Start();
         _desk.LauncherMissingClicked += OnLauncherMissing;
         _vm.DeskUsageChanged += _desk.UsageChanged;
         // The glow's Desk spot (spec 7.3): the glow service asks the Desk first and falls back to the window.
@@ -947,6 +953,7 @@ public partial class App : Application
         _messages?.Dispose();
         _handoff?.Dispose();
         _deskDesign?.Dispose();
+        _widgetReview?.Dispose();
         _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();
@@ -984,6 +991,7 @@ public partial class App : Application
         _messages?.Dispose();
         _handoff?.Dispose();
         _deskDesign?.Dispose();
+        _widgetReview?.Dispose();
         _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();
