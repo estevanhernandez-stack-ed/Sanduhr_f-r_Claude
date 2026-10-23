@@ -299,6 +299,22 @@ installed sprite). Showing it there places or hides the piece.
   "Gradient bars" (`now_playing.bars_gradient`, off) spreads the ink's colors across the row and fades
   each bar to its base. With Windows' animations off the bars ease gently, draw no caps, and the source
   ticks five times a second. Still a level only: no audio is captured.
+- **Meter styles** (#336): `layout.<piece>.style` on `claude`, `meters` and `telemetry` only
+  (`DeskMeterStyles`): `bar` (the default, drawn exactly as before), `slim` (label and value on one line
+  over a thin bar, about half the height; the Claude line becomes two short rows, `DeskClaudeText.Compact`),
+  `ring` (small 270-degree arc gauges with the value inside and a short name in the open bottom, one piece's
+  readings side by side in a row) and `ticks` (ten cells, unlit ones a faint outline: the OLED-friendly
+  one). A Claude limit keeps its pace mark in every style; slim, ring and ticks leave out the reset line.
+  The layout word grows a fifth field after the tilt, `widget:anchor:scale:tilt:style`
+  (`meters:tr:1:0:ring`), written only when not `bar` with the scale and tilt holding their places, so an
+  older build reads the size and tilt and draws bars. A style is the piece's own (the tilt stays the
+  stack's). `propose_desk` refuses a style on any other piece or an unknown word; `get_desk` reports each
+  styled piece's style and `limits.piece_style`; the review says "Claude meters (bars): ring"; a saved design with
+  bars matches one saved before styles. Settings, Desk has a Style picker under the place for the three
+  pieces. Nothing animates, and OLED care dims the island as before. `DeskView.Styles.cs` draws them.
+- **Harness**: `--scenario meterstyles` draws each style upright and in a ±18 degree fold, the dense
+  right face (Claude line, telemetry, limits) as bars and again with slim and rings, close-ups with a limit
+  over the warning line, Arrange Desk over a restyled fold, and the Style pickers.
 - **Harness**: `--scenario ridealongs` draws a two-face fold (left -18, right +18) with the weather as a
   nickname and gradient bars, the bars close up (lively, gradient, calm), Arrange Desk over the fold with a
   drag, and Settings, Weather and Now playing.

@@ -144,6 +144,9 @@ public static class DeskDesigns
                 };
                 // Upright writes nothing, so a design saved before the fold (#314) is still the same look.
                 if (DeskArrangement.ClampTilt(p.Tilt ?? 0) is var tilt && tilt != 0) po["tilt"] = tilt;
+                // A bar writes nothing, so a design saved before meter styles (#336) is still the same look.
+                if (DeskMeterStyles.For(p.Piece, p.Style ?? DeskMeterStyle.Bar) is var style && style != DeskMeterStyle.Bar)
+                    po["style"] = DeskMeterStyles.Word(style);
                 sorted[p.Piece] = po;
             }
             o["layout"] = sorted;

@@ -148,6 +148,13 @@ this way. A user PNG makes the pack local-only; it is never sent anywhere.
   refused), stored as a fourth field of the layout word (`clock:ml:1:-18`, written only when not 0).
 - **G. Livelier bars:** per-bar smoothing, a falloff, peak caps and a gradient ink, all from the
   existing session peak level. The privacy promise "a level only: no audio is captured" stands.
+- **Meter styles (#336), as built:** `layout.<piece>.style` on `claude`, `meters` and `telemetry` only:
+  `bar` (default, unchanged), `slim` (label and value on one line over a thin bar, about half the
+  height; the Claude line becomes two short rows), `ring` (small arc gauges, one piece's readings side
+  by side) and `ticks` (ten cells, the OLED-friendly one). Pace marks stay on every Claude limit. A
+  fifth field of the layout word after the tilt (`meters:tr:1:0:ring`), written only when not `bar`;
+  older builds read the size and tilt and draw bars. A style is per piece, the tilt per stack.
+  `get_desk` reports styles and `limits.piece_style`; Settings, Desk has a Style picker per piece.
 
 ## 8. Rainmeter spike (H) and the setup skill (I)
 

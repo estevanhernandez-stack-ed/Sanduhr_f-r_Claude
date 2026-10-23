@@ -263,7 +263,7 @@ public static class ToolCatalog
                             ["layout"] = new JsonObject
                             {
                                 ["type"] = "object",
-                                ["description"] = "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean, monitor: all|main|a monitor id from get_desk monitors, tilt: -20 to 20 degrees, the slant of the piece's whole stack}.",
+                                ["description"] = "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean, monitor: all|main|a monitor id from get_desk monitors, tilt: -20 to 20 degrees, the slant of the piece's whole stack, style: bar|slim|ring|ticks, only on claude, meters and telemetry}.",
                             },
                             ["weather"] = new JsonObject
                             {
@@ -602,7 +602,8 @@ public static class ToolCatalog
         "usage, a handwritten message, a Launcher of buttons, a sprite companion and other pieces, each placed at one of eight anchors " +
         "(tl tc tr ml mr bl bc br) with a size, in a font and an ink, optionally on a soft plate, beside the widget's " +
         "color theme. Returns design (the current look as a full design: layout with every piece's anchor, size, " +
-        "hidden, monitor and tilt (the slant of its stack in degrees, 0 upright), weather.nickname (the name the weather piece shows " +
+        "hidden, monitor and tilt (the slant of its stack in degrees, 0 upright), and for claude, meters and telemetry its style (bar, slim, ring or ticks; " +
+        "limits.piece_style lists the pieces and the words), weather.nickname (the name the weather piece shows " +
         "instead of the place's, \"\" for none), font, ink, plate, shadow, launcher, theme), pieces and anchors (the allowed words), fonts (installed " +
         "families, and the bundled handwriting fonts EsteFont Pro and EsteFont 26), wallpaper (path of a copy of the wallpaper " +
         "image scaled to at most 1600 pixels on its longest side, which you can open only if the user allows Claude Code to read that file; " +
@@ -623,6 +624,10 @@ public static class ToolCatalog
         "the companion piece draws the sprite the user chose in Settings, Widgets, sits at its anchor or roams the monitor's edges from it, and draws nothing until a sprite is installed); " +
         "tilt in a layout piece slants the piece's whole stack from -20 to 20 degrees (negative rises to the right, positive falls; 0 upright), " +
         "so a left stack at -18 and a right stack at 18 read as two faces of a fold; pieces at one anchor share one slant, so give them the same tilt; " +
+        "style in a layout piece, only on claude, meters and telemetry, is how its numbers draw so a stack fits its column: bar (the default, " +
+        "a full-width bar with its label above), slim (label and value on one line over a thin bar, about half the height; claude becomes a compact two-row line), " +
+        "ring (small arc gauges with the value inside, side by side in a row), ticks (ten segmented cells, the OLED-friendly one); " +
+        "a Claude limit keeps its pace mark in every style, and slim or ring keep a dense or slanted stack from running wide; " +
         "weather {nickname} (up to 24 characters, shown on the Desk's weather piece instead of the place's name, \"\" for the place's own name; " +
         "it never leaves the PC and the forecast still uses the city the user picked); font (a " +
         "family from get_desk fonts.installed or the bundled EsteFont Pro or EsteFont 26, or {family, link} with an " +

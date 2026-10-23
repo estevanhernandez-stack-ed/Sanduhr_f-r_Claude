@@ -116,6 +116,13 @@ public static class DeskState
                 ["note_chars"] = DeskDesign.NoteMax,
                 ["piece_size"] = new JsonObject { ["min"] = DeskArrangement.MinScale, ["max"] = DeskArrangement.MaxScale },
                 ["piece_tilt"] = new JsonObject { ["min"] = DeskArrangement.MinTilt, ["max"] = DeskArrangement.MaxTilt },
+                // The meter styles (#336): which pieces take one and the words; bar is the default.
+                ["piece_style"] = new JsonObject
+                {
+                    ["pieces"] = new JsonArray([.. DeskMeterStyles.Pieces.Select(p => (JsonNode?)p)]),
+                    ["values"] = new JsonArray([.. DeskMeterStyles.All.Select(s => (JsonNode?)DeskMeterStyles.Word(s))]),
+                    ["default"] = DeskMeterStyles.Word(DeskMeterStyle.Bar),
+                },
                 ["weather_nickname_chars"] = DeskDesign.WeatherNicknameMax,
                 ["launcher_buttons"] = LauncherModel.MaxButtons,
                 ["launcher_label_chars"] = LauncherButton.MaxLabel,

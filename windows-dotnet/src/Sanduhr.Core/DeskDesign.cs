@@ -32,8 +32,9 @@ public sealed record DeskFontChoice(string Family, string? Link = null);
 /// <summary>One piece's part of a design's layout. Every member but <see cref="Piece"/> is optional: absent leaves the
 /// current value alone. A hidden piece has no anchor, no size, no monitor and no tilt. <c>Monitor</c> is "all", "main" or a monitor id.
 /// <c>Tilt</c> is the fold (#314), whole degrees from -20 to 20, and belongs to the piece's stack: every piece at that anchor
-/// slants with it.</summary>
-public sealed record DeskPieceLayout(string Piece, DeskAnchor? Anchor, double? Size, bool? Hidden, string? Monitor = null, double? Tilt = null)
+/// slants with it. <c>Style</c> is the meter style (#336), only on the pieces <see cref="DeskMeterStyles.Pieces"/> names.</summary>
+public sealed record DeskPieceLayout(string Piece, DeskAnchor? Anchor, double? Size, bool? Hidden, string? Monitor = null, double? Tilt = null,
+    DeskMeterStyle? Style = null)
 {
     public bool IsHidden => Hidden == true || (Anchor is null && Hidden != false);
 }
@@ -64,7 +65,7 @@ public sealed record DeskParse(DeskDesign? Design, IReadOnlyList<DeskReason> Rea
 /// exactly what the widget would; <see cref="DeskDesignValidator"/> adds the rules that need the machine's fonts, the
 /// wallpaper and the Start menu.
 ///
-/// JSON, snake_case: <c>name</c>, <c>note</c>, <c>layout</c> ({piece: {anchor, size, hidden, monitor, tilt}}), <c>weather</c>
+/// JSON, snake_case: <c>name</c>, <c>note</c>, <c>layout</c> ({piece: {anchor, size, hidden, monitor, tilt, style}}), <c>weather</c>
 /// ({nickname}), <c>font</c> (a family, or
 /// {family, link}), <c>ink</c> ("auto", "light", "dark", "theme", one #hex, or two to four #hex), <c>plate</c>,
 /// <c>shadow</c>, <c>launcher</c> ({orientation, buttons[]}), <c>messages</c> ({lines[], mode}) and <c>theme</c> (a widget
@@ -217,7 +218,7 @@ public sealed partial record DeskDesign
         if (node is null) return null;
         if (node is not JsonObject lo)
         {
-            r.Add(new DeskReason("layout", "must be an object of piece name to {anchor, size, hidden, monitor, tilt}"));
+            r.Add(new DeskReason("layout", "must be an object of piece name to {anchor, size, hidden, monitor, tilt, style}"));
             return null;
         }
         if (lo.Count > MaxPieces)
@@ -237,11 +238,11 @@ public sealed partial record DeskDesign
             }
             if (value is not JsonObject po)
             {
-                r.Add(new DeskReason(field, "must be an object with anchor, size, hidden, monitor and tilt"));
+                r.Add(new DeskReason(field, "must be an object with anchor, size, hidden, monitor, tilt and style"));
                 continue;
             }
-            foreach (var bad in po.Select(kv => kv.Key).Where(k => k is not ("anchor" or "size" or "hidden" or "monitor" or "tilt")).Order(StringComparer.Ordinal).Take(3))
-                r.Add(new DeskReason(field, $"unknown member '{Clip(bad, 20)}'; use anchor, size, hidden, monitor and tilt"));
+            foreach (var bad in po.Select(kv => kv.Key).Where(k => k is not ("anchor" or "size" or "hidden" or "monitor" or "tilt" or "style")).Order(StringComparer.Ordinal).Take(3))
+                r.Add(new DeskReason(field, $"unknown member '{Clip(bad, 20)}'; use anchor, size, hidden, monitor, tilt and style"));
 
             DeskAnchor? anchor = null;
             if (po["anchor"] is { } an)
@@ -275,8 +276,17 @@ public sealed partial record DeskDesign
                     tilt = DeskArrangement.ClampTilt(t);
                 else r.Add(new DeskReason(field + ".tilt", $"must be a number of degrees from {DeskArrangement.MinTilt} to {DeskArrangement.MaxTilt} (0 is upright)"));
             }
-            if (hidden == true) { anchor = null; size = null; monitor = null; tilt = null; }
-            pieces.Add(new DeskPieceLayout(key, anchor, size, hidden, monitor, tilt));
+            DeskMeterStyle? style = null;
+            if (po["style"] is { } stn)
+            {
+                // A style only on a piece that draws one (#336): a clock or a launcher with a style is a mistake, not a no-op.
+                if (!DeskMeterStyles.Supports(key))
+                    r.Add(new DeskReason(field + ".style", "only " + string.Join(", ", DeskMeterStyles.Pieces) + " have a style"));
+                else if (TryStr(stn, out var sw) && DeskMeterStyles.Parse(sw.Trim().ToLowerInvariant()) is { } st) style = st;
+                else r.Add(new DeskReason(field + ".style", "must be one of " + string.Join(", ", DeskMeterStyles.All.Select(DeskMeterStyles.Word))));
+            }
+            if (hidden == true) { anchor = null; size = null; monitor = null; tilt = null; style = null; }
+            pieces.Add(new DeskPieceLayout(key, anchor, size, hidden, monitor, tilt, style));
         }
         // One slant per stack: two pieces sent to the same anchor with different tilts cannot both be honored.
         foreach (var clash in pieces.Where(p => p.Anchor is not null && p.Tilt is not null).GroupBy(p => p.Anchor!.Value)
@@ -564,6 +574,7 @@ public sealed partial record DeskDesign
                 if (p.Hidden is { } h) po["hidden"] = h;
                 if (p.Monitor is { } mo) po["monitor"] = mo;
                 if (p.Tilt is { } t) po["tilt"] = t;
+                if (p.Style is { } st) po["style"] = DeskMeterStyles.Word(st);
                 lo[p.Piece] = po;
             }
             o["layout"] = lo;
@@ -648,14 +659,16 @@ public sealed partial record DeskDesign
         if (layout is null) return arr;
         var placed = layout.Where(p => !p.IsHidden && DeskArrangement.Known.Contains(p.Piece, StringComparer.Ordinal))
             .Select(p => new DeskPlacement(p.Piece, p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece), p.Size ?? 1, DeskMonitors.FromWord(p.Monitor),
-                DeskArrangement.ClampTilt(p.Tilt ?? 0)));
+                DeskArrangement.ClampTilt(p.Tilt ?? 0), DeskMeterStyles.For(p.Piece, p.Style ?? DeskMeterStyle.Bar)));
         return new DeskArrangement(placed);
     }
 
-    /// <summary>Every known piece: the placed ones in layout order, then the hidden ones in Settings order.</summary>
+    /// <summary>Every known piece: the placed ones in layout order, then the hidden ones in Settings order. A piece that has a meter
+    /// style says it (bar included), so get_desk shows every style; the others carry none.</summary>
     public static List<DeskPieceLayout> FromArrangement(DeskArrangement arr)
     {
-        var list = arr.Pieces.Select(p => new DeskPieceLayout(p.Widget, p.Anchor, p.Scale, false, p.Monitor, p.Tilt)).ToList();
+        var list = arr.Pieces.Select(p => new DeskPieceLayout(p.Widget, p.Anchor, p.Scale, false, p.Monitor, p.Tilt,
+            DeskMeterStyles.Supports(p.Widget) ? p.Style : null)).ToList();
         foreach (var w in DeskArrangement.Known)
             if (arr.Placement(w) is null) list.Add(new DeskPieceLayout(w, null, null, true));
         return list;
@@ -674,6 +687,7 @@ public sealed partial record DeskDesign
             if (p.Monitor is not null) arr.SetMonitor(p.Piece, p.Monitor);
             // The tilt is the stack's: it slants every piece at the anchor (a piece that joins a stack took its slant above).
             if (p.Tilt is { } t) arr.SetTilt(p.Piece, t);
+            if (p.Style is { } st) arr.SetStyle(p.Piece, st);
         }
         return FromArrangement(arr);
     }
@@ -718,13 +732,17 @@ public sealed partial record DeskDesign
                         lines.Add(DeskMonitors.FromWord(p.Monitor) is null ? $"{P(p.Piece)}: now on all monitors" : $"{P(p.Piece)}: moved to {M(p.Monitor)}");
                     if (Math.Abs((was.Tilt ?? 0) - (p.Tilt ?? 0)) > 1e-9)
                         lines.Add($"{P(p.Piece)}: slant {Degrees(was.Tilt ?? 0)} to {Degrees(p.Tilt ?? 0)}");
+                    // A style left out is a bar (#336), so a design from before styles changes nothing here.
+                    if (p.Style is { } style && style != (was.Style ?? DeskMeterStyle.Bar))
+                        lines.Add($"{P(p.Piece)}: {DeskMeterStyles.Word(style)}");
                 }
                 else
                 {
                     lines.Add($"{P(p.Piece)}: shown at {DeskAnchors.Name(anchor).ToLowerInvariant()}"
                         + (Math.Abs((p.Size ?? 1) - 1) > 1e-9 ? $", size {Percent(p.Size ?? 1)}" : "")
                         + (DeskMonitors.FromWord(p.Monitor) is null ? "" : $", on {M(p.Monitor)}")
-                        + (p.Tilt is { } t && t != 0 ? $", slanted {Degrees(t)}" : ""));
+                        + (p.Tilt is { } t && t != 0 ? $", slanted {Degrees(t)}" : "")
+                        + (p.Style is { } s && s != DeskMeterStyle.Bar ? $", {DeskMeterStyles.Word(s)}" : ""));
                 }
             }
         }
