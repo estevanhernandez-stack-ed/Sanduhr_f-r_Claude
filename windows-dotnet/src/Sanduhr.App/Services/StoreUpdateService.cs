@@ -1,69 +1,49 @@
-using System.Diagnostics;
-using Microsoft.Toolkit.Uwp.Notifications;
-using Sanduhr.App.ViewModels;
 using Sanduhr.Core;
 using Windows.Services.Store;
 
 namespace Sanduhr.App.Services;
 
 /// <summary>
-/// Tells the person when a Store update is waiting, and gets out of its way.
+/// Notices a waiting Store update and offers Restart to update (3.8 spec 8b).
 ///
-/// An MSIX cannot replace files the running process holds, so the Store's
-/// install fails while the widget runs (0x80073D02) and silently leaves the old
-/// build in place — 3.4.1, 2026-09-14. The Velopack channel restarts itself
-/// after an update; this is the Store channel's equivalent: a toast with a
-/// "Quit and update" button, plus a line in the widget's status slot.
+/// An MSIX cannot replace files the running process holds, so the Store's install fails while the
+/// widget runs (0x80073D02) and silently leaves the old build in place: 3.4.1, 2026-09-14. 3.4 to 3.7
+/// offered "Quit and update", which left the install to the Store whenever it got round to it and
+/// could orphan a WebView2 helper that kept the package in use. 3.8 asks first, then closes its
+/// WebView2 helpers, registers for restart and asks the Store to install now
+/// (<see cref="StoreUpdateInstaller"/>), through <see cref="RestartToUpdateService"/>.
 ///
-/// Everything here is best-effort and guarded. <see cref="StoreContext"/> only
-/// answers for a package with Store identity, so the whole service is inert on
-/// the Velopack and dev builds, and any WinRT failure is logged and treated as
-/// "no update waiting" — a missed notice is a nuisance, a crashed tick is a
-/// broken widget. The cadence itself lives in <see cref="StoreUpdate"/>, away
-/// from WinRT, so it can be tested.
+/// Everything here is best-effort and guarded. <see cref="StoreContext"/> only answers for a package
+/// with Store identity, so the whole service is inert on the Velopack and dev builds, and any WinRT
+/// failure is logged and treated as "no update waiting": a missed notice is a nuisance, a crashed tick
+/// is a broken widget. The cadence lives in <see cref="StoreUpdate"/> and the restart's order in
+/// <see cref="RestartToUpdate"/>, away from WinRT, so both can be tested.
 /// </summary>
 public sealed class StoreUpdateService
 {
-    private readonly WidgetViewModel _widget;
+    private readonly RestartToUpdateService _offers;
     private readonly Func<bool> _isPackaged;
+    private readonly Func<nint> _ownerWindow;
     private readonly Action<string>? _log;
-    private readonly Action _quit;
 
     private DateTimeOffset? _lastCheck;
-    private DateTimeOffset? _lastNotified;
     private bool _checking;
-    private bool _updatePending;
 
-    /// <summary>True once the Store has told us an update is waiting. Read by
-    /// the tray menu so "Quit and update" can surface there too.</summary>
-    public bool UpdatePending => _updatePending;
+    /// <summary>True once the Store has told us an update is waiting.</summary>
+    public bool UpdatePending { get; private set; }
 
     public StoreUpdateService(
-        WidgetViewModel widget, Action quit, Func<bool>? isPackaged = null, Action<string>? log = null)
+        RestartToUpdateService offers, Func<nint> ownerWindow, Func<bool>? isPackaged = null, Action<string>? log = null)
     {
-        _widget = widget;
-        _quit = quit;
+        _offers = offers;
+        _ownerWindow = ownerWindow;
         _isPackaged = isPackaged ?? (() => Startup.IsPackaged());
         _log = log;
-        try
-        {
-            // The toast's button carries QuitAction; the body click does not, and
-            // must not quit the app out from under someone who just tapped it.
-            ToastNotificationManagerCompat.OnActivated += args =>
-            {
-                if (args.Argument?.Contains(StoreUpdate.QuitAction, StringComparison.Ordinal) == true)
-                    System.Windows.Application.Current?.Dispatcher.BeginInvoke(QuitForUpdate);
-            };
-        }
-        catch (Exception e)
-        {
-            Log("activation-hook", e);
-        }
     }
 
-    /// <summary>Called from the widget's 30-second tick on the UI thread. The
-    /// Store query itself is async and deliberately not awaited: the tick must
-    /// not stall on a network call, and the answer is acted on when it lands.</summary>
+    /// <summary>Called from the widget's 30-second tick on the UI thread. The Store query itself is
+    /// async and deliberately not awaited: the tick must not stall on a network call, and the answer
+    /// is acted on when it lands (on the UI thread, which the await resumes on).</summary>
     public void Tick(DateTimeOffset now)
     {
         if (_checking || !StoreUpdate.ShouldCheck(_isPackaged(), _lastCheck, now))
@@ -75,17 +55,18 @@ public sealed class StoreUpdateService
 
     private async Task CheckAsync()
     {
-        bool pending = false;
+        string? version = null;
         try
         {
             var context = StoreContext.GetDefault();
             var updates = await context.GetAppAndOptionalStorePackageUpdatesAsync();
-            pending = updates.Count > 0;
+            if (updates.Count > 0)
+                version = VersionOf(updates[0]);
         }
         catch (Exception e)
         {
-            // No Store identity, no network, a Store service hiccup: all the same
-            // answer here. Never notify on a guess.
+            // No Store identity, no network, a Store service hiccup: all the same answer here.
+            // Never offer on a guess.
             Log("update-check", e);
         }
         finally
@@ -93,55 +74,77 @@ public sealed class StoreUpdateService
             _checking = false;
         }
 
-        _updatePending = pending;
-        if (!pending)
-            return;
-
-        var now = DateTimeOffset.Now;
-        if (!StoreUpdate.ShouldNotify(true, _lastNotified, now))
-            return;
-        _lastNotified = now;
-
+        UpdatePending = version is not null;
         System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
         {
-            _widget.ShowTransientStatus(StoreUpdate.StatusNotice, TimeSpan.FromSeconds(30));
-            ShowToast();
+            if (version is null)
+                _offers.Withdraw(StoreUpdateInstaller.ChannelName);
+            else
+                _offers.Offer(version, new StoreUpdateInstaller(_ownerWindow, _log));
         });
     }
 
-    private void ShowToast()
+    private static string VersionOf(StorePackageUpdate update)
     {
         try
         {
-            new ToastContentBuilder()
-                .AddText(StoreUpdate.ToastTitle)
-                .AddText(StoreUpdate.ToastBody)
-                .AddButton(new ToastButton().SetContent("Quit and update").AddArgument("action", StoreUpdate.QuitAction))
-                .AddButton(new ToastButtonDismiss("Later"))
-                .Show();
+            var v = update.Package.Id.Version;
+            return RestartToUpdate.DisplayVersion(v.Major, v.Minor, v.Build, v.Revision);
         }
-        catch (Exception e)
+        catch
         {
-            Log("toast", e);
+            return "update"; // reads "Sanduhr update is ready", still true
         }
-    }
-
-    /// <summary>Open the Store's downloads page so the retry is one click away,
-    /// then quit. Quitting is the part that matters: the Store cannot replace a
-    /// file this process holds, and it retries on its own once nothing does.
-    /// The app exits even if the deep link fails.</summary>
-    public void QuitForUpdate()
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(StoreUpdate.StoreUpdatesUri) { UseShellExecute = true });
-        }
-        catch (Exception e)
-        {
-            Log("store-deep-link", e);
-        }
-        _quit();
     }
 
     private void Log(string stage, Exception e) => _log?.Invoke($"store update {stage} ({e.GetType().Name}: {e.Message})");
+}
+
+/// <summary>
+/// The Store channel's install: <c>RequestDownloadAndInstallStorePackageUpdatesAsync</c>, which shows
+/// Windows' own consent dialog, installs, and closes Sanduhr; Windows relaunches it from the restart
+/// registration. Only the person's click in <see cref="RestartToUpdateService"/> gets here.
+/// </summary>
+public sealed class StoreUpdateInstaller : IUpdateInstaller
+{
+    public const string ChannelName = "store";
+
+    private readonly Func<nint> _ownerWindow;
+    private readonly Action<string>? _log;
+
+    public StoreUpdateInstaller(Func<nint> ownerWindow, Action<string>? log = null)
+    {
+        _ownerWindow = ownerWindow;
+        _log = log;
+    }
+
+    public string Channel => ChannelName;
+
+    public async Task<UpdateInstallResult> InstallAsync()
+    {
+        var context = StoreContext.GetDefault();
+        // A desktop app's StoreContext needs an owner window for the consent dialog.
+        var hwnd = _ownerWindow();
+        if (hwnd != 0)
+        {
+            try { WinRT.Interop.InitializeWithWindow.Initialize(context, hwnd); }
+            catch (Exception e) { _log?.Invoke($"store update owner ({e.GetType().Name})"); }
+        }
+        var updates = await context.GetAppAndOptionalStorePackageUpdatesAsync();
+        if (updates.Count == 0)
+            return UpdateInstallResult.NotAvailable;
+        var result = await context.RequestDownloadAndInstallStorePackageUpdatesAsync(updates);
+        return Map(result.OverallState);
+    }
+
+    /// <summary>The Store's answer as the flow reads it.</summary>
+    public static UpdateInstallResult Map(StorePackageUpdateState state) => state switch
+    {
+        StorePackageUpdateState.Completed => UpdateInstallResult.Completed,
+        StorePackageUpdateState.Canceled => UpdateInstallResult.Canceled,
+        // Pending, Downloading, Deploying: the install is under way and Windows closes Sanduhr for it.
+        StorePackageUpdateState.Pending or StorePackageUpdateState.Downloading or StorePackageUpdateState.Deploying
+            => UpdateInstallResult.Installing,
+        _ => UpdateInstallResult.Failed, // ErrorLowBattery, ErrorWiFiRecommended, ErrorWiFiRequired, OtherError
+    };
 }
