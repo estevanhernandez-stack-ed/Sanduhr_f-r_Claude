@@ -93,6 +93,9 @@ public static class SettingsIndex
     public const string NowPlayingLooks = "np-looks";
     public const string WeatherPlace = "weather-place";
     public const string WeatherCredit = "weather-credit";
+    // Desk: Widgets (3.8)
+    public const string WidgetsCatalog = "widgets-catalog";
+    public const string WidgetsInstalled = "widgets-installed";
     // Claude Code (S6)
     public const string GlowWhere = "glow-where";
     // About
@@ -231,6 +234,12 @@ public static class SettingsIndex
             ["weather", "city", "forecast", "temperature", "Fahrenheit", "Celsius", "Open-Meteo", "location"]),
         E("Weather data by Open-Meteo.com", SettingsPage.Weather, WeatherCredit, ["Open-Meteo", "credit", "attribution", "GeoNames"]),
 
+        E("Widget catalog", SettingsPage.Widgets, WidgetsCatalog,
+            ["widgets", "catalog", "install", "download", "sprite", "companion", "pet", "palette", "effects", "font", "theme pack",
+             "hourglass", "OLED Neon", "signature", "verified", "GitHub"]),
+        E("Installed widgets", SettingsPage.Widgets, WidgetsInstalled,
+            ["installed", "uninstall", "remove", "update", "made here", "my widgets", "packs"]),
+
         E("Version", SettingsPage.About, Version,
             ["version", "What's New", "Take the tour", "tour", "release", "update"]),
         E("Trademark", SettingsPage.About, Trademark, ["Anthropic", "trademark", "disclaimer", "affiliated"]),
@@ -275,6 +284,7 @@ public static class SettingsIndex
         [SettingsNames.ClearLooks] = NowPlayingLooks,
         [SettingsNames.WeatherLookUp] = WeatherPlace,
         [SettingsNames.GlowWhere] = GlowWhere,
+        [SettingsNames.WidgetCatalogCheck] = WidgetsCatalog,
     };
 
     /// <summary>Words a page goes by besides its title.</summary>
@@ -293,6 +303,7 @@ public static class SettingsIndex
         [SettingsPage.DeskMessage] = ["messages", "messages.txt", "quote", "handwriting"],
         [SettingsPage.NowPlaying] = ["music", "song", "media", "visualizer", "looks", "song style"],
         [SettingsPage.Weather] = ["forecast", "temperature", "city"],
+        [SettingsPage.Widgets] = ["widget packs", "companion", "sprite", "catalog", "pet"],
         [SettingsPage.About] = ["help", "version", "trademark", "privacy"],
     };
 

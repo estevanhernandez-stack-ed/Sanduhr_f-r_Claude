@@ -141,6 +141,19 @@ public class TrustBoundaryTests
         Assert.Contains("DeskDesign", typeNames);   // and the validator it composes is
     }
 
+    /// <summary>The widget catalog client (3.8) is the app's alone: the server never fetches, verifies, unzips or installs a
+    /// pack. It validates a proposed pack with PackValidator and nothing more.</summary>
+    [Fact]
+    public void The_widget_catalog_client_is_not_in_the_mcp_assembly()
+    {
+        var typeNames = typeof(Sanduhr.Mcp.McpServer).Assembly.GetTypes().Select(t => t.Name).ToHashSet();
+        foreach (var name in new[] { "WidgetCatalog", "WidgetCatalogClient", "WidgetZip", "WidgetStore", "WidgetRegistry", "WidgetCatalogService" })
+            Assert.DoesNotContain(name, typeNames);
+        string csproj = File.ReadAllText(McpCsprojPath());
+        foreach (var file in new[] { "WidgetCatalog", "WidgetZip", "WidgetStore" })
+            Assert.DoesNotContain(file, csproj);
+    }
+
     /// <summary>The widget's half of the song looks (the saved-looks file, the handoff, the file for the mod) stays out of the
     /// server: it checks, queues the request file and reads desk-state.json, and never saves a look.</summary>
     [Fact]

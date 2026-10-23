@@ -227,6 +227,7 @@ internal sealed class ResetService
         string name = Path.GetFileName(item.Path.TrimEnd('\\', '/'));
         if (name.StartsWith("webview2", StringComparison.OrdinalIgnoreCase)) return "a sign-in profile folder";
         if (string.Equals(item.Path, _paths.VaultDir, StringComparison.OrdinalIgnoreCase)) return "the usage vault";
+        if (string.Equals(item.Path, _paths.WidgetsDir, StringComparison.OrdinalIgnoreCase)) return "the widgets folder";
         return part switch
         {
             ResetPart.ClaudeCodeEntries => item.IsDirectory ? "a folder of Sanduhr's Claude Code files" : "one of Sanduhr's Claude Code files",

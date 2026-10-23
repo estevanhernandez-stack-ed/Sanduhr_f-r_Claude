@@ -833,8 +833,17 @@ public static partial class Program
         await Settle();
     }
 
+    /// <summary>The harness never touches the network: Settings ▸ Widgets fetches the catalog when it opens, so it gets a
+    /// network that is never there and draws its offline line.</summary>
+    sealed class OfflineHandler : System.Net.Http.HttpMessageHandler
+    {
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken ct) =>
+            throw new System.Net.Http.HttpRequestException("the render harness is offline");
+    }
+
     static async Task RenderSettings(WidgetViewModel vm, Assembly asm)
     {
+        Sanduhr.App.Services.WidgetCatalogService.HandlerOverride = () => new OfflineHandler();
         var svm = new SettingsViewModel(vm, () => Task.CompletedTask, _ => Task.CompletedTask);
         AssertOnlySampleAccounts(svm);
         var swType = asm.GetType("Sanduhr.App.Views.SettingsWindow")!;

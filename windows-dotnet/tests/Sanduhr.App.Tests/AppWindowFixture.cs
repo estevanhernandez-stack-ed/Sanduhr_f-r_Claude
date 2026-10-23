@@ -40,6 +40,15 @@ public abstract class AppWindowFixture : IDisposable
         ClaudeCodeProfile.ConfigDirOverride = "";
         ClaudeCodeViewModel.ForgetSessionChoice();
         ModsConfigViewModel.ForgetSessionChoice();
+        // Settings ▸ Widgets fetches the catalog when it opens: never the real network from a test.
+        WidgetCatalogService.HandlerOverride = () => new OfflineHandler();
+    }
+
+    /// <summary>A network that is never there: every request fails as if the PC were offline.</summary>
+    internal sealed class OfflineHandler : System.Net.Http.HttpMessageHandler
+    {
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken ct) =>
+            throw new System.Net.Http.HttpRequestException("offline in tests");
     }
 
     public void Dispose()
@@ -47,6 +56,7 @@ public abstract class AppWindowFixture : IDisposable
         Environment.SetEnvironmentVariable("SANDUHR_DEV_PROFILE", _oldDev);
         ClaudeCodeProfile.ProfileOverride = null;
         ClaudeCodeProfile.ConfigDirOverride = null;
+        WidgetCatalogService.HandlerOverride = null;
         ClaudeCodeViewModel.ForgetSessionChoice();
         ModsConfigViewModel.ForgetSessionChoice();
         try { Directory.Delete(Root, true); } catch (IOException) { }

@@ -49,6 +49,10 @@ public sealed class SettingsViewModel
     /// <summary>Settings, Weather (spec 6.5).</summary>
     public WeatherPageViewModel WeatherPage { get; }
 
+    /// <summary>Settings, Widgets (spec 3.8): the signed catalog and the installed packs. Nothing is fetched until the
+    /// page opens.</summary>
+    public WidgetsPageViewModel WidgetsPage { get; internal set; } = new();
+
     /// <summary>Backs the General tab's auto-start control (item 10).</summary>
     public GeneralViewModel General { get; }
 
