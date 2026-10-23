@@ -12,11 +12,56 @@ public class WhatsNewCardsTests
     public void Table_HasEveryReleaseNewestFirst()
     {
         Assert.Equal(
-            ["desk-design", "launcher", "per-monitor", "song-looks", "oled-care", "saved-designs",
+            ["widgets", "companion", "claude-widgets", "restart-to-update", "desk-fold", "weather-nickname", "livelier-bars",
+             "desk-design", "launcher", "per-monitor", "song-looks", "oled-care", "saved-designs",
              "now-playing-steps-aside", "watchers", "suggested-messages", "desk-plate", "arrange-hide", "statusline-label",
              "desk", "settings-redesigned", "claude-code-page",
              "shortcut-keys", "tray-shows", "limits-come-and-go", "every-folder", "steady-sparklines", "whats-new"],
             Table.Select(c => c.Id));
+    }
+
+    private static readonly string[] Release380Ids =
+        ["widgets", "companion", "claude-widgets", "restart-to-update", "desk-fold", "weather-nickname", "livelier-bars"];
+
+    /// <summary>The Store goes 3.7.1 to 3.8.0; a Setup.exe install comes from 3.7.2, a patch with no cards.
+    /// Both see the seven 3.8.0 cards and nothing older.</summary>
+    [Theory]
+    [InlineData("3.7.1")]
+    [InlineData("3.7.2")]
+    public void Release380_ShowsOnlyItsOwnSevenCardsAfterTheUpdate(string lastSeen)
+    {
+        var shown = WhatsNew.Cards(lastSeen, "3.8.0");
+        Assert.Equal(Release380Ids, shown.Select(c => c.Id));
+        Assert.All(shown, c => Assert.Equal("3.8.0", c.Version));
+    }
+
+    /// <summary>From the Store's 3.5.0 era (an install that skipped 3.7.1): the seven 3.8.0 cards lead and the cap keeps one 3.7.1 card.</summary>
+    [Fact]
+    public void Release380_FromAnOlderVersion_LeadsWithItsSevenAndCapsAtEight()
+    {
+        var shown = WhatsNew.Cards("3.5.0", "3.8.0");
+        Assert.Equal(WhatsNew.Cap, shown.Count);
+        Assert.Equal(Release380Ids, shown.Take(7).Select(c => c.Id));
+        Assert.Equal("desk-design", shown[7].Id);
+    }
+
+    [Theory]
+    [InlineData("widgets", SettingsPage.Widgets)]
+    [InlineData("companion", SettingsPage.Widgets)]
+    [InlineData("claude-widgets", SettingsPage.Widgets)]
+    [InlineData("restart-to-update", SettingsPage.About)]
+    [InlineData("desk-fold", SettingsPage.Desk)]
+    [InlineData("weather-nickname", SettingsPage.Weather)]
+    [InlineData("livelier-bars", SettingsPage.NowPlaying)]
+    public void Release380_ShowMeOpensTheirPage(string id, SettingsPage page) =>
+        Assert.Equal(page, Table.Single(c => c.Id == id).Destination);
+
+    [Fact]
+    public void Release380_MenuShowsItsOwnHighlights()
+    {
+        var (menu, header) = WhatsNew.ForMenu("3.8.0", "3.8.0");
+        Assert.Equal(Release380Ids, menu.Select(c => c.Id));
+        Assert.Equal("Highlights in 3.8.0", header);
     }
 
     [Fact]
