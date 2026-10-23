@@ -234,7 +234,7 @@ public sealed class DeskArrangement
     /// <summary>The widget words this build knows, in Settings order (also the order a newly placed piece takes among its neighbors):
     /// the Mac's list with Windows' telemetry and weather (S6, after Este's Knighthawk skins) before watchers.</summary>
     public static readonly IReadOnlyList<string> Known =
-        ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "meetings", "glow"];
+        ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "meetings", "glow", "companion"];
 
     /// <summary>The widgets Stage 5 draws.</summary>
     public static readonly IReadOnlyList<string> DrawnInS5 = ["clock", "claude", "meters"];
@@ -280,13 +280,14 @@ public sealed class DeskArrangement
     }
 
     /// <summary>Where a piece goes when its anchor is not one this build knows: the message top left, telemetry top
-    /// right, weather middle right, the rest bottom left.</summary>
+    /// right, weather middle right, the glow top center, the companion bottom right, the rest bottom left.</summary>
     public static DeskAnchor DefaultAnchor(string widget) => widget switch
     {
         "message" => DeskAnchor.TL,
         "telemetry" => DeskAnchor.TR,
         "weather" => DeskAnchor.MR,
         "glow" => DeskAnchor.TC,
+        "companion" => DeskAnchor.BR,
         _ => DeskAnchor.BL,
     };
 

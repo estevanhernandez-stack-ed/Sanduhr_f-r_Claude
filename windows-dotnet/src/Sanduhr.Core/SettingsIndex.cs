@@ -95,6 +95,7 @@ public static class SettingsIndex
     public const string WeatherCredit = "weather-credit";
     // Desk: Widgets (3.8)
     public const string WidgetsCatalog = "widgets-catalog";
+    public const string WidgetsCompanion = "widgets-companion";
     public const string WidgetsInstalled = "widgets-installed";
     // Claude Code (S6)
     public const string GlowWhere = "glow-where";
@@ -234,6 +235,9 @@ public static class SettingsIndex
             ["weather", "city", "forecast", "temperature", "Fahrenheit", "Celsius", "Open-Meteo", "location"]),
         E("Weather data by Open-Meteo.com", SettingsPage.Weather, WeatherCredit, ["Open-Meteo", "credit", "attribution", "GeoNames"]),
 
+        E("Desk companion", SettingsPage.Widgets, WidgetsCompanion,
+            ["companion", "pet", "sprite", "hourglass", "roam", "walk", "grow", "growth", "stage", "mood", SettingsNames.WidgetCompanionShow,
+             SettingsNames.WidgetCompanionRoam]),
         E("Widget catalog", SettingsPage.Widgets, WidgetsCatalog,
             ["widgets", "catalog", "install", "download", "sprite", "companion", "pet", "palette", "effects", "font", "theme pack",
              "hourglass", "OLED Neon", "signature", "verified", "GitHub"]),
@@ -285,6 +289,8 @@ public static class SettingsIndex
         [SettingsNames.WeatherLookUp] = WeatherPlace,
         [SettingsNames.GlowWhere] = GlowWhere,
         [SettingsNames.WidgetCatalogCheck] = WidgetsCatalog,
+        [SettingsNames.WidgetCompanionShow] = WidgetsCompanion,
+        [SettingsNames.WidgetCompanionRoam] = WidgetsCompanion,
     };
 
     /// <summary>Words a page goes by besides its title.</summary>

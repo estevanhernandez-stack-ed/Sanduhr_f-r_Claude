@@ -191,11 +191,22 @@ public class DeskArrangeTests
     public void TheGlowWordRoundTripsAndDefaultsToTopCenter()
     {
         Assert.Contains("glow", DeskArrangement.Known);
-        Assert.Equal("glow", DeskArrangement.Known[^1]);
+        Assert.Equal("glow", DeskArrangement.Known[^2]);
         Assert.Equal(DeskAnchor.TC, DeskArrangement.DefaultAnchor("glow"));
         Assert.Equal("clock:bl glow:tc", new DeskArrangement("clock:bl glow:tc").Layout);
         Assert.Equal("glow:br:1.2", new DeskArrangement("glow:br:1.2").Layout);
         Assert.Equal(DeskAnchor.TC, new DeskArrangement("glow:zz").Placement("glow")?.Anchor);
+    }
+
+    [Fact]
+    public void TheCompanionWordIsLastRoundTripsAndDefaultsToBottomRight()
+    {
+        Assert.Equal("companion", DeskArrangement.Known[^1]);
+        Assert.Equal(DeskAnchor.BR, DeskArrangement.DefaultAnchor("companion"));
+        Assert.Equal("clock:bl companion:bc:1.4", new DeskArrangement("clock:bl companion:bc:1.4").Layout);
+        Assert.Equal(DeskAnchor.BR, new DeskArrangement("companion:zz").Placement("companion")?.Anchor);
+        Assert.Null(new DeskArrangement(DeskArrangement.Standard).Placement("companion"));
+        Assert.Equal("Companion", SettingsNames.DeskPieceName("companion"));
     }
 
     [Fact]
@@ -353,7 +364,7 @@ public class DeskArrangeTests
         a.Hide("clock");
         Assert.Null(a.Placement("clock"));
         Assert.Equal("message:tl claude:bl", a.Layout);
-        Assert.Equal(["clock", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "meetings", "glow"], a.Hidden());
+        Assert.Equal(["clock", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "meetings", "glow", "companion"], a.Hidden());
         // Limited to what the Desk draws: no meetings.
         Assert.Equal(["clock", "meters"], a.Hidden(["clock", "claude", "meters"]));
     }
@@ -422,7 +433,7 @@ public class DeskArrangeTests
         Assert.Equal("Show a piece first, or Cancel.", DeskArrangeCopy.NothingPlaced);
     }
 
-    private static readonly string[] DeskView_Drawn = ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "glow"];
+    private static readonly string[] DeskView_Drawn = ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "glow", "companion"];
 
     [Fact]
     public void HidingThenShowingAPieceIsNotAChangeWhenItWasAtItsStandardAnchor()
