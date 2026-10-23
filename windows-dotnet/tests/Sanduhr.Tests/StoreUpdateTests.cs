@@ -65,13 +65,10 @@ public class StoreUpdateTests
     }
 
     [Fact]
-    public void The_person_facing_text_says_why_quitting_is_the_fix()
+    public void An_older_builds_quit_toast_still_has_an_action_to_match()
     {
-        // "An update is available" would read as noise next to a Store that has
-        // already tried and failed; the whole point is the reason.
-        Assert.Contains("quit", StoreUpdate.StatusNotice, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("running", StoreUpdate.ToastBody, StringComparison.OrdinalIgnoreCase);
-        Assert.StartsWith("ms-windows-store://", StoreUpdate.StoreUpdatesUri, StringComparison.Ordinal);
-        Assert.False(string.IsNullOrWhiteSpace(StoreUpdate.QuitAction));
+        // 3.4 to 3.7 toasts carry this argument; 3.8 routes it to Restart to update.
+        Assert.Equal("sanduhr-quit-for-update", StoreUpdate.LegacyQuitAction);
+        Assert.NotEqual(StoreUpdate.LegacyQuitAction, RestartToUpdate.RestartAction);
     }
 }
