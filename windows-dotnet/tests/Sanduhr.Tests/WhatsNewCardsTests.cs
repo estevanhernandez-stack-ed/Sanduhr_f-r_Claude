@@ -12,7 +12,7 @@ public class WhatsNewCardsTests
     public void Table_HasEveryReleaseNewestFirst()
     {
         Assert.Equal(
-            ["widgets", "companion", "claude-widgets", "restart-to-update", "desk-fold", "weather-nickname", "livelier-bars",
+            ["widgets", "companion", "claude-widgets", "restart-to-update", "desk-fold", "weather-nickname", "livelier-bars", "meter-styles",
              "desk-design", "launcher", "per-monitor", "song-looks", "oled-care", "saved-designs",
              "now-playing-steps-aside", "watchers", "suggested-messages", "desk-plate", "arrange-hide", "statusline-label",
              "desk", "settings-redesigned", "claude-code-page",
@@ -21,10 +21,10 @@ public class WhatsNewCardsTests
     }
 
     private static readonly string[] Release380Ids =
-        ["widgets", "companion", "claude-widgets", "restart-to-update", "desk-fold", "weather-nickname", "livelier-bars"];
+        ["widgets", "companion", "claude-widgets", "restart-to-update", "desk-fold", "weather-nickname", "livelier-bars", "meter-styles"];
 
     /// <summary>The Store goes 3.7.1 to 3.8.0; a Setup.exe install comes from 3.7.2, a patch with no cards.
-    /// Both see the seven 3.8.0 cards and nothing older.</summary>
+    /// Both see the eight 3.8.0 cards and nothing older.</summary>
     [Theory]
     [InlineData("3.7.1")]
     [InlineData("3.7.2")]
@@ -35,14 +35,13 @@ public class WhatsNewCardsTests
         Assert.All(shown, c => Assert.Equal("3.8.0", c.Version));
     }
 
-    /// <summary>From the Store's 3.5.0 era (an install that skipped 3.7.1): the seven 3.8.0 cards lead and the cap keeps one 3.7.1 card.</summary>
+    /// <summary>From the Store's 3.5.0 era (an install that skipped 3.7.1): the eight 3.8.0 cards fill the cap, so no older card shows.</summary>
     [Fact]
-    public void Release380_FromAnOlderVersion_LeadsWithItsSevenAndCapsAtEight()
+    public void Release380_FromAnOlderVersion_ShowsItsEightAndFillsTheCap()
     {
         var shown = WhatsNew.Cards("3.5.0", "3.8.0");
         Assert.Equal(WhatsNew.Cap, shown.Count);
-        Assert.Equal(Release380Ids, shown.Take(7).Select(c => c.Id));
-        Assert.Equal("desk-design", shown[7].Id);
+        Assert.Equal(Release380Ids, shown.Select(c => c.Id));
     }
 
     [Theory]
@@ -51,6 +50,7 @@ public class WhatsNewCardsTests
     [InlineData("claude-widgets", SettingsPage.Widgets)]
     [InlineData("restart-to-update", SettingsPage.About)]
     [InlineData("desk-fold", SettingsPage.Desk)]
+    [InlineData("meter-styles", SettingsPage.Desk)]
     [InlineData("weather-nickname", SettingsPage.Weather)]
     [InlineData("livelier-bars", SettingsPage.NowPlaying)]
     public void Release380_ShowMeOpensTheirPage(string id, SettingsPage page) =>

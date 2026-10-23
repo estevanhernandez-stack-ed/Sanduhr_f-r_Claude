@@ -12,7 +12,7 @@
 - **Fold your Desk.** A Desk design from Claude Code can slant a stack of pieces up to 20 degrees either way, so two stacks read as the faces of a fold.
 - **Call the weather anything.** Settings ▸ Weather ▸ **Show it as** puts a name like "Funky Town" on the weather piece instead of the city (#315). It never leaves your PC.
 - **Livelier bars.** The bars beside now playing ease, fall and wear peak caps; **Gradient bars** (Settings ▸ Now playing) spreads your ink's colors across them. Still the playing app's level only: no audio is captured.
-- **Meter styles** (landing in 3.8, #336): one line here once the PR merges, or cut this bullet.
+- **Meter styles:** the Claude line, the Claude limits and the system readings each take a style: bars, slim (half the height, one line), rings (small arc gauges side by side) or ticks (ten cells, the OLED-friendly one). Pace marks stay on every style. Pick them in Settings ▸ Desk or ask for them in a Desk design; a slanted stack stays inside its column.
 - **Fixes.** The usage connection rebuilds itself when its browser exits, instead of stopping for good (#331). For Store installs, everything from 3.7.2: no leftover WebView2 process blocking the next update, one Sanduhr at a time, themes chosen by screen reader or keyboard apply, every folder's controls named for their folder, Now playing names web apps (#317), Launcher labels draw whole (#318), and the design review bar opens on the monitor the design is on (#319).
 
 Claude Code needs the Sanduhr MCP server installed (Settings ▸ Claude Code) for widgets made with Claude and Desk designs.

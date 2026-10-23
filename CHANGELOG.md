@@ -32,7 +32,7 @@
 - **The fold.** A Desk design from Claude Code can slant a stack of pieces from -20 to 20 degrees, plate included, so a left stack and a right stack read as two faces of a fold. Arrange Desk hit-tests, outlines and drags the slanted piece. Older layouts read and write unchanged.
 - **Call the weather anything** (#315). Settings ▸ Weather ▸ **Show it as** puts a name of up to 24 characters ("Funky Town") on the weather piece in place of the city. The place search and the forecast never see it, and a Desk design can set it under the same review.
 - **Livelier bars.** The bars beside now playing ease up and down, fall at a steady rate and wear peak caps that hold, then drop. **Gradient bars** (Settings ▸ Now playing, off by default) spreads your ink's colors across the row. Still the playing app's level only: no audio is captured.
-- **Meter styles** (landing in 3.8, #336): one line here once the PR merges, or cut this bullet.
+- **Meter styles:** the Claude line, the Claude limits and the system readings each take a style: bars, slim (half the height, one line), rings (small arc gauges side by side) or ticks (ten cells, the OLED-friendly one). Pace marks stay on every style. Pick them in Settings ▸ Desk or ask for them in a Desk design; a slanted stack stays inside its column.
 
 ### Fixes
 

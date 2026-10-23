@@ -10,7 +10,7 @@ public static class WhatsNewCards
     public static IReadOnlyList<WhatsNewCard> Table { get; } = [.. Release380(), .. Release371(), .. Release360(), .. Release350()];
 
     // 3.8.0: the Store goes 3.7.1 to 3.8.0 (3.7.2 was a GitHub-only patch with no cards). Seven cards
-    // leave one slot under the cap; meter styles (#336) takes it if it lands in 3.8.
+    // fill the cap of eight.
     private static WhatsNewCard[] Release380() =>
     [
         WhatsNewCard.Of("3.8.0", "widgets", "Widgets for your Desk",
@@ -41,6 +41,10 @@ public static class WhatsNewCards
             "The bars beside now playing ease, fall and wear peak caps, and Gradient bars spreads your ink across them. They still read a level only, never the audio.",
             "", // Equalizer
             WhatsNewPreview.None, SettingsPage.NowPlaying),
+        WhatsNewCard.Of("3.8.0", "meter-styles", "Meters that fit",
+            "The Claude line, your limits and the system readings come as bars, slim lines, rings or ticks, with pace marks on every one. Set them in Settings, Desk.",
+            "", // SpeedMedium
+            WhatsNewPreview.None, SettingsPage.Desk),
     ];
 
     private static WhatsNewCard[] Release371() =>
