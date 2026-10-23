@@ -91,7 +91,7 @@ Measures, 100:
 
 What is in the tier 3 pile (86): 26 `AudioLevel`, 10 `WebParser`, 6 `UsageMonitor`, 4
 `WindowsNowPlaying`, 1 `PingPlugin`, 1 `ActionTimer`, and the 38 tainted `Calc`. Lua: 0. Bangs:
-387 are state changes (`SetVariable`, `UpdateMeter`, `Redraw`: almost all the 28-frame shimmer in
+387 are state changes (`SetVariable`, `UpdateMeter`, `Redraw`: mostly the 28-frame shimmer in
 the clock), 2 are layout moves, 2 are fade effects, 1 is a `CommandMeasure` (tier 3), and 1
 action value launches a program by path (tier 3). Plugins: 5 distinct, 38 uses.
 
@@ -101,7 +101,7 @@ Tier 1 inputs found:
   a thin pen face for body). A third face was retired from the theme on 2026-10-02 and is still on
   disk. Sizes run 10 to 80, mostly 14 to 18.
 - Colours: three palette values (an electric azure glow, a medium blue ink, a near-black navy),
-  a vertical text gradient and an upward bar gradient, a dim bar colour, a shimmer colour, and nine
+  a vertical text gradient and an upward bar gradient, a dim bar colour, a shimmer colour, and seven
   alias variables ("the bridge") that all point at those three.
 - Skew: one matrix family only, shear 0.31, which is **17.2 degrees**. 36 meters slant one way
   (the left panels, up), 21 the other (the right panels, down). Inside the Desk's -20 to 20 range.
@@ -165,7 +165,7 @@ stack, so the importer produces two stacks rather than one:
 - The weather piece in the same fold: city, condition and temperature, then today's and
   tomorrow's high and low. The Desk supplies the data; the import supplies only the look.
 - The now-playing text (artist, title, time) as the `nowPlaying` piece with the suite's ink.
-  The 24-bar visualiser itself is dropped: nothing on the Desk draws system audio, and 64 of its
+  The 24-bar visualiser itself is dropped: nothing on the Desk draws system audio, and 66 of its
   70 measures are tier 3 or tainted.
 - The logo: the one `Image` becomes a `launcher` tile with its brightness change on hover, after
   a downscale (6.3 MB is over the 2 MB cap), and **without its target**: the action is a
@@ -187,7 +187,7 @@ Every skin sets the `Author` key in `[Metadata]` to the same single handle, the 
 No skin sets `License`, `Information` or `Version`. There is no license file. The fonts in
 `@Resources` are the owner's own hand-drawn faces, and the PNG and layouts are the owner's work,
 so this suite carries no third-party terms that the analyser can see. The retired third face
-(`gravity-light`) is not mine to vouch for and is not used.
+(`gravity-light`) has no provenance in the suite and is no longer used.
 
 That is not true of most skins in the wild, where Rainmeter's convention is `License=Creative
 Commons Attribution-NonCommercial-ShareAlike 3.0` and an `Author` line. An importer has to:
