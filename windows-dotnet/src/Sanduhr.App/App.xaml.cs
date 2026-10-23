@@ -37,6 +37,11 @@ public partial class App : Application
     private Desk.WidgetReviewService? _widgetReview;
     private Desk.NowPlayingLookService? _looks;
     private Desk.WatcherStore? _watchers;
+    private Desk.DockerPipe? _dockerPipe;
+    private Desk.RunnerWatchService? _runners;
+
+    /// <summary>The CI runners status changed (spec ci-watchers-3.9); raised on the UI thread for an open Settings.</summary>
+    private event Action? RunnerStatusShown;
     private LauncherAppCache? _launcherApps;
     private MenuItem? _endDemoItem;
     private MenuItem? _restartToUpdateItem;
@@ -560,6 +565,16 @@ public partial class App : Application
             if (_desk is { Running: true, WatchersPlaced: true }) _glow?.Preview(ClaudeCodeEvent.Waiting);
         };
         _watchers.Start();
+        // CI watchers (spec ci-watchers-3.9): runner containers' jobs, only while "Show my CI runners' jobs" is on.
+        _watchers.FailedStarted += () =>
+        {
+            if (!vm.IsDemo && _desk is { Running: true, WatchersPlaced: true }) _glow?.Preview(ClaudeCodeEvent.Waiting);
+        };
+        _dockerPipe = new Desk.DockerPipe();
+        var runners = new Desk.RunnerWatchService(_dockerPipe, store.LoadWatchersCiRunners, _watchers);
+        _runners = runners;
+        runners.StatusChanged += () => Dispatcher.BeginInvoke(new Action(() => RunnerStatusShown?.Invoke()));
+        runners.Refresh();
         // The Launcher (spec, Desk Launcher): one in-memory view of the Start menu for the Desk and Settings.
         _launcherApps = new LauncherAppCache();
         LauncherAppCache.Current = _launcherApps;
@@ -678,6 +693,10 @@ public partial class App : Application
         svm.WidgetsPage.Changed = () => { _desk?.Reload(); svm.Desk.Reload(); };
         svm.MessageChanged = () => { _desk?.Reload(); _handoff?.PublishState(); };
         svm.Desk.WatchersChanged = () => _watchers?.SwitchChanged();
+        svm.Desk.CiRunnersChanged = () => _runners?.Refresh();
+        svm.Desk.CiRunnersStatus = _runners?.Status.Text ?? "";
+        Action showRunnerStatus = () => svm.Desk.CiRunnersStatus = _runners?.Status.Text ?? "";
+        RunnerStatusShown += showRunnerStatus;
         svm.QuitRequested = QuitApp;
         svm.ResetRequested = () =>
         {
@@ -687,6 +706,7 @@ public partial class App : Application
         try
         {
             _settingsWindow = new SettingsWindow(svm);
+            _settingsWindow.Closed += (_, _) => RunnerStatusShown -= showRunnerStatus;
         }
         catch (Exception e)
         {
@@ -698,6 +718,7 @@ public partial class App : Application
                     $"{DateTime.UtcNow:o} settings window failed to open ({e.GetType().Name}: {e.Message}){Environment.NewLine}{e}{Environment.NewLine}");
             }
             catch { }
+            RunnerStatusShown -= showRunnerStatus; // no window to show it in
             throw;
         }
         if (_window is { IsLoaded: true })
@@ -952,6 +973,8 @@ public partial class App : Application
                 vm.StopBackgroundWork();
                 _glow?.Stop();
                 _desk?.StopForReset();
+                _runners?.Dispose();
+                _dockerPipe?.Dispose();
                 _watchers?.Dispose();
                 _vm?.NowPlaying?.Dispose();
             },
@@ -1056,6 +1079,8 @@ public partial class App : Application
         _handoff?.Dispose();
         _deskDesign?.Dispose();
         _widgetReview?.Dispose();
+        _runners?.Dispose();
+        _dockerPipe?.Dispose();
         _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();
@@ -1094,6 +1119,8 @@ public partial class App : Application
         _handoff?.Dispose();
         _deskDesign?.Dispose();
         _widgetReview?.Dispose();
+        _runners?.Dispose();
+        _dockerPipe?.Dispose();
         _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();

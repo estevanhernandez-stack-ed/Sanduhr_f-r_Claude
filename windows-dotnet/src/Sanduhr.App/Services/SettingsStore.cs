@@ -839,6 +839,18 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>"Show my CI runners' jobs" (spec ci-watchers-3.9): <c>watchers_ci_runners</c>, absent = off.
+    /// On, Sanduhr reads the log output of GitHub Actions runner containers through Docker's local pipe.</summary>
+    public bool LoadWatchersCiRunners() => ReadBool(Read(), "watchers_ci_runners", false);
+
+    public void SaveWatchersCiRunners(bool on)
+    {
+        var root = Read();
+        if (on) root["watchers_ci_runners"] = true;
+        else root.Remove("watchers_ci_runners");
+        Write(root);
+    }
+
     /// <summary>"Let Claude change the Desk directly" (spec, the agent-designed Desk): <c>desk_direct</c>, absent = off. On, a design Claude
     /// proposes is applied without the review bar (the Desk it replaces is still saved first).</summary>
     public bool LoadDeskDirect() => ReadBool(Read(), "desk_direct", false);

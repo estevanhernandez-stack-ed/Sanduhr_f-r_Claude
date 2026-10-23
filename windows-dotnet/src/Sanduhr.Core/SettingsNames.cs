@@ -146,6 +146,8 @@ public static class SettingsNames
     public const string LauncherAddLink = "Add link…";
     /// <summary>Desk: lets agents put watchers up through the MCP server (settings.json "watchers_agents", off by default).</summary>
     public const string WatchersSwitch = "Let agents show watchers";
+    /// <summary>Desk: CI watchers from this PC's runner containers (settings.json "watchers_ci_runners", off by default; spec ci-watchers-3.9).</summary>
+    public const string CiRunnersSwitch = "Show my CI runners' jobs";
     /// <summary>Desk: lets Claude apply a Desk design without the review bar (settings.json "desk_direct", off by default).</summary>
     public const string DeskDirectSwitch = "Let Claude change the Desk directly";
     /// <summary>Desk, Designs: the section that lists the Desk designs kept (ten, pinned ones never dropped).</summary>
@@ -243,6 +245,7 @@ public static class SettingsNames
         (DeskPieceClicksSwitch, SettingsPage.Desk),
         (DeskPlateSwitch, SettingsPage.Desk),
         (WatchersSwitch, SettingsPage.Desk),
+        (CiRunnersSwitch, SettingsPage.Desk),
         (DeskDirectSwitch, SettingsPage.Desk),
         (OledCareSwitch, SettingsPage.Desk),
         (PutMyDeskBack, SettingsPage.Desk),

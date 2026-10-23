@@ -338,6 +338,10 @@ font is ever accepted) and installs nothing.
 - **Harness**: `--scenario propose-widget` builds a 16 px pixel blob as the server would, previews it on a
   composited Desk with the bar, applies it, and shows Settings, Widgets with the row made here.
 
+### Since 3.8.0: CI watchers from local runners
+
+`docs/ci-watchers-3.9-spec.md`. Settings ▸ Desk ▸ **Show my CI runners' jobs** (`watchers_ci_runners`, off by default) puts a watcher card up for each job a GitHub Actions runner container on this PC runs. Core: `RunnerLog` (a log line to a start, end or restart), `RunnerFollow` (the replay gate), `DockerLogFrames` (Docker's multiplexed stream), `DockerContainers` (the list call, runner images, the status line), and `WatcherSource.Runner` on the board (no lost touch, hidden in demo mode). The board's runner operations in `Watchers.cs` take plain values, because `Watchers.cs` is source-linked into the MCP server; `RunnerBoard.cs` holds the `ApplyRunner` extension that feeds them. App: `DockerPipe` (an `HttpClient` over `\\.\pipe\docker_engine`, two calls only) and `RunnerWatchService`. `DockerPipeBoundaryTests` pins the boundary by structure: the only `HttpClient` call is `GetAsync(PathFor(...))`, and a scan of `src/Sanduhr.App`, `Sanduhr.Core` and `Sanduhr.Mcp` (each directory must exist) forbids the pipe name and Docker port tokens outside `src/Sanduhr.App/Desk/DockerPipe.cs`, so the pipe name appears only in `DockerPipe.cs`. The switch is searchable in Settings, under the Watchers entry. Fixtures in `tests/Sanduhr.Tests/fixtures/runner-logs/` are real lines from Neb's runners (a succeeded run, a cancelled one) plus derived ones, marked.
+
 ---
 
 ## Tech stack

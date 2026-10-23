@@ -70,6 +70,9 @@ public enum WatcherSource
 
     /// <summary>Claude Code's background work, through the Stop hook.</summary>
     Automatic,
+
+    /// <summary>A job a GitHub Actions runner container on this PC ran, read from its log (spec ci-watchers-3.9).</summary>
+    Runner,
 }
 
 /// <summary>One card. Immutable; the board replaces it on every change.</summary>
@@ -110,6 +113,16 @@ public sealed record Watcher
 
     /// <summary>An automatic watcher's kind of task (shell, subagent, monitor, workflow).</summary>
     public string? Kind { get; init; }
+
+    /// <summary>A runner card's runner as the card shows it (the Compose service name).</summary>
+    public string? Runner { get; init; }
+
+    /// <summary>What tells one runner container from another (its container name): replicas can share a
+    /// <see cref="Runner"/> label, never this.</summary>
+    public string? RunnerKey { get; init; }
+
+    /// <summary>A runner card's job name.</summary>
+    public string? Job { get; init; }
 
     /// <summary>How long it has run: until now, or until it ended.</summary>
     public TimeSpan Elapsed(DateTimeOffset now)
@@ -224,6 +237,9 @@ public sealed record BackgroundTask(string Id, string Type, string Status, strin
 /// <summary>One Stop's report: the session and its in-flight background work.</summary>
 public sealed record StopReport(string Session, string? Folder, IReadOnlyList<BackgroundTask> Tasks);
 
+/// <summary>What a runner line did to the board: anything at all, and whether a card just failed (the glow fires once).</summary>
+public readonly record struct RunnerChange(bool Changed, bool Failed);
+
 /// <summary>Every watcher, and how they change (the Mac's <c>WatcherBoard</c>). Pure: the time comes in.</summary>
 public sealed class WatcherBoard
 {
@@ -247,7 +263,14 @@ public sealed class WatcherBoard
 
     public IReadOnlyList<Watcher> Watchers => _watchers;
 
-    public static TimeSpan Window(WatcherSource source) => source == WatcherSource.Agent ? AgentWindow : AutomaticWindow;
+    /// <summary>How long a running watcher may go unheard before it loses touch; null for a runner's,
+    /// which prints nothing while a job runs and ends only on its result, a new job or a restart.</summary>
+    public static TimeSpan? Window(WatcherSource source) => source switch
+    {
+        WatcherSource.Agent => AgentWindow,
+        WatcherSource.Automatic => AutomaticWindow,
+        _ => null,
+    };
 
     public static string AgentId(string id) => $"a:{id}";
 
@@ -355,6 +378,64 @@ public sealed class WatcherBoard
         return !_watchers.SequenceEqual(before);
     }
 
+    public static string RunnerId(string key, string job) => $"r:{key}:{job}";
+
+    /// <summary>A runner started a job (spec ci-watchers-3.9 section 5). <paramref name="key"/> is the runner
+    /// container's own name (unique); <paramref name="runner"/> is the label the card shows. The runner's open
+    /// card ends as finished (a runner runs one job at a time) and the new one goes up with the runner's own
+    /// start time. Another container with the same label is not touched.</summary>
+    public RunnerChange RunnerStart(string key, string runner, string job, DateTimeOffset startedAt, DateTimeOffset now)
+    {
+        var before = _watchers.ToList();
+        EndOpenRunnerCards(key, now);
+        var id = RunnerId(key, job);
+        _watchers.RemoveAll(w => w.Id == id);
+        _watchers.Add(new Watcher
+        {
+            Id = id, Source = WatcherSource.Runner, Title = WatcherText.Clip($"{runner} · {job}", WatcherLimits.Title),
+            Short = WatcherText.Clip(job, WatcherLimits.Short), Note = "CI runner",
+            State = WatcherState.Running, Started = startedAt, Touched = now, Runner = runner, RunnerKey = key, Job = job,
+        });
+        Trim();
+        return new RunnerChange(!_watchers.SequenceEqual(before), false);
+    }
+
+    /// <summary>A runner's job ended: the matching open card closes with the result.</summary>
+    public RunnerChange RunnerEnd(string key, string job, WatcherState result, DateTimeOffset now)
+    {
+        var before = _watchers.ToList();
+        var i = _watchers.FindIndex(w => w.Id == RunnerId(key, job) && !w.State.IsEnded());
+        if (i < 0) return default;
+        _watchers[i] = _watchers[i] with { State = result, Touched = now, Ended = now };
+        return new RunnerChange(!_watchers.SequenceEqual(before), result == WatcherState.Failed);
+    }
+
+    /// <summary>The runner (re)started and holds no job: its open card ends as finished.</summary>
+    public RunnerChange RunnerOnline(string key, DateTimeOffset now)
+    {
+        var before = _watchers.ToList();
+        EndOpenRunnerCards(key, now);
+        return new RunnerChange(!_watchers.SequenceEqual(before), false);
+    }
+
+    /// <summary>The runner's container stopped or left the list: its open card ends as finished.</summary>
+    public bool RunnerGone(string key, DateTimeOffset now)
+    {
+        var before = _watchers.ToList();
+        EndOpenRunnerCards(key, now);
+        return !_watchers.SequenceEqual(before);
+    }
+
+    private void EndOpenRunnerCards(string key, DateTimeOffset now)
+    {
+        for (var i = 0; i < _watchers.Count; i++)
+        {
+            var w = _watchers[i];
+            if (w.Source == WatcherSource.Runner && w.RunnerKey == key && !w.State.IsEnded())
+                _watchers[i] = w with { State = WatcherState.Finished, Touched = now, Ended = now };
+        }
+    }
+
     /// <summary>The clock moved: running and waiting watchers past their window lose touch, passed
     /// and finished ones past the fade go. True when anything changed.</summary>
     public bool Tick(DateTimeOffset now)
@@ -364,7 +445,8 @@ public sealed class WatcherBoard
         for (var i = 0; i < _watchers.Count; i++)
         {
             var w = _watchers[i];
-            if (w.State is WatcherState.Running or WatcherState.Waiting && now - w.Touched > Window(w.Source))
+            if (w.State is WatcherState.Running or WatcherState.Waiting
+                && Window(w.Source) is { } window && now - w.Touched > window)
                 _watchers[i] = w with { State = WatcherState.LostTouch };
         }
         return !_watchers.SequenceEqual(before);
@@ -378,8 +460,8 @@ public sealed class WatcherBoard
         {
             DateTimeOffset? at = null;
             if (w.State.Fades() && w.Ended is { } ended) at = ended + FadeAfter;
-            else if (w.State is WatcherState.Running or WatcherState.Waiting)
-                at = w.Touched + Window(w.Source) + TimeSpan.FromSeconds(1);
+            else if (w.State is WatcherState.Running or WatcherState.Waiting && Window(w.Source) is { } window)
+                at = w.Touched + window + TimeSpan.FromSeconds(1);
             if (at is { } a && (best is null || a < best)) best = a;
         }
         return best;
@@ -401,9 +483,10 @@ public sealed class WatcherBoard
             .ThenBy(w => w.Id, StringComparer.Ordinal)
             .ToList();
 
-    /// <summary>What the Desk shows: the ordered watchers, less the work ones in demo mode.</summary>
+    /// <summary>What the Desk shows: the ordered watchers, less the work ones and the runners' in demo
+    /// mode (a runner's name can name a private repo).</summary>
     public static IReadOnlyList<Watcher> Shown(IReadOnlyList<Watcher> ordered, bool demo) =>
-        demo ? ordered.Where(w => !w.Work).ToList() : ordered;
+        demo ? ordered.Where(w => !w.Work && w.Source != WatcherSource.Runner).ToList() : ordered;
 
     /// <summary>Past capacity, the least urgent and oldest go first.</summary>
     private void Trim()
@@ -476,6 +559,7 @@ public static partial class WatcherText
     /// doesn't ("waiting on you", "lost touch").</summary>
     public static string? DeskNote(Watcher w)
     {
+        if (w.Source == WatcherSource.Runner && w.State.IsEnded()) return w.State.Label();
         if (w.Note is { } note) return note;
         return w.State is WatcherState.Waiting or WatcherState.LostTouch or WatcherState.Failed or WatcherState.Finished
             ? w.State.Label()
@@ -485,9 +569,12 @@ public static partial class WatcherText
     /// <summary>What a screen reader reads for a watcher.</summary>
     public static string Spoken(Watcher w, DateTimeOffset now)
     {
-        var parts = new List<string> { w.Title, w.State.Label(), Elapsed(w.Elapsed(now)) };
+        var name = w.Source == WatcherSource.Runner && w.Runner is { } runner && w.Job is { } job
+            ? $"CI job {job} on {runner}"
+            : w.Title;
+        var parts = new List<string> { name, w.State.Label(), Elapsed(w.Elapsed(now)) };
         if (w.Progress is { } p) parts.Add(p);
-        if (w.Note is { } note) parts.Add(note);
+        if (w.Note is { } note && w.Source != WatcherSource.Runner) parts.Add(note);
         return string.Join(", ", parts);
     }
 
