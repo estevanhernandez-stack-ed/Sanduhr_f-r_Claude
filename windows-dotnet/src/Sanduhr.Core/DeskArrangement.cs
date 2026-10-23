@@ -72,8 +72,54 @@ public static class DeskAnchors
 /// null for every monitor (what every layout written before monitors meant), <see cref="DeskMonitors.Main"/>, or a monitor's
 /// device path (the id <c>IDesktopWallpaper</c> uses). <paramref name="Tilt"/> is the fold (#314): the slant, in whole degrees from
 /// <see cref="DeskArrangement.MinTilt"/> to <see cref="DeskArrangement.MaxTilt"/>, of the stack the piece sits in. The pieces of one anchor
-/// share one slant (<see cref="DeskArrangement.SetTilt"/>); a stack whose words disagree slants by its first piece's.</summary>
-public sealed record DeskPlacement(string Widget, DeskAnchor Anchor, double Scale = 1, string? Monitor = null, double Tilt = 0);
+/// share one slant (<see cref="DeskArrangement.SetTilt"/>); a stack whose words disagree slants by its first piece's.
+/// <paramref name="Style"/> is how a meter-like piece draws its numbers (#336): <see cref="DeskMeterStyle.Bar"/> for every other piece.</summary>
+public sealed record DeskPlacement(string Widget, DeskAnchor Anchor, double Scale = 1, string? Monitor = null, double Tilt = 0,
+    DeskMeterStyle Style = DeskMeterStyle.Bar);
+
+/// <summary>
+/// How a meter-like piece draws (#336), so a stack fits its column, upright or slanted. <see cref="Bar"/>: today's full-width bar with
+/// its label above (the default, unchanged). <see cref="Slim"/>: the label and the value on one line over a thin bar, about half the
+/// height. <see cref="Ring"/>: a small arc gauge with the value inside, the readings of one piece side by side in a row.
+/// <see cref="Ticks"/>: ten segmented cells, fewer lit pixels (the OLED-friendly one). A Claude limit keeps its pace mark in every style.
+/// </summary>
+public enum DeskMeterStyle { Bar, Slim, Ring, Ticks }
+
+/// <summary>Words, names and the pieces that take a <see cref="DeskMeterStyle"/>.</summary>
+public static class DeskMeterStyles
+{
+    /// <summary>Every style, in Settings order.</summary>
+    public static readonly IReadOnlyList<DeskMeterStyle> All = [DeskMeterStyle.Bar, DeskMeterStyle.Slim, DeskMeterStyle.Ring, DeskMeterStyle.Ticks];
+
+    /// <summary>The pieces that have a style: the Claude line (which gains a compact two-row form), the Claude limits and CPU/RAM/Disk.</summary>
+    public static readonly IReadOnlyList<string> Pieces = ["claude", "meters", "telemetry"];
+
+    /// <summary>True when <paramref name="widget"/> takes a style.</summary>
+    public static bool Supports(string widget) => Pieces.Contains(widget, StringComparer.Ordinal);
+
+    /// <summary>The layout and design word: "bar", "slim", "ring", "ticks".</summary>
+    public static string Word(DeskMeterStyle s) => s.ToString().ToLowerInvariant();
+
+    /// <summary>The style for an exact lowercase word, null for anything else.</summary>
+    public static DeskMeterStyle? Parse(string? word)
+    {
+        foreach (var s in All)
+            if (string.Equals(Word(s), word, StringComparison.Ordinal)) return s;
+        return null;
+    }
+
+    /// <summary>As Settings, Desk names it.</summary>
+    public static string Name(DeskMeterStyle s) => s switch
+    {
+        DeskMeterStyle.Slim => "Slim",
+        DeskMeterStyle.Ring => "Rings",
+        DeskMeterStyle.Ticks => "Ticks",
+        _ => "Bars",
+    };
+
+    /// <summary>The style a piece can carry: <paramref name="style"/> for a piece that has one, <see cref="DeskMeterStyle.Bar"/> for any other.</summary>
+    public static DeskMeterStyle For(string widget, DeskMeterStyle style) => Supports(widget) ? style : DeskMeterStyle.Bar;
+}
 
 /// <summary>A monitor as the Desk and <c>get_desk</c> know it. <paramref name="Id"/> is its device path, stable across restarts and
 /// resolution changes; <paramref name="Name"/> is how a person is told which one it is ("3440×1440, main"); the size is in physical
@@ -165,7 +211,7 @@ public static class DeskMonitors
     public static IReadOnlyList<DeskPlacement> ReviewPieces(DeskArrangement current, DeskArrangement proposed)
     {
         var changed = proposed.Pieces.Where(p => current.Placement(p.Widget) is not { } was
-            || was.Anchor != p.Anchor || was.Scale != p.Scale || was.Tilt != p.Tilt || !Same(was.Monitor, p.Monitor)).ToList();
+            || was.Anchor != p.Anchor || was.Scale != p.Scale || was.Tilt != p.Tilt || was.Style != p.Style || !Same(was.Monitor, p.Monitor)).ToList();
         return changed.Count > 0 ? changed : proposed.Pieces;
     }
 
@@ -217,7 +263,10 @@ public static class DeskMonitors
 /// <summary>
 /// The Desk layout string read and written. Each word is <c>widget:anchor</c>,
 /// <c>widget:anchor:scale</c> or <c>widget:anchor:scale:tilt</c> (the fold, #314: whole degrees, written only when not 0, with the
-/// scale written as 1 to hold its place; a build from before the fold reads the scale and ignores the tilt), with an optional <c>@monitor</c> at its end (<c>clock:tl@main</c>, or a monitor's device path with
+/// scale written as 1 to hold its place; a build from before the fold reads the scale and ignores the tilt), or
+/// <c>widget:anchor:scale:tilt:style</c> (the meter style, #336: <c>meters:tr:1:0:ring</c>, written only when not <c>bar</c>, with the
+/// scale and the tilt holding their places; a build from before it reads the size and the tilt and ignores the style, so it draws bars),
+/// with an optional <c>@monitor</c> at its end (<c>clock:tl@main</c>, or a monitor's device path with
 /// <c>,</c> <c>:</c> <c>@</c> <c>%</c> and spaces escaped as %XX; no suffix is every monitor, so every older layout reads and writes
 /// unchanged); within an anchor, pieces stack top to bottom in the string order, and a screen draws only the pieces
 /// <see cref="ForScreen"/> gives it.
@@ -276,8 +325,10 @@ public sealed class DeskArrangement
             if (bits.Length >= 4 &&
                 double.TryParse(bits[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var t))
                 tilt = ClampTilt(t);
+            // The meter style (#336) is the fifth field; a word this build does not know, or a style on a piece that has none, is a bar.
+            var style = bits.Length >= 5 && DeskMeterStyles.Parse(bits[4]) is { } st ? DeskMeterStyles.For(bits[0], st) : DeskMeterStyle.Bar;
             _pieces.RemoveAll(p => p.Widget == bits[0]);
-            _pieces.Add(new DeskPlacement(bits[0], anchor, scale, monitor, tilt));
+            _pieces.Add(new DeskPlacement(bits[0], anchor, scale, monitor, tilt, style));
         }
     }
 
@@ -329,9 +380,12 @@ public sealed class DeskArrangement
         var head = $"{p.Widget}:{DeskAnchors.Word(p.Anchor)}";
         // The Mac writes the size with printf "%g": six significant digits, no trailing zeros.
         var tilt = ClampTilt(p.Tilt);
-        var word = p.Scale == 1 && tilt == 0 ? head : head + ":" + p.Scale.ToString("G6", CultureInfo.InvariantCulture);
+        var style = DeskMeterStyles.For(p.Widget, p.Style);
+        var word = p.Scale == 1 && tilt == 0 && style == DeskMeterStyle.Bar ? head : head + ":" + p.Scale.ToString("G6", CultureInfo.InvariantCulture);
         // The fold rides after the size; no slant writes nothing, so every layout from before it reads and writes as it did.
-        if (tilt != 0) word += ":" + tilt.ToString("0", CultureInfo.InvariantCulture);
+        if (tilt != 0 || style != DeskMeterStyle.Bar) word += ":" + tilt.ToString("0", CultureInfo.InvariantCulture);
+        // The meter style rides after the tilt (#336); a bar writes nothing.
+        if (style != DeskMeterStyle.Bar) word += ":" + DeskMeterStyles.Word(style);
         // Every monitor writes nothing, so a layout that never named a monitor reads and writes exactly as before.
         return DeskMonitors.FromWord(p.Monitor) is { } monitor ? word + "@" + DeskMonitors.Escape(monitor) : word;
     }
@@ -387,7 +441,7 @@ public sealed class DeskArrangement
         }
         if (old?.Anchor == a) return;
         // Into a stack, a piece takes its slant (one per stack); into an empty anchor it keeps its own.
-        var moved = new DeskPlacement(widget, a, old?.Scale ?? 1, old?.Monitor, StackTilt(a) ?? old?.Tilt ?? 0);
+        var moved = new DeskPlacement(widget, a, old?.Scale ?? 1, old?.Monitor, StackTilt(a) ?? old?.Tilt ?? 0, old?.Style ?? DeskMeterStyle.Bar);
         var rank = Rank(widget);
         if (!_pieces.Any(p => p.Anchor == a))
         {
@@ -476,6 +530,14 @@ public sealed class DeskArrangement
         var i = _pieces.FindIndex(p => p.Widget == widget);
         if (i < 0) return;
         _pieces[i] = _pieces[i] with { Scale = ClampScale(scale) };
+    }
+
+    /// <summary>Sets a placed piece's meter style (#336); a piece that has no style stays a bar, and a hidden piece has none.</summary>
+    public void SetStyle(string widget, DeskMeterStyle style)
+    {
+        var i = _pieces.FindIndex(p => p.Widget == widget);
+        if (i < 0) return;
+        _pieces[i] = _pieces[i] with { Style = DeskMeterStyles.For(widget, style) };
     }
 
     /// <summary>The slant of the stack at <paramref name="anchor"/>: its first piece's; null when the anchor has none.</summary>
