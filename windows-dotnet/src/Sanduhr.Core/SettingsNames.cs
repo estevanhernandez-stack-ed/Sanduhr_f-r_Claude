@@ -27,7 +27,7 @@ public static class SettingsNames
         new("Usage", [SettingsPage.History, SettingsPage.ClaudeUsage, SettingsPage.Publish]),
         new("Claude Code", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Themes]),
-        new("Desk", [SettingsPage.Desk, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather]),
+        new("Desk", [SettingsPage.Desk, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather, SettingsPage.Widgets]),
         new("Help", [SettingsPage.About]),
     ];
 
@@ -50,6 +50,7 @@ public static class SettingsNames
         SettingsPage.DeskMessage => "Message",
         SettingsPage.NowPlaying => "Now playing",
         SettingsPage.Weather => "Weather",
+        SettingsPage.Widgets => "Widgets",
         SettingsPage.About => "About",
         SettingsPage.Widget => "Widget",
         _ => page.ToString(),
@@ -190,6 +191,14 @@ public static class SettingsNames
     public const string WeatherLookUp = "Look up";
     /// <summary>Claude Code: where the glow lands (settings.json "claude_code_glow.target").</summary>
     public const string GlowWhere = "Where the glow shows";
+    /// <summary>Widgets: fetches and verifies the catalog again (it is fetched only when the page opens, spec 3.8, 2).</summary>
+    public const string WidgetCatalogCheck = "Check the catalog again";
+    /// <summary>Widgets: a catalog row's buttons and an installed row's. Each carries its pack's name for a screen reader.</summary>
+    public const string WidgetInstall = "Install";
+    public const string WidgetUpdate = "Update";
+    public const string WidgetUninstall = "Uninstall";
+    /// <summary>Widgets: how a Claude-made or the user's own pack is listed (spec 3.8, section 3).</summary>
+    public const string WidgetMadeHere = "made here";
 
     /// <summary>The trademark disclaimer, the standard text, word for word (About carries it).</summary>
     public const string TrademarkNotice =
@@ -231,6 +240,7 @@ public static class SettingsNames
         (ClearLooks, SettingsPage.NowPlaying),
         (WeatherLookUp, SettingsPage.Weather),
         (GlowWhere, SettingsPage.ClaudeCode),
+        (WidgetCatalogCheck, SettingsPage.Widgets),
     ];
 
     /// <summary>

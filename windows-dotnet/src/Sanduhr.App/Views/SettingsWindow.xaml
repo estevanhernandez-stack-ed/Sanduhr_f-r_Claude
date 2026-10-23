@@ -2846,6 +2846,11 @@
                     </Border>
                 </TabItem>
 
+                <!-- Settings, Widgets (spec 3.8): the signed catalog and the installed packs, drawn by their own control. -->
+                <TabItem Header="Widgets" Tag="Widgets" AutomationProperties.Name="Widgets" DataContext="{Binding WidgetsPage}">
+                    <views:WidgetsPage />
+                </TabItem>
+
                 <!-- About (Settings v2): the version, What's New and the tour, the trademark notice,
                      where Sanduhr keeps its files, and the packages it ships with. -->
                 <TabItem Header="About" Tag="About" AutomationProperties.Name="About" views:SettingsSidebar.GroupHeader="Help">

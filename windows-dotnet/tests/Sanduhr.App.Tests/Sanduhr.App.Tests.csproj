@@ -25,4 +25,11 @@
     <ProjectReference Include="..\..\src\Sanduhr.App\Sanduhr.App.csproj" />
   </ItemGroup>
 
+  <!-- Settings ▸ Widgets installs real packs over a fake network: the good fixtures, shared with Sanduhr.Tests. -->
+  <ItemGroup>
+    <None Include="..\Sanduhr.Tests\fixtures\widget-packs\good\**\*"
+          Link="fixtures\widget-packs\good\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

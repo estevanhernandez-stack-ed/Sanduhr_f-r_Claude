@@ -189,6 +189,11 @@ public sealed class Paths
     /// creates per-root dirs lazily on first write.</summary>
     public string VaultDir => Path.Combine(_localAppDataBase, "Sanduhr", "vault");
 
+    /// <summary>Installed widget packs (spec 3.8, section 3): <c>%LOCALAPPDATA%\Sanduhr\widgets</c>, one folder per pack
+    /// plus <c>widgets.json</c>. The app's own files (on the Store build the package virtualizes them, which is fine:
+    /// nothing outside the app reads them). Not auto-created; the first install creates it.</summary>
+    public string WidgetsDir => Path.Combine(_localAppDataBase, "Sanduhr", "widgets");
+
     /// <summary>v1 plaintext config location — read-only, used for migration.</summary>
     public string LegacyConfigFile
         => Path.Combine(_homeDir, ".claude-usage-widget", "config.json");

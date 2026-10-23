@@ -57,7 +57,7 @@ internal partial class ResetWindow : Window
         ResetPart.ClaudeCodeEntries => "Sanduhr's entries in Claude Code (statusline, MCP server)",
         ResetPart.Accounts => "Accounts and sign-in keys",
         ResetPart.History => "Usage history and the vault",
-        ResetPart.Themes => "Your themes",
+        ResetPart.Themes => "Your themes and widgets",
         ResetPart.Settings => "Settings",
         _ => "",
     };

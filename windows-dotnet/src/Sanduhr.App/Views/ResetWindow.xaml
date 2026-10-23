@@ -174,8 +174,8 @@
                           AutomationProperties.Name="Usage history and the vault"
                           Margin="0,0,0,10" Checked="Choice_Changed" Unchecked="Choice_Changed" />
                 <CheckBox x:Name="ThemesBox" Style="{StaticResource ThemedCheckBox}" IsChecked="True"
-                          Content="Your themes"
-                          AutomationProperties.Name="Your themes"
+                          Content="Your themes and widgets"
+                          AutomationProperties.Name="Your themes and widgets"
                           Margin="0,0,0,10" Checked="Choice_Changed" Unchecked="Choice_Changed" />
                 <CheckBox x:Name="SettingsBox" Style="{StaticResource ThemedCheckBox}" IsChecked="True"
                           Content="Settings"

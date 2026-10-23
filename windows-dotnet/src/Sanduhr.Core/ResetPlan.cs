@@ -11,7 +11,7 @@ public enum ResetPart
     Accounts,
     /// <summary>History files, snapshots, the vault, handoff and signal files, logs.</summary>
     History,
-    /// <summary>The themes folder.</summary>
+    /// <summary>The themes folder and the installed widget packs.</summary>
     Themes,
     /// <summary><c>settings.json</c>, last.</summary>
     Settings,
@@ -186,6 +186,8 @@ public static partial class ResetPlan
 
         var themes = new List<ResetItem>();
         AddDir(themes, paths.ThemesDir);
+        // Installed widget packs and widgets.json (spec 3.8, section 3): themes, palettes, effects, fonts and sprites.
+        AddDir(themes, paths.WidgetsDir);
         map[ResetPart.Themes] = Finish(themes, backups);
 
         var settings = new List<ResetItem>();
