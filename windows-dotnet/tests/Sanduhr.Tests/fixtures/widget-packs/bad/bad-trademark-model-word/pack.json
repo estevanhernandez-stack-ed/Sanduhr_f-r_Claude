@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "bad-trademark-model-word",
+  "name": "Fixture palette",
+  "version": "1.0.0",
+  "author": "Fixture Author",
+  "license": "MIT",
+  "kind": "palette",
+  "sanduhr_min": "3.8.0",
+  "description": "A pack that borrows the Sonnet name.",
+  "files": [
+    "palettes.json"
+  ]
+}

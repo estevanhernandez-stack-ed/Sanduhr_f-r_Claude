@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "oled-neon-effects",
+  "name": "OLED Neon Effects",
+  "version": "1.0.0",
+  "author": "626 Labs LLC",
+  "license": "CC-BY-4.0",
+  "kind": "effects",
+  "sanduhr_min": "3.8.0",
+  "description": "Six slow, low-intensity effect presets: breathe, heartbeat, scanline, aurora-sweep, embers and halo. Gentle on OLED, no hard flashes.",
+  "files": [
+    "effects.json"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "good-sprite-stages",
+  "name": "Fixture sprite",
+  "version": "1.0.0",
+  "author": "Fixture Author",
+  "license": "MIT",
+  "kind": "sprite",
+  "sanduhr_min": "3.8.0",
+  "description": "A fixture pack for the validator tests.",
+  "files": [
+    "sprite.json",
+    "sprites/one.png",
+    "sprites/two.png"
+  ]
+}
