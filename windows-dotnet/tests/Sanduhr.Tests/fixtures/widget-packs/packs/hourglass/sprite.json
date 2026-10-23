@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "frame_w": 32,
+  "frame_h": 32,
+  "scale": 2,
+  "fps": 8,
+  "stages": [
+    {
+      "id": "egg",
+      "name": "Egg",
+      "min_growth": 0.0,
+      "sheet": "sprites/egg.png",
+      "frame_w": 32,
+      "frame_h": 32
+    },
+    {
+      "id": "sprout",
+      "name": "Sprout",
+      "min_growth": 0.1,
+      "sheet": "sprites/sprout.png",
+      "frame_w": 32,
+      "frame_h": 32
+    },
+    {
+      "id": "runner",
+      "name": "Runner",
+      "min_growth": 0.35,
+      "sheet": "sprites/runner.png",
+      "frame_w": 32,
+      "frame_h": 32
+    },
+    {
+      "id": "keeper",
+      "name": "Keeper",
+      "min_growth": 0.75,
+      "sheet": "sprites/keeper.png",
+      "frame_w": 40,
+      "frame_h": 40
+    }
+  ],
+  "animations": {
+    "walk": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "sit": [
+      4,
+      5
+    ],
+    "nap": [
+      6,
+      7
+    ],
+    "pop": [
+      8,
+      9,
+      10,
+      11
+    ],
+    "cheer": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "worry": [
+      16,
+      17
+    ],
+    "focus": [
+      18,
+      19
+    ],
+    "sleep": [
+      20,
+      21
+    ],
+    "celebrate": [
+      22,
+      23,
+      24,
+      25,
+      26,
+      27
+    ]
+  },
+  "moods": {
+    "content": "sit",
+    "focused": "focus",
+    "worried": "worry",
+    "exhausted": "sleep",
+    "celebrate": "celebrate"
+  },
+  "triggers": {
+    "needs_you": "pop",
+    "job_passed": "cheer",
+    "near_limit": "worry",
+    "idle": "nap"
+  },
+  "roam": {
+    "edges": [
+      "bottom",
+      "left",
+      "right"
+    ],
+    "speed_px_s": 30
+  }
+}

@@ -1,0 +1,36 @@
+bad/bad-banned-extension	ERROR	run.exe: .exe files are banned (packs are data only: no scripts, executables, HTML or SVG)
+bad/bad-banned-extension	ERROR	pack.json: palette packs must list exactly ["palettes.json"]
+bad/bad-effects-range	ERROR	effects.json: effects[0]: period_ms must be an integer from 400 to 10000
+bad/bad-fake-png	ERROR	preview.png: not a PNG (bad signature)
+bad/bad-font-license	ERROR	pack.json: font packs must use OFL-1.1 or Apache-2.0 (got MIT)
+bad/bad-font-magic	ERROR	fixture.ttf: not a TrueType/OpenType font (bad magic number)
+bad/bad-id-mismatch	ERROR	pack.json: id 'something-else' does not match the folder name 'bad-id-mismatch'
+bad/bad-license-text	ERROR	LICENSE text does not look like MIT (expected the standard license text)
+bad/bad-no-license	ERROR	LICENSE is missing; every pack carries its own license text
+bad/bad-palette-stops	ERROR	palettes.json: palettes[0]: colors must be 1 to 4 #rrggbb stops
+bad/bad-pixel-char	ERROR	sheet.json: frames[0][3][3] is 'g'; a pixel is '.' (transparent) or 0-9, a-f (a palette index, lowercase)
+bad/bad-pixel-colors	ERROR	sheet.json: palette must be 1 to 16 #rrggbb colors (got 17)
+bad/bad-pixel-frame-size	ERROR	sheet.json: frame_w and frame_h must be integers from 8 to 32, got 40 x 40 (pixel sheets are sized for a companion)
+bad/bad-pixel-frames	ERROR	sheet.json: animations use frame index 3 but the pixel sheet has only 3 frames (sheet)
+bad/bad-pixel-index	ERROR	sheet.json: frames[0][2][3] is palette index '3' (3) but the palette has only 3 colors
+bad/bad-pixel-row-length	ERROR	sheet.json: frames[0][5] is 7 characters, expected 8 (frame_w)
+bad/bad-pixel-rows	ERROR	sheet.json: frames[0] has 7 rows, expected 8 (frame_h)
+bad/bad-pixel-white	ERROR	sheet.json: palette[1] is pure white (#FFFFFF), which sprites may not use (it burns on OLED panels); use an off-white such as #f0f0f0
+bad/bad-png-crc	ERROR	preview.png: bad CRC in IHDR chunk
+bad/bad-preview-too-wide	ERROR	preview.png: image is 5000x1, limit is 4096 pixels on a side
+bad/bad-script-in-json	ERROR	palettes.json: contains '<script'; active content is banned
+bad/bad-sprite-grid	ERROR	sprite.png: sheet is 30x8, not a whole number of 8x8 frames (sheet)
+bad/bad-sprite-index	ERROR	sprite.png: animations use frame index 3 but the sheet has only 2 frames (sheet)
+bad/bad-sprite-missing-anim	ERROR	sprite.json: required animation 'celebrate' is missing
+bad/bad-sprite-mood	ERROR	sprite.json: moods.exhausted names animation 'snore', which is not defined
+bad/bad-sprite-stage-order	ERROR	sprite.json: stages[1]: min_growth 0 must be greater than the previous stage's 0
+bad/bad-sprite-v1-json-sheet	ERROR	sprite.json: sheet 'sheet.json' is a .json pixel sheet, which needs sprite.json schema_version 2 (schema_version 1 sheets are .png only)
+bad/bad-theme-light-bg	WARN	themes/fixture-light.json: bg is light (luminance 0.87, keep it under 0.25)
+bad/bad-theme-light-bg	WARN	themes/fixture-light.json: glass is light (luminance 0.87, keep it under 0.25)
+bad/bad-theme-light-bg	WARN	themes/fixture-light.json: glass_on_mica is light (luminance 0.87, keep it under 0.25)
+bad/bad-theme-light-bg	WARN	themes/fixture-light.json: text reads at 1.1:1 on the card (needs 4.5:1)
+bad/bad-theme-light-bg	WARN	themes/fixture-light.json: text_secondary reads at 2.1:1 on the card (needs 3.0:1)
+bad/bad-theme-missing-field	ERROR	themes/fixture-dark.json: accent is required (a #rrggbb color)
+bad/bad-trademark-model-word	ERROR	trademark: pack.json description contains 'sonnet'. Third-party marks are not allowed in packs (no Anthropic or Claude marks, no model names as branding); see FORMAT.md rule 6
+bad/bad-trademark-name	ERROR	trademark: pack.json name contains 'claude'. Third-party marks are not allowed in packs (no Anthropic or Claude marks, no model names as branding); see FORMAT.md rule 6
+bad/bad-unlisted-file	ERROR	palettes-old.json: file is not listed in pack.json files

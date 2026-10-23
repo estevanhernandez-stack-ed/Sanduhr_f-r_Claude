@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "oled-neon",
+  "name": "OLED Neon",
+  "version": "1.0.0",
+  "author": "626 Labs LLC",
+  "license": "CC-BY-4.0",
+  "kind": "theme",
+  "sanduhr_min": "3.8.0",
+  "description": "Four true-black emissive themes for OLED desks: Synthwave, Ember, Aurora and Toxic. Text is capped at #e6e6e6 to go easy on the panel.",
+  "files": [
+    "themes/void-synthwave.json",
+    "themes/void-ember.json",
+    "themes/void-aurora.json",
+    "themes/void-toxic.json"
+  ]
+}

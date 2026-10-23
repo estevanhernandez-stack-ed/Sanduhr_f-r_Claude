@@ -1,0 +1,74 @@
+{
+  "schema_version": 2,
+  "frame_w": 8,
+  "frame_h": 8,
+  "scale": 2,
+  "fps": 8,
+  "animations": {
+    "walk": [
+      0,
+      1
+    ],
+    "sit": [
+      0
+    ],
+    "nap": [
+      1
+    ],
+    "pop": [
+      2
+    ],
+    "cheer": [
+      3
+    ],
+    "worry": [
+      0
+    ],
+    "focus": [
+      1
+    ],
+    "sleep": [
+      2
+    ],
+    "celebrate": [
+      3
+    ]
+  },
+  "moods": {
+    "content": "sit",
+    "focused": "focus",
+    "worried": "worry",
+    "exhausted": "sleep",
+    "celebrate": "celebrate"
+  },
+  "triggers": {
+    "needs_you": "pop",
+    "job_passed": "cheer",
+    "near_limit": "worry",
+    "idle": "nap"
+  },
+  "roam": {
+    "edges": [
+      "bottom"
+    ],
+    "speed_px_s": 20
+  },
+  "stages": [
+    {
+      "id": "one",
+      "name": "One",
+      "min_growth": 0,
+      "sheet": "sprites/one.json",
+      "frame_w": 8,
+      "frame_h": 8
+    },
+    {
+      "id": "two",
+      "name": "Two",
+      "min_growth": 0.5,
+      "sheet": "sprites/two.png",
+      "frame_w": 16,
+      "frame_h": 16
+    }
+  ]
+}
