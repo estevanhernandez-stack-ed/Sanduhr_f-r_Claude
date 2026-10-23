@@ -22,7 +22,8 @@ public sealed partial class NowPlayingAppRow : ObservableObject
     {
         _owner = owner;
         AppId = appId;
-        Name = NowPlayingApps.DisplayName(appId);
+        // The Start menu's name ("YouTube Music"), not the raw id of a web app ("Chrome._crx_…"): #317.
+        Name = NowPlayingApps.DisplayName(appId, LauncherAppCache.Current is { } apps ? apps.StartMenuName : null);
         _loading = true;
         Shown = shown;
         _loading = false;
@@ -151,7 +152,7 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
             OnPropertyChanged(nameof(HasApps));
         }
         bool on = _saved.Widget || (_hub?.Service.Running ?? false);
-        Status = NowPlayingStatus.Text(on, _hub?.Shown);
+        Status = NowPlayingStatus.Text(on, _hub?.Shown, LauncherAppCache.Current is { } apps ? apps.StartMenuName : null);
     }
 
     internal void SetExcluded(string appId, bool excluded)
