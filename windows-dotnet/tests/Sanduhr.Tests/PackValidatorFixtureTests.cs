@@ -3,7 +3,7 @@ using Sanduhr.Core;
 
 namespace Sanduhr.Tests;
 
-/// <summary>The fixtures and first-party packs of <c>sanduhr-widgets</c> (copied at 473597d, see
+/// <summary>The fixtures and first-party packs of <c>sanduhr-widgets</c> (copied at 61b4247, see
 /// fixtures/widget-packs/README.md), read into the in-memory form <see cref="PackValidator"/> takes.</summary>
 internal static class WidgetPackFixtures
 {
@@ -38,7 +38,7 @@ internal static class WidgetPackFixtures
 }
 
 /// <summary>
-/// Fixture parity with the reference validator (sanduhr-widgets tools/validate.py and test_validate.py at 473597d):
+/// Fixture parity with the reference validator (sanduhr-widgets tools/validate.py and test_validate.py at 61b4247):
 /// the same packs pass, the same packs fail, with the same messages. Theme schema and design messages come from
 /// Core's ThemeLint, which words them as the app does; the Python's sentence is a prefix of each, so those compare
 /// by prefix and everything else byte for byte.
@@ -55,7 +55,7 @@ public class PackValidatorFixtureTests
     public void The_fixture_sets_are_all_there()
     {
         Assert.Equal(8, WidgetPackFixtures.Names("good").Count());
-        Assert.Equal(31, WidgetPackFixtures.Names("bad").Count());
+        Assert.Equal(42, WidgetPackFixtures.Names("bad").Count());
         Assert.Equal(new[] { "hourglass", "oled-neon", "oled-neon-effects", "oled-neon-palettes" }, WidgetPackFixtures.Names("packs"));
     }
 
