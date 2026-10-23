@@ -143,7 +143,9 @@ this way. A user PNG makes the pack local-only; it is never sent anywhere.
   `propose_desk` gains `weather.nickname` under the same review.
 - **F. Fold (#314):** `layout.<piece>.tilt` from -20 to 20 degrees, a `SkewTransform` on the
   stack's `LayoutTransform` beside the existing scale. Arrange Desk hit-testing follows the
-  transform. Perspective (`Viewport3D`) stays out.
+  transform. Perspective (`Viewport3D`) stays out. As built: the tilt is the stack's (one slant per
+  anchor; a piece joining a stack takes it; two different tilts for one stack in a design are
+  refused), stored as a fourth field of the layout word (`clock:ml:1:-18`, written only when not 0).
 - **G. Livelier bars:** per-bar smoothing, a falloff, peak caps and a gradient ink, all from the
   existing session peak level. The privacy promise "a level only: no audio is captured" stands.
 
