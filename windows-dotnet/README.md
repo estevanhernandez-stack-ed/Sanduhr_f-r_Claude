@@ -279,6 +279,25 @@ installed sprite). Showing it there places or hides the piece.
 - **Harness**: `--scenario companion` installs the hourglass into the dev profile and draws each stage,
   a trigger, a mood, a roaming frame and Settings, Widgets.
 
+**Widgets made with Claude** (spec sections 5 and 6): `propose_widget` on the MCP server takes a whole
+pack as data (kind `sprite`, `palette` or `effects`; a theme goes through `propose_theme`, and no PNG or
+font is ever accepted) and installs nothing.
+
+- **Core, pure**: `WidgetProposal` (linked into the server) builds the pack from the tool's arguments:
+  `pack.json` with the id namespaced `my-<id>`, a LICENSE text for the chosen license (CC0-1.0 by
+  default), the kind's JSON files; it runs `PackValidator` strict (the trademark rule included) and holds
+  the `widget-request.json` / `widget-result.json` shapes. `Decode` is the widget's own check of a request.
+  `WidgetReview` is the bar's "What this widget is" and the palette's preview ink. `WidgetOwnArt` is Use
+  my own art…: the pack image rules on a picked PNG, the pack rebuilt around it, validated whole.
+- **App**: `Desk/WidgetReviewService.cs`. The service watches `%USERPROFILE%\.sanduhr` for the request
+  (`WidgetHandoff`), stages a sprite in `widgets\.preview\` (rasterized there) and draws it through the
+  companion's own loader (`CompanionService.PreviewPack`); a palette previews as Custom ink. The review
+  bar wears the widget's words and one choice, Make it the companion. Apply installs as source `claude`;
+  Dismiss removes the staged copy and writes nothing; the direct switch is never read. Settings, Widgets
+  offers Use my own art… on a sprite made here, which reinstalls it as source `local`.
+- **Harness**: `--scenario propose-widget` builds a 16 px pixel blob as the server would, previews it on a
+  composited Desk with the bar, applies it, and shows Settings, Widgets with the row made here.
+
 ---
 
 ## Tech stack
