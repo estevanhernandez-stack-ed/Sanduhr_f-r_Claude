@@ -23,6 +23,7 @@
         <DataTemplate x:Key="ThemeSwatchTemplate" DataType="{x:Type vm:ThemeStripItemViewModel}">
             <!-- Not a tab stop of its own: the list item around it is (ThemeSwatchList). -->
             <Button Command="{Binding ApplyCommand}" Cursor="Hand" ToolTip="{Binding Name}" Focusable="False"
+                    AutomationProperties.Name="{Binding Name}"
                     shell:WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">

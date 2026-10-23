@@ -59,10 +59,11 @@ public sealed partial class MessageRowViewModel : ObservableObject
     private readonly DeskMessagePageViewModel _owner;
     private bool _customColor;
 
-    internal MessageRowViewModel(DeskMessagePageViewModel owner, MessageRow row, bool focusMe)
+    internal MessageRowViewModel(DeskMessagePageViewModel owner, MessageRow row, bool focusMe, int number = 1)
     {
         _owner = owner;
         Id = row.Id;
+        Number = number;
         IsNew = focusMe;
         _customColor = row.Line is { } line && ColorShown(line.Look) == CustomColorChoice;
         SizeChoices = SizesFor(row.Line);
@@ -70,6 +71,10 @@ public sealed partial class MessageRowViewModel : ObservableObject
     }
 
     public Guid Id { get; }
+
+    /// <summary>The line's place in the list, from 1. The row's controls are named with it ("Remove line 2"), so a
+    /// screen reader can tell one line's buttons from the next; the list is rebuilt on every move.</summary>
+    public int Number { get; }
 
     /// <summary>True for the row Add line just put in, until the page has moved focus to its text box.</summary>
     public bool IsNew { get; set; }
@@ -481,10 +486,11 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
     private void Rebuild()
     {
         Rows.Clear();
+        int number = 0;
         foreach (var row in _editor.Document.MessageRows)
         {
             bool focus = _focusNext == row.Id;
-            Rows.Add(new MessageRowViewModel(this, row, focus));
+            Rows.Add(new MessageRowViewModel(this, row, focus, ++number));
         }
         _focusNext = null;
         RaiseState();

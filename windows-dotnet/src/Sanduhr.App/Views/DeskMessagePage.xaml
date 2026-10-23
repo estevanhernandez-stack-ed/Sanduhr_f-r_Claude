@@ -89,15 +89,15 @@
                                 <StackPanel Orientation="Horizontal">
                                     <ComboBox Style="{DynamicResource ThemedComboBox}" Width="128"
                                               ItemsSource="{Binding WhenOptions}" SelectedItem="{Binding When, Mode=TwoWay}"
-                                              AutomationProperties.Name="When this line shows" />
+                                              AutomationProperties.Name="{Binding Number, StringFormat='When line {0} shows'}" />
                                     <StackPanel Orientation="Horizontal" Margin="6,0,0,0"
                                                 Visibility="{Binding IsDate, Converter={StaticResource BoolVis}}">
                                         <ComboBox Style="{DynamicResource ThemedComboBox}" Width="112"
                                                   ItemsSource="{Binding MonthOptions}" SelectedItem="{Binding Month, Mode=TwoWay}"
-                                                  AutomationProperties.Name="Month" />
+                                                  AutomationProperties.Name="{Binding Number, StringFormat='Line {0} month'}" />
                                         <ComboBox Style="{DynamicResource ThemedComboBox}" Width="62" Margin="6,0,0,0"
                                                   ItemsSource="{Binding DayOptions}" SelectedItem="{Binding Day, Mode=TwoWay}"
-                                                  AutomationProperties.Name="Day" />
+                                                  AutomationProperties.Name="{Binding Number, StringFormat='Line {0} day'}" />
                                     </StackPanel>
                                 </StackPanel>
                             </StackPanel>
@@ -106,16 +106,16 @@
                                 <TextBox Style="{DynamicResource Input}" Height="30" VerticalContentAlignment="Center"
                                          Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
                                          Loaded="LineText_Loaded"
-                                         AutomationProperties.Name="Line text"
+                                         AutomationProperties.Name="{Binding Number, StringFormat='Line {0} text'}"
                                          ToolTip="What the Desk says. Plain text: the look below adds the effects." />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Bottom">
                                 <Button Style="{DynamicResource FlatButton}" Content="Up" Padding="9,5" Margin="0,0,4,0" Height="30"
-                                        Command="{Binding MoveUpCommand}" AutomationProperties.Name="Move this line up" />
+                                        Command="{Binding MoveUpCommand}" AutomationProperties.Name="{Binding Number, StringFormat='Move line {0} up'}" />
                                 <Button Style="{DynamicResource FlatButton}" Content="Down" Padding="9,5" Margin="0,0,4,0" Height="30"
-                                        Command="{Binding MoveDownCommand}" AutomationProperties.Name="Move this line down" />
+                                        Command="{Binding MoveDownCommand}" AutomationProperties.Name="{Binding Number, StringFormat='Move line {0} down'}" />
                                 <Button Style="{DynamicResource FlatButton}" Content="Remove" Padding="9,5" Margin="0" Height="30"
-                                        Command="{Binding RemoveCommand}" AutomationProperties.Name="Remove this line" />
+                                        Command="{Binding RemoveCommand}" AutomationProperties.Name="{Binding Number, StringFormat='Remove line {0}'}" />
                             </StackPanel>
                         </Grid>
                         <WrapPanel Margin="0,8,0,0">
@@ -124,12 +124,12 @@
                                 <StackPanel Orientation="Horizontal">
                                     <ComboBox Style="{DynamicResource ThemedComboBox}" Width="136"
                                               ItemsSource="{Binding ColorOptions}" SelectedItem="{Binding Color, Mode=TwoWay}"
-                                              AutomationProperties.Name="Line color" />
+                                              AutomationProperties.Name="{Binding Number, StringFormat='Line {0} color'}" />
                                     <TextBox Style="{DynamicResource Input}" Width="150" Height="30" Margin="6,0,0,0"
                                              VerticalContentAlignment="Center" FontFamily="Cascadia Code, Consolas"
                                              Visibility="{Binding IsCustomColor, Converter={StaticResource BoolVis}}"
                                              Text="{Binding CustomInk, UpdateSourceTrigger=PropertyChanged}"
-                                             AutomationProperties.Name="Custom line colors, hex, comma separated"
+                                             AutomationProperties.Name="{Binding Number, StringFormat='Line {0} custom colors, hex, comma separated'}"
                                              ToolTip="One to four hex colors. Two or more make a gradient." />
                                 </StackPanel>
                             </StackPanel>
@@ -137,25 +137,25 @@
                                 <TextBlock Text="Glow" Style="{StaticResource RowCaption}" />
                                 <ComboBox Style="{DynamicResource ThemedComboBox}" Width="104"
                                           ItemsSource="{Binding GlowOptions}" SelectedItem="{Binding Glow, Mode=TwoWay}"
-                                          AutomationProperties.Name="Line glow" />
+                                          AutomationProperties.Name="{Binding Number, StringFormat='Line {0} glow'}" />
                             </StackPanel>
                             <StackPanel Margin="0,0,10,4">
                                 <TextBlock Text="Size" Style="{StaticResource RowCaption}" />
                                 <ComboBox Style="{DynamicResource ThemedComboBox}" Width="86"
                                           ItemsSource="{Binding SizeChoices}" SelectedItem="{Binding Size, Mode=TwoWay}"
-                                          AutomationProperties.Name="Line size" />
+                                          AutomationProperties.Name="{Binding Number, StringFormat='Line {0} size'}" />
                             </StackPanel>
                             <StackPanel Margin="0,0,10,4">
                                 <TextBlock Text="Letters" Style="{StaticResource RowCaption}" />
                                 <ComboBox Style="{DynamicResource ThemedComboBox}" Width="124"
                                           ItemsSource="{Binding LetterOptions}" SelectedItem="{Binding Letters, Mode=TwoWay}"
-                                          AutomationProperties.Name="Line letter style" />
+                                          AutomationProperties.Name="{Binding Number, StringFormat='Line {0} letter style'}" />
                             </StackPanel>
                             <StackPanel Margin="0,0,0,4">
                                 <TextBlock Text="Motion" Style="{StaticResource RowCaption}" />
                                 <ComboBox Style="{DynamicResource ThemedComboBox}" Width="150"
                                           ItemsSource="{Binding MotionChoices}" SelectedItem="{Binding Motion, Mode=TwoWay}"
-                                          AutomationProperties.Name="Line motion" />
+                                          AutomationProperties.Name="{Binding Number, StringFormat='Line {0} motion'}" />
                             </StackPanel>
                         </WrapPanel>
                         <TextBlock Margin="0,2,0,0" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
@@ -185,16 +185,16 @@
                                 <TextBox Style="{DynamicResource Input}" Height="30" VerticalContentAlignment="Center"
                                          FontFamily="Cascadia Code, Consolas"
                                          Text="{Binding RawText, UpdateSourceTrigger=PropertyChanged}"
-                                         AutomationProperties.Name="Line text, kept as written"
+                                         AutomationProperties.Name="{Binding Number, StringFormat='Line {0} text, kept as written'}"
                                          ToolTip="The editor can't set everything on this line, so it is kept exactly as written." />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
                                 <Button Style="{DynamicResource FlatButton}" Content="Up" Padding="9,5" Margin="0,0,4,0" Height="30"
-                                        Command="{Binding MoveUpCommand}" AutomationProperties.Name="Move this line up" />
+                                        Command="{Binding MoveUpCommand}" AutomationProperties.Name="{Binding Number, StringFormat='Move line {0} up'}" />
                                 <Button Style="{DynamicResource FlatButton}" Content="Down" Padding="9,5" Margin="0,0,4,0" Height="30"
-                                        Command="{Binding MoveDownCommand}" AutomationProperties.Name="Move this line down" />
+                                        Command="{Binding MoveDownCommand}" AutomationProperties.Name="{Binding Number, StringFormat='Move line {0} down'}" />
                                 <Button Style="{DynamicResource FlatButton}" Content="Remove" Padding="9,5" Margin="0" Height="30"
-                                        Command="{Binding RemoveCommand}" AutomationProperties.Name="Remove this line" />
+                                        Command="{Binding RemoveCommand}" AutomationProperties.Name="{Binding Number, StringFormat='Remove line {0}'}" />
                             </StackPanel>
                         </Grid>
                         <TextBlock Style="{StaticResource Dim}" Margin="0,4,0,0"
