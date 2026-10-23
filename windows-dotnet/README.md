@@ -254,6 +254,31 @@ The Desk (`docs/spec.md` Stages 5 and 6), off until **Settings, Desk** turns it 
   rasterizes pixel sheets to `.raster\<sheet>.png` (WPF's PNG encoder), then renames into place.
   An id keeps its source. Reset's themes part removes the folder.
 
+**The companion** (spec section 4, FORMAT 5.5 and 6): a Desk piece, `companion`, placed like any
+other and listed in `get_desk` pieces (last in `DeskArrangement.Known`, default anchor bottom right).
+It draws the sprite chosen in Settings, Widgets (`desk_companion` {pack, roam}; no pick is the first
+installed sprite). Showing it there places or hides the piece.
+
+- **Core, pure**: `CompanionSprite` reads sprite.json (stages with their own cell sizes, the
+  animation table, moods, triggers, roam); `CompanionSheet` cuts cell `i` row-major from a PNG or a
+  `.raster` PNG. `CompanionGrowth` is the curve, piecewise linear in coding days through (0, 0),
+  (3, 0.10), (10, 0.35), (30, 0.75), (60, 1): the hourglass's thresholds land on days 3, 10 and 30;
+  any pack's `min_growth` maps through the same curve (`DaysFor`). Days come from Sanduhr Time's day
+  files (`~\.sanduhr\time\days`, v1 or v2, read-only) when present, else the days with Claude Code
+  activity (dates only, never token counts). `CompanionGrowthState` (`widgets\companion.json`)
+  remembers every day seen and the highest growth, so it never goes backwards. `CompanionMoods` and
+  `CompanionBrain` give the mood from the widget's pacing and the triggers (a watcher waiting or
+  passed, an alert threshold crossed upward, 20 minutes without input); `CompanionAnimator` picks the
+  frame (a trigger once, then the mood from its first frame; 1 fps with reduce motion);
+  `CompanionPath` and `CompanionRoamer` are the route along the pack's edges and the walk/rest clock.
+- **App**: `Desk/DeskCompanion.cs`. `CompanionService` lives in the controller across redraws and runs
+  its frame timer only while a piece is in sight; growth is read off the UI thread once an hour.
+  The piece is nearest-neighbour at cell x pack scale x piece size, bottom-centre, never hit-testable.
+  Roaming, it is its own island with a `DeskIslandMotion` the host follows by moving the window
+  (OLED care's drift and dim still apply); with Windows' animations off it sits in its stack.
+- **Harness**: `--scenario companion` installs the hourglass into the dev profile and draws each stage,
+  a trigger, a mood, a roaming frame and Settings, Widgets.
+
 ---
 
 ## Tech stack
