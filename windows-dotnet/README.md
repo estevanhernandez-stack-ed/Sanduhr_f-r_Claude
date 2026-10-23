@@ -235,6 +235,25 @@ The Desk (`docs/spec.md` Stages 5 and 6), off until **Settings, Desk** turns it 
 - New keys: `desk_ink`, `desk_message`, `desk_weather`, `now_playing`, and the glow group's
   `target`, `edge_side`, `edge_monitor`. Reset removes `messages.txt` with the settings.
 
+### 3.8 (in progress): the widget catalog
+
+`docs/widgets-3.8-spec.md` sections 2 and 3. **Settings, Widgets** (Desk group) lists the signed
+`sanduhr-widgets` catalog and the installed packs, and installs, updates and uninstalls them.
+
+- **Fetch** (`Services/WidgetCatalogService.cs`, the app only, never `Sanduhr.Mcp`): `catalog.json`,
+  `.sig` and `.sig2` from the latest release, only when the page opens or on Check the catalog
+  again; a pack zip only on Install or Update. Redirects are followed by hand, https only, to
+  `github.com` and GitHub's asset hosts; every body has a size cap and every request a timeout.
+- **Checks** (Core, pure, FORMAT 7's order): `WidgetCatalog` verifies an ECDSA P-256 / SHA-256
+  P1363 signature against the pinned keys before parsing, parses strictly, refuses a rollback by
+  `generated_at`, checks `sanduhr_min`, size and SHA-256; `WidgetZip` reads the stored-only zip
+  without inflating (limits checked from the directory first, then per entry); `PackValidator`
+  re-validates strict. `WidgetCatalogClient` runs the steps.
+- **Disk** (`WidgetStore`): `%LOCALAPPDATA%\Sanduhr\widgets\<id>\` plus `widgets.json` (id, version,
+  source, installed_at, enabled, and the newest catalog seen). Install stages under `.staging\`,
+  rasterizes pixel sheets to `.raster\<sheet>.png` (WPF's PNG encoder), then renames into place.
+  An id keeps its source. Reset's themes part removes the folder.
+
 ---
 
 ## Tech stack
