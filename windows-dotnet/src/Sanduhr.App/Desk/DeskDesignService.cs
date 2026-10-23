@@ -236,7 +236,7 @@ internal sealed class DeskDesignService : IDisposable
 
     /// <summary>The Desk as it is now, as a full design (the settings and the active theme).</summary>
     internal DeskDesign CurrentDesign() =>
-        DeskState.Current(_store.LoadDesk(), _store.LoadDeskInk(), _store.LoadLauncher(), ActiveTheme());
+        DeskState.Current(_store.LoadDesk(), _store.LoadDeskInk(), _store.LoadLauncher(), ActiveTheme(), _store.LoadDeskWeather().Nickname);
 
     /// <summary>What the widget's own check of a request knows about this PC.</summary>
     private DeskDesignContext Context()
@@ -490,6 +490,13 @@ internal sealed class DeskDesignService : IDisposable
         if (next.Desk.Plate != desk.Plate) _store.SaveDeskPlate(next.Desk.Plate);
         if (next.Ink != ink) _store.SaveDeskInk(next.Ink);
         if (next.Launcher.ToJson().ToJsonString() != launcher.ToJson().ToJsonString()) _store.SaveLauncher(next.Launcher);
+        // The weather nickname (#315) is the one part of desk_weather a design may set; the place and the unit stay the user's.
+        if (next.WeatherNickname is { } nickname)
+        {
+            var weather = _store.LoadDeskWeather();
+            var nick = DeskWeatherSettings.NormalizeNickname(nickname);
+            if (nick != weather.Nickname) _store.SaveDeskWeather(weather with { Nickname = nick });
+        }
 
         if (!withTheme || merged.Theme is not { } theme) return null;
         var map = ThemeMap();

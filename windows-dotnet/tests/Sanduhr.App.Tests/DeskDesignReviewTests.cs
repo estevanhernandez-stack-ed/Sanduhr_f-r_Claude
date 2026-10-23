@@ -569,4 +569,35 @@ public sealed class DeskDesignReviewTests : IDisposable
         Assert.Equal("end", host.Calls[^1]);
         SameLayout("clock:bl claude:bl", _store.LoadDesk().Layout);
     }
+
+    // ---- 3.8 ride-alongs: the weather nickname (#315) and the fold (#314) go through the same review ----
+
+    [Fact]
+    public void ANicknameAndASlantArePreviewedFromMemoryAndWrittenOnlyOnApply()
+    {
+        var place = WeatherPlace.Create("Fort Worth", "Texas", "United States", 32.7555, -97.3308);
+        _store.SaveDeskWeather(new DeskWeatherSettings(place, WeatherUnit.Fahrenheit));
+        WithService((s, host) =>
+        {
+            Send(s, "f1", """{"name":"Neon Column","layout":{"clock":{"tilt":-18}},"weather":{"nickname":"Funky Town"}}""");
+            Assert.Equal("previewing", ResultStatus);
+            var changes = Result()["result"]!["changes"]!.AsArray().Select(n => (string)n!).ToList();
+            Assert.Contains("Weather: shown as “Funky Town”", changes);
+            Assert.Contains(changes, c => c.EndsWith("slant 0° to -18°", StringComparison.Ordinal));
+            Assert.Equal("Funky Town", host.Previewed!.WeatherNickname);
+            Assert.Equal(-18, new DeskArrangement(host.Previewed.Desk.Layout).StackTilt(DeskAnchor.BL));
+            Assert.Equal("", _store.LoadDeskWeather().Nickname);   // the review wrote nothing
+            Assert.Equal(0, new DeskArrangement(_store.LoadDesk().Layout).StackTilt(DeskAnchor.BL));
+
+            host.Apply!();
+            Assert.Equal("applied", ResultStatus);
+            var weather = _store.LoadDeskWeather();
+            Assert.Equal("Funky Town", weather.Nickname);
+            Assert.Equal(place, weather.Place);   // the forecast still asks for the picked city
+            var layout = new DeskArrangement(_store.LoadDesk().Layout);
+            Assert.Equal(-18, layout.Placement("clock")!.Tilt);
+            Assert.Equal(-18, layout.Placement("claude")!.Tilt);   // one slant per stack
+            Assert.Equal("Funky Town", (string?)s.CurrentDesign().ToJson()["weather"]!["nickname"]);
+        });
+    }
 }

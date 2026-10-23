@@ -53,7 +53,9 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     /// can't cancel it (spec 7.3; the S7 live run's r2).</summary>
     private readonly DeskArrangeGesture<Drag> _gesture = new();
     private Drag? _drag => _gesture.Current;
-    private Rectangle? _ghost;
+    private Shape? _ghost;
+    /// <summary>Each piece's outline as drawn (its stack's slant included, #314): what a press hits and what the outline traces.</summary>
+    private IReadOnlyDictionary<string, DeskQuad> _quads = new Dictionary<string, DeskQuad>();
 
     private sealed record Drag(string Widget, Size Size, Vector Grab, DeskAnchor? Own);
 
@@ -160,6 +162,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         };
         view.Update(_frame, DeskInkMap.Light);
         _rects = view.PieceFrames();
+        _quads = view.PieceQuads();
         _frames = _rects.ToDictionary(kv => kv.Key, kv => new DeskRect(kv.Value.X, kv.Value.Y, kv.Value.Width, kv.Value.Height));
         _content = view.ContentRect;
         if (_view is { } old)
@@ -245,7 +248,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
             var tag = new TextBlock { Text = name, FontSize = 12, FontWeight = FontWeights.SemiBold };
             tag.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             double tagWidth = tag.DesiredSize.Width + 14, tagHeight = tag.DesiredSize.Height + 4;
-            double y = r.Y - OutlinePad - tagHeight - 3;
+            double y = TagTop(widget, r) - OutlinePad - tagHeight - 3;
             if (y < 2) y = r.Bottom + OutlinePad + 3;
             double hideLeft = Math.Max(2, r.X - OutlinePad) + tagWidth + 4;
             Canvas.SetLeft(hide, hideLeft);
@@ -334,16 +337,11 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         foreach (var (widget, r) in _rects)
         {
             var name = SettingsNames.DeskPieceName(widget);
-            var outline = new Rectangle
-            {
-                Width = r.Width + OutlinePad * 2,
-                Height = r.Height + OutlinePad * 2,
-                RadiusX = 8,
-                RadiusY = 8,
-                StrokeThickness = 1.5,
-                StrokeDashArray = [4, 3],
-                Fill = Brushes.Transparent,
-            };
+            // A slanted piece is outlined along its slant; an upright one keeps the rounded rectangle.
+            var outline = OutlineShape(widget, r);
+            outline.StrokeThickness = 1.5;
+            outline.StrokeDashArray = [4, 3];
+            outline.Fill = Brushes.Transparent;
             Ref(outline, Shape.StrokeProperty, "Sanduhr.Brush.Accent");
             AutomationProperties.SetName(outline, name + ", piece");
             Canvas.SetLeft(outline, r.X - OutlinePad);
@@ -362,7 +360,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
             Ref(label, Border.BackgroundProperty, "Sanduhr.Brush.Bg");
             AutomationProperties.SetName(label, name);
             label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            double y = r.Y - OutlinePad - label.DesiredSize.Height - 3;
+            double y = TagTop(widget, r) - OutlinePad - label.DesiredSize.Height - 3;
             if (y < 2) y = r.Bottom + OutlinePad + 3;
             Canvas.SetLeft(label, Math.Max(2, r.X - OutlinePad));
             Canvas.SetTop(label, y);
@@ -415,20 +413,40 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         return false;
     }
 
-    /// <summary>The piece under <paramref name="p"/> (its frame grown by the outline's pad); the smallest
+    /// <summary>The piece under <paramref name="p"/> (its outline as drawn, slant included, grown by the outline's pad); the smallest
     /// when pieces overlap.</summary>
-    private string? PieceAt(Point p)
+    internal string? PieceAt(Point p)
     {
         string? best = null;
         double area = double.PositiveInfinity;
         foreach (var (widget, r) in _rects)
         {
-            var hit = new Rect(r.X - OutlinePad, r.Y - OutlinePad, r.Width + OutlinePad * 2, r.Height + OutlinePad * 2);
-            if (!hit.Contains(p) || hit.Width * hit.Height >= area) continue;
+            var quad = DeskFold.Grow(_quads.TryGetValue(widget, out var q) ? q : DeskQuad.Of(new DeskRect(r.X, r.Y, r.Width, r.Height)), OutlinePad);
+            double a = DeskFold.Area(quad);
+            if (!DeskFold.Contains(quad, p.X, p.Y) || a >= area) continue;
             best = widget;
-            area = hit.Width * hit.Height;
+            area = a;
         }
         return best;
+    }
+
+    /// <summary>Where a piece's name tag hangs from: its top left corner as drawn, so a slanted piece's tag sits on its own corner
+    /// rather than at the top of the box around the slant.</summary>
+    private double TagTop(string widget, Rect r) => _quads.TryGetValue(widget, out var q) ? q.TopLeft.Y : r.Y;
+
+    /// <summary>The outline of a piece whose frame is <paramref name="r"/>, grown by the pad and placed at the grown frame's top left:
+    /// a rounded rectangle for an upright piece, the slanted quad for a piece in a slanted stack.</summary>
+    private Shape OutlineShape(string widget, Rect r)
+    {
+        if (_quads.TryGetValue(widget, out var q) && !q.IsUpright)
+        {
+            var g = DeskFold.Grow(q, OutlinePad);
+            double ox = r.X - OutlinePad, oy = r.Y - OutlinePad;
+            var poly = new Polygon { StrokeLineJoin = PenLineJoin.Round };
+            foreach (var c in g.Corners) poly.Points.Add(new Point(c.X - ox, c.Y - oy));
+            return poly;
+        }
+        return new Rectangle { Width = r.Width + OutlinePad * 2, Height = r.Height + OutlinePad * 2, RadiusX = 8, RadiusY = 8 };
     }
 
     /// <summary>Starts dragging <paramref name="widget"/>, grabbed at <paramref name="at"/>: a ghost the size of the piece follows.</summary>
@@ -437,16 +455,11 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         if (!_rects.TryGetValue(widget, out var r)) return;
         CancelDrag();
         _gesture.Down(new Drag(widget, r.Size, at - r.TopLeft, _working.Placement(widget)?.Anchor));
-        _ghost = new Rectangle
-        {
-            Width = r.Width + OutlinePad * 2,
-            Height = r.Height + OutlinePad * 2,
-            RadiusX = 8,
-            RadiusY = 8,
-            StrokeThickness = 2,
-            Opacity = 0.85,
-            IsHitTestVisible = false,
-        };
+        // The ghost is the piece's outline as drawn: slanted with its stack (#314).
+        _ghost = OutlineShape(widget, r);
+        _ghost.StrokeThickness = 2;
+        _ghost.Opacity = 0.85;
+        _ghost.IsHitTestVisible = false;
         _ghost.Fill = GhostFill;
         Ref(_ghost, Shape.StrokeProperty, "Sanduhr.Brush.Accent");
         _adorn.Children.Add(_ghost);
