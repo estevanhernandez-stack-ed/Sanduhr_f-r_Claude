@@ -99,6 +99,14 @@
          exactly what the widget would. The widget owns every write: the saved looks, the handoff files and the file for the mod
          are NowPlayingLookStore and NowPlayingLookHandoff, which stay out of the server. -->
     <Compile Include="..\Sanduhr.Core\NowPlayingLook.cs" Link="Core\NowPlayingLook.cs" />
+    <!-- propose_widget (3.8, widgets made with Claude; spec docs/widgets-3.8-spec.md section 2): the widget pack validator,
+         so the server refuses exactly what the widget's install would, before anything is written. Two files, both pure
+         (bytes in, findings out: JSON, regex, PNG chunk and CRC parsing, in-memory zlib; no disk, no network, no
+         credentials, no process). PackJson: the strict reader and the reference's message formatting. PackValidator: every
+         rule of the pack format, composing ThemeLint for theme packs. The pixel-sheet rasterizer stays out: the server
+         validates, the widget draws. The widget owns every write (the widgets folder, the handoff result). -->
+    <Compile Include="..\Sanduhr.Core\PackJson.cs" Link="Core\PackJson.cs" />
+    <Compile Include="..\Sanduhr.Core\PackValidator.cs" Link="Core\PackValidator.cs" />
   </ItemGroup>
 
 </Project>

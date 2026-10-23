@@ -70,7 +70,14 @@ public class TrustBoundaryTests
                 // decode and the result shape, so the server refuses exactly what the widget would. The widget owns every write
                 // (the saved looks, the handoff files, the file for the mod); the server queues the request file only.
                 "NowPlayingLook.cs",
-                "Pacing.cs", "SnapshotContract.cs",
+                "Pacing.cs",
+                // propose_widget (3.8, widgets made with Claude). Two files, pure (bytes in, findings out: JSON, regex, PNG
+                // chunks and CRCs, in-memory zlib; no disk, network, credentials or process), so the server refuses exactly
+                // the pack the widget's install would. The rasterizer and every write stay with the widget.
+                //   PackJson: the strict reader (duplicate keys, ints apart from floats) and the reference's message format.
+                //   PackValidator: every rule of the sanduhr-widgets pack format, composing ThemeLint for theme packs.
+                "PackJson.cs", "PackValidator.cs",
+                "SnapshotContract.cs",
                 // propose_theme: the lint and the model it builds, both pure. The
                 // widget owns every write under the themes folder.
                 "ThemeLint.cs", "ThemeModel.cs", "TierModel.cs",
@@ -106,6 +113,8 @@ public class TrustBoundaryTests
     [InlineData("LauncherTarget.cs")]
     [InlineData("LauncherModel.cs")]
     [InlineData("NowPlayingLook.cs")]
+    [InlineData("PackJson.cs")]
+    [InlineData("PackValidator.cs")]
     public void Files_linked_for_watchers_desk_messages_and_desk_designs_are_pure(string file)
     {
         string path = Path.Combine(Path.GetDirectoryName(McpCsprojPath())!, "..", "Sanduhr.Core", file);
@@ -141,6 +150,17 @@ public class TrustBoundaryTests
         foreach (var name in new[] { "NowPlayingLookStore", "NowPlayingLookHandoff", "NowPlayingLookPaths", "MessageFileIo" })
             Assert.DoesNotContain(name, typeNames);
         Assert.Contains("NowPlayingLookCheck", typeNames);   // and the checks are
+    }
+
+    /// <summary>The server validates a widget pack and never draws one: the validator is in, the pixel-sheet rasterizer
+    /// is not.</summary>
+    [Fact]
+    public void The_pack_validator_is_in_the_mcp_assembly_and_the_rasterizer_is_not()
+    {
+        var typeNames = typeof(Sanduhr.Mcp.McpServer).Assembly.GetTypes().Select(t => t.Name).ToHashSet();
+        Assert.Contains("PackValidator", typeNames);
+        Assert.DoesNotContain("PixelSheet", typeNames);
+        Assert.DoesNotContain("PixelSheetImage", typeNames);
     }
 
     [Fact]
