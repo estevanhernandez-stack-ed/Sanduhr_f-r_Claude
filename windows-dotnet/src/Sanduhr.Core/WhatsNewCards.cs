@@ -7,7 +7,45 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class WhatsNewCards
 {
-    public static IReadOnlyList<WhatsNewCard> Table { get; } = [.. Release371(), .. Release360(), .. Release350()];
+    public static IReadOnlyList<WhatsNewCard> Table { get; } = [.. Release380(), .. Release371(), .. Release360(), .. Release350()];
+
+    // 3.8.0: the Store goes 3.7.1 to 3.8.0 (3.7.2 was a GitHub-only patch with no cards). Seven cards
+    // fill the cap of eight.
+    private static WhatsNewCard[] Release380() =>
+    [
+        WhatsNewCard.Of("3.8.0", "widgets", "Widgets for your Desk",
+            "Settings, Widgets installs packs from the 626 Labs catalog: sprites, themes, palettes and effects. Packs are data only, signed, and checked again before they install.",
+            "", // Puzzle
+            WhatsNewPreview.None, SettingsPage.Widgets),
+        WhatsNewCard.Of("3.8.0", "companion", "A companion on your Desk",
+            "A pixel hourglass sits on your Desk, grows with the days you code and reacts to your pace. Show it and let it roam in Settings, Widgets.",
+            "", // Emoji
+            WhatsNewPreview.None, SettingsPage.Widgets),
+        WhatsNewCard.Of("3.8.0", "claude-widgets", "Claude can make you a widget",
+            "Ask Claude Code for a pixel sprite, a palette or effects. It previews on your Desk and installs only when you choose Apply.",
+            "", // Robot
+            WhatsNewPreview.None, SettingsPage.Widgets),
+        WhatsNewCard.Of("3.8.0", "restart-to-update", "Restart to update",
+            "When an update is ready, Sanduhr asks, then closes, installs it and opens on the new version. Nothing happens until you click.",
+            "", // UpdateRestore
+            WhatsNewPreview.None, SettingsPage.About),
+        WhatsNewCard.Of("3.8.0", "desk-fold", "Fold your Desk",
+            "Claude Code can slant a stack of Desk pieces up to 20 degrees, so two stacks read as the faces of a fold. Ask for it in a Desk design.",
+            "", // Rotate
+            WhatsNewPreview.None, SettingsPage.Desk),
+        WhatsNewCard.Of("3.8.0", "weather-nickname", "Call the weather anything",
+            "Show it as, in Settings, Weather, puts a name like Funky Town on the weather piece instead of the city. The name never leaves your PC.",
+            "", // Rename
+            WhatsNewPreview.None, SettingsPage.Weather),
+        WhatsNewCard.Of("3.8.0", "livelier-bars", "Livelier bars",
+            "The bars beside now playing ease, fall and wear peak caps, and Gradient bars spreads your ink across them. They still read a level only, never the audio.",
+            "", // Equalizer
+            WhatsNewPreview.None, SettingsPage.NowPlaying),
+        WhatsNewCard.Of("3.8.0", "meter-styles", "Meters that fit",
+            "The Claude line, your limits and the system readings come as bars, slim lines, rings or ticks, with pace marks on every one. Set them in Settings, Desk.",
+            "", // SpeedMedium
+            WhatsNewPreview.None, SettingsPage.Desk),
+    ];
 
     private static WhatsNewCard[] Release371() =>
     [

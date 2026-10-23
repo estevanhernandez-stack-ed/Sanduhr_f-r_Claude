@@ -1,5 +1,44 @@
 # Changelog
 
+## v3.8.0 — 2026-10-XX
+
+**Platform:** Windows (.NET 10 / WPF). Widgets come to the Desk: signed packs from the 626 Labs catalog, a companion that grows with the days you code, and widgets Claude Code makes with you that install only on Apply. Updates restart on your click. This is the Microsoft Store release: the Store was on 3.7.1, and 3.7.2 shipped on GitHub only, so the Store update carries 3.7.2's fixes too. `Sanduhr.Mcp` to 3.8.0. **One new outbound destination**, GitHub releases of `626Labs-LLC/sanduhr-widgets`, reached only when you open Settings ▸ Widgets or install a pack (PRIVACY has the hosts). No new capability; the manifest still declares `runFullTrust` only and changes only its version.
+
+### Widgets
+
+- **Settings ▸ Widgets** (in the Desk group) lists the widget catalog and the packs you have, with Install, Update and Uninstall. The first packs are the hourglass sprite and the OLED Neon theme, palettes and effects. Themes, palettes, effects and fonts from packs join the lists you already pick from.
+- **The catalog is signed and every pack is checked again on your PC.** Sanduhr verifies the catalog's ECDSA P-256 signature against a key built into the app before it reads a byte of it, refuses an older catalog served back, checks each zip's size and SHA-256 against the catalog, reads the zip without inflating anything, and runs the whole pack through `PackValidator` before it is renamed into `%LOCALAPPDATA%\Sanduhr\widgets\`. Packs are data only: JSON, PNG and fonts, never code.
+- **Only when you ask.** The catalog is fetched when you open Settings ▸ Widgets or press **Check the catalog again**; a pack downloads only on Install or Update. Nothing polls in the background, and no account, cookie or identifier goes with the request (the user agent is just "Sanduhr"). Offline, or with a catalog that fails its check, the page says so and installs nothing.
+
+### The companion
+
+- **A new Desk piece, `companion`,** draws the sprite you pick in Settings ▸ Widgets: pixel art at whole-pixel scale, sitting at its anchor or, with **Let it roam**, walking the edges of its monitor. OLED care's drift and dim apply to it; with Windows' animations off it stays put and animates at 1 frame a second.
+- **It grows with the days you code, never with your usage.** Growth reads Sanduhr Time's day files when they are there, otherwise the dates your local Claude Code logs show activity; the hourglass reaches its stages at about 3, 10 and 30 coding days and never goes backwards. Its mood follows your pace (content, focused, worried, exhausted at the limit), and it reacts to a watcher waiting on you or passing, an alert threshold, a reset and 20 minutes away.
+
+### Widgets made with Claude
+
+- **A new MCP tool, `propose_widget`.** Claude Code can design a pixel-art sprite (drawn as text: a palette of up to 16 colors and rows of characters, 8 to 32 pixels a side), palettes or effect presets in conversation. The server builds the pack, names it `my-<id>` so it can never replace a catalog pack, and checks it with the catalog's own rules, the trademark rule included, before anything is written. It never accepts a PNG, a font or code; a theme still goes through `propose_theme`.
+- **It previews, then waits for Apply.** A sprite shows as the companion and a palette as the Desk ink, under a bar that says what the widget is and lists its files, with **Apply** and **Dismiss**. Nothing installs until Apply, and **Let Claude change the Desk directly** never covers a widget.
+- **Use my own art…** on a sprite made here takes your own PNG sprite sheet per stage, checks it with the pack image rules, and checks the whole pack again. Your art stays on your PC; Claude never supplies an image.
+- **The trust boundary, widened on purpose.** `sanduhr-mcp` now source-links 30 Core files (was 27): `PackJson`, `PackValidator` and `WidgetProposal`, all pure (bytes in, findings out). The pixel-sheet rasterizer stays in the app. Still no project or package reference and no network; `TrustBoundaryTests` pins the list and scans the new files for IO, network and process names.
+
+### Restart to update
+
+- **One offer, on your click.** When an update is ready, the toast, the tray and the widget say "Sanduhr 3.x is ready. Restart to update?" On yes, Sanduhr closes its WebView2 browsers and waits for them, then asks the Store to install (Windows shows its own dialog) or applies the downloaded update, and opens again on the new version. If the install fails or you cancel, Sanduhr keeps running and the offer stays. It replaces **Quit and update**.
+- **Setup.exe installs update themselves from 3.8.** Before 3.8 the update check only noted a newer release in the log. Now it downloads the release in the background, at most once a day, and joins the same offer. A 3.7.x Setup.exe install needs this release's Setup.exe once.
+
+### The Desk
+
+- **The fold.** A Desk design from Claude Code can slant a stack of pieces from -20 to 20 degrees, plate included, so a left stack and a right stack read as two faces of a fold. Arrange Desk hit-tests, outlines and drags the slanted piece. Older layouts read and write unchanged.
+- **Call the weather anything** (#315). Settings ▸ Weather ▸ **Show it as** puts a name of up to 24 characters ("Funky Town") on the weather piece in place of the city. The place search and the forecast never see it, and a Desk design can set it under the same review.
+- **Livelier bars.** The bars beside now playing ease up and down, fall at a steady rate and wear peak caps that hold, then drop. **Gradient bars** (Settings ▸ Now playing, off by default) spreads your ink's colors across the row. Still the playing app's level only: no audio is captured.
+- **Meter styles:** the Claude line, the Claude limits and the system readings each take a style: bars, slim (half the height, one line), rings (small arc gauges side by side) or ticks (ten cells, the OLED-friendly one). Pace marks stay on every style. Pick them in Settings ▸ Desk or ask for them in a Desk design; a slanted stack stays inside its column.
+
+### Fixes
+
+- **The usage connection rebuilds itself** (#331). When the WebView2 browser behind the widget exited, 3.7.1 showed "The WebView control is no longer valid" and never fetched again. Sanduhr now notices the exit, shows "Reconnecting…", and rebuilds the browser 5 seconds later (30 seconds after a failed try, then every 5 minutes); after two failed rebuilds the widget offers **Restart**.
+- **From 3.7.2, for Store installs:** WebView2 no longer outlives Sanduhr and blocks the next update (0x80073D02); only one Sanduhr runs at a time; choosing a theme with a screen reader, voice access or the arrow keys applies it (#316); each Claude Code folder's controls and each Desk message line are named for screen readers; Now playing names a web app the way the Start menu does (#317); Launcher labels draw whole up to 24 characters (#318); the design review bar and Arrange Desk's bar open on the monitor the change is on (#319). Details under v3.7.2 below.
+
 ## v3.7.2 — 2026-10-22
 
 **Platform:** Windows (.NET 10 / WPF). A patch on GitHub (Setup.exe) only; Store installs get these fixes in 3.8. `Sanduhr.Mcp` to 3.7.2: a Core file it already links gained a pure rule; the link list is unchanged. No new capability and no new outbound destination; the manifest still declares `runFullTrust` only.

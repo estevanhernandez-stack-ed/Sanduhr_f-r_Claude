@@ -1,6 +1,6 @@
 ## Sanduhr für Claude 3.6.0 (Windows)
 
-**Download:** [`626Labs.Sanduhr-win-Setup.exe`](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v3.6.0/626Labs.Sanduhr-win-Setup.exe) (per-user install, updates itself). Existing Setup.exe installs update on their own within about a day. **This release is GitHub-only:** Microsoft Store installs stay on 3.5.0, and the Store's next update is 3.7.1. The `.msix` on this page is an unsigned build artifact and will not install by double-click; see [INSTALL.md](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/blob/main/INSTALL.md).
+**Download:** [`626Labs.Sanduhr-win-Setup.exe`](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v3.6.0/626Labs.Sanduhr-win-Setup.exe) (per-user install, updates itself). To update a Setup.exe install, download the new Setup.exe and run it; from 3.8 on, updates download and apply in the app. **This release is GitHub-only:** Microsoft Store installs stay on 3.5.0, and the Store's next update is 3.7.1. The `.msix` on this page is an unsigned build artifact and will not install by double-click; see [INSTALL.md](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/blob/main/INSTALL.md).
 
 ### What's new
 
