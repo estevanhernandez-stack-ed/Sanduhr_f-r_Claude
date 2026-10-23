@@ -80,6 +80,8 @@
             <StackPanel x:Name="Warnings" Margin="0,8,0,0" Visibility="Collapsed" />
             <TextBlock x:Name="DeskOff" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,10,0,0"
                        Visibility="Collapsed" Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+            <CheckBox x:Name="OptionBox" Margin="0,12,0,0" IsChecked="True" Visibility="Collapsed" FontSize="12.5"
+                      Foreground="{DynamicResource Sanduhr.Brush.Text}" />
             <TextBlock x:Name="Keys" FontSize="12" TextWrapping="Wrap" Margin="0,12,0,0"
                        AutomationProperties.LiveSetting="Polite"
                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />

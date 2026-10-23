@@ -181,12 +181,17 @@ public static partial class ResetPlan
             AddFile(history, Path.Combine(dir, NowPlayingLookProposal.ResultFile));
             AddFile(history, Path.Combine(dir, NowPlayingLookProposal.CurrentFile));
             AddFile(history, Path.Combine(dir, NowPlayingLookProposal.OfferFile));
+            // The widget handoff (3.8, propose_widget): the request Claude's pack waits in and the widget's answer. By name, like
+            // every file in ~\.sanduhr (shared ground). The packs it installs live in the widgets folder, below.
+            AddFile(history, Path.Combine(dir, WidgetProposal.RequestFile));
+            AddFile(history, Path.Combine(dir, WidgetProposal.ResultFile));
         }
         map[ResetPart.History] = Finish(history, backups);
 
         var themes = new List<ResetItem>();
         AddDir(themes, paths.ThemesDir);
-        // Installed widget packs and widgets.json (spec 3.8, section 3): themes, palettes, effects, fonts and sprites.
+        // Installed widget packs and widgets.json (spec 3.8, section 3): themes, palettes, effects, fonts and sprites, the packs
+        // made here (Claude's and the user's own art) and a pack staged for review (.preview) with them.
         AddDir(themes, paths.WidgetsDir);
         map[ResetPart.Themes] = Finish(themes, backups);
 

@@ -40,6 +40,19 @@ public sealed record DeskReviewModel(
     bool DeskOff,
     IReadOnlyList<string> Warnings)
 {
+    /// <summary>The small line over the title; null is the Desk design's ("Claude suggests a Desk design"). A widget under review
+    /// (spec 3.8 section 5) says "Claude suggests a widget · name".</summary>
+    public string? Heading { get; init; }
+
+    /// <summary>The header over the lines; null is "What changed".</summary>
+    public string? ChangesTitle { get; init; }
+
+    /// <summary>The bar's and its window's accessible name; null is <see cref="DeskReviewCopy.BarName"/>.</summary>
+    public string? BarName { get; init; }
+
+    /// <summary>One choice the user makes with Apply, as a check box (a Claude-made sprite's "Make it the companion"); null for none.</summary>
+    public string? Option { get; init; }
+
     /// <summary>Apply is available once every font the design names is installed.</summary>
     public bool CanApply => MissingFonts.Count == 0;
 
