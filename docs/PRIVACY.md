@@ -138,6 +138,8 @@ No account, key, cookie, identifier, machine name or app version goes with eithe
 
 No account, key, cookie, identifier, machine name or app version goes with these requests (the user agent is just "Sanduhr"), and nothing is uploaded. GitHub sees the request itself, as for any download. GitHub's privacy statement: <https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement>.
 
+**Updates on the GitHub (.exe) build** (Windows; not the Store build, which the Microsoft Store updates): at most once a day Sanduhr asks this project's GitHub releases whether a newer version is out and, from 3.8, downloads it in the background. Nothing installs until you click **Restart to update**. The Store build asks the Microsoft Store the same question every few hours, and installs through Windows' own dialog, also only after that click.
+
 **Only if you turn on Publish usage** (Settings ▸ Publish usage, off by default, and nothing is sent until you also set an endpoint and tick at least one home) there is a second destination, and you choose it:
 
 - The endpoint URL you enter — any absolute http(s) URL you control — receives the daily per-project token counts described in the table above, authenticated the way you configured (bearer token, a header you name, or no credential).

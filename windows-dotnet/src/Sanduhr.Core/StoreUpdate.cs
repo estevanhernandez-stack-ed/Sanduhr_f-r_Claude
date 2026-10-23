@@ -7,8 +7,7 @@ namespace Sanduhr.Core;
 /// failed install (0x80073D02) and the app keeps running the old build. Seen on
 /// 3.4.1, 2026-09-14 — the install went straight through once the widget was
 /// quit from the tray. The Velopack channel restarts itself; the Store channel
-/// had nothing, so this is the widget telling the person an update is waiting
-/// and offering to get out of the way.
+/// had nothing. 3.8 offers Restart to update when one waits (<see cref="RestartToUpdate"/>).
 ///
 /// The policy lives here, away from WinRT, so the cadence is testable without a
 /// Store, a package identity, or a clock.
@@ -25,21 +24,10 @@ public static class StoreUpdate
     /// dismissed it yesterday hears about it today.</summary>
     public static readonly TimeSpan RenotifyInterval = TimeSpan.FromHours(12);
 
-    /// <summary>The widget's status line while an update waits.</summary>
-    public const string StatusNotice = "Update waiting in the Store — quit Sanduhr to let it install";
-
-    public const string ToastTitle = "Sanduhr update waiting";
-
-    /// <summary>Toast body. Says why quitting is the fix, because "an update is
-    /// available" reads as noise next to a Store that already tried and failed.</summary>
-    public const string ToastBody =
-        "The Store cannot replace Sanduhr while it is running. Quit and it installs.";
-
-    /// <summary>Toast button argument; the activation handler matches on it.</summary>
-    public const string QuitAction = "sanduhr-quit-for-update";
-
-    /// <summary>Deep link to the Store's downloads page, where the retry lives.</summary>
-    public const string StoreUpdatesUri = "ms-windows-store://downloadsandupdates";
+    /// <summary>The toast button argument 3.4 to 3.7 used ("Quit and update"). A toast an older build
+    /// left in the notification centre still carries it; it now opens the same Restart to update as
+    /// <see cref="RestartToUpdate.RestartAction"/>, which still waits for the click.</summary>
+    public const string LegacyQuitAction = "sanduhr-quit-for-update";
 
     /// <summary>Time to ask the Store again? Only for the packaged build: the
     /// Velopack and dev builds have no Store identity, and asking would throw.

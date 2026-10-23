@@ -93,6 +93,24 @@ public class BrowserProcessGuardTests
     }
 
     [Fact]
+    public void A_restart_to_update_holds_new_browsers_until_it_is_called_off()
+    {
+        using var guard = new BrowserProcessGuard();
+        Assert.False(guard.ShuttingDown);
+
+        guard.BeginHold();
+        Assert.True(guard.ShuttingDown); // the transport refuses to start a browser
+
+        guard.EndHold(); // the install was cancelled
+        Assert.False(guard.ShuttingDown);
+
+        guard.BeginShutdown();
+        guard.BeginHold();
+        guard.EndHold();
+        Assert.True(guard.ShuttingDown); // a quit already begun stays begun
+    }
+
+    [Fact]
     public void Adopting_a_process_that_is_gone_is_refused_quietly()
     {
         using var guard = new BrowserProcessGuard();
