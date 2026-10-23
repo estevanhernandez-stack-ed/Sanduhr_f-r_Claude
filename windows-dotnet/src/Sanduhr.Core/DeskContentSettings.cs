@@ -64,9 +64,11 @@ public sealed record DeskMessageSettings(
 /// track hide at once, and hiding after the grace is now the default for everyone; it is dropped the
 /// next time the page saves. <c>style</c> is "Style what's playing" (off): the Desk draws the song in its look (a gradient and a
 /// letter style, saved or seeded from the song). <c>looks_direct</c> is "Let Claude style songs directly" (off): a look Claude
-/// proposes is saved without the card.
+/// proposes is saved without the card. <c>bars_gradient</c> is "Gradient bars" (off, spec 3.8 G): the bars spread the ink's colors
+/// across the row and fade toward their base.
 /// </summary>
-public sealed record NowPlayingSettings(bool Widget, bool KeepPaused, IReadOnlyList<string> Excluded, bool Bars, bool Style = false, bool LooksDirect = false)
+public sealed record NowPlayingSettings(bool Widget, bool KeepPaused, IReadOnlyList<string> Excluded, bool Bars, bool Style = false, bool LooksDirect = false,
+    bool BarsGradient = false)
 {
     public const string Key = "now_playing";
 
@@ -89,7 +91,8 @@ public sealed record NowPlayingSettings(bool Widget, bool KeepPaused, IReadOnlyL
             excluded,
             SettingsJson.Bool(o, "visualizer", d.Bars),
             SettingsJson.Bool(o, "style", d.Style),
-            SettingsJson.Bool(o, "looks_direct", d.LooksDirect));
+            SettingsJson.Bool(o, "looks_direct", d.LooksDirect),
+            SettingsJson.Bool(o, "bars_gradient", d.BarsGradient));
     }
 
     public JsonObject Encode()
@@ -104,6 +107,7 @@ public sealed record NowPlayingSettings(bool Widget, bool KeepPaused, IReadOnlyL
         // The looks switches are written only while on, so a settings file from before them stays as it was.
         if (Style) o["style"] = true;
         if (LooksDirect) o["looks_direct"] = true;
+        if (BarsGradient) o["bars_gradient"] = true;
         return o;
     }
 }
@@ -111,13 +115,30 @@ public sealed record NowPlayingSettings(bool Widget, bool KeepPaused, IReadOnlyL
 /// <summary>
 /// The weather piece's place (spec 6.5), settings.json <c>desk_weather</c>: the place picked in
 /// Settings, Weather (name, admin area, country and coordinates rounded to two decimals) and the unit.
-/// Absent: no place, and the unit follows the region.
+/// Absent: no place, and the unit follows the region. <c>nickname</c> (#315, "Show it as") is the name the Desk shows instead of
+/// the place's, up to <see cref="DeskDesign.WeatherNicknameMax"/> characters on one line; written only when set. It stays on this
+/// PC: the place search and the forecast never see it.
 /// </summary>
-public sealed record DeskWeatherSettings(WeatherPlace? Place, WeatherUnit? Unit)
+public sealed record DeskWeatherSettings(WeatherPlace? Place, WeatherUnit? Unit, string Nickname = "")
 {
     public const string Key = "desk_weather";
 
     public static DeskWeatherSettings Default { get; } = new(null, null);
+
+    /// <summary>A nickname as it is kept: control characters dropped, trimmed, and cut to <see cref="DeskDesign.WeatherNicknameMax"/>
+    /// characters (whole characters, never half of a pair).</summary>
+    public static string NormalizeNickname(string? raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return "";
+        var sb = new System.Text.StringBuilder(raw.Length);
+        foreach (var rune in raw.EnumerateRunes())
+            if (!System.Text.Rune.IsControl(rune) && rune.Value is not (0x2028 or 0x2029)) sb.Append(rune.ToString());
+        var runes = sb.ToString().Trim().EnumerateRunes().Take(DeskDesign.WeatherNicknameMax).Select(r => r.ToString());
+        return string.Concat(runes).Trim();
+    }
+
+    /// <summary>What the weather piece shows as its heading: the nickname when there is one, else the place's own name.</summary>
+    public string Shown(WeatherPlace place) => Nickname.Length > 0 ? Nickname : place.Name;
 
     /// <summary>The unit to ask for: the saved one, else the region's.</summary>
     public WeatherUnit UnitOr(bool isMetric) => Unit ?? Weather.DefaultUnit(isMetric);
@@ -140,7 +161,7 @@ public sealed record DeskWeatherSettings(WeatherPlace? Place, WeatherUnit? Unit)
             string? country = SettingsJson.String(o, "country", "");
             place = WeatherPlace.Create(name, admin.Length > 0 ? admin : null, country.Length > 0 ? country : null, lat, lon);
         }
-        return new DeskWeatherSettings(place, unit);
+        return new DeskWeatherSettings(place, unit, NormalizeNickname(SettingsJson.String(o, "nickname", "")));
     }
 
     public JsonObject Encode()
@@ -155,6 +176,8 @@ public sealed record DeskWeatherSettings(WeatherPlace? Place, WeatherUnit? Unit)
             o["lon"] = Math.Round(p.Lon, 2, MidpointRounding.AwayFromZero);
         }
         if (Unit is { } u) o["unit"] = u == WeatherUnit.Celsius ? "celsius" : "fahrenheit";
+        // Written only when set, so a settings file from before nicknames stays as it was.
+        if (NormalizeNickname(Nickname) is { Length: > 0 } nick) o["nickname"] = nick;
         return o;
     }
 }

@@ -41,12 +41,16 @@ internal sealed record DeskFrame
     public NowPlayingLookDraw? Look { get; init; }
     /// <summary>Draw the bars beside the track (spec 6.6).</summary>
     public bool Bars { get; init; }
+    /// <summary>Gradient bars (spec 3.8 G): the ink's colors spread across the row, each bar fading toward its base.</summary>
+    public bool BarsGradient { get; init; }
     public AudioLevelSource? Audio { get; init; }
     public TelemetrySource? Telemetry { get; init; }
     /// <summary>The weather piece: the place (null: not set up) and its latest reading.</summary>
     public WeatherPlace? Place { get; init; }
     public WeatherReading? Weather { get; init; }
     public bool WeatherOn { get; init; }
+    /// <summary>The name the weather piece shows instead of the place's (#315, "Show it as"); empty for the place's own name.</summary>
+    public string WeatherNickname { get; init; } = "";
     public IReadOnlyList<Watcher> Watchers { get; init; } = [];
     /// <summary>The Launcher piece's buttons and what they draw from (null: none to draw).</summary>
     public DeskLauncherFrame? Launcher { get; init; }
@@ -102,7 +106,24 @@ internal sealed class DeskView : Grid, IDisposable
     /// <summary>The content area the layout used, in this view's DIPs (the anchor points hang from it).</summary>
     public DeskRect ContentRect => _content;
 
-    /// <summary>Each drawn piece's frame in this view's DIPs after layout, by widget key.</summary>
+    /// <summary>Each drawn piece's outline in this view's DIPs after layout, by widget key: the four corners after its stack's
+    /// slant (the fold, #314), so Arrange Desk hit-tests and outlines what is drawn. An upright piece's quad is its frame.</summary>
+    public IReadOnlyDictionary<string, DeskQuad> PieceQuads()
+    {
+        LayOut();
+        var quads = new Dictionary<string, DeskQuad>(StringComparer.Ordinal);
+        foreach (var (widget, element) in _pieces)
+        {
+            if (element.RenderSize.Width <= 0 || element.RenderSize.Height <= 0) continue;
+            var t = element.TransformToAncestor(this);
+            var s = element.RenderSize;
+            DeskPoint P(double x, double y) { var p = t.Transform(new Point(x, y)); return new DeskPoint(p.X, p.Y); }
+            quads[widget] = new DeskQuad(P(0, 0), P(s.Width, 0), P(s.Width, s.Height), P(0, s.Height));
+        }
+        return quads;
+    }
+
+    /// <summary>Each drawn piece's frame in this view's DIPs after layout, by widget key (around its slant when its stack has one).</summary>
     public IReadOnlyDictionary<string, Rect> PieceFrames()
     {
         LayOut();
@@ -398,6 +419,9 @@ internal sealed class DeskView : Grid, IDisposable
                 }
             SpaceOut(stack);
             FrameworkElement placed = _settings.Plate ? Plated(stack, kinds, align) : stack;
+            // The fold (#314): the stack, its plate with it, slants as one face. A LayoutTransform, so the island's window is sized
+            // for the slanted stack; the host's DPI scale on the island root composes with it.
+            if (Fold(rows[i].Pieces) is { } fold) placed.LayoutTransform = fold;
             // A stack whose only real piece is the now-playing one has nothing else to hold its plate
             // up: the plate fades with the piece instead of lingering as an empty blur.
             if (stack.Children.OfType<ReflowHost>().FirstOrDefault() is { } reflow
@@ -411,6 +435,17 @@ internal sealed class DeskView : Grid, IDisposable
             grid.Children.Add(placed);
         }
         return grid;
+    }
+
+    /// <summary>The slant of a stack (#314): its first piece's tilt (the pieces of one anchor share one), as a vertical shear;
+    /// null when it stands upright.</summary>
+    internal static Transform? Fold(IReadOnlyList<DeskPlacement> stack)
+    {
+        double tilt = stack.Count == 0 ? 0 : DeskArrangement.ClampTilt(stack[0].Tilt);
+        if (tilt == 0) return null;
+        var skew = new SkewTransform(0, tilt);
+        skew.Freeze();
+        return skew;
     }
 
     /// <summary>
@@ -748,14 +783,16 @@ internal sealed class DeskView : Grid, IDisposable
             Add(Text(Weather.NoPlaceLine, size, 0.75, alignment: ta));
             return panel;
         }
+        // The nickname stands in for the place's name (#315); the forecast was still asked for with the place's coordinates.
+        string heading = string.IsNullOrWhiteSpace(_frame.WeatherNickname) ? place.Name : _frame.WeatherNickname.Trim();
         if (_frame.Weather is not { } reading)
         {
-            Add(Text(place.Name, size * 1.6, 1, bold: true, ta));
+            Add(Text(heading, size * 1.6, 1, bold: true, ta));
             Add(Text("…", size, 0.6, alignment: ta));
         }
         else
         {
-            var lines = WeatherLines.For(place, reading);
+            var lines = WeatherLines.For(place, reading, _frame.WeatherNickname);
             double dim = WeatherSchedule.IsStale(reading, _frame.Now) ? 0.5 : 1;
             Add(Text(lines.Heading, size * 1.6, dim, bold: true, ta));
             Add(Text(lines.Now, size * 1.15, 0.92 * dim, alignment: ta));
@@ -830,7 +867,7 @@ internal sealed class DeskView : Grid, IDisposable
         if (_frame.Bars && _frame.Audio is { } audio)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal };
-            var bars = BarsPiece(size, audio, look);
+            var bars = BarsPiece(size, audio, look, _frame.BarsGradient);
             bars.Margin = new Thickness(align == HorizontalAlignment.Right ? 0 : 0, 0, size * 0.6, 0);
             if (align == HorizontalAlignment.Right) { row.Children.Add(column); bars.Margin = new Thickness(size * 0.6, 0, 0, 0); row.Children.Add(bars); }
             else { row.Children.Add(bars); row.Children.Add(column); }
@@ -905,35 +942,92 @@ internal sealed class DeskView : Grid, IDisposable
         return b;
     }
 
-    /// <summary>The Command Center-style bars: the output peak level's recent history, in the ink,
-    /// rising from a baseline, redrawn on each frame of the level source (only while it runs).</summary>
-    private FrameworkElement BarsPiece(double size, AudioLevelSource audio, NowPlayingLookDraw? look = null)
+    /// <summary>
+    /// The Command Center-style bars: the output peak level's recent history, in the ink, rising from a baseline, redrawn on each
+    /// frame of the level source (only while it runs). Livelier since 3.8 (G): each bar eases up and falls off
+    /// (<see cref="AudioBarMotion"/>), and a peak cap holds over it and drops; with <paramref name="gradient"/> the ink's colors
+    /// spread across the row and each bar fades toward its base. Calm (Windows' animations off): gentler easing, no caps, and the
+    /// source ticks five times a second. A level only: no audio is captured.
+    /// </summary>
+    private FrameworkElement BarsPiece(double size, AudioLevelSource audio, NowPlayingLookDraw? look = null, bool gradient = false)
     {
         int count = audio.Bars.Levels.Count;
         double barW = Math.Max(2, size * 0.22), gap = Math.Max(1, size * 0.1);
         double height = size * 2.1;
+        double capH = Math.Max(1.5, barW * 0.4), capGap = Math.Max(1, capH * 0.6);
         var canvas = new Canvas { Width = count * (barW + gap) - gap, Height = height, VerticalAlignment = VerticalAlignment.Center };
         var rects = new Rectangle[count];
+        var caps = new Border[count];
+        var motion = new AudioBarMotion(count) { Calm = audio.Calm };
+        // The colors along the row: a song's look, or with gradient bars the ink's own stops; null draws every bar in the ink.
+        IReadOnlyList<string>? stops = look?.Stops ?? (gradient ? _ink.Stops : null);
         var ink = Ink;
         for (int i = 0; i < count; i++)
         {
-            // With a look each bar takes its place along the gradient, left to right.
-            var fill = look is null ? ink : SolidInk(NowPlayingLooks.ColorAt(look.Stops, count <= 1 ? 0 : (double)i / (count - 1)));
+            double at = count <= 1 ? 0 : (double)i / (count - 1);
+            Brush fill = stops is { Count: > 0 } ? SolidInk(NowPlayingLooks.ColorAt(stops, at)) : ink;
+            Brush capFill = fill;
+            if (gradient)
+            {
+                var top = stops is { Count: > 0 } ? Rgb(NowPlayingLooks.ColorAt(stops, at)) : (_ink.Stops.Count > 0 ? Rgb(_ink.Stops[0]) : Colors.White);
+                fill = BarFade(top);
+                var solid = new SolidColorBrush(top);
+                solid.Freeze();
+                capFill = solid;
+            }
             rects[i] = new Rectangle { Width = barW, Height = 1, Fill = fill, Opacity = _ink.TextOpacity, RadiusX = barW / 3, RadiusY = barW / 3 };
             Canvas.SetLeft(rects[i], i * (barW + gap));
             Canvas.SetBottom(rects[i], 0);
             canvas.Children.Add(rects[i]);
+            // A cap is a Border, not a Rectangle: the bars are the canvas's rectangles, the caps ride over them.
+            caps[i] = new Border
+            {
+                Width = barW, Height = capH, Background = capFill, Opacity = _ink.TextOpacity * 0.9, CornerRadius = new CornerRadius(capH / 2),
+                Visibility = motion.ShowsCaps ? Visibility.Visible : Visibility.Collapsed,
+                Tag = "cap",
+            };
+            Canvas.SetLeft(caps[i], i * (barW + gap));
+            Canvas.SetBottom(caps[i], 0);
+            canvas.Children.Add(caps[i]);
+        }
+        void Draw()
+        {
+            var heights = motion.Heights;
+            var tops = motion.Caps;
+            for (int i = 0; i < count; i++)
+            {
+                double h = Math.Max(1, heights[i] * (height - capH - capGap));
+                rects[i].Height = h;
+                if (!motion.ShowsCaps) continue;
+                // A cap sits a hair above its bar's top and never leaves the piece.
+                double capAt = Math.Min(height - capH, Math.Max(h + capGap, tops[i] * (height - capH - capGap) + capGap));
+                Canvas.SetBottom(caps[i], capAt);
+                caps[i].Visibility = tops[i] > 0.01 ? Visibility.Visible : Visibility.Hidden;
+            }
         }
         void Frame()
         {
-            var levels = audio.Bars.Levels;
-            for (int i = 0; i < count && i < levels.Count; i++)
-                rects[i].Height = Math.Max(1, levels[i] * height);
+            motion.Calm = audio.Calm;
+            if (!audio.Running && audio.Bars.IsIdle(DateTimeOffset.Now)) motion.Reset();
+            else motion.Step(audio.Bars.Levels);
+            Draw();
         }
-        Frame();
+        // The first draw starts where the levels are, so a redraw mid-song does not grow the bars from nothing.
+        for (int k = 0; k < 12; k++) motion.Step(audio.Bars.Levels);
+        Draw();
         audio.Frame += Frame;
         _live.Add(new Unhook(() => audio.Frame -= Frame));
         return canvas;
+    }
+
+    /// <summary>A bar's fill for gradient bars: its color at the top, fading to a third of it at the base.</summary>
+    private static Brush BarFade(Color top)
+    {
+        var g = new LinearGradientBrush { StartPoint = new Point(0.5, 0), EndPoint = new Point(0.5, 1) };
+        g.GradientStops.Add(new GradientStop(top, 0));
+        g.GradientStops.Add(new GradientStop(Color.FromArgb(0x55, top.R, top.G, top.B), 1));
+        g.Freeze();
+        return g;
     }
 
     /// <summary>The Launcher (spec, Desk Launcher): up to eight buttons in a row or a column, drawn by

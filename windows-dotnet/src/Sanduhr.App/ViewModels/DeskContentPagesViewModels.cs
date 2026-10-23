@@ -119,6 +119,7 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
     [ObservableProperty] private bool _widget;
     [ObservableProperty] private bool _keepPaused;
     [ObservableProperty] private bool _bars;
+    [ObservableProperty] private bool _barsGradient;
     [ObservableProperty] private bool _style;
     [ObservableProperty] private bool _looksDirect;
     [ObservableProperty] private string _status = "";
@@ -133,6 +134,7 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
         Widget = _saved.Widget;
         KeepPaused = _saved.KeepPaused;
         Bars = _saved.Bars;
+        BarsGradient = _saved.BarsGradient;
         Style = _saved.Style;
         LooksDirect = _saved.LooksDirect;
         _loading = false;
@@ -165,6 +167,7 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
     partial void OnWidgetChanged(bool value) { if (!_loading) Save(_saved with { Widget = value }); }
     partial void OnKeepPausedChanged(bool value) { if (!_loading) Save(_saved with { KeepPaused = value }); }
     partial void OnBarsChanged(bool value) { if (!_loading) Save(_saved with { Bars = value }); }
+    partial void OnBarsGradientChanged(bool value) { if (!_loading) Save(_saved with { BarsGradient = value }); }
     partial void OnStyleChanged(bool value) { if (!_loading) Save(_saved with { Style = value }); }
     partial void OnLooksDirectChanged(bool value) { if (!_loading) Save(_saved with { LooksDirect = value }); }
 
@@ -227,7 +230,8 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
 /// <summary>
 /// Settings, Weather (spec 6.5): type a city, Look up sends that name (and only that) to Open-Meteo's
 /// place search, pick one of the places found, choose the unit. The place's coordinates are saved
-/// rounded to about 1 km. Clear forgets the place. The piece itself is placed on the Desk page.
+/// rounded to about 1 km. Clear forgets the place. "Show it as" (#315) is a nickname the Desk shows instead of the place's
+/// name: kept on this PC only, never sent, and the forecast still uses the picked place. The piece itself is placed on the Desk page.
 /// </summary>
 public sealed partial class WeatherPageViewModel : ObservableObject
 {
@@ -242,8 +246,17 @@ public sealed partial class WeatherPageViewModel : ObservableObject
         _saved = store.LoadDeskWeather();
         _loading = true;
         Unit = Units.First(u => u.Unit == _saved.UnitOr(RegionInfo.CurrentRegion.IsMetric));
+        Nickname = _saved.Nickname;
         _loading = false;
     }
+
+    /// <summary>The nickname's longest length, for the text box.</summary>
+    public static int NicknameMax => DeskDesign.WeatherNicknameMax;
+
+    /// <summary>The hint under "Show it as": what it does, and that it is never sent.</summary>
+    public const string NicknameHint =
+        "Shown on the Desk instead of the city's name, up to 24 characters. It stays on this PC and is never sent anywhere; "
+        + "the forecast still uses the city you picked.";
 
     public sealed record UnitChoice(WeatherUnit Unit, string Name)
     {
@@ -264,6 +277,7 @@ public sealed partial class WeatherPageViewModel : ObservableObject
     [ObservableProperty] private string _note = "";
     [ObservableProperty] private UnitChoice _unit = Units[0];
     [ObservableProperty] private WeatherPlace? _picked;
+    [ObservableProperty] private string _nickname = "";
 
     public ObservableCollection<WeatherPlace> Results { get; } = [];
 
@@ -310,8 +324,20 @@ public sealed partial class WeatherPageViewModel : ObservableObject
         if (!_loading && value is not null) Save(_saved with { Unit = value.Unit });
     }
 
+    partial void OnNicknameChanged(string value)
+    {
+        if (_loading) return;
+        var nick = DeskWeatherSettings.NormalizeNickname(value);
+        // A design may have set the nickname since the page opened: compare with what is saved now.
+        _saved = _store.LoadDeskWeather();
+        if (nick != _saved.Nickname) Save(_saved with { Nickname = nick });
+    }
+
     private void Save(DeskWeatherSettings next)
     {
+        // Keep a nickname a design applied while the page was open, unless this change is to the nickname itself.
+        var stored = _store.LoadDeskWeather();
+        if (next.Nickname == _saved.Nickname && stored.Nickname != _saved.Nickname) next = next with { Nickname = stored.Nickname };
         _saved = next;
         _store.SaveDeskWeather(next);
         OnPropertyChanged(nameof(PlaceText));

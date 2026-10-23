@@ -76,7 +76,8 @@ internal sealed class TelemetrySource : IDisposable
 /// only while <see cref="Start"/>ed (the controller starts it only while a track plays and the piece is on
 /// screen). <see cref="Follow"/> names the app (the media session's AppUserModelId, held in memory only).
 /// After <see cref="AudioBars"/> says idle, it drops to one check a second until sound returns. Stopped,
-/// the meter is released and nothing ticks. A level only: no audio is captured.
+/// the meter is released and nothing ticks. With Windows' animations off (<see cref="Calm"/>) it ticks at
+/// <see cref="AudioBarMotion.CalmFrameInterval"/> and the bars stay calm. A level only: no audio is captured.
 /// </summary>
 internal sealed class AudioLevelSource : IDisposable
 {
@@ -98,6 +99,14 @@ internal sealed class AudioLevelSource : IDisposable
 
     public bool Running => _timer.IsEnabled;
 
+    /// <summary>Windows' animations are off (Settings, Accessibility, Animation effects): slower frames, no peak caps. Read at each tick.</summary>
+    public bool Calm => CalmNow();
+
+    /// <summary>Where <see cref="Calm"/> is read from; the harness and tests set it.</summary>
+    internal Func<bool> CalmNow { get; set; } = () => !System.Windows.SystemParameters.ClientAreaAnimation;
+
+    private TimeSpan Interval => Calm ? AudioBarMotion.CalmFrameInterval : AudioBars.FrameInterval;
+
     /// <summary>True when the last frame found the playing app's own audio session; false when it fell
     /// back to the loudest other session (the live check reads it). Never a title or an app id.</summary>
     internal bool FollowingApp { get; private set; }
@@ -117,7 +126,7 @@ internal sealed class AudioLevelSource : IDisposable
     {
         if (_timer.IsEnabled) return;
         _meter ??= new DeskSensorsNative.SessionPeakMeter();
-        _timer.Interval = AudioBars.FrameInterval;
+        _timer.Interval = Interval;
         _timer.Start();
     }
 
@@ -139,7 +148,7 @@ internal sealed class AudioLevelSource : IDisposable
         bool wasIdle = Bars.IsIdle(now);
         Bars.Push(peak, now);
         bool idle = Bars.IsIdle(now);
-        _timer.Interval = idle ? IdleCheck : AudioBars.FrameInterval;
+        _timer.Interval = idle ? IdleCheck : Interval;
         if (!(wasIdle && idle)) Frame?.Invoke();
     }
 

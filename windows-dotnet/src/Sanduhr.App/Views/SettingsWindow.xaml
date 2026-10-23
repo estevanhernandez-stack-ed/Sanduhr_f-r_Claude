@@ -2774,6 +2774,13 @@
                                 <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                            Text="The bars follow the loudness of the app that is playing, read from that app's Windows volume mixer level. Windows system sounds are ignored. Sanduhr never records or captures audio, and the bars stop while nothing plays." />
+                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,10,0,0"
+                                          Content="{x:Static core:SettingsNames.NowPlayingBarsGradient}" IsChecked="{Binding BarsGradient, Mode=TwoWay}"
+                                          IsEnabled="{Binding Bars}"
+                                          AutomationProperties.Name="{x:Static core:SettingsNames.NowPlayingBarsGradient}" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="Spreads the ink's colors across the bars and fades each one toward its base. Peak caps hold over the bars and drop; with Windows' animation effects off, the bars move calmly and the caps stay off." />
                             </StackPanel>
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
                             <views:NowPlayingLooksPanel views:SettingsAnchor.Id="np-looks" />
@@ -2816,6 +2823,21 @@
                                          DisplayMemberPath="Label" MaxHeight="140" Margin="0,4,0,0" Width="400" HorizontalAlignment="Left"
                                          Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Sanduhr.Brush.Text}"
                                          AutomationProperties.Name="Places found" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="230" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Static core:SettingsNames.WeatherShowAs}" FontSize="12" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <TextBox Grid.Column="1" Style="{StaticResource Input}" MaxLength="24"
+                                             Text="{Binding Nickname, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Delay=400}"
+                                             AutomationProperties.Name="{x:Static core:SettingsNames.WeatherShowAs}"
+                                             AutomationProperties.HelpText="{x:Static vm:WeatherPageViewModel.NicknameHint}" />
+                                </Grid>
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="90,4,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="{x:Static vm:WeatherPageViewModel.NicknameHint}" />
                                 <Grid Margin="0,10,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="90" />

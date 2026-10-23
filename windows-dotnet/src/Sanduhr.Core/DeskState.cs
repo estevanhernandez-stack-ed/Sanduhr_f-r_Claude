@@ -16,7 +16,8 @@ public static class DeskState
 
     /// <summary>The Desk's current look as a full design, built from the settings and the active widget theme.</summary>
     /// <param name="theme">The active theme as its JSON document (<see cref="ThemeDraft.ToJson"/>); null leaves it out.</param>
-    public static DeskDesign Current(DeskSettings desk, DeskInkSettings ink, LauncherModel launcher, JsonObject? theme)
+    /// <param name="weatherNickname">The weather piece's nickname (#315), "" or null for none; reported as <c>weather.nickname</c>.</param>
+    public static DeskDesign Current(DeskSettings desk, DeskInkSettings ink, LauncherModel launcher, JsonObject? theme, string? weatherNickname = null)
     {
         var arrangement = new DeskArrangement(desk.Layout);
         return new DeskDesign
@@ -29,6 +30,7 @@ public static class DeskState
             Shadow = ink.Shadow,
             Launcher = launcher,
             Theme = theme,
+            Weather = new DeskWeatherChange(weatherNickname ?? ""),
         };
     }
 
@@ -113,6 +115,8 @@ public static class DeskState
                 ["name_chars"] = DeskDesign.NameMax,
                 ["note_chars"] = DeskDesign.NoteMax,
                 ["piece_size"] = new JsonObject { ["min"] = DeskArrangement.MinScale, ["max"] = DeskArrangement.MaxScale },
+                ["piece_tilt"] = new JsonObject { ["min"] = DeskArrangement.MinTilt, ["max"] = DeskArrangement.MaxTilt },
+                ["weather_nickname_chars"] = DeskDesign.WeatherNicknameMax,
                 ["launcher_buttons"] = LauncherModel.MaxButtons,
                 ["launcher_label_chars"] = LauncherButton.MaxLabel,
                 ["message_lines"] = MessageProposal.MaxLines,

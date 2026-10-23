@@ -599,6 +599,57 @@ public class ToolLogicDeskDesignTests
     }
 
     [Fact]
+    public void A_design_can_slant_a_stack_and_nickname_the_weather_under_the_same_review()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg);
+        var r = Propose(cfg, """{"layout":{"clock":{"anchor":"bl","tilt":-18},"claude":{"anchor":"bl","tilt":-18}},"weather":{"nickname":"  Funky Town "}}""");
+        Assert.Equal("queued", (string?)r["status"]);
+        var request = (JsonObject)JsonNode.Parse(File.ReadAllText(cfg.DesignRequestPath!))!;
+        Assert.Equal(-18, (double?)request["design"]!["layout"]!["clock"]!["tilt"]);
+        Assert.Equal("Funky Town", (string?)request["design"]!["weather"]!["nickname"]);
+
+        var schema = ToolCatalog.Build().ToJsonString();
+        Assert.Contains("tilt: -20 to 20 degrees", schema);
+        Assert.Contains("weather {nickname}", schema);
+    }
+
+    [Theory]
+    [InlineData("""{"layout":{"clock":{"tilt":30}}}""", "layout.clock.tilt")]
+    [InlineData("""{"layout":{"clock":{"tilt":"steep"}}}""", "layout.clock.tilt")]
+    [InlineData("""{"layout":{"clock":{"anchor":"bl","tilt":10},"claude":{"anchor":"bl","tilt":-10}}}""", "layout.clock.tilt")]
+    [InlineData("""{"weather":{"nickname":"Dallas Fort Worth Metroplex Area"}}""", "weather.nickname")]
+    [InlineData("""{"weather":{"nickname":"two\nlines"}}""", "weather.nickname")]
+    [InlineData("""{"weather":{"city":"Paris"}}""", "weather")]
+    [InlineData("""{"weather":"Funky Town"}""", "weather")]
+    public void A_bad_tilt_or_nickname_is_refused_without_a_request(string design, string field)
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg);
+        var r = Propose(cfg, design);
+        Assert.Equal("rejected", (string?)r["status"]);
+        Assert.Contains(r["reasons"]!.AsArray(), x => (string?)x!["field"] == field);
+        AssertNoRequest(cfg);
+    }
+
+    [Fact]
+    public void Get_desk_passes_the_tilt_and_the_nickname_through()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg, s =>
+        {
+            s["design"]!["layout"]!["clock"]!["tilt"] = 12;
+            s["design"]!["weather"] = new JsonObject { ["nickname"] = "Funky Town" };
+        });
+        var r = new ToolLogic(cfg, () => Now).BuildGetDesk();
+        Assert.Equal(12, (double?)r["design"]!["layout"]!["clock"]!["tilt"]);
+        Assert.Equal("Funky Town", (string?)r["design"]!["weather"]!["nickname"]);
+    }
+
+    [Fact]
     public void A_monitor_id_the_widget_did_not_list_is_refused_without_a_request()
     {
         using var tmp = new TempDir();

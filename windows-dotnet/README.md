@@ -279,6 +279,30 @@ installed sprite). Showing it there places or hides the piece.
 - **Harness**: `--scenario companion` installs the hourglass into the dev profile and draws each stage,
   a trigger, a mood, a roaming frame and Settings, Widgets.
 
+**The ride-alongs** (spec section 7, E to G):
+
+- **Weather nickname** (#315): Settings, Weather, "Show it as" (`desk_weather.nickname`, up to 24
+  characters, written only when set). The Desk's weather piece shows it instead of the place's name;
+  the place search and the forecast never see it. `propose_desk` takes `weather {nickname}` under the
+  same review and Apply (`""` goes back to the place's name); `get_desk` reports it.
+- **The fold** (#314, affine only): `layout.<piece>.tilt`, whole degrees from -20 to 20, is the slant of
+  the piece's **stack**: the pieces at one anchor share one slant (`DeskArrangement.SetTilt`; a piece
+  that joins a stack takes its slant, one alone keeps its own; a design that gives two pieces of one
+  stack different tilts is refused). The layout word grows a fourth field, `widget:anchor:scale:tilt`
+  (`clock:ml:1:-18`), written only when not 0, so every older layout reads and writes unchanged and an
+  older build reads the scale and ignores the tilt. `DeskView` puts a `SkewTransform` (`AngleY` = tilt;
+  negative rises to the right) on the stack, its plate with it, as a `LayoutTransform`, so the island's
+  window is sized for the slanted face and the host's DPI scale composes over it. Arrange Desk hit-tests,
+  outlines and drags the slanted quad (`DeskFold`, `DeskView.PieceQuads`). Perspective stays out.
+- **Livelier bars**: `AudioBarMotion` eases each bar up (attack) and down (decay, never faster than the
+  falloff) and rides a peak cap over it that holds 9 frames and then drops with growing speed.
+  "Gradient bars" (`now_playing.bars_gradient`, off) spreads the ink's colors across the row and fades
+  each bar to its base. With Windows' animations off the bars ease gently, draw no caps, and the source
+  ticks five times a second. Still a level only: no audio is captured.
+- **Harness**: `--scenario ridealongs` draws a two-face fold (left -18, right +18) with the weather as a
+  nickname and gradient bars, the bars close up (lively, gradient, calm), Arrange Desk over the fold with a
+  drag, and Settings, Weather and Now playing.
+
 **Widgets made with Claude** (spec sections 5 and 6): `propose_widget` on the MCP server takes a whole
 pack as data (kind `sprite`, `palette` or `effects`; a theme goes through `propose_theme`, and no PNG or
 font is ever accepted) and installs nothing.

@@ -314,6 +314,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             _settings = preview.Desk with { Enabled = true };
             _ink = preview.Ink;
             _launcher = preview.Launcher;
+            if (preview.WeatherNickname is { } nickname) _weatherSettings = _weatherSettings with { Nickname = DeskWeatherSettings.NormalizeNickname(nickname) };
         }
         _messages.Reload();
         if (_settings.Enabled && Placed(CompanionSettings.Widget)) _companion?.Reload();
@@ -462,6 +463,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             WeatherOn = Placed("weather"),
             Place = _weatherSettings.Place,
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
+            WeatherNickname = _weatherSettings.Nickname,
             Watchers = WatchersNow(),
             Launcher = LauncherNow(),
             Companion = CompanionNow(),
@@ -694,11 +696,13 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Look = _looks?.DrawFor(track, _oledOn),
             Presence = track is null ? 0 : _nowPlaying.Presence.Amount(now),
             Bars = _np.Bars,
+            BarsGradient = _np.BarsGradient,
             Audio = _audio,
             Telemetry = Placed("telemetry") ? _telemetry : null,
             WeatherOn = Placed("weather"),
             Place = _weatherSettings.Place,
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
+            WeatherNickname = _weatherSettings.Nickname,
             Watchers = WatchersNow(),
             Launcher = LauncherNow(),
             Companion = CompanionNow(),
