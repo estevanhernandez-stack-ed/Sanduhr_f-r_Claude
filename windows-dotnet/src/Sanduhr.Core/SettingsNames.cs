@@ -192,6 +192,10 @@ public static class SettingsNames
     public const string ClearLooks = "Clear Looks…";
     /// <summary>Weather: looks a typed city up with Open-Meteo.</summary>
     public const string WeatherLookUp = "Look up";
+    /// <summary>Weather: the nickname the Desk shows instead of the place's name (#315, settings.json "desk_weather.nickname", local only).</summary>
+    public const string WeatherShowAs = "Show it as";
+    /// <summary>Now playing, Bars: the ink's colors across the row, each bar fading to its base (settings.json "now_playing.bars_gradient", off).</summary>
+    public const string NowPlayingBarsGradient = "Gradient bars";
     /// <summary>Claude Code: where the glow lands (settings.json "claude_code_glow.target").</summary>
     public const string GlowWhere = "Where the glow shows";
     /// <summary>Widgets: fetches and verifies the catalog again (it is fetched only when the page opens, spec 3.8, 2).</summary>
@@ -248,6 +252,8 @@ public static class SettingsNames
         (NowPlayingLooksDirect, SettingsPage.NowPlaying),
         (ClearLooks, SettingsPage.NowPlaying),
         (WeatherLookUp, SettingsPage.Weather),
+        (WeatherShowAs, SettingsPage.Weather),
+        (NowPlayingBarsGradient, SettingsPage.NowPlaying),
         (GlowWhere, SettingsPage.ClaudeCode),
         (WidgetCatalogCheck, SettingsPage.Widgets),
         (WidgetCompanionShow, SettingsPage.Widgets),

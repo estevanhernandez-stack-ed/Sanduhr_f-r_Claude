@@ -70,8 +70,10 @@ public static class DeskAnchors
 
 /// <summary>One placed piece: its widget word, its anchor, its size (1 is the piece's own size) and the monitor it is drawn on:
 /// null for every monitor (what every layout written before monitors meant), <see cref="DeskMonitors.Main"/>, or a monitor's
-/// device path (the id <c>IDesktopWallpaper</c> uses).</summary>
-public sealed record DeskPlacement(string Widget, DeskAnchor Anchor, double Scale = 1, string? Monitor = null);
+/// device path (the id <c>IDesktopWallpaper</c> uses). <paramref name="Tilt"/> is the fold (#314): the slant, in whole degrees from
+/// <see cref="DeskArrangement.MinTilt"/> to <see cref="DeskArrangement.MaxTilt"/>, of the stack the piece sits in. The pieces of one anchor
+/// share one slant (<see cref="DeskArrangement.SetTilt"/>); a stack whose words disagree slants by its first piece's.</summary>
+public sealed record DeskPlacement(string Widget, DeskAnchor Anchor, double Scale = 1, string? Monitor = null, double Tilt = 0);
 
 /// <summary>A monitor as the Desk and <c>get_desk</c> know it. <paramref name="Id"/> is its device path, stable across restarts and
 /// resolution changes; <paramref name="Name"/> is how a person is told which one it is ("3440×1440, main"); the size is in physical
@@ -157,13 +159,13 @@ public static class DeskMonitors
     }
 
     /// <summary>
-    /// The pieces a design review is about: those the proposed layout places differently from the current one (moved, resized, put on
+    /// The pieces a design review is about: those the proposed layout places differently from the current one (moved, resized, slanted, put on
     /// another monitor, or newly shown); when the layout does not change, every piece the proposal places.
     /// </summary>
     public static IReadOnlyList<DeskPlacement> ReviewPieces(DeskArrangement current, DeskArrangement proposed)
     {
         var changed = proposed.Pieces.Where(p => current.Placement(p.Widget) is not { } was
-            || was.Anchor != p.Anchor || was.Scale != p.Scale || !Same(was.Monitor, p.Monitor)).ToList();
+            || was.Anchor != p.Anchor || was.Scale != p.Scale || was.Tilt != p.Tilt || !Same(was.Monitor, p.Monitor)).ToList();
         return changed.Count > 0 ? changed : proposed.Pieces;
     }
 
@@ -213,8 +215,9 @@ public static class DeskMonitors
 }
 
 /// <summary>
-/// The Desk layout string read and written. Each word is <c>widget:anchor</c> or
-/// <c>widget:anchor:scale</c>, with an optional <c>@monitor</c> at its end (<c>clock:tl@main</c>, or a monitor's device path with
+/// The Desk layout string read and written. Each word is <c>widget:anchor</c>,
+/// <c>widget:anchor:scale</c> or <c>widget:anchor:scale:tilt</c> (the fold, #314: whole degrees, written only when not 0, with the
+/// scale written as 1 to hold its place; a build from before the fold reads the scale and ignores the tilt), with an optional <c>@monitor</c> at its end (<c>clock:tl@main</c>, or a monitor's device path with
 /// <c>,</c> <c>:</c> <c>@</c> <c>%</c> and spaces escaped as %XX; no suffix is every monitor, so every older layout reads and writes
 /// unchanged); within an anchor, pieces stack top to bottom in the string order, and a screen draws only the pieces
 /// <see cref="ForScreen"/> gives it.
@@ -227,6 +230,10 @@ public sealed class DeskArrangement
     public const double MinScale = 0.6;
     public const double MaxScale = 1.6;
     public const double ScaleStep = 0.1;
+
+    /// <summary>The fold's range (#314): a stack slants at most this many degrees either way. Negative rises to the right, positive falls.</summary>
+    public const double MinTilt = -20;
+    public const double MaxTilt = 20;
 
     /// <summary>The layout a fresh install draws.</summary>
     public const string Standard = "clock:bl claude:bl";
@@ -265,8 +272,12 @@ public sealed class DeskArrangement
             if (bits.Length >= 3 &&
                 double.TryParse(bits[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var s))
                 scale = ClampScale(s);
+            var tilt = 0.0;
+            if (bits.Length >= 4 &&
+                double.TryParse(bits[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var t))
+                tilt = ClampTilt(t);
             _pieces.RemoveAll(p => p.Widget == bits[0]);
-            _pieces.Add(new DeskPlacement(bits[0], anchor, scale, monitor));
+            _pieces.Add(new DeskPlacement(bits[0], anchor, scale, monitor, tilt));
         }
     }
 
@@ -277,6 +288,14 @@ public sealed class DeskArrangement
         var snapped = Math.Round(s / ScaleStep, MidpointRounding.AwayFromZero) * ScaleStep;
         var clamped = Math.Min(MaxScale, Math.Max(MinScale, snapped));
         return Math.Round(clamped * 100, MidpointRounding.AwayFromZero) / 100;
+    }
+
+    /// <summary>Whole degrees within <see cref="MinTilt"/> to <see cref="MaxTilt"/>; anything unreadable is 0 (no slant).</summary>
+    public static double ClampTilt(double t)
+    {
+        if (!double.IsFinite(t)) return 0;
+        var whole = Math.Round(Math.Clamp(t, MinTilt, MaxTilt), MidpointRounding.AwayFromZero);
+        return whole == 0 ? 0 : whole;   // never -0
     }
 
     /// <summary>Where a piece goes when its anchor is not one this build knows: the message top left, telemetry top
@@ -309,7 +328,10 @@ public sealed class DeskArrangement
     {
         var head = $"{p.Widget}:{DeskAnchors.Word(p.Anchor)}";
         // The Mac writes the size with printf "%g": six significant digits, no trailing zeros.
-        var word = p.Scale == 1 ? head : head + ":" + p.Scale.ToString("G6", CultureInfo.InvariantCulture);
+        var tilt = ClampTilt(p.Tilt);
+        var word = p.Scale == 1 && tilt == 0 ? head : head + ":" + p.Scale.ToString("G6", CultureInfo.InvariantCulture);
+        // The fold rides after the size; no slant writes nothing, so every layout from before it reads and writes as it did.
+        if (tilt != 0) word += ":" + tilt.ToString("0", CultureInfo.InvariantCulture);
         // Every monitor writes nothing, so a layout that never named a monitor reads and writes exactly as before.
         return DeskMonitors.FromWord(p.Monitor) is { } monitor ? word + "@" + DeskMonitors.Escape(monitor) : word;
     }
@@ -364,7 +386,8 @@ public sealed class DeskArrangement
             return;
         }
         if (old?.Anchor == a) return;
-        var moved = new DeskPlacement(widget, a, old?.Scale ?? 1, old?.Monitor);
+        // Into a stack, a piece takes its slant (one per stack); into an empty anchor it keeps its own.
+        var moved = new DeskPlacement(widget, a, old?.Scale ?? 1, old?.Monitor, StackTilt(a) ?? old?.Tilt ?? 0);
         var rank = Rank(widget);
         if (!_pieces.Any(p => p.Anchor == a))
         {
@@ -395,7 +418,9 @@ public sealed class DeskArrangement
         if (widget == before) return;
         var from = _pieces.FindIndex(p => p.Widget == widget);
         if (from < 0) return;
-        var piece = _pieces[from] with { Anchor = anchor };
+        var piece = _pieces[from];
+        if (piece.Anchor != anchor && StackTilt(anchor) is { } joined) piece = piece with { Tilt = joined };
+        piece = piece with { Anchor = anchor };
         _pieces.RemoveAt(from);
         var i = before is null ? -1 : _pieces.FindIndex(p => p.Widget == before && p.Anchor == anchor);
         if (i >= 0)
@@ -453,6 +478,21 @@ public sealed class DeskArrangement
         _pieces[i] = _pieces[i] with { Scale = ClampScale(scale) };
     }
 
+    /// <summary>The slant of the stack at <paramref name="anchor"/>: its first piece's; null when the anchor has none.</summary>
+    public double? StackTilt(DeskAnchor anchor) => _pieces.FirstOrDefault(p => p.Anchor == anchor) is { } first ? first.Tilt : null;
+
+    /// <summary>
+    /// Slants the stack <paramref name="widget"/> sits in (#314): every piece at its anchor takes the tilt (whole degrees, kept
+    /// within range), so a stack reads as one slanted face. Nothing changes for a piece that is not placed.
+    /// </summary>
+    public void SetTilt(string widget, double tilt)
+    {
+        if (Placement(widget) is not { } p) return;
+        var t = ClampTilt(tilt);
+        for (int i = 0; i < _pieces.Count; i++)
+            if (_pieces[i].Anchor == p.Anchor) _pieces[i] = _pieces[i] with { Tilt = t };
+    }
+
     /// <summary>
     /// Drops <paramref name="widget"/> onto <paramref name="onto"/>: in the same anchor it takes the
     /// target's place (coming from above it lands after, from below before); from another anchor it
@@ -466,7 +506,7 @@ public sealed class DeskArrangement
         if (from < 0 || to < 0) return;
         var piece = _pieces[from];
         var same = piece.Anchor == _pieces[to].Anchor;
-        piece = piece with { Anchor = _pieces[to].Anchor };
+        piece = piece with { Anchor = _pieces[to].Anchor, Tilt = same ? piece.Tilt : _pieces[to].Tilt };
         _pieces.RemoveAt(from);
         var target = _pieces.FindIndex(p => p.Widget == onto);
         if (target < 0) target = _pieces.Count;

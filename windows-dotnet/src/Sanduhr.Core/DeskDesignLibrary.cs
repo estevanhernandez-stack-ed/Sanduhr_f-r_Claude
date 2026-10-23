@@ -124,19 +124,27 @@ public static class DeskDesigns
         o.Remove("name");
         o.Remove("note");
         o.Remove("messages");
+        // No nickname is the same look as a design from before nicknames (#315).
+        if (design.Weather is { Nickname.Length: 0 }) o.Remove("weather");
         if (design.Layout is { } layout)
         {
             var sorted = new JsonObject();
             foreach (var p in layout.OrderBy(p => p.Piece, StringComparer.Ordinal))
             {
-                sorted[p.Piece] = p.IsHidden
-                    ? new JsonObject { ["hidden"] = true }
-                    : new JsonObject
-                    {
-                        ["anchor"] = DeskAnchors.Word(p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece)),
-                        ["size"] = DeskArrangement.ClampScale(p.Size ?? 1),
-                        ["monitor"] = DeskMonitors.Word(p.Monitor),
-                    };
+                if (p.IsHidden)
+                {
+                    sorted[p.Piece] = new JsonObject { ["hidden"] = true };
+                    continue;
+                }
+                var po = new JsonObject
+                {
+                    ["anchor"] = DeskAnchors.Word(p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece)),
+                    ["size"] = DeskArrangement.ClampScale(p.Size ?? 1),
+                    ["monitor"] = DeskMonitors.Word(p.Monitor),
+                };
+                // Upright writes nothing, so a design saved before the fold (#314) is still the same look.
+                if (DeskArrangement.ClampTilt(p.Tilt ?? 0) is var tilt && tilt != 0) po["tilt"] = tilt;
+                sorted[p.Piece] = po;
             }
             o["layout"] = sorted;
         }

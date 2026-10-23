@@ -189,14 +189,15 @@ public static class WeatherSchedule
 /// <summary>Builds the Desk weather piece's text lines.</summary>
 public static class WeatherLines
 {
-    /// <summary>Heading, now, range and tomorrow lines. Tomorrow is null unless its code, high and low are all present.</summary>
-    public static WeatherLineSet For(WeatherPlace place, WeatherReading reading)
+    /// <summary>Heading, now, range and tomorrow lines. Tomorrow is null unless its code, high and low are all present. The heading
+    /// is <paramref name="nickname"/> when one is set (#315, "Show it as"), else the place's own name.</summary>
+    public static WeatherLineSet For(WeatherPlace place, WeatherReading reading, string? nickname = null)
     {
         string? tomorrow = reading is { TomorrowCode: { } code, TomorrowHigh: { } hi, TomorrowLow: { } lo }
             ? $"Tomorrow: {WeatherCodes.Words(code)} {Deg(hi)} / {Deg(lo)}"
             : null;
         return new WeatherLineSet(
-            place.Name,
+            string.IsNullOrWhiteSpace(nickname) ? place.Name : nickname.Trim(),
             $"{WeatherCodes.Words(reading.CodeNow)} · {Deg(reading.TempNow)}",
             $"High {Deg(reading.TodayHigh)} · Low {Deg(reading.TodayLow)}",
             tomorrow);

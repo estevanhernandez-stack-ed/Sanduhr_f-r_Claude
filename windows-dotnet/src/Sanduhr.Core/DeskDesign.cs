@@ -30,11 +30,17 @@ public sealed record DeskInkChoice(DeskInkKind Kind, IReadOnlyList<string> Color
 public sealed record DeskFontChoice(string Family, string? Link = null);
 
 /// <summary>One piece's part of a design's layout. Every member but <see cref="Piece"/> is optional: absent leaves the
-/// current value alone. A hidden piece has no anchor, no size and no monitor. <c>Monitor</c> is "all", "main" or a monitor id.</summary>
-public sealed record DeskPieceLayout(string Piece, DeskAnchor? Anchor, double? Size, bool? Hidden, string? Monitor = null)
+/// current value alone. A hidden piece has no anchor, no size, no monitor and no tilt. <c>Monitor</c> is "all", "main" or a monitor id.
+/// <c>Tilt</c> is the fold (#314), whole degrees from -20 to 20, and belongs to the piece's stack: every piece at that anchor
+/// slants with it.</summary>
+public sealed record DeskPieceLayout(string Piece, DeskAnchor? Anchor, double? Size, bool? Hidden, string? Monitor = null, double? Tilt = null)
 {
     public bool IsHidden => Hidden == true || (Anchor is null && Hidden != false);
 }
+
+/// <summary>The weather piece's part of a design (#315): the name it shows instead of the geocoded place, "" for the place's
+/// own name. Local only: it is never sent anywhere, and the forecast keeps the picked city's coordinates.</summary>
+public sealed record DeskWeatherChange(string Nickname);
 
 /// <summary>The Desk message lines a design brings, and whether they join the list or replace it (the same two modes as
 /// Claude's message suggestions).</summary>
@@ -58,7 +64,8 @@ public sealed record DeskParse(DeskDesign? Design, IReadOnlyList<DeskReason> Rea
 /// exactly what the widget would; <see cref="DeskDesignValidator"/> adds the rules that need the machine's fonts, the
 /// wallpaper and the Start menu.
 ///
-/// JSON, snake_case: <c>name</c>, <c>note</c>, <c>layout</c> ({piece: {anchor, size, hidden}}), <c>font</c> (a family, or
+/// JSON, snake_case: <c>name</c>, <c>note</c>, <c>layout</c> ({piece: {anchor, size, hidden, monitor, tilt}}), <c>weather</c>
+/// ({nickname}), <c>font</c> (a family, or
 /// {family, link}), <c>ink</c> ("auto", "light", "dark", "theme", one #hex, or two to four #hex), <c>plate</c>,
 /// <c>shadow</c>, <c>launcher</c> ({orientation, buttons[]}), <c>messages</c> ({lines[], mode}) and <c>theme</c> (a widget
 /// theme object). <c>looks</c> is a list of per-song looks (<see cref="NowPlayingLookCheck"/>): they are saved with the design
@@ -74,6 +81,8 @@ public sealed partial record DeskDesign
     public const int NoteMax = 200;
     public const int FontFamilyMax = 64;
     public const int MaxPieces = 16;
+    /// <summary>The longest weather nickname (#315), in characters.</summary>
+    public const int WeatherNicknameMax = 24;
 
     /// <summary>The whole design is far below this by construction; the cap is a belt against a hostile or runaway request.</summary>
     public const int MaxJsonBytes = 128 * 1024;
@@ -90,9 +99,11 @@ public sealed partial record DeskDesign
     public JsonObject? Theme { get; init; }
     /// <summary>Per-song looks for now playing (1 to 20), saved into the user's looks when the design is applied.</summary>
     public IReadOnlyList<SongLook>? Looks { get; init; }
+    /// <summary>The weather piece's nickname (#315); null leaves it alone, "" goes back to the place's own name.</summary>
+    public DeskWeatherChange? Weather { get; init; }
 
     private static readonly string[] Fields =
-        ["name", "note", "layout", "font", "ink", "plate", "shadow", "launcher", "messages", "looks", "theme"];
+        ["name", "note", "layout", "weather", "font", "ink", "plate", "shadow", "launcher", "messages", "looks", "theme"];
 
     public static string Word(MessageProposalMode mode) => mode == MessageProposalMode.Add ? "add" : "replace";
 
@@ -120,6 +131,7 @@ public sealed partial record DeskDesign
         string? name = Text(o, "name", NameMax, r);
         string? note = Text(o, "note", NoteMax, r);
         var layout = ParseLayout(o["layout"], r);
+        var weather = ParseWeather(o["weather"], r);
         var font = ParseFont(o["font"], r);
         var ink = ParseInk(o["ink"], r);
         bool? plate = Bool(o, "plate", r);
@@ -141,7 +153,7 @@ public sealed partial record DeskDesign
         return new DeskParse(new DeskDesign
         {
             Name = name, Note = note, Layout = layout, Font = font, Ink = ink, Plate = plate, Shadow = shadow,
-            Launcher = launcher, Messages = messages, Theme = theme, Looks = looks,
+            Launcher = launcher, Messages = messages, Theme = theme, Looks = looks, Weather = weather,
         }, [], warnings);
     }
 
@@ -205,7 +217,7 @@ public sealed partial record DeskDesign
         if (node is null) return null;
         if (node is not JsonObject lo)
         {
-            r.Add(new DeskReason("layout", "must be an object of piece name to {anchor, size, hidden}"));
+            r.Add(new DeskReason("layout", "must be an object of piece name to {anchor, size, hidden, monitor, tilt}"));
             return null;
         }
         if (lo.Count > MaxPieces)
@@ -225,11 +237,11 @@ public sealed partial record DeskDesign
             }
             if (value is not JsonObject po)
             {
-                r.Add(new DeskReason(field, "must be an object with anchor, size and hidden"));
+                r.Add(new DeskReason(field, "must be an object with anchor, size, hidden, monitor and tilt"));
                 continue;
             }
-            foreach (var bad in po.Select(kv => kv.Key).Where(k => k is not ("anchor" or "size" or "hidden" or "monitor")).Order(StringComparer.Ordinal).Take(3))
-                r.Add(new DeskReason(field, $"unknown member '{Clip(bad, 20)}'; use anchor, size, hidden and monitor"));
+            foreach (var bad in po.Select(kv => kv.Key).Where(k => k is not ("anchor" or "size" or "hidden" or "monitor" or "tilt")).Order(StringComparer.Ordinal).Take(3))
+                r.Add(new DeskReason(field, $"unknown member '{Clip(bad, 20)}'; use anchor, size, hidden, monitor and tilt"));
 
             DeskAnchor? anchor = null;
             if (po["anchor"] is { } an)
@@ -256,10 +268,49 @@ public sealed partial record DeskDesign
                 if (TryStr(mn, out var mword) && MonitorProblem(mword) is null) monitor = DeskMonitors.Word(mword);
                 else r.Add(new DeskReason(field + ".monitor", "must be \"all\", \"main\" or a monitor id from get_desk monitors"));
             }
-            if (hidden == true) { anchor = null; size = null; monitor = null; }
-            pieces.Add(new DeskPieceLayout(key, anchor, size, hidden, monitor));
+            double? tilt = null;
+            if (po["tilt"] is { } tn)
+            {
+                if (TryNumber(tn, out var t) && t >= DeskArrangement.MinTilt - 1e-9 && t <= DeskArrangement.MaxTilt + 1e-9)
+                    tilt = DeskArrangement.ClampTilt(t);
+                else r.Add(new DeskReason(field + ".tilt", $"must be a number of degrees from {DeskArrangement.MinTilt} to {DeskArrangement.MaxTilt} (0 is upright)"));
+            }
+            if (hidden == true) { anchor = null; size = null; monitor = null; tilt = null; }
+            pieces.Add(new DeskPieceLayout(key, anchor, size, hidden, monitor, tilt));
         }
+        // One slant per stack: two pieces sent to the same anchor with different tilts cannot both be honored.
+        foreach (var clash in pieces.Where(p => p.Anchor is not null && p.Tilt is not null).GroupBy(p => p.Anchor!.Value)
+                     .Where(g => g.Select(p => p.Tilt).Distinct().Count() > 1).Take(3))
+            r.Add(new DeskReason("layout." + clash.First().Piece + ".tilt",
+                $"the pieces at {DeskAnchors.Word(clash.Key)} share one slant; give {string.Join(" and ", clash.Select(p => p.Piece))} the same tilt"));
         return r.Count > before ? null : pieces;
+    }
+
+    private static DeskWeatherChange? ParseWeather(JsonNode? node, List<DeskReason> r)
+    {
+        if (node is null) return null;
+        if (node is not JsonObject wo)
+        {
+            r.Add(new DeskReason("weather", "must be an object with nickname"));
+            return null;
+        }
+        int before = r.Count;
+        foreach (var bad in wo.Select(kv => kv.Key).Where(k => k != "nickname").Order(StringComparer.Ordinal).Take(3))
+            r.Add(new DeskReason("weather", $"unknown member '{Clip(bad, 20)}'; use nickname"));
+        if (wo["nickname"] is not { } nn)
+        {
+            if (r.Count == before) r.Add(new DeskReason("weather.nickname", "is missing; send a name, or an empty string for the place's own name"));
+            return null;
+        }
+        if (!TryStr(nn, out var raw)) { r.Add(new DeskReason("weather.nickname", "must be a string")); return null; }
+        if (HasControl(raw)) { r.Add(new DeskReason("weather.nickname", "must be one line, with no control characters")); return null; }
+        var nick = raw.Trim();
+        if (nick.Length > WeatherNicknameMax * 4 || nick.EnumerateRunes().Count() > WeatherNicknameMax)
+        {
+            r.Add(new DeskReason("weather.nickname", $"must be at most {WeatherNicknameMax} characters"));
+            return null;
+        }
+        return r.Count > before ? null : new DeskWeatherChange(nick);
     }
 
     /// <summary>Why a monitor word is refused, or null: it is "all", "main" or an id, a short string with no control characters.</summary>
@@ -512,10 +563,12 @@ public sealed partial record DeskDesign
                 if (p.Size is { } s) po["size"] = s;
                 if (p.Hidden is { } h) po["hidden"] = h;
                 if (p.Monitor is { } mo) po["monitor"] = mo;
+                if (p.Tilt is { } t) po["tilt"] = t;
                 lo[p.Piece] = po;
             }
             o["layout"] = lo;
         }
+        if (Weather is { } w) o["weather"] = new JsonObject { ["nickname"] = w.Nickname };
         if (Font is not null)
         {
             if (Font.Link is null) o["font"] = Font.Family;
@@ -585,6 +638,7 @@ public sealed partial record DeskDesign
             Messages = proposal.Messages ?? current?.Messages,
             Theme = proposal.Theme ?? current?.Theme,
             Looks = proposal.Looks ?? current?.Looks,
+            Weather = proposal.Weather ?? current?.Weather,
         };
     }
 
@@ -593,14 +647,15 @@ public sealed partial record DeskDesign
         var arr = new DeskArrangement();
         if (layout is null) return arr;
         var placed = layout.Where(p => !p.IsHidden && DeskArrangement.Known.Contains(p.Piece, StringComparer.Ordinal))
-            .Select(p => new DeskPlacement(p.Piece, p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece), p.Size ?? 1, DeskMonitors.FromWord(p.Monitor)));
+            .Select(p => new DeskPlacement(p.Piece, p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece), p.Size ?? 1, DeskMonitors.FromWord(p.Monitor),
+                DeskArrangement.ClampTilt(p.Tilt ?? 0)));
         return new DeskArrangement(placed);
     }
 
     /// <summary>Every known piece: the placed ones in layout order, then the hidden ones in Settings order.</summary>
     public static List<DeskPieceLayout> FromArrangement(DeskArrangement arr)
     {
-        var list = arr.Pieces.Select(p => new DeskPieceLayout(p.Widget, p.Anchor, p.Scale, false, p.Monitor)).ToList();
+        var list = arr.Pieces.Select(p => new DeskPieceLayout(p.Widget, p.Anchor, p.Scale, false, p.Monitor, p.Tilt)).ToList();
         foreach (var w in DeskArrangement.Known)
             if (arr.Placement(w) is null) list.Add(new DeskPieceLayout(w, null, null, true));
         return list;
@@ -617,6 +672,8 @@ public sealed partial record DeskDesign
             else if (p.Hidden == false && arr.Placement(p.Piece) is null) arr.Show(p.Piece);
             if (p.Size is { } s) arr.SetScale(p.Piece, s);
             if (p.Monitor is not null) arr.SetMonitor(p.Piece, p.Monitor);
+            // The tilt is the stack's: it slants every piece at the anchor (a piece that joins a stack took its slant above).
+            if (p.Tilt is { } t) arr.SetTilt(p.Piece, t);
         }
         return FromArrangement(arr);
     }
@@ -659,15 +716,20 @@ public sealed partial record DeskDesign
                         lines.Add($"{P(p.Piece)}: size {Percent(was.Size ?? 1)} to {Percent(p.Size ?? 1)}");
                     if (!DeskMonitors.Same(was.Monitor, p.Monitor))
                         lines.Add(DeskMonitors.FromWord(p.Monitor) is null ? $"{P(p.Piece)}: now on all monitors" : $"{P(p.Piece)}: moved to {M(p.Monitor)}");
+                    if (Math.Abs((was.Tilt ?? 0) - (p.Tilt ?? 0)) > 1e-9)
+                        lines.Add($"{P(p.Piece)}: slant {Degrees(was.Tilt ?? 0)} to {Degrees(p.Tilt ?? 0)}");
                 }
                 else
                 {
                     lines.Add($"{P(p.Piece)}: shown at {DeskAnchors.Name(anchor).ToLowerInvariant()}"
                         + (Math.Abs((p.Size ?? 1) - 1) > 1e-9 ? $", size {Percent(p.Size ?? 1)}" : "")
-                        + (DeskMonitors.FromWord(p.Monitor) is null ? "" : $", on {M(p.Monitor)}"));
+                        + (DeskMonitors.FromWord(p.Monitor) is null ? "" : $", on {M(p.Monitor)}")
+                        + (p.Tilt is { } t && t != 0 ? $", slanted {Degrees(t)}" : ""));
                 }
             }
         }
+        if (b.Weather is { } weather && (a.Weather?.Nickname ?? "") != weather.Nickname)
+            lines.Add(weather.Nickname.Length == 0 ? "Weather: shows the place's own name" : $"Weather: shown as \u201c{weather.Nickname}\u201d");
         if (b.Font is { } font && (a.Font is null || !string.Equals(a.Font.Family, font.Family, StringComparison.OrdinalIgnoreCase)))
             lines.Add($"Font: {FontName(a.Font)} to {FontName(font)}");
         if (b.Ink is { } ink && (a.Ink is null || a.Ink.Describe() != ink.Describe()))
@@ -693,6 +755,8 @@ public sealed partial record DeskDesign
         }
         return lines;
     }
+
+    private static string Degrees(double tilt) => tilt.ToString("0", CultureInfo.InvariantCulture) + "\u00b0";
 
     private static string Percent(double scale) => Math.Round(scale * 100).ToString("0", CultureInfo.InvariantCulture) + "%";
 

@@ -51,6 +51,13 @@ public class SettingsKeysContractTests
         "desk_sign_in_reminder",
         "desk_time_size",
         "desk_weather",
+        "desk_weather.admin",
+        "desk_weather.country",
+        "desk_weather.lat",
+        "desk_weather.lon",
+        "desk_weather.name",
+        "desk_weather.nickname",
+        "desk_weather.unit",
         "focus_mode_duration",
         "geom",
         "hidden_tiers",
@@ -154,6 +161,15 @@ public class SettingsKeysContractTests
         foreach (var src in new[] { store, glowTarget })
             foreach (Match m in Regex.Matches(src, @"(?:\bglow\[|Str\(|ReadBool\(o, )""([a-z_]+)"""))
                 keys.Add("claude_code_glow." + m.Groups[1].Value);
+
+        // The weather group (DeskWeatherSettings): the members it writes (o["k"] =) and reads (SettingsJson.X(o, "k", ...)).
+        var content = ReadSrc("Sanduhr.Core", "DeskContentSettings.cs");
+        int start = content.IndexOf("public sealed record DeskWeatherSettings", StringComparison.Ordinal);
+        int end = content.IndexOf("public static class SettingsJson", StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start, "DeskWeatherSettings moved: point the scan at it again");
+        var weather = content[start..end];
+        foreach (Match m in Regex.Matches(weather, @"(?:\bo\[""|SettingsJson\.\w+\(o, "")([a-z_]+)"""))
+            keys.Add("desk_weather." + m.Groups[1].Value);
         return keys;
     }
 

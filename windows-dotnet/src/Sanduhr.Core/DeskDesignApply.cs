@@ -2,9 +2,9 @@ using System.Text.Json.Nodes;
 
 namespace Sanduhr.Core;
 
-/// <summary>What a design changes in the Desk's settings: the layout, font and plate (<see cref="Desk"/>), the ink, and the Launcher.
-/// The preview draws these from memory; Apply saves them.</summary>
-public sealed record DeskDesignSettings(DeskSettings Desk, DeskInkSettings Ink, LauncherModel Launcher);
+/// <summary>What a design changes in the Desk's settings: the layout (with each stack's tilt), font and plate (<see cref="Desk"/>), the
+/// ink, the Launcher and the weather nickname (null: the design leaves it alone). The preview draws these from memory; Apply saves them.</summary>
+public sealed record DeskDesignSettings(DeskSettings Desk, DeskInkSettings Ink, LauncherModel Launcher, string? WeatherNickname = null);
 
 /// <summary>
 /// Turns a full design (<see cref="DeskDesign.Merge"/>) into the settings the Desk reads (spec, the agent-designed Desk, the live
@@ -22,15 +22,16 @@ public static class DeskDesignApply
             Font = design.Font is null ? desk.Font : FontSetting(design.Font),
             Plate = design.Plate ?? desk.Plate,
         };
-        return new DeskDesignSettings(nextDesk.Normalized(), Ink(ink, design), design.Launcher ?? launcher);
+        return new DeskDesignSettings(nextDesk.Normalized(), Ink(ink, design), design.Launcher ?? launcher, design.Weather?.Nickname);
     }
 
-    /// <summary>The layout string for a design's pieces: the placed ones, in the design's order, with their sizes.</summary>
+    /// <summary>The layout string for a design's pieces: the placed ones, in the design's order, with their sizes and tilts.</summary>
     public static string Layout(IReadOnlyList<DeskPieceLayout> pieces)
     {
         var placed = pieces
             .Where(p => !p.IsHidden && DeskArrangement.Known.Contains(p.Piece, StringComparer.Ordinal))
-            .Select(p => new DeskPlacement(p.Piece, p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece), DeskArrangement.ClampScale(p.Size ?? 1), DeskMonitors.FromWord(p.Monitor)));
+            .Select(p => new DeskPlacement(p.Piece, p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece), DeskArrangement.ClampScale(p.Size ?? 1), DeskMonitors.FromWord(p.Monitor),
+                DeskArrangement.ClampTilt(p.Tilt ?? 0)));
         return new DeskArrangement(placed).Layout;
     }
 
