@@ -35,6 +35,7 @@ public class SettingsKeysContractTests
         "claude_code_glow.skip_terminal",
         "claude_code_glow.target",
         "claude_code_glow.waiting",
+        "desk_companion",
         "desk_direct",
         "desk_enabled",
         "desk_font",

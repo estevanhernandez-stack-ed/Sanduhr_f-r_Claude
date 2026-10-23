@@ -138,6 +138,8 @@ public static class SettingsNames
     public const string DeskWatchers = "Watchers";
     /// <summary>Desk, Where each piece sits: the Launcher, buttons that open apps and links from the desktop.</summary>
     public const string DeskLauncher = "Launcher";
+    /// <summary>Desk, Where each piece sits: the companion, the sprite chosen in Settings, Widgets (spec 3.8 section 4).</summary>
+    public const string DeskCompanion = "Companion";
     /// <summary>Desk, Launcher: opens the app picker.</summary>
     public const string LauncherAddApp = "Add app…";
     /// <summary>Desk, Launcher: asks for an https link and a label.</summary>
@@ -171,6 +173,7 @@ public static class SettingsNames
         "glow" => DeskGlow,
         "watchers" => DeskWatchers,
         "launcher" => DeskLauncher,
+        "companion" => DeskCompanion,
         _ => widget,
     };
     /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7).</summary>
@@ -199,6 +202,12 @@ public static class SettingsNames
     public const string WidgetUninstall = "Uninstall";
     /// <summary>Widgets: how a Claude-made or the user's own pack is listed (spec 3.8, section 3).</summary>
     public const string WidgetMadeHere = "made here";
+    /// <summary>Widgets, Desk companion (spec 3.8 section 4): the installed sprite that is the companion (one at a time).</summary>
+    public const string WidgetCompanionPick = "Companion sprite";
+    /// <summary>Widgets, Desk companion: places or hides the Desk's companion piece.</summary>
+    public const string WidgetCompanionShow = "Show the companion on the Desk";
+    /// <summary>Widgets, Desk companion: it walks the screen's edges (never with Windows' animations off).</summary>
+    public const string WidgetCompanionRoam = "Let it roam";
 
     /// <summary>The trademark disclaimer, the standard text, word for word (About carries it).</summary>
     public const string TrademarkNotice =
@@ -241,6 +250,8 @@ public static class SettingsNames
         (WeatherLookUp, SettingsPage.Weather),
         (GlowWhere, SettingsPage.ClaudeCode),
         (WidgetCatalogCheck, SettingsPage.Widgets),
+        (WidgetCompanionShow, SettingsPage.Widgets),
+        (WidgetCompanionRoam, SettingsPage.Widgets),
     ];
 
     /// <summary>

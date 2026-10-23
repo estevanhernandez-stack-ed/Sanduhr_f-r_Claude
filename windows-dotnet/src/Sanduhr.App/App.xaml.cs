@@ -644,6 +644,8 @@ public partial class App : Application
         svm.Desk.ArrangingLayout = _desk?.Session?.Working.Layout;
         svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); _looks?.SettingsChanged(); };
         svm.WeatherPage.Changed = () => _desk?.Reload();
+        // The companion (spec 3.8 section 4): a new pick, roaming, an install or uninstall, or the piece shown or hidden.
+        svm.WidgetsPage.Changed = () => { _desk?.Reload(); svm.Desk.Reload(); };
         svm.MessageChanged = () => { _desk?.Reload(); _handoff?.PublishState(); };
         svm.Desk.WatchersChanged = () => _watchers?.SwitchChanged();
         svm.QuitRequested = QuitApp;

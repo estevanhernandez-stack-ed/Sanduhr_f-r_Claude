@@ -581,6 +581,24 @@ public class ToolLogicDeskDesignTests
     }
 
     [Fact]
+    public void The_companion_is_a_piece_a_design_can_place_and_its_art_is_not_judged_as_ink()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg);
+        // Light ink on the bright top right fails for a text piece; the companion draws its pack's art, so it passes there.
+        var r = Propose(cfg, """{"ink":"light","layout":{"companion":{"anchor":"tr","size":1.4}}}""");
+        Assert.Equal("queued", (string?)r["status"]);
+        var request = (JsonObject)JsonNode.Parse(File.ReadAllText(cfg.DesignRequestPath!))!;
+        Assert.Equal("tr", (string?)request["design"]!["layout"]!["companion"]!["anchor"]);
+        Assert.Equal(1.4, (double?)request["design"]!["layout"]!["companion"]!["size"]);
+
+        var clock = Propose(cfg, """{"ink":"light","layout":{"clock":{"anchor":"tr"}}}""");
+        Assert.Equal("rejected", (string?)clock["status"]);
+        Assert.Contains("a sprite companion", ToolCatalog.Build().ToJsonString());
+    }
+
+    [Fact]
     public void A_monitor_id_the_widget_did_not_list_is_refused_without_a_request()
     {
         using var tmp = new TempDir();

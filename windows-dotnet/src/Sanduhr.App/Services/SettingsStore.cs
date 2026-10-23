@@ -817,6 +817,16 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>The Desk companion (spec 3.8 section 4): <c>desk_companion</c> {pack, roam}; absent = no pack chosen, roaming on.</summary>
+    public CompanionSettings LoadCompanion() => CompanionSettings.Decode(Read()["desk_companion"]);
+
+    public void SaveCompanion(CompanionSettings companion)
+    {
+        var root = Read();
+        root["desk_companion"] = companion.Encode();
+        Write(root);
+    }
+
     /// <summary>"Let agents show watchers" (spec 6.9): <c>watchers_agents</c>, absent = off. The MCP tools
     /// <c>watch_start</c>, <c>watch_update</c> and <c>watch_end</c> write nothing while it is off.</summary>
     public bool LoadWatchersAgents() => ReadBool(Read(), "watchers_agents", false);

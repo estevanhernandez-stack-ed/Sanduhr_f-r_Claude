@@ -80,7 +80,7 @@ public class DeskArrangementTests
     [Fact]
     public void KnownIsTheMacList()
     {
-        Assert.Equal(["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "meetings", "glow"], DeskArrangement.Known);
+        Assert.Equal(["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "meetings", "glow", "companion"], DeskArrangement.Known);
         Assert.Equal(["clock", "claude", "meters"], DeskArrangement.DrawnInS5);
     }
 

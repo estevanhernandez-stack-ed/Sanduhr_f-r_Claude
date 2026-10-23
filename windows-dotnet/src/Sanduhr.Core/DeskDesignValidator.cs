@@ -201,7 +201,8 @@ public sealed partial record DeskDesign
         int found = 0;
         foreach (var p in merged.Layout ?? [])
         {
-            if (p.IsHidden || p.Piece is "message" or "glow") continue;   // the message has its own color; the glow is no text
+            // The message has its own color; the glow is no text; the companion is the pack's art, not the ink.
+            if (p.IsHidden || p.Piece is "message" or "glow" or "companion") continue;
             if (p.Piece == LauncherModel.Widget && !launcherLabelled) continue;   // icons do not take the ink
             if (!everything && named?.Contains(p.Piece) != true) continue;
             if (found >= MaxContrastReasons) break;

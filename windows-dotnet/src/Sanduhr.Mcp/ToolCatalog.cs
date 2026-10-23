@@ -525,7 +525,7 @@ public static class ToolCatalog
 
     private const string DeskDesignGuideRead =
         "Read the user's Desk before designing it. The Desk is what Sanduhr draws on the Windows desktop: a clock, Claude " +
-        "usage, a handwritten message, a Launcher of buttons and other pieces, each placed at one of eight anchors " +
+        "usage, a handwritten message, a Launcher of buttons, a sprite companion and other pieces, each placed at one of eight anchors " +
         "(tl tc tr ml mr bl bc br) with a size, in a font and an ink, optionally on a soft plate, beside the widget's " +
         "color theme. Returns design (the current look as a full design: layout with every piece's anchor, size and " +
         "hidden, font, ink, plate, shadow, launcher, theme), pieces and anchors (the allowed words), fonts (installed " +
@@ -544,7 +544,8 @@ public static class ToolCatalog
         "Propose a look for the user's Desk, and optionally the widget's color theme. The design is PARTIAL: send only " +
         "the fields to change; everything absent stays as it is. Fields, all optional: name (up to 40 characters); " +
         "note (one sentence for the user, up to 200); layout {piece: {anchor, size, hidden}}, where piece is a key from " +
-        "get_desk pieces, anchor is tl tc tr ml mr bl bc br, size is 0.6 to 1.6, hidden removes the piece and monitor puts it on \"all\" monitors (the default), the \"main\" monitor or one monitor by the id in get_desk monitors (a piece on a monitor that is unplugged shows on the main one meanwhile); font (a " +
+        "get_desk pieces, anchor is tl tc tr ml mr bl bc br, size is 0.6 to 1.6, hidden removes the piece and monitor puts it on \"all\" monitors (the default), the \"main\" monitor or one monitor by the id in get_desk monitors (a piece on a monitor that is unplugged shows on the main one meanwhile; " +
+        "the companion piece draws the sprite the user chose in Settings, Widgets, sits at its anchor or roams the monitor's edges from it, and draws nothing until a sprite is installed); font (a " +
         "family from get_desk fonts.installed or the bundled EsteFont Pro or EsteFont 26, or {family, link} with an " +
         "https link to get a font the user lacks: Sanduhr never downloads it, the review shows the link and Apply waits " +
         "for the font, status needs_font); ink (auto, light, dark, theme, one #rrggbb, or a list of 2 to 4 #rrggbb for a " +

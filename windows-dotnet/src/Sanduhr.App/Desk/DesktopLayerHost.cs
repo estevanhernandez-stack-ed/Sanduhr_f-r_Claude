@@ -60,6 +60,8 @@ internal sealed class DesktopLayerHost : IDeskHost
     /// <summary>Where each window truly belongs (its monitor's physical pixels) and the screen it draws on:
     /// OLED care's drift is worked out from this, never from where the window happens to sit.</summary>
     private readonly Dictionary<HwndSource, (PxRect Home, DeskScreen Screen)> _homes = [];
+    /// <summary>The roaming islands' motions each window follows (<see cref="DeskIsland.Motion"/>).</summary>
+    private readonly Dictionary<HwndSource, (DeskIslandMotion Motion, Action<Point> Handler)> _motions = [];
     /// <summary>OLED care's step on the orbit; null at the true anchor.</summary>
     private int? _drift;
     /// <summary>OLED care's idle dim, kept so a window made while dimmed starts dimmed.</summary>
@@ -222,19 +224,10 @@ internal sealed class DesktopLayerHost : IDeskHost
         var content = island.Content;
         content.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         double cw = Math.Ceiling(content.DesiredSize.Width), ch = Math.Ceiling(content.DesiredSize.Height);
-        double left = island.Anchor.X - Pad - island.Horizontal switch
-        {
-            HorizontalAlignment.Right => cw,
-            HorizontalAlignment.Center => cw / 2,
-            _ => 0,
-        };
-        double top = island.Anchor.Y - Pad - island.Vertical switch
-        {
-            VerticalAlignment.Bottom => ch,
-            VerticalAlignment.Center => ch / 2,
-            _ => 0,
-        };
+        Unfollow(src);
+        var (left, top) = Origin(island, island.Motion?.Anchor ?? island.Anchor, cw, ch);
         double w = cw + 2 * Pad, h = ch + 2 * Pad;
+        if (island.Motion is { } motion) Follow(src, screen, island, motion, cw, ch);
         bool through = ClickThrough && !island.TakesClicks;
         SetClickThrough(src.Handle, through);
         // The minute's in-place tick hands the same content back (spec 6.10): keep its frame and only
@@ -266,6 +259,46 @@ internal sealed class DesktopLayerHost : IDeskHost
         TextOptions.SetTextFormattingMode(root, TextFormattingMode.Ideal);
         src.RootVisual = root;
         Fit(src, screen, left, top, w, h, first);
+    }
+
+    /// <summary>The window's top-left, in the screen's DIPs, for an island of content <paramref name="cw"/> by <paramref name="ch"/> whose
+    /// aligned edge sits on <paramref name="anchor"/>.</summary>
+    private static (double Left, double Top) Origin(DeskIsland island, Point anchor, double cw, double ch)
+    {
+        double left = anchor.X - Pad - island.Horizontal switch
+        {
+            HorizontalAlignment.Right => cw,
+            HorizontalAlignment.Center => cw / 2,
+            _ => 0,
+        };
+        double top = anchor.Y - Pad - island.Vertical switch
+        {
+            VerticalAlignment.Bottom => ch,
+            VerticalAlignment.Center => ch / 2,
+            _ => 0,
+        };
+        return (left, top);
+    }
+
+    /// <summary>A roaming island's window follows its motion: each move puts the window on the new anchor (OLED care's drift still
+    /// applies). Only the position changes; the content is never laid out again for a move.</summary>
+    private void Follow(HwndSource src, DeskScreen screen, DeskIsland island, DeskIslandMotion motion, double cw, double ch)
+    {
+        double w = cw + 2 * Pad, h = ch + 2 * Pad;
+        void Moved(Point p)
+        {
+            if (_disposed || src.IsDisposed) return;
+            var (left, top) = Origin(island, p, cw, ch);
+            Fit(src, screen, left, top, w, h, first: false);
+        }
+        motion.Moved += Moved;
+        _motions[src] = (motion, Moved);
+    }
+
+    private void Unfollow(HwndSource src)
+    {
+        if (!_motions.Remove(src, out var m)) return;
+        m.Motion.Moved -= m.Handler;
     }
 
     /// <summary>Sets or clears <c>WS_EX_TRANSPARENT</c> on a Desk window when it differs. Fully transparent
@@ -354,7 +387,10 @@ internal sealed class DesktopLayerHost : IDeskHost
         try
         {
             foreach (var w in _windows)
+            {
+                Unfollow(w);
                 if (!w.IsDisposed) w.Dispose();
+            }
             _windows.Clear();
             _screens.Clear();
             _homes.Clear();

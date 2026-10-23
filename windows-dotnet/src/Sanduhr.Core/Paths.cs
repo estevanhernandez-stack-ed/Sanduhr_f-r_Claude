@@ -194,6 +194,14 @@ public sealed class Paths
     /// nothing outside the app reads them). Not auto-created; the first install creates it.</summary>
     public string WidgetsDir => Path.Combine(_localAppDataBase, "Sanduhr", "widgets");
 
+    /// <summary>The Desk companion's growth memory (<see cref="CompanionGrowthState"/>), in the widgets folder so Reset removes
+    /// it with the packs.</summary>
+    public string CompanionStateFile => Path.Combine(WidgetsDir, CompanionGrowthState.FileName);
+
+    /// <summary>Sanduhr Time's day files (<c>%USERPROFILE%\.sanduhr\time\days</c>): another estate tool's folder, which the
+    /// companion only reads (<see cref="SanduhrTimeDays"/>). Never created here.</summary>
+    public string TimeDaysDir => Path.Combine(_externalDir, "time", "days");
+
     /// <summary>v1 plaintext config location — read-only, used for migration.</summary>
     public string LegacyConfigFile
         => Path.Combine(_homeDir, ".claude-usage-widget", "config.json");
