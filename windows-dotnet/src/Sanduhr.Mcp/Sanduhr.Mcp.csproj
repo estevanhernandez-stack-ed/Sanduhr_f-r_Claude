@@ -107,6 +107,12 @@
          validates, the widget draws. The widget owns every write (the widgets folder, the handoff result). -->
     <Compile Include="..\Sanduhr.Core\PackJson.cs" Link="Core\PackJson.cs" />
     <Compile Include="..\Sanduhr.Core\PackValidator.cs" Link="Core\PackValidator.cs" />
+    <!-- propose_widget's own rules (3.8): one more file, pure like the two above (JSON in, bytes and reasons out; no disk, no
+         network, no credentials, no process). WidgetProposal builds the pack from the tool's arguments (pack.json, the
+         LICENSE text, the kind's JSON files), refuses PNGs, fonts and themes, namespaces the id my-, runs PackValidator
+         strict, and holds the request and result shapes, so the server refuses exactly what the widget would. The widget's
+         half (WidgetHandoff: the request read, the result write, the review lines) and every write that matters stay out. -->
+    <Compile Include="..\Sanduhr.Core\WidgetProposal.cs" Link="Core\WidgetProposal.cs" />
   </ItemGroup>
 
 </Project>

@@ -40,7 +40,7 @@ public class McpServerTests
         var tools = (JsonArray)((JsonObject)res.Single()["result"]!)["tools"]!;
         Assert.Equal(new[] { "get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping", "publish_usage", "propose_theme",
                 "get_desk_messages", "propose_desk_messages", "get_desk", "propose_desk", "watch_start", "watch_update", "watch_end",
-                "propose_now_playing_looks" },
+                "propose_now_playing_looks", "propose_widget" },
             tools.Select(t => (string?)t!["name"]).ToArray());
         Assert.All(tools.Take(5), t => Assert.True(t!["annotations"]!["readOnlyHint"]!.GetValue<bool>()));
         // publish_usage queues an upload (performed by the widget) — honestly not read-only.
@@ -54,7 +54,7 @@ public class McpServerTests
         // not read-only, and none of them reaches the network (openWorldHint false).
         Assert.True(tools[7]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
         Assert.True(tools[9]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
-        foreach (int i in new[] { 8, 10, 11, 12, 13, 14 })
+        foreach (int i in new[] { 8, 10, 11, 12, 13, 14, 15 })
         {
             Assert.False(tools[i]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
             Assert.False(tools[i]!["annotations"]!["destructiveHint"]!.GetValue<bool>());
@@ -67,6 +67,11 @@ public class McpServerTests
         Assert.Contains("style_on", (string?)tools[14]!["description"]);
         Assert.Contains("3:1", (string?)tools[14]!["description"]);
         Assert.Equal("looks", (string?)tools[14]!["inputSchema"]!["required"]![0]);
+        // propose_widget: data only, the pixel-sheet grammar in the description, and Apply always (the direct switch never covers it).
+        Assert.Contains("never a PNG", (string?)tools[15]!["description"]);
+        Assert.Contains("'.' is transparent", (string?)tools[15]!["description"]);
+        Assert.Contains("does not cover", (string?)tools[15]!["description"]);
+        Assert.Equal("kind", (string?)tools[15]!["inputSchema"]!["required"]![0]);
         Assert.Contains("pending_approval", (string?)tools[8]!["description"]);
         // The Desk design tools: read first, then a partial design the server checks before the widget sees it.
         Assert.Contains("Call this before", (string?)tools[9]!["description"]);
