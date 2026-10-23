@@ -1,6 +1,6 @@
 # Changelog
 
-## v3.8.0 — 2026-10-XX
+## v3.8.0 — 2026-10-23
 
 **Platform:** Windows (.NET 10 / WPF). Widgets come to the Desk: signed packs from the 626 Labs catalog, a companion that grows with the days you code, and widgets Claude Code makes with you that install only on Apply. Updates restart on your click. This is the Microsoft Store release: the Store was on 3.7.1, and 3.7.2 shipped on GitHub only, so the Store update carries 3.7.2's fixes too. `Sanduhr.Mcp` to 3.8.0. **One new outbound destination**, GitHub releases of `626Labs-LLC/sanduhr-widgets`, reached only when you open Settings ▸ Widgets or install a pack (PRIVACY has the hosts). No new capability; the manifest still declares `runFullTrust` only and changes only its version.
 
