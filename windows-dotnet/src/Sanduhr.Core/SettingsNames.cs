@@ -202,6 +202,8 @@ public static class SettingsNames
     public const string WidgetUninstall = "Uninstall";
     /// <summary>Widgets: how a Claude-made or the user's own pack is listed (spec 3.8, section 3).</summary>
     public const string WidgetMadeHere = "made here";
+    /// <summary>Widgets: an installed sprite made here takes the user's own PNG sheets, one per stage (spec 3.8, section 6).</summary>
+    public const string WidgetUseOwnArt = "Use my own art…";
     /// <summary>Widgets, Desk companion (spec 3.8 section 4): the installed sprite that is the companion (one at a time).</summary>
     public const string WidgetCompanionPick = "Companion sprite";
     /// <summary>Widgets, Desk companion: places or hides the Desk's companion piece.</summary>

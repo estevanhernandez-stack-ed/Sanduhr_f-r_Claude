@@ -247,9 +247,12 @@ public sealed class WidgetStore
 
     /// <summary>
     /// Installs a validated pack from <paramref name="source"/>. Refused when the id is installed from a different
-    /// source. Replaces an install from the same source (an update) atomically.
+    /// source. Replaces an install from the same source (an update) atomically. <paramref name="replaceMadeHere"/> lets a
+    /// pack made here change hands between made-here sources (a Claude-made sprite the user gave their own art becomes
+    /// <see cref="WidgetSource.Local"/>, spec 3.8 section 6); a catalog pack is never replaced that way.
     /// </summary>
-    public WidgetStoreResult Install(IReadOnlyDictionary<string, byte[]> files, PackManifest manifest, WidgetSource source)
+    public WidgetStoreResult Install(IReadOnlyDictionary<string, byte[]> files, PackManifest manifest, WidgetSource source,
+        bool replaceMadeHere = false)
     {
         if (files is null || manifest is null || !IsSafeId(manifest.Id))
             return WidgetStoreResult.Failed("The pack has no valid id.");
@@ -257,7 +260,8 @@ public sealed class WidgetStore
         lock (_gate)
         {
             var reg = Load();
-            if (reg.Find(id) is { } existing && existing.Source != source)
+            if (reg.Find(id) is { } existing && existing.Source != source
+                && !(replaceMadeHere && existing.MadeHere && source != WidgetSource.Catalog))
                 return WidgetStoreResult.Failed(existing.MadeHere
                     ? $"A widget made here is already installed as {id}. Uninstall it first."
                     : $"A catalog widget is already installed as {id}. Uninstall it first.");
@@ -316,6 +320,38 @@ public sealed class WidgetStore
             }
             if (old is not null) TryDelete(old);
             return WidgetStoreResult.Done;
+        }
+    }
+
+    /// <summary>
+    /// An installed pack's own files read back into memory (relative POSIX path to bytes; the rasterized <c>.raster</c> folder
+    /// is Sanduhr's, not the pack's, and is left out). Null when the pack is missing, a file can't be read, or it holds more
+    /// than a pack may (<see cref="PackValidator.MaxPackBytes"/>, <see cref="PackValidator.MaxFiles"/>).
+    /// </summary>
+    public IReadOnlyDictionary<string, byte[]>? ReadFiles(string id)
+    {
+        try
+        {
+            string dir = PackDir(id);
+            if (!Directory.Exists(dir)) return null;
+            string root = Path.GetFullPath(dir) + Path.DirectorySeparatorChar;
+            var files = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+            long total = 0;
+            foreach (var full in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
+            {
+                string rel = Path.GetRelativePath(root, full).Replace(Path.DirectorySeparatorChar, '/');
+                if (rel.StartsWith(RasterName + "/", StringComparison.Ordinal)) continue;
+                var info = new FileInfo(full);
+                if (info.Attributes.HasFlag(FileAttributes.ReparsePoint)) return null;
+                total += info.Length;
+                if (total > PackValidator.MaxPackBytes || files.Count > PackValidator.MaxFiles + 3) return null;
+                files[rel] = File.ReadAllBytes(full);
+            }
+            return files;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return null;
         }
     }
 
