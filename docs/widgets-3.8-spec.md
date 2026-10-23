@@ -19,6 +19,7 @@ everything users see lands here. Windows first; the Mac follows with the same pa
 | G | Livelier bars | Smoothing, falloff, peak caps and gradients from the level we already read. No audio capture. |
 | H | Rainmeter spike | Parse Este's Knighthawk skins and measure what maps. A report, not a feature. |
 | I | Guided setup skill | A `sanduhr-mods` Claude Code skill that runs Desk setup as a conversation. Not in the app. |
+| J | **Restart to update** | With the user's OK, Sanduhr closes its WebView2 helpers, asks the Store to install now and relaunches on the new version. |
 
 ## 2. Trust and signing
 
@@ -157,6 +158,32 @@ this way. A user PNG makes the pack local-only; it is never sent anywhere.
   and where, proposes with `propose_desk`, iterates on the live preview, then offers the widget
   (`propose_widget`) or mod that would finish it. It ships with the mods marketplace, not the app,
   so it can change daily.
+
+## 8b. Restart to update (J)
+
+Today `StoreUpdateService` notices a waiting Store update and offers **Quit and update**: it quits
+and leaves the install to the Store. That fails two ways: quitting can orphan a WebView2 helper,
+which keeps the package "running" and makes the install fail with 0x80073D02, and the Store
+installs whenever it gets around to it.
+
+3.8 replaces it with **Restart to update**, with the user's approval:
+
+1. The toast and the tray say "Sanduhr 3.x is ready. Restart to update?" Nothing happens without
+   a click.
+2. On Yes: dispose both WebView2 environments (`webview2`, `webview2-fetch`) and wait, bounded,
+   for `BrowserProcessExited` (the 3.7.2 fix); register for restart (`RegisterApplicationRestart`);
+   then `StoreContext.RequestDownloadAndInstallStorePackageUpdatesAsync`, which shows Windows' own
+   consent dialog, installs, and closes the app.
+3. The new version starts on its own and shows its What's New.
+4. If the Store call fails or the user cancels, Sanduhr stays running and the tray keeps the offer.
+
+The Velopack channel already restarts itself (`ApplyUpdatesAndRestart`); it gets the same WebView2
+teardown first, so both channels behave the same.
+
+**The 3.7.1 to 3.8 hop can't use this.** That install happens while 3.7.1's code runs, and 3.7.1
+only has Quit and update. So 3.8's Store release notes keep the known-issues line: *"If the update
+won't install (error 0x80073D02), restart Windows and try again."* It comes out of the notes in the
+first release after 3.8.
 
 ## 9. Store and privacy, before submission
 
