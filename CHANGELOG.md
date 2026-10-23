@@ -1,5 +1,19 @@
 # Changelog
 
+## v3.7.2 — 2026-10-22
+
+**Platform:** Windows (.NET 10 / WPF). A patch on GitHub (Setup.exe) only; Store installs get these fixes in 3.8. `Sanduhr.Mcp` to 3.7.2: a Core file it already links gained a pure rule; the link list is unchanged. No new capability and no new outbound destination; the manifest still declares `runFullTrust` only.
+
+### Fixes
+
+- **WebView2 no longer outlives Sanduhr and blocks the next update (0x80073D02).** An `msedgewebview2.exe` left running after Quit kept the package in use, so installing an update failed until Windows restarted. Reproduced on a dev build: a second Sanduhr on the same data folder shared the first one's WebView2 browser, so ending the first left the browser running with its parent gone. Every browser process Sanduhr starts (the usage transport, each inactive account's check, the sign-in window) now sits in a job object that Windows ends with Sanduhr however it exits: Quit, a crash or End task. Quit hides the widget, closes every WebView2, waits up to 5 seconds for the browsers to exit by themselves, then ends any still running; no transport starts a browser once quitting has begun.
+- **One Sanduhr at a time.** A second launch (two tray icons were seen once) now shows the running widget and exits. A launch while Sanduhr is still quitting waits for it and then starts, which is the restart after an update. A dev build's `SANDUHR_DEV_PROFILE` keeps its own claim, so it runs beside the installed app.
+- **Choosing a theme through UI Automation applies it (#316).** The theme gallery in Settings ▸ Themes and the widget's quick switch are now lists whose items are named for their theme: selecting one with a click, the arrow keys or a screen reader's Select applies it, where before only a mouse click did.
+- **Each folder's controls are named for the folder.** Settings ▸ Claude Code read "Linked account for this folder" on every row; the combo, **Forget** and the MCP check box now say which folder ("Linked account for ~\.claude-personal"). Settings ▸ Desk messages does the same per line ("Remove line 2", "Line 2 color").
+- **Now playing names the app (#317).** Settings ▸ Now playing showed a web app's raw id ("Playing in Chrome._crx_cinhimbnk…") in the status line and the Apps list. It now shows the name your Start menu gives the app ("YouTube Music"), as the Launcher's app list does, and falls back to the id only when the Start menu doesn't list it.
+- **Launcher labels draw whole up to their 24-character limit (#318).** Under its button a label was cut at about ten characters ("YouTube…"). A label now wraps to two lines, and when the longest one still needs room the buttons widen, up to 2.6 icons wide. A Launcher of short labels keeps its size.
+- **The design review bar opens where the design is (#319).** With the Desk on a second monitor, **Apply** / **Dismiss** opened on the main monitor while the preview drew on the other. The bar now opens top center on the monitor that holds most of the pieces the design moves, the main monitor on a tie. Arrange Desk's **Done** / **Cancel** bar follows the pieces the same way.
+
 ## v3.7.1 — 2026-10-21
 
 **Platform:** Windows (.NET 10 / WPF). Claude designs your Desk, the Desk gets a Launcher, every piece can live on its own monitor, every song can wear its own look, and the Desk learns to go easy on an OLED screen. This is the Microsoft Store release: the Store was on 3.5.0, and 3.6.0 shipped on GitHub only, so the Store update carries 3.6.0's changes too. `Sanduhr.Mcp` to 3.7.1. No new capability and no new outbound destination; the manifest still declares `runFullTrust` only.

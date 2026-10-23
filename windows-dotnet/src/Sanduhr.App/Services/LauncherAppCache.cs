@@ -28,6 +28,7 @@ internal sealed class LauncherAppCache : IDisposable
     private ILauncherAppCatalog? _catalog;
     private IReadOnlyList<LauncherAppInfo>? _apps;
     private Dictionary<string, string> _names = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string?> _startMenuNames = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> _present = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ImageSource> _icons = new(StringComparer.Ordinal);
     private readonly HashSet<string> _iconsAsked = new(StringComparer.Ordinal);
@@ -60,6 +61,30 @@ internal sealed class LauncherAppCache : IDisposable
     public string? NameOf(string aumid)
     {
         lock (_gate) return _names.TryGetValue(aumid, out var n) ? n : null;
+    }
+
+    /// <summary>
+    /// The Start menu's name for any app id, such as a media session's (Settings, Now playing: #317). From the list
+    /// when it has the id, otherwise asked of the shell once (blocking, on the shell thread) and remembered; null when
+    /// the Start menu does not list it, so the caller falls back to its own rule. Never throws.
+    /// </summary>
+    public string? StartMenuName(string appId)
+    {
+        if (string.IsNullOrWhiteSpace(appId)) return null;
+        lock (_gate)
+        {
+            if (_names.TryGetValue(appId, out var listed)) return listed;
+            if (_apps?.FirstOrDefault(a => string.Equals(a.Aumid, appId, StringComparison.OrdinalIgnoreCase)) is { } app) return app.Name;
+            if (_startMenuNames.TryGetValue(appId, out var asked)) return asked;
+        }
+        string? name = null;
+        if (LauncherTarget.Validate(LauncherKind.App, appId).Ok)
+        {
+            try { name = EnsureCatalog()?.Name(appId); }
+            catch (Exception) { name = null; }
+        }
+        lock (_gate) _startMenuNames[appId] = name;
+        return name;
     }
 
     /// <summary>True only when a list has been read and it does not have this app: an app that may simply not be

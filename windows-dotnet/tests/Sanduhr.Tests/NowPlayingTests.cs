@@ -355,4 +355,31 @@ public class NowPlayingTests
         Assert.Equal("Playing", NowPlayingStatus.Text(true, Playing with { AppId = null }));
         Assert.DoesNotContain("Tune", NowPlayingStatus.Text(true, Playing));
     }
+
+    // #317: a web app plays under an id no rule can name; the Start menu can.
+
+    private const string YouTubeMusicId = "Chrome._crx_cinhimbnkkghhklpknlkffjgod";
+
+    private static string? StartMenu(string id) => id == YouTubeMusicId ? "YouTube Music" : null;
+
+    [Fact]
+    public void DisplayName_TakesTheStartMenuNameWhenThereIsOne()
+    {
+        Assert.Equal("YouTube Music", NowPlayingApps.DisplayName(YouTubeMusicId, StartMenu));
+        Assert.Equal("YouTube Music", NowPlayingApps.DisplayName("  " + YouTubeMusicId + " ", StartMenu));
+    }
+
+    [Fact]
+    public void DisplayName_FallsBackToItsRuleThenTheId()
+    {
+        Assert.Equal("Spotify", NowPlayingApps.DisplayName("Spotify.exe", StartMenu));
+        Assert.Equal("Spotify", NowPlayingApps.DisplayName("Spotify.exe", _ => "   "));
+        Assert.Equal("Spotify", NowPlayingApps.DisplayName("Spotify.exe", _ => throw new InvalidOperationException()));
+        Assert.Equal(YouTubeMusicId, NowPlayingApps.DisplayName(YouTubeMusicId, null)); // no name anywhere: the id, as before
+        Assert.Equal("Unknown app", NowPlayingApps.DisplayName(null, StartMenu));
+    }
+
+    [Fact]
+    public void Status_NamesAWebAppByItsStartMenuName() =>
+        Assert.Equal("Playing in YouTube Music", NowPlayingStatus.Text(true, Playing with { AppId = YouTubeMusicId }, StartMenu));
 }

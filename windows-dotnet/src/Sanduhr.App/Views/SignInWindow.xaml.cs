@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
+using Sanduhr.App.Services;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.Views;
@@ -73,6 +74,8 @@ internal partial class SignInWindow : Window
                 browserExecutableFolder: null,
                 userDataFolder: _userDataDir);
             await WebView.EnsureCoreWebView2Async(environment);
+            // Its browser process ends with Sanduhr, whatever way Sanduhr ends (BrowserProcessGuard).
+            BrowserProcessGuard.Current.Adopt(WebView.CoreWebView2);
 
             // Use the SAME UA the API client sends (ClaudeSignIn.BrowserUserAgent):
             // (1) cf_clearance is UA-bound, so a clearance captured here must be
@@ -280,6 +283,9 @@ internal partial class SignInWindow : Window
     {
         StopPoll();
         StopLoadTimeout();
+        // Close the controller now rather than at finalization, so the sign-in profile's browser
+        // process exits with the window.
+        try { WebView.Dispose(); } catch { /* best-effort */ }
         // If the window closed while showing a load error (user clicked X after a failed
         // load), report Failed so the coordinator offers the manual-paste fallback. A
         // clean close before any error is a deliberate Cancel.

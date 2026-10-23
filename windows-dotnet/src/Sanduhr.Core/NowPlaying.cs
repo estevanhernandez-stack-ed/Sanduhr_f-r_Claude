@@ -248,6 +248,25 @@ public static class NowPlayingApps
     /// dotted segment, and capitalizes a lowercase first letter. "Spotify.exe" is "Spotify",
     /// "chrome" is "Chrome", "Microsoft.ZuneMusic_8wekyb3d8bbwe!Microsoft.ZuneMusic" is "ZuneMusic".
     /// </summary>
+    /// <summary>
+    /// The app's name as the Start menu shows it when <paramref name="startMenuName"/> knows the id, else
+    /// <see cref="DisplayName(string?)"/>. A Chrome or Edge web app plays under an id like
+    /// "Chrome._crx_cinhimbnk…" that no rule can turn into "YouTube Music"; the Start menu can (#317).
+    /// The id itself never changes, only what is shown.
+    /// </summary>
+    public static string DisplayName(string? appId, Func<string, string?>? startMenuName)
+    {
+        var id = appId?.Trim();
+        if (!string.IsNullOrEmpty(id) && startMenuName is not null)
+        {
+            string? name = null;
+            try { name = startMenuName(id); }
+            catch (Exception) { /* no name: the rule below */ }
+            if (!string.IsNullOrWhiteSpace(name)) return name.Trim();
+        }
+        return DisplayName(appId);
+    }
+
     public static string DisplayName(string? appId)
     {
         const string unknown = "Unknown app";
@@ -312,11 +331,11 @@ public static class NowPlayingStatus
 {
     /// <summary>"Off", "Nothing playing", "Playing in Spotify", "Paused in Spotify". Without an app
     /// id the "in ..." part is left off.</summary>
-    public static string Text(bool on, NowPlayingInfo? shown)
+    public static string Text(bool on, NowPlayingInfo? shown, Func<string, string?>? startMenuName = null)
     {
         if (!on) return "Off";
         if (shown is null || shown.State == NowPlayingState.None) return "Nothing playing";
         var verb = shown.State == NowPlayingState.Playing ? "Playing" : "Paused";
-        return string.IsNullOrWhiteSpace(shown.AppId) ? verb : $"{verb} in {NowPlayingApps.DisplayName(shown.AppId)}";
+        return string.IsNullOrWhiteSpace(shown.AppId) ? verb : $"{verb} in {NowPlayingApps.DisplayName(shown.AppId, startMenuName)}";
     }
 }

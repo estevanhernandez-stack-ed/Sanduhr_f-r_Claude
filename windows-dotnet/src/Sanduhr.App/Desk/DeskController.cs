@@ -324,6 +324,18 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         Reload();
     }
 
+    /// <summary>
+    /// The screen the design review's bar opens on (#319): the one drawing most of the pieces the design moves, resizes or puts on
+    /// another monitor (every piece it places when the layout stays). Null with no screens; the bar then takes the primary.
+    /// </summary>
+    internal DeskScreen? ReviewScreen(DeskDesignSettings design)
+    {
+        if (_screens.Count == 0) return null;
+        var pieces = DeskMonitors.ReviewPieces(new DeskArrangement(_store.LoadDesk().Layout), new DeskArrangement(design.Desk.Layout));
+        int i = DeskMonitors.BarScreen([.. _screens.Select(s => s.Ref)], pieces, ConnectedIds);
+        return i < 0 ? null : _screens[i];
+    }
+
     /// <summary>The review is over (Dismiss, or Apply wrote the design): the saved Desk is drawn again.</summary>
     public void EndPreview()
     {

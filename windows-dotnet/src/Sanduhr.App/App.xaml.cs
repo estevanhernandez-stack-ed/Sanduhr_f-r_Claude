@@ -38,6 +38,13 @@ public partial class App : Application
     private Desk.WatcherStore? _watchers;
     private LauncherAppCache? _launcherApps;
     private MenuItem? _endDemoItem;
+    private bool _quitting;
+
+    /// <summary>The claim on this data folder (Program.Main). A second launch asks it to show the widget.</summary>
+    internal SingleInstance? Instance { get; init; }
+
+    /// <summary>How long a quit waits for WebView2's browser processes to close by themselves before ending them.</summary>
+    private static readonly TimeSpan BrowserExitWait = TimeSpan.FromSeconds(5);
 
     /// <summary>Where this install stands with the welcome tour, decided once at launch.</summary>
     private TourState? _tourState;
@@ -95,6 +102,7 @@ public partial class App : Application
 
         SetupTray();
         SyncTrayRotation();
+        Instance?.Listen(() => Dispatcher.BeginInvoke(() => { if (!_quitting) ShowWindow(); }));
         SetupHotKeys();
         StartGlow();
         StartDesk();
@@ -920,11 +928,16 @@ public partial class App : Application
         ResetWindow.ShowFor(_settingsWindow, service, QuitApp);
     }
 
-    private void QuitApp()
+    private async void QuitApp()
     {
+        if (_quitting)
+            return;
+        _quitting = true;
+        Instance?.StopAnswering();
         // After a reset nothing may write settings.json, snapshot.json or history on the way out.
         // (QuitApp is also the normal quit; the guard is a no-op until a reset has run.)
         WhatsNewWindow.Quitting = true;
+        BrowserProcessGuard.Current.BeginShutdown();
         _glow?.Dispose();
         _desk?.Dispose();
         _looks?.Dispose();
@@ -939,6 +952,16 @@ public partial class App : Application
         _tray?.Dispose();
         _trayIcon?.Dispose();
         _vm?.Dispose();
+        _window?.Hide();
+        // The sign-in window owns a WebView2 too; closing it disposes its controller.
+        foreach (var signIn in Windows.OfType<SignInWindow>().ToList())
+        {
+            try { signIn.Close(); } catch { /* best-effort */ }
+        }
+        // Every controller is closed now. Wait (bounded) for the browser processes to exit before this
+        // process does: one left running keeps the package in use and the next update fails (0x80073D02).
+        try { await BrowserProcessGuard.Current.WaitForExitAsync(BrowserExitWait); }
+        catch { /* the job still ends them when the process exits */ }
         Shutdown();
     }
 
@@ -966,6 +989,11 @@ public partial class App : Application
         _tray?.Dispose();
         _trayIcon?.Dispose();
         _vm?.Dispose();
+        // Exits that skipped QuitApp (signing out of Windows, a Store-driven shutdown): same bounded wait,
+        // without awaiting. After a QuitApp this finds nothing left.
+        BrowserProcessGuard.Current.BeginShutdown();
+        try { BrowserProcessGuard.Current.WaitForExit(TimeSpan.FromSeconds(2)); }
+        catch { /* the job still ends them when the process exits */ }
         base.OnExit(e);
     }
 }

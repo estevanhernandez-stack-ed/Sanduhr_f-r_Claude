@@ -1725,7 +1725,7 @@
                                                                    Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                                         <Button Grid.Column="1" Style="{StaticResource FlatButton}" Content="Forget folder" Margin="8,0,0,0"
                                                                 Padding="10,4" FontSize="11"
-                                                                AutomationProperties.Name="Forget this folder"
+                                                                AutomationProperties.Name="{Binding ForgetName}"
                                                                 Command="{Binding ForgetCommand}"
                                                                 CommandParameter="{Binding}"
                                                                 Visibility="{Binding IsAdded, Converter={StaticResource BoolVis}}" />
@@ -1737,7 +1737,7 @@
                                                                   ItemsSource="{Binding AccountOptions}"
                                                                   SelectedItem="{Binding LinkedAccount, Mode=TwoWay}"
                                                                   IsEnabled="{Binding LinkEnabled}"
-                                                                  AutomationProperties.Name="Linked account for this folder" />
+                                                                  AutomationProperties.Name="{Binding LinkedAccountName}" />
                                                     </StackPanel>
                                                     <TextBlock Text="The statusline in this folder shows that account's meters." FontSize="10.5"
                                                                Margin="0,4,0,0" TextWrapping="Wrap"
@@ -1745,7 +1745,7 @@
                                                     <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,8,0,0"
                                                               Content="Claude can read this folder's project totals (MCP)"
                                                               IsChecked="{Binding McpReadable, Mode=TwoWay}"
-                                                              AutomationProperties.Name="Claude can read this folder's project totals through the MCP server"
+                                                              AutomationProperties.Name="{Binding McpReadableName}"
                                                               Visibility="{Binding Discovered, Converter={StaticResource BoolVis}}" />
                                                     <TextBlock Text="Folders added by hand are never read by the MCP server." FontSize="10.5"
                                                                Margin="0,8,0,0" TextWrapping="Wrap"
@@ -2078,14 +2078,8 @@
                                     <ScrollViewer.Resources>
                                         <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                                     </ScrollViewer.Resources>
-                                    <ItemsControl ItemsSource="{Binding Themes}"
-                                                  ItemTemplate="{StaticResource ThemeSwatchTemplate}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel Orientation="Horizontal" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                    </ItemsControl>
+                                    <ListBox x:Name="ThemeGallery" Style="{StaticResource ThemeSwatchList}"
+                                             ItemsSource="{Binding Themes}" AutomationProperties.Name="Choose a theme" />
                                 </ScrollViewer>
                             </Border>
 

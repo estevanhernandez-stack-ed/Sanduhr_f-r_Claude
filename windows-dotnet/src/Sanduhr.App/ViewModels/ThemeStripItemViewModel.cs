@@ -52,6 +52,23 @@ public sealed partial class ThemeStripItemViewModel : ObservableObject
 
     [ObservableProperty] private bool _isActive;
 
+    /// <summary>
+    /// The selection the swatch lists show (bound to each item's <c>IsSelected</c>). Selecting a theme applies it,
+    /// whatever selected it: a click, the arrow keys, or UI Automation's <c>SelectionItemPattern.Select()</c>, which a
+    /// screen reader or voice access uses (#316). Deselecting does nothing: the next theme's apply moves the marker.
+    /// </summary>
+    public bool IsSelected
+    {
+        get => IsActive;
+        set
+        {
+            if (value && !IsActive)
+                _apply(Key);
+        }
+    }
+
+    partial void OnIsActiveChanged(bool value) => OnPropertyChanged(nameof(IsSelected));
+
     private static readonly FontFamily DefaultFont = new("Segoe UI Variable Display, Segoe UI");
 
     public ThemeStripItemViewModel(string key, ThemeDefinition def, bool isActive, Action<string> apply)

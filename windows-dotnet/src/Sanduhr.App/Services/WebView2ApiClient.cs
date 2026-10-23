@@ -87,6 +87,7 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
     private Window? _host;
     private WebView2? _web;
+    private CoreWebView2Environment? _env;
     private Task? _ready;
 
     private string? _orgId;
@@ -261,6 +262,11 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         // process (and its OnWebMessageReceived subscription) instead of replacing it.
         TearDownHostAndWebView();
 
+        // Quitting: no new browser process may start, or it outlives the quit and blocks the next
+        // package update (BrowserProcessGuard).
+        if (BrowserProcessGuard.Current.ShuttingDown)
+            throw new OperationCanceledException("Sanduhr is quitting");
+
         Directory.CreateDirectory(_profileDir);
         Log("init: creating hidden host + WebView2 environment");
 
@@ -283,12 +289,21 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         _host.Content = _web;
         _host.Show(); // realizes the HWND without stealing focus (ShowActivated=false)
 
-        var env = await CoreWebView2Environment.CreateAsync(
+        var web = _web;
+        _env = await CoreWebView2Environment.CreateAsync(
             browserExecutableFolder: null,
             userDataFolder: _profileDir).ConfigureAwait(true);
-        await _web.EnsureCoreWebView2Async(env).ConfigureAwait(true);
+        await web.EnsureCoreWebView2Async(_env).ConfigureAwait(true);
 
-        var core = _web.CoreWebView2;
+        var core = web.CoreWebView2;
+        BrowserProcessGuard.Current.Adopt(core);
+        // Disposed (or quitting) while the browser came up: close what was just built rather than leave it running.
+        if (_disposed || BrowserProcessGuard.Current.ShuttingDown || !ReferenceEquals(web, _web))
+        {
+            if (ReferenceEquals(web, _web)) TearDownHostAndWebView();
+            else try { web.Dispose(); } catch { /* best-effort */ }
+            throw new OperationCanceledException("transport closed while starting");
+        }
         core.Settings.UserAgent = ClaudeSignIn.BrowserUserAgent;
         core.Settings.IsWebMessageEnabled = true;
         core.WebMessageReceived += OnWebMessageReceived;
@@ -576,10 +591,13 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
                 _web.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
         }
         catch { /* best-effort */ }
+        // Disposing the control closes its CoreWebView2Controller; with the environment released too, the
+        // browser process has no client left and exits (BrowserProcessGuard waits for it on quit).
         try { _web?.Dispose(); } catch { /* best-effort */ }
         try { _host?.Close(); } catch { /* best-effort */ }
         _web = null;
         _host = null;
+        _env = null;
     }
 
     public void Dispose()

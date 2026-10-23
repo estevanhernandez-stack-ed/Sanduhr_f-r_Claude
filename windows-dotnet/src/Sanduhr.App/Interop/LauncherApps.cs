@@ -27,6 +27,9 @@ internal interface ILauncherAppCatalog
 
     /// <summary>The app's own icon as a frozen bitmap at about <paramref name="px"/> pixels; null when the shell has none.</summary>
     BitmapSource? Icon(string aumid, int px);
+
+    /// <summary>The name the Start menu shows for this app; null when it does not list it.</summary>
+    string? Name(string aumid) => Enumerate().FirstOrDefault(a => string.Equals(a.Aumid, aumid, StringComparison.OrdinalIgnoreCase))?.Name;
 }
 
 /// <summary>
@@ -93,6 +96,10 @@ internal sealed class LauncherApps : ILauncherAppCatalog, IDisposable
     public BitmapSource? Icon(string aumid, int px) =>
         LauncherTarget.AppShellPath(aumid) is { } path ? Run(() => IconCore(path, Math.Clamp(px, 16, 512)), null) : null;
 
+    /// <summary>The Start menu's name for one app, asked of <c>shell:AppsFolder\&lt;id&gt;</c> directly (no full listing).</summary>
+    public string? Name(string aumid) =>
+        LauncherTarget.AppShellPath(aumid) is { } path ? Run(() => NameCore(path), null) : null;
+
     public void Dispose()
     {
         if (_disposed) return;
@@ -146,6 +153,18 @@ internal sealed class LauncherApps : ILauncherAppCatalog, IDisposable
         if (item.GetDisplayName(sigdn, out var p) != 0 || p == IntPtr.Zero) return null;
         try { return Marshal.PtrToStringUni(p); }
         finally { Marshal.FreeCoTaskMem(p); }
+    }
+
+    private static string? NameCore(string shellPath)
+    {
+        Guid iid = Native.IID_IShellItem;
+        if (Native.SHCreateItemFromParsingName(shellPath, IntPtr.Zero, ref iid, out var item) != 0 || item is null) return null;
+        try
+        {
+            var name = DisplayName(item, Native.SIGDN_NORMALDISPLAY)?.Trim();
+            return string.IsNullOrEmpty(name) ? null : name;
+        }
+        finally { Marshal.ReleaseComObject(item); }
     }
 
     private static bool ItemExists(string shellPath)

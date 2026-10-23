@@ -665,13 +665,13 @@ internal sealed class DeskArrangeMode : IDisposable
     {
         _ended = ended;
         _changed = changed;
-        bool barPlaced = false;
-        // The bar goes on the primary monitor, else the first.
-        var primary = screens.FirstOrDefault(s => s.Primary) ?? screens.FirstOrDefault();
-        foreach (var screen in screens)
+        // The bar goes on the monitor that draws the most of the pieces, the primary on a tie (#319: it opened on the primary
+        // while the pieces were on another monitor).
+        int barAt = DeskMonitors.BarScreen([.. screens.Select(s => s.Ref)], working.Pieces, connectedIds);
+        for (int index = 0; index < screens.Count; index++)
         {
-            bool bar = !barPlaced && ReferenceEquals(screen, primary);
-            barPlaced |= bar;
+            var screen = screens[index];
+            bool bar = index == barAt;
             var content = new DeskArrangeContent(screen, settings, fonts, frame, working, bar, connectedIds, showOn: screens.Count > 1);
             content.Locate = Locate;
             content.CancelHoverElsewhere = from =>

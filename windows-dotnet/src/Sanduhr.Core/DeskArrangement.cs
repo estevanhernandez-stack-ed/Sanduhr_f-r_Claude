@@ -139,6 +139,34 @@ public static class DeskMonitors
     /// monitor goes back to every monitor.</summary>
     public static string? ToggleShowOn(string? current, DeskScreenRef screen) => FromWord(current) is null ? ThisScreen(screen) : null;
 
+    /// <summary>
+    /// Which screen a bar over the Desk opens on (the design review's Apply / Dismiss, Arrange mode's Done / Cancel): the one that
+    /// draws the most of <paramref name="pieces"/>, so the bar sits where the change is (#319). A piece on every monitor counts on
+    /// each. A tie that includes the primary screen, no pieces, or no screen with any goes to the primary; another tie to the first
+    /// screen in the list. The index into <paramref name="screens"/>, or -1 when there are none.
+    /// </summary>
+    public static int BarScreen(IReadOnlyList<DeskScreenRef> screens, IEnumerable<DeskPlacement> pieces, IReadOnlyCollection<string> connectedIds)
+    {
+        if (screens.Count == 0) return -1;
+        int primary = Math.Max(0, screens.ToList().FindIndex(s => s.Primary));
+        var list = pieces.ToList();
+        var counts = screens.Select(s => list.Count(p => ShowsOn(p.Monitor, s, connectedIds))).ToList();
+        int most = counts.Max();
+        if (most == 0 || counts[primary] == most) return primary;
+        return counts.IndexOf(most);
+    }
+
+    /// <summary>
+    /// The pieces a design review is about: those the proposed layout places differently from the current one (moved, resized, put on
+    /// another monitor, or newly shown); when the layout does not change, every piece the proposal places.
+    /// </summary>
+    public static IReadOnlyList<DeskPlacement> ReviewPieces(DeskArrangement current, DeskArrangement proposed)
+    {
+        var changed = proposed.Pieces.Where(p => current.Placement(p.Widget) is not { } was
+            || was.Anchor != p.Anchor || was.Scale != p.Scale || !Same(was.Monitor, p.Monitor)).ToList();
+        return changed.Count > 0 ? changed : proposed.Pieces;
+    }
+
     /// <summary>Whether a device path is one of the connected monitors.</summary>
     public static bool IsConnected(string? monitor, IReadOnlyCollection<string> connectedIds) =>
         FromWord(monitor) is { } m && m != Main && connectedIds.Contains(m, StringComparer.OrdinalIgnoreCase);

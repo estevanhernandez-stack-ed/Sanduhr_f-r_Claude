@@ -214,7 +214,9 @@ internal static class DeskLauncherPiece
         var model = frame.Model;
         if (model.IsEmpty) return null;
         bool anyLabel = model.Buttons.Any(b => b.Label is not null);
-        var geometry = LauncherLayout.Compute(model.Buttons.Count, model.Orientation, size, anyLabel);
+        var labels = model.Buttons.Select(b => b.Label).OfType<string>().ToList();
+        var geometry = Fit(model, size, family, labels);
+        double lineHeight = LauncherLayout.LabelLineHeight(geometry.LabelSize);
         var buttons = new List<LauncherButtonVisual>(model.Buttons.Count);
         for (int i = 0; i < model.Buttons.Count; i++)
         {
@@ -227,12 +229,12 @@ internal static class DeskLauncherPiece
             UIElement? label = null;
             if (anyLabel && b.Label is { } text)
             {
-                label = new TextBlock
-                {
-                    Text = text, FontFamily = family, FontSize = geometry.LabelSize, Foreground = ink, Opacity = textOpacity,
-                    TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Stretch,
-                    TextTrimming = TextTrimming.CharacterEllipsis, IsHitTestVisible = false, Effect = shadow,
-                };
+                var block = Label(text, family, geometry.LabelSize, lineHeight);
+                block.Foreground = ink;
+                block.Opacity = textOpacity;
+                block.Effect = shadow;
+                block.MaxHeight = slot.Label.Height;
+                label = block;
             }
             var glow = b.Glow is { } hex ? DeskView.Rgb(hex) : inkColor;
             buttons.Add(new LauncherButtonVisual(i, b, name, missing, slot, image, label, glow));
@@ -247,6 +249,49 @@ internal static class DeskLauncherPiece
             piece.Children.Add(buttons[i]);
         }
         return piece;
+    }
+
+    /// <summary>A label: centered, wrapping under its button, an ellipsis only past the label row's lines.</summary>
+    internal static TextBlock Label(string text, FontFamily family, double fontSize, double lineHeight) => new()
+    {
+        Text = text, FontFamily = family, FontSize = fontSize,
+        TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Stretch,
+        TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis,
+        LineHeight = lineHeight, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+        IsHitTestVisible = false,
+    };
+
+    /// <summary>How many lines <paramref name="text"/> wraps to at <paramref name="width"/>, not capped.</summary>
+    internal static int LabelLines(string text, FontFamily family, double fontSize, double lineHeight, double width)
+    {
+        if (width <= 0 || lineHeight <= 0) return 1;
+        var block = Label(text, family, fontSize, lineHeight);
+        block.Measure(new Size(width, double.PositiveInfinity));
+        return Math.Max(1, (int)Math.Round(block.DesiredSize.Height / lineHeight));
+    }
+
+    /// <summary>
+    /// The layout whose label row holds every label whole (#318: the limit is 24 characters, and one line under a
+    /// button held about ten). The smallest that fits, in this order: one line at the usual width; two lines; two lines
+    /// with the buttons widened step by step up to <see cref="LauncherLayout.MaxLabelledWidthShare"/>. A label still too
+    /// long there (24 of the widest letters) ends in an ellipsis on its second line.
+    /// </summary>
+    internal static LauncherGeometry Fit(LauncherModel model, double size, FontFamily family, IReadOnlyList<string> labels)
+    {
+        int count = model.Buttons.Count;
+        var geometry = LauncherLayout.Compute(count, model.Orientation, size, labels.Count > 0);
+        if (labels.Count == 0 || geometry.Slots.Count == 0) return geometry;
+        double lineHeight = LauncherLayout.LabelLineHeight(geometry.LabelSize);
+        int Needed(double width) => labels.Max(t => LabelLines(t, family, geometry.LabelSize, lineHeight, width));
+
+        int lines = Needed(geometry.Slots[0].Label.Width);
+        if (lines <= 1) return geometry;
+        for (double share = LauncherLayout.LabelledWidthShare; ; share = Math.Min(share + 0.1, LauncherLayout.MaxLabelledWidthShare))
+        {
+            var wider = LauncherLayout.Compute(count, model.Orientation, size, true, LauncherLayout.MaxLabelLines, share);
+            if (Needed(wider.Slots[0].Label.Width) <= LauncherLayout.MaxLabelLines || share >= LauncherLayout.MaxLabelledWidthShare)
+                return wider;
+        }
     }
 
     /// <summary>The button's picture: the chosen PNG, else the app's own icon, else a link glyph or a placeholder.</summary>

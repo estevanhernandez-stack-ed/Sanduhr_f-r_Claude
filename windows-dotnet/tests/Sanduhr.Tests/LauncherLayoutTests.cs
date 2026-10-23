@@ -161,4 +161,40 @@ public class LauncherLayoutTests
         var empty = new DeskElement(DeskElementKind.LauncherButton, "0", default);
         Assert.Null(DeskHitTest.Element(0, 0, [empty]));
     }
+
+    // #318: a label wraps to two lines and a labelled button widens within a max, so 24 characters draw whole.
+
+    [Fact]
+    public void ATwoLineLabelRowIsTwoLinesTallAndNoMore()
+    {
+        var one = LauncherLayout.Compute(3, LauncherOrientation.Row, 112, true);
+        var two = LauncherLayout.Compute(3, LauncherOrientation.Row, 112, true, labelLines: 2);
+        var five = LauncherLayout.Compute(3, LauncherOrientation.Row, 112, true, labelLines: 5);
+        double line = LauncherLayout.LabelLineHeight(one.LabelSize);
+
+        Assert.Equal(line, one.Slots[0].Label.Height);
+        Assert.Equal(2 * line, two.Slots[0].Label.Height);
+        Assert.Equal(two.Height, five.Height);           // capped at MaxLabelLines
+        Assert.Equal(one.Height + line, two.Height);
+        Assert.Equal(one.Width, two.Width);              // more lines, same width
+    }
+
+    [Fact]
+    public void ALabelledButtonWidensOnlyWithinItsMax()
+    {
+        var usual = LauncherLayout.Compute(2, LauncherOrientation.Row, 112, true);
+        var wide = LauncherLayout.Compute(2, LauncherOrientation.Row, 112, true, 2, labelledWidth: 2.2);
+        var widest = LauncherLayout.Compute(2, LauncherOrientation.Row, 112, true, 2, labelledWidth: 9);
+        var narrow = LauncherLayout.Compute(2, LauncherOrientation.Row, 112, true, 2, labelledWidth: 0.5);
+
+        Assert.Equal(usual.ImageSize * LauncherLayout.LabelledWidthShare, usual.Slots[0].Frame.Width, 6);
+        Assert.Equal(usual.ImageSize * 2.2, wide.Slots[0].Frame.Width, 6);
+        Assert.Equal(usual.ImageSize * LauncherLayout.MaxLabelledWidthShare, widest.Slots[0].Frame.Width, 6);
+        Assert.Equal(usual.Slots[0].Frame.Width, narrow.Slots[0].Frame.Width, 6);
+        // The image stays centered over its wider label.
+        Assert.Equal(wide.Slots[0].Frame.MidX, wide.Slots[0].Image.MidX, 6);
+        // No labels: the width share does nothing.
+        Assert.Equal(LauncherLayout.Compute(2, LauncherOrientation.Row, 112, false).Width,
+            LauncherLayout.Compute(2, LauncherOrientation.Row, 112, false, 2, 2.4).Width, 6);
+    }
 }
