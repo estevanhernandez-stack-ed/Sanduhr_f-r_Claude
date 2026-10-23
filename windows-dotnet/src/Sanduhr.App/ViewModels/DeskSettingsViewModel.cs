@@ -46,16 +46,23 @@ public sealed partial class DeskPieceRow : ObservableObject
     /// <summary>The monitor the piece is drawn on.</summary>
     [ObservableProperty] private DeskMonitorChoice _monitor = new(null, DeskMonitorNames.AllMonitors);
 
+    /// <summary>The meter style (#336), for the pieces that have one (<see cref="HasStyle"/>).</summary>
+    [ObservableProperty] private DeskStyleOption _style = DeskSettingsViewModel.StyleOptions[0];
+
     /// <summary>"120%", for the size picker.</summary>
     public string SizeText => $"{Math.Round(Size * 100)}%";
 
     public bool IsPlaced => Place.Anchor is not null;
+
+    /// <summary>True for the Claude line, the Claude limits and telemetry: their row shows a Style picker.</summary>
+    public bool HasStyle => DeskMeterStyles.Supports(Widget);
 
     internal void Load(DeskPlacement? p)
     {
         _loading = true;
         Place = p is null ? DeskSettingsViewModel.Hidden : DeskSettingsViewModel.PlaceFor(p.Anchor);
         Size = p?.Scale ?? 1;
+        Style = DeskSettingsViewModel.StyleFor(p?.Style ?? DeskMeterStyle.Bar);
         MonitorChoices = DeskMonitorNames.Choices(_owner.Monitors, p?.Monitor);
         Monitor = DeskMonitorNames.Select(MonitorChoices, p?.Monitor);
         _loading = false;
@@ -77,6 +84,17 @@ public sealed partial class DeskPieceRow : ObservableObject
         OnPropertyChanged(nameof(SizeText));
         if (!_loading) _owner.Edit(a => a.SetScale(Widget, value));
     }
+
+    partial void OnStyleChanged(DeskStyleOption value)
+    {
+        if (!_loading && value is not null && HasStyle) _owner.Edit(a => a.SetStyle(Widget, value.Style));
+    }
+}
+
+/// <summary>A meter style as the Style picker lists it (#336).</summary>
+public sealed record DeskStyleOption(DeskMeterStyle Style, string Name)
+{
+    public override string ToString() => Name;
 }
 
 /// <summary>
@@ -96,6 +114,12 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
 
     /// <summary>The size steps, 60% to 160%.</summary>
     public static IReadOnlyList<double> SizeSteps => DeskArrangement.ScaleSteps;
+
+    /// <summary>The meter styles (#336): Bars, Slim, Rings, Ticks.</summary>
+    public static IReadOnlyList<DeskStyleOption> StyleOptions { get; } =
+        [.. DeskMeterStyles.All.Select(s => new DeskStyleOption(s, DeskMeterStyles.Name(s)))];
+
+    public static DeskStyleOption StyleFor(DeskMeterStyle s) => StyleOptions.First(o => o.Style == s);
 
     /// <summary>The font picker's first entry: the system font (saved as "").</summary>
     public const string SystemFont = "System font (Segoe UI)";

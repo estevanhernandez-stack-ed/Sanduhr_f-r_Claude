@@ -650,6 +650,60 @@ public class ToolLogicDeskDesignTests
     }
 
     [Fact]
+    public void A_design_can_restyle_the_meters_under_the_same_review()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg);
+        var r = Propose(cfg, """{"layout":{"meters":{"anchor":"mr","tilt":18,"style":"slim"},"telemetry":{"anchor":"mr","tilt":18,"style":"ring"},"claude":{"style":"ticks"}}}""");
+        Assert.Equal("queued", (string?)r["status"]);
+        var request = (JsonObject)JsonNode.Parse(File.ReadAllText(cfg.DesignRequestPath!))!;
+        Assert.Equal("slim", (string?)request["design"]!["layout"]!["meters"]!["style"]);
+        Assert.Equal("ring", (string?)request["design"]!["layout"]!["telemetry"]!["style"]);
+        Assert.Equal("ticks", (string?)request["design"]!["layout"]!["claude"]!["style"]);
+
+        var schema = ToolCatalog.Build().ToJsonString();
+        Assert.Contains("style: bar|slim|ring|ticks, only on claude, meters and telemetry", schema);
+        Assert.Contains("ticks (ten segmented cells, the OLED-friendly one)", schema);
+    }
+
+    [Theory]
+    [InlineData("""{"layout":{"clock":{"anchor":"bl","style":"ring"}}}""", "layout.clock.style")]
+    [InlineData("""{"layout":{"weather":{"style":"slim"}}}""", "layout.weather.style")]
+    [InlineData("""{"layout":{"meters":{"style":"gauge"}}}""", "layout.meters.style")]
+    [InlineData("""{"layout":{"telemetry":{"style":true}}}""", "layout.telemetry.style")]
+    public void A_style_on_a_piece_without_one_or_an_unknown_style_is_refused_without_a_request(string design, string field)
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg);
+        var r = Propose(cfg, design);
+        Assert.Equal("rejected", (string?)r["status"]);
+        Assert.Contains(r["reasons"]!.AsArray(), x => (string?)x!["field"] == field);
+        AssertNoRequest(cfg);
+    }
+
+    [Fact]
+    public void Get_desk_passes_the_styles_and_their_limits_through()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg, s =>
+        {
+            s["design"]!["layout"]!["meters"] = new JsonObject { ["anchor"] = "tr", ["size"] = 1, ["monitor"] = "all", ["tilt"] = 0, ["style"] = "ring" };
+            s["limits"]!["piece_style"] = new JsonObject
+            {
+                ["pieces"] = new JsonArray("claude", "meters", "telemetry"),
+                ["values"] = new JsonArray("bar", "slim", "ring", "ticks"),
+                ["default"] = "bar",
+            };
+        });
+        var r = new ToolLogic(cfg, () => Now).BuildGetDesk();
+        Assert.Equal("ring", (string?)r["design"]!["layout"]!["meters"]!["style"]);
+        Assert.Equal(4, r["limits"]!["piece_style"]!["values"]!.AsArray().Count);
+    }
+
+    [Fact]
     public void A_monitor_id_the_widget_did_not_list_is_refused_without_a_request()
     {
         using var tmp = new TempDir();

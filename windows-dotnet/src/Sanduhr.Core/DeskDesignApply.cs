@@ -25,13 +25,13 @@ public static class DeskDesignApply
         return new DeskDesignSettings(nextDesk.Normalized(), Ink(ink, design), design.Launcher ?? launcher, design.Weather?.Nickname);
     }
 
-    /// <summary>The layout string for a design's pieces: the placed ones, in the design's order, with their sizes and tilts.</summary>
+    /// <summary>The layout string for a design's pieces: the placed ones, in the design's order, with their sizes, tilts and meter styles.</summary>
     public static string Layout(IReadOnlyList<DeskPieceLayout> pieces)
     {
         var placed = pieces
             .Where(p => !p.IsHidden && DeskArrangement.Known.Contains(p.Piece, StringComparer.Ordinal))
             .Select(p => new DeskPlacement(p.Piece, p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece), DeskArrangement.ClampScale(p.Size ?? 1), DeskMonitors.FromWord(p.Monitor),
-                DeskArrangement.ClampTilt(p.Tilt ?? 0)));
+                DeskArrangement.ClampTilt(p.Tilt ?? 0), DeskMeterStyles.For(p.Piece, p.Style ?? DeskMeterStyle.Bar)));
         return new DeskArrangement(placed).Layout;
     }
 

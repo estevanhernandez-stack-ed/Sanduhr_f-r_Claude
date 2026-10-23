@@ -5,10 +5,24 @@
              Focusable="False">
     <!-- Settings, Desk, Where each piece sits: each piece's place, size and monitor. Its own control so the names Narrator reads can be tested.
          The Settings window supplies the ThemedComboBox style (found at run time) and the theme brushes. DataContext: the Desk page. -->
+    <UserControl.Resources>
+        <DataTemplate x:Key="StylePicker">
+            <ComboBox Width="138" Margin="0,6,0,0" HorizontalAlignment="Left" Style="{DynamicResource ThemedComboBox}"
+                      ItemsSource="{x:Static vm:DeskSettingsViewModel.StyleOptions}"
+                      SelectedItem="{Binding Style, Mode=TwoWay}"
+                      IsEnabled="{Binding IsPlaced}"
+                      AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, style'}"
+                      AutomationProperties.HelpText="Bars, Slim (one line over a thin bar), Rings (small gauges in a row) or Ticks (ten cells, kind to OLED screens)" />
+        </DataTemplate>
+    </UserControl.Resources>
             <ItemsControl ItemsSource="{Binding Pieces}" Focusable="False">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Grid Margin="0,0,0,8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" MinWidth="118" />
                                 <ColumnDefinition Width="138" />
@@ -39,6 +53,20 @@
                                       SelectedItem="{Binding Monitor, Mode=TwoWay}"
                                       IsEnabled="{Binding IsPlaced}"
                                       AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, monitor'}" />
+                            <!-- The meter style (#336), only on the Claude line, the Claude limits and telemetry: a second line under the
+                                 place. The picker is made only for those rows (not merely hidden), so a screen reader never meets it elsewhere. -->
+                            <ContentControl Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="5" Focusable="False" IsTabStop="False">
+                                <ContentControl.Style>
+                                    <Style TargetType="ContentControl">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasStyle}" Value="True">
+                                                <Setter Property="Content" Value="{Binding}" />
+                                                <Setter Property="ContentTemplate" Value="{StaticResource StylePicker}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ContentControl.Style>
+                            </ContentControl>
                         </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

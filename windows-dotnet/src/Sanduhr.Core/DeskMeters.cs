@@ -79,6 +79,28 @@ public static class DeskMeters
         return rows;
     }
 
+    /// <summary>The cells a <see cref="DeskMeterStyle.Ticks"/> meter has.</summary>
+    public const int Ticks = 10;
+
+    /// <summary>How many of <paramref name="cells"/> tick cells a fill of 0 to 1 lights (#336): to the nearest cell, but any reading
+    /// above zero lights at least one, so 3% never reads as nothing.</summary>
+    public static int LitTicks(double fill, int cells = Ticks)
+    {
+        if (!double.IsFinite(fill) || fill <= 0) return 0;
+        return Math.Clamp((int)Math.Round(Math.Min(1, fill) * cells, MidpointRounding.AwayFromZero), 1, cells);
+    }
+
+    /// <summary>The short name a ring carries under it (#336): "Session" for the five-hour limit, "Week" for all models, the model
+    /// for another weekly limit ("Sonnet"), the card's label for anything else.</summary>
+    public static string ShortLabel(string key)
+    {
+        if (key == TierModel.FiveHour) return "Session";
+        if (key == TierModel.SevenDay) return "Week";
+        var label = TierModel.Label(key);
+        const string weekly = "Weekly - ";
+        return label.StartsWith(weekly, StringComparison.Ordinal) ? label[weekly.Length..] : label;
+    }
+
     /// <summary>
     /// The card's reset text, character for character (<c>TierCardViewModel.ResetDatetimeStr</c>):
     /// "Today 1:00 AM" / "Tomorrow 1:00 AM" / "Sun 1:00 AM" (under a week) / "Wed Apr 22 1:00 AM";
@@ -142,4 +164,25 @@ public static class DeskClaudeText
     /// or more accounts the line starts with the active label in place of "claude".</summary>
     public static string? Line(DeskUsage u, TimeZoneInfo? zone = null) =>
         GetParts(u, zone) is { } p ? $"{p.Account ?? "claude"}   {p.Rest}" : null;
+
+    /// <summary>
+    /// The line's compact two-row form (#336), so it no longer runs wide on a narrow or slanted stack: "claude   7% session" over
+    /// "resets 3:00   63% week". The sign-in line goes under the name. Null with nothing to say; one row when only the name and
+    /// the session fit on it.
+    /// </summary>
+    public static IReadOnlyList<string>? Compact(DeskUsage u, TimeZoneInfo? zone = null)
+    {
+        string name = u.Account ?? "claude";
+        if (u.SignInNeeded) return u.SignInReminder ? [name, SignInLine(u.FirstSignIn)] : null;
+        var tiers = u.LineTiers ?? u.Tiers;
+        var session = tiers.FirstOrDefault(t => t.Key == TierModel.FiveHour);
+        var week = tiers.FirstOrDefault(t => t.Key == TierModel.SevenDay);
+        if (session is null && week is null) return null;
+        string top = session is null ? name : $"{name}   {(int)session.Utilization}% session";
+        var bottom = new List<string>();
+        if (session is not null && Pacing.Parse(session.ResetsAt) is { } reset)
+            bottom.Add($"resets {TimeZoneInfo.ConvertTime(reset, zone ?? TimeZoneInfo.Local).ToString("h:mm", CultureInfo.InvariantCulture)}");
+        if (week is not null) bottom.Add($"{(int)week.Utilization}% week");
+        return bottom.Count == 0 ? [top] : [top, string.Join("   ", bottom)];
+    }
 }
