@@ -6,7 +6,16 @@ bad/bad-font-license	ERROR	pack.json: font packs must use OFL-1.1 or Apache-2.0 
 bad/bad-font-magic	ERROR	fixture.ttf: not a TrueType/OpenType font (bad magic number)
 bad/bad-id-mismatch	ERROR	pack.json: id 'something-else' does not match the folder name 'bad-id-mismatch'
 bad/bad-license-text	ERROR	LICENSE text does not look like MIT (expected the standard license text)
+bad/bad-newline-color	ERROR	palettes.json: palettes[0]: '#ff2a6d\n' is not a #rrggbb color
+bad/bad-newline-name	ERROR	palettes.json: palettes[0]: name must be 2 to 24 lowercase letters, digits or hyphens
+bad/bad-newline-theme-color	ERROR	themes/fixture-dark.json: accent must be a #rrggbb color (six hex digits), got '#ff2a6d\n'
 bad/bad-no-license	ERROR	LICENSE is missing; every pack carries its own license text
+bad/bad-null-effects	ERROR	effects.json: must be a JSON object, got null
+bad/bad-null-pack	ERROR	pack.json: must be a JSON object, got null
+bad/bad-null-palettes	ERROR	palettes.json: must be a JSON object, got null
+bad/bad-null-pixel-sheet	ERROR	sheet.json: must be a JSON object, got null
+bad/bad-null-sprite	ERROR	sprite.json: must be a JSON object, got null
+bad/bad-null-theme	ERROR	themes/fixture-dark.json: must be a JSON object, got null
 bad/bad-palette-stops	ERROR	palettes.json: palettes[0]: colors must be 1 to 4 #rrggbb stops
 bad/bad-pixel-char	ERROR	sheet.json: frames[0][3][3] is 'g'; a pixel is '.' (transparent) or 0-9, a-f (a palette index, lowercase)
 bad/bad-pixel-colors	ERROR	sheet.json: palette must be 1 to 16 #rrggbb colors (got 17)
@@ -33,4 +42,6 @@ bad/bad-theme-light-bg	WARN	themes/fixture-light.json: text_secondary reads at 2
 bad/bad-theme-missing-field	ERROR	themes/fixture-dark.json: accent is required (a #rrggbb color)
 bad/bad-trademark-model-word	ERROR	trademark: pack.json description contains 'sonnet'. Third-party marks are not allowed in packs (no Anthropic or Claude marks, no model names as branding); see FORMAT.md rule 6
 bad/bad-trademark-name	ERROR	trademark: pack.json name contains 'claude'. Third-party marks are not allowed in packs (no Anthropic or Claude marks, no model names as branding); see FORMAT.md rule 6
+bad/bad-type-license	ERROR	pack.json: license [] is not allowed; use one of MIT, CC-BY-4.0, CC0-1.0, Apache-2.0, OFL-1.1, BSD-3-Clause, ISC
+bad/bad-type-sprite-files	ERROR	pack.json: files entries must be strings
 bad/bad-unlisted-file	ERROR	palettes-old.json: file is not listed in pack.json files

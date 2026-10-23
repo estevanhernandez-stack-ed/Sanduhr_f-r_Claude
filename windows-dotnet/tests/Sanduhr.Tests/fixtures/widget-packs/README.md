@@ -1,7 +1,7 @@
 # Widget pack fixtures (copied from sanduhr-widgets)
 
-Source: `626Labs-LLC/sanduhr-widgets` at commit **473597d** (main, "feat/p256-and-pixel-sheets" merged:
-P-256 signing and sprite.json v2 pixel sheets).
+Source: `626Labs-LLC/sanduhr-widgets` at commit **61b4247** (main, PR #3 merged: literal-null JSON,
+trailing-newline and wrong-type rejections).
 
 | Folder here | Source path | What it is |
 |---|---|---|

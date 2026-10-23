@@ -424,7 +424,7 @@ public static class PackValidator
             return null;
         var parsed = new Dictionary<string, object?>(StringComparer.Ordinal);
 
-        // A file's parsed JSON (null for JSON null), Unreadable after a reported parse error, or Absent when the pack
+        // A file's parsed JSON, Unreadable after a reported parse error, or Absent when the pack
         // has no such file.
         object? JLoad(string rel)
         {
@@ -516,8 +516,8 @@ public static class PackValidator
 
     // ---- small helpers ------------------------------------------------------------------------------------------------
 
-    /// <summary>Parse a UTF-8 JSON file. Returns the value (null for a JSON null), or <see cref="Unreadable"/> after
-    /// reporting why it could not be read.</summary>
+    /// <summary>Parse a UTF-8 JSON file. Returns the value, or <see cref="Unreadable"/> after
+    /// reporting why it could not be read (a JSON null included).</summary>
     private static object? LoadJson(Report rep, byte[] raw, string rel)
     {
         if (raw.Length >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF)
@@ -533,6 +533,12 @@ public static class PackValidator
         if (!PackJson.TryParse(raw, out var value, out var error))
         {
             rep.Err($"{rel}: invalid JSON ({error})");
+            return Unreadable;
+        }
+        // Null means "no usable file" to every caller, so a literal null is an error here, as in the reference.
+        if (value is null)
+        {
+            rep.Err($"{rel}: must be a JSON object, got null");
             return Unreadable;
         }
         return value;

@@ -688,17 +688,16 @@ public class PackValidatorTests
         AssertHas(Errors(p, "good-sprite-pixel"), "frames must be an array of 1 to 256");
     }
 
-    // -- where this port follows FORMAT and the Python does not --------------------------------------------------------------
+    // -- null documents and trailing newlines (validate.py rejects both too since 61b4247) --------------------------------------------------------------
 
-    /// <summary>validate.py treats a file whose JSON is the literal null as if it were absent, so a palette pack whose
-    /// palettes.json is "null" passes there. FORMAT requires the object.</summary>
+    /// <summary>A file whose JSON is the literal null is an error, worded as validate.py's load_json words it.</summary>
     [Theory]
-    [InlineData("good-palette", "palettes.json", "palettes.json: must be a JSON object")]
-    [InlineData("good-effects", "effects.json", "effects.json: must be a JSON object")]
-    [InlineData("good-sprite", "sprite.json", "sprite.json: must be a JSON object")]
-    [InlineData("good-theme", "themes/fixture-dark.json", "themes/fixture-dark.json: theme must be a JSON object")]
-    [InlineData("good-sprite-pixel", "sheet.json", "sheet.json: a pixel sheet must be a JSON object")]
-    [InlineData("good-palette", "pack.json", "pack.json: must be a JSON object")]
+    [InlineData("good-palette", "palettes.json", "palettes.json: must be a JSON object, got null")]
+    [InlineData("good-effects", "effects.json", "effects.json: must be a JSON object, got null")]
+    [InlineData("good-sprite", "sprite.json", "sprite.json: must be a JSON object, got null")]
+    [InlineData("good-theme", "themes/fixture-dark.json", "themes/fixture-dark.json: must be a JSON object, got null")]
+    [InlineData("good-sprite-pixel", "sheet.json", "sheet.json: must be a JSON object, got null")]
+    [InlineData("good-palette", "pack.json", "pack.json: must be a JSON object, got null")]
     public void A_null_document_is_not_an_object(string pack, string rel, string needle)
     {
         var p = Good(pack);
@@ -706,7 +705,7 @@ public class PackValidatorTests
         AssertHas(Errors(p, pack), needle);
     }
 
-    /// <summary>Python's $ matches before a trailing newline, so validate.py takes "#ff2a6d\n" as a color.</summary>
+    /// <summary>A color with a trailing newline is not a color (validate.py uses fullmatch).</summary>
     [Fact]
     public void A_trailing_newline_does_not_satisfy_a_pattern()
     {

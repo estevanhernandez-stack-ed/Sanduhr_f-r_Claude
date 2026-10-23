@@ -325,7 +325,7 @@ public static class ThemeLint
     private static string Describe(JsonNode? n) => n switch
     {
         null => "null",
-        JsonValue v when v.TryGetValue<string>(out var s) => $"\"{s}\"",
+        JsonValue v when v.TryGetValue<string>(out var s) => PackJson.PyStr(s),
         JsonValue v => v.ToJsonString(),
         JsonObject => "an object",
         JsonArray => "an array",
