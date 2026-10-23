@@ -101,6 +101,42 @@
                 <TextBlock Text="Widgets" FontSize="14" FontWeight="SemiBold"
                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
 
+                <!-- The Desk companion (spec 3.8 section 4): one sprite at a time, shown or hidden, roaming or sitting. -->
+                <StackPanel views:SettingsAnchor.Id="widgets-companion">
+                    <TextBlock Text="Desk companion" Style="{StaticResource Heading}" />
+                    <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8"
+                               Visibility="{Binding HasCompanions, Converter={x:Static views:WidgetsPage.NotVisible}}"
+                               Text="Install a sprite from the catalog below and it can live on your Desk." />
+                    <StackPanel Visibility="{Binding HasCompanions, Converter={StaticResource BoolVis}}">
+                        <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8"
+                                   Text="A sprite that lives on your Desk. It grows with the days you code, never with the usage you spend, and its mood follows your pace. It never dies; time away only pauses it." />
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Text="{x:Static core:SettingsNames.WidgetCompanionPick}" VerticalAlignment="Center" FontSize="12"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
+                            <ComboBox x:Name="CompanionPicker" Style="{DynamicResource ThemedComboBox}" Width="230"
+                                      ItemsSource="{Binding Companions}" DisplayMemberPath="Name"
+                                      SelectedItem="{Binding SelectedCompanion, Mode=TwoWay}"
+                                      AutomationProperties.Name="{x:Static core:SettingsNames.WidgetCompanionPick}" />
+                        </StackPanel>
+                        <CheckBox x:Name="CompanionShowSwitch" Style="{DynamicResource ThemedCheckBox}" Margin="0,0,0,6"
+                                  Content="{x:Static core:SettingsNames.WidgetCompanionShow}"
+                                  IsChecked="{Binding CompanionShown, Mode=TwoWay}"
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.WidgetCompanionShow}" />
+                        <CheckBox x:Name="CompanionRoamSwitch" Style="{DynamicResource ThemedCheckBox}"
+                                  Content="{x:Static core:SettingsNames.WidgetCompanionRoam}"
+                                  IsChecked="{Binding CompanionRoams, Mode=TwoWay}"
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.WidgetCompanionRoam}"
+                                  AutomationProperties.HelpText="It walks the edges of its monitor. With Windows' animations off it stays put." />
+                        <TextBlock Style="{StaticResource Dim}" Margin="0,4,0,0"
+                                   Text="It walks the edges of its monitor and stops now and then. With Windows' animations off it stays put and moves at one frame a second. Where it sits is in Settings, Desk." />
+                        <TextBlock x:Name="CompanionStatusLine" Text="{Binding CompanionStatus}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                   AutomationProperties.Name="Companion status" />
+                    </StackPanel>
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,8,0,16" />
+
                 <StackPanel views:SettingsAnchor.Id="widgets-catalog">
                     <TextBlock Text="Widget catalog" Style="{StaticResource Heading}" />
                     <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8"

@@ -50,6 +50,8 @@ internal sealed record DeskFrame
     public IReadOnlyList<Watcher> Watchers { get; init; } = [];
     /// <summary>The Launcher piece's buttons and what they draw from (null: none to draw).</summary>
     public DeskLauncherFrame? Launcher { get; init; }
+    /// <summary>The companion piece's sprite (spec 3.8 section 4); null when no sprite is installed or the piece is not placed.</summary>
+    public CompanionService? Companion { get; init; }
 }
 
 /// <summary>
@@ -68,7 +70,7 @@ internal sealed class DeskView : Grid, IDisposable
     private static readonly Color WarningRed = Color.FromRgb(0xF8, 0x71, 0x71);
 
     /// <summary>The pieces this build draws (watchers: only from the harness until their tools ship).</summary>
-    public static readonly IReadOnlyList<string> Drawn = ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "glow"];
+    public static readonly IReadOnlyList<string> Drawn = ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "glow", "companion"];
 
     private readonly DeskScreen _screen;
     private readonly DeskSettings _settings;
@@ -87,6 +89,8 @@ internal sealed class DeskView : Grid, IDisposable
     private readonly List<ReflowHost> _hosts = [];
     private readonly List<Action<double>> _presenceSinks = [];
     private DeskRect _content = new(0, 0, 0, 0);
+    /// <summary>The roaming companion, drawn as its own island that moves along its route (null when it sits in a stack).</summary>
+    private (FrameworkElement Piece, DeskIslandMotion Motion, DeskPause Pause)? _roaming;
 
     /// <summary>
     /// Arrange mode's drawing (spec 7.3): a piece that would draw nothing (nothing playing, an empty
@@ -223,6 +227,17 @@ internal sealed class DeskView : Grid, IDisposable
             }
             islands.Add(new DeskIsland(content, new Point(x, y), h, v) { Pause = pause, Widgets = widgets });
         }
+        if (_roaming is { } walker)
+        {
+            if (walker.Piece.Parent is Panel holder) holder.Children.Remove(walker.Piece);
+            islands.Add(new DeskIsland(walker.Piece, walker.Motion.Anchor, HorizontalAlignment.Center, VerticalAlignment.Bottom)
+            {
+                Pause = walker.Pause,
+                Widgets = [CompanionSettings.Widget],
+                Motion = walker.Motion,
+            });
+            _roaming = null;
+        }
         Children.Clear();
         _stacks.Clear();
         return islands;
@@ -264,8 +279,11 @@ internal sealed class DeskView : Grid, IDisposable
         _glows.Clear();
         _hosts.Clear();
         _presenceSinks.Clear();
+        _roaming = null;
         var arrangement = new DeskArrangement(_settings.Layout);
-        var stacks = arrangement.Stacks(Drawn);
+        // A roaming companion is not in a stack: it walks the screen's edges in an island of its own.
+        bool roams = !Arranging && _frame.Companion is { Ready: true, Roaming: true } && arrangement.Placement(CompanionSettings.Widget) is not null;
+        var stacks = arrangement.Stacks(roams ? Drawn.Where(w => w != CompanionSettings.Widget).ToList() : Drawn);
         var m = _settings.Margins;
         var margins = DeskGeometry.Margins(m.Left, m.Right, m.Top, m.Bottom, _screen.Taskbar, Inset);
         var size = _screen.SizeDips;
@@ -300,6 +318,44 @@ internal sealed class DeskView : Grid, IDisposable
         area.Children.Add(left);
         area.Children.Add(right);
         if (center is not null) area.Children.Add(center);
+        if (roams && arrangement.Placement(CompanionSettings.Widget) is { } companion)
+            RoamingCompanion(companion, size, content);
+    }
+
+    /// <summary>
+    /// The roaming companion (spec 3.8 section 4): its route runs along the pack's edges of this monitor, less the taskbar's
+    /// reach, and it starts from the point of the route nearest its anchor. It is laid out in this view (so it has a size)
+    /// and handed out by <see cref="TakeIslands"/> as an island the host moves.
+    /// </summary>
+    private void RoamingCompanion(DeskPlacement p, Size size, DeskRect content)
+    {
+        var service = _frame.Companion!;
+        var t = _screen.Taskbar;
+        var area = new DeskRect(t.Left, t.Top, Math.Max(0, size.Width - t.Left - t.Right), Math.Max(0, size.Height - t.Top - t.Bottom));
+        var cell = service.CellSize;
+        var path = CompanionPath.Build(service.Sprite!.Edges, area, cell.Width * p.Scale, cell.Height * p.Scale);
+        if (path is null) return;
+        double ax = DeskAnchors.Column(p.Anchor) switch
+        {
+            DeskColumn.Left => content.Left,
+            DeskColumn.Right => content.Right,
+            _ => content.MidX,
+        };
+        double ay = DeskAnchors.Row(p.Anchor) switch
+        {
+            DeskRow.Top => content.Top,
+            DeskRow.Middle => content.MidY,
+            _ => content.Bottom,
+        };
+        service.StartAt(path.Nearest(ax, ay));
+        var spot = path.At(service.Distance);
+        var motion = new DeskIslandMotion(new Point(spot.X, spot.Y));
+        var pause = new DeskPause();
+        var piece = CompanionPieceVisual.Roaming(service, p.Scale, path, motion, pause, _live);
+        piece.Tag = p.Widget;
+        Children.Add(piece);
+        _pieces[p.Widget] = piece;
+        _roaming = (piece, motion, pause);
     }
 
     /// <summary>A column: top, middle and bottom stacks, the middle halfway between the other two.</summary>
@@ -398,6 +454,7 @@ internal sealed class DeskView : Grid, IDisposable
             "watchers" => WatchersPiece(ts, align),
             "launcher" => LauncherPiece(ts),
             "glow" => GlowSlot(ts),
+            "companion" => _frame.Companion is { Ready: true } c ? CompanionPieceVisual.Create(c, p.Scale, _gate, _live) : null,
             _ => null,
         };
         if (piece is null && Arranging && p.Widget != "glow")
@@ -407,7 +464,7 @@ internal sealed class DeskView : Grid, IDisposable
         piece.Tag = p.Widget; // which piece this is, for the Desk's clicks (DeskClicks, spec 7.4)
         // The message carries its own glow (spec 6.2) and the glow's spot is clear at rest; every other
         // piece takes the ink's shadow.
-        if (p.Widget is not ("message" or "nowPlaying" or "glow" or "launcher") && _ink.ShadowOpacity > 0)
+        if (p.Widget is not ("message" or "nowPlaying" or "glow" or "launcher" or "companion") && _ink.ShadowOpacity > 0)
             piece.Effect = Shadow(_ink);
         return piece;
     }

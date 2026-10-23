@@ -125,6 +125,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             new DeskPieceRow(this, "watchers", SettingsNames.DeskWatchers),
             new DeskPieceRow(this, "launcher", SettingsNames.DeskLauncher),
             new DeskPieceRow(this, "glow", SettingsNames.DeskGlow),
+            new DeskPieceRow(this, "companion", SettingsNames.DeskCompanion),
         ];
         Launcher = new LauncherSettingsViewModel(store, new Paths(), () => Pieces.FirstOrDefault(p => p.Widget == "launcher")?.IsPlaced == true, PlaceLauncherIfHidden)
         {

@@ -32,6 +32,10 @@ internal sealed record DeskIsland(FrameworkElement Content, Point Anchor, Horizo
     /// <c>WS_EX_TRANSPARENT</c>, so its drawn pixels take the mouse while fully transparent ones still pass
     /// it to the desktop. False keeps the whole window click-through, as before.</summary>
     public bool TakesClicks { get; init; }
+
+    /// <summary>A roaming island (the companion walking its edges): the host keeps the window's aligned edge on the motion's
+    /// anchor as it moves, without laying the island out again. Null for an island that stays where it hangs.</summary>
+    public DeskIslandMotion? Motion { get; init; }
 }
 
 /// <summary>What the Desk draws on one screen: its islands, each drawn in a window just its size, so

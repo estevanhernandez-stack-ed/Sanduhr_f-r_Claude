@@ -73,11 +73,16 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// <summary>OLED care (spec 3.7.0): the drift and idle clocks, and whether the switch is on.</summary>
     private readonly OledCareDriver _oled;
     private bool _oledOn;
+    /// <summary>The companion piece's sprite and clocks (spec 3.8 section 4); null without an app data folder (some tests).</summary>
+    private readonly CompanionService? _companion;
 
     public DeskController(SettingsStore store, Func<IDeskHost> hostFactory, Func<DeskUsage> usageSource,
         NowPlayingHub nowPlaying, DeskMessageSource messages, WatcherStore? watchers = null,
-        Paths? paths = null, LauncherAppCache? launcherApps = null, OledCareDriver? oled = null, NowPlayingLookService? looks = null)
+        Paths? paths = null, LauncherAppCache? launcherApps = null, OledCareDriver? oled = null, NowPlayingLookService? looks = null,
+        CompanionService? companion = null)
     {
+        _companion = companion ?? (paths is null ? null : new CompanionService(paths, store));
+        if (_companion is not null) _companion.Changed += OnCompanionChanged;
         _looks = looks;
         if (_looks is not null) _looks.Changed += OnLooksChanged;
         _oled = oled ?? new OledCareDriver();
@@ -98,7 +103,11 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _pump.Tick += (_, _) => Pump();
         _weather.Updated += () => Render();
         _messages.Changed += () => Render();
-        if (_watchers is not null) _watchers.Changed += () => Render();
+        if (_watchers is not null) _watchers.Changed += () =>
+        {
+            if (_host is not null && !_stopped && Placed(CompanionSettings.Widget)) _companion?.ObserveWatchers(_watchers.Shown);
+            Render();
+        };
         _nowPlaying.Changed += OnTrackChanged;
         _nowPlaying.PresenceChanged += OnPresenceChanged;
     }
@@ -109,6 +118,20 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         if (_host is null || _stopped) return;
         Render();
     }
+
+    /// <summary>The companion's stage or pack changed: its piece changes size, so lay out again.</summary>
+    private void OnCompanionChanged()
+    {
+        if (_host is null || _stopped || !Placed(CompanionSettings.Widget)) return;
+        Render();
+    }
+
+    /// <summary>The companion (the live check and the tests read it).</summary>
+    internal CompanionService? Companion => _companion;
+
+    /// <summary>The companion to draw: its sprite is loaded and its piece is placed; null otherwise.</summary>
+    private CompanionService? CompanionNow() =>
+        _companion is { Ready: true } c && Placed(CompanionSettings.Widget) ? c : null;
 
     /// <summary>OLED care's clocks (the live check and the tests drive them).</summary>
     internal OledCareDriver Oled => _oled;
@@ -293,6 +316,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             _launcher = preview.Launcher;
         }
         _messages.Reload();
+        if (_settings.Enabled && Placed(CompanionSettings.Widget)) _companion?.Reload();
+        else _companion?.Rest();
         if (!_settings.Enabled)
         {
             StopHost(); // ends Arrange mode too, as Cancel
@@ -356,6 +381,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         if (_host is null || _stopped) return;
         _usage = _usageSource();
+        if (Placed(CompanionSettings.Widget)) _companion?.ObserveUsage(_usage);
         Render();
     }
 
@@ -374,6 +400,11 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _oled.DriftStepped -= ApplyDrift;
         _oled.DimChanged -= OnDim;
         _oled.Dispose();
+        if (_companion is not null)
+        {
+            _companion.Changed -= OnCompanionChanged;
+            _companion.Dispose();
+        }
         _nowPlaying.Changed -= OnTrackChanged;
         _nowPlaying.PresenceChanged -= OnPresenceChanged;
         if (_launcherApps is not null) _launcherApps.Changed -= OnLauncherAppsChanged;
@@ -433,6 +464,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
             Watchers = WatchersNow(),
             Launcher = LauncherNow(),
+            Companion = CompanionNow(),
         };
         DeskArrangeMode mode;
         try
@@ -499,6 +531,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         if (_host is null || _stopped) return;
         _screens = _host.Screens();
         _usage = _usageSource();
+        if (Placed(CompanionSettings.Widget)) _companion?.ObserveUsage(_usage);
         Render();
         ScheduleMinute();
     }
@@ -668,6 +701,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
             Watchers = WatchersNow(),
             Launcher = LauncherNow(),
+            Companion = CompanionNow(),
         };
         _fullAt = now;
         foreach (var old in _views) old.Dispose();
