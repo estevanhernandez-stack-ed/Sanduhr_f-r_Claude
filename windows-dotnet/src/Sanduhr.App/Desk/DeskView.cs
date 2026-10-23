@@ -68,7 +68,7 @@ internal sealed record DeskFrame
 /// numbers move between redraws (the position bar, telemetry, the bars) update in place with fixed
 /// sizes, so only their island repaints; <see cref="Dispose"/> unhooks them. Nothing here takes a click.
 /// </summary>
-internal sealed class DeskView : Grid, IDisposable
+internal sealed partial class DeskView : Grid, IDisposable
 {
     /// <summary>The widget's over-limit red (<c>ThemeCatalog.UsageColor</c> at 90% and up).</summary>
     private static readonly Color WarningRed = Color.FromRgb(0xF8, 0x71, 0x71);
@@ -481,10 +481,10 @@ internal sealed class DeskView : Grid, IDisposable
         {
             "message" => _frame.Message is { } msg ? DeskMessagePiece.Create(msg, p.Scale, _ink, _fonts, _settings.Font, align, width, _live, _gate) : null,
             "clock" => Clock(ts, align),
-            "claude" => ClaudeLine(ts),
-            "meters" => Meters(ts, align),
+            "claude" => p.Style == DeskMeterStyle.Bar ? ClaudeLine(ts) : StyledClaude(ts, align, p.Style),
+            "meters" => p.Style == DeskMeterStyle.Bar ? Meters(ts, align) : StyledMeters(ts, align, p.Style),
             "nowPlaying" => NowPlaying(ts, align),
-            "telemetry" => TelemetryPiece(ts, align),
+            "telemetry" => p.Style == DeskMeterStyle.Bar ? TelemetryPiece(ts, align) : StyledTelemetry(ts, align, p.Style),
             "weather" => WeatherPiece(ts, align),
             "watchers" => WatchersPiece(ts, align),
             "launcher" => LauncherPiece(ts),
