@@ -625,7 +625,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private StoreUpdateService? _storeUpdate;
 
-    /// <summary>Waiting-Store-update notice (packaged build only). Attached by App;
+    /// <summary>Waiting-Store-update check (packaged build only), feeding Restart to update. Attached by App;
     /// rides the 30-second tick and acts at most every few hours. Null in unit
     /// contexts and inert on the Velopack build.</summary>
     public void AttachStoreUpdateService(StoreUpdateService service) => _storeUpdate = service;
@@ -1000,6 +1000,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             StatusText = "";
             ClearSignedInChrome();
             ClearTray();
+            WatchTransport(null);
             return;
         }
         Reason = SignInReason.None;
@@ -1008,6 +1009,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // Same (sessionKey, cfClearance) shape as ClaudeApiClient, same interface.
         _client = new WebView2ApiClient(creds.SessionKey, creds.CfClearance);
         _fetcher = new UsageFetcher(_client, _history);
+        WatchTransport(_client);
     }
 
     // -- demo mode -------------------------------------------------------------
@@ -1407,6 +1409,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             UpdateFooter();
             WriteSnapshotOk(data);
             OnActiveFetchGood(data);
+            NoteTransportBack();
             FetchSucceeded?.Invoke();
             return RefreshOutcome.Ok;
         }
@@ -1438,6 +1441,15 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             EnterRecoveryState(SignInReason.Blocked);
             return RefreshOutcome.Auth;
         }
+        catch (TransportLostException)
+        {
+            // The browser behind the transport exited (issue #331): it is already torn down, and the
+            // rebuild is scheduled (WidgetViewModel.Transport). Not an error to show; say we reconnect.
+            WriteSnapshotError(SnapshotContract.ErrorNetwork);
+            OnActiveFetchFailed(SnapshotContract.ErrorNetwork);
+            Fail(TransportLostStatus);
+            return RefreshOutcome.Transient;
+        }
         catch (NetworkException)
         {
             WriteSnapshotError(SnapshotContract.ErrorNetwork);
@@ -1454,7 +1466,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            Fail($"Error: {Truncate(ex.Message, 60)}");
+            // While the transport is being rebuilt, a failed rebuild is part of that story, not a new error.
+            if (_transport.Lost)
+                Fail(TransportLostStatus);
+            else
+                Fail($"Error: {Truncate(ex.Message, 60)}");
             return RefreshOutcome.Other;
         }
         finally
@@ -1601,7 +1617,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _publish?.Tick(DateTimeOffset.Now);
         _themeHandoff?.Tick();
         // A waiting Store update cannot install while this process holds its
-        // files, so the widget is what tells the person and offers to quit.
+        // files, so the widget tells the person and offers Restart to update.
         _storeUpdate?.Tick(DateTimeOffset.Now);
 
         if (ShownData is null)
@@ -2048,6 +2064,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _statusNoticeTimer?.Stop();
         _follower.Stop();
         _seatMeters.Stop();
+        StopTransportRecovery();
         (_client as IDisposable)?.Dispose();
     }
 
@@ -2060,6 +2077,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _themeHandoff?.Dispose();
         _follower.Stop();
         _seatMeters.Stop();
+        StopTransportRecovery();
         (_client as IDisposable)?.Dispose();
     }
 }

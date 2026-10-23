@@ -466,6 +466,70 @@ public static class ToolCatalog
                 ["required"] = new JsonArray("looks"),
                 ["additionalProperties"] = false,
             },
+            readOnly: false, openWorld: false),
+        Tool(
+            "propose_widget",
+            WidgetGuide,
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["kind"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["enum"] = new JsonArray("sprite", "palette", "effects"),
+                        ["description"] = "What the pack is. A widget theme goes through propose_theme instead; fonts are never proposed.",
+                    },
+                    ["pack"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["description"] = "pack.json's own fields. Sanduhr writes files, kind, schema_version and sanduhr_min, and the LICENSE text.",
+                        ["properties"] = new JsonObject
+                        {
+                            ["id"] = new JsonObject { ["type"] = "string", ["pattern"] = "^[a-z][a-z0-9]*(-[a-z0-9]+)*$", ["description"] = "Lowercase kebab-case; Sanduhr prefixes my- (3 to 40 characters with it)." },
+                            ["name"] = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 40 },
+                            ["description"] = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 200 },
+                            ["version"] = new JsonObject { ["type"] = "string", ["description"] = "MAJOR.MINOR.PATCH, default 1.0.0." },
+                            ["author"] = new JsonObject { ["type"] = "string", ["maxLength"] = 80, ["description"] = "Default: Made here. Never a brand or model name." },
+                            ["license"] = new JsonObject
+                            {
+                                ["type"] = "string",
+                                ["enum"] = new JsonArray("CC0-1.0", "CC-BY-4.0", "MIT", "Apache-2.0", "BSD-3-Clause", "ISC"),
+                                ["description"] = "Default CC0-1.0. Sanduhr writes the matching LICENSE.",
+                            },
+                        },
+                        ["required"] = new JsonArray("id", "name", "description"),
+                        ["additionalProperties"] = false,
+                    },
+                    ["sprite"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["description"] = "kind sprite: sprite.json (schema_version 2): frame_w, frame_h, scale, fps, sheet or stages, animations, moods, triggers, roam. Every sheet path ends .json and is a key of sheets.",
+                    },
+                    ["sheets"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["description"] = "kind sprite: pixel sheets, path (such as sheet.json or sprites/egg.json) to {palette, frame_w, frame_h, frames}.",
+                    },
+                    ["palettes"] = new JsonObject
+                    {
+                        ["description"] = "kind palette: palettes.json, {schema_version: 1, palettes: [...]} or the list alone.",
+                    },
+                    ["effects"] = new JsonObject
+                    {
+                        ["description"] = "kind effects: effects.json, {schema_version: 1, effects: [...]} or the list alone.",
+                    },
+                    ["note"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["maxLength"] = 200,
+                        ["description"] = "One short sentence for the user on what you made and why (shown on the review bar).",
+                    },
+                },
+                ["required"] = new JsonArray("kind", "pack"),
+                ["additionalProperties"] = false,
+            },
             readOnly: false, openWorld: false));
 
     // The Desk and watcher descriptions are the Mac server's, adapted to this machine's paths and
@@ -641,6 +705,36 @@ public static class ToolCatalog
         ["maxLength"] = 140,
         ["description"] = "One line for the user, up to 140 characters.",
     };
+
+    // propose_widget (3.8): what an agent needs to draw a pack as data, the pixel-sheet grammar and the limits included.
+    private const string WidgetGuide =
+        "Make a widget for the user's Sanduhr Desk with them: a pixel-art companion sprite, a palette pack for the Desk ink, or " +
+        "an effects pack. Call when the user asks for a desk pet, a companion, a sprite, a palette or an effect preset. The pack " +
+        "is data only: never a PNG, never a font, never code. A widget theme goes through propose_theme instead. Pass kind, pack " +
+        "{id, name (1-40), description (1-200), version?, author?, license?} and the kind's files. Sanduhr namespaces the id my-<id>, " +
+        "writes pack.json and a LICENSE (CC0-1.0 by default), validates the whole pack with the catalog's own rules (strict), and " +
+        "refuses with status rejected and reasons before anything is sent. Trademark rule: no 'claude' or 'anthropic' anywhere and " +
+        "no 'opus', 'sonnet', 'haiku' or 'fable' as words, in any name, description, author, file name or JSON string; original " +
+        "art only, no studio or game characters. " +
+        "SPRITE: sprite = sprite.json, schema_version 2: frame_w and frame_h (8 to 32 for pixel sheets), scale 1-4 (nearest " +
+        "neighbour), fps 1-24, either sheet (one .json path) or stages (1-6 of {id kebab 2-20, name 1-24, min_growth 0 for the " +
+        "first then strictly increasing up to 1, sheet, frame_w, frame_h}; stage 0's size equals the top-level size; stages grow " +
+        "with the user's coding days, never tokens), animations (name to 1-64 frame indexes; required: walk, sit, nap, pop, cheer, " +
+        "worry, focus, sleep, celebrate), moods {content, focused, worried, exhausted, celebrate} and triggers {needs_you, " +
+        "job_passed, near_limit, idle} each naming an animation, roam {edges: subset of bottom, left, right; speed_px_s 5-120}. " +
+        "sheets = path to a pixel sheet: {palette: 1-16 '#rrggbb' colors, never #ffffff (use #f0f0f0), frame_w, frame_h (equal " +
+        "to the stage's), frames: 1-256 frames, each exactly frame_h strings of exactly frame_w characters, top row first; '.' " +
+        "is transparent and 0-9, a-f (lowercase) index the palette}. Frame i is frames[i]; every sheet needs a frame for the " +
+        "highest index any animation uses. Keep the character on transparency, readable at scale 2, and give walk two or more " +
+        "frames. PALETTE: palettes = 1-64 of {name: lowercase-kebab 2-24, unique; colors: 1-4 '#rrggbb' stops left to right; mood? " +
+        "up to 24 characters}. EFFECTS: effects = 1-64 of {name as for palettes, type glow|sweep|shimmer|pulse, intensity 0-1, " +
+        "period_ms integer 400-10000, color '#rrggbb' or 'ink'}. " +
+        "Sanduhr checks the pack again and previews it on the Desk (a sprite as the companion, a palette as the Desk ink) with a " +
+        "review bar: previewing means the user is looking at it; it installs only when they press Apply (applied, as a local " +
+        "widget made here, listed in Settings, Widgets; companion true when they made a sprite the companion), and Dismiss " +
+        "answers rejected with reason dismissed and writes nothing. 'Let Claude change the Desk directly' does not cover " +
+        "widgets: a new pack always waits for Apply. queued means Sanduhr did not answer: it is not running. Nothing is uploaded; " +
+        "sharing a pack is a pull request to the sanduhr-widgets catalog.";
 
     private static JsonObject Tool(string name, string description, JsonObject inputSchema, bool readOnly = true, bool? openWorld = null) => new()
     {

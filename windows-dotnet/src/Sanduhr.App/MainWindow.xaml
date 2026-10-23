@@ -385,6 +385,31 @@
                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" FontSize="12"
                                Visibility="{Binding StatusText, Converter={StaticResource StrVis}}" />
 
+                    <!-- A notice with one action: the usage connection stopped (Restart), or an update is
+                         ready (Restart to update). Nothing happens until the button is clicked. -->
+                    <Border x:Name="ActionNoticeBar" Margin="2,2,2,8" Padding="10,6" CornerRadius="6" BorderThickness="1"
+                            BorderBrush="{DynamicResource Sanduhr.Brush.Accent}"
+                            Background="{DynamicResource Sanduhr.Brush.CardGlass}"
+                            AutomationProperties.Name="{Binding ActionNotice}"
+                            Visibility="{Binding ActionNotice, Converter={StaticResource StrVis}}">
+                        <DockPanel LastChildFill="True">
+                            <Button x:Name="ActionNoticeButton" DockPanel.Dock="Right" Command="{Binding ActionNoticeClickedCommand}" Cursor="Hand"
+                                    Content="{Binding ActionNoticeButton}" Margin="8,0,0,0" FontSize="11"
+                                    Background="Transparent" BorderThickness="0" VerticalAlignment="Center"
+                                    Foreground="{DynamicResource Sanduhr.Brush.Accent}"
+                                    AutomationProperties.Name="{Binding ActionNoticeButton}">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <TextBlock Text="{TemplateBinding Content}" TextDecorations="Underline"
+                                                   Foreground="{TemplateBinding Foreground}" />
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                            <TextBlock Text="{Binding ActionNotice}" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                        </DockPanel>
+                    </Border>
+
                     <!-- Demo mode: every number below is made up, and the widget says so. -->
                     <Border Margin="2,2,2,8" Padding="10,6" CornerRadius="6" BorderThickness="1"
                             BorderBrush="{DynamicResource Sanduhr.Brush.Accent}"

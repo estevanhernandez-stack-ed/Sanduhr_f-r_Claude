@@ -366,7 +366,7 @@ public sealed class DeskRideAlongsTests
         Assert.Equal(0f, m.Heights[2]);
         m.Reset();
         Assert.All(m.Heights.Concat(m.Caps), v => Assert.Equal(0f, v));
-        Assert.Equal(1, new AudioBarMotion(0).Heights.Count);
+        Assert.Single(new AudioBarMotion(0).Heights);
     }
 
     [Fact]

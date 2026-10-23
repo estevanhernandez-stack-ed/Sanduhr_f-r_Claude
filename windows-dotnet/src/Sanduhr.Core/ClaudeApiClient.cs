@@ -36,6 +36,15 @@ public sealed class NetworkException : ApiException
     public NetworkException(string message, Exception inner) : base(message, inner) { }
 }
 
+/// <summary>The WebView2 browser behind the usage transport exited mid-request (a crash, End task, an
+/// Edge runtime update). The transport has already torn itself down; the next request rebuilds it
+/// (<see cref="TransportRecovery"/>, issue #331).</summary>
+public sealed class TransportLostException : ApiException
+{
+    public TransportLostException(string message) : base(message) { }
+    public TransportLostException(string message, Exception inner) : base(message, inner) { }
+}
+
 /// <summary>
 /// Plan/subscription fields captured off the selected org during discovery and
 /// surfaced to the tier-badge layer (<see cref="PlanLabel.Resolve"/>). Mirrors

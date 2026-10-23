@@ -95,6 +95,7 @@ public class ResetPlanTests : IDisposable
             "mods\\m\\file.txt", "mcp\\v1\\sanduhr-mcp.exe", "bin\\sanduhr-statusline.ps1", "mcp-settings.json",
             "watchers.json", "desk-state.json", "wallpaper-preview.png", "desk-design-request.json", "desk-design-result.json",
             "now-playing-looks-request.json", "now-playing-looks-result.json", "now-playing-look.json", "now-playing-look-offer.json",
+            "widget-request.json", "widget-result.json",
         ];
         foreach (var f in files) Touch(Path.Combine(app, f));
         foreach (var f in externalFiles) Touch(Path.Combine(ext, f));
@@ -130,6 +131,8 @@ public class ResetPlanTests : IDisposable
             "~\\glow-waiting.signal", "~\\glow-done.signal", "~\\desk-messages-request.json", "~\\watch-request-1-2-w1.json",
             "~\\desk-design-request.json", "~\\desk-design-result.json",
             "~\\now-playing-looks-request.json", "~\\now-playing-looks-result.json", "~\\now-playing-look.json", "~\\now-playing-look-offer.json",
+            // the widget handoff (3.8, propose_widget), by name
+            "~\\widget-request.json", "~\\widget-result.json",
         })
             Assert.Contains(expected, hist);
 

@@ -99,6 +99,13 @@ public sealed class SingleInstance : IDisposable
     /// <summary>Quitting: stop answering, so a launch in the meantime waits for this one to exit and takes over.</summary>
     public void StopAnswering() => _accepting = false;
 
+    /// <summary>A restart to update that did not happen: answer second launches again.</summary>
+    public void ResumeAnswering()
+    {
+        if (!_disposed)
+            _accepting = true;
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

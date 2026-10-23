@@ -34,10 +34,14 @@ public partial class App : Application
     private Desk.DeskMessageSource? _messages;
     private Desk.DeskMessageHandoffService? _handoff;
     private Desk.DeskDesignService? _deskDesign;
+    private Desk.WidgetReviewService? _widgetReview;
     private Desk.NowPlayingLookService? _looks;
     private Desk.WatcherStore? _watchers;
     private LauncherAppCache? _launcherApps;
     private MenuItem? _endDemoItem;
+    private MenuItem? _restartToUpdateItem;
+    private MenuItem? _restartItem;
+    private RestartToUpdateService? _restartToUpdate;
     private bool _quitting;
 
     /// <summary>The claim on this data folder (Program.Main). A second launch asks it to show the widget.</summary>
@@ -135,14 +139,22 @@ public partial class App : Application
             catch { }
         }));
 
-        // A Store update cannot replace files this process holds: the install
-        // fails and leaves the old build running (3.4.1, 2026-09-14). Inert on
-        // the Velopack and dev builds, which have no Store identity.
-        _vm.AttachStoreUpdateService(new StoreUpdateService(_vm, QuitApp, log: msg =>
+        // Restart to update (3.8 spec 8b): one offer for both channels, nothing without a click. A Store
+        // update cannot replace files this process holds (3.4.1, 2026-09-14), so on yes Sanduhr closes its
+        // WebView2 helpers, registers for restart and asks the Store to install now. The Store check is
+        // inert on the Velopack and dev builds, which have no Store identity.
+        void LogUpdate(string msg)
         {
             try { System.IO.File.AppendAllText(themePaths.LogFile, $"{DateTime.UtcNow:o} {msg}{Environment.NewLine}"); }
             catch { }
-        }));
+        }
+        _restartToUpdate = new RestartToUpdateService(_vm,
+            new AppRestartHost(ReleaseBrowsersForUpdateAsync, ResumeBrowsersAfterUpdate, Instance, RestartApp, LogUpdate),
+            LogUpdate);
+        _restartToUpdate.OfferChanged += UpdateRestartItems;
+        _vm.RestartToUpdateRequested += () => _restartToUpdate?.Accept();
+        _vm.RestartRequested += RestartApp;
+        _vm.AttachStoreUpdateService(new StoreUpdateService(_restartToUpdate, OwnerWindowHandle, log: LogUpdate));
 
         // Background, in order, each step on its own: the one-time re-point of pre-3.5.0 registrations to
         // %USERPROFILE%\.sanduhr, then the statusline bridge (WS-E) and the MCP integration refresh. The
@@ -198,7 +210,9 @@ public partial class App : Application
 
         // Best-effort GitHub/Velopack update probe — fire-and-forget so a slow or offline
         // network never delays the first paint. No-ops on the Store/MSIX install and in dev.
-        _ = new UpdateChecker().CheckForUpdatesAsync();
+        // A downloaded release joins the same Restart to update offer as the Store's.
+        _ = new UpdateChecker().CheckForUpdatesAsync((version, installer) =>
+            Dispatcher.BeginInvoke(() => _restartToUpdate?.Offer(version, installer)));
 
         ScheduleWhatsNewAtLaunch();
     }
@@ -428,6 +442,16 @@ public partial class App : Application
         var quit = new MenuItem { Header = "Quit Sanduhr" };
         quit.Click += (_, _) => QuitApp();
 
+        // Only while an update waits (3.8 spec 8b): the same Restart to update as the toast and the widget.
+        _restartToUpdateItem = new MenuItem { Header = RestartToUpdate.ButtonText, Visibility = Visibility.Collapsed };
+        _restartToUpdateItem.Click += (_, _) => _restartToUpdate?.Accept();
+        // Only while the usage connection would not come back (issue #331).
+        _restartItem = new MenuItem { Header = "Restart Sanduhr", Visibility = Visibility.Collapsed };
+        _restartItem.Click += (_, _) => RestartApp();
+        menu.Opened += (_, _) => UpdateRestartItems();
+
+        menu.Items.Add(_restartToUpdateItem);
+        menu.Items.Add(_restartItem);
         menu.Items.Add(_endDemoItem);
         menu.Items.Add(show);
         menu.Items.Add(settings);
@@ -557,6 +581,11 @@ public partial class App : Application
         // The live review of Claude's Desk designs: the Desk and widget draw a design from memory, the floating bar asks Apply or Dismiss.
         _deskDesign.Host = new Desk.DeskDesignHost(_desk, () => _vm, FollowDesignChange);
         _deskDesign.DesignsChanged += () => _settingsWindow?.ViewModel.Desk.Designs.Reload();
+        // Widgets made with Claude (spec 3.8 section 5): propose_widget's pack previews on the Desk and installs only on Apply.
+        _widgetReview = new Desk.WidgetReviewService(paths, store);
+        Desk.WidgetReviewService.Current = _widgetReview;
+        _widgetReview.Host = new Desk.WidgetReviewHost(_desk, store, () => _settingsWindow?.ViewModel.WidgetsPage.ReloadLocal());
+        _widgetReview.Start();
         _desk.LauncherMissingClicked += OnLauncherMissing;
         _vm.DeskUsageChanged += _desk.UsageChanged;
         // The glow's Desk spot (spec 7.3): the glow service asks the Desk first and falls back to the window.
@@ -931,6 +960,84 @@ public partial class App : Application
         ResetWindow.ShowFor(_settingsWindow, service, QuitApp);
     }
 
+    /// <summary>The tray's restart items follow the update offer and the transport's state.</summary>
+    private void UpdateRestartItems()
+    {
+        if (_restartToUpdateItem is { } update)
+        {
+            bool offered = _restartToUpdate?.Offered == true;
+            update.Visibility = offered ? Visibility.Visible : Visibility.Collapsed;
+            update.ToolTip = offered ? _restartToUpdate!.Flow.Notice : null;
+        }
+        if (_restartItem is { } restart)
+            restart.Visibility = _vm?.TransportStopped == true ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>The widget's window handle, the owner of the Store's consent dialog.</summary>
+    private nint OwnerWindowHandle()
+    {
+        try { return _window is null ? 0 : new System.Windows.Interop.WindowInteropHelper(_window).EnsureHandle(); }
+        catch { return 0; }
+    }
+
+    /// <summary>
+    /// Restart to update, step one: the 3.7.2 teardown without quitting. No browser may start, the usage
+    /// transport and any sign-in window close, and the browsers get the quit's bounded wait to exit (the
+    /// guard ends the ones that do not), so none keeps the package in use while it installs.
+    /// </summary>
+    private async Task ReleaseBrowsersForUpdateAsync()
+    {
+        BrowserProcessGuard.Current.BeginHold();
+        _vm?.ReleaseTransport();
+        foreach (var signIn in Windows.OfType<SignInWindow>().ToList())
+        {
+            try { signIn.Close(); } catch { /* best-effort */ }
+        }
+        try { await BrowserProcessGuard.Current.WaitForExitAsync(BrowserExitWait); }
+        catch { /* the job still ends them when the process exits */ }
+    }
+
+    /// <summary>The update did not happen: browsers may start again, and the widget fetches now.</summary>
+    private void ResumeBrowsersAfterUpdate()
+    {
+        BrowserProcessGuard.Current.EndHold();
+        if (!_quitting)
+            _vm?.RefreshCommand.Execute(null);
+    }
+
+    /// <summary>
+    /// Restart Sanduhr: start a new copy, then quit this one. The new copy finds this one not answering
+    /// (<see cref="SingleInstance.StopAnswering"/>), waits for it to exit (up to the 15 s hand-off, longer
+    /// than the quit's 5 s browser wait) and takes over. Used by "the usage connection stopped" and by a
+    /// Store install that finished without closing Sanduhr.
+    /// </summary>
+    private void RestartApp()
+    {
+        if (_quitting)
+            return;
+        Instance?.StopAnswering();
+        string? family = null;
+        bool packaged = Sanduhr.Core.Startup.IsPackaged();
+        if (packaged)
+        {
+            try { family = global::Windows.ApplicationModel.Package.Current.Id.FamilyName; }
+            catch { /* no identity after all */ }
+        }
+        if (AppRelaunch.Target(packaged, family, Environment.ProcessPath) is { } target)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target.FileName, target.Arguments) { UseShellExecute = false })?.Dispose();
+            }
+            catch (Exception e)
+            {
+                try { System.IO.File.AppendAllText(new Sanduhr.Core.Paths().LogFile, $"{DateTime.UtcNow:o} restart: relaunch failed ({e.GetType().Name}){Environment.NewLine}"); }
+                catch { }
+            }
+        }
+        QuitApp();
+    }
+
     private async void QuitApp()
     {
         if (_quitting)
@@ -948,6 +1055,7 @@ public partial class App : Application
         _messages?.Dispose();
         _handoff?.Dispose();
         _deskDesign?.Dispose();
+        _widgetReview?.Dispose();
         _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();
@@ -985,6 +1093,7 @@ public partial class App : Application
         _messages?.Dispose();
         _handoff?.Dispose();
         _deskDesign?.Dispose();
+        _widgetReview?.Dispose();
         _watchers?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();

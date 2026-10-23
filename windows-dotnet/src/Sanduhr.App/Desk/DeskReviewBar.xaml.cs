@@ -47,6 +47,15 @@ public sealed partial class DeskReviewBar : UserControl
         };
     }
 
+    /// <summary>The heading the Desk design review shows (the XAML's text).</summary>
+    private const string DefaultHeading = "Claude suggests a Desk design";
+
+    /// <summary>The model's <see cref="DeskReviewModel.Option"/> is shown and checked (false when there is none).</summary>
+    public bool OptionChecked => Model?.Option is not null && OptionBox.IsChecked == true;
+
+    /// <summary>The option's check box, for tests.</summary>
+    public CheckBox Option => OptionBox;
+
     /// <summary>The bar's buttons, for the window's key handling and for tests.</summary>
     public Button Apply => ApplyButton;
     public Button Dismiss => DismissButton;
@@ -54,7 +63,21 @@ public sealed partial class DeskReviewBar : UserControl
     /// <summary>Shows a model: the name, the note, the lines, the fonts still missing, and whether Apply is available.</summary>
     public void SetModel(DeskReviewModel model)
     {
+        bool sameOption = Model?.Option == model.Option;
         Model = model;
+        Heading.Text = model.Heading ?? DefaultHeading;
+        AutomationProperties.SetName(Heading, Heading.Text);
+        string barName = model.BarName ?? DeskReviewCopy.BarName;
+        AutomationProperties.SetName(this, barName);
+        AutomationProperties.SetName(Frame, barName);
+        ChangesHeader.Text = model.ChangesTitle ?? DeskReviewCopy.ChangesName;
+        AutomationProperties.SetName(ChangesHeader, ChangesHeader.Text);
+        AutomationProperties.SetName(Changes, ChangesHeader.Text);
+        // A widget's one choice with Apply ("Make it the companion"), on by default; kept as the user left it while the same bar updates.
+        OptionBox.Content = model.Option ?? "";
+        AutomationProperties.SetName(OptionBox, model.Option ?? "");
+        OptionBox.Visibility = model.Option is null ? Visibility.Collapsed : Visibility.Visible;
+        if (!sameOption) OptionBox.IsChecked = true;
         Title.Text = model.Title;
         AutomationProperties.SetName(Title, model.Title);
         Note.Text = model.Note ?? "";

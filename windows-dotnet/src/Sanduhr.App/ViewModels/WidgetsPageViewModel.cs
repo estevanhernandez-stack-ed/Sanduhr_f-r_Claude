@@ -104,7 +104,17 @@ public sealed partial class InstalledWidgetRowViewModel : ObservableObject
         Description = info?.Description ?? "";
         Source = row.MadeHere ? SettingsNames.WidgetMadeHere : "from the catalog";
         Preview = WidgetsPageViewModel.LoadPreview(info?.PreviewPath);
+        CanUseOwnArt = row.MadeHere && Kind == "sprite";
     }
+
+    /// <summary>A sprite made here (Claude's or the user's own) takes the user's own PNG sheets (spec 3.8 section 6); a catalog
+    /// pack never does.</summary>
+    public bool CanUseOwnArt { get; }
+
+    public string UseOwnArtName => $"Use my own art for {Name}";
+
+    [RelayCommand]
+    private Task UseOwnArt() => _owner.UseOwnArtAsync(Id, Name);
 
     public string Id { get; }
     public string Name { get; }
@@ -370,6 +380,91 @@ public sealed partial class WidgetsPageViewModel : ObservableObject
         foreach (var row in reg.Packs)
             Installed.Add(new InstalledWidgetRowViewModel(this, row, Service.Store.ReadInfo(row.Id)));
         HasInstalled = Installed.Count > 0;
+    }
+
+    /// <summary>Picks one PNG for a stage: the dialog's title in, the chosen file's path out (null when cancelled). The app's is
+    /// the Windows file dialog; tests pass their own.</summary>
+    internal Func<string, string?> PickImage { get; set; } = DefaultPickImage;
+
+    /// <summary>A pack installed, uninstalled or changed somewhere else (a widget made with Claude was applied): the lists are read
+    /// again from the widgets folder. The catalog is not fetched.</summary>
+    public void ReloadLocal() => Rebuild();
+
+    /// <summary>
+    /// "Use my own art…" (spec 3.8 section 6): one PNG per stage, each checked with the pack image rules before it is copied in,
+    /// then the whole pack validated again and installed as the user's own (local-only). A stage whose dialog is cancelled keeps
+    /// its sheet. The images never leave this PC.
+    /// </summary>
+    internal Task UseOwnArtAsync(string id, string name)
+    {
+        if (Busy) return Task.CompletedTask;
+        var files = Service.Store.ReadFiles(id);
+        if (files is null || WidgetOwnArt.Sprite(files) is not { } sprite)
+        {
+            Status = $"{name} couldn't be read, so it is unchanged.";
+            return Task.CompletedTask;
+        }
+        var art = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        for (int i = 0; i < sprite.Stages.Count; i++)
+        {
+            var stage = sprite.Stages[i];
+            string title = sprite.Stages.Count == 1
+                ? $"Your own art for {name} ({stage.FrameWidth}x{stage.FrameHeight} pixel cells)"
+                : $"Your own art for {name}: stage {i + 1} of {sprite.Stages.Count}, {stage.Name} ({stage.FrameWidth}x{stage.FrameHeight} pixel cells)";
+            if (PickImage(title) is not { } path) continue;
+            byte[] png;
+            try
+            {
+                var info = new FileInfo(path);
+                if (info.Length > PackValidator.MaxImageBytes)
+                {
+                    Status = $"{stage.Name}: that image is larger than 2 MB. A sprite sheet is at most 2 MB, so {name} is unchanged.";
+                    return Task.CompletedTask;
+                }
+                png = File.ReadAllBytes(path);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+            {
+                Status = $"That image couldn't be read, so {name} is unchanged.";
+                return Task.CompletedTask;
+            }
+            if (WidgetOwnArt.CheckImage(png, stage, sprite.MaxFrame) is { } why)
+            {
+                Status = $"{stage.Name}: {why} {name} is unchanged.";
+                return Task.CompletedTask;
+            }
+            art[stage.Id] = png;
+        }
+        if (art.Count == 0)
+        {
+            Status = $"No image was chosen, so {name} is unchanged.";
+            return Task.CompletedTask;
+        }
+        var result = WidgetOwnArt.Apply(files, id, art);
+        if (!result.Ok)
+        {
+            Status = $"{name} is unchanged: {result.Errors.FirstOrDefault() ?? "the pack didn't pass its checks."}";
+            return Task.CompletedTask;
+        }
+        var installed = Service.Store.Install(result.Files!, result.Manifest!, WidgetSource.Local, replaceMadeHere: true);
+        Status = installed.Ok
+            ? $"{name} now uses your own art. It stays on this PC."
+            : installed.Error ?? $"{name} couldn't be changed.";
+        Rebuild();
+        if (installed.Ok) Changed?.Invoke();
+        return Task.CompletedTask;
+    }
+
+    private static string? DefaultPickImage(string title)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = title,
+            Filter = "PNG sprite sheet (*.png)|*.png",
+            CheckFileExists = true,
+            Multiselect = false,
+        };
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
     /// <summary>A pack's preview, decoded from memory so the file is never held open (Uninstall deletes it).</summary>

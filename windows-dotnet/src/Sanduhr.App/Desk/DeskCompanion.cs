@@ -39,6 +39,10 @@ internal sealed class CompanionService : IDisposable
     private CompanionAnimator? _animator;
     private CompanionGrowthState _growth = CompanionGrowthState.Empty;
     private BitmapSource? _sheet;
+    /// <summary>A pack under review (spec 3.8 section 5): drawn from its staged copy in place of the chosen one, until <see cref="EndPreviewPack"/>.</summary>
+    private (WidgetStore Store, string Id)? _previewPack;
+    /// <summary>The widgets folder the pack drawn now comes from (the installed one, or a staged preview).</summary>
+    private string? _packRoot;
     private DateTimeOffset _lastStep;
     private DateTimeOffset _lastIdlePoll = DateTimeOffset.MinValue;
     private bool _growthRunning;
@@ -116,10 +120,14 @@ internal sealed class CompanionService : IDisposable
     {
         if (_disposed) return;
         Settings = _store.LoadCompanion();
-        var store = new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng);
+        var store = StoreNow();
         string? pack = null;
-        try { pack = Settings.ActivePack(store.Load(), id => store.ReadInfo(id)?.Kind); }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        if (_previewPack is { } preview) pack = preview.Id;
+        else
+        {
+            try { pack = Settings.ActivePack(store.Load(), id => store.ReadInfo(id)?.Kind); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        }
         CompanionSprite? sprite = null;
         if (pack is not null)
         {
@@ -131,7 +139,8 @@ internal sealed class CompanionService : IDisposable
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException) { }
         }
-        bool packChanged = pack != PackId || (sprite is null) != (Sprite is null);
+        bool packChanged = pack != PackId || (sprite is null) != (Sprite is null) || store.Root != _packRoot;
+        _packRoot = store.Root;
         PackId = sprite is null ? null : pack;
         Sprite = sprite;
         if (packChanged)
@@ -167,10 +176,26 @@ internal sealed class CompanionService : IDisposable
         if (!force && Stage == stage && _sheet is not null) return false;
         Stage = stage;
         _frames.Clear();
-        var store = new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng);
-        _sheet = LoadSheet(CompanionSheet.DrawnFile(store, PackId, stage));
+        _sheet = LoadSheet(CompanionSheet.DrawnFile(StoreNow(), PackId, stage));
         return true;
     }
+
+    /// <summary>The store the companion draws from: a pack under review's staged copy, else the installed widgets.</summary>
+    private WidgetStore StoreNow() =>
+        _previewPack?.Store ?? new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng);
+
+    /// <summary>True while a pack under review is drawn in place of the chosen companion.</summary>
+    public bool PreviewingPack => _previewPack is not null;
+
+    /// <summary>
+    /// Draws <paramref name="id"/> from <paramref name="store"/> (a Claude-made sprite staged for review, spec 3.8 section 5) as the
+    /// companion until <see cref="EndPreviewPack"/>: the same loader, pointed at the staged pack. Nothing is chosen or saved; the
+    /// Desk's next <see cref="Reload"/> picks it up.
+    /// </summary>
+    public void PreviewPack(WidgetStore store, string id) => _previewPack = (store, id);
+
+    /// <summary>The review is over: the chosen companion is drawn again on the next <see cref="Reload"/>.</summary>
+    public void EndPreviewPack() => _previewPack = null;
 
     /// <summary>A sheet decoded from memory (so Uninstall can delete the file), frozen; null when it is missing, too large or not an image.</summary>
     internal static BitmapSource? LoadSheet(string file)

@@ -43,8 +43,18 @@ public sealed class BrowserProcessGuard : IDisposable
 
     public BrowserProcessGuard(Action<string>? log = null) => _log = log;
 
-    /// <summary>Set once Sanduhr is quitting: nothing new should start a browser after it.</summary>
-    public bool ShuttingDown { get; private set; }
+    private volatile bool _quitting;
+    private volatile bool _held;
+
+    /// <summary>True once Sanduhr is quitting, or while a restart to update holds the browsers closed:
+    /// nothing new should start a browser.</summary>
+    public bool ShuttingDown => _quitting || _held;
+
+    /// <summary>Restart to update: no browser starts until <see cref="EndHold"/> (the install failed or was cancelled).</summary>
+    public void BeginHold() => _held = true;
+
+    /// <summary>Browsers may start again. A quit already begun stays begun.</summary>
+    public void EndHold() => _held = false;
 
     /// <summary>How many adopted browser processes are still running.</summary>
     public int RunningCount
@@ -111,7 +121,7 @@ public sealed class BrowserProcessGuard : IDisposable
     }
 
     /// <summary>Marks the quit: <see cref="ShuttingDown"/> turns true.</summary>
-    public void BeginShutdown() => ShuttingDown = true;
+    public void BeginShutdown() => _quitting = true;
 
     /// <summary>
     /// Waits up to <paramref name="timeout"/> for every adopted browser to exit by itself, then ends the ones

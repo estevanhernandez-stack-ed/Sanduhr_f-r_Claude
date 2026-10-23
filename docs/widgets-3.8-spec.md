@@ -179,8 +179,13 @@ installs whenever it gets around to it.
 3. The new version starts on its own and shows its What's New.
 4. If the Store call fails or the user cancels, Sanduhr stays running and the tray keeps the offer.
 
-The Velopack channel already restarts itself (`ApplyUpdatesAndRestart`); it gets the same WebView2
-teardown first, so both channels behave the same.
+The Velopack channel restarts itself (`ApplyUpdatesAndRestart`); it gets the same WebView2
+teardown first, so both channels behave the same. Before 3.8 `UpdateChecker` only logged a newer
+release, so 3.8 also downloads it in the background and joins the same offer and button.
+
+Built as `RestartToUpdate` (Core: the order and the undo, tested against fakes) and
+`RestartToUpdateService` (App: toast, tray, the widget's notice). Proving it end to end needs a real
+Store update from a 3.8 build to a 3.8.x: see `docs/release-runbook.md`, Phase 7.
 
 **The 3.7.1 to 3.8 hop can't use this.** That install happens while 3.7.1's code runs, and 3.7.1
 only has Quit and update. So 3.8's Store release notes keep the known-issues line: *"If the update

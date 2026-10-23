@@ -87,6 +87,11 @@ public class TrustBoundaryTests
                 "VaultJson.cs", "VaultModels.cs", "VaultReader.cs", "VaultStore.cs",
                 "WallpaperSummary.cs",
                 "WatcherRequest.cs", "Watchers.cs",
+                // propose_widget's own rules (3.8). One file, pure (JSON in, bytes and reasons out; no IO, network,
+                // credentials or process): it builds the pack from the tool's arguments (pack.json, the LICENSE text, the
+                // kind's JSON files), refuses PNGs, fonts and themes, namespaces the id my-, runs PackValidator strict and
+                // holds the request and result shapes. The widget's half (WidgetHandoff, the review) stays out.
+                "WidgetProposal.cs",
             },
             linked);
     }
@@ -115,6 +120,7 @@ public class TrustBoundaryTests
     [InlineData("NowPlayingLook.cs")]
     [InlineData("PackJson.cs")]
     [InlineData("PackValidator.cs")]
+    [InlineData("WidgetProposal.cs")]
     public void Files_linked_for_watchers_desk_messages_and_desk_designs_are_pure(string file)
     {
         string path = Path.Combine(Path.GetDirectoryName(McpCsprojPath())!, "..", "Sanduhr.Core", file);
@@ -147,7 +153,9 @@ public class TrustBoundaryTests
     public void The_widget_catalog_client_is_not_in_the_mcp_assembly()
     {
         var typeNames = typeof(Sanduhr.Mcp.McpServer).Assembly.GetTypes().Select(t => t.Name).ToHashSet();
-        foreach (var name in new[] { "WidgetCatalog", "WidgetCatalogClient", "WidgetZip", "WidgetStore", "WidgetRegistry", "WidgetCatalogService" })
+        foreach (var name in new[] { "WidgetCatalog", "WidgetCatalogClient", "WidgetZip", "WidgetStore", "WidgetRegistry", "WidgetCatalogService",
+                     // the widget's half of propose_widget: the request read, the result write, the review lines, the own-art copy
+                     "WidgetHandoff", "WidgetReview", "WidgetOwnArt", "PixelSheet" })
             Assert.DoesNotContain(name, typeNames);
         string csproj = File.ReadAllText(McpCsprojPath());
         foreach (var file in new[] { "WidgetCatalog", "WidgetZip", "WidgetStore" })
