@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows;
 using System.Windows.Markup;
 using System.Windows.Media;
 using Sanduhr.App.Services;
@@ -27,13 +28,18 @@ internal static class PackFontCatalog
                 {
                     string? name = family.FamilyNames.TryGetValue(XmlLanguage.GetLanguage("en-us"), out var en)
                         ? en : family.FamilyNames.Values.FirstOrDefault();
-                    if (!string.IsNullOrWhiteSpace(name)) map.TryAdd(name, baseUri);
+                    if (string.IsNullOrWhiteSpace(name) || map.ContainsKey(name)) continue;
+                    // The validator only checks a font's size and magic number. A body WPF can't read still shows its family name,
+                    // and then throws FileFormatException when the glyph typeface is built, which would be at draw time. List a family
+                    // only once its typeface builds.
+                    var typeface = new Typeface(family, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+                    if (typeface.TryGetGlyphTypeface(out _)) map[name] = baseUri;
                 }
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or UriFormatException
-                or NotSupportedException or InvalidOperationException)
+                or NotSupportedException or InvalidOperationException or FormatException)
             {
-                // an unreadable font adds nothing
+                // an unreadable font adds nothing (FileFormatException is a FormatException)
             }
         }
         return map;

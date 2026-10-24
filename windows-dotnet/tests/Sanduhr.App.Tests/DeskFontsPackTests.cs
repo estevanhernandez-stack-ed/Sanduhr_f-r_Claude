@@ -77,6 +77,24 @@ public sealed class DeskFontsPackTests : IDisposable
     }
 
     [Fact]
+    public void AFontWithAGoodHeaderAndABrokenBodyIsSkippedAndNeverThrows()
+    {
+        Sta.Run(() =>
+        {
+            var store = InstalledPackKit.Store(ScratchPaths());
+            // The validator checks the size and the magic number only. This is the real font cut 100 bytes short: WPF finds its
+            // family name and then throws FileFormatException when it builds the glyph typeface (at draw time, on the UI thread).
+            byte[] truncated = File.ReadAllBytes(FontPackKit.RepoFont())[..34000];
+            FontPackKit.Install(store, "brokenface", truncated);
+            Assert.Empty(PackFontCatalog.Families(store));
+
+            FontPackKit.Install(store);   // a good pack beside it still loads
+            Assert.Equal(["EsteFont Pro"], PackFontCatalog.Families(store).Keys);
+            Assert.Single(PackFonts.Folders(store), f => f.PackId == "brokenface");   // copied, just not listed
+        });
+    }
+
+    [Fact]
     public void TheDesignServiceListsAPackFontAsInstalled()
     {
         Sta.Run(() =>
