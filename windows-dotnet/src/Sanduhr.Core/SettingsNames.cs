@@ -266,6 +266,9 @@ public static class SettingsNames
     public const string NowPlayingLooksDirect = "Let Claude style songs directly";
     /// <summary>Now playing, Looks: forgets every saved look, after a question.</summary>
     public const string ClearLooks = "Clear Looks…";
+    /// <summary>Message, Your lines: the two views of messages.txt, as a segment (WF48).</summary>
+    public const string MessageModeList = "List";
+    public const string MessageModeText = "Text";
     /// <summary>Weather: looks a typed city up with Open-Meteo.</summary>
     public const string WeatherLookUp = "Look up";
     /// <summary>Weather: the nickname the Desk shows instead of the place's name (#315, settings.json "desk_weather.nickname", local only).</summary>
@@ -357,6 +360,8 @@ public static class SettingsNames
         ("Save & Apply", SaveAndApply, false),
         ("Let agents show watchers", WatchersSwitch, false),
         ("Claude can read this folder's project totals", LetClaudeReadTotals, false),
+        ("Edit as text…", MessageModeText, false),
+        ("Back to the list", MessageModeList, false),
         ("Export CSV…", ExportMeterHistory, false),
         ("History vault", SessionArchive, false),
         ("Usage vault", SessionArchive, false),

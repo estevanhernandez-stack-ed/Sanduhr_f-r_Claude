@@ -198,7 +198,7 @@
                             </StackPanel>
                         </Grid>
                         <TextBlock Style="{StaticResource Dim}" Margin="0,4,0,0"
-                                   Text="Kept as written: the editor can't set everything on this line. Edit as text changes it." />
+                                   Text="Kept as written: the editor can't set everything on this line. Text changes it." />
                     </StackPanel>
 
                     <TextBlock Style="{StaticResource Dim}" Margin="0,2,0,0" Text="{Binding Note}" />
@@ -267,10 +267,16 @@
                         <Button Style="{DynamicResource AccentButton}" Content="Add line" Command="{Binding AddLineCommand}"
                                 AutomationProperties.Name="Add line"
                                 ToolTip="A new line, every day, at the top of the list." />
-                        <Button Style="{DynamicResource FlatButton}" Content="{Binding ModeButtonText}"
-                                Command="{Binding ToggleModeCommand}"
-                                AutomationProperties.Name="Switch between the list and the text of messages.txt"
-                                ToolTip="List: each line as controls. Text: the file itself, tags and all. Your edits carry over either way." />
+                        <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageMode"
+                                     Content="{x:Static core:SettingsNames.MessageModeList}"
+                                     IsChecked="{Binding IsListMode, Mode=TwoWay}"
+                                     AutomationProperties.Name="List, each line as its own row"
+                                     ToolTip="Each line as controls. Your edits carry over to Text." />
+                        <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageMode"
+                                     Content="{x:Static core:SettingsNames.MessageModeText}"
+                                     IsChecked="{Binding IsTextMode, Mode=TwoWay}"
+                                     AutomationProperties.Name="Text, messages.txt as written, tags and all"
+                                     ToolTip="The file itself, tags and all. Your edits carry over to List." />
                         <Button Style="{DynamicResource FlatButton}" Content="Save" Command="{Binding SaveCommand}"
                                 IsEnabled="{Binding Unsaved}" AutomationProperties.Name="Save messages.txt" />
                         <Button Style="{DynamicResource FlatButton}" Content="Revert" Command="{Binding RevertCommand}"

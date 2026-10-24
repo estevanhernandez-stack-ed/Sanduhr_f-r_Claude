@@ -585,12 +585,20 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
 
     [ObservableProperty] private string _saveMessage = "";
 
-    public bool IsListMode => _editor.Mode == MessageEditorMode.List;
-    public bool IsTextMode => !IsListMode;
-    public bool HasNoRows => Rows.Count == 0;
+    /// <summary>The List radio. Checking it shows the list; the false WPF writes when Text takes the check does nothing.</summary>
+    public bool IsListMode
+    {
+        get => _editor.Mode == MessageEditorMode.List;
+        set { if (value && !IsListMode) ToggleMode(); }
+    }
 
-    /// <summary>"Edit as text…" in the list, "Back to the list" in the text.</summary>
-    public string ModeButtonText => IsListMode ? "Edit as text…" : "Back to the list";
+    /// <summary>The Text radio, the other half of the segment.</summary>
+    public bool IsTextMode
+    {
+        get => !IsListMode;
+        set { if (value && IsListMode) ToggleMode(); }
+    }
+    public bool HasNoRows => Rows.Count == 0;
 
     /// <summary>Unsaved edits: the text this view would write differs from the file as read.</summary>
     public bool Unsaved => _editor.Unsaved;
@@ -621,7 +629,6 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
         OnPropertyChanged(nameof(IsListMode));
         OnPropertyChanged(nameof(IsTextMode));
         OnPropertyChanged(nameof(HasNoRows));
-        OnPropertyChanged(nameof(ModeButtonText));
         OnPropertyChanged(nameof(Unsaved));
         OnPropertyChanged(nameof(FileChanged));
         OnPropertyChanged(nameof(StatusText));

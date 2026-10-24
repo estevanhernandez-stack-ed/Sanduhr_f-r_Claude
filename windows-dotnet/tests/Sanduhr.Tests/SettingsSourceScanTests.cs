@@ -463,4 +463,17 @@ public class SettingsSourceScanTests
             .ToList();
         Assert.True(copies.Count == 0, "Use <views:TrademarkFooter /> in: " + string.Join(", ", copies));
     }
+
+    [Fact]
+    public void Message_mode_is_a_two_radio_segment()
+    {
+        var page = File.ReadAllText(Path.Combine(AppDir(), "Views", "DeskMessagePage.xaml"));
+        var radios = Regex.Matches(page, "<RadioButton\\b[^>]*GroupName=\"MessageMode\"[^>]*>").Select(m => m.Value).ToList();
+        Assert.Equal(2, radios.Count);
+        Assert.Contains("Content=\"{x:Static core:SettingsNames.MessageModeList}\"", radios[0]);
+        Assert.Contains("IsChecked=\"{Binding IsListMode, Mode=TwoWay}\"", radios[0]);
+        Assert.Contains("Content=\"{x:Static core:SettingsNames.MessageModeText}\"", radios[1]);
+        Assert.Contains("IsChecked=\"{Binding IsTextMode, Mode=TwoWay}\"", radios[1]);
+        Assert.DoesNotContain("ModeButtonText", page);
+    }
 }

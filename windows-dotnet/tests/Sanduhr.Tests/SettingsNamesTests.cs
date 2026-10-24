@@ -312,4 +312,13 @@ public class SettingsNamesTests
             Assert.NotEmpty(SettingsNames.RetiredNames(old));
         Assert.Empty(SettingsNames.RetiredNames(SettingsNames.HideWhatsNewAfterUpdates));
     }
+
+    [Fact]
+    public void Message_modes_are_List_and_Text()
+    {
+        Assert.Equal("List", SettingsNames.MessageModeList);
+        Assert.Equal("Text", SettingsNames.MessageModeText);
+        Assert.NotEmpty(SettingsNames.RetiredNames("Edit as text…"));
+        Assert.NotEmpty(SettingsNames.RetiredNames("Back to the list"));
+    }
 }
