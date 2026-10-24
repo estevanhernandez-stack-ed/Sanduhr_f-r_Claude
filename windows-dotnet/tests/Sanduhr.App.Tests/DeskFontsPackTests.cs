@@ -95,6 +95,27 @@ public sealed class DeskFontsPackTests : IDisposable
     }
 
     [Fact]
+    public void AFamilyWithABrokenBoldFaceIsSkippedWholeBecauseTheDeskDrawsBoldOnEveryRender()
+    {
+        Sta.Run(() =>
+        {
+            string dir = Path.GetDirectoryName(FontPackKit.RepoFont())!;
+            byte[] regular = File.ReadAllBytes(Path.Combine(dir, "EsteFontPro-Regular.ttf"));
+            byte[] bold = File.ReadAllBytes(Path.Combine(dir, "EsteFontPro-Bold.ttf"));
+            var store = InstalledPackKit.Store(ScratchPaths());
+
+            // A good Regular and a Bold cut 100 bytes short, one family: the clock time, headings and letter styles ask for the Bold.
+            FontPackKit.InstallFiles(store, "halfface", new Dictionary<string, byte[]> { ["regular.ttf"] = regular, ["bold.ttf"] = bold[..^100] });
+            Assert.Empty(PackFontCatalog.Families(store));
+
+            // With both faces whole it is listed.
+            Assert.True(store.Uninstall("halfface").Ok);
+            FontPackKit.InstallFiles(store, "wholeface", new Dictionary<string, byte[]> { ["regular.ttf"] = regular, ["bold.ttf"] = bold });
+            Assert.Equal(["EsteFont Pro"], PackFontCatalog.Families(store).Keys);
+        });
+    }
+
+    [Fact]
     public void TheDesksFontsAreReadFromTheGivenPathsNotThePcsOwnWidgetsFolder()
     {
         Sta.Run(() =>

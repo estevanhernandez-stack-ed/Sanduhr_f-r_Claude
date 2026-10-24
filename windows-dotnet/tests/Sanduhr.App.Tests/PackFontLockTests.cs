@@ -21,6 +21,25 @@ internal static class FontPackKit
         return Path.Combine(dir!, "mac", "Resources", "Fonts", "EsteFontPro-Regular.ttf");
     }
 
+    /// <summary>Installs a font pack of several font files (name to bytes) through the validator and the real install.</summary>
+    public static void InstallFiles(WidgetStore store, string id, IReadOnlyDictionary<string, byte[]> fonts)
+    {
+        string fixture = Path.Combine(AppContext.BaseDirectory, "fixtures", "widget-packs", "good", "good-font");
+        string list = string.Join(", ", fonts.Keys.Select(k => $"\"{k}\""));
+        var manifest = System.Text.RegularExpressions.Regex.Replace(
+            File.ReadAllText(Path.Combine(fixture, "pack.json")).Replace("good-font", id), @"""files"":\s*\[[^\]]*\]", $"\"files\": [{list}]");
+        var files = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+        {
+            ["pack.json"] = Encoding.UTF8.GetBytes(manifest),
+            ["LICENSE"] = File.ReadAllBytes(Path.Combine(fixture, "LICENSE")),
+        };
+        foreach (var (name, bytes) in fonts) files[name] = bytes;
+        var v = PackValidator.Validate(files, id, strict: true);
+        Assert.True(v.Ok, string.Join(" | ", v.Errors));
+        var r = store.Install(files, v.Manifest!, WidgetSource.Catalog);
+        Assert.True(r.Ok, r.Error);
+    }
+
     /// <summary>Installs the pack <c>esteface</c> (kind font, one real .ttf) into the store, through the validator and the real install.</summary>
     public static void Install(WidgetStore store, string id = "esteface", byte[]? font = null)
     {

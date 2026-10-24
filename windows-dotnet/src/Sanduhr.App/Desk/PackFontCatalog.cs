@@ -30,10 +30,10 @@ internal static class PackFontCatalog
                         ? en : family.FamilyNames.Values.FirstOrDefault();
                     if (string.IsNullOrWhiteSpace(name) || map.ContainsKey(name)) continue;
                     // The validator only checks a font's size and magic number. A body WPF can't read still shows its family name,
-                    // and then throws FileFormatException when the glyph typeface is built, which would be at draw time. List a family
-                    // only once its typeface builds.
-                    var typeface = new Typeface(family, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
-                    if (typeface.TryGetGlyphTypeface(out _)) map[name] = baseUri;
+                    // and then throws FileFormatException when the glyph typeface is built, which would be at draw time. The Desk draws
+                    // Bold on every render (the clock, headings, letter styles) and Italic in letter styles, and a pack may carry a file
+                    // for each: list the family only when every face it has, and the four the Desk asks for, build.
+                    if (FacesBuild(family)) map[name] = baseUri;
                 }
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or UriFormatException
@@ -43,6 +43,30 @@ internal static class PackFontCatalog
             }
         }
         return map;
+    }
+
+    private static bool FacesBuild(FontFamily family)
+    {
+        var asked = new[]
+        {
+            new Typeface(family, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
+            new Typeface(family, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+            new Typeface(family, FontStyles.Italic, FontWeights.Normal, FontStretches.Normal),
+            new Typeface(family, FontStyles.Italic, FontWeights.Bold, FontStretches.Normal),
+        };
+        foreach (var face in asked.Concat(family.GetTypefaces()))
+        {
+            try
+            {
+                if (!face.TryGetGlyphTypeface(out _)) return false;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException
+                or InvalidOperationException or FormatException)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// <summary>The pack families of the installed packs under <paramref name="paths"/>.</summary>
