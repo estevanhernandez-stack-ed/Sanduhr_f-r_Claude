@@ -107,8 +107,9 @@ public partial class MainWindow : Window
         var refresh = new MenuItem { Header = SettingsNames.RefreshUsageNow, Command = Vm.RefreshCommand };
         menu.Items.Add(refresh);
 
-        // One name in both states; the check mark says which (WF19).
-        var compact = new MenuItem { Header = SettingsNames.CompactMode, Command = Vm.ToggleCompactCommand };
+        // One name in both states; the check mark says which (WF19). IsCheckable also gives the item a
+        // Toggle state for screen readers; the menu's Opened handler re-syncs it from IsCompact.
+        var compact = new MenuItem { Header = SettingsNames.CompactMode, Command = Vm.ToggleCompactCommand, IsCheckable = true };
         menu.Opened += (_, _) => compact.IsChecked = Vm?.IsCompact ?? false;
         menu.Items.Add(compact);
 
