@@ -496,4 +496,31 @@ public class SettingsSourceScanTests
         var inside = groups.Sum(g => Regex.Matches(g.Body, "<RadioButton\\b").Count);
         Assert.Equal(radios, inside);
     }
+
+    [Fact]
+    public void Accounts_and_the_key_window_read_their_copy_from_the_table()
+    {
+        var accounts = TabRange("Accounts");
+        Assert.Contains("SettingsNames.FollowAccountCaption", accounts);
+        Assert.Contains("SettingsNames.PickAnAccount", accounts);
+        var key = File.ReadAllText(Path.Combine(AppDir(), "Views", "ManualKeyWindow.xaml"));
+        foreach (var name in new[] { "ManualKeySteps", "ManualKeyCloudflareToggle", "ManualKeyCloudflareHelp", "ManualKeyCfLabel" })
+            Assert.Contains($"core:SettingsNames.{name}", key);
+        Assert.DoesNotContain("DevTools", key);
+        Assert.Contains("x:Name=\"CfClearanceBox\"", key);
+    }
+
+    [Fact]
+    public void The_Cloudflare_help_opens_from_a_keyboard_reachable_link()
+    {
+        // A TextBlock that opens on a mouse click leaves keyboard and screen-reader users without cf_clearance.
+        var key = File.ReadAllText(Path.Combine(AppDir(), "Views", "ManualKeyWindow.xaml"));
+        Assert.DoesNotContain("MouseLeftButtonUp=\"OnCloudflareToggleClick\"", key);
+        var link = Regex.Match(key, "<Hyperlink\\b[^>]*x:Name=\"CloudflareLink\"[^>]*>");
+        Assert.True(link.Success, "the Cloudflare toggle is not a Hyperlink named CloudflareLink");
+        Assert.Contains("Click=\"OnCloudflareToggleClick\"", link.Value);
+        var name = Resolve(link.Value, "AutomationProperties.Name");
+        Assert.NotNull(name);
+        Assert.StartsWith(SettingsNames.ManualKeyCloudflareToggle, name);
+    }
 }

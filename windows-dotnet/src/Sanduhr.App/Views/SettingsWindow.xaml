@@ -902,6 +902,7 @@
                                 <RowDefinition Height="*" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <StackPanel Grid.Row="0" Margin="0,0,0,12">
@@ -919,7 +920,7 @@
                                               AutomationProperties.Name="Follow the account I'm using" />
                                     <TextBlock TextWrapping="Wrap" FontSize="10.5" Margin="22,3,0,0"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                               Text="Every 15 minutes Sanduhr checks your other signed-in accounts and switches to the one whose session is climbing. A manual switch pauses it." />
+                                               Text="{x:Static core:SettingsNames.FollowAccountCaption}" />
                                 </StackPanel>
                             </StackPanel>
 
@@ -1005,6 +1006,24 @@
                                 <Button Style="{StaticResource AccentButton}" Content="Add account…"
                                         Command="{Binding AddCommand}" Margin="0" />
                             </StackPanel>
+                            <!-- Why the buttons above are dim until a row is picked (WF29). -->
+                            <TextBlock Grid.Row="4" Text="{x:Static core:SettingsNames.PickAnAccount}" TextWrapping="Wrap" FontSize="10.5" Margin="0,8,0,0"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding SelectedAccount}" Value="{x:Null}" />
+                                                    <Condition Binding="{Binding HasNoAccounts}" Value="False" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </Grid>
                     </Border>
                 </TabItem>

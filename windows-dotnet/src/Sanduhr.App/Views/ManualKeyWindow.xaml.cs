@@ -104,6 +104,13 @@ internal partial class ManualKeyWindow : Window
             ? Visibility.Collapsed
             : Visibility.Visible;
 
+    /// <summary>Shows or hides the cf_clearance field behind "Seeing a Cloudflare error?" (WF31). A Hyperlink, so
+    /// Tab reaches it and Enter opens it.</summary>
+    private void OnCloudflareToggleClick(object sender, RoutedEventArgs e)
+        => CloudflarePanel.Visibility = CloudflarePanel.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+
     private void ShowError(string message)
     {
         ErrorText.Text = message;

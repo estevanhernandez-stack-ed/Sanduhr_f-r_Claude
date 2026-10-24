@@ -106,6 +106,31 @@ public sealed class AppWindowNamesTests : AppWindowFixture
     });
 
     [Fact]
+    public void TheKeyWindowsCloudflareHelpIsAFocusableNamedLink() => AppHost.Run(() =>
+    {
+        var window = new ManualKeyWindow("Work", (_, _) => "", embeddedAvailable: false);
+        OffScreen(window);
+        window.Show();
+        try
+        {
+            window.UpdateLayout();
+            var link = Assert.IsType<System.Windows.Documents.Hyperlink>(window.FindName("CloudflareLink"));
+            var panel = Assert.IsType<System.Windows.Controls.StackPanel>(window.FindName("CloudflarePanel"));
+            Assert.True(link.Focusable, "the Cloudflare link can't take keyboard focus");
+            var name = System.Windows.Automation.AutomationProperties.GetName(link);
+            Assert.StartsWith(SettingsNames.ManualKeyCloudflareToggle, name);
+            Assert.Equal(Visibility.Collapsed, panel.Visibility);
+            Assert.Contains(NamesOf(window), n => n.StartsWith(SettingsNames.ManualKeyCloudflareToggle));
+
+            link.RaiseEvent(new RoutedEventArgs(System.Windows.Documents.Hyperlink.ClickEvent));
+            Assert.Equal(Visibility.Visible, panel.Visibility);
+            link.RaiseEvent(new RoutedEventArgs(System.Windows.Documents.Hyperlink.ClickEvent));
+            Assert.Equal(Visibility.Collapsed, panel.Visibility);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public void TheSmallWindowsHaveNoTypeNames() => AppHost.Run(() =>
     {
         var windows = new List<Window>

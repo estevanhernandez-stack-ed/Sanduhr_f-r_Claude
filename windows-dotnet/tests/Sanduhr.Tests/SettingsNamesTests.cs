@@ -321,4 +321,27 @@ public class SettingsNamesTests
         Assert.NotEmpty(SettingsNames.RetiredNames("Edit as text…"));
         Assert.NotEmpty(SettingsNames.RetiredNames("Back to the list"));
     }
+
+    [Fact]
+    public void Follow_caption_says_how_long_a_manual_switch_pauses_it()
+    {
+        Assert.Equal(
+            "Every 15 minutes Sanduhr checks your other signed-in accounts and switches to the one whose session is climbing. "
+            + "A manual switch pauses it for up to 3 hours, or until that account sits idle for 30 minutes.",
+            SettingsNames.FollowAccountCaption);
+        Assert.Equal("Pick an account to switch, rename, update or remove it.", SettingsNames.PickAnAccount);
+    }
+
+    [Fact]
+    public void Key_help_is_plain_steps_for_Edge_and_Chrome()
+    {
+        Assert.Contains("Edge", SettingsNames.ManualKeySteps);
+        Assert.Contains("Chrome", SettingsNames.ManualKeySteps);
+        Assert.Contains("sessionKey", SettingsNames.ManualKeySteps);
+        Assert.DoesNotContain("→", SettingsNames.ManualKeySteps);
+        Assert.DoesNotContain("DevTools", SettingsNames.ManualKeySteps);
+        Assert.Equal("Seeing a Cloudflare error?", SettingsNames.ManualKeyCloudflareToggle);
+        Assert.Contains("cf_clearance", SettingsNames.ManualKeyCloudflareHelp);
+        Assert.Equal("cf_clearance", SettingsNames.ManualKeyCfLabel);
+    }
 }

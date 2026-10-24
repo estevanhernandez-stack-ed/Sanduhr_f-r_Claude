@@ -169,6 +169,21 @@ public static class SettingsNames
     public const string CloseSettings = "Close Settings";
     /// <summary>Accounts: the follow switch, and the tray's account list marks the account in use.</summary>
     public const string FollowAccount = "Follow the account I'm using";
+    /// <summary>Accounts: the follow switch's caption, its numbers read from AccountFollow so they can't drift (WF29).</summary>
+    public static string FollowAccountCaption { get; } =
+        $"Every {(int)AccountFollow.CheckInterval.TotalMinutes} minutes Sanduhr checks your other signed-in accounts and switches to the one whose session is climbing. "
+        + $"A manual switch pauses it for up to {(int)AccountFollow.PauseLength.TotalHours} hours, or until that account sits idle for {(int)AccountFollow.PauseIdle.TotalMinutes} minutes.";
+    /// <summary>Accounts: why the account buttons are dim (WF29).</summary>
+    public const string PickAnAccount = "Pick an account to switch, rename, update or remove it.";
+    /// <summary>The manual key window: where the sessionKey is, in plain steps (WF31).</summary>
+    public const string ManualKeySteps =
+        "In Edge or Chrome, open claude.ai and sign in. Press F12, open the Application tab, then Cookies, then https://claude.ai. "
+        + "Copy the Value next to sessionKey and paste it below.";
+    /// <summary>The manual key window: cf_clearance waits behind this line.</summary>
+    public const string ManualKeyCloudflareToggle = "Seeing a Cloudflare error?";
+    public const string ManualKeyCloudflareHelp =
+        "Only if Sanduhr says Cloudflare blocked it: copy the Value next to cf_clearance from the same Cookies list and paste it here.";
+    public const string ManualKeyCfLabel = "cf_clearance";
     /// <summary>Mods &amp; Config: re-reads the folder.</summary>
     public const string RefreshFolder = "Refresh";
     /// <summary>Desk: the switch at the top of the page (settings.json "desk_enabled", off by default). It lists
