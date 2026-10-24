@@ -156,6 +156,30 @@ public sealed class AppWindowNamesTests : AppWindowFixture
     });
 
     [Fact]
+    public void TheKeyWindowsSecureSignInLinkIsAFocusableNamedLinkWhenAvailable() => AppHost.Run(() =>
+    {
+        foreach (var available in new[] { true, false })
+        {
+            var window = new ManualKeyWindow("Work", (_, _) => "", embeddedAvailable: available);
+            OffScreen(window);
+            window.Show();
+            try
+            {
+                window.UpdateLayout();
+                var link = Assert.IsType<System.Windows.Documents.Hyperlink>(window.FindName("UseEmbeddedHyperlink"));
+                var holder = Assert.IsType<System.Windows.Controls.TextBlock>(window.FindName("UseEmbeddedLink"));
+                Assert.Equal(available ? Visibility.Visible : Visibility.Collapsed, holder.Visibility);
+                Assert.True(link.Focusable, "the secure sign-in link can't take keyboard focus");
+                Assert.StartsWith("Use the secure sign-in window instead",
+                    System.Windows.Automation.AutomationProperties.GetName(link));
+                if (available)
+                    Assert.Contains(NamesOf(window), n => n.StartsWith("Use the secure sign-in window instead"));
+            }
+            finally { window.Close(); }
+        }
+    });
+
+    [Fact]
     public void TheSmallWindowsHaveNoTypeNames() => AppHost.Run(() =>
     {
         var windows = new List<Window>

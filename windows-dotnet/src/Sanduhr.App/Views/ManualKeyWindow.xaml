@@ -30,11 +30,12 @@
                        Text="The power-user path. Paste your claude.ai sessionKey cookie — it's stored in the Windows Credential Manager, never in a file."
                        TextWrapping="Wrap" FontSize="11"
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-            <TextBlock x:Name="UseEmbeddedLink" Margin="0,8,0,0" Cursor="Hand"
-                       Visibility="Collapsed" MouseLeftButtonUp="OnUseEmbeddedClick">
-                <Run Text="Use the secure sign-in window instead"
-                     Foreground="{DynamicResource Sanduhr.Brush.Accent}"
-                     TextDecorations="Underline" FontSize="11" />
+            <TextBlock x:Name="UseEmbeddedLink" Margin="0,8,0,0" Visibility="Collapsed">
+                <Hyperlink x:Name="UseEmbeddedHyperlink" Click="OnUseEmbeddedClick"
+                           Foreground="{DynamicResource Sanduhr.Brush.Accent}"
+                           AutomationProperties.Name="Use the secure sign-in window instead. Closes this window.">
+                    <Run Text="Use the secure sign-in window instead" FontSize="11" />
+                </Hyperlink>
             </TextBlock>
             <TextBlock x:Name="HelpToggle" Margin="0,6,0,0">
                 <Hyperlink x:Name="HelpLink" Click="OnHelpToggleClick"

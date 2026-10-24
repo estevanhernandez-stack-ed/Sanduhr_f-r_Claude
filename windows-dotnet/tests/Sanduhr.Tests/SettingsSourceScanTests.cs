@@ -542,9 +542,25 @@ public class SettingsSourceScanTests
     [Fact]
     public void No_toggle_in_the_key_window_opens_on_a_mouse_click_alone()
     {
-        // Every MouseLeftButtonUp handler left in the window must be an action link, listed here on purpose.
+        // Nothing in the window may act on a mouse click alone: every link is a Hyperlink, which Tab reaches.
         var key = File.ReadAllText(Path.Combine(AppDir(), "Views", "ManualKeyWindow.xaml"));
-        var handlers = Regex.Matches(key, "MouseLeftButtonUp=\"(\\w+)\"").Select(m => m.Groups[1].Value).ToList();
-        Assert.Equal(new[] { "OnUseEmbeddedClick" }, handlers);
+        Assert.DoesNotContain("MouseLeftButtonUp", key);
+        Assert.DoesNotContain("MouseLeftButtonDown", key);
+    }
+
+    [Fact]
+    public void The_secure_sign_in_link_is_a_keyboard_reachable_link()
+    {
+        var key = File.ReadAllText(Path.Combine(AppDir(), "Views", "ManualKeyWindow.xaml"));
+        var link = Regex.Match(key, "<Hyperlink\\b[^>]*x:Name=\"UseEmbeddedHyperlink\"[^>]*>(.*?)</Hyperlink>", RegexOptions.Singleline);
+        Assert.True(link.Success, "the secure sign-in link is not a Hyperlink named UseEmbeddedHyperlink");
+        Assert.Contains("Click=\"OnUseEmbeddedClick\"", link.Value);
+        var name = Resolve(link.Value, "AutomationProperties.Name");
+        Assert.NotNull(name);
+        var visible = Regex.Match(link.Groups[1].Value, "Text=\"([^\"]*)\"").Groups[1].Value;
+        Assert.Equal("Use the secure sign-in window instead", visible);
+        Assert.StartsWith(visible, name);
+        // The wrapping TextBlock keeps the name the code-behind shows and hides.
+        Assert.Contains("x:Name=\"UseEmbeddedLink\"", key);
     }
 }

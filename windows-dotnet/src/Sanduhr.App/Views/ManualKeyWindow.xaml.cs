@@ -1,5 +1,4 @@
 using System.Windows;
-using System.Windows.Input;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.Views;
@@ -91,7 +90,7 @@ internal partial class ManualKeyWindow : Window
     /// <summary>"Use the secure sign-in window instead" — close with a UseEmbedded
     /// result so the coordinator bounces to the embedded sign-in flow. Only visible
     /// when the WebView2 runtime is present.</summary>
-    private void OnUseEmbeddedClick(object sender, MouseButtonEventArgs e)
+    private void OnUseEmbeddedClick(object sender, RoutedEventArgs e)
     {
         Result = new SignInResult.UseEmbedded();
         DialogResult = false; // close; the coordinator reads Result, not DialogResult
