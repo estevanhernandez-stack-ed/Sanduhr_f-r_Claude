@@ -40,6 +40,9 @@ public sealed partial class CcFolderRowViewModel : ObservableObject
 
     partial void OnLinkedAccountChanged(string value)
     {
+        // A combo whose selected item leaves its list writes null back. That is not a choice: "None" is the
+        // choice that unlinks.
+        if (string.IsNullOrWhiteSpace(value)) return;
         if (!_loading) _owner.OnLinkChanged(this, value);
     }
 
@@ -329,15 +332,30 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     internal IReadOnlyList<CcFolder> KnownFolders() =>
         ClaudeCodeFolders.Build(Profile, ClaudeCodeProfile.ConfigDir, _widget.LoadCcFoldersAdded());
 
+    /// <summary>Brings the account choices to "None" plus the shown accounts without ever emptying the list: the
+    /// folder rows' combos are still bound to it, and a combo whose items are cleared writes a null selection back.
+    /// Only labels that are gone are removed.</summary>
+    private void SyncAccountOptions()
+    {
+        var wanted = new List<string> { NoAccount };
+        wanted.AddRange(_widget.ShownAccounts);
+        for (int i = AccountOptions.Count - 1; i >= 0; i--)
+            if (!wanted.Contains(AccountOptions[i])) AccountOptions.RemoveAt(i);
+        for (int i = 0; i < wanted.Count; i++)
+        {
+            if (i < AccountOptions.Count && AccountOptions[i] == wanted[i]) continue;
+            var at = AccountOptions.IndexOf(wanted[i]);
+            if (at >= 0) AccountOptions.Move(at, i);
+            else AccountOptions.Insert(i, wanted[i]);
+        }
+    }
+
     /// <summary>Re-reads the folder list, the account choices and every status.</summary>
     public void Reload()
     {
         var keep = SelectedFolder?.Path ?? s_sessionFolder;
         _loading = true;
-        AccountOptions.Clear();
-        AccountOptions.Add(NoAccount);
-        foreach (var label in _widget.ShownAccounts)
-            AccountOptions.Add(label);
+        SyncAccountOptions();
         LinkEnabled = !_widget.IsDemo;
 
         var roots = _widget.LoadMcpRoots();
@@ -416,6 +434,8 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
 
     internal void OnLinkChanged(CcFolderRowViewModel row, string account)
     {
+        // No account is not "unlink everything": only NoAccount unlinks.
+        if (string.IsNullOrWhiteSpace(account)) return;
         try
         {
             // One folder per account, and one account per folder.

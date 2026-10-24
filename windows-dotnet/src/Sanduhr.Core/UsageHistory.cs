@@ -187,10 +187,25 @@ public sealed class UsageHistory : IUsageHistory
     /// when there's no active account and none was passed.</summary>
     public void ClearAll(string? account = null)
     {
-        var active = ResolveAccount(account);
-        if (active is null)
+        var target = ResolveAccount(account);
+        if (target is null)
             return;
-        WriteAccountFile(active, new Dictionary<string, List<HistoryPoint>>());
+        // A legacy history.json belongs to the active account: move it first, so it is cleared with
+        // its owner (or kept for it) and never left behind.
+        MigrateLegacyIfNeeded(_accounts.GetActive());
+        WriteAccountFile(target, new Dictionary<string, List<HistoryPoint>>());
+    }
+
+    /// <summary>Wipe the history of every registered account, each by the same
+    /// empty-dict write as <see cref="ClearAll"/> (never unlinks). The "All
+    /// accounts" choice of the History tab's Clear button. An account with no
+    /// history file gets none; a legacy history.json is migrated first, then cleared.</summary>
+    public void ClearEvery()
+    {
+        MigrateLegacyIfNeeded(_accounts.GetActive());
+        foreach (var label in _accounts.ListAccounts())
+            if (File.Exists(_paths.HistoryFileFor(label)))
+                WriteAccountFile(label, new Dictionary<string, List<HistoryPoint>>());
     }
 
     /// <summary>Unlink the history file for the given (or active) account —

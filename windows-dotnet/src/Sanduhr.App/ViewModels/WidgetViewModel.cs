@@ -666,10 +666,16 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         }
     }
 
-    public WidgetViewModel()
+    public WidgetViewModel() : this(new Paths(), new AccountStore(new WindowsCredentialManager(AccountStore.Service)))
     {
-        _paths = new Paths();
-        _accounts = new AccountStore(new WindowsCredentialManager(AccountStore.Service));
+    }
+
+    /// <summary>The same widget over the given folders and account registry. Tests hand it a scratch
+    /// <see cref="Paths"/> and an in-memory registry so nothing touches the real AppData or Credential Manager.</summary>
+    internal WidgetViewModel(Paths paths, AccountStore accounts)
+    {
+        _paths = paths;
+        _accounts = accounts;
         _credentials = new CredentialStore(_accounts, _paths);
         _history = new UsageHistory(_accounts, _paths);
         _settings = new SettingsStore(_paths);

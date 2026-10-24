@@ -215,16 +215,19 @@ public sealed partial class HistoryTabViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(NotDemo))]
     private void ClearHistory()
     {
-        bool confirm = Confirm(
-            "This permanently removes the local 30-day usage history file. " +
-            "Sparkline and history chart will be empty until new data " +
-            "accumulates.\n\nCredentials are not affected.");
-        if (!confirm)
+        // CanExecute is not enforced on a programmatic Execute; demo labels can match a real account's.
+        if (_widget.IsDemo) return;
+        // The account the "Account:" picker shows: one account, or every account on "All accounts".
+        string? account = SelectedOption?.Account;
+        if (!Confirm(ClearConfirmation(account)))
             return;
 
         try
         {
-            _widget.History.ClearAll();
+            if (account is null)
+                _widget.History.ClearEvery();
+            else
+                _widget.History.ClearAll(account);
         }
         catch (IOException e)
         {
@@ -233,13 +236,30 @@ public sealed partial class HistoryTabViewModel : ObservableObject
             return;
         }
         Changed?.Invoke();
-        Info("Local usage history file removed.");
+        Info($"Local usage history removed for {account ?? "every account"}.");
     }
 
+    /// <summary>What the Clear history confirmation says: it names the account whose history goes, or every account.</summary>
+    internal static string ClearConfirmation(string? account) =>
+        $"This permanently removes the 30-day usage history of {account ?? "every account"}. " +
+        "Sparkline and history chart will be empty until new data " +
+        "accumulates.\n\nCredentials are not affected.";
+
+    /// <summary>Tests answer the dialogs here instead of showing them.</summary>
+    internal Func<string, bool>? ConfirmHook { get; set; }
+
+    /// <summary>Tests read the notices here instead of showing them.</summary>
+    internal Action<string>? InfoHook { get; set; }
+
     private void Info(string message)
-        => ThemedDialog.Show(_owner, "History", message, MessageBoxButton.OK, ThemedDialogKind.Info);
+    {
+        if (InfoHook is not null) { InfoHook(message); return; }
+        ThemedDialog.Show(_owner, "History", message, MessageBoxButton.OK, ThemedDialogKind.Info);
+    }
 
     private bool Confirm(string message)
-        => ThemedDialog.Show(_owner, "Clear history?", message, MessageBoxButton.YesNo, ThemedDialogKind.Warning)
-           == MessageBoxResult.Yes;
+        => ConfirmHook is not null
+            ? ConfirmHook(message)
+            : ThemedDialog.Show(_owner, "Clear history?", message, MessageBoxButton.YesNo, ThemedDialogKind.Warning)
+              == MessageBoxResult.Yes;
 }

@@ -191,6 +191,78 @@ public class UsageHistoryTests
         Assert.True(File.Exists(f.Paths.HistoryFileFor("Personal")));
     }
 
+    [Fact]
+    public void Clear_every_empties_each_account_and_keeps_every_file()
+    {
+        using var f = new Fixture("Personal", "Work");
+        f.History.AppendForAccount("five_hour", 10, "Personal");
+        f.History.AppendForAccount("five_hour", 20, "Work");
+        f.History.ClearEvery();
+        Assert.Empty(f.History.Load("five_hour", "Personal"));
+        Assert.Empty(f.History.Load("five_hour", "Work"));
+        Assert.True(File.Exists(f.Paths.HistoryFileFor("Personal")));
+        Assert.True(File.Exists(f.Paths.HistoryFileFor("Work")));
+    }
+
+    [Fact]
+    public void Clear_every_creates_no_file_for_an_account_without_history()
+    {
+        using var f = new Fixture("Personal", "Work");
+        f.History.AppendForAccount("five_hour", 10, "Personal");
+        f.History.ClearEvery();
+        Assert.True(File.Exists(f.Paths.HistoryFileFor("Personal")));
+        Assert.False(File.Exists(f.Paths.HistoryFileFor("Work")));
+    }
+
+    private static void WriteLegacy(Fixture f) =>
+        File.WriteAllText(f.Paths.HistoryFile, "{\"five_hour\":[{\"t\":\"2026-04-21T00:00:00.0000000+00:00\",\"v\":50}]}");
+
+    [Fact]
+    public void Clear_all_migrates_a_legacy_file_then_clears_it()
+    {
+        using var f = new Fixture("Personal");
+        WriteLegacy(f);
+        f.History.ClearAll();
+        Assert.False(File.Exists(f.Paths.HistoryFile));
+        Assert.True(File.Exists(f.Paths.HistoryFileFor("Personal")));
+        Assert.Empty(f.History.Load("five_hour"));
+    }
+
+    [Fact]
+    public void Clear_every_migrates_a_legacy_file_then_clears_it()
+    {
+        using var f = new Fixture("Personal", "Work");
+        f.Accounts.SetActive("Personal");
+        WriteLegacy(f);
+        f.History.ClearEvery();
+        Assert.False(File.Exists(f.Paths.HistoryFile));
+        Assert.Empty(f.History.Load("five_hour", "Personal"));
+        Assert.Empty(f.History.Load("five_hour", "Work"));
+    }
+
+    [Fact]
+    public void Clearing_another_account_keeps_the_active_accounts_legacy_history()
+    {
+        using var f = new Fixture("Personal", "Work");
+        f.Accounts.SetActive("Personal");
+        WriteLegacy(f);
+        f.History.ClearAll("Work");
+        Assert.False(File.Exists(f.Paths.HistoryFile));
+        Assert.Equal([50], f.History.Load("five_hour", "Personal"));
+    }
+
+    [Fact]
+    public void Clear_all_for_a_named_account_leaves_the_others()
+    {
+        using var f = new Fixture("Personal", "Work");
+        f.Accounts.SetActive("Personal");
+        f.History.AppendForAccount("five_hour", 10, "Personal");
+        f.History.AppendForAccount("five_hour", 20, "Work");
+        f.History.ClearAll("Work");
+        Assert.Empty(f.History.Load("five_hour", "Work"));
+        Assert.Equal([10], f.History.Load("five_hour", "Personal"));
+    }
+
     // -- test_history_per_account.py -----------------------------------------
 
     [Fact]

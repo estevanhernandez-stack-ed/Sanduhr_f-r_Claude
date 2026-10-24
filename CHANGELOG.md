@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased (windows)
+
+### Fixes
+
+- Settings ▸ History ▸ Clear history now clears the account the "Account:" picker shows, not the active account. "All accounts" clears every account's history. The confirmation names what it removes.
+- Reopening Settings, Claude Code no longer unlinks folders from their accounts or shows "Couldn't save that link." The account list is updated in place, and an empty selection is ignored instead of read as "unlink everything".
+
 ## v3.9.1 — 2026-10-24
 
 **Platform:** Windows (.NET 10 / WPF). A patch that fixes widget packs: the themes, palettes and fonts of the packs you install now apply. `Sanduhr.Mcp` to 3.9.1. **No new outbound destination and no new capability:** nothing new is read or sent, the manifest still declares `runFullTrust` only and changes only its version, and the MCP trust boundary is unchanged: the link list and `TrustBoundaryTests` are as in 3.9.0, and the new pack code lives in Core files the server does not link.
