@@ -696,7 +696,15 @@ public partial class App : Application
         svm.WeatherPage.Changed = () => { _desk?.Reload(); _deskDesign?.Refresh(); };
         // The companion (spec 3.8 section 4): a new pick, roaming, an install or uninstall, or the piece shown or hidden.
         // 3.9.1: it also reloads the theme list, since an installed theme pack joins it and an uninstalled one leaves it.
-        svm.WidgetsPage.Changed = () => { _vm?.ReloadUserThemes(); _desk?.Reload(); svm.Desk.Reload(); };
+        // A font pack changes what the Desk and a design may draw in: drop their font lists before the Desk redraws.
+        svm.WidgetsPage.Changed = () =>
+        {
+            _vm?.ReloadUserThemes();
+            _desk?.ResetFonts();
+            _deskDesign?.FontsChanged();
+            _desk?.Reload();
+            svm.Desk.Reload();
+        };
         svm.MessageChanged = () => { _desk?.Reload(); _handoff?.PublishState(); };
         svm.Desk.WatchersChanged = () => _watchers?.SwitchChanged();
         svm.Desk.CiRunnersChanged = () => _runners?.Refresh();

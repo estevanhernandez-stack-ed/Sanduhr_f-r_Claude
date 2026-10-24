@@ -86,6 +86,7 @@ internal sealed class DeskDesignService : IDisposable
         _apps = apps;
         _ui = ui ?? Dispatcher.CurrentDispatcher;
         _designs = new DesignStore(paths);
+        InstalledFonts = InstalledWithPacks;
         Handoff = new DeskDesignHandoff(new DeskDesignPaths(paths.ExternalDir), Context) { Handler = OnProposal };
         _settle = new DispatcherTimer(DispatcherPriority.Background, _ui) { Interval = Settle };
         _settle.Tick += (_, _) =>
@@ -117,6 +118,10 @@ internal sealed class DeskDesignService : IDisposable
 
     /// <summary>The installed font families (tests set it).</summary>
     internal Func<IReadOnlyList<string>> InstalledFonts { get; set; } = InstalledFamilies;
+
+    /// <summary>The system's families and the installed font packs' (3.9.1): what a design may name as installed.</summary>
+    private IReadOnlyList<string> InstalledWithPacks() => PackFontCatalog.Union(InstalledFamilies(),
+        PackFontCatalog.Families(new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng)));
 
     /// <summary>The clock (tests set it).</summary>
     internal Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.UtcNow;
