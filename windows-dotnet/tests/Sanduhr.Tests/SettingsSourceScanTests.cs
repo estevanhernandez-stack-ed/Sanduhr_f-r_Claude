@@ -445,4 +445,22 @@ public class SettingsSourceScanTests
             Assert.Contains("SettingsNames.TrademarkNotice", xaml);
         }
     }
+
+    [Fact]
+    public void The_trademark_footer_is_one_control_on_six_pages()
+    {
+        var views = Path.Combine(AppDir(), "Views");
+        int Count(string file) => Regex.Matches(File.ReadAllText(Path.Combine(views, file)), "<views:TrademarkFooter\\b").Count;
+        Assert.Equal(4, Count("SettingsWindow.xaml"));   // Desk, Now playing, Weather, About
+        Assert.Equal(1, Count("DeskMessagePage.xaml"));
+        Assert.Equal(1, Count("WidgetsPage.xaml"));
+        Assert.Contains("core:SettingsNames.TrademarkNotice", File.ReadAllText(Path.Combine(views, "TrademarkFooter.xaml")));
+        Assert.Contains("<views:TrademarkFooter views:SettingsAnchor.Id=\"trademark\"", TabRange("About"));
+        var copies = Files("*.xaml")
+            .Where(f => Path.GetFileName(f) is not ("TrademarkFooter.xaml" or "WhatsNewWindow.xaml" or "SignInWindow.xaml"))
+            .Where(f => File.ReadAllText(f).Contains("TrademarkNotice", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .ToList();
+        Assert.True(copies.Count == 0, "Use <views:TrademarkFooter /> in: " + string.Join(", ", copies));
+    }
 }

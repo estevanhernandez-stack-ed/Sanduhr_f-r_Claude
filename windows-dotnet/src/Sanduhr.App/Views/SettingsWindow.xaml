@@ -2728,9 +2728,7 @@
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
-                            <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"
-                                       TextWrapping="Wrap" FontSize="11"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <views:TrademarkFooter />
                         </StackPanel>
                         </ScrollViewer>
                     </Border>
@@ -2799,9 +2797,7 @@
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
                             <views:NowPlayingLooksPanel views:SettingsAnchor.Id="np-looks" />
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
-                            <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"
-                                       TextWrapping="Wrap" FontSize="11"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <views:TrademarkFooter />
                         </StackPanel>
                         </ScrollViewer>
                     </Border>
@@ -2874,9 +2870,7 @@
                                                Foreground="{DynamicResource Sanduhr.Brush.Accent}" AutomationProperties.Name="The licence"><Run Text="licence" /></Hyperlink><Run Text="). Place search by GeoNames (CC BY 4.0)." Foreground="{DynamicResource Sanduhr.Brush.TextDim}" /></TextBlock>
                             </StackPanel>
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
-                            <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"
-                                       TextWrapping="Wrap" FontSize="11"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <views:TrademarkFooter />
                         </StackPanel>
                         </ScrollViewer>
                     </Border>
@@ -2916,9 +2910,7 @@
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
-                            <TextBlock views:SettingsAnchor.Id="trademark" Text="{Binding TrademarkNotice}"
-                                       TextWrapping="Wrap" FontSize="11"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <views:TrademarkFooter views:SettingsAnchor.Id="trademark" />
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 

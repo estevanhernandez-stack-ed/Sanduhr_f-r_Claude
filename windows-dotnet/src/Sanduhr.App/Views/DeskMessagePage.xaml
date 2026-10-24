@@ -433,9 +433,7 @@
 
                 <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
-                <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"
-                           TextWrapping="Wrap" FontSize="11"
-                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                <views:TrademarkFooter />
             </StackPanel>
         </ScrollViewer>
     </Border>
