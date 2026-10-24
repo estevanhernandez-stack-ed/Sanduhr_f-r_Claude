@@ -61,7 +61,8 @@ public sealed class PackThemeWiringTests : AppWindowFixture
         Assert.Equal("obsidian", widget.ActiveThemeKey);
         Assert.DoesNotContain(widget.Themes, t => t.Key == PackKey);
         Assert.Equal("obsidian", Assert.Single(widget.Themes, t => t.IsActive).Key);
-        Assert.Equal("obsidian", new SettingsStore(paths).LoadTheme());
+        // Shown, not saved: a pack that reads as gone for a moment (a failed read) must not rewrite the choice. Next launch resolves it again.
+        Assert.Equal(PackKey, new SettingsStore(paths).LoadTheme());
     });
 
     [Fact]
@@ -82,6 +83,28 @@ public sealed class PackThemeWiringTests : AppWindowFixture
 
         Assert.Equal("obsidian", widget.ActiveThemeKey);
         Assert.Equal("obsidian", Assert.Single(widget.Themes, t => t.IsActive).Key);
+        Assert.Equal("dusk", new SettingsStore(paths).LoadTheme());
+    });
+
+    [Fact]
+    public void The_pack_theme_comes_back_when_the_pack_reads_again() => AppHost.Run(() =>
+    {
+        var paths = new Paths();
+        InstalledPackKit.Install(paths, "good-theme");
+        var widget = DemoWidget();
+        widget.ApplyThemeByKey(PackKey);
+        var packDir = InstalledPackKit.Store(paths).PackDir("good-theme");
+        string moved = packDir + "-away";
+        Directory.Move(packDir, moved);
+        widget.ReloadUserThemes();
+        Assert.Equal("obsidian", widget.ActiveThemeKey);
+
+        Directory.Move(moved, packDir);
+        widget.ReloadUserThemes();
+        Assert.Contains(widget.Themes, t => t.Key == PackKey);
+        widget.ApplyThemeByKey(new SettingsStore(paths).LoadTheme());
+
+        Assert.Equal(PackKey, widget.ActiveThemeKey);
     });
 
     [Fact]

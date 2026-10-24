@@ -801,8 +801,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// existing cards, persist the choice, update the strip's active marker, and
     /// raise <see cref="ThemeChanged"/> so the window swaps its backdrop. Silent
     /// (no chime) — callers add their own cue (the strip plays a toggle tick; the
-    /// Settings tab plays a save confirmation).</summary>
-    public void ApplyThemeByKey(string key)
+    /// Settings tab plays a save confirmation). <paramref name="save"/> false shows the theme without
+    /// writing it, for a fallback that must not rewrite the person's choice.</summary>
+    public void ApplyThemeByKey(string key, bool save = true)
     {
         if (!_themes.TryGetValue(key, out var def))
             return;
@@ -815,7 +816,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         foreach (var card in Tiers)
             card.ApplyPalette(_palette);
 
-        _settings.SaveTheme(key);
+        if (save)
+            _settings.SaveTheme(key);
         foreach (var item in Themes)
             item.IsActive = item.Key == key;
 
@@ -879,9 +881,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         RebuildThemeMap();
         BuildThemeStrip(_palette.Key);
-        // The theme in use is gone (its pack was uninstalled, or its file deleted): Obsidian now, not at the next launch.
+        // The theme in use is gone (its pack was uninstalled, or its file deleted): Obsidian now, not at the next launch. Shown, not
+        // saved, like the constructor's fallback: a failed read of the widgets folder makes a pack look gone for a moment, and the
+        // saved choice must survive it. The next launch resolves the saved key again.
         if (!_themes.ContainsKey(_palette.Key))
-            ApplyThemeByKey("obsidian");
+            ApplyThemeByKey("obsidian", save: false);
     }
 
     private static void Log(string message) => Debug.WriteLine($"[Sanduhr.Themes] {message}");
