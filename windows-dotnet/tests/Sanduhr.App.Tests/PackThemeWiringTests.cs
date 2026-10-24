@@ -109,6 +109,41 @@ public sealed class PackThemeWiringTests : AppWindowFixture
     });
 
     [Fact]
+    public void A_settings_read_that_answers_obsidian_does_not_flip_a_healthy_widget() => AppHost.Run(() =>
+    {
+        var paths = new Paths();
+        InstalledPackKit.Install(paths, "good-theme");
+        var widget = DemoWidget();
+        widget.ApplyThemeByKey(PackKey);
+        File.WriteAllText(paths.SettingsFile, "{ not json");   // settings.json briefly unreadable: LoadTheme answers "obsidian"
+        Assert.Equal("obsidian", new SettingsStore(paths).LoadTheme());
+
+        widget.ReloadUserThemes();
+
+        Assert.Equal(PackKey, widget.ActiveThemeKey);
+        Assert.Equal(PackKey, Assert.Single(widget.Themes, t => t.IsActive).Key);
+    });
+
+    [Fact]
+    public void A_real_choice_made_during_a_fallback_ends_it() => AppHost.Run(() =>
+    {
+        var paths = new Paths();
+        InstalledPackKit.Install(paths, "good-theme");
+        var widget = DemoWidget();
+        widget.ApplyThemeByKey(PackKey);
+        var packDir = InstalledPackKit.Store(paths).PackDir("good-theme");
+        Directory.Move(packDir, packDir + "-away");
+        widget.ReloadUserThemes();                       // fell back to Obsidian, in memory
+        Assert.Equal("obsidian", widget.ActiveThemeKey);
+
+        widget.ApplyThemeByKey("aurora");                // the person picks a theme: that is the new truth
+        Directory.Move(packDir + "-away", packDir);
+        widget.ReloadUserThemes();
+
+        Assert.Equal("aurora", widget.ActiveThemeKey);
+    });
+
+    [Fact]
     public void Keeping_the_theme_in_use_leaves_it_alone_on_a_reload() => AppHost.Run(() =>
     {
         var paths = new Paths();
