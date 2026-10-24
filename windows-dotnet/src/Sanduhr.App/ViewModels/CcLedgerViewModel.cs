@@ -130,7 +130,7 @@ public sealed partial class LedgerRowViewModel : ObservableObject
                 Info.BySkill.OrderByDescending(kv => kv.Value)
                     .Select(kv => $"{kv.Key} {TokenFormat.Compact(kv.Value)}")));
         }
-        sb.Append("\nHome: ").Append(Info.Root).Append("  ·  Session: ").Append(Info.Uuid);
+        sb.Append("\nFolder: ").Append(Info.Root).Append("  ·  Session: ").Append(Info.Uuid);
         return sb.ToString();
     }
 
@@ -166,7 +166,7 @@ public sealed partial class LedgerRowViewModel : ObservableObject
             sb.Append("  ·  Agents: ").Append(Info.AgentCount)
               .Append("  ·  ").Append(TokenFormat.Compact(Info.AgentTokens)).Append(" tokens");
         }
-        sb.Append("  ·  Homes: ").Append(string.Join(", ", roots));
+        sb.Append("  ·  Folders: ").Append(string.Join(", ", roots));
         return sb.ToString();
     }
 
@@ -587,7 +587,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         var vault = _widget.Vault;
         EmptyText = Rows.Count > 0 ? ""
             : (vault is null || vault.ConsentedRootNames().Count == 0)
-                ? "History vault is off — enable a Claude Code home in Overview."
+                ? "The session archive is off. Turn it on for a Claude Code folder under Overview, Session archive."
                 : "No sessions recorded yet — the first backfill lands within a minute.";
     }
 

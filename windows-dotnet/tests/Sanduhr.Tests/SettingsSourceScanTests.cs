@@ -323,6 +323,17 @@ public class SettingsSourceScanTests
     }
 
     [Fact]
+    public void The_reset_window_and_About_use_the_new_names()
+    {
+        var reset = File.ReadAllText(Path.Combine(AppDir(), "Views", "ResetWindow.xaml"));
+        Assert.Contains($"Content=\"{SettingsNames.ResetClaudeCodeEntries}\"", reset);
+        Assert.Contains($"Content=\"{SettingsNames.ResetMeterHistory}\"", reset);
+        var about = TabRange("About");
+        Assert.Contains("SettingsNames.NothingArchivedYet", about);
+        Assert.DoesNotContain("CharacterEllipsis", about); // paths wrap (WF43)
+    }
+
+    [Fact]
     public void The_trademark_notice_has_one_source_and_both_windows_bind_to_it()
     {
         const string phrase = "trademarks of Anthropic";

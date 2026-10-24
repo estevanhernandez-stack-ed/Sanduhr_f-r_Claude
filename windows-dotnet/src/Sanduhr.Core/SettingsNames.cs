@@ -113,8 +113,23 @@ public static class SettingsNames
     public const string WarnAgain = "Warn again for this limit";
     /// <summary>Alerts.</summary>
     public const string SendTestAlert = "Send test alert";
-    /// <summary>History and Claude Usage.</summary>
-    public const string ExportCsv = "Export CSV…";
+    /// <summary>History: the 30-day meter chart as a CSV file ("meter history", WF14).</summary>
+    public const string ExportMeterHistory = "Export meter history…";
+    /// <summary>The old identifier, kept because SettingsIndex.cs (slice 2's file) refers to it. Same text.</summary>
+    public const string ExportCsv = ExportMeterHistory;
+    /// <summary>Claude Usage, Sessions: the session table as a CSV file.</summary>
+    public const string ExportSessions = "Export sessions…";
+    /// <summary>Claude Usage, Overview, and About: the vault of Claude Code session totals ("session archive", WF14).</summary>
+    public const string SessionArchive = "Session archive";
+    public const string EraseSessionArchive = "Erase session archive…";
+    public const string OpenArchiveFolder = "Open archive folder";
+    /// <summary>About, Where settings live: the archive's Show in Explorer is dim until something is archived.</summary>
+    public const string NothingArchivedYet = "Nothing archived yet.";
+    /// <summary>Publish usage: the folders whose totals may leave ("Folder" is the one word, WF21).</summary>
+    public const string FoldersToShare = "Folders to share (off until you tick them)";
+    /// <summary>Reset Sanduhr…: two of its five parts, named for everything they remove (WF20).</summary>
+    public const string ResetClaudeCodeEntries = "Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, glow hook)";
+    public const string ResetMeterHistory = "Meter history and the session archive";
     /// <summary>Themes (paste box and Studio).</summary>
     public const string SaveAndApply = "Save & apply";
     /// <summary>About: where Sanduhr keeps its files.</summary>
@@ -259,7 +274,7 @@ public static class SettingsNames
         (ShortcutToOpenSettings, SettingsPage.General),
         (AddAccount, SettingsPage.Accounts),
         (SendTestAlert, SettingsPage.Alerts),
-        (ExportCsv, SettingsPage.History),
+        (ExportMeterHistory, SettingsPage.History),
         (SaveAndApply, SettingsPage.Themes),
         (WhatsNew, SettingsPage.About),
         (TakeTheTour, SettingsPage.About),
@@ -312,6 +327,14 @@ public static class SettingsNames
         ("Save & Apply", SaveAndApply, false),
         ("Let agents show watchers", WatchersSwitch, false),
         ("Claude can read this folder's project totals", LetClaudeReadTotals, false),
+        ("Export CSV…", ExportMeterHistory, false),
+        ("History vault", SessionArchive, false),
+        ("Usage vault", SessionArchive, false),
+        ("Erase archive", EraseSessionArchive, false),
+        ("Open vault folder", OpenArchiveFolder, false),
+        ("Homes to share", FoldersToShare, false),
+        ("(statusline, MCP server)", ResetClaudeCodeEntries, false),
+        ("Usage history and the vault", ResetMeterHistory, false),
     ];
 
     /// <summary>The retired names <paramref name="text"/> still uses, empty when it uses none.</summary>

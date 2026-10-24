@@ -351,7 +351,7 @@ public sealed partial class PublishViewModel : ObservableObject
             }
             if (_service.SharedRootNames().Count == 0)
             {
-                StatusText = "Tick at least one home to share first.";
+                StatusText = "Tick at least one folder to share first.";
                 return;
             }
             var date = UsagePublisher.DefaultDate(DateTimeOffset.Now);

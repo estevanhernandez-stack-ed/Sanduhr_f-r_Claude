@@ -250,4 +250,21 @@ public class SettingsNamesTests
         Assert.Equal("Let Claude show watchers", SettingsNames.WatchersSwitch);
         Assert.Equal(["Let agents show watchers"], SettingsNames.RetiredNames("turned on Let agents show watchers"));
     }
+
+    [Fact]
+    public void History_and_archive_names_are_pinned()
+    {
+        Assert.Equal("Export meter history…", SettingsNames.ExportMeterHistory);
+        Assert.Equal(SettingsNames.ExportMeterHistory, SettingsNames.ExportCsv);
+        Assert.Equal("Export sessions…", SettingsNames.ExportSessions);
+        Assert.Equal("Session archive", SettingsNames.SessionArchive);
+        Assert.Equal("Erase session archive…", SettingsNames.EraseSessionArchive);
+        Assert.Equal("Open archive folder", SettingsNames.OpenArchiveFolder);
+        Assert.Equal("Folders to share (off until you tick them)", SettingsNames.FoldersToShare);
+        Assert.Equal("Nothing archived yet.", SettingsNames.NothingArchivedYet);
+        Assert.Equal("Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, glow hook)", SettingsNames.ResetClaudeCodeEntries);
+        Assert.Equal("Meter history and the session archive", SettingsNames.ResetMeterHistory);
+        foreach (var old in new[] { "Export CSV…", "History vault", "Usage vault", "Erase archive", "Open vault folder", "Homes to share", "(statusline, MCP server)", "Usage history and the vault" })
+            Assert.NotEmpty(SettingsNames.RetiredNames(old));
+    }
 }

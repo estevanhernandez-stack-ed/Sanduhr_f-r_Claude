@@ -158,8 +158,8 @@
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
 
                 <CheckBox x:Name="ClaudeCodeBox" Style="{StaticResource ThemedCheckBox}" IsChecked="True"
-                          Content="Sanduhr's entries in Claude Code (statusline, MCP server)"
-                          AutomationProperties.Name="Sanduhr's entries in Claude Code (statusline, MCP server)"
+                          Content="Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, glow hook)"
+                          AutomationProperties.Name="Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, glow hook)"
                           Margin="0,0,0,4" Checked="Choice_Changed" Unchecked="Choice_Changed" />
                 <TextBlock x:Name="ClaudeCodeWarning" Margin="24,0,0,10" TextWrapping="Wrap" FontSize="11"
                            Text="An entry you leave unchecked can't be removed from Sanduhr later."
@@ -170,8 +170,8 @@
                           AutomationProperties.Name="Accounts and sign-in keys"
                           Margin="0,0,0,10" Checked="Choice_Changed" Unchecked="Choice_Changed" />
                 <CheckBox x:Name="HistoryBox" Style="{StaticResource ThemedCheckBox}" IsChecked="True"
-                          Content="Usage history and the vault"
-                          AutomationProperties.Name="Usage history and the vault"
+                          Content="Meter history and the session archive"
+                          AutomationProperties.Name="Meter history and the session archive"
                           Margin="0,0,0,10" Checked="Choice_Changed" Unchecked="Choice_Changed" />
                 <CheckBox x:Name="ThemesBox" Style="{StaticResource ThemedCheckBox}" IsChecked="True"
                           Content="Your themes and widgets"

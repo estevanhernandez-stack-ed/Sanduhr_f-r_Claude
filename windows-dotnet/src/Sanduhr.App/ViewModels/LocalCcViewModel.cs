@@ -140,7 +140,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
             {
                 vault.SetRootConsent(root, false);
                 var res = ThemedDialog.Show(_owner, $"Stop archiving {root}?",
-                    "Archiving is off for this home either way. Erase the history already stored for it?",
+                    "Archiving is off for this folder either way. Erase the history already stored for it?",
                     MessageBoxButton.YesNo, ThemedDialogKind.Warning,
                     primaryLabel: "Erase it", secondaryLabel: "Keep data");
                 if (res == MessageBoxResult.Yes)
@@ -185,8 +185,8 @@ public sealed partial class LocalCcViewModel : ObservableObject
         {
             if (_widget.Vault is not { } vault)
                 return;
-            var res = ThemedDialog.Show(_owner, "Erase usage history?",
-                "Deletes the entire local vault and turns archiving off for every home. This cannot be undone.",
+            var res = ThemedDialog.Show(_owner, "Erase the session archive?",
+                "Deletes the whole session archive and turns archiving off for every folder. This cannot be undone.",
                 MessageBoxButton.YesNo, ThemedDialogKind.Warning,
                 primaryLabel: "Erase everything", secondaryLabel: "Cancel");
             if (res != MessageBoxResult.Yes)
@@ -338,8 +338,8 @@ public sealed partial class LocalCcViewModel : ObservableObject
             return new OverviewData(
                 new Dictionary<DateOnly, long>(agg.ByDay), byName,
                 new Dictionary<string, long>(agg.BySkill),
-                !vaultOn ? "history vault off — these numbers are the live logs, not an archive"
-                         : "history vault paused — showing live logs only",
+                !vaultOn ? "session archive off, these numbers are the live logs, not an archive"
+                         : "session archive paused, showing live logs only",
                 sentT, recvT, sentW, recvW,
                 liveTotal > 0 && (sentW + recvW) < (long)(liveTotal * 0.95),
                 uncovered,

@@ -1151,7 +1151,7 @@
 
                             <!-- Action row -->
                             <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,12,0,0" views:SettingsAnchor.Id="export">
-                                <Button Style="{StaticResource AccentButton}" Content="{x:Static core:SettingsNames.ExportCsv}"
+                                <Button Style="{StaticResource AccentButton}" Content="{x:Static core:SettingsNames.ExportMeterHistory}"
                                         Command="{Binding ExportCsvCommand}" />
                                 <Button Style="{StaticResource FlatButton}" Content="Clear history"
                                         Command="{Binding ClearHistoryCommand}"
@@ -1200,7 +1200,7 @@
 
                                 <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,8"
-                                           Text="Claude Code deletes session logs after ~30 days. Sanduhr keeps a local history vault so your trends survive — never uploaded, per-home opt-in, erase any time below." />
+                                           Text="Claude Code deletes session logs after ~30 days. Sanduhr keeps a local session archive so your trends survive. It is never uploaded, opt-in per folder, and you can erase it any time below." />
 
                                 <TextBlock Grid.Row="1" FontSize="11" Margin="0,0,0,8"
                                            Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
@@ -1311,7 +1311,7 @@
 
                                 <!-- Data stewardship (spec: WS-A delete-completeness precedent). -->
                                 <StackPanel Grid.Row="7" Margin="0,10,0,0">
-                                    <TextBlock Text="History vault" FontSize="9" Margin="0,0,0,4" views:SettingsAnchor.Id="vault"
+                                    <TextBlock Text="{x:Static core:SettingsNames.SessionArchive}" FontSize="9" Margin="0,0,0,4" views:SettingsAnchor.Id="vault"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                     <ItemsControl ItemsSource="{Binding Roots}" AutomationProperties.Name="Session archive folders">
                                         <ItemsControl.ItemsPanel>
@@ -1328,10 +1328,10 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
                                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                        <Button Style="{StaticResource FlatButton}" Content="Erase archive"
+                                        <Button Style="{StaticResource FlatButton}" Content="{x:Static core:SettingsNames.EraseSessionArchive}"
                                                 Command="{Binding EraseArchiveCommand}"
                                                 Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" />
-                                        <Button Style="{StaticResource FlatButton}" Content="Open vault folder"
+                                        <Button Style="{StaticResource FlatButton}" Content="{x:Static core:SettingsNames.OpenArchiveFolder}"
                                                 Command="{Binding OpenVaultFolderCommand}" />
                                     </StackPanel>
 
@@ -1411,7 +1411,7 @@
 
                                 <DockPanel Grid.Row="0" Margin="0,0,0,8">
                                     <Button DockPanel.Dock="Right" Style="{StaticResource AccentButton}"
-                                            Content="Export CSV…" Command="{Binding ExportCsvCommand}" />
+                                            Content="{x:Static core:SettingsNames.ExportSessions}" Command="{Binding ExportCsvCommand}" />
                                     <CheckBox DockPanel.Dock="Right" Style="{StaticResource ThemedCheckBox}"
                                               Margin="0,0,12,0" VerticalAlignment="Center"
                                               Content="Stack by project"
@@ -1624,7 +1624,7 @@
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,0,0,12" />
 
                             <!-- What and when -->
-                            <TextBlock Text="Homes to share (off until you tick them)" FontSize="9" Margin="0,0,0,4" views:SettingsAnchor.Id="homes"
+                            <TextBlock Text="{x:Static core:SettingsNames.FoldersToShare}" FontSize="9" Margin="0,0,0,4" views:SettingsAnchor.Id="homes"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                             <ItemsControl ItemsSource="{Binding Roots}" Margin="0,0,0,10">
                                 <ItemsControl.ItemsPanel>
@@ -1637,7 +1637,7 @@
                                         <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
                                                   Content="{Binding Name}"
                                                   IsChecked="{Binding IsShared, Mode=TwoWay}"
-                                                  ToolTip="Include this Claude Code home's per-project token counts in the daily publish." />
+                                                  ToolTip="Include this Claude Code folder's per-project token counts in the daily publish." />
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -2940,7 +2940,7 @@
                                                VerticalAlignment="Center" Margin="0,0,12,6"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                     <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SettingsFolder}" FontSize="11"
-                                               FontFamily="Cascadia Code, Consolas" TextTrimming="CharacterEllipsis"
+                                               FontFamily="Cascadia Code, Consolas" TextWrapping="Wrap"
                                                ToolTip="{Binding SettingsFolder}" VerticalAlignment="Center" Margin="0,0,8,6"
                                                Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                     <Button Grid.Row="0" Grid.Column="2" Style="{StaticResource FlatButton}" Padding="10,4"
@@ -2948,14 +2948,29 @@
                                             AutomationProperties.Name="Show in Explorer, settings, history and themes"
                                             Command="{Binding ShowInExplorerCommand}" CommandParameter="{Binding SettingsFolder}" />
 
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Usage vault" FontSize="12"
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{x:Static core:SettingsNames.SessionArchive}" FontSize="12"
                                                VerticalAlignment="Center" Margin="0,0,12,6"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LocalFolder}" FontSize="11"
-                                               FontFamily="Cascadia Code, Consolas" TextTrimming="CharacterEllipsis"
-                                               ToolTip="{Binding LocalFolder}" VerticalAlignment="Center" Margin="0,0,8,6"
-                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                                    <Button Grid.Row="1" Grid.Column="2" Style="{StaticResource FlatButton}" Padding="10,4"
+                                    <StackPanel Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,6">
+                                        <TextBlock Text="{Binding LocalFolder}" FontSize="11"
+                                                   FontFamily="Cascadia Code, Consolas" TextWrapping="Wrap"
+                                                   ToolTip="{Binding LocalFolder}"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                        <TextBlock Text="{x:Static core:SettingsNames.NothingArchivedYet}" FontSize="10.5" Margin="0,2,0,0"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsEnabled, ElementName=VaultExplorerButton}" Value="False">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <Button x:Name="VaultExplorerButton" Grid.Row="1" Grid.Column="2" Style="{StaticResource FlatButton}" Padding="10,4"
                                             Margin="0,0,0,6" Content="Show in Explorer"
                                             AutomationProperties.Name="Show in Explorer, session archive"
                                             Command="{Binding ShowInExplorerCommand}" CommandParameter="{Binding LocalFolder}" />
@@ -2964,7 +2979,7 @@
                                                VerticalAlignment="Center" Margin="0,0,12,6"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                     <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ClaudeCodeFilesFolder}" FontSize="11"
-                                               FontFamily="Cascadia Code, Consolas" TextTrimming="CharacterEllipsis"
+                                               FontFamily="Cascadia Code, Consolas" TextWrapping="Wrap"
                                                ToolTip="{Binding ClaudeCodeFilesFolder}" VerticalAlignment="Center" Margin="0,0,8,6"
                                                Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                     <Button Grid.Row="2" Grid.Column="2" Style="{StaticResource FlatButton}" Padding="10,4"
