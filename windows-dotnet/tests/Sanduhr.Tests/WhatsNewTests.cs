@@ -158,4 +158,51 @@ public class WhatsNewTests
         Assert.Empty(d.Show);
         Assert.False(d.Record);
     }
+
+    /// <summary>Settings v2 (WF17): every card that opens Settings names the section it lands on, and that section is in
+    /// the index after any alias; a card that shows the widget names none.</summary>
+    [Fact]
+    public void Every_Settings_card_names_an_anchor_in_the_index()
+    {
+        var cards = WhatsNewCards.Table
+            .Concat(WelcomeTour.Table.Select(t => t.Card))
+            .Concat(WelcomeTour.DeskOnly.Select(t => t.Card))
+            .Concat(WelcomeTour.Table.Select(WelcomeTour.SignedOut).Select(t => t.Card));
+        foreach (var card in cards)
+        {
+            if (card.Destination == SettingsPage.Widget)
+            {
+                Assert.Null(card.Anchor);
+                continue;
+            }
+            Assert.False(card.Anchor is null, $"{card.Id} opens {card.Destination} with no anchor");
+            var link = SettingsIndex.Resolve(card.Destination, card.Anchor);
+            Assert.True(SettingsIndex.Find(link.Page, link.Anchor) is not null,
+                $"{card.Id}: {card.Destination}#{card.Anchor} is not in the index");
+        }
+    }
+
+    /// <summary>The cards the harness found landing below the fold at 800 high (WF17) name their section.</summary>
+    [Theory]
+    [InlineData("launcher", SettingsPage.Desk, SettingsIndex.DeskLauncher)]
+    [InlineData("per-monitor", SettingsPage.Desk, SettingsIndex.DeskPieces)]
+    [InlineData("meter-styles", SettingsPage.Desk, SettingsIndex.DeskPieces)]
+    [InlineData("saved-designs", SettingsPage.Desk, SettingsIndex.DeskDesigns)]
+    [InlineData("desk-fold", SettingsPage.Desk, SettingsIndex.DeskDesigns)]
+    [InlineData("desk-plate", SettingsPage.Desk, SettingsIndex.DeskPlate)]
+    [InlineData("ci-runners", SettingsPage.Desk, SettingsIndex.DeskWatchers)]
+    [InlineData("statusline-label", SettingsPage.ClaudeCode, SettingsIndex.Statusline)]
+    public void Cards_that_landed_below_the_fold_name_their_section(string id, SettingsPage page, string anchor)
+    {
+        var card = WhatsNewCards.Table.Single(c => c.Id == id);
+        Assert.Equal(page, card.Destination);
+        Assert.Equal(anchor, card.Anchor);
+    }
+
+    [Fact]
+    public void Signed_out_the_first_tour_card_lands_on_the_account_list()
+    {
+        var paced = WelcomeTour.SignedOut(WelcomeTour.Table.Single(t => t.Id == "paced"));
+        Assert.Equal((SettingsPage.Accounts, SettingsIndex.AccountList), (paced.Card.Destination, paced.Card.Anchor));
+    }
 }

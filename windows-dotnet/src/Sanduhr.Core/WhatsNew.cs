@@ -35,6 +35,13 @@ public sealed record WhatsNewCard
     public WhatsNewPreview Preview { get; }
     public SettingsPage Destination { get; }
 
+    /// <summary>
+    /// The section Show me lands on: an anchor of <see cref="SettingsIndex"/> on <see cref="Destination"/> (Settings v2,
+    /// WF17). Null when the card shows the widget. Set from the id maps in <see cref="WhatsNewCards"/> and
+    /// <see cref="WelcomeTour"/>, apart from the card's words.
+    /// </summary>
+    public string? Anchor { get; init; }
+
     public WhatsNewCard(IReadOnlyList<string> versions, string id, string title, string body,
         string glyph, WhatsNewPreview preview, SettingsPage destination)
     {
