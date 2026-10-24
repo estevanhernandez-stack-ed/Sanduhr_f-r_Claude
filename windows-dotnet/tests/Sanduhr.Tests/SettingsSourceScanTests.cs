@@ -481,8 +481,7 @@ public class SettingsSourceScanTests
     public void Each_Message_radio_group_sits_in_a_named_container()
     {
         var page = File.ReadAllText(Path.Combine(AppDir(), "Views", "DeskMessagePage.xaml"));
-        var groups = Regex.Matches(page, "<controls:RadioGroupPanel\\b([^>]*)>(.*?)</controls:RadioGroupPanel>", RegexOptions.Singleline)
-            .Select(m => (Open: m.Groups[1].Value, Body: m.Groups[2].Value)).ToList();
+        var groups = RadioGroups(page);
         foreach (var (group, nameStart) in new[] { ("MessageMode", "Message view"), ("MessageRotate", "Rotation"), ("MessageSpecial", "On special days") })
         {
             var holders = groups.Where(g => g.Body.Contains($"GroupName=\"{group}\"")).ToList();
@@ -495,6 +494,80 @@ public class SettingsSourceScanTests
         var radios = Regex.Matches(page, "<RadioButton\\b").Count;
         var inside = groups.Sum(g => Regex.Matches(g.Body, "<RadioButton\\b").Count);
         Assert.Equal(radios, inside);
+    }
+
+    /// <summary>
+    /// The RadioGroupPanel elements of a XAML file, each with its opening-tag attributes and its own body:
+    /// the text between its tags without the bodies of groups nested inside it, so a radio belongs to the
+    /// innermost group around it. A self-closing panel has an empty body.
+    /// </summary>
+    private static List<(string Open, string Body)> RadioGroups(string xaml)
+    {
+        var tokens = Regex.Matches(xaml, "<controls:RadioGroupPanel\\b([^>]*?)(/?)>|</controls:RadioGroupPanel>");
+        var found = new List<(string Open, string Body)>();
+        var stack = new Stack<OpenGroup>();
+        foreach (Match t in tokens)
+        {
+            // Whatever lies between the previous tag and this one is the innermost open group's own text.
+            if (stack.Count > 0)
+                stack.Peek().TakeUpTo(xaml, t.Index);
+            if (t.Value.StartsWith("</", StringComparison.Ordinal))
+            {
+                Assert.True(stack.Count > 0, "a </controls:RadioGroupPanel> with no opening tag");
+                var done = stack.Pop();
+                found.Add((done.Open, done.Own.ToString()));
+                if (stack.Count > 0)
+                    stack.Peek().Resume = t.Index + t.Length;
+            }
+            else if (t.Groups[2].Value == "/")
+            {
+                found.Add((t.Groups[1].Value, ""));
+                if (stack.Count > 0)
+                    stack.Peek().Resume = t.Index + t.Length;
+            }
+            else
+            {
+                stack.Push(new OpenGroup { Open = t.Groups[1].Value, Resume = t.Index + t.Length });
+            }
+        }
+        Assert.Empty(stack);
+        return found;
+    }
+
+    /// <summary>A RadioGroupPanel being read: its attributes, where its own text resumes, and that text so far.</summary>
+    private sealed class OpenGroup
+    {
+        public string Open { get; init; } = "";
+        public int Resume { get; set; }
+        public System.Text.StringBuilder Own { get; } = new();
+
+        public void TakeUpTo(string xaml, int end)
+        {
+            if (end > Resume)
+                Own.Append(xaml, Resume, end - Resume);
+            Resume = end;
+        }
+    }
+
+    [Fact]
+    public void The_radio_group_scan_reads_nested_and_self_closing_panels()
+    {
+        const string xaml =
+            "<controls:RadioGroupPanel AutomationProperties.Name=\"Outer\">" +
+            "<RadioButton GroupName=\"A\" />" +
+            "<controls:RadioGroupPanel AutomationProperties.Name=\"Inner\"><RadioButton GroupName=\"B\" /></controls:RadioGroupPanel>" +
+            "<controls:RadioGroupPanel AutomationProperties.Name=\"Empty\" />" +
+            "<RadioButton GroupName=\"C\" />" +
+            "</controls:RadioGroupPanel>";
+        var groups = RadioGroups(xaml);
+        Assert.Equal(3, groups.Count);
+        var outer = Assert.Single(groups, g => g.Open.Contains("Outer"));
+        Assert.Contains("GroupName=\"A\"", outer.Body);
+        Assert.Contains("GroupName=\"C\"", outer.Body);
+        Assert.DoesNotContain("GroupName=\"B\"", outer.Body);
+        var inner = Assert.Single(groups, g => g.Open.Contains("Inner"));
+        Assert.Contains("GroupName=\"B\"", inner.Body);
+        Assert.Empty(Assert.Single(groups, g => g.Open.Contains("Empty")).Body);
     }
 
     [Fact]

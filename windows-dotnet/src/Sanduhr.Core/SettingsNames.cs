@@ -123,7 +123,7 @@ public static class SettingsNames
     public const string SessionArchive = "Session archive";
     public const string EraseSessionArchive = "Erase session archive…";
     public const string OpenArchiveFolder = "Open archive folder";
-    /// <summary>About, Where settings live: the archive's Show in Explorer is dim until something is archived.</summary>
+    /// <summary>The empty state of the archive: About, Where settings live (beside the dim Show in Explorer) and the Claude Usage trends chart.</summary>
     public const string NothingArchivedYet = "Nothing archived yet.";
     /// <summary>Publish usage: the folders whose totals may leave ("Folder" is the one word, WF21).</summary>
     public const string FoldersToShare = "Folders to share (off until you tick them)";
@@ -416,6 +416,8 @@ public static class SettingsNames
         ("Glow when Claude needs you", ClaudeCodeGlowHook, false),
         ("Install again to update it", PieceOutdated, false),
         ("History kept", TranscriptsKept, false),
+        ("Keep a local usage history", SessionArchive, false),
+        ("Keep history", SessionArchive, false),
         ("Looks good", ThemeJsonValid, true),
         ("Save as:", SaveThemeAs, true),
         ("100% plays the !", SnakeSoundAtFull, false),
@@ -500,7 +502,7 @@ public static class SettingsNames
     /// capitalised word after a comma is read as a page or section, so "Settings, About, or the tray
     /// menu" and a literal that ends in "Settings, " pass. A known page title followed by another
     /// capitalised word in the same segment ("Settings, Desk Look, Font") is a longer, unknown title and
-    /// is flagged as no page.
+    /// is flagged as no page, and a section followed by another capitalised word is flagged the same way.
     /// </summary>
     public static IReadOnlyList<string> PathProblems(string text)
     {
@@ -541,7 +543,16 @@ public static class SettingsNames
             if (after.Length > 2 && after.StartsWith(", ", StringComparison.Ordinal) && char.IsUpper(after[2]))
             {
                 var section = after[2..];
-                if (!SettingsIndex.EntriesOn(page.Value).Any(e => StartsWithWord(section, e.Title)))
+                string? best = null;
+                foreach (var e in SettingsIndex.EntriesOn(page.Value))
+                {
+                    if (StartsWithWord(section, e.Title) && (best is null || e.Title.Length > best.Length))
+                        best = e.Title;
+                }
+                // The page rule again: a capitalised word right after the matched title is part of a
+                // longer title we do not know ("Ink and color" must not pass as "Ink").
+                var tail = best is null ? "" : section[best.Length..];
+                if (best is null || (tail.Length > 1 && tail[0] == ' ' && char.IsUpper(tail[1])))
                     found.Add($"no section \"{FirstWords(section)}\" on {PageTitle(page.Value)}");
             }
         }

@@ -65,7 +65,10 @@ public sealed class MessageModeSegmentTests : IDisposable
         page.IsTextMode = true;
         page.EditorText = "A line typed in the Text view";
         page.IsListMode = true;
+        // The list shows the typed line as a row...
+        Assert.Contains(page.Rows, r => r.IsStyled ? r.Text == "A line typed in the Text view" : r.RawText.Contains("A line typed in the Text view"));
         page.IsTextMode = true;
+        // ...and the text view still has it after the round trip.
         Assert.Contains("A line typed in the Text view", page.EditorText);
     });
 }

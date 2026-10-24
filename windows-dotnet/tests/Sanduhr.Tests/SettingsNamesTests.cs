@@ -222,6 +222,26 @@ public class SettingsNamesTests
     }
 
     [Fact]
+    public void PathProblems_flags_a_longer_unknown_section_title()
+    {
+        // The page rule, applied to sections: "Look" is a real section of Desk, "Look Ahead" is not.
+        Assert.Contains("no section \"Look Ahead\" on Desk", SettingsNames.PathProblems("(Settings, Desk, Look Ahead)"));
+        Assert.Empty(SettingsNames.PathProblems("(Settings, Desk, Look)"));
+        Assert.Empty(SettingsNames.PathProblems("Settings, Desk, Look and feel"));
+        Assert.Empty(SettingsNames.PathProblems("Settings, Claude Code, Folders to share"));
+    }
+
+    [Fact]
+    public void The_old_consent_copy_is_retired_and_the_shortcut_name_has_one_source()
+    {
+        Assert.Equal(["Keep a local usage history"], SettingsNames.RetiredNames("Keep a local usage history?"));
+        Assert.Equal(["Keep history"], SettingsNames.RetiredNames("Keep history"));
+        Assert.Empty(SettingsNames.RetiredNames("Keep a local session archive?"));
+        // Two literals name the same control; nothing else ties them.
+        Assert.Equal(SettingsNames.ShortcutToOpenSettings, HotKeys.Name(HotKeyAction.Settings));
+    }
+
+    [Fact]
     public void Names_that_match_their_labels_are_pinned()
     {
         Assert.Equal("Desk font", SettingsNames.DeskFont);

@@ -20,4 +20,25 @@ public sealed class RadioGroupPanelTests
         Assert.Equal("Message view", peer.GetName());
         Assert.True(peer.IsControlElement());
     });
+
+    [Fact]
+    public void The_radios_stay_visible_as_children_of_the_Group_peer() => AppHost.Run(() =>
+    {
+        var panel = new RadioGroupPanel();
+        System.Windows.Automation.AutomationProperties.SetName(panel, "Message view");
+        foreach (var label in new[] { "List", "Text" })
+        {
+            var radio = new System.Windows.Controls.RadioButton { Content = label, GroupName = "MessageMode" };
+            System.Windows.Automation.AutomationProperties.SetName(radio, label);
+            panel.Children.Add(radio);
+        }
+
+        var peer = UIElementAutomationPeer.CreatePeerForElement(panel);
+        var children = peer.GetChildren();
+
+        // A Group that hid its radios would announce a set with nothing in it.
+        Assert.NotNull(children);
+        Assert.Equal(["List", "Text"], children.Select(c => c.GetName()));
+        Assert.All(children, c => Assert.Equal(AutomationControlType.RadioButton, c.GetAutomationControlType()));
+    });
 }
