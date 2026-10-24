@@ -116,7 +116,7 @@ public partial class App : Application
         StartGlow();
         StartDesk();
 
-        // Usage vault (WS-C): consent resolves BEFORE the service attaches —
+        // Session archive (WS-C): consent resolves BEFORE the service attaches —
         // attach order is the consent gate; Start()'s first fetch cycle then
         // kicks the initial backfill through the attached service.
         var vaultService = new VaultService(new SettingsStore(new Sanduhr.Core.Paths()), _vm.CcReader);
@@ -125,7 +125,7 @@ public partial class App : Application
         _vm.AttachVaultService(vaultService);
 
         // Publish usage: everything defaults off (toggle + every home, no endpoint),
-        // so attaching is inert until the user opts in under Settings > Publish usage.
+        // so attaching is inert until the user opts in under Settings, Publish usage.
         // The publish token rides the same Credential Manager seam as the accounts.
         _vm.AttachPublishService(new UsagePublishService(
             new SettingsStore(new Sanduhr.Core.Paths()),
@@ -557,7 +557,7 @@ public partial class App : Application
         _handoff = new Desk.DeskMessageHandoffService(paths, _messages.FilePath, store);
         Desk.DeskMessageHandoffService.Current = _handoff;
         _handoff.Start(); // Claude's suggested Desk messages (spec 6.9)
-        // Watchers (spec 6.9): agents' cards, only while "Let agents show watchers" is on; in memory only.
+        // Watchers (spec 6.9): agents' cards, only while "Let Claude show watchers" is on; in memory only.
         _watchers = new Desk.WatcherStore(paths, store.LoadWatchersAgents, () => vm.IsDemo);
         _watchers.WaitingStarted += () =>
         {

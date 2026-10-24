@@ -199,7 +199,7 @@
                             </StackPanel>
                         </Grid>
                         <TextBlock Style="{StaticResource Dim}" Margin="0,4,0,0"
-                                   Text="Kept as written: the editor can't set everything on this line. Text changes it." />
+                                   Text="Kept as written: the editor can't set everything on this line. Switch to Text to change it." />
                     </StackPanel>
 
                     <TextBlock Style="{StaticResource Dim}" Margin="0,2,0,0" Text="{Binding Note}" />

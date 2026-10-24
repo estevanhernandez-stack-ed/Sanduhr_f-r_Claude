@@ -27,7 +27,7 @@
                    Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
         <StackPanel Grid.Row="1" Margin="0,6,0,0">
             <TextBlock x:Name="IntroText"
-                       Text="The power-user path. Paste your claude.ai sessionKey cookie — it's stored in the Windows Credential Manager, never in a file."
+                       Text="The power-user path. Paste your claude.ai sessionKey cookie. It's stored in the Windows Credential Manager, never in a file."
                        TextWrapping="Wrap" FontSize="11"
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
             <TextBlock x:Name="UseEmbeddedLink" Margin="0,8,0,0" Visibility="Collapsed">
@@ -75,16 +75,16 @@
             </Hyperlink>
         </TextBlock>
         <StackPanel Grid.Row="7" x:Name="CloudflarePanel" Visibility="Collapsed">
-        <TextBlock Text="{x:Static core:SettingsNames.ManualKeyCloudflareHelp}" FontSize="11" TextWrapping="Wrap"
-                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,6" />
-        <TextBlock Text="{x:Static core:SettingsNames.ManualKeyCfLabel}" FontSize="11"
-                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
-        <TextBox x:Name="CfClearanceBox" FontSize="13" Padding="8,6"
-                 Background="{DynamicResource Sanduhr.Brush.Glass}"
-                 Foreground="{DynamicResource Sanduhr.Brush.Text}"
-                 BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
-                 CaretBrush="{DynamicResource Sanduhr.Brush.Text}"
-                 FontFamily="Consolas, monospace" />
+            <TextBlock Text="{x:Static core:SettingsNames.ManualKeyCloudflareHelp}" FontSize="11" TextWrapping="Wrap"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,6" />
+            <TextBlock Text="{x:Static core:SettingsNames.ManualKeyCfLabel}" FontSize="11"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
+            <TextBox x:Name="CfClearanceBox" FontSize="13" Padding="8,6"
+                     Background="{DynamicResource Sanduhr.Brush.Glass}"
+                     Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                     BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                     CaretBrush="{DynamicResource Sanduhr.Brush.Text}"
+                     FontFamily="Consolas, monospace" />
         </StackPanel>
 
         <TextBlock Grid.Row="8" x:Name="ErrorText"

@@ -69,7 +69,7 @@ public partial class TierCard : UserControl
 
         if (host.CanHideUntilReset(key))
             menu.Items.Add(Item(SettingsNames.HideUntilItResets, () => host.HideUntilReset(key)));
-        menu.Items.Add(Item(SettingsNames.HideThisLimit,() => host.HideTier(key)));
+        menu.Items.Add(Item(SettingsNames.HideThisLimit, () => host.HideTier(key)));
         menu.Items.Add(host.WarningsOn(key)
             ? Item(SettingsNames.StopWarnings, () => host.SetWarnings(key, false))
             : Item(SettingsNames.WarnAgain, () => host.SetWarnings(key, true)));

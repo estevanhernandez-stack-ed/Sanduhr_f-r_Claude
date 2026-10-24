@@ -82,7 +82,7 @@ public sealed class WhatsNewViewModel : ObservableObject
     public IReadOnlyList<WhatsNewCardItem> Items { get; }
     public bool IsEmpty => Items.Count == 0;
 
-    // The window's mode: What's New (cards, Don't show after updates, Done).
+    // The window's mode: What's New (cards, Don't show What's New after updates, Done).
     public string WindowTitle => "What's New in Sanduhr";
     public string HeaderName => Header;
     public bool IsTour => false;

@@ -137,8 +137,8 @@ public sealed partial class LedgerRowViewModel : ObservableObject
     /// <summary>Group row detail: one line per member session (most recent
     /// first) — relative last-active, scoped tokens (current scope), lifetime
     /// tokens, short uuid — capped at 20 lines with a "… and N more" tail, plus
-    /// a "Sessions: N · Homes: {roots}" footer in place of the session row's
-    /// Home/Session line.</summary>
+    /// a "Sessions: N · Folders: {roots}" footer in place of the session row's
+    /// Folder/Session line.</summary>
     private string BuildGroupDetail()
     {
         var ordered = Members.OrderByDescending(m => m.LastTs).ToList();

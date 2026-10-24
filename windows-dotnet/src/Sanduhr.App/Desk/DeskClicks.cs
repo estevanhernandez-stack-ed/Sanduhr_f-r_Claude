@@ -49,7 +49,7 @@ internal static class DeskClicks
 
     /// <summary>The message's menu item: "Message settings…", a page name like every Settings entry point.</summary>
     public static readonly string MessageSettings = SettingsNames.LinkTitle(SettingsPage.DeskMessage);
-    public const string DeskSettings = "Desk settings…";
+    public static readonly string DeskSettings = SettingsNames.LinkTitle(SettingsPage.Desk);
     public const string LauncherSettings = "Edit buttons…";
     public const string TurnOffDesk = "Turn off the Desk";
 

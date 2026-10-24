@@ -1119,7 +1119,7 @@
 
                             <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
-                                       Text="Rolling 30-day usage history. Stored locally only — never uploaded. Export as CSV to analyze with any agent." />
+                                       Text="Rolling 30-day meter history. Stored locally only, never uploaded. Export as CSV to analyze with any agent." />
 
                             <!-- Window + account selector row -->
                             <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8" views:SettingsAnchor.Id="chart">
@@ -1558,7 +1558,7 @@
 
                 <!-- Publish usage tab: opt-in daily publish to an endpoint the user chooses.
                      Nothing comes back to us. Everything defaults OFF — master toggle, every
-                     home — and the one sentence above the controls says exactly what leaves
+                     folder — and the one sentence above the controls says exactly what leaves
                      the machine. 626 Labs is a preset, not the name of the feature. -->
                 <TabItem Header="Publish usage" Tag="Publish" AutomationProperties.Name="Publish usage" DataContext="{Binding Publish}">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="20">

@@ -54,7 +54,7 @@ public sealed partial class SettingsSearchViewModel : ObservableObject
     private SettingsSearchRow? _first;
 
     /// <summary>The row Enter opens from the search box: the best hit, a page or a section
-    /// ("publish" opens Publish usage, "vault" opens History vault).</summary>
+    /// ("publish" opens Publish usage, "vault" opens Session archive).</summary>
     public SettingsSearchRow? First => _first ?? Results.FirstOrDefault();
 
     public void Clear() => Query = "";

@@ -336,8 +336,8 @@
                          Shows the active account; ⇆-prefixed when 2+ accounts are
                          configured (the prefix signals a click cycles to the next one,
                          round-robin). Hidden when signed out; a plain non-interactive
-                         label with a single account. Tray "Accounts ▸" and Settings →
-                         Accounts remain the explicit pick-from-list surfaces. -->
+                         label with a single account. Tray "Accounts" and Settings, Accounts,
+                         remain the explicit pick-from-list surfaces. -->
                     <Button x:Name="AccountSwitcher"
                             Command="{Binding CycleAccountCommand}"
                             HorizontalAlignment="Left" Margin="2,2,2,6"
