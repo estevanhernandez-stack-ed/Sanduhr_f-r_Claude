@@ -476,4 +476,24 @@ public class SettingsSourceScanTests
         Assert.Contains("IsChecked=\"{Binding IsTextMode, Mode=TwoWay}\"", radios[1]);
         Assert.DoesNotContain("ModeButtonText", page);
     }
+
+    [Fact]
+    public void Each_Message_radio_group_sits_in_a_named_container()
+    {
+        var page = File.ReadAllText(Path.Combine(AppDir(), "Views", "DeskMessagePage.xaml"));
+        var groups = Regex.Matches(page, "<controls:RadioGroupPanel\\b([^>]*)>(.*?)</controls:RadioGroupPanel>", RegexOptions.Singleline)
+            .Select(m => (Open: m.Groups[1].Value, Body: m.Groups[2].Value)).ToList();
+        foreach (var (group, nameStart) in new[] { ("MessageMode", "Message view"), ("MessageRotate", "Rotation"), ("MessageSpecial", "On special days") })
+        {
+            var holders = groups.Where(g => g.Body.Contains($"GroupName=\"{group}\"")).ToList();
+            var holder = Assert.Single(holders);
+            var name = Regex.Match(holder.Open, "AutomationProperties\\.Name=\"([^\"]*)\"");
+            Assert.True(name.Success, $"{group}: the container has no AutomationProperties.Name");
+            Assert.StartsWith(nameStart, name.Groups[1].Value);
+        }
+        // No radio sits outside a named container.
+        var radios = Regex.Matches(page, "<RadioButton\\b").Count;
+        var inside = groups.Sum(g => Regex.Matches(g.Body, "<RadioButton\\b").Count);
+        Assert.Equal(radios, inside);
+    }
 }

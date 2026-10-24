@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:views="clr-namespace:Sanduhr.App.Views"
              xmlns:conv="clr-namespace:Sanduhr.App.Converters"
+             xmlns:controls="clr-namespace:Sanduhr.App.Controls"
              xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
              xmlns:vm="clr-namespace:Sanduhr.App.ViewModels">
     <!-- Settings, Message (spec 6.2, 6.9). Hosted inside SettingsWindow: the themed styles (ThemedCheckBox,
@@ -267,16 +268,18 @@
                         <Button Style="{DynamicResource AccentButton}" Content="Add line" Command="{Binding AddLineCommand}"
                                 AutomationProperties.Name="Add line"
                                 ToolTip="A new line, every day, at the top of the list." />
-                        <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageMode"
-                                     Content="{x:Static core:SettingsNames.MessageModeList}"
-                                     IsChecked="{Binding IsListMode, Mode=TwoWay}"
-                                     AutomationProperties.Name="List, each line as its own row"
-                                     ToolTip="Each line as controls. Your edits carry over to Text." />
-                        <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageMode"
-                                     Content="{x:Static core:SettingsNames.MessageModeText}"
-                                     IsChecked="{Binding IsTextMode, Mode=TwoWay}"
-                                     AutomationProperties.Name="Text, messages.txt as written, tags and all"
-                                     ToolTip="The file itself, tags and all. Your edits carry over to List." />
+                        <controls:RadioGroupPanel Orientation="Horizontal" AutomationProperties.Name="Message view">
+                            <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageMode"
+                                         Content="{x:Static core:SettingsNames.MessageModeList}"
+                                         IsChecked="{Binding IsListMode, Mode=TwoWay}"
+                                         AutomationProperties.Name="List, each line as its own row"
+                                         ToolTip="Each line as controls. Your edits carry over to Text." />
+                            <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageMode"
+                                         Content="{x:Static core:SettingsNames.MessageModeText}"
+                                         IsChecked="{Binding IsTextMode, Mode=TwoWay}"
+                                         AutomationProperties.Name="Text, messages.txt as written, tags and all"
+                                         ToolTip="The file itself, tags and all. Your edits carry over to List." />
+                        </controls:RadioGroupPanel>
                         <Button Style="{DynamicResource FlatButton}" Content="Save" Command="{Binding SaveCommand}"
                                 IsEnabled="{Binding Unsaved}" AutomationProperties.Name="Save messages.txt" />
                         <Button Style="{DynamicResource FlatButton}" Content="Revert" Command="{Binding RevertCommand}"
@@ -319,12 +322,13 @@
                 <!-- Rotation -->
                 <StackPanel views:SettingsAnchor.Id="rotation">
                     <TextBlock Text="Rotation" Style="{StaticResource Heading}" />
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <controls:RadioGroupPanel Orientation="Horizontal" Margin="0,0,0,10"
+                                              AutomationProperties.Name="Rotation, how often the line changes">
                         <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageRotate" Content="Daily"
                                      IsChecked="{Binding IsDaily, Mode=TwoWay}" AutomationProperties.Name="Daily, the line changes once a day" />
                         <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageRotate" Content="Hourly"
                                      IsChecked="{Binding IsHourly, Mode=TwoWay}" AutomationProperties.Name="Hourly, the line changes every hour" />
-                    </StackPanel>
+                    </controls:RadioGroupPanel>
                     <CheckBox Style="{DynamicResource ThemedCheckBox}"
                               Content="Mix every-day lines in on days with their own line"
                               IsChecked="{Binding Mix, Mode=TwoWay}"
@@ -356,15 +360,17 @@
                     <TextBlock Text="On special days" Style="{StaticResource Heading}" />
                     <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8"
                                Text="How a date's own lines share the Desk with the day's line." />
-                    <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Stack"
-                                 IsChecked="{Binding IsStack, Mode=TwoWay}" AutomationProperties.Name="Stack special day lines" />
-                    <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,8" Text="{Binding StackHelp}" />
-                    <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Take turns"
-                                 IsChecked="{Binding IsTurns, Mode=TwoWay}" AutomationProperties.Name="Take turns showing special day lines" />
-                    <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,8" Text="{Binding TurnsHelp}" />
-                    <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Scroll"
-                                 IsChecked="{Binding IsScroll, Mode=TwoWay}" AutomationProperties.Name="Scroll special day lines" />
-                    <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,10" Text="{Binding ScrollHelp}" />
+                    <controls:RadioGroupPanel AutomationProperties.Name="On special days, how a date's own lines share the Desk">
+                        <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Stack"
+                                     IsChecked="{Binding IsStack, Mode=TwoWay}" AutomationProperties.Name="Stack special day lines" />
+                        <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,8" Text="{Binding StackHelp}" />
+                        <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Take turns"
+                                     IsChecked="{Binding IsTurns, Mode=TwoWay}" AutomationProperties.Name="Take turns showing special day lines" />
+                        <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,8" Text="{Binding TurnsHelp}" />
+                        <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Scroll"
+                                     IsChecked="{Binding IsScroll, Mode=TwoWay}" AutomationProperties.Name="Scroll special day lines" />
+                        <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,10" Text="{Binding ScrollHelp}" />
+                    </controls:RadioGroupPanel>
                     <Grid IsEnabled="{Binding SecondsApply}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="130" />

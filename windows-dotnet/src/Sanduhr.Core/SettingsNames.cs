@@ -268,6 +268,7 @@ public static class SettingsNames
     public const string ClearLooks = "Clear Looks…";
     /// <summary>Message, Your lines: the two views of messages.txt, as a segment (WF48).</summary>
     public const string MessageModeList = "List";
+    /// <summary>Message, Your lines: the Text half of the segment, messages.txt as written (WF48).</summary>
     public const string MessageModeText = "Text";
     /// <summary>Weather: looks a typed city up with Open-Meteo.</summary>
     public const string WeatherLookUp = "Look up";
