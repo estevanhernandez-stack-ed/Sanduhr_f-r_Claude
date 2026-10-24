@@ -130,7 +130,7 @@ public sealed partial class ToolLogic
                 return BuildDegraded(history, historyAge!.Value, remedyText!, null, null, now);
             }
             return NoData("missing",
-                "No usage snapshot. Start the Sanduhr widget and turn on its Claude Code integration (Settings, Claude Usage).");
+                "No usage snapshot. Start the Sanduhr widget and turn on its Claude Code integration (Settings, Claude Code).");
         }
         if (outcome == SnapshotReadOutcome.Malformed)
             return NoData("malformed",
@@ -358,7 +358,7 @@ public sealed partial class ToolLogic
                 return ("degraded", ReasonWidgetTooOld, $"{WidgetTooOldRemedy} {polling}; snapshot.json does not exist.");
             string leftover = floorOk
                 ? $"snapshot.json was last written {snapshotAge:0}s ago by build {writer}. If the installed widget "
-                  + "is already 3.4.0 or later, re-enable its Claude Code integration (Settings, Claude Usage)."
+                  + "is already 3.4.0 or later, re-enable its Claude Code integration (Settings, Claude Code)."
                 : $"snapshot.json was last written {snapshotAge:0}s ago by build {writer}, a dev-build or pre-{RequiredWidgetVersion} leftover.";
             return ("degraded", ReasonWidgetTooOld, $"{WidgetTooOldRemedy} {polling}; {leftover}");
         }
@@ -439,7 +439,7 @@ public sealed partial class ToolLogic
             return NoData("invalid_params", "window_days must be 1, 7, or 30");
         if (_config.ConsentedRoots.Count == 0)
             return NoData("disabled",
-                "No Claude Code homes are consented for MCP reads. Enable them in the Sanduhr widget's settings (mcp_roots).");
+                "No Claude Code folders are consented for MCP reads. Turn on 'Let Claude read this folder's project totals' on a folder in the Sanduhr widget (Settings, Claude Code, Folders).");
 
         var now = _clock();
         var since = now.AddDays(-windowDays);
@@ -508,7 +508,7 @@ public sealed partial class ToolLogic
             return NoData("invalid_params", "window_days must be 1, 7, or 30");
         if (_config.ConsentedRoots.Count == 0)
             return NoData("disabled",
-                "No Claude Code homes are consented for MCP reads. Enable them in the Sanduhr widget's settings (mcp_roots).");
+                "No Claude Code folders are consented for MCP reads. Turn on 'Let Claude read this folder's project totals' on a folder in the Sanduhr widget (Settings, Claude Code, Folders).");
 
         var now = _clock();
         var since = now.AddDays(-windowDays);
@@ -598,7 +598,7 @@ public sealed partial class ToolLogic
             return NoData("invalid_params", "window_days must be 7, 30, or 90");
         if (_config.ConsentedRoots.Count == 0)
             return NoData("disabled",
-                "No Claude Code homes are consented for MCP reads. Enable them in the Sanduhr widget's settings (mcp_roots).");
+                "No Claude Code folders are consented for MCP reads. Turn on 'Let Claude read this folder's project totals' on a folder in the Sanduhr widget (Settings, Claude Code, Folders).");
 
         var today = DateOnly.FromDateTime(_clock().ToLocalTime().DateTime);
         var from = today.AddDays(-(windowDays - 1));
@@ -611,7 +611,7 @@ public sealed partial class ToolLogic
         }
         catch (Exception)
         {
-            return NoData("malformed", "The usage vault could not be read - see the Sanduhr widget's Claude Usage tab.");
+            return NoData("malformed", "The session archive (the vault) could not be read. See the Sanduhr widget (Settings, Claude Usage, Overview).");
         }
 
         if (window.ByDay.Count == 0)
