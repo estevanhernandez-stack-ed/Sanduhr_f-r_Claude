@@ -82,7 +82,7 @@ Slice 1 lands first; rebase on it before Task 16. Slice 1's strings win wherever
 | `src/Sanduhr.App/ViewModels/SettingsSearchViewModel.cs` (modify) | `SettingsSearchRow.CollapsedIn`, `DisplayTitle`. |
 | `src/Sanduhr.App/ViewModels/HistoryTabViewModel.cs` (modify) | `EmptyText`, `HasEmptyText`. |
 | `tests/Sanduhr.Tests/SettingsSourceScanTests.cs` (modify, Task 19) | `SettingsIndex.cs` leaves `NotScanned` (slice 1 hand-off). |
-| `src/Sanduhr.Core/SettingsNames.cs` (modify, Task 19 Step 7 only) | Drop the `ExportCsv` alias, as a one-line commit slice 1's owner reviews. |
+| `src/Sanduhr.Core/SettingsNames.cs` (modify, Task 19 Steps 7 and 9 only) | Drop the `ExportCsv` alias (with `SettingsNamesTests.cs:258`), as a commit slice 1's owner reviews; add `Table` rows for slice 1's new control names. |
 | `tools/Sanduhr.RenderHarness/SettingsPassScenario.cs` (modify) | `CARD-LANDING` and `TOUR-LANDING` lines; menu entries with their anchors. |
 | `tests/Sanduhr.Tests/SettingsReachIndexTests.cs`, `SettingsLinkTests.cs`, `WindowFitTests.cs`, `SettingsEntryPointScanTests.cs` (create); `WhatsNewTests.cs` (modify) | Core and source-scan tests. |
 | `tests/Sanduhr.App.Tests/NoActivate.cs`, `SettingsReachTests.cs` (create); `SingleInstanceTests.cs`, `AppWindowNamesTests.cs` (modify) | App tests. |
@@ -3762,6 +3762,7 @@ git commit -m "fix(settings-v2): the Desk page scrolls sideways at 680 instead o
 - Modify: `windows-dotnet/tests/Sanduhr.Tests/SettingsSourceScanTests.cs` (the `NotScanned` line only)
 - Modify: `windows-dotnet/src/Sanduhr.App/Views/SettingsWindow.xaml` (Alerts block)
 - Modify: `windows-dotnet/src/Sanduhr.App/ViewModels/SettingsViewModel.cs`
+- Modify (Steps 7 to 9): `windows-dotnet/src/Sanduhr.Core/SettingsNames.cs` (the `ExportCsv` alias; `Table` rows), `windows-dotnet/src/Sanduhr.Core/SettingsIndex.cs` (`NameAnchors` rows), `windows-dotnet/src/Sanduhr.App/Views/SettingsWindow.xaml.cs` (class summary), `windows-dotnet/tests/Sanduhr.Tests/SettingsNamesTests.cs` (line 258)
 - Test: `windows-dotnet/tests/Sanduhr.App.Tests/SettingsReachTests.cs`
 
 **Interfaces:**
@@ -3967,12 +3968,34 @@ git commit -m "feat(settings-v2): index titles from the names table, SettingsInd
 
 - [ ] **Step 7: Retire the `ExportCsv` alias (one-line follow-up for slice 1's owner)**
 
-Confirm nothing uses it: `git grep -n "SettingsNames.ExportCsv" -- windows-dotnet` prints nothing. In `SettingsNames.cs`, delete the `ExportCsv` alias line and the doc comment above it ("The old identifier, kept because SettingsIndex.cs (slice 2's file) refers to it. Same text."). Run `dotnet test tests/Sanduhr.Tests --filter "FullyQualifiedName~SettingsNamesTests|FullyQualifiedName~SettingsSourceScanTests"`; expected PASS. Commit on its own and ask slice 1's owner to review it:
+Confirm what still uses it: `git grep -n "SettingsNames.ExportCsv" -- windows-dotnet` prints exactly one line, `tests/Sanduhr.Tests/SettingsNamesTests.cs:258` (`Assert.Equal(SettingsNames.ExportMeterHistory, SettingsNames.ExportCsv);` in `History_and_archive_names_are_pinned`). That assert only pins the alias, so delete that one line from the test and then the alias. In `SettingsNames.cs`, delete the `ExportCsv` alias line and the doc comment above it ("The old identifier, kept because SettingsIndex.cs (slice 2's file) refers to it. Same text."). Rerun the grep; it now prints nothing. Run `dotnet test tests/Sanduhr.Tests --filter "FullyQualifiedName~SettingsNamesTests|FullyQualifiedName~SettingsSourceScanTests"`; expected PASS. Commit on its own, test line and alias together (deleting the alias alone breaks the build), and ask slice 1's owner to review it:
 
 ```bash
-git add windows-dotnet/src/Sanduhr.Core/SettingsNames.cs
+git add windows-dotnet/src/Sanduhr.Core/SettingsNames.cs windows-dotnet/tests/Sanduhr.Tests/SettingsNamesTests.cs
 git commit -m "chore(settings-v2): drop the ExportCsv alias now that SettingsIndex uses ExportMeterHistory"
 ```
+
+- [ ] **Step 8: Sidebar group titles from the table; the stale class summaries (slice 1 hand-offs P13, T11 / P9)**
+
+Five `views:SettingsSidebar.GroupHeader` values in `SettingsWindow.xaml` are literals ("Usage" on History, "Extend" on Claude Code, "Widget" on Themes, "Desktop" on Desk, "Help" on About), so the group titles live in two places. Remove the five attributes and set the attached property from `SettingsNames.GroupTitle(page)` for each page's TabItem in the `SettingsWindow` constructor, after `InitializeComponent()`, by reading each TabItem's `Tag` (the `SettingsPage`). `GroupTitle` returns null for the first group, which is what the sidebar template already expects, and the template's trigger on a null `GroupHeader` hides the heading for every page that is not first in its group, so set it only on the first page of each group (`SettingsNames.Sidebar[i].Pages[0]`). Add one App test to `SettingsWindowNamesTests.cs`: the TabItem for the first page of each group reports `SettingsSidebar.GetGroupHeader` equal to that group's `Title`, and every other TabItem reports null. Add a source scan to `SettingsSourceScanTests.cs`: `SettingsWindow.xaml` has no `SettingsSidebar.GroupHeader="` literal.
+
+In the same commit, rewrite the class summaries that still describe the old window: `SettingsWindow.xaml.cs:12-14` (it lists "Mods & Config" and the pre-v2 page set; name the sidebar groups from `SettingsNames.Sidebar` instead of listing titles) and `SettingsViewModel.cs:9-14` ("tabbed", "item 8/9/10"; say it backs the Settings window's pages and list what it owns, not which build item added it). `SettingsWindow.xaml.cs` also gets this plan's paragraph in Task 8. Run the App and Core tests named in Step 6.
+
+```bash
+git add windows-dotnet/src/Sanduhr.App/Views/SettingsWindow.xaml windows-dotnet/src/Sanduhr.App/Views/SettingsWindow.xaml.cs windows-dotnet/src/Sanduhr.App/ViewModels/SettingsViewModel.cs windows-dotnet/tests/Sanduhr.App.Tests/SettingsWindowNamesTests.cs windows-dotnet/tests/Sanduhr.Tests/SettingsSourceScanTests.cs
+git commit -m "refactor(settings-v2): sidebar group titles come from the names table; class summaries describe the sidebar"
+```
+
+- [ ] **Step 9: Names table and anchors for slice 1's new control names (slice 1 hand-off)**
+
+`SettingsNames.Table` (name, page) and `SettingsIndex.NameAnchors` (name, section anchor) stop short of the names slice 1 added: `ExportSessions`, `SessionArchive`, `FoldersToShare`, `ClaudeCodeGlowHook`, `TranscriptsKept`, `LetClaudeReadTotals`, `SnakeSoundAtFull`, `DeskFont`, `MessageFont` and `MessageColor`. Add one `Table` row and one `NameAnchors` row for each, on the page its control sits on in `SettingsWindow.xaml` / `DeskMessagePage.xaml` today and the anchor of its section (reuse an existing anchor where the control shares a section; add one only where none fits). The `Define*` parts and the `TitlesToCome` constants stay out of both. The `Table` rows are the only edit this slice makes in `SettingsNames.cs` beyond the alias. Extend the existing test that walks `Table` against `NameAnchors` (or add one in `SettingsReachIndexTests.cs`) so every `Table` name resolves to an anchor that exists on its page. Run `dotnet test tests/Sanduhr.Tests --filter "FullyQualifiedName~SettingsNamesTests|FullyQualifiedName~SettingsReachIndexTests|FullyQualifiedName~SettingsIndexTests"`; expected PASS.
+
+```bash
+git add windows-dotnet/src/Sanduhr.Core/SettingsNames.cs windows-dotnet/src/Sanduhr.Core/SettingsIndex.cs windows-dotnet/tests/Sanduhr.Tests/SettingsReachIndexTests.cs
+git commit -m "feat(settings-v2): the names table and anchors cover slice 1's new control names"
+```
+
+Hand-offs this slice does not take: `DefineWidget` as the Widget page's first line is slice 5's; the `docs/PRIVACY.md` rows that quote renamed controls are the 4.0 docs pass's (both listed in slice 1's plan, "Hand-offs to other slices").
 
 ---
 
@@ -4149,4 +4172,4 @@ Not code, and not for the agent: they need the real app on real screens, which t
 | WF26 (scroll) | 18 |
 | Done: every card with a page lands in view at 800; Tab never reaches Quit from page content | 20, 13 |
 | Tier 2 items 5, 9, 11 | 20 Step 7 |
-| Slice 1 hand-offs: index titles, `ExportMeterHistory`, `SettingsIndex.cs` scanned, Alerts title and "%", `TrademarkNotice` deleted | 19 |
+| Slice 1 hand-offs: index titles, `ExportMeterHistory`, `SettingsIndex.cs` scanned, Alerts title and "%", `TrademarkNotice` deleted, the `ExportCsv` alias and its test line, the sidebar `GroupHeader` literals, the two stale class summaries, `Table` / `NameAnchors` rows for slice 1's new names | 19 |
