@@ -144,12 +144,31 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
         Name = _draft.Name;
         GlassAlpha = _draft.GlassAlpha;
         BorderAlpha = _draft.BorderAlpha;
-        FileName = ThemeCatalog.BuiltIns.ContainsKey(key) ? "" : key;
+        FileName = SuggestedFileName(key);
         foreach (var row in Rows)
             row.Load(_draft.GetColor(row.Field), _draft.TryGetColor(row.Field));
         SelectedStart = StartFromOptions.FirstOrDefault(t => t.Key == key);
         _loading = false;
         Refresh(preview: false);
+    }
+
+    /// <summary>The file name to offer for a theme that was started from. A built-in has none (save a copy under a new name); your own
+    /// theme's file name stays. A pack's theme is keyed <c>pack:stem</c>, which is no file name, so its stem is offered, or
+    /// <c>stem-2</c>, <c>stem-3</c> and so on when a theme of yours already has that name, so a copy never lands on one of yours.</summary>
+    private string SuggestedFileName(string key)
+    {
+        if (ThemeCatalog.BuiltIns.ContainsKey(key)) return "";
+        if (!key.Contains(':')) return key;
+        string stem = ThemeHandoff.Slugify(key[(key.IndexOf(':') + 1)..]);
+        for (int n = 1; n <= 99; n++)
+        {
+            string suffix = n == 1 ? "" : "-" + n;
+            string name = (stem.Length + suffix.Length > 40 ? stem[..(40 - suffix.Length)].TrimEnd('-') : stem) + suffix;
+            if (ThemeHandoff.IsValidKey(name) && !ThemeCatalog.BuiltIns.ContainsKey(name)
+                && !File.Exists(Path.Combine(_widget.ThemesDir, name + ".json")))
+                return name;
+        }
+        return "";
     }
 
     internal bool OnTokenEdited(string field, string hex)
@@ -231,6 +250,13 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
 
         string dir = _widget.ThemesDir;
         string path = Path.Combine(dir, key + ".json");
+        // Saving over a theme of yours is for the theme this draft was started from (Save after an edit). Any other name that is taken
+        // is somebody else's file: ask for another name rather than replace it.
+        if (File.Exists(path) && _draft.SourceKey != key)
+        {
+            _error($"'{key}.json' is already one of your themes. Pick another file name, or start from it to change it.");
+            return;
+        }
         try
         {
             Directory.CreateDirectory(dir);

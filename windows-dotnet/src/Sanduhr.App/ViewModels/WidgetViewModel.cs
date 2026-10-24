@@ -730,6 +730,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         {
             savedKey = "obsidian";
             def = _themes[savedKey];
+            _fellBack = true;
         }
         _palette = new ThemePalette(savedKey, def);
         _activeThemeName = _palette.Name;
@@ -771,14 +772,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>Rebuild the merged theme map: the 6 built-ins plus any valid user
     /// drop-ins from <c>%APPDATA%\Sanduhr\themes</c> (user themes override a
-    /// built-in of the same key). Invalid files are skipped + logged, 1:1 with
+    /// built-in of the same key), then the themes of installed theme packs keyed
+    /// <c>&lt;packId&gt;:&lt;stem&gt;</c>. Invalid files are skipped + logged, 1:1 with
     /// <c>themes.load_user_themes</c>.</summary>
     private void RebuildThemeMap()
     {
-        var map = new Dictionary<string, ThemeDefinition>(ThemeCatalog.BuiltIns);
-        foreach (var (key, def) in ThemeCatalog.LoadUserThemes(_paths.ThemesDir, Log))
-            map[key] = def;
-        _themes = map;
+        _themes = PackThemes.Merged(_paths.ThemesDir, new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng), Log);
     }
 
     /// <summary>Rebuild the swatch collection: built-ins in display order, then any
@@ -803,13 +802,15 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// existing cards, persist the choice, update the strip's active marker, and
     /// raise <see cref="ThemeChanged"/> so the window swaps its backdrop. Silent
     /// (no chime) — callers add their own cue (the strip plays a toggle tick; the
-    /// Settings tab plays a save confirmation).</summary>
-    public void ApplyThemeByKey(string key)
+    /// Settings tab plays a save confirmation). <paramref name="save"/> false shows the theme without
+    /// writing it, for a fallback that must not rewrite the person's choice.</summary>
+    public void ApplyThemeByKey(string key, bool save = true)
     {
         if (!_themes.TryGetValue(key, out var def))
             return;
 
         _previewing = false;
+        _fellBack = false;   // any real apply is the new truth
         _palette = new ThemePalette(key, def);
         ActiveThemeName = _palette.Name;
         ApplyThemeResources();
@@ -817,7 +818,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         foreach (var card in Tiers)
             card.ApplyPalette(_palette);
 
-        _settings.SaveTheme(key);
+        if (save)
+            _settings.SaveTheme(key);
         foreach (var item in Themes)
             item.IsActive = item.Key == key;
 
@@ -838,6 +840,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     }
 
     private bool _previewing;
+
+    /// <summary>True while the widget shows Obsidian only because the saved theme could not be found (shown, not saved).</summary>
+    private bool _fellBack;
 
     /// <summary>The Theme Studio's live preview: re-tint the widget from a draft
     /// without touching the saved theme, the strip's active tile, or settings.
@@ -874,13 +879,33 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     public bool LoadThemesStudioMode() => _settings.LoadThemesStudioMode();
     public void SaveThemesStudioMode(bool on) => _settings.SaveThemesStudioMode(on);
 
-    /// <summary>Reload user theme drop-ins from disk and rebuild the strip,
-    /// keeping the current theme active. Called from the Settings Themes tab after
-    /// a save / reload / delete.</summary>
+    /// <summary>Reload user theme drop-ins and installed theme packs from disk and rebuild the strip,
+    /// keeping the current theme active, or switching to Obsidian when it is gone. Called from the
+    /// Settings Themes tab after a save / reload / delete, and after a widget pack is installed or removed.</summary>
     public void ReloadUserThemes()
     {
         RebuildThemeMap();
         BuildThemeStrip(_palette.Key);
+        // The saved choice is the truth; the widget follows it when it can. The theme in use is gone (its pack was uninstalled, or its
+        // file deleted): Obsidian now, not at the next launch. Shown, not saved, like the constructor's fallback: a failed read of
+        // the widgets folder makes a pack look gone for a moment, and the saved choice must survive it. When a later reload finds
+        // the saved key readable again, the widget goes back to it (also not saving), so it and the Desk design agree.
+        if (!_themes.ContainsKey(_palette.Key))
+        {
+            ApplyThemeByKey("obsidian", save: false);
+            _fellBack = true;
+        }
+        else if (_fellBack)
+        {
+            // Only after a fallback: LoadTheme answers "obsidian" for an unreadable settings.json too, which must not move a
+            // healthy widget off its theme.
+            string saved = _settings.LoadTheme();
+            if (_themes.ContainsKey(saved))
+            {
+                if (saved != _palette.Key) ApplyThemeByKey(saved, save: false);
+                _fellBack = false;
+            }
+        }
     }
 
     private static void Log(string message) => Debug.WriteLine($"[Sanduhr.Themes] {message}");

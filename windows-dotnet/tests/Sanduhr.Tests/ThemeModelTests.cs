@@ -185,6 +185,75 @@ public class ThemeModelTests
         Assert.Empty(loaded);
     }
 
+    // ---- theme packs (3.9.1): the installed packs' themes join the list under <packId>:<stem> ----------------------------------
+
+    private static (string Root, WidgetStore Store) ThemePackStore()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "sanduhr-packthemes-" + Guid.NewGuid().ToString("N")[..10]);
+        var store = new WidgetStore(Path.Combine(root, "widgets"), WidgetTestKit.EncodePng);
+        var files = WidgetPackFixtures.Load("good", "good-theme");
+        var v = PackValidator.Validate(files, "good-theme", strict: true);
+        Assert.True(v.Ok, string.Join(" | ", v.Errors));
+        Assert.True(store.Install(files, v.Manifest!, WidgetSource.Catalog).Ok);
+        return (root, store);
+    }
+
+    [Fact]
+    public void An_installed_theme_pack_joins_the_merged_map_keyed_by_pack_and_stem()
+    {
+        var (root, store) = ThemePackStore();
+        try
+        {
+            string themesDir = Path.Combine(root, "themes");
+            Directory.CreateDirectory(themesDir);
+            File.WriteAllText(Path.Combine(themesDir, "sunset.json"), MinimalTheme("Sunset"));
+
+            var map = PackThemes.Merged(themesDir, store);
+
+            Assert.Equal("Fixture Dark", map["good-theme:fixture-dark"].Name);
+            Assert.True(map.ContainsKey("sunset"));
+            foreach (var key in ThemeCatalog.BuiltInOrder) Assert.True(map.ContainsKey(key));
+            Assert.Equal(6, ThemeCatalog.BuiltIns.Count); // the built-ins table itself never grows
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void A_pack_theme_that_fails_the_lint_is_skipped_and_the_rest_still_load()
+    {
+        var (root, store) = ThemePackStore();
+        try
+        {
+            string dir = Path.Combine(store.PackDir("good-theme"), "themes");
+            var broken = new JsonObject { ["name"] = "Broken", ["bg"] = "#000000" }; // required colors missing
+            File.WriteAllText(Path.Combine(dir, "broken.json"), broken.ToJsonString());
+            var warnings = new List<string>();
+
+            var map = PackThemes.Merged(Path.Combine(root, "themes"), store, warnings.Add);
+
+            Assert.True(map.ContainsKey("good-theme:fixture-dark"));
+            Assert.False(map.ContainsKey("good-theme:broken"));
+            Assert.Contains(warnings, w => w.Contains("good-theme") && w.Contains("broken"));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void A_theme_pack_without_a_themes_folder_adds_nothing_and_none_is_created()
+    {
+        var (root, store) = ThemePackStore();
+        try
+        {
+            Directory.Delete(Path.Combine(store.PackDir("good-theme"), "themes"), true);
+
+            var map = PackThemes.Load(store.InstalledOfKind("theme"));
+
+            Assert.Empty(map);
+            Assert.False(Directory.Exists(Path.Combine(store.PackDir("good-theme"), "themes")));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
     /// <summary>A theme JSON with exactly the required color fields, no dials.</summary>
     private static string MinimalTheme(string name)
     {

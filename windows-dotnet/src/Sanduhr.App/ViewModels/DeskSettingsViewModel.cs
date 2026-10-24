@@ -130,9 +130,12 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     private bool _loading;
 
     /// <param name="monitors">The connected monitors, named (the Monitor dropdown). Default: what Windows reports now.</param>
-    public DeskSettingsViewModel(SettingsStore store, IReadOnlyList<string> fontFamilies, Func<IReadOnlyList<DeskMonitorInfo>>? monitors = null)
+    /// <param name="inkPresets">The Ink presets (name and hex spec): the built-ins and the installed palette packs'. Default: the built-ins.</param>
+    public DeskSettingsViewModel(SettingsStore store, IReadOnlyList<string> fontFamilies, Func<IReadOnlyList<DeskMonitorInfo>>? monitors = null,
+        Func<IReadOnlyList<(string Name, string Value)>>? inkPresets = null)
     {
         _store = store;
+        _inkPresets = inkPresets ?? (() => DeskInkPresets.All);
         _monitors = monitors ?? Sanduhr.App.Desk.DeskMonitorSource.Read;
         Monitors = _monitors();
         _saved = store.LoadDesk();
@@ -158,6 +161,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         Designs = new DesignsSettingsViewModel(() => Sanduhr.App.Desk.DeskDesignService.Current);
         Load();
         LoadInk();
+        RefreshInkPresets();
     }
 
     /// <summary>Settings, Desk, Designs: the saved designs and Put my Desk back (spec, the agent-designed Desk).</summary>
@@ -204,6 +208,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         Monitors = _monitors();
         _saved = _store.LoadDesk();
         Load();
+        RefreshInkPresets();
         OnPropertyChanged(nameof(Layout));
         OnPropertyChanged(nameof(Settings));
     }
@@ -249,8 +254,12 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         new(DeskInkMode.Custom, "Custom"),
     ];
 
-    /// <summary>Custom's presets (the Mac's), then Custom hex.</summary>
-    public static IReadOnlyList<string> InkPresetNames { get; } = [.. DeskInkPresets.All.Select(p => p.Name)];
+    /// <summary>Custom's presets: the Mac's, then the palettes of installed palette packs (3.9.1). Rebuilt by <see cref="Reload"/>, so an
+    /// install or an uninstall shows without reopening Settings.</summary>
+    [ObservableProperty] private IReadOnlyList<string> _inkPresetNames = [.. DeskInkPresets.All.Select(p => p.Name)];
+
+    private readonly Func<IReadOnlyList<(string Name, string Value)>> _inkPresets;
+    private IReadOnlyList<(string Name, string Value)> _inkList = DeskInkPresets.All;
 
     private DeskInkSettings _ink = DeskInkSettings.Default;
     private bool _loadingInk;
@@ -355,9 +364,21 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         _ink = _store.LoadDeskInk();
         InkChoice = InkChoices.First(c => c.Mode == _ink.Mode);
         InkColors = _ink.Color;
-        InkPreset = DeskInkPresets.All.FirstOrDefault(p => p.Value == _ink.Color).Name;
+        InkPreset = _inkList.FirstOrDefault(p => p.Value == _ink.Color).Name;
         InkShadow = _ink.Shadow;
         _loadingInk = false;
+    }
+
+    /// <summary>Reads the preset list again (a palette pack was installed or removed) and keeps the ink's own preset selected: the
+    /// ink stores colors, not a reference to a pack, so a removed pack's entry just stops being selected.</summary>
+    private void RefreshInkPresets()
+    {
+        _inkList = _inkPresets();
+        bool was = _loadingInk;
+        _loadingInk = true;
+        InkPresetNames = [.. _inkList.Select(p => p.Name)];
+        InkPreset = _inkList.FirstOrDefault(p => p.Value == _ink.Color).Name;
+        _loadingInk = was;
     }
 
     partial void OnInkChoiceChanged(DeskInkChoice value)
@@ -369,7 +390,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     partial void OnInkPresetChanged(string? value)
     {
         if (_loadingInk || value is null) return;
-        var preset = DeskInkPresets.All.FirstOrDefault(p => p.Name == value);
+        var preset = _inkList.FirstOrDefault(p => p.Name == value);
         if (preset.Value is null) return;
         _loadingInk = true;
         InkColors = preset.Value;
@@ -384,7 +405,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         var spec = string.Join(",", (value ?? "").Split(',').Select(s => Sanduhr.Core.InkHex.Normalize(s)).Where(s => s is not null));
         if (spec.Length == 0) return;
         _loadingInk = true;
-        InkPreset = DeskInkPresets.All.FirstOrDefault(p => p.Value == spec).Name;
+        InkPreset = _inkList.FirstOrDefault(p => p.Value == spec).Name;
         _loadingInk = false;
         SaveInk(_ink with { Color = spec });
     }
