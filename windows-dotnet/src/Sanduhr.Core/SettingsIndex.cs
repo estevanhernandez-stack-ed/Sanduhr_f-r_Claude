@@ -15,6 +15,9 @@ public sealed record SettingsEntry(
     IReadOnlyList<string> Synonyms,
     string? Subsection = null);
 
+/// <summary>A place in Settings: a page and, optionally, an anchor on it (spec, "Deep links and entry points").</summary>
+public sealed record SettingsLink(SettingsPage Page, string? Anchor);
+
 /// <summary>
 /// Settings v2's reach (the Mac's SettingsIndex.swift): every section's anchor, the sidebar search
 /// index built from the names table, and prefix-and-word matching. Settings marks each anchor in
@@ -445,6 +448,71 @@ public static class SettingsIndex
         if (current.Length > 0)
             words.Add(current.ToString());
         return words;
+    }
+
+    // ---- reach (Settings v2, slice 2): aliases ----
+
+    /// <summary>
+    /// An old page or anchor and where it lives in v2. <paramref name="ToPageId"/> is the target page's lower-case id
+    /// (the enum name, any case), so a row can name a page this build doesn't have yet: such a row does nothing until it
+    /// does. A null <paramref name="FromAnchor"/> stands for the whole page once the page leaves the sidebar.
+    /// </summary>
+    public sealed record Alias(SettingsPage FromPage, string? FromAnchor, string ToPageId, string ToAnchor);
+
+    /// <summary>Every old place that moves in v2 (spec, "Deep links and entry points", Aliases), anchor rows before page rows.</summary>
+    public static IReadOnlyList<Alias> Aliases { get; } =
+    [
+        new(SettingsPage.History, Chart, "claudeusage", "meters"),
+        new(SettingsPage.History, HistoryExport, "claudeusage", "meters-export"),
+        new(SettingsPage.Widgets, WidgetsCatalog, "mods", "catalog"),
+        new(SettingsPage.Widgets, WidgetsInstalled, "mods", ModList),
+        new(SettingsPage.Widgets, WidgetsCompanion, "desk", DeskPieces),
+        new(SettingsPage.Desk, DeskLook, "desklook", "look"),
+        new(SettingsPage.Desk, DeskInk, "desklook", "ink"),
+        new(SettingsPage.Desk, DeskPlate, "desklook", "desk-plate"),
+        new(SettingsPage.Desk, DeskWatchers, "watchers", "watchers"),
+        new(SettingsPage.Desk, DeskLauncher, "launcher", "launcher"),
+        new(SettingsPage.Desk, DeskDirect, "desk", DeskDesigns),
+        new(SettingsPage.DeskMessage, MessageLook, "desklook", "sizes"),
+        new(SettingsPage.Alerts, SignInReminders, "desk", "signin-reminders"),
+        new(SettingsPage.ClaudeCode, Meters, "mods", "meters"),
+        new(SettingsPage.ClaudeCode, Statusline, "claudecode", Folders),
+        new(SettingsPage.ClaudeCode, Mcp, "claudecode", Folders),
+        new(SettingsPage.Mods, ConfigFiles, "claudecode", "folder-config"),
+        new(SettingsPage.Mods, McpServers, "claudecode", "folder-config"),
+        new(SettingsPage.Mods, ClaudeMd, "claudecode", "folder-config"),
+        new(SettingsPage.Mods, Retention, "claudecode", "folder-config"),
+        new(SettingsPage.History, null, "claudeusage", "meters"),
+        new(SettingsPage.Widgets, null, "mods", "catalog"),
+    ];
+
+    /// <summary>The page an id names, in any case; null for anything else, numbers and spaces included.</summary>
+    public static SettingsPage? PageFromId(string? id) =>
+        !string.IsNullOrEmpty(id) && id.All(char.IsAsciiLetter) && Enum.TryParse<SettingsPage>(id, ignoreCase: true, out var page)
+            ? page
+            : null;
+
+    /// <summary>
+    /// Where (<paramref name="page"/>, <paramref name="anchor"/>) lives now: itself while it is still in the index; else
+    /// its alias's target once that target is in the index; else itself, unchanged. Cards, tests and agent text written
+    /// before 4.0 land through this.
+    /// </summary>
+    public static SettingsLink Resolve(SettingsPage page, string? anchor) =>
+        Resolve(page, anchor, Anchors, SettingsNames.Pages);
+
+    /// <summary><see cref="Resolve(SettingsPage, string?)"/> over a given index and sidebar, so tests can stand in for later slices.</summary>
+    public static SettingsLink Resolve(SettingsPage page, string? anchor, IReadOnlyList<SettingsEntry> anchors,
+        IReadOnlyList<SettingsPage> pages)
+    {
+        bool Live(SettingsPage p, string? a) =>
+            pages.Contains(p) && (a is null || anchors.Any(e => e.Page == p && e.Anchor == a));
+        if (Live(page, anchor))
+            return new(page, anchor);
+        var row = (anchor is null ? null : Aliases.FirstOrDefault(a => a.FromPage == page && a.FromAnchor == anchor))
+            ?? (pages.Contains(page) ? null : Aliases.FirstOrDefault(a => a.FromPage == page && a.FromAnchor is null));
+        if (row is not null && PageFromId(row.ToPageId) is { } to && Live(to, row.ToAnchor))
+            return new(to, row.ToAnchor);
+        return new(page, anchor);
     }
 
     private static int IndexOf(IReadOnlyList<SettingsPage> list, SettingsPage p)
