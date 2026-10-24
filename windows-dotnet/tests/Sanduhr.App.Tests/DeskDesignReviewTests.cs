@@ -23,7 +23,7 @@ public sealed class DeskDesignReviewTests : IDisposable
     public DeskDesignReviewTests()
     {
         Directory.CreateDirectory(_root);
-        _paths = new Paths(appDataBase: _root);
+        _paths = new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local"));
         _store = new SettingsStore(_paths);
         _store.SaveDesk(DeskSettings.Default with { Enabled = true, Layout = "clock:bl claude:bl", Font = "Segoe UI" });
     }

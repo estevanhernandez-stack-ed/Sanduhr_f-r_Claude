@@ -147,7 +147,7 @@ public sealed class DeskRideAlongsViewTests : IDisposable
     [Fact]
     public void SettingsWeatherKeepsTheNicknameLocallyAndAcrossAPlaceChange()
     {
-        var store = new SettingsStore(new Paths(appDataBase: _root));
+        var store = new SettingsStore(new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local")));
         store.SaveDeskWeather(new DeskWeatherSettings(FortWorth, WeatherUnit.Fahrenheit));
         var page = new WeatherPageViewModel(store);
         int changed = 0;

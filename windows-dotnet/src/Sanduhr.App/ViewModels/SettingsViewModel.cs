@@ -138,10 +138,11 @@ public sealed class SettingsViewModel
             new CcLedgerViewModel(widget, widget.LoadLedgerGroupByProject(), widget.SaveLedgerGroupByProject));
         ClaudeCodePage = new ClaudeCodeViewModel(widget);
         Mods = new ModsConfigViewModel(widget);
-        Desk = new DeskSettingsViewModel(new SettingsStore(new Paths()), new Sanduhr.App.Desk.DeskFonts().PickerFamilies());
+        Desk = new DeskSettingsViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies(),
+            inkPresets: () => PackInkPresets.Merged(new WidgetStore(new Paths().WidgetsDir, Sanduhr.App.Services.WidgetCatalogService.EncodePng)));
         var msgPaths = new Paths();
         MessagePage = new DeskMessagePageViewModel(new SettingsStore(msgPaths), System.IO.Path.Combine(msgPaths.AppDataDir, "messages.txt"),
-            () => !ResetGuard.Done, () => MessageChanged?.Invoke(), new Sanduhr.App.Desk.DeskFonts().PickerFamilies(),
+            () => !ResetGuard.Done, () => MessageChanged?.Invoke(), Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies(),
             Sanduhr.App.Desk.DeskMessageHandoffService.Current?.Handoff);
         NowPlayingPage = new NowPlayingPageViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.NowPlayingHub.Current, Sanduhr.App.Desk.NowPlayingLookService.Current);
         WeatherPage = new WeatherPageViewModel(new SettingsStore(new Paths()));

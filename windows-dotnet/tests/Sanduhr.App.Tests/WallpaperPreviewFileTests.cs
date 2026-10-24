@@ -151,7 +151,7 @@ public sealed class WallpaperPreviewFileTests : IDisposable
     [Fact]
     public void TheStateOffersThePreviewOnlyWhileTheIntegrationIsInstalled()
     {
-        var paths = new Paths(appDataBase: _root);
+        var paths = new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local"));
         var store = new SettingsStore(paths);
         string preview = Path.Combine(paths.ExternalDir, WallpaperPreview.FileName);
         Sta.Run(() =>

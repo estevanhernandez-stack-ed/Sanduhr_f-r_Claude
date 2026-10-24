@@ -257,3 +257,78 @@ public class DeskInkTests
         Assert.Equal("9ad7ff", DeskInk.MessageColor(null, false));
     }
 }
+
+/// <summary>3.9.1: the palettes of installed palette packs join the Desk ink presets, after the built-ins.</summary>
+public sealed class DeskInkPackPresetsTests : IDisposable
+{
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "sanduhr-packink-" + Guid.NewGuid().ToString("N")[..10]);
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_root, true); } catch (IOException) { }
+    }
+
+    private WidgetStore Store() => new(Path.Combine(_root, "widgets"), WidgetTestKit.EncodePng);
+
+    private static void Install(WidgetStore store, string group, string name, WidgetSource source = WidgetSource.Catalog)
+    {
+        var files = WidgetPackFixtures.Load(group, name);
+        var v = PackValidator.Validate(files, name, strict: true);
+        Assert.True(v.Ok, string.Join(" | ", v.Errors));
+        Assert.True(store.Install(files, v.Manifest!, source).Ok);
+    }
+
+    [Fact]
+    public void Pack_palettes_follow_the_built_ins_named_for_their_pack()
+    {
+        var store = Store();
+        Install(store, "good", "good-palette");
+
+        var merged = PackInkPresets.Merged(store);
+
+        Assert.Equal(DeskInkPresets.All, merged.Take(5));
+        Assert.Equal(6, merged.Count);
+        Assert.Equal(("plain · Fixture palette", "ff2a6d,05d9e8"), merged[5]);
+    }
+
+    [Fact]
+    public void The_built_in_list_itself_stays_five()
+    {
+        var store = Store();
+        Install(store, "good", "good-palette");
+        _ = PackInkPresets.Merged(store);
+        Assert.Equal(5, DeskInkPresets.All.Count);
+    }
+
+    [Fact]
+    public void The_first_party_palette_pack_adds_every_palette_with_hashless_values()
+    {
+        var store = Store();
+        Install(store, "packs", "oled-neon-palettes");
+
+        var added = PackInkPresets.Merged(store).Skip(5).ToList();
+
+        Assert.NotEmpty(added);
+        Assert.All(added, p =>
+        {
+            Assert.Contains(" · ", p.Name);
+            Assert.DoesNotContain('#', p.Value);
+            Assert.NotEmpty(InkHex.Stops(p.Value));
+        });
+        Assert.Contains(added, p => p.Value == "ff2a6d,d16ba5,05d9e8");
+    }
+
+    [Fact]
+    public void A_claude_made_palette_flows_through_and_a_disabled_or_broken_pack_does_not()
+    {
+        var store = Store();
+        Install(store, "good", "good-palette", WidgetSource.Claude);
+        Assert.Equal(6, PackInkPresets.Merged(store).Count);
+
+        File.WriteAllText(Path.Combine(store.PackDir("good-palette"), "palettes.json"), "{ not json");
+        Assert.Equal(5, PackInkPresets.Merged(store).Count);
+
+        File.WriteAllText(store.RegistryFile, File.ReadAllText(store.RegistryFile).Replace("\"enabled\": true", "\"enabled\": false"));
+        Assert.Equal(5, PackInkPresets.Merged(store).Count);
+    }
+}

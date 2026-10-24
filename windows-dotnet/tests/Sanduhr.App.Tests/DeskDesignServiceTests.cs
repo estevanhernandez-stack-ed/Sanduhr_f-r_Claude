@@ -22,7 +22,7 @@ public sealed class DeskDesignServiceTests : IDisposable
     public DeskDesignServiceTests()
     {
         Directory.CreateDirectory(_root);
-        _paths = new Paths(appDataBase: _root);
+        _paths = new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local"));
         _store = new SettingsStore(_paths);
     }
 
@@ -136,6 +136,19 @@ public sealed class DeskDesignServiceTests : IDisposable
         var theme = (JsonObject)ReadState()["design"]!["theme"]!;
         Assert.Equal("Dusk", (string?)theme["name"]);
         Assert.Equal("#ff7e5f", (string?)theme["accent"]);
+    }
+
+    [Fact]
+    public void AnInstalledThemePacksThemeIsReportedByItsPalette()
+    {
+        _store.SaveMcpEnabled(true);
+        InstalledPackKit.Install(_paths, "good-theme");
+        _store.SaveTheme("good-theme:fixture-dark");
+        WithService(s => s.Publish());
+
+        var theme = (JsonObject)ReadState()["design"]!["theme"]!;
+        Assert.Equal("Fixture Dark", (string?)theme["name"]);
+        Assert.Equal("#ff2a6d", (string?)theme["accent"]);
     }
 
     [Fact]

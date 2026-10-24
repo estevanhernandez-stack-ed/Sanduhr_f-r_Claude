@@ -599,7 +599,12 @@ public partial class App : Application
         // Widgets made with Claude (spec 3.8 section 5): propose_widget's pack previews on the Desk and installs only on Apply.
         _widgetReview = new Desk.WidgetReviewService(paths, store);
         Desk.WidgetReviewService.Current = _widgetReview;
-        _widgetReview.Host = new Desk.WidgetReviewHost(_desk, store, () => _settingsWindow?.ViewModel.WidgetsPage.ReloadLocal());
+        _widgetReview.Host = new Desk.WidgetReviewHost(_desk, store, () =>
+        {
+            _settingsWindow?.ViewModel.WidgetsPage.ReloadLocal();
+            // A palette Claude made joins the Ink presets (3.9.1).
+            _settingsWindow?.ViewModel.Desk.Reload();
+        });
         _widgetReview.Start();
         _desk.LauncherMissingClicked += OnLauncherMissing;
         _vm.DeskUsageChanged += _desk.UsageChanged;
@@ -690,7 +695,16 @@ public partial class App : Application
         // get_desk reports the weather nickname (#315), so a change rewrites desk-state.json too.
         svm.WeatherPage.Changed = () => { _desk?.Reload(); _deskDesign?.Refresh(); };
         // The companion (spec 3.8 section 4): a new pick, roaming, an install or uninstall, or the piece shown or hidden.
-        svm.WidgetsPage.Changed = () => { _desk?.Reload(); svm.Desk.Reload(); };
+        // 3.9.1: it also reloads the theme list, since an installed theme pack joins it and an uninstalled one leaves it.
+        // A font pack changes what the Desk and a design may draw in: drop their font lists before the Desk redraws.
+        svm.WidgetsPage.Changed = () =>
+        {
+            _vm?.ReloadUserThemes();
+            _desk?.ResetFonts();
+            _deskDesign?.FontsChanged();
+            _desk?.Reload();
+            svm.Desk.Reload();
+        };
         svm.MessageChanged = () => { _desk?.Reload(); _handoff?.PublishState(); };
         svm.Desk.WatchersChanged = () => _watchers?.SwitchChanged();
         svm.Desk.CiRunnersChanged = () => _runners?.Refresh();

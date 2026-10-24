@@ -296,6 +296,10 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     public Func<string?> ThemeText { get; set; } = () => null;
 
     /// <summary>Read the settings again and start, rebuild or stop to match.</summary>
+    /// <summary>A font pack was installed or removed: the font list is read again at the next redraw (the cache is dropped here, then
+    /// <see cref="Reload"/> redraws), so a new font draws, and a removed one falls back to EsteFont Pro, without a restart.</summary>
+    public void ResetFonts() => _fonts = null;
+
     public void Reload()
     {
         if (_stopped) return;
@@ -448,7 +452,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         // Not tied to Running: a Desk that is on but draws nothing yet (an empty message, no numbers) can
         // still be arranged, since arrange mode draws every placed piece.
         if (_host is null || _stopped || Arranging || _screens.Count == 0) return;
-        _fonts ??= new DeskFonts();
+        _fonts ??= _paths is null ? new DeskFonts() : DeskFonts.ForThisPc(_paths);
         var session = new DeskArrangeSession(_settings.Layout);
         var now = DateTimeOffset.Now;
         var track = TrackToDraw(now);
@@ -681,7 +685,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
 
     private void RenderOnce()
     {
-        _fonts ??= new DeskFonts();
+        _fonts ??= _paths is null ? new DeskFonts() : DeskFonts.ForThisPc(_paths);
         var now = DateTimeOffset.Now;
         var track = TrackToDraw(now);
         _trackKey = TrackKey(track);

@@ -27,7 +27,7 @@ public abstract class NowPlayingLooksFixture : IDisposable
     protected NowPlayingLooksFixture()
     {
         Directory.CreateDirectory(_root);
-        _paths = new Paths(appDataBase: _root);
+        _paths = new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local"));
         _store = new SettingsStore(_paths);
     }
 
