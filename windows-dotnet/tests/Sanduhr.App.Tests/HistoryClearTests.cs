@@ -8,25 +8,10 @@ namespace Sanduhr.App.Tests;
 [Collection("SettingsWindow")]
 public sealed class HistoryClearTests : AppWindowFixture
 {
-    private sealed class MemoryCredentials : ICredentialManager
-    {
-        private readonly Dictionary<string, string> _store = new();
-        public string Service => AccountStore.Service;
-        public string? GetPassword(string slot) => _store.GetValueOrDefault(slot);
-        public void SetPassword(string slot, string value) => _store[slot] = value;
-        public bool DeletePassword(string slot) => _store.Remove(slot);
-    }
-
-    private Paths ScratchPaths() => new(Path.Combine(Root, "appdata"), Path.Combine(Root, "home"), Path.Combine(Root, "local"));
-
     /// <summary>A real (not demo) widget over scratch folders and an in-memory registry: Work active, Personal second.</summary>
     private (WidgetViewModel Widget, HistoryTabViewModel Tab, List<string> Confirmations) Open()
     {
-        var accounts = new AccountStore(new MemoryCredentials());
-        accounts.AddAccount("Work", "placeholder-work");
-        accounts.AddAccount("Personal", "placeholder-personal");
-        accounts.SetActive("Work");
-        var widget = new WidgetViewModel(ScratchPaths(), accounts);
+        var (widget, _) = ScratchWidget("Work", "Personal");
         widget.History.AppendForAccount("five_hour", 41, "Work");
         widget.History.AppendForAccount("five_hour", 17, "Personal");
         var confirmations = new List<string>();
@@ -82,6 +67,22 @@ public sealed class HistoryClearTests : AppWindowFixture
         Assert.Contains("30-day usage history of Personal", confirmations[0]);
         Assert.DoesNotContain("Work", confirmations[0]);
         Assert.Contains("30-day usage history of every account", confirmations[1]);
+    });
+
+    [Fact]
+    public void DemoModeNeverClearsARealHistoryFileEvenThroughExecute() => AppHost.Run(() =>
+    {
+        var (widget, tab, confirmations) = Open();
+        widget.StartDemo(); // the sample accounts are named Work and Personal too
+        Pick(tab, "Work");
+
+        tab.ClearHistoryCommand.Execute(null);
+        Pick(tab, null);
+        tab.ClearHistoryCommand.Execute(null);
+
+        Assert.Empty(confirmations);
+        Assert.Equal([41], widget.History.Load("five_hour", "Work"));
+        Assert.Equal([17], widget.History.Load("five_hour", "Personal"));
     });
 
     [Fact]

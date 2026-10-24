@@ -70,6 +70,32 @@ public abstract class AppWindowFixture : IDisposable
         return widget;
     }
 
+    /// <summary>An account registry in memory: nothing reaches Credential Manager.</summary>
+    internal sealed class MemoryCredentials : Sanduhr.Core.ICredentialManager
+    {
+        private readonly Dictionary<string, string> _store = new();
+        public string Service => Sanduhr.Core.AccountStore.Service;
+        public string? GetPassword(string slot) => _store.GetValueOrDefault(slot);
+        public void SetPassword(string slot, string value) => _store[slot] = value;
+        public bool DeletePassword(string slot) => _store.Remove(slot);
+    }
+
+    /// <summary>Folders under this test's scratch root, so no test reaches the real AppData.</summary>
+    protected Sanduhr.Core.Paths ScratchPaths() =>
+        new(Path.Combine(Root, "appdata"), Path.Combine(Root, "home"), Path.Combine(Root, "local"));
+
+    /// <summary>A real (not demo) widget over scratch folders and an in-memory registry holding
+    /// <paramref name="labels"/>, the first of them active.</summary>
+    protected (WidgetViewModel Widget, Sanduhr.Core.AccountStore Accounts) ScratchWidget(params string[] labels)
+    {
+        var accounts = new Sanduhr.Core.AccountStore(new MemoryCredentials());
+        foreach (var label in labels)
+            accounts.AddAccount(label, "placeholder-" + label);
+        if (labels.Length > 0)
+            accounts.SetActive(labels[0]);
+        return (new WidgetViewModel(ScratchPaths(), accounts), accounts);
+    }
+
     /// <summary>A name that is a type or a record's text rather than words for a person.</summary>
     internal static bool Leaks(string name) =>
         name.Contains("ViewModel") || name.Contains("Sanduhr.App") || name.Contains("Sanduhr.Core") || name.Contains("System.")

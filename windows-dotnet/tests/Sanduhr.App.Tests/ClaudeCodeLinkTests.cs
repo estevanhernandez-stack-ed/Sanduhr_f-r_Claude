@@ -26,7 +26,7 @@ public sealed class ClaudeCodeLinkTests : AppWindowFixture
     }
 
     /// <summary>What settings.json holds for account_folders, read fresh from the scratch profile.</summary>
-    private static Dictionary<string, string> Saved() => new SettingsStore(new Paths()).LoadAccountFolders();
+    private Dictionary<string, string> Saved() => new SettingsStore(ScratchPaths()).LoadAccountFolders();
 
     private static IEnumerable<ComboBox> LinkCombos(System.Windows.DependencyObject node)
     {
@@ -40,7 +40,7 @@ public sealed class ClaudeCodeLinkTests : AppWindowFixture
     [Fact]
     public void ReopeningTheClaudeCodePageKeepsTheLinkThroughTheRealCombos() => AppHost.Run(() =>
     {
-        var widget = DemoWidget();
+        var (widget, _) = ScratchWidget("Work", "Personal");
         var folder = Linked(widget);
         var before = Saved();
         var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
@@ -70,9 +70,48 @@ public sealed class ClaudeCodeLinkTests : AppWindowFixture
     });
 
     [Fact]
+    public void AnAccountRenamedOrRemovedWhileThePageIsOpenLeavesTheOtherLinksIntact() => AppHost.Run(() =>
+    {
+        var other = Path.Combine(Profile, ".claude-personal");
+        Directory.CreateDirectory(Path.Combine(other, "projects"));
+        var (widget, accounts) = ScratchWidget("Work", "Personal", "Extra", "Gone");
+        var work = Linked(widget);
+        widget.SetAccountFolder("Personal", other);
+        var before = Saved();
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+        var window = new SettingsWindow(svm);
+        OffScreen(window);
+        window.Show();
+        try
+        {
+            var tabs = (TabControl)window.FindName("Tabs");
+            var general = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag != "ClaudeCode");
+            var cc = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "ClaudeCode");
+            tabs.SelectedItem = cc;
+            NamesOf(window);
+
+            tabs.SelectedItem = general;
+            accounts.RenameAccount("Extra", "Spare");
+            accounts.RemoveAccount("Gone");
+            tabs.SelectedItem = cc; // Settings reloads the page every time it is opened
+            NamesOf(window);
+
+            var page = svm.ClaudeCodePage;
+            Assert.Equal(before, Saved());
+            Assert.Equal(work, widget.AccountFolder("Work"));
+            Assert.Equal(other, widget.AccountFolder("Personal"));
+            Assert.NotEqual(SaveFailed, page.StatusText);
+            Assert.Equal(["None", "Work", "Personal", "Spare"], page.AccountOptions);
+            Assert.Equal("Work", page.Folders.Single(f => f.Path == work).LinkedAccount);
+            Assert.Equal("Personal", page.Folders.Single(f => f.Path == other).LinkedAccount);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public void ReloadingTwiceKeepsTheLink() => AppHost.Run(() =>
     {
-        var widget = DemoWidget();
+        var (widget, _) = ScratchWidget("Work", "Personal");
         var folder = Linked(widget);
         var before = Saved();
         var page = new ClaudeCodeViewModel(widget);
@@ -89,7 +128,7 @@ public sealed class ClaudeCodeLinkTests : AppWindowFixture
     [Fact]
     public void ANullSelectionLeavesTheLinksAsTheyWere() => AppHost.Run(() =>
     {
-        var widget = DemoWidget();
+        var (widget, _) = ScratchWidget("Work", "Personal");
         var folder = Linked(widget);
         var before = Saved();
         var page = new ClaudeCodeViewModel(widget);
@@ -107,7 +146,7 @@ public sealed class ClaudeCodeLinkTests : AppWindowFixture
     [Fact]
     public void AnUnknownAccountIsNeverTreatedAsUnlinkAll() => AppHost.Run(() =>
     {
-        var widget = DemoWidget();
+        var (widget, _) = ScratchWidget("Work", "Personal");
         var folder = Linked(widget);
         var page = new ClaudeCodeViewModel(widget);
         var row = page.Folders.Single(f => f.Path == folder);
@@ -121,7 +160,7 @@ public sealed class ClaudeCodeLinkTests : AppWindowFixture
     [Fact]
     public void PickingNoneStillUnlinksTheFolder() => AppHost.Run(() =>
     {
-        var widget = DemoWidget();
+        var (widget, _) = ScratchWidget("Work", "Personal");
         var folder = Linked(widget);
         var page = new ClaudeCodeViewModel(widget);
 

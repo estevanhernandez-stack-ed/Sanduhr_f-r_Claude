@@ -215,6 +215,8 @@ public sealed partial class HistoryTabViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(NotDemo))]
     private void ClearHistory()
     {
+        // CanExecute is not enforced on a programmatic Execute; demo labels can match a real account's.
+        if (_widget.IsDemo) return;
         // The account the "Account:" picker shows: one account, or every account on "All accounts".
         string? account = SelectedOption?.Account;
         if (!Confirm(ClearConfirmation(account)))
