@@ -193,6 +193,15 @@ public sealed class UsageHistory : IUsageHistory
         WriteAccountFile(active, new Dictionary<string, List<HistoryPoint>>());
     }
 
+    /// <summary>Wipe the history of every registered account, each by the same
+    /// empty-dict write as <see cref="ClearAll"/> (never unlinks). The "All
+    /// accounts" choice of the History tab's Clear button.</summary>
+    public void ClearEvery()
+    {
+        foreach (var label in _accounts.ListAccounts())
+            ClearAll(label);
+    }
+
     /// <summary>Unlink the history file for the given (or active) account —
     /// used by full account removal, where <see cref="ClearAll"/>'s keep-the-file
     /// invariant is exactly wrong. Best-effort: a locked or missing file never

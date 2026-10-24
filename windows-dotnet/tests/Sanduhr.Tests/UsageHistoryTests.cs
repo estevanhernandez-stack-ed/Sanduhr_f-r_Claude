@@ -191,6 +191,31 @@ public class UsageHistoryTests
         Assert.True(File.Exists(f.Paths.HistoryFileFor("Personal")));
     }
 
+    [Fact]
+    public void Clear_every_empties_each_account_and_keeps_every_file()
+    {
+        using var f = new Fixture("Personal", "Work");
+        f.History.AppendForAccount("five_hour", 10, "Personal");
+        f.History.AppendForAccount("five_hour", 20, "Work");
+        f.History.ClearEvery();
+        Assert.Empty(f.History.Load("five_hour", "Personal"));
+        Assert.Empty(f.History.Load("five_hour", "Work"));
+        Assert.True(File.Exists(f.Paths.HistoryFileFor("Personal")));
+        Assert.True(File.Exists(f.Paths.HistoryFileFor("Work")));
+    }
+
+    [Fact]
+    public void Clear_all_for_a_named_account_leaves_the_others()
+    {
+        using var f = new Fixture("Personal", "Work");
+        f.Accounts.SetActive("Personal");
+        f.History.AppendForAccount("five_hour", 10, "Personal");
+        f.History.AppendForAccount("five_hour", 20, "Work");
+        f.History.ClearAll("Work");
+        Assert.Empty(f.History.Load("five_hour", "Work"));
+        Assert.Equal([10], f.History.Load("five_hour", "Personal"));
+    }
+
     // -- test_history_per_account.py -----------------------------------------
 
     [Fact]
