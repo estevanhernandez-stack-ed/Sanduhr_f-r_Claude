@@ -66,4 +66,28 @@ public class SettingsLinkTests
             SettingsIndex.LinkFromArgs(["--settings", "claudeusage#sessions"]));
         Assert.Null(SettingsIndex.LinkFromArgs(["--demo"]));
     }
+
+    [Theory]
+    [InlineData(SettingsPage.Accounts, SettingsIndex.AccountList)]
+    [InlineData(SettingsPage.Alerts, SettingsIndex.Notifications)]
+    [InlineData(SettingsPage.Desk, SettingsIndex.DeskPieces)]
+    [InlineData(SettingsPage.DeskMessage, SettingsIndex.MessageLines)]
+    public void Menu_links_land_on_their_section(SettingsPage page, string anchor)
+    {
+        Assert.Equal(anchor, SettingsIndex.MenuAnchor(page));
+        Assert.NotNull(SettingsIndex.Find(page, anchor));
+    }
+
+    [Fact]
+    public void A_menu_with_no_section_opens_the_page_top() => Assert.Null(SettingsIndex.MenuAnchor(SettingsPage.Themes));
+
+    [Fact]
+    public void Settings_reopens_where_it_was_left_and_a_named_place_wins()
+    {
+        var last = new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskPieces);
+        Assert.Equal(new SettingsLink(SettingsPage.General, null), SettingsIndex.Landing(null, null, null));
+        Assert.Equal(last, SettingsIndex.Landing(null, null, last));
+        Assert.Equal(new SettingsLink(SettingsPage.Alerts, SettingsIndex.Notifications),
+            SettingsIndex.Landing(SettingsPage.Alerts, SettingsIndex.Notifications, last));
+    }
 }

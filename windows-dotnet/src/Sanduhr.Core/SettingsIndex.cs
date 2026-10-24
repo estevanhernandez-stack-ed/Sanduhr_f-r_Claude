@@ -573,6 +573,25 @@ public static class SettingsIndex
     /// <summary>The place a launch's <see cref="SettingsSwitch"/> asks for, null without the switch.</summary>
     public static SettingsLink? LinkFromArgs(IEnumerable<string> args) => ParseLink(LinkArgument(args));
 
+    // ---- reach: menus and reopening ----
+
+    /// <summary>
+    /// The section a menu's "&lt;Page&gt; settings…" opens at (spec, Menus table). Slices 3 and 5 move Alerts to
+    /// <c>each-limit</c> and add the Launcher here; null opens the page top.
+    /// </summary>
+    public static string? MenuAnchor(SettingsPage page) => page switch
+    {
+        SettingsPage.Accounts => AccountList,
+        SettingsPage.Alerts => Notifications,
+        SettingsPage.Desk => DeskPieces,
+        SettingsPage.DeskMessage => MessageLines,
+        _ => null,
+    };
+
+    /// <summary>Where an opening Settings lands: the place asked for; else where it was left this session; else General.</summary>
+    public static SettingsLink Landing(SettingsPage? page, string? anchor, SettingsLink? last) =>
+        page is { } p ? new(p, anchor) : last ?? new(SettingsPage.General, null);
+
     private static int IndexOf(IReadOnlyList<SettingsPage> list, SettingsPage p)
     {
         for (int i = 0; i < list.Count; i++)
