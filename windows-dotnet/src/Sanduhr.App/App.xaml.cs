@@ -417,7 +417,7 @@ public partial class App : Application
         _putBackItem.Click += (_, _) => _deskDesign?.PutBack();
         menu.Opened += (_, _) => _putBackItem.Visibility = _deskDesign?.CanPutBack == true ? Visibility.Visible : Visibility.Collapsed;
 
-        var refresh = new MenuItem { Header = "Refresh" };
+        var refresh = new MenuItem { Header = SettingsNames.RefreshUsageNow };
         refresh.Click += (_, _) => _vm?.RefreshCommand.Execute(null);
 
         // Accounts ▸ quick-switch submenu — repopulated on open so the live registry
@@ -434,17 +434,17 @@ public partial class App : Application
         addAccount.Click += async (_, _) => await RunSignInAsync(embedded: true);
 
         // Focus + Game affordances (parity with widget.py's tray entries).
-        var focus = new MenuItem { Header = "Deep Work (Focus)" };
+        var focus = new MenuItem { Header = SettingsNames.DeepWork };
         focus.Click += (_, _) => _vm?.ToggleFocusCommand.Execute(null);
 
-        var game = new MenuItem { Header = "Cooldown Snake" };
+        var game = new MenuItem { Header = SettingsNames.CooldownSnake };
         game.Click += (_, _) =>
         {
             ShowWindow();
             _vm?.StartGameCommand.Execute(null);
         };
 
-        var quit = new MenuItem { Header = "Quit Sanduhr" };
+        var quit = new MenuItem { Header = SettingsNames.QuitSanduhr };
         quit.Click += (_, _) => QuitApp();
 
         // Only while an update waits (3.8 spec 8b): the same Restart to update as the toast and the widget.

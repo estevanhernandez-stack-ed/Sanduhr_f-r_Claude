@@ -291,6 +291,66 @@ public class SettingsSourceScanTests
     }
 
     [Fact]
+    public void Tray_widget_menu_and_icon_strip_read_their_names_from_the_table()
+    {
+        var app = File.ReadAllText(Path.Combine(AppDir(), "App.xaml.cs"));
+        var menu = File.ReadAllText(Path.Combine(AppDir(), "MainWindow.xaml.cs"));
+        var strip = File.ReadAllText(Path.Combine(AppDir(), "MainWindow.xaml"));
+        foreach (var name in new[] { "OpenSettings", "DeepWork", "CooldownSnake", "RefreshUsageNow", "QuitSanduhr" })
+            Assert.Contains($"SettingsNames.{name}", app);
+        foreach (var name in new[] { "OpenSettings", "CompactMode", "DeepWork", "CooldownSnake", "RefreshUsageNow" })
+        {
+            Assert.Contains($"SettingsNames.{name}", menu);
+            Assert.Contains($"AutomationProperties.Name=\"{{x:Static core:SettingsNames.{name}}}\"", strip);
+        }
+        Assert.DoesNotContain("Header = \"Refresh\"", app + menu);
+        Assert.DoesNotContain("Header = \"Quit Sanduhr\"", app);
+    }
+
+    [Fact]
+    public void The_graph_pin_and_What_s_New_controls_are_named_from_the_table()
+    {
+        var strip = File.ReadAllText(Path.Combine(AppDir(), "MainWindow.xaml"));
+        foreach (var name in new[] { "GraphStyle", "KeepWidgetOnTop" })
+            Assert.Contains($"AutomationProperties.Name=\"{{x:Static core:SettingsNames.{name}}}\"", strip);
+        // The strip's tooltips lead with the same words, and the pin says what it does in both states.
+        Assert.Contains("ToolTip\" Value=\"Graph style: classic line (click to cycle)\"", strip);
+        Assert.Contains("ToolTip\" Value=\"Graph style: horizon bands (click to cycle)\"", strip);
+        Assert.Contains("ToolTip\" Value=\"{x:Static core:SettingsNames.KeepWidgetOnTop}\"", strip);
+
+        var whatsNew = File.ReadAllText(Path.Combine(AppDir(), "Views", "WhatsNewWindow.xaml"));
+        var box = Regex.Match(whatsNew, "<CheckBox\\b[^>]*HideAfterUpdates[^>]*>", RegexOptions.Singleline);
+        Assert.True(box.Success, "no check box bound to HideAfterUpdates");
+        Assert.Equal(SettingsNames.HideWhatsNewAfterUpdates, Resolve(box.Value, "Content"));
+        Assert.Equal(SettingsNames.HideWhatsNewAfterUpdates, Resolve(box.Value, "AutomationProperties.Name"));
+    }
+
+    [Fact]
+    public void The_folder_consent_list_and_the_Themes_fields_and_lists_carry_a_spoken_name_that_starts_with_their_label()
+    {
+        // Publish usage: the heading is the visible label, the list says the same words.
+        var publish = TabRange("Publish");
+        Assert.Matches("<TextBlock Text=\"\\{x:Static core:SettingsNames\\.FoldersToShare\\}\"", publish);
+        Assert.Matches("<ItemsControl ItemsSource=\"\\{Binding Roots\\}\"[^>]*AutomationProperties\\.Name=\"\\{x:Static core:SettingsNames\\.FoldersToShare\\}\"", publish);
+
+        // Themes: every text box beside a visible label (Filename, Name, Save the theme as) and both
+        // labelled lists. LabelThenField checks the first three against their labels in
+        // Visible_labels_start_their_spoken_names; this pins that none is left unnamed.
+        var themes = TabRange("Themes");
+        foreach (Match m in LabelThenField.Matches(themes))
+        {
+            // A bound label (the token rows' own hex boxes) names its box through the same binding.
+            if (m.Groups[2].Value != "TextBox" || ResolveValue(m.Groups[1].Value) is not { } label) continue;
+            var name = Resolve(m.Groups[3].Value, "AutomationProperties.Name");
+            Assert.True(name is not null, $"the text box after \"{label}\" has no spoken name");
+            Assert.StartsWith(Bare(label), name);
+        }
+        Assert.Equal(3, LabelThenField.Matches(themes).Count(m => m.Groups[2].Value == "TextBox" && ResolveValue(m.Groups[1].Value) is not null));
+        Assert.Matches("<ListBox x:Name=\"ThemeGallery\"[^>]*AutomationProperties\\.Name=\"Choose a theme\"", themes);
+        Assert.Matches("<ListBox x:Name=\"ThemesList\"[^>]*AutomationProperties\\.Name=\"Installed user themes\"", themes);
+    }
+
+    [Fact]
     public void The_scan_sees_known_strings()
     {
         // A positive control: if either regex stops matching, the retired-name test would pass

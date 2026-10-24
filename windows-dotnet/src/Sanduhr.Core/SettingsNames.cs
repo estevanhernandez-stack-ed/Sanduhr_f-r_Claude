@@ -11,7 +11,7 @@ public sealed record SettingsGroup(string? Title, IReadOnlyList<SettingsPage> Pa
 ///
 /// Casing: the words follow the Mac, the casing follows Windows. Commands and control labels are
 /// sentence case ("Take the tour…", "Sign in"), as Windows writes its own. Proper names keep their
-/// capitals: Claude, Claude Code, Sanduhr, What's New (the window's name), Deep Work, Cooldown Snake.
+/// capitals: Claude, Claude Code, Sanduhr, What's New (the window's name), Deep Work. The cooldown snake is a game, not a name.
 /// Page titles stay as they shipped ("Claude Usage", "Publish usage"): PRIVACY.md and the Store copy
 /// quote them.
 /// </summary>
@@ -141,6 +141,20 @@ public static class SettingsNames
 
     /// <summary>The Quit button at the foot of the sidebar (not on a page, so not in <see cref="Table"/>).</summary>
     public const string QuitSanduhr = "Quit Sanduhr";
+    /// <summary>The widget's menu, icon strip and the tray (WF19): one name each. The strip's tooltips add
+    /// the shortcut ("Compact mode (Ctrl+D)").</summary>
+    public const string CompactMode = "Compact mode";
+    public const string DeepWork = "Deep Work";
+    public const string CooldownSnake = "Cooldown snake";
+    public const string RefreshUsageNow = "Refresh usage now";
+    /// <summary>A limit card's menu: hides the limit until shown again.</summary>
+    public const string HideThisLimit = "Hide this limit";
+    /// <summary>The widget's icon strip: cycles the sparkline style (settings.json "sparkline_style").</summary>
+    public const string GraphStyle = "Graph style";
+    /// <summary>The widget's icon strip: keeps the widget above other windows (settings.json "pinned").</summary>
+    public const string KeepWidgetOnTop = "Keep the widget on top";
+    /// <summary>The What's New window (settings.json "whats_new_hide_after_updates").</summary>
+    public const string HideWhatsNewAfterUpdates = "Don't show What's New after updates";
     /// <summary>Claude Code: picks a folder Sanduhr did not find.</summary>
     public const string AddFolder = "Add folder…";
     /// <summary>Claude Code: drops a folder that was added by hand.</summary>
@@ -358,6 +372,18 @@ public static class SettingsNames
         ("Looks good", ThemeJsonValid, true),
         ("Save as:", SaveThemeAs, true),
         ("100% plays the !", SnakeSoundAtFull, false),
+        ("Compact Mode", CompactMode, false),
+        ("Expand", CompactMode, true),
+        ("Deep Work (Focus)", DeepWork, false),
+        ("Deep Work focus timer", DeepWork, false),
+        ("Cooldown Snake", CooldownSnake, false),
+        ("Cooldown snake game", CooldownSnake, false),
+        ("Hide this tier", HideThisLimit, false),
+        ("Edit messages…", LinkTitle(SettingsPage.DeskMessage), false),
+        ("Cycle graph style", GraphStyle, false),
+        ("Pin on top", KeepWidgetOnTop, false),
+        ("Pin always on top", KeepWidgetOnTop, false),
+        ("Don't show after updates", HideWhatsNewAfterUpdates, false),
     ];
 
     /// <summary>The retired names <paramref name="text"/> still uses, empty when it uses none.</summary>

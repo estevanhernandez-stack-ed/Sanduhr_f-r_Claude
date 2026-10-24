@@ -104,19 +104,20 @@ public partial class MainWindow : Window
         var settings = new MenuItem { Header = Sanduhr.Core.SettingsNames.OpenSettings, Command = Vm.OpenSettingsCommand };
         menu.Items.Add(settings);
 
-        var refresh = new MenuItem { Header = "Refresh", Command = Vm.RefreshCommand };
+        var refresh = new MenuItem { Header = SettingsNames.RefreshUsageNow, Command = Vm.RefreshCommand };
         menu.Items.Add(refresh);
 
-        var compact = new MenuItem { Command = Vm.ToggleCompactCommand };
-        menu.Opened += (_, _) => compact.Header = (Vm?.IsCompact ?? false) ? "Expand" : "Compact Mode";
+        // One name in both states; the check mark says which (WF19).
+        var compact = new MenuItem { Header = SettingsNames.CompactMode, Command = Vm.ToggleCompactCommand };
+        menu.Opened += (_, _) => compact.IsChecked = Vm?.IsCompact ?? false;
         menu.Items.Add(compact);
 
         menu.Items.Add(new Separator());
 
-        var focus = new MenuItem { Header = "Deep Work (Focus)", Command = Vm.ToggleFocusCommand };
+        var focus = new MenuItem { Header = SettingsNames.DeepWork, Command = Vm.ToggleFocusCommand };
         menu.Items.Add(focus);
 
-        var game = new MenuItem { Header = "Cooldown Snake", Command = Vm.StartGameCommand };
+        var game = new MenuItem { Header = SettingsNames.CooldownSnake, Command = Vm.StartGameCommand };
         menu.Items.Add(game);
 
         menu.Items.Add(new Separator());

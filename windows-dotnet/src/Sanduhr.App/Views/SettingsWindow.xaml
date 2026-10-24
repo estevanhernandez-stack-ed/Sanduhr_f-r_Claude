@@ -1626,7 +1626,7 @@
                             <!-- What and when -->
                             <TextBlock Text="{x:Static core:SettingsNames.FoldersToShare}" FontSize="9" Margin="0,0,0,4" views:SettingsAnchor.Id="homes"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                            <ItemsControl ItemsSource="{Binding Roots}" Margin="0,0,0,10">
+                            <ItemsControl ItemsSource="{Binding Roots}" Margin="0,0,0,10" AutomationProperties.Name="{x:Static core:SettingsNames.FoldersToShare}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <WrapPanel Orientation="Horizontal" />
@@ -2143,7 +2143,8 @@
                                         <TextBlock Text="Filename:" VerticalAlignment="Center" FontSize="12"
                                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
                                         <TextBox Style="{StaticResource Input}" Width="220"
-                                                 Text="{Binding FileName, UpdateSourceTrigger=PropertyChanged}" />
+                                                 Text="{Binding FileName, UpdateSourceTrigger=PropertyChanged}"
+                                                 AutomationProperties.Name="Filename" />
                                         <TextBlock Text=".json" VerticalAlignment="Center" FontSize="12"
                                                    Foreground="{DynamicResource Sanduhr.Brush.TextDim}" Margin="6,0,0,0" />
                                     </StackPanel>
@@ -2176,7 +2177,8 @@
                                         <TextBlock Grid.Column="2" Text="Name" VerticalAlignment="Center" FontSize="12"
                                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="12,0,8,0" />
                                         <TextBox Grid.Column="3" Style="{StaticResource Input}" Width="120"
-                                                 Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+                                                 Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                 AutomationProperties.Name="Name of the theme" />
                                     </Grid>
                                     <ItemsControl ItemsSource="{Binding Rows}">
                                         <ItemsControl.ItemsPanel>
@@ -2255,6 +2257,7 @@
                                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
                                         <TextBox Style="{StaticResource Input}" Width="160"
                                                  Text="{Binding FileName, UpdateSourceTrigger=PropertyChanged}"
+                                                 AutomationProperties.Name="{x:Static core:SettingsNames.SaveThemeAs}"
                                                  ToolTip="Lowercase letters, digits, hyphens. Empty = the name, slugged." />
                                         <TextBlock Text=".json" VerticalAlignment="Center" FontSize="12"
                                                    Foreground="{DynamicResource Sanduhr.Brush.TextDim}" Margin="6,0,0,0" />
@@ -2280,7 +2283,7 @@
                             <Border Grid.Row="8" Height="72" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
                                     BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
                                 <Grid>
-                                    <ListBox x:Name="ThemesList"
+                                    <ListBox x:Name="ThemesList" AutomationProperties.Name="Installed user themes"
                                              ItemsSource="{Binding InstalledThemes}"
                                              SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
                                              Background="Transparent" BorderThickness="0"

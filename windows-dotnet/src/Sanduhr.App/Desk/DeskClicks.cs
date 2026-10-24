@@ -47,7 +47,8 @@ internal static class DeskClicks
     /// <summary>Open-Meteo's site, the link its CC BY 4.0 licence asks for beside its data.</summary>
     public const string WeatherCreditUrl = "https://open-meteo.com/";
 
-    public const string EditMessages = "Edit messages…";
+    /// <summary>The message's menu item: "Message settings…", a page name like every Settings entry point.</summary>
+    public static readonly string MessageSettings = SettingsNames.LinkTitle(SettingsPage.DeskMessage);
     public const string DeskSettings = "Desk settings…";
     public const string LauncherSettings = "Edit buttons…";
     public const string TurnOffDesk = "Turn off the Desk";
@@ -267,7 +268,7 @@ internal static class DeskClicks
         };
     }
 
-    /// <summary>The Desk menu: the piece's own item (Edit messages… on the message), then the shared ones.</summary>
+    /// <summary>The Desk menu: the piece's own item (Message settings… on the message), then the shared ones.</summary>
     private static void OpenMenu(FrameworkElement target, DeskElementKind kind, IDeskClickActions actions)
     {
         var menu = new ContextMenu { PlacementTarget = target, Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint };
@@ -279,7 +280,7 @@ internal static class DeskClicks
             item.Click += (_, _) => actions.Menu(action);
             menu.Items.Add(item);
         }
-        if (kind == DeskElementKind.Message) Add(EditMessages, DeskMenuAction.EditMessages);
+        if (kind == DeskElementKind.Message) Add(MessageSettings, DeskMenuAction.EditMessages);
         if (kind == DeskElementKind.LauncherButton) Add(LauncherSettings, DeskMenuAction.LauncherSettings);
         Add(DeskSettings, DeskMenuAction.DeskSettings);
         Add(DeskArrangeCopy.MenuItem, DeskMenuAction.Arrange);

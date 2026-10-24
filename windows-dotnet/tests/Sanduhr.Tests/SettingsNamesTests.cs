@@ -284,4 +284,32 @@ public class SettingsNamesTests
             Assert.NotEmpty(SettingsNames.RetiredNames(old));
         Assert.Empty(SettingsNames.RetiredNames("Looks good to me")); // "Looks good" is whole-string only
     }
+
+    [Fact]
+    public void Menu_names_are_pinned_and_their_old_forms_retired()
+    {
+        Assert.Equal("Compact mode", SettingsNames.CompactMode);
+        Assert.Equal("Deep Work", SettingsNames.DeepWork);
+        Assert.Equal("Cooldown snake", SettingsNames.CooldownSnake);
+        Assert.Equal("Refresh usage now", SettingsNames.RefreshUsageNow);
+        Assert.Equal("Settings…", SettingsNames.OpenSettings);
+        Assert.Equal("Quit Sanduhr", SettingsNames.QuitSanduhr);
+        Assert.Equal("Hide this limit", SettingsNames.HideThisLimit);
+        Assert.Equal("Message settings…", SettingsNames.LinkTitle(SettingsPage.DeskMessage));
+        foreach (var old in new[] { "Compact Mode", "Expand", "Deep Work (Focus)", "Deep Work focus timer (Ctrl+P)",
+                     "Cooldown Snake", "Cooldown snake game", "Hide this tier", "Edit messages…" })
+            Assert.NotEmpty(SettingsNames.RetiredNames(old));
+        Assert.Empty(SettingsNames.RetiredNames("Expand the list")); // "Expand" is whole-string only
+    }
+
+    [Fact]
+    public void The_widget_and_What_s_New_window_names_are_pinned_and_their_old_forms_retired()
+    {
+        Assert.Equal("Graph style", SettingsNames.GraphStyle);
+        Assert.Equal("Keep the widget on top", SettingsNames.KeepWidgetOnTop);
+        Assert.Equal("Don't show What's New after updates", SettingsNames.HideWhatsNewAfterUpdates);
+        foreach (var old in new[] { "Cycle graph style", "Pin on top", "Pin always on top", "Don't show after updates" })
+            Assert.NotEmpty(SettingsNames.RetiredNames(old));
+        Assert.Empty(SettingsNames.RetiredNames(SettingsNames.HideWhatsNewAfterUpdates));
+    }
 }
