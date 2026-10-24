@@ -24,6 +24,7 @@ using Sanduhr.Core;
 //   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | desk | arrange | launcher | review | companion | ridealongs | propose-widget | meterstyles | all; repeatable (default all)
 //                        settings-pass is not part of all: it is the slow evidence run for the Settings persona pass
 //                        (see SettingsPassScenario.cs); run it once without and once with --light
+//                        manual-key is not part of all either: the manual sign-in key window, closed and fully open
 //   --pages <list>       settings-pass only: comma-separated page names to run (default every page)
 //   --parts <list>       settings-pass only: pages, tab, focus, search, links, contrast (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)
@@ -106,7 +107,7 @@ public static partial class Program
             }
         }
         string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange", "launcher", "review", "companion", "ridealongs", "propose-widget", "meterstyles" };
-        string[] opt = { "settings-pass" };
+        string[] opt = { "settings-pass", "manual-key" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
         var bad = scenarios.Where(s => !known.Contains(s) && !opt.Contains(s)).ToList();
@@ -360,6 +361,8 @@ public static partial class Program
                 await RenderSettings(vm, asm);
             if (scenarios.Contains("settings-pass"))
                 await RenderSettingsPass(vm, asm, light);
+            if (scenarios.Contains("manual-key"))
+                await RenderManualKey(asm);
             if (scenarios.Contains("launcher"))
                 await RenderLauncher(vm, asm, light);
             if (scenarios.Contains("review"))
