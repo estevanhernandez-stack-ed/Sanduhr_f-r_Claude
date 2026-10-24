@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased (windows)
+## v3.9.0 — 2026-10-24
+
+**Platform:** Windows (.NET 10 / WPF). CI watchers is the release: a card on the Desk for every job a GitHub Actions runner on this PC runs, read from the runner containers' logs through Docker's local pipe. `Sanduhr.Mcp` to 3.9.0. **No new outbound destination and no new capability:** Docker's pipe is local to your PC, the manifest still declares `runFullTrust` only and changes only its version, and the MCP trust boundary is unchanged: `Watchers.cs`, which the server already links, gained the board's runner operations, all pure (plain values in, cards out), and the link list and `TrustBoundaryTests` are as in 3.8.0.
 
 ### CI watchers
 

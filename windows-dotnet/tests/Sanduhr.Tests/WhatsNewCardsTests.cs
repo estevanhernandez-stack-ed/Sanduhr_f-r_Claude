@@ -12,12 +12,48 @@ public class WhatsNewCardsTests
     public void Table_HasEveryReleaseNewestFirst()
     {
         Assert.Equal(
-            ["widgets", "companion", "claude-widgets", "restart-to-update", "desk-fold", "weather-nickname", "livelier-bars", "meter-styles",
+            ["ci-runners",
+             "widgets", "companion", "claude-widgets", "restart-to-update", "desk-fold", "weather-nickname", "livelier-bars", "meter-styles",
              "desk-design", "launcher", "per-monitor", "song-looks", "oled-care", "saved-designs",
              "now-playing-steps-aside", "watchers", "suggested-messages", "desk-plate", "arrange-hide", "statusline-label",
              "desk", "settings-redesigned", "claude-code-page",
              "shortcut-keys", "tray-shows", "limits-come-and-go", "every-folder", "steady-sparklines", "whats-new"],
             Table.Select(c => c.Id));
+    }
+
+    /// <summary>The Store goes 3.8.0 to 3.9.0: the one CI watchers card, and nothing from 3.8.0 again.</summary>
+    [Fact]
+    public void Release390_ShowsOnlyItsOwnCardAfterTheUpdate()
+    {
+        var shown = WhatsNew.Cards("3.8.0", "3.9.0");
+        Assert.Equal(["ci-runners"], shown.Select(c => c.Id));
+        Assert.All(shown, c => Assert.Equal("3.9.0", c.Version));
+    }
+
+    /// <summary>A Setup.exe install from the 3.7.2 patch sees the 3.9.0 card first; the cap of eight keeps seven of 3.8.0's.</summary>
+    [Fact]
+    public void Release390_FromTheSetupExePatch_LeadsAndCapsAtEight()
+    {
+        var shown = WhatsNew.Cards("3.7.2", "3.9.0");
+        Assert.Equal(WhatsNew.Cap, shown.Count);
+        Assert.Equal("ci-runners", shown[0].Id);
+        Assert.Equal(Release380Ids.Take(7), shown.Skip(1).Select(c => c.Id));
+    }
+
+    [Fact]
+    public void Release390_ShowMeOpensTheDeskPage() =>
+        Assert.Equal(SettingsPage.Desk, Table.Single(c => c.Id == "ci-runners").Destination);
+
+    [Fact]
+    public void Release390_CardNamesTheSwitchByItsSettingsName() =>
+        Assert.Contains(SettingsNames.CiRunnersSwitch, Table.Single(c => c.Id == "ci-runners").Body);
+
+    [Fact]
+    public void Release390_MenuShowsItsOwnHighlights()
+    {
+        var (menu, header) = WhatsNew.ForMenu("3.9.0", "3.9.0");
+        Assert.Equal(["ci-runners"], menu.Select(c => c.Id));
+        Assert.Equal("Highlights in 3.9.0", header);
     }
 
     private static readonly string[] Release380Ids =
