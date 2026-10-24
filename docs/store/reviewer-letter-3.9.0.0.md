@@ -85,7 +85,7 @@ Estevan Hernandez, 626 Labs LLC
 - [ ] Store keywords: no model names (Fable, Opus, Sonnet, Haiku), the 3.5.0 failure
 - [ ] Trademark disclaimer on all six surfaces plus What's New, the tour and the Desk pages
 - [ ] `docs/PRIVACY.md` row (CI watchers) and the hosted policy at 626labs.dev/privacy.html#privacy-sanduhr match **before commit**: open a hub issue for the CI watchers row, then curl-check the live page for `watchers_ci_runners` and `docker_engine`
-- [ ] Store "What's new" keeps the line *"If the update won't install (error 0x80073D02), restart Windows and try again."* only if the update path still needs it; otherwise drop it
+- [ ] Store "What's new" keeps the line *"If the update won't install (error 0x80073D02), restart Windows and try again."*: the restart-to-update check (runbook Phase 7, step 9) can only run when a Store update reaches a real 3.8 install, and 3.9 is that update. Drop the 0x80073D02 line in the first release after 3.9 once the Phase 7 step 9 check passes on the 3.8 to 3.9 Store update.
 - [ ] "What's new" through the Store Listing Console from `store-listing-console/apps/sanduhr/copy/whats-new-3.9.0.0.md`; Notes for certification pasted by hand from the block above
 - [ ] `dotnet test windows-dotnet` green
 
