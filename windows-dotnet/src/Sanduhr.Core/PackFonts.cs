@@ -14,7 +14,10 @@ public static class PackFonts
     public const string CacheName = ".fonts";
 
     /// <summary>The enabled font packs, each as its copy. A pack whose files can't be copied is left out.</summary>
-    public static IReadOnlyList<PackFontFolder> Folders(WidgetStore widgets)
+    public static IReadOnlyList<PackFontFolder> Folders(WidgetStore widgets) => Folders(widgets, null);
+
+    /// <param name="beforeMove">Test seam: runs with the target folder just before a finished copy is renamed into place.</param>
+    internal static IReadOnlyList<PackFontFolder> Folders(WidgetStore widgets, Action<string>? beforeMove)
     {
         string cache = Path.Combine(widgets.Root, CacheName);
         var folders = new List<PackFontFolder>();
@@ -26,7 +29,7 @@ public static class PackFonts
             string dir = Path.Combine(cache, name);
             try
             {
-                if (!Directory.Exists(dir) && !Copy(pack.Dir, cache, dir)) continue;
+                if (!Directory.Exists(dir) && !Copy(pack.Dir, cache, dir, beforeMove)) continue;
                 folders.Add(new PackFontFolder(pack.Row.Id, pack.Info.Name, dir));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -40,7 +43,7 @@ public static class PackFonts
 
     /// <summary>Copies the font files into a scratch folder and renames it into place, so a half copy is never read. False when the
     /// pack has no font file.</summary>
-    private static bool Copy(string packDir, string cache, string dir)
+    private static bool Copy(string packDir, string cache, string dir, Action<string>? beforeMove)
     {
         var fonts = Directory.EnumerateFiles(packDir, "*", SearchOption.AllDirectories)
             .Where(f => Path.GetExtension(f).ToLowerInvariant() is ".ttf" or ".otf")
@@ -59,7 +62,16 @@ public static class PackFonts
                 if (!used.Add(file)) file = $"{used.Count}-{file}";
                 File.Copy(font, Path.Combine(scratch, file));
             }
-            Directory.Move(scratch, dir);
+            beforeMove?.Invoke(dir);
+            try
+            {
+                Directory.Move(scratch, dir);
+            }
+            catch (IOException) when (Directory.Exists(dir))
+            {
+                // Another caller finished the same copy first (the Desk and Settings can ask at once): use theirs.
+                TryDelete(scratch);
+            }
             return true;
         }
         catch

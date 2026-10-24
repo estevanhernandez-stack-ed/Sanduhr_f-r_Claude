@@ -103,4 +103,36 @@ public sealed class PackFontsTests : IDisposable
         Assert.Empty(PackFonts.Folders(store));
         Assert.False(Directory.Exists(folder.Dir));
     }
+
+    [Fact]
+    public void A_copy_another_caller_finished_first_is_used_and_the_pack_is_not_dropped()
+    {
+        var store = Store();
+        Install(store);
+
+        // The other caller wins between our copy and our rename: its folder is already in place when ours is moved.
+        var folders = PackFonts.Folders(store, beforeMove: dir =>
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllBytes(Path.Combine(dir, "fixture.ttf"), [1]);
+        });
+
+        var folder = Assert.Single(folders);
+        Assert.Equal("good-font", folder.PackId);
+        Assert.Equal(["fixture.ttf"], Directory.GetFiles(folder.Dir).Select(Path.GetFileName));
+        Assert.DoesNotContain(Directory.GetDirectories(Path.Combine(store.Root, ".fonts")), d => d.Contains(".tmp-"));
+    }
+
+    [Fact]
+    public void Many_callers_at_once_all_get_the_pack()
+    {
+        var store = Store();
+        Install(store);
+
+        var results = new PackFontFolder[16][];
+        Parallel.For(0, results.Length, new ParallelOptions { MaxDegreeOfParallelism = 16 },
+            i => results[i] = [.. PackFonts.Folders(store)]);
+
+        Assert.All(results, r => Assert.Equal("good-font", Assert.Single(r).PackId));
+    }
 }
