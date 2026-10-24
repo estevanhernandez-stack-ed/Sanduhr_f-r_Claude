@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased (windows)
+
+### Fixes
+
+- Themes, palettes and fonts from installed widget packs now show in the theme list, the Desk ink presets and the Desk fonts. They installed before, but nothing used them. A new font shows in the Desk font list the next time you open Settings.
+- Effects packs install and preview, but nothing draws them yet.
+- Removing the theme in use switches to Obsidian at once. That includes deleting the theme file you have selected in Settings ▸ Themes.
+
 ## v3.9.0 — 2026-10-24
 
 **Platform:** Windows (.NET 10 / WPF). CI watchers is the release: a card on the Desk for every job a GitHub Actions runner on this PC runs, read from the runner containers' logs through Docker's local pipe. `Sanduhr.Mcp` to 3.9.0. **No new outbound destination and no new capability:** Docker's pipe is local to your PC, the manifest still declares `runFullTrust` only and changes only its version, and the MCP trust boundary is unchanged: `Watchers.cs`, which the server already links, gained the board's runner operations, all pure (plain values in, cards out), and the link list and `TrustBoundaryTests` are as in 3.8.0.
@@ -17,7 +25,7 @@
 
 ### Widgets
 
-- **Settings ▸ Widgets** (in the Desk group) lists the widget catalog and the packs you have, with Install, Update and Uninstall. The first packs are the hourglass sprite and the OLED Neon theme, palettes and effects. Themes, palettes, effects and fonts from packs join the lists you already pick from.
+- **Settings ▸ Widgets** (in the Desk group) lists the widget catalog and the packs you have, with Install, Update and Uninstall. The first packs are the hourglass sprite and the OLED Neon theme, palettes and effects. Themes, palettes and fonts from packs were meant to join the lists you already pick from, and only did in 3.9.1. Effects packs install and preview, but nothing draws them yet.
 - **The catalog is signed and every pack is checked again on your PC.** Sanduhr verifies the catalog's ECDSA P-256 signature against a key built into the app before it reads a byte of it, refuses an older catalog served back, checks each zip's size and SHA-256 against the catalog, reads the zip without inflating anything, and runs the whole pack through `PackValidator` before it is renamed into `%LOCALAPPDATA%\Sanduhr\widgets\`. Packs are data only: JSON, PNG and fonts, never code.
 - **Only when you ask.** The catalog is fetched when you open Settings ▸ Widgets or press **Check the catalog again**; a pack downloads only on Install or Update. Nothing polls in the background, and no account, cookie or identifier goes with the request (the user agent is just "Sanduhr"). Offline, or with a catalog that fails its check, the page says so and installs nothing.
 
