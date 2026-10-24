@@ -515,6 +515,61 @@ public static class SettingsIndex
         return new(page, anchor);
     }
 
+    // ---- reach: links and the --settings switch ----
+
+    /// <summary>A page's id in links and <c>--settings</c>: its enum name in lower case ("claudeusage").</summary>
+    public static string PageId(SettingsPage page) => page.ToString().ToLowerInvariant();
+
+    /// <summary>The command-line switch that opens Settings: <c>Sanduhr.exe --settings &lt;page&gt;[#&lt;anchor&gt;]</c>.</summary>
+    public const string SettingsSwitch = "--settings";
+
+    /// <summary>
+    /// A link's text, "desk#pieces", as a place: the page by id (any case), the anchor after "#" resolved through the
+    /// aliases and dropped when the page has no such anchor. Text that names no Settings page opens General; the widget
+    /// is kept, so the caller can show it. Null text is no link.
+    /// </summary>
+    public static SettingsLink? ParseLink(string? text)
+    {
+        if (text is null)
+            return null;
+        var trimmed = text.Trim();
+        int hash = trimmed.IndexOf('#');
+        var pageText = (hash < 0 ? trimmed : trimmed[..hash]).Trim();
+        var anchorText = hash < 0 ? "" : trimmed[(hash + 1)..].Trim().ToLowerInvariant();
+        if (PageFromId(pageText) is not { } page)
+            return new(SettingsPage.General, null);
+        var link = Resolve(page, anchorText.Length == 0 ? null : anchorText);
+        if (link.Page != SettingsPage.Widget && !SettingsNames.Pages.Contains(link.Page))
+            return new(SettingsPage.General, null);
+        return link.Anchor is not null && Find(link.Page, link.Anchor) is null ? link with { Anchor = null } : link;
+    }
+
+    /// <summary>
+    /// The value of <see cref="SettingsSwitch"/> in <paramref name="args"/>: "desk#pieces" for "--settings desk#pieces" or
+    /// "--settings=desk#pieces"; "general" when the switch has no value; null without the switch.
+    /// </summary>
+    public static string? LinkArgument(IEnumerable<string> args)
+    {
+        var list = args as IReadOnlyList<string> ?? args.ToList();
+        for (int i = 0; i < list.Count; i++)
+        {
+            var arg = list[i];
+            if (arg.StartsWith(SettingsSwitch + "=", StringComparison.OrdinalIgnoreCase))
+            {
+                var value = arg[(SettingsSwitch.Length + 1)..];
+                return value.Length == 0 ? PageId(SettingsPage.General) : value;
+            }
+            if (string.Equals(arg, SettingsSwitch, StringComparison.OrdinalIgnoreCase))
+                return i + 1 < list.Count && !list[i + 1].StartsWith("--", StringComparison.Ordinal)
+                    ? list[i + 1]
+                    : PageId(SettingsPage.General);
+        }
+        return null;
+    }
+
+    /// <summary>The place a launch's <see cref="SettingsSwitch"/> asks for, null without the switch.</summary>
+    public static SettingsLink? LinkFromArgs(IEnumerable<string> args) => ParseLink(LinkArgument(args));
+
     private static int IndexOf(IReadOnlyList<SettingsPage> list, SettingsPage p)
     {
         for (int i = 0; i < list.Count; i++)
