@@ -206,6 +206,7 @@ public class SettingsNamesTests
     [InlineData("in Settings ▸ Claude Usage.", "\"Settings ▸\": write \"Settings, <Page>, <Section>\"")]
     [InlineData("(Settings > Publish usage > Endpoint URL)", "\"Settings >\": write \"Settings, <Page>, <Section>\"")]
     [InlineData("Open Settings, Privacy.", "no page \"Privacy\" after \"Settings, \"")]
+    [InlineData("(Settings → Accounts to add or remove)", "\"Settings →\": write \"Settings, <Page>, <Section>\"")]
     public void PathProblems_names_the_problem(string text, string problem) =>
         Assert.Contains(problem, SettingsNames.PathProblems(text));
 
@@ -218,5 +219,12 @@ public class SettingsNamesTests
         Assert.Empty(SettingsNames.PathProblems("Settings, Desk, Look"));
         // Lowercase prose after a page and a comma is not a title.
         Assert.Empty(SettingsNames.PathProblems("Settings, About, or the tray menu"));
+    }
+
+    [Fact]
+    public void The_agent_switches_say_Claude()
+    {
+        Assert.Equal("Let Claude show watchers", SettingsNames.WatchersSwitch);
+        Assert.Equal(["Let agents show watchers"], SettingsNames.RetiredNames("turned on Let agents show watchers"));
     }
 }

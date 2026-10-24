@@ -342,7 +342,7 @@
                             Command="{Binding CycleAccountCommand}"
                             HorizontalAlignment="Left" Margin="2,2,2,6"
                             Visibility="{Binding AccountSwitcherText, Converter={StaticResource StrVis}}"
-                            ToolTip="Active Claude account. Click to switch when multiple are configured (Settings → Accounts to add or remove).">
+                            ToolTip="Active Claude account. Click to switch when multiple are configured. Add or remove accounts in Settings, Accounts.">
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.TextDim}" />

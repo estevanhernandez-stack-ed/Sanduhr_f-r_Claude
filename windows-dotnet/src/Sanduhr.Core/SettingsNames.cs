@@ -157,8 +157,9 @@ public static class SettingsNames
     public const string LauncherAddApp = "Add app…";
     /// <summary>Desk, Launcher: asks for an https link and a label.</summary>
     public const string LauncherAddLink = "Add link…";
-    /// <summary>Desk: lets agents put watchers up through the MCP server (settings.json "watchers_agents", off by default).</summary>
-    public const string WatchersSwitch = "Let agents show watchers";
+    /// <summary>Desk: lets Claude put watchers up through the MCP server (settings.json "watchers_agents", off by default).
+    /// "Claude" means any agent using Sanduhr's MCP server, the one word every agent consent uses (WF10).</summary>
+    public const string WatchersSwitch = "Let Claude show watchers";
     /// <summary>Desk: CI watchers from this PC's runner containers (settings.json "watchers_ci_runners", off by default; spec ci-watchers-3.9).</summary>
     public const string CiRunnersSwitch = "Show my CI runners' jobs";
     /// <summary>Desk: lets Claude apply a Desk design without the review bar (settings.json "desk_direct", off by default).</summary>
@@ -294,6 +295,7 @@ public static class SettingsNames
         ("Alerts Settings…", LinkTitle(SettingsPage.Alerts), false),
         ("Save and apply", SaveAndApply, false),
         ("Save & Apply", SaveAndApply, false),
+        ("Let agents show watchers", WatchersSwitch, false),
     ];
 
     /// <summary>The retired names <paramref name="text"/> still uses, empty when it uses none.</summary>
@@ -370,7 +372,7 @@ public static class SettingsNames
         var found = new List<string>();
         if (string.IsNullOrEmpty(text))
             return found;
-        foreach (var old in new[] { "Settings ▸", "Settings >", "Settings ›" })
+        foreach (var old in new[] { "Settings ▸", "Settings >", "Settings ›", "Settings →" })
         {
             if (text.Contains(old, StringComparison.Ordinal))
                 found.Add($"\"{old}\": write \"Settings, <Page>, <Section>\"");

@@ -39,7 +39,7 @@ public sealed partial class ToolLogic
             case DesignStateOutcome.Missing:
                 return NoData("missing",
                     "Sanduhr has not written the Desk state yet. Start the Sanduhr widget with its Claude Code integration installed "
-                    + "(Settings > Claude Code); the state appears within a few seconds. Then call get_desk again.");
+                    + "(Settings, Claude Code); the state appears within a few seconds. Then call get_desk again.");
             case DesignStateOutcome.TooLarge:
                 return NoData("too_large", "The Desk state is larger than 1 MB; it is not read. Restart the Sanduhr widget.");
             case DesignStateOutcome.Schema:

@@ -50,7 +50,7 @@
             </StackPanel>
             <TextBlock TextWrapping="Wrap" FontSize="12" Margin="0,0,0,12"
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                       Text="Claude Code deletes its session logs after about 30 days. Sanduhr can keep a local history vault of your usage totals so your trends survive — stored only on this machine, never uploaded. Choose which Claude Code homes to include; you can change this or erase everything any time in Settings &#x25B8; Claude Usage." />
+                       Text="Claude Code deletes its session logs after about 30 days. Sanduhr can keep a session archive of your usage totals on this PC so your trends survive. It is never uploaded. Choose which Claude Code folders to include; you can change this or erase the archive any time in Settings, Claude Usage, Overview." />
             <StackPanel x:Name="RootsPanel" Margin="0,0,0,14" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="NotNowButton" Content="Not now" MinWidth="80" Height="30"

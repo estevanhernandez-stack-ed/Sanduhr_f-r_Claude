@@ -32,19 +32,29 @@ public class SettingsSourceScanTests
         return Path.Combine(dir!.FullName, "src", "Sanduhr.App");
     }
 
-    private static IEnumerable<string> Files(string pattern) =>
-        Directory.EnumerateFiles(AppDir(), pattern, SearchOption.AllDirectories)
+    private static string SrcDir() => Path.GetFullPath(Path.Combine(AppDir(), ".."));
+
+    /// <summary>Files the scan leaves out. The names table holds every retired name on purpose. The search
+    /// index is slice 2's file: its titles keep old words until slice 2 points them at the table, and it
+    /// leaves this list then.</summary>
+    private static readonly string[] NotScanned = ["SettingsNames.cs", "SettingsIndex.cs"];
+
+    private static IEnumerable<string> FilesIn(string root, string pattern) =>
+        Directory.EnumerateFiles(root, pattern, SearchOption.AllDirectories)
             .Where(f =>
             {
-                var rel = Path.GetRelativePath(AppDir(), f).Replace('\\', '/');
+                var rel = Path.GetRelativePath(root, f).Replace('\\', '/');
                 return !rel.StartsWith("bin/") && !rel.StartsWith("obj/")
-                    && !rel.Contains("/bin/") && !rel.Contains("/obj/");
+                    && !rel.Contains("/bin/") && !rel.Contains("/obj/")
+                    && !NotScanned.Contains(Path.GetFileName(f));
             })
             .OrderBy(f => f, StringComparer.Ordinal);
 
-    private static IEnumerable<(string Where, string Text)> CsStrings()
+    private static IEnumerable<string> Files(string pattern) => FilesIn(AppDir(), pattern);
+
+    private static IEnumerable<(string Where, string Text)> CsStringsIn(string root, string prefix)
     {
-        foreach (var file in Files("*.cs"))
+        foreach (var file in FilesIn(root, "*.cs"))
         {
             var lines = File.ReadAllLines(file);
             for (int i = 0; i < lines.Length; i++)
@@ -57,11 +67,19 @@ public class SettingsSourceScanTests
                     string text;
                     try { text = Regex.Unescape(m.Groups[1].Value); }
                     catch (ArgumentException) { text = m.Groups[1].Value; }
-                    yield return ($"{Path.GetRelativePath(AppDir(), file)}:{i + 1}", text);
+                    yield return ($"{prefix}{Path.GetRelativePath(root, file)}:{i + 1}", text);
                 }
             }
         }
     }
+
+    private static IEnumerable<(string Where, string Text)> CsStrings() => CsStringsIn(AppDir(), "");
+
+    /// <summary>Core's and the MCP server's literals, prefixed "Core/" and "Mcp/". The MCP cannot read
+    /// SettingsNames (its link list is fixed), so this is what holds its copies of a name to the table.</summary>
+    private static IEnumerable<(string Where, string Text)> CoreAndMcpStrings() =>
+        CsStringsIn(Path.Combine(SrcDir(), "Sanduhr.Core"), "Core/")
+            .Concat(CsStringsIn(Path.Combine(SrcDir(), "Sanduhr.Mcp"), "Mcp/"));
 
     private static IEnumerable<(string Where, string Text)> XamlStrings()
     {
@@ -91,6 +109,42 @@ public class SettingsSourceScanTests
                 bad.Add($"{where}: unknown link [{string.Join(", ", links)}] in \"{text}\"");
         }
         Assert.True(bad.Count == 0, Environment.NewLine + string.Join(Environment.NewLine, bad));
+    }
+
+    [Fact]
+    public void Core_and_Mcp_strings_use_no_retired_name_and_link_to_no_unknown_page()
+    {
+        var bad = new List<string>();
+        foreach (var (where, text) in CoreAndMcpStrings())
+        {
+            var retired = SettingsNames.RetiredNames(text);
+            var links = SettingsNames.UnknownLinks(text);
+            if (retired.Count > 0)
+                bad.Add($"{where}: retired [{string.Join(", ", retired)}] in \"{text}\"");
+            if (links.Count > 0)
+                bad.Add($"{where}: unknown link [{string.Join(", ", links)}] in \"{text}\"");
+        }
+        Assert.True(bad.Count == 0, Environment.NewLine + string.Join(Environment.NewLine, bad));
+    }
+
+    [Fact]
+    public void Every_Settings_path_names_a_real_page_and_section()
+    {
+        var bad = CsStrings().Concat(XamlStrings()).Concat(CoreAndMcpStrings())
+            .SelectMany(x => SettingsNames.PathProblems(x.Text).Select(p => $"{x.Where}: {p} in \"{x.Text}\""))
+            .ToList();
+        Assert.True(bad.Count == 0, Environment.NewLine + string.Join(Environment.NewLine, bad));
+    }
+
+    [Fact]
+    public void The_Core_and_Mcp_scan_sees_known_strings()
+    {
+        var strings = CoreAndMcpStrings().ToList();
+        Assert.Contains(strings, x => x.Where.StartsWith("Core/Weather.cs", StringComparison.Ordinal)
+            && x.Text == "Set a city in Settings, Weather");
+        Assert.Contains(strings, x => x.Where.StartsWith("Mcp/ToolLogic.Watchers.cs", StringComparison.Ordinal)
+            && x.Text.Contains(SettingsNames.WatchersSwitch, StringComparison.Ordinal));
+        Assert.DoesNotContain(strings, x => x.Where.Contains("SettingsNames.cs", StringComparison.Ordinal));
     }
 
     [Fact]

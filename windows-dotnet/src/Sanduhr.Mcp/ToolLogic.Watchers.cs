@@ -111,7 +111,7 @@ public sealed partial class ToolLogic
             return Refusal("no_data", "unavailable", "Watchers are not wired on this server configuration.");
         if (!WatchersAllowed())
             return WatchRefusal("watchers_off",
-                "The user has not turned on Let agents show watchers in Sanduhr (Settings, Desk, Watchers). "
+                "The user has not turned on 'Let Claude show watchers' in Sanduhr (Settings, Desk). "
                 + "Do not retry; tell the user if they asked for a watcher.");
         return null;
     }
