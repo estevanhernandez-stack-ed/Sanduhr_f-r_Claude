@@ -120,4 +120,41 @@ public sealed class PackThemeWiringTests : AppWindowFixture
         Assert.Equal(PackKey, widget.ActiveThemeKey);
         Assert.Equal(PackKey, Assert.Single(widget.Themes, t => t.IsActive).Key);
     });
+
+    [Fact]
+    public void The_studio_starting_from_a_pack_theme_offers_a_file_name_that_saves() => AppHost.Run(() =>
+    {
+        var paths = new Paths();
+        InstalledPackKit.Install(paths, "good-theme");
+        var widget = DemoWidget();
+        widget.ReloadUserThemes();
+        var errors = new List<string>();
+        var studio = new ThemeStudioViewModel(widget, errors.Add, _ => { }, () => { });
+
+        studio.SelectedStart = widget.Themes.First(t => t.Key == PackKey);
+
+        Assert.Equal("fixture-dark", studio.FileName);   // not "good-theme:fixture-dark", which no file name rule accepts
+        studio.SaveCommand.Execute(null);
+        Assert.Empty(errors);
+        Assert.True(File.Exists(Path.Combine(paths.ThemesDir, "fixture-dark.json")));
+        Assert.Equal("fixture-dark", widget.ActiveThemeKey);
+        Assert.Contains(widget.Themes, t => t.Key == PackKey);   // the pack's own theme is still there beside the copy
+    });
+
+    [Fact]
+    public void The_studio_leaves_the_file_name_empty_rather_than_overwrite_a_theme_of_the_same_name() => AppHost.Run(() =>
+    {
+        var paths = new Paths();
+        InstalledPackKit.Install(paths, "good-theme");
+        Directory.CreateDirectory(paths.ThemesDir);
+        var mine = ThemeDraft.FromDefinition("obsidian", ThemeCatalog.BuiltIns["obsidian"]).ToJson();
+        mine["name"] = "Mine";
+        File.WriteAllText(Path.Combine(paths.ThemesDir, "fixture-dark.json"), mine.ToJsonString());
+        var widget = DemoWidget();
+        var studio = new ThemeStudioViewModel(widget, _ => { }, _ => { }, () => { });
+
+        studio.SelectedStart = widget.Themes.First(t => t.Key == PackKey);
+
+        Assert.Equal("", studio.FileName);
+    });
 }

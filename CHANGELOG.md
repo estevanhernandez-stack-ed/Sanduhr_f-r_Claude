@@ -4,7 +4,7 @@
 
 ### Fixes
 
-- Themes, palettes and fonts from installed widget packs now show in the theme list, the Desk ink presets and the Desk fonts. They installed before, but nothing used them. A new font shows in the Desk font list the next time you open Settings.
+- Themes, palettes and fonts from installed widget packs now show in the theme list, the Desk ink presets and the Desk fonts. They installed before, but nothing used them. The Desk and message font lists update when Settings reopens.
 - Effects packs install and preview, but nothing draws them yet.
 - Removing the theme in use switches to Obsidian at once. That includes deleting the theme file you have selected in Settings ▸ Themes.
 

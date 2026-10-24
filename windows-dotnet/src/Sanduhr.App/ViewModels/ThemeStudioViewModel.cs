@@ -144,12 +144,24 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
         Name = _draft.Name;
         GlassAlpha = _draft.GlassAlpha;
         BorderAlpha = _draft.BorderAlpha;
-        FileName = ThemeCatalog.BuiltIns.ContainsKey(key) ? "" : key;
+        FileName = SuggestedFileName(key);
         foreach (var row in Rows)
             row.Load(_draft.GetColor(row.Field), _draft.TryGetColor(row.Field));
         SelectedStart = StartFromOptions.FirstOrDefault(t => t.Key == key);
         _loading = false;
         Refresh(preview: false);
+    }
+
+    /// <summary>The file name to offer for a theme that was started from. A built-in has none (save a copy under a new name); a pack's
+    /// theme is keyed <c>pack:stem</c>, which is no file name, so its stem is offered, unless that would overwrite a theme of the same
+    /// name in the themes folder or is not a valid key; your own theme's file name stays.</summary>
+    private string SuggestedFileName(string key)
+    {
+        if (ThemeCatalog.BuiltIns.ContainsKey(key)) return "";
+        if (!key.Contains(':')) return key;
+        string stem = ThemeHandoff.Slugify(key[(key.IndexOf(':') + 1)..]);
+        if (!ThemeHandoff.IsValidKey(stem) || ThemeCatalog.BuiltIns.ContainsKey(stem)) return "";
+        return File.Exists(Path.Combine(_widget.ThemesDir, stem + ".json")) ? "" : stem;
     }
 
     internal bool OnTokenEdited(string field, string hex)
