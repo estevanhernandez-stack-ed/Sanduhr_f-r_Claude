@@ -7,7 +7,16 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class WhatsNewCards
 {
-    public static IReadOnlyList<WhatsNewCard> Table { get; } = [.. Release380(), .. Release371(), .. Release360(), .. Release350()];
+    public static IReadOnlyList<WhatsNewCard> Table { get; } = [.. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()];
+
+    // 3.9.0: the Store goes 3.8.0 to 3.9.0. One card; the cap of eight is not in play.
+    private static WhatsNewCard[] Release390() =>
+    [
+        WhatsNewCard.Of("3.9.0", "ci-runners", "Your CI runners on the Desk",
+            "Show my CI runners' jobs, in Settings, Desk, puts a card on your Desk for each job a runner on this PC runs. Sanduhr reads the runners' logs through Docker's local pipe: no account, no network.",
+            "", // CommandPrompt
+            WhatsNewPreview.None, SettingsPage.Desk),
+    ];
 
     // 3.8.0: the Store goes 3.7.1 to 3.8.0 (3.7.2 was a GitHub-only patch with no cards). Seven cards
     // fill the cap of eight.
