@@ -881,11 +881,14 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         RebuildThemeMap();
         BuildThemeStrip(_palette.Key);
-        // The theme in use is gone (its pack was uninstalled, or its file deleted): Obsidian now, not at the next launch. Shown, not
-        // saved, like the constructor's fallback: a failed read of the widgets folder makes a pack look gone for a moment, and the
-        // saved choice must survive it. The next launch resolves the saved key again.
-        if (!_themes.ContainsKey(_palette.Key))
-            ApplyThemeByKey("obsidian", save: false);
+        // The saved choice is the truth; the widget follows it when it can. The theme in use is gone (its pack was uninstalled, or its
+        // file deleted): Obsidian now, not at the next launch. Shown, not saved, like the constructor's fallback: a failed read of
+        // the widgets folder makes a pack look gone for a moment, and the saved choice must survive it. When a later reload finds
+        // the saved key readable again, the widget goes back to it (also not saving), so it and the Desk design agree.
+        string saved = _settings.LoadTheme();
+        string target = _themes.ContainsKey(saved) ? saved : _themes.ContainsKey(_palette.Key) ? _palette.Key : "obsidian";
+        if (target != _palette.Key)
+            ApplyThemeByKey(target, save: false);
     }
 
     private static void Log(string message) => Debug.WriteLine($"[Sanduhr.Themes] {message}");

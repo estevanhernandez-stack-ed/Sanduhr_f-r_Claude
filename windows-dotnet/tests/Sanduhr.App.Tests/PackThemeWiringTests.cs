@@ -101,10 +101,11 @@ public sealed class PackThemeWiringTests : AppWindowFixture
 
         Directory.Move(moved, packDir);
         widget.ReloadUserThemes();
-        Assert.Contains(widget.Themes, t => t.Key == PackKey);
-        widget.ApplyThemeByKey(new SettingsStore(paths).LoadTheme());
 
+        // The saved choice never changed, so the widget goes back to it by itself, and still does not rewrite it.
         Assert.Equal(PackKey, widget.ActiveThemeKey);
+        Assert.Equal(PackKey, Assert.Single(widget.Themes, t => t.IsActive).Key);
+        Assert.Equal(PackKey, new SettingsStore(paths).LoadTheme());
     });
 
     [Fact]
