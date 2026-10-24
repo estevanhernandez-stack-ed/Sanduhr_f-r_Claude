@@ -2653,7 +2653,7 @@
                                     <TextBlock Text="Colors" FontSize="12" VerticalAlignment="Center"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                     <ComboBox Grid.Column="1" Style="{StaticResource ThemedComboBox}"
-                                              ItemsSource="{x:Static vm:DeskSettingsViewModel.InkPresetNames}"
+                                              ItemsSource="{Binding InkPresetNames}"
                                               SelectedItem="{Binding InkPreset, Mode=TwoWay}"
                                               AutomationProperties.Name="Ink preset" />
                                     <TextBox Grid.Column="3" Style="{StaticResource Input}" FontFamily="Cascadia Code, Consolas"

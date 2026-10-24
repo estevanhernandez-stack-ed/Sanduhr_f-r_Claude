@@ -599,7 +599,12 @@ public partial class App : Application
         // Widgets made with Claude (spec 3.8 section 5): propose_widget's pack previews on the Desk and installs only on Apply.
         _widgetReview = new Desk.WidgetReviewService(paths, store);
         Desk.WidgetReviewService.Current = _widgetReview;
-        _widgetReview.Host = new Desk.WidgetReviewHost(_desk, store, () => _settingsWindow?.ViewModel.WidgetsPage.ReloadLocal());
+        _widgetReview.Host = new Desk.WidgetReviewHost(_desk, store, () =>
+        {
+            _settingsWindow?.ViewModel.WidgetsPage.ReloadLocal();
+            // A palette Claude made joins the Ink presets (3.9.1).
+            _settingsWindow?.ViewModel.Desk.Reload();
+        });
         _widgetReview.Start();
         _desk.LauncherMissingClicked += OnLauncherMissing;
         _vm.DeskUsageChanged += _desk.UsageChanged;
