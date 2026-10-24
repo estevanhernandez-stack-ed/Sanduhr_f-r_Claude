@@ -5,6 +5,7 @@
 ### Fixes
 
 - Settings ▸ History ▸ Clear history now clears the account the "Account:" picker shows, not the active account. "All accounts" clears every account's history. The confirmation names what it removes.
+- Reopening Settings, Claude Code no longer unlinks folders from their accounts or shows "Couldn't save that link." The account list is updated in place, and an empty selection is ignored instead of read as "unlink everything".
 
 ## v3.9.1 — 2026-10-24
 
