@@ -90,7 +90,7 @@ public static class SettingsNames
 
     // ---- Commands and controls ----
 
-    /// <summary>Tray and widget menus: opens Settings where it was left.</summary>
+    /// <summary>Tray and widget menus: opens Settings. Which page it lands on is App's rule.</summary>
     public const string OpenSettings = "Settings…";
     /// <summary>About, and the tray menu: the What's New window. "What's New" is the window's name.</summary>
     public const string WhatsNew = "What's New…";
