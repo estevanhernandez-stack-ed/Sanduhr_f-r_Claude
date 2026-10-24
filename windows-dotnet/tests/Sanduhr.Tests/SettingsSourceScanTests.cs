@@ -523,4 +523,28 @@ public class SettingsSourceScanTests
         Assert.NotNull(name);
         Assert.StartsWith(SettingsNames.ManualKeyCloudflareToggle, name);
     }
+
+    [Fact]
+    public void The_sessionKey_help_opens_from_a_keyboard_reachable_link()
+    {
+        var key = File.ReadAllText(Path.Combine(AppDir(), "Views", "ManualKeyWindow.xaml"));
+        Assert.DoesNotContain("MouseLeftButtonUp=\"OnHelpToggleClick\"", key);
+        var link = Regex.Match(key, "<Hyperlink\\b[^>]*x:Name=\"HelpLink\"[^>]*>(.*?)</Hyperlink>", RegexOptions.Singleline);
+        Assert.True(link.Success, "the sessionKey help toggle is not a Hyperlink named HelpLink");
+        Assert.Contains("Click=\"OnHelpToggleClick\"", link.Value);
+        var name = Resolve(link.Value, "AutomationProperties.Name");
+        Assert.NotNull(name);
+        var visible = Regex.Match(link.Groups[1].Value, "Text=\"([^\"]*)\"").Groups[1].Value;
+        Assert.Equal("Where do I find the sessionKey?", visible);
+        Assert.StartsWith(visible, name);
+    }
+
+    [Fact]
+    public void No_toggle_in_the_key_window_opens_on_a_mouse_click_alone()
+    {
+        // Every MouseLeftButtonUp handler left in the window must be an action link, listed here on purpose.
+        var key = File.ReadAllText(Path.Combine(AppDir(), "Views", "ManualKeyWindow.xaml"));
+        var handlers = Regex.Matches(key, "MouseLeftButtonUp=\"(\\w+)\"").Select(m => m.Groups[1].Value).ToList();
+        Assert.Equal(new[] { "OnUseEmbeddedClick" }, handlers);
+    }
 }

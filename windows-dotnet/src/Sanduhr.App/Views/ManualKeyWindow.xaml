@@ -36,11 +36,12 @@
                      Foreground="{DynamicResource Sanduhr.Brush.Accent}"
                      TextDecorations="Underline" FontSize="11" />
             </TextBlock>
-            <TextBlock x:Name="HelpToggle" Margin="0,6,0,0" Cursor="Hand"
-                       MouseLeftButtonUp="OnHelpToggleClick">
-                <Run Text="Where do I find the sessionKey?"
-                     Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                     TextDecorations="Underline" FontSize="11" />
+            <TextBlock x:Name="HelpToggle" Margin="0,6,0,0">
+                <Hyperlink x:Name="HelpLink" Click="OnHelpToggleClick"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                           AutomationProperties.Name="Where do I find the sessionKey? Show the steps.">
+                    <Run Text="Where do I find the sessionKey?" FontSize="11" />
+                </Hyperlink>
             </TextBlock>
             <TextBlock x:Name="HelpSteps" Margin="0,6,0,0" Visibility="Collapsed"
                        TextWrapping="Wrap" FontSize="11"

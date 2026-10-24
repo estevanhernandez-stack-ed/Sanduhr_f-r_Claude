@@ -131,6 +131,31 @@ public sealed class AppWindowNamesTests : AppWindowFixture
     });
 
     [Fact]
+    public void TheKeyWindowsSessionKeyHelpIsAFocusableNamedLink() => AppHost.Run(() =>
+    {
+        var window = new ManualKeyWindow("Work", (_, _) => "", embeddedAvailable: false);
+        OffScreen(window);
+        window.Show();
+        try
+        {
+            window.UpdateLayout();
+            var link = Assert.IsType<System.Windows.Documents.Hyperlink>(window.FindName("HelpLink"));
+            var steps = Assert.IsType<System.Windows.Controls.TextBlock>(window.FindName("HelpSteps"));
+            Assert.True(link.Focusable, "the sessionKey help link can't take keyboard focus");
+            var name = System.Windows.Automation.AutomationProperties.GetName(link);
+            Assert.StartsWith("Where do I find the sessionKey?", name);
+            Assert.Contains(NamesOf(window), n => n.StartsWith("Where do I find the sessionKey?"));
+            Assert.Equal(Visibility.Collapsed, steps.Visibility);
+
+            link.RaiseEvent(new RoutedEventArgs(System.Windows.Documents.Hyperlink.ClickEvent));
+            Assert.Equal(Visibility.Visible, steps.Visibility);
+            link.RaiseEvent(new RoutedEventArgs(System.Windows.Documents.Hyperlink.ClickEvent));
+            Assert.Equal(Visibility.Collapsed, steps.Visibility);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public void TheSmallWindowsHaveNoTypeNames() => AppHost.Run(() =>
     {
         var windows = new List<Window>

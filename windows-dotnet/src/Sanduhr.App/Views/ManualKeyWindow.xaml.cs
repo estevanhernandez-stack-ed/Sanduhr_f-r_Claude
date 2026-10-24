@@ -98,8 +98,8 @@ internal partial class ManualKeyWindow : Window
         Close();
     }
 
-    /// <summary>Toggle the collapsed "Where do I find the sessionKey?" DevTools steps.</summary>
-    private void OnHelpToggleClick(object sender, MouseButtonEventArgs e)
+    /// <summary>Toggle the collapsed "Where do I find the sessionKey?" steps. A Hyperlink, so Tab reaches it and Enter opens it.</summary>
+    private void OnHelpToggleClick(object sender, RoutedEventArgs e)
         => HelpSteps.Visibility = HelpSteps.Visibility == Visibility.Visible
             ? Visibility.Collapsed
             : Visibility.Visible;
