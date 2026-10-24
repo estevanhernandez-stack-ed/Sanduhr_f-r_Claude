@@ -170,4 +170,53 @@ public class SettingsNamesTests
             + "or associated with Anthropic PBC.",
             SettingsNames.TrademarkNotice);
     }
+
+    [Fact]
+    public void Group_titles_follow_the_v2_sidebar()
+    {
+        // "Extend" holds Claude Code and Mods (it will hold widget packs too); "Desktop" no longer repeats its first page.
+        Assert.Equal(new string?[] { null, "Usage", "Extend", "Widget", "Desktop", "Help" },
+            SettingsNames.Sidebar.Select(g => g.Title).ToArray());
+    }
+
+    [Fact]
+    public void Titles_to_come_are_pinned_and_open_no_page_yet()
+    {
+        Assert.Equal(["Privacy", "Desk Look", "Watchers", "Launcher", "Mods & Widgets"], SettingsNames.TitlesToCome);
+        foreach (var title in SettingsNames.TitlesToCome)
+            Assert.Null(SettingsNames.Linked(title + " settings…"));
+    }
+
+    [Theory]
+    [InlineData("Turn it on in Settings, Desk, then place Watchers.")]
+    [InlineData("Sign in any time from Settings, Accounts.")]
+    [InlineData("(Settings, Now playing, Looks)")]
+    [InlineData("in the Sanduhr widget (Settings, Publish usage, Destination).")]
+    [InlineData("Settings, Claude Usage, Overview")]
+    [InlineData("You can take the tour again from Settings, About, or the tray menu.")]
+    [InlineData("Show in Explorer, settings, history and themes")]
+    [InlineData("has not turned on 'Let Claude show watchers' in Sanduhr (Settings, ")]
+    [InlineData("Settings, redesigned")]
+    [InlineData("")]
+    public void PathProblems_passes_real_places(string text) =>
+        Assert.Empty(SettingsNames.PathProblems(text));
+
+    [Theory]
+    [InlineData("(Settings, Desk, Watchers)", "no section \"Watchers\" on Desk")]
+    [InlineData("in Settings ▸ Claude Usage.", "\"Settings ▸\": write \"Settings, <Page>, <Section>\"")]
+    [InlineData("(Settings > Publish usage > Endpoint URL)", "\"Settings >\": write \"Settings, <Page>, <Section>\"")]
+    [InlineData("Open Settings, Privacy.", "no page \"Privacy\" after \"Settings, \"")]
+    public void PathProblems_names_the_problem(string text, string problem) =>
+        Assert.Contains(problem, SettingsNames.PathProblems(text));
+
+    [Fact]
+    public void PathProblems_flags_a_longer_unknown_title()
+    {
+        // "Desk Look" is not a page yet: the known title "Desk" must not let it through.
+        Assert.Contains("no page \"Desk Look\" after \"Settings, \"", SettingsNames.PathProblems("Settings, Desk Look, Font"));
+        // "Look" is a section of Desk, so the comma form is a real place.
+        Assert.Empty(SettingsNames.PathProblems("Settings, Desk, Look"));
+        // Lowercase prose after a page and a comma is not a title.
+        Assert.Empty(SettingsNames.PathProblems("Settings, About, or the tray menu"));
+    }
 }

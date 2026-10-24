@@ -182,7 +182,7 @@ public class SettingsIndexTests
     [Fact]
     public void Widgets_is_a_Desk_page_search_finds_by_its_words()
     {
-        Assert.Equal("Desk", SettingsNames.GroupTitle(SettingsPage.Widgets));
+        Assert.Equal("Desktop", SettingsNames.GroupTitle(SettingsPage.Widgets));
         Assert.Equal("Widgets", SettingsNames.PageTitle(SettingsPage.Widgets));
         Assert.Equal(SettingsPage.Widgets, SettingsIndex.Search("widgets")[0].Entry.Page);
         foreach (var (query, anchor) in new[]

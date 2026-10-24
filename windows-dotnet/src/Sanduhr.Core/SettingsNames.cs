@@ -20,16 +20,29 @@ public static class SettingsNames
     // ---- Pages ----
 
     /// <summary>The sidebar: six groups, each page once. Widget is not a page (Show me on a widget card
-    /// shows the widget itself).</summary>
+    /// shows the widget itself). Settings v2 names the groups: "Extend" (it will hold widget packs, which
+    /// are not Claude Code's) and "Desktop" (the Mac's word, and no longer its first page's title).</summary>
     public static IReadOnlyList<SettingsGroup> Sidebar { get; } =
     [
         new(null, [SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts]),
         new("Usage", [SettingsPage.History, SettingsPage.ClaudeUsage, SettingsPage.Publish]),
-        new("Claude Code", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
+        new("Extend", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Themes]),
-        new("Desk", [SettingsPage.Desk, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather, SettingsPage.Widgets]),
+        new("Desktop", [SettingsPage.Desk, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather, SettingsPage.Widgets]),
         new("Help", [SettingsPage.About]),
     ];
+
+    // ---- Page titles still to come (Settings v2). Unused until their slice adds the page: Privacy
+    // (slice 6), Desk Look, Watchers and Launcher (slice 3), Mods & Widgets (slice 4, the Mods page's new title).
+    public const string PrivacyTitle = "Privacy";
+    public const string DeskLookTitle = "Desk Look";
+    public const string WatchersTitle = "Watchers";
+    public const string LauncherTitle = "Launcher";
+    public const string ModsAndWidgetsTitle = "Mods & Widgets";
+
+    /// <summary>The titles above, in sidebar order of their future pages.</summary>
+    public static IReadOnlyList<string> TitlesToCome { get; } =
+        [PrivacyTitle, DeskLookTitle, WatchersTitle, LauncherTitle, ModsAndWidgetsTitle];
 
     /// <summary>Every page in sidebar order.</summary>
     public static IReadOnlyList<SettingsPage> Pages { get; } = [.. Sidebar.SelectMany(g => g.Pages)];
@@ -341,4 +354,70 @@ public static class SettingsNames
     private static bool IsWindowsOwn(string before) =>
         before.EndsWith("Windows Startup", StringComparison.Ordinal)
         || before.EndsWith("Notification", StringComparison.Ordinal);
+
+    /// <summary>
+    /// What is wrong with the places <paramref name="text"/> names, empty when nothing is. Prose names a
+    /// place one way only: "Settings, &lt;Page&gt;" or "Settings, &lt;Page&gt;, &lt;Section&gt;", where the
+    /// page is a sidebar title and the section is the title of one of that page's anchors in
+    /// <see cref="SettingsIndex"/>. "Settings ▸ X" and "Settings &gt; X" are the old forms. Only a
+    /// capitalised word after a comma is read as a page or section, so "Settings, About, or the tray
+    /// menu" and a literal that ends in "Settings, " pass. A known page title followed by another
+    /// capitalised word in the same segment ("Settings, Desk Look, Font") is a longer, unknown title and
+    /// is flagged as no page.
+    /// </summary>
+    public static IReadOnlyList<string> PathProblems(string text)
+    {
+        var found = new List<string>();
+        if (string.IsNullOrEmpty(text))
+            return found;
+        foreach (var old in new[] { "Settings ▸", "Settings >", "Settings ›" })
+        {
+            if (text.Contains(old, StringComparison.Ordinal))
+                found.Add($"\"{old}\": write \"Settings, <Page>, <Section>\"");
+        }
+        const string lead = "Settings, ";
+        int at = 0;
+        while ((at = text.IndexOf(lead, at, StringComparison.Ordinal)) >= 0)
+        {
+            at += lead.Length;
+            var rest = text[at..];
+            if (rest.Length == 0 || !char.IsUpper(rest[0]))
+                continue;
+            SettingsPage? page = null;
+            foreach (var p in Pages)
+            {
+                if (StartsWithWord(rest, PageTitle(p)) && (page is null || PageTitle(p).Length > PageTitle(page.Value).Length))
+                    page = p;
+            }
+            if (page is null)
+            {
+                found.Add($"no page \"{FirstWords(rest)}\" after \"Settings, \"");
+                continue;
+            }
+            var after = rest[PageTitle(page.Value).Length..];
+            // A capitalised word right after the matched title is part of a longer title we do not know.
+            if (after.Length > 1 && after[0] == ' ' && char.IsUpper(after[1]))
+            {
+                found.Add($"no page \"{FirstWords(rest)}\" after \"Settings, \"");
+                continue;
+            }
+            if (after.Length > 2 && after.StartsWith(", ", StringComparison.Ordinal) && char.IsUpper(after[2]))
+            {
+                var section = after[2..];
+                if (!SettingsIndex.EntriesOn(page.Value).Any(e => StartsWithWord(section, e.Title)))
+                    found.Add($"no section \"{FirstWords(section)}\" on {PageTitle(page.Value)}");
+            }
+        }
+        return found;
+    }
+
+    private static bool StartsWithWord(string text, string words) =>
+        text.StartsWith(words, StringComparison.Ordinal)
+        && (text.Length == words.Length || !char.IsLetterOrDigit(text[words.Length]));
+
+    private static string FirstWords(string text)
+    {
+        var end = text.IndexOfAny([',', '.', ')', ';', ':']);
+        return end < 0 ? text : text[..end];
+    }
 }

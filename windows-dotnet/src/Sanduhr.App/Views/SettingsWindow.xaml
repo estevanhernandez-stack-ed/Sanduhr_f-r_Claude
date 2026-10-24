@@ -1682,7 +1682,7 @@
                 <!-- Claude Code page (Stage 4.2): the folders Sanduhr knows and Sanduhr's pieces in each.
                      Every write goes through a consent dialog and only to the folder picked here. -->
                 <TabItem Header="Claude Code" Tag="ClaudeCode" AutomationProperties.Name="Claude Code" DataContext="{Binding ClaudeCodePage}"
-                         views:SettingsSidebar.GroupHeader="Claude Code">
+                         views:SettingsSidebar.GroupHeader="Extend">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="4,4,0,4">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False" Padding="12,10,16,10">
                             <ScrollViewer.Resources>
@@ -2309,7 +2309,7 @@
 
                 <!-- Desk (Stage 5): the clock and Claude meters on the desktop. Off by default; every
                      change saves at once and the running Desk follows. -->
-                <TabItem Header="Desk" Tag="Desk" AutomationProperties.Name="Desk" views:SettingsSidebar.GroupHeader="Desk"
+                <TabItem Header="Desk" Tag="Desk" AutomationProperties.Name="Desk" views:SettingsSidebar.GroupHeader="Desktop"
                          DataContext="{Binding Desk}">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
