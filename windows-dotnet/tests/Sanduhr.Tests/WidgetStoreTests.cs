@@ -175,6 +175,64 @@ public sealed class WidgetStoreTests : IDisposable
         Assert.False(store.Uninstall("../escape").Ok);
     }
 
+    // ---- InstalledOfKind (3.9.1: what the pickers read) ---------------------------------------------------------------
+
+    [Fact]
+    public void InstalledOfKind_returns_only_that_kind_ordered_by_id()
+    {
+        var store = Store();
+        foreach (var name in new[] { "good-theme", "good-palette", "good-font" })
+        {
+            var (files, manifest) = Valid("good", name);
+            Assert.True(store.Install(files, manifest, WidgetSource.Catalog).Ok);
+        }
+        var palettes = store.InstalledOfKind("palette");
+        var one = Assert.Single(palettes);
+        Assert.Equal("good-palette", one.Row.Id);
+        Assert.Equal("Fixture palette", one.Info.Name);
+        Assert.Equal(store.PackDir("good-palette"), one.Dir);
+        Assert.Equal(["good-theme"], store.InstalledOfKind("theme").Select(p => p.Row.Id));
+        Assert.Empty(store.InstalledOfKind("effects"));
+    }
+
+    [Fact]
+    public void InstalledOfKind_skips_a_disabled_pack()
+    {
+        var store = Store();
+        var (files, manifest) = Valid("good", "good-palette");
+        Assert.True(store.Install(files, manifest, WidgetSource.Catalog).Ok);
+        Assert.Single(store.InstalledOfKind("palette"));
+
+        File.WriteAllText(store.RegistryFile, File.ReadAllText(store.RegistryFile).Replace("\"enabled\": true", "\"enabled\": false"));
+        Assert.False(Assert.Single(store.Load().Packs).Enabled);
+        Assert.Empty(store.InstalledOfKind("palette"));
+    }
+
+    [Fact]
+    public void InstalledOfKind_skips_a_pack_with_a_missing_folder_or_a_broken_manifest()
+    {
+        var store = Store();
+        foreach (var name in new[] { "good-palette", "good-theme" })
+        {
+            var (files, manifest) = Valid("good", name);
+            Assert.True(store.Install(files, manifest, WidgetSource.Catalog).Ok);
+        }
+        // a malformed pack.json reads as no pack, a deleted folder too; the other kind is untouched
+        File.WriteAllText(Path.Combine(store.PackDir("good-palette"), "pack.json"), "{ not json");
+        Assert.Empty(store.InstalledOfKind("palette"));
+        Directory.Delete(store.PackDir("good-theme"), true);
+        Assert.Empty(store.InstalledOfKind("theme"));
+    }
+
+    [Fact]
+    public void InstalledOfKind_includes_a_claude_made_pack()
+    {
+        var store = Store();
+        var (files, manifest) = Valid("good", "good-palette");
+        Assert.True(store.Install(files, manifest, WidgetSource.Claude).Ok);
+        Assert.Equal(WidgetSource.Claude, Assert.Single(store.InstalledOfKind("palette")).Row.Source);
+    }
+
     [Fact]
     public void The_rollback_marker_only_moves_forward_and_survives_installs()
     {

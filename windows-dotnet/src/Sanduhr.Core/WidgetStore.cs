@@ -26,6 +26,10 @@ public sealed record InstalledWidget(string Id, string Version, WidgetSource Sou
 /// <summary>What Settings shows for an installed pack, read from its own <c>pack.json</c>.</summary>
 public sealed record InstalledWidgetInfo(string Name, string Kind, string Description, string? PreviewPath);
 
+/// <summary>One installed, enabled pack of a kind (<see cref="WidgetStore.InstalledOfKind"/>): its registry row, its own
+/// <c>pack.json</c> info and its folder.</summary>
+public sealed record InstalledPack(InstalledWidget Row, InstalledWidgetInfo Info, string Dir);
+
 /// <summary><c>widgets.json</c>: the installed packs and the newest catalog <c>generated_at</c> seen (the rollback
 /// marker, FORMAT 7 rule 2).</summary>
 public sealed record WidgetRegistry(string? CatalogSeen, IReadOnlyList<InstalledWidget> Packs)
@@ -218,6 +222,23 @@ public sealed class WidgetStore
             if (seen is not null && seen >= t) return;
             Save(reg with { CatalogSeen = generatedAt });
         }
+    }
+
+    /// <summary>
+    /// The installed packs of one kind (<c>theme</c>, <c>palette</c>, <c>font</c>, ...) that are enabled, ordered by id: what the
+    /// theme list, the Desk ink presets and the Desk fonts read. A pack whose folder is gone or whose <c>pack.json</c>
+    /// can't be read is skipped. Claude-made <c>my-</c> packs are rows like any other, so they flow through unchanged.
+    /// </summary>
+    public IReadOnlyList<InstalledPack> InstalledOfKind(string kind)
+    {
+        var found = new List<InstalledPack>();
+        foreach (var row in Load().Packs.Where(p => p.Enabled && IsSafeId(p.Id)).OrderBy(p => p.Id, StringComparer.Ordinal))
+        {
+            string dir = PackDir(row.Id);
+            if (Directory.Exists(dir) && ReadInfo(row.Id) is { } info && info.Kind == kind)
+                found.Add(new InstalledPack(row, info, dir));
+        }
+        return found;
     }
 
     /// <summary>The installed pack's name, kind, description and preview from its own pack.json, or null.</summary>

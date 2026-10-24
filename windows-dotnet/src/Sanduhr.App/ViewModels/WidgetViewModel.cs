@@ -771,14 +771,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>Rebuild the merged theme map: the 6 built-ins plus any valid user
     /// drop-ins from <c>%APPDATA%\Sanduhr\themes</c> (user themes override a
-    /// built-in of the same key). Invalid files are skipped + logged, 1:1 with
+    /// built-in of the same key), then the themes of installed theme packs keyed
+    /// <c>&lt;packId&gt;:&lt;stem&gt;</c>. Invalid files are skipped + logged, 1:1 with
     /// <c>themes.load_user_themes</c>.</summary>
     private void RebuildThemeMap()
     {
-        var map = new Dictionary<string, ThemeDefinition>(ThemeCatalog.BuiltIns);
-        foreach (var (key, def) in ThemeCatalog.LoadUserThemes(_paths.ThemesDir, Log))
-            map[key] = def;
-        _themes = map;
+        _themes = PackThemes.Merged(_paths.ThemesDir, new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng), Log);
     }
 
     /// <summary>Rebuild the swatch collection: built-ins in display order, then any
@@ -874,13 +872,16 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     public bool LoadThemesStudioMode() => _settings.LoadThemesStudioMode();
     public void SaveThemesStudioMode(bool on) => _settings.SaveThemesStudioMode(on);
 
-    /// <summary>Reload user theme drop-ins from disk and rebuild the strip,
-    /// keeping the current theme active. Called from the Settings Themes tab after
-    /// a save / reload / delete.</summary>
+    /// <summary>Reload user theme drop-ins and installed theme packs from disk and rebuild the strip,
+    /// keeping the current theme active, or switching to Obsidian when it is gone. Called from the
+    /// Settings Themes tab after a save / reload / delete, and after a widget pack is installed or removed.</summary>
     public void ReloadUserThemes()
     {
         RebuildThemeMap();
         BuildThemeStrip(_palette.Key);
+        // The theme in use is gone (its pack was uninstalled, or its file deleted): Obsidian now, not at the next launch.
+        if (!_themes.ContainsKey(_palette.Key))
+            ApplyThemeByKey("obsidian");
     }
 
     private static void Log(string message) => Debug.WriteLine($"[Sanduhr.Themes] {message}");

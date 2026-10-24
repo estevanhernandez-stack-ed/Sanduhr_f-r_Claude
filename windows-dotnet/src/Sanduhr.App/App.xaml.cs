@@ -690,7 +690,8 @@ public partial class App : Application
         // get_desk reports the weather nickname (#315), so a change rewrites desk-state.json too.
         svm.WeatherPage.Changed = () => { _desk?.Reload(); _deskDesign?.Refresh(); };
         // The companion (spec 3.8 section 4): a new pick, roaming, an install or uninstall, or the piece shown or hidden.
-        svm.WidgetsPage.Changed = () => { _desk?.Reload(); svm.Desk.Reload(); };
+        // 3.9.1: it also reloads the theme list, since an installed theme pack joins it and an uninstalled one leaves it.
+        svm.WidgetsPage.Changed = () => { _vm?.ReloadUserThemes(); _desk?.Reload(); svm.Desk.Reload(); };
         svm.MessageChanged = () => { _desk?.Reload(); _handoff?.PublishState(); };
         svm.Desk.WatchersChanged = () => _watchers?.SwitchChanged();
         svm.Desk.CiRunnersChanged = () => _runners?.Refresh();

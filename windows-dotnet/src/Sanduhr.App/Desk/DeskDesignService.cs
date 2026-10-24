@@ -266,13 +266,9 @@ internal sealed class DeskDesignService : IDisposable
         }
     }
 
-    /// <summary>The built-in themes and the user's.</summary>
-    private Dictionary<string, ThemeDefinition> ThemeMap()
-    {
-        var map = new Dictionary<string, ThemeDefinition>(ThemeCatalog.BuiltIns);
-        foreach (var (k, def) in ThemeCatalog.LoadUserThemes(_paths.ThemesDir)) map[k] = def;
-        return map;
-    }
+    /// <summary>The built-in themes, the user's and the installed theme packs'.</summary>
+    private Dictionary<string, ThemeDefinition> ThemeMap() =>
+        PackThemes.Merged(_paths.ThemesDir, new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng));
 
     private bool FontInstalled(string family)
     {
