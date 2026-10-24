@@ -310,7 +310,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     public event Func<Task>? PasteKeyRequested;
 
     /// <summary>Raised by the "Settings…" command (title-bar chip, widget right-click,
-    /// tray) — App opens the <c>SettingsWindow</c> on the Accounts tab.</summary>
+    /// tray). App opens the <c>SettingsWindow</c>; which page it lands on is App's rule.</summary>
     public event Func<Task>? SettingsRequested;
 
     /// <summary>Raised by <see cref="OpenSettingsAtAsync"/> — App opens (or focuses) Settings

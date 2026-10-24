@@ -94,18 +94,27 @@ public class SettingsIndexTests
     }
 
     [Fact]
-    public void Csv_first_hit_is_History_export_because_its_title_matches()
+    public void Csv_first_hit_is_the_meter_history_export()
     {
-        // "Export CSV..." has the word csv in its TITLE (rank 0), so it outranks the Sessions
-        // ledger, whose only link to csv is a synonym (rank 1). Rank sorts first, so this is not
-        // even a tie broken by sidebar order; History would also win a tie (History before Claude Usage).
+        // "Export meter history…" has no "csv" in its title any more; both exports match "csv" through a
+        // synonym (rank 1), and the tie goes to sidebar order: History before Claude Usage.
         var top = Top("csv");
-        Assert.Equal(0, top.Rank);
+        Assert.Equal(1, top.Rank);
         Assert.Equal(SettingsPage.History, top.Entry.Page);
         Assert.Equal(SettingsIndex.HistoryExport, top.Entry.Anchor);
+        Assert.Equal(SettingsNames.ExportMeterHistory, top.Entry.Title);
         Assert.Contains(SettingsIndex.Search("csv"),
             h => h.Entry.Page == SettingsPage.ClaudeUsage && h.Entry.Anchor == SettingsIndex.Sessions && h.Rank == 1);
     }
+
+    [Theory]
+    [InlineData("vault", SettingsPage.ClaudeUsage, SettingsIndex.Vault)]
+    [InlineData("history vault", SettingsPage.ClaudeUsage, SettingsIndex.Vault)]
+    [InlineData("homes", SettingsPage.Publish, SettingsIndex.Homes)]
+    [InlineData("export", SettingsPage.History, SettingsIndex.HistoryExport)]
+    [InlineData("meter history", SettingsPage.History, SettingsIndex.HistoryExport)]
+    public void Old_words_still_find_the_renamed_controls(string query, SettingsPage page, string anchor) =>
+        Assert.Contains(SettingsIndex.Search(query), h => h.Entry.Page == page && h.Entry.Anchor == anchor);
 
     [Fact]
     public void Endpoint_leads_with_the_Publish_page_row_then_Destination()
@@ -182,7 +191,7 @@ public class SettingsIndexTests
     [Fact]
     public void Widgets_is_a_Desk_page_search_finds_by_its_words()
     {
-        Assert.Equal("Desk", SettingsNames.GroupTitle(SettingsPage.Widgets));
+        Assert.Equal("Desktop", SettingsNames.GroupTitle(SettingsPage.Widgets));
         Assert.Equal("Widgets", SettingsNames.PageTitle(SettingsPage.Widgets));
         Assert.Equal(SettingsPage.Widgets, SettingsIndex.Search("widgets")[0].Entry.Page);
         foreach (var (query, anchor) in new[]

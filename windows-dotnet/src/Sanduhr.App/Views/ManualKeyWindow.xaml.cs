@@ -1,5 +1,4 @@
 using System.Windows;
-using System.Windows.Input;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.Views;
@@ -91,16 +90,23 @@ internal partial class ManualKeyWindow : Window
     /// <summary>"Use the secure sign-in window instead" — close with a UseEmbedded
     /// result so the coordinator bounces to the embedded sign-in flow. Only visible
     /// when the WebView2 runtime is present.</summary>
-    private void OnUseEmbeddedClick(object sender, MouseButtonEventArgs e)
+    private void OnUseEmbeddedClick(object sender, RoutedEventArgs e)
     {
         Result = new SignInResult.UseEmbedded();
         DialogResult = false; // close; the coordinator reads Result, not DialogResult
         Close();
     }
 
-    /// <summary>Toggle the collapsed "Where do I find the sessionKey?" DevTools steps.</summary>
-    private void OnHelpToggleClick(object sender, MouseButtonEventArgs e)
+    /// <summary>Toggle the collapsed "Where do I find the sessionKey?" steps. A Hyperlink, so Tab reaches it and Enter opens it.</summary>
+    private void OnHelpToggleClick(object sender, RoutedEventArgs e)
         => HelpSteps.Visibility = HelpSteps.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+
+    /// <summary>Shows or hides the cf_clearance field behind "Seeing a Cloudflare error?" (WF31). A Hyperlink, so
+    /// Tab reaches it and Enter opens it.</summary>
+    private void OnCloudflareToggleClick(object sender, RoutedEventArgs e)
+        => CloudflarePanel.Visibility = CloudflarePanel.Visibility == Visibility.Visible
             ? Visibility.Collapsed
             : Visibility.Visible;
 

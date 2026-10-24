@@ -827,7 +827,7 @@ public sealed class SettingsStore
         Write(root);
     }
 
-    /// <summary>"Let agents show watchers" (spec 6.9): <c>watchers_agents</c>, absent = off. The MCP tools
+    /// <summary>"Let Claude show watchers" (spec 6.9): <c>watchers_agents</c>, absent = off. The MCP tools
     /// <c>watch_start</c>, <c>watch_update</c> and <c>watch_end</c> write nothing while it is off.</summary>
     public bool LoadWatchersAgents() => ReadBool(Read(), "watchers_agents", false);
 
@@ -1028,7 +1028,7 @@ public sealed class SettingsStore
 
     public void SaveWhatsNewInstalledVersion(string version) => WriteString("whats_new_installed_version", version);
 
-    /// <summary>"Don't show after updates" (default false).</summary>
+    /// <summary>"Don't show What's New after updates" (default false).</summary>
     public bool LoadWhatsNewHideAfterUpdates()
     {
         try { return Read()["whats_new_hide_after_updates"]?.GetValue<bool>() ?? false; }

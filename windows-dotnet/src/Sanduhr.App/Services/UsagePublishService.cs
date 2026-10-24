@@ -161,17 +161,17 @@ public sealed class UsagePublishService
         if (!s.Enabled)
         {
             payload = Typed("disabled", "publishing_off",
-                "Publishing is off. Turn on 'Publish daily' in the Sanduhr widget (Settings > Publish usage).");
+                "Publishing is off. Turn on 'Publish daily at' in the Sanduhr widget (Settings, Publish usage, Publish daily).");
         }
         else if (!s.HasEndpoint)
         {
             payload = Typed("no_endpoint", "no_endpoint_url",
-                "No publish endpoint is configured. Set one in the Sanduhr widget (Settings > Publish usage > Endpoint URL, or pick a preset).");
+                "No publish endpoint is configured. Set the Endpoint URL, or pick a preset, in the Sanduhr widget (Settings, Publish usage, Destination).");
         }
         else if (s.AuthScheme != PublishAuthScheme.None && !HasToken)
         {
             payload = Typed("no_token", "no_publish_token",
-                "No publish token is stored for the publish endpoint. Add one in the Sanduhr widget (Settings > Publish usage > Set token).");
+                "No publish token is stored for the publish endpoint. Add one with Set token… in the Sanduhr widget (Settings, Publish usage, Token).");
         }
         else
         {

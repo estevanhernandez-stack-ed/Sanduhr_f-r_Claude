@@ -39,10 +39,10 @@ public static class WelcomeTour
     public static IReadOnlyList<TourCard> Table { get; } =
     [
         new(1, new WhatsNewCard([], "paced", "Your limits, paced",
-            "Each bar is one of your limits, filling as you use it. The tick marks where an even pace would put you right now.",
+            "The widget is the small floating window with your meters, one bar per limit. The tick on each bar marks where an even pace would put you right now.",
             "\uE9D2", WhatsNewPreview.Meters, SettingsPage.Widget)),
         new(2, new WhatsNewCard([], "desk", "On your desktop",
-            "The Desk puts a clock, your meters, a message and more on the desktop, under every window. Arrange each piece from Settings, Desk.",
+            "The Desk is the clock, meters and pieces Sanduhr draws on your desktop, under every window. A piece is one thing on the Desk, and you arrange each from Settings, Desk.",
             "\uE7F4", WhatsNewPreview.None, SettingsPage.Desk)),
         new(3, new WhatsNewCard([], "tray", "At a glance",
             "The hourglass in the tray shows a percent: your session, your weekly limit, whichever is higher, both in turn, or the highest of any.",
@@ -51,7 +51,7 @@ public static class WelcomeTour
             "Add each Claude account with its own sign-in and history, then switch from the name chip or the tray's Accounts menu.",
             "\uE716", WhatsNewPreview.AccountChip, SettingsPage.Accounts)),
         new(5, new WhatsNewCard([], "claude-code", "Claude Code, connected",
-            "The Claude Usage page shows your Claude Code tokens by day and project. The Claude Code page adds the MCP tools and the statusline, each after you say yes.",
+            "The Claude Usage page shows your Claude Code tokens by day and project. The Claude Code page adds the MCP tools, the statusline and a mod, an add-on that Claude Code loads, each after you say yes.",
             "\uEA86", WhatsNewPreview.None, SettingsPage.ClaudeCode)),
     ];
 

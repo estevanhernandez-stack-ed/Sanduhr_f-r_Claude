@@ -170,4 +170,217 @@ public class SettingsNamesTests
             + "or associated with Anthropic PBC.",
             SettingsNames.TrademarkNotice);
     }
+
+    [Fact]
+    public void Group_titles_follow_the_v2_sidebar()
+    {
+        // "Extend" holds Claude Code and Mods (it will hold widget packs too); "Desktop" no longer repeats its first page.
+        Assert.Equal(new string?[] { null, "Usage", "Extend", "Widget", "Desktop", "Help" },
+            SettingsNames.Sidebar.Select(g => g.Title).ToArray());
+    }
+
+    [Fact]
+    public void Titles_to_come_are_pinned_and_open_no_page_yet()
+    {
+        Assert.Equal(["Privacy", "Desk Look", "Watchers", "Launcher", "Mods & Widgets"], SettingsNames.TitlesToCome);
+        foreach (var title in SettingsNames.TitlesToCome)
+            Assert.Null(SettingsNames.Linked(title + " settings…"));
+    }
+
+    [Theory]
+    [InlineData("Turn it on in Settings, Desk, then place Watchers.")]
+    [InlineData("Sign in any time from Settings, Accounts.")]
+    [InlineData("(Settings, Now playing, Looks)")]
+    [InlineData("in the Sanduhr widget (Settings, Publish usage, Destination).")]
+    [InlineData("Settings, Claude Usage, Overview")]
+    [InlineData("You can take the tour again from Settings, About, or the tray menu.")]
+    [InlineData("Show in Explorer, settings, history and themes")]
+    [InlineData("has not turned on 'Let Claude show watchers' in Sanduhr (Settings, ")]
+    [InlineData("Settings, redesigned")]
+    [InlineData("")]
+    public void PathProblems_passes_real_places(string text) =>
+        Assert.Empty(SettingsNames.PathProblems(text));
+
+    [Theory]
+    [InlineData("(Settings, Desk, Watchers)", "no section \"Watchers\" on Desk")]
+    [InlineData("in Settings ▸ Claude Usage.", "\"Settings ▸\": write \"Settings, <Page>, <Section>\"")]
+    [InlineData("(Settings > Publish usage > Endpoint URL)", "\"Settings >\": write \"Settings, <Page>, <Section>\"")]
+    [InlineData("Open Settings, Privacy.", "no page \"Privacy\" after \"Settings, \"")]
+    [InlineData("(Settings → Accounts to add or remove)", "\"Settings →\": write \"Settings, <Page>, <Section>\"")]
+    public void PathProblems_names_the_problem(string text, string problem) =>
+        Assert.Contains(problem, SettingsNames.PathProblems(text));
+
+    [Fact]
+    public void PathProblems_flags_a_longer_unknown_title()
+    {
+        // "Desk Look" is not a page yet: the known title "Desk" must not let it through.
+        Assert.Contains("no page \"Desk Look\" after \"Settings, \"", SettingsNames.PathProblems("Settings, Desk Look, Font"));
+        // "Look" is a section of Desk, so the comma form is a real place.
+        Assert.Empty(SettingsNames.PathProblems("Settings, Desk, Look"));
+        // Lowercase prose after a page and a comma is not a title.
+        Assert.Empty(SettingsNames.PathProblems("Settings, About, or the tray menu"));
+    }
+
+    [Fact]
+    public void PathProblems_flags_a_longer_unknown_section_title()
+    {
+        // The page rule, applied to sections: "Look" is a real section of Desk, "Look Ahead" is not.
+        Assert.Contains("no section \"Look Ahead\" on Desk", SettingsNames.PathProblems("(Settings, Desk, Look Ahead)"));
+        Assert.Empty(SettingsNames.PathProblems("(Settings, Desk, Look)"));
+        Assert.Empty(SettingsNames.PathProblems("Settings, Desk, Look and feel"));
+        Assert.Empty(SettingsNames.PathProblems("Settings, Claude Code, Folders to share"));
+    }
+
+    [Fact]
+    public void The_old_consent_copy_is_retired_and_the_shortcut_name_has_one_source()
+    {
+        Assert.Equal(["Keep a local usage history"], SettingsNames.RetiredNames("Keep a local usage history?"));
+        Assert.Equal(["Keep history"], SettingsNames.RetiredNames("Keep history"));
+        Assert.Empty(SettingsNames.RetiredNames("Keep a local session archive?"));
+        // Two literals name the same control; nothing else ties them.
+        Assert.Equal(SettingsNames.ShortcutToOpenSettings, HotKeys.Name(HotKeyAction.Settings));
+    }
+
+    [Fact]
+    public void Names_that_match_their_labels_are_pinned()
+    {
+        Assert.Equal("Desk font", SettingsNames.DeskFont);
+        Assert.Equal("Message font", SettingsNames.MessageFont);
+        Assert.Equal("Message color", SettingsNames.MessageColor);
+        Assert.Equal("Clock, date, Claude", SettingsNames.DeskInkPicker);
+        Assert.Equal("Close Settings", SettingsNames.CloseSettings);
+        Assert.Equal("Let Claude read this folder's project totals", SettingsNames.LetClaudeReadTotals);
+        Assert.Equal(["Claude can read this folder's project totals"],
+            SettingsNames.RetiredNames("Claude can read this folder's project totals (MCP)"));
+    }
+
+    [Theory]
+    [InlineData(@"~\.claude")]
+    [InlineData(@"D:\Work Stuff\my claude seat")]
+    [InlineData(@"C:\Users\someone-with-a-very-long-profile-name\AppData\Roaming\claude-code\.claude-work")]
+    public void The_folder_formatters_keep_the_whole_folder(string folder)
+    {
+        Assert.Equal("Forget folder " + folder, SettingsNames.ForgetFolderFor(folder));
+        Assert.Equal("Let Claude read this folder's project totals, " + folder, SettingsNames.LetClaudeReadTotalsFor(folder));
+    }
+
+    [Fact]
+    public void The_agent_switches_say_Claude()
+    {
+        Assert.Equal("Let Claude show watchers", SettingsNames.WatchersSwitch);
+        Assert.Equal(["Let agents show watchers"], SettingsNames.RetiredNames("turned on Let agents show watchers"));
+    }
+
+    [Fact]
+    public void History_and_archive_names_are_pinned()
+    {
+        Assert.Equal("Export meter history…", SettingsNames.ExportMeterHistory);
+        Assert.Equal(SettingsNames.ExportMeterHistory, SettingsNames.ExportCsv);
+        Assert.Equal("Export sessions…", SettingsNames.ExportSessions);
+        Assert.Equal("Session archive", SettingsNames.SessionArchive);
+        Assert.Equal("Erase session archive…", SettingsNames.EraseSessionArchive);
+        Assert.Equal("Open archive folder", SettingsNames.OpenArchiveFolder);
+        Assert.Equal("Folders to share (off until you tick them)", SettingsNames.FoldersToShare);
+        Assert.Equal("Nothing archived yet.", SettingsNames.NothingArchivedYet);
+        Assert.Equal("Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, glow hook)", SettingsNames.ResetClaudeCodeEntries);
+        Assert.Equal("Meter history and the session archive", SettingsNames.ResetMeterHistory);
+        foreach (var old in new[] { "Export CSV…", "History vault", "Usage vault", "Erase archive", "Open vault folder", "Homes to share", "(statusline, MCP server)", "Usage history and the vault" })
+            Assert.NotEmpty(SettingsNames.RetiredNames(old));
+    }
+
+    [Fact]
+    public void Page_copy_names_are_pinned_and_the_old_ones_retired()
+    {
+        Assert.Equal("Desk: a clock, your meters, a message and more on the desktop", SettingsNames.DeskSwitch);
+        Assert.Equal("Claude Code glow hook", SettingsNames.ClaudeCodeGlowHook);
+        Assert.Equal("Installed, but not the current version.", SettingsNames.PieceOutdated);
+        Assert.Equal("Once the statusline or meters are installed here, they show this account's meters.", SettingsNames.LinkedAccountCaption);
+        Assert.Equal("Claude Code keeps transcripts for", SettingsNames.TranscriptsKept);
+        Assert.Equal("This theme's JSON is valid.", SettingsNames.ThemeJsonValid);
+        Assert.Equal("Save the theme as", SettingsNames.SaveThemeAs);
+        Assert.Equal("Play the cooldown snake's sound at 100%", SettingsNames.SnakeSoundAtFull);
+        foreach (var old in new[] { "Desk: the clock and your Claude meters on the desktop", "Glow when Claude needs you",
+                     "Install again to update it.", "History kept", "Looks good", "Save as:", "100% plays the ! (you know the one)" })
+            Assert.NotEmpty(SettingsNames.RetiredNames(old));
+        Assert.Empty(SettingsNames.RetiredNames("Looks good to me")); // "Looks good" is whole-string only
+    }
+
+    [Fact]
+    public void Menu_names_are_pinned_and_their_old_forms_retired()
+    {
+        Assert.Equal("Compact mode", SettingsNames.CompactMode);
+        Assert.Equal("Deep Work", SettingsNames.DeepWork);
+        Assert.Equal("Cooldown snake", SettingsNames.CooldownSnake);
+        Assert.Equal("Refresh usage now", SettingsNames.RefreshUsageNow);
+        Assert.Equal("Settings…", SettingsNames.OpenSettings);
+        Assert.Equal("Quit Sanduhr", SettingsNames.QuitSanduhr);
+        Assert.Equal("Hide this limit", SettingsNames.HideThisLimit);
+        Assert.Equal("Message settings…", SettingsNames.LinkTitle(SettingsPage.DeskMessage));
+        foreach (var old in new[] { "Compact Mode", "Expand", "Deep Work (Focus)", "Deep Work focus timer (Ctrl+P)",
+                     "Cooldown Snake", "Cooldown snake game", "Hide this tier", "Edit messages…" })
+            Assert.NotEmpty(SettingsNames.RetiredNames(old));
+        Assert.Empty(SettingsNames.RetiredNames("Expand the list")); // "Expand" is whole-string only
+    }
+
+    [Fact]
+    public void The_widget_and_What_s_New_window_names_are_pinned_and_their_old_forms_retired()
+    {
+        Assert.Equal("Graph style", SettingsNames.GraphStyle);
+        Assert.Equal("Keep the widget on top", SettingsNames.KeepWidgetOnTop);
+        Assert.Equal("Don't show What's New after updates", SettingsNames.HideWhatsNewAfterUpdates);
+        foreach (var old in new[] { "Cycle graph style", "Pin on top", "Pin always on top", "Don't show after updates" })
+            Assert.NotEmpty(SettingsNames.RetiredNames(old));
+        Assert.Empty(SettingsNames.RetiredNames(SettingsNames.HideWhatsNewAfterUpdates));
+    }
+
+    [Fact]
+    public void Message_modes_are_List_and_Text()
+    {
+        Assert.Equal("List", SettingsNames.MessageModeList);
+        Assert.Equal("Text", SettingsNames.MessageModeText);
+        Assert.NotEmpty(SettingsNames.RetiredNames("Edit as text…"));
+        Assert.NotEmpty(SettingsNames.RetiredNames("Back to the list"));
+    }
+
+    [Fact]
+    public void Follow_caption_says_how_long_a_manual_switch_pauses_it()
+    {
+        Assert.Equal(
+            "Every 15 minutes Sanduhr checks your other signed-in accounts and switches to the one whose session is climbing. "
+            + "A manual switch pauses it for up to 3 hours, or until that account sits idle for 30 minutes.",
+            SettingsNames.FollowAccountCaption);
+        Assert.Equal("Pick an account to switch, rename, update or remove it.", SettingsNames.PickAnAccount);
+    }
+
+    [Fact]
+    public void Key_help_is_plain_steps_for_Edge_and_Chrome()
+    {
+        Assert.Contains("Edge", SettingsNames.ManualKeySteps);
+        Assert.Contains("Chrome", SettingsNames.ManualKeySteps);
+        Assert.Contains("sessionKey", SettingsNames.ManualKeySteps);
+        Assert.DoesNotContain("→", SettingsNames.ManualKeySteps);
+        Assert.DoesNotContain("DevTools", SettingsNames.ManualKeySteps);
+        Assert.Equal("Seeing a Cloudflare error?", SettingsNames.ManualKeyCloudflareToggle);
+        Assert.Contains("cf_clearance", SettingsNames.ManualKeyCloudflareHelp);
+        Assert.Equal("cf_clearance", SettingsNames.ManualKeyCfLabel);
+    }
+
+    [Fact]
+    public void Core_words_are_defined_once()
+    {
+        Assert.Equal(
+            new (string, string)[]
+            {
+                ("Desk", "the clock, meters and pieces Sanduhr draws on your desktop"),
+                ("Widget", "the small floating window with your meters"),
+                ("Piece", "one thing on the Desk"),
+                ("Watchers", "cards that show work in progress, from Claude or your CI"),
+                ("Companion", "a small animated sprite on the Desk"),
+                ("Mod", "an add-on that Claude Code loads"),
+                ("Widget pack", "an add-on for Sanduhr: a theme, colors, a font or a companion"),
+            },
+            SettingsNames.CoreWords);
+        Assert.Equal("The Desk is the clock, meters and pieces Sanduhr draws on your desktop.", SettingsNames.DeskLine);
+        Assert.Equal("A widget pack is an add-on for Sanduhr: a theme, colors, a font or a companion.", SettingsNames.WidgetPackLine);
+    }
 }

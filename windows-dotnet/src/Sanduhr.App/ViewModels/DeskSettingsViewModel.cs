@@ -271,10 +271,10 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
 
     public bool IsCustomInk => InkChoice.Mode == DeskInkMode.Custom;
 
-    /// <summary>Raised after "Let agents show watchers" is saved (App writes watchers.json and, off, clears the cards).</summary>
+    /// <summary>Raised after "Let Claude show watchers" is saved (App writes watchers.json and, off, clears the cards).</summary>
     public Action? WatchersChanged { get; set; }
 
-    /// <summary>"Let agents show watchers" (spec 6.9): off by default; saved at once.</summary>
+    /// <summary>"Let Claude show watchers" (spec 6.9): off by default; saved at once.</summary>
     public bool WatchersAgents
     {
         get => _store.LoadWatchersAgents();

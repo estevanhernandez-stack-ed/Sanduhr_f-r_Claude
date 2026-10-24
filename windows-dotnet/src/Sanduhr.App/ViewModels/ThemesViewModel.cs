@@ -130,7 +130,7 @@ public sealed partial class ThemesViewModel : ObservableObject
         int errors = lint.Errors.Count(), warnings = lint.Warnings.Count();
         PasteSummary = errors > 0 ? $"{errors} to fix before this theme can be applied"
             : warnings > 0 ? $"Applies, with {warnings} design {(warnings == 1 ? "note" : "notes")}"
-            : "Looks good";
+            : SettingsNames.ThemeJsonValid;
     }
 
     [RelayCommand]

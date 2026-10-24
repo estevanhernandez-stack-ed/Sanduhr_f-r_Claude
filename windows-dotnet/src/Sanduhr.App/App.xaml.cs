@@ -116,7 +116,7 @@ public partial class App : Application
         StartGlow();
         StartDesk();
 
-        // Usage vault (WS-C): consent resolves BEFORE the service attaches —
+        // Session archive (WS-C): consent resolves BEFORE the service attaches —
         // attach order is the consent gate; Start()'s first fetch cycle then
         // kicks the initial backfill through the attached service.
         var vaultService = new VaultService(new SettingsStore(new Sanduhr.Core.Paths()), _vm.CcReader);
@@ -125,7 +125,7 @@ public partial class App : Application
         _vm.AttachVaultService(vaultService);
 
         // Publish usage: everything defaults off (toggle + every home, no endpoint),
-        // so attaching is inert until the user opts in under Settings > Publish usage.
+        // so attaching is inert until the user opts in under Settings, Publish usage.
         // The publish token rides the same Credential Manager seam as the accounts.
         _vm.AttachPublishService(new UsagePublishService(
             new SettingsStore(new Sanduhr.Core.Paths()),
@@ -417,7 +417,7 @@ public partial class App : Application
         _putBackItem.Click += (_, _) => _deskDesign?.PutBack();
         menu.Opened += (_, _) => _putBackItem.Visibility = _deskDesign?.CanPutBack == true ? Visibility.Visible : Visibility.Collapsed;
 
-        var refresh = new MenuItem { Header = "Refresh" };
+        var refresh = new MenuItem { Header = SettingsNames.RefreshUsageNow };
         refresh.Click += (_, _) => _vm?.RefreshCommand.Execute(null);
 
         // Accounts ▸ quick-switch submenu — repopulated on open so the live registry
@@ -434,17 +434,17 @@ public partial class App : Application
         addAccount.Click += async (_, _) => await RunSignInAsync(embedded: true);
 
         // Focus + Game affordances (parity with widget.py's tray entries).
-        var focus = new MenuItem { Header = "Deep Work (Focus)" };
+        var focus = new MenuItem { Header = SettingsNames.DeepWork };
         focus.Click += (_, _) => _vm?.ToggleFocusCommand.Execute(null);
 
-        var game = new MenuItem { Header = "Cooldown Snake" };
+        var game = new MenuItem { Header = SettingsNames.CooldownSnake };
         game.Click += (_, _) =>
         {
             ShowWindow();
             _vm?.StartGameCommand.Execute(null);
         };
 
-        var quit = new MenuItem { Header = "Quit Sanduhr" };
+        var quit = new MenuItem { Header = SettingsNames.QuitSanduhr };
         quit.Click += (_, _) => QuitApp();
 
         // Only while an update waits (3.8 spec 8b): the same Restart to update as the toast and the widget.
@@ -557,7 +557,7 @@ public partial class App : Application
         _handoff = new Desk.DeskMessageHandoffService(paths, _messages.FilePath, store);
         Desk.DeskMessageHandoffService.Current = _handoff;
         _handoff.Start(); // Claude's suggested Desk messages (spec 6.9)
-        // Watchers (spec 6.9): agents' cards, only while "Let agents show watchers" is on; in memory only.
+        // Watchers (spec 6.9): agents' cards, only while "Let Claude show watchers" is on; in memory only.
         _watchers = new Desk.WatcherStore(paths, store.LoadWatchersAgents, () => vm.IsDemo);
         _watchers.WaitingStarted += () =>
         {

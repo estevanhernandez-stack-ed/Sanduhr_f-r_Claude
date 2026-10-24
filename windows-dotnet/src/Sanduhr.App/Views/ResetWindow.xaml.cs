@@ -54,9 +54,9 @@ internal partial class ResetWindow : Window
     /// <summary>The five names, as the check boxes carry them.</summary>
     public static string PartLabel(ResetPart part) => part switch
     {
-        ResetPart.ClaudeCodeEntries => "Sanduhr's entries in Claude Code (statusline, MCP server)",
+        ResetPart.ClaudeCodeEntries => SettingsNames.ResetClaudeCodeEntries,
         ResetPart.Accounts => "Accounts and sign-in keys",
-        ResetPart.History => "Usage history and the vault",
+        ResetPart.History => SettingsNames.ResetMeterHistory,
         ResetPart.Themes => "Your themes and widgets",
         ResetPart.Settings => "Settings",
         _ => "",

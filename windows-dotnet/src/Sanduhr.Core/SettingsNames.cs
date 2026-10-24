@@ -11,7 +11,7 @@ public sealed record SettingsGroup(string? Title, IReadOnlyList<SettingsPage> Pa
 ///
 /// Casing: the words follow the Mac, the casing follows Windows. Commands and control labels are
 /// sentence case ("Take the tour…", "Sign in"), as Windows writes its own. Proper names keep their
-/// capitals: Claude, Claude Code, Sanduhr, What's New (the window's name), Deep Work, Cooldown Snake.
+/// capitals: Claude, Claude Code, Sanduhr, What's New (the window's name), Deep Work. The cooldown snake is a game, not a name.
 /// Page titles stay as they shipped ("Claude Usage", "Publish usage"): PRIVACY.md and the Store copy
 /// quote them.
 /// </summary>
@@ -20,16 +20,29 @@ public static class SettingsNames
     // ---- Pages ----
 
     /// <summary>The sidebar: six groups, each page once. Widget is not a page (Show me on a widget card
-    /// shows the widget itself).</summary>
+    /// shows the widget itself). Settings v2 names the groups: "Extend" (it will hold widget packs, which
+    /// are not Claude Code's) and "Desktop" (the Mac's word, and no longer its first page's title).</summary>
     public static IReadOnlyList<SettingsGroup> Sidebar { get; } =
     [
         new(null, [SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts]),
         new("Usage", [SettingsPage.History, SettingsPage.ClaudeUsage, SettingsPage.Publish]),
-        new("Claude Code", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
+        new("Extend", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Themes]),
-        new("Desk", [SettingsPage.Desk, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather, SettingsPage.Widgets]),
+        new("Desktop", [SettingsPage.Desk, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather, SettingsPage.Widgets]),
         new("Help", [SettingsPage.About]),
     ];
+
+    // ---- Page titles still to come (Settings v2). Unused until their slice adds the page: Privacy
+    // (slice 6), Desk Look, Watchers and Launcher (slice 3), Mods & Widgets (slice 4, the Mods page's new title).
+    public const string PrivacyTitle = "Privacy";
+    public const string DeskLookTitle = "Desk Look";
+    public const string WatchersTitle = "Watchers";
+    public const string LauncherTitle = "Launcher";
+    public const string ModsAndWidgetsTitle = "Mods & Widgets";
+
+    /// <summary>The titles above, in sidebar order of their future pages.</summary>
+    public static IReadOnlyList<string> TitlesToCome { get; } =
+        [PrivacyTitle, DeskLookTitle, WatchersTitle, LauncherTitle, ModsAndWidgetsTitle];
 
     /// <summary>Every page in sidebar order.</summary>
     public static IReadOnlyList<SettingsPage> Pages { get; } = [.. Sidebar.SelectMany(g => g.Pages)];
@@ -77,7 +90,7 @@ public static class SettingsNames
 
     // ---- Commands and controls ----
 
-    /// <summary>Tray and widget menus: opens Settings where it was left.</summary>
+    /// <summary>Tray and widget menus: opens Settings. Which page it lands on is App's rule.</summary>
     public const string OpenSettings = "Settings…";
     /// <summary>About, and the tray menu: the What's New window. "What's New" is the window's name.</summary>
     public const string WhatsNew = "What's New…";
@@ -100,8 +113,23 @@ public static class SettingsNames
     public const string WarnAgain = "Warn again for this limit";
     /// <summary>Alerts.</summary>
     public const string SendTestAlert = "Send test alert";
-    /// <summary>History and Claude Usage.</summary>
-    public const string ExportCsv = "Export CSV…";
+    /// <summary>History: the 30-day meter chart as a CSV file ("meter history", WF14).</summary>
+    public const string ExportMeterHistory = "Export meter history…";
+    /// <summary>The old identifier, kept because SettingsIndex.cs (slice 2's file) refers to it. Same text.</summary>
+    public const string ExportCsv = ExportMeterHistory;
+    /// <summary>Claude Usage, Sessions: the session table as a CSV file.</summary>
+    public const string ExportSessions = "Export sessions…";
+    /// <summary>Claude Usage, Overview, and About: the vault of Claude Code session totals ("session archive", WF14).</summary>
+    public const string SessionArchive = "Session archive";
+    public const string EraseSessionArchive = "Erase session archive…";
+    public const string OpenArchiveFolder = "Open archive folder";
+    /// <summary>The empty state of the archive: About, Where settings live (beside the dim Show in Explorer) and the Claude Usage trends chart.</summary>
+    public const string NothingArchivedYet = "Nothing archived yet.";
+    /// <summary>Publish usage: the folders whose totals may leave ("Folder" is the one word, WF21).</summary>
+    public const string FoldersToShare = "Folders to share (off until you tick them)";
+    /// <summary>Reset Sanduhr…: two of its five parts, named for everything they remove (WF20).</summary>
+    public const string ResetClaudeCodeEntries = "Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, glow hook)";
+    public const string ResetMeterHistory = "Meter history and the session archive";
     /// <summary>Themes (paste box and Studio).</summary>
     public const string SaveAndApply = "Save & apply";
     /// <summary>About: where Sanduhr keeps its files.</summary>
@@ -113,16 +141,69 @@ public static class SettingsNames
 
     /// <summary>The Quit button at the foot of the sidebar (not on a page, so not in <see cref="Table"/>).</summary>
     public const string QuitSanduhr = "Quit Sanduhr";
+    /// <summary>The widget's menu, icon strip and the tray (WF19): one name each. The strip's tooltips add
+    /// the shortcut ("Compact mode (Ctrl+D)").</summary>
+    public const string CompactMode = "Compact mode";
+    public const string DeepWork = "Deep Work";
+    public const string CooldownSnake = "Cooldown snake";
+    public const string RefreshUsageNow = "Refresh usage now";
+    /// <summary>A limit card's menu: hides the limit until shown again.</summary>
+    public const string HideThisLimit = "Hide this limit";
+    /// <summary>The widget's icon strip: cycles the sparkline style (settings.json "sparkline_style").</summary>
+    public const string GraphStyle = "Graph style";
+    /// <summary>The widget's icon strip: keeps the widget above other windows (settings.json "pinned").</summary>
+    public const string KeepWidgetOnTop = "Keep the widget on top";
+    /// <summary>The What's New window (settings.json "whats_new_hide_after_updates").</summary>
+    public const string HideWhatsNewAfterUpdates = "Don't show What's New after updates";
     /// <summary>Claude Code: picks a folder Sanduhr did not find.</summary>
     public const string AddFolder = "Add folder…";
     /// <summary>Claude Code: drops a folder that was added by hand.</summary>
     public const string ForgetFolder = "Forget folder";
+    /// <summary>Claude Code, a folder card's Forget button, spoken with its folder (WF34).</summary>
+    public static string ForgetFolderFor(string folder) => $"{ForgetFolder} {folder}";
+    /// <summary>Claude Code, a folder card: the MCP server may read this folder's project totals (settings.json "mcp_roots").</summary>
+    public const string LetClaudeReadTotals = "Let Claude read this folder's project totals";
+    /// <summary>The same switch spoken with its folder, so each card's reads apart.</summary>
+    public static string LetClaudeReadTotalsFor(string folder) => $"{LetClaudeReadTotals}, {folder}";
+    /// <summary>Settings' title-bar close button, spoken (its face is a glyph).</summary>
+    public const string CloseSettings = "Close Settings";
     /// <summary>Accounts: the follow switch, and the tray's account list marks the account in use.</summary>
     public const string FollowAccount = "Follow the account I'm using";
+    /// <summary>Accounts: the follow switch's caption, its numbers read from AccountFollow so they can't drift (WF29).</summary>
+    public static string FollowAccountCaption { get; } =
+        $"Every {(int)AccountFollow.CheckInterval.TotalMinutes} minutes Sanduhr checks your other signed-in accounts and switches to the one whose session is climbing. "
+        + $"A manual switch pauses it for up to {(int)AccountFollow.PauseLength.TotalHours} hours, or until that account sits idle for {(int)AccountFollow.PauseIdle.TotalMinutes} minutes.";
+    /// <summary>Accounts: why the account buttons are dim (WF29).</summary>
+    public const string PickAnAccount = "Pick an account to switch, rename, update or remove it.";
+    /// <summary>The manual key window: where the sessionKey is, in plain steps (WF31).</summary>
+    public const string ManualKeySteps =
+        "In Edge or Chrome, open claude.ai and sign in. Press F12, open the Application tab, then Cookies, then https://claude.ai. "
+        + "Copy the Value next to sessionKey and paste it below.";
+    /// <summary>The manual key window: cf_clearance waits behind this line.</summary>
+    public const string ManualKeyCloudflareToggle = "Seeing a Cloudflare error?";
+    public const string ManualKeyCloudflareHelp =
+        "Only if Sanduhr says Cloudflare blocked it: copy the Value next to cf_clearance from the same Cookies list and paste it here.";
+    public const string ManualKeyCfLabel = "cf_clearance";
     /// <summary>Mods &amp; Config: re-reads the folder.</summary>
     public const string RefreshFolder = "Refresh";
-    /// <summary>Desk: the switch at the top of the page (settings.json "desk_enabled", off by default).</summary>
-    public const string DeskSwitch = "Desk: the clock and your Claude meters on the desktop";
+    /// <summary>Desk: the switch at the top of the page (settings.json "desk_enabled", off by default). It lists
+    /// what the Desk draws, as the tour does (WF16).</summary>
+    public const string DeskSwitch = "Desk: a clock, your meters, a message and more on the desktop";
+    /// <summary>Claude Code: the install that lights the glow, the Mac's name (WF11). "Claude Code glow" is the
+    /// section and the Desk piece.</summary>
+    public const string ClaudeCodeGlowHook = "Claude Code glow hook";
+    /// <summary>Claude Code: a piece installed in an older version. "Update…" beside it is the verb (WF42).</summary>
+    public const string PieceOutdated = "Installed, but not the current version.";
+    /// <summary>Claude Code, a folder card's Linked account caption, true before and after an install (WF27).</summary>
+    public const string LinkedAccountCaption = "Once the statusline or meters are installed here, they show this account's meters.";
+    /// <summary>Mods &amp; Config: Claude Code's own retention (cleanupPeriodDays), the fourth "history" (WF14).</summary>
+    public const string TranscriptsKept = "Claude Code keeps transcripts for";
+    /// <summary>Themes: a pasted or edited theme with no errors or notes (WF43).</summary>
+    public const string ThemeJsonValid = "This theme's JSON is valid.";
+    /// <summary>Themes, Studio: the file name the theme is saved under (WF43).</summary>
+    public const string SaveThemeAs = "Save the theme as";
+    /// <summary>Alerts, Sound (settings.json "alert_snake_full"), said plainly (WF43, WF38).</summary>
+    public const string SnakeSoundAtFull = "Play the cooldown snake's sound at 100%";
     /// <summary>Desk, Where each piece sits: the pieces, named as on the Mac.</summary>
     public const string DeskClock = "Clock and date";
     public const string DeskClaudeLine = "Claude meters (line)";
@@ -144,8 +225,9 @@ public static class SettingsNames
     public const string LauncherAddApp = "Add app…";
     /// <summary>Desk, Launcher: asks for an https link and a label.</summary>
     public const string LauncherAddLink = "Add link…";
-    /// <summary>Desk: lets agents put watchers up through the MCP server (settings.json "watchers_agents", off by default).</summary>
-    public const string WatchersSwitch = "Let agents show watchers";
+    /// <summary>Desk: lets Claude put watchers up through the MCP server (settings.json "watchers_agents", off by default).
+    /// "Claude" means any agent using Sanduhr's MCP server, the one word every agent consent uses (WF10).</summary>
+    public const string WatchersSwitch = "Let Claude show watchers";
     /// <summary>Desk: CI watchers from this PC's runner containers (settings.json "watchers_ci_runners", off by default; spec ci-watchers-3.9).</summary>
     public const string CiRunnersSwitch = "Show my CI runners' jobs";
     /// <summary>Desk: lets Claude apply a Desk design without the review bar (settings.json "desk_direct", off by default).</summary>
@@ -178,8 +260,15 @@ public static class SettingsNames
         "companion" => DeskCompanion,
         _ => widget,
     };
-    /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7).</summary>
+    /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7). The section's name.</summary>
     public const string DeskInk = "Ink";
+    /// <summary>Desk, Ink: the picker's label and spoken name (it was spoken "Ink", WF34).</summary>
+    public const string DeskInkPicker = "Clock, date, Claude";
+    /// <summary>Desk, Look: the Desk's font, one of the two "Font"s (WF12).</summary>
+    public const string DeskFont = "Desk font";
+    /// <summary>Message, Look: the message's font and color.</summary>
+    public const string MessageFont = "Message font";
+    public const string MessageColor = "Message color";
     /// <summary>Alerts: the Desk's sign-in reminder switch (settings.json "desk_sign_in_reminder", on by default).</summary>
     public const string SignInReminders = SignInReminder.Title;
     /// <summary>The first-run card's third action (settings.json "just_the_desk"); it has no Settings control.</summary>
@@ -192,6 +281,10 @@ public static class SettingsNames
     public const string NowPlayingLooksDirect = "Let Claude style songs directly";
     /// <summary>Now playing, Looks: forgets every saved look, after a question.</summary>
     public const string ClearLooks = "Clear Looks…";
+    /// <summary>Message, Your lines: the two views of messages.txt, as a segment (WF48).</summary>
+    public const string MessageModeList = "List";
+    /// <summary>Message, Your lines: the Text half of the segment, messages.txt as written (WF48).</summary>
+    public const string MessageModeText = "Text";
     /// <summary>Weather: looks a typed city up with Open-Meteo.</summary>
     public const string WeatherLookUp = "Look up";
     /// <summary>Weather: the nickname the Desk shows instead of the place's name (#315, settings.json "desk_weather.nickname", local only).</summary>
@@ -217,6 +310,32 @@ public static class SettingsNames
     /// <summary>Widgets, Desk companion: it walks the screen's edges (never with Windows' animations off).</summary>
     public const string WidgetCompanionRoam = "Let it roam";
 
+    // ---- Core words (WF21): each is defined once, used as its home page's first line and in the tour.
+    public const string DefineDesk = "the clock, meters and pieces Sanduhr draws on your desktop";
+    public const string DefineWidget = "the small floating window with your meters";
+    public const string DefinePiece = "one thing on the Desk";
+    public const string DefineWatchers = "cards that show work in progress, from Claude or your CI";
+    public const string DefineCompanion = "a small animated sprite on the Desk";
+    public const string DefineMod = "an add-on that Claude Code loads";
+    public const string DefineWidgetPack = "an add-on for Sanduhr: a theme, colors, a font or a companion";
+
+    /// <summary>The Desk page's first line.</summary>
+    public const string DeskLine = "The Desk is " + DefineDesk + ".";
+    /// <summary>The Widgets page's first line (Mods &amp; Widgets' in slice 4).</summary>
+    public const string WidgetPackLine = "A widget pack is " + DefineWidgetPack + ".";
+
+    /// <summary>Every core word and its definition.</summary>
+    public static IReadOnlyList<(string Word, string Definition)> CoreWords { get; } =
+    [
+        ("Desk", DefineDesk),
+        ("Widget", DefineWidget),
+        ("Piece", DefinePiece),
+        ("Watchers", DefineWatchers),
+        ("Companion", DefineCompanion),
+        ("Mod", DefineMod),
+        ("Widget pack", DefineWidgetPack),
+    ];
+
     /// <summary>The trademark disclaimer, the standard text, word for word (About carries it).</summary>
     public const string TrademarkNotice =
         "\"Claude\" and \"claude.ai\" are trademarks of Anthropic PBC, used nominatively. "
@@ -230,7 +349,7 @@ public static class SettingsNames
         (ShortcutToOpenSettings, SettingsPage.General),
         (AddAccount, SettingsPage.Accounts),
         (SendTestAlert, SettingsPage.Alerts),
-        (ExportCsv, SettingsPage.History),
+        (ExportMeterHistory, SettingsPage.History),
         (SaveAndApply, SettingsPage.Themes),
         (WhatsNew, SettingsPage.About),
         (TakeTheTour, SettingsPage.About),
@@ -281,6 +400,39 @@ public static class SettingsNames
         ("Alerts Settings…", LinkTitle(SettingsPage.Alerts), false),
         ("Save and apply", SaveAndApply, false),
         ("Save & Apply", SaveAndApply, false),
+        ("Let agents show watchers", WatchersSwitch, false),
+        ("Claude can read this folder's project totals", LetClaudeReadTotals, false),
+        ("Edit as text…", MessageModeText, false),
+        ("Back to the list", MessageModeList, false),
+        ("Export CSV…", ExportMeterHistory, false),
+        ("History vault", SessionArchive, false),
+        ("Usage vault", SessionArchive, false),
+        ("Erase archive", EraseSessionArchive, false),
+        ("Open vault folder", OpenArchiveFolder, false),
+        ("Homes to share", FoldersToShare, false),
+        ("(statusline, MCP server)", ResetClaudeCodeEntries, false),
+        ("Usage history and the vault", ResetMeterHistory, false),
+        ("Desk: the clock and your Claude meters on the desktop", DeskSwitch, false),
+        ("Glow when Claude needs you", ClaudeCodeGlowHook, false),
+        ("Install again to update it", PieceOutdated, false),
+        ("History kept", TranscriptsKept, false),
+        ("Keep a local usage history", SessionArchive, false),
+        ("Keep history", SessionArchive, false),
+        ("Looks good", ThemeJsonValid, true),
+        ("Save as:", SaveThemeAs, true),
+        ("100% plays the !", SnakeSoundAtFull, false),
+        ("Compact Mode", CompactMode, false),
+        ("Expand", CompactMode, true),
+        ("Deep Work (Focus)", DeepWork, false),
+        ("Deep Work focus timer", DeepWork, false),
+        ("Cooldown Snake", CooldownSnake, false),
+        ("Cooldown snake game", CooldownSnake, false),
+        ("Hide this tier", HideThisLimit, false),
+        ("Edit messages…", LinkTitle(SettingsPage.DeskMessage), false),
+        ("Cycle graph style", GraphStyle, false),
+        ("Pin on top", KeepWidgetOnTop, false),
+        ("Pin always on top", KeepWidgetOnTop, false),
+        ("Don't show after updates", HideWhatsNewAfterUpdates, false),
     ];
 
     /// <summary>The retired names <paramref name="text"/> still uses, empty when it uses none.</summary>
@@ -341,4 +493,79 @@ public static class SettingsNames
     private static bool IsWindowsOwn(string before) =>
         before.EndsWith("Windows Startup", StringComparison.Ordinal)
         || before.EndsWith("Notification", StringComparison.Ordinal);
+
+    /// <summary>
+    /// What is wrong with the places <paramref name="text"/> names, empty when nothing is. Prose names a
+    /// place one way only: "Settings, &lt;Page&gt;" or "Settings, &lt;Page&gt;, &lt;Section&gt;", where the
+    /// page is a sidebar title and the section is the title of one of that page's anchors in
+    /// <see cref="SettingsIndex"/>. "Settings ▸ X" and "Settings &gt; X" are the old forms. Only a
+    /// capitalised word after a comma is read as a page or section, so "Settings, About, or the tray
+    /// menu" and a literal that ends in "Settings, " pass. A known page title followed by another
+    /// capitalised word in the same segment ("Settings, Desk Look, Font") is a longer, unknown title and
+    /// is flagged as no page, and a section followed by another capitalised word is flagged the same way.
+    /// </summary>
+    public static IReadOnlyList<string> PathProblems(string text)
+    {
+        var found = new List<string>();
+        if (string.IsNullOrEmpty(text))
+            return found;
+        foreach (var old in new[] { "Settings ▸", "Settings >", "Settings ›", "Settings →" })
+        {
+            if (text.Contains(old, StringComparison.Ordinal))
+                found.Add($"\"{old}\": write \"Settings, <Page>, <Section>\"");
+        }
+        const string lead = "Settings, ";
+        int at = 0;
+        while ((at = text.IndexOf(lead, at, StringComparison.Ordinal)) >= 0)
+        {
+            at += lead.Length;
+            var rest = text[at..];
+            if (rest.Length == 0 || !char.IsUpper(rest[0]))
+                continue;
+            SettingsPage? page = null;
+            foreach (var p in Pages)
+            {
+                if (StartsWithWord(rest, PageTitle(p)) && (page is null || PageTitle(p).Length > PageTitle(page.Value).Length))
+                    page = p;
+            }
+            if (page is null)
+            {
+                found.Add($"no page \"{FirstWords(rest)}\" after \"Settings, \"");
+                continue;
+            }
+            var after = rest[PageTitle(page.Value).Length..];
+            // A capitalised word right after the matched title is part of a longer title we do not know.
+            if (after.Length > 1 && after[0] == ' ' && char.IsUpper(after[1]))
+            {
+                found.Add($"no page \"{FirstWords(rest)}\" after \"Settings, \"");
+                continue;
+            }
+            if (after.Length > 2 && after.StartsWith(", ", StringComparison.Ordinal) && char.IsUpper(after[2]))
+            {
+                var section = after[2..];
+                string? best = null;
+                foreach (var e in SettingsIndex.EntriesOn(page.Value))
+                {
+                    if (StartsWithWord(section, e.Title) && (best is null || e.Title.Length > best.Length))
+                        best = e.Title;
+                }
+                // The page rule again: a capitalised word right after the matched title is part of a
+                // longer title we do not know ("Ink and color" must not pass as "Ink").
+                var tail = best is null ? "" : section[best.Length..];
+                if (best is null || (tail.Length > 1 && tail[0] == ' ' && char.IsUpper(tail[1])))
+                    found.Add($"no section \"{FirstWords(section)}\" on {PageTitle(page.Value)}");
+            }
+        }
+        return found;
+    }
+
+    private static bool StartsWithWord(string text, string words) =>
+        text.StartsWith(words, StringComparison.Ordinal)
+        && (text.Length == words.Length || !char.IsLetterOrDigit(text[words.Length]));
+
+    private static string FirstWords(string text)
+    {
+        var end = text.IndexOfAny([',', '.', ')', ';', ':']);
+        return end < 0 ? text : text[..end];
+    }
 }

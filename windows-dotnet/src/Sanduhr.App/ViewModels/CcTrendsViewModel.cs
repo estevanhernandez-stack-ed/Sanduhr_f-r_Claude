@@ -92,7 +92,7 @@ public sealed partial class CcTrendsViewModel : ObservableObject
             ? $"history preserved since {birth.ToString("MMMM d, yyyy", CultureInfo.InvariantCulture)}"
             : "";
         InfoText = data.Birth is { } b && todayLocal.DayNumber - b.DayNumber <= 1
-            ? "Fresh vault — the first backfill seeded about 4 weeks from your existing logs; longer trends fill in from here."
+            ? "Fresh session archive: the first backfill seeded about 4 weeks from your existing logs; longer trends fill in from here."
             : "";
         Changed?.Invoke();
     }

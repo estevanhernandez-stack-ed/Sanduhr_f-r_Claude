@@ -108,7 +108,8 @@
             </ScrollViewer.Resources>
             <StackPanel Margin="20">
                 <TextBlock Text="Widgets" FontSize="14" FontWeight="SemiBold"
-                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,4" />
+                <TextBlock Text="{x:Static core:SettingsNames.WidgetPackLine}" Style="{StaticResource Dim}" Margin="0,0,0,12" />
 
                 <!-- The Desk companion (spec 3.8 section 4): one sprite at a time, shown or hidden, roaming or sitting. -->
                 <StackPanel views:SettingsAnchor.Id="widgets-companion">
@@ -182,9 +183,7 @@
                 </StackPanel>
 
                 <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
-                <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"
-                           TextWrapping="Wrap" FontSize="11"
-                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                <views:TrademarkFooter />
             </StackPanel>
         </ScrollViewer>
     </Border>

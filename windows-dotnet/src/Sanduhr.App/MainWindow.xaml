@@ -269,18 +269,18 @@
 
                     <Button Style="{StaticResource IconStripButton}" Content="⚙"
                             Command="{Binding OpenSettingsCommand}"
-                            ToolTip="Settings" AutomationProperties.Name="Settings" />
+                            ToolTip="{x:Static core:SettingsNames.OpenSettings}" AutomationProperties.Name="{x:Static core:SettingsNames.OpenSettings}" />
 
                     <Button Command="{Binding CycleSparklineStyleCommand}"
-                            AutomationProperties.Name="Cycle graph style">
+                            AutomationProperties.Name="{x:Static core:SettingsNames.GraphStyle}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource IconStripButton}">
                                 <Setter Property="Content" Value="📊" />
-                                <Setter Property="ToolTip" Value="Graph: classic line (click to cycle)" />
+                                <Setter Property="ToolTip" Value="Graph style: classic line (click to cycle)" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding SparklineStyle}" Value="Horizon">
                                         <Setter Property="Content" Value="📈" />
-                                        <Setter Property="ToolTip" Value="Graph: horizon bands (click to cycle)" />
+                                        <Setter Property="ToolTip" Value="Graph style: horizon bands (click to cycle)" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -289,30 +289,30 @@
 
                     <Button Style="{StaticResource IconStripButton}" Content="↕"
                             Command="{Binding ToggleCompactCommand}"
-                            ToolTip="Compact mode (Ctrl+D)" AutomationProperties.Name="Compact mode" />
+                            ToolTip="Compact mode (Ctrl+D)" AutomationProperties.Name="{x:Static core:SettingsNames.CompactMode}" />
 
                     <Button Style="{StaticResource IconStripButton}" Content="⏳"
                             Command="{Binding ToggleFocusCommand}"
-                            ToolTip="Deep Work focus timer (Ctrl+P)"
-                            AutomationProperties.Name="Deep Work focus timer" />
+                            ToolTip="Deep Work (Ctrl+P)"
+                            AutomationProperties.Name="{x:Static core:SettingsNames.DeepWork}" />
 
                     <Button Style="{StaticResource IconStripButton}" Content="🐍"
                             Command="{Binding StartGameCommand}"
-                            ToolTip="Cooldown snake game" AutomationProperties.Name="Cooldown snake game" />
+                            ToolTip="{x:Static core:SettingsNames.CooldownSnake}" AutomationProperties.Name="{x:Static core:SettingsNames.CooldownSnake}" />
 
                     <Button Style="{StaticResource IconStripButton}" Content="🔄"
                             Command="{Binding RefreshCommand}"
-                            ToolTip="Refresh usage now" AutomationProperties.Name="Refresh usage" />
+                            ToolTip="{x:Static core:SettingsNames.RefreshUsageNow}" AutomationProperties.Name="{x:Static core:SettingsNames.RefreshUsageNow}" />
 
                     <Button Command="{Binding TogglePinCommand}"
-                            AutomationProperties.Name="Pin on top">
+                            AutomationProperties.Name="{x:Static core:SettingsNames.KeepWidgetOnTop}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource IconStripButton}">
                                 <Setter Property="Content" Value="📌" />
-                                <Setter Property="ToolTip" Value="Pin always on top" />
+                                <Setter Property="ToolTip" Value="{x:Static core:SettingsNames.KeepWidgetOnTop}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Pinned}" Value="True">
-                                        <Setter Property="ToolTip" Value="Unpin (currently always on top)" />
+                                        <Setter Property="ToolTip" Value="Keep the widget on top (on, click to turn off)" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -336,13 +336,13 @@
                          Shows the active account; ⇆-prefixed when 2+ accounts are
                          configured (the prefix signals a click cycles to the next one,
                          round-robin). Hidden when signed out; a plain non-interactive
-                         label with a single account. Tray "Accounts ▸" and Settings →
-                         Accounts remain the explicit pick-from-list surfaces. -->
+                         label with a single account. Tray "Accounts" and Settings, Accounts,
+                         remain the explicit pick-from-list surfaces. -->
                     <Button x:Name="AccountSwitcher"
                             Command="{Binding CycleAccountCommand}"
                             HorizontalAlignment="Left" Margin="2,2,2,6"
                             Visibility="{Binding AccountSwitcherText, Converter={StaticResource StrVis}}"
-                            ToolTip="Active Claude account. Click to switch when multiple are configured (Settings → Accounts to add or remove).">
+                            ToolTip="Active Claude account. Click to switch when multiple are configured. Add or remove accounts in Settings, Accounts.">
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.TextDim}" />

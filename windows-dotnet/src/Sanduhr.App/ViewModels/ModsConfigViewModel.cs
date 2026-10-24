@@ -280,11 +280,11 @@ public sealed partial class ModsConfigViewModel : ObservableObject
             ? $"{report.ClaudeMd.Lines} {(report.ClaudeMd.Lines == 1 ? "line" : "lines")}, {FormatBytes(report.ClaudeMd.Bytes)}"
             : "None";
 
-        // History kept
+        // Claude Code keeps transcripts for
         RetentionWarning = report.Retention.Warning;
         RetentionSummary = report.Retention.Warning
             ? ModInventory.RetentionWarning + "."
-            : report.Retention.CleanupPeriodDays is { } days ? $"Kept for {days} days." : "Unknown while settings.json is unreadable.";
+            : report.Retention.CleanupPeriodDays is { } days ? $"{days} days." : "Unknown while settings.json is unreadable.";
     }
 
     private static string FormatBytes(long bytes) =>

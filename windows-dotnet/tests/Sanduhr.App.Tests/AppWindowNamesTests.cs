@@ -106,6 +106,80 @@ public sealed class AppWindowNamesTests : AppWindowFixture
     });
 
     [Fact]
+    public void TheKeyWindowsCloudflareHelpIsAFocusableNamedLink() => AppHost.Run(() =>
+    {
+        var window = new ManualKeyWindow("Work", (_, _) => "", embeddedAvailable: false);
+        OffScreen(window);
+        window.Show();
+        try
+        {
+            window.UpdateLayout();
+            var link = Assert.IsType<System.Windows.Documents.Hyperlink>(window.FindName("CloudflareLink"));
+            var panel = Assert.IsType<System.Windows.Controls.StackPanel>(window.FindName("CloudflarePanel"));
+            Assert.True(link.Focusable, "the Cloudflare link can't take keyboard focus");
+            var name = System.Windows.Automation.AutomationProperties.GetName(link);
+            Assert.StartsWith(SettingsNames.ManualKeyCloudflareToggle, name);
+            Assert.Equal(Visibility.Collapsed, panel.Visibility);
+            Assert.Contains(NamesOf(window), n => n.StartsWith(SettingsNames.ManualKeyCloudflareToggle));
+
+            link.RaiseEvent(new RoutedEventArgs(System.Windows.Documents.Hyperlink.ClickEvent));
+            Assert.Equal(Visibility.Visible, panel.Visibility);
+            link.RaiseEvent(new RoutedEventArgs(System.Windows.Documents.Hyperlink.ClickEvent));
+            Assert.Equal(Visibility.Collapsed, panel.Visibility);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void TheKeyWindowsSessionKeyHelpIsAFocusableNamedLink() => AppHost.Run(() =>
+    {
+        var window = new ManualKeyWindow("Work", (_, _) => "", embeddedAvailable: false);
+        OffScreen(window);
+        window.Show();
+        try
+        {
+            window.UpdateLayout();
+            var link = Assert.IsType<System.Windows.Documents.Hyperlink>(window.FindName("HelpLink"));
+            var steps = Assert.IsType<System.Windows.Controls.TextBlock>(window.FindName("HelpSteps"));
+            Assert.True(link.Focusable, "the sessionKey help link can't take keyboard focus");
+            var name = System.Windows.Automation.AutomationProperties.GetName(link);
+            Assert.StartsWith("Where do I find the sessionKey?", name);
+            Assert.Contains(NamesOf(window), n => n.StartsWith("Where do I find the sessionKey?"));
+            Assert.Equal(Visibility.Collapsed, steps.Visibility);
+
+            link.RaiseEvent(new RoutedEventArgs(System.Windows.Documents.Hyperlink.ClickEvent));
+            Assert.Equal(Visibility.Visible, steps.Visibility);
+            link.RaiseEvent(new RoutedEventArgs(System.Windows.Documents.Hyperlink.ClickEvent));
+            Assert.Equal(Visibility.Collapsed, steps.Visibility);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void TheKeyWindowsSecureSignInLinkIsAFocusableNamedLinkWhenAvailable() => AppHost.Run(() =>
+    {
+        foreach (var available in new[] { true, false })
+        {
+            var window = new ManualKeyWindow("Work", (_, _) => "", embeddedAvailable: available);
+            OffScreen(window);
+            window.Show();
+            try
+            {
+                window.UpdateLayout();
+                var link = Assert.IsType<System.Windows.Documents.Hyperlink>(window.FindName("UseEmbeddedHyperlink"));
+                var holder = Assert.IsType<System.Windows.Controls.TextBlock>(window.FindName("UseEmbeddedLink"));
+                Assert.Equal(available ? Visibility.Visible : Visibility.Collapsed, holder.Visibility);
+                Assert.True(link.Focusable, "the secure sign-in link can't take keyboard focus");
+                Assert.StartsWith("Use the secure sign-in window instead",
+                    System.Windows.Automation.AutomationProperties.GetName(link));
+                if (available)
+                    Assert.Contains(NamesOf(window), n => n.StartsWith("Use the secure sign-in window instead"));
+            }
+            finally { window.Close(); }
+        }
+    });
+
+    [Fact]
     public void TheSmallWindowsHaveNoTypeNames() => AppHost.Run(() =>
     {
         var windows = new List<Window>

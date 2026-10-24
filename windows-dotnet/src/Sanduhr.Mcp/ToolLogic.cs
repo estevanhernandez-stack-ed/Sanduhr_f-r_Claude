@@ -130,7 +130,7 @@ public sealed partial class ToolLogic
                 return BuildDegraded(history, historyAge!.Value, remedyText!, null, null, now);
             }
             return NoData("missing",
-                "No usage snapshot. Start the Sanduhr widget and enable its Claude Code integration (Settings > Claude Usage).");
+                "No usage snapshot. Start the Sanduhr widget and turn on its Claude Code integration (Settings, Claude Code).");
         }
         if (outcome == SnapshotReadOutcome.Malformed)
             return NoData("malformed",
@@ -358,7 +358,7 @@ public sealed partial class ToolLogic
                 return ("degraded", ReasonWidgetTooOld, $"{WidgetTooOldRemedy} {polling}; snapshot.json does not exist.");
             string leftover = floorOk
                 ? $"snapshot.json was last written {snapshotAge:0}s ago by build {writer}. If the installed widget "
-                  + "is already 3.4.0 or later, re-enable its Claude Code integration (Settings > Claude Usage)."
+                  + "is already 3.4.0 or later, re-enable its Claude Code integration (Settings, Claude Code)."
                 : $"snapshot.json was last written {snapshotAge:0}s ago by build {writer}, a dev-build or pre-{RequiredWidgetVersion} leftover.";
             return ("degraded", ReasonWidgetTooOld, $"{WidgetTooOldRemedy} {polling}; {leftover}");
         }
@@ -439,7 +439,7 @@ public sealed partial class ToolLogic
             return NoData("invalid_params", "window_days must be 1, 7, or 30");
         if (_config.ConsentedRoots.Count == 0)
             return NoData("disabled",
-                "No Claude Code homes are consented for MCP reads. Enable them in the Sanduhr widget's settings (mcp_roots).");
+                "No Claude Code folders are consented for MCP reads. Turn on 'Let Claude read this folder's project totals' on a folder in the Sanduhr widget (Settings, Claude Code, Folders).");
 
         var now = _clock();
         var since = now.AddDays(-windowDays);
@@ -508,7 +508,7 @@ public sealed partial class ToolLogic
             return NoData("invalid_params", "window_days must be 1, 7, or 30");
         if (_config.ConsentedRoots.Count == 0)
             return NoData("disabled",
-                "No Claude Code homes are consented for MCP reads. Enable them in the Sanduhr widget's settings (mcp_roots).");
+                "No Claude Code folders are consented for MCP reads. Turn on 'Let Claude read this folder's project totals' on a folder in the Sanduhr widget (Settings, Claude Code, Folders).");
 
         var now = _clock();
         var since = now.AddDays(-windowDays);
@@ -598,7 +598,7 @@ public sealed partial class ToolLogic
             return NoData("invalid_params", "window_days must be 7, 30, or 90");
         if (_config.ConsentedRoots.Count == 0)
             return NoData("disabled",
-                "No Claude Code homes are consented for MCP reads. Enable them in the Sanduhr widget's settings (mcp_roots).");
+                "No Claude Code folders are consented for MCP reads. Turn on 'Let Claude read this folder's project totals' on a folder in the Sanduhr widget (Settings, Claude Code, Folders).");
 
         var today = DateOnly.FromDateTime(_clock().ToLocalTime().DateTime);
         var from = today.AddDays(-(windowDays - 1));
@@ -611,12 +611,12 @@ public sealed partial class ToolLogic
         }
         catch (Exception)
         {
-            return NoData("malformed", "The usage vault could not be read - see the Sanduhr widget's Claude Usage tab.");
+            return NoData("malformed", "The session archive (the vault) could not be read. See the Sanduhr widget (Settings, Claude Usage, Overview).");
         }
 
         if (window.ByDay.Count == 0)
             return NoData("missing",
-                "No vault history for the consented homes. Enable the history vault in the Sanduhr widget (Settings > Claude Usage) and let it ingest.");
+                "No archived history for the consented folders. Turn on the session archive (the vault) in the Sanduhr widget (Settings, Claude Usage, Overview) and let it ingest.");
 
         long total = 0;
         var days = new JsonArray();
@@ -768,13 +768,13 @@ public sealed partial class ToolLogic
         var (enabled, hasEndpoint, tokenStored) = ReadPublishSettings(_config.McpSettingsPath);
         if (!enabled)
             return Refusal("disabled", "publishing_off",
-                "Publishing is off. Turn on 'Publish daily' in the Sanduhr widget (Settings > Publish usage) and tick the homes to share.");
+                "Publishing is off. Turn on 'Publish daily at' in the Sanduhr widget (Settings, Publish usage, Publish daily) and tick the folders to share.");
         if (!hasEndpoint)
             return Refusal("no_endpoint", "no_endpoint_url",
-                "No publish endpoint is configured. Set one in the Sanduhr widget (Settings > Publish usage > Endpoint URL, or pick a preset).");
+                "No publish endpoint is configured. Set the Endpoint URL, or pick a preset, in the Sanduhr widget (Settings, Publish usage, Destination).");
         if (!tokenStored)
             return Refusal("no_token", "no_publish_token",
-                "No publish token is stored for the publish endpoint. Add one in the Sanduhr widget (Settings > Publish usage > Set token), or set Auth to None if the endpoint needs no credential.");
+                "No publish token is stored for the publish endpoint. Add one with Set token… in the Sanduhr widget (Settings, Publish usage, Token), or set Auth to None if the endpoint needs no credential.");
 
         string id = Guid.NewGuid().ToString("N");
         var request = new JsonObject
@@ -811,7 +811,7 @@ public sealed partial class ToolLogic
             ["status"] = "queued",
             ["reason"] = "widget_not_responding",
             ["remedy"] = "The Sanduhr widget did not answer within the wait window - start (or restart) it. "
-                         + "The request stays queued and runs on the widget's next tick; check Settings > Publish usage for the result.",
+                         + "The request stays queued and runs on the widget's next tick; check Settings, Publish usage, Publish daily for the result.",
             ["date"] = request["date"]!.DeepClone(),
             ["request_id"] = id,
         };

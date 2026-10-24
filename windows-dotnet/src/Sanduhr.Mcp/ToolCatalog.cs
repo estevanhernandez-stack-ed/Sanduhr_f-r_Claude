@@ -46,10 +46,10 @@ public static class ToolCatalog
         Tool(
             "get_local_burn_by_project",
             "Attribute recent local Claude Code token burn to projects: which project ate the " +
-            "tokens, keyed per Claude Code home. Attribution only - token counts are a proxy " +
+            "tokens, keyed per Claude Code folder. Attribution only - token counts are a proxy " +
             "(input+output, cache excluded) and are NOT convertible to quota percentages; use " +
-            "get_usage for headroom. Scoped to the Claude Code homes the user consented to in " +
-            "Sanduhr's settings; every response names the roots it covered.",
+            "get_usage for headroom. Scoped to the Claude Code folders the user consented to in " +
+            "Sanduhr (Settings, Claude Code, Folders); every response names the roots it covered.",
             new JsonObject
             {
                 ["type"] = "object",
@@ -75,7 +75,7 @@ public static class ToolCatalog
             "a window, joined with each model's weekly meter utilization from the live snapshot. " +
             "Use when choosing between models for a big job - a model whose per-model weekly " +
             "meter is hot is the one to avoid. Token counts are a proxy (input+output, cache " +
-            "excluded), never convertible to quota %. Scoped to consented Claude Code homes.",
+            "excluded), never convertible to quota %. Scoped to consented Claude Code folders.",
             new JsonObject
             {
                 ["type"] = "object",
@@ -92,11 +92,11 @@ public static class ToolCatalog
             }),
         Tool(
             "get_usage_history",
-            "Daily local Claude Code usage history from Sanduhr's durable vault (survives Claude " +
+            "Daily local Claude Code usage history from Sanduhr's durable session archive (the vault; survives Claude " +
             "Code's ~30-day log cleanup): tokens per day with sent/received split, window totals, " +
             "top projects. Trend and attribution data, not quota - use get_usage for headroom. " +
             "Days without a record are omitted, never fabricated as zero. Scoped to consented " +
-            "Claude Code homes.",
+            "Claude Code folders.",
             new JsonObject
             {
                 ["type"] = "object",
@@ -683,7 +683,7 @@ public static class ToolCatalog
         "failed). Without an update for 10 minutes it greys as lost touch, so update long jobs. Limits: " +
         "title 1 to 80 characters on one line, short up to 12, link https only, total 1 to 1000000. Pass work: true for " +
         "anything from the user's employer, so it hides in demo mode. Refused with reason " +
-        "watchers_off when the user has not turned on Let agents show watchers in Sanduhr (Settings, " +
+        "watchers_off when the user has not turned on 'Let Claude show watchers' in Sanduhr (Settings, " +
         "Desk); then do not retry. It shows where the user has placed the Watchers piece on the Desk.";
 
     private const string WatchGuideUpdate =
