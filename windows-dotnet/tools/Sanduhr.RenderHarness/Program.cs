@@ -22,6 +22,10 @@ using Sanduhr.Core;
 // Options:
 //   --out <dir>          where PNGs and log.txt go (default ./harness-out)
 //   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | desk | arrange | launcher | review | companion | ridealongs | propose-widget | meterstyles | all; repeatable (default all)
+//                        settings-pass is not part of all: it is the slow evidence run for the Settings persona pass
+//                        (see SettingsPassScenario.cs); run it once without and once with --light
+//   --pages <list>       settings-pass only: comma-separated page names to run (default every page)
+//   --parts <list>       settings-pass only: pages, tab, focus, search, links, contrast (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)
 //   --light              write a LIGHT user theme into the dev profile's themes folder and apply
 //                        it, to check dialogs for legibility on a light surface
@@ -94,15 +98,18 @@ public static partial class Program
                 case "--theme": theme = Next(args, ref i); break;
                 case "--app-xaml": appXamlArg = Next(args, ref i); break;
                 case "--light": light = true; break;
+                case "--parts": PassParts = Next(args, ref i).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries); break;
+                case "--pages": PassPages = Next(args, ref i).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries); break;
                 default:
                     Console.Error.WriteLine($"Unknown argument: {args[i]}");
                     return 2;
             }
         }
         string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange", "launcher", "review", "companion", "ridealongs", "propose-widget", "meterstyles" };
+        string[] opt = { "settings-pass" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
-        var bad = scenarios.Where(s => !known.Contains(s)).ToList();
+        var bad = scenarios.Where(s => !known.Contains(s) && !opt.Contains(s)).ToList();
         if (bad.Count > 0)
         {
             Console.Error.WriteLine($"Unknown scenario: {string.Join(", ", bad)}. Known: {string.Join(", ", known)}, all.");
@@ -351,6 +358,8 @@ public static partial class Program
                 await RenderArrange();
             if (scenarios.Contains("settings"))
                 await RenderSettings(vm, asm);
+            if (scenarios.Contains("settings-pass"))
+                await RenderSettingsPass(vm, asm, light);
             if (scenarios.Contains("launcher"))
                 await RenderLauncher(vm, asm, light);
             if (scenarios.Contains("review"))
