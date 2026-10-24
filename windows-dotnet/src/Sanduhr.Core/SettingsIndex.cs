@@ -557,12 +557,15 @@ public static class SettingsIndex
             if (arg.StartsWith(SettingsSwitch + "=", StringComparison.OrdinalIgnoreCase))
             {
                 var value = arg[(SettingsSwitch.Length + 1)..];
-                return value.Length == 0 ? PageId(SettingsPage.General) : value;
+                return string.IsNullOrWhiteSpace(value) ? PageId(SettingsPage.General) : value;
             }
             if (string.Equals(arg, SettingsSwitch, StringComparison.OrdinalIgnoreCase))
-                return i + 1 < list.Count && !list[i + 1].StartsWith("--", StringComparison.Ordinal)
+            {
+                var value = i + 1 < list.Count && !list[i + 1].StartsWith("--", StringComparison.Ordinal)
                     ? list[i + 1]
-                    : PageId(SettingsPage.General);
+                    : null;
+                return string.IsNullOrWhiteSpace(value) ? PageId(SettingsPage.General) : value;
+            }
         }
         return null;
     }

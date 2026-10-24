@@ -52,6 +52,8 @@ public class SettingsLinkTests
     [InlineData(new[] { "--demo", "--settings" }, "general")]
     [InlineData(new[] { "--settings", "--demo" }, "general")]
     [InlineData(new[] { "--settings=" }, "general")]
+    [InlineData(new[] { "--settings", "" }, "general")]
+    [InlineData(new[] { "--settings=   " }, "general")]
     [InlineData(new[] { "--demo" }, null)]
     [InlineData(new string[0], null)]
     public void The_settings_switch_reads_its_value(string[] args, string? expected) =>
