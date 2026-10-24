@@ -563,4 +563,12 @@ public class SettingsSourceScanTests
         // The wrapping TextBlock keeps the name the code-behind shows and hides.
         Assert.Contains("x:Name=\"UseEmbeddedLink\"", key);
     }
+
+    [Fact]
+    public void The_Desk_and_Widgets_pages_open_with_their_definitions()
+    {
+        Assert.Contains("core:SettingsNames.DeskLine", TabRange("Desk"));
+        Assert.Contains("core:SettingsNames.WidgetPackLine",
+            File.ReadAllText(Path.Combine(AppDir(), "Views", "WidgetsPage.xaml")));
+    }
 }

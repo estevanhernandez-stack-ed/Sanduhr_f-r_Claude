@@ -344,4 +344,23 @@ public class SettingsNamesTests
         Assert.Contains("cf_clearance", SettingsNames.ManualKeyCloudflareHelp);
         Assert.Equal("cf_clearance", SettingsNames.ManualKeyCfLabel);
     }
+
+    [Fact]
+    public void Core_words_are_defined_once()
+    {
+        Assert.Equal(
+            new (string, string)[]
+            {
+                ("Desk", "the clock, meters and pieces Sanduhr draws on your desktop"),
+                ("Widget", "the small floating window with your meters"),
+                ("Piece", "one thing on the Desk"),
+                ("Watchers", "cards that show work in progress, from Claude or your CI"),
+                ("Companion", "a small animated sprite on the Desk"),
+                ("Mod", "an add-on that Claude Code loads"),
+                ("Widget pack", "an add-on for Sanduhr: a theme, colors, a font or a companion"),
+            },
+            SettingsNames.CoreWords);
+        Assert.Equal("The Desk is the clock, meters and pieces Sanduhr draws on your desktop.", SettingsNames.DeskLine);
+        Assert.Equal("A widget pack is an add-on for Sanduhr: a theme, colors, a font or a companion.", SettingsNames.WidgetPackLine);
+    }
 }

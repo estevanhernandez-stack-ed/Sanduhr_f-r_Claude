@@ -310,6 +310,32 @@ public static class SettingsNames
     /// <summary>Widgets, Desk companion: it walks the screen's edges (never with Windows' animations off).</summary>
     public const string WidgetCompanionRoam = "Let it roam";
 
+    // ---- Core words (WF21): each is defined once, used as its home page's first line and in the tour.
+    public const string DefineDesk = "the clock, meters and pieces Sanduhr draws on your desktop";
+    public const string DefineWidget = "the small floating window with your meters";
+    public const string DefinePiece = "one thing on the Desk";
+    public const string DefineWatchers = "cards that show work in progress, from Claude or your CI";
+    public const string DefineCompanion = "a small animated sprite on the Desk";
+    public const string DefineMod = "an add-on that Claude Code loads";
+    public const string DefineWidgetPack = "an add-on for Sanduhr: a theme, colors, a font or a companion";
+
+    /// <summary>The Desk page's first line.</summary>
+    public const string DeskLine = "The Desk is " + DefineDesk + ".";
+    /// <summary>The Widgets page's first line (Mods &amp; Widgets' in slice 4).</summary>
+    public const string WidgetPackLine = "A widget pack is " + DefineWidgetPack + ".";
+
+    /// <summary>Every core word and its definition.</summary>
+    public static IReadOnlyList<(string Word, string Definition)> CoreWords { get; } =
+    [
+        ("Desk", DefineDesk),
+        ("Widget", DefineWidget),
+        ("Piece", DefinePiece),
+        ("Watchers", DefineWatchers),
+        ("Companion", DefineCompanion),
+        ("Mod", DefineMod),
+        ("Widget pack", DefineWidgetPack),
+    ];
+
     /// <summary>The trademark disclaimer, the standard text, word for word (About carries it).</summary>
     public const string TrademarkNotice =
         "\"Claude\" and \"claude.ai\" are trademarks of Anthropic PBC, used nominatively. "
