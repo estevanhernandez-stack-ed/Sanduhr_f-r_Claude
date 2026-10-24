@@ -669,7 +669,7 @@
                            ToolTip="Drag to move" />
                 <Button Style="{StaticResource CloseButton}" Content="&#x2715;"
                         HorizontalAlignment="Right"
-                        Click="CloseButton_Click" ToolTip="Close settings" />
+                        Click="CloseButton_Click" ToolTip="Close Settings" AutomationProperties.Name="{x:Static core:SettingsNames.CloseSettings}" />
             </Grid>
 
             <!-- Pages: a TabControl drawn as a grouped sidebar (Settings v2). Each TabItem's Tag is
@@ -859,7 +859,7 @@
                                             ToolTip="{Binding Shortcuts.KeysToolTip}"
                                             AutomationProperties.Name="{Binding Shortcuts.KeysAutomationName}"
                                             LostKeyboardFocus="ShortcutKeys_LostKeyboardFocus" />
-                                    <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                    <CheckBox Style="{StaticResource ThemedCheckBox}" Content="{x:Static core:SettingsNames.ShortcutToOpenSettings}"
                                               IsChecked="{Binding Shortcuts.IsOn, Mode=TwoWay}"
                                               AutomationProperties.Name="{Binding Shortcuts.SwitchAutomationName}" />
                                 </StackPanel>
@@ -927,7 +927,7 @@
                             <Border Grid.Row="1" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
                                     BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
                                 <Grid>
-                                    <ListBox x:Name="AccountsList"
+                                    <ListBox x:Name="AccountsList" AutomationProperties.Name="Accounts"
                                              ItemsSource="{Binding Accounts}"
                                              SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"
                                              Background="Transparent" BorderThickness="0"
@@ -1116,7 +1116,7 @@
                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="12,0,8,0" />
                                 <ComboBox Style="{StaticResource ThemedComboBox}" Width="170"
                                           VerticalAlignment="Center"
-                                          AutomationProperties.Name="History account"
+                                          AutomationProperties.Name="Account, meter history"
                                           ItemsSource="{Binding AccountOptions}"
                                           DisplayMemberPath="Display"
                                           SelectedItem="{Binding SelectedOption, Mode=TwoWay}" />
@@ -1255,7 +1255,7 @@
                                             <ScrollViewer.Resources>
                                                 <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                                             </ScrollViewer.Resources>
-                                            <ItemsControl ItemsSource="{Binding Projects}" Margin="4">
+                                            <ItemsControl ItemsSource="{Binding Projects}" Margin="4" AutomationProperties.Name="Top projects (last 30 days)">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Grid Margin="4,3">
@@ -1286,7 +1286,7 @@
                                             <ScrollViewer.Resources>
                                                 <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                                             </ScrollViewer.Resources>
-                                            <ItemsControl ItemsSource="{Binding Skills}" Margin="4">
+                                            <ItemsControl ItemsSource="{Binding Skills}" Margin="4" AutomationProperties.Name="Top skills (last 30 days)">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Grid Margin="4,3">
@@ -1313,7 +1313,7 @@
                                 <StackPanel Grid.Row="7" Margin="0,10,0,0">
                                     <TextBlock Text="History vault" FontSize="9" Margin="0,0,0,4" views:SettingsAnchor.Id="vault"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <ItemsControl ItemsSource="{Binding Roots}">
+                                    <ItemsControl ItemsSource="{Binding Roots}" AutomationProperties.Name="Session archive folders">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <WrapPanel Orientation="Horizontal" />
@@ -1373,7 +1373,7 @@
                                 <DockPanel Grid.Row="3" Margin="0,8,0,0" MaxHeight="120">
                                     <TextBlock DockPanel.Dock="Top" Text="Top projects (window)" FontSize="9"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
-                                    <ItemsControl ItemsSource="{Binding TopProjects}">
+                                    <ItemsControl ItemsSource="{Binding TopProjects}" AutomationProperties.Name="Top projects (window)">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid Margin="0,1">
@@ -1456,7 +1456,7 @@
                                 <Border Grid.Row="2" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
                                         BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
                                     <Grid>
-                                        <ListBox ItemsSource="{Binding View}" Background="Transparent" BorderThickness="0"
+                                        <ListBox ItemsSource="{Binding View}" Background="Transparent" BorderThickness="0" AutomationProperties.Name="Sessions"
                                                  HorizontalContentAlignment="Stretch"
                                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                                  VirtualizingPanel.IsVirtualizing="True"
@@ -1561,7 +1561,7 @@
                                           ItemsSource="{Binding PresetOptions}"
                                           DisplayMemberPath="Display"
                                           SelectedItem="{Binding SelectedPreset, Mode=TwoWay}"
-                                          AutomationProperties.Name="Publish preset"
+                                          AutomationProperties.Name="Preset"
                                           ToolTip="Custom endpoint, or the 626 Labs dashboard preset (fills the URL, bearer auth, and the dashboard body format)." />
                                 <TextBlock Text="{Binding PresetHint}" FontSize="10.5" VerticalAlignment="Center"
                                            Margin="10,0,0,0" TextWrapping="Wrap" MaxWidth="260"
@@ -1574,7 +1574,7 @@
                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                 <TextBox Style="{StaticResource Input}" Width="360"
                                          Text="{Binding EndpointUrl, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                         AutomationProperties.Name="Publish endpoint URL"
+                                         AutomationProperties.Name="Endpoint URL"
                                          ToolTip="Where the daily POST goes. An absolute http(s) URL you control." />
                             </StackPanel>
                             <TextBlock FontSize="10.5" Margin="0,0,0,8"
@@ -1590,7 +1590,7 @@
                                           ItemsSource="{Binding AuthOptions}"
                                           DisplayMemberPath="Display"
                                           SelectedItem="{Binding SelectedAuth, Mode=TwoWay}"
-                                          AutomationProperties.Name="Publish auth scheme"
+                                          AutomationProperties.Name="Auth"
                                           ToolTip="How the token rides on the request: Authorization: Bearer, a header you name, or no credential." />
                                 <StackPanel Orientation="Horizontal" Margin="10,0,0,0"
                                             Visibility="{Binding ShowHeaderName, Converter={StaticResource BoolVis}}">
@@ -1598,7 +1598,7 @@
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                     <TextBox Style="{StaticResource Input}" Width="150"
                                              Text="{Binding AuthHeaderName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                             AutomationProperties.Name="Publish auth header name"
+                                             AutomationProperties.Name="Header name"
                                              ToolTip="The header that carries the token, e.g. X-Api-Key." />
                                 </StackPanel>
                             </StackPanel>
@@ -1608,11 +1608,11 @@
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                                 <Button Style="{StaticResource FlatButton}" Content="Set token…"
                                         Command="{Binding SetTokenCommand}"
-                                        AutomationProperties.Name="Set publish token"
+                                        AutomationProperties.Name="Set token…"
                                         ToolTip="Paste the token your endpoint expects. Stored in Windows Credential Manager, never in a file." />
                                 <Button Style="{StaticResource FlatButton}" Content="Clear token"
                                         Command="{Binding ClearTokenCommand}"
-                                        AutomationProperties.Name="Clear publish token"
+                                        AutomationProperties.Name="Clear token"
                                         ToolTip="Delete the stored token. Publishing stops until a new one is set."
                                         Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
                                         Visibility="{Binding HasToken, Converter={StaticResource BoolVis}}" />
@@ -1743,7 +1743,7 @@
                                                                Margin="0,4,0,0" TextWrapping="Wrap"
                                                                Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                                                     <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,8,0,0"
-                                                              Content="Claude can read this folder's project totals (MCP)"
+                                                              Content="{x:Static core:SettingsNames.LetClaudeReadTotals}"
                                                               IsChecked="{Binding McpReadable, Mode=TwoWay}"
                                                               AutomationProperties.Name="{Binding McpReadableName}"
                                                               Visibility="{Binding Discovered, Converter={StaticResource BoolVis}}" />
@@ -1756,9 +1756,9 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <Button Style="{StaticResource FlatButton}" Content="Add folder…" HorizontalAlignment="Left"
+                                <Button Style="{StaticResource FlatButton}" Content="{x:Static core:SettingsNames.AddFolder}" HorizontalAlignment="Left"
                                         Command="{Binding AddFolderCommand}" Margin="0,0,0,18"
-                                        AutomationProperties.Name="Add a Claude Code folder" />
+                                        AutomationProperties.Name="{x:Static core:SettingsNames.AddFolder}" />
 
                                 <!-- Sanduhr in Claude Code -->
                                 <TextBlock Text="Sanduhr in Claude Code" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,6"
@@ -1796,10 +1796,10 @@
                                             <StackPanel Orientation="Horizontal">
                                                 <Button Style="{StaticResource FlatButton}" Content="Try it: waiting" Padding="10,5"
                                                         Command="{Binding TryWaitingCommand}"
-                                                        AutomationProperties.Name="Try the waiting glow" />
+                                                        AutomationProperties.Name="Try it: waiting" />
                                                 <Button Style="{StaticResource FlatButton}" Content="Try it: done" Padding="10,5"
                                                         Command="{Binding TryDoneCommand}"
-                                                        AutomationProperties.Name="Try the done glow" />
+                                                        AutomationProperties.Name="Try it: done" />
                                             </StackPanel>
                                             <StackPanel views:SettingsAnchor.Id="glow-where" Margin="0,12,0,0">
                                                 <TextBlock Text="{x:Static core:SettingsNames.GlowWhere}" FontSize="12" FontWeight="SemiBold"
@@ -1863,7 +1863,7 @@
                                               AutomationProperties.Name="Folder to look at" />
                                     <Button Style="{StaticResource FlatButton}" Content="Refresh" Margin="8,0,0,0" Padding="12,5"
                                             Command="{Binding RefreshCommand}"
-                                            AutomationProperties.Name="Read this folder again" />
+                                            AutomationProperties.Name="Refresh, read this folder again" />
                                 </StackPanel>
 
                                 <!-- Settings, statusline, hooks, plugins -->
@@ -2430,7 +2430,7 @@
                                     <ComboBox Grid.Column="1" Style="{StaticResource ThemedComboBox}"
                                               ItemsSource="{x:Static vm:LauncherSettingsViewModel.OrientationChoices}"
                                               SelectedItem="{Binding SelectedOrientation, Mode=TwoWay}"
-                                              AutomationProperties.Name="Launcher buttons in a row or a column" />
+                                              AutomationProperties.Name="Buttons in a row or a column" />
                                 </Grid>
                                 <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
                                            AutomationProperties.LiveSetting="Polite"
@@ -2588,12 +2588,12 @@
                                         <ColumnDefinition Width="90" />
                                         <ColumnDefinition Width="230" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Font" FontSize="12" VerticalAlignment="Center"
+                                    <TextBlock Text="{x:Static core:SettingsNames.DeskFont}" FontSize="12" VerticalAlignment="Center"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                     <ComboBox Grid.Column="1" Style="{StaticResource ThemedComboBox}"
                                               ItemsSource="{Binding FontChoices}"
                                               SelectedItem="{Binding Font, Mode=TwoWay}"
-                                              AutomationProperties.Name="Font" />
+                                              AutomationProperties.Name="{x:Static core:SettingsNames.DeskFont}" />
                                 </Grid>
                                 <Grid Margin="0,10,0,0">
                                     <Grid.ColumnDefinitions>
@@ -2636,12 +2636,12 @@
                                         <ColumnDefinition Width="90" />
                                         <ColumnDefinition Width="230" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Clock, date, Claude" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"
+                                    <TextBlock Text="{x:Static core:SettingsNames.DeskInkPicker}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                     <ComboBox Grid.Column="1" Style="{StaticResource ThemedComboBox}"
                                               ItemsSource="{x:Static vm:DeskSettingsViewModel.InkChoices}"
                                               SelectedItem="{Binding InkChoice, Mode=TwoWay}"
-                                              AutomationProperties.Name="{x:Static core:SettingsNames.DeskInk}" />
+                                              AutomationProperties.Name="{x:Static core:SettingsNames.DeskInkPicker}" />
                                 </Grid>
                                 <Grid Margin="0,10,0,0" Visibility="{Binding IsCustomInk, Converter={StaticResource BoolVis}}">
                                     <Grid.ColumnDefinitions>
@@ -2655,7 +2655,7 @@
                                     <ComboBox Grid.Column="1" Style="{StaticResource ThemedComboBox}"
                                               ItemsSource="{Binding InkPresetNames}"
                                               SelectedItem="{Binding InkPreset, Mode=TwoWay}"
-                                              AutomationProperties.Name="Ink preset" />
+                                              AutomationProperties.Name="Colors, ink preset" />
                                     <TextBox Grid.Column="3" Style="{StaticResource Input}" FontFamily="Cascadia Code, Consolas"
                                              Text="{Binding InkColors, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                                              AutomationProperties.Name="Ink hex colors" />
@@ -2945,7 +2945,7 @@
                                                Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                     <Button Grid.Row="0" Grid.Column="2" Style="{StaticResource FlatButton}" Padding="10,4"
                                             Margin="0,0,0,6" Content="Show in Explorer"
-                                            AutomationProperties.Name="Show the settings folder in File Explorer"
+                                            AutomationProperties.Name="Show in Explorer, settings, history and themes"
                                             Command="{Binding ShowInExplorerCommand}" CommandParameter="{Binding SettingsFolder}" />
 
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Usage vault" FontSize="12"
@@ -2957,7 +2957,7 @@
                                                Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                     <Button Grid.Row="1" Grid.Column="2" Style="{StaticResource FlatButton}" Padding="10,4"
                                             Margin="0,0,0,6" Content="Show in Explorer"
-                                            AutomationProperties.Name="Show the usage vault folder in File Explorer"
+                                            AutomationProperties.Name="Show in Explorer, session archive"
                                             Command="{Binding ShowInExplorerCommand}" CommandParameter="{Binding LocalFolder}" />
 
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="Claude Code files" FontSize="12"
@@ -2969,7 +2969,7 @@
                                                Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                     <Button Grid.Row="2" Grid.Column="2" Style="{StaticResource FlatButton}" Padding="10,4"
                                             Margin="0,0,0,6" Content="Show in Explorer"
-                                            AutomationProperties.Name="Show the Claude Code files folder in File Explorer"
+                                            AutomationProperties.Name="Show in Explorer, Claude Code files"
                                             Command="{Binding ShowInExplorerCommand}" CommandParameter="{Binding ClaudeCodeFilesFolder}" />
 
                                     <TextBlock Grid.Row="3" Grid.Column="0" Text="Sign-in keys" FontSize="12"
@@ -2991,7 +2991,7 @@
                                 </Grid>
                                 <StackPanel views:SettingsAnchor.Id="reset" Margin="0,12,0,0" HorizontalAlignment="Left">
                                     <Button Style="{StaticResource FlatButton}" Padding="10,4" Content="{Binding ResetSanduhrTitle}"
-                                            AutomationProperties.Name="Reset Sanduhr, remove what Sanduhr keeps on this PC"
+                                            AutomationProperties.Name="{x:Static core:SettingsNames.ResetSanduhr}" AutomationProperties.HelpText="Removes what Sanduhr keeps on this PC. You choose which parts."
                                             Command="{Binding ResetSanduhrCommand}" />
                                 </StackPanel>
                             </StackPanel>

@@ -57,7 +57,7 @@ public sealed class RowControlNamesTests : AppWindowFixture
             Assert.Contains(@"Linked account for ~\.claude", combos);
             Assert.Contains(@"Linked account for ~\.claude-personal", combos);
             Assert.Equal(combos.Count, combos.Distinct().Count());
-            Assert.DoesNotContain(names, n => n.Name.Contains("this folder"));
+            Assert.DoesNotContain(names, n => n.Name.EndsWith("this folder"));
         }
         finally { window.Close(); }
     });
@@ -79,6 +79,24 @@ public sealed class RowControlNamesTests : AppWindowFixture
             Assert.Equal(combos.Count, combos.Distinct().Count());
         }
         finally { window.Close(); }
+    });
+
+    [Fact]
+    public void Row_names_start_with_the_label_and_keep_the_whole_folder() => AppHost.Run(() =>
+    {
+        // Voice control says the words on screen (WF34): the Forget button shows "Forget folder" and the
+        // switch shows "Let Claude read this folder's project totals"; the folder follows, whole.
+        var page = new Sanduhr.App.ViewModels.ClaudeCodeViewModel(DemoWidget());
+        foreach (var folder in new[] { @"~\.claude", @"D:\Work Stuff\my claude seat",
+            @"C:\Users\someone-with-a-very-long-profile-name\AppData\Roaming\claude-code\.claude-work" })
+        {
+            var row = new Sanduhr.App.ViewModels.CcFolderRowViewModel(
+                page, new Sanduhr.Core.CcFolder(folder, "x", false), folder, Sanduhr.App.ViewModels.ClaudeCodeViewModel.NoAccount, false);
+            Assert.StartsWith(Sanduhr.Core.SettingsNames.ForgetFolder, row.ForgetName);
+            Assert.EndsWith(folder, row.ForgetName);
+            Assert.StartsWith(Sanduhr.Core.SettingsNames.LetClaudeReadTotals, row.McpReadableName);
+            Assert.EndsWith(folder, row.McpReadableName);
+        }
     });
 
     [Fact]

@@ -315,9 +315,9 @@
                     <TextBlock Text="Rotation" Style="{StaticResource Heading}" />
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageRotate" Content="Daily"
-                                     IsChecked="{Binding IsDaily, Mode=TwoWay}" AutomationProperties.Name="Change the line once a day" />
+                                     IsChecked="{Binding IsDaily, Mode=TwoWay}" AutomationProperties.Name="Daily, the line changes once a day" />
                         <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageRotate" Content="Hourly"
-                                     IsChecked="{Binding IsHourly, Mode=TwoWay}" AutomationProperties.Name="Change the line every hour" />
+                                     IsChecked="{Binding IsHourly, Mode=TwoWay}" AutomationProperties.Name="Hourly, the line changes every hour" />
                     </StackPanel>
                     <CheckBox Style="{DynamicResource ThemedCheckBox}"
                               Content="Mix every-day lines in on days with their own line"
@@ -399,11 +399,11 @@
                             <ColumnDefinition Width="230" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Color" FontSize="12" VerticalAlignment="Center"
+                        <TextBlock Text="{x:Static core:SettingsNames.MessageColor}" FontSize="12" VerticalAlignment="Center"
                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                         <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
                                   ItemsSource="{Binding ColorOptions}" SelectedItem="{Binding Color, Mode=TwoWay}"
-                                  AutomationProperties.Name="Message color" />
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.MessageColor}" />
                         <TextBox Grid.Column="2" Style="{DynamicResource Input}" Width="170" Height="30" Margin="8,0,0,0"
                                  VerticalContentAlignment="Center" FontFamily="Cascadia Code, Consolas"
                                  Visibility="{Binding IsCustomColor, Converter={StaticResource BoolVis}}"
@@ -423,11 +423,11 @@
                             <ColumnDefinition Width="90" />
                             <ColumnDefinition Width="230" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Font" FontSize="12" VerticalAlignment="Center"
+                        <TextBlock Text="{x:Static core:SettingsNames.MessageFont}" FontSize="12" VerticalAlignment="Center"
                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                         <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
                                   ItemsSource="{Binding FontOptions}" SelectedItem="{Binding Font, Mode=TwoWay}"
-                                  AutomationProperties.Name="Message font" />
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.MessageFont}" />
                     </Grid>
                 </StackPanel>
 

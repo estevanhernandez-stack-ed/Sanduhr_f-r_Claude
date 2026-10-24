@@ -34,6 +34,51 @@ public class SettingsSourceScanTests
 
     private static string SrcDir() => Path.GetFullPath(Path.Combine(AppDir(), ".."));
 
+    private static readonly Regex ControlTag = new("<(Button|CheckBox|RadioButton|ToggleButton)\\b[^>]*>", RegexOptions.Compiled);
+    private static readonly Regex LabelThenField = new(
+        "<TextBlock\\b[^>]*?\\bText=\"([^\"]+)\"[^>]*/>\\s*<(TextBox|ComboBox|Slider)\\b([^>]*)>", RegexOptions.Compiled);
+
+    /// <summary>An attribute's value as shown: a literal (entities decoded), a SettingsNames member through
+    /// x:Static, or null for a binding or anything else the scan can't read.</summary>
+    private static string? ResolveValue(string raw)
+    {
+        var s = Regex.Match(raw, @"^\{x:Static core:SettingsNames\.(\w+)\}$");
+        if (s.Success)
+        {
+            var t = typeof(SettingsNames);
+            var member = s.Groups[1].Value;
+            return (t.GetField(member)?.GetValue(null) ?? t.GetProperty(member)?.GetValue(null)) as string;
+        }
+        return raw.StartsWith('{') ? null : WebUtility.HtmlDecode(raw);
+    }
+
+    private static string? Resolve(string tag, string attr)
+    {
+        var m = Regex.Match(tag, @"(?<![\w.:])" + Regex.Escape(attr) + "=\"([^\"]*)\"");
+        return m.Success ? ResolveValue(m.Groups[1].Value) : null;
+    }
+
+    /// <summary>A label as voice control hears it: no trailing ellipsis or colon.</summary>
+    private static string Bare(string label) => label.Trim().TrimEnd('…').TrimEnd(':').Trim();
+
+    /// <summary>The window and the pages and panels it hosts.</summary>
+    private static IEnumerable<string> SettingsXamlFiles()
+    {
+        var views = Path.Combine(AppDir(), "Views");
+        return new[] { Path.Combine(views, "SettingsWindow.xaml") }
+            .Concat(Directory.EnumerateFiles(views, "*Page.xaml").Order(StringComparer.Ordinal))
+            .Concat(Directory.EnumerateFiles(views, "*Panel.xaml").Order(StringComparer.Ordinal));
+    }
+
+    /// <summary>One TabItem of SettingsWindow.xaml, from its start tag to its end tag.</summary>
+    private static string TabRange(string tag)
+    {
+        var xaml = File.ReadAllText(Path.Combine(AppDir(), "Views", "SettingsWindow.xaml"));
+        var m = Regex.Match(xaml, "<TabItem\\b[^>]*?\\bTag=\"" + tag + "\"[^>]*>");
+        Assert.True(m.Success, "no TabItem with Tag=" + tag);
+        return xaml[m.Index..xaml.IndexOf("</TabItem>", m.Index, StringComparison.Ordinal)];
+    }
+
     /// <summary>Files the scan leaves out. The names table holds every retired name on purpose. The search
     /// index is slice 2's file: its titles keep old words until slice 2 points them at the table, and it
     /// leaves this list then.</summary>
@@ -198,6 +243,51 @@ public class SettingsSourceScanTests
         // Search finds it, and Enter on the hit puts the keyboard on the button.
         Assert.Contains(SettingsIndex.Search("quit"), h => h.Entry.Anchor == SettingsIndex.Quit);
         Assert.Contains(SettingsIndex.Search("exit"), h => h.Entry.Anchor == SettingsIndex.Quit);
+    }
+
+    [Fact]
+    public void Visible_labels_start_their_spoken_names()
+    {
+        // Voice control matches the words on screen (WF34): a control's spoken name starts with its visible
+        // text; per-row context may follow ("Show in Explorer, session archive").
+        var bad = new List<string>();
+        int pairs = 0;
+        foreach (var file in SettingsXamlFiles())
+        {
+            var src = XmlComment.Replace(File.ReadAllText(file), m => new string('\n', m.Value.Count(c => c == '\n')));
+            string At(int index) => $"{Path.GetFileName(file)}:{1 + src.Take(index).Count(c => c == '\n')}";
+            foreach (Match m in ControlTag.Matches(src))
+            {
+                var label = Resolve(m.Value, "Content");
+                var name = Resolve(m.Value, "AutomationProperties.Name");
+                if (label is null || name is null || !label.Any(char.IsLetter)) continue;
+                pairs++;
+                if (!name.StartsWith(Bare(label), StringComparison.Ordinal))
+                    bad.Add($"{At(m.Index)}: shows \"{label}\", says \"{name}\"");
+            }
+            foreach (Match m in LabelThenField.Matches(src))
+            {
+                var label = ResolveValue(m.Groups[1].Value);
+                var name = Resolve(m.Groups[3].Value, "AutomationProperties.Name");
+                if (label is null || name is null) continue;
+                pairs++;
+                if (!name.StartsWith(Bare(label), StringComparison.Ordinal))
+                    bad.Add($"{At(m.Index)}: label \"{label}\", says \"{name}\"");
+            }
+        }
+        Assert.True(pairs >= 60, $"checked only {pairs} label and name pairs");
+        Assert.True(bad.Count == 0, Environment.NewLine + string.Join(Environment.NewLine, bad));
+    }
+
+    [Fact]
+    public void Lists_the_close_button_and_the_shortcut_switch_are_named()
+    {
+        var xaml = File.ReadAllText(Path.Combine(AppDir(), "Views", "SettingsWindow.xaml"));
+        Assert.Contains("AutomationProperties.Name=\"{x:Static core:SettingsNames.CloseSettings}\"", xaml);
+        Assert.Matches("<ListBox x:Name=\"AccountsList\"[^>]*AutomationProperties.Name=\"Accounts\"", xaml);
+        foreach (var list in new[] { "Top projects (last 30 days)", "Top skills (last 30 days)", "Top projects (window)", "Session archive folders", "Sessions" })
+            Assert.Contains($"AutomationProperties.Name=\"{list}\"", TabRange("ClaudeUsage"));
+        Assert.Contains("Content=\"{x:Static core:SettingsNames.ShortcutToOpenSettings}\"", TabRange("General"));
     }
 
     [Fact]

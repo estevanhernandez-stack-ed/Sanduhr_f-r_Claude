@@ -130,6 +130,14 @@ public static class SettingsNames
     public const string AddFolder = "Add folder…";
     /// <summary>Claude Code: drops a folder that was added by hand.</summary>
     public const string ForgetFolder = "Forget folder";
+    /// <summary>Claude Code, a folder card's Forget button, spoken with its folder (WF34).</summary>
+    public static string ForgetFolderFor(string folder) => $"{ForgetFolder} {folder}";
+    /// <summary>Claude Code, a folder card: the MCP server may read this folder's project totals (settings.json "mcp_roots").</summary>
+    public const string LetClaudeReadTotals = "Let Claude read this folder's project totals";
+    /// <summary>The same switch spoken with its folder, so each card's reads apart.</summary>
+    public static string LetClaudeReadTotalsFor(string folder) => $"{LetClaudeReadTotals}, {folder}";
+    /// <summary>Settings' title-bar close button, spoken (its face is a glyph).</summary>
+    public const string CloseSettings = "Close Settings";
     /// <summary>Accounts: the follow switch, and the tray's account list marks the account in use.</summary>
     public const string FollowAccount = "Follow the account I'm using";
     /// <summary>Mods &amp; Config: re-reads the folder.</summary>
@@ -192,8 +200,15 @@ public static class SettingsNames
         "companion" => DeskCompanion,
         _ => widget,
     };
-    /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7).</summary>
+    /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7). The section's name.</summary>
     public const string DeskInk = "Ink";
+    /// <summary>Desk, Ink: the picker's label and spoken name (it was spoken "Ink", WF34).</summary>
+    public const string DeskInkPicker = "Clock, date, Claude";
+    /// <summary>Desk, Look: the Desk's font, one of the two "Font"s (WF12).</summary>
+    public const string DeskFont = "Desk font";
+    /// <summary>Message, Look: the message's font and color.</summary>
+    public const string MessageFont = "Message font";
+    public const string MessageColor = "Message color";
     /// <summary>Alerts: the Desk's sign-in reminder switch (settings.json "desk_sign_in_reminder", on by default).</summary>
     public const string SignInReminders = SignInReminder.Title;
     /// <summary>The first-run card's third action (settings.json "just_the_desk"); it has no Settings control.</summary>
@@ -296,6 +311,7 @@ public static class SettingsNames
         ("Save and apply", SaveAndApply, false),
         ("Save & Apply", SaveAndApply, false),
         ("Let agents show watchers", WatchersSwitch, false),
+        ("Claude can read this folder's project totals", LetClaudeReadTotals, false),
     ];
 
     /// <summary>The retired names <paramref name="text"/> still uses, empty when it uses none.</summary>

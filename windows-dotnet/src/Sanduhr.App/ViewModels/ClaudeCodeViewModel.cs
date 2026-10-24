@@ -63,8 +63,8 @@ public sealed partial class CcFolderRowViewModel : ObservableObject
     // Each row's controls are named for its folder: every row's combo read "Linked account for this folder",
     // so a screen reader could not tell one folder's from another's.
     public string LinkedAccountName => $"Linked account for {Display}";
-    public string ForgetName => $"Forget {Display}";
-    public string McpReadableName => $"Claude can read the project totals of {Display} through the MCP server";
+    public string ForgetName => SettingsNames.ForgetFolderFor(Display);
+    public string McpReadableName => SettingsNames.LetClaudeReadTotalsFor(Display);
 
     public override string ToString() => AutomationName;
 

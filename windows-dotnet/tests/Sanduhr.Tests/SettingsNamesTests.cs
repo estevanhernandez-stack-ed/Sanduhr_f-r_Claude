@@ -222,6 +222,29 @@ public class SettingsNamesTests
     }
 
     [Fact]
+    public void Names_that_match_their_labels_are_pinned()
+    {
+        Assert.Equal("Desk font", SettingsNames.DeskFont);
+        Assert.Equal("Message font", SettingsNames.MessageFont);
+        Assert.Equal("Message color", SettingsNames.MessageColor);
+        Assert.Equal("Clock, date, Claude", SettingsNames.DeskInkPicker);
+        Assert.Equal("Close Settings", SettingsNames.CloseSettings);
+        Assert.Equal("Let Claude read this folder's project totals", SettingsNames.LetClaudeReadTotals);
+        Assert.Equal(["Claude can read this folder's project totals"],
+            SettingsNames.RetiredNames("Claude can read this folder's project totals (MCP)"));
+    }
+
+    [Theory]
+    [InlineData(@"~\.claude")]
+    [InlineData(@"D:\Work Stuff\my claude seat")]
+    [InlineData(@"C:\Users\someone-with-a-very-long-profile-name\AppData\Roaming\claude-code\.claude-work")]
+    public void The_folder_formatters_keep_the_whole_folder(string folder)
+    {
+        Assert.Equal("Forget folder " + folder, SettingsNames.ForgetFolderFor(folder));
+        Assert.Equal("Let Claude read this folder's project totals, " + folder, SettingsNames.LetClaudeReadTotalsFor(folder));
+    }
+
+    [Fact]
     public void The_agent_switches_say_Claude()
     {
         Assert.Equal("Let Claude show watchers", SettingsNames.WatchersSwitch);
