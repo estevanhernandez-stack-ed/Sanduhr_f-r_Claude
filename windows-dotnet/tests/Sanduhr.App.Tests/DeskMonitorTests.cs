@@ -38,7 +38,7 @@ public sealed class DeskMonitorTests : IDisposable
     public DeskMonitorTests()
     {
         Directory.CreateDirectory(_root);
-        _paths = new Paths(appDataBase: _root);
+        _paths = new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local"));
         _store = new SettingsStore(_paths);
     }
 

@@ -21,7 +21,7 @@ public sealed class DeskDirectSwitchTests : IDisposable
     [Fact]
     public void TheSwitchIsOffByDefaultAndSavesAtOnce()
     {
-        var paths = new Paths(appDataBase: _root);
+        var paths = new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local"));
         var store = new SettingsStore(paths);
         var page = new DeskSettingsViewModel(store, ["Segoe UI"]);
         Assert.False(page.DirectDesign);
@@ -36,7 +36,7 @@ public sealed class DeskDirectSwitchTests : IDisposable
     [Fact]
     public void ChangingItElsewhereIsReadFreshEveryTime()
     {
-        var paths = new Paths(appDataBase: _root);
+        var paths = new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local"));
         var store = new SettingsStore(paths);
         var page = new DeskSettingsViewModel(store, ["Segoe UI"]);
         store.SaveDeskDirect(true);

@@ -45,9 +45,9 @@ internal static class PackFontCatalog
         return map;
     }
 
-    /// <summary>The pack families of this PC's installed packs.</summary>
-    public static IReadOnlyDictionary<string, Uri> ForThisPc() =>
-        Families(new WidgetStore(new Paths().WidgetsDir, WidgetCatalogService.EncodePng));
+    /// <summary>The pack families of the installed packs under <paramref name="paths"/>.</summary>
+    public static IReadOnlyDictionary<string, Uri> ForThisPc(Paths paths) =>
+        Families(new WidgetStore(paths.WidgetsDir, WidgetCatalogService.EncodePng));
 
     /// <summary>The installed families and the packs', one copy of each name, sorted without case.</summary>
     public static IReadOnlyList<string> Union(IEnumerable<string> installed, IReadOnlyDictionary<string, Uri> packs) =>

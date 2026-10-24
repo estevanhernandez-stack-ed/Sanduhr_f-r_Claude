@@ -31,8 +31,9 @@ internal sealed class DeskFonts
                 _packs[name] = baseUri;
     }
 
-    /// <summary>The Desk's fonts on this PC: the system's and the bundled ones, plus the installed font packs'.</summary>
-    public static DeskFonts ForThisPc() => new(packFamilies: PackFontCatalog.ForThisPc());
+    /// <summary>The Desk's fonts on this PC: the system's and the bundled ones, plus the font packs installed under <paramref name="paths"/>.
+    /// There is no overload without paths on purpose: whatever builds these says whose widgets folder it reads.</summary>
+    public static DeskFonts ForThisPc(Paths paths) => new(packFamilies: PackFontCatalog.ForThisPc(paths));
 
     /// <summary>The installed families for Settings' picker, the bundled ones first, then the font packs' among the rest.</summary>
     public IReadOnlyList<string> PickerFamilies() => DeskFont.PickerFamilies(_installed.Concat(_packs.Keys));

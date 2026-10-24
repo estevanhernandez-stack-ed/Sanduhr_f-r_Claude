@@ -230,7 +230,7 @@ public sealed class DeskMeterStylesViewTests : IDisposable
     public void SettingsOffersAStylePerPieceThatHasOneAndSavesIt()
     {
         Directory.CreateDirectory(_root);
-        var store = new SettingsStore(new Paths(appDataBase: _root));
+        var store = new SettingsStore(new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local")));
         store.SaveDesk(DeskSettings.Default with { Enabled = true, Layout = "clock:bl meters:tr:1:0:ring" });
         var page = new DeskSettingsViewModel(store, ["Segoe UI"], () => []);
         var meters = page.Pieces.Single(p => p.Widget == "meters");
@@ -252,7 +252,7 @@ public sealed class DeskMeterStylesViewTests : IDisposable
     {
         _ = System.IO.Packaging.PackUriHelper.UriSchemePack;
         Directory.CreateDirectory(_root);
-        var store = new SettingsStore(new Paths(appDataBase: _root));
+        var store = new SettingsStore(new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local")));
         store.SaveDesk(DeskSettings.Default with { Enabled = true, Layout = "clock:bl claude:bl:1:0:slim telemetry:tr" });
         var page = new DeskSettingsViewModel(store, ["Segoe UI"], () => []);
         var panel = new DeskPiecesPanel { DataContext = page };

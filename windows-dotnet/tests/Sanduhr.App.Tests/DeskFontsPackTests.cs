@@ -95,6 +95,21 @@ public sealed class DeskFontsPackTests : IDisposable
     }
 
     [Fact]
+    public void TheDesksFontsAreReadFromTheGivenPathsNotThePcsOwnWidgetsFolder()
+    {
+        Sta.Run(() =>
+        {
+            var empty = ScratchPaths();
+            Assert.Empty(PackFontCatalog.ForThisPc(empty));
+
+            FontPackKit.Install(InstalledPackKit.Store(empty));
+            var family = Assert.Single(PackFontCatalog.ForThisPc(empty));
+            Assert.StartsWith(Path.Combine(empty.WidgetsDir, ".fonts"), family.Value.LocalPath);
+            Assert.NotNull(DeskFonts.ForThisPc(empty));
+        });
+    }
+
+    [Fact]
     public void TheDesignServiceListsAPackFontAsInstalled()
     {
         Sta.Run(() =>

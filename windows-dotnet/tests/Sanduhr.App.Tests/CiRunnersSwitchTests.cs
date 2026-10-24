@@ -23,7 +23,7 @@ public sealed class CiRunnersSwitchTests : IDisposable
     [Fact]
     public void TheSwitchIsOffByDefault()
     {
-        var store = new SettingsStore(new Paths(appDataBase: _root));
+        var store = new SettingsStore(new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local")));
         var page = new DeskSettingsViewModel(store, ["Segoe UI"]);
         Assert.False(page.WatchersCiRunners);
         Assert.False(store.LoadWatchersCiRunners());
@@ -32,7 +32,7 @@ public sealed class CiRunnersSwitchTests : IDisposable
     [Fact]
     public void TurningItOnSavesAtOnceAndTurningItOffRemovesTheKey()
     {
-        var paths = new Paths(appDataBase: _root);
+        var paths = new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local"));
         var store = new SettingsStore(paths);
         var page = new DeskSettingsViewModel(store, ["Segoe UI"]);
         page.WatchersCiRunners = true;
@@ -46,7 +46,7 @@ public sealed class CiRunnersSwitchTests : IDisposable
     [Fact]
     public void ChangedFiresOncePerRealChangeAndNotForTheSameValue()
     {
-        var store = new SettingsStore(new Paths(appDataBase: _root));
+        var store = new SettingsStore(new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local")));
         var page = new DeskSettingsViewModel(store, ["Segoe UI"]);
         var fired = 0;
         page.CiRunnersChanged = () => fired++;

@@ -15,7 +15,7 @@ public sealed class DesignStoreTests : IDisposable
     public DesignStoreTests()
     {
         Directory.CreateDirectory(_root);
-        _paths = new Paths(appDataBase: _root);
+        _paths = new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local"));
     }
 
     public void Dispose()

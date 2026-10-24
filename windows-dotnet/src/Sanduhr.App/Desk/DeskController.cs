@@ -452,7 +452,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         // Not tied to Running: a Desk that is on but draws nothing yet (an empty message, no numbers) can
         // still be arranged, since arrange mode draws every placed piece.
         if (_host is null || _stopped || Arranging || _screens.Count == 0) return;
-        _fonts ??= DeskFonts.ForThisPc();
+        _fonts ??= _paths is null ? new DeskFonts() : DeskFonts.ForThisPc(_paths);
         var session = new DeskArrangeSession(_settings.Layout);
         var now = DateTimeOffset.Now;
         var track = TrackToDraw(now);
@@ -685,7 +685,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
 
     private void RenderOnce()
     {
-        _fonts ??= DeskFonts.ForThisPc();
+        _fonts ??= _paths is null ? new DeskFonts() : DeskFonts.ForThisPc(_paths);
         var now = DateTimeOffset.Now;
         var track = TrackToDraw(now);
         _trackKey = TrackKey(track);
