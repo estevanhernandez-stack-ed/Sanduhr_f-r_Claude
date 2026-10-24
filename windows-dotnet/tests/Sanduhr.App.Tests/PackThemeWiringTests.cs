@@ -141,20 +141,83 @@ public sealed class PackThemeWiringTests : AppWindowFixture
         Assert.Contains(widget.Themes, t => t.Key == PackKey);   // the pack's own theme is still there beside the copy
     });
 
+    private static string MineJson() =>
+        ThemeDraft.FromDefinition("obsidian", ThemeCatalog.BuiltIns["obsidian"]).ToJson().ToJsonString();
+
+    private static ThemeStudioViewModel StudioOver(WidgetViewModel widget, List<string> errors) =>
+        new(widget, errors.Add, _ => { }, () => { });
+
     [Fact]
-    public void The_studio_leaves_the_file_name_empty_rather_than_overwrite_a_theme_of_the_same_name() => AppHost.Run(() =>
+    public void The_studio_offers_the_next_free_name_when_a_theme_of_the_stem_exists_and_saving_leaves_yours_alone() => AppHost.Run(() =>
     {
         var paths = new Paths();
         InstalledPackKit.Install(paths, "good-theme");
         Directory.CreateDirectory(paths.ThemesDir);
-        var mine = ThemeDraft.FromDefinition("obsidian", ThemeCatalog.BuiltIns["obsidian"]).ToJson();
-        mine["name"] = "Mine";
-        File.WriteAllText(Path.Combine(paths.ThemesDir, "fixture-dark.json"), mine.ToJsonString());
+        string mine = Path.Combine(paths.ThemesDir, "fixture-dark.json");
+        File.WriteAllText(mine, MineJson());
         var widget = DemoWidget();
-        var studio = new ThemeStudioViewModel(widget, _ => { }, _ => { }, () => { });
+        var errors = new List<string>();
+        var studio = StudioOver(widget, errors);
 
         studio.SelectedStart = widget.Themes.First(t => t.Key == PackKey);
+        Assert.Equal("fixture-dark-2", studio.FileName);
 
-        Assert.Equal("", studio.FileName);
+        File.WriteAllText(Path.Combine(paths.ThemesDir, "fixture-dark-2.json"), MineJson());
+        studio.SelectedStart = widget.Themes.First(t => t.Key == "obsidian");
+        studio.SelectedStart = widget.Themes.First(t => t.Key == PackKey);
+        Assert.Equal("fixture-dark-3", studio.FileName);
+
+        string before = File.ReadAllText(mine);
+        studio.SaveCommand.Execute(null);
+        Assert.Empty(errors);
+        Assert.Equal(before, File.ReadAllText(mine));
+        Assert.True(File.Exists(Path.Combine(paths.ThemesDir, "fixture-dark-3.json")));
+    });
+
+    [Fact]
+    public void Save_refuses_to_overwrite_one_of_your_themes_it_was_not_started_from() => AppHost.Run(() =>
+    {
+        var paths = new Paths();
+        InstalledPackKit.Install(paths, "good-theme");
+        Directory.CreateDirectory(paths.ThemesDir);
+        string mine = Path.Combine(paths.ThemesDir, "fixture-dark.json");
+        File.WriteAllText(mine, MineJson());
+        var widget = DemoWidget();
+        var errors = new List<string>();
+        var studio = StudioOver(widget, errors);
+        studio.SelectedStart = widget.Themes.First(t => t.Key == PackKey);
+        string before = File.ReadAllText(mine);
+
+        studio.FileName = "fixture-dark";   // typed over the suggestion
+        studio.SaveCommand.Execute(null);
+        Assert.Equal(before, File.ReadAllText(mine));
+        Assert.Contains("already one of your themes", Assert.Single(errors));
+
+        // Empty falls back to the name's slug ("Fixture Dark" is fixture-dark): the same refusal, not a silent overwrite.
+        errors.Clear();
+        studio.FileName = "";
+        studio.SaveCommand.Execute(null);
+        Assert.Equal(before, File.ReadAllText(mine));
+        Assert.Single(errors);
+    });
+
+    [Fact]
+    public void Save_still_updates_the_theme_of_yours_it_was_started_from() => AppHost.Run(() =>
+    {
+        var paths = new Paths();
+        Directory.CreateDirectory(paths.ThemesDir);
+        string mine = Path.Combine(paths.ThemesDir, "dusk.json");
+        File.WriteAllText(mine, MineJson());
+        var widget = DemoWidget();
+        var errors = new List<string>();
+        var studio = StudioOver(widget, errors);
+        studio.SelectedStart = widget.Themes.First(t => t.Key == "dusk");
+        Assert.Equal("dusk", studio.FileName);
+        studio.Name = "Dusk edited";
+
+        studio.SaveCommand.Execute(null);
+
+        Assert.Empty(errors);
+        Assert.Contains("Dusk edited", File.ReadAllText(mine));
     });
 }
