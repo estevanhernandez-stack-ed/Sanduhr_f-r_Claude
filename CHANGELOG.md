@@ -1,12 +1,16 @@
 # Changelog
 
-## Unreleased (windows)
+## v3.9.1 — 2026-10-24
+
+**Platform:** Windows (.NET 10 / WPF). A patch that fixes widget packs: the themes, palettes and fonts of the packs you install now apply. `Sanduhr.Mcp` to 3.9.1. **No new outbound destination and no new capability:** nothing new is read or sent, the manifest still declares `runFullTrust` only and changes only its version, and the MCP trust boundary is unchanged: the link list and `TrustBoundaryTests` are as in 3.9.0, and the new pack code lives in Core files the server does not link.
 
 ### Fixes
 
 - Themes, palettes and fonts from installed widget packs now show in the theme list, the Desk ink presets and the Desk fonts. They installed before, but nothing used them. The Desk and message font lists update when Settings reopens.
 - Effects packs install and preview, but nothing draws them yet.
-- Removing the theme in use switches to Obsidian at once. That includes deleting the theme file you have selected in Settings ▸ Themes.
+- Removing the theme in use switches to Obsidian at once. That includes deleting the theme file you have selected in Settings ▸ Themes. The switch is only shown, never saved, so a pack that can't be read for a moment doesn't change your choice.
+- A pack font Sanduhr can't read is left out of the lists instead of failing when the Desk draws with it.
+- Theme Studio: starting from a pack's theme offers a file name that saves a copy (`name`, then `name-2`...), and Save no longer replaces one of your themes you didn't start from.
 
 ## v3.9.0 — 2026-10-24
 
