@@ -7,13 +7,16 @@ namespace Sanduhr.Core;
 /// One searchable place in Settings: a page (no anchor), a section or a control. The anchor is
 /// page-local and marks the element Settings scrolls to. <paramref name="Subsection"/> names the
 /// Claude Usage view (Overview, Trends, Sessions) the anchor sits in, null elsewhere.
+/// <paramref name="CollapsedIn"/> names the collapsed section it sits in ("Advanced"), so a search
+/// result can say so and opening it can unfold the section; null while it is always shown.
 /// </summary>
 public sealed record SettingsEntry(
     string Title,
     SettingsPage Page,
     string? Anchor,
     IReadOnlyList<string> Synonyms,
-    string? Subsection = null);
+    string? Subsection = null,
+    string? CollapsedIn = null);
 
 /// <summary>A place in Settings: a page and, optionally, an anchor on it (spec, "Deep links and entry points").</summary>
 public sealed record SettingsLink(SettingsPage Page, string? Anchor);
@@ -90,6 +93,7 @@ public static class SettingsIndex
     public const string MessageRotation = "rotation";
     public const string MessageSpecial = "special";
     public const string MessageLook = "message-look";
+    public const string MessageSuggestion = "suggestion";
     public const string NowPlayingWidget = "np-widget";
     public const string NowPlayingApps = "np-apps";
     public const string NowPlayingBars = "np-bars";
@@ -221,6 +225,8 @@ public static class SettingsIndex
         E(SettingsNames.DeskInk, SettingsPage.Desk, DeskInk,
             ["ink", "text color", "automatic", "light", "dark", "wallpaper", "readable", "shadow", "gradient", "hex"]),
 
+        E("Claude's suggestion", SettingsPage.DeskMessage, MessageSuggestion,
+            ["suggestion", "suggested", "Claude", "agent", "review", "dismiss", "propose"]),
         E("Your lines", SettingsPage.DeskMessage, MessageLines,
             ["messages.txt", "message", "edit", "add line", "effects", "glow", "write", "sweep", "shimmer", "font", "ink", "edit as text"]),
         E("Rotation", SettingsPage.DeskMessage, MessageRotation, ["rotate", "daily", "hourly", "pin", "mix", "every day"]),
@@ -338,8 +344,8 @@ public static class SettingsIndex
             var anchor = NameAnchors.TryGetValue(name, out var a) ? a : null;
             if (!all.Any(e => e.Title == name && e.Page == page && e.Anchor == anchor))
             {
-                var sub = Anchors.FirstOrDefault(e => e.Page == page && e.Anchor == anchor)?.Subsection;
-                all.Add(new SettingsEntry(name, page, anchor, [], sub));
+                var at = Anchors.FirstOrDefault(e => e.Page == page && e.Anchor == anchor);
+                all.Add(new SettingsEntry(name, page, anchor, [], at?.Subsection, at?.CollapsedIn));
             }
         }
         return all;
@@ -352,12 +358,12 @@ public static class SettingsIndex
     public static SettingsEntry? Find(SettingsPage page, string? id) =>
         id is null ? null : Anchors.FirstOrDefault(e => e.Page == page && e.Anchor == id);
 
-    /// <summary>A match: the entry, and 0 when its title matched, 1 when only a synonym did.</summary>
+    /// <summary>A match: the entry, and 0 when its title matched, 1 when only a synonym did, -1 when a boost named it.</summary>
     public sealed record Hit(SettingsEntry Entry, int Rank);
 
     /// <summary>
-    /// The entries <paramref name="query"/> finds, best first: title matches before synonym matches,
-    /// then in sidebar order, then in index order. Empty for a blank query.
+    /// The entries <paramref name="query"/> finds, best first: boosted sections, then title matches, then synonym
+    /// matches, then in sidebar order, then in index order. Empty for a blank query.
     /// </summary>
     public static IReadOnlyList<Hit> Search(string? query, IReadOnlyList<SettingsEntry>? index = null)
     {
@@ -366,21 +372,60 @@ public static class SettingsIndex
             return [];
         index ??= All;
         var order = SettingsNames.Pages;
+        var boosted = Boosted(q, index);
         var found = new List<(Hit Hit, int I)>();
         for (int i = 0; i < index.Count; i++)
         {
             var e = index[i];
+            if (boosted.Any(b => ReferenceEquals(b, e)))
+                continue;
             if (Matches(q, e.Title))
                 found.Add((new Hit(e, 0), i));
             else if (e.Synonyms.Any(s => Matches(q, s)))
                 found.Add((new Hit(e, 1), i));
         }
         int PageOrder(SettingsPage p) { var at = IndexOf(order, p); return at < 0 ? int.MaxValue : at; }
-        return [.. found
+        return [.. boosted.Select(e => new Hit(e, -1)),
+            .. found
             .OrderBy(f => f.Hit.Rank)
             .ThenBy(f => PageOrder(f.Hit.Entry.Page))
             .ThenBy(f => f.I)
             .Select(f => f.Hit)];
+    }
+
+    /// <summary>
+    /// A word that lands on one section above every title match (spec, Search, Synonyms). Like an alias it names its page
+    /// by id, so it does nothing until that page and anchor are in the index: the rows below wait for slices 3 to 7.
+    /// </summary>
+    public sealed record Boost(IReadOnlyList<string> Queries, string PageId, string Anchor);
+
+    /// <summary>The spec's synonyms, each the whole query (any case), never a prefix of it.</summary>
+    public static IReadOnlyList<Boost> Boosts { get; } =
+    [
+        new(["font", "fonts"], "desklook", "look"),
+        new(["update", "updates"], "about", "updates"),
+        new(["docker", "runner", "runners"], "watchers", "ci-runners"),
+        new(["privacy", "offline", "network", "send"], "privacy", "network"),
+        new(["stream", "streamer", "screen share", "hide names", "obs"], "privacy", "streamer"),
+        new(["demo"], "privacy", "streamer"),
+        new(["codename", "codenames"], "privacy", "streamer-allowlist"),
+        new(["widgets", "packs", "pack"], "mods", "catalog"),
+    ];
+
+    /// <summary>The entries a boost names for exactly this query, in boost order, when they are in <paramref name="index"/>.</summary>
+    private static List<SettingsEntry> Boosted(IReadOnlyList<string> query, IReadOnlyList<SettingsEntry> index)
+    {
+        var phrase = string.Join(' ', query);
+        var hits = new List<SettingsEntry>();
+        foreach (var boost in Boosts)
+        {
+            if (!boost.Queries.Any(w => string.Join(' ', Words(w)) == phrase) || PageFromId(boost.PageId) is not { } page)
+                continue;
+            if (index.FirstOrDefault(e => e.Page == page && e.Anchor == boost.Anchor) is { } entry
+                && !hits.Any(h => ReferenceEquals(h, entry)))
+                hits.Add(entry);
+        }
+        return hits;
     }
 
     /// <summary>
