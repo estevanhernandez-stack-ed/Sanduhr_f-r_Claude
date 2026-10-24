@@ -334,6 +334,34 @@ public class SettingsSourceScanTests
     }
 
     [Fact]
+    public void The_dialogs_and_reset_wording_use_the_archive_and_folder_names()
+    {
+        // Lowercase or prose uses the retired-name scan can't see: "home" for a Claude Code folder,
+        // "the usage vault" for the session archive.
+        var views = Path.Combine(AppDir(), "Views");
+        var reset = File.ReadAllText(Path.Combine(AppDir(), "Services", "ResetService.cs"));
+        Assert.Contains("\"the session archive\"", reset);
+        Assert.DoesNotContain("the usage vault", reset);
+
+        var consentXaml = File.ReadAllText(Path.Combine(views, "McpConsentDialog.xaml"));
+        var consentCs = File.ReadAllText(Path.Combine(views, "McpConsentDialog.xaml.cs"));
+        Assert.Contains("Pick which Claude Code folder gets it", consentXaml);
+        Assert.Contains("each Claude Code folder needs its own checkbox", consentXaml);
+        Assert.Contains("only for folders checked above", consentCs);
+        Assert.DoesNotContain("Claude Code home", consentXaml);
+        Assert.DoesNotContain("for homes checked", consentCs);
+
+        var settings = File.ReadAllText(Path.Combine(views, "SettingsWindow.xaml"));
+        Assert.Contains("ToolTip=\"Find a setting by name: tray, archive, CSV, shortcut, theme\"", settings);
+        Assert.DoesNotContain("tray, vault,", settings);
+
+        var vault = File.ReadAllText(Path.Combine(views, "VaultConsentDialog.xaml"));
+        Assert.Contains("Text=\"Keep a local session archive?\"", vault);
+        Assert.Contains("Content=\"Keep archive\"", vault);
+        Assert.DoesNotContain("usage history", vault);
+    }
+
+    [Fact]
     public void The_trademark_notice_has_one_source_and_both_windows_bind_to_it()
     {
         const string phrase = "trademarks of Anthropic";

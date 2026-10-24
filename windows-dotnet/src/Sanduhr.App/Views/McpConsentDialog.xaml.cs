@@ -71,7 +71,7 @@ internal partial class McpConsentDialog : Window
         DetailsText.Text =
             $"What gets written: the server files under %USERPROFILE%\\.sanduhr\\mcp\\, a launcher at {launcherPath}, " +
             $"and a 'sanduhr' entry in {configPathFor(home)} (a timestamped backup is saved beside it first). " +
-            "The helper is read-only: it can see your usage percentages and - only for homes checked above - " +
+            "The helper is read-only: it can see your usage percentages and, only for folders checked above, " +
             "project-level token totals. It cannot see your keys, your accounts, or conversation content. " +
             "It can also propose a color theme, which Sanduhr saves under its themes folder and applies; the previous theme stays one click away. " +
             "sanduhr-mcp requires widget 3.4.0 or later; Sanduhr refreshes the helper's files on every start so the two stay paired. " +

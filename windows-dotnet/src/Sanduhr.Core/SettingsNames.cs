@@ -157,8 +157,24 @@ public static class SettingsNames
     public const string FollowAccount = "Follow the account I'm using";
     /// <summary>Mods &amp; Config: re-reads the folder.</summary>
     public const string RefreshFolder = "Refresh";
-    /// <summary>Desk: the switch at the top of the page (settings.json "desk_enabled", off by default).</summary>
-    public const string DeskSwitch = "Desk: the clock and your Claude meters on the desktop";
+    /// <summary>Desk: the switch at the top of the page (settings.json "desk_enabled", off by default). It lists
+    /// what the Desk draws, as the tour does (WF16).</summary>
+    public const string DeskSwitch = "Desk: a clock, your meters, a message and more on the desktop";
+    /// <summary>Claude Code: the install that lights the glow, the Mac's name (WF11). "Claude Code glow" is the
+    /// section and the Desk piece.</summary>
+    public const string ClaudeCodeGlowHook = "Claude Code glow hook";
+    /// <summary>Claude Code: a piece installed in an older version. "Update…" beside it is the verb (WF42).</summary>
+    public const string PieceOutdated = "Installed, but not the current version.";
+    /// <summary>Claude Code, a folder card's Linked account caption, true before and after an install (WF27).</summary>
+    public const string LinkedAccountCaption = "Once the statusline or meters are installed here, they show this account's meters.";
+    /// <summary>Mods &amp; Config: Claude Code's own retention (cleanupPeriodDays), the fourth "history" (WF14).</summary>
+    public const string TranscriptsKept = "Claude Code keeps transcripts for";
+    /// <summary>Themes: a pasted or edited theme with no errors or notes (WF43).</summary>
+    public const string ThemeJsonValid = "This theme's JSON is valid.";
+    /// <summary>Themes, Studio: the file name the theme is saved under (WF43).</summary>
+    public const string SaveThemeAs = "Save the theme as";
+    /// <summary>Alerts, Sound (settings.json "alert_snake_full"), said plainly (WF43, WF38).</summary>
+    public const string SnakeSoundAtFull = "Play the cooldown snake's sound at 100%";
     /// <summary>Desk, Where each piece sits: the pieces, named as on the Mac.</summary>
     public const string DeskClock = "Clock and date";
     public const string DeskClaudeLine = "Claude meters (line)";
@@ -335,6 +351,13 @@ public static class SettingsNames
         ("Homes to share", FoldersToShare, false),
         ("(statusline, MCP server)", ResetClaudeCodeEntries, false),
         ("Usage history and the vault", ResetMeterHistory, false),
+        ("Desk: the clock and your Claude meters on the desktop", DeskSwitch, false),
+        ("Glow when Claude needs you", ClaudeCodeGlowHook, false),
+        ("Install again to update it", PieceOutdated, false),
+        ("History kept", TranscriptsKept, false),
+        ("Looks good", ThemeJsonValid, true),
+        ("Save as:", SaveThemeAs, true),
+        ("100% plays the !", SnakeSoundAtFull, false),
     ];
 
     /// <summary>The retired names <paramref name="text"/> still uses, empty when it uses none.</summary>

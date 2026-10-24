@@ -214,7 +214,7 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
         int errors = lint.Errors.Count(), warnings = lint.Warnings.Count();
         Summary = errors > 0 ? $"{errors} to fix before saving"
             : warnings > 0 ? $"Saveable, {warnings} design {(warnings == 1 ? "note" : "notes")}"
-            : "Looks good";
+            : SettingsNames.ThemeJsonValid;
 
         if (!preview)
             return;

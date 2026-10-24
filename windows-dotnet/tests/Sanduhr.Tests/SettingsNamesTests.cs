@@ -267,4 +267,21 @@ public class SettingsNamesTests
         foreach (var old in new[] { "Export CSV…", "History vault", "Usage vault", "Erase archive", "Open vault folder", "Homes to share", "(statusline, MCP server)", "Usage history and the vault" })
             Assert.NotEmpty(SettingsNames.RetiredNames(old));
     }
+
+    [Fact]
+    public void Page_copy_names_are_pinned_and_the_old_ones_retired()
+    {
+        Assert.Equal("Desk: a clock, your meters, a message and more on the desktop", SettingsNames.DeskSwitch);
+        Assert.Equal("Claude Code glow hook", SettingsNames.ClaudeCodeGlowHook);
+        Assert.Equal("Installed, but not the current version.", SettingsNames.PieceOutdated);
+        Assert.Equal("Once the statusline or meters are installed here, they show this account's meters.", SettingsNames.LinkedAccountCaption);
+        Assert.Equal("Claude Code keeps transcripts for", SettingsNames.TranscriptsKept);
+        Assert.Equal("This theme's JSON is valid.", SettingsNames.ThemeJsonValid);
+        Assert.Equal("Save the theme as", SettingsNames.SaveThemeAs);
+        Assert.Equal("Play the cooldown snake's sound at 100%", SettingsNames.SnakeSoundAtFull);
+        foreach (var old in new[] { "Desk: the clock and your Claude meters on the desktop", "Glow when Claude needs you",
+                     "Install again to update it.", "History kept", "Looks good", "Save as:", "100% plays the ! (you know the one)" })
+            Assert.NotEmpty(SettingsNames.RetiredNames(old));
+        Assert.Empty(SettingsNames.RetiredNames("Looks good to me")); // "Looks good" is whole-string only
+    }
 }

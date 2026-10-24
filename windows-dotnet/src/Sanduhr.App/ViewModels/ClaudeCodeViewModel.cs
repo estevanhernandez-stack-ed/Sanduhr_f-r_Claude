@@ -201,7 +201,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             "A mod that draws your meters in a band above the prompt.",
             InstallMeters, RemoveMeters, "Update…",
             "Asks first, then copies the current mod files again and points this folder's entry at them.");
-        Hooks = new CcPieceViewModel("Glow when Claude needs you",
+        Hooks = new CcPieceViewModel(SettingsNames.ClaudeCodeGlowHook,
             "Two hooks that light the edge of your window when Claude Code waits on you or finishes.",
             InstallHooks, RemoveHooks, "Update…",
             "Asks first, then writes Sanduhr's two hooks into this folder's settings.json again.");
@@ -479,7 +479,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     private static string StatusWords(IntegrationStatus s) => s switch
     {
         IntegrationStatus.Installed => "Installed.",
-        IntegrationStatus.Outdated => "Installed, but not the current version. Install again to update it.",
+        IntegrationStatus.Outdated => SettingsNames.PieceOutdated,
         IntegrationStatus.Unreadable => "This folder's settings.json can't be read, so nothing is changed.",
         _ => "Not installed.",
     };
