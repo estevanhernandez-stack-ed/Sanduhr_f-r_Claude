@@ -292,6 +292,41 @@ public sealed class SettingsReachTests : AppWindowFixture
     });
 
     [Fact]
+    public void The_meter_history_says_why_it_is_empty() => AppHost.Run(() =>
+    {
+        var (signedOut, _) = ScratchWidget();
+        var tab = new HistoryTabViewModel(signedOut);
+        tab.BuildRows();
+        Assert.Equal(HistoryTabViewModel.SignedOutLine, tab.EmptyText);
+        Assert.True(tab.HasEmptyText);
+
+        var (work, _) = ScratchWidget("Work");
+        var workTab = new HistoryTabViewModel(work);
+        workTab.BuildRows();
+        Assert.Equal(HistoryTabViewModel.NoHistoryLine, workTab.EmptyText);
+
+        work.History.AppendForAccount("five_hour", 41, "Work");
+        Assert.NotEmpty(workTab.BuildRows());
+        Assert.Equal("", workTab.EmptyText);
+        Assert.False(workTab.HasEmptyText);
+    });
+
+    [Fact]
+    public void Signed_out_the_History_page_reads_its_empty_line() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open();
+        try
+        {
+            Land(window, guard, SettingsPage.History, SettingsIndex.Chart);
+            var line = (TextBlock)window.FindName("HistoryEmptyText");
+            Assert.True(line.IsVisible);
+            Assert.Equal(HistoryTabViewModel.SignedOutLine, line.Text);
+            Assert.Equal(Visibility.Hidden, ((FrameworkElement)window.FindName("Chart")).Visibility);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public void Alerts_and_Publish_usage_scroll_on_a_short_window() => AppHost.Run(() =>
     {
         var (window, _, guard) = Open("Personal");
