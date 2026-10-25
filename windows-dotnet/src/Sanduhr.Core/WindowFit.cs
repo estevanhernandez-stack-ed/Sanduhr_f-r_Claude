@@ -18,4 +18,12 @@ public static class WindowFit
         double top = work.Top + Math.Max(0, (work.Height - h) / 2);
         return new Area(left, top, w, h);
     }
+
+    /// <summary>Below this window height, in DIPs, the Desk's Layout map folds to its 44 DIP header (spec, Short windows).</summary>
+    public const double MapFoldsBelow = 600;
+
+    /// <summary>Whether the Layout map is folded: the person's own choice this window's life when they made one, else folded below
+    /// <see cref="MapFoldsBelow"/> (the Mac's rule).</summary>
+    public static bool MapFolds(double windowHeight, bool? chosenOpen) =>
+        chosenOpen is { } open ? !open : windowHeight < MapFoldsBelow;
 }

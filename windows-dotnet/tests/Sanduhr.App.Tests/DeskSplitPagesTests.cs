@@ -355,4 +355,90 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void The_map_folds_below_600_and_a_choice_holds_for_the_window() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Desk);
+            window.Height = 560;
+            Settle(window, guard);
+            var fold = (Expander)window.FindName("DeskMapFold");
+            Assert.False(fold.IsExpanded);
+            Assert.InRange(Below<ToggleButton>(fold).First().ActualHeight, 43.5, 46);   // a 44 DIP strip
+            window.Height = 800;
+            Settle(window, guard);
+            Assert.True(fold.IsExpanded);
+            fold.IsExpanded = false;                                                       // the person folds it
+            window.Height = 820;
+            Settle(window, guard);
+            Assert.False(fold.IsExpanded);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void A_window_that_opens_under_600_opens_with_the_map_folded() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+        var window = new SettingsWindow(svm) { Height = 560 };
+        var guard = NoActivate.Show(window);
+        try
+        {
+            Settle(window, guard);
+            Assert.False(((Expander)window.FindName("DeskMapFold")).IsExpanded);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void A_link_to_the_folded_map_opens_it() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Desk);
+            window.Height = 560;
+            Settle(window, guard);
+            var fold = (Expander)window.FindName("DeskMapFold");
+            Assert.False(fold.IsExpanded);
+            window.SelectPage(SettingsPage.Desk, SettingsIndex.DeskMap);
+            Settle(window, guard);
+            Assert.True(fold.IsExpanded);
+            Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskMap), window.Place);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void The_map_toggle_speaks_as_an_expander_with_the_map_title() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Desk);
+            Settle(window, guard);
+            var fold = (Expander)window.FindName("DeskMapFold");
+            var peer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(fold);
+            var provider = (System.Windows.Automation.Provider.IExpandCollapseProvider)peer.GetPattern(System.Windows.Automation.Peers.PatternInterface.ExpandCollapse);
+            Assert.Equal(SettingsNames.DeskLayoutMap, peer.GetName());
+            Assert.Equal(System.Windows.Automation.ExpandCollapseState.Expanded, provider.ExpandCollapseState);
+            var toggle = Below<ToggleButton>(fold).First();
+            Assert.Equal("HeaderSite", toggle.Name);
+            Assert.Equal(SettingsNames.DeskLayoutMap, System.Windows.Automation.AutomationProperties.GetName(toggle));
+            Assert.Equal(System.Windows.Automation.AutomationHeadingLevel.Level2, System.Windows.Automation.AutomationProperties.GetHeadingLevel(fold));
+            foreach (var text in Below<TextBlock>(toggle))
+            {
+                var tp = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(text);
+                Assert.False(tp is not null && tp.IsControlElement(), "header text '" + text.Text + "' is a control element");
+            }
+            fold.IsExpanded = false;
+            Settle(window, guard);
+            Assert.Equal(System.Windows.Automation.ExpandCollapseState.Collapsed, provider.ExpandCollapseState);
+        }
+        finally { window.Close(); }
+    });
 }

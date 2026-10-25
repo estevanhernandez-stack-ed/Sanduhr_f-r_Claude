@@ -2608,16 +2608,21 @@
 
                                     <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
-                                    <!-- The Layout map, on top (spec, Desk): a picture of where each piece sits, not a control (WF5). -->
-                                    <StackPanel views:SettingsAnchor.Id="map">
-                                        <TextBlock Text="{x:Static core:SettingsNames.DeskLayoutMap}" FontSize="13" FontWeight="SemiBold"
-                                                   AutomationProperties.HeadingLevel="Level2"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
-                                        <views:DeskLayoutMap HorizontalAlignment="Left" />
-                                        <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                                   Text="{x:Static core:SettingsNames.DeskMapCaption}" />
-                                    </StackPanel>
+                                    <!-- The Layout map, on top (spec, Desk): a picture of where each piece sits, not a control (WF5). Below 600 DIP of
+                                         window height it folds to its 44 DIP header; a fold or unfold by the person holds for the window's life.
+                                         The header is a plain string: SectionExpander's toggle draws it. -->
+                                    <Expander x:Name="DeskMapFold" Style="{StaticResource SectionExpander}" views:SettingsAnchor.Id="map" IsExpanded="True"
+                                              AutomationProperties.Name="{x:Static core:SettingsNames.DeskLayoutMap}"
+                                              AutomationProperties.HeadingLevel="Level2"
+                                              Header="{x:Static core:SettingsNames.DeskLayoutMap}"
+                                              Expanded="DeskMapFold_Toggled" Collapsed="DeskMapFold_Toggled">
+                                        <StackPanel>
+                                            <views:DeskLayoutMap HorizontalAlignment="Left" />
+                                            <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                                       Text="{x:Static core:SettingsNames.DeskMapCaption}" />
+                                        </StackPanel>
+                                    </Expander>
 
                                     <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 

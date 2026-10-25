@@ -142,4 +142,12 @@ public class WindowFitTests
             }
         }
     }
+
+    [Theory]
+    [InlineData(599, null, true)]
+    [InlineData(600, null, false)]
+    [InlineData(800, false, true)]    // folded by the person: stays folded on a tall window
+    [InlineData(500, true, false)]    // opened by the person: stays open on a short one
+    public void The_map_folds_below_600_unless_the_person_chose(double height, bool? chosenOpen, bool folds) =>
+        Assert.Equal(folds, WindowFit.MapFolds(height, chosenOpen));
 }
