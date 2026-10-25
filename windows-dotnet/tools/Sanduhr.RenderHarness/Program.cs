@@ -21,7 +21,7 @@ using Sanduhr.Core;
 //
 // Options:
 //   --out <dir>          where PNGs and log.txt go (default ./harness-out)
-//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | desk | arrange | launcher | review | companion | ridealongs | propose-widget | meterstyles | all; repeatable (default all)
+//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | desk | arrange | launcher | review | companion | ridealongs | propose-widget | meterstyles | theme-match | all; repeatable (default all)
 //                        settings-pass is not part of all: it is the slow evidence run for the Settings persona pass
 //                        (see SettingsPassScenario.cs); run it once without and once with --light
 //                        manual-key is not part of all either: the manual sign-in key window, closed and fully open
@@ -106,7 +106,7 @@ public static partial class Program
                     return 2;
             }
         }
-        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange", "launcher", "review", "companion", "ridealongs", "propose-widget", "meterstyles" };
+        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange", "launcher", "review", "companion", "ridealongs", "propose-widget", "meterstyles", "theme-match" };
         string[] opt = { "settings-pass", "manual-key" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
@@ -371,6 +371,8 @@ public static partial class Program
                 await RenderCompanion(vm, asm);
             if (scenarios.Contains("meterstyles"))
                 await RenderMeterStyles(vm, asm);
+            if (scenarios.Contains("theme-match"))
+                await RenderThemeMatch(vm, asm);
             if (scenarios.Contains("ridealongs"))
                 await RenderRideAlongs(vm, asm);
             if (scenarios.Contains("propose-widget"))
