@@ -200,7 +200,7 @@ public sealed class ThemeMatchServiceTests : AppWindowFixture
         var result = r.Service.MatchNow();
         Assert.True(result.Ok);
         Assert.True(r.Store.LoadDeskPlate());
-        Assert.EndsWith(SettingsNames.ThemeMatchPlateNote, result.Message);
+        Assert.Contains(SettingsNames.ThemeMatchPlateNote, result.Message);
     });
 
     [Fact]
@@ -211,7 +211,7 @@ public sealed class ThemeMatchServiceTests : AppWindowFixture
         r.Service.WallpaperLuminance = () => [0.05, 0.9];
         var result = r.Service.MatchNow();
         Assert.True(r.Store.LoadDeskPlate());
-        Assert.EndsWith(SettingsNames.ThemeMatchPlateNote, result.Message);
+        Assert.Contains(SettingsNames.ThemeMatchPlateNote, result.Message);
     });
 
     [Fact]
@@ -496,5 +496,24 @@ public sealed class ThemeMatchServiceTests : AppWindowFixture
         var service = new ThemeMatchService(r.Store, r.Widget, () => throw new InvalidOperationException("boom"));
         Assert.Throws<InvalidOperationException>(() => service.FollowOn());
         Assert.Empty(Directory.GetFiles(r.Paths.ThemesDir, "*.tmp"));
+    });
+
+    [Fact]
+    public void Match_now_over_a_light_wallpaper_says_the_clock_may_be_faint_and_Follow_keeps_it_readable() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        r.Service.WallpaperLuminance = () => [0.79];
+        var result = r.Service.MatchNow();
+        Assert.True(result.Ok);
+        Assert.EndsWith(SettingsNames.ThemeMatchFaintNote, result.Message);
+        Assert.Empty(SettingsNames.PathProblems(SettingsNames.ThemeMatchFaintNote));
+    });
+
+    [Fact]
+    public void Match_now_over_a_dark_wallpaper_adds_no_faint_note() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        r.Service.WallpaperLuminance = () => [0.05];
+        Assert.Equal(SettingsNames.MatchedTheme("Obsidian"), r.Service.MatchNow().Message);
     });
 }

@@ -56,7 +56,7 @@ public sealed partial class ThemeMatchViewModel : ObservableObject
 
     public bool NotFollowing => !Follow;
 
-    public string PlateNote => Follow && PlateForced() ? SettingsNames.ThemeMatchPlateNote : "";
+    public string PlateNote => Follow && PlateForced() ? SettingsNames.ThemeFollowPlateNote : "";
 
     /// <summary>Reads the switch again (and the plate note) without acting on it. While following the status line says what the Desk
     /// follows; an action's own message is kept when not following.</summary>

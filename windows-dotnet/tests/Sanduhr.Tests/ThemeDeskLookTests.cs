@@ -149,4 +149,51 @@ public class ThemeDeskLookTests
         Assert.Equal(["gradient", "ink", "bars", "message", "glow", "plate", "plate_color", "shadow", "font", "bar_track", "pace_tick"],
             json.Select(kv => kv.Key));
     }
+
+    // ---- the plate opacity rule (final review I-3) ----
+
+    private static readonly ThemeDeskLook Obsidian = ThemeDeskLook.From(ThemeCatalog.BuiltIns["obsidian"]);
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(double.NaN)]
+    [InlineData(-0.2)]
+    [InlineData(1.4)]
+    [InlineData(0.05)]   // reads over the plate already
+    public void The_plate_stays_at_todays_opacity_when_there_is_no_sample_or_the_ink_already_reads(double? luminance) =>
+        Assert.Equal(DeskPlate.Opacity, Obsidian.PlateOpacityOver(luminance));
+
+    [Theory]
+    [InlineData(0.79)]
+    [InlineData(1.0)]
+    public void The_plate_is_the_smallest_step_from_030_to_060_at_which_the_ink_reads(double luminance)
+    {
+        double opacity = Obsidian.PlateOpacityOver(luminance);
+        Assert.InRange(opacity, DeskPlate.Opacity + 0.049, ThemeDeskLook.MaxPlateOpacity);
+        Assert.Equal(0, Math.Round(opacity / 0.05) * 0.05 - opacity, 6);   // on the 0.05 grid
+        double ink = InkHex.Luminance(Obsidian.Ink[0]);
+        Assert.True(DeskDesign.Ratio(ink, DeskDesign.UnderPlate(luminance, Obsidian.PlateColor, opacity)) >= DeskDesign.MinContrast);
+        Assert.True(DeskDesign.Ratio(ink, DeskDesign.UnderPlate(luminance, Obsidian.PlateColor, opacity - 0.05)) < DeskDesign.MinContrast);
+    }
+
+    [Fact]
+    public void The_plate_is_050_for_obsidian_over_the_light_wallpaper_and_055_over_white()
+    {
+        Assert.Equal(0.50, Obsidian.PlateOpacityOver(0.79), 6);
+        Assert.Equal(0.55, Obsidian.PlateOpacityOver(1.0), 6);
+    }
+
+    [Fact]
+    public void The_plate_stops_at_the_maximum_when_no_opacity_can_make_the_ink_read()
+    {
+        var white = ThemeDeskLook.From(ThemeCatalog.BuiltIns["obsidian"] with { Desk = new ThemeDesk { PlateColor = "#ffffff" } });
+        Assert.Equal(ThemeDeskLook.MaxPlateOpacity, white.PlateOpacityOver(0.9));
+    }
+
+    [Fact]
+    public void UnderPlate_at_the_default_opacity_is_the_two_argument_form()
+    {
+        Assert.Equal(DeskDesign.UnderPlate(0.79, "0a0a0a"), DeskDesign.UnderPlate(0.79, "0a0a0a", DeskPlate.Opacity));
+        Assert.True(DeskDesign.UnderPlate(0.79, "0a0a0a", 0.6) < DeskDesign.UnderPlate(0.79, "0a0a0a", 0.3));
+    }
 }

@@ -234,7 +234,8 @@ public sealed partial record DeskDesign
                 foreach (var m in MonitorsOf(wall, p.Monitor))
                 {
                     double under = m.Summary.At(anchor)?.Brightness ?? m.Summary.Brightness;
-                    if (onPlate) under = look is not null ? UnderPlate(under, look.PlateColor) : UnderPlate(under, ink.DarkInk);
+                    // A followed plate is judged at the strength the Desk's guard gives it over this wallpaper (ThemeDeskLook.PlateOpacityOver).
+                    if (onPlate) under = look is not null ? UnderPlate(under, look.PlateColor, look.PlateOpacityOver(under)) : UnderPlate(under, ink.DarkInk);
                     foreach (var l in stopLum)
                     {
                         double ratio = Ratio(l, under);
@@ -296,14 +297,14 @@ public sealed partial record DeskDesign
     }
 
     /// <summary>The same composite for a plate of any color (a followed theme's <c>desk.plate_color</c>, hex without the #): each channel
-    /// of the plate at <see cref="DeskPlate.Opacity"/> over the wallpaper's gray, then the luminance of the result.</summary>
-    public static double UnderPlate(double wallpaper, string plateHex)
+    /// of the plate at <paramref name="opacity"/> (default <see cref="DeskPlate.Opacity"/>) over the wallpaper's gray, then the luminance of the result.</summary>
+    public static double UnderPlate(double wallpaper, string plateHex, double opacity = DeskPlate.Opacity)
     {
         double w = Encode(wallpaper);
         int Channel(int at)
         {
             double c = Convert.ToInt32(plateHex.Substring(at, 2), 16) / 255.0;
-            return (int)Math.Round(((1 - DeskPlate.Opacity) * w + DeskPlate.Opacity * c) * 255);
+            return (int)Math.Round(((1 - opacity) * w + opacity * c) * 255);
         }
         return InkHex.Luminance($"#{Channel(0):x2}{Channel(2):x2}{Channel(4):x2}");
     }

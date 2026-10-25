@@ -63,6 +63,8 @@ internal sealed record DeskFrame
     // -- theme match: what a followed theme draws. Null is the Desk's own look, exactly as before. --
     /// <summary>The plate's tint (six hex digits); null is black behind light ink, white behind dark ink.</summary>
     public string? PlateHex { get; init; }
+    /// <summary>The plate's strength when the readability guard raises it over a bright wallpaper; null is <see cref="DeskPlate.Opacity"/>.</summary>
+    public double? PlateOpacity { get; init; }
     /// <summary>Now playing's bars and position bar when no song look shows: the theme gradient. Null: the ink (and Gradient bars).</summary>
     public IReadOnlyList<string>? NowPlayingStops { get; init; }
     /// <summary>The meters' colors (desk.bars, else the theme gradient), their track (bar_bg) and pace tick (pace_marker). Null: the ink.</summary>
@@ -533,7 +535,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         double gap = TimeSize * 0.12, topTrim = 0, bottomTrim = 0;
         for (int i = 0; i < span.First; i++) topTrim += kinds[i].Height + gap;
         for (int i = span.Last + 1; i < kinds.Count; i++) bottomTrim += kinds[i].Height + gap;
-        var fill = new SolidColorBrush(Color.FromArgb((byte)Math.Round(DeskPlate.Opacity * 255), 0, 0, 0));
+        var fill = new SolidColorBrush(Color.FromArgb((byte)Math.Round((_frame.PlateOpacity ?? DeskPlate.Opacity) * 255), 0, 0, 0));
         var c = Rgb(_frame.PlateHex ?? DeskPlate.ColorHex(_ink.DarkInk));
         fill.Color = Color.FromArgb(fill.Color.A, c.R, c.G, c.B);
         fill.Freeze();

@@ -390,6 +390,10 @@ public static class SettingsNames
     public static string MatchedTheme(string theme) => $"The Desk now matches {theme}. Its look is its own, so it stays when the theme changes.";
     /// <summary>Appended to the Match now line when the readability guard turned the plate on.</summary>
     public const string ThemeMatchPlateNote = "The plate is on so the clock reads over this wallpaper.";
+    /// <summary>Under the Follow switch while the guard holds the plate on or draws it stronger.</summary>
+    public const string ThemeFollowPlateNote = "The plate is stronger so the clock reads over this wallpaper.";
+    /// <summary>Appended to the Match now line when the clock may still be faint over this wallpaper at the plate's one fixed strength.</summary>
+    public const string ThemeMatchFaintNote = "The clock may be faint over this wallpaper. Follow the widget theme keeps it readable.";
     public const string CouldNotSaveDeskFirst = "The Desk could not be saved first, so nothing was changed.";
     public static string ThemeNotWritten(string why) => $"The theme could not be written ({why}), so nothing was changed.";
     public static string AddOrNewQuestion(string theme) =>

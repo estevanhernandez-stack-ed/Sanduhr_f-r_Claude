@@ -380,10 +380,12 @@ public class DeskDesignValidatorTests
     }
 
     [Fact]
-    public void A_followed_look_that_cannot_read_even_on_its_plate_is_refused_naming_follows_theme()
+    public void A_followed_look_that_cannot_read_even_on_its_strongest_plate_is_refused_naming_follows_theme()
     {
         var ctx = new DeskDesignContext(Wallpaper: Flat(0.9), Current: Current("""{"layout":{"clock":{"anchor":"bl"}},"ink":"dark"}"""));
-        var v = DeskDesign.Validate(Follow(ObsidianTheme()), ctx);
+        var theme = ObsidianTheme(plate: true);
+        theme["desk"]!["plate_color"] = "#ffffff";
+        var v = DeskDesign.Validate(Follow(theme), ctx);
         Assert.Equal("follows_theme", Fields(v));
         Assert.Contains("with the plate on", v.Reasons[0].Message);
         Assert.Contains("desk.ink", v.Reasons[0].Message);
@@ -392,9 +394,11 @@ public class DeskDesignValidatorTests
     [Fact]
     public void A_theme_only_proposal_that_fails_while_following_names_theme()
     {
-        var current = Current("{\"follows_theme\":true,\"layout\":{\"clock\":{\"anchor\":\"bl\"}},\"theme\":" + ObsidianTheme().ToJsonString() + "}");
+        var white = ObsidianTheme(plate: true);   // a white plate cannot hold light ink at any strength
+        white["desk"]!["plate_color"] = "#ffffff";
+        var current = Current("{\"follows_theme\":true,\"layout\":{\"clock\":{\"anchor\":\"bl\"}},\"theme\":" + white.ToJsonString() + "}");
         var ctx = new DeskDesignContext(Wallpaper: Flat(0.9), Current: current);
-        var v = DeskDesign.Validate(new JsonObject { ["theme"] = ObsidianTheme() }, ctx);
+        var v = DeskDesign.Validate(new JsonObject { ["theme"] = white.DeepClone() }, ctx);
         Assert.Equal("theme", Fields(v));
     }
 
@@ -407,5 +411,15 @@ public class DeskDesignValidatorTests
         var ctx = new DeskDesignContext(Wallpaper: Flat(0.1), Current: Current("""{"layout":{"clock":{"anchor":"bl"}}}"""));
         var v = DeskDesign.Validate(Follow(theme), ctx);
         Assert.Equal("follows_theme", Fields(v));
+    }
+
+    [Theory]
+    [InlineData(0.79)]
+    [InlineData(1.0)]
+    public void A_followed_dark_theme_over_a_light_wallpaper_passes_because_the_Desk_strengthens_the_plate(double wallpaper)
+    {
+        var ctx = new DeskDesignContext(Wallpaper: Flat(wallpaper), Current: Current("""{"layout":{"clock":{"anchor":"bl"}}}"""));
+        Assert.True(DeskDesign.Validate(Follow(ObsidianTheme()), ctx).Ok);
+        Assert.True(DeskDesign.Validate(Follow(ObsidianTheme(plate: false)), ctx).Ok);
     }
 }

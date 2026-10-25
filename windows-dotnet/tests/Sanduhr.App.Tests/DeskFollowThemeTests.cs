@@ -146,11 +146,12 @@ public sealed class DeskFollowThemeTests : IDisposable
     public void The_guard_turns_a_plateless_looks_plate_on_where_the_ink_would_not_read() => Sta.Run(() =>
     {
         var plateless = ThemeCatalog.BuiltIns["obsidian"] with { Desk = new ThemeDesk { Plate = false } };
-        var (desk, host) = Start(follows: true, wallpaper: 0.9);
+        var (desk, host) = Start(follows: true, wallpaper: 0.05);
         int raised = 0;
         desk.PlateForcedChanged += () => raised++;
         try
         {
+            desk.WallpaperLuminance = (_, _) => 0.9;
             desk.ThemeChanged(plateless);
             Assert.True(desk.PlateForced);
             Assert.Equal(1, raised);
@@ -166,11 +167,12 @@ public sealed class DeskFollowThemeTests : IDisposable
     public void A_forced_plate_clears_when_the_Desk_stops_so_the_plate_note_never_shows_for_a_Desk_that_is_off() => Sta.Run(() =>
     {
         var plateless = ThemeCatalog.BuiltIns["obsidian"] with { Desk = new ThemeDesk { Plate = false } };
-        var (desk, _) = Start(follows: true, wallpaper: 0.9);
+        var (desk, _) = Start(follows: true, wallpaper: 0.05);
         int raised = 0;
         desk.PlateForcedChanged += () => raised++;
         try
         {
+            desk.WallpaperLuminance = (_, _) => 0.9;
             desk.ThemeChanged(plateless);
             Assert.True(desk.PlateForced);
             Assert.Equal(1, raised);
@@ -315,6 +317,36 @@ public sealed class DeskFollowThemeTests : IDisposable
             Assert.Equal([C("e8e4dc"), C("6c63ff")], Stops(Clock(host).Foreground));   // previewed as following
             desk.EndPreview();
             Assert.Equal(C("ffffff"), Stops(Clock(host).Foreground)[0]);               // back to the Desk's own
+        }
+        finally { desk.Dispose(); }
+    });
+
+    /// <summary>The alpha byte of the plate behind the first stack (the blurred Border in a PlateHost).</summary>
+    private static byte PlateAlpha(FakeHost host) =>
+        ((SolidColorBrush)host.Shown.SelectMany(s => s.Islands).SelectMany(i => All<Border>(i.Content))
+            .First(b => b.Effect is System.Windows.Media.Effects.BlurEffect).Background).Color.A;
+
+    [Fact]
+    public void A_dark_theme_over_a_light_wallpaper_gets_a_stronger_plate_and_the_note() => Sta.Run(() =>
+    {
+        var (desk, host) = Start(follows: true, wallpaper: 0.79);   // Obsidian: plate on in the theme's own look
+        try
+        {
+            Assert.True(desk.PlateForced);
+            Assert.Equal((byte)Math.Round(ThemeDeskLook.From(ThemeCatalog.BuiltIns["obsidian"]).PlateOpacityOver(0.79) * 255), PlateAlpha(host));
+            Assert.True(PlateAlpha(host) > (byte)Math.Round(DeskPlate.Opacity * 255));
+        }
+        finally { desk.Dispose(); }
+    });
+
+    [Fact]
+    public void A_plate_that_already_reads_stays_at_todays_opacity_and_is_not_forced() => Sta.Run(() =>
+    {
+        var (desk, host) = Start(follows: true, wallpaper: 0.05);
+        try
+        {
+            Assert.False(desk.PlateForced);
+            Assert.Equal((byte)Math.Round(DeskPlate.Opacity * 255), PlateAlpha(host));
         }
         finally { desk.Dispose(); }
     });

@@ -75,6 +75,29 @@ public sealed record ThemeDeskLook(
         double.IsNaN(wallpaperLuminance) || wallpaperLuminance < 0 || wallpaperLuminance > 1 ||
         DeskDesign.Ratio(InkHex.Luminance(Ink[0]), wallpaperLuminance) >= DeskDesign.MinContrast;
 
+    /// <summary>The strongest plate the guard will draw.</summary>
+    public const double MaxPlateOpacity = 0.6;
+
+    /// <summary>
+    /// How strong the plate must be for the ink to read over a wallpaper of this luminance (theme match, the guard): the plate's usual
+    /// <see cref="DeskPlate.Opacity"/> when there is no usable sample or the ink's first stop keeps <see cref="DeskDesign.MinContrast"/>
+    /// over the plate at that strength; else the smallest opacity at 0.05 steps up to <see cref="MaxPlateOpacity"/> at which it does, and
+    /// the maximum when none does. The plate's own color and the wallpaper stay as they are, so the theme's colors never change.
+    /// </summary>
+    public double PlateOpacityOver(double? wallpaperLuminance)
+    {
+        if (wallpaperLuminance is not { } l || double.IsNaN(l) || l < 0 || l > 1) return DeskPlate.Opacity;
+        double ink = InkHex.Luminance(Ink[0]);
+        bool Reads(double opacity) => DeskDesign.Ratio(ink, DeskDesign.UnderPlate(l, PlateColor, opacity)) >= DeskDesign.MinContrast;
+        if (Reads(DeskPlate.Opacity)) return DeskPlate.Opacity;
+        for (int step = 1; ; step++)
+        {
+            double opacity = Math.Round(DeskPlate.Opacity + 0.05 * step, 2);
+            if (opacity >= MaxPlateOpacity) return MaxPlateOpacity;
+            if (Reads(opacity)) return opacity;
+        }
+    }
+
     /// <summary>This look over a wallpaper of this luminance: the plate turned on when it is off and the ink would not read. No sample
     /// (null or NaN) leaves the look as the theme says.</summary>
     public ThemeDeskLook Guarded(double? wallpaperLuminance) =>

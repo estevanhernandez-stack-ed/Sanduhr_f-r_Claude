@@ -113,10 +113,14 @@ internal sealed class ThemeMatchService
         if (!SaveBefore(SettingsNames.MatchingTheme(def.Name))) return CouldNotSave;
         var look = ThemeDeskLook.From(def);
         // Guarded only ever turns the plate on, so folding the screens' samples is exact.
-        var guarded = WallpaperLuminance().Aggregate(look, (l, s) => l.Guarded(s));
+        var samples = WallpaperLuminance();
+        var guarded = samples.Aggregate(look, (l, s) => l.Guarded(s));
         WriteOwn(guarded);
         string said = SettingsNames.MatchedTheme(def.Name);
-        return new(true, guarded.Plate && !look.Plate ? said + " " + SettingsNames.ThemeMatchPlateNote : said);
+        if (guarded.Plate && !look.Plate) said += " " + SettingsNames.ThemeMatchPlateNote;
+        // The Desk's own plate has one strength, so no key can hold a stronger one: say where the clock may be faint, and that Follow fixes it.
+        if (guarded.Plate && samples.Any(s => look.PlateOpacityOver(s) > DeskPlate.Opacity)) said += " " + SettingsNames.ThemeMatchFaintNote;
+        return new(true, said);
     }
 
     /// <summary>

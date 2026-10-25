@@ -792,14 +792,24 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             var settings = DeskLookResolver.Settings(_settings, draw, _fonts.Has) with { Layout = LayoutFor(screen) };
             var view = new DeskView(screen, settings, _fonts);
             var inks = InkFor(view, screen, frame, draw);
-            // The readability guard: a followed look without its plate gets it where its ink would not read over this wallpaper.
-            if (draw is not null && !settings.Plate && !Reads(view, screen, frame, inks, draw.Look))
+            // The readability guard: a followed look gets its plate where its ink would not read over this wallpaper, and a plate that
+            // is on is drawn stronger (0.05 steps up to ThemeDeskLook.MaxPlateOpacity) until the ink reads. The theme's colors never change.
+            var shown = frame;
+            if (draw is not null)
             {
-                view.Dispose();
-                view = new DeskView(screen, settings with { Plate = true }, _fonts);
-                forced = true;
+                var samples = StackLuminances(view, screen, frame, inks);
+                bool turnOn = !settings.Plate && !samples.All(draw.Look.ReadsOver);
+                double opacity = samples.Select(l => draw.Look.PlateOpacityOver(l)).DefaultIfEmpty(DeskPlate.Opacity).Max();
+                bool stronger = (settings.Plate || turnOn) && opacity > DeskPlate.Opacity;
+                if (turnOn)
+                {
+                    view.Dispose();
+                    view = new DeskView(screen, settings with { Plate = true }, _fonts);
+                }
+                if (stronger) shown = frame with { PlateOpacity = opacity };
+                forced |= turnOn || stronger;
             }
-            view.Update(frame, inks);
+            view.Update(shown, inks);
             _views.Add(view);
             surfaces.Add(new DeskSurface(screen, DeskClicks.Prepare(view.TakeIslands(), _piecesTakeClicks, this)));
         }
@@ -847,13 +857,14 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         return new DeskInkMap(Care(DeskInk.Resolve(_ink, ThemeText(), null)), by);
     }
 
-    /// <summary>True when a followed look's ink reads over the wallpaper behind every stack on this screen; a stack with no sample reads.</summary>
-    private bool Reads(DeskView view, DeskScreen screen, DeskFrame frame, DeskInkMap inks, ThemeDeskLook look)
+    /// <summary>The wallpaper's luminance behind every stack on this screen that has a sample (a stack with none does not count).</summary>
+    private List<double> StackLuminances(DeskView view, DeskScreen screen, DeskFrame frame, DeskInkMap inks)
     {
         view.Update(Scratch(frame), inks);
+        var samples = new List<double>();
         foreach (var (_, r) in view.StackRects())
-            if (Luminance(screen, Px(screen, r)) is { } l && !double.IsNaN(l) && !look.ReadsOver(l)) return false;
-        return true;
+            if (Luminance(screen, Px(screen, r)) is { } l && !double.IsNaN(l)) samples.Add(l);
+        return samples;
     }
 
     /// <summary>A sampling pass draws nothing anyone sees: its message gets a scratch copy of the played set, so the drawn pass still
