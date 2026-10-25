@@ -626,9 +626,13 @@ public partial class App : Application
         _desk.ArrangeChanged += OnArrangeChanged;
         _desk.WidgetDimRequested += (dimmed, ease) => _window?.SetCareDim(dimmed, ease);
         _desk.MenuRequested += OnDeskMenu;
-        _vm.ThemeChanged += _ => _desk?.ThemeChanged();
+        _vm.ThemeChanged += p => _desk?.ThemeChanged(p.Definition);
+        // The meters' usage signal follows Alerts' thresholds.
+        _vm.AlertSettingsChanged += () => _desk?.Reload();
         // The widget's now-playing line (spec 6.3, W8) shares the Desk's media-session listener.
         _vm.NowPlaying = new NowPlayingLineViewModel(_nowPlaying, store);
+        // The theme a following Desk draws from (theme match), before the first redraw.
+        _desk.ThemeChanged(_vm.Palette.Definition);
         _desk.Reload();
         _looks.Start();
     }

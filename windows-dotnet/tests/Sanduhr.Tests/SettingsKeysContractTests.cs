@@ -38,6 +38,7 @@ public class SettingsKeysContractTests
         "desk_companion",
         "desk_direct",
         "desk_enabled",
+        "desk_follows_theme",
         "desk_font",
         "desk_ink",
         "desk_launcher",
