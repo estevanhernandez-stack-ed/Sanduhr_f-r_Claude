@@ -99,6 +99,34 @@ public class ThemeDeskLookTests
     }
 
     [Fact]
+    public void The_ink_as_a_desk_ink_setting_is_custom_with_the_joined_stops()
+    {
+        var s = ThemeDeskLook.From(ThemeCatalog.BuiltIns["obsidian"]).InkSettings;
+        Assert.Equal(DeskInkMode.Custom, s.Mode);
+        Assert.Equal("e8e4dc,6c63ff", s.Color);
+        Assert.True(s.Shadow);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(-0.1)]
+    [InlineData(1.5)]
+    public void A_bad_sample_is_no_sample_and_reads(double luminance) =>
+        Assert.True(ThemeDeskLook.From(ThemeCatalog.BuiltIns["obsidian"]).ReadsOver(luminance));
+
+    [Fact]
+    public void Stops_drop_consecutive_repeats_normalize_short_hex_and_cap_at_four()
+    {
+        var look = ThemeDeskLook.From(ThemeCatalog.BuiltIns["obsidian"] with { Desk = new ThemeDesk { Bars = ["#f00", "#ff0000", "#0f0"] } });
+        Assert.Equal(["ff0000", "00ff00"], look.Bars);
+        var five = ThemeDeskLook.From(ThemeCatalog.BuiltIns["obsidian"] with
+        {
+            Desk = new ThemeDesk { Bars = ["#111111", "#222222", "#333333", "#444444", "#555555"] },
+        });
+        Assert.Equal(["111111", "222222", "333333", "444444"], five.Bars);
+    }
+
+    [Fact]
     public void The_guard_turns_the_plate_on_only_where_the_ink_does_not_read()
     {
         var bare = ThemeDeskLook.From(ThemeCatalog.BuiltIns["obsidian"] with { Desk = new ThemeDesk { Plate = false } });

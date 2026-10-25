@@ -36,6 +36,9 @@ public sealed record ThemeDeskLook(
     /// <summary>True when the ink is dark: its first stop under half luminance, as <see cref="DeskInk"/> decides for a custom ink.</summary>
     public bool DarkInk => InkHex.Luminance(Ink[0]) < 0.5;
 
+    /// <summary>The ink as a Desk ink setting: Custom mode over the ink's stops, with the drop shadow.</summary>
+    public DeskInkSettings InkSettings => new(DeskInkMode.Custom, string.Join(",", Ink), true);
+
     /// <summary>
     /// The theme's Desk look. The gradient is accent to sparkline (accent to text when they are one color). Ink: desk.ink, else text to
     /// accent. Bars and message: theirs, else the gradient. Glow: desk.glow, else accent. Plate: desk.plate, else on. Plate tint and
@@ -65,9 +68,11 @@ public sealed record ThemeDeskLook(
 
     /// <summary>
     /// The readability rule (theme match, the guard): the ink reads over a wallpaper of this luminance when its first stop, the color the
-    /// clock's digits start in, keeps <see cref="DeskDesign.MinContrast"/> against it.
+    /// clock's digits start in, keeps <see cref="DeskDesign.MinContrast"/> against it. A luminance that is NaN or outside 0 to 1 is no
+    /// usable sample and reads, as <see cref="Guarded"/> treats a missing one.
     /// </summary>
     public bool ReadsOver(double wallpaperLuminance) =>
+        double.IsNaN(wallpaperLuminance) || wallpaperLuminance < 0 || wallpaperLuminance > 1 ||
         DeskDesign.Ratio(InkHex.Luminance(Ink[0]), wallpaperLuminance) >= DeskDesign.MinContrast;
 
     /// <summary>This look over a wallpaper of this luminance: the plate turned on when it is off and the ink would not read. No sample
