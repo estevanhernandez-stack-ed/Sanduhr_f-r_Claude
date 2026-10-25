@@ -366,7 +366,8 @@ public sealed class DeskArrangement
     /// Desk", a feature's own on-action, Arrange's Hidden strip, a companion install and the glow. One table, so a place is one
     /// line to change. The rows marked "proposal" are the spec's proposals for the owner to confirm (settings-v2 spec, Desk);
     /// the clock, the Claude meters and the glow keep the place they had before v2. <see cref="DefaultAnchor"/> stays the
-    /// layout and design formats' fallback for an anchor this build can't read.
+    /// layout and design formats' fallback for an anchor this build can't read. A design that unhides a piece without an anchor
+    /// uses this table too (the merge goes through <c>Show</c>).
     /// </summary>
     public static DeskAnchor DefaultPlaceFor(string widget) => widget switch
     {

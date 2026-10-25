@@ -415,6 +415,19 @@ public class DeskDesignTests
     }
 
     [Fact]
+    public void MergeUnhidingAPieceWithoutAnAnchorUsesTheDefaultPlacesTable()
+    {
+        var shown = DeskDesign.Merge(Current(), Proposal("""{"layout":{"weather":{"hidden":false}}}"""));
+        var weather = shown.Layout!.Single(p => p.Piece == "weather");
+        Assert.False(weather.IsHidden);
+        Assert.Equal(DeskArrangement.DefaultPlaceFor("weather"), weather.Anchor);
+        Assert.Equal(DeskAnchor.TR, weather.Anchor);
+
+        var anchored = DeskDesign.Merge(Current(), Proposal("""{"layout":{"weather":{"hidden":false,"anchor":"ml"}}}"""));
+        Assert.Equal(DeskAnchor.ML, anchored.Layout!.Single(p => p.Piece == "weather").Anchor);
+    }
+
+    [Fact]
     public void MergeHidesAndShowsPieces()
     {
         var hidden = DeskDesign.Merge(Current(), Proposal("""{"layout":{"claude":{"hidden":true}}}"""));
