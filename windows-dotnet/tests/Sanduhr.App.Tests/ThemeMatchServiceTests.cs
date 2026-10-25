@@ -418,4 +418,83 @@ public sealed class ThemeMatchServiceTests : AppWindowFixture
         Assert.Equal(SettingsNames.CouldNotSaveDeskFirst, match.Message);
         Assert.Empty(Directory.Exists(r.Paths.ThemesDir) ? Directory.GetFiles(r.Paths.ThemesDir) : []);
     });
+
+    // ---- the final fix wave ----
+
+    [Fact]
+    public void Hand_edits_while_following_save_no_Before_design_and_Put_back_still_returns_the_state_before_Follow() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        r.Service.FollowOn();   // the one Before design
+        r.Service.AskWhere = (_, _) => ThemeEditChoice.UpdateTheme;
+        var def = r.Widget.GetThemeDefinition("obsidian-desk")!;
+        Assert.True(r.Service.Edit(ThemeMatch.SpelledOut(def) with { Ink = ["#ffffff"] }).Ok);
+        Assert.True(r.Service.Edit(ThemeMatch.SpelledOut(def) with { Ink = ["#000000"] }).Ok);
+
+        Assert.Single(r.Designs.Designs());
+        Assert.True(r.Designs.PutBack().Ok);
+        Assert.Equal("obsidian", r.Store.LoadTheme());
+        Assert.False(r.Store.LoadDeskFollowsTheme());
+    });
+
+    [Fact]
+    public void A_theme_font_this_PC_lacks_is_not_written_into_the_Desks_own_font_by_Match_now_or_Follow_off() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        r.Service.FontAvailable = _ => false;
+        var themed = ThemeCatalog.BuiltIns["obsidian"] with { Font = "Zzz Missing Face" };
+        Directory.CreateDirectory(r.Paths.ThemesDir);
+        File.WriteAllText(Path.Combine(r.Paths.ThemesDir, "faced.json"), ThemeDraft.FromDefinition("faced", themed with { Name = "Faced" }).ToJsonText());
+        r.Widget.ReloadUserThemes();
+        r.Widget.ApplyThemeByKey("faced");
+        string own = r.Store.LoadDesk().Font;
+
+        Assert.True(r.Service.MatchNow().Ok);
+        Assert.Equal(own, r.Store.LoadDesk().Font);
+
+        r.Store.SaveDeskFollowsTheme(true);
+        Assert.True(r.Service.FollowOff().Ok);
+        Assert.Equal(own, r.Store.LoadDesk().Font);
+    });
+
+    [Fact]
+    public void A_theme_the_loader_refuses_after_the_move_is_put_back_as_it_was_on_the_update_path() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        string path = AddDusk(r);
+        byte[] bytes = File.ReadAllBytes(path);
+        r.Service.AskAddOrNew = _ => ThemeAddChoice.AddToTheme;
+        r.Service.AfterMoved = p => File.WriteAllText(p, "not json");
+
+        var result = r.Service.FollowOn();
+
+        Assert.False(result.Ok);
+        Assert.Equal(SettingsNames.ThemeNotWritten("NotLoaded"), result.Message);
+        Assert.Equal(bytes, File.ReadAllBytes(path));
+        Assert.True(r.Widget.HasTheme("dusk"));
+        Assert.False(r.Store.LoadDeskFollowsTheme());
+    });
+
+    [Fact]
+    public void A_theme_the_loader_refuses_after_the_move_is_removed_on_the_new_path() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        r.Service.AfterMoved = p => File.WriteAllText(p, "not json");
+
+        var result = r.Service.FollowOn();
+
+        Assert.False(result.Ok);
+        Assert.False(File.Exists(Path.Combine(r.Paths.ThemesDir, "obsidian-desk.json")));
+        Assert.False(r.Widget.HasTheme("obsidian-desk"));
+        Assert.Equal("obsidian", r.Widget.ActiveThemeKey);
+    });
+
+    [Fact]
+    public void An_unexpected_failure_after_staging_leaves_no_tmp_file() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        var service = new ThemeMatchService(r.Store, r.Widget, () => throw new InvalidOperationException("boom"));
+        Assert.Throws<InvalidOperationException>(() => service.FollowOn());
+        Assert.Empty(Directory.GetFiles(r.Paths.ThemesDir, "*.tmp"));
+    });
 }

@@ -378,6 +378,8 @@ public static class SettingsNames
     public const string MatchNowButton = "Match now";
     public const string MatchNowCaption =
         "Copies the widget theme's look into the Desk's own settings once. The Desk keeps it when the theme changes.";
+    /// <summary>Under the ink choices in Desk Look.</summary>
+    public const string DeskInkCaption = "Automatic reads how bright your wallpaper image is behind each piece and picks light or dark ink, so it stays readable. It reads the wallpaper file only, never your screen. Picking one of the Colors switches the ink to Custom, which takes one hex color, or two to four with commas for a gradient, such as 8f5bd6,3a63e0,33fdff. A meter past the alert levels (warn and urgent, set in Settings, Alerts) takes a yellow or red stop in the middle of its color, in every ink.";
     /// <summary>Under Desk Look's own look controls while the Desk follows the theme.</summary>
     public const string ThemeLookSetsThis = "The widget theme sets this while the Desk follows it. Change it above, in Match the widget theme.";
     /// <summary>The status line after Follow on, an update or a new theme.</summary>
@@ -397,7 +399,7 @@ public static class SettingsNames
     public const string ThemeMatchCancel = "Cancel";
     public static string WhereQuestion(string theme, bool canUpdate) => canUpdate
         ? $"The Desk follows {theme}. Save this change into it, or into a new theme?"
-        : $"The Desk follows {theme}, which ships with Sanduhr and stays as it is. Save this change as a new theme?";
+        : $"The Desk follows {theme}, a built-in or pack theme that stays as it is. Save this change as a new theme?";
     public static string UpdateTheme(string theme) => $"Update {theme}";
     public const string SaveAsNewTheme = "Save as a new theme";
     public const string NewThemeNamePrompt = "Name of the new theme";

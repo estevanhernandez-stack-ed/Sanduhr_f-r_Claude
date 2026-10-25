@@ -47,6 +47,13 @@ internal sealed class ThemeMatchService
     /// Desk's controller wires it (the readability guard); the default samples nothing.</summary>
     public Func<IReadOnlyList<double>> WallpaperLuminance { get; set; } = () => [];
 
+    /// <summary>Whether a font family is on this PC (ruling P13: the Desk takes a look's font only when it is). The App wires the real
+    /// check; the default says every font is there.</summary>
+    public Func<string, bool> FontAvailable { get; set; } = _ => true;
+
+    /// <summary>Test seam: called with the path right after a staged theme is moved into place, before the widget reloads.</summary>
+    internal Action<string> AfterMoved { get; set; } = _ => { };
+
     /// <summary>The active theme's name (the status line while following).</summary>
     public string ActiveName => Active.Name;
 
@@ -71,13 +78,13 @@ internal sealed class ThemeMatchService
                 case ThemeAddChoice.Cancel:
                     return new(false, "");
                 case ThemeAddChoice.AddToTheme:
-                    if (Save(key, ThemeMatch.WithDesk(def, ThemeMatch.SpelledOut(def)), def.Name, overwrite: true) is { } failed) return failed;
+                    if (Save(key, ThemeMatch.WithDesk(def, ThemeMatch.SpelledOut(def)), def.Name, overwrite: true, saveFirst: true) is { } failed) return failed;
                     return Follow(key, def.Name);
             }
         }
         string name = ThemeMatch.NewThemeName(def.Name, NameTaken);
         string newKey = ThemeMatch.NewThemeKey(name, KeyTaken);
-        if (Save(newKey, ThemeMatch.WithDesk(def, ThemeMatch.SpelledOut(def), name), name, overwrite: false) is { } bad) return bad;
+        if (Save(newKey, ThemeMatch.WithDesk(def, ThemeMatch.SpelledOut(def), name), name, overwrite: false, saveFirst: true) is { } bad) return bad;
         return Follow(newKey, name);
     }
 
@@ -127,13 +134,13 @@ internal sealed class ThemeMatchService
         switch (AskWhere(def.Name, canUpdate))
         {
             case ThemeEditChoice.UpdateTheme when canUpdate:
-                if (Save(key, ThemeMatch.WithDesk(def, next), def.Name, overwrite: true) is { } failed) return failed;
+                if (Save(key, ThemeMatch.WithDesk(def, next), def.Name, overwrite: true, saveFirst: false) is { } failed) return failed;
                 _widget.ApplyThemeByKey(key);
                 return new(true, SettingsNames.ThemeUpdated(def.Name));
             case ThemeEditChoice.NewTheme:
                 if (ThemeMatch.CleanName(AskName(ThemeMatch.NewThemeName(def.Name, NameTaken))) is not { } name) return new(false, "");
                 string newKey = ThemeMatch.NewThemeKey(name, KeyTaken);
-                if (Save(newKey, ThemeMatch.WithDesk(def, next, name), name, overwrite: false) is { } bad) return bad;
+                if (Save(newKey, ThemeMatch.WithDesk(def, next, name), name, overwrite: false, saveFirst: false) is { } bad) return bad;
                 _widget.ApplyThemeByKey(newKey);
                 return new(true, SettingsNames.FollowingTheme(name));
             default:
@@ -143,7 +150,7 @@ internal sealed class ThemeMatchService
 
     private void WriteOwn(ThemeDeskLook look)
     {
-        var own = ThemeMatch.OwnSettings(look, _store.LoadDesk(), _store.LoadDeskInk(), _store.LoadDeskMessage(), _store.LoadNowPlaying());
+        var own = ThemeMatch.OwnSettings(look, _store.LoadDesk(), _store.LoadDeskInk(), _store.LoadDeskMessage(), _store.LoadNowPlaying(), FontAvailable);
         _store.SaveDesk(own.Desk);
         _store.SaveDeskPlate(own.Desk.Plate);
         _store.SaveDeskInk(own.Ink);
@@ -155,11 +162,12 @@ internal sealed class ThemeMatchService
     private bool SaveBefore(string incoming) => _designs() is not { } designs || designs.SaveBeforeChange(incoming);
 
     /// <summary>
-    /// Writes a theme and loads it, in the order that keeps "nothing was changed" true: lint, stage the file, save the Desk first, then
-    /// move the file into place and reload. Null when it is in and loaded, else the result to show. A new theme (<paramref name="overwrite"/>
-    /// false) never replaces a file or folder that is there; Update and Add rewrite the active user file.
+    /// Writes a theme and loads it, in the order that keeps "nothing was changed" true: lint, stage the file, save the Desk first (only
+    /// when <paramref name="saveFirst"/>: Follow on, not a hand edit while following), then move the file into place and reload. Null
+    /// when it is in and loaded, else the result to show. A new theme (<paramref name="overwrite"/> false) never replaces a file or folder
+    /// that is there; Update and Add rewrite the active user file. A file the loader then refuses is taken back out.
     /// </summary>
-    private ThemeMatchResult? Save(string key, JsonObject theme, string incomingName, bool overwrite)
+    private ThemeMatchResult? Save(string key, JsonObject theme, string incomingName, bool overwrite, bool saveFirst)
     {
         var lint = ThemeLint.Lint(theme);
         if (!lint.Ok) return new(false, lint.Errors.First().Message);
@@ -176,23 +184,37 @@ internal sealed class ThemeMatchService
             TryDelete(tmp);
             return new(false, SettingsNames.ThemeNotWritten(e.GetType().Name));
         }
-        if (!SaveBefore(incomingName))
-        {
-            TryDelete(tmp);
-            return CouldNotSave;
-        }
+        byte[]? old = null;
         try
         {
-            File.Move(tmp, path, overwrite);
+            if (saveFirst && !SaveBefore(incomingName)) return CouldNotSave;
+            try
+            {
+                if (overwrite && File.Exists(path)) old = File.ReadAllBytes(path);
+                File.Move(tmp, path, overwrite);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                return new(false, SettingsNames.ThemeNotWritten(e.GetType().Name));
+            }
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        finally
         {
-            TryDelete(tmp);
-            return new(false, SettingsNames.ThemeNotWritten(e.GetType().Name));
+            TryDelete(tmp);   // after a move it is already gone
         }
+        AfterMoved(path);
         _widget.ReloadUserThemes();
-        // The loader can refuse a file the lint passed; ApplyThemeByKey would then ignore the key silently.
-        return _widget.HasTheme(key) ? null : new(false, SettingsNames.ThemeNotWritten("NotLoaded"));
+        if (_widget.HasTheme(key)) return null;
+        // The loader refused a file the lint passed (ApplyThemeByKey would ignore the key silently): put the old file back, or remove the
+        // new one, so the person's own theme keeps loading.
+        try
+        {
+            if (old is not null) File.WriteAllBytes(path, old);
+            else File.Delete(path);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        _widget.ReloadUserThemes();
+        return new(false, SettingsNames.ThemeNotWritten("NotLoaded"));
     }
 
     private static void TryDelete(string path)

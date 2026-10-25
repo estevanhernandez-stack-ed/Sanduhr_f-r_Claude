@@ -167,7 +167,8 @@ public sealed class SettingsViewModel
             Sanduhr.App.Desk.DeskMessageHandoffService.Current?.Handoff);
         NowPlayingPage = new NowPlayingPageViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.NowPlayingHub.Current, Sanduhr.App.Desk.NowPlayingLookService.Current);
         WeatherPage = new WeatherPageViewModel(new SettingsStore(new Paths()));
-        ThemeMatch = new ThemeMatchViewModel(new ThemeMatchService(new SettingsStore(new Paths()), widget),
+        ThemeMatch = new ThemeMatchViewModel(new ThemeMatchService(new SettingsStore(new Paths()), widget)
+            { FontAvailable = family => Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).Has(family) },
             () => widget.Palette.Definition, Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies());
         // Follow on and off and Match now change the Desk's switch or its own look: the pages that show them read them again, and the
         // running Desk follows (App sets Desk.Changed).

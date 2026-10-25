@@ -706,4 +706,12 @@ public class SettingsSourceScanTests
         }
         Assert.True(bad.Count == 0, string.Join(Environment.NewLine, bad));
     }
+
+    [Fact]
+    public void Desk_Look_takes_the_ink_caption_from_SettingsNames_not_an_inline_sentence()
+    {
+        string xaml = File.ReadAllText(Path.Combine(AppDir(), "Views", "DeskLookPage.xaml"));
+        Assert.DoesNotContain("set under Alerts", xaml, StringComparison.Ordinal);
+        Assert.Contains("SettingsNames.DeskInkCaption", xaml, StringComparison.Ordinal);
+    }
 }

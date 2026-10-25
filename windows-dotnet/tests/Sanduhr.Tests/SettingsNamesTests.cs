@@ -395,4 +395,20 @@ public class SettingsNamesTests
         Assert.Equal("The Desk is the clock, meters and pieces Sanduhr draws on your desktop.", SettingsNames.DeskLine);
         Assert.Equal("A widget pack is an add-on for Sanduhr: a theme, colors, a font or a companion.", SettingsNames.WidgetPackLine);
     }
+
+    [Fact]
+    public void The_where_question_for_a_theme_that_is_not_the_persons_names_built_in_and_pack_themes()
+    {
+        string q = SettingsNames.WhereQuestion("Mint", false);
+        Assert.Contains("built-in or pack theme", q);
+        Assert.DoesNotContain("ships with Sanduhr", q);
+        Assert.Empty(SettingsNames.PathProblems(q));
+    }
+
+    [Fact]
+    public void The_ink_caption_names_Alerts_as_a_place_and_passes_the_path_check()
+    {
+        Assert.Contains("Settings, Alerts", SettingsNames.DeskInkCaption);
+        Assert.Empty(SettingsNames.PathProblems(SettingsNames.DeskInkCaption));
+    }
 }
