@@ -115,8 +115,6 @@ public static class SettingsNames
     public const string SendTestAlert = "Send test alert";
     /// <summary>History: the 30-day meter chart as a CSV file ("meter history", WF14).</summary>
     public const string ExportMeterHistory = "Export meter history…";
-    /// <summary>The old identifier, kept because SettingsIndex.cs (slice 2's file) refers to it. Same text.</summary>
-    public const string ExportCsv = ExportMeterHistory;
     /// <summary>Claude Usage, Sessions: the session table as a CSV file.</summary>
     public const string ExportSessions = "Export sessions…";
     /// <summary>Claude Usage, Overview, and About: the vault of Claude Code session totals ("session archive", WF14).</summary>

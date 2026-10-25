@@ -282,7 +282,6 @@ public class SettingsNamesTests
     public void History_and_archive_names_are_pinned()
     {
         Assert.Equal("Export meter history…", SettingsNames.ExportMeterHistory);
-        Assert.Equal(SettingsNames.ExportMeterHistory, SettingsNames.ExportCsv);
         Assert.Equal("Export sessions…", SettingsNames.ExportSessions);
         Assert.Equal("Session archive", SettingsNames.SessionArchive);
         Assert.Equal("Erase session archive…", SettingsNames.EraseSessionArchive);
