@@ -94,6 +94,8 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
         string Layout() => Store().LoadDesk().Layout;
         Assert.DoesNotContain("nowPlaying", Layout());
+        Assert.DoesNotContain("weather", Layout());
+        Assert.DoesNotContain("message", Layout());
 
         svm.NowPlayingPage.Bars = false;   // the page loads with Bars on: turning it on is a change
         Assert.DoesNotContain("nowPlaying", Layout());
@@ -107,6 +109,18 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         Assert.Equal(SettingsNames.PieceStatus("Top right", svm.Desk.Enabled), svm.WeatherPage.Piece!.Text);
         Assert.True(svm.NowPlayingPage.Piece!.IsPlaced);
         Assert.True(svm.MessagePage.Piece!.IsPlaced);
+    });
+
+    [Fact]
+    public void Turning_Style_on_places_a_hidden_Now_playing_piece() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+        Assert.DoesNotContain("nowPlaying", Store().LoadDesk().Layout);
+        svm.NowPlayingPage.Style = false;
+        Assert.DoesNotContain("nowPlaying", Store().LoadDesk().Layout);
+        svm.NowPlayingPage.Style = true;
+        Assert.Contains("nowPlaying:br", Store().LoadDesk().Layout);
     });
 
     [Fact]
