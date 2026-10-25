@@ -349,4 +349,40 @@ public class DeskDesignValidatorTests
         Assert.True(v.Ok);
         Assert.Equal("""{"name":"Dusk","layout":{"clock":{"anchor":"bl","size":1.2}},"ink":"#ffaa00"}""", v.Design!.ToJson().ToJsonString());
     }
+
+    // ---- theme match: a design that follows the widget theme is judged in the theme's look ----
+
+    private static JsonObject ObsidianTheme(bool? plate = null)
+    {
+        var t = ThemeDraft.FromDefinition("obsidian", ThemeCatalog.BuiltIns["obsidian"]).ToJson();
+        if (plate is { } p) t["desk"] = new JsonObject { ["plate"] = p };
+        return t;
+    }
+
+    private static JsonObject Follow(JsonObject theme) => new() { ["follows_theme"] = true, ["theme"] = theme };
+
+    [Fact]
+    public void A_followed_design_is_judged_by_the_themes_ink_not_the_desks_own()
+    {
+        var ctx = new DeskDesignContext(Wallpaper: Flat(0.05), Current: Current("""{"layout":{"clock":{"anchor":"bl"}},"ink":"dark","plate":false}"""));
+        Assert.False(DeskDesign.Validate(Obj("""{"plate":false}"""), ctx).Ok);   // the Desk's own dark ink on a dark wallpaper
+        Assert.True(DeskDesign.Validate(Follow(ObsidianTheme()), ctx).Ok);         // #e8e4dc reads at 8:1
+    }
+
+    [Fact]
+    public void The_guard_turns_the_plate_on_before_a_followed_look_is_refused()
+    {
+        // At 0.3 #e8e4dc reads at 2.4:1 bare but 4.4:1 over the plate: the Desk turns the plate on, so the design is fine.
+        var ctx = new DeskDesignContext(Wallpaper: Flat(0.3), Current: Current("""{"layout":{"clock":{"anchor":"bl"}}}"""));
+        Assert.True(DeskDesign.Validate(Follow(ObsidianTheme(plate: false)), ctx).Ok);
+    }
+
+    [Fact]
+    public void A_followed_look_that_cannot_read_even_on_its_plate_is_refused_naming_follows_theme()
+    {
+        var ctx = new DeskDesignContext(Wallpaper: Flat(0.9), Current: Current("""{"layout":{"clock":{"anchor":"bl"}},"ink":"dark"}"""));
+        var v = DeskDesign.Validate(Follow(ObsidianTheme()), ctx);
+        Assert.Equal("follows_theme", Fields(v));
+        Assert.Contains("with the plate on", v.Reasons[0].Message);
+    }
 }

@@ -68,8 +68,8 @@ public sealed record DeskParse(DeskDesign? Design, IReadOnlyList<DeskReason> Rea
 /// JSON, snake_case: <c>name</c>, <c>note</c>, <c>layout</c> ({piece: {anchor, size, hidden, monitor, tilt, style}}), <c>weather</c>
 /// ({nickname}), <c>font</c> (a family, or
 /// {family, link}), <c>ink</c> ("auto", "light", "dark", "theme", one #hex, or two to four #hex), <c>plate</c>,
-/// <c>shadow</c>, <c>launcher</c> ({orientation, buttons[]}), <c>messages</c> ({lines[], mode}) and <c>theme</c> (a widget
-/// theme object). <c>looks</c> is a list of per-song looks (<see cref="NowPlayingLookCheck"/>): they are saved with the design
+/// <c>shadow</c>, <c>launcher</c> ({orientation, buttons[]}), <c>messages</c> ({lines[], mode}), <c>theme</c> (a widget
+/// theme object) and <c>follows_theme</c> (true draws the Desk in the theme's own look). <c>looks</c> is a list of per-song looks (<see cref="NowPlayingLookCheck"/>): they are saved with the design
 /// and never become part of the Desk it reads back.
 /// </summary>
 public sealed partial record DeskDesign

@@ -169,34 +169,56 @@ public sealed partial record DeskDesign
     {
         if (ctx.Wallpaper is not { Monitors.Count: > 0 } wall) return;
         var merged = Merge(ctx.Current, proposal);
-        if (merged.Ink is not { } choice || choice.Kind == DeskInkKind.Auto) return;
+        // Following the widget theme (theme match): the Desk draws the theme's look, whatever its own ink says.
+        var look = merged.FollowsTheme == true && merged.Theme is { } followed && ThemeLint.Lint(followed).Theme is { } fdef
+            ? ThemeDeskLook.From(fdef) : null;
+        var choice = merged.Ink;
+        if (look is null && (choice is null || choice.Kind == DeskInkKind.Auto)) return;
 
-        bool inkChanged = proposal.Ink is not null;
-        bool plateChanged = proposal.Plate is not null;
-        bool themeChanged = proposal.Theme is not null && choice.Kind == DeskInkKind.Theme;
+        bool inkChanged = look is null && proposal.Ink is not null;
+        bool plateChanged = look is null && proposal.Plate is not null;
+        bool followChanged = look is not null && proposal.FollowsTheme == true;
+        bool themeChanged = proposal.Theme is not null && (look is not null || choice!.Kind == DeskInkKind.Theme);
         bool layoutChanged = proposal.Layout is not null;
-        if (!(inkChanged || plateChanged || themeChanged || layoutChanged)) return;
+        if (!(inkChanged || plateChanged || followChanged || themeChanged || layoutChanged)) return;
 
-        string? themeText = merged.Theme?["text"] is JsonValue tv && tv.TryGetValue<string>(out var text) ? text : null;
-        if (choice.Kind == DeskInkKind.Theme && InkHex.Normalize(themeText) is null) return;
-        var settings = new DeskInkSettings(
-            choice.Kind switch
-            {
-                DeskInkKind.Light => DeskInkMode.Light,
-                DeskInkKind.Dark => DeskInkMode.Dark,
-                DeskInkKind.Theme => DeskInkMode.Theme,
-                _ => DeskInkMode.Custom,
-            },
-            string.Join(",", choice.Colors), merged.Shadow ?? true);
-        var ink = DeskInk.Resolve(settings, themeText, null);
-        double[] stopLum = ink.Stops.Select(h => InkHex.Luminance(h)).ToArray();
-        bool plate = merged.Plate ?? false;
+        ResolvedInk ink;
+        bool plate;
+        double[] stopLum;
+        if (look is not null)
+        {
+            ink = DeskInk.Resolve(look.InkSettings, null, null);
+            plate = look.Plate;
+            // The readability rule judges a followed ink by its first stop (ThemeDeskLook.ReadsOver), as the Desk does.
+            stopLum = [InkHex.Luminance(look.Ink[0])];
+        }
+        else
+        {
+            string? themeText = merged.Theme?["text"] is JsonValue tv && tv.TryGetValue<string>(out var text) ? text : null;
+            if (choice!.Kind == DeskInkKind.Theme && InkHex.Normalize(themeText) is null) return;
+            var settings = new DeskInkSettings(
+                choice.Kind switch
+                {
+                    DeskInkKind.Light => DeskInkMode.Light,
+                    DeskInkKind.Dark => DeskInkMode.Dark,
+                    DeskInkKind.Theme => DeskInkMode.Theme,
+                    _ => DeskInkMode.Custom,
+                },
+                string.Join(",", choice.Colors), merged.Shadow ?? true);
+            ink = DeskInk.Resolve(settings, themeText, null);
+            plate = merged.Plate ?? false;
+            stopLum = ink.Stops.Select(h => InkHex.Luminance(h)).ToArray();
+        }
+        // A followed look without its plate gets it where its ink would not read (the guard): judged again on the plate first.
+        bool guard = look is not null && !plate;
 
-        // A change of ink, plate or theme touches every placed piece; a layout change only the pieces it names.
+        // A change of ink, plate, theme or following touches every placed piece; a layout change only the pieces it names.
         var named = proposal.Layout?.Select(p => p.Piece).ToHashSet(StringComparer.Ordinal);
-        bool everything = inkChanged || plateChanged || themeChanged;
+        bool everything = inkChanged || plateChanged || followChanged || themeChanged;
         bool launcherLabelled = merged.Launcher?.Buttons.Any(b => b.Label is not null) == true;
-        string from = inkChanged ? "ink" : plateChanged ? "plate" : themeChanged ? "theme" : "layout";
+        string from = inkChanged ? "ink" : plateChanged ? "plate" : followChanged ? "follows_theme" : themeChanged ? "theme" : "layout";
+        // A followed look's failure belongs to the following, whichever field set it off.
+        if (look is not null && from != "layout") from = "follows_theme";
 
         int found = 0;
         foreach (var p in merged.Layout ?? [])
@@ -208,27 +230,38 @@ public sealed partial record DeskDesign
             if (found >= MaxContrastReasons) break;
 
             var anchor = p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece);
-            double worst = double.MaxValue, worstBg = 0;
-            foreach (var m in MonitorsOf(wall, p.Monitor))
+            (double Worst, double Bg) Judge(bool onPlate)
             {
-                double under = m.Summary.At(anchor)?.Brightness ?? m.Summary.Brightness;
-                if (plate) under = UnderPlate(under, ink.DarkInk);
-                foreach (var l in stopLum)
+                double worst = double.MaxValue, worstBg = 0;
+                foreach (var m in MonitorsOf(wall, p.Monitor))
                 {
-                    double ratio = Ratio(l, under);
-                    if (ratio < worst) { worst = ratio; worstBg = under; }
+                    double under = m.Summary.At(anchor)?.Brightness ?? m.Summary.Brightness;
+                    if (onPlate) under = UnderPlate(under, ink.DarkInk);
+                    foreach (var l in stopLum)
+                    {
+                        double ratio = Ratio(l, under);
+                        if (ratio < worst) { worst = ratio; worstBg = under; }
+                    }
                 }
+                return (worst, worstBg);
             }
-            if (worst >= MinContrast) continue;
+            bool plated = plate;
+            var (worstRatio, worstBack) = Judge(plate);
+            if (worstRatio < MinContrast && guard)
+            {
+                (worstRatio, worstBack) = Judge(true);
+                plated = true;
+            }
+            if (worstRatio >= MinContrast) continue;
 
             string field = from == "layout" ? $"layout.{p.Piece}" : from;
             // Black beats white as the ground gets brighter than about 0.18 (where (L + .05)^2 = 1.05 * .05).
-            string fix = worstBg > 0.179 ? "a darker ink" : "a lighter ink";
+            string fix = worstBack > 0.179 ? "a darker ink" : "a lighter ink";
             reasons.Add(new DeskReason(field,
                 $"the {p.Piece} piece at {DeskAnchors.Word(anchor)} ({DeskAnchors.Name(anchor).ToLowerInvariant()}): the ink would read at "
-                + $"{worst.ToString("0.0", CultureInfo.InvariantCulture)}:1 against the wallpaper there "
-                + $"(brightness {worstBg.ToString("0.00", CultureInfo.InvariantCulture)}{(plate ? ", with the plate on" : "")}); "
-                + $"the Desk needs {MinContrast.ToString("0", CultureInfo.InvariantCulture)}:1. Choose {fix}, {(plate ? "" : "turn the plate on, ")}or move the piece."));
+                + $"{worstRatio.ToString("0.0", CultureInfo.InvariantCulture)}:1 against the wallpaper there "
+                + $"(brightness {worstBack.ToString("0.00", CultureInfo.InvariantCulture)}{(plated ? ", with the plate on" : "")}); "
+                + $"the Desk needs {MinContrast.ToString("0", CultureInfo.InvariantCulture)}:1. Choose {fix}, {(plated ? "" : "turn the plate on, ")}or move the piece."));
             found++;
         }
     }

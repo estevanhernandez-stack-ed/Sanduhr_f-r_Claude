@@ -53,6 +53,10 @@
          credentials; the widget still owns every write under the themes folder. -->
     <Compile Include="..\Sanduhr.Core\ThemeModel.cs" Link="Core\ThemeModel.cs" />
     <Compile Include="..\Sanduhr.Core\ThemeLint.cs" Link="Core\ThemeLint.cs" />
+    <!-- Theme match (2026-10-25, decision zIsGHT5TiD5lbEwP4AiQ): one more file, pure (colors and arithmetic; no IO, no network, no
+         credentials, no process). ThemeDeskLook turns a theme into the Desk's look, so get_desk's theme_look and the check of a design
+         that follows the theme compute exactly what the widget draws. -->
+    <Compile Include="..\Sanduhr.Core\ThemeDeskLook.cs" Link="Core\ThemeDeskLook.cs" />
     <!-- Vault slice (abilities wave): READ-ONLY by tool construction. The design
          review's drift watchlist bans MCP-side vault WRITES; VaultStore's write
          methods ride along with the type but have zero call sites in this

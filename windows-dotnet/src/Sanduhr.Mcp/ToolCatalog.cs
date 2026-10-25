@@ -163,7 +163,11 @@ public static class ToolCatalog
             "base (bg/glass luminance under 0.25); text at 4.5:1 or better on the card; text_secondary, " +
             "text_dim, text_muted the same hue as text at decreasing luminance; one accent hue shared " +
             "by accent, sparkline and border_tint; pace_marker visible on every bar fill (a " +
-            "complementary hue works). The server lints first: status rejected with findings means " +
+            "complementary hue works). Optional: font (a font family the widget's text, and the Desk while it follows the " +
+            "theme, is drawn in) and desk {ink, bars, message: 1 to 4 #rrggbb each; glow, plate_color, shadow: #rrggbb; " +
+            "plate: true or false; font}: the Desk's look for this theme, every field optional with a default worked out from " +
+            "the colors; bars also fills the widget's bars, with a yellow or red middle stop at the user's alert levels. " +
+            "The server lints first: status rejected with findings means " +
             "fix the named fields and call again, nothing was written. Otherwise the widget saves the " +
             "theme under its themes folder and applies it (apply: false saves without switching); the " +
             "result names the previous theme's key so the user can go back, and carries any warnings.",
@@ -175,7 +179,7 @@ public static class ToolCatalog
                     ["theme"] = new JsonObject
                     {
                         ["type"] = "object",
-                        ["description"] = "The palette JSON: name, the fourteen #rrggbb colors, optional dials.",
+                        ["description"] = "The palette JSON: name, the fourteen #rrggbb colors, optional dials, optional font and desk.",
                     },
                     ["save_as"] = new JsonObject
                     {
@@ -303,7 +307,12 @@ public static class ToolCatalog
                             ["theme"] = new JsonObject
                             {
                                 ["type"] = "object",
-                                ["description"] = "A widget palette as propose_theme takes it: name and the fourteen #rrggbb colors.",
+                                ["description"] = "A widget palette as propose_theme takes it: name and the fourteen #rrggbb colors, optional font and desk.",
+                            },
+                            ["follows_theme"] = new JsonObject
+                            {
+                                ["type"] = "boolean",
+                                ["description"] = "True draws the Desk in the widget theme's own look (get_desk theme_look) instead of its font, ink and plate.",
                             },
                         },
                         ["additionalProperties"] = false,
@@ -604,7 +613,9 @@ public static class ToolCatalog
         "color theme. Returns design (the current look as a full design: layout with every piece's anchor, size, " +
         "hidden, monitor and tilt (the slant of its stack in degrees, 0 upright), and for claude, meters and telemetry its style (bar, slim, ring or ticks; " +
         "limits.piece_style lists the pieces and the words), weather.nickname (the name the weather piece shows " +
-        "instead of the place's, \"\" for none), font, ink, plate, shadow, launcher, theme), pieces and anchors (the allowed words), fonts (installed " +
+        "instead of the place's, \"\" for none), font, ink, plate, shadow, launcher, theme, follows_theme: true while the Desk draws the " +
+        "theme's look instead of its own), theme_look (that look worked out from the theme: gradient, ink, bars, message, glow, plate, " +
+        "plate_color, shadow, font, bar_track, pace_tick), pieces and anchors (the allowed words), fonts (installed " +
         "families, and the bundled handwriting fonts EsteFont Pro and EsteFont 26), wallpaper (path of a copy of the wallpaper " +
         "image scaled to at most 1600 pixels on its longest side, which you can open only if the user allows Claude Code to read that file; " +
         "source file, or cache when Windows' cached copy stands in for a wallpaper file that was deleted; kind image, or color when the shell " +
@@ -641,7 +652,9 @@ public static class ToolCatalog
         "per-song looks for the now playing line, {title, artist, ink, style, mood} as propose_now_playing_looks takes " +
         "them, saved with the design when it is applied; each color must keep 3:1 against what is behind the now " +
         "playing piece, and they show while the user's Style what's playing is on); theme (a widget " +
-        "palette: name and the fourteen #rrggbb colors, per docs/themes/AGENT_PROMPT.md, as propose_theme takes it). " +
+        "palette: name and the fourteen #rrggbb colors, per docs/themes/AGENT_PROMPT.md, as propose_theme takes it, with its optional " +
+        "font and desk look); follows_theme (true draws the Desk in the theme's look; its ink is judged by its first stop, and the " +
+        "Desk turns its plate on where that would not read). " +
         "The server checks before anything is sent: every field's shape and range; ink against the wallpaper (each " +
         "placed piece's ink must keep a WCAG contrast of at least 3:1 against the wallpaper brightness under its anchor " +
         "on every monitor, or against the plate when the plate is on; auto ink picks its own and is not judged), so read " +

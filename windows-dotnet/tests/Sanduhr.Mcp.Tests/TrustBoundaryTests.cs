@@ -78,6 +78,10 @@ public class TrustBoundaryTests
                 //   PackValidator: every rule of the sanduhr-widgets pack format, composing ThemeLint for theme packs.
                 "PackJson.cs", "PackValidator.cs",
                 "SnapshotContract.cs",
+                // theme match (2026-10-25, decision zIsGHT5TiD5lbEwP4AiQ): ThemeDeskLook turns a theme into the Desk's look, so
+                // get_desk's theme_look and the check of a design that follows the theme compute what the widget draws. Pure
+                // (colors and arithmetic; no IO, network, credentials or process).
+                "ThemeDeskLook.cs",
                 // propose_theme: the lint and the model it builds, both pure. The
                 // widget owns every write under the themes folder.
                 "ThemeLint.cs", "ThemeModel.cs", "TierModel.cs",
@@ -121,6 +125,7 @@ public class TrustBoundaryTests
     [InlineData("PackJson.cs")]
     [InlineData("PackValidator.cs")]
     [InlineData("WidgetProposal.cs")]
+    [InlineData("ThemeDeskLook.cs")]
     public void Files_linked_for_watchers_desk_messages_and_desk_designs_are_pure(string file)
     {
         string path = Path.Combine(Path.GetDirectoryName(McpCsprojPath())!, "..", "Sanduhr.Core", file);
