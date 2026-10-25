@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Runtime.InteropServices;
 using System.Windows.Threading;
 using Sanduhr.App.Interop;
 using Sanduhr.App.ViewModels;
@@ -126,6 +127,55 @@ internal partial class SettingsWindow : Window
         base.OnSourceInitialized(e);
         MicaHelper.ApplyDarkRoundedChrome(this);
     }
+
+    /// <summary>
+    /// Before the first Show: sizes and places the window inside the work area of the monitor <paramref name="near"/> is
+    /// on (the primary monitor without one), at most its designed 780 x 800 and at least MinWidth x MinHeight, centred,
+    /// so its foot and Quit never sit off screen (spec, "Short windows"; WF41). A work area that cannot be read, or that
+    /// is empty or not a number, leaves the window as the XAML sizes it.
+    /// </summary>
+    internal void FitToWorkArea(Window? near)
+    {
+        if (WorkAreaNear(near) is not { } work)
+            return;
+        var fit = WindowFit.Fit(work, Width, Height, MinWidth, MinHeight);
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Width = fit.Width;
+        Height = fit.Height;
+        Left = fit.Left;
+        Top = fit.Top;
+    }
+
+    /// <summary>The work area, in DIPs, of the monitor <paramref name="near"/> is on; the primary's when it has no handle; null when unusable.</summary>
+    private static WindowFit.Area? WorkAreaNear(Window? near)
+    {
+        var primary = SystemParameters.WorkArea;
+        var fallback = Usable(new WindowFit.Area(primary.Left, primary.Top, primary.Width, primary.Height));
+        var hwnd = near is null ? IntPtr.Zero : new System.Windows.Interop.WindowInteropHelper(near).Handle;
+        if (hwnd == IntPtr.Zero)
+            return fallback;
+        const uint MONITOR_DEFAULTTONEAREST = 2;
+        var monitor = GlowNative.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        var info = new GlowNative.MONITORINFO { cbSize = Marshal.SizeOf<GlowNative.MONITORINFO>() };
+        if (monitor == IntPtr.Zero || !GlowNative.GetMonitorInfoW(monitor, ref info))
+            return fallback;
+        // rcWork is in the coordinates this process runs in (system-scaled pixels while the process is system-DPI aware;
+        // the owner's own scale if it ever goes per-monitor), and the owner, which sits on that monitor, draws at that scale.
+        var r = info.rcWork;
+        return WorkAreaDips(r.Left, r.Top, r.Right, r.Bottom, VisualTreeHelper.GetDpi(near!).DpiScaleX) ?? fallback;
+    }
+
+    /// <summary>A work-area rectangle in pixels as DIPs at <paramref name="scale"/>; null when it is empty, inverted or the scale is not a positive number.</summary>
+    internal static WindowFit.Area? WorkAreaDips(int left, int top, int right, int bottom, double scale) =>
+        double.IsFinite(scale) && scale > 0
+            ? Usable(new WindowFit.Area(left / scale, top / scale, (right - left) / scale, (bottom - top) / scale))
+            : null;
+
+    private static WindowFit.Area? Usable(WindowFit.Area a) =>
+        double.IsFinite(a.Left) && double.IsFinite(a.Top) && double.IsFinite(a.Width) && double.IsFinite(a.Height)
+        && a.Width > 0 && a.Height > 0
+            ? a
+            : null;
 
     private void RenderHistory()
         => Chart.SetData(

@@ -81,4 +81,49 @@ public sealed class SettingsReachTests : AppWindowFixture
         Assert.False(outer.IsExpanded);
         Assert.False(SettingsWindow.RevealInside(target, page)); // already open: nothing to do
     });
+
+    [Fact]
+    public void Settings_opens_inside_the_work_area() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        var window = new SettingsWindow(new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask));
+        try
+        {
+            window.FitToWorkArea(null); // no owner: the primary monitor's work area; the window is never shown
+            var work = SystemParameters.WorkArea;
+            Assert.Equal(WindowStartupLocation.Manual, window.WindowStartupLocation);
+            Assert.InRange(window.Height, window.MinHeight, Math.Max(window.MinHeight, work.Height));
+            Assert.InRange(window.Width, window.MinWidth, Math.Max(window.MinWidth, 780));
+            Assert.True(window.Top >= work.Top - 0.5, $"top {window.Top} is above the work area's {work.Top}");
+            Assert.True(window.Height == window.MinHeight || window.Top + window.Height <= work.Bottom + 0.5,
+                $"the foot at {window.Top + window.Height} is below the work area's {work.Bottom}");
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void A_work_area_in_pixels_becomes_DIPs_by_the_scale_and_a_broken_one_becomes_nothing()
+    {
+        // 150%: 2880 x 1560 px of work area is 1920 x 1040 DIPs, from (0, 0).
+        Assert.Equal(new WindowFit.Area(0, 0, 1920, 1040), SettingsWindow.WorkAreaDips(0, 0, 2880, 1560, 1.5));
+        // A second monitor left of the primary keeps its negative origin.
+        Assert.Equal(new WindowFit.Area(-1920, 0, 1920, 1080), SettingsWindow.WorkAreaDips(-1920, 0, 0, 1080, 1.0));
+        Assert.Null(SettingsWindow.WorkAreaDips(0, 0, 0, 0, 1.0));          // empty
+        Assert.Null(SettingsWindow.WorkAreaDips(100, 100, 50, 50, 1.0));    // inverted
+        Assert.Null(SettingsWindow.WorkAreaDips(0, 0, 1920, 1080, 0));      // no scale
+        Assert.Null(SettingsWindow.WorkAreaDips(0, 0, 1920, 1080, -1));
+        Assert.Null(SettingsWindow.WorkAreaDips(0, 0, 1920, 1080, double.NaN));
+    }
+
+    [Fact]
+    public void A_shown_test_window_stays_off_screen() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal"); // FitToWorkArea is App's call, never the window's own
+        try
+        {
+            Assert.True(window.Left <= -10000 && window.Top <= -10000, $"the test window sits at {window.Left}, {window.Top}");
+            guard.Check();
+        }
+        finally { window.Close(); }
+    });
 }
