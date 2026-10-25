@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Runtime.InteropServices;
 using System.Windows.Threading;
 using Sanduhr.App.Interop;
 using Sanduhr.App.ViewModels;
@@ -10,10 +11,13 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Views;
 
 /// <summary>
-/// The Settings window (Settings v2): a grouped sidebar with search over General,
-/// Accounts, Alerts, History, Claude Usage, Publish usage, Claude Code, Mods &amp; Config, Themes and About. The
-/// sidebar is the TabControl re-templated; each TabItem's Tag is its
-/// <see cref="SettingsPage"/>, which <see cref="SelectPage"/> and the search use.
+/// The Settings window (Settings v2): a grouped sidebar with search. The sidebar is the TabControl
+/// re-templated; its groups and their order come from <see cref="SettingsNames.Sidebar"/>, and the constructor sets
+/// each group's heading on that group's first page. Each TabItem's Tag is its <see cref="SettingsPage"/>, which
+/// <see cref="SelectPage"/> and the search use. <see cref="SelectPage"/> resolves an old link through
+/// <see cref="SettingsIndex.Resolve"/> before it lands; <see cref="Place"/> is where the window was left, for the
+/// App to reopen there; <see cref="FitToWorkArea"/> is called before the first Show so a short screen never hides
+/// the foot; Quit asks before it quits.
 /// Opened non-modally and kept single-instance by the App so a live account switch
 /// from here reflects in the widget immediately.
 ///
@@ -34,6 +38,12 @@ internal partial class SettingsWindow : Window
     public SettingsViewModel ViewModel { get; }
 
     private readonly DispatcherTimer _localCcTimer;
+
+    /// <summary>
+    /// Where the window is now: the page, and the anchor <see cref="SelectPage"/> last opened it at (null after a sidebar
+    /// click). App keeps it when the window closes, to reopen there this session (spec, Reopen where it was left).
+    /// </summary>
+    public SettingsLink? Place { get; private set; }
 
     /// <summary>Opens a page's https link (the Open-Meteo credit and licence) in the default browser.</summary>
     private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
@@ -62,7 +72,13 @@ internal partial class SettingsWindow : Window
         };
 
         InitializeComponent();
+        // The sidebar's group headings have one source, the names table: each group's first page carries its title.
+        foreach (var group in SettingsNames.Sidebar)
+            if (group.Title is { } title
+                && Tabs.Items.OfType<TabItem>().FirstOrDefault(t => (string?)t.Tag == group.Pages[0].ToString()) is { } first)
+                SettingsSidebar.SetGroupHeader(first, title);
         // Modal dialogs spawned by the tabs (rename, confirm, export result) parent to us.
+        ViewModel.AttachOwner(this);
         ViewModel.Accounts.AttachOwner(this);
         ViewModel.Themes.AttachOwner(this);
         ViewModel.History.AttachOwner(this);
@@ -121,6 +137,55 @@ internal partial class SettingsWindow : Window
         MicaHelper.ApplyDarkRoundedChrome(this);
     }
 
+    /// <summary>
+    /// Before the first Show: sizes and places the window inside the work area of the monitor <paramref name="near"/> is
+    /// on (the primary monitor without one), at most its designed 780 x 800 and at least MinWidth x MinHeight, centred,
+    /// so its foot and Quit never sit off screen (spec, "Short windows"; WF41). A work area that cannot be read, or that
+    /// is empty or not a number, leaves the window as the XAML sizes it.
+    /// </summary>
+    internal void FitToWorkArea(Window? near)
+    {
+        if (WorkAreaNear(near) is not { } work)
+            return;
+        var fit = WindowFit.Fit(work, Width, Height, MinWidth, MinHeight);
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Width = fit.Width;
+        Height = fit.Height;
+        Left = fit.Left;
+        Top = fit.Top;
+    }
+
+    /// <summary>The work area, in DIPs, of the monitor <paramref name="near"/> is on; the primary's when it has no handle; null when unusable.</summary>
+    private static WindowFit.Area? WorkAreaNear(Window? near)
+    {
+        var primary = SystemParameters.WorkArea;
+        var fallback = Usable(new WindowFit.Area(primary.Left, primary.Top, primary.Width, primary.Height));
+        var hwnd = near is null ? IntPtr.Zero : new System.Windows.Interop.WindowInteropHelper(near).Handle;
+        if (hwnd == IntPtr.Zero)
+            return fallback;
+        const uint MONITOR_DEFAULTTONEAREST = 2;
+        var monitor = GlowNative.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        var info = new GlowNative.MONITORINFO { cbSize = Marshal.SizeOf<GlowNative.MONITORINFO>() };
+        if (monitor == IntPtr.Zero || !GlowNative.GetMonitorInfoW(monitor, ref info))
+            return fallback;
+        // rcWork is in the coordinates this process runs in (system-scaled pixels while the process is system-DPI aware;
+        // the owner's own scale if it ever goes per-monitor), and the owner, which sits on that monitor, draws at that scale.
+        var r = info.rcWork;
+        return WorkAreaDips(r.Left, r.Top, r.Right, r.Bottom, VisualTreeHelper.GetDpi(near!).DpiScaleX) ?? fallback;
+    }
+
+    /// <summary>A work-area rectangle in pixels as DIPs at <paramref name="scale"/>; null when it is empty, inverted or the scale is not a positive number.</summary>
+    internal static WindowFit.Area? WorkAreaDips(int left, int top, int right, int bottom, double scale) =>
+        double.IsFinite(scale) && scale > 0
+            ? Usable(new WindowFit.Area(left / scale, top / scale, (right - left) / scale, (bottom - top) / scale))
+            : null;
+
+    private static WindowFit.Area? Usable(WindowFit.Area a) =>
+        double.IsFinite(a.Left) && double.IsFinite(a.Top) && double.IsFinite(a.Width) && double.IsFinite(a.Height)
+        && a.Width > 0 && a.Height > 0
+            ? a
+            : null;
+
     private void RenderHistory()
         => Chart.SetData(
             ViewModel.History.BuildRows(),
@@ -152,6 +217,8 @@ internal partial class SettingsWindow : Window
             return; // ignore bubbled selection changes from inner controls (combo, lists)
 
         var page = PageOf(Tabs.SelectedItem as TabItem);
+        if (page is { } shown)
+            Place = new SettingsLink(shown, null);
         ViewModel.ClaudeCode.IsTabActive = page == SettingsPage.ClaudeUsage;
         if (page == SettingsPage.ClaudeUsage)
         {
@@ -221,6 +288,8 @@ internal partial class SettingsWindow : Window
     /// </summary>
     public void SelectPage(SettingsPage page, string? anchor = null)
     {
+        // An old page or anchor (a card, a menu or agent text from before 4.0) lands where it lives now.
+        (page, anchor) = SettingsIndex.Resolve(page, anchor);
         var tab = Tabs.Items.OfType<TabItem>().FirstOrDefault(t => PageOf(t) == page);
         if (tab is null)
             return;
@@ -252,16 +321,24 @@ internal partial class SettingsWindow : Window
             ViewModel.Themes.IsStudioMode = false;
 
         Tabs.SelectedItem = tab;
+        Place = new SettingsLink(page, entry?.Anchor);
         if (entry is null)
             return;
 
         // After layout: the page may have just been realized for the first time.
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
-            if (tab.Content is not DependencyObject content || SettingsAnchor.Find(content, entry.Anchor!) is not { } target
-                || !target.IsVisible)
+            if (tab.Content is not DependencyObject content || SettingsAnchor.Find(content, entry.Anchor!) is not { } target)
             {
                 tab.Focus();   // never leave keyboard focus nowhere
+                return;
+            }
+            // A section inside a collapsed group (a search hit "(in Advanced)") opens its group first.
+            if (RevealInside(target, content))
+                target.UpdateLayout();
+            if (!target.IsVisible)
+            {
+                tab.Focus();
                 return;
             }
             target.BringIntoView();
@@ -287,6 +364,25 @@ internal partial class SettingsWindow : Window
                 return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Opens every collapsed Expander between <paramref name="target"/> and the page's content root
+    /// <paramref name="root"/> (exclusive: the walk stops there and never opens anything above the page), so a section
+    /// inside one can be shown and focused. True when one was opened.
+    /// </summary>
+    internal static bool RevealInside(DependencyObject target, DependencyObject root)
+    {
+        bool opened = false;
+        for (var d = target; d is not null && !ReferenceEquals(d, root); d = LogicalTreeHelper.GetParent(d) ?? (d is Visual ? VisualTreeHelper.GetParent(d) : null))
+        {
+            if (d is Expander { IsExpanded: false } expander)
+            {
+                expander.IsExpanded = true;
+                opened = true;
+            }
+        }
+        return opened;
     }
 
     private static UIElement? FirstFocusable(DependencyObject root)
@@ -375,4 +471,12 @@ internal partial class SettingsWindow : Window
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>A link inside Settings (an empty list's "Claude Code settings…"): its Tag is a link, "claudecode#folders".</summary>
+    private void OpenSettingsLink_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is string text && SettingsIndex.ParseLink(text) is { } link
+            && link.Page != SettingsPage.Widget)
+            SelectPage(link.Page, link.Anchor);
+    }
 }

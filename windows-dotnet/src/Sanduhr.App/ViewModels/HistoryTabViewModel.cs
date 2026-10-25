@@ -125,12 +125,37 @@ public sealed partial class HistoryTabViewModel : ObservableObject
     }
 
     /// <summary>
+    /// What the meter history says when it draws nothing (WF32, WF35): signed out, how to start it; signed in with nothing
+    /// recorded yet, that it fills in. Empty while the chart has rows. A screen reader reads it; the chart is a drawing.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasEmptyText))]
+    private string _emptyText = "";
+
+    /// <summary>The empty-state line shows in place of the chart.</summary>
+    public bool HasEmptyText => EmptyText.Length > 0;
+
+    internal const string SignedOutLine = "Sign in to start recording your meters. Sanduhr keeps 30 days on this PC.";
+    internal const string NoHistoryLine = "No history yet. Data accumulates as you use Sanduhr.";
+
+    /// <summary>The empty-state line for a chart with or without rows.</summary>
+    internal static string EmptyLine(bool signedIn, bool hasRows) => hasRows ? "" : signedIn ? NoHistoryLine : SignedOutLine;
+
+    /// <summary>The chart rows (see <see cref="Rows"/>), and the empty-state line that goes with them.</summary>
+    public IReadOnlyList<ChartRow> BuildRows()
+    {
+        var rows = Rows();
+        EmptyText = EmptyLine(_widget.ActiveAccount is not null || _widget.IsDemo, rows.Count > 0);
+        return rows;
+    }
+
+    /// <summary>
     /// Assemble the chart rows from the shared history store. Single-account mode
     /// loads one window per tier (accent line); all-accounts mode overlays one
     /// per-account series per tier (registry order → stable colors). A tier with
     /// no data in the window is dropped (parity with the Python <c>if agg:</c>).
     /// </summary>
-    public IReadOnlyList<ChartRow> BuildRows()
+    private IReadOnlyList<ChartRow> Rows()
     {
         // Demo mode charts nothing: a sample label could match a real account's history file.
         if (_widget.IsDemo)

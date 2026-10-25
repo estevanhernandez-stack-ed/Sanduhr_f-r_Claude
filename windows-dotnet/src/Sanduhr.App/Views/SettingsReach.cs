@@ -34,7 +34,7 @@ public static class SettingsAnchor
 
 /// <summary>
 /// The sidebar's group heading, drawn above the first page of each group:
-/// <c>views:SettingsSidebar.GroupHeader="Usage"</c> on that page's TabItem.
+/// set by <c>SettingsWindow</c> from <c>SettingsNames.Sidebar</c> on that page's TabItem.
 /// </summary>
 public static class SettingsSidebar
 {

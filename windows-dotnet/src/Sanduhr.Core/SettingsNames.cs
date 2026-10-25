@@ -115,8 +115,6 @@ public static class SettingsNames
     public const string SendTestAlert = "Send test alert";
     /// <summary>History: the 30-day meter chart as a CSV file ("meter history", WF14).</summary>
     public const string ExportMeterHistory = "Export meter history…";
-    /// <summary>The old identifier, kept because SettingsIndex.cs (slice 2's file) refers to it. Same text.</summary>
-    public const string ExportCsv = ExportMeterHistory;
     /// <summary>Claude Usage, Sessions: the session table as a CSV file.</summary>
     public const string ExportSessions = "Export sessions…";
     /// <summary>Claude Usage, Overview, and About: the vault of Claude Code session totals ("session archive", WF14).</summary>
@@ -165,6 +163,10 @@ public static class SettingsNames
     public const string LetClaudeReadTotals = "Let Claude read this folder's project totals";
     /// <summary>The same switch spoken with its folder, so each card's reads apart.</summary>
     public static string LetClaudeReadTotalsFor(string folder) => $"{LetClaudeReadTotals}, {folder}";
+    /// <summary>A search row for a control inside a collapsed section: "Margins (in Advanced)".</summary>
+    public static string InSection(string title, string section) => $"{title} (in {section})";
+    /// <summary>The same row spoken, without the parentheses: "Margins, in Advanced".</summary>
+    public static string InSectionSpoken(string title, string section) => $"{title}, in {section}";
     /// <summary>Settings' title-bar close button, spoken (its face is a glyph).</summary>
     public const string CloseSettings = "Close Settings";
     /// <summary>Accounts: the follow switch, and the tray's account list marks the account in use.</summary>
@@ -368,6 +370,16 @@ public static class SettingsNames
         (DeskDirectSwitch, SettingsPage.Desk),
         (OledCareSwitch, SettingsPage.Desk),
         (PutMyDeskBack, SettingsPage.Desk),
+        (ExportSessions, SettingsPage.ClaudeUsage),
+        (SessionArchive, SettingsPage.ClaudeUsage),
+        (FoldersToShare, SettingsPage.Publish),
+        (ClaudeCodeGlowHook, SettingsPage.ClaudeCode),
+        (TranscriptsKept, SettingsPage.Mods),
+        (LetClaudeReadTotals, SettingsPage.ClaudeCode),
+        (SnakeSoundAtFull, SettingsPage.Alerts),
+        (DeskFont, SettingsPage.Desk),
+        (MessageFont, SettingsPage.DeskMessage),
+        (MessageColor, SettingsPage.DeskMessage),
         (LauncherAddApp, SettingsPage.Desk),
         (LauncherAddLink, SettingsPage.Desk),
         (SignInReminders, SettingsPage.Alerts),

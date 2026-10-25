@@ -79,10 +79,8 @@ public class SettingsSourceScanTests
         return xaml[m.Index..xaml.IndexOf("</TabItem>", m.Index, StringComparison.Ordinal)];
     }
 
-    /// <summary>Files the scan leaves out. The names table holds every retired name on purpose. The search
-    /// index is slice 2's file: its titles keep old words until slice 2 points them at the table, and it
-    /// leaves this list then.</summary>
-    private static readonly string[] NotScanned = ["SettingsNames.cs", "SettingsIndex.cs"];
+    /// <summary>Files the scan leaves out. The names table holds every retired name on purpose.</summary>
+    private static readonly string[] NotScanned = ["SettingsNames.cs"];
 
     private static IEnumerable<string> FilesIn(string root, string pattern) =>
         Directory.EnumerateFiles(root, pattern, SearchOption.AllDirectories)
@@ -331,7 +329,7 @@ public class SettingsSourceScanTests
         // Publish usage: the heading is the visible label, the list says the same words.
         var publish = TabRange("Publish");
         Assert.Matches("<TextBlock Text=\"\\{x:Static core:SettingsNames\\.FoldersToShare\\}\"", publish);
-        Assert.Matches("<ItemsControl ItemsSource=\"\\{Binding Roots\\}\"[^>]*AutomationProperties\\.Name=\"\\{x:Static core:SettingsNames\\.FoldersToShare\\}\"", publish);
+        Assert.Matches("<ItemsControl x:Name=\"PublishHomesList\" ItemsSource=\"\\{Binding Roots\\}\"[^>]*AutomationProperties\\.Name=\"\\{x:Static core:SettingsNames\\.FoldersToShare\\}\"", publish);
 
         // Themes: every text box beside a visible label (Filename, Name, Save the theme as) and both
         // labelled lists. LabelThenField checks the first three against their labels in
@@ -376,10 +374,7 @@ public class SettingsSourceScanTests
         Assert.Equal(SettingsNames.Pages.Select(p => p.ToString()), tabs.Select(t => Attr(t, "Tag")));
         Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => WebUtility.HtmlDecode(Attr(t, "Header"))));
         Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => WebUtility.HtmlDecode(Attr(t, "AutomationProperties.Name"))));
-        // A group's heading sits on its first page and nowhere else.
-        var expected = SettingsNames.Pages.Select(p =>
-            SettingsNames.Sidebar.FirstOrDefault(g => g.Pages[0] == p)?.Title ?? "");
-        Assert.Equal(expected, tabs.Select(t => Attr(t, "views:SettingsSidebar.GroupHeader")));
+        Assert.DoesNotContain("SettingsSidebar.GroupHeader=\"", xaml); // one source: SettingsWindow sets it from SettingsNames.Sidebar
     }
 
     [Fact]
@@ -635,6 +630,17 @@ public class SettingsSourceScanTests
         Assert.StartsWith(visible, name);
         // The wrapping TextBlock keeps the name the code-behind shows and hides.
         Assert.Contains("x:Name=\"UseEmbeddedLink\"", key);
+    }
+
+    [Fact]
+    public void The_shared_dialog_paints_no_button_with_a_hard_coded_color()
+    {
+        // A literal hex Background pairs a themed Foreground with a fixed fill: dark text on near-black in a light theme (Store 10.1.4.4).
+        var xaml = XmlComment.Replace(File.ReadAllText(Path.Combine(AppDir(), "Views", "ThemedDialog.xaml")), "");
+        var buttons = Regex.Matches(xaml, "<Button\\b[^>]*>", RegexOptions.Singleline);
+        Assert.Equal(2, buttons.Count);
+        foreach (Match button in buttons)
+            Assert.DoesNotMatch("\\bBackground=\"#", button.Value);
     }
 
     [Fact]

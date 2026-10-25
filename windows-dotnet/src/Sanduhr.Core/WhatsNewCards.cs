@@ -7,7 +7,7 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class WhatsNewCards
 {
-    public static IReadOnlyList<WhatsNewCard> Table { get; } = [.. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()];
+    public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
 
     // 3.9.0: the Store goes 3.8.0 to 3.9.0. One card; the cap of eight is not in play.
     private static WhatsNewCard[] Release390() =>
@@ -151,4 +151,46 @@ public static class WhatsNewCards
             "\uE789", // Megaphone
             WhatsNewPreview.None, SettingsPage.About),
     ];
+
+    /// <summary>Each card with the section its Show me lands on (Settings v2, WF17).</summary>
+    private static WhatsNewCard[] Anchored(WhatsNewCard[] cards) =>
+        [.. cards.Select(c => AnchorFor(c.Id) is { } anchor ? c with { Anchor = anchor } : c)];
+
+    /// <summary>
+    /// Where each card lands, by id. Kept apart from the cards so their words and their landings change independently.
+    /// Today's anchors; the aliases in <see cref="SettingsIndex.Resolve(SettingsPage, string?)"/> carry them to v2's pages.
+    /// Cards that show the widget have none.
+    /// </summary>
+    private static string? AnchorFor(string id) => id switch
+    {
+        "ci-runners" => SettingsIndex.DeskWatchers,
+        "widgets" => SettingsIndex.WidgetsCatalog,
+        "companion" => SettingsIndex.WidgetsCompanion,
+        "claude-widgets" => SettingsIndex.WidgetsInstalled,
+        "restart-to-update" => SettingsIndex.Version,
+        "desk-fold" => SettingsIndex.DeskDesigns,
+        "weather-nickname" => SettingsIndex.WeatherPlace,
+        "livelier-bars" => SettingsIndex.NowPlayingBars,
+        "meter-styles" => SettingsIndex.DeskPieces,
+        "desk-design" => SettingsIndex.DeskDirect,
+        "launcher" => SettingsIndex.DeskLauncher,
+        "per-monitor" => SettingsIndex.DeskPieces,
+        "song-looks" => SettingsIndex.NowPlayingLooks,
+        "oled-care" => SettingsIndex.DeskOled,
+        "saved-designs" => SettingsIndex.DeskDesigns,
+        "now-playing-steps-aside" => SettingsIndex.NowPlayingWidget,
+        "watchers" => SettingsIndex.DeskWatchers,
+        "suggested-messages" => SettingsIndex.MessageLines,
+        "desk-plate" => SettingsIndex.DeskPlate,
+        "arrange-hide" => SettingsIndex.DeskArrange,
+        "statusline-label" => SettingsIndex.Statusline,
+        "desk" => SettingsIndex.DeskOn,
+        "settings-redesigned" => SettingsIndex.Tray,
+        "claude-code-page" => SettingsIndex.Folders,
+        "shortcut-keys" => SettingsIndex.Shortcuts,
+        "tray-shows" => SettingsIndex.Tray,
+        "every-folder" => SettingsIndex.Vault,
+        "whats-new" => SettingsIndex.Version,
+        _ => null,
+    };
 }

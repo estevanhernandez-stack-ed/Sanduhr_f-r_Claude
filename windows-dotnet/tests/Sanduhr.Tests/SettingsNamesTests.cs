@@ -265,6 +265,13 @@ public class SettingsNamesTests
     }
 
     [Fact]
+    public void A_title_in_a_collapsed_section_is_marked_in_text_and_spoken_plainly()
+    {
+        Assert.Equal("Margins (in Advanced)", SettingsNames.InSection("Margins", "Advanced"));
+        Assert.Equal("Margins, in Advanced", SettingsNames.InSectionSpoken("Margins", "Advanced"));
+    }
+
+    [Fact]
     public void The_agent_switches_say_Claude()
     {
         Assert.Equal("Let Claude show watchers", SettingsNames.WatchersSwitch);
@@ -275,7 +282,6 @@ public class SettingsNamesTests
     public void History_and_archive_names_are_pinned()
     {
         Assert.Equal("Export meter history…", SettingsNames.ExportMeterHistory);
-        Assert.Equal(SettingsNames.ExportMeterHistory, SettingsNames.ExportCsv);
         Assert.Equal("Export sessions…", SettingsNames.ExportSessions);
         Assert.Equal("Session archive", SettingsNames.SessionArchive);
         Assert.Equal("Erase session archive…", SettingsNames.EraseSessionArchive);

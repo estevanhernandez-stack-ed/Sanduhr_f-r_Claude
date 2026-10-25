@@ -75,6 +75,8 @@ public sealed partial class LocalCcViewModel : ObservableObject
     [ObservableProperty] private string _monthSplitText = "";
     [ObservableProperty] private bool _showBreakdowns;
     [ObservableProperty] private string _statusLine = "";
+    // True once the first full compute has presented: the breakdown's "none" lines wait for it.
+    [ObservableProperty] private bool _hasLoaded;
 
     public ObservableCollection<BreakdownRow> Projects { get; } = new();
     public ObservableCollection<BreakdownRow> Skills { get; } = new();
@@ -250,6 +252,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
         }
         Apply(data);
         _hasPresented = true;
+        HasLoaded = true;
     }
 
     /// <summary>Head shared by <see cref="Compute"/> and <see cref="ComputePreview"/> —

@@ -188,8 +188,8 @@
                     <!-- A drawn mark, not text: it has no automation peer, so a screen reader hears the
                          item's Toggle state once and not a stray "check mark" besides. It sits over the
                          header's left padding, so it adds no column. -->
-                    <Path x:Name="CheckMark" Grid.Column="0" Data="M0,4 L3,7 L8,0" Width="8" Height="7"
-                          Margin="3,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"
+                    <Path x:Name="CheckMark" Grid.Column="0" Data="M0.8,4.4 L3.4,7 L8.2,0.8" Width="9" Height="8"
+                          Margin="1,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"
                           Stroke="{TemplateBinding Foreground}" StrokeThickness="1.6"
                           StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
                           Visibility="Collapsed" IsHitTestVisible="False" />

@@ -97,7 +97,7 @@ public partial class MainWindow : Window
         accounts.SubmenuOpened += (_, _) =>
         {
             if (Vm is not null)
-                AccountMenuBuilder.PopulateSwitchList(accounts.Items, Vm, includeAdd: true, includeManage: false);
+                AccountMenuBuilder.PopulateSwitchList(accounts.Items, Vm, includeAdd: true, includeManage: true);
         };
         menu.Items.Add(accounts);
 
