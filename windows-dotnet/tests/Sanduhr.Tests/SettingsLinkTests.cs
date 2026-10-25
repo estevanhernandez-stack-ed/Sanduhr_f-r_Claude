@@ -76,15 +76,16 @@ public class SettingsLinkTests
             SettingsIndex.Check(SettingsPage.ClaudeCode, SettingsIndex.Meters, withoutMeters, SettingsNames.Pages));
     }
 
-    [Fact]
-    public void A_link_is_checked_by_the_same_rule_as_Check()
-    {
-        foreach (var text in new[] { "desk#pieces", "desk#nowhere", "desk", "history#chart", "desk#desk-launcher" })
-        {
-            var parsed = SettingsIndex.ParseLink(text)!;
-            Assert.Equal(parsed, SettingsIndex.Check(parsed.Page, parsed.Anchor));
-        }
-    }
+    [Theory]
+    [InlineData("desk#pieces", SettingsPage.Desk, "pieces")]
+    [InlineData("desk#nowhere", SettingsPage.Desk, null)]
+    [InlineData("desk", SettingsPage.Desk, null)]
+    [InlineData("history#chart", SettingsPage.History, "chart")]            // History is a page until slice 5
+    [InlineData("desk#desk-launcher", SettingsPage.Launcher, "launcher")]   // an alias live since slice 3
+    [InlineData("deskmessage#message-look", SettingsPage.DeskLook, "sizes")]
+    [InlineData("DESKLOOK#INK", SettingsPage.DeskLook, "ink")]
+    public void A_link_lands_where_the_rule_says(string text, SettingsPage page, string? anchor) =>
+        Assert.Equal(new SettingsLink(page, anchor), SettingsIndex.ParseLink(text));
 
     [Theory]
     [InlineData(new[] { "--settings", "desk#pieces" }, "desk#pieces")]

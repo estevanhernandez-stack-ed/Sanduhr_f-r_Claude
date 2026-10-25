@@ -279,4 +279,40 @@ public class SettingsDeskSplitIndexTests
         Assert.Empty(SettingsNames.PathProblems("Settings, Desk, Designs"));
         Assert.Empty(SettingsNames.PathProblems("Settings, Desk, Behavior"));
     }
+
+    [Theory]
+    [InlineData("ci-runners", "Settings, Watchers")]
+    [InlineData("companion", "Settings, Desk, Pieces")]
+    [InlineData("meter-styles", "Settings, Desk, Pieces")]
+    [InlineData("launcher", "Settings, Launcher")]
+    [InlineData("oled-care", "Settings, Desk, Advanced")]
+    [InlineData("saved-designs", "Settings, Desk, Designs")]
+    [InlineData("watchers", "Settings, Watchers")]
+    [InlineData("desk-plate", "Settings, Desk Look, Back plate")]
+    public void A_Desk_card_names_the_exact_place(string id, string place)
+    {
+        var body = WhatsNewCards.Table.Single(c => c.Id == id).Body;
+        Assert.Contains(place, body);
+        Assert.Empty(SettingsNames.PathProblems(body));
+    }
+
+    [Fact]
+    public void The_tours_Desk_card_says_where_pieces_are_arranged() =>
+        Assert.Contains("Settings, Desk, Pieces", WelcomeTour.Table.Single(t => t.Id == "desk").Card.Body);
+
+    [Theory]
+    [InlineData(SettingsPage.Desk, "look", SettingsPage.DeskLook, "look")]
+    [InlineData(SettingsPage.Desk, "ink", SettingsPage.DeskLook, "ink")]
+    [InlineData(SettingsPage.Desk, "desk-plate", SettingsPage.DeskLook, "desk-plate")]
+    [InlineData(SettingsPage.Desk, "desk-watchers", SettingsPage.Watchers, "watchers")]
+    [InlineData(SettingsPage.Desk, "desk-launcher", SettingsPage.Launcher, "launcher")]
+    [InlineData(SettingsPage.Desk, "desk-direct", SettingsPage.Desk, "desk-designs")]
+    [InlineData(SettingsPage.DeskMessage, "message-look", SettingsPage.DeskLook, "sizes")]
+    [InlineData(SettingsPage.Alerts, "signin-reminders", SettingsPage.Desk, "signin-reminders")]
+    [InlineData(SettingsPage.Widgets, "widgets-companion", SettingsPage.Desk, "pieces")]
+    public void Every_slice_3_alias_lands_on_its_new_home(SettingsPage from, string anchor, SettingsPage to, string toAnchor)
+    {
+        Assert.Equal(new SettingsLink(to, toAnchor), SettingsIndex.Resolve(from, anchor));
+        Assert.Equal(new SettingsLink(to, toAnchor), SettingsIndex.ParseLink(SettingsIndex.PageId(from) + "#" + anchor));
+    }
 }

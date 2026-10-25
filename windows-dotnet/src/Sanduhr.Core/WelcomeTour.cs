@@ -42,7 +42,7 @@ public static class WelcomeTour
             "The widget is the small floating window with your meters, one bar per limit. The tick on each bar marks where an even pace would put you right now.",
             "\uE9D2", WhatsNewPreview.Meters, SettingsPage.Widget)),
         new(2, new WhatsNewCard([], "desk", "On your desktop",
-            "The Desk is the clock, meters and pieces Sanduhr draws on your desktop, under every window. A piece is one thing on the Desk, and you arrange each from Settings, Desk.",
+            "The Desk is the clock, meters and pieces Sanduhr draws on your desktop, under every window. A piece is one thing on the Desk, and you arrange each in Settings, Desk, Pieces.",
             "\uE7F4", WhatsNewPreview.None, SettingsPage.Desk)),
         new(3, new WhatsNewCard([], "tray", "At a glance",
             "The hourglass in the tray shows a percent: your session, your weekly limit, whichever is higher, both in turn, or the highest of any.",

@@ -13,9 +13,9 @@ public static class WhatsNewCards
     private static WhatsNewCard[] Release390() =>
     [
         WhatsNewCard.Of("3.9.0", "ci-runners", "Your CI runners on the Desk",
-            "Show my CI runners' jobs, in Settings, Desk, puts a card on your Desk for each job a runner on this PC runs. Sanduhr reads the runners' logs through Docker's local pipe: no account, no network.",
+            "Show my CI runners' jobs, in Settings, Watchers, puts a card on your Desk for each job a runner on this PC runs. Sanduhr reads the runners' logs through Docker's local pipe: no account, no network.",
             "", // CommandPrompt
-            WhatsNewPreview.None, SettingsPage.Desk),
+            WhatsNewPreview.None, SettingsPage.Watchers),
     ];
 
     // 3.8.0: the Store goes 3.7.1 to 3.8.0 (3.7.2 was a GitHub-only patch with no cards). Seven cards
@@ -27,7 +27,7 @@ public static class WhatsNewCards
             "", // Puzzle
             WhatsNewPreview.None, SettingsPage.Widgets),
         WhatsNewCard.Of("3.8.0", "companion", "A companion on your Desk",
-            "A pixel hourglass sits on your Desk, grows with the days you code and reacts to your pace. Show it and let it roam in Settings, Widgets.",
+            "A pixel hourglass sits on your Desk, grows with the days you code and reacts to your pace. Show it and let it roam in Settings, Desk, Pieces.",
             "", // Emoji
             WhatsNewPreview.None, SettingsPage.Widgets),
         WhatsNewCard.Of("3.8.0", "claude-widgets", "Claude can make you a widget",
@@ -51,7 +51,7 @@ public static class WhatsNewCards
             "", // Equalizer
             WhatsNewPreview.None, SettingsPage.NowPlaying),
         WhatsNewCard.Of("3.8.0", "meter-styles", "Meters that fit",
-            "The Claude line, your limits and the system readings come as bars, slim lines, rings or ticks, with pace marks on every one. Set them in Settings, Desk.",
+            "The Claude line, your limits and the system readings come as bars, slim lines, rings or ticks, with pace marks on every one. Set them in Settings, Desk, Pieces.",
             "", // SpeedMedium
             WhatsNewPreview.None, SettingsPage.Desk),
     ];
@@ -63,7 +63,7 @@ public static class WhatsNewCards
             "", // Edit
             WhatsNewPreview.None, SettingsPage.Desk),
         WhatsNewCard.Of("3.7.1", "launcher", "A Launcher on the Desk",
-            "Up to eight buttons on your Desk open Start-menu apps, web apps or https links when you click. Add them in Settings, Desk.",
+            "Up to eight buttons on your Desk open Start-menu apps, web apps or https links when you click. Add them in Settings, Launcher.",
             "", // AllApps
             WhatsNewPreview.None, SettingsPage.Desk),
         WhatsNewCard.Of("3.7.1", "per-monitor", "A Desk piece on each monitor",
@@ -75,11 +75,11 @@ public static class WhatsNewCards
             "", // Font
             WhatsNewPreview.None, SettingsPage.NowPlaying),
         WhatsNewCard.Of("3.7.1", "oled-care", "Care for OLED screens",
-            "The Desk drifts a few pixels every 3 minutes, dims after 5 idle minutes, and can hold its ink off pure white. Turn it on in Settings, Desk.",
+            "The Desk drifts a few pixels every 3 minutes, dims after 5 idle minutes, and can hold its ink off pure white. Turn it on in Settings, Desk, Advanced.",
             "", // Brightness
             WhatsNewPreview.None, SettingsPage.Desk),
         WhatsNewCard.Of("3.7.1", "saved-designs", "Put my Desk back",
-            "Sanduhr keeps your last ten Desk looks, and you can pin the ones you love. Put my Desk back, in Settings and the tray menu, returns to the look before a change.",
+            "Sanduhr keeps your last ten Desk looks, and you can pin the ones you love. Put my Desk back, in Settings, Desk, Designs and in the tray menu, returns to the look before a change.",
             "", // Undo
             WhatsNewPreview.None, SettingsPage.Desk),
     ];
@@ -91,7 +91,7 @@ public static class WhatsNewCards
             "", // MusicNote
             WhatsNewPreview.None, SettingsPage.NowPlaying),
         WhatsNewCard.Of("3.6.0", "watchers", "Watchers on the Desk",
-            "Claude Code can show a live card on your Desk for work it's watching, and say when it needs you. Turn it on in Settings, Desk, then place Watchers.",
+            "Claude Code can show a live card on your Desk for work it's watching, and say when it needs you. Turn it on in Settings, Watchers.",
             "", // Stopwatch
             WhatsNewPreview.None, SettingsPage.Desk),
         WhatsNewCard.Of("3.6.0", "suggested-messages", "Claude can suggest Desk messages",
@@ -99,7 +99,7 @@ public static class WhatsNewCards
             "", // Message
             WhatsNewPreview.None, SettingsPage.DeskMessage),
         WhatsNewCard.Of("3.6.0", "desk-plate", "A plate behind the text",
-            "A soft plate behind the Desk's pieces keeps them readable over a busy desktop. Turn it on in Settings, Desk.",
+            "A soft plate behind the Desk's pieces keeps them readable over a busy desktop. Turn it on in Settings, Desk Look, Back plate.",
             "", // Color
             WhatsNewPreview.None, SettingsPage.Desk),
         WhatsNewCard.Of("3.6.0", "arrange-hide", "Hide pieces while arranging",
@@ -163,7 +163,7 @@ public static class WhatsNewCards
     /// </summary>
     private static string? AnchorFor(string id) => id switch
     {
-        "ci-runners" => SettingsIndex.DeskWatchers,
+        "ci-runners" => SettingsIndex.CiRunners,
         "widgets" => SettingsIndex.WidgetsCatalog,
         "companion" => SettingsIndex.WidgetsCompanion,
         "claude-widgets" => SettingsIndex.WidgetsInstalled,

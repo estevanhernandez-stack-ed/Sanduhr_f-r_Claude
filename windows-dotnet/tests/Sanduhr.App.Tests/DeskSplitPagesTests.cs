@@ -581,4 +581,32 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void Old_desk_links_land_on_the_new_pages() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            foreach (var (from, anchor, to, toAnchor) in new[]
+            {
+                (SettingsPage.Desk, SettingsIndex.DeskLook, SettingsPage.DeskLook, SettingsIndex.DeskLook),
+                (SettingsPage.Desk, SettingsIndex.DeskInk, SettingsPage.DeskLook, SettingsIndex.DeskInk),
+                (SettingsPage.Desk, SettingsIndex.DeskPlate, SettingsPage.DeskLook, SettingsIndex.DeskPlate),
+                (SettingsPage.Desk, SettingsIndex.DeskWatchers, SettingsPage.Watchers, SettingsIndex.Watchers),
+                (SettingsPage.Desk, SettingsIndex.DeskLauncher, SettingsPage.Launcher, SettingsIndex.LauncherPlace),
+                (SettingsPage.Desk, SettingsIndex.DeskDirect, SettingsPage.Desk, SettingsIndex.DeskDesigns),
+                (SettingsPage.DeskMessage, SettingsIndex.MessageLook, SettingsPage.DeskLook, SettingsIndex.DeskSizes),
+                (SettingsPage.Alerts, SettingsIndex.SignInReminders, SettingsPage.Desk, SettingsIndex.SignInReminders),
+                (SettingsPage.Widgets, SettingsIndex.WidgetsCompanion, SettingsPage.Desk, SettingsIndex.DeskPieces),
+            })
+            {
+                window.SelectPage(from, anchor);
+                Settle(window, guard);
+                Assert.Equal(new SettingsLink(to, toAnchor), window.Place);
+                Assert.True(Marked(window, to, toAnchor).IsVisible, $"{from}#{anchor} landed on {to}#{toAnchor}, hidden");
+            }
+        }
+        finally { window.Close(); }
+    });
 }

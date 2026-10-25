@@ -190,7 +190,7 @@ public class WhatsNewTests
     [InlineData("saved-designs", SettingsPage.Desk, SettingsIndex.DeskDesigns)]
     [InlineData("desk-fold", SettingsPage.Desk, SettingsIndex.DeskDesigns)]
     [InlineData("desk-plate", SettingsPage.Desk, SettingsIndex.DeskPlate)]
-    [InlineData("ci-runners", SettingsPage.Desk, SettingsIndex.DeskWatchers)]
+    [InlineData("ci-runners", SettingsPage.Watchers, SettingsIndex.CiRunners)]
     [InlineData("statusline-label", SettingsPage.ClaudeCode, SettingsIndex.Statusline)]
     public void Cards_that_landed_below_the_fold_name_their_section(string id, SettingsPage page, string anchor)
     {
