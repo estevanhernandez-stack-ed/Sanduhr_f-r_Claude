@@ -907,7 +907,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         if (_frame.Bars && _frame.Audio is { } audio)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal };
-            var bars = BarsPiece(size, audio, look, _frame.BarsGradient || _frame.NowPlayingStops is not null);
+            var bars = BarsPiece(size, audio, look, _frame.BarsGradient || (look is null && _frame.NowPlayingStops is not null));
             bars.Margin = new Thickness(align == HorizontalAlignment.Right ? 0 : 0, 0, size * 0.6, 0);
             if (align == HorizontalAlignment.Right) { row.Children.Add(column); bars.Margin = new Thickness(size * 0.6, 0, 0, 0); row.Children.Add(bars); }
             else { row.Children.Add(bars); row.Children.Add(column); }

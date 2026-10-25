@@ -69,13 +69,16 @@ public sealed class DeskThemeLookViewTests
     [Fact]
     public void Meters_draw_the_themes_bars_track_and_tick() => Sta.Run(() =>
     {
-        var frame = new DeskFrame { Now = Now, Usage = Usage(), MeterStops = ["6c63ff", "e8e4dc"], MeterTrackHex = "2a2a2a", PaceHex = "ff6b6b" };
+        var paced = new DeskUsage(
+            [new DeskTier(TierModel.FiveHour, 42, Now.AddHours(2).ToString("o")), new DeskTier(TierModel.SevenDay, 63, null)], Now.AddMinutes(-1), false, false, null);
+        var frame = new DeskFrame { Now = Now, Usage = paced, MeterStops = ["6c63ff", "e8e4dc"], MeterTrackHex = "2a2a2a", PaceHex = "ff6b6b" };
         var view = View("meters:tr", frame);
         var meters = All<FrameworkElement>(view).First(e => e.Tag as string == "meters");
         var rects = All<Rectangle>(meters).ToList();
         var fill = rects.First(r => r.HorizontalAlignment == HorizontalAlignment.Left && r.Width > 2);
         Assert.Equal([C("6c63ff"), C("e8e4dc")], Assert.IsType<LinearGradientBrush>(fill.Fill).GradientStops.Select(s => s.Color));
         Assert.Contains(rects, r => r.Fill is SolidColorBrush b && b.Color == C("2a2a2a"));   // the track
+        Assert.Contains(rects, r => r.Width == 2 && r.Fill is SolidColorBrush b && b.Color == C("ff6b6b"));   // the pace tick
     });
 
     [Fact]
@@ -100,5 +103,29 @@ public sealed class DeskThemeLookViewTests
         Assert.Equal(4, lit.Count);
         Assert.Contains(C("facc15"), lit);
         Assert.DoesNotContain(Colors.White, lit);   // Light ink's base: no lit cell is pure base ink
+    });
+
+    [Fact]
+    public void A_songs_own_look_keeps_its_solid_bars_under_a_followed_theme() => Sta.Run(() =>
+    {
+        var track = new NowPlayingInfo { Title = "Song", Artist = "Band", Duration = 200, Elapsed = 50, ElapsedAt = Now, Playing = false };
+        List<Brush?> Bars(IReadOnlyList<string>? themed)
+        {
+            var settings = (DeskSettings.Default with { Enabled = true, Layout = "nowPlaying:bl", Font = "Segoe UI" }).Normalized();
+            var view = new DeskView(Screen(), settings, new DeskFonts(["Segoe UI"]));
+            view.Update(new DeskFrame
+            {
+                Now = Now, Track = track, Bars = true, Audio = new AudioLevelSource(),
+                Look = new NowPlayingLookDraw(["ff2a6d", "05d9e8"], LookStyle.Plain), NowPlayingStops = themed,
+            }, DeskInkMap.Light);
+            var cells = All<Canvas>(view).SelectMany(c => c.Children.OfType<Rectangle>()).Where(r => r.Height <= 1.5).Select(r => (Brush?)r.Fill).ToList();
+            view.Dispose();
+            return cells;
+        }
+        var plain = Bars(null);
+        var followed = Bars(["6c63ff", "e8e4dc"]);
+        Assert.NotEmpty(plain);
+        Assert.All(plain, b => Assert.IsType<SolidColorBrush>(b));
+        Assert.Equal(plain.Select(b => ((SolidColorBrush)b!).Color), followed.Select(b => Assert.IsType<SolidColorBrush>(b).Color));
     });
 }
