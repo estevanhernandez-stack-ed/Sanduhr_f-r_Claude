@@ -166,6 +166,31 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         finally { window.Close(); }
     });
 
+    /// <summary>Review I2: "Place it on the Desk" collapses while it holds the keyboard; focus moves to the "Desk settings…" link
+    /// that takes its spot instead of falling to the top of the window.</summary>
+    [DesktopFact]
+    public void Placing_a_piece_from_its_page_keeps_the_keyboard_on_Desk_settings() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            guard.RouteKeyboard();
+            window.SelectPage(SettingsPage.Weather);
+            Settle(window, guard);
+            var status = Below<DeskPieceStatusPanel>((DependencyObject)TabOf(window, SettingsPage.Weather).Content).Single();
+            var place = (Button)status.FindName("PlaceButton");
+            var link = (Button)status.FindName("DeskLink");
+            place.Focus();
+            Settle(window, guard);
+            Assert.True(place.IsKeyboardFocused, "the Place button took the focus; focused: " + Keyboard.FocusedElement);
+            place.Command.Execute(place.CommandParameter);
+            Settle(window, guard);
+            Assert.False(place.IsVisible);
+            Assert.True(ReferenceEquals(Keyboard.FocusedElement, link), "focus should be on the Desk settings link; focused: " + Keyboard.FocusedElement);
+        }
+        finally { window.Close(); }
+    });
+
     [Fact]
     public void Desk_Look_reads_the_message_settings_fresh_when_shown() => AppHost.Run(() =>
     {
