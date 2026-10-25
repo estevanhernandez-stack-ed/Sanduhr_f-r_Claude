@@ -483,10 +483,14 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         // One to four hex colors with commas; anything unreadable is kept as typed and drawn white.
         var spec = string.Join(",", (value ?? "").Split(',').Select(s => Sanduhr.Core.InkHex.Normalize(s)).Where(s => s is not null));
         if (spec.Length == 0) return;
+        // A typed color is the ink's own, so it switches the ink to Custom, as choosing a preset does.
         _loadingInk = true;
         InkPreset = _inkList.FirstOrDefault(p => p.Value == spec).Name;
+        if (InkChoice.Mode != DeskInkMode.Custom) InkChoice = InkChoices.First(c => c.Mode == DeskInkMode.Custom);
         _loadingInk = false;
-        SaveInk(_ink with { Color = spec });
+        OnPropertyChanged(nameof(IsCustomInk));
+        OnPropertyChanged(nameof(ShowsInkColors));
+        SaveInk(_ink with { Color = spec, Mode = DeskInkMode.Custom });
     }
 
     partial void OnInkShadowChanged(bool value) => SaveInk(_ink with { Shadow = value });

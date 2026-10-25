@@ -167,6 +167,29 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
     });
 
     [Fact]
+    public void Desk_Look_reads_the_message_settings_fresh_when_shown() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Desk);
+            Settle(window, guard);
+            // Changed behind the view model while Settings is open (a design switch, a Claude proposal).
+            var store = Store();
+            store.SaveDeskMessage(store.LoadDeskMessage() with { Size = 77, Glow = false });
+            window.SelectPage(SettingsPage.DeskLook);
+            Settle(window, guard);
+            Assert.Equal(77, svm.MessagePage.Size);
+            // An edit made here keeps what changed behind it.
+            svm.MessagePage.Glow = true;
+            var saved = store.LoadDeskMessage();
+            Assert.True(saved.Glow);
+            Assert.Equal(77, saved.Size);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public void Desk_Look_holds_both_fonts_both_sizes_and_both_colors() => AppHost.Run(() =>
     {
         var (window, _, guard) = Open("Personal");

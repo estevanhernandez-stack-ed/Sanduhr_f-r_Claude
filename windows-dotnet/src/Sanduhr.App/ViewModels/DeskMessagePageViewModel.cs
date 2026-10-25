@@ -448,6 +448,17 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
         RaiseSuggestion();
     }
 
+    /// <summary>
+    /// Desk Look shows the message's size, color, glow and font without the rest of the page: it reads the saved settings
+    /// again (a design switch or a proposal may have changed them) so its controls are fresh and an edit keeps the other fields.
+    /// </summary>
+    public void RefreshSettings()
+    {
+        _settings = _store.LoadDeskMessage();
+        _customColorText = null;
+        RaiseSettings();
+    }
+
     private void CheckDisk()
     {
         if (!_editor.Loaded) return;
