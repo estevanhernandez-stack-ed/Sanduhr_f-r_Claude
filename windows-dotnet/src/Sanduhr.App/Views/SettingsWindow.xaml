@@ -2764,12 +2764,13 @@
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
                             <StackPanel views:SettingsAnchor.Id="pieces" IsEnabled="{Binding NotArranging}">
-                                <TextBlock Text="Where each piece sits" FontSize="13" FontWeight="SemiBold"
+                                <TextBlock Text="{x:Static core:SettingsNames.PiecesSection}" FontSize="13" FontWeight="SemiBold"
+                                           AutomationProperties.HeadingLevel="Level2"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
                                 <views:DeskPiecesPanel />
                                 <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                           Text="Eight places: the four corners, the top and bottom centers, and the middle of each side. Size scales a piece from 60% to 160%. Hidden takes a piece off the desktop. Monitor puts a piece on every monitor, on the main one, or on one monitor; a piece on a monitor that is not connected shows on the main one until it is back." />
+                                           Text="Tick a piece to show it at its usual place. Eight places: the four corners, the top and bottom centers, and the middle of each side. Size scales a piece from 60% to 160%. Move up and Move down change the order of the pieces that share a place. Monitor puts a piece on every monitor, on the main one, or on one monitor; a piece on a monitor that is not connected shows on the main one until it is back." />
                             </StackPanel>
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />

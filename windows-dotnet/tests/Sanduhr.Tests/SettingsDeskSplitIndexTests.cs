@@ -108,4 +108,16 @@ public class SettingsDeskSplitIndexTests
     [InlineData("telemetry")]
     [InlineData("companion")]
     public void A_piece_without_a_page_names_none(string widget) => Assert.Null(SettingsNames.DeskPiecePage(widget));
+
+    [Fact]
+    public void The_pieces_section_is_called_Pieces_and_still_found_by_its_old_name()
+    {
+        var entry = SettingsIndex.Find(SettingsPage.Desk, SettingsIndex.DeskPieces)!;
+        Assert.Equal(SettingsNames.PiecesSection, entry.Title);
+        Assert.Contains(SettingsIndex.Search("where each piece sits"), h => h.Entry == entry);
+        Assert.Contains(SettingsIndex.Search("move up"), h => h.Entry == entry);
+        Assert.Equal(["Where each piece sits"], SettingsNames.RetiredNames("Where each piece sits"));
+        Assert.Empty(SettingsNames.RetiredNames(SettingsNames.DeskMapCaption));   // a whole-name retirement: the caption may say it
+        Assert.Empty(SettingsNames.PathProblems("Move it in Settings, Desk, Pieces."));
+    }
 }

@@ -64,4 +64,24 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void A_pieces_row_is_named_and_its_page_link_opens_the_page() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Desk, SettingsIndex.DeskPieces);
+            Settle(window, guard);
+            var pieces = Marked(window, SettingsPage.Desk, SettingsIndex.DeskPieces);
+            var show = Below<CheckBox>(pieces).Single(c => (string)c.Content == SettingsNames.DeskWeather);
+            Assert.Equal("Weather, on the Desk", System.Windows.Automation.AutomationProperties.GetName(show));
+            var link = Below<Button>(pieces).Single(b => (b.Content as string) == "Weather settings…");
+            Assert.Equal("weather", SettingsLinkTo.GetLink(link));
+            link.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Settle(window, guard);
+            Assert.Equal(new SettingsLink(SettingsPage.Weather, null), window.Place);
+        }
+        finally { window.Close(); }
+    });
 }

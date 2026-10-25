@@ -171,7 +171,7 @@ public sealed class LauncherSettingsTests : IDisposable
             vm.Add(App("A"), "refused");
             Assert.Equal(1, placedCalls);
             Assert.True(vm.HasPlacementNote);
-            Assert.Equal("Placed at bottom right. Move it under Where each piece sits.", vm.PlacementNote);
+            Assert.Equal("Placed at bottom right. Move it in Settings, Desk, Pieces.", vm.PlacementNote);
 
             vm.Add(LauncherButton.Create(LauncherKind.Link, "https://example.com")!, "refused");   // the second button places nothing
             Assert.Equal(1, placedCalls);
@@ -226,7 +226,7 @@ public sealed class LauncherSettingsTests : IDisposable
         Assert.False(Open(placed: false).HasPlacementNote);   // nothing to place yet
         var hidden = Open(new LauncherModel(LauncherOrientation.Row, [App("A")]), placed: false);
         Assert.True(hidden.HasPlacementNote);
-        Assert.Contains("Where each piece sits", hidden.PlacementNote);
+        Assert.Contains("Settings, Desk, Pieces", hidden.PlacementNote);
         Assert.False(Open(new LauncherModel(LauncherOrientation.Row, [App("A")]), placed: true).HasPlacementNote);
     }
 

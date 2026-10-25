@@ -72,6 +72,8 @@ internal partial class SettingsWindow : Window
         };
 
         InitializeComponent();
+        // A button carrying views:SettingsLinkTo.Link opens that place, wherever it sits (Desk, Pieces' rows, a page's status line).
+        AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, new RoutedEventHandler(OnSettingsLinkClick));
         // The sidebar's group headings have one source, the names table: each group's first page carries its title.
         foreach (var group in SettingsNames.Sidebar)
             if (group.Title is { } title
@@ -473,10 +475,22 @@ internal partial class SettingsWindow : Window
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
 
     /// <summary>A link inside Settings (an empty list's "Claude Code settings…"): its Tag is a link, "claudecode#folders".</summary>
-    private void OpenSettingsLink_Click(object sender, RoutedEventArgs e)
+    private void OpenSettingsLink_Click(object sender, RoutedEventArgs e) => OpenLink((sender as FrameworkElement)?.Tag as string);
+
+    /// <summary>Opens the place a clicked button's <see cref="SettingsLinkTo.Link"/> names.</summary>
+    private void OnSettingsLinkClick(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.Tag is string text && SettingsIndex.ParseLink(text) is { } link
-            && link.Page != SettingsPage.Widget)
+        if (e.OriginalSource is DependencyObject d && SettingsLinkTo.GetLink(d) is { Length: > 0 } text)
+        {
+            OpenLink(text);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Selects the page and anchor a link's text names ("claudecode#folders"); the widget is not a Settings page.</summary>
+    private void OpenLink(string? text)
+    {
+        if (text is not null && SettingsIndex.ParseLink(text) is { } link && link.Page != SettingsPage.Widget)
             SelectPage(link.Page, link.Anchor);
     }
 }

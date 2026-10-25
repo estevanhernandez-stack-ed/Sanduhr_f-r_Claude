@@ -122,7 +122,7 @@ public sealed partial class LauncherButtonRow : ObservableObject
 /// Settings, Desk, Launcher (spec, Desk Launcher): the buttons as a list you can add to, remove from and reorder, each
 /// with its label, glow color and picture; row or column; and the way into the app picker and the link prompt. Every
 /// change saves at once, removes the picture files nothing uses any more, and tells the running Desk. The piece
-/// itself is placed under Where each piece sits, like any other.
+/// itself is placed in Settings, Desk, Pieces, like any other.
 /// </summary>
 public sealed partial class LauncherSettingsViewModel : ObservableObject
 {
@@ -166,7 +166,7 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
 
     /// <summary>Shown when there are buttons but the piece has no place on the Desk.</summary>
     public string PlacementNote => !HasButtons ? ""
-        : !_isPlaced() ? "The Launcher is hidden. Pick a place for it under Where each piece sits."
+        : !_isPlaced() ? "The Launcher is hidden. Show it in Settings, Desk, Pieces."
         : _autoNote;
 
     public bool HasPlacementNote => PlacementNote.Length > 0;
@@ -364,7 +364,7 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
         Select(Rows.Count - 1);
         if (first && !_isPlaced() && _autoPlace?.Invoke() is { } where)
         {
-            _autoNote = $"Placed at {where}. Move it under Where each piece sits.";
+            _autoNote = $"Placed at {where}. Move it in Settings, Desk, Pieces.";
             RaiseNote();
         }
     }

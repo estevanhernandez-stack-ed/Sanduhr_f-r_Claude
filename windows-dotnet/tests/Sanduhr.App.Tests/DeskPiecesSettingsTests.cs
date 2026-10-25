@@ -209,4 +209,32 @@ public sealed class DeskPiecesSettingsTests : IDisposable
         desk.Arranging = false;
         Assert.True(status.PlaceCommand.CanExecute(null));
     }
+
+    private static System.Windows.Controls.WrapPanel? FirstRow(System.Windows.DependencyObject root)
+    {
+        for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is System.Windows.Controls.WrapPanel { Tag: "PieceRow" } row) return row;
+            if (FirstRow(child) is { } found) return found;
+        }
+        return null;
+    }
+
+    [Fact]
+    public void A_row_is_one_line_at_760_of_page_width_and_wraps_below() => Sta.Run(() =>
+    {
+        var panel = new Sanduhr.App.Views.DeskPiecesPanel { DataContext = Desk("clock:bl claude:bl") };
+        double OrderTop(double pageWidth)
+        {
+            double inner = pageWidth - 40;   // the page's 20 DIP margins
+            panel.Measure(new System.Windows.Size(inner, double.PositiveInfinity));
+            panel.Arrange(new System.Windows.Rect(0, 0, inner, panel.DesiredSize.Height));
+            panel.UpdateLayout();
+            var row = FirstRow(panel) ?? throw new Xunit.Sdk.XunitException("no piece row");
+            return ((System.Windows.FrameworkElement)row.Children[1]).TranslatePoint(new System.Windows.Point(0, 0), row).Y;
+        }
+        Assert.Equal(0, OrderTop(760), 1);
+        Assert.True(OrderTop(759) > 20, "the Order buttons stay on the first line below 760 DIP");
+    });
 }

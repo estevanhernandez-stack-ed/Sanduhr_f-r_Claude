@@ -520,6 +520,7 @@ public static class SettingsNames
         ("Pin on top", KeepWidgetOnTop, false),
         ("Pin always on top", KeepWidgetOnTop, false),
         ("Don't show after updates", HideWhatsNewAfterUpdates, false),
+        ("Where each piece sits", PiecesSection, true),
     ];
 
     /// <summary>The retired names <paramref name="text"/> still uses, empty when it uses none.</summary>
