@@ -364,6 +364,7 @@ public sealed class SettingsReachTests : AppWindowFixture
             Land(window, guard, SettingsPage.ClaudeUsage, SettingsIndex.Vault);
             Shows("VaultRootsEmpty", "VaultRootsList");
             svm.ClaudeCode.Overview.ShowBreakdowns = true;
+            LoadOverview(svm);
             Shows("OverviewProjectsEmpty", "OverviewProjectsList");
             Shows("OverviewSkillsEmpty", "OverviewSkillsList");
 
@@ -381,6 +382,46 @@ public sealed class SettingsReachTests : AppWindowFixture
             Pump();
             guard.Check();
             Assert.Equal(new SettingsLink(SettingsPage.ClaudeCode, SettingsIndex.Folders), window.Place);
+        }
+        finally { window.Close(); }
+    });
+
+    /// <summary>Runs the Overview's first scan to its end, as the window does when the page opens.</summary>
+    private static void LoadOverview(SettingsViewModel svm)
+    {
+        var scan = svm.ClaudeCode.Overview.RefreshAsync();
+        var until = DateTime.UtcNow.AddSeconds(30);
+        while (!scan.IsCompleted && DateTime.UtcNow < until)
+        {
+            Pump();
+            Thread.Sleep(15);
+        }
+        Pump();
+        Assert.True(svm.ClaudeCode.Overview.HasLoaded, "the first scan did not finish");
+    }
+
+    [Fact]
+    public void The_Overview_breakdown_says_none_only_after_its_first_scan() => AppHost.Run(() =>
+    {
+        Directory.Delete(Path.Combine(Profile, ".claude"), recursive: true);
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            Land(window, guard, SettingsPage.ClaudeUsage, SettingsIndex.Vault);
+            svm.ClaudeCode.Overview.ShowBreakdowns = true;
+            LoadOverview(svm);
+            // Back to the moment before the first scan presents (landing on the page starts the scan, which is quick against a scratch profile).
+            svm.ClaudeCode.Overview.HasLoaded = false;
+            window.UpdateLayout();
+            Pump();
+            Assert.False(((FrameworkElement)window.FindName("OverviewProjectsEmpty")).IsVisible, "the projects line shows before the first scan");
+            Assert.False(((FrameworkElement)window.FindName("OverviewSkillsEmpty")).IsVisible, "the skills line shows before the first scan");
+
+            LoadOverview(svm);
+            window.UpdateLayout();
+            Pump();
+            Assert.True(((FrameworkElement)window.FindName("OverviewProjectsEmpty")).IsVisible, "the projects line is not shown after the scan");
+            Assert.True(((FrameworkElement)window.FindName("OverviewSkillsEmpty")).IsVisible, "the skills line is not shown after the scan");
         }
         finally { window.Close(); }
     });

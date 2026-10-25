@@ -1398,6 +1398,16 @@
                                 <!-- Per-project + per-skill tables side by side. -->
                                 <Grid Grid.Row="6"
                                       Visibility="{Binding ShowBreakdowns, Converter={StaticResource BoolVis}}">
+                                <Grid.Resources>
+                                    <!-- Empty means empty after the first scan, not while "Today" still says Loading. -->
+                                    <Style x:Key="OverviewEmptyLine" TargetType="TextBlock" BasedOn="{StaticResource EmptyLine}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasLoaded}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Resources>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="12" />
@@ -1407,7 +1417,7 @@
                                 <DockPanel Grid.Column="0">
                                     <TextBlock DockPanel.Dock="Top" Text="Top projects (last 30 days)" FontSize="9"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
-                                    <TextBlock x:Name="OverviewProjectsEmpty" DockPanel.Dock="Top" Style="{StaticResource EmptyLine}"
+                                    <TextBlock x:Name="OverviewProjectsEmpty" DockPanel.Dock="Top" Style="{StaticResource OverviewEmptyLine}"
                                                Margin="0,0,0,4" Text="No projects in the last 30 days."
                                                Tag="{Binding HasItems, ElementName=OverviewProjectsList}" />
                                     <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
@@ -1441,7 +1451,7 @@
                                 <DockPanel Grid.Column="2">
                                     <TextBlock DockPanel.Dock="Top" Text="Top skills (last 30 days)" FontSize="9"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
-                                    <TextBlock x:Name="OverviewSkillsEmpty" DockPanel.Dock="Top" Style="{StaticResource EmptyLine}"
+                                    <TextBlock x:Name="OverviewSkillsEmpty" DockPanel.Dock="Top" Style="{StaticResource OverviewEmptyLine}"
                                                Margin="0,0,0,4" Text="No skills in the last 30 days."
                                                Tag="{Binding HasItems, ElementName=OverviewSkillsList}" />
                                     <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
