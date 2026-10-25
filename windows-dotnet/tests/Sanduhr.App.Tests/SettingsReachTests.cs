@@ -384,4 +384,25 @@ public sealed class SettingsReachTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void An_empty_line_hides_when_its_list_fills() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            Land(window, guard, SettingsPage.Publish, SettingsIndex.Homes);
+            svm.Publish.Roots.Clear();
+            window.UpdateLayout();
+            Pump();
+            Assert.True(((FrameworkElement)window.FindName("PublishHomesEmpty")).IsVisible, "the line is not shown while the list is empty");
+
+            svm.Publish.Roots.Add(new PublishRootToggleViewModel(svm.Publish, "scratch-home", false));
+            window.UpdateLayout();
+            Pump();
+            guard.Check();
+            Assert.False(((FrameworkElement)window.FindName("PublishHomesEmpty")).IsVisible, "the line stays shown with an item in the list");
+        }
+        finally { window.Close(); }
+    });
 }
