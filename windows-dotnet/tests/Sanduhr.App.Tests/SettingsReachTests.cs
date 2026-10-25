@@ -453,4 +453,19 @@ public sealed class SettingsReachTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void Alerts_has_its_page_title_and_percent_after_the_thresholds() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            var thresholds = Land(window, guard, SettingsPage.Alerts, SettingsIndex.Thresholds);
+            var page = (Panel)SettingsAnchor.Find((DependencyObject)TabOf(window, SettingsPage.Alerts).Content, SettingsIndex.Notifications)!;
+            Assert.Equal("Alerts", ((TextBlock)page.Children[0]).Text);
+            var grid = (Grid)thresholds;
+            Assert.Equal(2, grid.Children.OfType<TextBlock>().Count(x => x.Text == "%"));
+        }
+        finally { window.Close(); }
+    });
 }

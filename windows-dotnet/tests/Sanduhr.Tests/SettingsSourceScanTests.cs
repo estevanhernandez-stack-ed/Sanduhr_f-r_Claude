@@ -79,10 +79,8 @@ public class SettingsSourceScanTests
         return xaml[m.Index..xaml.IndexOf("</TabItem>", m.Index, StringComparison.Ordinal)];
     }
 
-    /// <summary>Files the scan leaves out. The names table holds every retired name on purpose. The search
-    /// index is slice 2's file: its titles keep old words until slice 2 points them at the table, and it
-    /// leaves this list then.</summary>
-    private static readonly string[] NotScanned = ["SettingsNames.cs", "SettingsIndex.cs"];
+    /// <summary>Files the scan leaves out. The names table holds every retired name on purpose.</summary>
+    private static readonly string[] NotScanned = ["SettingsNames.cs"];
 
     private static IEnumerable<string> FilesIn(string root, string pattern) =>
         Directory.EnumerateFiles(root, pattern, SearchOption.AllDirectories)

@@ -80,7 +80,6 @@ public sealed class SettingsViewModel
     /// <summary>About: the names the buttons and sections carry.</summary>
     public string WhatsNewTitle => SettingsNames.WhatsNew;
     public string TakeTheTourTitle => SettingsNames.TakeTheTour;
-    public string TrademarkNotice => SettingsNames.TrademarkNotice;
     public string WhereSettingsLiveTitle => SettingsNames.WhereSettingsLive;
     public string ThirdPartyNoticesTitle => SettingsNames.ThirdPartyNotices;
     public string ResetSanduhrTitle => SettingsNames.ResetSanduhr;

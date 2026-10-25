@@ -1116,6 +1116,8 @@
                                 <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                             </ScrollViewer.Resources>
                         <StackPanel Margin="16" DataContext="{Binding Alerts}" views:SettingsAnchor.Id="notifications">
+                            <TextBlock Text="Alerts" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
                             <TextBlock TextWrapping="Wrap" FontSize="11"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
                                        Text="Get a toast and a soft chime when a tier crosses your thresholds, or when your pace will hit the cap before it resets. Toasts respect Focus Assist. Model-scoped weekly tiers alert silently by default — toast only, no chime." />
@@ -1154,10 +1156,16 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="24" />
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="2" Text="%" VerticalAlignment="Center" FontSize="12" Margin="4,0,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <TextBlock Grid.Column="6" Text="%" VerticalAlignment="Center" FontSize="12" Margin="4,0,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                 <TextBlock Grid.Column="0" Text="Warn at" VerticalAlignment="Center" FontSize="12"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,8,0" />
                                 <TextBox Grid.Column="1" Text="{Binding WarnPct, UpdateSourceTrigger=LostFocus}"
@@ -1167,9 +1175,9 @@
                                          Foreground="{DynamicResource Sanduhr.Brush.Text}"
                                          BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
                                          CaretBrush="{DynamicResource Sanduhr.Brush.Text}" />
-                                <TextBlock Grid.Column="3" Text="Urgent at" VerticalAlignment="Center" FontSize="12"
+                                <TextBlock Grid.Column="4" Text="Urgent at" VerticalAlignment="Center" FontSize="12"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,8,0" />
-                                <TextBox Grid.Column="4" Text="{Binding UrgentPct, UpdateSourceTrigger=LostFocus}"
+                                <TextBox Grid.Column="5" Text="{Binding UrgentPct, UpdateSourceTrigger=LostFocus}"
                                          AutomationProperties.Name="Urgent at, percent"
                                          FontSize="12" Padding="6,4"
                                          Background="{DynamicResource Sanduhr.Brush.Bg}"
