@@ -654,6 +654,7 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
             Visit(SettingsPage.Watchers);
             Below<CheckBox>(Marked(window, SettingsPage.Watchers, SettingsIndex.Watchers)).Single().IsChecked = true;
             Settle(window, guard);
+            Assert.NotEqual(SettingsPage.Desk, window.Place!.Page);
             Visit(SettingsPage.NowPlaying);
             var bars = Below<CheckBox>((DependencyObject)TabOf(window, SettingsPage.NowPlaying).Content)
                 .Single(c => (c.Content as string) == "Bars beside it on the Desk");
@@ -661,15 +662,18 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
             Settle(window, guard);
             bars.IsChecked = true;
             Settle(window, guard);
+            Assert.NotEqual(SettingsPage.Desk, window.Place!.Page);
             Visit(SettingsPage.Weather);
             svm.WeatherPage.Picked = WeatherPlace.Create("Fort Worth", "Texas", "United States", 32.75, -97.33);
             Settle(window, guard);
+            Assert.NotEqual(SettingsPage.Desk, window.Place!.Page);
 
             var layout = Store().LoadDesk().Layout;
             Assert.Contains("watchers:mr", layout);
             Assert.Contains("nowPlaying:br", layout);
             Assert.Contains("weather:tr", layout);
             Assert.DoesNotContain(SettingsPage.Desk, visited);
+            Assert.NotEqual(SettingsPage.Desk, window.Place!.Page);
             var weatherLine = Below<DeskPieceStatusPanel>((DependencyObject)TabOf(window, SettingsPage.Weather).Content).Single();
             Assert.StartsWith("On the Desk: top right.", ((TextBlock)weatherLine.FindName("StatusText")).Text);
         }
