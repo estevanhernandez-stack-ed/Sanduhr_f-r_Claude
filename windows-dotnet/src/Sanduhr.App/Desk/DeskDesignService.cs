@@ -241,7 +241,8 @@ internal sealed class DeskDesignService : IDisposable
 
     /// <summary>The Desk as it is now, as a full design (the settings and the active theme).</summary>
     internal DeskDesign CurrentDesign() =>
-        DeskState.Current(_store.LoadDesk(), _store.LoadDeskInk(), _store.LoadLauncher(), ActiveTheme(), _store.LoadDeskWeather().Nickname);
+        DeskState.Current(_store.LoadDesk(), _store.LoadDeskInk(), _store.LoadLauncher(), ActiveTheme(), _store.LoadDeskWeather().Nickname,
+            _store.LoadDeskFollowsTheme());
 
     /// <summary>What the widget's own check of a request knows about this PC.</summary>
     private DeskDesignContext Context()
@@ -466,6 +467,26 @@ internal sealed class DeskDesignService : IDisposable
         return _designs.Load(design.Id);
     }
 
+    /// <summary>
+    /// Saves the Desk as it is before a change Settings makes to it (theme match: Follow on, Match now), unless a saved design already is
+    /// that look, and points "Put my Desk back" at it, as applying a design does. False when it could not be saved.
+    /// </summary>
+    public bool SaveBeforeChange(string incomingName)
+    {
+        try
+        {
+            if (SaveCurrentFirst(CurrentDesign(), incomingName) is not { } saved) return false;
+            _store.SaveDeskPutBack(saved.Id);
+            AfterChange();
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Log("save before", e);
+            return false;
+        }
+    }
+
     /// <summary>Keeps the look that was just written as a saved design: the one that is already that look (now the newest), or a new one.</summary>
     private void KeepApplied(DeskDesign after, string? name)
     {
@@ -491,6 +512,8 @@ internal sealed class DeskDesignService : IDisposable
         if (next.Desk.Plate != desk.Plate) _store.SaveDeskPlate(next.Desk.Plate);
         if (next.Ink != ink) _store.SaveDeskInk(next.Ink);
         if (next.Launcher.ToJson().ToJsonString() != launcher.ToJson().ToJsonString()) _store.SaveLauncher(next.Launcher);
+        // Theme match: a design that says whether the Desk follows the theme sets it (Put my Desk back restores both sides).
+        if (next.FollowsTheme is { } follows && follows != _store.LoadDeskFollowsTheme()) _store.SaveDeskFollowsTheme(follows);
         // The weather nickname (#315) is the one part of desk_weather a design may set; the place and the unit stay the user's.
         if (next.WeatherNickname is { } nickname)
         {
@@ -608,6 +631,8 @@ internal sealed class DeskDesignService : IDisposable
         if (_review is not null) DismissReview();
 
         var design = DeskDesigns.WithoutMissingImages(target.Design, _designs.ImageExists);
+        // A saved design is a whole Desk: no follows_theme is one that does not follow (theme match).
+        design = design with { FollowsTheme = design.FollowsTheme ?? false };
         var before = CurrentDesign();
         if (DeskDesigns.FindSame([target], before) is not null) return new(true, $"{target.Name} is your Desk already.");
 

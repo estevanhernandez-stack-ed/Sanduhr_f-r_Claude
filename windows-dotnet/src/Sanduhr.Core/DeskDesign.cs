@@ -103,8 +103,11 @@ public sealed partial record DeskDesign
     /// <summary>The weather piece's nickname (#315); null leaves it alone, "" goes back to the place's own name.</summary>
     public DeskWeatherChange? Weather { get; init; }
 
+    /// <summary>"Follow the widget theme" (theme match): true, the Desk draws the theme's look; null leaves it alone.</summary>
+    public bool? FollowsTheme { get; init; }
+
     private static readonly string[] Fields =
-        ["name", "note", "layout", "weather", "font", "ink", "plate", "shadow", "launcher", "messages", "looks", "theme"];
+        ["name", "note", "layout", "weather", "font", "ink", "plate", "shadow", "launcher", "messages", "looks", "theme", "follows_theme"];
 
     public static string Word(MessageProposalMode mode) => mode == MessageProposalMode.Add ? "add" : "replace";
 
@@ -137,6 +140,7 @@ public sealed partial record DeskDesign
         var ink = ParseInk(o["ink"], r);
         bool? plate = Bool(o, "plate", r);
         bool? shadow = Bool(o, "shadow", r);
+        bool? followsTheme = Bool(o, "follows_theme", r);
         var launcher = ParseLauncher(o["launcher"], r);
         var messages = ParseMessages(o["messages"], r);
         JsonObject? theme = null;
@@ -154,7 +158,7 @@ public sealed partial record DeskDesign
         return new DeskParse(new DeskDesign
         {
             Name = name, Note = note, Layout = layout, Font = font, Ink = ink, Plate = plate, Shadow = shadow,
-            Launcher = launcher, Messages = messages, Theme = theme, Looks = looks, Weather = weather,
+            Launcher = launcher, Messages = messages, Theme = theme, Looks = looks, Weather = weather, FollowsTheme = followsTheme,
         }, [], warnings);
     }
 
@@ -612,6 +616,7 @@ public sealed partial record DeskDesign
             o["looks"] = arr;
         }
         if (Theme is not null) o["theme"] = Theme.DeepClone();
+        if (FollowsTheme is { } follows) o["follows_theme"] = follows;
         return o;
     }
 
@@ -650,6 +655,7 @@ public sealed partial record DeskDesign
             Theme = proposal.Theme ?? current?.Theme,
             Looks = proposal.Looks ?? current?.Looks,
             Weather = proposal.Weather ?? current?.Weather,
+            FollowsTheme = proposal.FollowsTheme ?? current?.FollowsTheme,
         };
     }
 
@@ -754,6 +760,8 @@ public sealed partial record DeskDesign
             lines.Add(a.Ink is null ? $"Ink: {ink.Describe()}" : $"Ink: {a.Ink.Describe()} to {ink.Describe()}");
         if (b.Plate is { } plate && a.Plate != plate) lines.Add($"Plate behind the text: {(plate ? "on" : "off")}");
         if (b.Shadow is { } shadow && a.Shadow != shadow) lines.Add($"Text shadow: {(shadow ? "on" : "off")}");
+        if (b.FollowsTheme is { } follows && (a.FollowsTheme ?? false) != follows)
+            lines.Add($"Desk follows the widget theme: {(follows ? "on" : "off")}");
         if (b.Launcher is { } launcher && (a.Launcher is null || a.Launcher.ToJson().ToJsonString() != launcher.ToJson().ToJsonString()))
             lines.Add($"Launcher: {Buttons(launcher)}");
         if (b.Messages is { } m)

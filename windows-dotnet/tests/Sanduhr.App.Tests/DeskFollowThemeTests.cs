@@ -216,4 +216,39 @@ public sealed class DeskFollowThemeTests : IDisposable
         Assert.Equal("Consolas", DeskLookResolver.Settings(own, present, Has).Font);
         Assert.Equal("", DeskLookResolver.Settings(own, missing, Has).Font);
     }
+
+    [Fact]
+    public void Arrange_mode_draws_what_the_desk_shows_while_following() => Sta.Run(() =>
+    {
+        var (desk, _) = Start(follows: true);
+        try
+        {
+            var arrange = desk.ArrangeLook(new DeskFrame());
+            Assert.Equal(ThemeDeskLook.From(ThemeCatalog.BuiltIns["obsidian"]).Plate, arrange.Settings.Plate);
+            Assert.Equal(ThemeDeskLook.From(ThemeCatalog.BuiltIns["obsidian"]).PlateColor, arrange.Frame.PlateHex);
+            desk.ThemeChanged(ThemeCatalog.BuiltIns["obsidian"] with { Font = "Consolas" });
+            Assert.Equal("Consolas", desk.ArrangeLook(new DeskFrame()).Settings.Font);
+            _store.SaveDeskFollowsTheme(false);
+            desk.Reload();
+            Assert.Equal("", desk.ArrangeLook(new DeskFrame()).Settings.Font);   // not following: the Desk's own
+            Assert.Null(desk.ArrangeLook(new DeskFrame()).Frame.PlateHex);
+        }
+        finally { desk.Dispose(); }
+    });
+
+    [Fact]
+    public void A_design_under_review_follows_or_not_as_the_design_says() => Sta.Run(() =>
+    {
+        var (desk, host) = Start(follows: false);
+        try
+        {
+            var settings = DeskSettings.Default with { Enabled = true, Layout = "clock:bl", Font = "" };
+            Assert.Equal(C("ffffff"), Stops(Clock(host).Foreground)[0]);
+            desk.ShowPreview(new DeskDesignSettings(settings, DeskInkSettings.Default, LauncherModel.Empty, null, FollowsTheme: true));
+            Assert.Equal([C("e8e4dc"), C("6c63ff")], Stops(Clock(host).Foreground));   // previewed as following
+            desk.EndPreview();
+            Assert.Equal(C("ffffff"), Stops(Clock(host).Foreground)[0]);               // back to the Desk's own
+        }
+        finally { desk.Dispose(); }
+    });
 }

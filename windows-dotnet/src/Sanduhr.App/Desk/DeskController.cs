@@ -343,6 +343,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             _settings = preview.Desk with { Enabled = true };
             _ink = preview.Ink;
             _launcher = preview.Launcher;
+            if (preview.FollowsTheme is { } follows) _follows = follows;   // a design under review follows, or not, as it says
             if (preview.WeatherNickname is { } nickname) _weatherSettings = _weatherSettings with { Nickname = DeskWeatherSettings.NormalizeNickname(nickname) };
         }
         _messages.Reload();
@@ -501,10 +502,12 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             WarnAt = _warnAt,
             UrgentAt = _urgentAt,
         };
+        // Arrange draws what the Desk shows: while it follows the widget theme, the theme's font, plate and colors.
+        var (arrangeSettings, arrangeFrame) = ArrangeLook(frame);
         DeskArrangeMode mode;
         try
         {
-            mode = new DeskArrangeMode(_screens, _settings, _fonts, frame, session.Working, ConnectedIds,
+            mode = new DeskArrangeMode(_screens, arrangeSettings, _fonts, arrangeFrame, session.Working, ConnectedIds,
                 how => EndArrange(how), () => ArrangeChanged?.Invoke());
         }
         catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception)
@@ -524,6 +527,14 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         SyncSources(track);
         mode.Activate();
         ArrangeChanged?.Invoke();
+    }
+
+    /// <summary>The settings and frame Arrange mode draws: the resolved look, as the Desk itself draws it (theme match).</summary>
+    internal (DeskSettings Settings, DeskFrame Frame) ArrangeLook(DeskFrame frame)
+    {
+        _fonts ??= _paths is null ? new DeskFonts() : DeskFonts.ForThisPc(_paths);
+        var draw = DeskLookResolver.For(_follows, _theme);
+        return (DeskLookResolver.Settings(_settings, draw, _fonts.Has), DeskLookResolver.Frame(frame, draw));
     }
 
     /// <summary>
