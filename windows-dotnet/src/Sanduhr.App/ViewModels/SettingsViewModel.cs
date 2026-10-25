@@ -169,6 +169,9 @@ public sealed class SettingsViewModel
         MessagePage.Piece = Desk.PieceStatus("message");
         NowPlayingPage.Piece = Desk.PieceStatus("nowPlaying");
         WeatherPage.Piece = Desk.PieceStatus("weather");
+        // The glow's spot is placed by the Claude Code page through its own store: the Desk page reads it again (App replaces this
+        // with one that also reloads the running Desk).
+        ClaudeCodePage.DeskReload = Desk.Reload;
         // The two pages share one folder list and one set of installed pieces.
         ClaudeCodePage.FoldersChanged += Mods.ReloadFolders;
         ClaudeCodePage.PiecesChanged += Mods.Refresh;

@@ -562,4 +562,23 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void Choosing_the_Desk_for_the_glow_places_its_spot_and_its_line_says_where() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.ClaudeCode, SettingsIndex.GlowWhere);
+            Settle(window, guard);
+            svm.ClaudeCodePage.GlowTarget = ClaudeCodeViewModel.GlowTargets.First(t => t.Kind == GlowTargetKind.Desk);
+            Settle(window, guard);
+            Assert.Contains("glow:tc", Store().LoadDesk().Layout);
+            Assert.True(svm.Desk.GlowPiece.IsPlaced);                     // the Desk page heard it without a visit
+            var line = Below<DeskPieceStatusPanel>(Marked(window, SettingsPage.ClaudeCode, SettingsIndex.GlowWhere)).Single();
+            Assert.True(line.IsVisible);
+            Assert.Equal(svm.Desk.GlowPiece.Text, ((TextBlock)line.FindName("StatusText")).Text);
+        }
+        finally { window.Close(); }
+    });
 }

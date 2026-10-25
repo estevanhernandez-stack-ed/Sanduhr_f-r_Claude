@@ -286,8 +286,8 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         {
             var desk = _glowStore.LoadDesk();
             var layout = new DeskArrangement(desk.Layout);
-            if (layout.Placement("glow") is not null) return;
-            layout.Place("glow", DeskArrangement.DefaultAnchor("glow"));
+            // DeskArrangement.DefaultPlaceFor: the one table of default places (Settings v2, Principle 4).
+            if (layout.PlaceAtDefault("glow") is null) return;
             _glowStore.SaveDesk((desk with { Layout = layout.Layout }).Normalized());
             DeskReload?.Invoke();
             GlowReload?.Invoke();

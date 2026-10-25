@@ -2074,6 +2074,11 @@
                                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                                            Text="{x:Static core:GlowTargetSettings.DeskCaption}"
                                                            Visibility="{Binding GlowOnDesk, Converter={StaticResource BoolVis}}" />
+                                                <!-- The glow's spot on the Desk: its line (Principle 1), while the Desk is the target. -->
+                                                <Border Margin="0,6,0,0" Visibility="{Binding GlowOnDesk, Converter={StaticResource BoolVis}}">
+                                                    <views:DeskPieceStatusPanel
+                                                        DataContext="{Binding DataContext.Desk.GlowPiece, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                                </Border>
                                                 <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
                                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                                            Text="The taskbar button flashes in every choice. Only flash skips the light." />
