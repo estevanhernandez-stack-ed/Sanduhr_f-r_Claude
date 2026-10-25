@@ -402,6 +402,21 @@ public static class SettingsNames
     public const string SaveAsNewTheme = "Save as a new theme";
     public const string NewThemeNamePrompt = "Name of the new theme";
     public static string ThemeUpdated(string theme) => $"Updated {theme}.";
+
+    /// <summary>The theme's Desk look editor (Desk Look while following; the Theme Studio).</summary>
+    public const string ThemeDeskLookHeading = "The theme's Desk look";
+    public const string ThemeDeskFont = "Desk font in this theme";
+    public const string ThemeInkColors = "Ink colors";
+    public const string ThemeBarColors = "Meter bar colors";
+    public const string ThemeMessageColors = "Message colors";
+    public const string ThemeGlowColor = "Message glow color";
+    public const string ThemePlateSwitch = "Plate behind the text in this theme";
+    public const string ThemePlateColor = "Plate color";
+    public const string ThemeShadowColor = "Shadow color";
+    public const string ThemeDeskFromTheme = "From the theme";
+    public const string DesksOwnFont = "The Desk's own font";
+    public const string ThemeColorsProblem = "Use one to four hex colors, like #e8e4dc, #6c63ff.";
+    public const string ThemeColorProblem = "Use one hex color, like #6c63ff.";
     /// <summary>Watchers and Launcher: the section that holds the piece's status line.</summary>
     public const string WatchersPlace = "Where they show";
     public const string LauncherPlace = "Where it shows";

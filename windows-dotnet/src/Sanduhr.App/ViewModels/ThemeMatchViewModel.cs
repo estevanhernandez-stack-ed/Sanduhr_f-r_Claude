@@ -13,13 +13,28 @@ namespace Sanduhr.App.ViewModels;
 public sealed partial class ThemeMatchViewModel : ObservableObject
 {
     private readonly ThemeMatchService _service;
+    private readonly Func<ThemeDefinition> _activeTheme;
     private bool _loading;
     private bool _followLine;   // the status line is the followed line Reload wrote, not an action's message
 
-    internal ThemeMatchViewModel(ThemeMatchService service)
+    /// <param name="activeTheme">The widget's saved theme (never a Studio preview): what the editor shows.</param>
+    internal ThemeMatchViewModel(ThemeMatchService service, Func<ThemeDefinition> activeTheme, IReadOnlyList<string> fontFamilies)
     {
         _service = service;
+        _activeTheme = activeTheme;
+        Editor = new ThemeDeskEditorViewModel(fontFamilies) { Committed = OnEdited };
         Reload();
+    }
+
+    /// <summary>The theme's Desk look, shown while following; each committed edit asks where it goes.</summary>
+    public ThemeDeskEditorViewModel Editor { get; }
+
+    private void OnEdited(ThemeDesk next)
+    {
+        var result = _service.Edit(next);
+        Reload();   // Update or a new theme: the theme now; Cancel: the theme as it was
+        Status = result.Message;
+        _followLine = false;
     }
 
     /// <summary>The service (tests replace its questions).</summary>
@@ -46,6 +61,7 @@ public sealed partial class ThemeMatchViewModel : ObservableObject
     {
         _loading = true;
         Follow = _service.Following;
+        Editor.Load(_activeTheme());
         _loading = false;
         if (Follow)
         {

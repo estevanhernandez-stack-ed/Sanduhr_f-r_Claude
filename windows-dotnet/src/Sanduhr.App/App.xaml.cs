@@ -795,6 +795,8 @@ public partial class App : Application
             }
             catch { }
             RunnerStatusShown -= showRunnerStatus; // no window to show it in
+            if (_vm is not null) _vm.ThemeChanged -= themeShown;
+            if (_desk is not null) _desk.PlateForcedChanged -= plateShown;
             throw;
         }
         if (_window is { IsLoaded: true })

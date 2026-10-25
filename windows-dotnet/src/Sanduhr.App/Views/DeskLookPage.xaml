@@ -53,6 +53,8 @@
                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                                Text="{Binding PlateNote}" Visibility="{Binding PlateNote, Converter={StaticResource StrVis}}"
                                AutomationProperties.LiveSetting="Polite" />
+                    <views:ThemeDeskEditor Margin="0,12,0,0" DataContext="{Binding Editor}"
+                                           Visibility="{Binding DataContext.Follow, ElementName=ThemeMatchSection, Converter={StaticResource BoolVis}}" />
                 </StackPanel>
                 <!-- Once, for the font, ink and plate controls below, which the theme draws while the Desk follows it. -->
                 <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"

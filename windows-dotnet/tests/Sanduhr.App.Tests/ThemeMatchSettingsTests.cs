@@ -4,6 +4,7 @@ using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Sanduhr.App.Controls;
 using Sanduhr.App.Services;
 using Sanduhr.App.ViewModels;
 using Sanduhr.App.Views;
@@ -156,6 +157,72 @@ public sealed class ThemeMatchSettingsTests : AppWindowFixture
             Settle(window, guard);
             Assert.True(svm.ThemeMatch.Follow);
             Assert.Equal(SettingsNames.FollowingTheme("Obsidian"), svm.ThemeMatch.Status);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void The_editor_shows_only_while_following_and_an_edit_updates_the_theme() => AppHost.Run(() =>
+    {
+        var (window, svm, guard, widget) = Open();
+        try
+        {
+            window.SelectPage(SettingsPage.DeskLook);
+            Settle(window, guard);
+            var section = Marked(window, SettingsPage.DeskLook, SettingsIndex.DeskThemeMatch);
+            Assert.False(Below<ThemeDeskEditor>(section).Single().IsVisible);
+
+            svm.ThemeMatch.Follow = true;
+            Settle(window, guard);
+            Assert.True(Below<ThemeDeskEditor>(section).Single().IsVisible);
+            Assert.Equal("#e8e4dc, #6c63ff", svm.ThemeMatch.Editor.Ink);   // Follow spelled the look out into Obsidian + Desk
+
+            svm.ThemeMatch.Service.AskWhere = (_, canUpdate) => { Assert.True(canUpdate); return ThemeEditChoice.UpdateTheme; };
+            svm.ThemeMatch.Editor.Ink = "#ffffff";
+            Settle(window, guard);
+            Assert.Equal(["#ffffff"], widget.GetThemeDefinition("obsidian-desk")!.Desk!.Ink);
+            Assert.Equal(SettingsNames.ThemeUpdated("Obsidian + Desk"), svm.ThemeMatch.Status);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void A_cancelled_edit_puts_the_editor_back() => AppHost.Run(() =>
+    {
+        var (window, svm, guard, widget) = Open();
+        try
+        {
+            svm.ThemeMatch.Follow = true;
+            svm.ThemeMatch.Service.AskWhere = (_, _) => ThemeEditChoice.Cancel;
+            svm.ThemeMatch.Editor.Ink = "#ffffff";
+            Settle(window, guard);
+            Assert.Equal("#e8e4dc, #6c63ff", svm.ThemeMatch.Editor.Ink);
+            Assert.Equal(["#e8e4dc", "#6c63ff"], widget.GetThemeDefinition("obsidian-desk")!.Desk!.Ink);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void The_greyed_default_is_not_read_twice() => AppHost.Run(() =>
+    {
+        var (window, svm, guard, _) = Open();
+        try
+        {
+            window.SelectPage(SettingsPage.DeskLook);
+            svm.ThemeMatch.Follow = true;
+            Settle(window, guard);
+            var editor = Below<ThemeDeskEditor>(Marked(window, SettingsPage.DeskLook, SettingsIndex.DeskThemeMatch)).Single();
+            var overlays = Below<DecorativeText>(editor).ToList();
+            Assert.NotEmpty(overlays);
+            foreach (var o in overlays)
+            {
+                var peer = UIElementAutomationPeer.CreatePeerForElement(o);
+                Assert.False(peer.IsControlElement());
+                Assert.False(peer.IsContentElement());
+            }
+            var box = Below<TextBox>(editor).First();
+            Assert.Equal(SettingsNames.ThemeInkColors, AutomationProperties.GetName(box));
+            Assert.Equal(svm.ThemeMatch.Editor.InkDefault, AutomationProperties.GetHelpText(box));
         }
         finally { window.Close(); }
     });

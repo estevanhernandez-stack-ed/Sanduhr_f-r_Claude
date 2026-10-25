@@ -67,7 +67,8 @@ public class SettingsSourceScanTests
         var views = Path.Combine(AppDir(), "Views");
         return new[] { Path.Combine(views, "SettingsWindow.xaml") }
             .Concat(Directory.EnumerateFiles(views, "*Page.xaml").Order(StringComparer.Ordinal))
-            .Concat(Directory.EnumerateFiles(views, "*Panel.xaml").Order(StringComparer.Ordinal));
+            .Concat(Directory.EnumerateFiles(views, "*Panel.xaml").Order(StringComparer.Ordinal))
+            .Append(Path.Combine(views, "ThemeDeskEditor.xaml"));
     }
 
     /// <summary>One TabItem of SettingsWindow.xaml, from its start tag to its end tag.</summary>
