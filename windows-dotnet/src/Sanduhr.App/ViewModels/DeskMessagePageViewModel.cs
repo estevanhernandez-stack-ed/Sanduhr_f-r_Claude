@@ -433,6 +433,7 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
     public void Activate()
     {
         _active = true;
+        Flush();   // a size drag still inside its settle window would be overwritten by the old value
         _settings = _store.LoadDeskMessage();
         _customColorText = null;
         RaiseSettings();
@@ -454,6 +455,7 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
     /// </summary>
     public void RefreshSettings()
     {
+        Flush();   // a size drag still inside its settle window would be overwritten by the old value
         _settings = _store.LoadDeskMessage();
         _customColorText = null;
         RaiseSettings();
