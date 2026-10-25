@@ -195,11 +195,11 @@ public sealed class LauncherSettingsTests : IDisposable
     }
 
     [Fact]
-    public void TheDeskSettingsPicksTheFirstFreeCornerAndSavesIt()
+    public void TheDeskSettingsPlacesTheLauncherAtItsDefaultPlaceAndSavesIt()
     {
-        var desk = new DeskSettingsViewModel(_store, []);
-        Assert.Equal("bottom right", desk.PlaceLauncherIfHidden());   // the standard layout fills bottom left
-        Assert.Equal(DeskAnchor.BR, new DeskArrangement(_store.LoadDesk().Layout).Placement("launcher")!.Anchor);
+        var desk = new DeskSettingsViewModel(_store, [], () => []);
+        Assert.Equal("top left", desk.PlaceLauncherIfHidden());       // DeskArrangement.DefaultPlaceFor("launcher")
+        Assert.Equal(DeskAnchor.TL, new DeskArrangement(_store.LoadDesk().Layout).Placement("launcher")!.Anchor);
         Assert.Null(desk.PlaceLauncherIfHidden());                    // already placed: nothing moves
     }
 
