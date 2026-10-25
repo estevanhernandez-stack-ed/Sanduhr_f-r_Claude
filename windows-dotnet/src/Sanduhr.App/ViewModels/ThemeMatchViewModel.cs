@@ -33,8 +33,11 @@ public sealed partial class ThemeMatchViewModel : ObservableObject
     {
         var result = _service.Edit(next);
         Reload();   // Update or a new theme: the theme now; Cancel: the theme as it was
-        Status = result.Message;
-        _followLine = false;
+        if (!string.IsNullOrEmpty(result.Message))
+        {
+            Status = result.Message;
+            _followLine = false;
+        }
     }
 
     /// <summary>The service (tests replace its questions).</summary>

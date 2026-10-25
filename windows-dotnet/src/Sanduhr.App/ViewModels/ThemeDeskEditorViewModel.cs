@@ -126,9 +126,17 @@ public sealed partial class ThemeDeskEditorViewModel : ObservableObject
     {
         if (_loading) return;
         Problem = null;
+        if (Same(_desk, next)) return;   // retyped or cleared to what is already there: nothing to ask
         _desk = next;
         Committed?.Invoke(next);
     }
+
+    private static bool Same(ThemeDesk a, ThemeDesk b) =>
+        a.Font == b.Font && a.Plate == b.Plate
+        && string.Equals(a.Glow?.TrimStart('#'), b.Glow?.TrimStart('#'), StringComparison.OrdinalIgnoreCase)
+        && string.Equals(a.PlateColor?.TrimStart('#'), b.PlateColor?.TrimStart('#'), StringComparison.OrdinalIgnoreCase)
+        && string.Equals(a.Shadow?.TrimStart('#'), b.Shadow?.TrimStart('#'), StringComparison.OrdinalIgnoreCase)
+        && Join(a.Ink) == Join(b.Ink) && Join(a.Bars) == Join(b.Bars) && Join(a.Message) == Join(b.Message);
 
     /// <summary>"#e8e4dc, 6C63FF" is ["#e8e4dc", "#6c63ff"]; empty is []; a bad color or more than four is null.</summary>
     internal static IReadOnlyList<string>? ParseStops(string text)

@@ -23,8 +23,8 @@
             </Grid.ColumnDefinitions>
             <TextBlock Text="{x:Static core:SettingsNames.ThemeDeskFont}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-            <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
-                      ItemsSource="{Binding FontChoices}" SelectedItem="{Binding Font, Mode=TwoWay}"
+            <ComboBox x:Name="FontBox" Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
+                      ItemsSource="{Binding FontChoices}" SelectedItem="{Binding Font, Mode=TwoWay, UpdateSourceTrigger=Explicit}"
                       AutomationProperties.Name="{x:Static core:SettingsNames.ThemeDeskFont}"
                       AutomationProperties.HelpText="{Binding FontDefault}" />
         </Grid>
@@ -36,13 +36,13 @@
             </Grid.ColumnDefinitions>
             <TextBlock Text="{x:Static core:SettingsNames.ThemeInkColors}" FontSize="12" VerticalAlignment="Center"
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-            <TextBox Grid.Column="1" Style="{DynamicResource Input}" FontFamily="Cascadia Code, Consolas"
+            <TextBox x:Name="InkBox" Grid.Column="1" Style="{DynamicResource Input}" FontFamily="Cascadia Code, Consolas"
                      Text="{Binding Ink, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                      AutomationProperties.Name="{x:Static core:SettingsNames.ThemeInkColors}"
                      AutomationProperties.HelpText="{Binding InkDefault}" />
             <controls:DecorativeText Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
                        FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource Sanduhr.Brush.TextMuted}"
-                       Text="{Binding InkDefault}" Visibility="{Binding Ink, Converter={StaticResource StrVis}, ConverterParameter=empty}" />
+                       Text="{Binding InkDefault}" Visibility="{Binding Text, ElementName=InkBox, Converter={StaticResource StrVis}, ConverterParameter=empty}" />
         </Grid>
 
         <Grid Margin="0,6,0,0">
@@ -52,13 +52,13 @@
             </Grid.ColumnDefinitions>
             <TextBlock Text="{x:Static core:SettingsNames.ThemeBarColors}" FontSize="12" VerticalAlignment="Center"
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-            <TextBox Grid.Column="1" Style="{DynamicResource Input}" FontFamily="Cascadia Code, Consolas"
+            <TextBox x:Name="BarsBox" Grid.Column="1" Style="{DynamicResource Input}" FontFamily="Cascadia Code, Consolas"
                      Text="{Binding Bars, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                      AutomationProperties.Name="{x:Static core:SettingsNames.ThemeBarColors}"
                      AutomationProperties.HelpText="{Binding BarsDefault}" />
             <controls:DecorativeText Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
                        FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource Sanduhr.Brush.TextMuted}"
-                       Text="{Binding BarsDefault}" Visibility="{Binding Bars, Converter={StaticResource StrVis}, ConverterParameter=empty}" />
+                       Text="{Binding BarsDefault}" Visibility="{Binding Text, ElementName=BarsBox, Converter={StaticResource StrVis}, ConverterParameter=empty}" />
         </Grid>
 
         <Grid Margin="0,6,0,0">
@@ -68,13 +68,13 @@
             </Grid.ColumnDefinitions>
             <TextBlock Text="{x:Static core:SettingsNames.ThemeMessageColors}" FontSize="12" VerticalAlignment="Center"
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-            <TextBox Grid.Column="1" Style="{DynamicResource Input}" FontFamily="Cascadia Code, Consolas"
+            <TextBox x:Name="MessageBox" Grid.Column="1" Style="{DynamicResource Input}" FontFamily="Cascadia Code, Consolas"
                      Text="{Binding Message, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                      AutomationProperties.Name="{x:Static core:SettingsNames.ThemeMessageColors}"
                      AutomationProperties.HelpText="{Binding MessageDefault}" />
             <controls:DecorativeText Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
                        FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource Sanduhr.Brush.TextMuted}"
-                       Text="{Binding MessageDefault}" Visibility="{Binding Message, Converter={StaticResource StrVis}, ConverterParameter=empty}" />
+                       Text="{Binding MessageDefault}" Visibility="{Binding Text, ElementName=MessageBox, Converter={StaticResource StrVis}, ConverterParameter=empty}" />
         </Grid>
 
         <Grid Margin="0,6,0,0">
@@ -84,13 +84,13 @@
             </Grid.ColumnDefinitions>
             <TextBlock Text="{x:Static core:SettingsNames.ThemeGlowColor}" FontSize="12" VerticalAlignment="Center"
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-            <TextBox Grid.Column="1" Style="{DynamicResource Input}" FontFamily="Cascadia Code, Consolas"
+            <TextBox x:Name="GlowBox" Grid.Column="1" Style="{DynamicResource Input}" FontFamily="Cascadia Code, Consolas"
                      Text="{Binding Glow, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                      AutomationProperties.Name="{x:Static core:SettingsNames.ThemeGlowColor}"
                      AutomationProperties.HelpText="{Binding GlowDefault}" />
             <controls:DecorativeText Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
                        FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource Sanduhr.Brush.TextMuted}"
-                       Text="{Binding GlowDefault}" Visibility="{Binding Glow, Converter={StaticResource StrVis}, ConverterParameter=empty}" />
+                       Text="{Binding GlowDefault}" Visibility="{Binding Text, ElementName=GlowBox, Converter={StaticResource StrVis}, ConverterParameter=empty}" />
         </Grid>
 
         <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,10,0,0"
@@ -104,13 +104,13 @@
             </Grid.ColumnDefinitions>
             <TextBlock Text="{x:Static core:SettingsNames.ThemePlateColor}" FontSize="12" VerticalAlignment="Center"
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-            <TextBox Grid.Column="1" Style="{DynamicResource Input}" FontFamily="Cascadia Code, Consolas"
+            <TextBox x:Name="PlateColorBox" Grid.Column="1" Style="{DynamicResource Input}" FontFamily="Cascadia Code, Consolas"
                      Text="{Binding PlateColor, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                      AutomationProperties.Name="{x:Static core:SettingsNames.ThemePlateColor}"
                      AutomationProperties.HelpText="{Binding PlateColorDefault}" />
             <controls:DecorativeText Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
                        FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource Sanduhr.Brush.TextMuted}"
-                       Text="{Binding PlateColorDefault}" Visibility="{Binding PlateColor, Converter={StaticResource StrVis}, ConverterParameter=empty}" />
+                       Text="{Binding PlateColorDefault}" Visibility="{Binding Text, ElementName=PlateColorBox, Converter={StaticResource StrVis}, ConverterParameter=empty}" />
         </Grid>
 
         <Grid Margin="0,6,0,0">
@@ -120,13 +120,13 @@
             </Grid.ColumnDefinitions>
             <TextBlock Text="{x:Static core:SettingsNames.ThemeShadowColor}" FontSize="12" VerticalAlignment="Center"
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-            <TextBox Grid.Column="1" Style="{DynamicResource Input}" FontFamily="Cascadia Code, Consolas"
+            <TextBox x:Name="ShadowBox" Grid.Column="1" Style="{DynamicResource Input}" FontFamily="Cascadia Code, Consolas"
                      Text="{Binding Shadow, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                      AutomationProperties.Name="{x:Static core:SettingsNames.ThemeShadowColor}"
                      AutomationProperties.HelpText="{Binding ShadowDefault}" />
             <controls:DecorativeText Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
                        FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource Sanduhr.Brush.TextMuted}"
-                       Text="{Binding ShadowDefault}" Visibility="{Binding Shadow, Converter={StaticResource StrVis}, ConverterParameter=empty}" />
+                       Text="{Binding ShadowDefault}" Visibility="{Binding Text, ElementName=ShadowBox, Converter={StaticResource StrVis}, ConverterParameter=empty}" />
         </Grid>
 
         <TextBlock FontSize="11" TextWrapping="Wrap" Margin="160,4,0,0"

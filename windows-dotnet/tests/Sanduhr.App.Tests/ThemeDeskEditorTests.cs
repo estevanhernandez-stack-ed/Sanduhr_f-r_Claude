@@ -77,6 +77,19 @@ public sealed class ThemeDeskEditorTests
     });
 
     [Fact]
+    public void Retyping_what_is_already_there_asks_nothing() => Sta.Run(() =>
+    {
+        var (e, commits) = Editor(ThemeCatalog.BuiltIns["obsidian"] with { Desk = new ThemeDesk { Ink = ["#e8e4dc", "#6c63ff"], Plate = false } });
+        e.Ink = "#E8E4DC, #6C63FF";
+        e.Glow = "";
+        e.Bars = "";
+        e.Plate = false;
+        Assert.Empty(commits);
+        e.Ink = "#FFF";
+        Assert.Single(commits);
+    });
+
+    [Fact]
     public void A_font_this_PC_does_not_have_is_added_so_the_picker_is_not_blank() => Sta.Run(() =>
     {
         var (e, _) = Editor(ThemeCatalog.BuiltIns["obsidian"] with { Desk = new ThemeDesk { Font = "Zapfino Nowhere" } });
