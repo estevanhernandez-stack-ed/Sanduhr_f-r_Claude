@@ -638,6 +638,17 @@ public class SettingsSourceScanTests
     }
 
     [Fact]
+    public void The_shared_dialog_paints_no_button_with_a_hard_coded_color()
+    {
+        // A literal hex Background pairs a themed Foreground with a fixed fill: dark text on near-black in a light theme (Store 10.1.4.4).
+        var xaml = XmlComment.Replace(File.ReadAllText(Path.Combine(AppDir(), "Views", "ThemedDialog.xaml")), "");
+        var buttons = Regex.Matches(xaml, "<Button\\b[^>]*>", RegexOptions.Singleline);
+        Assert.Equal(2, buttons.Count);
+        foreach (Match button in buttons)
+            Assert.DoesNotMatch("\\bBackground=\"#", button.Value);
+    }
+
+    [Fact]
     public void The_Desk_and_Widgets_pages_open_with_their_definitions()
     {
         Assert.Contains("core:SettingsNames.DeskLine", TabRange("Desk"));
