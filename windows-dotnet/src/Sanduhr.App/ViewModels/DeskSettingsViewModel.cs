@@ -111,6 +111,7 @@ public sealed partial class DeskPieceRow : ObservableObject
         Style = DeskSettingsViewModel.StyleFor(p?.Style ?? DeskMeterStyle.Bar);
         MonitorChoices = DeskMonitorNames.Choices(_owner.Monitors, p?.Monitor);
         Monitor = DeskMonitorNames.Select(MonitorChoices, p?.Monitor);
+        if (p is not null) _owner.Remember(Widget, p.Anchor);   // whatever hides it later, Show returns to the last visible place
         CanMoveUp = stackIndex > 0;
         CanMoveDown = stackIndex >= 0 && stackIndex < stackCount - 1;
         _loading = false;

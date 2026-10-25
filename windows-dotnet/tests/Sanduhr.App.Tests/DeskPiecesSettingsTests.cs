@@ -69,6 +69,49 @@ public sealed class DeskPiecesSettingsTests : IDisposable
     }
 
     [Fact]
+    public void Show_returns_to_the_last_visible_place_whatever_hid_the_piece()
+    {
+        var desk = Desk("clock:bl claude:bl weather:bl");
+        var weather = Row(desk, "weather");
+        weather.Shown = false;
+        weather.Shown = true;                                  // back at BL
+        weather.Place = DeskSettingsViewModel.PlaceFor(DeskAnchor.TR);
+        _store.SaveDesk(_store.LoadDesk() with { Layout = "clock:bl claude:bl" });   // hidden outside the row (Arrange, a design)
+        desk.Reload();
+        Assert.False(weather.Shown);
+        Assert.Equal(DeskAnchor.TR, desk.PlaceIfHidden("weather"));
+    }
+
+    [Fact]
+    public void Showing_a_piece_into_an_occupied_place_updates_the_other_rows_Order()
+    {
+        var desk = Desk("claude:bl weather:tr");
+        var claude = Row(desk, "claude");
+        Assert.False(claude.CanMoveUp);
+        var raised = 0;
+        claude.MoveUpCommand.CanExecuteChanged += (_, _) => raised++;
+        Row(desk, "clock").Shown = true;                        // joins bottom left, seated above the Claude line
+        Assert.Equal("clock:bl claude:bl weather:tr", Layout);
+        Assert.True(claude.CanMoveUp);
+        Assert.True(raised > 0);
+        Assert.True(claude.MoveUpCommand.CanExecute(null));
+        Assert.Equal(SettingsNames.MoveUpIn(claude.Name, claude.Place.Name), claude.MoveUpName);
+
+        claude.MoveUpCommand.Execute(null);
+        Assert.Equal("claude:bl clock:bl weather:tr", Layout);
+        Assert.False(claude.CanMoveUp);
+    }
+
+    [Fact]
+    public void The_status_properties_are_the_pieces_words()
+    {
+        var desk = Desk();
+        Assert.Same(desk.PieceStatus("watchers"), desk.WatchersPiece);
+        Assert.Same(desk.PieceStatus("launcher"), desk.LauncherPiece);
+        Assert.Same(desk.PieceStatus("glow"), desk.GlowPiece);
+    }
+
+    [Fact]
     public void Order_moves_a_piece_within_its_place_and_is_live_only_where_it_can_move()
     {
         var desk = Desk("clock:bl claude:bl weather:tr");
