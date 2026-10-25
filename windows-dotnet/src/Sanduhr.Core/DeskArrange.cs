@@ -3,6 +3,13 @@ namespace Sanduhr.Core;
 /// <summary>How Arrange mode ends: Done writes the edit, Cancel drops it.</summary>
 public enum DeskArrangeEnd { Done, Cancel }
 
+/// <summary>What an arrow key does in Arrange mode (spec, Keyboard and screen reader): move the chosen piece to the next place
+/// (<see cref="Place"/>), or up or down its stack (<see cref="Order"/>).</summary>
+public enum DeskArrangeArrowKind { Place, Order }
+
+/// <summary>An arrow key read: its kind and its direction (dx: -1 left, +1 right; dy: -1 up, +1 down).</summary>
+public sealed record DeskArrangeArrow(DeskArrangeArrowKind Kind, int Dx, int Dy);
+
 /// <summary>
 /// Arrange mode: the Desk's pieces moved and reordered on the desktop itself. The pure answers live
 /// here: which anchor a drop lands on, where in a stack, the size a handle drag snaps to, when the
@@ -126,6 +133,36 @@ public static class DeskArrange
         _ => null,
     };
 
+    /// <summary>
+    /// What an arrow key does to the piece the keyboard is on: a plain arrow moves it to the next place that way, Shift+Up and
+    /// Shift+Down move it up or down its stack; null for any other key (Shift+Left and Shift+Right included). The caller maps
+    /// its key to "Left", "Right", "Up" and "Down".
+    /// </summary>
+    public static DeskArrangeArrow? ArrowKey(string? keyName, bool shift) => (keyName, shift) switch
+    {
+        ("Up", true) => new(DeskArrangeArrowKind.Order, 0, -1),
+        ("Down", true) => new(DeskArrangeArrowKind.Order, 0, 1),
+        ("Left", false) => new(DeskArrangeArrowKind.Place, -1, 0),
+        ("Right", false) => new(DeskArrangeArrowKind.Place, 1, 0),
+        ("Up", false) => new(DeskArrangeArrowKind.Place, 0, -1),
+        ("Down", false) => new(DeskArrangeArrowKind.Place, 0, 1),
+        _ => null,
+    };
+
+    /// <summary>The place one step from <paramref name="from"/> that way, stepping over the open middle of the screen; null at
+    /// the screen's edge.</summary>
+    public static DeskAnchor? Step(DeskAnchor from, int dx, int dy)
+    {
+        int col = (int)DeskAnchors.Column(from) + dx, row = (int)DeskAnchors.Row(from) + dy;
+        while (col is >= 0 and <= 2 && row is >= 0 and <= 2 && (dx != 0 || dy != 0))
+        {
+            if (DeskAnchors.At((DeskColumn)col, (DeskRow)row) is { } at) return at;
+            col += dx;
+            row += dy;
+        }
+        return null;
+    }
+
     /// <summary>The bar's size: what its content fits, never smaller than the bar needs to show its words and buttons.</summary>
     public static (double Width, double Height) BarSize(double fittingWidth, double fittingHeight) =>
         (Math.Max(Finite(fittingWidth), BarMinimumWidth), Math.Max(Finite(fittingHeight), BarMinimumHeight));
@@ -154,10 +191,11 @@ public static class DeskArrangeCopy
 {
     public const string MenuItem = "Arrange Desk…";
     public const string SettingsButton = "Arrange Desk…";
-    public const string SettingsNote = "Move and reorder the pieces on the desktop itself. Return or Done keeps the new layout; Escape or Cancel puts it back as it was.";
+    public const string SettingsNote = "Move and reorder the pieces on the desktop itself. Return or Done keeps the new layout; Escape or Cancel puts it back as it was. Or use the Order buttons below.";
     public const string BarTitle = "Arrange Desk";
     public const string BarHint = "Drag a piece to any of the eight places, or up and down its stack, or onto another monitor.";
-    public const string BarKeys = "Return or Done keeps the new layout. Escape or Cancel puts it back.";
+    public const string BarKeys = "Tab picks a piece; the arrow keys move it to the next place, and Shift+Up or Shift+Down moves it in its stack. "
+        + "Return or Done keeps the new layout. Escape or Cancel puts it back.";
     public const string SettingsArranging = "Arranging on the desktop. Finish there with Done or Cancel.";
     public const string SettingsDeskOff = "Turn on the Desk to arrange it on the desktop.";
 
