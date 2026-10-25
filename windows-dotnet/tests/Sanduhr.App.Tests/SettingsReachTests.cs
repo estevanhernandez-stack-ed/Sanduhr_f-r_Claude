@@ -407,6 +407,30 @@ public sealed class SettingsReachTests : AppWindowFixture
     });
 
     [Fact]
+    public void The_Desk_page_scrolls_sideways_only_below_its_rows_width() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.Width = 680;
+            window.Height = 800;
+            Land(window, guard, SettingsPage.Desk, SettingsIndex.DeskPieces);
+            window.UpdateLayout();
+            Pump();
+            var scroller = (ScrollViewer)window.FindName("DeskPageScroller");
+            Assert.True(scroller.ScrollableWidth > 0,
+                $"at 680 wide the Desk page clips instead of scrolling (extent {scroller.ExtentWidth:0}, viewport {scroller.ViewportWidth:0})");
+
+            window.Width = 780;
+            window.UpdateLayout();
+            Pump();
+            Assert.True(scroller.ScrollableWidth < 1,
+                $"at the default 780 wide the Desk page scrolls sideways (extent {scroller.ExtentWidth:0}, viewport {scroller.ViewportWidth:0})");
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public void Buttons_pills_links_and_boxes_show_focus_and_draw_disabled() => AppHost.Run(() =>
     {
         var (window, _, _) = Open("Personal");

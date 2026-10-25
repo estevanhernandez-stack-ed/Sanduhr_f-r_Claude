@@ -2493,10 +2493,15 @@
                 <TabItem Header="Desk" Tag="Desk" AutomationProperties.Name="Desk" views:SettingsSidebar.GroupHeader="Desktop"
                          DataContext="{Binding Desk}">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <!-- WF26: the page is as wide as the viewport, so text wraps, but never narrower than a piece row
+                             (118 + 138 + 8 + 72 + 8 + 146 = 490, plus the 2 x 20 margin): below that it scrolls sideways
+                             instead of clipping the Monitor combo. -->
+                        <ScrollViewer x:Name="DeskPageScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Focusable="False">
                             <ScrollViewer.Resources>
                                 <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                             </ScrollViewer.Resources>
+                        <Border x:Name="DeskPageContent" MinWidth="530" HorizontalAlignment="Left"
+                                Width="{Binding ViewportWidth, ElementName=DeskPageScroller}">
                         <StackPanel Margin="20">
                             <TextBlock Text="Desk" FontSize="14" FontWeight="SemiBold"
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,4" />
@@ -2910,6 +2915,7 @@
 
                             <views:TrademarkFooter />
                         </StackPanel>
+                        </Border>
                         </ScrollViewer>
                     </Border>
                 </TabItem>
