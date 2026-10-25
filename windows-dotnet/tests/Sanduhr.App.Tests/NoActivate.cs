@@ -42,11 +42,11 @@ internal sealed class NoActivate
         return guard;
     }
 
-    /// <summary>Lets WPF route keyboard focus inside the window: WM_ACTIVATE and WM_SETFOCUS sent to it, never SetForegroundWindow.</summary>
+    /// <summary>Lets WPF route keyboard focus inside the window: WM_SETFOCUS sent to it, never SetForegroundWindow. WM_ACTIVATE is
+    /// left out: in the test host it made the window the foreground window (measured), and focus routes without it.</summary>
     public void RouteKeyboard()
     {
-        const int WM_ACTIVATE = 0x0006, WM_SETFOCUS = 0x0007;
-        SendMessage(_hwnd, WM_ACTIVATE, (IntPtr)1, IntPtr.Zero);
+        const int WM_SETFOCUS = 0x0007;
         SendMessage(_hwnd, WM_SETFOCUS, IntPtr.Zero, IntPtr.Zero);
         Check();
     }
