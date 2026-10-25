@@ -463,4 +463,12 @@ internal partial class SettingsWindow : Window
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>A link inside Settings (an empty list's "Claude Code settings…"): its Tag is a link, "claudecode#folders".</summary>
+    private void OpenSettingsLink_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is string text && SettingsIndex.ParseLink(text) is { } link
+            && link.Page != SettingsPage.Widget)
+            SelectPage(link.Page, link.Anchor);
+    }
 }

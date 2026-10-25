@@ -331,7 +331,7 @@ public class SettingsSourceScanTests
         // Publish usage: the heading is the visible label, the list says the same words.
         var publish = TabRange("Publish");
         Assert.Matches("<TextBlock Text=\"\\{x:Static core:SettingsNames\\.FoldersToShare\\}\"", publish);
-        Assert.Matches("<ItemsControl ItemsSource=\"\\{Binding Roots\\}\"[^>]*AutomationProperties\\.Name=\"\\{x:Static core:SettingsNames\\.FoldersToShare\\}\"", publish);
+        Assert.Matches("<ItemsControl (?:x:Name=\"\\w+\" )?ItemsSource=\"\\{Binding Roots\\}\"[^>]*AutomationProperties\\.Name=\"\\{x:Static core:SettingsNames\\.FoldersToShare\\}\"", publish);
 
         // Themes: every text box beside a visible label (Filename, Name, Save the theme as) and both
         // labelled lists. LabelThenField checks the first three against their labels in

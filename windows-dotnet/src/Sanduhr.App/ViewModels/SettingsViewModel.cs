@@ -84,6 +84,9 @@ public sealed class SettingsViewModel
     public string WhereSettingsLiveTitle => SettingsNames.WhereSettingsLive;
     public string ThirdPartyNoticesTitle => SettingsNames.ThirdPartyNotices;
     public string ResetSanduhrTitle => SettingsNames.ResetSanduhr;
+
+    /// <summary>The empty folder lists' link to the Claude Code page, in the names table's "&lt;Page&gt; settings…" form.</summary>
+    public string ClaudeCodeSettingsLink => SettingsNames.LinkTitle(SettingsPage.ClaudeCode);
     public string AboutVersionLine => $"Sanduhr für Claude {Version}";
 
     /// <summary>About, Third-party notices: the packages the app ships with.</summary>

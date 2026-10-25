@@ -610,6 +610,55 @@
             </Style.Triggers>
         </Style>
 
+        <!-- An empty list's line (WF35): shown only while its Tag, bound to the list's HasItems, is false. -->
+        <Style x:Key="EmptyLine" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.TextDim}" />
+            <Setter Property="AutomationProperties.LiveSetting" Value="Polite" />
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="False">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- The same for a line that carries a link. -->
+        <Style x:Key="EmptyLinkLine" TargetType="WrapPanel">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="False">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- A link inside Settings ("Claude Code settings…"): accent text, underlined on hover, ringed on keyboard focus. -->
+        <Style x:Key="SettingsLinkButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ring" BorderThickness="1" BorderBrush="Transparent" CornerRadius="3" Padding="2,0">
+                            <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="t" Property="TextDecorations" Value="Underline" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="ring" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Title-bar close button — themed text, square red hover (matches the widget). -->
         <Style x:Key="CloseButton" TargetType="Button">
             <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
@@ -1323,13 +1372,16 @@
                                 <DockPanel Grid.Column="0">
                                     <TextBlock DockPanel.Dock="Top" Text="Top projects (last 30 days)" FontSize="9"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
+                                    <TextBlock x:Name="OverviewProjectsEmpty" DockPanel.Dock="Top" Style="{StaticResource EmptyLine}"
+                                               Margin="0,0,0,4" Text="No projects in the last 30 days."
+                                               Tag="{Binding HasItems, ElementName=OverviewProjectsList}" />
                                     <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
                                             BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
                                             <ScrollViewer.Resources>
                                                 <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                                             </ScrollViewer.Resources>
-                                            <ItemsControl ItemsSource="{Binding Projects}" Margin="4" AutomationProperties.Name="Top projects (last 30 days)">
+                                            <ItemsControl x:Name="OverviewProjectsList" ItemsSource="{Binding Projects}" Margin="4" AutomationProperties.Name="Top projects (last 30 days)" Focusable="False">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Grid Margin="4,3">
@@ -1354,13 +1406,16 @@
                                 <DockPanel Grid.Column="2">
                                     <TextBlock DockPanel.Dock="Top" Text="Top skills (last 30 days)" FontSize="9"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
+                                    <TextBlock x:Name="OverviewSkillsEmpty" DockPanel.Dock="Top" Style="{StaticResource EmptyLine}"
+                                               Margin="0,0,0,4" Text="No skills in the last 30 days."
+                                               Tag="{Binding HasItems, ElementName=OverviewSkillsList}" />
                                     <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
                                             BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
                                             <ScrollViewer.Resources>
                                                 <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                                             </ScrollViewer.Resources>
-                                            <ItemsControl ItemsSource="{Binding Skills}" Margin="4" AutomationProperties.Name="Top skills (last 30 days)">
+                                            <ItemsControl x:Name="OverviewSkillsList" ItemsSource="{Binding Skills}" Margin="4" AutomationProperties.Name="Top skills (last 30 days)" Focusable="False">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Grid Margin="4,3">
@@ -1387,7 +1442,14 @@
                                 <StackPanel Grid.Row="7" Margin="0,10,0,0">
                                     <TextBlock Text="{x:Static core:SettingsNames.SessionArchive}" FontSize="9" Margin="0,0,0,4" views:SettingsAnchor.Id="vault"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <ItemsControl ItemsSource="{Binding Roots}" AutomationProperties.Name="Session archive folders">
+                                    <WrapPanel x:Name="VaultRootsEmpty" Style="{StaticResource EmptyLinkLine}" Margin="0,0,0,4"
+                                               Tag="{Binding HasItems, ElementName=VaultRootsList}">
+                                        <TextBlock Text="No Claude Code folders found. Add one in " FontSize="11" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                        <Button Style="{StaticResource SettingsLinkButton}" Tag="claudecode#folders" Click="OpenSettingsLink_Click"
+                                                Content="{Binding DataContext.ClaudeCodeSettingsLink, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                    </WrapPanel>
+                                    <ItemsControl x:Name="VaultRootsList" ItemsSource="{Binding Roots}" AutomationProperties.Name="Session archive folders" Focusable="False">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <WrapPanel Orientation="Horizontal" />
@@ -1447,7 +1509,10 @@
                                 <DockPanel Grid.Row="3" Margin="0,8,0,0" MaxHeight="120">
                                     <TextBlock DockPanel.Dock="Top" Text="Top projects (window)" FontSize="9"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
-                                    <ItemsControl ItemsSource="{Binding TopProjects}" AutomationProperties.Name="Top projects (window)">
+                                    <TextBlock x:Name="TrendsProjectsEmpty" DockPanel.Dock="Top" Style="{StaticResource EmptyLine}"
+                                               Text="No projects in this window."
+                                               Tag="{Binding HasItems, ElementName=TrendsProjectsList}" />
+                                    <ItemsControl x:Name="TrendsProjectsList" ItemsSource="{Binding TopProjects}" AutomationProperties.Name="Top projects (window)" Focusable="False">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid Margin="0,1">
@@ -1704,7 +1769,14 @@
                             <!-- What and when -->
                             <TextBlock Text="{x:Static core:SettingsNames.FoldersToShare}" FontSize="9" Margin="0,0,0,4" views:SettingsAnchor.Id="homes"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                            <ItemsControl ItemsSource="{Binding Roots}" Margin="0,0,0,10" AutomationProperties.Name="{x:Static core:SettingsNames.FoldersToShare}">
+                            <WrapPanel x:Name="PublishHomesEmpty" Style="{StaticResource EmptyLinkLine}" Margin="0,0,0,10"
+                                       Tag="{Binding HasItems, ElementName=PublishHomesList}">
+                                <TextBlock Text="No Claude Code folders found. Add one in " FontSize="11" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                <Button Style="{StaticResource SettingsLinkButton}" Tag="claudecode#folders" Click="OpenSettingsLink_Click"
+                                        Content="{Binding DataContext.ClaudeCodeSettingsLink, RelativeSource={RelativeSource AncestorType=Window}}" />
+                            </WrapPanel>
+                            <ItemsControl x:Name="PublishHomesList" ItemsSource="{Binding Roots}" Margin="0,0,0,10" AutomationProperties.Name="{x:Static core:SettingsNames.FoldersToShare}" Focusable="False">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <WrapPanel Orientation="Horizontal" />
@@ -2846,7 +2918,10 @@
                             <StackPanel views:SettingsAnchor.Id="np-apps">
                                 <TextBlock Text="Apps" FontSize="13" FontWeight="SemiBold"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
-                                <ItemsControl ItemsSource="{Binding Apps}" Focusable="False">
+                                <TextBlock x:Name="NowPlayingAppsEmpty" Style="{StaticResource EmptyLine}" Margin="0,0,0,6"
+                                           Text="Nothing has played since Sanduhr started."
+                                           Tag="{Binding HasItems, ElementName=NowPlayingAppsList}" />
+                                <ItemsControl x:Name="NowPlayingAppsList" ItemsSource="{Binding Apps}" Focusable="False">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,0,6"

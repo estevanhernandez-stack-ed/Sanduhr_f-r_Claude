@@ -342,4 +342,46 @@ public sealed class SettingsReachTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void Empty_lists_say_so_and_are_not_tab_stops() => AppHost.Run(() =>
+    {
+        Directory.Delete(Path.Combine(Profile, ".claude"), recursive: true); // no Claude Code folder at all
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            void Shows(string line, string list)
+            {
+                window.UpdateLayout();
+                Pump();
+                Assert.True(((FrameworkElement)window.FindName(line)).IsVisible, $"{line} is not shown");
+                Assert.False(((Control)window.FindName(list)).Focusable, $"{list} is a tab stop");
+            }
+
+            Land(window, guard, SettingsPage.Publish, SettingsIndex.Homes);
+            Shows("PublishHomesEmpty", "PublishHomesList");
+
+            Land(window, guard, SettingsPage.ClaudeUsage, SettingsIndex.Vault);
+            Shows("VaultRootsEmpty", "VaultRootsList");
+            svm.ClaudeCode.Overview.ShowBreakdowns = true;
+            Shows("OverviewProjectsEmpty", "OverviewProjectsList");
+            Shows("OverviewSkillsEmpty", "OverviewSkillsList");
+
+            Land(window, guard, SettingsPage.ClaudeUsage, SettingsIndex.Trends);
+            Shows("TrendsProjectsEmpty", "TrendsProjectsList");
+
+            Land(window, guard, SettingsPage.NowPlaying, SettingsIndex.NowPlayingApps);
+            Shows("NowPlayingAppsEmpty", "NowPlayingAppsList");
+
+            // The link in the folder line lands on the Claude Code folders.
+            Land(window, guard, SettingsPage.Publish, SettingsIndex.Homes);
+            var link = ((Panel)window.FindName("PublishHomesEmpty")).Children.OfType<Button>().Single();
+            Assert.Equal(SettingsNames.LinkTitle(SettingsPage.ClaudeCode), link.Content);
+            link.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            Pump();
+            guard.Check();
+            Assert.Equal(new SettingsLink(SettingsPage.ClaudeCode, SettingsIndex.Folders), window.Place);
+        }
+        finally { window.Close(); }
+    });
 }
