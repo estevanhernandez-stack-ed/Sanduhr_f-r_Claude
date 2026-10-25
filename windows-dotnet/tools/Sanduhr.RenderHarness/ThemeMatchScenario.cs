@@ -47,10 +47,16 @@ public static partial class Program
                 {
                     var view = new DeskView(screen, settings, fonts);
                     var frame = DeskLookResolver.Frame(new DeskFrame { Now = now, Usage = usage, Telemetry = telemetry, Message = message }, guardedDraw);
+                    // A plate that is on is drawn at the strength the guard picks (final review I-3); reads is judged over that plate.
+                    double opacity = guarded.Plate ? draw.Look.PlateOpacityOver(wallLum) : DeskPlate.Opacity;
+                    if (opacity > DeskPlate.Opacity) frame = frame with { PlateOpacity = opacity };
+                    bool reads = guarded.Plate
+                        ? DeskDesign.Ratio(InkHex.Luminance(draw.Look.Ink[0]), DeskDesign.UnderPlate(wallLum, draw.Look.PlateColor, opacity)) >= DeskDesign.MinContrast
+                        : draw.Look.ReadsOver(wallLum);
                     view.Update(frame, new DeskInkMap(draw.Ink));
                     var islands = view.TakeIslands();
                     Log.Add($"theme-match {key}-{levelName}-{wallName}: plate {(guarded.Plate ? "on" : "off")}"
-                        + $"{(guarded.Plate && !draw.Look.Plate ? " (the guard)" : "")}, reads {draw.Look.ReadsOver(wallLum)}, islands {islands.Count}");
+                        + $"{(guarded.Plate && !draw.Look.Plate ? " (the guard)" : "")}, opacity {opacity:0.00}, reads {reads}, islands {islands.Count}");
                     SaveScaled(Composite(islands, wallColor), $"theme-match-{key}-{levelName}-{wallName}", 0.5);
                     await Settle();
                     view.Dispose();
