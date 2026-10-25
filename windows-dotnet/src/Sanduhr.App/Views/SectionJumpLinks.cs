@@ -54,7 +54,7 @@ public sealed class SectionJumpLinks : WrapPanel
 
 /// <summary>
 /// The Group peer behind <see cref="SectionJumpLinks"/>. A plain panel has no peer, so UI Automation would hoist the buttons and
-/// never announce the row's name; and the "·" separators are code-built TextBlocks, which are control elements unless templated.
+/// never announce the row's name; and the "Â·" separators are code-built TextBlocks, which are control elements unless templated.
 /// The peer names the row and exposes the link buttons alone.
 /// </summary>
 public sealed class SectionJumpLinksAutomationPeer : FrameworkElementAutomationPeer

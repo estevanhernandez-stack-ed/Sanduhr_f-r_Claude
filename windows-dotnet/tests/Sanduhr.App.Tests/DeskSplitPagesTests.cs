@@ -458,6 +458,10 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
             var children = peer.GetChildren();
             Assert.Equal(SettingsIndex.JumpLinks(SettingsPage.Desk).Select(l => l.Title), children.Select(c => c.GetName()));
             Assert.All(children, c => Assert.Equal(System.Windows.Automation.Peers.AutomationControlType.Button, c.GetAutomationControlType()));
+            // The separators read as a middle dot (U+00B7), not a mis-decoded "Â·" (the source file must stay UTF-8).
+            var dots = links.Children.OfType<TextBlock>().ToList();
+            Assert.Equal(3, dots.Count);
+            Assert.All(dots, d => Assert.Equal("·", d.Text));
         }
         finally { window.Close(); }
     });
@@ -525,7 +529,7 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
                 stops++;
             }
             Assert.True(Inside(at, pieces), $"Tab never reached Pieces; it stopped on {at?.GetType().Name ?? "nothing"}");
-            Assert.True(stops <= 8, $"Pieces is Tab stop {stops} from the page's first stop (pinned at 8 so a creeping count shows before the spec's 10)");
+            Assert.True(stops == 8, $"Pieces is Tab stop {stops} from the page's first stop (pinned at 8 so a creeping count shows before the spec's 10)");
         }
         finally { window.Close(); }
     });
