@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Sanduhr.App.Services;
 using Sanduhr.Core;
 
@@ -18,7 +19,8 @@ public sealed record DeskPlaceOption(DeskAnchor? Anchor, string Name)
     public override string ToString() => Name;
 }
 
-/// <summary>One row of "Where each piece sits": a piece, its place and its size (60% to 160%).</summary>
+/// <summary>One row of Desk, Pieces: the piece's Show box, its place, size, monitor and style, its order among the pieces that
+/// share its place, and the link to its own page.</summary>
 public sealed partial class DeskPieceRow : ObservableObject
 {
     private readonly DeskSettingsViewModel _owner;
@@ -49,6 +51,10 @@ public sealed partial class DeskPieceRow : ObservableObject
     /// <summary>The meter style (#336), for the pieces that have one (<see cref="HasStyle"/>).</summary>
     [ObservableProperty] private DeskStyleOption _style = DeskSettingsViewModel.StyleOptions[0];
 
+    /// <summary>Order (WF5): live when another piece shares the place and this one isn't at that end of its stack.</summary>
+    [ObservableProperty, NotifyCanExecuteChangedFor(nameof(MoveUpCommand))] private bool _canMoveUp;
+    [ObservableProperty, NotifyCanExecuteChangedFor(nameof(MoveDownCommand))] private bool _canMoveDown;
+
     /// <summary>"120%", for the size picker.</summary>
     public string SizeText => $"{Math.Round(Size * 100)}%";
 
@@ -57,7 +63,51 @@ public sealed partial class DeskPieceRow : ObservableObject
     /// <summary>True for the Claude line, the Claude limits and telemetry: their row shows a Style picker.</summary>
     public bool HasStyle => DeskMeterStyles.Supports(Widget);
 
-    internal void Load(DeskPlacement? p)
+    /// <summary>The companion's row carries its sprite and roaming inline (spec, Pieces).</summary>
+    public bool IsCompanion => Widget == CompanionSettings.Widget;
+    public DeskCompanionViewModel? Companion => IsCompanion ? _owner.Companion : null;
+
+    /// <summary>Show (spec, Pieces): on means Place is not Hidden. On places the piece where it last was in this window, else at its
+    /// default place (<see cref="DeskArrangement.DefaultPlaceFor"/>); off hides it and remembers where it was.</summary>
+    public bool Shown
+    {
+        get => IsPlaced;
+        set
+        {
+            if (_loading || value == IsPlaced) return;
+            if (value) _owner.PlaceIfHidden(Widget);
+            else Place = DeskSettingsViewModel.Hidden;
+        }
+    }
+
+    /// <summary>The Show box spoken; its visible label is <see cref="Name"/>.</summary>
+    public string ShownName => SettingsNames.PieceShownSpoken(Name);
+    public string MoveUpName => SettingsNames.MoveUpIn(Name, Place.Name);
+    public string MoveDownName => SettingsNames.MoveDownIn(Name, Place.Name);
+
+    /// <summary>The page with this piece's own settings; null for a piece that has none.</summary>
+    public SettingsPage? PiecePage => SettingsNames.DeskPiecePage(Widget);
+
+    /// <summary>True when that page is in this build's sidebar: the row then shows "&lt;Page&gt; settings…".</summary>
+    public bool HasSettingsPage => PiecePage is { } page && SettingsNames.Pages.Contains(page);
+
+    public string SettingsTitle => PiecePage is { } page ? SettingsNames.LinkTitle(page) : "";
+
+    /// <summary>The link the button opens: the page, and for the glow the section where its place is chosen.</summary>
+    public string SettingsLink => PiecePage switch
+    {
+        null => "",
+        SettingsPage.ClaudeCode => SettingsIndex.PageId(SettingsPage.ClaudeCode) + "#" + SettingsIndex.GlowWhere,
+        { } page => SettingsIndex.PageId(page),
+    };
+
+    [RelayCommand(CanExecute = nameof(CanMoveUp))]
+    private void MoveUp() => _owner.Edit(a => a.Move(Widget, -1));
+
+    [RelayCommand(CanExecute = nameof(CanMoveDown))]
+    private void MoveDown() => _owner.Edit(a => a.Move(Widget, 1));
+
+    internal void Load(DeskPlacement? p, int stackIndex, int stackCount)
     {
         _loading = true;
         Place = p is null ? DeskSettingsViewModel.Hidden : DeskSettingsViewModel.PlaceFor(p.Anchor);
@@ -65,13 +115,25 @@ public sealed partial class DeskPieceRow : ObservableObject
         Style = DeskSettingsViewModel.StyleFor(p?.Style ?? DeskMeterStyle.Bar);
         MonitorChoices = DeskMonitorNames.Choices(_owner.Monitors, p?.Monitor);
         Monitor = DeskMonitorNames.Select(MonitorChoices, p?.Monitor);
+        if (p is not null) _owner.Remember(Widget, p.Anchor);   // whatever hides it later, Show returns to the last visible place
+        CanMoveUp = stackIndex > 0;
+        CanMoveDown = stackIndex >= 0 && stackIndex < stackCount - 1;
         _loading = false;
     }
 
     partial void OnPlaceChanged(DeskPlaceOption value)
     {
         OnPropertyChanged(nameof(IsPlaced));
+        OnPropertyChanged(nameof(Shown));
+        OnPropertyChanged(nameof(MoveUpName));
+        OnPropertyChanged(nameof(MoveDownName));
         if (!_loading) _owner.Edit(a => a.Place(Widget, value.Anchor));
+    }
+
+    /// <summary>Hidden by hand (Show or Place): the place is remembered for this window's life.</summary>
+    partial void OnPlaceChanged(DeskPlaceOption? oldValue, DeskPlaceOption newValue)
+    {
+        if (!_loading && newValue.Anchor is null && oldValue?.Anchor is { } was) _owner.Remember(Widget, was);
     }
 
     partial void OnMonitorChanged(DeskMonitorChoice value)
@@ -130,9 +192,10 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     private bool _loading;
 
     /// <param name="monitors">The connected monitors, named (the Monitor dropdown). Default: what Windows reports now.</param>
+    /// <param name="widgets">The installed packs (the companion's sprites). Default: this store's own widgets folder.</param>
     /// <param name="inkPresets">The Ink presets (name and hex spec): the built-ins and the installed palette packs'. Default: the built-ins.</param>
     public DeskSettingsViewModel(SettingsStore store, IReadOnlyList<string> fontFamilies, Func<IReadOnlyList<DeskMonitorInfo>>? monitors = null,
-        Func<IReadOnlyList<(string Name, string Value)>>? inkPresets = null)
+        Func<IReadOnlyList<(string Name, string Value)>>? inkPresets = null, Func<WidgetStore>? widgets = null)
     {
         _store = store;
         _inkPresets = inkPresets ?? (() => DeskInkPresets.All);
@@ -154,6 +217,11 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             new DeskPieceRow(this, "glow", SettingsNames.DeskGlow),
             new DeskPieceRow(this, "companion", SettingsNames.DeskCompanion),
         ];
+        Companion = new DeskCompanionViewModel(store,
+            widgets ?? (() => new WidgetStore(store.Paths.WidgetsDir, Sanduhr.App.Services.WidgetCatalogService.EncodePng)))
+        {
+            Changed = () => Changed?.Invoke(),
+        };
         Launcher = new LauncherSettingsViewModel(store, new Paths(), () => Pieces.FirstOrDefault(p => p.Widget == "launcher")?.IsPlaced == true, PlaceLauncherIfHidden)
         {
             Changed = () => Changed?.Invoke(),
@@ -166,6 +234,9 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
 
     /// <summary>Settings, Desk, Designs: the saved designs and Put my Desk back (spec, the agent-designed Desk).</summary>
     public DesignsSettingsViewModel Designs { get; }
+
+    /// <summary>Desk, Pieces, the Companion row's sprite and roaming (moved from Settings, Widgets).</summary>
+    public DeskCompanionViewModel Companion { get; }
 
     /// <summary>The monitors connected when the page was loaded (read again by <see cref="Reload"/>).</summary>
     public IReadOnlyList<DeskMonitorInfo> Monitors { get; private set; }
@@ -271,10 +342,13 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
 
     public bool IsCustomInk => InkChoice.Mode == DeskInkMode.Custom;
 
+    /// <summary>The Colors presets show whenever the ink is not Automatic (WF3: a palette pack is no longer hidden behind Custom).</summary>
+    public bool ShowsInkColors => InkChoice.Mode != DeskInkMode.Auto;
+
     /// <summary>Raised after "Let Claude show watchers" is saved (App writes watchers.json and, off, clears the cards).</summary>
     public Action? WatchersChanged { get; set; }
 
-    /// <summary>"Let Claude show watchers" (spec 6.9): off by default; saved at once.</summary>
+    /// <summary>Settings, Watchers: "Let Claude show watchers" (spec 6.9). Off by default; saved at once. Turning it on shows a hidden Watchers piece.</summary>
     public bool WatchersAgents
     {
         get => _store.LoadWatchersAgents();
@@ -284,13 +358,14 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             _store.SaveWatchersAgents(value);
             OnPropertyChanged();
             WatchersChanged?.Invoke();
+            if (value) PlaceIfHidden("watchers");   // Principle 4: turning watchers on never leaves them invisible
         }
     }
 
     /// <summary>Raised after "Show my CI runners' jobs" is saved (App starts or stops the runner watch).</summary>
     public Action? CiRunnersChanged { get; set; }
 
-    /// <summary>"Show my CI runners' jobs" (spec ci-watchers-3.9): off by default; saved at once.</summary>
+    /// <summary>Settings, Watchers: "Show my CI runners' jobs" (spec ci-watchers-3.9). Off by default; saved at once. Turning it on shows a hidden Watchers piece.</summary>
     public bool WatchersCiRunners
     {
         get => _store.LoadWatchersCiRunners();
@@ -300,6 +375,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             _store.SaveWatchersCiRunners(value);
             OnPropertyChanged();
             CiRunnersChanged?.Invoke();
+            if (value) PlaceIfHidden("watchers");
         }
     }
 
@@ -384,6 +460,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     partial void OnInkChoiceChanged(DeskInkChoice value)
     {
         OnPropertyChanged(nameof(IsCustomInk));
+        OnPropertyChanged(nameof(ShowsInkColors));
         SaveInk(_ink with { Mode = value.Mode });
     }
 
@@ -392,10 +469,14 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         if (_loadingInk || value is null) return;
         var preset = _inkList.FirstOrDefault(p => p.Name == value);
         if (preset.Value is null) return;
+        // Choosing a preset sets Custom (spec, Desk Look): the colors are the ink's own from now on.
         _loadingInk = true;
         InkColors = preset.Value;
+        if (InkChoice.Mode != DeskInkMode.Custom) InkChoice = InkChoices.First(c => c.Mode == DeskInkMode.Custom);
         _loadingInk = false;
-        SaveInk(_ink with { Color = preset.Value });
+        OnPropertyChanged(nameof(IsCustomInk));
+        OnPropertyChanged(nameof(ShowsInkColors));
+        SaveInk(_ink with { Color = preset.Value, Mode = DeskInkMode.Custom });
     }
 
     partial void OnInkColorsChanged(string value)
@@ -404,10 +485,14 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         // One to four hex colors with commas; anything unreadable is kept as typed and drawn white.
         var spec = string.Join(",", (value ?? "").Split(',').Select(s => Sanduhr.Core.InkHex.Normalize(s)).Where(s => s is not null));
         if (spec.Length == 0) return;
+        // A typed color is the ink's own, so it switches the ink to Custom, as choosing a preset does.
         _loadingInk = true;
         InkPreset = _inkList.FirstOrDefault(p => p.Value == spec).Name;
+        if (InkChoice.Mode != DeskInkMode.Custom) InkChoice = InkChoices.First(c => c.Mode == DeskInkMode.Custom);
         _loadingInk = false;
-        SaveInk(_ink with { Color = spec });
+        OnPropertyChanged(nameof(IsCustomInk));
+        OnPropertyChanged(nameof(ShowsInkColors));
+        SaveInk(_ink with { Color = spec, Mode = DeskInkMode.Custom });
     }
 
     partial void OnInkShadowChanged(bool value) => SaveInk(_ink with { Shadow = value });
@@ -441,23 +526,55 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         MarginRight = _saved.Margins.Right;
         MarginTop = _saved.Margins.Top;
         MarginBottom = _saved.Margins.Bottom;
-        var a = new DeskArrangement(_saved.Layout);
-        foreach (var row in Pieces) row.Load(a.Placement(row.Widget));
+        LoadRows(new DeskArrangement(_saved.Layout));
+        Companion?.Reload();
         _loading = false;
         Launcher?.PlacementChanged();
     }
 
+    /// <summary>The Launcher's first button was added while the piece has no place: puts it at its default place (or where it last
+    /// was in this window) and returns that place's name in lower case ("top left"), or null when it already has a place.</summary>
+    internal string? PlaceLauncherIfHidden() =>
+        PlaceIfHidden(LauncherModel.Widget) is { } at ? DeskAnchors.Name(at).ToLowerInvariant() : null;
+
+    private readonly Dictionary<string, DeskAnchor> _lastPlace = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, DeskPieceStatusViewModel> _statuses = new(StringComparer.Ordinal);
+
+    /// <summary>A piece hidden by hand: where it was, for the life of this Settings window (spec, Pieces: Show).</summary>
+    internal void Remember(string widget, DeskAnchor at) => _lastPlace[widget] = at;
+
     /// <summary>
-    /// The Launcher's first button was added while the piece has no place: puts it at the first free corner
-    /// (<see cref="DeskArrangement.FirstFreeAnchor"/>) and returns that corner's name in lower case ("bottom left"),
-    /// or null when the piece already has a place.
+    /// Shows a hidden piece (Principle 4): where it last was in this window, else at <see cref="DeskArrangement.DefaultPlaceFor"/>;
+    /// saves, and the running Desk follows. Returns where, or null when nothing changed: the piece is already placed, the word is
+    /// unknown, or an Arrange session runs (its Done would overwrite the layout). Nothing is written then.
     /// </summary>
-    internal string? PlaceLauncherIfHidden()
+    public DeskAnchor? PlaceIfHidden(string widget)
     {
-        if (Pieces.FirstOrDefault(p => p.Widget == "launcher")?.IsPlaced == true) return null;
-        var anchor = new DeskArrangement(_saved.Layout).FirstFreeAnchor();
-        Edit(a => a.Place("launcher", anchor));
-        return DeskAnchors.Name(anchor).ToLowerInvariant();
+        if (Arranging || new DeskArrangement(_saved.Layout).Placement(widget) is not null
+            || !DeskArrangement.Known.Contains(widget, StringComparer.Ordinal))
+            return null;
+        DeskAnchor? remembered = _lastPlace.TryGetValue(widget, out var at) ? at : null;
+        DeskAnchor? placed = null;
+        Edit(a => placed = a.PlaceAtDefault(widget, remembered));
+        return placed;
+    }
+
+    /// <summary>The line a feature page shows about <paramref name="widget"/>'s piece; one per piece for this window.</summary>
+    public DeskPieceStatusViewModel PieceStatus(string widget) =>
+        _statuses.TryGetValue(widget, out var status) ? status : _statuses[widget] = new DeskPieceStatusViewModel(this, widget);
+
+    /// <summary>Watchers, Launcher and Claude Code bind to these (a binding can't call <see cref="PieceStatus"/>).</summary>
+    public DeskPieceStatusViewModel WatchersPiece => PieceStatus("watchers");
+    public DeskPieceStatusViewModel LauncherPiece => PieceStatus(LauncherModel.Widget);
+    public DeskPieceStatusViewModel GlowPiece => PieceStatus("glow");
+
+    private void LoadRows(DeskArrangement a)
+    {
+        foreach (var row in Pieces)
+        {
+            var (index, count) = a.StackPosition(row.Widget);
+            row.Load(a.Placement(row.Widget), index, count);
+        }
     }
 
     /// <summary>Change the layout through <see cref="DeskArrangement"/> and save.</summary>
@@ -467,7 +584,8 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         change(a);
         Save(_saved with { Layout = a.Layout });
         _loading = true;
-        foreach (var row in Pieces) row.Load(a.Placement(row.Widget));
+        LoadRows(a);
+        Companion.RefreshStatus();
         _loading = false;
         Launcher.PlacementChanged();
     }
@@ -477,6 +595,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(CanArrange));
         OnPropertyChanged(nameof(ArrangeNote));
         if (!_loading) Save(_saved with { Enabled = value });
+        Companion?.RefreshStatus();
     }
 
     partial void OnFontChanged(string value)

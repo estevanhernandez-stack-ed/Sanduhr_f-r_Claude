@@ -64,6 +64,7 @@
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Margin" Value="0,0,0,8" />
             <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="AutomationProperties.HeadingLevel" Value="Level2" />
         </Style>
 
         <Style x:Key="Dim" TargetType="TextBlock">
@@ -214,8 +215,9 @@
     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
         <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
             <StackPanel Margin="20">
-                <TextBlock Text="Message" FontSize="14" FontWeight="SemiBold"
-                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+                <TextBlock Text="Message" FontSize="14" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level1"
+                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                <views:DeskPieceStatusPanel DataContext="{Binding Piece}" Margin="0,0,0,12" />
 
                 <!-- Claude's suggestion (spec 6.9): only while one waits. -->
                 <StackPanel views:SettingsAnchor.Id="suggestion"
@@ -381,65 +383,6 @@
                         <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
                                   ItemsSource="{Binding SecondsOptions}" SelectedItem="{Binding Seconds, Mode=TwoWay}"
                                   AutomationProperties.Name="Each line shows for" />
-                    </Grid>
-                </StackPanel>
-
-                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
-
-                <!-- Look -->
-                <StackPanel views:SettingsAnchor.Id="message-look">
-                    <TextBlock Text="Look" Style="{StaticResource Heading}" />
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="90" />
-                            <ColumnDefinition Width="230" />
-                            <ColumnDefinition Width="44" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Message size" FontSize="12" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                        <Slider Grid.Column="1" x:Name="MessageSizeSlider" Style="{DynamicResource ThemedSlider}"
-                                Minimum="24" Maximum="180"
-                                TickFrequency="1" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="10"
-                                Value="{Binding Size, Mode=TwoWay}" AutomationProperties.Name="Message size" />
-                        <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=MessageSizeSlider, StringFormat='{}{0:0}'}"
-                                   FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Right"
-                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}" FontFamily="Cascadia Code, Consolas" />
-                    </Grid>
-                    <Grid Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="90" />
-                            <ColumnDefinition Width="230" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="{x:Static core:SettingsNames.MessageColor}" FontSize="12" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                        <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
-                                  ItemsSource="{Binding ColorOptions}" SelectedItem="{Binding Color, Mode=TwoWay}"
-                                  AutomationProperties.Name="{x:Static core:SettingsNames.MessageColor}" />
-                        <TextBox Grid.Column="2" Style="{DynamicResource Input}" Width="170" Height="30" Margin="8,0,0,0"
-                                 VerticalContentAlignment="Center" FontFamily="Cascadia Code, Consolas"
-                                 Visibility="{Binding IsCustomColor, Converter={StaticResource BoolVis}}"
-                                 Text="{Binding CustomColorText, UpdateSourceTrigger=PropertyChanged}"
-                                 AutomationProperties.Name="Custom message color, hex"
-                                 ToolTip="Hex colors like 9ad7ff. Two or more, separated by commas, make a gradient." />
-                    </Grid>
-                    <TextBlock Style="{StaticResource Dim}" Margin="90,4,0,0"
-                               Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
-                               Text="{Binding CustomColorProblem}"
-                               Visibility="{Binding CustomColorProblem, Converter={StaticResource StrVis}}" />
-                    <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,10,0,0"
-                              Content="Glow around the message" IsChecked="{Binding Glow, Mode=TwoWay}"
-                              AutomationProperties.Name="Glow around the message" />
-                    <Grid Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="90" />
-                            <ColumnDefinition Width="230" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="{x:Static core:SettingsNames.MessageFont}" FontSize="12" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                        <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
-                                  ItemsSource="{Binding FontOptions}" SelectedItem="{Binding Font, Mode=TwoWay}"
-                                  AutomationProperties.Name="{x:Static core:SettingsNames.MessageFont}" />
                     </Grid>
                 </StackPanel>
 

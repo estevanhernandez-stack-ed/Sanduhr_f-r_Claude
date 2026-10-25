@@ -489,7 +489,7 @@ public partial class App : Application
         {
             case Desk.DeskMenuAction.EditMessages: _ = ShowSettingsAsync(SettingsPage.DeskMessage, SettingsIndex.MenuAnchor(SettingsPage.DeskMessage)); break;
             case Desk.DeskMenuAction.DeskSettings: _ = ShowSettingsAsync(SettingsPage.Desk, SettingsIndex.MenuAnchor(SettingsPage.Desk)); break;
-            case Desk.DeskMenuAction.LauncherSettings: _ = ShowSettingsAsync(SettingsPage.Desk, SettingsIndex.DeskLauncher); break;
+            case Desk.DeskMenuAction.LauncherSettings: _ = ShowSettingsAsync(SettingsPage.Launcher, SettingsIndex.MenuAnchor(SettingsPage.Launcher)); break;
             case Desk.DeskMenuAction.Arrange: _desk?.BeginArrange(); break;
             case Desk.DeskMenuAction.TurnOffDesk:
                 try
@@ -507,10 +507,10 @@ public partial class App : Application
         }
     }
 
-    /// <summary>A Launcher button for an app that is no longer installed was chosen: Settings, Desk, Launcher opens at that button.</summary>
+    /// <summary>A Launcher button for an app that is no longer installed was chosen: Settings, Launcher opens at its buttons, that one selected.</summary>
     private void OnLauncherMissing(int index)
     {
-        _ = ShowSettingsAsync(SettingsPage.Desk, SettingsIndex.DeskLauncher);
+        _ = ShowSettingsAsync(SettingsPage.Launcher, SettingsIndex.MenuAnchor(SettingsPage.Launcher));
         if (_settingsWindow?.ViewModel.Desk.Launcher is { } launcher)
         {
             launcher.Reload();
@@ -725,7 +725,7 @@ public partial class App : Application
         svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); _looks?.SettingsChanged(); };
         // get_desk reports the weather nickname (#315), so a change rewrites desk-state.json too.
         svm.WeatherPage.Changed = () => { _desk?.Reload(); _deskDesign?.Refresh(); };
-        // The companion (spec 3.8 section 4): a new pick, roaming, an install or uninstall, or the piece shown or hidden.
+        // An install or uninstall (a companion sprite included), theme, font or palette pack.
         // 3.9.1: it also reloads the theme list, since an installed theme pack joins it and an uninstalled one leaves it.
         // A font pack changes what the Desk and a design may draw in: drop their font lists before the Desk redraws.
         svm.WidgetsPage.Changed = () =>

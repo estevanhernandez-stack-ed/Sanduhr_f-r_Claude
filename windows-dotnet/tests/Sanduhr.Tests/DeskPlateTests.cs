@@ -128,6 +128,6 @@ public class DeskPlateTests
     public void TheSwitchIsFoundFromSettingsSearch()
     {
         var hits = SettingsIndex.Search("plate");
-        Assert.Contains(hits, h => h.Entry.Page == SettingsPage.Desk && h.Entry.Anchor == SettingsIndex.DeskPlate && h.Rank == 0);
+        Assert.Contains(hits, h => h.Entry.Page == SettingsPage.DeskLook && h.Entry.Anchor == SettingsIndex.DeskPlate && h.Rank == 0);
     }
 }

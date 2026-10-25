@@ -621,7 +621,7 @@ public static class ToolCatalog
         "the fields to change; everything absent stays as it is. Fields, all optional: name (up to 40 characters); " +
         "note (one sentence for the user, up to 200); layout {piece: {anchor, size, hidden}}, where piece is a key from " +
         "get_desk pieces, anchor is tl tc tr ml mr bl bc br, size is 0.6 to 1.6, hidden removes the piece and monitor puts it on \"all\" monitors (the default), the \"main\" monitor or one monitor by the id in get_desk monitors (a piece on a monitor that is unplugged shows on the main one meanwhile; " +
-        "the companion piece draws the sprite the user chose in Settings, Widgets, sits at its anchor or roams the monitor's edges from it, and draws nothing until a sprite is installed); " +
+        "the companion piece draws the sprite the user chose in Settings, Desk, Pieces, sits at its anchor or roams the monitor's edges from it, and draws nothing until a sprite is installed); " +
         "tilt in a layout piece slants the piece's whole stack from -20 to 20 degrees (negative rises to the right, positive falls; 0 upright), " +
         "so a left stack at -18 and a right stack at 18 read as two faces of a fold; pieces at one anchor share one slant, so give them the same tilt; " +
         "style in a layout piece, only on claude, meters and telemetry, is how its numbers draw so a stack fits its column: bar (the default, " +
@@ -683,8 +683,8 @@ public static class ToolCatalog
         "failed). Without an update for 10 minutes it greys as lost touch, so update long jobs. Limits: " +
         "title 1 to 80 characters on one line, short up to 12, link https only, total 1 to 1000000. Pass work: true for " +
         "anything from the user's employer, so it hides in demo mode. Refused with reason " +
-        "watchers_off when the user has not turned on 'Let Claude show watchers' in Sanduhr (Settings, " +
-        "Desk); then do not retry. It shows where the user has placed the Watchers piece on the Desk.";
+        "watchers_off when the user has not turned on 'Let Claude show watchers' in Sanduhr " +
+        "(Settings, Watchers); then do not retry. It shows where the user has placed the Watchers piece on the Desk.";
 
     private const string WatchGuideUpdate =
         "Move a watcher from watch_start: done (how many of its total are done), note (one line, up to " +

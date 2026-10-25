@@ -71,4 +71,26 @@ public sealed class MessageModeSegmentTests : IDisposable
         // ...and the text view still has it after the round trip.
         Assert.Contains("A line typed in the Text view", page.EditorText);
     });
+
+    [Fact]
+    public void A_size_drag_inside_the_settle_window_survives_a_settings_refresh_and_a_reactivation() => AppHost.Run(() =>
+    {
+        var paths = new Paths(appDataBase: Path.Combine(_root, "appdata"), homeDir: Path.Combine(_root, "home"),
+            localAppDataBase: Path.Combine(_root, "local"), externalDir: Path.Combine(_root, "external"));
+        var store = new SettingsStore(paths);
+        var page = new DeskMessagePageViewModel(store, Path.Combine(_root, "messages.txt"), () => true, () => { }, ["Segoe UI"]);
+        page.Activate();
+
+        double dragged = page.Size == 120 ? 100 : 120;
+        page.Size = dragged;                 // pending: the 200 ms settle has not fired
+        page.RefreshSettings();
+        Assert.Equal(dragged, store.LoadDeskMessage().Size);
+        Assert.Equal(dragged, page.Size);
+
+        double again = dragged == 100 ? 90 : 100;
+        page.Size = again;
+        page.Activate();
+        Assert.Equal(again, store.LoadDeskMessage().Size);
+        Assert.Equal(again, page.Size);
+    });
 }

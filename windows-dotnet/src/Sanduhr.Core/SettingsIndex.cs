@@ -84,10 +84,21 @@ public static class SettingsIndex
     public const string DeskClicks = "desk-clicks";
     public const string DeskPlate = "desk-plate";
     public const string DeskWatchers = "desk-watchers";
+    // Watchers (slice 3)
+    public const string Watchers = "watchers";
+    public const string CiRunners = "ci-runners";
+    public const string WatchersPlace = "watchers-place";
+    // Launcher (slice 3)
+    public const string LauncherPlace = "launcher";
+    public const string LauncherButtons = "launcher-buttons";
     public const string DeskLauncher = "desk-launcher";
     public const string DeskDirect = "desk-direct";
     public const string DeskOled = "desk-oled";
     public const string DeskDesigns = "desk-designs";
+    /// <summary>Desk, Advanced (slice 3): collapsed; holds Margins and OLED care.</summary>
+    public const string DeskAdvanced = "desk-advanced";
+    /// <summary>Desk Look, Sizes (slice 3).</summary>
+    public const string DeskSizes = "sizes";
     // Desk: Message, Now playing, Weather (S6)
     public const string MessageLines = "lines";
     public const string MessageRotation = "rotation";
@@ -119,7 +130,7 @@ public static class SettingsIndex
     public const string SessionsView = "Sessions";
 
     private static SettingsEntry E(string title, SettingsPage page, string anchor, string[]? synonyms = null,
-        string? subsection = null) => new(title, page, anchor, synonyms ?? [], subsection);
+        string? subsection = null, string? collapsedIn = null) => new(title, page, anchor, synonyms ?? [], subsection, collapsedIn);
 
     /// <summary>Every anchor in sidebar order, with its title and the words a person might type for it.</summary>
     public static IReadOnlyList<SettingsEntry> Anchors { get; } =
@@ -144,8 +155,6 @@ public static class SettingsIndex
         E("Warn at and Urgent at", SettingsPage.Alerts, Thresholds, ["threshold", "warn", "urgent", "percent"]),
         E("Sound", SettingsPage.Alerts, Sound, ["chime", "sound", "snake", "model-scoped", "mute"]),
         E(SettingsNames.SendTestAlert, SettingsPage.Alerts, TestAlert, ["test", "try"]),
-        E(SettingsNames.SignInReminders, SettingsPage.Alerts, SignInReminders,
-            ["sign in", "signed out", "without Claude", "reminder", "Just the Desk", "session expired"]),
 
         E("History chart", SettingsPage.History, Chart,
             ["meter history", "30 days", "week", "month", "account", "all accounts", "chart"]),
@@ -196,34 +205,40 @@ public static class SettingsIndex
         E(SettingsNames.DeskSwitch, SettingsPage.Desk, DeskOn,
             ["desktop", "wallpaper", "clock", "meters", "Rainmeter", "show the Desk", "on the desktop", "off by default", "monitors"]),
         E(SettingsNames.ArrangeDesk, SettingsPage.Desk, DeskArrange,
-            ["drag", "move", "rearrange", "arrange", "reorder", "on the desktop", "layout"]),
-        E(SettingsNames.DeskPieceClicksSwitch, SettingsPage.Desk, DeskClicks,
-            ["click", "click-through", "right-click", "menu", "desktop icons", "clock", "message"]),
-        E(SettingsNames.WatchersSwitch, SettingsPage.Desk, DeskWatchers,
-            ["watcher", "watchers", "agent", "agents", "MCP", "watch_start", "CI", "deploy", "progress", "card", "claude code",
-             SettingsNames.CiRunnersSwitch, "runner", "runners", "GitHub Actions", "Docker", "jobs", "off by default"]),
-        E(SettingsNames.DeskDirectSwitch, SettingsPage.Desk, DeskDirect,
-            ["Claude", "agent", "agents", "MCP", "propose_desk", "design", "designs", "review", "apply", "without asking", "wallpaper", "off by default"]),
-        E(SettingsNames.OledCareSwitch, SettingsPage.Desk, DeskOled,
-            ["oled", "burn-in", "burn in", "burnin", "drift", "dim", "idle", "away", "screen", "pixels", "white", "image retention", "off by default"]),
-        E(SettingsNames.DeskDesigns, SettingsPage.Desk, DeskDesigns,
-            ["design", "designs", "undo", "put back", SettingsNames.PutMyDeskBack, "restore", "switch", "switch to", "rename", "pin", "delete", "saved looks", "Before", "history", "Claude"]),
-        E(SettingsNames.DeskLauncher, SettingsPage.Desk, DeskLauncher,
-            ["launcher", "button", "buttons", "shortcut", "shortcuts", "app", "apps", "link", "TouchButton", "Rainmeter",
-             SettingsNames.LauncherAddApp, SettingsNames.LauncherAddLink, "image", "label", "PNG", "Chrome app", "PWA"]),
-        E("Where each piece sits", SettingsPage.Desk, DeskPieces,
-            ["layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor", "monitor", "monitors", "screen", "display", "main monitor", "all monitors", "second monitor", "per monitor",
-             "style", "meter style", "slim", "ring", "rings", "gauge", "ticks", "segments", "Roundline", "compact"]),
-        E("Look", SettingsPage.Desk, DeskLook,
-            ["font", "EsteFont", "EsteFont Pro", "EsteFont 26", "clock size", "time size", "typeface", "Segoe UI"]),
-        E(SettingsNames.DeskPlateSwitch, SettingsPage.Desk, DeskPlate,
-            ["plate", "backdrop", "background", "contrast", "readable", "desktop icons", "files", "dark plate", "behind the text"]),
-        E("Margins", SettingsPage.Desk, DeskMargins,
-            ["margin", "edge", "padding", "taskbar", "inset", "spacing"]),
-        E("Layout map", SettingsPage.Desk, DeskMap,
+            ["drag", "move", "rearrange", "arrange", "reorder", "on the desktop", "layout", "arrow keys", "keyboard"]),
+        E(SettingsNames.DeskLayoutMap, SettingsPage.Desk, DeskMap,
             ["map", "preview", "layout", "taskbar", "screen", "monitor", "where"]),
-        E(SettingsNames.DeskInk, SettingsPage.Desk, DeskInk,
-            ["ink", "text color", "automatic", "light", "dark", "wallpaper", "readable", "shadow", "gradient", "hex"]),
+        E(SettingsNames.PiecesSection, SettingsPage.Desk, DeskPieces,
+            ["where each piece sits", "show", "hide", "order", "reorder", "move up", "move down", "stack",
+             "layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor", "monitor", "monitors",
+             "screen", "display", "main monitor", "all monitors", "second monitor", "per monitor",
+             "style", "meter style", "slim", "ring", "rings", "gauge", "ticks", "segments", "Roundline", "compact",
+             "companion", "pet", "sprite", "hourglass", "roam", "walk", "grow", "growth", "stage", "mood",
+             SettingsNames.WidgetCompanionPick, SettingsNames.WidgetCompanionRoam]),
+        E(SettingsNames.DeskBehavior, SettingsPage.Desk, DeskClicks,
+            [SettingsNames.DeskPieceClicksSwitch, "click", "click-through", "right-click", "menu", "desktop icons", "clock", "message"]),
+        E(SettingsNames.SignInReminders, SettingsPage.Desk, SignInReminders,
+            ["sign in", "signed out", "without Claude", "reminder", "Just the Desk", "session expired"]),
+        E(SettingsNames.DeskDesigns, SettingsPage.Desk, DeskDesigns,
+            ["design", "designs", "undo", "put back", SettingsNames.PutMyDeskBack, "restore", "switch", "switch to", "rename", "pin", "delete",
+             "saved looks", "Before", "history", "Claude", SettingsNames.DeskDirectSwitch, "agent", "agents", "MCP", "propose_desk", "review",
+             "apply", "without asking", "wallpaper", "off by default"]),
+        E(SettingsNames.DeskAdvanced, SettingsPage.Desk, DeskAdvanced, ["advanced", "more"]),
+        E("Margins", SettingsPage.Desk, DeskMargins,
+            ["margin", "edge", "padding", "taskbar", "inset", "spacing"], collapsedIn: SettingsNames.DeskAdvanced),
+        E(SettingsNames.OledCareSwitch, SettingsPage.Desk, DeskOled,
+            ["oled", "burn-in", "burn in", "burnin", "drift", "dim", "idle", "away", "screen", "pixels", "white", "image retention", "off by default"],
+            collapsedIn: SettingsNames.DeskAdvanced),
+
+        E(SettingsNames.FontsSection, SettingsPage.DeskLook, DeskLook,
+            ["font", SettingsNames.DeskFont, SettingsNames.MessageFont, "EsteFont", "EsteFont Pro", "EsteFont 26", "typeface", "Segoe UI", "font pack"]),
+        E(SettingsNames.SizesSection, SettingsPage.DeskLook, DeskSizes,
+            [SettingsNames.ClockSize, SettingsNames.MessageSize, "time size", "size", "bigger", "smaller"]),
+        E(SettingsNames.InkAndColor, SettingsPage.DeskLook, DeskInk,
+            ["ink", SettingsNames.DeskInkPicker, "text color", "automatic", "light", "dark", "wallpaper", "readable", SettingsNames.DropShadow,
+             "shadow", "gradient", "hex", "palette", "presets", SettingsNames.MessageColor, SettingsNames.GlowAroundMessage]),
+        E(SettingsNames.BackPlate, SettingsPage.DeskLook, DeskPlate,
+            [SettingsNames.DeskPlateSwitch, "plate", "backdrop", "background", "contrast", "readable", "desktop icons", "files", "dark plate", "behind the text"]),
 
         E("Claude's suggestion", SettingsPage.DeskMessage, MessageSuggestion,
             ["suggestion", "suggested", "Claude", "agent", "review", "dismiss", "propose"]),
@@ -232,7 +247,6 @@ public static class SettingsIndex
         E("Rotation", SettingsPage.DeskMessage, MessageRotation, ["rotate", "daily", "hourly", "pin", "mix", "every day"]),
         E("On special days", SettingsPage.DeskMessage, MessageSpecial,
             ["special day", "birthday", "date", "stack", "take turns", "scroll", "ticker"]),
-        E("Message look", SettingsPage.DeskMessage, MessageLook, ["message size", "message color", "message font", "glow"]),
 
         E(SettingsNames.NowPlayingInWidget, SettingsPage.NowPlaying, NowPlayingWidget,
             ["now playing", "music", "song", "track", "Spotify", "media", "play", "pause", "next", "keep showing while paused", "hide while paused", "hide when nothing plays"]),
@@ -248,9 +262,19 @@ public static class SettingsIndex
              SettingsNames.WeatherShowAs]),
         E("Weather data by Open-Meteo.com", SettingsPage.Weather, WeatherCredit, ["Open-Meteo", "credit", "attribution", "GeoNames"]),
 
-        E("Desk companion", SettingsPage.Widgets, WidgetsCompanion,
-            ["companion", "pet", "sprite", "hourglass", "roam", "walk", "grow", "growth", "stage", "mood", SettingsNames.WidgetCompanionShow,
-             SettingsNames.WidgetCompanionRoam]),
+        E(SettingsNames.WatchersSwitch, SettingsPage.Watchers, Watchers,
+            ["watcher", "watchers", "agent", "agents", "MCP", "watch_start", "deploy", "progress", "card", "claude code", "off by default"]),
+        E(SettingsNames.CiRunnersSwitch, SettingsPage.Watchers, CiRunners,
+            ["CI", "runner", "runners", "GitHub Actions", "Docker", "jobs", "containers", "off by default"]),
+        E(SettingsNames.WatchersPlace, SettingsPage.Watchers, WatchersPlace,
+            ["place", "where", "corner", "on the Desk", "piece", "hidden"]),
+
+        E(SettingsNames.LauncherPlace, SettingsPage.Launcher, LauncherPlace,
+            ["place", "where", "corner", "on the Desk", "piece", "hidden"]),
+        E(SettingsNames.LauncherButtons, SettingsPage.Launcher, LauncherButtons,
+            ["launcher", "button", "buttons", "shortcut", "shortcuts", "app", "apps", "link", "TouchButton", "Rainmeter",
+             SettingsNames.LauncherAddApp, SettingsNames.LauncherAddLink, "image", "label", "PNG", "Chrome app", "PWA", "row", "column"]),
+
         E("Widget catalog", SettingsPage.Widgets, WidgetsCatalog,
             ["widgets", "catalog", "install", "download", "sprite", "companion", "pet", "palette", "effects", "font", "theme pack",
              "hourglass", "OLED Neon", "signature", "verified", "GitHub"]),
@@ -285,13 +309,13 @@ public static class SettingsIndex
         [SettingsNames.ThirdPartyNotices] = Notices,
         [SettingsNames.ResetSanduhr] = Reset,
         [SettingsNames.DeskSwitch] = DeskOn,
-        [SettingsNames.DeskInk] = DeskInk,
+        [SettingsNames.DeskInkPicker] = DeskInk,
         [SettingsNames.ArrangeDesk] = DeskArrange,
         [SettingsNames.DeskPieceClicksSwitch] = DeskClicks,
         [SettingsNames.DeskPlateSwitch] = DeskPlate,
-        [SettingsNames.WatchersSwitch] = DeskWatchers,
-        [SettingsNames.CiRunnersSwitch] = DeskWatchers,
-        [SettingsNames.DeskDirectSwitch] = DeskDirect,
+        [SettingsNames.WatchersSwitch] = Watchers,
+        [SettingsNames.CiRunnersSwitch] = CiRunners,
+        [SettingsNames.DeskDirectSwitch] = DeskDesigns,
         [SettingsNames.OledCareSwitch] = DeskOled,
         [SettingsNames.PutMyDeskBack] = DeskDesigns,
         [SettingsNames.ExportSessions] = Sessions,
@@ -302,10 +326,10 @@ public static class SettingsIndex
         [SettingsNames.LetClaudeReadTotals] = Folders,
         [SettingsNames.SnakeSoundAtFull] = Sound,
         [SettingsNames.DeskFont] = DeskLook,
-        [SettingsNames.MessageFont] = MessageLook,
-        [SettingsNames.MessageColor] = MessageLook,
-        [SettingsNames.LauncherAddApp] = DeskLauncher,
-        [SettingsNames.LauncherAddLink] = DeskLauncher,
+        [SettingsNames.MessageFont] = DeskLook,
+        [SettingsNames.MessageColor] = DeskInk,
+        [SettingsNames.LauncherAddApp] = LauncherButtons,
+        [SettingsNames.LauncherAddLink] = LauncherButtons,
         [SettingsNames.NowPlayingInWidget] = NowPlayingWidget,
         [SettingsNames.NowPlayingStyle] = NowPlayingLooks,
         [SettingsNames.NowPlayingLooksDirect] = NowPlayingLooks,
@@ -315,9 +339,21 @@ public static class SettingsIndex
         [SettingsNames.NowPlayingBarsGradient] = NowPlayingBars,
         [SettingsNames.GlowWhere] = GlowWhere,
         [SettingsNames.WidgetCatalogCheck] = WidgetsCatalog,
-        [SettingsNames.WidgetCompanionShow] = WidgetsCompanion,
-        [SettingsNames.WidgetCompanionRoam] = WidgetsCompanion,
+        [SettingsNames.WidgetCompanionPick] = DeskPieces,
+        [SettingsNames.WidgetCompanionRoam] = DeskPieces,
     };
+
+    /// <summary>
+    /// The sections that start collapsed (spec, Desk: Designs and Advanced), by page and anchor, with the name a search row gives
+    /// what sits in them: "Let Claude change the Desk directly (in Designs)". A name in <see cref="SettingsNames.Table"/> whose
+    /// anchor is one of these is inside it; the section's own row is not. Declared before <see cref="All"/>, which reads it.
+    /// </summary>
+    public static IReadOnlyDictionary<(SettingsPage Page, string Anchor), string> CollapsedSections { get; } =
+        new Dictionary<(SettingsPage Page, string Anchor), string>
+        {
+            [(SettingsPage.Desk, DeskDesigns)] = SettingsNames.DeskDesigns,
+            [(SettingsPage.Desk, DeskAdvanced)] = SettingsNames.DeskAdvanced,
+        };
 
     /// <summary>Words a page goes by besides its title.</summary>
     public static IReadOnlyDictionary<SettingsPage, string[]> PageSynonyms { get; } = new Dictionary<SettingsPage, string[]>
@@ -332,11 +368,14 @@ public static class SettingsIndex
         [SettingsPage.Mods] = ["mod", "plugin", "hooks", "statusline", "MCP", "CLAUDE.md", "retention", "config", "settings.json"],
         [SettingsPage.Publish] = ["publish", "upload", "endpoint", "share"],
         [SettingsPage.Themes] = ["theme", "colors", "look"],
-        [SettingsPage.Desk] = ["desktop", "wallpaper", "clock", "Rainmeter", "layout", "font", "EsteFont", "margins", "taskbar", "telemetry", "CPU", "RAM", "disk"],
+        [SettingsPage.Desk] = ["desktop", "wallpaper", "clock", "Rainmeter", "layout", "margins", "taskbar", "telemetry", "CPU", "RAM", "disk"],
         [SettingsPage.DeskMessage] = ["messages", "messages.txt", "quote", "handwriting"],
         [SettingsPage.NowPlaying] = ["music", "song", "media", "visualizer", "looks", "song style"],
         [SettingsPage.Weather] = ["forecast", "temperature", "city"],
-        [SettingsPage.Widgets] = ["widget packs", "companion", "sprite", "catalog", "pet"],
+        [SettingsPage.DeskLook] = ["look", "fonts", "size", "ink", "color", "colour", "plate"],
+        [SettingsPage.Watchers] = ["watcher", "cards", "CI", "progress"],
+        [SettingsPage.Launcher] = ["buttons", "apps", "links", "shortcuts"],
+        [SettingsPage.Widgets] = ["widget packs", "sprite", "catalog"],
         [SettingsPage.About] = ["help", "version", "trademark", "privacy"],
     };
 
@@ -356,7 +395,9 @@ public static class SettingsIndex
             if (!all.Any(e => e.Title == name && e.Page == page && e.Anchor == anchor))
             {
                 var at = Anchors.FirstOrDefault(e => e.Page == page && e.Anchor == anchor);
-                all.Add(new SettingsEntry(name, page, anchor, [], at?.Subsection, at?.CollapsedIn));
+                var inside = at?.CollapsedIn
+                    ?? (anchor is not null && CollapsedSections.TryGetValue((page, anchor), out var section) ? section : null);
+                all.Add(new SettingsEntry(name, page, anchor, [], at?.Subsection, inside));
             }
         }
         return all;
@@ -542,7 +583,11 @@ public static class SettingsIndex
         new(SettingsPage.Widgets, null, "mods", "catalog"),
     ];
 
-    /// <summary>The page an id names, in any case; null for anything else, numbers and spaces included.</summary>
+    /// <summary>
+    /// The page an id names, in any case; null for anything else, numbers and spaces included. Retired pages (History, Widgets)
+    /// still read on purpose: their aliases carry old links (cards, agent text, <c>--settings history</c>) to the new homes, and
+    /// <see cref="ParseLink"/> opens General when nothing carries them.
+    /// </summary>
     public static SettingsPage? PageFromId(string? id) =>
         !string.IsNullOrEmpty(id) && id.All(char.IsAsciiLetter) && Enum.TryParse<SettingsPage>(id, ignoreCase: true, out var page)
             ? page
@@ -564,10 +609,16 @@ public static class SettingsIndex
             pages.Contains(p) && (a is null || anchors.Any(e => e.Page == p && e.Anchor == a));
         if (Live(page, anchor))
             return new(page, anchor);
-        var row = (anchor is null ? null : Aliases.FirstOrDefault(a => a.FromPage == page && a.FromAnchor == anchor))
-            ?? (pages.Contains(page) ? null : Aliases.FirstOrDefault(a => a.FromPage == page && a.FromAnchor is null));
-        if (row is not null && PageFromId(row.ToPageId) is { } to && Live(to, row.ToAnchor))
-            return new(to, row.ToAnchor);
+        // The anchor's own row first. When its target is a later slice's (not live yet), the page's row, once the page itself has
+        // left the sidebar: the old link then lands where the page as a whole went rather than on a page that no longer shows.
+        var tries = new[]
+        {
+            anchor is null ? null : Aliases.FirstOrDefault(a => a.FromPage == page && a.FromAnchor == anchor),
+            pages.Contains(page) ? null : Aliases.FirstOrDefault(a => a.FromPage == page && a.FromAnchor is null),
+        };
+        foreach (var row in tries)
+            if (row is not null && PageFromId(row.ToPageId) is { } to && Live(to, row.ToAnchor))
+                return new(to, row.ToAnchor);
         return new(page, anchor);
     }
 
@@ -650,8 +701,8 @@ public static class SettingsIndex
     // ---- reach: menus and reopening ----
 
     /// <summary>
-    /// The section a menu's "&lt;Page&gt; settings…" opens at (spec, Menus table). Slices 3 and 5 move Alerts to
-    /// <c>each-limit</c> and add the Launcher here; null opens the page top.
+    /// The section a menu's "&lt;Page&gt; settings…" opens at (spec, Menus table). Slice 5 moves Alerts to
+    /// <c>each-limit</c>; null opens the page top.
     /// </summary>
     public static string? MenuAnchor(SettingsPage page) => page switch
     {
@@ -659,12 +710,30 @@ public static class SettingsIndex
         SettingsPage.Alerts => Notifications,
         SettingsPage.Desk => DeskPieces,
         SettingsPage.DeskMessage => MessageLines,
+        SettingsPage.Launcher => LauncherButtons,
         _ => null,
     };
 
     /// <summary>Where an opening Settings lands: the place asked for; else where it was left this session; else General.</summary>
     public static SettingsLink Landing(SettingsPage? page, string? anchor, SettingsLink? last) =>
         page is { } p ? new(p, anchor) : last ?? new(SettingsPage.General, null);
+
+    /// <summary>
+    /// A page's jump links (spec, Keyboard and screen reader: pages with four or more sections), in page order: a short label and
+    /// the section's anchor. Slice 3 gives them to its pages; other pages get theirs in their own slices. Empty for a page without.
+    /// </summary>
+    public static IReadOnlyList<(string Title, string Anchor)> JumpLinks(SettingsPage page) => page switch
+    {
+        SettingsPage.Desk => Links(page, DeskPieces, DeskClicks, DeskDesigns, DeskAdvanced),
+        SettingsPage.DeskLook => Links(page, DeskLook, DeskSizes, DeskInk, DeskPlate),
+        // The first is named for the widget it sits in; the others read as their index rows.
+        SettingsPage.NowPlaying => [(SettingsNames.NowPlayingJumpWidget, NowPlayingWidget),
+            .. Links(page, NowPlayingApps, NowPlayingBars, NowPlayingLooks)],
+        _ => [],
+    };
+
+    private static (string Title, string Anchor)[] Links(SettingsPage page, params string[] anchors) =>
+        [.. anchors.Select(a => (Find(page, a)!.Title, a))];
 
     private static int IndexOf(IReadOnlyList<SettingsPage> list, SettingsPage p)
     {

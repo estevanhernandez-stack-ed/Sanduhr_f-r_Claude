@@ -45,6 +45,21 @@ public static class SettingsSidebar
     public static void SetGroupHeader(DependencyObject d, string? value) => d.SetValue(GroupHeaderProperty, value);
 }
 
+/// <summary>
+/// A link to a Settings place on a button anywhere in the Settings window, page controls in their own files included:
+/// <c>views:SettingsLinkTo.Link="desk#pieces"</c>. The window opens it when the button is clicked (<c>SettingsWindow</c>
+/// listens for every Click), reading the text with <c>SettingsIndex.ParseLink</c>, so aliases and unknown anchors land as any
+/// link does.
+/// </summary>
+public static class SettingsLinkTo
+{
+    public static readonly DependencyProperty LinkProperty = DependencyProperty.RegisterAttached(
+        "Link", typeof(string), typeof(SettingsLinkTo), new PropertyMetadata(null));
+
+    public static string? GetLink(DependencyObject d) => (string?)d.GetValue(LinkProperty);
+    public static void SetLink(DependencyObject d, string? value) => d.SetValue(LinkProperty, value);
+}
+
 /// <summary>A rounded accent outline around a section search or a link just opened, for 1.5 s.</summary>
 internal sealed class AnchorHighlightAdorner : Adorner
 {

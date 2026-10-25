@@ -30,6 +30,17 @@ public abstract class AppWindowFixture : IDisposable
     protected readonly string Root = Path.Combine(Path.GetTempPath(), "sanduhr-names-" + Guid.NewGuid().ToString("N")[..10]);
     private readonly string? _oldDev = Environment.GetEnvironmentVariable("SANDUHR_DEV_PROFILE");
 
+    private readonly Sanduhr.App.Desk.NowPlayingHub? _oldHub = Sanduhr.App.Desk.NowPlayingHub.Current;
+    private readonly Sanduhr.App.Desk.NowPlayingLookService? _oldLooks = Sanduhr.App.Desk.NowPlayingLookService.Current;
+
+    /// <summary>Settings reads the app's one Now playing hub and look service, which follow the PC's live media session.
+    /// A test never has them: this clears both, so a hub left by another test (or a player on the PC) cannot reach a window.</summary>
+    protected static void NoLiveMedia()
+    {
+        Sanduhr.App.Desk.NowPlayingHub.Current = null;
+        Sanduhr.App.Desk.NowPlayingLookService.Current = null;
+    }
+
     protected string Profile => Path.Combine(Root, "profile");
 
     protected AppWindowFixture()
@@ -42,6 +53,7 @@ public abstract class AppWindowFixture : IDisposable
         ModsConfigViewModel.ForgetSessionChoice();
         // Settings ▸ Widgets fetches the catalog when it opens: never the real network from a test.
         WidgetCatalogService.HandlerOverride = () => new OfflineHandler();
+        NoLiveMedia();
     }
 
     /// <summary>A network that is never there: every request fails as if the PC were offline.</summary>
@@ -57,6 +69,8 @@ public abstract class AppWindowFixture : IDisposable
         ClaudeCodeProfile.ProfileOverride = null;
         ClaudeCodeProfile.ConfigDirOverride = null;
         WidgetCatalogService.HandlerOverride = null;
+        Sanduhr.App.Desk.NowPlayingHub.Current = _oldHub;
+        Sanduhr.App.Desk.NowPlayingLookService.Current = _oldLooks;
         ClaudeCodeViewModel.ForgetSessionChoice();
         ModsConfigViewModel.ForgetSessionChoice();
         try { Directory.Delete(Root, true); } catch (IOException) { }
@@ -65,6 +79,7 @@ public abstract class AppWindowFixture : IDisposable
     /// <summary>A widget in demo mode: sample accounts and sample meters.</summary>
     protected static WidgetViewModel DemoWidget()
     {
+        NoLiveMedia();
         var widget = new WidgetViewModel();
         widget.StartDemo();
         return widget;
@@ -88,6 +103,7 @@ public abstract class AppWindowFixture : IDisposable
     /// <paramref name="labels"/>, the first of them active.</summary>
     protected (WidgetViewModel Widget, Sanduhr.Core.AccountStore Accounts) ScratchWidget(params string[] labels)
     {
+        NoLiveMedia();
         var accounts = new Sanduhr.Core.AccountStore(new MemoryCredentials());
         foreach (var label in labels)
             accounts.AddAccount(label, "placeholder-" + label);

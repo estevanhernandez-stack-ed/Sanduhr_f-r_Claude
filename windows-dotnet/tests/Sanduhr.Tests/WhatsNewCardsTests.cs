@@ -41,8 +41,8 @@ public class WhatsNewCardsTests
     }
 
     [Fact]
-    public void Release390_ShowMeOpensTheDeskPage() =>
-        Assert.Equal(SettingsPage.Desk, Table.Single(c => c.Id == "ci-runners").Destination);
+    public void Release390_ShowMeOpensTheWatchersPage() =>
+        Assert.Equal(SettingsPage.Watchers, Table.Single(c => c.Id == "ci-runners").Destination);
 
     [Fact]
     public void Release390_CardNamesTheSwitchByItsSettingsName() =>

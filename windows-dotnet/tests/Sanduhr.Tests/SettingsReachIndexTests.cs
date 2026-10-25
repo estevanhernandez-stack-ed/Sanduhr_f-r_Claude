@@ -57,9 +57,9 @@ public class SettingsReachIndexTests
     }
 
     [Fact]
-    public void A_row_naming_a_page_this_build_lacks_changes_nothing()
+    public void An_alias_whose_target_anchor_is_missing_keeps_the_place()
     {
-        // Desk's Look moves to Desk Look in slice 3; until that page exists the old link stays put.
+        // Desk Look exists; without its `look` section the old link stays put.
         var withoutLook = SettingsIndex.Anchors.Where(e => e.Anchor != SettingsIndex.DeskLook).ToList();
         Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskLook),
             SettingsIndex.Resolve(SettingsPage.Desk, SettingsIndex.DeskLook, withoutLook, SettingsNames.Pages));
@@ -108,11 +108,14 @@ public class SettingsReachIndexTests
     }
 
     [Fact]
-    public void Boosts_change_no_search_today()
+    public void A_boost_ranks_first_only_once_its_section_is_live()
     {
         foreach (var boost in SettingsIndex.Boosts)
+        {
+            bool live = SettingsIndex.PageFromId(boost.PageId) is { } page && SettingsIndex.Find(page, boost.Anchor) is not null;
             foreach (var q in boost.Queries)
-                Assert.DoesNotContain(SettingsIndex.Search(q), h => h.Rank < 0);
+                Assert.True(live == SettingsIndex.Search(q).Any(h => h.Rank < 0), $"\"{q}\" (live: {live})");
+        }
     }
 
     [Fact]
@@ -154,7 +157,8 @@ public class SettingsReachIndexTests
     {
         var margins = new SettingsEntry("Margins", SettingsPage.Desk, SettingsIndex.DeskMargins, ["edge"], CollapsedIn: "Advanced");
         Assert.Equal("Advanced", SettingsIndex.Search("edge", [margins]).Single().Entry.CollapsedIn);
-        // Nothing is collapsed until slice 3 folds Designs and Advanced.
-        Assert.All(SettingsIndex.All, e => Assert.Null(e.CollapsedIn));
+        // Slice 3 folds Designs and Advanced on the Desk page; nothing else is collapsed.
+        Assert.All(SettingsIndex.All.Where(e => e.CollapsedIn is not null), e => Assert.Equal(SettingsPage.Desk, e.Page));
+        Assert.Contains(SettingsIndex.All, e => e.CollapsedIn == SettingsNames.DeskAdvanced);
     }
 }

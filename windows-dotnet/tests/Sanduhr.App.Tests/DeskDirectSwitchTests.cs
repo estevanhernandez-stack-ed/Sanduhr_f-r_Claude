@@ -47,7 +47,7 @@ public sealed class DeskDirectSwitchTests : IDisposable
     public void TheSwitchIsSearchableByWhatAPersonWouldTypeAndSitsOnTheDeskPage()
     {
         foreach (var query in new[] { "let Claude change the Desk directly", "propose_desk", "agents" })
-            Assert.Contains(SettingsIndex.Search(query), h => h.Entry.Page == SettingsPage.Desk && h.Entry.Anchor == SettingsIndex.DeskDirect);
+            Assert.Contains(SettingsIndex.Search(query), h => h.Entry.Page == SettingsPage.Desk && h.Entry.Anchor == SettingsIndex.DeskDesigns);
         Assert.Equal(SettingsPage.Desk, SettingsNames.Table.Single(t => t.Name == SettingsNames.DeskDirectSwitch).Page);
     }
 }

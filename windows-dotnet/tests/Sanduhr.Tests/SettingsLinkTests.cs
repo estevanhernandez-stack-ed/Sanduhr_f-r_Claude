@@ -22,7 +22,7 @@ public class SettingsLinkTests
         Assert.Null(SettingsIndex.PageFromId("desk look"));
         Assert.Null(SettingsIndex.PageFromId(""));
         Assert.Null(SettingsIndex.PageFromId(null));
-        Assert.Null(SettingsIndex.PageFromId("desklook")); // slice 3's page: unknown until then
+        Assert.Equal(SettingsPage.DeskLook, SettingsIndex.PageFromId("desklook")); // a page since slice 3
     }
 
     [Theory]
@@ -63,23 +63,29 @@ public class SettingsLinkTests
         var pages = SettingsNames.Pages.Where(p => p != SettingsPage.Widgets).ToList();
         Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskPieces),
             SettingsIndex.Check(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion, SettingsIndex.Anchors, pages));
-        // With it, the place is live and stays.
-        Assert.Equal(new SettingsLink(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion),
+        // With it too, now that the companion left Widgets (slice 3): the old section is gone from the page, so the alias carries it.
+        Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskPieces),
             SettingsIndex.Check(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion));
-        // An alias whose target page isn't there yet does nothing: the place is kept (Desk's Launcher until slice 3).
-        Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskLauncher),
+        // Desk's Launcher became a page in slice 3: the old section lands at the page's place line.
+        Assert.Equal(new SettingsLink(SettingsPage.Launcher, SettingsIndex.LauncherPlace),
             SettingsIndex.Check(SettingsPage.Desk, SettingsIndex.DeskLauncher));
+        // An alias whose target isn't there yet does nothing: Claude Code's meters wait for Mods & Widgets (slice 4), so a build
+        // without the old section sends the link to the page's top.
+        var withoutMeters = SettingsIndex.Anchors.Where(e => !(e.Page == SettingsPage.ClaudeCode && e.Anchor == SettingsIndex.Meters)).ToList();
+        Assert.Equal(new SettingsLink(SettingsPage.ClaudeCode, null),
+            SettingsIndex.Check(SettingsPage.ClaudeCode, SettingsIndex.Meters, withoutMeters, SettingsNames.Pages));
     }
 
-    [Fact]
-    public void A_link_is_checked_by_the_same_rule_as_Check()
-    {
-        foreach (var text in new[] { "desk#pieces", "desk#nowhere", "desk", "history#chart", "desk#desk-launcher" })
-        {
-            var parsed = SettingsIndex.ParseLink(text)!;
-            Assert.Equal(parsed, SettingsIndex.Check(parsed.Page, parsed.Anchor));
-        }
-    }
+    [Theory]
+    [InlineData("desk#pieces", SettingsPage.Desk, "pieces")]
+    [InlineData("desk#nowhere", SettingsPage.Desk, null)]
+    [InlineData("desk", SettingsPage.Desk, null)]
+    [InlineData("history#chart", SettingsPage.History, "chart")]            // History is a page until slice 5
+    [InlineData("desk#desk-launcher", SettingsPage.Launcher, "launcher")]   // an alias live since slice 3
+    [InlineData("deskmessage#message-look", SettingsPage.DeskLook, "sizes")]
+    [InlineData("DESKLOOK#INK", SettingsPage.DeskLook, "ink")]
+    public void A_link_lands_where_the_rule_says(string text, SettingsPage page, string? anchor) =>
+        Assert.Equal(new SettingsLink(page, anchor), SettingsIndex.ParseLink(text));
 
     [Theory]
     [InlineData(new[] { "--settings", "desk#pieces" }, "desk#pieces")]
@@ -108,6 +114,7 @@ public class SettingsLinkTests
     [InlineData(SettingsPage.Alerts, SettingsIndex.Notifications)]
     [InlineData(SettingsPage.Desk, SettingsIndex.DeskPieces)]
     [InlineData(SettingsPage.DeskMessage, SettingsIndex.MessageLines)]
+    [InlineData(SettingsPage.Launcher, SettingsIndex.LauncherButtons)]
     public void Menu_links_land_on_their_section(SettingsPage page, string anchor)
     {
         Assert.Equal(anchor, SettingsIndex.MenuAnchor(page));

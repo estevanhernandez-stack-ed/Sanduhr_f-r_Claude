@@ -79,4 +79,29 @@ public sealed class DeskInkPackPresetsTests : IDisposable
         Assert.Equal("ff2a6d,05d9e8", page.InkColors);
         Assert.Equal("ff2a6d,05d9e8", _store.LoadDeskInk().Color);
     }
+
+    [Fact]
+    public void A_typed_hex_switches_Light_or_Dark_to_Custom()
+    {
+        var page = Page();
+        page.InkChoice = DeskSettingsViewModel.InkChoices.First(c => c.Mode == DeskInkMode.Dark);
+        page.InkColors = "ff8800";
+        Assert.Equal(DeskInkMode.Custom, page.InkChoice.Mode);
+        Assert.True(page.IsCustomInk);
+        Assert.Equal(DeskInkMode.Custom, _store.LoadDeskInk().Mode);
+        Assert.Equal("ff8800", _store.LoadDeskInk().Color);
+    }
+
+    [Fact]
+    public void The_presets_show_whenever_the_ink_is_not_Automatic_and_a_preset_sets_Custom()
+    {
+        var page = Page();
+        Assert.False(page.ShowsInkColors);                    // Automatic
+        page.InkChoice = DeskSettingsViewModel.InkChoices.First(c => c.Mode == DeskInkMode.Light);
+        Assert.True(page.ShowsInkColors);
+        page.InkPreset = "Sky";
+        Assert.Equal(DeskInkMode.Custom, page.InkChoice.Mode);
+        Assert.Equal(DeskInkMode.Custom, _store.LoadDeskInk().Mode);
+        Assert.Equal("9ad7ff", _store.LoadDeskInk().Color);
+    }
 }

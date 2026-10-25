@@ -30,6 +30,8 @@ public class SettingsEntryPointScanTests
         Assert.Contains("SettingsIndex.MenuAnchor(page)", app);
         Assert.Contains("SettingsIndex.MenuAnchor(SettingsPage.Desk)", app);
         Assert.Contains("SettingsIndex.MenuAnchor(SettingsPage.DeskMessage)", app);
+        Assert.Contains("SettingsIndex.MenuAnchor(SettingsPage.Launcher)", app);
+        Assert.DoesNotContain("SettingsIndex.DeskLauncher", app);
     }
 
     [Fact]

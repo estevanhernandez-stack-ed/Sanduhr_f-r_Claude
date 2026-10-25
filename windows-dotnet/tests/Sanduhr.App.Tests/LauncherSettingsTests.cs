@@ -171,7 +171,7 @@ public sealed class LauncherSettingsTests : IDisposable
             vm.Add(App("A"), "refused");
             Assert.Equal(1, placedCalls);
             Assert.True(vm.HasPlacementNote);
-            Assert.Equal("Placed at bottom right. Move it under Where each piece sits.", vm.PlacementNote);
+            Assert.Equal("Placed at bottom right. Move it in Settings, Desk, Pieces.", vm.PlacementNote);
 
             vm.Add(LauncherButton.Create(LauncherKind.Link, "https://example.com")!, "refused");   // the second button places nothing
             Assert.Equal(1, placedCalls);
@@ -195,11 +195,11 @@ public sealed class LauncherSettingsTests : IDisposable
     }
 
     [Fact]
-    public void TheDeskSettingsPicksTheFirstFreeCornerAndSavesIt()
+    public void TheDeskSettingsPlacesTheLauncherAtItsDefaultPlaceAndSavesIt()
     {
-        var desk = new DeskSettingsViewModel(_store, []);
-        Assert.Equal("bottom right", desk.PlaceLauncherIfHidden());   // the standard layout fills bottom left
-        Assert.Equal(DeskAnchor.BR, new DeskArrangement(_store.LoadDesk().Layout).Placement("launcher")!.Anchor);
+        var desk = new DeskSettingsViewModel(_store, [], () => []);
+        Assert.Equal("top left", desk.PlaceLauncherIfHidden());       // DeskArrangement.DefaultPlaceFor("launcher")
+        Assert.Equal(DeskAnchor.TL, new DeskArrangement(_store.LoadDesk().Layout).Placement("launcher")!.Anchor);
         Assert.Null(desk.PlaceLauncherIfHidden());                    // already placed: nothing moves
     }
 
@@ -221,12 +221,10 @@ public sealed class LauncherSettingsTests : IDisposable
     }
 
     [Fact]
-    public void ThePlacementNoteShowsOnlyWhileTheButtonsHaveNoPlace()
+    public void AHiddenLauncherIsSaidByThePagesStatusLineNotANote()
     {
-        Assert.False(Open(placed: false).HasPlacementNote);   // nothing to place yet
-        var hidden = Open(new LauncherModel(LauncherOrientation.Row, [App("A")]), placed: false);
-        Assert.True(hidden.HasPlacementNote);
-        Assert.Contains("Where each piece sits", hidden.PlacementNote);
+        Assert.False(Open(placed: false).HasPlacementNote);
+        Assert.False(Open(new LauncherModel(LauncherOrientation.Row, [App("A")]), placed: false).HasPlacementNote);
         Assert.False(Open(new LauncherModel(LauncherOrientation.Row, [App("A")]), placed: true).HasPlacementNote);
     }
 

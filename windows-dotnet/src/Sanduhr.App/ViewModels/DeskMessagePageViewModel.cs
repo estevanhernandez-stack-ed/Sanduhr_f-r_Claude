@@ -433,6 +433,7 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
     public void Activate()
     {
         _active = true;
+        Flush();   // a size drag still inside its settle window would be overwritten by the old value
         _settings = _store.LoadDeskMessage();
         _customColorText = null;
         RaiseSettings();
@@ -446,6 +447,18 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
             CheckDisk();
         }
         RaiseSuggestion();
+    }
+
+    /// <summary>
+    /// Desk Look shows the message's size, color, glow and font without the rest of the page: it reads the saved settings
+    /// again (a design switch or a proposal may have changed them) so its controls are fresh and an edit keeps the other fields.
+    /// </summary>
+    public void RefreshSettings()
+    {
+        Flush();   // a size drag still inside its settle window would be overwritten by the old value
+        _settings = _store.LoadDeskMessage();
+        _customColorText = null;
+        RaiseSettings();
     }
 
     private void CheckDisk()
@@ -536,6 +549,9 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
 
     // The bar: Add line, view switch, Save, Revert
 
+    /// <summary>The Message piece's line at the page top (set by <see cref="SettingsViewModel"/>).</summary>
+    public DeskPieceStatusViewModel? Piece { get; internal set; }
+
     [RelayCommand]
     private void AddLine()
     {
@@ -543,6 +559,8 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
         _focusNext = _editor.JustAdded;
         Rebuild();
         OnPropertyChanged(nameof(EditorText));
+        // Writing a line is turning the message on: a hidden piece is shown (Principle 4).
+        Piece?.PlaceIfHidden();
     }
 
     [RelayCommand]

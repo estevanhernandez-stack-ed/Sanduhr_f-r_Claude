@@ -28,21 +28,21 @@ public static class SettingsNames
         new("Usage", [SettingsPage.History, SettingsPage.ClaudeUsage, SettingsPage.Publish]),
         new("Extend", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Themes]),
-        new("Desktop", [SettingsPage.Desk, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather, SettingsPage.Widgets]),
+        new("Desktop", [SettingsPage.Desk, SettingsPage.DeskLook, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather,
+            SettingsPage.Watchers, SettingsPage.Launcher, SettingsPage.Widgets]),
         new("Help", [SettingsPage.About]),
     ];
 
-    // ---- Page titles still to come (Settings v2). Unused until their slice adds the page: Privacy
-    // (slice 6), Desk Look, Watchers and Launcher (slice 3), Mods & Widgets (slice 4, the Mods page's new title).
+    // ---- Page titles added by Settings v2. Desk Look, Watchers and Launcher are pages since slice 3; Privacy (slice 6) and
+    // Mods & Widgets (slice 4, the Mods page's new title) are still to come.
     public const string PrivacyTitle = "Privacy";
     public const string DeskLookTitle = "Desk Look";
     public const string WatchersTitle = "Watchers";
     public const string LauncherTitle = "Launcher";
     public const string ModsAndWidgetsTitle = "Mods & Widgets";
 
-    /// <summary>The titles above, in sidebar order of their future pages.</summary>
-    public static IReadOnlyList<string> TitlesToCome { get; } =
-        [PrivacyTitle, DeskLookTitle, WatchersTitle, LauncherTitle, ModsAndWidgetsTitle];
+    /// <summary>The titles of pages still to come, in sidebar order.</summary>
+    public static IReadOnlyList<string> TitlesToCome { get; } = [PrivacyTitle, ModsAndWidgetsTitle];
 
     /// <summary>Every page in sidebar order.</summary>
     public static IReadOnlyList<SettingsPage> Pages { get; } = [.. Sidebar.SelectMany(g => g.Pages)];
@@ -63,6 +63,9 @@ public static class SettingsNames
         SettingsPage.DeskMessage => "Message",
         SettingsPage.NowPlaying => "Now playing",
         SettingsPage.Weather => "Weather",
+        SettingsPage.DeskLook => DeskLookTitle,
+        SettingsPage.Watchers => WatchersTitle,
+        SettingsPage.Launcher => LauncherTitle,
         SettingsPage.Widgets => "Widgets",
         SettingsPage.About => "About",
         SettingsPage.Widget => "Widget",
@@ -221,11 +224,11 @@ public static class SettingsNames
     public const string DeskWatchers = "Watchers";
     /// <summary>Desk, Where each piece sits: the Launcher, buttons that open apps and links from the desktop.</summary>
     public const string DeskLauncher = "Launcher";
-    /// <summary>Desk, Where each piece sits: the companion, the sprite chosen in Settings, Widgets (spec 3.8 section 4).</summary>
+    /// <summary>Desk, Where each piece sits: the companion, whose sprite is chosen in its own row.</summary>
     public const string DeskCompanion = "Companion";
-    /// <summary>Desk, Launcher: opens the app picker.</summary>
+    /// <summary>Launcher, Buttons: opens the app picker.</summary>
     public const string LauncherAddApp = "Add app…";
-    /// <summary>Desk, Launcher: asks for an https link and a label.</summary>
+    /// <summary>Launcher, Buttons: asks for an https link and a label.</summary>
     public const string LauncherAddLink = "Add link…";
     /// <summary>Desk: lets Claude put watchers up through the MCP server (settings.json "watchers_agents", off by default).
     /// "Claude" means any agent using Sanduhr's MCP server, the one word every agent consent uses (WF10).</summary>
@@ -244,7 +247,7 @@ public static class SettingsNames
     public const string DeskPieceClicksSwitch = DeskPieceClicks.Title;
     /// <summary>Desk: burn-in care for OLED screens (settings.json "desk_oled_care", off by default).</summary>
     public const string OledCareSwitch = OledCare.Title;
-    /// <summary>Desk, Look: a soft plate behind each piece.</summary>
+    /// <summary>Desk Look, Back plate: a soft plate behind each piece.</summary>
     public const string DeskPlateSwitch = DeskPlate.Title;
     /// <summary>The name a Desk piece goes by on the layout map and in Arrange mode; an unknown piece goes by its key.</summary>
     public static string DeskPieceName(string widget) => widget switch
@@ -262,16 +265,28 @@ public static class SettingsNames
         "companion" => DeskCompanion,
         _ => widget,
     };
-    /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7). The section's name.</summary>
-    public const string DeskInk = "Ink";
-    /// <summary>Desk, Ink: the picker's label and spoken name (it was spoken "Ink", WF34).</summary>
+
+    /// <summary>The page a Desk piece's own settings live on (Desk, Pieces' "&lt;Page&gt; settings…"); null for a piece that has
+    /// none (the clock, the Claude meters, System, and the companion, whose controls sit in its row).</summary>
+    public static SettingsPage? DeskPiecePage(string widget) => widget switch
+    {
+        "message" => SettingsPage.DeskMessage,
+        "nowPlaying" => SettingsPage.NowPlaying,
+        "weather" => SettingsPage.Weather,
+        "watchers" => SettingsPage.Watchers,
+        "launcher" => SettingsPage.Launcher,
+        "glow" => SettingsPage.ClaudeCode,
+        _ => null,
+    };
+    /// <summary>Desk Look, Ink and color: the ink picker's label and spoken name (it was spoken "Ink", WF34).</summary>
     public const string DeskInkPicker = "Clock, date, Claude";
-    /// <summary>Desk, Look: the Desk's font, one of the two "Font"s (WF12).</summary>
+    /// <summary>Desk Look, Fonts: the Desk's font, one of the two "Font"s (WF12).</summary>
     public const string DeskFont = "Desk font";
-    /// <summary>Message, Look: the message's font and color.</summary>
+    /// <summary>Desk Look, Fonts: the message's font. <see cref="MessageColor"/> sits under Ink and color.</summary>
     public const string MessageFont = "Message font";
+    /// <summary>Desk Look, Ink and color: the message's color.</summary>
     public const string MessageColor = "Message color";
-    /// <summary>Alerts: the Desk's sign-in reminder switch (settings.json "desk_sign_in_reminder", on by default).</summary>
+    /// <summary>Desk, Behavior: the Desk's sign-in reminder switch (settings.json "desk_sign_in_reminder", on by default; WF32).</summary>
     public const string SignInReminders = SignInReminder.Title;
     /// <summary>The first-run card's third action (settings.json "just_the_desk"); it has no Settings control.</summary>
     public const string JustTheDeskButton = JustTheDesk.ButtonTitle;
@@ -305,12 +320,74 @@ public static class SettingsNames
     public const string WidgetMadeHere = "made here";
     /// <summary>Widgets: an installed sprite made here takes the user's own PNG sheets, one per stage (spec 3.8, section 6).</summary>
     public const string WidgetUseOwnArt = "Use my own art…";
-    /// <summary>Widgets, Desk companion (spec 3.8 section 4): the installed sprite that is the companion (one at a time).</summary>
+    /// <summary>Desk, Pieces, the Companion row: the installed sprite that is the companion (one at a time).</summary>
     public const string WidgetCompanionPick = "Companion sprite";
-    /// <summary>Widgets, Desk companion: places or hides the Desk's companion piece.</summary>
-    public const string WidgetCompanionShow = "Show the companion on the Desk";
-    /// <summary>Widgets, Desk companion: it walks the screen's edges (never with Windows' animations off).</summary>
+    /// <summary>Desk, Pieces, the Companion row: it walks the screen's edges (never with Windows' animations off).</summary>
     public const string WidgetCompanionRoam = "Let it roam";
+
+    // ---- Settings v2, slice 3: the Desk split ----
+
+    /// <summary>A page's row of jump links, spoken (spec, Keyboard and screen reader).</summary>
+    public const string JumpLinksName = "Sections on this page";
+    /// <summary>Now playing's first jump link (its section is "Show what's playing in the widget").</summary>
+    public const string NowPlayingJumpWidget = "In the widget";
+
+    /// <summary>Desk: the piece rows' section (was "Where each piece sits").</summary>
+    public const string PiecesSection = "Pieces";
+    /// <summary>Desk: the clicks switch and the sign-in reminders.</summary>
+    public const string DeskBehavior = "Behavior";
+    /// <summary>Desk: the collapsed section holding Margins and OLED care.</summary>
+    public const string DeskAdvanced = "Advanced";
+    /// <summary>Desk: the map at the top of the page, and its fold's name below 600 DIP.</summary>
+    public const string DeskLayoutMap = "Layout map";
+    /// <summary>Desk, Layout map: it is a picture, not a control (WF5).</summary>
+    public const string DeskMapCaption = "Where each piece sits now. Move pieces with the rows below or Arrange Desk…";
+    /// <summary>Desk, Pieces: Order (WF5), live when another piece shares the place.</summary>
+    public const string MoveUp = "Move up";
+    public const string MoveDown = "Move down";
+    /// <summary>An Order button spoken: "Move Weather up in bottom left".</summary>
+    public static string MoveUpIn(string piece, string place) => $"Move {piece} up in {place.ToLowerInvariant()}";
+    public static string MoveDownIn(string piece, string place) => $"Move {piece} down in {place.ToLowerInvariant()}";
+    /// <summary>A row's Show box spoken: its visible label is the piece's name.</summary>
+    public static string PieceShownSpoken(string piece) => $"{piece}, on the Desk";
+    /// <summary>A feature page's button when its piece is hidden (Principle 1); it places the piece where Desk, Pieces would.</summary>
+    public const string PlaceOnDesk = "Place it on the Desk";
+    public const string NotOnDesk = "Not on the Desk.";
+    /// <summary>Added to a placed piece's line while the Desk itself is off.</summary>
+    public const string DeskIsOff = "The Desk is off: turn it on in Settings, Desk.";
+    /// <summary>A feature page's line about its piece: "On the Desk: bottom right." or "Not on the Desk."</summary>
+    public static string PieceStatus(string? place, bool deskOn) =>
+        place is null ? NotOnDesk : $"On the Desk: {place.ToLowerInvariant()}." + (deskOn ? "" : " " + DeskIsOff);
+    /// <summary>Desk Look's sections (spec, Desk Look).</summary>
+    public const string FontsSection = "Fonts";
+    public const string SizesSection = "Sizes";
+    public const string InkAndColor = "Ink and color";
+    public const string BackPlate = "Back plate";
+    /// <summary>Desk Look's controls whose labels were literals.</summary>
+    public const string ClockSize = "Clock size";
+    public const string MessageSize = "Message size";
+    public const string GlowAroundMessage = "Glow around the message";
+    public const string DropShadow = "Drop shadow under the text";
+    /// <summary>Watchers and Launcher: the section that holds the piece's status line.</summary>
+    public const string WatchersPlace = "Where they show";
+    public const string LauncherPlace = "Where it shows";
+    /// <summary>Launcher: the buttons, their pictures, Add app… and Add link….</summary>
+    public const string LauncherButtons = "Buttons";
+    /// <summary>Watchers: under "Show my CI runners' jobs" (WF8).</summary>
+    public const string CiRunnersCaption = "Independent of the switch above.";
+    /// <summary>The Watchers page's first line, and the Companion row's (WF21).</summary>
+    public const string WatchersLine = "Watchers are " + DefineWatchers + ".";
+    public const string CompanionLine = "The companion is " + DefineCompanion + ".";
+    /// <summary>Desk, Pieces, the Companion row with no sprite installed. The link names the page that holds the catalog today.</summary>
+    public const string NoCompanionYet = "No companion yet.";
+    public static string GetACompanion => $"Get one in {PageTitle(SettingsPage.Widgets)}…";
+    /// <summary>Desk, Designs: the collapsed section's one-line summary.</summary>
+    public static string DesignsSummary(int saved, bool canPutBack) =>
+        saved == 0 ? "None saved yet." : $"{saved} saved." + (canPutBack ? " " + PutMyDeskBack + " is ready." : "");
+    /// <summary>The sidebar's Quit asks first (WF33): the question and its two buttons.</summary>
+    public const string QuitQuestion = "Quit Sanduhr? The widget and the Desk close.";
+    public const string QuitConfirm = "Quit";
+    public const string QuitCancel = "Cancel";
 
     // ---- Core words (WF21): each is defined once, used as its home page's first line and in the tour.
     public const string DefineDesk = "the clock, meters and pieces Sanduhr draws on your desktop";
@@ -361,12 +438,12 @@ public static class SettingsNames
         (AddFolder, SettingsPage.ClaudeCode),
         (FollowAccount, SettingsPage.Accounts),
         (DeskSwitch, SettingsPage.Desk),
-        (DeskInk, SettingsPage.Desk),
+        (DeskInkPicker, SettingsPage.DeskLook),
         (ArrangeDesk, SettingsPage.Desk),
         (DeskPieceClicksSwitch, SettingsPage.Desk),
-        (DeskPlateSwitch, SettingsPage.Desk),
-        (WatchersSwitch, SettingsPage.Desk),
-        (CiRunnersSwitch, SettingsPage.Desk),
+        (DeskPlateSwitch, SettingsPage.DeskLook),
+        (WatchersSwitch, SettingsPage.Watchers),
+        (CiRunnersSwitch, SettingsPage.Watchers),
         (DeskDirectSwitch, SettingsPage.Desk),
         (OledCareSwitch, SettingsPage.Desk),
         (PutMyDeskBack, SettingsPage.Desk),
@@ -377,12 +454,12 @@ public static class SettingsNames
         (TranscriptsKept, SettingsPage.Mods),
         (LetClaudeReadTotals, SettingsPage.ClaudeCode),
         (SnakeSoundAtFull, SettingsPage.Alerts),
-        (DeskFont, SettingsPage.Desk),
-        (MessageFont, SettingsPage.DeskMessage),
-        (MessageColor, SettingsPage.DeskMessage),
-        (LauncherAddApp, SettingsPage.Desk),
-        (LauncherAddLink, SettingsPage.Desk),
-        (SignInReminders, SettingsPage.Alerts),
+        (DeskFont, SettingsPage.DeskLook),
+        (MessageFont, SettingsPage.DeskLook),
+        (MessageColor, SettingsPage.DeskLook),
+        (LauncherAddApp, SettingsPage.Launcher),
+        (LauncherAddLink, SettingsPage.Launcher),
+        (SignInReminders, SettingsPage.Desk),
         (NowPlayingInWidget, SettingsPage.NowPlaying),
         (NowPlayingStyle, SettingsPage.NowPlaying),
         (NowPlayingLooksDirect, SettingsPage.NowPlaying),
@@ -392,8 +469,8 @@ public static class SettingsNames
         (NowPlayingBarsGradient, SettingsPage.NowPlaying),
         (GlowWhere, SettingsPage.ClaudeCode),
         (WidgetCatalogCheck, SettingsPage.Widgets),
-        (WidgetCompanionShow, SettingsPage.Widgets),
-        (WidgetCompanionRoam, SettingsPage.Widgets),
+        (WidgetCompanionPick, SettingsPage.Desk),
+        (WidgetCompanionRoam, SettingsPage.Desk),
     ];
 
     /// <summary>
@@ -404,11 +481,13 @@ public static class SettingsNames
     public static IReadOnlyList<(string Old, string Now, bool Whole)> Retired { get; } =
     [
         ("Take the Tour", TakeTheTour, false),
+        ("Show the companion on the Desk", DeskCompanion, false),
         ("Tray Shows", TrayShows, false),
         ("End Demo Mode", EndDemoMode, false),
         ("Sign In", SignIn, true),
         ("Add account", AddAccount, true),
         ("Manage accounts…", LinkTitle(SettingsPage.Accounts), false),
+        ("Edit buttons…", LinkTitle(SettingsPage.Launcher), false),
         ("Alerts Settings…", LinkTitle(SettingsPage.Alerts), false),
         ("Save and apply", SaveAndApply, false),
         ("Save & Apply", SaveAndApply, false),
@@ -445,6 +524,7 @@ public static class SettingsNames
         ("Pin on top", KeepWidgetOnTop, false),
         ("Pin always on top", KeepWidgetOnTop, false),
         ("Don't show after updates", HideWhatsNewAfterUpdates, false),
+        ("Where each piece sits", PiecesSection, true),
     ];
 
     /// <summary>The retired names <paramref name="text"/> still uses, empty when it uses none.</summary>

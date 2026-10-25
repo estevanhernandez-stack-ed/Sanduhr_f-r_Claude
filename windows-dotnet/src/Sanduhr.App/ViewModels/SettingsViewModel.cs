@@ -123,7 +123,7 @@ public sealed class SettingsViewModel
     public Action? QuitRequested { get; set; }
 
     /// <summary>What the sidebar's Quit asks first (spec, General). The tray's Quit stays immediate: using the tray is an explicit act.</summary>
-    public const string QuitQuestion = "Quit Sanduhr? The widget and the Desk close.";
+    public const string QuitQuestion = SettingsNames.QuitQuestion;
 
     /// <summary>Tests answer the Quit question here instead of showing it.</summary>
     internal Func<bool>? ConfirmQuitHook { get; set; }
@@ -137,7 +137,7 @@ public sealed class SettingsViewModel
         ? hook()
         : Sanduhr.App.Views.ThemedDialog.Show(_owner, SettingsNames.QuitSanduhr, QuitQuestion,
               System.Windows.MessageBoxButton.YesNo, Sanduhr.App.Views.ThemedDialogKind.Warning,
-              primaryLabel: "Quit", secondaryLabel: "Cancel") == System.Windows.MessageBoxResult.Yes;
+              primaryLabel: SettingsNames.QuitConfirm, secondaryLabel: SettingsNames.QuitCancel) == System.Windows.MessageBoxResult.Yes;
 
     /// <summary>Backs the General tab's Shortcuts section (global shortcut + recorder).</summary>
     public ShortcutsViewModel Shortcuts { get; }
@@ -164,6 +164,14 @@ public sealed class SettingsViewModel
             Sanduhr.App.Desk.DeskMessageHandoffService.Current?.Handoff);
         NowPlayingPage = new NowPlayingPageViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.NowPlayingHub.Current, Sanduhr.App.Desk.NowPlayingLookService.Current);
         WeatherPage = new WeatherPageViewModel(new SettingsStore(new Paths()));
+        // Each feature page says where its Desk piece sits and can place it (Settings v2, Principle 1): one line per piece,
+        // reading and writing the same desk_layout as Desk, Pieces.
+        MessagePage.Piece = Desk.PieceStatus("message");
+        NowPlayingPage.Piece = Desk.PieceStatus("nowPlaying");
+        WeatherPage.Piece = Desk.PieceStatus("weather");
+        // The glow's spot is placed by the Claude Code page through its own store: the Desk page reads it again (App replaces this
+        // with one that also reloads the running Desk).
+        ClaudeCodePage.DeskReload = Desk.Reload;
         // The two pages share one folder list and one set of installed pieces.
         ClaudeCodePage.FoldersChanged += Mods.ReloadFolders;
         ClaudeCodePage.PiecesChanged += Mods.Refresh;

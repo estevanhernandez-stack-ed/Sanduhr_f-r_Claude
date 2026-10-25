@@ -2,9 +2,14 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Sanduhr.App.ViewModels"
+             xmlns:views="clr-namespace:Sanduhr.App.Views"
+             xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
              Focusable="False">
-    <!-- Settings, Desk, Where each piece sits: each piece's place, size and monitor. Its own control so the names Narrator reads can be tested.
-         The Settings window supplies the ThemedComboBox style (found at run time) and the theme brushes. DataContext: the Desk page. -->
+    <!-- Settings, Desk, Pieces (spec, Desk: the split): one row per piece. Show is the piece's name; then Place, Size and Monitor,
+         and on a second line its Style (the meters) or the link to its own page; then Order, live when another piece shares the
+         place (WF5). Each row is two blocks in a WrapPanel, 490 + 230 DIP, so it is one line from 760 DIP of page width (720
+         inside the page's margins) and wraps to two below (WF26). The Settings window supplies the styles (found at run time)
+         and the theme brushes. DataContext: the Desk page. -->
     <UserControl.Resources>
         <DataTemplate x:Key="StylePicker">
             <ComboBox Width="138" Margin="0,6,0,0" HorizontalAlignment="Left" Style="{DynamicResource ThemedComboBox}"
@@ -14,11 +19,48 @@
                       AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, style'}"
                       AutomationProperties.HelpText="Bars, Slim (one line over a thin bar), Rings (small gauges in a row) or Ticks (ten cells, kind to OLED screens)" />
         </DataTemplate>
+        <BooleanToVisibilityConverter x:Key="BoolVis" />
+        <DataTemplate x:Key="CompanionExtras">
+            <StackPanel Margin="0,6,0,0" DataContext="{Binding Companion}">
+                <TextBlock Text="{Binding Line}" FontSize="11" TextWrapping="Wrap"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                <WrapPanel Margin="0,6,0,0" Visibility="{Binding HasCompanions, Converter={StaticResource BoolVis}}">
+                    <ComboBox Width="190" Style="{DynamicResource ThemedComboBox}" Margin="0,0,8,6"
+                              ItemsSource="{Binding Companions}" DisplayMemberPath="Name"
+                              SelectedItem="{Binding SelectedCompanion, Mode=TwoWay}"
+                              AutomationProperties.Name="{x:Static core:SettingsNames.WidgetCompanionPick}"
+                              AutomationProperties.HelpText="A sprite that lives on your Desk. It grows with the days you code, never with the usage you spend, and its mood follows your pace. It never dies; time away only pauses it." />
+                    <CheckBox Style="{DynamicResource ThemedCheckBox}" VerticalAlignment="Center" Margin="0,0,0,6"
+                              Content="{x:Static core:SettingsNames.WidgetCompanionRoam}"
+                              IsChecked="{Binding Roams, Mode=TwoWay}"
+                              AutomationProperties.Name="{x:Static core:SettingsNames.WidgetCompanionRoam}"
+                              AutomationProperties.HelpText="It walks the edges of its monitor. With Windows' animations off it stays put." />
+                </WrapPanel>
+                <TextBlock Text="{Binding Status}" FontSize="11" TextWrapping="Wrap"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                           AutomationProperties.Name="Companion status" AutomationProperties.LiveSetting="Polite"
+                           Visibility="{Binding HasCompanions, Converter={StaticResource BoolVis}}" />
+                <WrapPanel Visibility="{Binding HasCompanions, Converter={x:Static views:WidgetsPage.NotVisible}}">
+                    <TextBlock Text="{Binding NoneYet}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                    <Button Style="{DynamicResource SettingsLinkButton}" Content="{Binding GetOneTitle}"
+                            views:SettingsLinkTo.Link="{Binding GetOneLink}"
+                            AutomationProperties.Name="{Binding GetOneTitle}" />
+                </WrapPanel>
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="PageLink">
+            <Button Style="{DynamicResource SettingsLinkButton}" HorizontalAlignment="Left" Margin="0,6,0,0"
+                    Content="{Binding SettingsTitle}" views:SettingsLinkTo.Link="{Binding SettingsLink}"
+                    AutomationProperties.Name="{Binding SettingsTitle}" />
+        </DataTemplate>
     </UserControl.Resources>
-            <ItemsControl ItemsSource="{Binding Pieces}" Focusable="False">
+            <ItemsControl x:Name="PieceRows" ItemsSource="{Binding Pieces}" Focusable="False"
+                          AutomationProperties.Name="{x:Static core:SettingsNames.PiecesSection}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Grid Margin="0,0,0,8">
+                        <WrapPanel Tag="PieceRow" Margin="0,0,0,8">
+                        <Grid Width="490">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -31,8 +73,9 @@
                                 <ColumnDefinition Width="8" />
                                 <ColumnDefinition Width="146" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" VerticalAlignment="Center"
-                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" TextTrimming="CharacterEllipsis" />
+                            <CheckBox Grid.Column="0" Style="{DynamicResource ThemedCheckBox}" VerticalAlignment="Center" Margin="0,0,6,0"
+                                      Content="{Binding Name}" IsChecked="{Binding Shown, Mode=TwoWay}"
+                                      AutomationProperties.Name="{Binding ShownName}" />
                             <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
                                       ItemsSource="{x:Static vm:DeskSettingsViewModel.PlaceOptions}"
                                       SelectedItem="{Binding Place, Mode=TwoWay}"
@@ -53,8 +96,8 @@
                                       SelectedItem="{Binding Monitor, Mode=TwoWay}"
                                       IsEnabled="{Binding IsPlaced}"
                                       AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, monitor'}" />
-                            <!-- The meter style (#336), only on the Claude line, the Claude limits and telemetry: a second line under the
-                                 place. The picker is made only for those rows (not merely hidden), so a screen reader never meets it elsewhere. -->
+                            <!-- The second line: the meter style (#336) on the Claude line, the Claude limits and telemetry, or the link to the
+                                 piece's own page. Made only for those rows (not merely hidden), so a screen reader never meets it elsewhere. -->
                             <ContentControl Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="5" Focusable="False" IsTabStop="False">
                                 <ContentControl.Style>
                                     <Style TargetType="ContentControl">
@@ -63,11 +106,29 @@
                                                 <Setter Property="Content" Value="{Binding}" />
                                                 <Setter Property="ContentTemplate" Value="{StaticResource StylePicker}" />
                                             </DataTrigger>
+                                            <DataTrigger Binding="{Binding HasSettingsPage}" Value="True">
+                                                <Setter Property="Content" Value="{Binding}" />
+                                                <Setter Property="ContentTemplate" Value="{StaticResource PageLink}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsCompanion}" Value="True">
+                                                <Setter Property="Content" Value="{Binding}" />
+                                                <Setter Property="ContentTemplate" Value="{StaticResource CompanionExtras}" />
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </ContentControl.Style>
                             </ContentControl>
                         </Grid>
+                        <!-- Order (WF5): live when another piece shares the place. Spoken "Move <piece> up in <place>". -->
+                        <StackPanel Width="230" Orientation="Horizontal" VerticalAlignment="Top">
+                            <Button Style="{DynamicResource FlatButton}" Padding="8,4" Margin="8,0,4,0"
+                                    Content="{x:Static core:SettingsNames.MoveUp}" Command="{Binding MoveUpCommand}"
+                                    AutomationProperties.Name="{Binding MoveUpName}" />
+                            <Button Style="{DynamicResource FlatButton}" Padding="8,4" Margin="0"
+                                    Content="{x:Static core:SettingsNames.MoveDown}" Command="{Binding MoveDownCommand}"
+                                    AutomationProperties.Name="{Binding MoveDownName}" />
+                        </StackPanel>
+                        </WrapPanel>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>

@@ -28,6 +28,30 @@ public sealed class SettingsReachTests : AppWindowFixture
     private static TabItem TabOf(SettingsWindow window, SettingsPage page) =>
         ((TabControl)window.FindName("Tabs")).Items.OfType<TabItem>().Single(t => (string)t.Tag == page.ToString());
 
+    /// <summary>Layout, then the dispatcher's idle work, then layout again (a visibility flip queued by a binding lands on the
+    /// second pass), then the focus guard.</summary>
+    private static void Settle(SettingsWindow window, NoActivate guard)
+    {
+        window.UpdateLayout();
+        Pump();
+        window.UpdateLayout();
+        Pump();
+        guard.Check();
+    }
+
+    /// <summary>Where a focus-routing failure happened: the selected page and the focused element (type and name).</summary>
+    private static string Where(SettingsWindow window)
+    {
+        var tabs = (TabControl)window.FindName("Tabs");
+        var page = (tabs.SelectedItem as TabItem)?.Tag?.ToString() ?? "?";
+        return $"page [{page}], place {window.Place}, focused {Describe(Keyboard.FocusedElement)}";
+    }
+
+    private static string Describe(IInputElement? element) =>
+        element is null ? "nothing"
+            : element.GetType().Name + (element is FrameworkElement { Name.Length: > 0 } fe ? " '" + fe.Name + "'" : "")
+              + (element is ContentControl { Content: string text } ? " \"" + text + "\"" : "");
+
     /// <summary>Opens <paramref name="page"/> at <paramref name="anchor"/>, lets layout and the landing run, and returns the marked element.</summary>
     private static FrameworkElement Land(SettingsWindow window, NoActivate guard, SettingsPage page, string anchor)
     {
@@ -233,7 +257,7 @@ public sealed class SettingsReachTests : AppWindowFixture
                 }
                 Keyboard.Focus(first);
                 guard.Check();
-                Assert.True(ReferenceEquals(Keyboard.FocusedElement, first), $"keyboard focus could not be routed to [{item.Tag}]");
+                Assert.True(ReferenceEquals(Keyboard.FocusedElement, first), $"keyboard focus could not be routed to [{item.Tag}] ({Where(window)})");
                 IInputElement? at = first;
                 for (int step = 0; step < 400 && at is not null && Inside(at, host); step++)
                 {
@@ -243,9 +267,9 @@ public sealed class SettingsReachTests : AppWindowFixture
                     at = Keyboard.FocusedElement;
                 }
                 if (ReferenceEquals(at, quit))
-                    bad.Add($"[{item.Tag}] Tab from the page reached Quit");
+                    bad.Add($"[{item.Tag}] Tab from the page reached Quit ({Where(window)})");
                 else if (!ReferenceEquals(at, search))
-                    bad.Add($"[{item.Tag}] Tab from the page reached {at?.GetType().Name ?? "nothing"}, not the search box");
+                    bad.Add($"[{item.Tag}] Tab from the page reached {Describe(at)}, not the search box ({Where(window)})");
             }
         }
         finally { window.Close(); }
@@ -278,7 +302,6 @@ public sealed class SettingsReachTests : AppWindowFixture
             Assert.False(SettingsAnchor.Find(content, SettingsIndex.Thresholds)!.IsEnabled);
             Assert.False(SettingsAnchor.Find(content, SettingsIndex.Sound)!.IsEnabled);
             Assert.False(SettingsAnchor.Find(content, SettingsIndex.TestAlert)!.IsEnabled);
-            Assert.True(SettingsAnchor.Find(content, SettingsIndex.SignInReminders)!.IsEnabled);
             Assert.True(off.IsVisible);
             Assert.Equal(0.45, ((FrameworkElement)window.FindName("AlertsDependents")).Opacity, 2);
 
@@ -343,6 +366,24 @@ public sealed class SettingsReachTests : AppWindowFixture
         finally { window.Close(); }
     });
 
+    /// <summary>The Now playing apps list reads the app's one hub, whose service fills it from the PC's live media
+    /// session. A hub that outlives its test (or a media player on the PC) must never reach a test's Settings window.</summary>
+    [Fact]
+    public void A_live_media_hub_never_reaches_the_Settings_window() => AppHost.Run(() =>
+    {
+        var leaked = new Sanduhr.App.Desk.NowPlayingHub();
+        leaked.Service.SeenApps = ["Spotify.exe"];
+        Sanduhr.App.Desk.NowPlayingHub.Current = leaked;
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            Land(window, guard, SettingsPage.NowPlaying, SettingsIndex.NowPlayingApps);
+            Assert.Empty(svm.NowPlayingPage.Apps);
+            Assert.True(((FrameworkElement)window.FindName("NowPlayingAppsEmpty")).IsVisible, "NowPlayingAppsEmpty is not shown");
+        }
+        finally { window.Close(); leaked.Dispose(); }
+    });
+
     [Fact]
     public void Empty_lists_say_so_and_are_not_tab_stops() => AppHost.Run(() =>
     {
@@ -352,10 +393,9 @@ public sealed class SettingsReachTests : AppWindowFixture
         {
             void Shows(string line, string list)
             {
-                window.UpdateLayout();
-                Pump();
-                Assert.True(((FrameworkElement)window.FindName(line)).IsVisible, $"{line} is not shown");
-                Assert.False(((Control)window.FindName(list)).Focusable, $"{list} is a tab stop");
+                Settle(window, guard);
+                Assert.True(((FrameworkElement)window.FindName(line)).IsVisible, $"{line} is not shown ({Where(window)})");
+                Assert.False(((Control)window.FindName(list)).Focusable, $"{list} is a tab stop ({Where(window)})");
             }
 
             Land(window, guard, SettingsPage.Publish, SettingsIndex.Homes);

@@ -50,7 +50,8 @@ internal static class DeskClicks
     /// <summary>The message's menu item: "Message settings…", a page name like every Settings entry point.</summary>
     public static readonly string MessageSettings = SettingsNames.LinkTitle(SettingsPage.DeskMessage);
     public static readonly string DeskSettings = SettingsNames.LinkTitle(SettingsPage.Desk);
-    public const string LauncherSettings = "Edit buttons…";
+    /// <summary>A Launcher button's menu item: "Launcher settings…" (WF17, WF19), the page's own name like every entry point.</summary>
+    public static readonly string LauncherSettings = SettingsNames.LinkTitle(SettingsPage.Launcher);
     public const string TurnOffDesk = "Turn off the Desk";
 
     private static readonly Brush Plate = Frozen(Color.FromArgb(1, 0, 0, 0));

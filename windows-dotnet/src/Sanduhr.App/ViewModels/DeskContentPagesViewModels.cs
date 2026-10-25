@@ -116,6 +116,9 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
     /// <summary>Called after every saved change (the widget line and the Desk follow).</summary>
     public Action? Changed { get; set; }
 
+    /// <summary>The Now playing piece's line at the page top (set by <see cref="SettingsViewModel"/>).</summary>
+    public DeskPieceStatusViewModel? Piece { get; internal set; }
+
     [ObservableProperty] private bool _widget;
     [ObservableProperty] private bool _keepPaused;
     [ObservableProperty] private bool _bars;
@@ -166,9 +169,20 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
 
     partial void OnWidgetChanged(bool value) { if (!_loading) Save(_saved with { Widget = value }); }
     partial void OnKeepPausedChanged(bool value) { if (!_loading) Save(_saved with { KeepPaused = value }); }
-    partial void OnBarsChanged(bool value) { if (!_loading) Save(_saved with { Bars = value }); }
+    // The bars and the song's look draw on the Desk: turning either on shows a hidden piece (Principle 4).
+    partial void OnBarsChanged(bool value)
+    {
+        if (_loading) return;
+        Save(_saved with { Bars = value });
+        if (value) Piece?.PlaceIfHidden();
+    }
     partial void OnBarsGradientChanged(bool value) { if (!_loading) Save(_saved with { BarsGradient = value }); }
-    partial void OnStyleChanged(bool value) { if (!_loading) Save(_saved with { Style = value }); }
+    partial void OnStyleChanged(bool value)
+    {
+        if (_loading) return;
+        Save(_saved with { Style = value });
+        if (value) Piece?.PlaceIfHidden();
+    }
     partial void OnLooksDirectChanged(bool value) { if (!_loading) Save(_saved with { LooksDirect = value }); }
 
     // ---- Looks (spec, a look per song) ----
@@ -231,7 +245,7 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
 /// Settings, Weather (spec 6.5): type a city, Look up sends that name (and only that) to Open-Meteo's
 /// place search, pick one of the places found, choose the unit. The place's coordinates are saved
 /// rounded to about 1 km. Clear forgets the place. "Show it as" (#315) is a nickname the Desk shows instead of the place's
-/// name: kept on this PC only, never sent, and the forecast still uses the picked place. The piece itself is placed on the Desk page.
+/// name: kept on this PC only, never sent, and the forecast still uses the picked place. Picking a place shows a hidden Weather piece (Principle 4); where it sits is Settings, Desk, Pieces.
 /// </summary>
 public sealed partial class WeatherPageViewModel : ObservableObject
 {
@@ -272,6 +286,9 @@ public sealed partial class WeatherPageViewModel : ObservableObject
 
     /// <summary>Called after every saved change (the Desk follows).</summary>
     public Action? Changed { get; set; }
+
+    /// <summary>The Weather piece's line at the page top (set by <see cref="SettingsViewModel"/>).</summary>
+    public DeskPieceStatusViewModel? Piece { get; internal set; }
 
     [ObservableProperty] private string _city = "";
     [ObservableProperty] private string _note = "";
@@ -314,6 +331,7 @@ public sealed partial class WeatherPageViewModel : ObservableObject
         Results.Clear();
         Note = "";
         City = "";
+        Piece?.PlaceIfHidden();
     }
 
     [RelayCommand]

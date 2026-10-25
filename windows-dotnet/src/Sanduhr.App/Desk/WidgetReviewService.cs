@@ -232,11 +232,8 @@ internal sealed class WidgetReviewService : IDisposable
             _store.SaveCompanion(_store.LoadCompanion() with { Pack = pack.Id });
             var desk = _store.LoadDesk();
             var layout = new DeskArrangement(desk.Layout);
-            if (layout.Placement(CompanionSettings.Widget) is null)
-            {
-                layout.Place(CompanionSettings.Widget, DeskArrangement.DefaultAnchor(CompanionSettings.Widget));
+            if (layout.PlaceAtDefault(CompanionSettings.Widget) is not null)
                 _store.SaveDesk(desk with { Layout = layout.Layout });
-            }
             companion = true;
         }
         return new WidgetAnswer(WidgetAnswer.Applied, PackId: pack.Id, Companion: pack.Kind == "sprite" ? companion : null);
@@ -355,11 +352,8 @@ internal sealed class WidgetReviewHost : IWidgetReviewHost, IDisposable
         if (preview.Pack.Kind == "sprite")
         {
             var layout = new DeskArrangement(desk.Layout);
-            if (layout.Placement(CompanionSettings.Widget) is null)
-            {
-                layout.Place(CompanionSettings.Widget, DeskArrangement.DefaultAnchor(CompanionSettings.Widget));
+            if (layout.PlaceAtDefault(CompanionSettings.Widget) is not null)
                 desk = desk with { Layout = layout.Layout };
-            }
         }
         if (preview.Ink is { } stops) ink = ink with { Mode = DeskInkMode.Custom, Color = stops };
         return new DeskDesignSettings(desk, ink, _store.LoadLauncher());
