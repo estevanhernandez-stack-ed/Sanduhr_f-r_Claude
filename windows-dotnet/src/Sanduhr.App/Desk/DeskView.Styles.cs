@@ -145,7 +145,7 @@ internal sealed partial class DeskView
         var bar = new Grid { Width = width, Height = markH, Margin = new Thickness(0, size * 0.1, 0, 0) };
         bar.Children.Add(new Rectangle
         {
-            Height = barH, RadiusX = barH / 2, RadiusY = barH / 2, Fill = Ink, Opacity = 0.22, VerticalAlignment = VerticalAlignment.Center,
+            Height = barH, RadiusX = barH / 2, RadiusY = barH / 2, Fill = MeterTrack, Opacity = MeterTrackOpacity, VerticalAlignment = VerticalAlignment.Center,
         });
         var fill = new Rectangle
         {
@@ -168,7 +168,7 @@ internal sealed partial class DeskView
     /// <summary>The pace mark: a 2 px upright line at the pace's place along the meter.</summary>
     private Rectangle PaceMark(double pace, double width, double height) => new()
     {
-        Width = 2, Height = height, Fill = Ink, Opacity = _ink.TextOpacity,
+        Width = 2, Height = height, Fill = PaceInk, Opacity = _ink.TextOpacity,
         HorizontalAlignment = HorizontalAlignment.Left,
         Margin = new Thickness(Math.Max(0, Math.Min(width - 2, pace * width - 1)), 0, 0, 0),
     };
@@ -201,16 +201,32 @@ internal sealed partial class DeskView
         // the signal's stop runs along it too (theme match).
         Brush[] CellColors(MeterLevel level)
         {
-            var stops = MeterSignal.Stops(_ink.Stops, level);
+            var stops = MeterSignal.Stops(MeterStops, level);
             bool spread = stops.Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1;
-            var solid = Ink;
+            var solid = _frame.MeterStops is null ? Ink : SolidInk(stops[0]);
             return [.. Enumerable.Range(0, n).Select(i => spread ? SolidInk(NowPlayingLooks.ColorAt(stops, (double)i / (n - 1))) : solid)];
+        }
+        // Past Warn at the signal runs along the LIT cells, not the whole row: its peak sits on the middle lit cell and the rest blend
+        // toward it from the ink's ends, so a low custom Warn at never leaves the yellow on an unlit cell.
+        Brush[] LitColors(MeterLevel level, int on)
+        {
+            var stops = MeterSignal.Stops(MeterStops, level);
+            int baseCount = MeterSignal.Stops(MeterStops, MeterLevel.Calm).Count;
+            double peak = (double)((Math.Max(baseCount, 2) + 1) / 2) / (stops.Count - 1);   // where the signal sits along the stops
+            int p = on / 2, right = on - 1 - p;
+            return [.. Enumerable.Range(0, on).Select(i =>
+            {
+                double t = i <= p
+                    ? peak * (1 - (double)(p - i) / (p + 1))
+                    : peak + (1 - peak) * ((double)(i - p) / (right + 1));
+                return SolidInk(NowPlayingLooks.ColorAt(stops, t));
+            })];
         }
         var colors = CellColors(MeterLevel.Calm);
         void Light(DeskGaugeRead read)
         {
             int on = DeskMeters.LitTicks(read.Fill, n);
-            var lit = read.Level == MeterLevel.Calm ? colors : CellColors(read.Level);
+            var lit = read.Level == MeterLevel.Calm || on == 0 ? colors : LitColors(read.Level, on);
             for (int i = 0; i < n; i++)
             {
                 if (i < on)
@@ -231,7 +247,7 @@ internal sealed partial class DeskView
         Light(r);
         if (r.Pace is { } p)
         {
-            var mark = new Rectangle { Width = 2, Height = ch + 2 * over, Fill = Ink, Opacity = _ink.TextOpacity };
+            var mark = new Rectangle { Width = 2, Height = ch + 2 * over, Fill = PaceInk, Opacity = _ink.TextOpacity };
             Canvas.SetLeft(mark, Math.Max(0, Math.Min(width - 2, p * width - 1)));
             canvas.Children.Add(mark);
         }
@@ -262,7 +278,7 @@ internal sealed partial class DeskView
         var face = new Grid { Width = d, Height = d };
         face.Children.Add(new Path
         {
-            Data = Arc(c, radius, 1), Stroke = Ink, StrokeThickness = t, Opacity = 0.22,
+            Data = Arc(c, radius, 1), Stroke = MeterTrack, StrokeThickness = t, Opacity = MeterTrackOpacity,
             StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
         });
         var arc = new Path
@@ -279,7 +295,7 @@ internal sealed partial class DeskView
             {
                 X1 = c.X + inner * Math.Cos(a), Y1 = c.Y + inner * Math.Sin(a),
                 X2 = c.X + outer * Math.Cos(a), Y2 = c.Y + outer * Math.Sin(a),
-                Stroke = Ink, StrokeThickness = 2, Opacity = _ink.TextOpacity,
+                Stroke = PaceInk, StrokeThickness = 2, Opacity = _ink.TextOpacity,
             });
         }
         var value = Text($"{r.Percent}", size, 1, bold: true, alignment: TextAlignment.Center);

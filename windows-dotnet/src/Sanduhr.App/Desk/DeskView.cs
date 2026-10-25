@@ -59,6 +59,16 @@ internal sealed record DeskFrame
     /// <summary>The alert thresholds the meters' signal uses (theme match): Alerts' Warn at and Urgent at.</summary>
     public int WarnAt { get; init; } = MeterSignal.DefaultWarnAt;
     public int UrgentAt { get; init; } = MeterSignal.DefaultUrgentAt;
+
+    // -- theme match: what a followed theme draws. Null is the Desk's own look, exactly as before. --
+    /// <summary>The plate's tint (six hex digits); null is black behind light ink, white behind dark ink.</summary>
+    public string? PlateHex { get; init; }
+    /// <summary>Now playing's bars and position bar when no song look shows: the theme gradient. Null: the ink (and Gradient bars).</summary>
+    public IReadOnlyList<string>? NowPlayingStops { get; init; }
+    /// <summary>The meters' colors (desk.bars, else the theme gradient), their track (bar_bg) and pace tick (pace_marker). Null: the ink.</summary>
+    public IReadOnlyList<string>? MeterStops { get; init; }
+    public string? MeterTrackHex { get; init; }
+    public string? PaceHex { get; init; }
 }
 
 /// <summary>
@@ -524,7 +534,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         for (int i = 0; i < span.First; i++) topTrim += kinds[i].Height + gap;
         for (int i = span.Last + 1; i < kinds.Count; i++) bottomTrim += kinds[i].Height + gap;
         var fill = new SolidColorBrush(Color.FromArgb((byte)Math.Round(DeskPlate.Opacity * 255), 0, 0, 0));
-        var c = Rgb(DeskPlate.ColorHex(_ink.DarkInk));
+        var c = Rgb(_frame.PlateHex ?? DeskPlate.ColorHex(_ink.DarkInk));
         fill.Color = Color.FromArgb(fill.Color.A, c.R, c.G, c.B);
         fill.Freeze();
         var plate = new Border
@@ -628,9 +638,22 @@ internal sealed partial class DeskView : Grid, IDisposable
 
     private Brush Ink => InkBrush(_ink.Stops);
 
-    /// <summary>A meter's fill (theme match, the usage signal): the ink, and past Warn at or Urgent at the ink with a yellow or red stop
-    /// in its middle. Calm, it is <see cref="Ink"/> itself, so a meter under Warn at draws exactly as it always has.</summary>
-    private Brush MeterFill(MeterLevel level) => level == MeterLevel.Calm ? Ink : InkBrush(MeterSignal.Stops(_ink.Stops, level));
+    /// <summary>A meter's colors: the frame's (a followed theme's bars) or the ink.</summary>
+    private IReadOnlyList<string> MeterStops => _frame.MeterStops ?? _ink.Stops;
+
+    /// <summary>A meter's fill (theme match, the usage signal): its colors, and past Warn at or Urgent at with a yellow or red stop in
+    /// their middle. Calm in the Desk's own look, it is <see cref="Ink"/> itself, so such a meter draws exactly as it always has.</summary>
+    private Brush MeterFill(MeterLevel level) =>
+        level == MeterLevel.Calm && _frame.MeterStops is null ? Ink : InkBrush(MeterSignal.Stops(MeterStops, level));
+
+    /// <summary>A meter's track: a followed theme's bar_bg, else the ink (at <see cref="MeterTrackOpacity"/>).</summary>
+    private Brush MeterTrack => _frame.MeterTrackHex is { } hex ? SolidInk(hex) : Ink;
+
+    /// <summary>The ink's track is the ink at 22%; a theme's bar_bg is its own color, nearly solid.</summary>
+    private double MeterTrackOpacity => _frame.MeterTrackHex is null ? 0.22 : 0.9;
+
+    /// <summary>A meter's pace tick: a followed theme's pace_marker, else the ink.</summary>
+    private Brush PaceInk => _frame.PaceHex is { } hex ? SolidInk(hex) : Ink;
 
     /// <summary>A meter's value past Warn at or Urgent at takes the signal's color; under it, the ink as before.</summary>
     private static void Signal(TextBlock value, MeterLevel level)
@@ -706,7 +729,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         bar.Children.Add(new Rectangle
         {
             Height = barHeight, RadiusX = barHeight / 2, RadiusY = barHeight / 2,
-            Fill = Ink, Opacity = 0.22, VerticalAlignment = VerticalAlignment.Center,
+            Fill = MeterTrack, Opacity = MeterTrackOpacity, VerticalAlignment = VerticalAlignment.Center,
         });
         var rect = new Rectangle
         {
@@ -718,7 +741,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         if (pace is { } p)
             bar.Children.Add(new Rectangle
             {
-                Width = 2, Height = barHeight * 2, Fill = Ink, Opacity = _ink.TextOpacity,
+                Width = 2, Height = barHeight * 2, Fill = PaceInk, Opacity = _ink.TextOpacity,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = new Thickness(Math.Max(0, Math.Min(width - 2, p * width)), 0, 0, 0),
             });
@@ -842,7 +865,9 @@ internal sealed partial class DeskView : Grid, IDisposable
             column.Children.Add(StyledLine(line, size, width, align, look));
         }
         // With a look the position bar takes its gradient across the whole bar, however much of it is filled.
-        Brush barInk = look is null ? Ink : AbsoluteGradient(look.Stops, width);
+        // A followed theme's gradient (theme match) when no song look shows.
+        Brush barInk = look is not null ? AbsoluteGradient(look.Stops, width)
+            : _frame.NowPlayingStops is { } themed ? AbsoluteGradient(themed, width) : Ink;
         double barHeight = Math.Max(2, size * 0.14);
         var bar = new Grid { Width = width, Height = barHeight, Margin = new Thickness(0, size * 0.3, 0, 0) };
         bar.Children.Add(new Rectangle { Fill = barInk, Opacity = 0.22, RadiusX = barHeight / 2, RadiusY = barHeight / 2 });
@@ -882,7 +907,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         if (_frame.Bars && _frame.Audio is { } audio)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal };
-            var bars = BarsPiece(size, audio, look, _frame.BarsGradient);
+            var bars = BarsPiece(size, audio, look, _frame.BarsGradient || _frame.NowPlayingStops is not null);
             bars.Margin = new Thickness(align == HorizontalAlignment.Right ? 0 : 0, 0, size * 0.6, 0);
             if (align == HorizontalAlignment.Right) { row.Children.Add(column); bars.Margin = new Thickness(size * 0.6, 0, 0, 0); row.Children.Add(bars); }
             else { row.Children.Add(bars); row.Children.Add(column); }
@@ -975,7 +1000,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         var caps = new Border[count];
         var motion = new AudioBarMotion(count) { Calm = audio.Calm };
         // The colors along the row: a song's look, or with gradient bars the ink's own stops; null draws every bar in the ink.
-        IReadOnlyList<string>? stops = look?.Stops ?? (gradient ? _ink.Stops : null);
+        IReadOnlyList<string>? stops = look?.Stops ?? _frame.NowPlayingStops ?? (gradient ? _ink.Stops : null);
         var ink = Ink;
         for (int i = 0; i < count; i++)
         {

@@ -16,6 +16,8 @@ namespace Sanduhr.App.Desk;
 internal sealed record DeskMessageFrame(MessageToday Today, DeskMessageSettings Settings)
 {
     public ISet<string> Played { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+    /// <summary>The glow's color (theme match: the followed theme's desk.glow, else its accent); null glows in the line's middle stop.</summary>
+    public string? GlowHex { get; init; }
 }
 
 /// <summary>
@@ -146,7 +148,7 @@ internal static class DeskMessagePiece
             HorizontalAlignment.Center => TextAlignment.Center,
             _ => TextAlignment.Left,
         };
-        var built = lines.Select(l => Line(l, s, ink, regular, bold, baseSize, ta, align, width, live, frame.Played, gate)).ToList();
+        var built = lines.Select(l => Line(l, s, ink, regular, bold, baseSize, ta, align, width, live, frame.Played, gate, frame.GlowHex)).ToList();
 
         if (!MessageSpecialModes.Cycles(s.Special, frame.Today))
         {
@@ -254,7 +256,8 @@ internal static class DeskMessagePiece
 
     /// <summary>One line with its effects. A line that is nothing but tags draws as written.</summary>
     private static FrameworkElement Line(string raw, DeskMessageSettings s, ResolvedInk ink, FontFamily regular, FontFamily bold,
-        double baseSize, TextAlignment ta, HorizontalAlignment align, double width, List<IDisposable> live, ISet<string> played, DeskPause gate)
+        double baseSize, TextAlignment ta, HorizontalAlignment align, double width, List<IDisposable> live, ISet<string> played, DeskPause gate,
+        string? glowHex = null)
     {
         var parsed = MessageMarkup.Parse(raw);
         var e = parsed.Effects;
@@ -287,7 +290,7 @@ internal static class DeskMessagePiece
         if (MessageMotion.Glows(e, s.Glow))
             block.Effect = new DropShadowEffect
             {
-                Color = DeskView.Rgb(stops[stops.Count / 2]),
+                Color = DeskView.Rgb(glowHex ?? stops[stops.Count / 2]),
                 ShadowDepth = 0,
                 BlurRadius = DeskMessageLook.GlowBlur,
                 Opacity = DeskMessageLook.GlowOpacity,
