@@ -247,7 +247,7 @@ public static class SettingsNames
     public const string DeskPieceClicksSwitch = DeskPieceClicks.Title;
     /// <summary>Desk: burn-in care for OLED screens (settings.json "desk_oled_care", off by default).</summary>
     public const string OledCareSwitch = OledCare.Title;
-    /// <summary>Desk, Look: a soft plate behind each piece.</summary>
+    /// <summary>Desk Look, Back plate: a soft plate behind each piece.</summary>
     public const string DeskPlateSwitch = DeskPlate.Title;
     /// <summary>The name a Desk piece goes by on the layout map and in Arrange mode; an unknown piece goes by its key.</summary>
     public static string DeskPieceName(string widget) => widget switch
@@ -278,14 +278,13 @@ public static class SettingsNames
         "glow" => SettingsPage.ClaudeCode,
         _ => null,
     };
-    /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7). The section's name.</summary>
-    public const string DeskInk = "Ink";
-    /// <summary>Desk, Ink: the picker's label and spoken name (it was spoken "Ink", WF34).</summary>
+    /// <summary>Desk Look, Ink and color: the ink picker's label and spoken name (it was spoken "Ink", WF34).</summary>
     public const string DeskInkPicker = "Clock, date, Claude";
-    /// <summary>Desk, Look: the Desk's font, one of the two "Font"s (WF12).</summary>
+    /// <summary>Desk Look, Fonts: the Desk's font, one of the two "Font"s (WF12).</summary>
     public const string DeskFont = "Desk font";
-    /// <summary>Message, Look: the message's font and color.</summary>
+    /// <summary>Desk Look, Fonts: the message's font. <see cref="MessageColor"/> sits under Ink and color.</summary>
     public const string MessageFont = "Message font";
+    /// <summary>Desk Look, Ink and color: the message's color.</summary>
     public const string MessageColor = "Message color";
     /// <summary>Alerts: the Desk's sign-in reminder switch (settings.json "desk_sign_in_reminder", on by default).</summary>
     public const string SignInReminders = SignInReminder.Title;
@@ -434,10 +433,10 @@ public static class SettingsNames
         (AddFolder, SettingsPage.ClaudeCode),
         (FollowAccount, SettingsPage.Accounts),
         (DeskSwitch, SettingsPage.Desk),
-        (DeskInk, SettingsPage.Desk),
+        (DeskInkPicker, SettingsPage.DeskLook),
         (ArrangeDesk, SettingsPage.Desk),
         (DeskPieceClicksSwitch, SettingsPage.Desk),
-        (DeskPlateSwitch, SettingsPage.Desk),
+        (DeskPlateSwitch, SettingsPage.DeskLook),
         (WatchersSwitch, SettingsPage.Desk),
         (CiRunnersSwitch, SettingsPage.Desk),
         (DeskDirectSwitch, SettingsPage.Desk),
@@ -450,9 +449,9 @@ public static class SettingsNames
         (TranscriptsKept, SettingsPage.Mods),
         (LetClaudeReadTotals, SettingsPage.ClaudeCode),
         (SnakeSoundAtFull, SettingsPage.Alerts),
-        (DeskFont, SettingsPage.Desk),
-        (MessageFont, SettingsPage.DeskMessage),
-        (MessageColor, SettingsPage.DeskMessage),
+        (DeskFont, SettingsPage.DeskLook),
+        (MessageFont, SettingsPage.DeskLook),
+        (MessageColor, SettingsPage.DeskLook),
         (LauncherAddApp, SettingsPage.Desk),
         (LauncherAddLink, SettingsPage.Desk),
         (SignInReminders, SettingsPage.Alerts),

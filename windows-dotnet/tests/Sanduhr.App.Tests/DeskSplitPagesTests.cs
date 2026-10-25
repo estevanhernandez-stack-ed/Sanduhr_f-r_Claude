@@ -165,4 +165,30 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void Desk_Look_holds_both_fonts_both_sizes_and_both_colors() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.DeskLook, SettingsIndex.DeskLook);
+            Settle(window, guard);
+            string Names<T>(string anchor) where T : FrameworkElement => string.Join("|",
+                Below<T>(Marked(window, SettingsPage.DeskLook, anchor)).Select(System.Windows.Automation.AutomationProperties.GetName));
+            Assert.Equal($"{SettingsNames.DeskFont}|{SettingsNames.MessageFont}", Names<ComboBox>(SettingsIndex.DeskLook));
+            Assert.Equal($"{SettingsNames.ClockSize}|{SettingsNames.MessageSize}", Names<Slider>(SettingsIndex.DeskSizes));
+            Assert.Contains(SettingsNames.MessageColor, Names<ComboBox>(SettingsIndex.DeskInk));
+            Assert.Contains(SettingsNames.DeskInkPicker, Names<ComboBox>(SettingsIndex.DeskInk));
+
+            // Old links land here.
+            window.SelectPage(SettingsPage.Desk, SettingsIndex.DeskInk);
+            Settle(window, guard);
+            Assert.Equal(new SettingsLink(SettingsPage.DeskLook, SettingsIndex.DeskInk), window.Place);
+            window.SelectPage(SettingsPage.DeskMessage, SettingsIndex.MessageLook);
+            Settle(window, guard);
+            Assert.Equal(new SettingsLink(SettingsPage.DeskLook, SettingsIndex.DeskSizes), window.Place);
+        }
+        finally { window.Close(); }
+    });
 }

@@ -88,6 +88,8 @@ public static class SettingsIndex
     public const string DeskDirect = "desk-direct";
     public const string DeskOled = "desk-oled";
     public const string DeskDesigns = "desk-designs";
+    /// <summary>Desk Look, Sizes (slice 3).</summary>
+    public const string DeskSizes = "sizes";
     // Desk: Message, Now playing, Weather (S6)
     public const string MessageLines = "lines";
     public const string MessageRotation = "rotation";
@@ -216,16 +218,20 @@ public static class SettingsIndex
              "style", "meter style", "slim", "ring", "rings", "gauge", "ticks", "segments", "Roundline", "compact",
              "companion", "pet", "sprite", "hourglass", "roam", "walk", "grow", "growth", "stage", "mood", SettingsNames.WidgetCompanionPick,
              SettingsNames.WidgetCompanionRoam]),
-        E("Look", SettingsPage.Desk, DeskLook,
-            ["font", "EsteFont", "EsteFont Pro", "EsteFont 26", "clock size", "time size", "typeface", "Segoe UI"]),
-        E(SettingsNames.DeskPlateSwitch, SettingsPage.Desk, DeskPlate,
-            ["plate", "backdrop", "background", "contrast", "readable", "desktop icons", "files", "dark plate", "behind the text"]),
         E("Margins", SettingsPage.Desk, DeskMargins,
             ["margin", "edge", "padding", "taskbar", "inset", "spacing"]),
         E("Layout map", SettingsPage.Desk, DeskMap,
             ["map", "preview", "layout", "taskbar", "screen", "monitor", "where"]),
-        E(SettingsNames.DeskInk, SettingsPage.Desk, DeskInk,
-            ["ink", "text color", "automatic", "light", "dark", "wallpaper", "readable", "shadow", "gradient", "hex"]),
+
+        E(SettingsNames.FontsSection, SettingsPage.DeskLook, DeskLook,
+            ["font", SettingsNames.DeskFont, SettingsNames.MessageFont, "EsteFont", "EsteFont Pro", "EsteFont 26", "typeface", "Segoe UI", "font pack"]),
+        E(SettingsNames.SizesSection, SettingsPage.DeskLook, DeskSizes,
+            [SettingsNames.ClockSize, SettingsNames.MessageSize, "time size", "size", "bigger", "smaller"]),
+        E(SettingsNames.InkAndColor, SettingsPage.DeskLook, DeskInk,
+            ["ink", SettingsNames.DeskInkPicker, "text color", "automatic", "light", "dark", "wallpaper", "readable", SettingsNames.DropShadow,
+             "shadow", "gradient", "hex", "palette", "presets", SettingsNames.MessageColor, SettingsNames.GlowAroundMessage]),
+        E(SettingsNames.BackPlate, SettingsPage.DeskLook, DeskPlate,
+            [SettingsNames.DeskPlateSwitch, "plate", "backdrop", "background", "contrast", "readable", "desktop icons", "files", "dark plate", "behind the text"]),
 
         E("Claude's suggestion", SettingsPage.DeskMessage, MessageSuggestion,
             ["suggestion", "suggested", "Claude", "agent", "review", "dismiss", "propose"]),
@@ -234,7 +240,6 @@ public static class SettingsIndex
         E("Rotation", SettingsPage.DeskMessage, MessageRotation, ["rotate", "daily", "hourly", "pin", "mix", "every day"]),
         E("On special days", SettingsPage.DeskMessage, MessageSpecial,
             ["special day", "birthday", "date", "stack", "take turns", "scroll", "ticker"]),
-        E("Message look", SettingsPage.DeskMessage, MessageLook, ["message size", "message color", "message font", "glow"]),
 
         E(SettingsNames.NowPlayingInWidget, SettingsPage.NowPlaying, NowPlayingWidget,
             ["now playing", "music", "song", "track", "Spotify", "media", "play", "pause", "next", "keep showing while paused", "hide while paused", "hide when nothing plays"]),
@@ -284,7 +289,7 @@ public static class SettingsIndex
         [SettingsNames.ThirdPartyNotices] = Notices,
         [SettingsNames.ResetSanduhr] = Reset,
         [SettingsNames.DeskSwitch] = DeskOn,
-        [SettingsNames.DeskInk] = DeskInk,
+        [SettingsNames.DeskInkPicker] = DeskInk,
         [SettingsNames.ArrangeDesk] = DeskArrange,
         [SettingsNames.DeskPieceClicksSwitch] = DeskClicks,
         [SettingsNames.DeskPlateSwitch] = DeskPlate,
@@ -301,8 +306,8 @@ public static class SettingsIndex
         [SettingsNames.LetClaudeReadTotals] = Folders,
         [SettingsNames.SnakeSoundAtFull] = Sound,
         [SettingsNames.DeskFont] = DeskLook,
-        [SettingsNames.MessageFont] = MessageLook,
-        [SettingsNames.MessageColor] = MessageLook,
+        [SettingsNames.MessageFont] = DeskLook,
+        [SettingsNames.MessageColor] = DeskInk,
         [SettingsNames.LauncherAddApp] = DeskLauncher,
         [SettingsNames.LauncherAddLink] = DeskLauncher,
         [SettingsNames.NowPlayingInWidget] = NowPlayingWidget,
@@ -331,7 +336,7 @@ public static class SettingsIndex
         [SettingsPage.Mods] = ["mod", "plugin", "hooks", "statusline", "MCP", "CLAUDE.md", "retention", "config", "settings.json"],
         [SettingsPage.Publish] = ["publish", "upload", "endpoint", "share"],
         [SettingsPage.Themes] = ["theme", "colors", "look"],
-        [SettingsPage.Desk] = ["desktop", "wallpaper", "clock", "Rainmeter", "layout", "font", "EsteFont", "margins", "taskbar", "telemetry", "CPU", "RAM", "disk"],
+        [SettingsPage.Desk] = ["desktop", "wallpaper", "clock", "Rainmeter", "layout", "margins", "taskbar", "telemetry", "CPU", "RAM", "disk"],
         [SettingsPage.DeskMessage] = ["messages", "messages.txt", "quote", "handwriting"],
         [SettingsPage.NowPlaying] = ["music", "song", "media", "visualizer", "looks", "song style"],
         [SettingsPage.Weather] = ["forecast", "temperature", "city"],

@@ -342,6 +342,9 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
 
     public bool IsCustomInk => InkChoice.Mode == DeskInkMode.Custom;
 
+    /// <summary>The Colors presets show whenever the ink is not Automatic (WF3: a palette pack is no longer hidden behind Custom).</summary>
+    public bool ShowsInkColors => InkChoice.Mode != DeskInkMode.Auto;
+
     /// <summary>Raised after "Let Claude show watchers" is saved (App writes watchers.json and, off, clears the cards).</summary>
     public Action? WatchersChanged { get; set; }
 
@@ -455,6 +458,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     partial void OnInkChoiceChanged(DeskInkChoice value)
     {
         OnPropertyChanged(nameof(IsCustomInk));
+        OnPropertyChanged(nameof(ShowsInkColors));
         SaveInk(_ink with { Mode = value.Mode });
     }
 
@@ -463,10 +467,14 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         if (_loadingInk || value is null) return;
         var preset = _inkList.FirstOrDefault(p => p.Name == value);
         if (preset.Value is null) return;
+        // Choosing a preset sets Custom (spec, Desk Look): the colors are the ink's own from now on.
         _loadingInk = true;
         InkColors = preset.Value;
+        if (InkChoice.Mode != DeskInkMode.Custom) InkChoice = InkChoices.First(c => c.Mode == DeskInkMode.Custom);
         _loadingInk = false;
-        SaveInk(_ink with { Color = preset.Value });
+        OnPropertyChanged(nameof(IsCustomInk));
+        OnPropertyChanged(nameof(ShowsInkColors));
+        SaveInk(_ink with { Color = preset.Value, Mode = DeskInkMode.Custom });
     }
 
     partial void OnInkColorsChanged(string value)

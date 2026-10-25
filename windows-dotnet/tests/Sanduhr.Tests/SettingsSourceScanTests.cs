@@ -442,13 +442,14 @@ public class SettingsSourceScanTests
     }
 
     [Fact]
-    public void The_trademark_footer_is_one_control_on_six_pages()
+    public void The_trademark_footer_is_one_control_on_seven_pages()
     {
         var views = Path.Combine(AppDir(), "Views");
         int Count(string file) => Regex.Matches(File.ReadAllText(Path.Combine(views, file)), "<views:TrademarkFooter\\b").Count;
         Assert.Equal(4, Count("SettingsWindow.xaml"));   // Desk, Now playing, Weather, About
         Assert.Equal(1, Count("DeskMessagePage.xaml"));
         Assert.Equal(1, Count("WidgetsPage.xaml"));
+        Assert.Equal(1, Count("DeskLookPage.xaml"));
         Assert.Contains("core:SettingsNames.TrademarkNotice", File.ReadAllText(Path.Combine(views, "TrademarkFooter.xaml")));
         Assert.Contains("<views:TrademarkFooter views:SettingsAnchor.Id=\"trademark\"", TabRange("About"));
         var copies = Files("*.xaml")

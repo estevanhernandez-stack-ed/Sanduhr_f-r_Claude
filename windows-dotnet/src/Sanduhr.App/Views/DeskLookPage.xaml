@@ -4,12 +4,14 @@
              xmlns:views="clr-namespace:Sanduhr.App.Views"
              xmlns:vm="clr-namespace:Sanduhr.App.ViewModels"
              xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
+             xmlns:conv="clr-namespace:Sanduhr.App.Converters"
              Focusable="False">
     <!-- Settings, Desk Look (spec, Desk Look): the Desk's fonts, sizes, ink and color, and the back plate, in one place (WF12).
          Hosted in SettingsWindow, whose styles it finds with DynamicResource. DataContext: the SettingsViewModel; each section
          sets its own (Desk, or MessagePage for the message's look). -->
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolVis" />
+        <conv:StringToVisibilityConverter x:Key="StrVis" />
     </UserControl.Resources>
     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
         <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
@@ -20,6 +22,170 @@
                 <TextBlock Text="{x:Static core:SettingsNames.DeskLookTitle}" FontSize="14" FontWeight="SemiBold"
                            AutomationProperties.HeadingLevel="Level1"
                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+
+                <!-- Fonts: the Desk's and the message's, the two "Font"s apart (WF12). Font packs join both lists. -->
+                <StackPanel views:SettingsAnchor.Id="look">
+                    <TextBlock Text="{x:Static core:SettingsNames.FontsSection}" FontSize="13" FontWeight="SemiBold"
+                               AutomationProperties.HeadingLevel="Level2"
+                               Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                    <Grid DataContext="{Binding Desk}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="230" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Static core:SettingsNames.DeskFont}" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
+                                  ItemsSource="{Binding FontChoices}" SelectedItem="{Binding Font, Mode=TwoWay}"
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.DeskFont}" />
+                    </Grid>
+                    <Grid Margin="0,10,0,0" DataContext="{Binding MessagePage}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="230" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Static core:SettingsNames.MessageFont}" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
+                                  ItemsSource="{Binding FontOptions}" SelectedItem="{Binding Font, Mode=TwoWay}"
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.MessageFont}" />
+                    </Grid>
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                <!-- Sizes: the clock's and the message's. -->
+                <StackPanel views:SettingsAnchor.Id="sizes">
+                    <TextBlock Text="{x:Static core:SettingsNames.SizesSection}" FontSize="13" FontWeight="SemiBold"
+                               AutomationProperties.HeadingLevel="Level2"
+                               Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                    <Grid DataContext="{Binding Desk}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="230" />
+                            <ColumnDefinition Width="44" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Static core:SettingsNames.ClockSize}" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        <Slider Grid.Column="1" x:Name="TimeSizeSlider" Style="{DynamicResource ThemedSlider}"
+                                Minimum="48" Maximum="200" TickFrequency="4" IsSnapToTickEnabled="True"
+                                SmallChange="4" LargeChange="16" Value="{Binding TimeSize, Mode=TwoWay}"
+                                AutomationProperties.Name="{x:Static core:SettingsNames.ClockSize}" />
+                        <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=TimeSizeSlider, StringFormat='{}{0:0}'}"
+                                   FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}" FontFamily="Cascadia Code, Consolas" />
+                    </Grid>
+                    <Grid Margin="0,10,0,0" DataContext="{Binding MessagePage}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="230" />
+                            <ColumnDefinition Width="44" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Static core:SettingsNames.MessageSize}" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        <Slider Grid.Column="1" x:Name="MessageSizeSlider" Style="{DynamicResource ThemedSlider}"
+                                Minimum="24" Maximum="180" TickFrequency="1" IsSnapToTickEnabled="True"
+                                SmallChange="1" LargeChange="10" Value="{Binding Size, Mode=TwoWay}"
+                                AutomationProperties.Name="{x:Static core:SettingsNames.MessageSize}" />
+                        <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=MessageSizeSlider, StringFormat='{}{0:0}'}"
+                                   FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}" FontFamily="Cascadia Code, Consolas" />
+                    </Grid>
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                <!-- Ink and color: the Desk's ink (its presets show whenever it is not Automatic, WF3) and the message's color. -->
+                <StackPanel views:SettingsAnchor.Id="ink">
+                    <TextBlock Text="{x:Static core:SettingsNames.InkAndColor}" FontSize="13" FontWeight="SemiBold"
+                               AutomationProperties.HeadingLevel="Level2"
+                               Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                    <StackPanel DataContext="{Binding Desk}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="230" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static core:SettingsNames.DeskInkPicker}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
+                                      ItemsSource="{x:Static vm:DeskSettingsViewModel.InkChoices}"
+                                      SelectedItem="{Binding InkChoice, Mode=TwoWay}"
+                                      AutomationProperties.Name="{x:Static core:SettingsNames.DeskInkPicker}" />
+                        </Grid>
+                        <Grid Margin="0,10,0,0" Visibility="{Binding ShowsInkColors, Converter={StaticResource BoolVis}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="200" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Colors" FontSize="12" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
+                                      ItemsSource="{Binding InkPresetNames}"
+                                      SelectedItem="{Binding InkPreset, Mode=TwoWay}"
+                                      AutomationProperties.Name="Colors, ink preset" />
+                            <TextBox Grid.Column="3" Style="{DynamicResource Input}" FontFamily="Cascadia Code, Consolas"
+                                     Text="{Binding InkColors, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                     AutomationProperties.Name="Ink hex colors" />
+                        </Grid>
+                        <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,10,0,0"
+                                  Content="{x:Static core:SettingsNames.DropShadow}" IsChecked="{Binding InkShadow, Mode=TwoWay}"
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.DropShadow}" />
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                   Text="Automatic reads how bright your wallpaper image is behind each piece and picks light or dark ink, so it stays readable. It reads the wallpaper file only, never your screen. Picking one of the Colors switches the ink to Custom, which takes one hex color, or two to four with commas for a gradient, such as 8f5bd6,3a63e0,33fdff. A meter near its limit stays red in every ink." />
+                    </StackPanel>
+                    <StackPanel Margin="0,14,0,0" DataContext="{Binding MessagePage}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="230" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static core:SettingsNames.MessageColor}" FontSize="12" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
+                                      ItemsSource="{Binding ColorOptions}" SelectedItem="{Binding Color, Mode=TwoWay}"
+                                      AutomationProperties.Name="{x:Static core:SettingsNames.MessageColor}" />
+                            <TextBox Grid.Column="2" Style="{DynamicResource Input}" Width="170" Height="30" Margin="8,0,0,0"
+                                     VerticalContentAlignment="Center" FontFamily="Cascadia Code, Consolas"
+                                     Visibility="{Binding IsCustomColor, Converter={StaticResource BoolVis}}"
+                                     Text="{Binding CustomColorText, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="Custom message color, hex"
+                                     ToolTip="Hex colors like 9ad7ff. Two or more, separated by commas, make a gradient." />
+                        </Grid>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Margin="110,4,0,0"
+                                   Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                   Text="{Binding CustomColorProblem}"
+                                   Visibility="{Binding CustomColorProblem, Converter={StaticResource StrVis}}" />
+                        <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,10,0,0"
+                                  Content="{x:Static core:SettingsNames.GlowAroundMessage}" IsChecked="{Binding Glow, Mode=TwoWay}"
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.GlowAroundMessage}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                <!-- Back plate: a soft plate behind each piece. -->
+                <StackPanel views:SettingsAnchor.Id="desk-plate" DataContext="{Binding Desk}">
+                    <TextBlock Text="{x:Static core:SettingsNames.BackPlate}" FontSize="13" FontWeight="SemiBold"
+                               AutomationProperties.HeadingLevel="Level2"
+                               Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                    <CheckBox Style="{DynamicResource ThemedCheckBox}"
+                              Content="{x:Static core:SettingsNames.DeskPlateSwitch}"
+                              IsChecked="{Binding Plate, Mode=TwoWay}"
+                              AutomationProperties.Name="{x:Static core:SettingsNames.DeskPlateSwitch}"
+                              AutomationProperties.HelpText="{x:Static core:DeskPlate.Caption}" />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                               Text="{x:Static core:DeskPlate.Caption}" />
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                <views:TrademarkFooter />
             </StackPanel>
         </ScrollViewer>
     </Border>

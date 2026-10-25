@@ -130,4 +130,41 @@ public class SettingsDeskSplitIndexTests
             SettingsIndex.Resolve(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion));
         Assert.Equal(["Show the companion on the Desk"], SettingsNames.RetiredNames("Show the companion on the Desk"));
     }
+
+    [Fact]
+    public void Desk_Look_holds_four_sections_and_the_old_links_land_there()
+    {
+        Assert.Equal([SettingsIndex.DeskLook, SettingsIndex.DeskSizes, SettingsIndex.DeskInk, SettingsIndex.DeskPlate],
+            SettingsIndex.EntriesOn(SettingsPage.DeskLook).Select(e => e.Anchor));
+        Assert.Equal([SettingsNames.FontsSection, SettingsNames.SizesSection, SettingsNames.InkAndColor, SettingsNames.BackPlate],
+            SettingsIndex.EntriesOn(SettingsPage.DeskLook).Select(e => e.Title));
+        foreach (var (from, anchor, to) in new[]
+        {
+            (SettingsPage.Desk, SettingsIndex.DeskLook, SettingsIndex.DeskLook),
+            (SettingsPage.Desk, SettingsIndex.DeskInk, SettingsIndex.DeskInk),
+            (SettingsPage.Desk, SettingsIndex.DeskPlate, SettingsIndex.DeskPlate),
+            (SettingsPage.DeskMessage, SettingsIndex.MessageLook, SettingsIndex.DeskSizes),
+        })
+            Assert.Equal(new SettingsLink(SettingsPage.DeskLook, to), SettingsIndex.Resolve(from, anchor));
+        Assert.Null(SettingsIndex.Find(SettingsPage.DeskMessage, SettingsIndex.MessageLook));
+    }
+
+    [Fact]
+    public void Font_lands_on_Desk_Look_Fonts_first()
+    {
+        // Slice 2's boost, live now that its page is (slice 2 final review: pin "font" once Desk Look lands).
+        var top = SettingsIndex.Search("font")[0];
+        Assert.Equal((SettingsPage.DeskLook, SettingsIndex.DeskLook, -1), (top.Entry.Page, top.Entry.Anchor, top.Rank));
+        Assert.Contains(SettingsIndex.Search("message color"), h => h.Entry.Page == SettingsPage.DeskLook && h.Entry.Anchor == SettingsIndex.DeskInk);
+        Assert.Contains(SettingsIndex.Search("clock size"), h => h.Entry.Page == SettingsPage.DeskLook && h.Entry.Anchor == SettingsIndex.DeskSizes);
+    }
+
+    [Fact]
+    public void The_moved_names_sit_on_Desk_Look()
+    {
+        foreach (var name in new[] { SettingsNames.DeskFont, SettingsNames.MessageFont, SettingsNames.MessageColor, SettingsNames.DeskPlateSwitch, SettingsNames.DeskInkPicker })
+            Assert.Equal(SettingsPage.DeskLook, SettingsNames.Table.Single(t => t.Name == name).Page);
+        Assert.Empty(SettingsNames.PathProblems("Settings, Desk Look, Ink and color"));
+        Assert.Empty(SettingsNames.PathProblems("Settings, Desk Look, Back plate"));
+    }
 }
