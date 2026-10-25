@@ -84,4 +84,71 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    private static Sanduhr.App.Services.SettingsStore Store() => new(new Paths());   // the fixture's scratch profile
+
+    [Fact]
+    public void Turning_a_feature_on_from_its_page_places_its_piece() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+        string Layout() => Store().LoadDesk().Layout;
+        Assert.DoesNotContain("nowPlaying", Layout());
+
+        svm.NowPlayingPage.Bars = false;   // the page loads with Bars on: turning it on is a change
+        Assert.DoesNotContain("nowPlaying", Layout());
+        svm.NowPlayingPage.Bars = true;
+        Assert.Contains("nowPlaying:br", Layout());
+        svm.WeatherPage.Picked = WeatherPlace.Create("Fort Worth", "Texas", "United States", 32.75, -97.33);
+        Assert.Contains("weather:tr", Layout());
+        svm.MessagePage.AddLineCommand.Execute(null);
+        Assert.Contains("message:bl", Layout());
+
+        Assert.Equal(SettingsNames.PieceStatus("Top right", svm.Desk.Enabled), svm.WeatherPage.Piece!.Text);
+        Assert.True(svm.NowPlayingPage.Piece!.IsPlaced);
+        Assert.True(svm.MessagePage.Piece!.IsPlaced);
+    });
+
+    [Fact]
+    public void An_on_action_leaves_a_placed_piece_where_it_is() => AppHost.Run(() =>
+    {
+        var store = Store();
+        store.SaveDesk(store.LoadDesk() with { Layout = "clock:bl weather:bl nowPlaying:tl message:tc" });
+        var (widget, _) = ScratchWidget("Personal");
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+
+        svm.WeatherPage.Picked = WeatherPlace.Create("Fort Worth", "Texas", "United States", 32.75, -97.33);
+        svm.NowPlayingPage.Bars = true;
+        svm.NowPlayingPage.Bars = false;
+        svm.NowPlayingPage.Style = true;
+        svm.MessagePage.AddLineCommand.Execute(null);
+        Assert.Equal("clock:bl weather:bl nowPlaying:tl message:tc", Store().LoadDesk().Layout);
+    });
+
+    [Fact]
+    public void Now_playing_and_Weather_show_their_line_at_the_top() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            foreach (var page in new[] { SettingsPage.NowPlaying, SettingsPage.Weather, SettingsPage.DeskMessage })
+            {
+                window.SelectPage(page);
+                Settle(window, guard);
+                var status = Below<DeskPieceStatusPanel>((DependencyObject)TabOf(window, page).Content).Single();
+                var place = (Button)status.FindName("PlaceButton");
+                Assert.True(place.IsVisible);
+                Assert.Equal(SettingsNames.PlaceOnDesk, System.Windows.Automation.AutomationProperties.GetName(place));
+                // Execute the button's own command: a raised Click would not run it (P13).
+                Assert.True(place.Command.CanExecute(place.CommandParameter));
+                place.Command.Execute(place.CommandParameter);
+                Settle(window, guard);
+                Assert.False(place.IsVisible);
+                var link = (Button)status.FindName("DeskLink");
+                Assert.True(link.IsVisible);
+                Assert.Equal("desk#pieces", SettingsLinkTo.GetLink(link));
+            }
+        }
+        finally { window.Close(); }
+    });
 }

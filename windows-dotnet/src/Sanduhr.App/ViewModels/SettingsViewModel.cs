@@ -164,6 +164,11 @@ public sealed class SettingsViewModel
             Sanduhr.App.Desk.DeskMessageHandoffService.Current?.Handoff);
         NowPlayingPage = new NowPlayingPageViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.NowPlayingHub.Current, Sanduhr.App.Desk.NowPlayingLookService.Current);
         WeatherPage = new WeatherPageViewModel(new SettingsStore(new Paths()));
+        // Each feature page says where its Desk piece sits and can place it (Settings v2, Principle 1): one line per piece,
+        // reading and writing the same desk_layout as Desk, Pieces.
+        MessagePage.Piece = Desk.PieceStatus("message");
+        NowPlayingPage.Piece = Desk.PieceStatus("nowPlaying");
+        WeatherPage.Piece = Desk.PieceStatus("weather");
         // The two pages share one folder list and one set of installed pieces.
         ClaudeCodePage.FoldersChanged += Mods.ReloadFolders;
         ClaudeCodePage.PiecesChanged += Mods.Refresh;

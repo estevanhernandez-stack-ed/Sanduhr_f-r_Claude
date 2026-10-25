@@ -536,6 +536,9 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
 
     // The bar: Add line, view switch, Save, Revert
 
+    /// <summary>The Message piece's line at the page top (set by <see cref="SettingsViewModel"/>).</summary>
+    public DeskPieceStatusViewModel? Piece { get; internal set; }
+
     [RelayCommand]
     private void AddLine()
     {
@@ -543,6 +546,8 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
         _focusNext = _editor.JustAdded;
         Rebuild();
         OnPropertyChanged(nameof(EditorText));
+        // Writing a line is turning the message on: a hidden piece is shown (Principle 4).
+        Piece?.PlaceIfHidden();
     }
 
     [RelayCommand]
