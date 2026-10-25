@@ -78,7 +78,8 @@ public sealed partial class ThemesViewModel : ObservableObject
     public ThemesViewModel(WidgetViewModel widget)
     {
         _widget = widget;
-        Studio = new ThemeStudioViewModel(widget, Error, Info, RefreshList);
+        Studio = new ThemeStudioViewModel(widget, Error, Info, RefreshList,
+            Sanduhr.App.Desk.DeskFonts.ForThisPc(new Sanduhr.Core.Paths()).PickerFamilies());
         _isStudioMode = widget.LoadThemesStudioMode();
         if (_isStudioMode)
             Studio.Activate();
@@ -123,7 +124,7 @@ public sealed partial class ThemesViewModel : ObservableObject
             PasteSummary = "";
             return;
         }
-        var lint = ThemeLint.Lint(raw);
+        var lint = ThemeLint.Lint(raw, _widget.FontAvailable);
         foreach (var f in lint.Findings.OrderBy(f => f.Level == ThemeFindingLevel.Error ? 0 : 1))
             PasteFindings.Add(new ThemeFindingViewModel(f.Field, f.Message, f.Level == ThemeFindingLevel.Error));
         HasPasteFindings = PasteFindings.Count > 0;

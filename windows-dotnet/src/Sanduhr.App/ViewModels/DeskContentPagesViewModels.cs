@@ -160,6 +160,13 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
         Status = NowPlayingStatus.Text(on, _hub?.Shown, LauncherAppCache.Current is { } apps ? apps.StartMenuName : null);
     }
 
+    /// <summary>The settings changed behind the page (theme match's Follow off or Match now turned Gradient bars on): read them again.</summary>
+    public void ReloadSettings()
+    {
+        _saved = _store.LoadNowPlaying();
+        Load();
+    }
+
     internal void SetExcluded(string appId, bool excluded)
     {
         var list = _saved.Excluded.Where(e => !string.Equals(e, appId, StringComparison.OrdinalIgnoreCase)).ToList();

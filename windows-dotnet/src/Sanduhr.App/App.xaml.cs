@@ -30,6 +30,9 @@ public partial class App : Application
     private GlobalHotKeyService? _hotKeys;
     private ClaudeCodeGlowService? _glow;
     private Desk.DeskController? _desk;
+    /// <summary>This PC's font families for the theme's font (theme match): drawn when present, warned about when not. Read again when a
+    /// font pack comes or goes.</summary>
+    private Desk.DeskFonts _themeFonts = new([]);
     private Desk.NowPlayingHub? _nowPlaying;
     private Desk.DeskMessageSource? _messages;
     private Desk.DeskMessageHandoffService? _handoff;
@@ -75,6 +78,11 @@ public partial class App : Application
         startupSettings.SyncMcpExport();
 
         _vm = new WidgetViewModel();
+        // A theme's font (theme match): drawn when this PC has the family, bundled, installed or from a font pack; the theme lint warns
+        // about one it lacks. Set before the first ApplyThemeResources so the first paint is in the theme's font.
+        _themeFonts = Desk.DeskFonts.ForThisPc(new Sanduhr.Core.Paths());
+        _vm.FontAvailable = f => _themeFonts.Has(f);
+        Sanduhr.App.Theming.ThemePalette.ResolveFont = f => _themeFonts.Has(f) ? _themeFonts.Families(f).Regular : null;
         // Apply the saved theme's palette to the Application resources before the
         // window is shown so the first paint is correct (no obsidian→saved flash).
         _vm.ApplyThemeResources();
@@ -533,8 +541,10 @@ public partial class App : Application
     /// <summary>A design was applied: an open Settings window re-reads the Desk page, the Launcher and the designs.</summary>
     private void FollowDesignChange()
     {
-        if (_settingsWindow?.ViewModel.Desk is not { } page) return;
-        page.RefreshFromStore();
+        if (_settingsWindow?.ViewModel is not { } svm) return;
+        svm.Desk.RefreshFromStore();
+        // Put my Desk back, a design switch or an MCP design can turn Follow on or off behind the section.
+        svm.ThemeMatch.Reload();
     }
 
     /// <summary>Arrange mode began, dropped a piece or ended: the tray entry and an open Settings window follow
@@ -618,9 +628,13 @@ public partial class App : Application
         _desk.ArrangeChanged += OnArrangeChanged;
         _desk.WidgetDimRequested += (dimmed, ease) => _window?.SetCareDim(dimmed, ease);
         _desk.MenuRequested += OnDeskMenu;
-        _vm.ThemeChanged += _ => _desk?.ThemeChanged();
+        _vm.ThemeChanged += p => _desk?.ThemeChanged(p.Definition);
+        // The meters' usage signal follows Alerts' thresholds.
+        _vm.AlertSettingsChanged += () => _desk?.Reload();
         // The widget's now-playing line (spec 6.3, W8) shares the Desk's media-session listener.
         _vm.NowPlaying = new NowPlayingLineViewModel(_nowPlaying, store);
+        // The theme a following Desk draws from (theme match), before the first redraw.
+        _desk.ThemeChanged(_vm.Palette.Definition);
         _desk.Reload();
         _looks.Start();
     }
@@ -719,6 +733,16 @@ public partial class App : Application
         svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
         svm.Desk.Changed = () => _desk?.Reload();
+        // Desk Look, Match the widget theme: the plate note follows the running Desk's readability guard.
+        svm.ThemeMatch.PlateForced = () => _desk?.PlateForced == true;
+        Action plateShown = () => svm.ThemeMatch.Reload();
+        if (_desk is not null) _desk.PlateForcedChanged += plateShown;
+        // The widget theme changing while Settings is open (the strip, Themes, an MCP theme): the followed line names the new one.
+        Action<Sanduhr.App.Theming.ThemePalette> themeShown = _ => svm.ThemeMatch.Reload();
+        if (_vm is not null) _vm.ThemeChanged += themeShown;
+        // Match now's guard asks the Desk what is behind the clock, and whether the guard already holds the plate on.
+        svm.ThemeMatch.Service.WallpaperLuminance = () => _desk?.ClockLuminance() ?? [];
+        svm.ThemeMatch.Service.PlateForced = () => _desk?.PlateForced == true;
         svm.Desk.ArrangeRequested = () => _desk?.BeginArrange();
         svm.Desk.Arranging = _desk?.Arranging == true;
         svm.Desk.ArrangingLayout = _desk?.Session?.Working.Layout;
@@ -730,7 +754,9 @@ public partial class App : Application
         // A font pack changes what the Desk and a design may draw in: drop their font lists before the Desk redraws.
         svm.WidgetsPage.Changed = () =>
         {
+            _themeFonts = Desk.DeskFonts.ForThisPc(new Sanduhr.Core.Paths());
             _vm?.ReloadUserThemes();
+            _vm?.ApplyThemeResources();
             _desk?.ResetFonts();
             _deskDesign?.FontsChanged();
             _desk?.Reload();
@@ -751,7 +777,12 @@ public partial class App : Application
         try
         {
             _settingsWindow = new SettingsWindow(svm);
-            _settingsWindow.Closed += (_, _) => RunnerStatusShown -= showRunnerStatus;
+            _settingsWindow.Closed += (_, _) =>
+            {
+                RunnerStatusShown -= showRunnerStatus;
+                if (_desk is not null) _desk.PlateForcedChanged -= plateShown;
+                if (_vm is not null) _vm.ThemeChanged -= themeShown;
+            };
         }
         catch (Exception e)
         {
@@ -764,6 +795,8 @@ public partial class App : Application
             }
             catch { }
             RunnerStatusShown -= showRunnerStatus; // no window to show it in
+            if (_vm is not null) _vm.ThemeChanged -= themeShown;
+            if (_desk is not null) _desk.PlateForcedChanged -= plateShown;
             throw;
         }
         if (_window is { IsLoaded: true })

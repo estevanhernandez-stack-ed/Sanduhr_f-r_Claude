@@ -7,8 +7,8 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Desk;
 
 /// <summary>One reading a styled meter draws (#336): its label, the short name a ring carries, the percent, the fill (0 to 1), the
-/// pace mark (0 to 1, a Claude limit only) and whether it is over the warning line.</summary>
-internal sealed record DeskGaugeRead(string Label, string Short, int Percent, double Fill, double? Pace = null, bool Warning = false);
+/// pace mark (0 to 1, a Claude limit only) and its level by the alert thresholds (theme match, the usage signal).</summary>
+internal sealed record DeskGaugeRead(string Label, string Short, int Percent, double Fill, double? Pace = null, MeterLevel Level = MeterLevel.Calm);
 
 /// <summary>
 /// The meter styles (#336): <see cref="DeskMeterStyle.Slim"/>, <see cref="DeskMeterStyle.Ring"/> and <see cref="DeskMeterStyle.Ticks"/>
@@ -21,14 +21,14 @@ internal sealed partial class DeskView
     /// <summary>The Claude limits in a style other than bar: the same rows, the sign-in line when there are none.</summary>
     private FrameworkElement? StyledMeters(double ts, HorizontalAlignment align, DeskMeterStyle style)
     {
-        var rows = DeskMeters.Rows(_frame.Usage, _frame.Now);
+        var rows = DeskMeters.Rows(_frame.Usage, _frame.Now, warnAt: _frame.WarnAt, urgentAt: _frame.UrgentAt);
         double size = ts * 0.17;
         if (rows.Count == 0)
         {
             if (!DeskMeters.SignInLineShown(_frame.Usage)) return null;
             return Text(DeskClaudeText.SignInLine(_frame.Usage.FirstSignIn), size, 0.75);
         }
-        var reads = rows.Select(r => new DeskGaugeRead(r.Label, DeskMeters.ShortLabel(r.Key), r.Percent, r.Fill, r.Pace, r.Warning)).ToList();
+        var reads = rows.Select(r => new DeskGaugeRead(r.Label, DeskMeters.ShortLabel(r.Key), r.Percent, r.Fill, r.Pace, r.Level)).ToList();
         var gauges = Gauges(reads, style, size, ts * 2.6, align, null);
         gauges.Opacity = _frame.Usage.IsStale(_frame.Now) ? 0.5 : 1;
         return gauges;
@@ -64,7 +64,8 @@ internal sealed partial class DeskView
         double size = ts * 0.19;
         double opacity = _frame.Usage.IsStale(_frame.Now) ? 0.45 : 0.75;
         var tiers = (_frame.Usage.LineTiers ?? _frame.Usage.Tiers).Where(t => t.Key is TierModel.FiveHour or TierModel.SevenDay).ToList();
-        IReadOnlyList<DeskMeterRow> rows = style == DeskMeterStyle.Slim ? [] : DeskMeters.Rows(_frame.Usage with { Tiers = tiers }, _frame.Now);
+        IReadOnlyList<DeskMeterRow> rows = style == DeskMeterStyle.Slim ? []
+            : DeskMeters.Rows(_frame.Usage with { Tiers = tiers }, _frame.Now, warnAt: _frame.WarnAt, urgentAt: _frame.UrgentAt);
         if (rows.Count == 0)
         {
             if (DeskClaudeText.Compact(_frame.Usage) is not { } lines) return null;
@@ -84,7 +85,7 @@ internal sealed partial class DeskView
         name.Margin = new Thickness(0, 0, 0, small * 0.3);
         column.Children.Add(name);
         var reads = rows.Select(r => new DeskGaugeRead(r.Key == TierModel.FiveHour ? "session" : "week",
-            r.Key == TierModel.FiveHour ? "session" : "week", r.Percent, r.Fill, r.Pace, r.Warning)).ToList();
+            r.Key == TierModel.FiveHour ? "session" : "week", r.Percent, r.Fill, r.Pace, r.Level)).ToList();
         column.Children.Add(Gauges(reads, style, small, ts * 2.6, align, null));
         return column;
     }
@@ -116,22 +117,13 @@ internal sealed partial class DeskView
         return panel;
     }
 
-    private Brush Warn
-    {
-        get
-        {
-            var b = new SolidColorBrush(WarningRed);
-            b.Freeze();
-            return b;
-        }
-    }
 
-    /// <summary>The label and the value on one line, the value at the end (red over the warning line).</summary>
+    /// <summary>The label and the value on one line, the value at the end (yellow or red past the alert thresholds).</summary>
     private (DockPanel Head, TextBlock Percent) Head(DeskGaugeRead r, double size)
     {
         var head = new DockPanel { LastChildFill = true };
         var pct = Text($"{r.Percent}%", size, 1);
-        if (r.Warning) pct.Foreground = Warn;
+        Signal(pct, r.Level);
         DockPanel.SetDock(pct, Dock.Right);
         head.Children.Add(pct);
         var name = Text(r.Label, size, 0.85);
@@ -153,12 +145,12 @@ internal sealed partial class DeskView
         var bar = new Grid { Width = width, Height = markH, Margin = new Thickness(0, size * 0.1, 0, 0) };
         bar.Children.Add(new Rectangle
         {
-            Height = barH, RadiusX = barH / 2, RadiusY = barH / 2, Fill = Ink, Opacity = 0.22, VerticalAlignment = VerticalAlignment.Center,
+            Height = barH, RadiusX = barH / 2, RadiusY = barH / 2, Fill = MeterTrack, Opacity = MeterTrackOpacity, VerticalAlignment = VerticalAlignment.Center,
         });
         var fill = new Rectangle
         {
             Width = Math.Round(width * Math.Clamp(r.Fill, 0, 1)), Height = barH, RadiusX = barH / 2, RadiusY = barH / 2,
-            Fill = r.Warning ? Warn : Ink, Opacity = _ink.TextOpacity,
+            Fill = MeterFill(r.Level), Opacity = _ink.TextOpacity,
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
         };
         bar.Children.Add(fill);
@@ -176,7 +168,7 @@ internal sealed partial class DeskView
     /// <summary>The pace mark: a 2 px upright line at the pace's place along the meter.</summary>
     private Rectangle PaceMark(double pace, double width, double height) => new()
     {
-        Width = 2, Height = height, Fill = Ink, Opacity = _ink.TextOpacity,
+        Width = 2, Height = height, Fill = PaceInk, Opacity = _ink.TextOpacity,
         HorizontalAlignment = HorizontalAlignment.Left,
         Margin = new Thickness(Math.Max(0, Math.Min(width - 2, pace * width - 1)), 0, 0, 0),
     };
@@ -205,20 +197,41 @@ internal sealed partial class DeskView
             Canvas.SetTop(cells[i], over);
             canvas.Children.Add(cells[i]);
         }
-        var lit = Ink;
-        // A gradient ink runs along the row, a color per cell, so each cell is not a little copy of the whole gradient.
-        var stops = _ink.Stops;
-        bool spread = stops.Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1;
-        var colors = Enumerable.Range(0, n).Select(i => spread ? SolidInk(NowPlayingLooks.ColorAt(stops, (double)i / (n - 1))) : lit).ToArray();
-        var warn = Warn;
+        // A gradient ink runs along the row, a color per cell, so each cell is not a little copy of the whole gradient; past Warn at
+        // the signal's stop runs along it too (theme match).
+        Brush[] CellColors(MeterLevel level)
+        {
+            var stops = MeterSignal.Stops(MeterStops, level);
+            bool spread = stops.Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1;
+            var solid = _frame.MeterStops is null ? Ink : SolidInk(stops[0]);
+            return [.. Enumerable.Range(0, n).Select(i => spread ? SolidInk(NowPlayingLooks.ColorAt(stops, (double)i / (n - 1))) : solid)];
+        }
+        // Past Warn at the signal runs along the LIT cells, not the whole row: its peak sits on the middle lit cell and the rest blend
+        // toward it from the ink's ends, so a low custom Warn at never leaves the yellow on an unlit cell.
+        Brush[] LitColors(MeterLevel level, int on)
+        {
+            var stops = MeterSignal.Stops(MeterStops, level);
+            int baseCount = MeterSignal.Stops(MeterStops, MeterLevel.Calm).Count;
+            double peak = (double)((Math.Max(baseCount, 2) + 1) / 2) / (stops.Count - 1);   // where the signal sits along the stops
+            int p = on / 2, right = on - 1 - p;
+            return [.. Enumerable.Range(0, on).Select(i =>
+            {
+                double t = i <= p
+                    ? peak * (1 - (double)(p - i) / (p + 1))
+                    : peak + (1 - peak) * ((double)(i - p) / (right + 1));
+                return SolidInk(NowPlayingLooks.ColorAt(stops, t));
+            })];
+        }
+        var colors = CellColors(MeterLevel.Calm);
         void Light(DeskGaugeRead read)
         {
             int on = DeskMeters.LitTicks(read.Fill, n);
+            var lit = read.Level == MeterLevel.Calm || on == 0 ? colors : LitColors(read.Level, on);
             for (int i = 0; i < n; i++)
             {
                 if (i < on)
                 {
-                    cells[i].Fill = read.Warning ? warn : colors[i];
+                    cells[i].Fill = lit[i];
                     cells[i].Stroke = null;
                     cells[i].Opacity = _ink.TextOpacity;
                 }
@@ -234,7 +247,7 @@ internal sealed partial class DeskView
         Light(r);
         if (r.Pace is { } p)
         {
-            var mark = new Rectangle { Width = 2, Height = ch + 2 * over, Fill = Ink, Opacity = _ink.TextOpacity };
+            var mark = new Rectangle { Width = 2, Height = ch + 2 * over, Fill = PaceInk, Opacity = _ink.TextOpacity };
             Canvas.SetLeft(mark, Math.Max(0, Math.Min(width - 2, p * width - 1)));
             canvas.Children.Add(mark);
         }
@@ -254,7 +267,7 @@ internal sealed partial class DeskView
 
     /// <summary>
     /// Ring: a small arc gauge (Rainmeter's Roundline) with the value inside and the short name in its open bottom. The track is the
-    /// ink at 22%, the arc the ink (red over the warning line), and a Claude limit's pace mark crosses the ring.
+    /// ink at 22%, the arc the ink (with the signal's middle stop past the alert thresholds), and a Claude limit's pace mark crosses the ring.
     /// </summary>
     private (FrameworkElement, Action<DeskGaugeRead>) Ring(DeskGaugeRead r, double size)
     {
@@ -265,12 +278,12 @@ internal sealed partial class DeskView
         var face = new Grid { Width = d, Height = d };
         face.Children.Add(new Path
         {
-            Data = Arc(c, radius, 1), Stroke = Ink, StrokeThickness = t, Opacity = 0.22,
+            Data = Arc(c, radius, 1), Stroke = MeterTrack, StrokeThickness = t, Opacity = MeterTrackOpacity,
             StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
         });
         var arc = new Path
         {
-            Data = Arc(c, radius, r.Fill), Stroke = r.Warning ? Warn : Ink, StrokeThickness = t, Opacity = _ink.TextOpacity,
+            Data = Arc(c, radius, r.Fill), Stroke = MeterFill(r.Level), StrokeThickness = t, Opacity = _ink.TextOpacity,
             StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
         };
         face.Children.Add(arc);
@@ -282,11 +295,11 @@ internal sealed partial class DeskView
             {
                 X1 = c.X + inner * Math.Cos(a), Y1 = c.Y + inner * Math.Sin(a),
                 X2 = c.X + outer * Math.Cos(a), Y2 = c.Y + outer * Math.Sin(a),
-                Stroke = Ink, StrokeThickness = 2, Opacity = _ink.TextOpacity,
+                Stroke = PaceInk, StrokeThickness = 2, Opacity = _ink.TextOpacity,
             });
         }
         var value = Text($"{r.Percent}", size, 1, bold: true, alignment: TextAlignment.Center);
-        if (r.Warning) value.Foreground = Warn;
+        Signal(value, r.Level);
         value.HorizontalAlignment = HorizontalAlignment.Center;
         value.VerticalAlignment = VerticalAlignment.Center;
         face.Children.Add(value);

@@ -106,6 +106,8 @@ public static class PackValidator
     {
         "glass_alpha", "border_alpha", "border_tint", "accent_bloom", "inner_highlight", "card_corner_radius",
         "breath_period_ms", "opts_out_of_mica", "bg_grid", "monospace_font", "monospace_fallback",
+        // theme match: the widget's font and the Desk look (Core's ThemeLint checks both).
+        "font", "desk",
     };
 
     public static readonly IReadOnlyList<string> RequiredAnimations =

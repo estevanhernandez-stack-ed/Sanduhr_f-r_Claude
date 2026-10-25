@@ -24,12 +24,53 @@
                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
                 <views:SectionJumpLinks Page="DeskLook" />
 
+                <!-- Match the widget theme (theme match): Follow keeps the Desk in the active theme's look, kept in a theme of yours;
+                     Match now copies the look into the Desk's own settings once. -->
+                <StackPanel x:Name="ThemeMatchSection" views:SettingsAnchor.Id="theme-match" DataContext="{Binding ThemeMatch}">
+                    <TextBlock Text="{x:Static core:SettingsNames.ThemeMatchSection}" FontSize="13" FontWeight="SemiBold"
+                               AutomationProperties.HeadingLevel="Level2"
+                               Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                    <CheckBox Style="{DynamicResource ThemedCheckBox}"
+                              Content="{x:Static core:SettingsNames.FollowThemeSwitch}"
+                              IsChecked="{Binding Follow, Mode=TwoWay}"
+                              AutomationProperties.Name="{x:Static core:SettingsNames.FollowThemeSwitch}"
+                              AutomationProperties.HelpText="{x:Static core:SettingsNames.FollowThemeCaption}" />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                               Text="{x:Static core:SettingsNames.FollowThemeCaption}" />
+                    <Button Style="{DynamicResource FlatButton}" HorizontalAlignment="Left" Margin="0,10,0,0"
+                            Content="{x:Static core:SettingsNames.MatchNowButton}" Command="{Binding MatchNowCommand}"
+                            AutomationProperties.Name="{x:Static core:SettingsNames.MatchNowButton}"
+                            AutomationProperties.HelpText="{x:Static core:SettingsNames.MatchNowCaption}" />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                               Text="{x:Static core:SettingsNames.MatchNowCaption}" />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                               Text="{Binding Status}" Visibility="{Binding Status, Converter={StaticResource StrVis}}"
+                               AutomationProperties.LiveSetting="Polite" />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                               Text="{Binding PlateNote}" Visibility="{Binding PlateNote, Converter={StaticResource StrVis}}"
+                               AutomationProperties.LiveSetting="Polite" />
+                    <views:ThemeDeskEditor Margin="0,12,0,0" DataContext="{Binding Editor}"
+                                           Visibility="{Binding DataContext.Follow, ElementName=ThemeMatchSection, Converter={StaticResource BoolVis}}" />
+                </StackPanel>
+                <!-- Once, for the font, ink and plate controls below, which the theme draws while the Desk follows it. -->
+                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                           Text="{x:Static core:SettingsNames.ThemeLookSetsThis}"
+                           Visibility="{Binding ThemeMatch.Follow, Converter={StaticResource BoolVis}}" />
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
                 <!-- Fonts: the Desk's and the message's, the two "Font"s apart (WF12). Font packs join both lists. -->
                 <StackPanel views:SettingsAnchor.Id="look">
                     <TextBlock Text="{x:Static core:SettingsNames.FontsSection}" FontSize="13" FontWeight="SemiBold"
                                AutomationProperties.HeadingLevel="Level2"
                                Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
-                    <Grid DataContext="{Binding Desk}">
+                    <Grid DataContext="{Binding Desk}"
+                          IsEnabled="{Binding DataContext.ThemeMatch.NotFollowing, ElementName=PageBody}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="110" />
                             <ColumnDefinition Width="230" />
@@ -101,7 +142,8 @@
                     <TextBlock Text="{x:Static core:SettingsNames.InkAndColor}" FontSize="13" FontWeight="SemiBold"
                                AutomationProperties.HeadingLevel="Level2"
                                Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
-                    <StackPanel DataContext="{Binding Desk}">
+                    <StackPanel DataContext="{Binding Desk}"
+                                IsEnabled="{Binding DataContext.ThemeMatch.NotFollowing, ElementName=PageBody}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="110" />
@@ -136,9 +178,10 @@
                                   AutomationProperties.Name="{x:Static core:SettingsNames.DropShadow}" />
                         <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
                                    Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                   Text="Automatic reads how bright your wallpaper image is behind each piece and picks light or dark ink, so it stays readable. It reads the wallpaper file only, never your screen. Picking one of the Colors switches the ink to Custom, which takes one hex color, or two to four with commas for a gradient, such as 8f5bd6,3a63e0,33fdff. A meter near its limit stays red in every ink." />
+                                   Text="{x:Static core:SettingsNames.DeskInkCaption}" />
                     </StackPanel>
-                    <StackPanel Margin="0,14,0,0" DataContext="{Binding MessagePage}">
+                    <StackPanel Margin="0,14,0,0" DataContext="{Binding MessagePage}"
+                                IsEnabled="{Binding DataContext.ThemeMatch.NotFollowing, ElementName=PageBody}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="110" />
@@ -175,6 +218,7 @@
                                AutomationProperties.HeadingLevel="Level2"
                                Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
                     <CheckBox Style="{DynamicResource ThemedCheckBox}"
+                              IsEnabled="{Binding DataContext.ThemeMatch.NotFollowing, ElementName=PageBody}"
                               Content="{x:Static core:SettingsNames.DeskPlateSwitch}"
                               IsChecked="{Binding Plate, Mode=TwoWay}"
                               AutomationProperties.Name="{x:Static core:SettingsNames.DeskPlateSwitch}"

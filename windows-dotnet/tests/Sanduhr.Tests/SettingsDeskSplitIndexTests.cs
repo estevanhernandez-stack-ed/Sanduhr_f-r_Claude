@@ -186,11 +186,12 @@ public class SettingsDeskSplitIndexTests
     }
 
     [Fact]
-    public void Desk_Look_holds_four_sections_and_the_old_links_land_there()
+    public void Desk_Look_holds_five_sections_and_the_old_links_land_there()
     {
-        Assert.Equal([SettingsIndex.DeskLook, SettingsIndex.DeskSizes, SettingsIndex.DeskInk, SettingsIndex.DeskPlate],
+        // Theme match put "Match the widget theme" first.
+        Assert.Equal([SettingsIndex.DeskThemeMatch, SettingsIndex.DeskLook, SettingsIndex.DeskSizes, SettingsIndex.DeskInk, SettingsIndex.DeskPlate],
             SettingsIndex.EntriesOn(SettingsPage.DeskLook).Select(e => e.Anchor));
-        Assert.Equal([SettingsNames.FontsSection, SettingsNames.SizesSection, SettingsNames.InkAndColor, SettingsNames.BackPlate],
+        Assert.Equal([SettingsNames.ThemeMatchSection, SettingsNames.FontsSection, SettingsNames.SizesSection, SettingsNames.InkAndColor, SettingsNames.BackPlate],
             SettingsIndex.EntriesOn(SettingsPage.DeskLook).Select(e => e.Title));
         foreach (var (from, anchor, to) in new[]
         {
@@ -314,5 +315,18 @@ public class SettingsDeskSplitIndexTests
     {
         Assert.Equal(new SettingsLink(to, toAnchor), SettingsIndex.Resolve(from, anchor));
         Assert.Equal(new SettingsLink(to, toAnchor), SettingsIndex.ParseLink(SettingsIndex.PageId(from) + "#" + anchor));
+    }
+
+    // ---- theme match: Desk Look's first section ----
+
+    [Fact]
+    public void Match_the_widget_theme_is_Desk_Looks_first_section_and_first_jump_link()
+    {
+        Assert.Equal((SettingsNames.ThemeMatchSection, SettingsIndex.DeskThemeMatch), SettingsIndex.JumpLinks(SettingsPage.DeskLook)[0]);
+        Assert.Contains(SettingsIndex.Search("follow the widget theme"), h => h.Entry.Page == SettingsPage.DeskLook && h.Entry.Anchor == SettingsIndex.DeskThemeMatch);
+        Assert.Contains(SettingsIndex.Search("match now"), h => h.Entry.Anchor == SettingsIndex.DeskThemeMatch);
+        Assert.Empty(SettingsNames.PathProblems("Settings, Desk Look, Match the widget theme"));
+        foreach (var name in new[] { SettingsNames.FollowThemeSwitch, SettingsNames.MatchNowButton })
+            Assert.Equal(SettingsPage.DeskLook, SettingsNames.Table.Single(t => t.Name == name).Page);
     }
 }

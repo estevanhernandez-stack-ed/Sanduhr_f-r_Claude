@@ -70,7 +70,7 @@
                                FontSize="15" FontWeight="Bold"
                                FontFamily="{DynamicResource Sanduhr.Font.Value}"
                                Effect="{DynamicResource Sanduhr.Effect.ValueBloom}"
-                               Foreground="{Binding BarColor, Converter={StaticResource ColorBrush}}" />
+                               Foreground="{Binding ValueBrush}" />
                 </Border>
             </Grid>
 
@@ -78,6 +78,7 @@
             <controls:UsageBar Height="18" Margin="0,6,0,0"
                                Value="{Binding Utilization}"
                                FillColor="{Binding BarColor}"
+                               FillBrush="{Binding BarBrush}"
                                TrackColor="{DynamicResource Sanduhr.Color.BarBg}"
                                PaceFraction="{Binding PaceFraction}"
                                PaceColor="{Binding PaceTickColor}" />

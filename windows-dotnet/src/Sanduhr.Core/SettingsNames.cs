@@ -368,6 +368,67 @@ public static class SettingsNames
     public const string MessageSize = "Message size";
     public const string GlowAroundMessage = "Glow around the message";
     public const string DropShadow = "Drop shadow under the text";
+
+    // ---- One theme for the widget and the Desk (theme match) ----
+    /// <summary>Desk Look's first section (theme match).</summary>
+    public const string ThemeMatchSection = "Match the widget theme";
+    public const string FollowThemeSwitch = "Follow the widget theme";
+    public const string FollowThemeCaption =
+        "The Desk draws its colors, gradients, font, plate and shadow from the widget's theme, and changes with it. The look is kept in a theme of yours, so it travels with the theme.";
+    public const string MatchNowButton = "Match now";
+    public const string MatchNowCaption =
+        "Copies the widget theme's look into the Desk's own settings once. The Desk keeps it when the theme changes.";
+    /// <summary>Under the ink choices in Desk Look.</summary>
+    public const string DeskInkCaption = "Automatic reads how bright your wallpaper image is behind each piece and picks light or dark ink, so it stays readable. It reads the wallpaper file only, never your screen. Picking one of the Colors switches the ink to Custom, which takes one hex color, or two to four with commas for a gradient, such as 8f5bd6,3a63e0,33fdff. A meter past the alert levels (warn and urgent, set in Settings, Alerts) takes a yellow or red stop in the middle of its color, in every ink.";
+    /// <summary>Under Desk Look's own look controls while the Desk follows the theme.</summary>
+    public const string ThemeLookSetsThis = "The widget theme sets this while the Desk follows it. Change it above, in Match the widget theme.";
+    /// <summary>The status line after Follow on, an update or a new theme.</summary>
+    public static string FollowingTheme(string theme) => $"The Desk follows {theme}.";
+    public const string KeptAsOwnLook = "The Desk keeps this look as its own.";
+    /// <summary>The incoming name of the design Match now saves first: "Before matching Obsidian".</summary>
+    public static string MatchingTheme(string theme) => $"matching {theme}";
+    public static string MatchedTheme(string theme) => $"The Desk now matches {theme}. Its look is its own, so it stays when the theme changes.";
+    /// <summary>Appended to the Match now line when the readability guard turned the plate on.</summary>
+    public const string ThemeMatchPlateNote = "The plate is on so the clock reads over this wallpaper.";
+    /// <summary>Under the Follow switch while the guard holds the plate on or draws it stronger.</summary>
+    public const string ThemeFollowPlateNote = "The plate is stronger so the clock reads over this wallpaper.";
+    /// <summary>Appended to the Match now line when the clock may still be faint over this wallpaper at the plate's one fixed strength.</summary>
+    public const string ThemeMatchFaintNote = "The clock may be faint over this wallpaper. Follow the widget theme keeps it readable.";
+    public const string CouldNotSaveDeskFirst = "The Desk could not be saved first, so nothing was changed.";
+    public static string ThemeNotWritten(string why) => $"The theme could not be written ({why}), so nothing was changed.";
+    public static string AddOrNewQuestion(string theme) =>
+        $"{theme} is one of your themes. The Desk's look can go into it, or into a new theme made from it.";
+    public static string AddDeskLookTo(string theme) => $"Add the Desk look to {theme}";
+    public const string MakeANewTheme = "Make a new theme";
+    public const string ThemeMatchCancel = "Cancel";
+    public static string WhereQuestion(string theme, bool canUpdate) => canUpdate
+        ? $"The Desk follows {theme}. Save this change into it, or into a new theme?"
+        : $"The Desk follows {theme}, a built-in or pack theme that stays as it is. Save this change as a new theme?";
+    public static string UpdateTheme(string theme) => $"Update {theme}";
+    public const string SaveAsNewTheme = "Save as a new theme";
+    public const string NewThemeNamePrompt = "Name of the new theme";
+    public static string ThemeUpdated(string theme) => $"Updated {theme}.";
+
+    /// <summary>The theme's Desk look editor (Desk Look while following; the Theme Studio).</summary>
+    public const string ThemeDeskLookHeading = "The theme's Desk look";
+    public const string ThemeDeskFont = "Desk font in this theme";
+    public const string ThemeInkColors = "Ink colors";
+    public const string ThemeBarColors = "Meter bar colors";
+    public const string ThemeMessageColors = "Message colors";
+    public const string ThemeGlowColor = "Message glow color";
+    public const string ThemePlateSwitch = "Plate behind the text in this theme";
+    public const string ThemePlateColor = "Plate color";
+    public const string ThemeShadowColor = "Shadow color";
+    public const string ThemeDeskFromTheme = "From the theme";
+    public const string DesksOwnFont = "The Desk's own font";
+    public const string ThemeColorsProblem = "Use one to four hex colors, like #e8e4dc, #6c63ff.";
+    public const string ThemeColorProblem = "Use one hex color, like #6c63ff.";
+
+    /// <summary>The Theme Studio's font picker (theme match) and its first choice, no font (Segoe UI).</summary>
+    public const string ThemeFontPicker = "Font";
+    public const string ThemeDefaultFont = "Segoe UI (the default)";
+    public const string ThemeStudioDeskNote =
+        "The Desk shows these while it follows the widget theme (Settings, Desk Look, Match the widget theme).";
     /// <summary>Watchers and Launcher: the section that holds the piece's status line.</summary>
     public const string WatchersPlace = "Where they show";
     public const string LauncherPlace = "Where it shows";
@@ -457,6 +518,8 @@ public static class SettingsNames
         (DeskFont, SettingsPage.DeskLook),
         (MessageFont, SettingsPage.DeskLook),
         (MessageColor, SettingsPage.DeskLook),
+        (FollowThemeSwitch, SettingsPage.DeskLook),
+        (MatchNowButton, SettingsPage.DeskLook),
         (LauncherAddApp, SettingsPage.Launcher),
         (LauncherAddLink, SettingsPage.Launcher),
         (SignInReminders, SettingsPage.Desk),

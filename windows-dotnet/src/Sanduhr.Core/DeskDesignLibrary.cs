@@ -126,6 +126,8 @@ public static class DeskDesigns
         o.Remove("messages");
         // No nickname is the same look as a design from before nicknames (#315).
         if (design.Weather is { Nickname.Length: 0 }) o.Remove("weather");
+        // Not following is the same look as a design from before theme match.
+        if (design.FollowsTheme != true) o.Remove("follows_theme");
         if (design.Layout is { } layout)
         {
             var sorted = new JsonObject();

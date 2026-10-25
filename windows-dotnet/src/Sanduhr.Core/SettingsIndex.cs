@@ -99,6 +99,8 @@ public static class SettingsIndex
     public const string DeskAdvanced = "desk-advanced";
     /// <summary>Desk Look, Sizes (slice 3).</summary>
     public const string DeskSizes = "sizes";
+    /// <summary>Desk Look, Match the widget theme (theme match): the page's first section.</summary>
+    public const string DeskThemeMatch = "theme-match";
     // Desk: Message, Now playing, Weather (S6)
     public const string MessageLines = "lines";
     public const string MessageRotation = "rotation";
@@ -230,6 +232,9 @@ public static class SettingsIndex
             ["oled", "burn-in", "burn in", "burnin", "drift", "dim", "idle", "away", "screen", "pixels", "white", "image retention", "off by default"],
             collapsedIn: SettingsNames.DeskAdvanced),
 
+        E(SettingsNames.ThemeMatchSection, SettingsPage.DeskLook, DeskThemeMatch,
+            [SettingsNames.FollowThemeSwitch, SettingsNames.MatchNowButton, "widget theme", "match", "matching", "follow",
+             "same look", "one theme", "plate color", "shadow color", "glow color"]),
         E(SettingsNames.FontsSection, SettingsPage.DeskLook, DeskLook,
             ["font", SettingsNames.DeskFont, SettingsNames.MessageFont, "EsteFont", "EsteFont Pro", "EsteFont 26", "typeface", "Segoe UI", "font pack"]),
         E(SettingsNames.SizesSection, SettingsPage.DeskLook, DeskSizes,
@@ -328,6 +333,8 @@ public static class SettingsIndex
         [SettingsNames.DeskFont] = DeskLook,
         [SettingsNames.MessageFont] = DeskLook,
         [SettingsNames.MessageColor] = DeskInk,
+        [SettingsNames.FollowThemeSwitch] = DeskThemeMatch,
+        [SettingsNames.MatchNowButton] = DeskThemeMatch,
         [SettingsNames.LauncherAddApp] = LauncherButtons,
         [SettingsNames.LauncherAddLink] = LauncherButtons,
         [SettingsNames.NowPlayingInWidget] = NowPlayingWidget,
@@ -725,7 +732,7 @@ public static class SettingsIndex
     public static IReadOnlyList<(string Title, string Anchor)> JumpLinks(SettingsPage page) => page switch
     {
         SettingsPage.Desk => Links(page, DeskPieces, DeskClicks, DeskDesigns, DeskAdvanced),
-        SettingsPage.DeskLook => Links(page, DeskLook, DeskSizes, DeskInk, DeskPlate),
+        SettingsPage.DeskLook => Links(page, DeskThemeMatch, DeskLook, DeskSizes, DeskInk, DeskPlate),
         // The first is named for the widget it sits in; the others read as their index rows.
         SettingsPage.NowPlaying => [(SettingsNames.NowPlayingJumpWidget, NowPlayingWidget),
             .. Links(page, NowPlayingApps, NowPlayingBars, NowPlayingLooks)],

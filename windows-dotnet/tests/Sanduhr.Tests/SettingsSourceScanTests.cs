@@ -67,7 +67,8 @@ public class SettingsSourceScanTests
         var views = Path.Combine(AppDir(), "Views");
         return new[] { Path.Combine(views, "SettingsWindow.xaml") }
             .Concat(Directory.EnumerateFiles(views, "*Page.xaml").Order(StringComparer.Ordinal))
-            .Concat(Directory.EnumerateFiles(views, "*Panel.xaml").Order(StringComparer.Ordinal));
+            .Concat(Directory.EnumerateFiles(views, "*Panel.xaml").Order(StringComparer.Ordinal))
+            .Append(Path.Combine(views, "ThemeDeskEditor.xaml"));
     }
 
     /// <summary>One TabItem of SettingsWindow.xaml, from its start tag to its end tag.</summary>
@@ -639,7 +640,7 @@ public class SettingsSourceScanTests
         // A literal hex Background pairs a themed Foreground with a fixed fill: dark text on near-black in a light theme (Store 10.1.4.4).
         var xaml = XmlComment.Replace(File.ReadAllText(Path.Combine(AppDir(), "Views", "ThemedDialog.xaml")), "");
         var buttons = Regex.Matches(xaml, "<Button\\b[^>]*>", RegexOptions.Singleline);
-        Assert.Equal(2, buttons.Count);
+        Assert.Equal(3, buttons.Count);   // Primary, Secondary and the Cancel of ShowChoice
         foreach (Match button in buttons)
             Assert.DoesNotMatch("\\bBackground=\"#", button.Value);
     }
@@ -704,5 +705,13 @@ public class SettingsSourceScanTests
                     bad.Add($"{Path.GetFileName(file)}: {sv.Value} is a Tab stop");
         }
         Assert.True(bad.Count == 0, string.Join(Environment.NewLine, bad));
+    }
+
+    [Fact]
+    public void Desk_Look_takes_the_ink_caption_from_SettingsNames_not_an_inline_sentence()
+    {
+        string xaml = File.ReadAllText(Path.Combine(AppDir(), "Views", "DeskLookPage.xaml"));
+        Assert.DoesNotContain("set under Alerts", xaml, StringComparison.Ordinal);
+        Assert.Contains("SettingsNames.DeskInkCaption", xaml, StringComparison.Ordinal);
     }
 }

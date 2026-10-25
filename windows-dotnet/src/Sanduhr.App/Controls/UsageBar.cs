@@ -35,11 +35,18 @@ public sealed class UsageBar : FrameworkElement
         nameof(PaceColor), typeof(Color), typeof(UsageBar),
         new FrameworkPropertyMetadata(Color.FromRgb(0xff, 0x6b, 0x6b), FrameworkPropertyMetadataOptions.AffectsRender));
 
+    /// <summary>The fill as a brush (theme match: a theme's <c>desk.bars</c> gradient with the usage signal); null fills with
+    /// <see cref="FillColor"/>, the ramp, as before.</summary>
+    public static readonly DependencyProperty FillBrushProperty = DependencyProperty.Register(
+        nameof(FillBrush), typeof(Brush), typeof(UsageBar),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
     public double Value { get => (double)GetValue(ValueProperty); set => SetValue(ValueProperty, value); }
     public Color FillColor { get => (Color)GetValue(FillColorProperty); set => SetValue(FillColorProperty, value); }
     public Color TrackColor { get => (Color)GetValue(TrackColorProperty); set => SetValue(TrackColorProperty, value); }
     public double PaceFraction { get => (double)GetValue(PaceFractionProperty); set => SetValue(PaceFractionProperty, value); }
     public Color PaceColor { get => (Color)GetValue(PaceColorProperty); set => SetValue(PaceColorProperty, value); }
+    public Brush? FillBrush { get => (Brush?)GetValue(FillBrushProperty); set => SetValue(FillBrushProperty, value); }
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -56,7 +63,13 @@ public sealed class UsageBar : FrameworkElement
         if (frac > 0)
         {
             double fw = Math.Max(radius * 2, w * frac);
-            var fill = new SolidColorBrush(FillColor); fill.Freeze();
+            var fill = FillBrush;
+            if (fill is null)
+            {
+                var solid = new SolidColorBrush(FillColor);
+                solid.Freeze();
+                fill = solid;
+            }
             dc.PushClip(new System.Windows.Media.RectangleGeometry(rect, radius, radius));
             dc.DrawRoundedRectangle(fill, null, new Rect(0, 0, fw, h), radius, radius);
             dc.Pop();

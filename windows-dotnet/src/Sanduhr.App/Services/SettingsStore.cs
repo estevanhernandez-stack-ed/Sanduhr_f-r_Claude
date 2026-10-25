@@ -793,6 +793,18 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>"Follow the widget theme" (theme match): <c>desk_follows_theme</c>, absent = off. While on, the Desk draws the active
+    /// theme's look and leaves its own look settings untouched for when it goes off. Written only while on.</summary>
+    public bool LoadDeskFollowsTheme() => ReadBool(Read(), "desk_follows_theme", false);
+
+    public void SaveDeskFollowsTheme(bool on)
+    {
+        var root = Read();
+        if (on) root["desk_follows_theme"] = true;
+        else root.Remove("desk_follows_theme");
+        Write(root);
+    }
+
     /// <summary>A fresh install's first launch writes the plate on; an existing install keeps what it has.</summary>
     public void SeedDeskPlate(bool freshInstall)
     {
