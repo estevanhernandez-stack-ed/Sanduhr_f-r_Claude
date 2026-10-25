@@ -361,6 +361,25 @@ public sealed class DeskArrangement
         _ => DeskAnchor.BL,
     };
 
+    /// <summary>
+    /// Where Settings and Arrange put a piece they show (Settings v2, Principle 4): Desk, Pieces' Show box, "Place it on the
+    /// Desk", a feature's own on-action, Arrange's Hidden strip, a companion install and the glow. One table, so a place is one
+    /// line to change. The rows marked "proposal" are the spec's proposals for the owner to confirm (settings-v2 spec, Desk);
+    /// the clock, the Claude meters and the glow keep the place they had before v2. <see cref="DefaultAnchor"/> stays the
+    /// layout and design formats' fallback for an anchor this build can't read.
+    /// </summary>
+    public static DeskAnchor DefaultPlaceFor(string widget) => widget switch
+    {
+        "message" => DeskAnchor.BL,      // proposal: bottom left
+        "nowPlaying" => DeskAnchor.BR,   // proposal: bottom right
+        "weather" => DeskAnchor.TR,      // proposal: top right
+        "watchers" => DeskAnchor.MR,     // proposal: right (the middle of the right edge)
+        "launcher" => DeskAnchor.TL,     // proposal: top left
+        "companion" => DeskAnchor.BC,    // proposal: bottom center
+        "telemetry" => DeskAnchor.TR,    // proposal: top right
+        _ => DefaultAnchor(widget),      // clock, claude, meters, meetings: bottom left; glow: top center (as before v2)
+    };
+
     /// <summary>The widget's place in Settings order; an unknown word sorts last.</summary>
     public static int Rank(string widget)
     {
@@ -501,13 +520,29 @@ public sealed class DeskArrangement
     public void Hide(string widget) => Place(widget, null);
 
     /// <summary>
-    /// Puts a hidden <paramref name="widget"/> back at its standard anchor at size 1, seated by Settings
+    /// Puts a hidden <paramref name="widget"/> back at its <see cref="DefaultPlaceFor"/> place at size 1, seated by Settings
     /// order. A placed piece stays where it is; a word this build does not know is ignored.
     /// </summary>
-    public void Show(string widget)
+    public void Show(string widget) => PlaceAtDefault(widget);
+
+    /// <summary>Places a hidden <paramref name="widget"/> at <paramref name="remembered"/> or else <see cref="DefaultPlaceFor"/>,
+    /// seated by Settings order, and returns where. Null, with nothing changed, when it is already placed or this build doesn't
+    /// know the word.</summary>
+    public DeskAnchor? PlaceAtDefault(string widget, DeskAnchor? remembered = null)
     {
-        if (Placement(widget) is not null || !Known.Contains(widget, StringComparer.Ordinal)) return;
-        Place(widget, DefaultAnchor(widget));
+        if (Placement(widget) is not null || !Known.Contains(widget, StringComparer.Ordinal)) return null;
+        var at = remembered ?? DefaultPlaceFor(widget);
+        Place(widget, at);
+        return at;
+    }
+
+    /// <summary>Where <paramref name="widget"/> sits in its place's stack, top first, and how many pieces share the place;
+    /// (-1, 0) for a hidden piece. Desk, Pieces' Order buttons read it.</summary>
+    public (int Index, int Count) StackPosition(string widget)
+    {
+        if (Placement(widget) is not { } p) return (-1, 0);
+        var stack = Stack(p.Anchor);
+        return (stack.ToList().FindIndex(x => x.Widget == widget), stack.Count);
     }
 
     /// <summary>

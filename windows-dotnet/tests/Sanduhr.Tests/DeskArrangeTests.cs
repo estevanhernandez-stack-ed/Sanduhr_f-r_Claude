@@ -379,9 +379,9 @@ public class DeskArrangeTests
         Assert.Equal(1, a.Placement("clock")!.Scale);
         a.Hide("message");
         a.Show("message");
-        Assert.Equal(DeskAnchor.TL, a.Placement("message")!.Anchor);
+        Assert.Equal(DeskAnchor.BL, a.Placement("message")!.Anchor);   // DefaultPlaceFor (slice 3)
         a.Show("weather");
-        Assert.Equal(DeskAnchor.MR, a.Placement("weather")!.Anchor);
+        Assert.Equal(DeskAnchor.TR, a.Placement("weather")!.Anchor);
     }
 
     [Fact]
