@@ -63,8 +63,8 @@ public class SettingsLinkTests
         var pages = SettingsNames.Pages.Where(p => p != SettingsPage.Widgets).ToList();
         Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskPieces),
             SettingsIndex.Check(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion, SettingsIndex.Anchors, pages));
-        // With it, the place is live and stays.
-        Assert.Equal(new SettingsLink(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion),
+        // With it too, now that the companion left Widgets (slice 3): the old section is gone from the page, so the alias carries it.
+        Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskPieces),
             SettingsIndex.Check(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion));
         // An alias whose target page isn't there yet does nothing: the place is kept (Desk's Launcher until slice 3).
         Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskLauncher),

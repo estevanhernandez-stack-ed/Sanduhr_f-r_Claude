@@ -134,137 +134,24 @@ public sealed partial class InstalledWidgetRowViewModel : ObservableObject
     public override string ToString() => RowName;
 }
 
-/// <summary>An installed sprite pack the companion can be: its id and its name.</summary>
-public sealed record CompanionChoice(string Id, string Name)
-{
-    public override string ToString() => Name;
-}
-
 /// <summary>
-/// Settings ▸ Widgets (spec 3.8, sections 2 to 4): the Desk companion (which installed sprite, shown or not, roaming or
-/// not), the verified catalog with Install and Update, the installed packs with Uninstall (made here ones included), and a
+/// Settings ▸ Widgets (spec 3.8, sections 2 to 4): the verified catalog with Install and Update, the installed packs with Uninstall (made here ones included), and a
 /// status line for the fetch and the checks. The catalog is fetched only when the page opens (<see cref="Activate"/>) or on
-/// <see cref="SettingsNames.WidgetCatalogCheck"/>, and a pack only when the user installs it.
+/// <see cref="SettingsNames.WidgetCatalogCheck"/>, and a pack only when the user installs it. The companion moved to Settings, Desk, Pieces in Settings v2.
 /// </summary>
 public sealed partial class WidgetsPageViewModel : ObservableObject
 {
     private readonly Lazy<WidgetCatalogService> _service;
-    private readonly Lazy<SettingsStore> _settings;
     private Task? _refreshing;
-    private bool _loading;
 
     internal WidgetsPageViewModel(Func<WidgetCatalogService>? service = null, SettingsStore? store = null)
     {
         _service = new Lazy<WidgetCatalogService>(service ?? (() => new WidgetCatalogService()));
-        _settings = new Lazy<SettingsStore>(() => store ?? new SettingsStore(new Paths()));
+        // settings.json is no longer read here; the parameter stays for callers.
     }
 
-    /// <summary>settings.json, read only once a sprite is installed (the companion's choices live there).</summary>
-    private SettingsStore Prefs => _settings.Value;
-
-    /// <summary>Called after the companion's choice changes or a pack is installed or removed (the Desk reloads).</summary>
+    /// <summary>Called after a pack is installed or removed (the Desk reloads).</summary>
     public Action? Changed { get; set; }
-
-    /// <summary>The installed sprite packs, the companion's choices.</summary>
-    public ObservableCollection<CompanionChoice> Companions { get; } = [];
-
-    [ObservableProperty] private CompanionChoice? _selectedCompanion;
-    [ObservableProperty] private bool _companionShown;
-    [ObservableProperty] private bool _companionRoams;
-    [ObservableProperty] private bool _hasCompanions;
-    [ObservableProperty] private string _companionStatus = "";
-
-    public string CompanionPickName => SettingsNames.WidgetCompanionPick;
-    public string CompanionShowName => SettingsNames.WidgetCompanionShow;
-    public string CompanionRoamName => SettingsNames.WidgetCompanionRoam;
-
-    partial void OnSelectedCompanionChanged(CompanionChoice? value)
-    {
-        if (_loading || value is null) return;
-        Prefs.SaveCompanion(Prefs.LoadCompanion() with { Pack = value.Id });
-        CompanionStatus = StatusFor(value.Id);
-        Changed?.Invoke();
-    }
-
-    partial void OnCompanionRoamsChanged(bool value)
-    {
-        if (_loading) return;
-        Prefs.SaveCompanion(Prefs.LoadCompanion() with { Roam = value });
-        Changed?.Invoke();
-    }
-
-    /// <summary>Shown is the Desk's <c>companion</c> piece being placed: on puts it at its usual corner (bottom right) when it is
-    /// hidden, off hides it. Where it sits is Settings ▸ Desk's, like every piece.</summary>
-    partial void OnCompanionShownChanged(bool value)
-    {
-        if (_loading) return;
-        var desk = Prefs.LoadDesk();
-        var layout = new DeskArrangement(desk.Layout);
-        bool placed = layout.Placement(CompanionSettings.Widget) is not null;
-        if (value == placed) return;
-        if (value) layout.Place(CompanionSettings.Widget, DeskArrangement.DefaultAnchor(CompanionSettings.Widget));
-        else layout.Hide(CompanionSettings.Widget);
-        Prefs.SaveDesk(desk with { Layout = layout.Layout });
-        CompanionStatus = SelectedCompanion is { } c ? StatusFor(c.Id) : "";
-        Changed?.Invoke();
-    }
-
-    /// <summary>Lists the installed sprites and reads the companion's choices. A pick that is no longer installed falls back
-    /// to the first sprite, as the Desk does.</summary>
-    internal void ReloadCompanions()
-    {
-        _loading = true;
-        try
-        {
-            Companions.Clear();
-            WidgetRegistry reg;
-            try { reg = Service.Store.Load(); }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { reg = WidgetRegistry.Empty; }
-            foreach (var row in reg.Packs)
-                if (Service.Store.ReadInfo(row.Id) is { Kind: "sprite" } info)
-                    Companions.Add(new CompanionChoice(row.Id, info.Name));
-            HasCompanions = Companions.Count > 0;
-            if (!HasCompanions)
-            {
-                SelectedCompanion = null;
-                CompanionStatus = "";
-                return;
-            }
-            var settings = Prefs.LoadCompanion();
-            var active = settings.ActivePack(reg, id => Service.Store.ReadInfo(id)?.Kind);
-            SelectedCompanion = Companions.FirstOrDefault(c => c.Id == active);
-            CompanionRoams = settings.Roam;
-            CompanionShown = new DeskArrangement(Prefs.LoadDesk().Layout).Placement(CompanionSettings.Widget) is not null;
-            CompanionStatus = active is null ? "" : StatusFor(active);
-        }
-        finally { _loading = false; }
-    }
-
-    /// <summary>"Stage 2 of 4, Sprout. 5 coding days so far." and, when the Desk is off or the piece hidden, how to see it.</summary>
-    private string StatusFor(string packId)
-    {
-        string line = "";
-        try
-        {
-            var growth = CompanionGrowthState.Load(Path.Combine(Service.Store.Root, CompanionGrowthState.FileName));
-            var file = Path.Combine(Service.Store.PackDir(packId), "sprite.json");
-            if (File.Exists(file) && CompanionSprite.Parse(File.ReadAllBytes(file)) is { } sprite)
-            {
-                var stage = sprite.StageAt(growth.Growth);
-                int at = sprite.Stages.ToList().IndexOf(stage) + 1;
-                string days = growth.Days.Count == 1 ? "1 coding day" : $"{growth.Days.Count} coding days";
-                line = sprite.Stages.Count > 1
-                    ? $"Stage {at} of {sprite.Stages.Count}, {stage.Name}. {days} so far."
-                    : $"{days} so far.";
-            }
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException) { }
-        var desk = Prefs.LoadDesk();
-        if (!desk.Enabled) line = (line + " Turn the Desk on in Settings, Desk to see it.").Trim();
-        else if (new DeskArrangement(desk.Layout).Placement(CompanionSettings.Widget) is null)
-            line = (line + " It is hidden; switch on " + SettingsNames.WidgetCompanionShow + ".").Trim();
-        return line;
-    }
 
     internal WidgetCatalogService Service => _service.Value;
 
@@ -282,7 +169,6 @@ public sealed partial class WidgetsPageViewModel : ObservableObject
     public Task Activate()
     {
         ReloadInstalled();
-        ReloadCompanions();
         return _refreshing is { IsCompleted: false } running ? running : _refreshing = RefreshAsync();
     }
 
@@ -353,7 +239,6 @@ public sealed partial class WidgetsPageViewModel : ObservableObject
     private void Rebuild()
     {
         ReloadInstalled();
-        ReloadCompanions();
         Catalog.Clear();
         var doc = Service.Client.Current;
         if (doc is not null)

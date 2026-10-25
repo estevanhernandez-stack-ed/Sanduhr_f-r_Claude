@@ -213,7 +213,9 @@ public static class SettingsIndex
              SettingsNames.LauncherAddApp, SettingsNames.LauncherAddLink, "image", "label", "PNG", "Chrome app", "PWA"]),
         E(SettingsNames.PiecesSection, SettingsPage.Desk, DeskPieces,
             ["where each piece sits", "show", "hide", "order", "reorder", "move up", "move down", "stack", "layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor", "monitor", "monitors", "screen", "display", "main monitor", "all monitors", "second monitor", "per monitor",
-             "style", "meter style", "slim", "ring", "rings", "gauge", "ticks", "segments", "Roundline", "compact"]),
+             "style", "meter style", "slim", "ring", "rings", "gauge", "ticks", "segments", "Roundline", "compact",
+             "companion", "pet", "sprite", "hourglass", "roam", "walk", "grow", "growth", "stage", "mood", SettingsNames.WidgetCompanionPick,
+             SettingsNames.WidgetCompanionRoam]),
         E("Look", SettingsPage.Desk, DeskLook,
             ["font", "EsteFont", "EsteFont Pro", "EsteFont 26", "clock size", "time size", "typeface", "Segoe UI"]),
         E(SettingsNames.DeskPlateSwitch, SettingsPage.Desk, DeskPlate,
@@ -248,9 +250,6 @@ public static class SettingsIndex
              SettingsNames.WeatherShowAs]),
         E("Weather data by Open-Meteo.com", SettingsPage.Weather, WeatherCredit, ["Open-Meteo", "credit", "attribution", "GeoNames"]),
 
-        E("Desk companion", SettingsPage.Widgets, WidgetsCompanion,
-            ["companion", "pet", "sprite", "hourglass", "roam", "walk", "grow", "growth", "stage", "mood", SettingsNames.WidgetCompanionShow,
-             SettingsNames.WidgetCompanionRoam]),
         E("Widget catalog", SettingsPage.Widgets, WidgetsCatalog,
             ["widgets", "catalog", "install", "download", "sprite", "companion", "pet", "palette", "effects", "font", "theme pack",
              "hourglass", "OLED Neon", "signature", "verified", "GitHub"]),
@@ -315,8 +314,8 @@ public static class SettingsIndex
         [SettingsNames.NowPlayingBarsGradient] = NowPlayingBars,
         [SettingsNames.GlowWhere] = GlowWhere,
         [SettingsNames.WidgetCatalogCheck] = WidgetsCatalog,
-        [SettingsNames.WidgetCompanionShow] = WidgetsCompanion,
-        [SettingsNames.WidgetCompanionRoam] = WidgetsCompanion,
+        [SettingsNames.WidgetCompanionPick] = DeskPieces,
+        [SettingsNames.WidgetCompanionRoam] = DeskPieces,
     };
 
     /// <summary>Words a page goes by besides its title.</summary>
@@ -339,7 +338,7 @@ public static class SettingsIndex
         [SettingsPage.DeskLook] = ["look", "fonts", "size", "ink", "color", "colour", "plate"],
         [SettingsPage.Watchers] = ["watcher", "cards", "CI", "progress"],
         [SettingsPage.Launcher] = ["buttons", "apps", "links", "shortcuts"],
-        [SettingsPage.Widgets] = ["widget packs", "companion", "sprite", "catalog", "pet"],
+        [SettingsPage.Widgets] = ["widget packs", "sprite", "catalog"],
         [SettingsPage.About] = ["help", "version", "trademark", "privacy"],
     };
 

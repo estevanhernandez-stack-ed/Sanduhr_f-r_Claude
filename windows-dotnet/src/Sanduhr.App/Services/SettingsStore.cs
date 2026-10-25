@@ -31,8 +31,12 @@ public sealed class SettingsStore
     private readonly string _path;
     private readonly string _mcpSettingsPath;
 
+    /// <summary>The folders this store reads and writes under (a scratch profile in tests).</summary>
+    public Paths Paths { get; }
+
     public SettingsStore(Paths paths)
     {
+        Paths = paths;
         _path = paths.SettingsFile;
         // The projection sanduhr-mcp reads, in %USERPROFILE%\.sanduhr (spec Plan B, B.2).
         _mcpSettingsPath = paths.McpSettingsFile;

@@ -63,6 +63,10 @@ public sealed partial class DeskPieceRow : ObservableObject
     /// <summary>True for the Claude line, the Claude limits and telemetry: their row shows a Style picker.</summary>
     public bool HasStyle => DeskMeterStyles.Supports(Widget);
 
+    /// <summary>The companion's row carries its sprite and roaming inline (spec, Pieces).</summary>
+    public bool IsCompanion => Widget == CompanionSettings.Widget;
+    public DeskCompanionViewModel? Companion => IsCompanion ? _owner.Companion : null;
+
     /// <summary>Show (spec, Pieces): on means Place is not Hidden. On places the piece where it last was in this window, else at its
     /// default place (<see cref="DeskArrangement.DefaultPlaceFor"/>); off hides it and remembers where it was.</summary>
     public bool Shown
@@ -188,9 +192,10 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     private bool _loading;
 
     /// <param name="monitors">The connected monitors, named (the Monitor dropdown). Default: what Windows reports now.</param>
+    /// <param name="widgets">The installed packs (the companion's sprites). Default: this store's own widgets folder.</param>
     /// <param name="inkPresets">The Ink presets (name and hex spec): the built-ins and the installed palette packs'. Default: the built-ins.</param>
     public DeskSettingsViewModel(SettingsStore store, IReadOnlyList<string> fontFamilies, Func<IReadOnlyList<DeskMonitorInfo>>? monitors = null,
-        Func<IReadOnlyList<(string Name, string Value)>>? inkPresets = null)
+        Func<IReadOnlyList<(string Name, string Value)>>? inkPresets = null, Func<WidgetStore>? widgets = null)
     {
         _store = store;
         _inkPresets = inkPresets ?? (() => DeskInkPresets.All);
@@ -212,6 +217,11 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             new DeskPieceRow(this, "glow", SettingsNames.DeskGlow),
             new DeskPieceRow(this, "companion", SettingsNames.DeskCompanion),
         ];
+        Companion = new DeskCompanionViewModel(store,
+            widgets ?? (() => new WidgetStore(store.Paths.WidgetsDir, Sanduhr.App.Services.WidgetCatalogService.EncodePng)))
+        {
+            Changed = () => Changed?.Invoke(),
+        };
         Launcher = new LauncherSettingsViewModel(store, new Paths(), () => Pieces.FirstOrDefault(p => p.Widget == "launcher")?.IsPlaced == true, PlaceLauncherIfHidden)
         {
             Changed = () => Changed?.Invoke(),
@@ -224,6 +234,9 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
 
     /// <summary>Settings, Desk, Designs: the saved designs and Put my Desk back (spec, the agent-designed Desk).</summary>
     public DesignsSettingsViewModel Designs { get; }
+
+    /// <summary>Desk, Pieces, the Companion row's sprite and roaming (moved from Settings, Widgets).</summary>
+    public DeskCompanionViewModel Companion { get; }
 
     /// <summary>The monitors connected when the page was loaded (read again by <see cref="Reload"/>).</summary>
     public IReadOnlyList<DeskMonitorInfo> Monitors { get; private set; }
@@ -500,6 +513,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         MarginTop = _saved.Margins.Top;
         MarginBottom = _saved.Margins.Bottom;
         LoadRows(new DeskArrangement(_saved.Layout));
+        Companion?.Reload();
         _loading = false;
         Launcher?.PlacementChanged();
     }
@@ -557,6 +571,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         Save(_saved with { Layout = a.Layout });
         _loading = true;
         LoadRows(a);
+        Companion.RefreshStatus();
         _loading = false;
         Launcher.PlacementChanged();
     }
@@ -566,6 +581,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(CanArrange));
         OnPropertyChanged(nameof(ArrangeNote));
         if (!_loading) Save(_saved with { Enabled = value });
+        Companion?.RefreshStatus();
     }
 
     partial void OnFontChanged(string value)

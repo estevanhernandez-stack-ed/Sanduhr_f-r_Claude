@@ -224,7 +224,7 @@ public static class SettingsNames
     public const string DeskWatchers = "Watchers";
     /// <summary>Desk, Where each piece sits: the Launcher, buttons that open apps and links from the desktop.</summary>
     public const string DeskLauncher = "Launcher";
-    /// <summary>Desk, Where each piece sits: the companion, the sprite chosen in Settings, Widgets (spec 3.8 section 4).</summary>
+    /// <summary>Desk, Where each piece sits: the companion, whose sprite is chosen in its own row.</summary>
     public const string DeskCompanion = "Companion";
     /// <summary>Desk, Launcher: opens the app picker.</summary>
     public const string LauncherAddApp = "Add app…";
@@ -321,11 +321,9 @@ public static class SettingsNames
     public const string WidgetMadeHere = "made here";
     /// <summary>Widgets: an installed sprite made here takes the user's own PNG sheets, one per stage (spec 3.8, section 6).</summary>
     public const string WidgetUseOwnArt = "Use my own art…";
-    /// <summary>Widgets, Desk companion (spec 3.8 section 4): the installed sprite that is the companion (one at a time).</summary>
+    /// <summary>Desk, Pieces, the Companion row: the installed sprite that is the companion (one at a time).</summary>
     public const string WidgetCompanionPick = "Companion sprite";
-    /// <summary>Widgets, Desk companion: places or hides the Desk's companion piece.</summary>
-    public const string WidgetCompanionShow = "Show the companion on the Desk";
-    /// <summary>Widgets, Desk companion: it walks the screen's edges (never with Windows' animations off).</summary>
+    /// <summary>Desk, Pieces, the Companion row: it walks the screen's edges (never with Windows' animations off).</summary>
     public const string WidgetCompanionRoam = "Let it roam";
 
     // ---- Settings v2, slice 3: the Desk split ----
@@ -467,8 +465,8 @@ public static class SettingsNames
         (NowPlayingBarsGradient, SettingsPage.NowPlaying),
         (GlowWhere, SettingsPage.ClaudeCode),
         (WidgetCatalogCheck, SettingsPage.Widgets),
-        (WidgetCompanionShow, SettingsPage.Widgets),
-        (WidgetCompanionRoam, SettingsPage.Widgets),
+        (WidgetCompanionPick, SettingsPage.Desk),
+        (WidgetCompanionRoam, SettingsPage.Desk),
     ];
 
     /// <summary>
@@ -479,6 +477,7 @@ public static class SettingsNames
     public static IReadOnlyList<(string Old, string Now, bool Whole)> Retired { get; } =
     [
         ("Take the Tour", TakeTheTour, false),
+        ("Show the companion on the Desk", DeskCompanion, false),
         ("Tray Shows", TrayShows, false),
         ("End Demo Mode", EndDemoMode, false),
         ("Sign In", SignIn, true),

@@ -162,11 +162,11 @@ public static partial class Program
         sw.Top = -20000;
         sw.Height = 1100;
         await Settle();
-        swType.GetMethod("SelectPage")!.Invoke(sw, [SettingsPage.Widgets, SettingsIndex.WidgetsCompanion]);
+        swType.GetMethod("SelectPage")!.Invoke(sw, [SettingsPage.Desk, SettingsIndex.DeskPieces]);
         await Settle();
         await Settle();
-        Log.Add($"companion: settings companions={svm.WidgetsPage.Companions.Count} shown={svm.WidgetsPage.CompanionShown} roams={svm.WidgetsPage.CompanionRoams} status={svm.WidgetsPage.CompanionStatus}");
-        Save((FrameworkElement)sw.Content, "companion-settings-widgets");
+        Log.Add($"companion: settings companions={svm.Desk.Companion.Companions.Count} shown={svm.Desk.Pieces.Single(p => p.Widget == CompanionSettings.Widget).Shown} roams={svm.Desk.Companion.Roams} status={svm.Desk.Companion.Status}");
+        Save((FrameworkElement)sw.Content, "companion-settings-desk");
         sw.Close();
         await Settle();
     }

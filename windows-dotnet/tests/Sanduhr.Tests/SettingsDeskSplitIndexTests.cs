@@ -120,4 +120,14 @@ public class SettingsDeskSplitIndexTests
         Assert.Empty(SettingsNames.RetiredNames(SettingsNames.DeskMapCaption));   // a whole-name retirement: the caption may say it
         Assert.Empty(SettingsNames.PathProblems("Move it in Settings, Desk, Pieces."));
     }
+
+    [Fact]
+    public void The_companion_is_found_on_Desk_Pieces_and_its_old_link_lands_there()
+    {
+        Assert.Null(SettingsIndex.Find(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion));
+        Assert.Contains(SettingsIndex.Search("companion"), h => h.Entry.Page == SettingsPage.Desk && h.Entry.Anchor == SettingsIndex.DeskPieces);
+        Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskPieces),
+            SettingsIndex.Resolve(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion));
+        Assert.Equal(["Show the companion on the Desk"], SettingsNames.RetiredNames("Show the companion on the Desk"));
+    }
 }
