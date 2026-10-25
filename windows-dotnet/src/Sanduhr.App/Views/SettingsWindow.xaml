@@ -40,6 +40,7 @@
 
         <!-- Flat themed button (re-tints with the active theme). -->
         <Style x:Key="FlatButton" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
             <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
             <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
@@ -64,6 +65,11 @@
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.4" />
+                            </Trigger>
+                            <!-- WF38: a ring in the text ink, which reads on glass and on an accent-filled pill alike. -->
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Text}" />
+                                <Setter TargetName="bg" Property="BorderThickness" Value="2" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -121,6 +127,10 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="bg" Property="Opacity" Value="0.88" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Text}" />
+                                <Setter TargetName="bg" Property="BorderThickness" Value="2" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.4" />
@@ -405,6 +415,10 @@
                             <Trigger Property="IsKeyboardFocusWithin" Value="True">
                                 <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
                             </Trigger>
+                            <!-- WF38: a disabled combo (demo mode's Linked account) looks disabled. -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -413,6 +427,7 @@
 
         <!-- Themed check box (Local CC "show breakdowns"). -->
         <Style x:Key="ThemedCheckBox" TargetType="CheckBox">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -437,6 +452,13 @@
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="box" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="box" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                <Setter TargetName="box" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -923,11 +945,16 @@
                                         Visibility="{Binding Shortcuts.ShowReset, Converter={StaticResource BoolVis}}">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
-                                            <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
-                                                       Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                            <Border x:Name="ring" BorderThickness="1" BorderBrush="Transparent" CornerRadius="3" Padding="2,0">
+                                                <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
+                                                           Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                            </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter TargetName="t" Property="TextDecorations" Value="Underline" />
+                                                </Trigger>
+                                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                                    <Setter TargetName="ring" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -3190,14 +3217,16 @@
                                                         CommandParameter="{Binding Url}">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
-                                                            <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
-                                                                       Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                            <Border x:Name="ring" BorderThickness="1" BorderBrush="Transparent" CornerRadius="3" Padding="2,0">
+                                                                <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
+                                                                           Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                            </Border>
                                                             <ControlTemplate.Triggers>
                                                                 <Trigger Property="IsMouseOver" Value="True">
                                                                     <Setter TargetName="t" Property="TextDecorations" Value="Underline" />
                                                                 </Trigger>
                                                                 <Trigger Property="IsKeyboardFocused" Value="True">
-                                                                    <Setter TargetName="t" Property="TextDecorations" Value="Underline" />
+                                                                    <Setter TargetName="ring" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
                                                                 </Trigger>
                                                             </ControlTemplate.Triggers>
                                                         </ControlTemplate>
@@ -3230,14 +3259,16 @@
                                                         CommandParameter="{Binding Url}">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
-                                                            <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
-                                                                       Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                            <Border x:Name="ring" BorderThickness="1" BorderBrush="Transparent" CornerRadius="3" Padding="2,0">
+                                                                <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
+                                                                           Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                            </Border>
                                                             <ControlTemplate.Triggers>
                                                                 <Trigger Property="IsMouseOver" Value="True">
                                                                     <Setter TargetName="t" Property="TextDecorations" Value="Underline" />
                                                                 </Trigger>
                                                                 <Trigger Property="IsKeyboardFocused" Value="True">
-                                                                    <Setter TargetName="t" Property="TextDecorations" Value="Underline" />
+                                                                    <Setter TargetName="ring" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
                                                                 </Trigger>
                                                             </ControlTemplate.Triggers>
                                                         </ControlTemplate>

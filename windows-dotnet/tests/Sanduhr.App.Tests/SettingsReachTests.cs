@@ -405,4 +405,28 @@ public sealed class SettingsReachTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void Buttons_pills_links_and_boxes_show_focus_and_draw_disabled() => AppHost.Run(() =>
+    {
+        var (window, _, _) = Open("Personal");
+        try
+        {
+            IEnumerable<Trigger> TemplateTriggers(string key) =>
+                ((Style)window.FindResource(key)).Setters.OfType<Setter>()
+                    .Where(s => s.Property == Control.TemplateProperty)
+                    .SelectMany(s => ((ControlTemplate)s.Value).Triggers.OfType<Trigger>());
+            bool Shows(string key, DependencyProperty property, bool value) =>
+                TemplateTriggers(key).Any(t => t.Property == property && Equals(t.Value, value));
+
+            foreach (var key in new[] { "FlatButton", "AccentButton", "SettingsLinkButton", "ThemedCheckBox" })
+                Assert.True(Shows(key, UIElement.IsKeyboardFocusedProperty, true), $"{key} draws no focus ring");
+            foreach (var key in new[] { "FlatButton", "ThemedComboBox", "ThemedCheckBox" })
+                Assert.True(Shows(key, UIElement.IsEnabledProperty, false), $"{key} does not draw disabled");
+            // The History and Claude Usage pills are FlatButtons with the same template.
+            Assert.Same(window.FindResource("FlatButton"), ((Style)window.FindResource("RangePillWeek")).BasedOn);
+            Assert.Same(window.FindResource("FlatButton"), ((Style)window.FindResource("CcNavOverview")).BasedOn);
+        }
+        finally { window.Close(); }
+    });
 }
