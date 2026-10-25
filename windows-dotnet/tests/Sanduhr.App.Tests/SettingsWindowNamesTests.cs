@@ -75,4 +75,20 @@ public sealed class SettingsWindowNamesTests : AppWindowFixture
         Assert.Contains("Notification, 1 group", seen["Mods"]);
         Assert.Contains("alpha@m, On", seen["Mods"]);
     });
+
+    [Fact]
+    public void The_first_page_of_each_group_carries_its_heading_from_the_names_table() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+        var window = new SettingsWindow(svm);
+        try
+        {
+            var tabs = ((TabControl)window.FindName("Tabs")).Items.OfType<TabItem>().ToList();
+            var firsts = SettingsNames.Sidebar.ToDictionary(g => g.Pages[0].ToString(), g => g.Title);
+            foreach (var tab in tabs)
+                Assert.Equal(firsts.GetValueOrDefault((string)tab.Tag), SettingsSidebar.GetGroupHeader(tab));
+        }
+        finally { window.Close(); }
+    });
 }

@@ -11,10 +11,13 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Views;
 
 /// <summary>
-/// The Settings window (Settings v2): a grouped sidebar with search over General,
-/// Accounts, Alerts, History, Claude Usage, Publish usage, Claude Code, Mods &amp; Config, Themes and About. The
-/// sidebar is the TabControl re-templated; each TabItem's Tag is its
-/// <see cref="SettingsPage"/>, which <see cref="SelectPage"/> and the search use.
+/// The Settings window (Settings v2): a grouped sidebar with search. The sidebar is the TabControl
+/// re-templated; its groups and their order come from <see cref="SettingsNames.Sidebar"/>, and the constructor sets
+/// each group's heading on that group's first page. Each TabItem's Tag is its <see cref="SettingsPage"/>, which
+/// <see cref="SelectPage"/> and the search use. <see cref="SelectPage"/> resolves an old link through
+/// <see cref="SettingsIndex.Resolve"/> before it lands; <see cref="Place"/> is where the window was left, for the
+/// App to reopen there; <see cref="FitToWorkArea"/> is called before the first Show so a short screen never hides
+/// the foot; Quit asks before it quits.
 /// Opened non-modally and kept single-instance by the App so a live account switch
 /// from here reflects in the widget immediately.
 ///
@@ -69,6 +72,11 @@ internal partial class SettingsWindow : Window
         };
 
         InitializeComponent();
+        // The sidebar's group headings have one source, the names table: each group's first page carries its title.
+        foreach (var group in SettingsNames.Sidebar)
+            if (group.Title is { } title
+                && Tabs.Items.OfType<TabItem>().FirstOrDefault(t => (string?)t.Tag == group.Pages[0].ToString()) is { } first)
+                SettingsSidebar.SetGroupHeader(first, title);
         // Modal dialogs spawned by the tabs (rename, confirm, export result) parent to us.
         ViewModel.AttachOwner(this);
         ViewModel.Accounts.AttachOwner(this);

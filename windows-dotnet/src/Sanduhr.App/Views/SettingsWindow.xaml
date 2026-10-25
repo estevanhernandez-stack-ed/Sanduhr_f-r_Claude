@@ -1228,7 +1228,7 @@
                 </TabItem>
 
                 <!-- History tab (item 9) — 30-day usage chart + CSV export. -->
-                <TabItem Header="History" Tag="History" AutomationProperties.Name="History" views:SettingsSidebar.GroupHeader="Usage">
+                <TabItem Header="History" Tag="History" AutomationProperties.Name="History">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="16"
                             DataContext="{Binding History}">
                         <Grid>
@@ -1867,8 +1867,7 @@
 
                 <!-- Claude Code page (Stage 4.2): the folders Sanduhr knows and Sanduhr's pieces in each.
                      Every write goes through a consent dialog and only to the folder picked here. -->
-                <TabItem Header="Claude Code" Tag="ClaudeCode" AutomationProperties.Name="Claude Code" DataContext="{Binding ClaudeCodePage}"
-                         views:SettingsSidebar.GroupHeader="Extend">
+                <TabItem Header="Claude Code" Tag="ClaudeCode" AutomationProperties.Name="Claude Code" DataContext="{Binding ClaudeCodePage}">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="4,4,0,4">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False" Padding="12,10,16,10">
                             <ScrollViewer.Resources>
@@ -2233,7 +2232,7 @@
                 </TabItem>
 
                 <!-- Themes tab (item 8) — swatch grid + agent-assisted theme creation. -->
-                <TabItem Header="Themes" Tag="Themes" AutomationProperties.Name="Themes" views:SettingsSidebar.GroupHeader="Widget">
+                <TabItem Header="Themes" Tag="Themes" AutomationProperties.Name="Themes">
                     <Border x:Name="ThemesRoot" Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="16"
                             DataContext="{Binding Themes}">
                         <Grid>
@@ -2498,7 +2497,7 @@
 
                 <!-- Desk (Stage 5): the clock and Claude meters on the desktop. Off by default; every
                      change saves at once and the running Desk follows. -->
-                <TabItem Header="Desk" Tag="Desk" AutomationProperties.Name="Desk" views:SettingsSidebar.GroupHeader="Desktop"
+                <TabItem Header="Desk" Tag="Desk" AutomationProperties.Name="Desk"
                          DataContext="{Binding Desk}">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
                         <!-- WF26: the page is as wide as the viewport, so text wraps, but never narrower than a piece row
@@ -3080,7 +3079,7 @@
 
                 <!-- About (Settings v2): the version, What's New and the tour, the trademark notice,
                      where Sanduhr keeps its files, and the packages it ships with. -->
-                <TabItem Header="About" Tag="About" AutomationProperties.Name="About" views:SettingsSidebar.GroupHeader="Help">
+                <TabItem Header="About" Tag="About" AutomationProperties.Name="About">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <ScrollViewer.Resources>

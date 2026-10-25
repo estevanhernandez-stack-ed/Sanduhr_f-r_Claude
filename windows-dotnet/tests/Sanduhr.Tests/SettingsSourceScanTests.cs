@@ -374,10 +374,7 @@ public class SettingsSourceScanTests
         Assert.Equal(SettingsNames.Pages.Select(p => p.ToString()), tabs.Select(t => Attr(t, "Tag")));
         Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => WebUtility.HtmlDecode(Attr(t, "Header"))));
         Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => WebUtility.HtmlDecode(Attr(t, "AutomationProperties.Name"))));
-        // A group's heading sits on its first page and nowhere else.
-        var expected = SettingsNames.Pages.Select(p =>
-            SettingsNames.Sidebar.FirstOrDefault(g => g.Pages[0] == p)?.Title ?? "");
-        Assert.Equal(expected, tabs.Select(t => Attr(t, "views:SettingsSidebar.GroupHeader")));
+        Assert.DoesNotContain("SettingsSidebar.GroupHeader=\"", xaml); // one source: SettingsWindow sets it from SettingsNames.Sidebar
     }
 
     [Fact]
