@@ -691,11 +691,13 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Expander">
                         <StackPanel>
-                            <ToggleButton x:Name="Toggle" MinHeight="44" Cursor="Hand" FocusVisualStyle="{x:Null}"
+                            <ToggleButton x:Name="HeaderSite" MinHeight="44" Cursor="Hand" FocusVisualStyle="{x:Null}"
                                           HorizontalContentAlignment="Stretch"
                                           IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
                                           Content="{TemplateBinding Header}"
-                                          AutomationProperties.Name="{TemplateBinding AutomationProperties.Name}">
+                                          Tag="{TemplateBinding AutomationProperties.HelpText}"
+                                          AutomationProperties.Name="{TemplateBinding AutomationProperties.Name}"
+                                          AutomationProperties.HelpText="{TemplateBinding AutomationProperties.HelpText}">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
                                         <Border x:Name="ring" Background="Transparent" BorderThickness="1" BorderBrush="Transparent"
@@ -704,7 +706,24 @@
                                                 <TextBlock x:Name="arrow" DockPanel.Dock="Left" Text="&#xE76C;" FontSize="10" Margin="0,0,8,0"
                                                            FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" VerticalAlignment="Center"
                                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                                <ContentPresenter VerticalAlignment="Center" />
+                                                <!-- The title and the summary are drawn by this template, so they are part of the toggle
+                                                     (TemplatedParent is the toggle) and not extra UIA elements beside it. -->
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{TemplateBinding Content}" FontSize="13" FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                    <TextBlock Text="{TemplateBinding Tag}" FontSize="11" Margin="0,2,0,0"
+                                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Value="">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </StackPanel>
                                             </DockPanel>
                                         </Border>
                                         <ControlTemplate.Triggers>
@@ -2642,16 +2661,10 @@
 
                                     <!-- Designs (collapsed): the kept designs, Put my Desk back, and the switch whose changes they undo. -->
                                     <Expander x:Name="DeskDesignsSection" Style="{StaticResource SectionExpander}" views:SettingsAnchor.Id="desk-designs"
-                                              AutomationProperties.Name="{x:Static core:SettingsNames.DeskDesigns}">
-                                        <Expander.Header>
-                                            <StackPanel>
-                                                <TextBlock Text="{x:Static core:SettingsNames.DeskDesigns}" FontSize="13" FontWeight="SemiBold"
-                                                           AutomationProperties.HeadingLevel="Level2"
-                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                                                <TextBlock Text="{Binding Designs.Summary}" FontSize="11" Margin="0,2,0,0"
-                                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
-                                            </StackPanel>
-                                        </Expander.Header>
+                                              AutomationProperties.Name="{x:Static core:SettingsNames.DeskDesigns}"
+                                              AutomationProperties.HeadingLevel="Level2"
+                                              AutomationProperties.HelpText="{Binding Designs.Summary}"
+                                              Header="{x:Static core:SettingsNames.DeskDesigns}">
                                         <StackPanel>
                                             <views:DesignsSettingsPanel DataContext="{Binding Designs}" />
                                             <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,14,0,0"
@@ -2668,12 +2681,9 @@
 
                                     <!-- Advanced (collapsed): Margins and OLED care. -->
                                     <Expander x:Name="DeskAdvancedSection" Style="{StaticResource SectionExpander}" views:SettingsAnchor.Id="desk-advanced"
-                                              AutomationProperties.Name="{x:Static core:SettingsNames.DeskAdvanced}">
-                                        <Expander.Header>
-                                            <TextBlock Text="{x:Static core:SettingsNames.DeskAdvanced}" FontSize="13" FontWeight="SemiBold"
-                                                       AutomationProperties.HeadingLevel="Level2"
-                                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                                        </Expander.Header>
+                                              AutomationProperties.Name="{x:Static core:SettingsNames.DeskAdvanced}"
+                                              AutomationProperties.HeadingLevel="Level2"
+                                              Header="{x:Static core:SettingsNames.DeskAdvanced}">
                                         <StackPanel>
                                             <StackPanel views:SettingsAnchor.Id="margins" IsEnabled="{Binding NotArranging}">
                                                 <TextBlock Text="Margins" FontSize="13" FontWeight="SemiBold"

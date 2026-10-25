@@ -311,4 +311,48 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void The_section_toggles_speak_as_expanders_once_with_their_summary() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            guard.RouteKeyboard();
+            window.SelectPage(SettingsPage.Desk);
+            Settle(window, guard);
+            foreach (var (name, title) in new[] { ("DeskDesignsSection", SettingsNames.DeskDesigns), ("DeskAdvancedSection", SettingsNames.DeskAdvanced) })
+            {
+                var expander = (Expander)window.FindName(name);
+                var peer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(expander);
+                var provider = (System.Windows.Automation.Provider.IExpandCollapseProvider)peer.GetPattern(System.Windows.Automation.Peers.PatternInterface.ExpandCollapse);
+                Assert.Equal(title, peer.GetName());
+                Assert.Equal(System.Windows.Automation.ExpandCollapseState.Collapsed, provider.ExpandCollapseState);
+
+                var toggle = Below<ToggleButton>(expander).First();
+                Assert.Equal(title, System.Windows.Automation.AutomationProperties.GetName(toggle));
+                toggle.Focus();
+                Settle(window, guard);
+                Assert.True(toggle.IsKeyboardFocused);
+                Assert.True(peer.HasKeyboardFocus(), title + ": the Expander's peer reports the focus");
+
+                // The header text is drawn by the toggle's own template: none of it is a control element beside the toggle.
+                foreach (var text in Below<TextBlock>(toggle))
+                {
+                    var tp = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(text);
+                    Assert.False(tp is not null && tp.IsControlElement(), title + ": header text '" + text.Text + "' is a control element");
+                }
+
+                expander.IsExpanded = true;
+                Settle(window, guard);
+                Assert.Equal(System.Windows.Automation.ExpandCollapseState.Expanded, provider.ExpandCollapseState);
+                expander.IsExpanded = false;
+            }
+            var designs = (Expander)window.FindName("DeskDesignsSection");
+            Assert.Equal(svm.Desk.Designs.Summary, System.Windows.Automation.AutomationProperties.GetHelpText(Below<ToggleButton>(designs).First()));
+            Assert.Equal(System.Windows.Automation.AutomationHeadingLevel.Level2,
+                System.Windows.Automation.AutomationProperties.GetHeadingLevel(designs));
+        }
+        finally { window.Close(); }
+    });
 }
