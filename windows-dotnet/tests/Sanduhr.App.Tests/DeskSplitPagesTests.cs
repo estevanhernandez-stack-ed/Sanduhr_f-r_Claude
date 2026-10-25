@@ -231,4 +231,24 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void The_Launcher_page_holds_its_buttons_and_old_links_land_there() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Launcher, SettingsIndex.MenuAnchor(SettingsPage.Launcher));
+            Settle(window, guard);
+            Assert.Equal(new SettingsLink(SettingsPage.Launcher, SettingsIndex.LauncherButtons), window.Place);
+            Assert.Contains(Below<Button>(Marked(window, SettingsPage.Launcher, SettingsIndex.LauncherButtons)),
+                b => (b.Content as string) == SettingsNames.LauncherAddApp);
+            Assert.Single(Below<DeskPieceStatusPanel>(Marked(window, SettingsPage.Launcher, SettingsIndex.LauncherPlace)));
+
+            window.SelectPage(SettingsPage.Desk, SettingsIndex.DeskLauncher);
+            Settle(window, guard);
+            Assert.Equal(new SettingsLink(SettingsPage.Launcher, SettingsIndex.LauncherPlace), window.Place);
+        }
+        finally { window.Close(); }
+    });
 }

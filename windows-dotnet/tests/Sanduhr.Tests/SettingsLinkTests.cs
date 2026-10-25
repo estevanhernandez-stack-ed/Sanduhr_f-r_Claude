@@ -66,9 +66,14 @@ public class SettingsLinkTests
         // With it too, now that the companion left Widgets (slice 3): the old section is gone from the page, so the alias carries it.
         Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskPieces),
             SettingsIndex.Check(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion));
-        // An alias whose target page isn't there yet does nothing: the place is kept (Desk's Launcher until slice 3).
-        Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskLauncher),
+        // Desk's Launcher became a page in slice 3: the old section lands at the page's place line.
+        Assert.Equal(new SettingsLink(SettingsPage.Launcher, SettingsIndex.LauncherPlace),
             SettingsIndex.Check(SettingsPage.Desk, SettingsIndex.DeskLauncher));
+        // An alias whose target isn't there yet does nothing: Claude Code's meters wait for Mods & Widgets (slice 4), so a build
+        // without the old section sends the link to the page's top.
+        var withoutMeters = SettingsIndex.Anchors.Where(e => !(e.Page == SettingsPage.ClaudeCode && e.Anchor == SettingsIndex.Meters)).ToList();
+        Assert.Equal(new SettingsLink(SettingsPage.ClaudeCode, null),
+            SettingsIndex.Check(SettingsPage.ClaudeCode, SettingsIndex.Meters, withoutMeters, SettingsNames.Pages));
     }
 
     [Fact]
@@ -108,6 +113,7 @@ public class SettingsLinkTests
     [InlineData(SettingsPage.Alerts, SettingsIndex.Notifications)]
     [InlineData(SettingsPage.Desk, SettingsIndex.DeskPieces)]
     [InlineData(SettingsPage.DeskMessage, SettingsIndex.MessageLines)]
+    [InlineData(SettingsPage.Launcher, SettingsIndex.LauncherButtons)]
     public void Menu_links_land_on_their_section(SettingsPage page, string anchor)
     {
         Assert.Equal(anchor, SettingsIndex.MenuAnchor(page));

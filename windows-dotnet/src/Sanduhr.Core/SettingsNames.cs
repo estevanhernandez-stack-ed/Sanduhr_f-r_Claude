@@ -226,9 +226,9 @@ public static class SettingsNames
     public const string DeskLauncher = "Launcher";
     /// <summary>Desk, Where each piece sits: the companion, whose sprite is chosen in its own row.</summary>
     public const string DeskCompanion = "Companion";
-    /// <summary>Desk, Launcher: opens the app picker.</summary>
+    /// <summary>Launcher, Buttons: opens the app picker.</summary>
     public const string LauncherAddApp = "Add app…";
-    /// <summary>Desk, Launcher: asks for an https link and a label.</summary>
+    /// <summary>Launcher, Buttons: asks for an https link and a label.</summary>
     public const string LauncherAddLink = "Add link…";
     /// <summary>Desk: lets Claude put watchers up through the MCP server (settings.json "watchers_agents", off by default).
     /// "Claude" means any agent using Sanduhr's MCP server, the one word every agent consent uses (WF10).</summary>
@@ -452,8 +452,8 @@ public static class SettingsNames
         (DeskFont, SettingsPage.DeskLook),
         (MessageFont, SettingsPage.DeskLook),
         (MessageColor, SettingsPage.DeskLook),
-        (LauncherAddApp, SettingsPage.Desk),
-        (LauncherAddLink, SettingsPage.Desk),
+        (LauncherAddApp, SettingsPage.Launcher),
+        (LauncherAddLink, SettingsPage.Launcher),
         (SignInReminders, SettingsPage.Alerts),
         (NowPlayingInWidget, SettingsPage.NowPlaying),
         (NowPlayingStyle, SettingsPage.NowPlaying),
@@ -482,6 +482,7 @@ public static class SettingsNames
         ("Sign In", SignIn, true),
         ("Add account", AddAccount, true),
         ("Manage accounts…", LinkTitle(SettingsPage.Accounts), false),
+        ("Edit buttons…", LinkTitle(SettingsPage.Launcher), false),
         ("Alerts Settings…", LinkTitle(SettingsPage.Alerts), false),
         ("Save and apply", SaveAndApply, false),
         ("Save & Apply", SaveAndApply, false),

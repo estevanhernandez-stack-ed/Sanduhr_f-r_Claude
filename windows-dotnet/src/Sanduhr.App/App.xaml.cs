@@ -489,7 +489,7 @@ public partial class App : Application
         {
             case Desk.DeskMenuAction.EditMessages: _ = ShowSettingsAsync(SettingsPage.DeskMessage, SettingsIndex.MenuAnchor(SettingsPage.DeskMessage)); break;
             case Desk.DeskMenuAction.DeskSettings: _ = ShowSettingsAsync(SettingsPage.Desk, SettingsIndex.MenuAnchor(SettingsPage.Desk)); break;
-            case Desk.DeskMenuAction.LauncherSettings: _ = ShowSettingsAsync(SettingsPage.Desk, SettingsIndex.DeskLauncher); break;
+            case Desk.DeskMenuAction.LauncherSettings: _ = ShowSettingsAsync(SettingsPage.Launcher, SettingsIndex.MenuAnchor(SettingsPage.Launcher)); break;
             case Desk.DeskMenuAction.Arrange: _desk?.BeginArrange(); break;
             case Desk.DeskMenuAction.TurnOffDesk:
                 try
@@ -507,10 +507,10 @@ public partial class App : Application
         }
     }
 
-    /// <summary>A Launcher button for an app that is no longer installed was chosen: Settings, Desk, Launcher opens at that button.</summary>
+    /// <summary>A Launcher button for an app that is no longer installed was chosen: Settings, Launcher opens at its buttons, that one selected.</summary>
     private void OnLauncherMissing(int index)
     {
-        _ = ShowSettingsAsync(SettingsPage.Desk, SettingsIndex.DeskLauncher);
+        _ = ShowSettingsAsync(SettingsPage.Launcher, SettingsIndex.MenuAnchor(SettingsPage.Launcher));
         if (_settingsWindow?.ViewModel.Desk.Launcher is { } launcher)
         {
             launcher.Reload();

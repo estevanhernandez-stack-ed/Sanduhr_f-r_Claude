@@ -164,10 +164,9 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
     /// <summary>"3 of 8 buttons".</summary>
     public string CountText => $"{Rows.Count} of {LauncherModel.MaxButtons} buttons";
 
-    /// <summary>Shown when there are buttons but the piece has no place on the Desk.</summary>
-    public string PlacementNote => !HasButtons ? ""
-        : !_isPlaced() ? "The Launcher is hidden. Show it in Settings, Desk, Pieces."
-        : _autoNote;
+    /// <summary>Where the first button put the piece ("Placed at top left. …"). A hidden Launcher is said by the page's status line
+    /// at its top (Principle 1), not here.</summary>
+    public string PlacementNote => HasButtons && _isPlaced() ? _autoNote : "";
 
     public bool HasPlacementNote => PlacementNote.Length > 0;
 

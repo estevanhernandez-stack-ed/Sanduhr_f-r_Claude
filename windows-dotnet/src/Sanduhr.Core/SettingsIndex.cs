@@ -88,6 +88,9 @@ public static class SettingsIndex
     public const string Watchers = "watchers";
     public const string CiRunners = "ci-runners";
     public const string WatchersPlace = "watchers-place";
+    // Launcher (slice 3)
+    public const string LauncherPlace = "launcher";
+    public const string LauncherButtons = "launcher-buttons";
     public const string DeskLauncher = "desk-launcher";
     public const string DeskDirect = "desk-direct";
     public const string DeskOled = "desk-oled";
@@ -211,9 +214,6 @@ public static class SettingsIndex
             ["oled", "burn-in", "burn in", "burnin", "drift", "dim", "idle", "away", "screen", "pixels", "white", "image retention", "off by default"]),
         E(SettingsNames.DeskDesigns, SettingsPage.Desk, DeskDesigns,
             ["design", "designs", "undo", "put back", SettingsNames.PutMyDeskBack, "restore", "switch", "switch to", "rename", "pin", "delete", "saved looks", "Before", "history", "Claude"]),
-        E(SettingsNames.DeskLauncher, SettingsPage.Desk, DeskLauncher,
-            ["launcher", "button", "buttons", "shortcut", "shortcuts", "app", "apps", "link", "TouchButton", "Rainmeter",
-             SettingsNames.LauncherAddApp, SettingsNames.LauncherAddLink, "image", "label", "PNG", "Chrome app", "PWA"]),
         E(SettingsNames.PiecesSection, SettingsPage.Desk, DeskPieces,
             ["where each piece sits", "show", "hide", "order", "reorder", "move up", "move down", "stack", "layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor", "monitor", "monitors", "screen", "display", "main monitor", "all monitors", "second monitor", "per monitor",
              "style", "meter style", "slim", "ring", "rings", "gauge", "ticks", "segments", "Roundline", "compact",
@@ -262,6 +262,12 @@ public static class SettingsIndex
             ["CI", "runner", "runners", "GitHub Actions", "Docker", "jobs", "containers", "off by default"]),
         E(SettingsNames.WatchersPlace, SettingsPage.Watchers, WatchersPlace,
             ["place", "where", "corner", "on the Desk", "piece", "hidden"]),
+
+        E(SettingsNames.LauncherPlace, SettingsPage.Launcher, LauncherPlace,
+            ["place", "where", "corner", "on the Desk", "piece", "hidden"]),
+        E(SettingsNames.LauncherButtons, SettingsPage.Launcher, LauncherButtons,
+            ["launcher", "button", "buttons", "shortcut", "shortcuts", "app", "apps", "link", "TouchButton", "Rainmeter",
+             SettingsNames.LauncherAddApp, SettingsNames.LauncherAddLink, "image", "label", "PNG", "Chrome app", "PWA", "row", "column"]),
 
         E("Widget catalog", SettingsPage.Widgets, WidgetsCatalog,
             ["widgets", "catalog", "install", "download", "sprite", "companion", "pet", "palette", "effects", "font", "theme pack",
@@ -316,8 +322,8 @@ public static class SettingsIndex
         [SettingsNames.DeskFont] = DeskLook,
         [SettingsNames.MessageFont] = DeskLook,
         [SettingsNames.MessageColor] = DeskInk,
-        [SettingsNames.LauncherAddApp] = DeskLauncher,
-        [SettingsNames.LauncherAddLink] = DeskLauncher,
+        [SettingsNames.LauncherAddApp] = LauncherButtons,
+        [SettingsNames.LauncherAddLink] = LauncherButtons,
         [SettingsNames.NowPlayingInWidget] = NowPlayingWidget,
         [SettingsNames.NowPlayingStyle] = NowPlayingLooks,
         [SettingsNames.NowPlayingLooksDirect] = NowPlayingLooks,
@@ -675,8 +681,8 @@ public static class SettingsIndex
     // ---- reach: menus and reopening ----
 
     /// <summary>
-    /// The section a menu's "&lt;Page&gt; settings…" opens at (spec, Menus table). Slices 3 and 5 move Alerts to
-    /// <c>each-limit</c> and add the Launcher here; null opens the page top.
+    /// The section a menu's "&lt;Page&gt; settings…" opens at (spec, Menus table). Slice 5 moves Alerts to
+    /// <c>each-limit</c>; null opens the page top.
     /// </summary>
     public static string? MenuAnchor(SettingsPage page) => page switch
     {
@@ -684,6 +690,7 @@ public static class SettingsIndex
         SettingsPage.Alerts => Notifications,
         SettingsPage.Desk => DeskPieces,
         SettingsPage.DeskMessage => MessageLines,
+        SettingsPage.Launcher => LauncherButtons,
         _ => null,
     };
 

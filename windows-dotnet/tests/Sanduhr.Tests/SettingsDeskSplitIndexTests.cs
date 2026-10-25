@@ -181,4 +181,15 @@ public class SettingsDeskSplitIndexTests
                 (SettingsIndex.Search(q)[0].Entry.Page, SettingsIndex.Search(q)[0].Entry.Anchor, SettingsIndex.Search(q)[0].Rank));
         Assert.Equal(SettingsPage.Watchers, SettingsNames.Table.Single(t => t.Name == SettingsNames.WatchersSwitch).Page);
     }
+
+    [Fact]
+    public void Launcher_holds_where_it_shows_and_its_buttons()
+    {
+        Assert.Equal([SettingsIndex.LauncherPlace, SettingsIndex.LauncherButtons],
+            SettingsIndex.EntriesOn(SettingsPage.Launcher).Select(e => e.Anchor));
+        Assert.Equal(new SettingsLink(SettingsPage.Launcher, SettingsIndex.LauncherPlace),
+            SettingsIndex.Resolve(SettingsPage.Desk, SettingsIndex.DeskLauncher));
+        Assert.Equal(["Edit buttons…"], SettingsNames.RetiredNames("Edit buttons…"));
+        Assert.Equal("Launcher settings…", SettingsNames.LinkTitle(SettingsPage.Launcher));
+    }
 }

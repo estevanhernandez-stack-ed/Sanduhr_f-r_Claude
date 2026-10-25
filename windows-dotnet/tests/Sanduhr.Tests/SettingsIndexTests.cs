@@ -41,8 +41,7 @@ public class SettingsIndexTests
     [Fact]
     public void Every_sidebar_page_has_an_anchor()
     {
-        SettingsPage[] filledLater = [SettingsPage.Launcher]; // slice 3: Launcher joins empty (Task 6) and gets its sections in Task 13
-        foreach (var page in SettingsNames.Pages.Except(filledLater))
+        foreach (var page in SettingsNames.Pages)
             Assert.NotEmpty(SettingsIndex.EntriesOn(page));
     }
 

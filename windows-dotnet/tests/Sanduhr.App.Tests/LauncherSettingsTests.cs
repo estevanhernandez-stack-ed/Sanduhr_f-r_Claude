@@ -221,12 +221,10 @@ public sealed class LauncherSettingsTests : IDisposable
     }
 
     [Fact]
-    public void ThePlacementNoteShowsOnlyWhileTheButtonsHaveNoPlace()
+    public void AHiddenLauncherIsSaidByThePagesStatusLineNotANote()
     {
-        Assert.False(Open(placed: false).HasPlacementNote);   // nothing to place yet
-        var hidden = Open(new LauncherModel(LauncherOrientation.Row, [App("A")]), placed: false);
-        Assert.True(hidden.HasPlacementNote);
-        Assert.Contains("Settings, Desk, Pieces", hidden.PlacementNote);
+        Assert.False(Open(placed: false).HasPlacementNote);
+        Assert.False(Open(new LauncherModel(LauncherOrientation.Row, [App("A")]), placed: false).HasPlacementNote);
         Assert.False(Open(new LauncherModel(LauncherOrientation.Row, [App("A")]), placed: true).HasPlacementNote);
     }
 
