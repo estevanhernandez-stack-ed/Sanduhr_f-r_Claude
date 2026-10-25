@@ -290,7 +290,7 @@ internal partial class SettingsWindow : Window
     {
         // An old page or anchor (a card, a menu or agent text from before 4.0) lands where it lives now.
         (page, anchor) = SettingsIndex.Resolve(page, anchor);
-        var tab =Tabs.Items.OfType<TabItem>().FirstOrDefault(t => PageOf(t) == page);
+        var tab = Tabs.Items.OfType<TabItem>().FirstOrDefault(t => PageOf(t) == page);
         if (tab is null)
             return;
         // A link from outside (a card's Show me, a menu) shows the page list, not an old search.

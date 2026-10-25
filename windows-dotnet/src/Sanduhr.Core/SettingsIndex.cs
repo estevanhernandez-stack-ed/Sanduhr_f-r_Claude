@@ -326,6 +326,7 @@ public static class SettingsIndex
         [SettingsPage.Accounts] = ["sign in", "account"],
         [SettingsPage.Alerts] = ["notification", "warning"],
         [SettingsPage.History] = ["meter history", "chart"],
+        // "vault" lives on the archive section only: as a page synonym it ties the section at rank 1 and the page row wins.
         [SettingsPage.ClaudeUsage] = ["Claude Code", "tokens", "usage"],
         [SettingsPage.ClaudeCode] = ["statusline", "MCP", "meters", "mod", "plugin", "hooks", "glow", "folder", "seat"],
         [SettingsPage.Mods] = ["mod", "plugin", "hooks", "statusline", "MCP", "CLAUDE.md", "retention", "config", "settings.json"],

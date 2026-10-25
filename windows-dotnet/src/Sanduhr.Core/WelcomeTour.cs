@@ -38,7 +38,7 @@ public static class WelcomeTour
     /// </summary>
     public static IReadOnlyList<TourCard> Table { get; } = Anchored(
     [
-        new(1,new WhatsNewCard([], "paced", "Your limits, paced",
+        new(1, new WhatsNewCard([], "paced", "Your limits, paced",
             "The widget is the small floating window with your meters, one bar per limit. The tick on each bar marks where an even pace would put you right now.",
             "\uE9D2", WhatsNewPreview.Meters, SettingsPage.Widget)),
         new(2, new WhatsNewCard([], "desk", "On your desktop",
