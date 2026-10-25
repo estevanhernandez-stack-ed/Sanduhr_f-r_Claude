@@ -85,8 +85,14 @@ public sealed class SingleInstance : IDisposable
         var show = new EventWaitHandle(false, EventResetMode.AutoReset, name + ".Show");
         var ack = new EventWaitHandle(false, EventResetMode.AutoReset, name + ".Shown");
 
+        MemoryMappedFile? mailbox = null;
         bool owns = Take(mutex, TimeSpan.Zero);
-        if (!owns)
+        if (owns)
+        {
+            mailbox = OpenMailbox(name);
+            ClearStale(name, mailbox);
+        }
+        else
         {
             // One second launch at a time writes the mailbox, and keeps it until the first instance has answered.
             // A busy .Post (another launch is mid-hand-off, or a quit is in progress) is skipped: this launch then
@@ -114,7 +120,15 @@ public sealed class SingleInstance : IDisposable
                     owns = true; // the first instance died holding it: ours now
                 }
                 if (owns)
+                {
                     show.Reset(); // nobody is left to answer our own request
+                    mailbox = OpenMailbox(name);
+                    // What this launch posted to an instance that then quit is not a request to itself. Cleared while
+                    // .Post is still ours, so it cannot wipe a link another launch posts right after we let go. Without
+                    // .Post (it was busy) nothing here is ours to clear.
+                    if (posting)
+                        Clear(mailbox);
+                }
             }
             finally
             {
@@ -127,13 +141,36 @@ public sealed class SingleInstance : IDisposable
                 catch { /* best effort */ }
             }
         }
-        MemoryMappedFile? mailbox = null;
-        if (owns)
-        {
-            mailbox = OpenMailbox(name);
-            Clear(mailbox); // what this launch posted to an instance that then quit is not a request to itself
-        }
         return new SingleInstance(mutex, show, ack, owns, mailbox);
+    }
+
+    /// <summary>
+    /// A new first instance wipes a link left by an earlier run, but only while it holds <c>.Post</c>, taken without
+    /// waiting: a second launch that already holds it may have just posted, and its link must survive. When .Post is busy
+    /// the clear is skipped and a stale link is the harmless case the mailbox already tolerates.
+    /// </summary>
+    private static void ClearStale(string name, MemoryMappedFile? mailbox)
+    {
+        Mutex? post = null;
+        bool held = false;
+        try
+        {
+            post = new Mutex(initiallyOwned: false, name + ".Post");
+            held = Take(post, PostWait);
+            if (held)
+                Clear(mailbox);
+        }
+        catch { /* best effort; never stops a launch */ }
+        finally
+        {
+            if (held)
+            {
+                try { post!.ReleaseMutex(); }
+                catch { /* best effort */ }
+            }
+            try { post?.Dispose(); }
+            catch { /* best effort */ }
+        }
     }
 
     // The mailbox is best effort end to end: a smaller or foreign mapping under the name, a denied open or a dead

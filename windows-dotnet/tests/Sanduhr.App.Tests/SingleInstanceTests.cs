@@ -183,24 +183,37 @@ public class SingleInstanceTests
         // Something else already owns the mailbox name with a 16-byte file-backed mapping (a page-file one would round up to a
         // page), so a 1024-byte view over it cannot be made.
         Directory.CreateDirectory(dir);
-        var backing = Path.Combine(dir, "foreign.bin");
-        using var file = new FileStream(backing, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite);
-        using var foreign = MemoryMappedFile.CreateFromFile(file, SingleInstance.NameFor(dir) + ".Message", 16,
-            MemoryMappedFileAccess.ReadWrite, HandleInheritability.None, leaveOpen: true);
+        FileStream? file = null;
+        MemoryMappedFile? foreign = null;
         using var release = new ManualResetEventSlim();
-        var got = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Thread? thread = null;
+        try
+        {
+            file = new FileStream(Path.Combine(dir, "foreign.bin"), FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite);
+            foreign = MemoryMappedFile.CreateFromFile(file, SingleInstance.NameFor(dir) + ".Message", 16,
+                MemoryMappedFileAccess.ReadWrite, HandleInheritability.None, leaveOpen: true);
+            var got = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var (thread, claimed) = HoldOnThread(dir, release, onMessage: m => got.TrySetResult(m));
-        Assert.True((await claimed).IsPrimary, "a primary that cannot set up its mailbox still runs");
+            var (holder, claimed) = HoldOnThread(dir, release, onMessage: m => got.TrySetResult(m));
+            thread = holder;
+            Assert.True((await claimed).IsPrimary, "a primary that cannot set up its mailbox still runs");
 
-        var clock = System.Diagnostics.Stopwatch.StartNew();
-        using var second = SingleInstance.Claim(dir, TimeSpan.FromSeconds(10), "desk#pieces");
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            using var second = SingleInstance.Claim(dir, TimeSpan.FromSeconds(10), "desk#pieces");
 
-        Assert.False(second.IsPrimary);
-        Assert.Null(await got.Task.WaitAsync(TimeSpan.FromSeconds(2))); // the plain show, no link
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(3), $"the fall-back took {clock.Elapsed}");
-        release.Set();
-        thread.Join();
+            Assert.False(second.IsPrimary);
+            Assert.Null(await got.Task.WaitAsync(TimeSpan.FromSeconds(2))); // the plain show, no link
+            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(3), $"the fall-back took {clock.Elapsed}");
+        }
+        finally
+        {
+            release.Set();
+            thread?.Join();
+            foreign?.Dispose();
+            file?.Dispose();
+            try { Directory.Delete(dir, true); }
+            catch { /* a stray temp folder is not a test failure */ }
+        }
     }
 
     [Fact]
@@ -241,7 +254,7 @@ public class SingleInstanceTests
 
         Assert.False(third.IsPrimary); // never got the claim, and gave up at the deadline
         Assert.True(took >= TimeSpan.FromMilliseconds(800), $"gave up early, after {took}");
-        Assert.True(took < handoff + TimeSpan.FromSeconds(1.5), $"waited {took} on a 1 s deadline");
+        Assert.True(took < handoff + TimeSpan.FromMilliseconds(500), $"waited {took} on a 1 s deadline");
         release.Set();
         thread.Join();
     }
