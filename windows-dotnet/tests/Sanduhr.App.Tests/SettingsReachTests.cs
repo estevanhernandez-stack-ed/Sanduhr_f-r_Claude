@@ -213,10 +213,11 @@ public sealed class SettingsReachTests : AppWindowFixture
     {
         var (window, _, guard) = Open("Personal");
         var bad = new List<string>();
+        var skipped = new List<string>();
+        var tabs = (TabControl)window.FindName("Tabs");
         try
         {
             guard.RouteKeyboard();
-            var tabs = (TabControl)window.FindName("Tabs");
             var host = (ContentPresenter)tabs.Template.FindName("PART_SelectedContentHost", tabs);
             var search = (TextBox)tabs.Template.FindName("SearchBox", tabs);
             var quit = (Button)tabs.Template.FindName("QuitButton", tabs);
@@ -226,7 +227,10 @@ public sealed class SettingsReachTests : AppWindowFixture
                 window.UpdateLayout();
                 Pump();
                 if (FirstTabStop(host) is not { } first)
+                {
+                    skipped.Add(item.Tag?.ToString() ?? "?");
                     continue;
+                }
                 Keyboard.Focus(first);
                 guard.Check();
                 Assert.True(ReferenceEquals(Keyboard.FocusedElement, first), $"keyboard focus could not be routed to [{item.Tag}]");
@@ -245,6 +249,8 @@ public sealed class SettingsReachTests : AppWindowFixture
             }
         }
         finally { window.Close(); }
-        Assert.True(bad.Count == 0, string.Join(Environment.NewLine, bad));
+        var note = skipped.Count == 0 ? "" : $"{Environment.NewLine}pages with no tab stop, not walked: {string.Join(", ", skipped)}";
+        Assert.True(bad.Count == 0, string.Join(Environment.NewLine, bad) + note);
+        Assert.True(skipped.Count < tabs.Items.Count, "no page had a tab stop, so nothing was walked" + note);
     });
 }

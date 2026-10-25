@@ -86,6 +86,12 @@ public class SettingsEntryPointScanTests
         Assert.Matches(@"<Grid KeyboardNavigation\.TabIndex=""1""", xaml);
         Assert.Matches(@"x:Name=""QuitButton""[^>]*KeyboardNavigation\.TabIndex=""2""", xaml);
         Assert.Matches(@"x:Name=""PART_SelectedContentHost""[^>]*KeyboardNavigation\.TabIndex=""3""", xaml);
+        // The indices only order anything because these four elements are Local tab groups.
+        const string Local = @"KeyboardNavigation\.TabNavigation=""Local""";
+        Assert.Matches(@"<ControlTemplate TargetType=""TabControl"">(\s|<!--[\s\S]*?-->)*<Grid " + Local, xaml);
+        Assert.Matches(@"<Grid(?=[^>]*DockPanel\.Dock=""Top"")(?=[^>]*" + Local + ")[^>]*>", xaml);
+        Assert.Matches(@"<Grid(?=[^>]*KeyboardNavigation\.TabIndex=""1"")(?=[^>]*" + Local + ")[^>]*>", xaml);
+        Assert.Matches(@"<ContentPresenter(?=[^>]*x:Name=""PART_SelectedContentHost"")(?=[^>]*" + Local + ")[^>]*>", xaml);
         var close = Regex.Match(xaml, @"x:Key=""CloseButton""[\s\S]*?</Style>");
         Assert.True(close.Success, "no CloseButton style");
         Assert.Contains(@"<Setter Property=""IsTabStop"" Value=""False"" />", close.Value);
