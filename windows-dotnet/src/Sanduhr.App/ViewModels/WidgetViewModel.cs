@@ -361,6 +361,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// and save/reload flows.</summary>
     public string ThemesDir => _paths.ThemesDir;
 
+    /// <summary>Whether this PC can draw a font family (bundled, installed or a font pack), for the theme lint's font warning. App sets
+    /// it; the default (tests, the harness) answers yes, so no warning appears there.</summary>
+    public Func<string, bool> FontAvailable { get; set; } = _ => true;
+
     /// <summary>True when <paramref name="key"/> resolves to a loaded theme
     /// (built-in or user). Lets the Settings tab guard Apply before switching.</summary>
     public bool HasTheme(string key) => _themes.ContainsKey(key);

@@ -38,6 +38,10 @@ internal sealed class DeskFonts
     /// <summary>The installed families for Settings' picker, the bundled ones first, then the font packs' among the rest.</summary>
     public IReadOnlyList<string> PickerFamilies() => DeskFont.PickerFamilies(_installed.Concat(_packs.Keys));
 
+    /// <summary>True when this PC can draw <paramref name="family"/>: bundled, installed or from a font pack (theme match's font check).</summary>
+    public bool Has(string family) =>
+        BundledFonts.Bundled(family) is not null || _installed.Contains(family) || _packs.ContainsKey(family);
+
     /// <summary>The family to draw a saved choice in, and the one for bold text (the clock's time).
     /// A bundled family resolves both faces from its resources; WPF picks the Bold file by weight.</summary>
     public (FontFamily Regular, FontFamily Bold) Families(string? saved)

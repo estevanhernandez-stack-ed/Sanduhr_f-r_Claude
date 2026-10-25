@@ -70,10 +70,21 @@ public sealed class ThemePalette
     /// defaults to the obsidian 10 px, Matrix tightens to 2 px.</summary>
     public int CardCornerRadius => Definition.CardCornerRadius ?? 10;
 
-    public ThemePalette(string key, ThemeDefinition def)
+    /// <summary>The widget's text family before theme match, and for a theme without a <c>font</c> this PC has.</summary>
+    public const string DefaultUiFamily = "Segoe UI Variable Display, Segoe UI";
+
+    /// <summary>Turns a theme's <c>font</c> into the family to draw, or null when this PC lacks it. App sets it from <c>DeskFonts</c>
+    /// (bundled, installed and font-pack families); unset (tests, the harness) a theme's font is not drawn.</summary>
+    public static Func<string, FontFamily?>? ResolveFont { get; set; }
+
+    private readonly Func<string, FontFamily?>? _resolveFont;
+
+    /// <param name="resolveFont">This palette's font lookup; null uses <see cref="ResolveFont"/>.</param>
+    public ThemePalette(string key, ThemeDefinition def, Func<string, FontFamily?>? resolveFont = null)
     {
         Key = key;
         Definition = def;
+        _resolveFont = resolveFont;
         Bg = Hex(def.Bg);
         Glass = Hex(def.Glass);
         GlassOnMica = Hex(def.GlassOnMica);
@@ -174,6 +185,9 @@ public sealed class ThemePalette
         // widget default. The numeric/tier text is the only surface that switches.
         res["Sanduhr.Font.Value"] = ResolveValueFont();
 
+        // The widget's text (theme match): the theme's font when this PC has it, else Segoe UI. MainWindow binds to it.
+        res["Sanduhr.Font.Ui"] = UiFont();
+
         // Accent-bloom glow on the value label — applied ONLY for monospace
         // terminal themes (widget._apply_monospace_if_needed gates the bloom drop
         // shadow on monospace_font being set). Non-terminal themes get an inert,
@@ -192,8 +206,12 @@ public sealed class ThemePalette
             // families automatically — no manual exactMatch probe needed.
             return new FontFamily($"{Definition.MonospaceFont}, {fallback}");
         }
-        return new FontFamily("Segoe UI Variable Display, Segoe UI");
+        return UiFont();
     }
+
+    /// <summary>The widget's text family: the theme's <c>font</c> when this PC has it, else <see cref="DefaultUiFamily"/>.</summary>
+    public FontFamily UiFont() =>
+        Definition.Font is { Length: > 0 } f && (_resolveFont ?? ResolveFont)?.Invoke(f) is { } family ? family : new FontFamily(DefaultUiFamily);
 
     private Effect BuildValueBloom()
     {

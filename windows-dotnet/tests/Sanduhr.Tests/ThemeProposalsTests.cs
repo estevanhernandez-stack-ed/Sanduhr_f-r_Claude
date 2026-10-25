@@ -106,4 +106,21 @@ public class ThemeProposalsTests
         Assert.Equal("#00ff88", ThemeCatalog.LoadUserThemes(dir)["nebula"].Accent);
         Assert.Equal("nebula", (string?)o.Payload["previous_key"]);
     }
+    [Fact]
+    public void A_theme_with_font_and_desk_is_saved_whole_and_a_missing_font_is_a_warning()
+    {
+        using var tmp = new TempDir();
+        string dir = Path.Combine(tmp.Path, "themes");
+        var theme = CleanTheme();
+        theme["font"] = "Nope Sans";
+        theme["desk"] = JsonNode.Parse("""{"bars": ["#6c63ff", "#e8e4dc"]}""");
+
+        var o = ThemeProposals.Process(Req(theme), dir, "obsidian", Reserved, fontAvailable: _ => false);
+
+        Assert.Equal("applied", (string?)o.Payload["status"]);
+        Assert.Contains((JsonArray)o.Payload["findings"]!, f => (string?)f!["field"] == "font");
+        var saved = ThemeCatalog.LoadUserThemes(dir)["nebula"];
+        Assert.Equal("Nope Sans", saved.Font);
+        Assert.Equal(["#6c63ff", "#e8e4dc"], saved.Desk!.Bars);
+    }
 }

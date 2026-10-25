@@ -21,7 +21,7 @@
         MinWidth="360" MinHeight="400"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display"
-        FontFamily="Segoe UI Variable Display, Segoe UI"
+        FontFamily="{DynamicResource Sanduhr.Font.Ui}"
         Icon="Assets/Sanduhr.ico">
 
     <shell:WindowChrome.WindowChrome>

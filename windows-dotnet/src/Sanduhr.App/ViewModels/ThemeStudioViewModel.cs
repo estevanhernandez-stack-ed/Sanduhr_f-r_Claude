@@ -205,7 +205,7 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
     /// draft into the widget as the live preview.</summary>
     private void Refresh(bool preview)
     {
-        var lint = _draft.Lint();
+        var lint = _draft.Lint(_widget.FontAvailable);
         Findings.Clear();
         foreach (var f in lint.Findings.OrderBy(f => f.Level == ThemeFindingLevel.Error ? 0 : 1))
             Findings.Add(new ThemeFindingViewModel(f.Field, f.Message, f.Level == ThemeFindingLevel.Error));
@@ -228,7 +228,7 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
     [RelayCommand]
     private void Save()
     {
-        var lint = _draft.Lint();
+        var lint = _draft.Lint(_widget.FontAvailable);
         if (!lint.Ok)
         {
             _error("Fix the errors listed under the rows first: " + string.Join("; ", lint.Errors.Select(e => e.Field)));

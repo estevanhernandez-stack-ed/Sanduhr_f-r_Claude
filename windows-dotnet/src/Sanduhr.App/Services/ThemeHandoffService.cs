@@ -93,7 +93,8 @@ public sealed class ThemeHandoffService : IDisposable
             if (ThemeHandoff.TryReadRequest(reqPath, DateTimeOffset.Now) is not { } request)
                 return;
 
-            var outcome = ThemeProposals.Process(request, _paths.ThemesDir, _widget.ActiveThemeKey, ThemeCatalog.BuiltIns.ContainsKey);
+            var outcome = ThemeProposals.Process(request, _paths.ThemesDir, _widget.ActiveThemeKey, ThemeCatalog.BuiltIns.ContainsKey,
+                _widget.FontAvailable);
             if (outcome.SavedPath is not null)
                 _widget.ReloadUserThemes();
             if (outcome.ApplyKey is { } key)

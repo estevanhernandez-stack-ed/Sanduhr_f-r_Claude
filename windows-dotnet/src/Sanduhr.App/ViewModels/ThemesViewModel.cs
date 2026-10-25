@@ -123,7 +123,7 @@ public sealed partial class ThemesViewModel : ObservableObject
             PasteSummary = "";
             return;
         }
-        var lint = ThemeLint.Lint(raw);
+        var lint = ThemeLint.Lint(raw, _widget.FontAvailable);
         foreach (var f in lint.Findings.OrderBy(f => f.Level == ThemeFindingLevel.Error ? 0 : 1))
             PasteFindings.Add(new ThemeFindingViewModel(f.Field, f.Message, f.Level == ThemeFindingLevel.Error));
         HasPasteFindings = PasteFindings.Count > 0;

@@ -30,6 +30,9 @@ public partial class App : Application
     private GlobalHotKeyService? _hotKeys;
     private ClaudeCodeGlowService? _glow;
     private Desk.DeskController? _desk;
+    /// <summary>This PC's font families for the theme's font (theme match): drawn when present, warned about when not. Read again when a
+    /// font pack comes or goes.</summary>
+    private Desk.DeskFonts _themeFonts = new([]);
     private Desk.NowPlayingHub? _nowPlaying;
     private Desk.DeskMessageSource? _messages;
     private Desk.DeskMessageHandoffService? _handoff;
@@ -75,6 +78,11 @@ public partial class App : Application
         startupSettings.SyncMcpExport();
 
         _vm = new WidgetViewModel();
+        // A theme's font (theme match): drawn when this PC has the family, bundled, installed or from a font pack; the theme lint warns
+        // about one it lacks. Set before the first ApplyThemeResources so the first paint is in the theme's font.
+        _themeFonts = Desk.DeskFonts.ForThisPc(new Sanduhr.Core.Paths());
+        _vm.FontAvailable = f => _themeFonts.Has(f);
+        Sanduhr.App.Theming.ThemePalette.ResolveFont = f => _themeFonts.Has(f) ? _themeFonts.Families(f).Regular : null;
         // Apply the saved theme's palette to the Application resources before the
         // window is shown so the first paint is correct (no obsidian→saved flash).
         _vm.ApplyThemeResources();
@@ -730,7 +738,9 @@ public partial class App : Application
         // A font pack changes what the Desk and a design may draw in: drop their font lists before the Desk redraws.
         svm.WidgetsPage.Changed = () =>
         {
+            _themeFonts = Desk.DeskFonts.ForThisPc(new Sanduhr.Core.Paths());
             _vm?.ReloadUserThemes();
+            _vm?.ApplyThemeResources();
             _desk?.ResetFonts();
             _deskDesign?.FontsChanged();
             _desk?.Reload();
