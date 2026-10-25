@@ -652,11 +652,22 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
-        if (e.Handled || _drag is not null) return;
+        RouteArrow(e, Keyboard.Modifiers);
+    }
+
+    /// <summary>
+    /// A key press, with the modifiers passed in (the tests cannot press real keys). Arrows act with no modifier or Shift alone;
+    /// Ctrl, Alt and Win pass through. Marks <paramref name="e"/> handled, and returns true, only when the arrow changed the layout.
+    /// </summary>
+    internal bool RouteArrow(KeyEventArgs e, ModifierKeys modifiers)
+    {
+        if (e.Handled || _drag is not null || (modifiers & ~ModifierKeys.Shift) != 0) return false;
         var key = e.Key.ToString();
-        bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
-        if (DeskArrange.ArrowKey(key, shift) is null || PieceWithFocus() is not { } widget) return;
-        if (HandleArrow(widget, key, shift)) e.Handled = true;
+        bool shift = modifiers.HasFlag(ModifierKeys.Shift);
+        if (DeskArrange.ArrowKey(key, shift) is null || PieceWithFocus() is not { } widget) return false;
+        if (!HandleArrow(widget, key, shift)) return false;
+        e.Handled = true;
+        return true;
     }
 
     /// <summary>The piece whose Hide or Show on button holds the keyboard, null when none does.</summary>
