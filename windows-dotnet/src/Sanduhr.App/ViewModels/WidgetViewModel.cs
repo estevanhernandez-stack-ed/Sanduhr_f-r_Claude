@@ -684,7 +684,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             ClaudeCodeProfile.ConfigDir));
 
         _alertConfig = _settings.LoadAlertConfig();
-        AlertSettingsChanged += () => _alertConfig = _settings.LoadAlertConfig();
+        AlertSettingsChanged += () =>
+        {
+            _alertConfig = _settings.LoadAlertConfig();
+            // The bars' usage signal (theme match) follows Alerts' thresholds.
+            foreach (var card in Tiers) card.SetThresholds(_alertConfig.WarnPct, _alertConfig.UrgentPct);
+        };
 
         _snapshotWriter = new SnapshotWriter(_paths.SnapshotFile, LogSnapshotFailure, AppVersion);
         _statuslineEnabled = _settings.LoadStatuslineEnabled();
@@ -1751,6 +1756,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             if (!existing.TryGetValue(key, out var vm))
             {
                 vm = new TierCardViewModel(key, _palette);
+                vm.SetThresholds(_alertConfig.WarnPct, _alertConfig.UrgentPct);
                 Tiers.Insert(Math.Min(i, Tiers.Count), vm);
                 existing[key] = vm;
             }
