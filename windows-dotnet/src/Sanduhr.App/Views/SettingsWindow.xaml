@@ -2937,6 +2937,11 @@
                     </Border>
                 </TabItem>
 
+                <!-- Settings, Desk Look (Settings v2, slice 3): its own control; its sections pick their view models. -->
+                <TabItem Header="Desk Look" Tag="DeskLook" AutomationProperties.Name="Desk Look">
+                    <views:DeskLookPage />
+                </TabItem>
+
                 <!-- Settings, Message (spec 6.2): its own control, which carries its glass, scroller and anchors. -->
                 <TabItem Header="Message" Tag="DeskMessage" AutomationProperties.Name="Message" DataContext="{Binding MessagePage}">
                     <views:DeskMessagePage />
@@ -3080,6 +3085,15 @@
                         </StackPanel>
                         </ScrollViewer>
                     </Border>
+                </TabItem>
+
+                <!-- Settings, Watchers and Launcher (Settings v2, slice 3): features that were sections of the Desk page (WF22). -->
+                <TabItem Header="Watchers" Tag="Watchers" AutomationProperties.Name="Watchers" DataContext="{Binding Desk}">
+                    <views:WatchersPage />
+                </TabItem>
+
+                <TabItem Header="Launcher" Tag="Launcher" AutomationProperties.Name="Launcher" DataContext="{Binding Desk}">
+                    <views:LauncherPage />
                 </TabItem>
 
                 <!-- Settings, Widgets (spec 3.8): the signed catalog and the installed packs, drawn by their own control. -->

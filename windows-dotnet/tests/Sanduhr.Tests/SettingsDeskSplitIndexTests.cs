@@ -80,4 +80,32 @@ public class SettingsDeskSplitIndexTests
         Assert.Equal(SettingsPage.Widgets, SettingsIndex.PageFromId("Widgets"));
         Assert.Null(SettingsIndex.PageFromId("history2"));
     }
+
+    [Fact]
+    public void The_Desktop_group_holds_the_split_pages_in_the_specs_order()
+    {
+        var desktop = SettingsNames.Sidebar.Single(g => g.Title == "Desktop").Pages;
+        Assert.Equal([SettingsPage.Desk, SettingsPage.DeskLook, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather,
+            SettingsPage.Watchers, SettingsPage.Launcher, SettingsPage.Widgets], desktop);
+        Assert.Equal(["desklook", "watchers", "launcher"],
+            new[] { SettingsPage.DeskLook, SettingsPage.Watchers, SettingsPage.Launcher }.Select(SettingsIndex.PageId));
+    }
+
+    [Theory]
+    [InlineData("message", SettingsPage.DeskMessage)]
+    [InlineData("nowPlaying", SettingsPage.NowPlaying)]
+    [InlineData("weather", SettingsPage.Weather)]
+    [InlineData("watchers", SettingsPage.Watchers)]
+    [InlineData("launcher", SettingsPage.Launcher)]
+    [InlineData("glow", SettingsPage.ClaudeCode)]
+    public void A_piece_with_a_page_names_it(string widget, SettingsPage page) =>
+        Assert.Equal(page, SettingsNames.DeskPiecePage(widget));
+
+    [Theory]
+    [InlineData("clock")]
+    [InlineData("claude")]
+    [InlineData("meters")]
+    [InlineData("telemetry")]
+    [InlineData("companion")]
+    public void A_piece_without_a_page_names_none(string widget) => Assert.Null(SettingsNames.DeskPiecePage(widget));
 }

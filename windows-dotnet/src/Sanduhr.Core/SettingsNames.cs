@@ -28,21 +28,21 @@ public static class SettingsNames
         new("Usage", [SettingsPage.History, SettingsPage.ClaudeUsage, SettingsPage.Publish]),
         new("Extend", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Themes]),
-        new("Desktop", [SettingsPage.Desk, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather, SettingsPage.Widgets]),
+        new("Desktop", [SettingsPage.Desk, SettingsPage.DeskLook, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather,
+            SettingsPage.Watchers, SettingsPage.Launcher, SettingsPage.Widgets]),
         new("Help", [SettingsPage.About]),
     ];
 
-    // ---- Page titles still to come (Settings v2). Unused until their slice adds the page: Privacy
-    // (slice 6), Desk Look, Watchers and Launcher (slice 3), Mods & Widgets (slice 4, the Mods page's new title).
+    // ---- Page titles added by Settings v2. Desk Look, Watchers and Launcher are pages since slice 3; Privacy (slice 6) and
+    // Mods & Widgets (slice 4, the Mods page's new title) are still to come.
     public const string PrivacyTitle = "Privacy";
     public const string DeskLookTitle = "Desk Look";
     public const string WatchersTitle = "Watchers";
     public const string LauncherTitle = "Launcher";
     public const string ModsAndWidgetsTitle = "Mods & Widgets";
 
-    /// <summary>The titles above, in sidebar order of their future pages.</summary>
-    public static IReadOnlyList<string> TitlesToCome { get; } =
-        [PrivacyTitle, DeskLookTitle, WatchersTitle, LauncherTitle, ModsAndWidgetsTitle];
+    /// <summary>The titles of pages still to come, in sidebar order.</summary>
+    public static IReadOnlyList<string> TitlesToCome { get; } = [PrivacyTitle, ModsAndWidgetsTitle];
 
     /// <summary>Every page in sidebar order.</summary>
     public static IReadOnlyList<SettingsPage> Pages { get; } = [.. Sidebar.SelectMany(g => g.Pages)];
@@ -63,6 +63,9 @@ public static class SettingsNames
         SettingsPage.DeskMessage => "Message",
         SettingsPage.NowPlaying => "Now playing",
         SettingsPage.Weather => "Weather",
+        SettingsPage.DeskLook => DeskLookTitle,
+        SettingsPage.Watchers => WatchersTitle,
+        SettingsPage.Launcher => LauncherTitle,
         SettingsPage.Widgets => "Widgets",
         SettingsPage.About => "About",
         SettingsPage.Widget => "Widget",
@@ -261,6 +264,19 @@ public static class SettingsNames
         "launcher" => DeskLauncher,
         "companion" => DeskCompanion,
         _ => widget,
+    };
+
+    /// <summary>The page a Desk piece's own settings live on (Desk, Pieces' "&lt;Page&gt; settings…"); null for a piece that has
+    /// none (the clock, the Claude meters, System, and the companion, whose controls sit in its row).</summary>
+    public static SettingsPage? DeskPiecePage(string widget) => widget switch
+    {
+        "message" => SettingsPage.DeskMessage,
+        "nowPlaying" => SettingsPage.NowPlaying,
+        "weather" => SettingsPage.Weather,
+        "watchers" => SettingsPage.Watchers,
+        "launcher" => SettingsPage.Launcher,
+        "glow" => SettingsPage.ClaudeCode,
+        _ => null,
     };
     /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7). The section's name.</summary>
     public const string DeskInk = "Ink";

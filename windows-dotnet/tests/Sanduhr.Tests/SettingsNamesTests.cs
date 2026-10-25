@@ -44,6 +44,9 @@ public class SettingsNamesTests
     [InlineData(SettingsPage.Publish, "Publish usage")]
     [InlineData(SettingsPage.Themes, "Themes")]
     [InlineData(SettingsPage.Desk, "Desk")]
+    [InlineData(SettingsPage.DeskLook, "Desk Look")]
+    [InlineData(SettingsPage.Watchers, "Watchers")]
+    [InlineData(SettingsPage.Launcher, "Launcher")]
     [InlineData(SettingsPage.About, "About")]
     public void PageTitle_is_pinned(SettingsPage page, string title) =>
         Assert.Equal(title, SettingsNames.PageTitle(page));
@@ -182,7 +185,7 @@ public class SettingsNamesTests
     [Fact]
     public void Titles_to_come_are_pinned_and_open_no_page_yet()
     {
-        Assert.Equal(["Privacy", "Desk Look", "Watchers", "Launcher", "Mods & Widgets"], SettingsNames.TitlesToCome);
+        Assert.Equal(["Privacy", "Mods & Widgets"], SettingsNames.TitlesToCome);   // Desk Look, Watchers, Launcher landed in slice 3
         foreach (var title in SettingsNames.TitlesToCome)
             Assert.Null(SettingsNames.Linked(title + " settings…"));
     }
@@ -213,8 +216,8 @@ public class SettingsNamesTests
     [Fact]
     public void PathProblems_flags_a_longer_unknown_title()
     {
-        // "Desk Look" is not a page yet: the known title "Desk" must not let it through.
-        Assert.Contains("no page \"Desk Look\" after \"Settings, \"", SettingsNames.PathProblems("Settings, Desk Look, Font"));
+        // "Desk Look" is a page since slice 3: the longer title wins over "Desk", and "Font" is none of its sections.
+        Assert.Contains("no section \"Font\" on Desk Look", SettingsNames.PathProblems("Settings, Desk Look, Font"));
         // "Look" is a section of Desk, so the comma form is a real place.
         Assert.Empty(SettingsNames.PathProblems("Settings, Desk, Look"));
         // Lowercase prose after a page and a comma is not a title.

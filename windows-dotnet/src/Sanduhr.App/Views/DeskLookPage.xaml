@@ -1,0 +1,26 @@
+<UserControl x:Class="Sanduhr.App.Views.DeskLookPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Sanduhr.App.Views"
+             xmlns:vm="clr-namespace:Sanduhr.App.ViewModels"
+             xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
+             Focusable="False">
+    <!-- Settings, Desk Look (spec, Desk Look): the Desk's fonts, sizes, ink and color, and the back plate, in one place (WF12).
+         Hosted in SettingsWindow, whose styles it finds with DynamicResource. DataContext: the SettingsViewModel; each section
+         sets its own (Desk, or MessagePage for the message's look). -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolVis" />
+    </UserControl.Resources>
+    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+            <ScrollViewer.Resources>
+                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+            </ScrollViewer.Resources>
+            <StackPanel x:Name="PageBody" Margin="20">
+                <TextBlock Text="{x:Static core:SettingsNames.DeskLookTitle}" FontSize="14" FontWeight="SemiBold"
+                           AutomationProperties.HeadingLevel="Level1"
+                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+            </StackPanel>
+        </ScrollViewer>
+    </Border>
+</UserControl>

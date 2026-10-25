@@ -336,6 +336,9 @@ public static class SettingsIndex
         [SettingsPage.DeskMessage] = ["messages", "messages.txt", "quote", "handwriting"],
         [SettingsPage.NowPlaying] = ["music", "song", "media", "visualizer", "looks", "song style"],
         [SettingsPage.Weather] = ["forecast", "temperature", "city"],
+        [SettingsPage.DeskLook] = ["look", "fonts", "size", "ink", "color", "colour", "plate"],
+        [SettingsPage.Watchers] = ["watcher", "cards", "CI", "progress"],
+        [SettingsPage.Launcher] = ["buttons", "apps", "links", "shortcuts"],
         [SettingsPage.Widgets] = ["widget packs", "companion", "sprite", "catalog", "pet"],
         [SettingsPage.About] = ["help", "version", "trademark", "privacy"],
     };

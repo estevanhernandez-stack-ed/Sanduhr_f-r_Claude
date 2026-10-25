@@ -22,7 +22,7 @@ public class SettingsLinkTests
         Assert.Null(SettingsIndex.PageFromId("desk look"));
         Assert.Null(SettingsIndex.PageFromId(""));
         Assert.Null(SettingsIndex.PageFromId(null));
-        Assert.Null(SettingsIndex.PageFromId("desklook")); // slice 3's page: unknown until then
+        Assert.Equal(SettingsPage.DeskLook, SettingsIndex.PageFromId("desklook")); // a page since slice 3
     }
 
     [Theory]
