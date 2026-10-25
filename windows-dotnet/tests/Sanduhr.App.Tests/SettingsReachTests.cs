@@ -61,7 +61,7 @@ public sealed class SettingsReachTests : AppWindowFixture
     {
         var row = new SettingsSearchRow("Margins", SettingsPage.Desk, SettingsIndex.DeskMargins, IsPage: false, CollapsedIn: "Advanced");
         Assert.Equal("Margins (in Advanced)", row.DisplayTitle);
-        Assert.Equal("Margins (in Advanced), on Desk", row.AutomationName);
+        Assert.Equal("Margins, in Advanced, on Desk", row.AutomationName);
         Assert.Equal("Margins", new SettingsSearchRow("Margins", SettingsPage.Desk, SettingsIndex.DeskMargins, false).DisplayTitle);
     }
 
@@ -74,9 +74,11 @@ public sealed class SettingsReachTests : AppWindowFixture
         var expander = new Expander { IsExpanded = false, Content = inner };
         var page = new StackPanel();
         page.Children.Add(expander);
+        var outer = new Expander { IsExpanded = false, Content = page };   // above the page: never ours to open
 
-        Assert.True(SettingsWindow.RevealInside(target));
+        Assert.True(SettingsWindow.RevealInside(target, page));
         Assert.True(expander.IsExpanded);
-        Assert.False(SettingsWindow.RevealInside(target)); // already open: nothing to do
+        Assert.False(outer.IsExpanded);
+        Assert.False(SettingsWindow.RevealInside(target, page)); // already open: nothing to do
     });
 }

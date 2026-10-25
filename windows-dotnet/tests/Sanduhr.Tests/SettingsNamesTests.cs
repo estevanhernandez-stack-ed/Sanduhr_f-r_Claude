@@ -265,6 +265,13 @@ public class SettingsNamesTests
     }
 
     [Fact]
+    public void A_title_in_a_collapsed_section_is_marked_in_text_and_spoken_plainly()
+    {
+        Assert.Equal("Margins (in Advanced)", SettingsNames.InSection("Margins", "Advanced"));
+        Assert.Equal("Margins, in Advanced", SettingsNames.InSectionSpoken("Margins", "Advanced"));
+    }
+
+    [Fact]
     public void The_agent_switches_say_Claude()
     {
         Assert.Equal("Let Claude show watchers", SettingsNames.WatchersSwitch);

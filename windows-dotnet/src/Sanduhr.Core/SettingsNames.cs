@@ -165,6 +165,10 @@ public static class SettingsNames
     public const string LetClaudeReadTotals = "Let Claude read this folder's project totals";
     /// <summary>The same switch spoken with its folder, so each card's reads apart.</summary>
     public static string LetClaudeReadTotalsFor(string folder) => $"{LetClaudeReadTotals}, {folder}";
+    /// <summary>A search row for a control inside a collapsed section: "Margins (in Advanced)".</summary>
+    public static string InSection(string title, string section) => $"{title} (in {section})";
+    /// <summary>The same row spoken, without the parentheses: "Margins, in Advanced".</summary>
+    public static string InSectionSpoken(string title, string section) => $"{title}, in {section}";
     /// <summary>Settings' title-bar close button, spoken (its face is a glyph).</summary>
     public const string CloseSettings = "Close Settings";
     /// <summary>Accounts: the follow switch, and the tray's account list marks the account in use.</summary>

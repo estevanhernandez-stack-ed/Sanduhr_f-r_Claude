@@ -11,10 +11,15 @@ namespace Sanduhr.App.ViewModels;
 public sealed record SettingsSearchRow(string Title, SettingsPage Page, string? Anchor, bool IsPage, string? CollapsedIn = null)
 {
     /// <summary>The row's words: the title, with "(in Advanced)" when it sits in a collapsed section.</summary>
-    public string DisplayTitle => CollapsedIn is null ? Title : $"{Title} (in {CollapsedIn})";
+    public string DisplayTitle => CollapsedIn is null ? Title : SettingsNames.InSection(Title, CollapsedIn);
 
-    /// <summary>What a screen reader says: the page alone, or "Tray shows, on General".</summary>
-    public string AutomationName => IsPage ? $"{Title} page" : $"{DisplayTitle}, on {SettingsNames.PageTitle(Page)}";
+    /// <summary>
+    /// What a screen reader says: the page alone, "Tray shows, on General", or "Margins, in Advanced, on Desk"
+    /// (no parentheses when spoken).
+    /// </summary>
+    public string AutomationName => IsPage
+        ? $"{Title} page"
+        : $"{(CollapsedIn is null ? Title : SettingsNames.InSectionSpoken(Title, CollapsedIn))}, on {SettingsNames.PageTitle(Page)}";
 }
 
 /// <summary>

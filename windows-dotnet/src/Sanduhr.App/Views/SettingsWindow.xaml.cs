@@ -275,8 +275,8 @@ internal partial class SettingsWindow : Window
                 return;
             }
             // A section inside a collapsed group (a search hit "(in Advanced)") opens its group first.
-            if (RevealInside(target) && target is UIElement opened)
-                opened.UpdateLayout();
+            if (RevealInside(target, content))
+                target.UpdateLayout();
             if (!target.IsVisible)
             {
                 tab.Focus();
@@ -308,13 +308,14 @@ internal partial class SettingsWindow : Window
     }
 
     /// <summary>
-    /// Opens every collapsed Expander between <paramref name="target"/> and the page, so a section inside one can be
-    /// shown and focused. True when one was opened.
+    /// Opens every collapsed Expander between <paramref name="target"/> and the page's content root
+    /// <paramref name="root"/> (exclusive: the walk stops there and never opens anything above the page), so a section
+    /// inside one can be shown and focused. True when one was opened.
     /// </summary>
-    internal static bool RevealInside(DependencyObject target)
+    internal static bool RevealInside(DependencyObject target, DependencyObject root)
     {
         bool opened = false;
-        for (var d = target; d is not null; d = LogicalTreeHelper.GetParent(d) ?? (d is Visual ? VisualTreeHelper.GetParent(d) : null))
+        for (var d = target; d is not null && !ReferenceEquals(d, root); d = LogicalTreeHelper.GetParent(d) ?? (d is Visual ? VisualTreeHelper.GetParent(d) : null))
         {
             if (d is Expander { IsExpanded: false } expander)
             {
