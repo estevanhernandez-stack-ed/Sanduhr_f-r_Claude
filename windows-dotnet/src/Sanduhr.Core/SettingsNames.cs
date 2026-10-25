@@ -286,7 +286,7 @@ public static class SettingsNames
     public const string MessageFont = "Message font";
     /// <summary>Desk Look, Ink and color: the message's color.</summary>
     public const string MessageColor = "Message color";
-    /// <summary>Alerts: the Desk's sign-in reminder switch (settings.json "desk_sign_in_reminder", on by default).</summary>
+    /// <summary>Desk, Behavior: the Desk's sign-in reminder switch (settings.json "desk_sign_in_reminder", on by default; WF32).</summary>
     public const string SignInReminders = SignInReminder.Title;
     /// <summary>The first-run card's third action (settings.json "just_the_desk"); it has no Settings control.</summary>
     public const string JustTheDeskButton = JustTheDesk.ButtonTitle;
@@ -454,7 +454,7 @@ public static class SettingsNames
         (MessageColor, SettingsPage.DeskLook),
         (LauncherAddApp, SettingsPage.Launcher),
         (LauncherAddLink, SettingsPage.Launcher),
-        (SignInReminders, SettingsPage.Alerts),
+        (SignInReminders, SettingsPage.Desk),
         (NowPlayingInWidget, SettingsPage.NowPlaying),
         (NowPlayingStyle, SettingsPage.NowPlaying),
         (NowPlayingLooksDirect, SettingsPage.NowPlaying),

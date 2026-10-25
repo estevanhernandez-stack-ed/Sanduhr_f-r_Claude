@@ -95,6 +95,8 @@ public static class SettingsIndex
     public const string DeskDirect = "desk-direct";
     public const string DeskOled = "desk-oled";
     public const string DeskDesigns = "desk-designs";
+    /// <summary>Desk, Advanced (slice 3): collapsed; holds Margins and OLED care.</summary>
+    public const string DeskAdvanced = "desk-advanced";
     /// <summary>Desk Look, Sizes (slice 3).</summary>
     public const string DeskSizes = "sizes";
     // Desk: Message, Now playing, Weather (S6)
@@ -128,7 +130,7 @@ public static class SettingsIndex
     public const string SessionsView = "Sessions";
 
     private static SettingsEntry E(string title, SettingsPage page, string anchor, string[]? synonyms = null,
-        string? subsection = null) => new(title, page, anchor, synonyms ?? [], subsection);
+        string? subsection = null, string? collapsedIn = null) => new(title, page, anchor, synonyms ?? [], subsection, collapsedIn);
 
     /// <summary>Every anchor in sidebar order, with its title and the words a person might type for it.</summary>
     public static IReadOnlyList<SettingsEntry> Anchors { get; } =
@@ -153,8 +155,6 @@ public static class SettingsIndex
         E("Warn at and Urgent at", SettingsPage.Alerts, Thresholds, ["threshold", "warn", "urgent", "percent"]),
         E("Sound", SettingsPage.Alerts, Sound, ["chime", "sound", "snake", "model-scoped", "mute"]),
         E(SettingsNames.SendTestAlert, SettingsPage.Alerts, TestAlert, ["test", "try"]),
-        E(SettingsNames.SignInReminders, SettingsPage.Alerts, SignInReminders,
-            ["sign in", "signed out", "without Claude", "reminder", "Just the Desk", "session expired"]),
 
         E("History chart", SettingsPage.History, Chart,
             ["meter history", "30 days", "week", "month", "account", "all accounts", "chart"]),
@@ -205,24 +205,30 @@ public static class SettingsIndex
         E(SettingsNames.DeskSwitch, SettingsPage.Desk, DeskOn,
             ["desktop", "wallpaper", "clock", "meters", "Rainmeter", "show the Desk", "on the desktop", "off by default", "monitors"]),
         E(SettingsNames.ArrangeDesk, SettingsPage.Desk, DeskArrange,
-            ["drag", "move", "rearrange", "arrange", "reorder", "on the desktop", "layout"]),
-        E(SettingsNames.DeskPieceClicksSwitch, SettingsPage.Desk, DeskClicks,
-            ["click", "click-through", "right-click", "menu", "desktop icons", "clock", "message"]),
-        E(SettingsNames.DeskDirectSwitch, SettingsPage.Desk, DeskDirect,
-            ["Claude", "agent", "agents", "MCP", "propose_desk", "design", "designs", "review", "apply", "without asking", "wallpaper", "off by default"]),
-        E(SettingsNames.OledCareSwitch, SettingsPage.Desk, DeskOled,
-            ["oled", "burn-in", "burn in", "burnin", "drift", "dim", "idle", "away", "screen", "pixels", "white", "image retention", "off by default"]),
-        E(SettingsNames.DeskDesigns, SettingsPage.Desk, DeskDesigns,
-            ["design", "designs", "undo", "put back", SettingsNames.PutMyDeskBack, "restore", "switch", "switch to", "rename", "pin", "delete", "saved looks", "Before", "history", "Claude"]),
-        E(SettingsNames.PiecesSection, SettingsPage.Desk, DeskPieces,
-            ["where each piece sits", "show", "hide", "order", "reorder", "move up", "move down", "stack", "layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor", "monitor", "monitors", "screen", "display", "main monitor", "all monitors", "second monitor", "per monitor",
-             "style", "meter style", "slim", "ring", "rings", "gauge", "ticks", "segments", "Roundline", "compact",
-             "companion", "pet", "sprite", "hourglass", "roam", "walk", "grow", "growth", "stage", "mood", SettingsNames.WidgetCompanionPick,
-             SettingsNames.WidgetCompanionRoam]),
-        E("Margins", SettingsPage.Desk, DeskMargins,
-            ["margin", "edge", "padding", "taskbar", "inset", "spacing"]),
-        E("Layout map", SettingsPage.Desk, DeskMap,
+            ["drag", "move", "rearrange", "arrange", "reorder", "on the desktop", "layout", "arrow keys", "keyboard"]),
+        E(SettingsNames.DeskLayoutMap, SettingsPage.Desk, DeskMap,
             ["map", "preview", "layout", "taskbar", "screen", "monitor", "where"]),
+        E(SettingsNames.PiecesSection, SettingsPage.Desk, DeskPieces,
+            ["where each piece sits", "show", "hide", "order", "reorder", "move up", "move down", "stack",
+             "layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor", "monitor", "monitors",
+             "screen", "display", "main monitor", "all monitors", "second monitor", "per monitor",
+             "style", "meter style", "slim", "ring", "rings", "gauge", "ticks", "segments", "Roundline", "compact",
+             "companion", "pet", "sprite", "hourglass", "roam", "walk", "grow", "growth", "stage", "mood",
+             SettingsNames.WidgetCompanionPick, SettingsNames.WidgetCompanionRoam]),
+        E(SettingsNames.DeskBehavior, SettingsPage.Desk, DeskClicks,
+            [SettingsNames.DeskPieceClicksSwitch, "click", "click-through", "right-click", "menu", "desktop icons", "clock", "message"]),
+        E(SettingsNames.SignInReminders, SettingsPage.Desk, SignInReminders,
+            ["sign in", "signed out", "without Claude", "reminder", "Just the Desk", "session expired"]),
+        E(SettingsNames.DeskDesigns, SettingsPage.Desk, DeskDesigns,
+            ["design", "designs", "undo", "put back", SettingsNames.PutMyDeskBack, "restore", "switch", "switch to", "rename", "pin", "delete",
+             "saved looks", "Before", "history", "Claude", SettingsNames.DeskDirectSwitch, "agent", "agents", "MCP", "propose_desk", "review",
+             "apply", "without asking", "wallpaper", "off by default"]),
+        E(SettingsNames.DeskAdvanced, SettingsPage.Desk, DeskAdvanced, ["advanced", "more"]),
+        E("Margins", SettingsPage.Desk, DeskMargins,
+            ["margin", "edge", "padding", "taskbar", "inset", "spacing"], collapsedIn: SettingsNames.DeskAdvanced),
+        E(SettingsNames.OledCareSwitch, SettingsPage.Desk, DeskOled,
+            ["oled", "burn-in", "burn in", "burnin", "drift", "dim", "idle", "away", "screen", "pixels", "white", "image retention", "off by default"],
+            collapsedIn: SettingsNames.DeskAdvanced),
 
         E(SettingsNames.FontsSection, SettingsPage.DeskLook, DeskLook,
             ["font", SettingsNames.DeskFont, SettingsNames.MessageFont, "EsteFont", "EsteFont Pro", "EsteFont 26", "typeface", "Segoe UI", "font pack"]),
@@ -309,7 +315,7 @@ public static class SettingsIndex
         [SettingsNames.DeskPlateSwitch] = DeskPlate,
         [SettingsNames.WatchersSwitch] = Watchers,
         [SettingsNames.CiRunnersSwitch] = CiRunners,
-        [SettingsNames.DeskDirectSwitch] = DeskDirect,
+        [SettingsNames.DeskDirectSwitch] = DeskDesigns,
         [SettingsNames.OledCareSwitch] = DeskOled,
         [SettingsNames.PutMyDeskBack] = DeskDesigns,
         [SettingsNames.ExportSessions] = Sessions,
@@ -336,6 +342,18 @@ public static class SettingsIndex
         [SettingsNames.WidgetCompanionPick] = DeskPieces,
         [SettingsNames.WidgetCompanionRoam] = DeskPieces,
     };
+
+    /// <summary>
+    /// The sections that start collapsed (spec, Desk: Designs and Advanced), by page and anchor, with the name a search row gives
+    /// what sits in them: "Let Claude change the Desk directly (in Designs)". A name in <see cref="SettingsNames.Table"/> whose
+    /// anchor is one of these is inside it; the section's own row is not. Declared before <see cref="All"/>, which reads it.
+    /// </summary>
+    public static IReadOnlyDictionary<(SettingsPage Page, string Anchor), string> CollapsedSections { get; } =
+        new Dictionary<(SettingsPage Page, string Anchor), string>
+        {
+            [(SettingsPage.Desk, DeskDesigns)] = SettingsNames.DeskDesigns,
+            [(SettingsPage.Desk, DeskAdvanced)] = SettingsNames.DeskAdvanced,
+        };
 
     /// <summary>Words a page goes by besides its title.</summary>
     public static IReadOnlyDictionary<SettingsPage, string[]> PageSynonyms { get; } = new Dictionary<SettingsPage, string[]>
@@ -377,7 +395,9 @@ public static class SettingsIndex
             if (!all.Any(e => e.Title == name && e.Page == page && e.Anchor == anchor))
             {
                 var at = Anchors.FirstOrDefault(e => e.Page == page && e.Anchor == anchor);
-                all.Add(new SettingsEntry(name, page, anchor, [], at?.Subsection, at?.CollapsedIn));
+                var inside = at?.CollapsedIn
+                    ?? (anchor is not null && CollapsedSections.TryGetValue((page, anchor), out var section) ? section : null);
+                all.Add(new SettingsEntry(name, page, anchor, [], at?.Subsection, inside));
             }
         }
         return all;

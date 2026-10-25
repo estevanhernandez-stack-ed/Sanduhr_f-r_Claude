@@ -251,4 +251,64 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void Designs_and_Advanced_start_closed_and_a_hit_inside_opens_them() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Desk);
+            Settle(window, guard);
+            var designs = (Expander)window.FindName("DeskDesignsSection");
+            var advanced = (Expander)window.FindName("DeskAdvancedSection");
+            Assert.False(designs.IsExpanded);
+            Assert.False(advanced.IsExpanded);
+            Assert.Contains(Below<TextBlock>(designs), t => t.Text == svm.Desk.Designs.Summary);
+
+            window.SelectPage(SettingsPage.Desk, SettingsIndex.DeskMargins);
+            Settle(window, guard);
+            Assert.True(advanced.IsExpanded);
+            Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskMargins), window.Place);
+
+            window.SelectPage(SettingsPage.Desk, SettingsIndex.DeskDirect);   // an old link
+            Settle(window, guard);
+            Assert.True(designs.IsExpanded);
+            Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskDesigns), window.Place);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void A_hit_inside_Advanced_opens_it() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Desk, SettingsIndex.DeskOled);
+            Settle(window, guard);
+            Assert.True(((Expander)window.FindName("DeskAdvancedSection")).IsExpanded);
+            Assert.True(Marked(window, SettingsPage.Desk, SettingsIndex.DeskOled).IsVisible);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void Sign_in_reminders_live_on_Desk_Behavior() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Alerts, SettingsIndex.SignInReminders);   // an old link
+            Settle(window, guard);
+            Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.SignInReminders), window.Place);
+            var box = Below<CheckBox>(Marked(window, SettingsPage.Desk, SettingsIndex.SignInReminders)).Single();
+            Assert.Equal(SettingsNames.SignInReminders, box.Content);
+            Assert.Equal(SettingsNames.SignInReminders, System.Windows.Automation.AutomationProperties.GetName(box));
+            Assert.True(box.IsChecked);
+            box.IsChecked = false;
+            Assert.False(svm.Alerts.DeskSignInReminder);
+        }
+        finally { window.Close(); }
+    });
 }

@@ -278,7 +278,6 @@ public sealed class SettingsReachTests : AppWindowFixture
             Assert.False(SettingsAnchor.Find(content, SettingsIndex.Thresholds)!.IsEnabled);
             Assert.False(SettingsAnchor.Find(content, SettingsIndex.Sound)!.IsEnabled);
             Assert.False(SettingsAnchor.Find(content, SettingsIndex.TestAlert)!.IsEnabled);
-            Assert.True(SettingsAnchor.Find(content, SettingsIndex.SignInReminders)!.IsEnabled);
             Assert.True(off.IsVisible);
             Assert.Equal(0.45, ((FrameworkElement)window.FindName("AlertsDependents")).Opacity, 2);
 

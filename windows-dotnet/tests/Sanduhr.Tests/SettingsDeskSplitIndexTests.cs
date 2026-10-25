@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Sanduhr.Core;
 using Xunit;
 
@@ -7,6 +8,23 @@ namespace Sanduhr.Tests;
 /// go live and the jump links.</summary>
 public class SettingsDeskSplitIndexTests
 {
+    private static string AppDir()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "src", "Sanduhr.App", "Package.appxmanifest")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        return Path.Combine(dir!.FullName, "src", "Sanduhr.App");
+    }
+
+    private static string TabRange(string tag)
+    {
+        var xaml = File.ReadAllText(Path.Combine(AppDir(), "Views", "SettingsWindow.xaml"));
+        var m = Regex.Match(xaml, "<TabItem\\b[^>]*?\\bTag=\"" + tag + "\"[^>]*>");
+        Assert.True(m.Success, "no TabItem with Tag=" + tag);
+        return xaml[m.Index..xaml.IndexOf("</TabItem>", m.Index, StringComparison.Ordinal)];
+    }
+
     [Fact]
     public void A_feature_page_says_where_its_piece_sits()
     {
@@ -191,5 +209,38 @@ public class SettingsDeskSplitIndexTests
             SettingsIndex.Resolve(SettingsPage.Desk, SettingsIndex.DeskLauncher));
         Assert.Equal(["Edit buttons…"], SettingsNames.RetiredNames("Edit buttons…"));
         Assert.Equal("Launcher settings…", SettingsNames.LinkTitle(SettingsPage.Launcher));
+    }
+
+    [Fact]
+    public void The_Desk_page_runs_in_the_specs_order()
+    {
+        var marks = Regex.Matches(TabRange("Desk"), "views:SettingsAnchor\\.Id=\"([\\w-]+)\"").Select(m => m.Groups[1].Value).ToList();
+        Assert.Equal(["desk", "arrange", "map", "pieces", "desk-clicks", "signin-reminders", "desk-designs", "desk-advanced", "margins", "desk-oled"], marks);
+        Assert.DoesNotContain("signin-reminders", TabRange("Alerts"));
+    }
+
+    [Fact]
+    public void What_sits_in_Designs_and_Advanced_says_so()
+    {
+        Assert.Equal(SettingsNames.DeskAdvanced, SettingsIndex.Search("margins")[0].Entry.CollapsedIn);
+        Assert.Contains(SettingsIndex.Search("OLED care"),
+            h => h.Entry.Anchor == SettingsIndex.DeskOled && h.Entry.CollapsedIn == SettingsNames.DeskAdvanced);
+        Assert.Contains(SettingsIndex.Search("let Claude change the Desk directly"),
+            h => h.Entry.Anchor == SettingsIndex.DeskDesigns && h.Entry.CollapsedIn == SettingsNames.DeskDesigns);
+        Assert.Contains(SettingsIndex.Search("put my desk back"),
+            h => h.Entry.Anchor == SettingsIndex.DeskDesigns && h.Entry.CollapsedIn == SettingsNames.DeskDesigns);
+        Assert.Null(SettingsIndex.Find(SettingsPage.Desk, SettingsIndex.DeskDesigns)!.CollapsedIn);    // the section's own row
+        Assert.Null(SettingsIndex.Find(SettingsPage.Desk, SettingsIndex.DeskAdvanced)!.CollapsedIn);
+    }
+
+    [Fact]
+    public void The_moved_Desk_links_land_in_their_new_sections()
+    {
+        Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskDesigns), SettingsIndex.Resolve(SettingsPage.Desk, SettingsIndex.DeskDirect));
+        Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.SignInReminders), SettingsIndex.Resolve(SettingsPage.Alerts, SettingsIndex.SignInReminders));
+        Assert.Equal(SettingsPage.Desk, SettingsNames.Table.Single(t => t.Name == SettingsNames.SignInReminders).Page);
+        Assert.Empty(SettingsNames.PathProblems("Settings, Desk, Advanced"));
+        Assert.Empty(SettingsNames.PathProblems("Settings, Desk, Designs"));
+        Assert.Empty(SettingsNames.PathProblems("Settings, Desk, Behavior"));
     }
 }

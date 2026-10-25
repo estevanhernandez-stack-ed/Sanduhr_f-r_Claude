@@ -157,7 +157,8 @@ public class SettingsReachIndexTests
     {
         var margins = new SettingsEntry("Margins", SettingsPage.Desk, SettingsIndex.DeskMargins, ["edge"], CollapsedIn: "Advanced");
         Assert.Equal("Advanced", SettingsIndex.Search("edge", [margins]).Single().Entry.CollapsedIn);
-        // Nothing is collapsed until slice 3 folds Designs and Advanced.
-        Assert.All(SettingsIndex.All, e => Assert.Null(e.CollapsedIn));
+        // Slice 3 folds Designs and Advanced on the Desk page; nothing else is collapsed.
+        Assert.All(SettingsIndex.All.Where(e => e.CollapsedIn is not null), e => Assert.Equal(SettingsPage.Desk, e.Page));
+        Assert.Contains(SettingsIndex.All, e => e.CollapsedIn == SettingsNames.DeskAdvanced);
     }
 }
