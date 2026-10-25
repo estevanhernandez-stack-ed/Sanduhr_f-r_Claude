@@ -418,6 +418,73 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
     });
 
     [Fact]
+    public void A_jump_link_lands_on_its_section_and_opens_it() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Desk);
+            Settle(window, guard);
+            var links = Below<SectionJumpLinks>((DependencyObject)TabOf(window, SettingsPage.Desk).Content).Single();
+            Assert.Equal(SettingsNames.JumpLinksName, System.Windows.Automation.AutomationProperties.GetName(links));
+            var advanced = links.Children.OfType<Button>().Single(b => (string)b.Content == SettingsNames.DeskAdvanced);
+            advanced.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Settle(window, guard);
+            Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskAdvanced), window.Place);
+            Assert.True(((Expander)window.FindName("DeskAdvancedSection")).IsExpanded);
+        }
+        finally { window.Close(); }
+    });
+
+    private static bool Inside(object? element, DependencyObject root)
+    {
+        for (var d = element as DependencyObject; d is not null; d = (d is Visual ? VisualTreeHelper.GetParent(d) : null) ?? LogicalTreeHelper.GetParent(d))
+            if (ReferenceEquals(d, root))
+                return true;
+        return false;
+    }
+
+    private static void Next(IInputElement element)
+    {
+        var request = new TraversalRequest(FocusNavigationDirection.Next);
+        if (element is UIElement ui) ui.MoveFocus(request);
+        else if (element is ContentElement content) content.MoveFocus(request);
+    }
+
+    /// <summary>Done (spec, slice 3): the Desk page reaches Pieces in under 10 Tab stops. Keyboard focus is routed inside the
+    /// never-activating window, as slice 2's Tab walk does.</summary>
+    [DesktopFact]
+    public void From_the_Desk_pages_first_stop_Tab_reaches_Pieces_in_under_10() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Desk);
+            Settle(window, guard);
+            guard.RouteKeyboard();
+            var content = (DependencyObject)TabOf(window, SettingsPage.Desk).Content;
+            var pieces = Marked(window, SettingsPage.Desk, SettingsIndex.DeskPieces);
+            var first = Below<Control>(content).First(c => c is { Focusable: true, IsTabStop: true, IsVisible: true, IsEnabled: true });
+            Keyboard.Focus(first);
+            guard.Check();
+            Assert.True(ReferenceEquals(Keyboard.FocusedElement, first), "keyboard focus could not be routed to the Desk page");
+            int stops = 1;
+            IInputElement? at = first;
+            while (stops < 20 && at is not null && !Inside(at, pieces))
+            {
+                Next(at);
+                Pump();
+                guard.Check();
+                at = Keyboard.FocusedElement;
+                stops++;
+            }
+            Assert.True(Inside(at, pieces), $"Tab never reached Pieces; it stopped on {at?.GetType().Name ?? "nothing"}");
+            Assert.True(stops < 10, $"Pieces is Tab stop {stops} from the page's first stop");
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public void The_map_toggle_speaks_as_an_expander_with_the_map_title() => AppHost.Run(() =>
     {
         var (window, _, guard) = Open("Personal");

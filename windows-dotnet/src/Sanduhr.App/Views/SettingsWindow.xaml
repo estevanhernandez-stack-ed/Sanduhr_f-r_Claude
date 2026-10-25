@@ -2581,6 +2581,7 @@
                                                Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,4" />
                                     <TextBlock Text="{x:Static core:SettingsNames.DeskLine}" FontSize="11" TextWrapping="Wrap"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12" />
+                                    <views:SectionJumpLinks Page="Desk" />
 
                                     <StackPanel views:SettingsAnchor.Id="desk">
                                         <CheckBox Style="{StaticResource ThemedCheckBox}"
@@ -2779,6 +2780,7 @@
                             <TextBlock Text="Now playing" FontSize="14" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level1"
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
                             <views:DeskPieceStatusPanel DataContext="{Binding Piece}" Margin="0,0,0,12" />
+                            <views:SectionJumpLinks Page="NowPlaying" />
                             <StackPanel views:SettingsAnchor.Id="np-widget">
                                 <CheckBox Style="{StaticResource ThemedCheckBox}"
                                           Content="{x:Static core:SettingsNames.NowPlayingInWidget}" IsChecked="{Binding Widget, Mode=TwoWay}"
@@ -2794,7 +2796,7 @@
                             </StackPanel>
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
                             <StackPanel views:SettingsAnchor.Id="np-apps">
-                                <TextBlock Text="Apps" FontSize="13" FontWeight="SemiBold"
+                                <TextBlock Text="Apps" FontSize="13" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level2"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
                                 <TextBlock x:Name="NowPlayingAppsEmpty" Style="{StaticResource EmptyLine}" Margin="0,0,0,6"
                                            Text="Nothing has played since Sanduhr started."
@@ -2848,7 +2850,7 @@
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
                             <views:DeskPieceStatusPanel DataContext="{Binding Piece}" Margin="0,0,0,12" />
                             <StackPanel views:SettingsAnchor.Id="weather-place">
-                                <TextBlock Text="City" FontSize="13" FontWeight="SemiBold"
+                                <TextBlock Text="City" FontSize="13" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level2"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
                                 <TextBlock Text="{Binding PlaceText}" FontSize="12" Margin="0,0,0,8"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />

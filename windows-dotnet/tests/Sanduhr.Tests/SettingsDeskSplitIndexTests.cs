@@ -25,6 +25,42 @@ public class SettingsDeskSplitIndexTests
         return xaml[m.Index..xaml.IndexOf("</TabItem>", m.Index, StringComparison.Ordinal)];
     }
 
+    [Theory]
+    [InlineData(SettingsPage.Desk)]
+    [InlineData(SettingsPage.DeskLook)]
+    [InlineData(SettingsPage.NowPlaying)]
+    public void A_page_with_four_or_more_sections_has_a_jump_link_to_each(SettingsPage page)
+    {
+        var links = SettingsIndex.JumpLinks(page);
+        Assert.True(links.Count >= 4);
+        Assert.All(links, l => Assert.NotNull(SettingsIndex.Find(page, l.Anchor)));
+        Assert.Equal(links.Count, links.Select(l => l.Anchor).Distinct().Count());
+    }
+
+    [Fact]
+    public void The_Desks_jump_links_read_as_the_spec_writes_them()
+    {
+        Assert.Equal(["Pieces", "Behavior", "Designs", "Advanced"], SettingsIndex.JumpLinks(SettingsPage.Desk).Select(l => l.Title));
+        Assert.Empty(SettingsIndex.JumpLinks(SettingsPage.Weather));
+    }
+
+    [Fact]
+    public void The_Desk_split_pages_mark_their_headings()
+    {
+        var sources = new[] { TabRange("Desk"), TabRange("NowPlaying"), TabRange("Weather") }
+            .Concat(new[] { "DeskLookPage", "WatchersPage", "LauncherPage" }
+                .Select(p => File.ReadAllText(Path.Combine(AppDir(), "Views", p + ".xaml"))));
+        var bad = new List<string>();
+        foreach (var src in sources)
+            foreach (Match t in Regex.Matches(src, "<TextBlock\\b[^>]*FontSize=\"1[34]\"[^>]*FontWeight=\"SemiBold\"[^>]*>"))
+                // a list row's own title (the Launcher's buttons) is data, not a section heading
+                if (!t.Value.Contains("Text=\"{Binding", StringComparison.Ordinal) && !t.Value.Contains("AutomationProperties.HeadingLevel=\"Level", StringComparison.Ordinal))
+                    bad.Add(t.Value);
+        Assert.True(bad.Count == 0, "Headings not marked:" + Environment.NewLine + string.Join(Environment.NewLine, bad));
+        Assert.Contains("<Setter Property=\"AutomationProperties.HeadingLevel\" Value=\"Level2\" />",
+            File.ReadAllText(Path.Combine(AppDir(), "Views", "DeskMessagePage.xaml")));
+    }
+
     [Fact]
     public void A_feature_page_says_where_its_piece_sits()
     {

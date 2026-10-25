@@ -327,6 +327,11 @@ public static class SettingsNames
 
     // ---- Settings v2, slice 3: the Desk split ----
 
+    /// <summary>A page's row of jump links, spoken (spec, Keyboard and screen reader).</summary>
+    public const string JumpLinksName = "Sections on this page";
+    /// <summary>Now playing's first jump link (its section is "Show what's playing in the widget").</summary>
+    public const string NowPlayingJumpWidget = "In the widget";
+
     /// <summary>Desk: the piece rows' section (was "Where each piece sits").</summary>
     public const string PiecesSection = "Pieces";
     /// <summary>Desk: the clicks switch and the sign-in reminders.</summary>

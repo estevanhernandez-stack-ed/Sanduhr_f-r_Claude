@@ -22,6 +22,7 @@
                 <TextBlock Text="{x:Static core:SettingsNames.DeskLookTitle}" FontSize="14" FontWeight="SemiBold"
                            AutomationProperties.HeadingLevel="Level1"
                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+                <views:SectionJumpLinks Page="DeskLook" />
 
                 <!-- Fonts: the Desk's and the message's, the two "Font"s apart (WF12). Font packs join both lists. -->
                 <StackPanel views:SettingsAnchor.Id="look">

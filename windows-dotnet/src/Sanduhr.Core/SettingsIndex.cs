@@ -718,6 +718,21 @@ public static class SettingsIndex
     public static SettingsLink Landing(SettingsPage? page, string? anchor, SettingsLink? last) =>
         page is { } p ? new(p, anchor) : last ?? new(SettingsPage.General, null);
 
+    /// <summary>
+    /// A page's jump links (spec, Keyboard and screen reader: pages with four or more sections), in page order: a short label and
+    /// the section's anchor. Slice 3 gives them to its pages; other pages get theirs in their own slices. Empty for a page without.
+    /// </summary>
+    public static IReadOnlyList<(string Title, string Anchor)> JumpLinks(SettingsPage page) => page switch
+    {
+        SettingsPage.Desk => [(SettingsNames.PiecesSection, DeskPieces), (SettingsNames.DeskBehavior, DeskClicks),
+            (SettingsNames.DeskDesigns, DeskDesigns), (SettingsNames.DeskAdvanced, DeskAdvanced)],
+        SettingsPage.DeskLook => [(SettingsNames.FontsSection, DeskLook), (SettingsNames.SizesSection, DeskSizes),
+            (SettingsNames.InkAndColor, DeskInk), (SettingsNames.BackPlate, DeskPlate)],
+        SettingsPage.NowPlaying => [(SettingsNames.NowPlayingJumpWidget, NowPlayingWidget), ("Apps", NowPlayingApps),
+            ("Bars", NowPlayingBars), ("Looks", NowPlayingLooks)],
+        _ => [],
+    };
+
     private static int IndexOf(IReadOnlyList<SettingsPage> list, SettingsPage p)
     {
         for (int i = 0; i < list.Count; i++)
