@@ -115,11 +115,28 @@ public sealed class SettingsViewModel
     /// <summary>Connected by the orchestrator: opens the reset dialog. Null does nothing.</summary>
     public Func<Task>? ResetRequested { get; set; }
 
-    /// <summary>The sidebar foot's "Quit Sanduhr": runs the tray's quit path.</summary>
+    /// <summary>The sidebar foot's "Quit Sanduhr": asks first (WF33), then runs the tray's quit path.</summary>
     public ICommand QuitCommand { get; }
 
     /// <summary>Connected by the orchestrator: the same quit the tray's Quit runs. Null does nothing.</summary>
     public Action? QuitRequested { get; set; }
+
+    /// <summary>What the sidebar's Quit asks first (spec, General). The tray's Quit stays immediate: using the tray is an explicit act.</summary>
+    public const string QuitQuestion = "Quit Sanduhr? The widget and the Desk close.";
+
+    /// <summary>Tests answer the Quit question here instead of showing it.</summary>
+    internal Func<bool>? ConfirmQuitHook { get; set; }
+
+    private System.Windows.Window? _owner;
+
+    /// <summary>The Quit question parents to the Settings window.</summary>
+    public void AttachOwner(System.Windows.Window owner) => _owner = owner;
+
+    private bool ConfirmQuit() => ConfirmQuitHook is { } hook
+        ? hook()
+        : Sanduhr.App.Views.ThemedDialog.Show(_owner, SettingsNames.QuitSanduhr, QuitQuestion,
+              System.Windows.MessageBoxButton.YesNo, Sanduhr.App.Views.ThemedDialogKind.Warning,
+              primaryLabel: "Quit", secondaryLabel: "Cancel") == System.Windows.MessageBoxResult.Yes;
 
     /// <summary>Backs the General tab's Shortcuts section (global shortcut + recorder).</summary>
     public ShortcutsViewModel Shortcuts { get; }
@@ -170,7 +187,11 @@ public sealed class SettingsViewModel
         ShowInExplorerCommand = new RelayCommand<string>(OpenFolder,
             folder => !string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder));
         OpenLinkCommand = new RelayCommand<string>(OpenLink);
-        QuitCommand = new RelayCommand(() => QuitRequested?.Invoke());
+        QuitCommand = new RelayCommand(() =>
+        {
+            if (ConfirmQuit())
+                QuitRequested?.Invoke();
+        });
         ResetSanduhrCommand = new RelayCommand(async () =>
         {
             try { if (ResetRequested is { } reset) await reset(); }

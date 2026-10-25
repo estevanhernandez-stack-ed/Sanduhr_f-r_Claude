@@ -160,4 +160,24 @@ public sealed class SettingsReachTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void Quit_from_Settings_asks_first_and_Cancel_keeps_Sanduhr_running() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        int quits = 0, asked = 0;
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask)
+        {
+            QuitRequested = () => quits++,
+            ConfirmQuitHook = () => { asked++; return false; },
+        };
+
+        svm.QuitCommand.Execute(null);
+        Assert.Equal((1, 0), (asked, quits));
+
+        svm.ConfirmQuitHook = () => { asked++; return true; };
+        svm.QuitCommand.Execute(null);
+        Assert.Equal((2, 1), (asked, quits));
+        Assert.Equal("Quit Sanduhr? The widget and the Desk close.", SettingsViewModel.QuitQuestion);
+    });
 }

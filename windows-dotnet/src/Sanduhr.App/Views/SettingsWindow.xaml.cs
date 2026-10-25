@@ -70,6 +70,7 @@ internal partial class SettingsWindow : Window
 
         InitializeComponent();
         // Modal dialogs spawned by the tabs (rename, confirm, export result) parent to us.
+        ViewModel.AttachOwner(this);
         ViewModel.Accounts.AttachOwner(this);
         ViewModel.Themes.AttachOwner(this);
         ViewModel.History.AttachOwner(this);
