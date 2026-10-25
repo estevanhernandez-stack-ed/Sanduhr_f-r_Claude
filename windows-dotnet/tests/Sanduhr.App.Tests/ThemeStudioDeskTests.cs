@@ -12,6 +12,7 @@ namespace Sanduhr.App.Tests;
 
 /// <summary>Theme match in the Theme Studio: a Font picker and the Desk look section, saved into the theme and previewed live (the Desk
 /// redraws on the preview's ThemeChanged while it follows).</summary>
+[Collection("SettingsWindow")]
 public sealed class ThemeStudioDeskTests : AppWindowFixture
 {
     [Fact]
@@ -85,6 +86,43 @@ public sealed class ThemeStudioDeskTests : AppWindowFixture
         Assert.Contains("Zzz Missing Face", studio.FontChoices);
     });
 
+    [Fact]
+    public void The_default_font_entry_saves_no_font_key() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        var errors = new List<string>();
+        var studio = new ThemeStudioViewModel(widget, errors.Add, _ => { }, () => { }, ["Consolas"]);
+        studio.Activate();
+        studio.Font = "Consolas";
+        studio.Font = SettingsNames.ThemeDefaultFont;
+        studio.FileName = "plain-font";
+        studio.SaveCommand.Execute(null);
+
+        Assert.Empty(errors);
+        Assert.Null(widget.GetThemeDefinition("plain-font")!.Font);
+        Assert.DoesNotContain("\"font\"", File.ReadAllText(Path.Combine(widget.ThemesDir, "plain-font.json")));
+    });
+
+    [Fact]
+    public void Switching_to_a_theme_without_a_desk_look_leaves_no_stale_rows() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        var dusk = ThemeCatalog.BuiltIns["aurora"] with { Name = "Dusk", Font = "Consolas", Desk = new ThemeDesk { Ink = ["#ffffff"] } };
+        Directory.CreateDirectory(widget.ThemesDir);
+        File.WriteAllText(Path.Combine(widget.ThemesDir, "dusk.json"), ThemeDraft.FromDefinition("dusk", dusk).ToJsonText());
+        widget.ReloadUserThemes();
+        var studio = new ThemeStudioViewModel(widget, _ => { }, _ => { }, () => { }, ["Consolas"]);
+        studio.SelectedStart = widget.Themes.First(t => t.Key == "dusk");
+        Assert.Equal("#ffffff", studio.DeskEditor.Ink);
+
+        studio.SelectedStart = widget.Themes.First(t => t.Key == "obsidian");
+
+        Assert.Equal("", studio.DeskEditor.Ink);
+        Assert.Equal("", studio.DeskEditor.Bars);
+        Assert.True(studio.DeskEditor.Desk.IsEmpty);
+        Assert.Equal(SettingsNames.ThemeDefaultFont, studio.Font);
+    });
+
     [DesktopFact]
     public void The_hosted_editor_and_the_font_picker_wear_the_themed_styles() => AppHost.Run(() =>
     {
@@ -105,6 +143,7 @@ public sealed class ThemeStudioDeskTests : AppWindowFixture
             var combo = Descendants<ComboBox>(editor).Single();
             Assert.Equal(window.FindResource("ThemedComboBox"), combo.Style);
             Assert.Equal(window.FindResource("ThemedCheckBox"), Descendants<CheckBox>(editor).Single().Style);
+            Assert.NotEmpty(Descendants<TextBox>(editor));
             Assert.All(Descendants<TextBox>(editor), t => Assert.Equal(window.FindResource("Input"), t.Style));
             var picker = Descendants<ComboBox>(window).Single(c => AutomationProperties.GetName(c) == SettingsNames.ThemeFontPicker);
             Assert.Equal(window.FindResource("ThemedComboBox"), picker.Style);

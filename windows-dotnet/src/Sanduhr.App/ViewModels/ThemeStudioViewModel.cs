@@ -222,7 +222,7 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
     partial void OnFontChanged(string value)
     {
         if (_loading) return;
-        _draft.Font = value == SettingsNames.ThemeDefaultFont || value.Length == 0 ? null : value;
+        _draft.Font = value == SettingsNames.ThemeDefaultFont || string.IsNullOrEmpty(value) ? null : value;
         Refresh(preview: true);
     }
 
