@@ -55,4 +55,28 @@ public sealed class SettingsReachTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void A_search_hit_in_a_collapsed_section_says_so()
+    {
+        var row = new SettingsSearchRow("Margins", SettingsPage.Desk, SettingsIndex.DeskMargins, IsPage: false, CollapsedIn: "Advanced");
+        Assert.Equal("Margins (in Advanced)", row.DisplayTitle);
+        Assert.Equal("Margins (in Advanced), on Desk", row.AutomationName);
+        Assert.Equal("Margins", new SettingsSearchRow("Margins", SettingsPage.Desk, SettingsIndex.DeskMargins, false).DisplayTitle);
+    }
+
+    [Fact]
+    public void Opening_a_hit_inside_a_collapsed_section_unfolds_it() => AppHost.Run(() =>
+    {
+        var target = new CheckBox();
+        var inner = new StackPanel();
+        inner.Children.Add(target);
+        var expander = new Expander { IsExpanded = false, Content = inner };
+        var page = new StackPanel();
+        page.Children.Add(expander);
+
+        Assert.True(SettingsWindow.RevealInside(target));
+        Assert.True(expander.IsExpanded);
+        Assert.False(SettingsWindow.RevealInside(target)); // already open: nothing to do
+    });
 }

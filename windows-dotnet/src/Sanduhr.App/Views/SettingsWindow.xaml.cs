@@ -269,10 +269,17 @@ internal partial class SettingsWindow : Window
         // After layout: the page may have just been realized for the first time.
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
-            if (tab.Content is not DependencyObject content || SettingsAnchor.Find(content, entry.Anchor!) is not { } target
-                || !target.IsVisible)
+            if (tab.Content is not DependencyObject content || SettingsAnchor.Find(content, entry.Anchor!) is not { } target)
             {
                 tab.Focus();   // never leave keyboard focus nowhere
+                return;
+            }
+            // A section inside a collapsed group (a search hit "(in Advanced)") opens its group first.
+            if (RevealInside(target) && target is UIElement opened)
+                opened.UpdateLayout();
+            if (!target.IsVisible)
+            {
+                tab.Focus();
                 return;
             }
             target.BringIntoView();
@@ -298,6 +305,24 @@ internal partial class SettingsWindow : Window
                 return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Opens every collapsed Expander between <paramref name="target"/> and the page, so a section inside one can be
+    /// shown and focused. True when one was opened.
+    /// </summary>
+    internal static bool RevealInside(DependencyObject target)
+    {
+        bool opened = false;
+        for (var d = target; d is not null; d = LogicalTreeHelper.GetParent(d) ?? (d is Visual ? VisualTreeHelper.GetParent(d) : null))
+        {
+            if (d is Expander { IsExpanded: false } expander)
+            {
+                expander.IsExpanded = true;
+                opened = true;
+            }
+        }
+        return opened;
     }
 
     private static UIElement? FirstFocusable(DependencyObject root)

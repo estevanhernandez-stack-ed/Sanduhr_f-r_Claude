@@ -746,7 +746,7 @@
                                                 </ListBox.Resources>
                                                 <ListBox.ItemTemplate>
                                                     <DataTemplate>
-                                                        <TextBlock x:Name="t" Text="{Binding Title}" FontSize="12" TextWrapping="Wrap"
+                                                        <TextBlock x:Name="t" Text="{Binding DisplayTitle}" FontSize="12" TextWrapping="Wrap"
                                                                    Margin="12,0,0,0"
                                                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                                         <DataTemplate.Triggers>
