@@ -683,8 +683,8 @@ public static class ToolCatalog
         "failed). Without an update for 10 minutes it greys as lost touch, so update long jobs. Limits: " +
         "title 1 to 80 characters on one line, short up to 12, link https only, total 1 to 1000000. Pass work: true for " +
         "anything from the user's employer, so it hides in demo mode. Refused with reason " +
-        "watchers_off when the user has not turned on 'Let Claude show watchers' in Sanduhr (Settings, " +
-        "Desk); then do not retry. It shows where the user has placed the Watchers piece on the Desk.";
+        "watchers_off when the user has not turned on 'Let Claude show watchers' in Sanduhr " +
+        "(Settings, Desk); then do not retry. It shows where the user has placed the Watchers piece on the Desk.";
 
     private const string WatchGuideUpdate =
         "Move a watcher from watch_start: done (how many of its total are done), note (one line, up to " +

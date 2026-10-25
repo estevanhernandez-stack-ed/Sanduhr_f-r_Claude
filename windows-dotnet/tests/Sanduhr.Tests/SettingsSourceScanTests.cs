@@ -650,4 +650,58 @@ public class SettingsSourceScanTests
         Assert.Contains("core:SettingsNames.WidgetPackLine",
             File.ReadAllText(Path.Combine(AppDir(), "Views", "WidgetsPage.xaml")));
     }
+
+    [Fact]
+    public void No_literal_ends_inside_a_Settings_path()
+    {
+        // "(Settings, " + "Desk);" escapes PathProblems: the page is in the next literal (slice 1 review, split literals). Keep a
+        // place in one literal; wrap the prose around it instead.
+        var split = CsStrings().Concat(CoreAndMcpStrings())
+            .Where(x => x.Text.TrimEnd().EndsWith("Settings,", StringComparison.Ordinal))
+            .Select(x => $"{x.Where}: \"{x.Text}\"")
+            .ToList();
+        Assert.True(split.Count == 0, "A Settings path split across literals: " + string.Join(", ", split));
+    }
+
+    [Fact]
+    public void Every_radio_in_Settings_sits_in_a_named_group()
+    {
+        // Slice 1's scan read DeskMessagePage only; the Desk split adds pages. A radio outside a named RadioGroupPanel is read
+        // as a lone choice by Narrator.
+        var bad = new List<string>();
+        foreach (var file in SettingsXamlFiles())
+        {
+            var src = XmlComment.Replace(File.ReadAllText(file), "");
+            int radios = Regex.Matches(src, "<RadioButton\\b").Count;
+            if (radios == 0) continue;
+            var groups = RadioGroups(src);
+            foreach (var g in groups.Where(g => !Regex.IsMatch(g.Open, "AutomationProperties\\.Name=\"[^\"]+\"")))
+                bad.Add($"{Path.GetFileName(file)}: a RadioGroupPanel with no AutomationProperties.Name");
+            int inside = groups.Sum(g => Regex.Matches(g.Body, "<RadioButton\\b").Count);
+            if (inside != radios)
+                bad.Add($"{Path.GetFileName(file)}: {radios - inside} radio(s) outside a RadioGroupPanel");
+        }
+        Assert.True(bad.Count == 0, string.Join(Environment.NewLine, bad));
+    }
+
+    [Fact]
+    public void Own_file_pages_draw_a_focus_ring_and_add_no_scroll_stop()
+    {
+        // P25: the window's styles ring keyboard focus, but a page in its own file can hide the focus rectangle in a local style
+        // and draw nothing instead. P5: a page's ScrollViewer must not be an extra, invisible Tab stop.
+        var bad = new List<string>();
+        foreach (var file in SettingsXamlFiles().Skip(1))   // SettingsWindow.xaml's own styles are pinned by slice 2's tests
+        {
+            var src = XmlComment.Replace(File.ReadAllText(file), "");
+            foreach (Match style in Regex.Matches(src, "<Style\\b.*?</Style>", RegexOptions.Singleline))
+                if (Regex.IsMatch(style.Value, "Property=\"FocusVisualStyle\"\\s+Value=\"\\{x:Null\\}\"")
+                    && !style.Value.Contains("IsKeyboardFocused", StringComparison.Ordinal))
+                    bad.Add($"{Path.GetFileName(file)}: {Regex.Match(style.Value, "<Style\\b[^>]*>").Value} hides the focus rectangle and draws no ring");
+            // the element, not <ScrollViewer.Resources>
+            foreach (Match sv in Regex.Matches(src, "<ScrollViewer(?=[\\s/>])[^>]*>"))
+                if (!sv.Value.Contains("Focusable=\"False\"", StringComparison.Ordinal))
+                    bad.Add($"{Path.GetFileName(file)}: {sv.Value} is a Tab stop");
+        }
+        Assert.True(bad.Count == 0, string.Join(Environment.NewLine, bad));
+    }
 }
