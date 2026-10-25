@@ -110,6 +110,9 @@ public abstract class AppWindowFixture : IDisposable
     {
         yield return peer;
         IList<AutomationPeer>? children = null;
+        // A peer keeps the children it first listed, and a page selected since then is not among them unless a UI
+        // Automation client is listening. Drop the cache so each walk reads the tree as it is now.
+        try { peer.ResetChildrenCache(); } catch (NullReferenceException) { /* a stale item peer */ }
         try { children = peer.GetChildren(); }
         catch (NullReferenceException) { /* a stale item peer */ }
         foreach (var child in children ?? [])
