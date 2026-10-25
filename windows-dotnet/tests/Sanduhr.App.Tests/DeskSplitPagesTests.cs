@@ -408,6 +408,10 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
             window.SelectPage(SettingsPage.Desk, SettingsIndex.DeskMap);
             Settle(window, guard);
             Assert.True(fold.IsExpanded);
+            // The link counts as the person's choice: a taller window leaves it open.
+            window.Height = 561;
+            Settle(window, guard);
+            Assert.True(fold.IsExpanded);
             Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskMap), window.Place);
         }
         finally { window.Close(); }
