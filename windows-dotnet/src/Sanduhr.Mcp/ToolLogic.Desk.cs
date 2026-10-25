@@ -55,7 +55,7 @@ public sealed partial class ToolLogic
             if (state![key] is { } value) answer[key] = value.DeepClone();
         if (state!["writer_version"] is JsonValue wv && wv.TryGetValue<string>(out var writer)) answer["writer_version"] = writer;
         // Theme match: the look the theme gives the Desk (what it draws while design.follows_theme is true), computed with the widget's code.
-        if (state["design"]?["theme"] is JsonObject theme && ThemeLint.Lint(theme).Theme is { } def)
+        if (state["design"] is JsonObject sd && sd["theme"] is JsonObject theme && ThemeLint.Lint(theme).Theme is { } def)
             answer["theme_look"] = ThemeDeskLook.From(def).ToJson();
         try
         {

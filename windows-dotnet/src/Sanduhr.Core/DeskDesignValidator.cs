@@ -217,8 +217,6 @@ public sealed partial record DeskDesign
         bool everything = inkChanged || plateChanged || followChanged || themeChanged;
         bool launcherLabelled = merged.Launcher?.Buttons.Any(b => b.Label is not null) == true;
         string from = inkChanged ? "ink" : plateChanged ? "plate" : followChanged ? "follows_theme" : themeChanged ? "theme" : "layout";
-        // A followed look's failure belongs to the following, whichever field set it off.
-        if (look is not null && from != "layout") from = "follows_theme";
 
         int found = 0;
         foreach (var p in merged.Layout ?? [])
@@ -236,7 +234,7 @@ public sealed partial record DeskDesign
                 foreach (var m in MonitorsOf(wall, p.Monitor))
                 {
                     double under = m.Summary.At(anchor)?.Brightness ?? m.Summary.Brightness;
-                    if (onPlate) under = UnderPlate(under, ink.DarkInk);
+                    if (onPlate) under = look is not null ? UnderPlate(under, look.PlateColor) : UnderPlate(under, ink.DarkInk);
                     foreach (var l in stopLum)
                     {
                         double ratio = Ratio(l, under);
@@ -256,7 +254,7 @@ public sealed partial record DeskDesign
 
             string field = from == "layout" ? $"layout.{p.Piece}" : from;
             // Black beats white as the ground gets brighter than about 0.18 (where (L + .05)^2 = 1.05 * .05).
-            string fix = worstBack > 0.179 ? "a darker ink" : "a lighter ink";
+            string fix = (worstBack > 0.179 ? "a darker ink" : "a lighter ink") + (look is not null ? " (desk.ink in the theme)" : "");
             reasons.Add(new DeskReason(field,
                 $"the {p.Piece} piece at {DeskAnchors.Word(anchor)} ({DeskAnchors.Name(anchor).ToLowerInvariant()}): the ink would read at "
                 + $"{worstRatio.ToString("0.0", CultureInfo.InvariantCulture)}:1 against the wallpaper there "
@@ -295,6 +293,19 @@ public sealed partial record DeskDesign
         double plate = DeskPlate.ColorHex(darkInk) == "ffffff" ? 1 : 0;
         double v = (1 - DeskPlate.Opacity) * Encode(wallpaper) + DeskPlate.Opacity * plate;
         return Decode(v);
+    }
+
+    /// <summary>The same composite for a plate of any color (a followed theme's <c>desk.plate_color</c>, hex without the #): each channel
+    /// of the plate at <see cref="DeskPlate.Opacity"/> over the wallpaper's gray, then the luminance of the result.</summary>
+    public static double UnderPlate(double wallpaper, string plateHex)
+    {
+        double w = Encode(wallpaper);
+        int Channel(int at)
+        {
+            double c = Convert.ToInt32(plateHex.Substring(at, 2), 16) / 255.0;
+            return (int)Math.Round(((1 - DeskPlate.Opacity) * w + DeskPlate.Opacity * c) * 255);
+        }
+        return InkHex.Luminance($"#{Channel(0):x2}{Channel(2):x2}{Channel(4):x2}");
     }
 
     private static double Encode(double linear) =>

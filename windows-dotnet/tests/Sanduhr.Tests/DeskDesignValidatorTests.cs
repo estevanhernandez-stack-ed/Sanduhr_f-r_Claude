@@ -359,6 +359,8 @@ public class DeskDesignValidatorTests
         return t;
     }
 
+    private static JsonObject WithLayout(JsonObject o) { o["layout"] = Obj("""{"clock":{"anchor":"bl"}}"""); return o; }
+
     private static JsonObject Follow(JsonObject theme) => new() { ["follows_theme"] = true, ["theme"] = theme };
 
     [Fact]
@@ -366,7 +368,7 @@ public class DeskDesignValidatorTests
     {
         var ctx = new DeskDesignContext(Wallpaper: Flat(0.05), Current: Current("""{"layout":{"clock":{"anchor":"bl"}},"ink":"dark","plate":false}"""));
         Assert.False(DeskDesign.Validate(Obj("""{"plate":false}"""), ctx).Ok);   // the Desk's own dark ink on a dark wallpaper
-        Assert.True(DeskDesign.Validate(Follow(ObsidianTheme()), ctx).Ok);         // #e8e4dc reads at 8:1
+        Assert.True(DeskDesign.Validate(WithLayout(Follow(ObsidianTheme())), ctx).Ok);         // #e8e4dc reads at 8:1
     }
 
     [Fact]
@@ -384,5 +386,26 @@ public class DeskDesignValidatorTests
         var v = DeskDesign.Validate(Follow(ObsidianTheme()), ctx);
         Assert.Equal("follows_theme", Fields(v));
         Assert.Contains("with the plate on", v.Reasons[0].Message);
+        Assert.Contains("desk.ink", v.Reasons[0].Message);
+    }
+
+    [Fact]
+    public void A_theme_only_proposal_that_fails_while_following_names_theme()
+    {
+        var current = Current("{\"follows_theme\":true,\"layout\":{\"clock\":{\"anchor\":\"bl\"}},\"theme\":" + ObsidianTheme().ToJsonString() + "}");
+        var ctx = new DeskDesignContext(Wallpaper: Flat(0.9), Current: current);
+        var v = DeskDesign.Validate(new JsonObject { ["theme"] = ObsidianTheme() }, ctx);
+        Assert.Equal("theme", Fields(v));
+    }
+
+    [Fact]
+    public void A_followed_plate_is_judged_at_its_real_color()
+    {
+        // Light ink on a dark wallpaper reads bare; a bright plate_color puts a bright ground under it.
+        var theme = ObsidianTheme(plate: true);
+        theme["desk"]!["plate_color"] = "#ffffff";
+        var ctx = new DeskDesignContext(Wallpaper: Flat(0.1), Current: Current("""{"layout":{"clock":{"anchor":"bl"}}}"""));
+        var v = DeskDesign.Validate(Follow(theme), ctx);
+        Assert.Equal("follows_theme", Fields(v));
     }
 }

@@ -797,4 +797,16 @@ public class ToolLogicDeskDesignTests
         WriteState(cfg);
         Assert.Null(new ToolLogic(cfg, () => Now).BuildGetDesk()["theme_look"]);
     }
+
+    [Fact]
+    public void Get_reports_no_theme_look_for_a_theme_that_fails_the_lint_or_a_design_that_is_no_object()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg, s => s["design"]!["theme"] = JsonNode.Parse("""{"name":"X"}"""));
+        Assert.Null(new ToolLogic(cfg, () => Now).BuildGetDesk()["theme_look"]);
+
+        WriteState(cfg, s => s["design"] = "nope");
+        Assert.Null(new ToolLogic(cfg, () => Now).BuildGetDesk()["theme_look"]);
+    }
 }
