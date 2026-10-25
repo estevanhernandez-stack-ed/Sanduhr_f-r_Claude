@@ -62,13 +62,19 @@ public sealed class SettingsReachTests : AppWindowFixture
         var (window, _, guard) = Open("Personal");
         try
         {
-            // Every old place the aliases name, in the build as it is: each lands (now or on its page) and none throws.
+            // Every old place the aliases name, in the build as it is: none throws, and each lands where Check says. A
+            // page this build doesn't show (a later slice's) is ignored, so the place stays where the last link put it.
             foreach (var alias in SettingsIndex.Aliases)
             {
+                var expected = SettingsIndex.Check(alias.FromPage, alias.FromAnchor);
+                var before = window.Place;
                 window.SelectPage(alias.FromPage, alias.FromAnchor);
                 window.UpdateLayout();
                 Pump();
-                Assert.NotNull(window.Place);
+                if (SettingsNames.Pages.Contains(expected.Page))
+                    Assert.Equal(expected, window.Place);
+                else
+                    Assert.Equal(before, window.Place);
             }
 
             // An anchor the page doesn't have, and one that names nothing at all: the page, at its top.

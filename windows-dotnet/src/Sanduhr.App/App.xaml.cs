@@ -489,7 +489,7 @@ public partial class App : Application
         {
             case Desk.DeskMenuAction.EditMessages: _ = ShowSettingsAsync(SettingsPage.DeskMessage, SettingsIndex.MenuAnchor(SettingsPage.DeskMessage)); break;
             case Desk.DeskMenuAction.DeskSettings: _ = ShowSettingsAsync(SettingsPage.Desk, SettingsIndex.MenuAnchor(SettingsPage.Desk)); break;
-            case Desk.DeskMenuAction.LauncherSettings: _ = ShowSettingsAsync(SettingsPage.Desk, Sanduhr.Core.SettingsIndex.DeskLauncher); break;
+            case Desk.DeskMenuAction.LauncherSettings: _ = ShowSettingsAsync(SettingsPage.Desk, SettingsIndex.DeskLauncher); break;
             case Desk.DeskMenuAction.Arrange: _desk?.BeginArrange(); break;
             case Desk.DeskMenuAction.TurnOffDesk:
                 try
@@ -510,7 +510,7 @@ public partial class App : Application
     /// <summary>A Launcher button for an app that is no longer installed was chosen: Settings, Desk, Launcher opens at that button.</summary>
     private void OnLauncherMissing(int index)
     {
-        _ = ShowSettingsAsync(SettingsPage.Desk, Sanduhr.Core.SettingsIndex.DeskLauncher);
+        _ = ShowSettingsAsync(SettingsPage.Desk, SettingsIndex.DeskLauncher);
         if (_settingsWindow?.ViewModel.Desk.Launcher is { } launcher)
         {
             launcher.Reload();
@@ -698,16 +698,9 @@ public partial class App : Application
         if (_vm is null)
             return Task.CompletedTask;
 
-        // Landing only ever sees a checked place: an old page or anchor resolves through the aliases, and an anchor
-        // the page does not have drops to the page's top (ParseLink's rule), so nothing raw reaches Landing.
+        // Landing only ever sees a checked place (SettingsIndex.Check, the rule ParseLink uses), so nothing raw reaches it.
         if (page is { } asked)
-        {
-            var checkedLink = SettingsIndex.Resolve(asked, anchor);
-            page = checkedLink.Page;
-            anchor = checkedLink.Anchor is not null && SettingsIndex.Find(checkedLink.Page, checkedLink.Anchor) is null
-                ? null
-                : checkedLink.Anchor;
-        }
+            (page, anchor) = SettingsIndex.Check(asked, anchor);
 
         if (_settingsWindow is not null)
         {

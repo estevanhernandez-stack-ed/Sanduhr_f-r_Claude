@@ -73,6 +73,7 @@ public class SettingsEntryPointScanTests
         int show = app.IndexOf("_settingsWindow.Show();", StringComparison.Ordinal);
         Assert.True(fit >= 0 && show > fit, "FitToWorkArea must run before the first Show");
         Assert.Equal(fit, app.LastIndexOf("_settingsWindow.FitToWorkArea(", StringComparison.Ordinal));
+        Assert.Contains("SettingsIndex.Check(asked, anchor)", app);
         Assert.Contains("SettingsIndex.Landing(page, anchor, _lastSettings)", app);
         Assert.Contains("_lastSettings = opened.Place;", app);
     }

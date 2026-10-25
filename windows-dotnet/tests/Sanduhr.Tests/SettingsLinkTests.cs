@@ -45,6 +45,42 @@ public class SettingsLinkTests
     [Fact]
     public void No_text_is_no_link() => Assert.Null(SettingsIndex.ParseLink(null));
 
+    [Fact]
+    public void Check_keeps_a_live_anchor_and_drops_an_unknown_or_missing_one()
+    {
+        // A live anchor stays; a null anchor stays null; one the page doesn't have drops to the page's top.
+        Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskPieces),
+            SettingsIndex.Check(SettingsPage.Desk, SettingsIndex.DeskPieces));
+        Assert.Equal(new SettingsLink(SettingsPage.Desk, null), SettingsIndex.Check(SettingsPage.Desk, null));
+        Assert.Equal(new SettingsLink(SettingsPage.Desk, null), SettingsIndex.Check(SettingsPage.Desk, "no-such-section"));
+        Assert.Equal(new SettingsLink(SettingsPage.Desk, null), SettingsIndex.Check(SettingsPage.Desk, ""));
+    }
+
+    [Fact]
+    public void Check_sends_an_old_place_to_where_it_lives_now()
+    {
+        // A sidebar without Widgets: Widgets#widgets-companion is an alias row, and its target (Desk, pieces) is in the index.
+        var pages = SettingsNames.Pages.Where(p => p != SettingsPage.Widgets).ToList();
+        Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskPieces),
+            SettingsIndex.Check(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion, SettingsIndex.Anchors, pages));
+        // With it, the place is live and stays.
+        Assert.Equal(new SettingsLink(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion),
+            SettingsIndex.Check(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion));
+        // An alias whose target page isn't there yet does nothing: the place is kept (Desk's Launcher until slice 3).
+        Assert.Equal(new SettingsLink(SettingsPage.Desk, SettingsIndex.DeskLauncher),
+            SettingsIndex.Check(SettingsPage.Desk, SettingsIndex.DeskLauncher));
+    }
+
+    [Fact]
+    public void A_link_is_checked_by_the_same_rule_as_Check()
+    {
+        foreach (var text in new[] { "desk#pieces", "desk#nowhere", "desk", "history#chart", "desk#desk-launcher" })
+        {
+            var parsed = SettingsIndex.ParseLink(text)!;
+            Assert.Equal(parsed, SettingsIndex.Check(parsed.Page, parsed.Anchor));
+        }
+    }
+
     [Theory]
     [InlineData(new[] { "--settings", "desk#pieces" }, "desk#pieces")]
     [InlineData(new[] { "--settings=about#version" }, "about#version")]

@@ -583,10 +583,28 @@ public static class SettingsIndex
         var anchorText = hash < 0 ? "" : trimmed[(hash + 1)..].Trim().ToLowerInvariant();
         if (PageFromId(pageText) is not { } page)
             return new(SettingsPage.General, null);
-        var link = Resolve(page, anchorText.Length == 0 ? null : anchorText);
-        if (link.Page != SettingsPage.Widget && !SettingsNames.Pages.Contains(link.Page))
-            return new(SettingsPage.General, null);
-        return link.Anchor is not null && Find(link.Page, link.Anchor) is null ? link with { Anchor = null } : link;
+        var link = Check(page, anchorText.Length == 0 ? null : anchorText);
+        return link.Page != SettingsPage.Widget && !SettingsNames.Pages.Contains(link.Page)
+            ? new(SettingsPage.General, null)
+            : link;
+    }
+
+    /// <summary>
+    /// The one checked-anchor rule: (<paramref name="page"/>, <paramref name="anchor"/>) resolved through the aliases
+    /// (<see cref="Resolve(SettingsPage, string?)"/>), with the anchor dropped to the page's top when the index has no
+    /// such section. Every place a link enters Settings, from <see cref="ParseLink"/> to the App's entry points, passes
+    /// through here, so nothing unchecked reaches <see cref="Landing"/>.
+    /// </summary>
+    public static SettingsLink Check(SettingsPage page, string? anchor) => Check(page, anchor, Anchors, SettingsNames.Pages);
+
+    /// <summary><see cref="Check(SettingsPage, string?)"/> over a given index and sidebar, so tests can stand in for later slices.</summary>
+    public static SettingsLink Check(SettingsPage page, string? anchor, IReadOnlyList<SettingsEntry> anchors,
+        IReadOnlyList<SettingsPage> pages)
+    {
+        var link = Resolve(page, anchor, anchors, pages);
+        return link.Anchor is not null && !anchors.Any(e => e.Page == link.Page && e.Anchor == link.Anchor)
+            ? link with { Anchor = null }
+            : link;
     }
 
     /// <summary>
