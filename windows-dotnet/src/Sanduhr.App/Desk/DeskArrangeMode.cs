@@ -644,6 +644,48 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         if (name is not null && HandleKey(name)) e.Handled = true;
     }
 
+    /// <summary>
+    /// The arrow keys (spec, Keyboard and screen reader). Tab picks a piece: its Hide or Show on button holds the keyboard. Then a
+    /// plain arrow moves it to the next place that way and Shift+Up or Shift+Down moves it up or down its stack. Seen before the
+    /// buttons see them, so the arrows never move focus instead.
+    /// </summary>
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+        if (e.Handled || _drag is not null) return;
+        var key = e.Key.ToString();
+        bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        if (DeskArrange.ArrowKey(key, shift) is null || PieceWithFocus() is not { } widget) return;
+        if (HandleArrow(widget, key, shift)) e.Handled = true;
+    }
+
+    /// <summary>The piece whose Hide or Show on button holds the keyboard, null when none does.</summary>
+    private string? PieceWithFocus()
+    {
+        foreach (var (key, button) in _buttons)
+            if (button.IsKeyboardFocused && (key.StartsWith("hide:", StringComparison.Ordinal) || key.StartsWith("showon:", StringComparison.Ordinal)))
+                return key[(key.IndexOf(':') + 1)..];
+        return null;
+    }
+
+    /// <summary>
+    /// An arrow on <paramref name="widget"/>: to the next place that way (<see cref="DeskArrange.Step"/>, joining the bottom of that
+    /// stack), or up or down its own stack. True when the working layout changed; then every surface lays out again and the
+    /// keyboard stays on the piece's Hide button (<see cref="Toggled"/>).
+    /// </summary>
+    public bool HandleArrow(string widget, string keyName, bool shift)
+    {
+        if (_drag is not null || DeskArrange.ArrowKey(keyName, shift) is not { } arrow || _working.Placement(widget) is not { } piece) return false;
+        var before = _working.Layout;
+        if (arrow.Kind == DeskArrangeArrowKind.Order)
+            _working.Move(widget, arrow.Dy);
+        else if (DeskArrange.Step(piece.Anchor, arrow.Dx, arrow.Dy) is { } to)
+            _working.Put(widget, to, before: null);
+        if (_working.Layout == before) return false;
+        Toggled?.Invoke(HideKey(widget));
+        return true;
+    }
+
     public void Dispose()
     {
         _gesture.CaptureLost();
