@@ -337,7 +337,7 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         finally { window.Close(); }
     });
 
-    [Fact]
+    [SkippableFact]
     public void The_section_toggles_speak_as_expanders_once_with_their_summary() => AppHost.Run(() =>
     {
         var (window, svm, guard) = Open("Personal");

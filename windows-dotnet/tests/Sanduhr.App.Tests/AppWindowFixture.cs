@@ -10,8 +10,9 @@ namespace Sanduhr.App.Tests;
 /// <summary>
 /// A fact that is skipped, with a message, on GitHub's hosted runner. There the items of a list get no automation
 /// names at all, though every one is named on a desktop session; until that is understood these run locally only.
+/// Skippable too: a focus test that meets an outside app taking the foreground ends as a skip (see <see cref="AppHost.Run"/>).
 /// </summary>
-public sealed class DesktopFactAttribute : FactAttribute
+public sealed class DesktopFactAttribute : SkippableFactAttribute
 {
     public DesktopFactAttribute()
     {
