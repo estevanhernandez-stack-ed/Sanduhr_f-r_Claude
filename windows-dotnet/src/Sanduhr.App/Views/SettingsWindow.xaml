@@ -1034,14 +1034,45 @@
 
                 <!-- Alerts tab (WS-B) — thresholds, projection, sounds. -->
                 <TabItem Header="Alerts" Tag="Alerts" AutomationProperties.Name="Alerts">
-                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="16">
-                        <StackPanel DataContext="{Binding Alerts}" views:SettingsAnchor.Id="notifications">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                            <ScrollViewer.Resources>
+                                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                            </ScrollViewer.Resources>
+                        <StackPanel Margin="16" DataContext="{Binding Alerts}" views:SettingsAnchor.Id="notifications">
                             <TextBlock TextWrapping="Wrap" FontSize="11"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
                                        Text="Get a toast and a soft chime when a tier crosses your thresholds, or when your pace will hit the cap before it resets. Toasts respect Focus Assist. Model-scoped weekly tiers alert silently by default — toast only, no chime." />
 
                             <CheckBox Content="Enable alerts" IsChecked="{Binding AlertsEnabled}"
                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,10" />
+
+                            <!-- WF36: with alerts off, everything that only matters for alerts dims and says so. -->
+                            <TextBlock x:Name="AlertsOffLine" Text="Alerts are off. Nothing below sends." FontSize="11"
+                                       TextWrapping="Wrap" Margin="0,0,0,10" AutomationProperties.LiveSetting="Polite"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding AlertsEnabled}" Value="False">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <StackPanel x:Name="AlertsDependents" IsEnabled="{Binding AlertsEnabled}">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Style.Triggers>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter Property="Opacity" Value="0.45" />
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
 
                             <Grid Margin="0,0,0,10" views:SettingsAnchor.Id="thresholds">
                                 <Grid.ColumnDefinitions>
@@ -1094,6 +1125,7 @@
                             <Button Style="{StaticResource FlatButton}" Content="{x:Static core:SettingsNames.SendTestAlert}"
                                     views:SettingsAnchor.Id="test"
                                     Command="{Binding TestAlertCommand}" HorizontalAlignment="Left" />
+                            </StackPanel>
 
                             <!-- Sign-in reminders (spec 7.5): the Desk's "sign in to Sanduhr" line. -->
                             <StackPanel Margin="0,20,0,0" views:SettingsAnchor.Id="signin-reminders">
@@ -1107,6 +1139,7 @@
                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="22,0,0,0" />
                             </StackPanel>
                         </StackPanel>
+                        </ScrollViewer>
                     </Border>
                 </TabItem>
 
@@ -1567,8 +1600,12 @@
                      folder — and the one sentence above the controls says exactly what leaves
                      the machine. 626 Labs is a preset, not the name of the feature. -->
                 <TabItem Header="Publish usage" Tag="Publish" AutomationProperties.Name="Publish usage" DataContext="{Binding Publish}">
-                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="20">
-                        <StackPanel>
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                            <ScrollViewer.Resources>
+                                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                            </ScrollViewer.Resources>
+                        <StackPanel Margin="20">
                             <TextBlock Text="Publish usage" FontSize="14" FontWeight="SemiBold"
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
                             <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,12"
@@ -1699,6 +1736,7 @@
                                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                        Text="The sanduhr-mcp publish_usage tool queues the same upload through this widget; it never holds the token itself. Re-publishing a day sends that day's record again." />
                         </StackPanel>
+                        </ScrollViewer>
                     </Border>
                 </TabItem>
 

@@ -253,4 +253,58 @@ public sealed class SettingsReachTests : AppWindowFixture
         Assert.True(bad.Count == 0, string.Join(Environment.NewLine, bad) + note);
         Assert.True(skipped.Count < tabs.Items.Count, "no page had a tab stop, so nothing was walked" + note);
     });
+
+    private static ScrollViewer? ScrollerAbove(DependencyObject element)
+    {
+        for (var p = VisualTreeHelper.GetParent(element); p is not null; p = VisualTreeHelper.GetParent(p))
+            if (p is ScrollViewer scroller)
+                return scroller;
+        return null;
+    }
+
+    [Fact]
+    public void Alerts_off_dims_everything_under_the_switch_and_says_why() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            Land(window, guard, SettingsPage.Alerts, SettingsIndex.Notifications);
+            var content = (DependencyObject)TabOf(window, SettingsPage.Alerts).Content;
+            var off = (FrameworkElement)window.FindName("AlertsOffLine");
+
+            svm.Alerts.AlertsEnabled = false;
+            window.UpdateLayout();
+            Pump();
+            Assert.False(SettingsAnchor.Find(content, SettingsIndex.Thresholds)!.IsEnabled);
+            Assert.False(SettingsAnchor.Find(content, SettingsIndex.Sound)!.IsEnabled);
+            Assert.False(SettingsAnchor.Find(content, SettingsIndex.TestAlert)!.IsEnabled);
+            Assert.True(SettingsAnchor.Find(content, SettingsIndex.SignInReminders)!.IsEnabled);
+            Assert.True(off.IsVisible);
+            Assert.Equal(0.45, ((FrameworkElement)window.FindName("AlertsDependents")).Opacity, 2);
+
+            svm.Alerts.AlertsEnabled = true;
+            window.UpdateLayout();
+            Pump();
+            Assert.True(SettingsAnchor.Find(content, SettingsIndex.Sound)!.IsEnabled);
+            Assert.False(off.IsVisible);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void Alerts_and_Publish_usage_scroll_on_a_short_window() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.Height = 520;
+            foreach (var (page, anchor) in new[] { (SettingsPage.Alerts, SettingsIndex.TestAlert), (SettingsPage.Publish, SettingsIndex.Schedule) })
+            {
+                var scroller = ScrollerAbove(Land(window, guard, page, anchor));
+                Assert.True(scroller is { VerticalScrollBarVisibility: ScrollBarVisibility.Auto, Focusable: false },
+                    $"{page} has no page scroll viewer");
+            }
+        }
+        finally { window.Close(); }
+    });
 }
