@@ -43,9 +43,12 @@ internal sealed class ThemeMatchService
     public Func<string, bool, ThemeEditChoice> AskWhere { get; set; } = ThemeMatchPrompts.Where;
     public Func<string, string?> AskName { get; set; } = ThemeMatchPrompts.Name;
 
-    /// <summary>The wallpaper's luminance under the clock (0 to 1), or null when there is no sample. The Desk's controller wires it (the
-    /// readability guard); the default samples nothing.</summary>
-    public Func<double?> WallpaperLuminance { get; set; } = () => null;
+    /// <summary>The wallpaper's luminance (0 to 1) under the clock on every screen that draws it; empty when there is no sample. The
+    /// Desk's controller wires it (the readability guard); the default samples nothing.</summary>
+    public Func<IReadOnlyList<double>> WallpaperLuminance { get; set; } = () => [];
+
+    /// <summary>The active theme's name (the status line while following).</summary>
+    public string ActiveName => Active.Name;
 
     /// <summary>Whether the guard is holding the plate on at the moment (the Desk's <c>PlateForced</c>); Follow off keeps it.</summary>
     public Func<bool> PlateForced { get; set; } = () => false;
@@ -102,7 +105,8 @@ internal sealed class ThemeMatchService
         var def = Active;
         if (!SaveBefore(SettingsNames.MatchingTheme(def.Name))) return CouldNotSave;
         var look = ThemeDeskLook.From(def);
-        var guarded = look.Guarded(WallpaperLuminance());
+        // Guarded only ever turns the plate on, so folding the screens' samples is exact.
+        var guarded = WallpaperLuminance().Aggregate(look, (l, s) => l.Guarded(s));
         WriteOwn(guarded);
         string said = SettingsNames.MatchedTheme(def.Name);
         return new(true, guarded.Plate && !look.Plate ? said + " " + SettingsNames.ThemeMatchPlateNote : said);

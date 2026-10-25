@@ -14,6 +14,7 @@ public sealed partial class ThemeMatchViewModel : ObservableObject
 {
     private readonly ThemeMatchService _service;
     private bool _loading;
+    private bool _followLine;   // the status line is the followed line Reload wrote, not an action's message
 
     internal ThemeMatchViewModel(ThemeMatchService service)
     {
@@ -39,12 +40,23 @@ public sealed partial class ThemeMatchViewModel : ObservableObject
 
     public string PlateNote => Follow && PlateForced() ? SettingsNames.ThemeMatchPlateNote : "";
 
-    /// <summary>Reads the switch again (and the plate note) without acting on it.</summary>
+    /// <summary>Reads the switch again (and the plate note) without acting on it. While following the status line says what the Desk
+    /// follows; an action's own message is kept when not following.</summary>
     public void Reload()
     {
         _loading = true;
         Follow = _service.Following;
         _loading = false;
+        if (Follow)
+        {
+            Status = SettingsNames.FollowingTheme(_service.ActiveName);
+            _followLine = true;
+        }
+        else if (_followLine)
+        {
+            Status = "";
+            _followLine = false;
+        }
         OnPropertyChanged(nameof(PlateNote));
     }
 
@@ -52,8 +64,9 @@ public sealed partial class ThemeMatchViewModel : ObservableObject
     {
         if (_loading) return;
         var result = value ? _service.FollowOn() : _service.FollowOff();
-        Status = result.Message;
         Reload();   // a Cancel, or a theme that could not be written, puts the switch back
+        Status = result.Message;
+        _followLine = false;
         if (result.Ok) Changed?.Invoke();
     }
 

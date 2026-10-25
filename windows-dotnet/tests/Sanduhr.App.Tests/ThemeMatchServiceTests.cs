@@ -196,9 +196,20 @@ public sealed class ThemeMatchServiceTests : AppWindowFixture
     {
         using var r = Make();
         AddPlatelessDusk(r);
-        r.Service.WallpaperLuminance = () => 0.9;
+        r.Service.WallpaperLuminance = () => [0.9];
         var result = r.Service.MatchNow();
         Assert.True(result.Ok);
+        Assert.True(r.Store.LoadDeskPlate());
+        Assert.EndsWith(SettingsNames.ThemeMatchPlateNote, result.Message);
+    });
+
+    [Fact]
+    public void Match_now_turns_the_plate_on_when_only_one_of_two_screens_would_not_read() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        AddPlatelessDusk(r);
+        r.Service.WallpaperLuminance = () => [0.05, 0.9];
+        var result = r.Service.MatchNow();
         Assert.True(r.Store.LoadDeskPlate());
         Assert.EndsWith(SettingsNames.ThemeMatchPlateNote, result.Message);
     });
@@ -208,7 +219,7 @@ public sealed class ThemeMatchServiceTests : AppWindowFixture
     {
         using var r = Make();
         AddPlatelessDusk(r);
-        r.Service.WallpaperLuminance = () => 0.05;
+        r.Service.WallpaperLuminance = () => [0.05];
         var result = r.Service.MatchNow();
         Assert.False(r.Store.LoadDeskPlate());
         Assert.Equal(SettingsNames.MatchedTheme("Dusk"), result.Message);

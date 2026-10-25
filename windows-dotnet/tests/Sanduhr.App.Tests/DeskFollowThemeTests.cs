@@ -39,8 +39,12 @@ public sealed class DeskFollowThemeTests : IDisposable
         public bool IsShowing { get; private set; }
         public IReadOnlyList<bool> Coverage => [];
 
+        /// <summary>Replaces the one default screen (a multi-monitor test).</summary>
+        public IReadOnlyList<DeskScreen>? Custom { get; set; }
+
         public IReadOnlyList<DeskScreen> Screens()
         {
+            if (Custom is { } custom) return custom;
             var bounds = new PxRect(0, 0, 1920, 1080);
             var work = new PxRect(0, 0, 1920, 1032);
             return [new DeskScreen("TEST", bounds, work, 1.0, true, TaskbarClearance.Insets(bounds, work, [], 1.0))];
@@ -53,12 +57,12 @@ public sealed class DeskFollowThemeTests : IDisposable
         public void Dispose() { }
     }
 
-    private (DeskController Desk, FakeHost Host) Start(bool follows, double wallpaper = 0.05)
+    private (DeskController Desk, FakeHost Host) Start(bool follows, double wallpaper = 0.05, string layout = "clock:bl", FakeHost? host = null)
     {
-        _store.SaveDesk(DeskSettings.Default with { Enabled = true, Layout = "clock:bl", Font = "" });
+        _store.SaveDesk(DeskSettings.Default with { Enabled = true, Layout = layout, Font = "" });
         _store.SaveDeskFollowsTheme(follows);
-        var host = new FakeHost();
-        var desk = new DeskController(_store, () => host, () => DeskUsage.Empty, new NowPlayingHub(), new DeskMessageSource(_store, _paths), paths: _paths)
+        host ??= new FakeHost();
+        var desk = new DeskController(_store, () => host!, () => DeskUsage.Empty, new NowPlayingHub(), new DeskMessageSource(_store, _paths), paths: _paths)
         {
             WallpaperLuminance = (_, _) => wallpaper,
         };
@@ -178,16 +182,45 @@ public sealed class DeskFollowThemeTests : IDisposable
         finally { desk.Dispose(); }
     });
 
-    [Fact]
-    public void ClockLuminance_samples_behind_the_clock_while_the_Desk_runs_and_is_null_when_it_is_off() => Sta.Run(() =>
+    private static DeskScreen Screen(string id, int left, bool primary)
     {
-        var (desk, _) = Start(follows: true, wallpaper: 0.9);
+        var bounds = new PxRect(left, 0, 1920, 1080);
+        var work = new PxRect(left, 0, 1920, 1032);
+        return new DeskScreen("TEST" + id, bounds, work, 1.0, primary, TaskbarClearance.Insets(bounds, work, [], 1.0), id);
+    }
+
+    [Fact]
+    public void ClockLuminance_samples_the_clock_stack_on_the_screen_that_draws_it_and_is_empty_when_the_Desk_is_off() => Sta.Run(() =>
+    {
+        var host = new FakeHost { Custom = [Screen("A", 0, true), Screen("B", 1920, false)] };
+        var layout = new DeskArrangement("clock:bl");
+        layout.SetMonitor("clock", "B");
+        var (desk, _) = Start(follows: true, wallpaper: 0.9, layout: layout.Layout, host: host);
         try
         {
-            Assert.Equal(0.9, desk.ClockLuminance());
-            _store.SaveDesk(DeskSettings.Default with { Enabled = false, Layout = "clock:bl", Font = "" });
+            var seen = new List<(string Id, PxRect Rect)>();
+            desk.WallpaperLuminance = (s, r) => { seen.Add((s.Id!, r)); return 0.9; };
+            Assert.Equal([0.9], desk.ClockLuminance());
+            var only = Assert.Single(seen);
+            Assert.Equal("B", only.Id);   // the clock is not on screen A
+            Assert.InRange(only.Rect.X, 1920, 1920 + 1920 / 2);       // bottom left of screen B, in its pixels
+            Assert.True(only.Rect.Y > 1080 / 2);
+            _store.SaveDesk(DeskSettings.Default with { Enabled = false, Layout = layout.Layout, Font = "" });
             desk.Reload();
-            Assert.Null(desk.ClockLuminance());
+            Assert.Empty(desk.ClockLuminance());
+        }
+        finally { desk.Dispose(); }
+    });
+
+    [Fact]
+    public void ClockLuminance_reads_every_screen_that_draws_the_clock() => Sta.Run(() =>
+    {
+        var host = new FakeHost { Custom = [Screen("A", 0, true), Screen("B", 1920, false)] };
+        var (desk, _) = Start(follows: true, wallpaper: 0.05, host: host);
+        try
+        {
+            desk.WallpaperLuminance = (s, _) => s.Id == "B" ? 0.9 : 0.05;
+            Assert.Equal([0.05, 0.9], desk.ClockLuminance());
         }
         finally { desk.Dispose(); }
     });

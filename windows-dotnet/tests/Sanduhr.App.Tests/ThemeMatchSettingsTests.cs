@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Sanduhr.App.Services;
@@ -78,7 +80,11 @@ public sealed class ThemeMatchSettingsTests : AppWindowFixture
             Assert.False(svm.ThemeMatch.MatchNowCommand.CanExecute(null));
             var ink = Marked(window, SettingsPage.DeskLook, SettingsIndex.DeskInk);
             Assert.All(Below<ComboBox>(ink), c => Assert.False(c.IsEnabled));
-            Assert.Contains(Below<TextBlock>(ink), t => t.Text == SettingsNames.ThemeLookSetsThis && t.IsVisible);
+            // One line, once, under the section: it covers the font, ink and plate controls, so it is not inside Ink and color.
+            var page = (DependencyObject)TabOf(window, SettingsPage.DeskLook).Content;
+            var line = Assert.Single(Below<TextBlock>(page), t => t.Text == SettingsNames.ThemeLookSetsThis);
+            Assert.True(line.IsVisible);
+            Assert.DoesNotContain(line, Below<TextBlock>(ink));
             var plate = Marked(window, SettingsPage.DeskLook, SettingsIndex.DeskPlate);
             Assert.All(Below<CheckBox>(plate), c => Assert.False(c.IsEnabled));
 
@@ -106,13 +112,50 @@ public sealed class ThemeMatchSettingsTests : AppWindowFixture
             window.SelectPage(SettingsPage.DeskLook);
             Settle(window, guard);
 
-            svm.ThemeMatch.Follow = true;
+            var box = Below<CheckBox>(Marked(window, SettingsPage.DeskLook, SettingsIndex.DeskThemeMatch))
+                .Single(c => AutomationProperties.GetName(c) == SettingsNames.FollowThemeSwitch);
+            ((IToggleProvider)new CheckBoxAutomationPeer(box).GetPattern(PatternInterface.Toggle)!).Toggle();   // the real switch
             Settle(window, guard);
 
             Assert.False(svm.ThemeMatch.Follow);
-            var box = Below<CheckBox>(Marked(window, SettingsPage.DeskLook, SettingsIndex.DeskThemeMatch))
-                .Single(c => AutomationProperties.GetName(c) == SettingsNames.FollowThemeSwitch);
             Assert.False(box.IsChecked);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void A_change_made_elsewhere_is_read_again_by_the_section_and_the_own_look_controls() => AppHost.Run(() =>
+    {
+        var (window, svm, guard, _) = Open();
+        try
+        {
+            window.SelectPage(SettingsPage.DeskLook);
+            svm.ThemeMatch.Follow = true;
+            Settle(window, guard);
+            var ink = Marked(window, SettingsPage.DeskLook, SettingsIndex.DeskInk);
+            Assert.All(Below<ComboBox>(ink), c => Assert.False(c.IsEnabled));
+
+            new SettingsStore(new Paths()).SaveDeskFollowsTheme(false);   // Put my Desk back, a design or the MCP did this
+            svm.Desk.RefreshFromStore();
+            svm.ThemeMatch.Reload();
+            Settle(window, guard);
+
+            Assert.False(svm.ThemeMatch.Follow);
+            Assert.All(Below<ComboBox>(ink), c => Assert.True(c.IsEnabled));
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void Opening_while_the_Desk_already_follows_shows_the_followed_line() => AppHost.Run(() =>
+    {
+        new SettingsStore(new Paths()).SaveDeskFollowsTheme(true);
+        var (window, svm, guard, _) = Open();
+        try
+        {
+            Settle(window, guard);
+            Assert.True(svm.ThemeMatch.Follow);
+            Assert.Equal(SettingsNames.FollowingTheme("Obsidian"), svm.ThemeMatch.Status);
         }
         finally { window.Close(); }
     });

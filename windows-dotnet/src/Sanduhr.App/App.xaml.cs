@@ -541,8 +541,10 @@ public partial class App : Application
     /// <summary>A design was applied: an open Settings window re-reads the Desk page, the Launcher and the designs.</summary>
     private void FollowDesignChange()
     {
-        if (_settingsWindow?.ViewModel.Desk is not { } page) return;
-        page.RefreshFromStore();
+        if (_settingsWindow?.ViewModel is not { } svm) return;
+        svm.Desk.RefreshFromStore();
+        // Put my Desk back, a design switch or an MCP design can turn Follow on or off behind the section.
+        svm.ThemeMatch.Reload();
     }
 
     /// <summary>Arrange mode began, dropped a piece or ended: the tray entry and an open Settings window follow
@@ -735,8 +737,11 @@ public partial class App : Application
         svm.ThemeMatch.PlateForced = () => _desk?.PlateForced == true;
         Action plateShown = () => svm.ThemeMatch.Reload();
         if (_desk is not null) _desk.PlateForcedChanged += plateShown;
+        // The widget theme changing while Settings is open (the strip, Themes, an MCP theme): the followed line names the new one.
+        Action<Sanduhr.App.Theming.ThemePalette> themeShown = _ => svm.ThemeMatch.Reload();
+        if (_vm is not null) _vm.ThemeChanged += themeShown;
         // Match now's guard asks the Desk what is behind the clock, and whether the guard already holds the plate on.
-        svm.ThemeMatch.Service.WallpaperLuminance = () => _desk?.ClockLuminance();
+        svm.ThemeMatch.Service.WallpaperLuminance = () => _desk?.ClockLuminance() ?? [];
         svm.ThemeMatch.Service.PlateForced = () => _desk?.PlateForced == true;
         svm.Desk.ArrangeRequested = () => _desk?.BeginArrange();
         svm.Desk.Arranging = _desk?.Arranging == true;
@@ -776,6 +781,7 @@ public partial class App : Application
             {
                 RunnerStatusShown -= showRunnerStatus;
                 if (_desk is not null) _desk.PlateForcedChanged -= plateShown;
+                if (_vm is not null) _vm.ThemeChanged -= themeShown;
             };
         }
         catch (Exception e)

@@ -54,6 +54,11 @@
                                Text="{Binding PlateNote}" Visibility="{Binding PlateNote, Converter={StaticResource StrVis}}"
                                AutomationProperties.LiveSetting="Polite" />
                 </StackPanel>
+                <!-- Once, for the font, ink and plate controls below, which the theme draws while the Desk follows it. -->
+                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                           Text="{x:Static core:SettingsNames.ThemeLookSetsThis}"
+                           Visibility="{Binding ThemeMatch.Follow, Converter={StaticResource BoolVis}}" />
 
                 <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
@@ -135,10 +140,6 @@
                     <TextBlock Text="{x:Static core:SettingsNames.InkAndColor}" FontSize="13" FontWeight="SemiBold"
                                AutomationProperties.HeadingLevel="Level2"
                                Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
-                    <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8"
-                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                               Text="{x:Static core:SettingsNames.ThemeLookSetsThis}"
-                               Visibility="{Binding DataContext.ThemeMatch.Follow, ElementName=PageBody, Converter={StaticResource BoolVis}}" />
                     <StackPanel DataContext="{Binding Desk}"
                                 IsEnabled="{Binding DataContext.ThemeMatch.NotFollowing, ElementName=PageBody}">
                         <Grid>
