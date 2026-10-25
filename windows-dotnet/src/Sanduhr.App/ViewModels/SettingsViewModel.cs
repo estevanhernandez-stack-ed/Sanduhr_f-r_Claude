@@ -123,7 +123,7 @@ public sealed class SettingsViewModel
     public Action? QuitRequested { get; set; }
 
     /// <summary>What the sidebar's Quit asks first (spec, General). The tray's Quit stays immediate: using the tray is an explicit act.</summary>
-    public const string QuitQuestion = "Quit Sanduhr? The widget and the Desk close.";
+    public const string QuitQuestion = SettingsNames.QuitQuestion;
 
     /// <summary>Tests answer the Quit question here instead of showing it.</summary>
     internal Func<bool>? ConfirmQuitHook { get; set; }
@@ -137,7 +137,7 @@ public sealed class SettingsViewModel
         ? hook()
         : Sanduhr.App.Views.ThemedDialog.Show(_owner, SettingsNames.QuitSanduhr, QuitQuestion,
               System.Windows.MessageBoxButton.YesNo, Sanduhr.App.Views.ThemedDialogKind.Warning,
-              primaryLabel: "Quit", secondaryLabel: "Cancel") == System.Windows.MessageBoxResult.Yes;
+              primaryLabel: SettingsNames.QuitConfirm, secondaryLabel: SettingsNames.QuitCancel) == System.Windows.MessageBoxResult.Yes;
 
     /// <summary>Backs the General tab's Shortcuts section (global shortcut + recorder).</summary>
     public ShortcutsViewModel Shortcuts { get; }

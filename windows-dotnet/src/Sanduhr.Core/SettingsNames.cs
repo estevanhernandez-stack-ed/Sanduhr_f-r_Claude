@@ -312,6 +312,65 @@ public static class SettingsNames
     /// <summary>Widgets, Desk companion: it walks the screen's edges (never with Windows' animations off).</summary>
     public const string WidgetCompanionRoam = "Let it roam";
 
+    // ---- Settings v2, slice 3: the Desk split ----
+
+    /// <summary>Desk: the piece rows' section (was "Where each piece sits").</summary>
+    public const string PiecesSection = "Pieces";
+    /// <summary>Desk: the clicks switch and the sign-in reminders.</summary>
+    public const string DeskBehavior = "Behavior";
+    /// <summary>Desk: the collapsed section holding Margins and OLED care.</summary>
+    public const string DeskAdvanced = "Advanced";
+    /// <summary>Desk: the map at the top of the page, and its fold's name below 600 DIP.</summary>
+    public const string DeskLayoutMap = "Layout map";
+    /// <summary>Desk, Layout map: it is a picture, not a control (WF5).</summary>
+    public const string DeskMapCaption = "Where each piece sits now. Move pieces with the rows below or Arrange Desk…";
+    /// <summary>Desk, Pieces: Order (WF5), live when another piece shares the place.</summary>
+    public const string MoveUp = "Move up";
+    public const string MoveDown = "Move down";
+    /// <summary>An Order button spoken: "Move Weather up in bottom left".</summary>
+    public static string MoveUpIn(string piece, string place) => $"Move {piece} up in {place.ToLowerInvariant()}";
+    public static string MoveDownIn(string piece, string place) => $"Move {piece} down in {place.ToLowerInvariant()}";
+    /// <summary>A row's Show box spoken: its visible label is the piece's name.</summary>
+    public static string PieceShownSpoken(string piece) => $"{piece}, on the Desk";
+    /// <summary>A feature page's button when its piece is hidden (Principle 1); it places the piece where Desk, Pieces would.</summary>
+    public const string PlaceOnDesk = "Place it on the Desk";
+    public const string NotOnDesk = "Not on the Desk.";
+    /// <summary>Added to a placed piece's line while the Desk itself is off.</summary>
+    public const string DeskIsOff = "The Desk is off: turn it on in Settings, Desk.";
+    /// <summary>A feature page's line about its piece: "On the Desk: bottom right." or "Not on the Desk."</summary>
+    public static string PieceStatus(string? place, bool deskOn) =>
+        place is null ? NotOnDesk : $"On the Desk: {place.ToLowerInvariant()}." + (deskOn ? "" : " " + DeskIsOff);
+    /// <summary>Desk Look's sections (spec, Desk Look).</summary>
+    public const string FontsSection = "Fonts";
+    public const string SizesSection = "Sizes";
+    public const string InkAndColor = "Ink and color";
+    public const string BackPlate = "Back plate";
+    /// <summary>Desk Look's controls whose labels were literals.</summary>
+    public const string ClockSize = "Clock size";
+    public const string MessageSize = "Message size";
+    public const string GlowAroundMessage = "Glow around the message";
+    public const string DropShadow = "Drop shadow under the text";
+    /// <summary>Watchers and Launcher: the section that holds the piece's status line.</summary>
+    public const string WatchersPlace = "Where they show";
+    public const string LauncherPlace = "Where it shows";
+    /// <summary>Launcher: the buttons, their pictures, Add app… and Add link….</summary>
+    public const string LauncherButtons = "Buttons";
+    /// <summary>Watchers: under "Show my CI runners' jobs" (WF8).</summary>
+    public const string CiRunnersCaption = "Independent of the switch above.";
+    /// <summary>The Watchers page's first line, and the Companion row's (WF21).</summary>
+    public const string WatchersLine = "Watchers are " + DefineWatchers + ".";
+    public const string CompanionLine = "The companion is " + DefineCompanion + ".";
+    /// <summary>Desk, Pieces, the Companion row with no sprite installed. The link names the page that holds the catalog today.</summary>
+    public const string NoCompanionYet = "No companion yet.";
+    public static string GetACompanion => $"Get one in {PageTitle(SettingsPage.Widgets)}…";
+    /// <summary>Desk, Designs: the collapsed section's one-line summary.</summary>
+    public static string DesignsSummary(int saved, bool canPutBack) =>
+        saved == 0 ? "None saved yet." : $"{saved} saved." + (canPutBack ? " " + PutMyDeskBack + " is ready." : "");
+    /// <summary>The sidebar's Quit asks first (WF33): the question and its two buttons.</summary>
+    public const string QuitQuestion = "Quit Sanduhr? The widget and the Desk close.";
+    public const string QuitConfirm = "Quit";
+    public const string QuitCancel = "Cancel";
+
     // ---- Core words (WF21): each is defined once, used as its home page's first line and in the tour.
     public const string DefineDesk = "the clock, meters and pieces Sanduhr draws on your desktop";
     public const string DefineWidget = "the small floating window with your meters";
