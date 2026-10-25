@@ -621,6 +621,9 @@
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="VerticalAlignment" Value="Stretch" />
             <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+            <!-- A caption button, as in any Windows title bar: clicked, invoked by a screen reader, or Alt+F4; never a
+                 Tab stop, so Tab from the page wraps to the search box (WF33). -->
+            <Setter Property="IsTabStop" Value="False" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -679,7 +682,9 @@
                         SelectionChanged="Tabs_SelectionChanged">
                 <TabControl.Template>
                     <ControlTemplate TargetType="TabControl">
-                        <Grid>
+                        <!-- One tab group: search (0), the page list (1), Quit (2), the page (3). Tab past the page's
+                             last control wraps to search; Quit is never the next stop after page content (WF33). -->
+                        <Grid KeyboardNavigation.TabNavigation="Local">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="200" />
                                 <ColumnDefinition Width="*" />
@@ -690,12 +695,12 @@
                                     <!-- The foot of the sidebar: Quit Sanduhr, on every page, the tray's quit. -->
                                     <Button x:Name="QuitButton" DockPanel.Dock="Bottom" Style="{StaticResource SidebarQuitButton}"
                                             Margin="0,8,0,0" Padding="10,5" HorizontalAlignment="Stretch"
-                                            KeyboardNavigation.TabIndex="1"
+                                            KeyboardNavigation.TabIndex="2"
                                             Content="Quit Sanduhr" Command="{Binding QuitCommand}"
                                             AutomationProperties.Name="Quit Sanduhr"
                                             AutomationProperties.HelpText="Closes the widget, the Desk and everything else Sanduhr is showing."
                                             ToolTip="Quit Sanduhr" />
-                                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8" KeyboardNavigation.TabIndex="0">
+                                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8" KeyboardNavigation.TabIndex="0" KeyboardNavigation.TabNavigation="Local">
                                         <TextBox x:Name="SearchBox" Style="{StaticResource Input}"
                                                  Text="{Binding Search.Query, UpdateSourceTrigger=PropertyChanged}"
                                                  AutomationProperties.Name="Search settings"
@@ -715,7 +720,7 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                     </Grid>
-                                    <Grid KeyboardNavigation.TabIndex="0">
+                                    <Grid KeyboardNavigation.TabIndex="1" KeyboardNavigation.TabNavigation="Local">
                                         <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
                                             <ScrollViewer.Style>
                                                 <Style TargetType="ScrollViewer">
@@ -768,7 +773,8 @@
                                 </DockPanel>
                             </Border>
                             <ContentPresenter x:Name="PART_SelectedContentHost" Grid.Column="1"
-                                              ContentSource="SelectedContent" Margin="16,12,16,16" />
+                                              ContentSource="SelectedContent" Margin="16,12,16,16"
+                                              KeyboardNavigation.TabIndex="3" KeyboardNavigation.TabNavigation="Local" />
                         </Grid>
                     </ControlTemplate>
                 </TabControl.Template>

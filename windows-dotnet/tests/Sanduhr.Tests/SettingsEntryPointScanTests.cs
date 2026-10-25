@@ -77,4 +77,17 @@ public class SettingsEntryPointScanTests
         Assert.Contains("SettingsIndex.Landing(page, anchor, _lastSettings)", app);
         Assert.Contains("_lastSettings = opened.Place;", app);
     }
+
+    [Fact]
+    public void Quit_comes_after_the_page_list_and_the_close_button_is_not_a_tab_stop()
+    {
+        var xaml = Read("Views", "SettingsWindow.xaml");
+        Assert.Matches(@"<Grid DockPanel\.Dock=""Top""[^>]*KeyboardNavigation\.TabIndex=""0""", xaml);
+        Assert.Matches(@"<Grid KeyboardNavigation\.TabIndex=""1""", xaml);
+        Assert.Matches(@"x:Name=""QuitButton""[^>]*KeyboardNavigation\.TabIndex=""2""", xaml);
+        Assert.Matches(@"x:Name=""PART_SelectedContentHost""[^>]*KeyboardNavigation\.TabIndex=""3""", xaml);
+        var close = Regex.Match(xaml, @"x:Key=""CloseButton""[\s\S]*?</Style>");
+        Assert.True(close.Success, "no CloseButton style");
+        Assert.Contains(@"<Setter Property=""IsTabStop"" Value=""False"" />", close.Value);
+    }
 }

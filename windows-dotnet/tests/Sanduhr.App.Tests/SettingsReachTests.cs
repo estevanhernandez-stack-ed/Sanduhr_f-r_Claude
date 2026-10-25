@@ -180,4 +180,71 @@ public sealed class SettingsReachTests : AppWindowFixture
         Assert.Equal((2, 1), (asked, quits));
         Assert.Equal("Quit Sanduhr? The widget and the Desk close.", SettingsViewModel.QuitQuestion);
     });
+
+    private static Control? FirstTabStop(DependencyObject root)
+    {
+        if (root is Control { Focusable: true, IsTabStop: true, IsVisible: true, IsEnabled: true } control)
+            return control;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            if (FirstTabStop(VisualTreeHelper.GetChild(root, i)) is { } found)
+                return found;
+        return null;
+    }
+
+    private static bool Inside(object? element, DependencyObject root)
+    {
+        for (var d = element as DependencyObject; d is not null; d = (d is Visual ? VisualTreeHelper.GetParent(d) : null) ?? LogicalTreeHelper.GetParent(d))
+            if (ReferenceEquals(d, root))
+                return true;
+        return false;
+    }
+
+    private static void Next(IInputElement element)
+    {
+        var request = new TraversalRequest(FocusNavigationDirection.Next);
+        if (element is UIElement ui) ui.MoveFocus(request);
+        else if (element is ContentElement content) content.MoveFocus(request);
+    }
+
+    /// <summary>WF33: one Tab past a page's last control used to land on Quit. Keyboard focus is routed inside the
+    /// never-activating window, as the harness does; on GitHub's runner this is skipped. Written, deferred to Tier 2.</summary>
+    [DesktopFact]
+    public void Tab_from_the_end_of_every_page_goes_to_the_search_box_never_to_Quit() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        var bad = new List<string>();
+        try
+        {
+            guard.RouteKeyboard();
+            var tabs = (TabControl)window.FindName("Tabs");
+            var host = (ContentPresenter)tabs.Template.FindName("PART_SelectedContentHost", tabs);
+            var search = (TextBox)tabs.Template.FindName("SearchBox", tabs);
+            var quit = (Button)tabs.Template.FindName("QuitButton", tabs);
+            foreach (var item in tabs.Items.OfType<TabItem>())
+            {
+                tabs.SelectedItem = item;
+                window.UpdateLayout();
+                Pump();
+                if (FirstTabStop(host) is not { } first)
+                    continue;
+                Keyboard.Focus(first);
+                guard.Check();
+                Assert.True(ReferenceEquals(Keyboard.FocusedElement, first), $"keyboard focus could not be routed to [{item.Tag}]");
+                IInputElement? at = first;
+                for (int step = 0; step < 400 && at is not null && Inside(at, host); step++)
+                {
+                    Next(at);
+                    Pump();
+                    guard.Check();
+                    at = Keyboard.FocusedElement;
+                }
+                if (ReferenceEquals(at, quit))
+                    bad.Add($"[{item.Tag}] Tab from the page reached Quit");
+                else if (!ReferenceEquals(at, search))
+                    bad.Add($"[{item.Tag}] Tab from the page reached {at?.GetType().Name ?? "nothing"}, not the search box");
+            }
+        }
+        finally { window.Close(); }
+        Assert.True(bad.Count == 0, string.Join(Environment.NewLine, bad));
+    });
 }
