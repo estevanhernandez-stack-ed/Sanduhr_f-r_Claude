@@ -639,7 +639,7 @@ public class SettingsSourceScanTests
         // A literal hex Background pairs a themed Foreground with a fixed fill: dark text on near-black in a light theme (Store 10.1.4.4).
         var xaml = XmlComment.Replace(File.ReadAllText(Path.Combine(AppDir(), "Views", "ThemedDialog.xaml")), "");
         var buttons = Regex.Matches(xaml, "<Button\\b[^>]*>", RegexOptions.Singleline);
-        Assert.Equal(2, buttons.Count);
+        Assert.Equal(3, buttons.Count);   // Primary, Secondary and the Cancel of ShowChoice
         foreach (Match button in buttons)
             Assert.DoesNotMatch("\\bBackground=\"#", button.Value);
     }

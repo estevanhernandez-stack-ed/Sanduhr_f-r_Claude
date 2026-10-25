@@ -90,4 +90,37 @@ internal partial class ThemedDialog : Window
         dlg.ShowDialog();
         return dlg.Result;
     }
+
+    private void OnTertiaryClick(object sender, RoutedEventArgs e)
+    {
+        Result = MessageBoxResult.Cancel;
+        DialogResult = false;
+        Close();
+    }
+
+    /// <summary>A three-way question (theme match: "Add the Desk look to Dusk", "Make a new theme", Cancel). Yes for the primary, No for the
+    /// secondary, Cancel for the Cancel button, Escape or closing the window. Sizes to its buttons; Enter picks nothing, since the primary
+    /// choice writes into the person's own theme.</summary>
+    public static MessageBoxResult ShowChoice(Window? owner, string title, string message, string primaryLabel, string secondaryLabel)
+    {
+        var dlg = new ThemedDialog(title, message, MessageBoxButton.YesNo, ThemedDialogKind.Info, playSound: true);
+        dlg.PrimaryButton.Content = primaryLabel;
+        dlg.PrimaryButton.IsDefault = false;
+        dlg.SecondaryButton.Content = secondaryLabel;
+        dlg.SecondaryButton.IsCancel = false;
+        dlg.TertiaryButton.Content = Sanduhr.Core.SettingsNames.ThemeMatchCancel;
+        dlg.TertiaryButton.Visibility = Visibility.Visible;
+        dlg.TertiaryButton.IsCancel = true;
+        dlg.Result = MessageBoxResult.Cancel;
+        dlg.SizeToContent = SizeToContent.WidthAndHeight;
+        dlg.MinWidth = 430;
+        dlg.MaxWidth = 720;
+        dlg.MessageText.MaxWidth = 520;
+        if (owner is not null && owner.IsLoaded)
+            dlg.Owner = owner;
+        else
+            dlg.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        dlg.ShowDialog();
+        return dlg.Result;
+    }
 }

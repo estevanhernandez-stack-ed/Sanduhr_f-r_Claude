@@ -368,6 +368,26 @@ public static class SettingsNames
     public const string MessageSize = "Message size";
     public const string GlowAroundMessage = "Glow around the message";
     public const string DropShadow = "Drop shadow under the text";
+
+    // ---- One theme for the widget and the Desk (theme match) ----
+    /// <summary>Desk Look's first section (theme match).</summary>
+    public const string ThemeMatchSection = "Match the widget theme";
+    public const string FollowThemeSwitch = "Follow the widget theme";
+    /// <summary>The status line after Follow on, an update or a new theme.</summary>
+    public static string FollowingTheme(string theme) => $"The Desk follows {theme}.";
+    public const string KeptAsOwnLook = "The Desk keeps this look as its own.";
+    /// <summary>The incoming name of the design Match now saves first: "Before matching Obsidian".</summary>
+    public static string MatchingTheme(string theme) => $"matching {theme}";
+    public static string MatchedTheme(string theme) => $"The Desk now matches {theme}. Its look is its own, so it stays when the theme changes.";
+    /// <summary>Appended to the Match now line when the readability guard turned the plate on.</summary>
+    public const string ThemeMatchPlateNote = "The plate is on so the clock reads over this wallpaper.";
+    public const string CouldNotSaveDeskFirst = "The Desk could not be saved first, so nothing was changed.";
+    public static string ThemeNotWritten(string why) => $"The theme could not be written ({why}), so nothing was changed.";
+    public static string AddOrNewQuestion(string theme) =>
+        $"{theme} is one of your themes. The Desk's look can go into it, or into a new theme made from it.";
+    public static string AddDeskLookTo(string theme) => $"Add the Desk look to {theme}";
+    public const string MakeANewTheme = "Make a new theme";
+    public const string ThemeMatchCancel = "Cancel";
     /// <summary>Watchers and Launcher: the section that holds the piece's status line.</summary>
     public const string WatchersPlace = "Where they show";
     public const string LauncherPlace = "Where it shows";

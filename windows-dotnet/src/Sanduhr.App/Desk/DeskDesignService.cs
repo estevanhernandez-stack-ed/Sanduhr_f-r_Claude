@@ -473,6 +473,7 @@ internal sealed class DeskDesignService : IDisposable
     /// </summary>
     public bool SaveBeforeChange(string incomingName)
     {
+        if (_disposed || ResetGuard.Done) return false;   // a late call after Reset must not write into a cleared store
         try
         {
             if (SaveCurrentFirst(CurrentDesign(), incomingName) is not { } saved) return false;

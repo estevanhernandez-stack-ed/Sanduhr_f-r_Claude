@@ -49,6 +49,12 @@
 
             <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right"
                         Margin="20,18,20,18">
+                <Button x:Name="TertiaryButton" Content="Cancel" Click="OnTertiaryClick"
+                        Visibility="Collapsed" Cursor="Hand"
+                        Padding="18,7" Margin="0,0,8,0" BorderThickness="1"
+                        Background="{DynamicResource Sanduhr.Brush.Glass}"
+                        Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}" />
                 <Button x:Name="SecondaryButton" Content="No" Click="OnSecondaryClick"
                         IsCancel="True" Visibility="Collapsed" Cursor="Hand"
                         Padding="18,7" Margin="0,0,8,0" BorderThickness="1"
