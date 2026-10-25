@@ -78,7 +78,8 @@ public sealed partial class ThemesViewModel : ObservableObject
     public ThemesViewModel(WidgetViewModel widget)
     {
         _widget = widget;
-        Studio = new ThemeStudioViewModel(widget, Error, Info, RefreshList);
+        Studio = new ThemeStudioViewModel(widget, Error, Info, RefreshList,
+            Sanduhr.App.Desk.DeskFonts.ForThisPc(new Sanduhr.Core.Paths()).PickerFamilies());
         _isStudioMode = widget.LoadThemesStudioMode();
         if (_isStudioMode)
             Studio.Activate();

@@ -102,15 +102,29 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
     [ObservableProperty] private string _summary = "";
     [ObservableProperty] private bool _isPreviewing;
 
+    /// <summary>The theme's font (theme match): the widget's text, and the Desk's while it follows.</summary>
+    [ObservableProperty] private string _font = SettingsNames.ThemeDefaultFont;
+
+    /// <summary>The Font picker's choices: no font (Segoe UI), then this PC's families, then a font a loaded theme names that this PC lacks.</summary>
+    private readonly ObservableCollection<string> _fontChoices;
+    public IReadOnlyList<string> FontChoices => _fontChoices;
+
+    /// <summary>The theme's Desk look (theme match); each committed row updates the draft and the preview.</summary>
+    public ThemeDeskEditorViewModel DeskEditor { get; }
+
     public string GlassAlphaText => GlassAlpha.ToString("0.00");
     public string BorderAlphaText => BorderAlpha.ToString("0.00");
 
-    public ThemeStudioViewModel(WidgetViewModel widget, Action<string> error, Action<string> info, Action saved)
+    /// <param name="fontFamilies">This PC's families for the Font picker and the Desk font row; null offers none beyond the default.</param>
+    public ThemeStudioViewModel(WidgetViewModel widget, Action<string> error, Action<string> info, Action saved,
+        IReadOnlyList<string>? fontFamilies = null)
     {
         _widget = widget;
         _error = error;
         _info = info;
         _saved = saved;
+        _fontChoices = new ObservableCollection<string>([SettingsNames.ThemeDefaultFont, .. fontFamilies ?? []]);
+        DeskEditor = new ThemeDeskEditorViewModel(fontFamilies ?? []) { Committed = OnDeskEdited };
         foreach (var (field, label, job) in ThemeDraft.ColorTokens)
             Rows.Add(new ThemeTokenRowViewModel(this, field, label, job));
     }
@@ -144,6 +158,10 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
         Name = _draft.Name;
         GlassAlpha = _draft.GlassAlpha;
         BorderAlpha = _draft.BorderAlpha;
+        // A font this PC lacks stays in the list so the picker is not blank.
+        if (_draft.Font is { Length: > 0 } f && !_fontChoices.Contains(f)) _fontChoices.Add(f);
+        Font = _draft.Font is { Length: > 0 } ? _draft.Font : SettingsNames.ThemeDefaultFont;
+        DeskEditor.Load(def);
         FileName = SuggestedFileName(key);
         foreach (var row in Rows)
             row.Load(_draft.GetColor(row.Field), _draft.TryGetColor(row.Field));
@@ -201,6 +219,20 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
         Refresh(preview: true);
     }
 
+    partial void OnFontChanged(string value)
+    {
+        if (_loading) return;
+        _draft.Font = value == SettingsNames.ThemeDefaultFont || value.Length == 0 ? null : value;
+        Refresh(preview: true);
+    }
+
+    private void OnDeskEdited(ThemeDesk desk)
+    {
+        if (_loading) return;
+        _draft.Desk = desk.IsEmpty ? null : desk;
+        Refresh(preview: true);
+    }
+
     /// <summary>Re-lint, refresh the findings list, and (for user edits) push the
     /// draft into the widget as the live preview.</summary>
     private void Refresh(bool preview)
@@ -220,7 +252,9 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
             return;
         if (_draft.PreviewDefinition() is { } def)
         {
-            _widget.PreviewTheme(def);
+            // The greyed Desk defaults follow the colors being edited.
+            DeskEditor.ShowRules(def);
+            _widget.PreviewTheme(def);   // ThemeChanged: a Desk that follows the theme redraws from the draft too
             IsPreviewing = true;
         }
     }

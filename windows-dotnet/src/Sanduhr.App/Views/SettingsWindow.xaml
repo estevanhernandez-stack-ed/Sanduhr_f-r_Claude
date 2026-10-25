@@ -2500,6 +2500,22 @@
                                         <TextBlock Grid.Column="6" Text="{Binding BorderAlphaText}" FontSize="11" VerticalAlignment="Center"
                                                    HorizontalAlignment="Right" Foreground="{DynamicResource Sanduhr.Brush.TextDim}" FontFamily="Cascadia Code, Consolas" />
                                     </Grid>
+                                    <!-- Theme match: the theme's font (the widget's text; the Desk's while it follows) and its Desk look. -->
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="92" />
+                                            <ColumnDefinition Width="230" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Static core:SettingsNames.ThemeFontPicker}" FontSize="11" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                        <ComboBox Grid.Column="1" Style="{StaticResource ThemedComboBox}"
+                                                  ItemsSource="{Binding FontChoices}" SelectedItem="{Binding Font, Mode=TwoWay}"
+                                                  AutomationProperties.Name="{x:Static core:SettingsNames.ThemeFontPicker}" />
+                                    </Grid>
+                                    <views:ThemeDeskEditor Margin="0,10,0,0" DataContext="{Binding DeskEditor}" />
+                                    <TextBlock FontSize="10.5" TextWrapping="Wrap" Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                               Text="{x:Static core:SettingsNames.ThemeStudioDeskNote}" />
                                     <TextBlock FontSize="10.5" Margin="0,6,0,0" Text="{Binding Summary}"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                     <ScrollViewer Height="58" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,2,0,0">

@@ -417,6 +417,12 @@ public static class SettingsNames
     public const string DesksOwnFont = "The Desk's own font";
     public const string ThemeColorsProblem = "Use one to four hex colors, like #e8e4dc, #6c63ff.";
     public const string ThemeColorProblem = "Use one hex color, like #6c63ff.";
+
+    /// <summary>The Theme Studio's font picker (theme match) and its first choice, no font (Segoe UI).</summary>
+    public const string ThemeFontPicker = "Font";
+    public const string ThemeDefaultFont = "Segoe UI (the default)";
+    public const string ThemeStudioDeskNote =
+        "The Desk shows these while it follows the widget theme (Settings, Desk Look, Match the widget theme).";
     /// <summary>Watchers and Launcher: the section that holds the piece's status line.</summary>
     public const string WatchersPlace = "Where they show";
     public const string LauncherPlace = "Where it shows";
