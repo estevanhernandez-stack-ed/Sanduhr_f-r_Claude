@@ -342,6 +342,24 @@ public sealed class SettingsReachTests : AppWindowFixture
         finally { window.Close(); }
     });
 
+    /// <summary>The Now playing apps list reads the app's one hub, whose service fills it from the PC's live media
+    /// session. A hub that outlives its test (or a media player on the PC) must never reach a test's Settings window.</summary>
+    [Fact]
+    public void A_live_media_hub_never_reaches_the_Settings_window() => AppHost.Run(() =>
+    {
+        var leaked = new Sanduhr.App.Desk.NowPlayingHub();
+        leaked.Service.SeenApps = ["Spotify.exe"];
+        Sanduhr.App.Desk.NowPlayingHub.Current = leaked;
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            Land(window, guard, SettingsPage.NowPlaying, SettingsIndex.NowPlayingApps);
+            Assert.Empty(svm.NowPlayingPage.Apps);
+            Assert.True(((FrameworkElement)window.FindName("NowPlayingAppsEmpty")).IsVisible, "NowPlayingAppsEmpty is not shown");
+        }
+        finally { window.Close(); leaked.Dispose(); }
+    });
+
     [Fact]
     public void Empty_lists_say_so_and_are_not_tab_stops() => AppHost.Run(() =>
     {
