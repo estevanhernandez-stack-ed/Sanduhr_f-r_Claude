@@ -47,6 +47,7 @@ internal sealed class NoActivate
     public void RouteKeyboard()
     {
         const int WM_SETFOCUS = 0x0007;
+        ForegroundWatch.Current?.MarkFocusTest();
         SendMessage(_hwnd, WM_SETFOCUS, IntPtr.Zero, IntPtr.Zero);
         Check();
     }

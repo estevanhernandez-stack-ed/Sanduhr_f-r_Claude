@@ -50,13 +50,23 @@ internal static class AppHost
         return dispatcher!;
     }
 
-    public static void Run(Action work)
+    /// <summary>
+    /// Runs the work on the app thread. A failure in a run that routed real keyboard focus (<see cref="NoActivate.RouteKeyboard"/>)
+    /// while an outside app held or took the foreground is rethrown as a skip (<see cref="SkipException"/>): the tests never
+    /// change the foreground, so a change means interference. Any other failure rethrows as it was.
+    /// </summary>
+    public static void Run(Action work, ForegroundProbe? probe = null)
     {
         ExceptionDispatchInfo? failure = null;
         Dispatch.Value.Invoke(() =>
         {
+            using var watch = ForegroundWatch.Begin(probe);
             try { work(); }
-            catch (Exception e) { failure = ExceptionDispatchInfo.Capture(e); }
+            catch (Exception e)
+            {
+                var reason = watch.RoutesFocus ? watch.Interference() : null;
+                failure = ExceptionDispatchInfo.Capture(reason is null ? e : new SkipException(reason));
+            }
         });
         failure?.Throw();
     }
