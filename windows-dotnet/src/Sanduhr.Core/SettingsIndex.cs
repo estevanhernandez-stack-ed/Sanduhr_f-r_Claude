@@ -724,14 +724,16 @@ public static class SettingsIndex
     /// </summary>
     public static IReadOnlyList<(string Title, string Anchor)> JumpLinks(SettingsPage page) => page switch
     {
-        SettingsPage.Desk => [(SettingsNames.PiecesSection, DeskPieces), (SettingsNames.DeskBehavior, DeskClicks),
-            (SettingsNames.DeskDesigns, DeskDesigns), (SettingsNames.DeskAdvanced, DeskAdvanced)],
-        SettingsPage.DeskLook => [(SettingsNames.FontsSection, DeskLook), (SettingsNames.SizesSection, DeskSizes),
-            (SettingsNames.InkAndColor, DeskInk), (SettingsNames.BackPlate, DeskPlate)],
-        SettingsPage.NowPlaying => [(SettingsNames.NowPlayingJumpWidget, NowPlayingWidget), ("Apps", NowPlayingApps),
-            ("Bars", NowPlayingBars), ("Looks", NowPlayingLooks)],
+        SettingsPage.Desk => Links(page, DeskPieces, DeskClicks, DeskDesigns, DeskAdvanced),
+        SettingsPage.DeskLook => Links(page, DeskLook, DeskSizes, DeskInk, DeskPlate),
+        // The first is named for the widget it sits in; the others read as their index rows.
+        SettingsPage.NowPlaying => [(SettingsNames.NowPlayingJumpWidget, NowPlayingWidget),
+            .. Links(page, NowPlayingApps, NowPlayingBars, NowPlayingLooks)],
         _ => [],
     };
+
+    private static (string Title, string Anchor)[] Links(SettingsPage page, params string[] anchors) =>
+        [.. anchors.Select(a => (Find(page, a)!.Title, a))];
 
     private static int IndexOf(IReadOnlyList<SettingsPage> list, SettingsPage p)
     {

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using Sanduhr.Core;
 
@@ -28,6 +29,8 @@ public sealed class SectionJumpLinks : WrapPanel
         AutomationProperties.SetName(this, SettingsNames.JumpLinksName);
     }
 
+    protected override AutomationPeer OnCreateAutomationPeer() => new SectionJumpLinksAutomationPeer(this);
+
     private void Build()
     {
         Children.Clear();
@@ -47,4 +50,23 @@ public sealed class SectionJumpLinks : WrapPanel
             Children.Add(link);
         }
     }
+}
+
+/// <summary>
+/// The Group peer behind <see cref="SectionJumpLinks"/>. A plain panel has no peer, so UI Automation would hoist the buttons and
+/// never announce the row's name; and the "·" separators are code-built TextBlocks, which are control elements unless templated.
+/// The peer names the row and exposes the link buttons alone.
+/// </summary>
+public sealed class SectionJumpLinksAutomationPeer : FrameworkElementAutomationPeer
+{
+    public SectionJumpLinksAutomationPeer(SectionJumpLinks owner) : base(owner) { }
+
+    protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Group;
+
+    protected override string GetClassNameCore() => nameof(SectionJumpLinks);
+
+    protected override bool IsControlElementCore() => true;
+
+    protected override List<AutomationPeer>? GetChildrenCore() =>
+        base.GetChildrenCore()?.Where(p => p is UIElementAutomationPeer { Owner: Button }).ToList();
 }

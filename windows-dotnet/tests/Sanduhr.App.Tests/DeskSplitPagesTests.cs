@@ -417,6 +417,51 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         finally { window.Close(); }
     });
 
+    [Theory]
+    [InlineData(SettingsPage.Desk)]
+    [InlineData(SettingsPage.DeskLook)]
+    [InlineData(SettingsPage.NowPlaying)]
+    public void Every_jump_link_lands_on_its_section(SettingsPage page) => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(page);
+            Settle(window, guard);
+            var links = Below<SectionJumpLinks>((DependencyObject)TabOf(window, page).Content).Single();
+            foreach (var (title, anchor) in SettingsIndex.JumpLinks(page))
+            {
+                links.Children.OfType<Button>().Single(b => (string)b.Content == title).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                Settle(window, guard);
+                Assert.Equal(new SettingsLink(page, anchor), window.Place);
+                if (Marked(window, page, anchor) is Expander expander)
+                    Assert.True(expander.IsExpanded, anchor + " did not open");
+            }
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void The_jump_links_reach_UI_Automation_as_one_named_group_of_the_links_alone() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Desk);
+            Settle(window, guard);
+            var links = Below<SectionJumpLinks>((DependencyObject)TabOf(window, SettingsPage.Desk).Content).Single();
+            var peer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(links);
+            Assert.NotNull(peer);
+            Assert.Equal(System.Windows.Automation.Peers.AutomationControlType.Group, peer.GetAutomationControlType());
+            Assert.True(peer.IsControlElement());
+            Assert.Equal(SettingsNames.JumpLinksName, peer.GetName());
+            var children = peer.GetChildren();
+            Assert.Equal(SettingsIndex.JumpLinks(SettingsPage.Desk).Select(l => l.Title), children.Select(c => c.GetName()));
+            Assert.All(children, c => Assert.Equal(System.Windows.Automation.Peers.AutomationControlType.Button, c.GetAutomationControlType()));
+        }
+        finally { window.Close(); }
+    });
+
     [Fact]
     public void A_jump_link_lands_on_its_section_and_opens_it() => AppHost.Run(() =>
     {
@@ -456,10 +501,11 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
     [DesktopFact]
     public void From_the_Desk_pages_first_stop_Tab_reaches_Pieces_in_under_10() => AppHost.Run(() =>
     {
-        var (window, _, guard) = Open("Personal");
+        var (window, svm, guard) = Open("Personal");
         try
         {
             window.SelectPage(SettingsPage.Desk);
+            svm.Desk.Enabled = true; // Arrange is a stop only while the Desk is on: the longest walk
             Settle(window, guard);
             guard.RouteKeyboard();
             var content = (DependencyObject)TabOf(window, SettingsPage.Desk).Content;
@@ -479,7 +525,7 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
                 stops++;
             }
             Assert.True(Inside(at, pieces), $"Tab never reached Pieces; it stopped on {at?.GetType().Name ?? "nothing"}");
-            Assert.True(stops < 10, $"Pieces is Tab stop {stops} from the page's first stop");
+            Assert.True(stops <= 8, $"Pieces is Tab stop {stops} from the page's first stop (pinned at 8 so a creeping count shows before the spec's 10)");
         }
         finally { window.Close(); }
     });
