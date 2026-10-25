@@ -855,7 +855,7 @@
                      moved to About (Settings v2). -->
                 <TabItem Header="General" Tag="General" AutomationProperties.Name="General">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
                             <ScrollViewer.Resources>
                                 <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                             </ScrollViewer.Resources>
@@ -2944,7 +2944,7 @@
 
                 <TabItem Header="Now playing" Tag="NowPlaying" AutomationProperties.Name="Now playing" DataContext="{Binding NowPlayingPage}">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
                             <ScrollViewer.Resources>
                                 <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                             </ScrollViewer.Resources>
@@ -3011,7 +3011,7 @@
 
                 <TabItem Header="Weather" Tag="Weather" AutomationProperties.Name="Weather" DataContext="{Binding WeatherPage}">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
                             <ScrollViewer.Resources>
                                 <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                             </ScrollViewer.Resources>
@@ -3091,7 +3091,7 @@
                      where Sanduhr keeps its files, and the packages it ships with. -->
                 <TabItem Header="About" Tag="About" AutomationProperties.Name="About">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
                             <ScrollViewer.Resources>
                                 <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                             </ScrollViewer.Resources>
