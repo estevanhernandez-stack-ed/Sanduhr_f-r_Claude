@@ -388,6 +388,13 @@ public static class SettingsNames
     public static string AddDeskLookTo(string theme) => $"Add the Desk look to {theme}";
     public const string MakeANewTheme = "Make a new theme";
     public const string ThemeMatchCancel = "Cancel";
+    public static string WhereQuestion(string theme, bool canUpdate) => canUpdate
+        ? $"The Desk follows {theme}. Save this change into it, or into a new theme?"
+        : $"The Desk follows {theme}, which ships with Sanduhr and stays as it is. Save this change as a new theme?";
+    public static string UpdateTheme(string theme) => $"Update {theme}";
+    public const string SaveAsNewTheme = "Save as a new theme";
+    public const string NewThemeNamePrompt = "Name of the new theme";
+    public static string ThemeUpdated(string theme) => $"Updated {theme}.";
     /// <summary>Watchers and Launcher: the section that holds the piece's status line.</summary>
     public const string WatchersPlace = "Where they show";
     public const string LauncherPlace = "Where it shows";

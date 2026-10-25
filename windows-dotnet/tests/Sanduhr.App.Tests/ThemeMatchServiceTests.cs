@@ -40,6 +40,8 @@ public sealed class ThemeMatchServiceTests : AppWindowFixture
         var service = new ThemeMatchService(store, widget, () => designs)
         {
             AskAddOrNew = _ => throw new Xunit.Sdk.XunitException("asked add-or-new"),
+            AskWhere = (_, _) => throw new Xunit.Sdk.XunitException("asked where"),
+            AskName = _ => throw new Xunit.Sdk.XunitException("asked a name"),
         };
         return new Rig(service, widget, store, designs, paths);
     }
@@ -267,5 +269,142 @@ public sealed class ThemeMatchServiceTests : AppWindowFixture
         r.Designs.Dispose();
         Assert.False(r.Designs.SaveBeforeChange("late"));
         Assert.False(r.Designs.CanPutBack);
+    });
+
+    // ---- a hand edit while following ----
+
+    private static ThemeDesk Edited(ThemeDefinition def) => ThemeMatch.SpelledOut(def) with { Ink = ["#ffffff"] };
+
+    [Fact]
+    public void A_hand_edit_on_a_built_in_follow_offers_only_a_new_theme() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        r.Store.SaveDeskFollowsTheme(true);   // following while the built-in itself is active (a Desk from a design, or an older build)
+        bool? offered = null;
+        r.Service.AskWhere = (_, canUpdate) => { offered = canUpdate; return ThemeEditChoice.NewTheme; };
+        r.Service.AskName = suggested => { Assert.Equal("Obsidian + Desk", suggested); return "Obsidian Neon"; };
+
+        var result = r.Service.Edit(Edited(ThemeCatalog.BuiltIns["obsidian"]));
+
+        Assert.True(result.Ok);
+        Assert.False(offered);
+        Assert.Equal("obsidian-neon", r.Widget.ActiveThemeKey);
+        Assert.Equal(["#ffffff"], r.Widget.GetThemeDefinition("obsidian-neon")!.Desk!.Ink);
+        Assert.False(File.Exists(Path.Combine(r.Paths.ThemesDir, "obsidian.json")));
+    });
+
+    [Fact]
+    public void Update_writes_the_edit_into_the_active_user_theme() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        r.Service.FollowOn();   // obsidian-desk, a theme of the person's now
+        var before = r.Widget.GetThemeDefinition("obsidian-desk")!;
+        bool? offered = null;
+        r.Service.AskWhere = (name, canUpdate) => { Assert.Equal("Obsidian + Desk", name); offered = canUpdate; return ThemeEditChoice.UpdateTheme; };
+
+        var result = r.Service.Edit(Edited(before));
+
+        Assert.True(result.Ok);
+        Assert.True(offered);
+        Assert.Equal(SettingsNames.ThemeUpdated("Obsidian + Desk"), result.Message);
+        var after = r.Widget.GetThemeDefinition("obsidian-desk")!;
+        Assert.Equal(["#ffffff"], after.Desk!.Ink);
+        Assert.Equal(before with { Desk = after.Desk }, after);
+    });
+
+    [Fact]
+    public void Cancel_leaves_the_theme_as_it_was() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        r.Service.FollowOn();
+        string path = Path.Combine(r.Paths.ThemesDir, "obsidian-desk.json");
+        byte[] bytes = File.ReadAllBytes(path);
+        r.Service.AskWhere = (_, _) => ThemeEditChoice.Cancel;
+
+        Assert.False(r.Service.Edit(Edited(ThemeCatalog.BuiltIns["obsidian"])).Ok);
+        Assert.Equal(bytes, File.ReadAllBytes(path));
+    });
+
+    [Fact]
+    public void A_name_left_empty_saves_nothing() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        r.Service.FollowOn();
+        int files = Directory.GetFiles(r.Paths.ThemesDir).Length;
+        r.Service.AskWhere = (_, _) => ThemeEditChoice.NewTheme;
+        r.Service.AskName = _ => "   ";
+
+        Assert.False(r.Service.Edit(Edited(ThemeCatalog.BuiltIns["obsidian"])).Ok);
+        Assert.Equal(files, Directory.GetFiles(r.Paths.ThemesDir).Length);
+        Assert.Equal("obsidian-desk", r.Widget.ActiveThemeKey);
+    });
+
+    [Fact]
+    public void Not_following_an_edit_asks_nothing_and_does_nothing() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        Assert.False(r.Service.Edit(Edited(ThemeCatalog.BuiltIns["obsidian"])).Ok);   // AskWhere would throw
+    });
+
+    [Fact]
+    public void A_typed_reserved_name_does_not_become_a_device_file() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        r.Store.SaveDeskFollowsTheme(true);
+        r.Service.AskWhere = (_, _) => ThemeEditChoice.NewTheme;
+        r.Service.AskName = _ => "Con";
+
+        Assert.True(r.Service.Edit(Edited(ThemeCatalog.BuiltIns["obsidian"])).Ok);
+        Assert.Equal("con-2", r.Widget.ActiveThemeKey);
+    });
+
+    [Fact]
+    public void A_theme_that_fails_lint_leaves_no_Before_design_and_no_file() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        r.Store.SaveDeskFollowsTheme(true);
+        r.Service.AskWhere = (_, _) => ThemeEditChoice.NewTheme;
+        r.Service.AskName = _ => "Broken";
+        var bad = Edited(ThemeCatalog.BuiltIns["obsidian"]) with { Ink = ["not-a-color"] };
+
+        Assert.False(r.Service.Edit(bad).Ok);
+        Assert.False(r.Designs.CanPutBack);
+        Assert.False(File.Exists(Path.Combine(r.Paths.ThemesDir, "broken.json")));
+        Assert.Equal("obsidian", r.Widget.ActiveThemeKey);
+    });
+
+    [Fact]
+    public void A_target_that_already_exists_on_the_new_path_is_not_written_and_no_Before_design_is_left() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        r.Store.SaveDeskFollowsTheme(true);
+        Directory.CreateDirectory(Path.Combine(r.Paths.ThemesDir, "taken.json"));   // KeyTaken sees no file; the move would still have to refuse
+        r.Service.AskWhere = (_, _) => ThemeEditChoice.NewTheme;
+        r.Service.AskName = _ => "Taken";
+
+        var result = r.Service.Edit(Edited(ThemeCatalog.BuiltIns["obsidian"]));
+
+        Assert.False(result.Ok);
+        Assert.False(r.Designs.CanPutBack);
+        Assert.Equal("obsidian", r.Widget.ActiveThemeKey);
+        Assert.True(r.Store.LoadDeskFollowsTheme());
+    });
+
+    [Fact]
+    public void Follow_on_and_Match_now_with_the_design_service_disposed_change_nothing() => AppHost.Run(() =>
+    {
+        using var r = Make();
+        r.Designs.Dispose();
+
+        var on = r.Service.FollowOn();
+        Assert.False(on.Ok);
+        Assert.Equal(SettingsNames.CouldNotSaveDeskFirst, on.Message);
+        Assert.False(r.Store.LoadDeskFollowsTheme());
+        Assert.Empty(Directory.Exists(r.Paths.ThemesDir) ? Directory.GetFiles(r.Paths.ThemesDir) : []);
+
+        var match = r.Service.MatchNow();
+        Assert.False(match.Ok);
+        Assert.Equal(SettingsNames.CouldNotSaveDeskFirst, match.Message);
+        Assert.Empty(Directory.Exists(r.Paths.ThemesDir) ? Directory.GetFiles(r.Paths.ThemesDir) : []);
     });
 }
