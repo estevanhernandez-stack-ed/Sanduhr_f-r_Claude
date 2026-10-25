@@ -35,6 +35,12 @@ internal partial class SettingsWindow : Window
 
     private readonly DispatcherTimer _localCcTimer;
 
+    /// <summary>
+    /// Where the window is now: the page, and the anchor <see cref="SelectPage"/> last opened it at (null after a sidebar
+    /// click). App keeps it when the window closes, to reopen there this session (spec, Reopen where it was left).
+    /// </summary>
+    public SettingsLink? Place { get; private set; }
+
     /// <summary>Opens a page's https link (the Open-Meteo credit and licence) in the default browser.</summary>
     private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
     {
@@ -152,6 +158,8 @@ internal partial class SettingsWindow : Window
             return; // ignore bubbled selection changes from inner controls (combo, lists)
 
         var page = PageOf(Tabs.SelectedItem as TabItem);
+        if (page is { } shown)
+            Place = new SettingsLink(shown, null);
         ViewModel.ClaudeCode.IsTabActive = page == SettingsPage.ClaudeUsage;
         if (page == SettingsPage.ClaudeUsage)
         {
@@ -221,7 +229,9 @@ internal partial class SettingsWindow : Window
     /// </summary>
     public void SelectPage(SettingsPage page, string? anchor = null)
     {
-        var tab = Tabs.Items.OfType<TabItem>().FirstOrDefault(t => PageOf(t) == page);
+        // An old page or anchor (a card, a menu or agent text from before 4.0) lands where it lives now.
+        (page, anchor) = SettingsIndex.Resolve(page, anchor);
+        var tab =Tabs.Items.OfType<TabItem>().FirstOrDefault(t => PageOf(t) == page);
         if (tab is null)
             return;
         // A link from outside (a card's Show me, a menu) shows the page list, not an old search.
@@ -252,6 +262,7 @@ internal partial class SettingsWindow : Window
             ViewModel.Themes.IsStudioMode = false;
 
         Tabs.SelectedItem = tab;
+        Place = new SettingsLink(page, entry?.Anchor);
         if (entry is null)
             return;
 
