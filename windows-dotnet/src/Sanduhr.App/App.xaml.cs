@@ -49,7 +49,10 @@ public partial class App : Application
     private RestartToUpdateService? _restartToUpdate;
     private bool _quitting;
 
-    /// <summary>The claim on this data folder (Program.Main). A second launch asks it to show the widget.</summary>
+    /// <summary>Where Settings was when it last closed, for the app's life (spec, Reopen where it was left). Never saved.</summary>
+    private SettingsLink? _lastSettings;
+
+    /// <summary>The claim on this data folder (Program.Main). A second launch asks it to show the widget, or Settings at its `--settings` link.</summary>
     internal SingleInstance? Instance { get; init; }
 
     /// <summary>How long a quit waits for WebView2's browser processes to close by themselves before ending them.</summary>
@@ -92,7 +95,8 @@ public partial class App : Application
         _vm.ManualReauthRequested += RunManualReauthAsync;
         _vm.PasteKeyRequested += () => RunSignInAsync(embedded: false);
         _vm.SettingsRequested += () => ShowSettingsAsync();
-        _vm.SettingsPageRequested += page => ShowSettingsAsync(page);
+        // "<Page> settings…" from the tier card and the account menus lands on its section (spec, Menus table).
+        _vm.SettingsPageRequested += page => ShowSettingsAsync(page, SettingsIndex.MenuAnchor(page));
         _vm.JustTheDeskRequested += ChooseJustTheDesk;
         // Keep an open Settings window's account list in sync with quick-switches
         // made elsewhere (tray / widget chip / right-click).
@@ -111,7 +115,7 @@ public partial class App : Application
 
         SetupTray();
         SyncTrayRotation();
-        Instance?.Listen(() => Dispatcher.BeginInvoke(() => { if (!_quitting) ShowWindow(); }));
+        Instance?.Listen(message => Dispatcher.BeginInvoke(() => { if (!_quitting) OnSecondLaunch(message); }));
         SetupHotKeys();
         StartGlow();
         StartDesk();
@@ -220,6 +224,10 @@ public partial class App : Application
             Dispatcher.BeginInvoke(() => _restartToUpdate?.Offer(version, installer)));
 
         ScheduleWhatsNewAtLaunch();
+
+        // `Sanduhr.exe --settings <page>[#<anchor>]` as the first launch: Settings opens there once the widget is up.
+        if (SettingsIndex.LinkFromArgs(Environment.GetCommandLineArgs().Skip(1)) is { } startLink)
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => OpenSettingsLink(startLink)));
     }
 
     /// <summary>The app version as Major.Minor.Build, the same shape Settings shows.</summary>
@@ -288,13 +296,16 @@ public partial class App : Application
     }
 
     private void OpenWhatsNew(IReadOnlyList<WhatsNewCard> cards, string header) =>
-        WhatsNewWindow.Show(cards, header, new SettingsStore(new Sanduhr.Core.Paths()), page =>
-        {
-            if (page == SettingsPage.Widget)
-                ShowWindow();
-            else
-                _ = ShowSettingsAsync(page);
-        });
+        WhatsNewWindow.Show(cards, header, new SettingsStore(new Sanduhr.Core.Paths()), ShowMe);
+
+    /// <summary>A card's Show me: the widget, or Settings at the card's page and section (WF17).</summary>
+    private void ShowMe(SettingsPage page, string? anchor)
+    {
+        if (page == SettingsPage.Widget)
+            ShowWindow();
+        else
+            _ = ShowSettingsAsync(page, anchor);
+    }
 
     /// <summary>
     /// The first successful fetch on a fresh install opens the tour, once a launch, so its first
@@ -320,13 +331,7 @@ public partial class App : Application
         {
             var signedIn = _vm.ActiveAccount is not null || _vm.IsDemo;
             var steps = WelcomeTour.StepsFor(_vm.JustTheDesk, new HashSet<TourFeature>(), signedIn);
-            WhatsNewWindow.ShowTour(new WelcomeTourViewModel(steps, _vm), page =>
-            {
-                if (page == SettingsPage.Widget)
-                    ShowWindow();
-                else
-                    _ = ShowSettingsAsync(page);
-            }, EndTour);
+            WhatsNewWindow.ShowTour(new WelcomeTourViewModel(steps, _vm), ShowMe, EndTour);
         }
         catch (Exception e)
         {
@@ -427,7 +432,7 @@ public partial class App : Application
         accounts.SubmenuOpened += (_, _) =>
         {
             if (_vm is not null)
-                AccountMenuBuilder.PopulateSwitchList(accounts.Items, _vm, includeAdd: false, includeManage: false);
+                AccountMenuBuilder.PopulateSwitchList(accounts.Items, _vm, includeAdd: false, includeManage: true);
         };
 
         var addAccount = new MenuItem { Header = SettingsNames.AddAccount };
@@ -482,8 +487,8 @@ public partial class App : Application
     {
         switch (action)
         {
-            case Desk.DeskMenuAction.EditMessages: _ = ShowSettingsAsync(SettingsPage.DeskMessage); break;
-            case Desk.DeskMenuAction.DeskSettings: _ = ShowSettingsAsync(SettingsPage.Desk); break;
+            case Desk.DeskMenuAction.EditMessages: _ = ShowSettingsAsync(SettingsPage.DeskMessage, SettingsIndex.MenuAnchor(SettingsPage.DeskMessage)); break;
+            case Desk.DeskMenuAction.DeskSettings: _ = ShowSettingsAsync(SettingsPage.Desk, SettingsIndex.MenuAnchor(SettingsPage.Desk)); break;
             case Desk.DeskMenuAction.LauncherSettings: _ = ShowSettingsAsync(SettingsPage.Desk, Sanduhr.Core.SettingsIndex.DeskLauncher); break;
             case Desk.DeskMenuAction.Arrange: _desk?.BeginArrange(); break;
             case Desk.DeskMenuAction.TurnOffDesk:
@@ -663,14 +668,46 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Open the Settings window (on General, or on <paramref name="page"/>) — single-instance and
-    /// non-modal so a live account switch from here reflects in the widget at once.
-    /// Re-invoking focuses the existing window and refreshes its account list.
+    /// A second launch asked: <c>--settings desk#pieces</c> opens Settings there; a plain launch shows the widget.
+    /// </summary>
+    private void OnSecondLaunch(string? message)
+    {
+        if (SettingsIndex.ParseLink(message) is { } link)
+            OpenSettingsLink(link);
+        else
+            ShowWindow();
+    }
+
+    /// <summary>A link from outside the app: the widget, or Settings at that page and section.</summary>
+    private void OpenSettingsLink(SettingsLink link)
+    {
+        if (link.Page == SettingsPage.Widget)
+            ShowWindow();
+        else
+            _ = ShowSettingsAsync(link.Page, link.Anchor);
+    }
+
+    /// <summary>
+    /// Open the Settings window at <paramref name="page"/> and <paramref name="anchor"/>, or, with no page, where it was
+    /// left this session (General the first time); single-instance and non-modal so a live account switch from here
+    /// reflects in the widget at once. Re-invoking focuses the existing window, refreshes its account list and, with a
+    /// page, moves it there.
     /// </summary>
     private Task ShowSettingsAsync(SettingsPage? page = null, string? anchor = null)
     {
         if (_vm is null)
             return Task.CompletedTask;
+
+        // Landing only ever sees a checked place: an old page or anchor resolves through the aliases, and an anchor
+        // the page does not have drops to the page's top (ParseLink's rule), so nothing raw reaches Landing.
+        if (page is { } asked)
+        {
+            var checkedLink = SettingsIndex.Resolve(asked, anchor);
+            page = checkedLink.Page;
+            anchor = checkedLink.Anchor is not null && SettingsIndex.Find(checkedLink.Page, checkedLink.Anchor) is null
+                ? null
+                : checkedLink.Anchor;
+        }
 
         if (_settingsWindow is not null)
         {
@@ -681,6 +718,7 @@ public partial class App : Application
             return Task.CompletedTask;
         }
 
+        var landing = SettingsIndex.Landing(page, anchor, _lastSettings);
         var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync, _hotKeys,
             ShowWhatsNewFromMenu, ShowTour);
         // The Claude Code page re-reads the glow switches and plays "Try it" through the running glow service.
@@ -737,10 +775,17 @@ public partial class App : Application
         }
         if (_window is { IsLoaded: true })
             _settingsWindow.Owner = _window;
-        _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+        // On the widget's monitor, inside its work area, so the foot and Quit never sit off screen (WF41). Once, before the
+        // first Show of a new window; a reopen of the window already up never comes through here.
+        _settingsWindow.FitToWorkArea(_window);
+        var opened = _settingsWindow;
+        _settingsWindow.Closed += (_, _) =>
+        {
+            _lastSettings = opened.Place; // reopen here this session (spec, Reopen where it was left)
+            _settingsWindow = null;
+        };
         _settingsWindow.Show();
-        if (page is { } first)
-            _settingsWindow.SelectPage(first, anchor);
+        _settingsWindow.SelectPage(landing.Page, landing.Anchor);
         _settingsWindow.Activate();
         return Task.CompletedTask;
     }

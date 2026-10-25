@@ -49,7 +49,7 @@ public sealed class AppWindowNamesTests : AppWindowFixture
     {
         var store = new SettingsStore(new Paths(appDataBase: Path.Combine(Root, "appdata")));
         var cards = WhatsNewCards.Table.Take(6).ToList();
-        WhatsNewWindow.Show(cards, "What's new in 3.7.1", store, _ => { });
+        WhatsNewWindow.Show(cards, "What's new in 3.7.1", store, (_, _) => { });
         var window = Application.Current.Windows.OfType<WhatsNewWindow>().Single();
         OffScreen(window);
         try
@@ -68,7 +68,7 @@ public sealed class AppWindowNamesTests : AppWindowFixture
         var widget = DemoWidget();
         var steps = WelcomeTour.StepsFor(false, new HashSet<TourFeature> { TourFeature.Desk });
         var tour = new WelcomeTourViewModel(steps, widget);
-        WhatsNewWindow.ShowTour(tour, _ => { }, _ => { });
+        WhatsNewWindow.ShowTour(tour, (_, _) => { }, _ => { });
         var window = Application.Current.Windows.OfType<WhatsNewWindow>().Single();
         OffScreen(window);
         try

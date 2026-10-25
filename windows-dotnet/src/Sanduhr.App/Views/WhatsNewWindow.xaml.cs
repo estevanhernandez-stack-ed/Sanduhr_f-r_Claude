@@ -17,13 +17,13 @@ internal partial class WhatsNewWindow : Window
     private static WhatsNewWindow? _open;
     private static WhatsNewWindow? _tour;
 
-    private Action<SettingsPage> _showMe;
+    private Action<SettingsPage, string?> _showMe;
 
     /// <summary>Step mode only: how the tour ended (true = Finish, false = Skip, Escape or Alt+F4).</summary>
     private Action<bool>? _ended;
     private bool _endReported;
 
-    private WhatsNewWindow(Action<SettingsPage> showMe)
+    private WhatsNewWindow(Action<SettingsPage, string?> showMe)
     {
         _showMe = showMe;
         InitializeComponent();
@@ -49,7 +49,7 @@ internal partial class WhatsNewWindow : Window
     /// Open the welcome tour (the window in step mode), or bring the open one forward. Show me
     /// leaves the tour open; <paramref name="ended"/> runs once, when it finishes or is skipped.
     /// </summary>
-    public static void ShowTour(WelcomeTourViewModel model, Action<SettingsPage> showMe, Action<bool> ended)
+    public static void ShowTour(WelcomeTourViewModel model, Action<SettingsPage, string?> showMe, Action<bool> ended)
     {
         if (_tour is { } open)
         {
@@ -78,9 +78,9 @@ internal partial class WhatsNewWindow : Window
     }
 
     /// <summary>Open the window with these cards, or refill and activate the one already open.
-    /// <paramref name="showMe"/> runs after the window closes, with the card's destination.</summary>
+    /// <paramref name="showMe"/> runs after the window closes, with the card's destination and anchor.</summary>
     public static void Show(IReadOnlyList<WhatsNewCard> cards, string header, SettingsStore store,
-        Action<SettingsPage> showMe)
+        Action<SettingsPage, string?> showMe)
     {
         var model = new WhatsNewViewModel(cards, header, store);
         if (_open is { } window)
@@ -110,11 +110,12 @@ internal partial class WhatsNewWindow : Window
         if ((sender as FrameworkElement)?.DataContext is not WhatsNewCardItem item)
             return;
         var destination = item.Card.Destination;
+        var anchor = item.Card.Anchor;
         var callback = _showMe;
         // The tour stays open behind the page it shows (as on the Mac); What's New closes.
         if (DataContext is not WelcomeTourViewModel)
             Close();
-        callback(destination);
+        callback(destination, anchor);
     }
 
     private void Done_Click(object sender, RoutedEventArgs e) => Close();

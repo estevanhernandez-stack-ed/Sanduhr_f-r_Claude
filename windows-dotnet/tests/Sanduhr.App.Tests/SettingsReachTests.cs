@@ -57,6 +57,34 @@ public sealed class SettingsReachTests : AppWindowFixture
     });
 
     [Fact]
+    public void An_old_link_and_an_unknown_anchor_land_without_throwing() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            // Every old place the aliases name, in the build as it is: each lands (now or on its page) and none throws.
+            foreach (var alias in SettingsIndex.Aliases)
+            {
+                window.SelectPage(alias.FromPage, alias.FromAnchor);
+                window.UpdateLayout();
+                Pump();
+                Assert.NotNull(window.Place);
+            }
+
+            // An anchor the page doesn't have, and one that names nothing at all: the page, at its top.
+            foreach (var anchor in new[] { "no-such-section", "", "  ", "DESK-PIECES-OLD" })
+            {
+                window.SelectPage(SettingsPage.Desk, anchor);
+                window.UpdateLayout();
+                Pump();
+                Assert.Equal(new SettingsLink(SettingsPage.Desk, null), window.Place);
+            }
+            guard.Check();
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public void A_search_hit_in_a_collapsed_section_says_so()
     {
         var row = new SettingsSearchRow("Margins", SettingsPage.Desk, SettingsIndex.DeskMargins, IsPage: false, CollapsedIn: "Advanced");
