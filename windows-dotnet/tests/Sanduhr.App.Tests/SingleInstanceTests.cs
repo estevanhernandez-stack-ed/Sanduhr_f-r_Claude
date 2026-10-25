@@ -1,4 +1,5 @@
 using System.IO;
+using System.IO.MemoryMappedFiles;
 using Sanduhr.App.Services;
 
 namespace Sanduhr.App.Tests;
@@ -13,13 +14,15 @@ public class SingleInstanceTests
     private static string Folder() => Path.Combine(Path.GetTempPath(), "sanduhr-instance-" + Guid.NewGuid().ToString("N")[..10]);
 
     /// <summary>Claims on a thread of its own and holds the claim until <paramref name="release"/> is set.</summary>
-    private static (Thread Thread, Task<SingleInstance> Claimed) HoldOnThread(string dir, ManualResetEventSlim release, Action? onShow = null, TimeSpan? handoff = null)
+    private static (Thread Thread, Task<SingleInstance> Claimed) HoldOnThread(string dir, ManualResetEventSlim release, Action? onShow = null, TimeSpan? handoff = null,
+        Action<string?>? onMessage = null)
     {
         var claimed = new TaskCompletionSource<SingleInstance>();
         var thread = new Thread(() =>
         {
             var instance = SingleInstance.Claim(dir, handoff ?? TimeSpan.FromSeconds(5));
-            if (onShow is not null) instance.Listen(onShow);
+            if (onMessage is not null) instance.Listen(onMessage);
+            else if (onShow is not null) instance.Listen(onShow);
             claimed.SetResult(instance);
             release.Wait();
             instance.Dispose();
@@ -114,5 +117,155 @@ public class SingleInstanceTests
         using var next = SingleInstance.Claim(dir, TimeSpan.FromSeconds(2));
 
         Assert.True(next.IsPrimary);
+    }
+
+    [Fact]
+    public async Task A_second_launch_hands_its_settings_link_to_the_first()
+    {
+        var dir = Folder();
+        using var release = new ManualResetEventSlim();
+        var got = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var (thread, claimed) = HoldOnThread(dir, release, onMessage: m => got.TrySetResult(m));
+        Assert.True((await claimed).IsPrimary);
+
+        using var second = SingleInstance.Claim(dir, TimeSpan.FromSeconds(5), "desk#pieces");
+
+        Assert.False(second.IsPrimary);
+        Assert.Equal("desk#pieces", await got.Task.WaitAsync(TimeSpan.FromSeconds(2)));
+        release.Set();
+        thread.Join();
+    }
+
+    [Fact]
+    public async Task A_plain_launch_after_a_link_hands_over_nothing()
+    {
+        var dir = Folder();
+        using var release = new ManualResetEventSlim();
+        using var got = new System.Collections.Concurrent.BlockingCollection<string>();
+        var (thread, claimed) = HoldOnThread(dir, release, onMessage: m => got.Add(m ?? "(none)"));
+        Assert.True((await claimed).IsPrimary);
+
+        using (SingleInstance.Claim(dir, TimeSpan.FromSeconds(5), "about#version")) { }
+        using (SingleInstance.Claim(dir, TimeSpan.FromSeconds(5))) { }
+
+        Assert.True(got.TryTake(out var first, 2000));
+        Assert.Equal("about#version", first);
+        Assert.True(got.TryTake(out var second, 2000));
+        Assert.Equal("(none)", second);
+        release.Set();
+        thread.Join();
+    }
+
+    [Fact]
+    public async Task A_link_too_long_for_the_mailbox_is_dropped_not_cut()
+    {
+        var dir = Folder();
+        using var release = new ManualResetEventSlim();
+        var got = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var (thread, claimed) = HoldOnThread(dir, release, onMessage: m => got.TrySetResult(m));
+        Assert.True((await claimed).IsPrimary);
+
+        using var second = SingleInstance.Claim(dir, TimeSpan.FromSeconds(5), new string('a', SingleInstance.MaxMessageBytes + 1));
+
+        Assert.False(second.IsPrimary);
+        Assert.Null(await got.Task.WaitAsync(TimeSpan.FromSeconds(2)));
+        release.Set();
+        thread.Join();
+    }
+
+    // The hand-off never stops or delays a launch. Each test below uses its own folder, so its own kernel-object names
+    // (NameFor hashes the folder): none touches the running Sanduhr's.
+
+    [Fact]
+    public async Task A_foreign_or_too_small_mapping_under_the_mailbox_name_falls_back_to_the_plain_show()
+    {
+        var dir = Folder();
+        // Something else already owns the mailbox name with a 16-byte file-backed mapping (a page-file one would round up to a
+        // page), so a 1024-byte view over it cannot be made.
+        Directory.CreateDirectory(dir);
+        var backing = Path.Combine(dir, "foreign.bin");
+        using var file = new FileStream(backing, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite);
+        using var foreign = MemoryMappedFile.CreateFromFile(file, SingleInstance.NameFor(dir) + ".Message", 16,
+            MemoryMappedFileAccess.ReadWrite, HandleInheritability.None, leaveOpen: true);
+        using var release = new ManualResetEventSlim();
+        var got = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var (thread, claimed) = HoldOnThread(dir, release, onMessage: m => got.TrySetResult(m));
+        Assert.True((await claimed).IsPrimary, "a primary that cannot set up its mailbox still runs");
+
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        using var second = SingleInstance.Claim(dir, TimeSpan.FromSeconds(10), "desk#pieces");
+
+        Assert.False(second.IsPrimary);
+        Assert.Null(await got.Task.WaitAsync(TimeSpan.FromSeconds(2))); // the plain show, no link
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(3), $"the fall-back took {clock.Elapsed}");
+        release.Set();
+        thread.Join();
+    }
+
+    [Fact]
+    public async Task A_busy_post_mutex_skips_the_post_quickly()
+    {
+        var dir = Folder();
+        using var release = new ManualResetEventSlim();
+        var got = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var (thread, claimed) = HoldOnThread(dir, release, onMessage: m => got.TrySetResult(m));
+        Assert.True((await claimed).IsPrimary);
+
+        using var held = HoldPostMutex(dir);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        using var second = SingleInstance.Claim(dir, TimeSpan.FromSeconds(10), "desk#pieces");
+        var took = clock.Elapsed;
+
+        Assert.False(second.IsPrimary);
+        Assert.Null(await got.Task.WaitAsync(TimeSpan.FromSeconds(2))); // asked plainly, the link was not posted
+        Assert.True(took < TimeSpan.FromSeconds(3), $"a busy .Post mutex held the launch for {took}");
+        release.Set();
+        thread.Join();
+    }
+
+    [Fact]
+    public async Task The_whole_hand_off_runs_under_one_deadline()
+    {
+        var dir = Folder();
+        using var release = new ManualResetEventSlim();
+        var (thread, claimed) = HoldOnThread(dir, release, onShow: () => { });
+        var first = await claimed;
+        first.StopAnswering(); // quitting: it holds the claim and never answers
+
+        using var held = HoldPostMutex(dir); // and another launch is mid-hand-off
+        var handoff = TimeSpan.FromSeconds(1);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        using var third = SingleInstance.Claim(dir, handoff, "desk#pieces");
+        var took = clock.Elapsed;
+
+        Assert.False(third.IsPrimary); // never got the claim, and gave up at the deadline
+        Assert.True(took >= TimeSpan.FromMilliseconds(800), $"gave up early, after {took}");
+        Assert.True(took < handoff + TimeSpan.FromSeconds(1.5), $"waited {took} on a 1 s deadline");
+        release.Set();
+        thread.Join();
+    }
+
+    /// <summary>Holds the folder's <c>.Post</c> mutex on a thread of its own (a mutex belongs to its thread).</summary>
+    private static IDisposable HoldPostMutex(string dir)
+    {
+        var taken = new ManualResetEventSlim();
+        var free = new ManualResetEventSlim();
+        var thread = new Thread(() =>
+        {
+            using var post = new Mutex(false, SingleInstance.NameFor(dir) + ".Post");
+            post.WaitOne();
+            taken.Set();
+            free.Wait();
+            post.ReleaseMutex();
+        }) { IsBackground = true };
+        thread.Start();
+        Assert.True(taken.Wait(2000), "the test could not take the .Post mutex");
+        return new Releaser(() => { free.Set(); thread.Join(); taken.Dispose(); free.Dispose(); });
+    }
+
+    private sealed class Releaser(Action release) : IDisposable
+    {
+        public void Dispose() => release();
     }
 }
