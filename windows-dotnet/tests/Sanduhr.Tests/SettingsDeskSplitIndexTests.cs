@@ -167,4 +167,18 @@ public class SettingsDeskSplitIndexTests
         Assert.Empty(SettingsNames.PathProblems("Settings, Desk Look, Ink and color"));
         Assert.Empty(SettingsNames.PathProblems("Settings, Desk Look, Back plate"));
     }
+
+    [Fact]
+    public void Watchers_holds_its_switches_and_where_they_show()
+    {
+        Assert.Equal([SettingsIndex.Watchers, SettingsIndex.CiRunners, SettingsIndex.WatchersPlace],
+            SettingsIndex.EntriesOn(SettingsPage.Watchers).Select(e => e.Anchor));
+        Assert.Equal(new SettingsLink(SettingsPage.Watchers, SettingsIndex.Watchers),
+            SettingsIndex.Resolve(SettingsPage.Desk, SettingsIndex.DeskWatchers));
+        // Slice 2's boost, live now: "docker" and "runner" land on the CI runners first.
+        foreach (var q in new[] { "docker", "runner", "runners" })
+            Assert.Equal((SettingsPage.Watchers, SettingsIndex.CiRunners, -1),
+                (SettingsIndex.Search(q)[0].Entry.Page, SettingsIndex.Search(q)[0].Entry.Anchor, SettingsIndex.Search(q)[0].Rank));
+        Assert.Equal(SettingsPage.Watchers, SettingsNames.Table.Single(t => t.Name == SettingsNames.WatchersSwitch).Page);
+    }
 }

@@ -237,4 +237,18 @@ public sealed class DeskPiecesSettingsTests : IDisposable
         Assert.Equal(0, OrderTop(760), 1);
         Assert.True(OrderTop(759) > 20, "the Order buttons stay on the first line below 760 DIP");
     });
+
+    [Fact]
+    public void Either_watchers_switch_shows_a_hidden_Watchers_piece()
+    {
+        var desk = Desk();
+        desk.WatchersAgents = true;
+        Assert.Contains("watchers:mr", Layout);
+        desk.Pieces.Single(p => p.Widget == "watchers").Shown = false;
+        desk.WatchersAgents = false;
+        Assert.DoesNotContain("watchers", Layout);       // turning a switch off never hides the piece, and never shows it
+        desk.WatchersCiRunners = true;
+        Assert.Contains("watchers:mr", Layout);           // back where it was
+        Assert.Equal("On the Desk: middle right.", desk.WatchersPiece.Text);
+    }
 }

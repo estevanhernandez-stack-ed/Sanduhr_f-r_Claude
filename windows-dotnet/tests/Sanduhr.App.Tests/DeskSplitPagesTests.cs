@@ -214,4 +214,21 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [Fact]
+    public void The_Watchers_page_holds_both_switches_and_the_pieces_line() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Desk, SettingsIndex.DeskWatchers);   // an old link
+            Settle(window, guard);
+            Assert.Equal(new SettingsLink(SettingsPage.Watchers, SettingsIndex.Watchers), window.Place);
+            var ci = Below<CheckBox>(Marked(window, SettingsPage.Watchers, SettingsIndex.CiRunners)).Single();
+            Assert.Equal(SettingsNames.CiRunnersSwitch, System.Windows.Automation.AutomationProperties.GetName(ci));
+            Assert.Single(Below<DeskPieceStatusPanel>(Marked(window, SettingsPage.Watchers, SettingsIndex.WatchersPlace)));
+            Assert.Null(SettingsAnchor.Find((DependencyObject)TabOf(window, SettingsPage.Desk).Content, SettingsIndex.DeskWatchers));
+        }
+        finally { window.Close(); }
+    });
 }

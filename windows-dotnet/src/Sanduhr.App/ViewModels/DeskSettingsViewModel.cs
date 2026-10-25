@@ -348,7 +348,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     /// <summary>Raised after "Let Claude show watchers" is saved (App writes watchers.json and, off, clears the cards).</summary>
     public Action? WatchersChanged { get; set; }
 
-    /// <summary>"Let Claude show watchers" (spec 6.9): off by default; saved at once.</summary>
+    /// <summary>Settings, Watchers: "Let Claude show watchers" (spec 6.9). Off by default; saved at once. Turning it on shows a hidden Watchers piece.</summary>
     public bool WatchersAgents
     {
         get => _store.LoadWatchersAgents();
@@ -358,13 +358,14 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             _store.SaveWatchersAgents(value);
             OnPropertyChanged();
             WatchersChanged?.Invoke();
+            if (value) PlaceIfHidden("watchers");   // Principle 4: turning watchers on never leaves them invisible
         }
     }
 
     /// <summary>Raised after "Show my CI runners' jobs" is saved (App starts or stops the runner watch).</summary>
     public Action? CiRunnersChanged { get; set; }
 
-    /// <summary>"Show my CI runners' jobs" (spec ci-watchers-3.9): off by default; saved at once.</summary>
+    /// <summary>Settings, Watchers: "Show my CI runners' jobs" (spec ci-watchers-3.9). Off by default; saved at once. Turning it on shows a hidden Watchers piece.</summary>
     public bool WatchersCiRunners
     {
         get => _store.LoadWatchersCiRunners();
@@ -374,6 +375,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             _store.SaveWatchersCiRunners(value);
             OnPropertyChanged();
             CiRunnersChanged?.Invoke();
+            if (value) PlaceIfHidden("watchers");
         }
     }
 

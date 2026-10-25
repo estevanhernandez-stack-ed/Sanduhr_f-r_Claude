@@ -84,6 +84,10 @@ public static class SettingsIndex
     public const string DeskClicks = "desk-clicks";
     public const string DeskPlate = "desk-plate";
     public const string DeskWatchers = "desk-watchers";
+    // Watchers (slice 3)
+    public const string Watchers = "watchers";
+    public const string CiRunners = "ci-runners";
+    public const string WatchersPlace = "watchers-place";
     public const string DeskLauncher = "desk-launcher";
     public const string DeskDirect = "desk-direct";
     public const string DeskOled = "desk-oled";
@@ -201,9 +205,6 @@ public static class SettingsIndex
             ["drag", "move", "rearrange", "arrange", "reorder", "on the desktop", "layout"]),
         E(SettingsNames.DeskPieceClicksSwitch, SettingsPage.Desk, DeskClicks,
             ["click", "click-through", "right-click", "menu", "desktop icons", "clock", "message"]),
-        E(SettingsNames.WatchersSwitch, SettingsPage.Desk, DeskWatchers,
-            ["watcher", "watchers", "agent", "agents", "MCP", "watch_start", "CI", "deploy", "progress", "card", "claude code",
-             SettingsNames.CiRunnersSwitch, "runner", "runners", "GitHub Actions", "Docker", "jobs", "off by default"]),
         E(SettingsNames.DeskDirectSwitch, SettingsPage.Desk, DeskDirect,
             ["Claude", "agent", "agents", "MCP", "propose_desk", "design", "designs", "review", "apply", "without asking", "wallpaper", "off by default"]),
         E(SettingsNames.OledCareSwitch, SettingsPage.Desk, DeskOled,
@@ -255,6 +256,13 @@ public static class SettingsIndex
              SettingsNames.WeatherShowAs]),
         E("Weather data by Open-Meteo.com", SettingsPage.Weather, WeatherCredit, ["Open-Meteo", "credit", "attribution", "GeoNames"]),
 
+        E(SettingsNames.WatchersSwitch, SettingsPage.Watchers, Watchers,
+            ["watcher", "watchers", "agent", "agents", "MCP", "watch_start", "deploy", "progress", "card", "claude code", "off by default"]),
+        E(SettingsNames.CiRunnersSwitch, SettingsPage.Watchers, CiRunners,
+            ["CI", "runner", "runners", "GitHub Actions", "Docker", "jobs", "containers", "off by default"]),
+        E(SettingsNames.WatchersPlace, SettingsPage.Watchers, WatchersPlace,
+            ["place", "where", "corner", "on the Desk", "piece", "hidden"]),
+
         E("Widget catalog", SettingsPage.Widgets, WidgetsCatalog,
             ["widgets", "catalog", "install", "download", "sprite", "companion", "pet", "palette", "effects", "font", "theme pack",
              "hourglass", "OLED Neon", "signature", "verified", "GitHub"]),
@@ -293,8 +301,8 @@ public static class SettingsIndex
         [SettingsNames.ArrangeDesk] = DeskArrange,
         [SettingsNames.DeskPieceClicksSwitch] = DeskClicks,
         [SettingsNames.DeskPlateSwitch] = DeskPlate,
-        [SettingsNames.WatchersSwitch] = DeskWatchers,
-        [SettingsNames.CiRunnersSwitch] = DeskWatchers,
+        [SettingsNames.WatchersSwitch] = Watchers,
+        [SettingsNames.CiRunnersSwitch] = CiRunners,
         [SettingsNames.DeskDirectSwitch] = DeskDirect,
         [SettingsNames.OledCareSwitch] = DeskOled,
         [SettingsNames.PutMyDeskBack] = DeskDesigns,

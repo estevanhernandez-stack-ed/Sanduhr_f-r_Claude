@@ -20,6 +20,47 @@
                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
                 <TextBlock Text="{x:Static core:SettingsNames.WatchersLine}" FontSize="11" TextWrapping="Wrap"
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,-8,0,12" />
+
+                <!-- Claude's watchers (WF10's one word for agents: "Claude"). -->
+                <StackPanel views:SettingsAnchor.Id="watchers">
+                    <CheckBox Style="{DynamicResource ThemedCheckBox}"
+                              Content="{x:Static core:SettingsNames.WatchersSwitch}"
+                              IsChecked="{Binding WatchersAgents, Mode=TwoWay}"
+                              AutomationProperties.Name="{x:Static core:SettingsNames.WatchersSwitch}" />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                               Text="Off by default. With the Sanduhr MCP server installed, Claude Code can put a live card on the Desk for work it is watching (a CI run, a deploy): a title, progress and a one-line note. Cards live in memory only, fade or stay as the work ends, and are gone when you quit. Turning this on shows the Watchers piece if it is hidden." />
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                <!-- The CI runners' jobs, a switch of its own (WF8). -->
+                <StackPanel views:SettingsAnchor.Id="ci-runners">
+                    <CheckBox Style="{DynamicResource ThemedCheckBox}"
+                              Content="{x:Static core:SettingsNames.CiRunnersSwitch}"
+                              IsChecked="{Binding WatchersCiRunners, Mode=TwoWay}"
+                              AutomationProperties.Name="{x:Static core:SettingsNames.CiRunnersSwitch}" />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                               Text="{x:Static core:SettingsNames.CiRunnersCaption}" />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                               Text="Off by default. Shows a card for each job a GitHub Actions runner container on this PC runs, however it was started. Sanduhr reads only the runners' log output through Docker's local pipe: no GitHub account, no network, and never a container's settings. Cards live in memory only." />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                               Text="{Binding CiRunnersStatus}"
+                               AutomationProperties.LiveSetting="Polite" />
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                <!-- Where they show: the Watchers piece's line (Principle 1). -->
+                <StackPanel views:SettingsAnchor.Id="watchers-place">
+                    <TextBlock Text="{x:Static core:SettingsNames.WatchersPlace}" FontSize="13" FontWeight="SemiBold"
+                               AutomationProperties.HeadingLevel="Level2"
+                               Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                    <views:DeskPieceStatusPanel DataContext="{Binding WatchersPiece}" />
+                </StackPanel>
             </StackPanel>
         </ScrollViewer>
     </Border>
