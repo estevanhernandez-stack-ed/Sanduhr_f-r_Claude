@@ -46,22 +46,21 @@ public sealed record DeskUsage(
 /// <param name="Fill">How much of the bar to fill, 0 to 1; a limit over 100% fills the bar and stops.</param>
 /// <param name="Pace">Where the pace tick goes, 0 to 1, or null without a reset time.</param>
 /// <param name="Reset">"Today 5:00 PM" as the card prints it, or empty without a reset time.</param>
-/// <param name="Warning">Utilization at <see cref="DeskMeters.WarningAt"/> or more: the bar draws red.</param>
-public sealed record DeskMeterRow(string Key, string Label, int Percent, double Fill, double? Pace, string Reset, bool Warning);
+/// <param name="Level">How far the limit is toward its end by the alert thresholds (<see cref="MeterSignal"/>): past Warn at the bar
+/// takes a yellow middle stop, past Urgent at a red one.</param>
+public sealed record DeskMeterRow(string Key, string Label, int Percent, double Fill, double? Pace, string Reset, MeterLevel Level);
 
 /// <summary>The Desk meters' rows (the Mac's <c>DeskMeterRow.rows</c>).</summary>
 public static class DeskMeters
 {
-    /// <summary>The utilization at which the widget card's bar turns red
-    /// (<see cref="ThemeCatalog.UsageColor"/>: under 90 is orange, 90 and up is red).</summary>
-    public const double WarningAt = 90;
-
     /// <summary>True when the Desk draws its sign-in line: a sign-in is needed and the reminder is on.</summary>
     public static bool SignInLineShown(DeskUsage u) => u.SignInNeeded && u.SignInReminder;
 
     /// <summary>One row per tier, in the given order; none when a sign-in is needed.
-    /// <paramref name="zone"/> converts reset times (default: local), for deterministic tests.</summary>
-    public static IReadOnlyList<DeskMeterRow> Rows(DeskUsage usage, DateTimeOffset now, TimeZoneInfo? zone = null)
+    /// <paramref name="zone"/> converts reset times (default: local), for deterministic tests. <paramref name="warnAt"/> and
+    /// <paramref name="urgentAt"/> are the alert thresholds (settings.json <c>alert_warn_pct</c>, <c>alert_urgent_pct</c>).</summary>
+    public static IReadOnlyList<DeskMeterRow> Rows(DeskUsage usage, DateTimeOffset now, TimeZoneInfo? zone = null,
+        int warnAt = MeterSignal.DefaultWarnAt, int urgentAt = MeterSignal.DefaultUrgentAt)
     {
         if (usage.SignInNeeded) return [];
         var rows = new List<DeskMeterRow>(usage.Tiers.Count);
@@ -74,7 +73,7 @@ public static class DeskMeters
                 Math.Min(1.0, Math.Max(0.0, t.Utilization / 100.0)),
                 Pacing.PaceFrac(t.ResetsAt, t.Key, now),
                 ResetDateTime(t.ResetsAt, now, zone),
-                t.Utilization >= WarningAt));
+                MeterSignal.Level(t.Utilization, warnAt, urgentAt)));
         }
         return rows;
     }
@@ -184,5 +183,49 @@ public static class DeskClaudeText
             bottom.Add($"resets {TimeZoneInfo.ConvertTime(reset, zone ?? TimeZoneInfo.Local).ToString("h:mm", CultureInfo.InvariantCulture)}");
         if (week is not null) bottom.Add($"{(int)week.Utilization}% week");
         return bottom.Count == 0 ? [top] : [top, string.Join("   ", bottom)];
+    }
+}
+
+/// <summary>How far a meter is toward its limit, by the alert thresholds (theme match, the usage signal).</summary>
+public enum MeterLevel { Calm, Warn, Urgent }
+
+/// <summary>
+/// The usage signal worked into a meter's gradient (theme match, spec "Meters"): under Warn at the meter is its own colors; from Warn
+/// at a yellow stop sits in their middle, from Urgent at a red one; a solid meter is its color to itself, so it gets the same stop.
+/// The thresholds are the alerts' (<c>alert_warn_pct</c>, default 80; <c>alert_urgent_pct</c>, default 95); the colors are the widget
+/// ramp's own yellow and red (<see cref="ThemeCatalog.UsageColor"/>). Only meters carry it: the clock, date, message and Now
+/// playing keep their gradient exactly. This replaces the Desk's switch to solid red at 90%.
+/// </summary>
+public static class MeterSignal
+{
+    public const int DefaultWarnAt = 80;
+    public const int DefaultUrgentAt = 95;
+    public const string WarnHex = "facc15";
+    public const string UrgentHex = "f87171";
+
+    public static MeterLevel Level(double percent, int warnAt, int urgentAt) =>
+        percent >= urgentAt ? MeterLevel.Urgent : percent >= warnAt ? MeterLevel.Warn : MeterLevel.Calm;
+
+    /// <summary>The signal's color, six hex digits; null when calm (the meter's text keeps its own color).</summary>
+    public static string? Hex(MeterLevel level) => level switch
+    {
+        MeterLevel.Warn => WarnHex,
+        MeterLevel.Urgent => UrgentHex,
+        _ => null,
+    };
+
+    /// <summary>
+    /// The stops a meter at <paramref name="level"/> draws: the given ones normalized (none usable is white); past Warn at, a solid
+    /// is doubled and the signal goes in at index ceil(n / 2), so with one, two or four stops it sits exactly in the middle once the
+    /// stops are spread evenly.
+    /// </summary>
+    public static IReadOnlyList<string> Stops(IReadOnlyList<string> stops, MeterLevel level)
+    {
+        var list = stops.Select(InkHex.Normalize).OfType<string>().ToList();
+        if (list.Count == 0) list.Add(InkHex.Fallback);
+        if (Hex(level) is not { } signal) return list;
+        if (list.Count == 1) list.Add(list[0]);
+        list.Insert((list.Count + 1) / 2, signal);
+        return list;
     }
 }

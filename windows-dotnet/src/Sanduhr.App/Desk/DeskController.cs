@@ -456,6 +456,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         var session = new DeskArrangeSession(_settings.Layout);
         var now = DateTimeOffset.Now;
         var track = TrackToDraw(now);
+        var alerts = _store.LoadAlertConfig();
         var frame = new DeskFrame
         {
             Usage = _usage,
@@ -471,6 +472,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Watchers = WatchersNow(),
             Launcher = LauncherNow(),
             Companion = CompanionNow(),
+            WarnAt = alerts.WarnPct,
+            UrgentAt = alerts.UrgentPct,
         };
         DeskArrangeMode mode;
         try
@@ -690,6 +693,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         var track = TrackToDraw(now);
         _trackKey = TrackKey(track);
         SyncSources(track);
+        var alerts = _store.LoadAlertConfig();
         var frame = new DeskFrame
         {
             Usage = _usage,
@@ -710,6 +714,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Watchers = WatchersNow(),
             Launcher = LauncherNow(),
             Companion = CompanionNow(),
+            WarnAt = alerts.WarnPct,
+            UrgentAt = alerts.UrgentPct,
         };
         _fullAt = now;
         foreach (var old in _views) old.Dispose();

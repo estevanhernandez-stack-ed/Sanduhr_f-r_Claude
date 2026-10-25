@@ -56,6 +56,9 @@ internal sealed record DeskFrame
     public DeskLauncherFrame? Launcher { get; init; }
     /// <summary>The companion piece's sprite (spec 3.8 section 4); null when no sprite is installed or the piece is not placed.</summary>
     public CompanionService? Companion { get; init; }
+    /// <summary>The alert thresholds the meters' signal uses (theme match): Alerts' Warn at and Urgent at.</summary>
+    public int WarnAt { get; init; } = MeterSignal.DefaultWarnAt;
+    public int UrgentAt { get; init; } = MeterSignal.DefaultUrgentAt;
 }
 
 /// <summary>
@@ -70,7 +73,8 @@ internal sealed record DeskFrame
 /// </summary>
 internal sealed partial class DeskView : Grid, IDisposable
 {
-    /// <summary>The widget's over-limit red (<c>ThemeCatalog.UsageColor</c> at 90% and up).</summary>
+    /// <summary>The widget's over-limit red (<c>ThemeCatalog.UsageColor</c> at 90% and up): a failed watcher's title. Meters take
+    /// <see cref="MeterSignal"/> instead.</summary>
     private static readonly Color WarningRed = Color.FromRgb(0xF8, 0x71, 0x71);
 
     /// <summary>The pieces this build draws (watchers: only from the harness until their tools ship).</summary>
@@ -624,6 +628,16 @@ internal sealed partial class DeskView : Grid, IDisposable
 
     private Brush Ink => InkBrush(_ink.Stops);
 
+    /// <summary>A meter's fill (theme match, the usage signal): the ink, and past Warn at or Urgent at the ink with a yellow or red stop
+    /// in its middle. Calm, it is <see cref="Ink"/> itself, so a meter under Warn at draws exactly as it always has.</summary>
+    private Brush MeterFill(MeterLevel level) => level == MeterLevel.Calm ? Ink : InkBrush(MeterSignal.Stops(_ink.Stops, level));
+
+    /// <summary>A meter's value past Warn at or Urgent at takes the signal's color; under it, the ink as before.</summary>
+    private static void Signal(TextBlock value, MeterLevel level)
+    {
+        if (MeterSignal.Hex(level) is { } hex) value.Foreground = SolidInk(hex);
+    }
+
     private TextBlock Text(string text, double size, double opacity, bool bold = false, TextAlignment alignment = TextAlignment.Left) => new()
     {
         Text = text,
@@ -674,12 +688,12 @@ internal sealed partial class DeskView : Grid, IDisposable
     /// <summary>A row in the meters' shape: a label and a percent over a bar in the ink. Returns the
     /// pieces a live row updates.</summary>
     private (StackPanel Block, TextBlock Percent, Rectangle Fill) BarRow(string label, int percent, double fill, double size, double width,
-        bool warning, bool first, double? pace = null)
+        MeterLevel level, bool first, double? pace = null)
     {
         var block = new StackPanel { Width = width, Margin = new Thickness(0, first ? 0 : size * 0.6, 0, 0) };
         var head = new DockPanel { LastChildFill = true };
         var pct = Text($"{percent}%", size, 1);
-        if (warning) pct.Foreground = new SolidColorBrush(WarningRed);
+        Signal(pct, level);
         DockPanel.SetDock(pct, Dock.Right);
         head.Children.Add(pct);
         var name = Text(label, size, 0.85);
@@ -697,7 +711,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         var rect = new Rectangle
         {
             Width = width * Math.Clamp(fill, 0, 1), Height = barHeight, RadiusX = barHeight / 2, RadiusY = barHeight / 2,
-            Fill = warning ? new SolidColorBrush(WarningRed) : Ink, Opacity = _ink.TextOpacity,
+            Fill = MeterFill(level), Opacity = _ink.TextOpacity,
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
         };
         bar.Children.Add(rect);
@@ -714,7 +728,7 @@ internal sealed partial class DeskView : Grid, IDisposable
 
     private FrameworkElement? Meters(double ts, HorizontalAlignment align)
     {
-        var rows = DeskMeters.Rows(_frame.Usage, _frame.Now);
+        var rows = DeskMeters.Rows(_frame.Usage, _frame.Now, warnAt: _frame.WarnAt, urgentAt: _frame.UrgentAt);
         double size = ts * 0.17;
         double width = ts * 3.2;
         if (rows.Count == 0)
@@ -725,7 +739,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         var panel = new StackPanel { HorizontalAlignment = align, Opacity = _frame.Usage.IsStale(_frame.Now) ? 0.5 : 1 };
         foreach (var row in rows)
         {
-            var (block, _, _) = BarRow(row.Label, row.Percent, row.Fill, size, width, row.Warning, panel.Children.Count == 0, row.Pace);
+            var (block, _, _) = BarRow(row.Label, row.Percent, row.Fill, size, width, row.Level, panel.Children.Count == 0, row.Pace);
             if (row.Reset.Length > 0)
                 block.Children.Add(Text($"resets {row.Reset}", size * 0.8, 0.7));
             panel.Children.Add(block);
@@ -746,7 +760,8 @@ internal sealed partial class DeskView : Grid, IDisposable
         var cells = new List<(TextBlock Pct, Rectangle Fill)>();
         foreach (var row in Telemetry.Rows(sample))
         {
-            var (block, pct, fill) = BarRow(row.Label, row.Percent, row.Fill, size, width, false, panel.Children.Count == 0);
+            // Telemetry is no usage: it never carries the signal.
+            var (block, pct, fill) = BarRow(row.Label, row.Percent, row.Fill, size, width, MeterLevel.Calm, panel.Children.Count == 0);
             panel.Children.Add(block);
             cells.Add((pct, fill));
         }

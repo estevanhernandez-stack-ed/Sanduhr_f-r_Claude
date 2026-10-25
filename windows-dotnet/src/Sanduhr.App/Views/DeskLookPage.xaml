@@ -136,7 +136,7 @@
                                   AutomationProperties.Name="{x:Static core:SettingsNames.DropShadow}" />
                         <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
                                    Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                   Text="Automatic reads how bright your wallpaper image is behind each piece and picks light or dark ink, so it stays readable. It reads the wallpaper file only, never your screen. Picking one of the Colors switches the ink to Custom, which takes one hex color, or two to four with commas for a gradient, such as 8f5bd6,3a63e0,33fdff. A meter near its limit stays red in every ink." />
+                                   Text="Automatic reads how bright your wallpaper image is behind each piece and picks light or dark ink, so it stays readable. It reads the wallpaper file only, never your screen. Picking one of the Colors switches the ink to Custom, which takes one hex color, or two to four with commas for a gradient, such as 8f5bd6,3a63e0,33fdff. A meter past the alert levels (warn and urgent, set under Alerts) takes a yellow or red stop in the middle of its color, in every ink." />
                     </StackPanel>
                     <StackPanel Margin="0,14,0,0" DataContext="{Binding MessagePage}">
                         <Grid>
