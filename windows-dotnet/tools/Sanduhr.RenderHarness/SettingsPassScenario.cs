@@ -146,11 +146,13 @@ public static partial class Program
         throw new InvalidOperationException("The harness window became the foreground window; stopped so the person's foreground window is left alone. Run again without the keyboard parts: --parts pages,search,links,contrast leaves out tab, focus and anything that moves keyboard focus.");
     }
 
+    /// <summary>Lets WPF route keyboard focus inside the off-screen window: WM_SETFOCUS only. WM_ACTIVATE is left out: in the test
+    /// host it made the window the foreground window (measured in 6af89bf), and focus routes without it. NoActivate (App.Tests)
+    /// follows the same rule.</summary>
     static void RouteKeyboard(PassCtx c)
     {
         var hwnd = new WindowInteropHelper(c.Sw).Handle;
-        const int WM_ACTIVATE = 0x0006, WM_SETFOCUS = 0x0007;
-        SendMessage(hwnd, WM_ACTIVATE, (IntPtr)1, IntPtr.Zero);
+        const int WM_SETFOCUS = 0x0007;
         SendMessage(hwnd, WM_SETFOCUS, IntPtr.Zero, IntPtr.Zero);
     }
 
@@ -756,8 +758,8 @@ public static partial class Program
             ("Account menu (widget chip, tray): the Accounts link", SettingsPage.Accounts, SettingsIndex.MenuAnchor(SettingsPage.Accounts)),
             ("Desk right-click: Edit messages", SettingsPage.DeskMessage, SettingsIndex.MenuAnchor(SettingsPage.DeskMessage)),
             ("Desk right-click: Desk settings", SettingsPage.Desk, SettingsIndex.MenuAnchor(SettingsPage.Desk)),
-            ("Desk right-click: Launcher settings", SettingsPage.Desk, SettingsIndex.DeskLauncher),
-            ("Launcher piece: add buttons / empty state (App.xaml.cs:508)", SettingsPage.Desk, SettingsIndex.DeskLauncher),
+            ("Desk right-click on a Launcher button: Launcher settings…", SettingsPage.Launcher, SettingsIndex.MenuAnchor(SettingsPage.Launcher)),
+            ("Launcher piece: a missing app's click (App.OnLauncherMissing)", SettingsPage.Launcher, SettingsIndex.MenuAnchor(SettingsPage.Launcher)),
         };
         foreach (var (where, page, anchor) in entries)
         {

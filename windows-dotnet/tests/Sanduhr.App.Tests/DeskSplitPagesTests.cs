@@ -609,4 +609,72 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    /// <summary>Done (spec, slice 3): turning on Weather, Watchers or Now playing from their pages shows the piece, with no visit
+    /// to Desk.</summary>
+    [Fact]
+    public void Turning_on_watchers_now_playing_and_weather_from_their_pages_shows_each_piece() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        var visited = new List<SettingsPage>();
+        try
+        {
+            void Visit(SettingsPage page)
+            {
+                window.SelectPage(page);
+                Settle(window, guard);
+                visited.Add(window.Place!.Page);
+            }
+
+            Visit(SettingsPage.Watchers);
+            Below<CheckBox>(Marked(window, SettingsPage.Watchers, SettingsIndex.Watchers)).Single().IsChecked = true;
+            Settle(window, guard);
+            Visit(SettingsPage.NowPlaying);
+            var bars = Below<CheckBox>((DependencyObject)TabOf(window, SettingsPage.NowPlaying).Content)
+                .Single(c => (c.Content as string) == "Bars beside it on the Desk");
+            bars.IsChecked = false;          // the page loads with Bars on: turning it on is a change
+            Settle(window, guard);
+            bars.IsChecked = true;
+            Settle(window, guard);
+            Visit(SettingsPage.Weather);
+            svm.WeatherPage.Picked = WeatherPlace.Create("Fort Worth", "Texas", "United States", 32.75, -97.33);
+            Settle(window, guard);
+
+            var layout = Store().LoadDesk().Layout;
+            Assert.Contains("watchers:mr", layout);
+            Assert.Contains("nowPlaying:br", layout);
+            Assert.Contains("weather:tr", layout);
+            Assert.DoesNotContain(SettingsPage.Desk, visited);
+            var weatherLine = Below<DeskPieceStatusPanel>((DependencyObject)TabOf(window, SettingsPage.Weather).Content).Single();
+            Assert.StartsWith("On the Desk: top right.", ((TextBlock)weatherLine.FindName("StatusText")).Text);
+        }
+        finally { window.Close(); }
+    });
+
+    /// <summary>Done (spec, slice 3): two pieces in one corner reorder by keyboard (WF5). Keyboard focus is routed inside the
+    /// never-activating window; Space on the focused Move down button presses it.</summary>
+    [DesktopFact]
+    public void Two_pieces_in_one_place_reorder_from_the_keyboard() => AppHost.Run(() =>
+    {
+        var store = Store();
+        store.SaveDesk(store.LoadDesk() with { Layout = "clock:bl claude:bl" });
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Desk, SettingsIndex.DeskPieces);
+            Settle(window, guard);
+            guard.RouteKeyboard();
+            var down = Below<Button>(Marked(window, SettingsPage.Desk, SettingsIndex.DeskPieces)).First(b =>
+                System.Windows.Automation.AutomationProperties.GetName(b) == SettingsNames.MoveDownIn(SettingsNames.DeskClock, "Bottom left"));
+            Keyboard.Focus(down);
+            guard.Check();
+            Assert.True(down.IsKeyboardFocused, "keyboard focus could not be routed to Move down");
+            var source = PresentationSource.FromVisual(down)!;
+            down.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, 0, Key.Space) { RoutedEvent = Keyboard.KeyDownEvent });
+            down.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, 0, Key.Space) { RoutedEvent = Keyboard.KeyUpEvent });
+            Settle(window, guard);
+            Assert.Equal("claude:bl clock:bl", Store().LoadDesk().Layout);
+        }
+        finally { window.Close(); }
+    });
 }

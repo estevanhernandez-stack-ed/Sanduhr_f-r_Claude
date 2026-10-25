@@ -5,7 +5,7 @@ using System.Windows.Interop;
 namespace Sanduhr.App.Tests;
 
 /// <summary>
-/// The render harness's foreground rule for tests (SettingsPassScenario: NeverActivate, RouteKeyboard, GuardForeground).
+/// The foreground rule for tests, the same one the render harness follows (SettingsPassScenario: NeverActivate, RouteKeyboard with WM_SETFOCUS only, GuardForeground).
 /// A window shown through it is off screen and can never become the foreground window; <see cref="Check"/> hands the
 /// foreground back and fails the test if it ever did.
 /// </summary>
