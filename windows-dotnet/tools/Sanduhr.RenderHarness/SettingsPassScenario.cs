@@ -11,6 +11,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Sanduhr.App.ViewModels;
 using Sanduhr.Core;
@@ -583,6 +584,8 @@ public static partial class Program
             if (Part("search")) await PassSearch(c);
             if (Part("links")) await PassLinks(c);
             if (Part("contrast")) PassContrast();
+            if (Part("menucheck")) PassMenuCheck(light);
+            if (Part("dialog")) PassDialog(c, light);
         }
         Log.Add($"settings-pass: foreground window before {foreground0}, after {GetForegroundWindow()}; keyboard routing worked: {c.KeyboardWorks}");
 
@@ -715,34 +718,44 @@ public static partial class Program
         PassWrite("anchors-landing.txt", table.ToString());
 
         sb.AppendLine();
-        sb.AppendLine("## What's New cards (Show me opens Settings at the card's page, no anchor)");
+        sb.AppendLine("## What's New cards (Show me opens Settings at the card's page and anchor; CARD-LANDING is the target after the jump)");
         foreach (var card in WhatsNewCards.Table)
         {
-            sb.AppendLine($"- {card.Version} {card.Id}: \"{card.Title}\" -> {(card.Destination == SettingsPage.Widget ? "the widget (not Settings)" : SettingsNames.PageTitle(card.Destination))}");
+            sb.AppendLine($"- {card.Version} {card.Id}: \"{card.Title}\" -> {(card.Destination == SettingsPage.Widget ? "the widget (not Settings)" : SettingsNames.PageTitle(card.Destination) + " / " + card.Anchor)}");
             sb.AppendLine($"  body: {card.Body}");
             if (card.Destination != SettingsPage.Widget)
             {
-                sb.AppendLine(await TopView(card.Destination, 800));
-                sb.AppendLine(await TopView(card.Destination, 600));
+                // The same parse the --settings switch runs.
+                var link = SettingsIndex.ParseLink($"{SettingsIndex.PageId(card.Destination)}#{card.Anchor}")!;
+                var l8 = await Probe(c, link.Page, link.Anchor, 800);
+                var l6 = await Probe(c, link.Page, link.Anchor, 600);
+                sb.AppendLine($"  CARD-LANDING {card.Id} at 800: {l8.After}; {l8.Found}");
+                sb.AppendLine($"  at 600: {l6.After}");
             }
         }
         sb.AppendLine();
-        sb.AppendLine("## Welcome tour cards (Show me)");
+        sb.AppendLine("## Welcome tour cards (Show me; TOUR-LANDING is the target after the jump)");
         foreach (var (set, cards) in new[] { ("tour", WelcomeTour.Table), ("tour, Just the Desk", WelcomeTour.DeskOnly) })
             foreach (var t in cards)
             {
-                sb.AppendLine($"- {set} step {t.Step} {t.Id}: \"{t.Card.Title}\" [{t.ShowMeTitle}] -> {(t.Card.Destination == SettingsPage.Widget ? "the widget (not Settings)" : SettingsNames.PageTitle(t.Card.Destination))}");
+                sb.AppendLine($"- {set} step {t.Step} {t.Id}: \"{t.Card.Title}\" [{t.ShowMeTitle}] -> {(t.Card.Destination == SettingsPage.Widget ? "the widget (not Settings)" : SettingsNames.PageTitle(t.Card.Destination) + " / " + t.Card.Anchor)}");
                 sb.AppendLine($"  body: {t.Card.Body}");
+                if (t.Card.Destination != SettingsPage.Widget)
+                {
+                    var link = SettingsIndex.ParseLink($"{SettingsIndex.PageId(t.Card.Destination)}#{t.Card.Anchor}")!;
+                    var l8 = await Probe(c, link.Page, link.Anchor, 800);
+                    sb.AppendLine($"  TOUR-LANDING {set} {t.Id} at 800: {l8.After}; {l8.Found}");
+                }
             }
         sb.AppendLine();
         sb.AppendLine("## In-app entry points that open Settings (from the source; each is a SelectPage call, so each is reproduced here)");
         var entries = new (string Where, SettingsPage Page, string? Anchor)[]
         {
-            ("Tray menu / widget menu: Open Settings (default page)", SettingsPage.General, null),
-            ("Meter card right-click: Alerts link (TierCard)", SettingsPage.Alerts, null),
-            ("Account menu (widget chip, tray): the Accounts link", SettingsPage.Accounts, null),
-            ("Desk right-click: Edit messages", SettingsPage.DeskMessage, null),
-            ("Desk right-click: Desk settings", SettingsPage.Desk, null),
+            ("Tray menu / widget menu: Open Settings (first open this session)", SettingsPage.General, null),
+            ("Meter card right-click: Alerts link (TierCard)", SettingsPage.Alerts, SettingsIndex.MenuAnchor(SettingsPage.Alerts)),
+            ("Account menu (widget chip, tray): the Accounts link", SettingsPage.Accounts, SettingsIndex.MenuAnchor(SettingsPage.Accounts)),
+            ("Desk right-click: Edit messages", SettingsPage.DeskMessage, SettingsIndex.MenuAnchor(SettingsPage.DeskMessage)),
+            ("Desk right-click: Desk settings", SettingsPage.Desk, SettingsIndex.MenuAnchor(SettingsPage.Desk)),
             ("Desk right-click: Launcher settings", SettingsPage.Desk, SettingsIndex.DeskLauncher),
             ("Launcher piece: add buttons / empty state (App.xaml.cs:508)", SettingsPage.Desk, SettingsIndex.DeskLauncher),
         };
@@ -751,6 +764,8 @@ public static partial class Program
             var l = await Probe(c, page, anchor, 800);
             var l6 = await Probe(c, page, anchor, 600);
             sb.AppendLine($"- {where} -> {SettingsNames.PageTitle(page)}{(anchor is null ? "" : " / " + anchor)}");
+            if (anchor is null)
+                sb.AppendLine(await TopView(page, 800));
             sb.AppendLine($"  at 800: {l.Before} -> {l.After}; {l.Scroll}; {l.Found}");
             sb.AppendLine($"  at 600: {l6.Before} -> {l6.After}; {l6.Scroll}");
         }
@@ -759,6 +774,141 @@ public static partial class Program
         sb.AppendLine("- Search result Enter or click: SelectPage(page, anchor), covered in search.txt.");
         sb.AppendLine("- Claude Usage calendar day click: opens the Sessions ledger scoped to that day (needs a click on the calendar; live pass).");
         PassWrite("deeplinks.txt", sb.ToString());
+    }
+
+    // ---- off-screen element renders: the menu check mark and the Quit question ----
+
+    static BitmapSource RenderAt(FrameworkElement el, double scale, string rel)
+    {
+        el.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        el.Arrange(new Rect(el.DesiredSize));
+        el.UpdateLayout();
+        int w = (int)Math.Ceiling(el.ActualWidth * scale), h = (int)Math.Ceiling(el.ActualHeight * scale);
+        var rtb = new RenderTargetBitmap(Math.Max(1, w), Math.Max(1, h), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
+        rtb.Render(el);
+        string path = Path.Combine(Out, "settings-pass", rel);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(rtb));
+        using (var f = File.Create(path)) enc.Save(f);
+        Log.Add($"png settings-pass/{rel.Replace('\\', '/')} {w}x{h}");
+        return rtb;
+    }
+
+    static byte[] Pixels(BitmapSource b)
+    {
+        var px = new byte[b.PixelWidth * b.PixelHeight * 4];
+        b.CopyPixels(px, b.PixelWidth * 4, 0);
+        return px;
+    }
+
+    /// <summary>A leaf MenuItem checked and unchecked, in a Border (never a popup, which can take activation), at 4x.
+    /// The mark is the difference between the two renders; the first glyph is the leftmost ink of the unchecked one.</summary>
+    static void PassMenuCheck(bool light)
+    {
+        string tag = light ? "light" : "dark";
+        const double S = 4;
+        BitmapSource Host(bool isChecked)
+        {
+            var item = new MenuItem { Header = SettingsNames.CompactMode, IsCheckable = true, IsChecked = isChecked, Width = 220 };
+            var host = new Border { Padding = new Thickness(6), Child = item };
+            host.SetResourceReference(Border.BackgroundProperty, "Sanduhr.Brush.GlassChrome");
+            return RenderAt(host, S, $"probe/menucheck-{tag}-{(isChecked ? "checked" : "unchecked")}.png");
+        }
+        var on = Host(true);
+        var off = Host(false);
+        var a = Pixels(on); var b = Pixels(off);
+        int w = on.PixelWidth, h = on.PixelHeight;
+        int mL = w, mR = -1, mT = h, mB = -1, gL = w;
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int i = (y * w + x) * 4;
+                int d = Math.Abs(a[i] - b[i]) + Math.Abs(a[i + 1] - b[i + 1]) + Math.Abs(a[i + 2] - b[i + 2]);
+                if (d > 24) { mL = Math.Min(mL, x); mR = Math.Max(mR, x); mT = Math.Min(mT, y); mB = Math.Max(mB, y); }
+            }
+        // The unchecked render has the header text only; its background is the host's corner pixel.
+        int bgI = 0;
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int i = (y * w + x) * 4;
+                int d = Math.Abs(b[i] - b[bgI]) + Math.Abs(b[i + 1] - b[bgI + 1]) + Math.Abs(b[i + 2] - b[bgI + 2]);
+                if (d > 60) gL = Math.Min(gL, x);
+            }
+        var sb = new StringBuilder();
+        sb.AppendLine($"Menu check mark, {tag} theme, 4x. Bitmap {w}x{h} px; the host Border has 6 DIP padding, so the item's left edge is at 24 px.");
+        if (mR < 0)
+            sb.AppendLine("NO MARK INK FOUND: the checked and unchecked renders are identical.");
+        else
+        {
+            sb.AppendLine($"mark ink box (DIP, from the item's left edge): x {(mL / S) - 6:0.00} to {((mR + 1) / S) - 6:0.00}, y {mT / S:0.00} to {(mB + 1) / S:0.00}; {(mR + 1 - mL) / S:0.00} wide, {(mB + 1 - mT) / S:0.00} high");
+            sb.AppendLine($"first glyph of the header starts at {(gL / S) - 6:0.00} DIP; clear space between mark and glyph {(gL - (mR + 1)) / S:0.00} DIP");
+        }
+        PassWrite($"probe/menucheck-{tag}.txt", sb.ToString());
+    }
+
+    /// <summary>The Quit question (ThemedDialog, Quit / Cancel) shown off screen without activation and rendered at 2x;
+    /// the labels' contrast is measured from the pixels, and the primary button's from each built-in accent.</summary>
+    static void PassDialog(PassCtx c, bool light)
+    {
+        string tag = light ? "light" : "dark";
+        const double S = 2;
+        var type = typeof(Sanduhr.App.Views.ThemedDialog);
+        var dlg = (Window)Activator.CreateInstance(type, BindingFlags.NonPublic | BindingFlags.Instance, null,
+            [SettingsNames.QuitSanduhr, SettingsViewModel.QuitQuestion, MessageBoxButton.YesNo, Sanduhr.App.Views.ThemedDialogKind.Info, false], null)!;
+        var primary = (Button)dlg.FindName("PrimaryButton");
+        var secondary = (Button)dlg.FindName("SecondaryButton");
+        primary.Content = "Quit"; secondary.Content = "Cancel";
+        OffScreen(dlg);
+        new WindowInteropHelper(dlg).EnsureHandle();
+        NeverActivate(dlg);
+        dlg.Show();
+        dlg.Left = -20000; dlg.Top = -20000;
+        dlg.UpdateLayout();
+        var root = (FrameworkElement)dlg.Content;
+        var bmp = RenderAt(root, S, $"probe/quit-dialog-{tag}.png");
+        GuardForeground(c);
+        var px = Pixels(bmp);
+        int bw = bmp.PixelWidth;
+
+        (double Ratio, string Fg, string Bg) Measure(Button btn)
+        {
+            var r = btn.TransformToAncestor(root).TransformBounds(new Rect(btn.RenderSize));
+            int x0 = (int)(r.Left * S) + 3, x1 = (int)(r.Right * S) - 3, y0 = (int)(r.Top * S) + 3, y1 = (int)(r.Bottom * S) - 3;
+            var counts = new Dictionary<int, int>();
+            for (int y = y0; y < y1; y++)
+                for (int x = x0; x < x1; x++)
+                {
+                    int i = (y * bw + x) * 4;
+                    int k = (px[i + 2] << 16) | (px[i + 1] << 8) | px[i];
+                    counts[k] = counts.GetValueOrDefault(k) + 1;
+                }
+            int bgK = counts.OrderByDescending(p => p.Value).First().Key;
+            Color bg = Color.FromRgb((byte)(bgK >> 16), (byte)(bgK >> 8), (byte)bgK);
+            Color fg = bg; double best = 0;
+            foreach (var k in counts.Keys)
+            {
+                var col = Color.FromRgb((byte)(k >> 16), (byte)(k >> 8), (byte)k);
+                double rr = Ratio(col, bg);
+                if (rr > best) { best = rr; fg = col; }
+            }
+            return (best, fg.ToString(), bg.ToString());
+        }
+        var p = Measure(primary); var s = Measure(secondary);
+        var sb = new StringBuilder();
+        sb.AppendLine($"Quit question (ThemedDialog), {tag} theme, 2x. Measured from the rendered pixels (strongest ink against the button's own fill; antialiasing can only understate it).");
+        sb.AppendLine($"primary \"Quit\": text {p.Fg} on {p.Bg}: {p.Ratio:0.0}:1");
+        sb.AppendLine($"secondary \"Cancel\": text {s.Fg} on {s.Bg}: {s.Ratio:0.0}:1");
+        sb.AppendLine();
+        sb.AppendLine("Primary button (#0d0d0d text) on each theme's accent, computed:");
+        var themes = ThemeCatalog.BuiltInOrder.Select(k => (k, ThemeCatalog.BuiltIns[k].Accent)).ToList();
+        var j = JsonNode.Parse(LightThemeJson)!;
+        themes.Add(("harness-light", j["accent"]!.GetValue<string>()));
+        foreach (var (k, accent) in themes)
+            sb.AppendLine($"  {k,-28} accent {accent}  {Ratio(Hex("#0d0d0d"), Hex(accent)):0.0}:1");
+        PassWrite($"probe/quit-dialog-{tag}.txt", sb.ToString());
+        dlg.Close();
     }
 
     // ---- contrast ----
