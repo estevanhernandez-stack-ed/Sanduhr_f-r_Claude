@@ -48,4 +48,36 @@ public class SettingsDeskSplitIndexTests
     public void Quit_asks_in_the_tables_words() =>
         Assert.Equal(("Quit Sanduhr? The widget and the Desk close.", "Quit", "Cancel"),
             (SettingsNames.QuitQuestion, SettingsNames.QuitConfirm, SettingsNames.QuitCancel));
+
+    [Fact]
+    public void An_anchor_row_whose_target_is_missing_falls_back_to_the_page_row()
+    {
+        // A later build without Widgets in the sidebar, where Mods has a catalog but no "mods" section yet: the installed-widgets
+        // link can't land on its own target, so it lands where the Widgets page as a whole went.
+        var anchors = SettingsIndex.Anchors
+            .Where(e => !(e.Page == SettingsPage.Mods && e.Anchor == SettingsIndex.ModList))
+            .Append(new SettingsEntry("Catalog", SettingsPage.Mods, "catalog", []))
+            .ToList();
+        var pages = SettingsNames.Pages.Where(p => p != SettingsPage.Widgets).ToList();
+        Assert.Equal(new SettingsLink(SettingsPage.Mods, "catalog"),
+            SettingsIndex.Resolve(SettingsPage.Widgets, SettingsIndex.WidgetsInstalled, anchors, pages));
+    }
+
+    [Fact]
+    public void A_live_page_keeps_an_anchor_no_alias_carries()
+    {
+        // While the old page is in the sidebar there is no page row to fall back to: the link stays, and Check drops the dead
+        // anchor to the page top.
+        Assert.Equal(new SettingsLink(SettingsPage.Widgets, "gone"),
+            SettingsIndex.Resolve(SettingsPage.Widgets, "gone", SettingsIndex.Anchors, SettingsNames.Pages));
+        Assert.Equal(new SettingsLink(SettingsPage.Widgets, null), SettingsIndex.Check(SettingsPage.Widgets, "gone"));
+    }
+
+    [Fact]
+    public void Retired_page_ids_still_read_so_their_aliases_can_carry_old_links()
+    {
+        Assert.Equal(SettingsPage.History, SettingsIndex.PageFromId("history"));
+        Assert.Equal(SettingsPage.Widgets, SettingsIndex.PageFromId("Widgets"));
+        Assert.Null(SettingsIndex.PageFromId("history2"));
+    }
 }

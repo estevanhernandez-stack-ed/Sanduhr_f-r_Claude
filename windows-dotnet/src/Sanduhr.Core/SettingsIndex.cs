@@ -542,7 +542,11 @@ public static class SettingsIndex
         new(SettingsPage.Widgets, null, "mods", "catalog"),
     ];
 
-    /// <summary>The page an id names, in any case; null for anything else, numbers and spaces included.</summary>
+    /// <summary>
+    /// The page an id names, in any case; null for anything else, numbers and spaces included. Retired pages (History, Widgets)
+    /// still read on purpose: their aliases carry old links (cards, agent text, <c>--settings history</c>) to the new homes, and
+    /// <see cref="ParseLink"/> opens General when nothing carries them.
+    /// </summary>
     public static SettingsPage? PageFromId(string? id) =>
         !string.IsNullOrEmpty(id) && id.All(char.IsAsciiLetter) && Enum.TryParse<SettingsPage>(id, ignoreCase: true, out var page)
             ? page
@@ -564,10 +568,16 @@ public static class SettingsIndex
             pages.Contains(p) && (a is null || anchors.Any(e => e.Page == p && e.Anchor == a));
         if (Live(page, anchor))
             return new(page, anchor);
-        var row = (anchor is null ? null : Aliases.FirstOrDefault(a => a.FromPage == page && a.FromAnchor == anchor))
-            ?? (pages.Contains(page) ? null : Aliases.FirstOrDefault(a => a.FromPage == page && a.FromAnchor is null));
-        if (row is not null && PageFromId(row.ToPageId) is { } to && Live(to, row.ToAnchor))
-            return new(to, row.ToAnchor);
+        // The anchor's own row first. When its target is a later slice's (not live yet), the page's row, once the page itself has
+        // left the sidebar: the old link then lands where the page as a whole went rather than on a page that no longer shows.
+        var tries = new[]
+        {
+            anchor is null ? null : Aliases.FirstOrDefault(a => a.FromPage == page && a.FromAnchor == anchor),
+            pages.Contains(page) ? null : Aliases.FirstOrDefault(a => a.FromPage == page && a.FromAnchor is null),
+        };
+        foreach (var row in tries)
+            if (row is not null && PageFromId(row.ToPageId) is { } to && Live(to, row.ToAnchor))
+                return new(to, row.ToAnchor);
         return new(page, anchor);
     }
 
