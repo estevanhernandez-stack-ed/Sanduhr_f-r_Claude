@@ -14,6 +14,94 @@ public sealed record AccentBloom(int Blur, double Alpha);
 public sealed record InnerHighlight(string Color, double Alpha);
 
 /// <summary>
+/// The Desk part of a theme (theme match, the theme JSON's <c>desk</c> object). Every field is optional; null leaves that part to
+/// ThemeDeskLook's rules. Stops and colors are <c>#rrggbb</c> as the file has them (<see cref="ThemeLint"/> accepted them).
+/// Equality compares the stop lists element by element, so a definition read twice equals itself.
+/// </summary>
+public sealed record ThemeDesk
+{
+    /// <summary>1 to 4 stops for the clock, the date and the Claude line.</summary>
+    public IReadOnlyList<string>? Ink { get; init; }
+    /// <summary>1 to 4 stops for the meter bars, on the widget and the Desk.</summary>
+    public IReadOnlyList<string>? Bars { get; init; }
+    /// <summary>1 to 4 stops for the Message line.</summary>
+    public IReadOnlyList<string>? Message { get; init; }
+    /// <summary>The message glow's color.</summary>
+    public string? Glow { get; init; }
+    /// <summary>Whether the back plate shows.</summary>
+    public bool? Plate { get; init; }
+    /// <summary>The plate's tint.</summary>
+    public string? PlateColor { get; init; }
+    /// <summary>The text shadow's color.</summary>
+    public string? Shadow { get; init; }
+    /// <summary>A family for the Desk only, when it should differ from the theme's <c>font</c>.</summary>
+    public string? Font { get; init; }
+
+    /// <summary>The fields a desk object may carry, in the order a file writes them.</summary>
+    public static IReadOnlyList<string> Fields { get; } = ["ink", "bars", "message", "glow", "plate", "plate_color", "shadow", "font"];
+
+    public bool IsEmpty =>
+        Ink is null && Bars is null && Message is null && Glow is null && Plate is null && PlateColor is null && Shadow is null && Font is null;
+
+    /// <summary>The desk object: only the fields that are set.</summary>
+    public JsonObject ToJson()
+    {
+        var o = new JsonObject();
+        if (Ink is not null) o["ink"] = Stops(Ink);
+        if (Bars is not null) o["bars"] = Stops(Bars);
+        if (Message is not null) o["message"] = Stops(Message);
+        if (Glow is not null) o["glow"] = Glow;
+        if (Plate is { } plate) o["plate"] = plate;
+        if (PlateColor is not null) o["plate_color"] = PlateColor;
+        if (Shadow is not null) o["shadow"] = Shadow;
+        if (Font is not null) o["font"] = Font;
+        return o;
+    }
+
+    /// <summary>The desk object of a theme the lint accepted; null when it is absent or sets nothing. Unknown fields are left behind
+    /// (the lint names them).</summary>
+    internal static ThemeDesk? Read(JsonNode? node)
+    {
+        if (node is not JsonObject o) return null;
+        var d = new ThemeDesk
+        {
+            Ink = List(o["ink"]),
+            Bars = List(o["bars"]),
+            Message = List(o["message"]),
+            Glow = Str(o["glow"]),
+            Plate = o["plate"] is JsonValue v && v.TryGetValue<bool>(out var on) ? on : null,
+            PlateColor = Str(o["plate_color"]),
+            Shadow = Str(o["shadow"]),
+            Font = Str(o["font"]),
+        };
+        return d.IsEmpty ? null : d;
+    }
+
+    public bool Equals(ThemeDesk? other) =>
+        other is not null && Same(Ink, other.Ink) && Same(Bars, other.Bars) && Same(Message, other.Message)
+        && Glow == other.Glow && Plate == other.Plate && PlateColor == other.PlateColor && Shadow == other.Shadow && Font == other.Font;
+
+    public override int GetHashCode() =>
+        HashCode.Combine(Glow, Plate, PlateColor, Shadow, Font, Ink?.Count ?? -1, Bars?.Count ?? -1, Message?.Count ?? -1);
+
+    private static bool Same(IReadOnlyList<string>? a, IReadOnlyList<string>? b) =>
+        a is null ? b is null : b is not null && a.SequenceEqual(b, StringComparer.Ordinal);
+
+    private static JsonArray Stops(IReadOnlyList<string> stops)
+    {
+        var a = new JsonArray();
+        // Non-generic Add: the trimmed MCP server carries no serializer metadata.
+        foreach (var s in stops) a.Add((JsonNode?)s);
+        return a;
+    }
+
+    private static IReadOnlyList<string>? List(JsonNode? n) =>
+        n is JsonArray a ? [.. a.Select(x => x is JsonValue v && v.TryGetValue<string>(out var s) ? s : "")] : null;
+
+    private static string? Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
+}
+
+/// <summary>
 /// A single Sanduhr theme — every color field plus the glass-tuning dials and the
 /// Matrix/Blueprint terminal extras. Pure data, no WPF: colors stay as
 /// <c>#rrggbb</c> strings so this lives in Core and is unit-testable. The App's
@@ -56,6 +144,12 @@ public sealed record ThemeDefinition
     public int? CardCornerRadius { get; init; }
     public int? BreathPeriodMs { get; init; }
     public bool BgGrid { get; init; }
+
+    // -- one theme for the widget and the Desk (theme match) -------------------
+    /// <summary>The family the widget's text is drawn in, and the Desk's while it follows the theme; null keeps Segoe UI.</summary>
+    public string? Font { get; init; }
+    /// <summary>The theme's Desk look; null leaves every part of it to ThemeDeskLook's rules.</summary>
+    public ThemeDesk? Desk { get; init; }
 }
 
 /// <summary>
@@ -357,6 +451,8 @@ public static class ThemeCatalog
             CardCornerRadius = IntOrNull(data["card_corner_radius"]),
             BreathPeriodMs = IntOrNull(data["breath_period_ms"]),
             BgGrid = BoolOr(data["bg_grid"], false),
+            Font = StrOrNull(data, "font"),
+            Desk = ThemeDesk.Read(data["desk"]),
         };
     }
 
