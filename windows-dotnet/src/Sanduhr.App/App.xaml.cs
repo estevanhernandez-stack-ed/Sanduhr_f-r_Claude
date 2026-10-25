@@ -731,6 +731,13 @@ public partial class App : Application
         svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
         svm.Desk.Changed = () => _desk?.Reload();
+        // Desk Look, Match the widget theme: the plate note follows the running Desk's readability guard.
+        svm.ThemeMatch.PlateForced = () => _desk?.PlateForced == true;
+        Action plateShown = () => svm.ThemeMatch.Reload();
+        if (_desk is not null) _desk.PlateForcedChanged += plateShown;
+        // Match now's guard asks the Desk what is behind the clock, and whether the guard already holds the plate on.
+        svm.ThemeMatch.Service.WallpaperLuminance = () => _desk?.ClockLuminance();
+        svm.ThemeMatch.Service.PlateForced = () => _desk?.PlateForced == true;
         svm.Desk.ArrangeRequested = () => _desk?.BeginArrange();
         svm.Desk.Arranging = _desk?.Arranging == true;
         svm.Desk.ArrangingLayout = _desk?.Session?.Working.Layout;
@@ -765,7 +772,11 @@ public partial class App : Application
         try
         {
             _settingsWindow = new SettingsWindow(svm);
-            _settingsWindow.Closed += (_, _) => RunnerStatusShown -= showRunnerStatus;
+            _settingsWindow.Closed += (_, _) =>
+            {
+                RunnerStatusShown -= showRunnerStatus;
+                if (_desk is not null) _desk.PlateForcedChanged -= plateShown;
+            };
         }
         catch (Exception e)
         {

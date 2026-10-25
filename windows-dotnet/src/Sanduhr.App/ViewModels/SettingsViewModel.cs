@@ -48,6 +48,9 @@ public sealed class SettingsViewModel
     /// <summary>Settings, Weather (spec 6.5).</summary>
     public WeatherPageViewModel WeatherPage { get; }
 
+    /// <summary>Settings, Desk Look, Match the widget theme (theme match).</summary>
+    public ThemeMatchViewModel ThemeMatch { get; }
+
     /// <summary>Settings, Widgets (spec 3.8): the signed catalog and the installed packs. Nothing is fetched until the
     /// page opens.</summary>
     public WidgetsPageViewModel WidgetsPage { get; internal set; } = new();
@@ -164,6 +167,16 @@ public sealed class SettingsViewModel
             Sanduhr.App.Desk.DeskMessageHandoffService.Current?.Handoff);
         NowPlayingPage = new NowPlayingPageViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.NowPlayingHub.Current, Sanduhr.App.Desk.NowPlayingLookService.Current);
         WeatherPage = new WeatherPageViewModel(new SettingsStore(new Paths()));
+        ThemeMatch = new ThemeMatchViewModel(new ThemeMatchService(new SettingsStore(new Paths()), widget));
+        // Follow on and off and Match now change the Desk's switch or its own look: the pages that show them read them again, and the
+        // running Desk follows (App sets Desk.Changed).
+        ThemeMatch.Changed = () =>
+        {
+            Desk.RefreshFromStore();
+            MessagePage.RefreshSettings();
+            NowPlayingPage.ReloadSettings();
+            Desk.Changed?.Invoke();
+        };
         // Each feature page says where its Desk piece sits and can place it (Settings v2, Principle 1): one line per piece,
         // reading and writing the same desk_layout as Desk, Pieces.
         MessagePage.Piece = Desk.PieceStatus("message");

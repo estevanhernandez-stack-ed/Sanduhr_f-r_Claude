@@ -317,6 +317,26 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
 
     private double? Luminance(DeskScreen screen, PxRect px) => WallpaperLuminance is { } f ? f(screen, px) : _wallpaper.Luminance(screen, px);
 
+    /// <summary>The wallpaper's luminance behind the clock stack, sampled the way the inks are (theme match's Match now guard); null when
+    /// the Desk is not running, the clock is not placed, or there is no sample.</summary>
+    internal double? ClockLuminance()
+    {
+        if (_host is null || _stopped || _screens.Count == 0 || _fonts is null || LastFrame is not { } frame) return null;
+        var screen = _screens[0];
+        var layout = LayoutFor(screen);
+        if (new DeskArrangement(layout).Placement("clock") is not { } clock) return null;
+        var draw = DeskLookResolver.For(_follows, _theme);
+        var settings = DeskLookResolver.Settings(_settings, draw, _fonts.Has) with { Layout = layout };
+        var view = new DeskView(screen, settings, _fonts);
+        try
+        {
+            view.Update(Scratch(frame), DeskInkMap.Light);
+            if (!view.StackRects().TryGetValue(clock.Anchor, out var rect)) return null;
+            return Luminance(screen, Px(screen, rect) ) is { } l && !double.IsNaN(l) ? l : null;
+        }
+        finally { view.Dispose(); }
+    }
+
     /// <summary>Read the settings again and start, rebuild or stop to match.</summary>
     /// <summary>A font pack was installed or removed: the font list is read again at the next redraw (the cache is dropped here, then
     /// <see cref="Reload"/> redraws), so a new font draws, and a removed one falls back to EsteFont Pro, without a restart.</summary>
@@ -896,6 +916,12 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         foreach (var v in _views) v.Dispose();
         _views.Clear();
         _surfaces = [];
+        // A Desk that is off holds no plate: the plate note in Settings must not outlive it.
+        if (_plateForced)
+        {
+            _plateForced = false;
+            PlateForcedChanged?.Invoke();
+        }
         _telemetry.Stop();
         if (_audio.Running) _audio.Stop();
         _weather.Stop();

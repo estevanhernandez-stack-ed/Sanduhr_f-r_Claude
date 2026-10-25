@@ -373,6 +373,13 @@ public static class SettingsNames
     /// <summary>Desk Look's first section (theme match).</summary>
     public const string ThemeMatchSection = "Match the widget theme";
     public const string FollowThemeSwitch = "Follow the widget theme";
+    public const string FollowThemeCaption =
+        "The Desk draws its colors, gradients, font, plate and shadow from the widget's theme, and changes with it. The look is kept in a theme of yours, so it travels with the theme.";
+    public const string MatchNowButton = "Match now";
+    public const string MatchNowCaption =
+        "Copies the widget theme's look into the Desk's own settings once. The Desk keeps it when the theme changes.";
+    /// <summary>Under Desk Look's own look controls while the Desk follows the theme.</summary>
+    public const string ThemeLookSetsThis = "The widget theme sets this while the Desk follows it. Change it above, in Match the widget theme.";
     /// <summary>The status line after Follow on, an update or a new theme.</summary>
     public static string FollowingTheme(string theme) => $"The Desk follows {theme}.";
     public const string KeptAsOwnLook = "The Desk keeps this look as its own.";
@@ -484,6 +491,8 @@ public static class SettingsNames
         (DeskFont, SettingsPage.DeskLook),
         (MessageFont, SettingsPage.DeskLook),
         (MessageColor, SettingsPage.DeskLook),
+        (FollowThemeSwitch, SettingsPage.DeskLook),
+        (MatchNowButton, SettingsPage.DeskLook),
         (LauncherAddApp, SettingsPage.Launcher),
         (LauncherAddLink, SettingsPage.Launcher),
         (SignInReminders, SettingsPage.Desk),

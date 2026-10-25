@@ -159,6 +159,40 @@ public sealed class DeskFollowThemeTests : IDisposable
     });
 
     [Fact]
+    public void A_forced_plate_clears_when_the_Desk_stops_so_the_plate_note_never_shows_for_a_Desk_that_is_off() => Sta.Run(() =>
+    {
+        var plateless = ThemeCatalog.BuiltIns["obsidian"] with { Desk = new ThemeDesk { Plate = false } };
+        var (desk, _) = Start(follows: true, wallpaper: 0.9);
+        int raised = 0;
+        desk.PlateForcedChanged += () => raised++;
+        try
+        {
+            desk.ThemeChanged(plateless);
+            Assert.True(desk.PlateForced);
+            Assert.Equal(1, raised);
+            _store.SaveDesk(DeskSettings.Default with { Enabled = false, Layout = "clock:bl", Font = "" });
+            desk.Reload();
+            Assert.False(desk.PlateForced);
+            Assert.Equal(2, raised);
+        }
+        finally { desk.Dispose(); }
+    });
+
+    [Fact]
+    public void ClockLuminance_samples_behind_the_clock_while_the_Desk_runs_and_is_null_when_it_is_off() => Sta.Run(() =>
+    {
+        var (desk, _) = Start(follows: true, wallpaper: 0.9);
+        try
+        {
+            Assert.Equal(0.9, desk.ClockLuminance());
+            _store.SaveDesk(DeskSettings.Default with { Enabled = false, Layout = "clock:bl", Font = "" });
+            desk.Reload();
+            Assert.Null(desk.ClockLuminance());
+        }
+        finally { desk.Dispose(); }
+    });
+
+    [Fact]
     public void A_controller_built_frame_carries_the_alert_thresholds_and_a_change_reaches_it_on_reload() => Sta.Run(() =>
     {
         _store.SaveAlertConfig(new AlertConfig(true, 55, 70, true, false));
