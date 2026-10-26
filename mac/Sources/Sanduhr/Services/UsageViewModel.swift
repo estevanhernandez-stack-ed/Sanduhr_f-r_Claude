@@ -192,6 +192,11 @@ final class UsageViewModel {
     /// between accounts, in demo mode (item 4 owns demo plans) and until the first fetch answers.
     private(set) var plan: PlanBadge?
     var planName: String? { plan?.name }
+    /// The badge the footer shows: demo mode's sample plan for the shown sample account (never a
+    /// real one), otherwise the fetched plan.
+    var shownPlan: PlanBadge? {
+        demo ? PlanLabel.badge(named: activeAccount.flatMap(DemoMode.plan(for:))) : plan
+    }
     @ObservationIgnored private var demoSession = DemoSession()
 
     /// The real accounts, whatever demo mode shows: what the Claude Code folders, the Mods page and

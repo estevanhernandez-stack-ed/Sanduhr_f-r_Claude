@@ -42,4 +42,43 @@ enum PlanLabel {
         resolve(rateLimitTier: org.rateLimitTier, billingType: org.billingType,
                 capabilities: org.capabilities)
     }
+
+    /// The badge for a display name (`PlanBadge.name`), so demo mode's sample plan names map back
+    /// to their riffs. Nil for a name no tier produces.
+    static func badge(named name: String?) -> PlanBadge? {
+        switch name {
+        case "Max \u{00D7}20": return PlanBadge(name: "Max \u{00D7}20", riffs: max20xRiffs)
+        case "Max": return PlanBadge(name: "Max", riffs: maxRiffs)
+        case "Team": return PlanBadge(name: "Team", riffs: [])
+        case "Pro": return PlanBadge(name: "Pro", riffs: [])
+        default: return nil
+        }
+    }
+}
+
+/// The footer capsule's tooltip rotation. Pure: the view owns the clock.
+enum PlanRiffs {
+    /// Seconds between riffs.
+    static let interval: TimeInterval = 4
+
+    /// Rotation runs only with two or more riffs and Reduce Motion off.
+    static func rotates(riffCount: Int, reduceMotion: Bool) -> Bool { riffCount >= 2 && !reduceMotion }
+
+    /// The index after `index`, wrapping. 0 with no riffs; pinned to 0 with one riff or Reduce Motion.
+    static func next(after index: Int, count: Int, reduceMotion: Bool = false) -> Int {
+        guard rotates(riffCount: count, reduceMotion: reduceMotion) else { return 0 }
+        return (index + 1) % count
+    }
+
+    /// The riff at `index` (wrapped into range), or the plan name when there are none.
+    static func tooltip(name: String, riffs: [String], index: Int) -> String {
+        guard !riffs.isEmpty else { return name }
+        return riffs[((index % riffs.count) + riffs.count) % riffs.count]
+    }
+
+    /// The index a periodic tick `ticks` intervals after the start shows.
+    static func index(atTick ticks: Int, count: Int, reduceMotion: Bool) -> Int {
+        guard rotates(riffCount: count, reduceMotion: reduceMotion) else { return 0 }
+        return ((ticks % count) + count) % count
+    }
 }
