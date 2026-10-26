@@ -25,7 +25,7 @@ public static class SettingsNames
     /// <see cref="SettingsPage"/> for their aliases but are in no group.</summary>
     public static IReadOnlyList<SettingsGroup> Sidebar { get; } =
     [
-        new(null, [SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts]),
+        new(null, [SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts, SettingsPage.Privacy]),
         new("Usage", [SettingsPage.ClaudeUsage, SettingsPage.Publish]),
         new("Extend", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Widget, SettingsPage.Themes]),
@@ -34,8 +34,8 @@ public static class SettingsNames
         new("Help", [SettingsPage.About]),
     ];
 
-    // ---- Page titles added by Settings v2. Desk Look, Watchers and Launcher are pages since slice 3, Mods & Widgets since slice 4;
-    // Privacy (slice 6) is still to come.
+    // ---- Page titles added by Settings v2. Desk Look, Watchers and Launcher are pages since slice 3, Mods & Widgets since slice 4,
+    // Privacy since slice 6.
     public const string PrivacyTitle = "Privacy";
     public const string DeskLookTitle = "Desk Look";
     public const string WatchersTitle = "Watchers";
@@ -43,7 +43,7 @@ public static class SettingsNames
     public const string ModsAndWidgetsTitle = "Mods & Widgets";
 
     /// <summary>The titles of pages still to come, in sidebar order.</summary>
-    public static IReadOnlyList<string> TitlesToCome { get; } = [PrivacyTitle];
+    public static IReadOnlyList<string> TitlesToCome { get; } = [];
 
     /// <summary>Every page in sidebar order.</summary>
     public static IReadOnlyList<SettingsPage> Pages { get; } = [.. Sidebar.SelectMany(g => g.Pages)];
@@ -54,6 +54,7 @@ public static class SettingsNames
         SettingsPage.General => "General",
         SettingsPage.Accounts => "Accounts",
         SettingsPage.Alerts => "Alerts",
+        SettingsPage.Privacy => PrivacyTitle,
         SettingsPage.History => "History",   // retired in slice 5: keeps its old title for aliases and logs
         SettingsPage.ClaudeUsage => "Claude Usage",
         SettingsPage.Publish => "Publish usage",

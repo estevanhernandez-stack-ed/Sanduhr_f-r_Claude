@@ -1,0 +1,81 @@
+using Sanduhr.Core;
+using Xunit;
+
+namespace Sanduhr.Tests;
+
+/// <summary>Settings v2, slice 6: the Privacy page in the sidebar and the index, and the words that land on it.</summary>
+public class SettingsSlice6IndexTests
+{
+    private static SettingsIndex.Hit Top(string q)
+    {
+        var hits = SettingsIndex.Search(q);
+        Assert.NotEmpty(hits);
+        return hits[0];
+    }
+
+    [Theory]
+    [InlineData("privacy")]
+    [InlineData("offline")]
+    [InlineData("network")]
+    [InlineData("send")]
+    public void Privacy_words_land_on_what_leaves_this_PC_first(string query)
+    {
+        var top = Top(query);
+        Assert.Equal((SettingsPage.Privacy, SettingsIndex.Network, -1), (top.Entry.Page, top.Entry.Anchor, top.Rank));
+    }
+
+    [Fact]
+    public void Privacy_groups_first_for_its_own_name_and_send_still_finds_the_test_alert()
+    {
+        Assert.Equal(SettingsPage.Privacy, SettingsIndex.Grouped(SettingsIndex.Search("privacy"))[0].Page);
+        Assert.Contains(SettingsIndex.Search("send"), h => h.Entry.Page == SettingsPage.Alerts && h.Entry.Anchor == SettingsIndex.TestAlert);
+        Assert.DoesNotContain("privacy", SettingsIndex.PageSynonyms[SettingsPage.About]);
+    }
+
+    [Fact]
+    public void Privacy_is_the_first_groups_fourth_page()
+    {
+        Assert.Equal([SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts, SettingsPage.Privacy], SettingsNames.Sidebar[0].Pages);
+        Assert.Equal("Privacy", SettingsNames.PageTitle(SettingsPage.Privacy));
+        Assert.Equal(SettingsPage.Privacy, SettingsNames.Linked("Privacy settings…"));
+        Assert.Empty(SettingsNames.TitlesToCome);
+        Assert.Equal(SettingsPage.Privacy, SettingsIndex.PageFromId("privacy"));
+    }
+
+    [Fact]
+    public void Privacy_holds_two_sections_and_no_jump_links()
+    {
+        Assert.Equal([SettingsIndex.Network, SettingsIndex.Agents], SettingsIndex.EntriesOn(SettingsPage.Privacy).Select(e => e.Anchor));
+        Assert.Equal([SettingsNames.WhatLeavesThisPc, SettingsNames.WhatClaudeCanChange],
+            SettingsIndex.EntriesOn(SettingsPage.Privacy).Select(e => e.Title));
+        Assert.Empty(SettingsIndex.JumpLinks(SettingsPage.Privacy));   // two sections (decision 12); slice 7 adds the third
+    }
+
+    [Theory]
+    [InlineData("agents")]
+    [InlineData("what Claude can change")]
+    [InlineData("consent")]
+    public void Agent_words_find_the_Privacy_page_first(string query) =>
+        Assert.Equal(SettingsPage.Privacy, Top(query).Entry.Page);
+
+    [Fact]
+    public void MCP_still_finds_the_Claude_Code_folders_first() =>
+        Assert.Equal((SettingsPage.ClaudeCode, SettingsIndex.Folders), (Top("MCP").Entry.Page, Top("MCP").Entry.Anchor));
+
+    [Fact]
+    public void Words_the_other_pages_own_still_land_on_them()
+    {
+        Assert.Equal(SettingsPage.Publish, Top("endpoint").Entry.Page);   // P2: Privacy's search words leave these alone
+        Assert.Equal(SettingsPage.Desk, Top("telemetry").Entry.Page);
+        Assert.Equal(SettingsPage.Publish, Top("upload").Entry.Page);
+    }
+
+    [Theory]
+    [InlineData("privacy")]
+    [InlineData("what leaves this PC")]
+    public void The_privacy_boosts_put_Privacy_first_in_the_sidebar_grouping(string query)
+    {
+        Assert.Equal((SettingsPage.Privacy, SettingsIndex.Network), (Top(query).Entry.Page, Top(query).Entry.Anchor));
+        Assert.Equal(SettingsPage.Privacy, SettingsIndex.Grouped(SettingsIndex.Search(query))[0].Page);
+    }
+}

@@ -46,6 +46,9 @@ public static class SettingsIndex
     public const string TestAlert = "test";
     public const string EachLimit = "each-limit";
     public const string SignInReminders = "signin-reminders";
+    // Privacy (slice 6): Streamer mode's anchors come first on the page in slice 7
+    public const string Network = "network";
+    public const string Agents = "agents";
     // History (retired in slice 5): kept for the aliases to Claude Usage, Meters
     public const string Chart = "chart";
     public const string HistoryExport = "export";
@@ -181,6 +184,13 @@ public static class SettingsIndex
              "until it resets", "promo", "special limit", SettingsNames.WarnForThisLimit, SettingsNames.ShowThisLimit, SettingsNames.HiddenUntilItResets]),
         E("Sound", SettingsPage.Alerts, Sound, ["chime", "sound", "snake", "model-scoped", "mute"]),
         E(SettingsNames.SendTestAlert, SettingsPage.Alerts, TestAlert, ["test", "try"]),
+
+        // P2: "endpoint", "upload", "GitHub", "telemetry", "Microsoft Store" and "propose" stay with the pages that own those controls.
+        E(SettingsNames.WhatLeavesThisPc, SettingsPage.Privacy, Network,
+            ["network", "internet", "online", "offline", "send", "sends", "analytics", "tracking", "claude.ai",
+             "Open-Meteo", "what leaves", "WebView2", "SmartScreen", "privacy policy"]),
+        E(SettingsNames.WhatClaudeCanChange, SettingsPage.Privacy, Agents,
+            ["agents", "agent", "consent", "consents", "permission", "permissions", "allow", "what can Claude do"]),
 
         E(SettingsNames.MeterHistorySection, SettingsPage.ClaudeUsage, MeterHistory,
             ["history", "30 days", "week", "month", "account", "all accounts", "chart", "graph", "meters over time"], MetersView),
@@ -413,6 +423,7 @@ public static class SettingsIndex
         [SettingsPage.General] = ["tray", "startup", "shortcut"],
         [SettingsPage.Accounts] = ["sign in", "account"],
         [SettingsPage.Alerts] = ["notification", "warning"],
+        [SettingsPage.Privacy] = ["privacy", "what leaves this PC", "what Claude can change", "agents", "network"],
         // "vault" lives on the archive section only: as a page synonym it ties the section at rank 1 and the page row wins.
         [SettingsPage.ClaudeUsage] = ["Claude Code", "tokens", "usage"],
         [SettingsPage.ClaudeCode] = ["Claude Code folders", "folder", "seat", "pieces"],
@@ -427,7 +438,7 @@ public static class SettingsIndex
         [SettingsPage.Watchers] = ["watcher", "cards", "CI", "progress"],
         [SettingsPage.Launcher] = ["buttons", "apps", "links", "shortcuts"],
         [SettingsPage.Widget] = ["floating window", "meters window"],
-        [SettingsPage.About] = ["help", "version", "trademark", "privacy"],
+        [SettingsPage.About] = ["help", "version", "trademark"],
     };
 
     /// <summary>The whole index: every page, every anchor, and every name in the names table.</summary>
@@ -525,7 +536,7 @@ public static class SettingsIndex
         new(["font", "fonts"], "desklook", "look"),
         new(["update", "updates"], "about", "updates"),
         new(["docker", "runner", "runners"], "watchers", "ci-runners"),
-        new(["privacy", "offline", "network", "send"], "privacy", "network"),
+        new(["privacy", "offline", "network", "send", "what leaves this PC", "what leaves"], "privacy", "network"),
         new(["stream", "streamer", "screen share", "hide names", "obs"], "privacy", "streamer"),
         new(["demo"], "privacy", "streamer"),
         new(["codename", "codenames"], "privacy", "streamer-allowlist"),

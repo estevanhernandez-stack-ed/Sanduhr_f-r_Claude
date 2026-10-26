@@ -1354,6 +1354,11 @@
                     </Border>
                 </TabItem>
 
+                <!-- Settings, Privacy (slice 6): what leaves this PC and what Claude can change (WF6, WF10). Slice 7 adds Streamer mode at its top. -->
+                <TabItem Header="Privacy" Tag="Privacy" AutomationProperties.Name="Privacy" DataContext="{Binding Privacy}">
+                    <views:PrivacyPage />
+                </TabItem>
+
                 <!-- Claude Usage (WS-C; Settings v2, slice 5): Meters / Overview / Trends / Sessions over the meter history,
                      the session archive and the live session-log reader.
                      DataContext must live ON the TabItem: the CcSection* visibility triggers resolve

@@ -98,6 +98,9 @@ public sealed class SettingsViewModel
     /// <summary>Settings, Widget (Settings v2, slice 5): the widget's own options and Just the Desk's way back.</summary>
     public WidgetPageViewModel WidgetPage { get; }
 
+    /// <summary>Settings, Privacy (Settings v2, slice 6): what leaves this PC and what Claude can change.</summary>
+    public PrivacyViewModel Privacy { get; }
+
     /// <summary>Assembly version for About (e.g. "3.0.0").</summary>
     public string Version { get; }
 
@@ -240,6 +243,10 @@ public sealed class SettingsViewModel
         });
         Publish = new PublishViewModel(widget.Publish);
         WidgetPage = new WidgetPageViewModel(widget);
+        // Each consent is read where its own page writes it (slice 6, decision 10): the Desk pages' store, the widget's mcp_roots, publish.enabled.
+        var privacyStore = new SettingsStore(new Paths());
+        Privacy = new PrivacyViewModel(privacyStore, ClaudeCodeHost.For(widget), widget.LoadMcpRoots,
+            publishOn: () => privacyStore.LoadPublishSettings().Enabled);
         var v = Assembly.GetExecutingAssembly().GetName().Version;
         Version = v is null ? "3.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
 

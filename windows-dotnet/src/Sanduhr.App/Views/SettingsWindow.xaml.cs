@@ -250,6 +250,10 @@ internal partial class SettingsWindow : Window
             CommandManager.InvalidateRequerySuggested();
         }
 
+        // Privacy reads every consent and the MCP install again on each visit; it holds no subscription, so Closed detaches nothing (slice 6).
+        if (page == SettingsPage.Privacy)
+            ViewModel.Privacy.Reload();
+
         // Deep Work length is also written by the focus timer's own stepper: read it again on each visit.
         if (page == SettingsPage.Widget)
             ViewModel.WidgetPage.Reload();
