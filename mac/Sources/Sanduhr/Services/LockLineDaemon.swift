@@ -8,7 +8,24 @@ import ServiceManagement
 /// `LockLineHelperRules`.
 @MainActor
 enum LockLineDaemon {
-    static var service: SMAppService { .daemon(plistName: LockLineHelperRules.plistName) }
+    /// The helper this copy registers: the dev label when build.sh gave the bundle that plist (an
+    /// ad-hoc signature), else the release one.
+    static var service: SMAppService { .daemon(plistName: LockLineHelperRules.plistName(label)) }
+
+    /// 2.33.0's helper, only ever unregistered.
+    static var legacy: SMAppService { .daemon(plistName: LockLineHelperRules.plistName(LockLineHelperRules.legacyLabel)) }
+
+    static var label: String {
+        let folder = Bundle.main.bundleURL.appendingPathComponent("Contents/Library/LaunchDaemons")
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        return label(bundled: Set(names))
+    }
+
+    /// The label for the plists a bundle carries: the dev one when present, else the release one.
+    nonisolated static func label(bundled: Set<String>) -> String {
+        bundled.contains(LockLineHelperRules.plistName(LockLineHelperRules.devLabel))
+            ? LockLineHelperRules.devLabel : LockLineHelperRules.label
+    }
 
     /// What Settings says about the helper.
     enum State: Equatable {
@@ -27,7 +44,14 @@ enum LockLineDaemon {
         }
     }
 
-    static var state: State { state(service.status) }
+    /// A 2.33.0 helper still registered counts as on, so its switch reads true and turning it
+    /// off removes it.
+    static func state(_ status: SMAppService.Status, legacy: SMAppService.Status) -> State {
+        let current = state(status)
+        return current == .off && legacy == .enabled ? .on : current
+    }
+
+    static var state: State { state(service.status, legacy: legacy.status) }
 
     /// One line under the switch for each state.
     static func caption(_ state: State) -> String {
@@ -41,9 +65,17 @@ enum LockLineDaemon {
 
     /// Registers the helper. Throws what macOS says when it refuses (an unsigned build, a denied
     /// password), for Settings to show.
+    /// A 2.33.0 helper goes once this one is registered: both run the same executable on the
+    /// same files, so the line stays up through the swap.
     static func install() throws {
+        defer { if service.status == .enabled { dropLegacy() } }
         guard service.status != .enabled else { return }
         try service.register()
+    }
+
+    private static func dropLegacy() {
+        guard legacy.status == .enabled || legacy.status == .requiresApproval else { return }
+        Task { @MainActor in try? await legacy.unregister() }
     }
 
     /// Removes the helper once it has taken Sanduhr's line off the lock screen (or put back the
@@ -60,6 +92,7 @@ enum LockLineDaemon {
             try? await Task.sleep(for: .seconds(5))
         }
         try? await service.unregister()
+        if legacy.status != .notRegistered, legacy.status != .notFound { try? await legacy.unregister() }
         return true
     }
 

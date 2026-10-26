@@ -3,8 +3,8 @@ import SystemConfiguration
 import os
 
 // The lock screen line's root helper (#137, docs/lock-screen-line-spec.md). launchd runs it once
-// a minute (Contents/Library/LaunchDaemons/com.626labs.sanduhr.lockline.plist, registered by the
-// app with SMAppService.daemon). Each run: find the console user, read their lock-line.txt with
+// a minute (Contents/Library/LaunchDaemons/com.626labs.sanduhr.lockscreen.plist, or its .dev
+// twin in an ad-hoc build, registered by the app with SMAppService.daemon). Each run: find the console user, read their lock-line.txt with
 // the checks in LockLineHelperRules, set or clear LoginwindowText, exit. No network, no
 // arguments, one key. It logs what it did, never the text.
 

@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>com.626labs.sanduhr.lockline</string>
+	<string>com.626labs.sanduhr.lockscreen</string>
 	<key>BundleProgram</key>
 	<string>Contents/MacOS/SanduhrLockLineHelper</string>
 	<key>AssociatedBundleIdentifiers</key>

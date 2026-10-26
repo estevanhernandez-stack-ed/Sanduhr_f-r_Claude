@@ -1454,11 +1454,18 @@ message it did not write. Turning the switch off waits for the line to be gone b
 the helper; a launch sweep finishes an interrupted turn-off. See `docs/lock-screen-line-spec.md`.
 
 
-**Dev builds and the helper.** macOS stores a launch constraint when the helper registers. For an
-ad-hoc signed dev build that pins the exact binary, so after a rebuild launchd refuses the
-registered helper (`launchctl print system/com.626labs.sanduhr.lockline` shows `job state = spawn
-failed`, exit 78, `needs LWCR update`). Turn the switch off and on to register the new build. A
-team-signed release is constrained by team and identifier, which updates keep.
+**Dev builds and the helper.** The job's label follows the signature: a Developer ID build
+registers `com.626labs.sanduhr.lockscreen`, an ad-hoc build `com.626labs.sanduhr.lockscreen.dev`
+(build.sh writes the plist; `LockLineDaemon.label` registers whichever the bundle carries). macOS
+keeps a helper's background-item record, with the signer that first registered it, across
+unregistering and re-approving in Login Items (`sudo sfltool dumpbtm` shows it with no Team
+Identifier). In 2.33.0 both kinds of build shared `com.626labs.sanduhr.lockline`, and on a Mac
+where a dev build registered first, the signed release was refused at spawn (`launchctl print`:
+`spawn failed`, `OS_REASON_CODESIGNING`, `needs LWCR update`); the only reset is `sfltool
+resetbtm`, which wipes every app's records. 2.33.1 split the labels; the bundle still carries
+2.33.0's plist so the app can unregister it, and a 2.33.0 helper still registered reads as On
+until the switch is turned off and on. An ad-hoc dev build's constraint pins the exact binary,
+so after a rebuild turn the switch off and on to register the new build.
 ## Now playing
 
 Now playing (items 53, 53b) shows what plays on the Mac, in any app that publishes now playing

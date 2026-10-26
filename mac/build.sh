@@ -120,6 +120,16 @@ install -m 0644 Vendor/mediaremote-adapter/bin/mediaremote-adapter.pl "$APP/Cont
 # executable in MacOS/ and its launchd plist in Library/LaunchDaemons/, registered by the app
 # with SMAppService.daemon only when the Lock Screen switch is on. It shares its rules file with
 # the app so the suite tests what root runs.
+# Release builds get a Developer ID signature + hardened runtime so they can
+# be notarized and run anywhere. Debug builds get an ad-hoc signature for
+# local iteration only. Override with SIGN_IDENTITY=<id> or SIGN_IDENTITY=-
+# (ad-hoc). Decided here because the helper's label depends on it.
+if [[ "$CONFIG" == "debug" ]]; then
+    SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+else
+    SIGN_IDENTITY="${SIGN_IDENTITY:-Developer ID Application: Estevan Hernandez (82BSR56X5J)}"
+fi
+
 echo "→ Building the lock screen line helper..."
 HELPER_OUT=".build/lockline-helper"
 mkdir -p "$HELPER_OUT"
@@ -131,9 +141,22 @@ done
 lipo -create "$HELPER_OUT/SanduhrLockLineHelper-arm64" "$HELPER_OUT/SanduhrLockLineHelper-x86_64" \
     -output "$HELPER_OUT/SanduhrLockLineHelper"
 install -m 0755 "$HELPER_OUT/SanduhrLockLineHelper" "$APP/Contents/MacOS/SanduhrLockLineHelper"
+# The job's label follows the signature: macOS keeps a helper's background-item record, with the
+# signer that first registered it, across unregistering, so an ad-hoc build registering the
+# release label leaves the signed release refused at spawn on that Mac (seen with 2.33.0). Ad-hoc
+# builds get the .dev label; the app registers whichever plist it carries. 2.33.0's label ships
+# too, only so the app can unregister a helper 2.33.0 registered.
+if [[ "$SIGN_IDENTITY" == "-" ]]; then
+    LOCK_LABEL="com.626labs.sanduhr.lockscreen.dev"
+else
+    LOCK_LABEL="com.626labs.sanduhr.lockscreen"
+fi
 mkdir -p "$APP/Contents/Library/LaunchDaemons"
-install -m 0644 Resources/LaunchDaemons/com.626labs.sanduhr.lockline.plist \
-    "$APP/Contents/Library/LaunchDaemons/com.626labs.sanduhr.lockline.plist"
+for label in "$LOCK_LABEL" com.626labs.sanduhr.lockline; do
+    plist="$APP/Contents/Library/LaunchDaemons/$label.plist"
+    install -m 0644 Resources/LaunchDaemons/lockscreen-helper.plist "$plist"
+    plutil -replace Label -string "$label" "$plist"
+done
 # The third-party notices (Sparkle, mediaremote-adapter, EsteFont Pro, EsteFont 26), opened from Settings, About.
 install -m 0644 THIRD-PARTY-NOTICES.txt "$APP/Contents/Resources/THIRD-PARTY-NOTICES.txt"
 # EsteFont Pro and EsteFont 26 (items 58, 65 (e)): registered for Sanduhr's process at launch
@@ -145,16 +168,6 @@ for font in "${FONTS[@]}"; do
     [[ -f "Resources/Fonts/$font" ]] || { echo "✗ Resources/Fonts/$font is missing" >&2; exit 1; }
     install -m 0644 "Resources/Fonts/$font" "$APP/Contents/Resources/Fonts/$font"
 done
-
-# Release builds get a Developer ID signature + hardened runtime so they can
-# be notarized and run anywhere. Debug builds get an ad-hoc signature for
-# local iteration only. Override with SIGN_IDENTITY=<id> or SIGN_IDENTITY=-
-# (ad-hoc).
-if [[ "$CONFIG" == "debug" ]]; then
-    SIGN_IDENTITY="${SIGN_IDENTITY:--}"
-else
-    SIGN_IDENTITY="${SIGN_IDENTITY:-Developer ID Application: Estevan Hernandez (82BSR56X5J)}"
-fi
 
 if [[ "$SIGN_IDENTITY" == "-" ]]; then
     echo "→ Ad-hoc signing (dev build — not distributable)..."

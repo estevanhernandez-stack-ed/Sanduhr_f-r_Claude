@@ -64,8 +64,25 @@ struct LockLineHelperRulesTests {
     }
 
     @Test func theNamesLineUpWithTheBundle() {
-        #expect(LockLineHelperRules.plistName == LockLineHelperRules.label + ".plist")
+        #expect(LockLineHelperRules.plistName(LockLineHelperRules.label) == "com.626labs.sanduhr.lockscreen.plist")
+        #expect(LockLineHelperRules.devLabel == LockLineHelperRules.label + ".dev")
+        #expect(LockLineHelperRules.legacyLabel == "com.626labs.sanduhr.lockline")
         #expect(LockLineHelperRules.relativePath.hasSuffix("Sanduhr/lock-line.txt"))
+    }
+
+    /// build.sh writes the plists from one template and names the labels itself (bash can't read
+    /// the Swift), so the three spellings are pinned against the rules here.
+    @Test func buildScriptAndTemplateUseTheRulesLabels() throws {
+        let mac = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let template = mac.appendingPathComponent("Resources/LaunchDaemons/lockscreen-helper.plist")
+        let plist = try PropertyListSerialization.propertyList(from: Data(contentsOf: template), format: nil) as? [String: Any]
+        #expect(plist?["Label"] as? String == LockLineHelperRules.label)
+        #expect(plist?["BundleProgram"] as? String == "Contents/MacOS/" + LockLineHelperRules.executable)
+        let script = try String(contentsOf: mac.appendingPathComponent("build.sh"), encoding: .utf8)
+        for label in [LockLineHelperRules.label, LockLineHelperRules.devLabel, LockLineHelperRules.legacyLabel] {
+            #expect(script.contains("\"\(label)\"") || script.contains(" \(label);"), "build.sh lacks \(label)")
+        }
     }
 }
 
@@ -80,6 +97,23 @@ struct LockLineDaemonTests {
         for s in [LockLineDaemon.State.on, .needsApproval, .missing, .off] {
             #expect(LockLineDaemon.caption(s).hasSuffix("."))
         }
+    }
+
+    @Test func aBundleWithTheDevPlistRegistersTheDevLabel() {
+        let dev = LockLineHelperRules.plistName(LockLineHelperRules.devLabel)
+        let release = LockLineHelperRules.plistName(LockLineHelperRules.label)
+        let legacy = LockLineHelperRules.plistName(LockLineHelperRules.legacyLabel)
+        #expect(LockLineDaemon.label(bundled: [dev, legacy]) == LockLineHelperRules.devLabel)
+        #expect(LockLineDaemon.label(bundled: [release, legacy]) == LockLineHelperRules.label)
+        #expect(LockLineDaemon.label(bundled: []) == LockLineHelperRules.label)
+    }
+
+    @Test func a233HelperStillRegisteredReadsAsOn() {
+        #expect(LockLineDaemon.state(.notRegistered, legacy: .enabled) == .on)
+        #expect(LockLineDaemon.state(.notRegistered, legacy: .notRegistered) == .off)
+        #expect(LockLineDaemon.state(.notRegistered, legacy: .notFound) == .off)
+        #expect(LockLineDaemon.state(.requiresApproval, legacy: .enabled) == .needsApproval)
+        #expect(LockLineDaemon.state(.notFound, legacy: .notFound) == .missing)
     }
 
     @Test func aThrownRegisterIsOnlyAProblemWhenTheHelperIsNotThere() {
