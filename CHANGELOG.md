@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.33.1-mac — 2026-10-26
 
 - **Continue with Google finishes inside Sanduhr (#357).** Google's sign-in now opens in a small window of its own and hands the result back to claude.ai, so a Google account signs in like an email one: no browser, no copying cookies. The browser-and-paste steps show up only if Google's page stays blank, and Paste a Key Instead is still at the bottom of the window.
 
