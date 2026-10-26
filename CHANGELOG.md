@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **What a session starts with, up top.** The Mods & Config card that estimates what a new Claude Code session loads (skill list, agents, MCP servers, the budget warning) sat inside the Catalog tab, where the window's bottom edge cut it at the default size. It now sits above the Catalog, By Folder and Compare tabs, shows on every tab, and Search Settings finds it (#291).
+
+- **No empty bar on a notchless Notch page.** On a Mac without a notch, with the top-center island off, the Notch page's preview drew an empty dark bar. It now draws the menu-bar strip only when the pill or the camera and mic tab sits on it, and the caption says which switch brings the pill (#290).
+
+- **Demo mode shows the real Accounts page.** With demo mode on, Settings, Accounts draws its full layout over the two sample accounts, the Follow the account I'm using switch included, with every account action inert.
+
+- **For the smoke harness.** `mods-config export`, `export-sample` and `import-sample` open the Export Config and Compare on import sheets; the samples are invented and write nothing. The transcript walks sort paths by their bytes.
+
 ## v3.9.1 — 2026-10-24
 
 **Platform:** Windows (.NET 10 / WPF). A patch that fixes widget packs: the themes, palettes and fonts of the packs you install now apply. `Sanduhr.Mcp` to 3.9.1. **No new outbound destination and no new capability:** nothing new is read or sent, the manifest still declares `runFullTrust` only and changes only its version, and the MCP trust boundary is unchanged: the link list and `TrustBoundaryTests` are as in 3.9.0, and the new pack code lives in Core files the server does not link.
