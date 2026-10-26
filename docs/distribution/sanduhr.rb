@@ -4,8 +4,8 @@ cask "sanduhr" do
 
   url "https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v#{version}-mac/Sanduhr-#{version}.dmg"
   name "Sanduhr für Claude"
-  desc "Claude.ai subscription usage widget with burn-rate alerts"
-  homepage "https://estevanhernandez-stack-ed.github.io/Sanduhr_f-r_Claude/"
+  desc "Claude.ai usage meters on the desktop, with Claude Code mods and config packs"
+  homepage "https://626labs.dev/sanduhr/"
 
   livecheck do
     url :url
