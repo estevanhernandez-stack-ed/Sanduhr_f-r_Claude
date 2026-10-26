@@ -63,7 +63,7 @@ public sealed class ModsPageNamesTests : AppWindowFixture
 
         var svm = new SettingsViewModel(DemoWidget(), () => Task.CompletedTask, _ => Task.CompletedTask)
         {
-            ModsPage = new ModsPageViewModel(() => service),
+            ModsPage = new ModsPageViewModel(() => service) { Confirm = (_, _) => true },
         };
         var window = new SettingsWindow(svm);
         OffScreen(window);

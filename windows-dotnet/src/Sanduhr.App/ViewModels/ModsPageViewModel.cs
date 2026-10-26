@@ -1,11 +1,13 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
+using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sanduhr.App.Services;
+using Sanduhr.App.Views;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
@@ -89,66 +91,138 @@ public sealed partial class WidgetCatalogRowViewModel : ObservableObject
 
 public enum WidgetRowAction { None, Install, Update }
 
-/// <summary>One installed pack, from the catalog or made here.</summary>
-public sealed partial class InstalledWidgetRowViewModel : ObservableObject
+/// <summary>
+/// One row of Mods &amp; Widgets' Installed list (Settings v2 slice 4): a widget pack with its on switch and where it shows, Sanduhr's meters
+/// mod with its scope and a link up to its section, or another Claude Code plugin or mod, read-only, with its scope. No row shows a control
+/// that can't act (Principle 5).
+/// </summary>
+public sealed partial class InstalledRowViewModel : ObservableObject
 {
     private readonly ModsPageViewModel _owner;
 
-    internal InstalledWidgetRowViewModel(ModsPageViewModel owner, InstalledWidget row, InstalledWidgetInfo? info)
+    internal InstalledRowViewModel(ModsPageViewModel owner, InstalledItem item, string? previewPath)
     {
         _owner = owner;
-        Id = row.Id;
-        Name = info?.Name ?? row.Id;
-        Kind = info?.Kind ?? "";
-        Version = row.Version;
-        Description = info?.Description ?? "";
-        Source = row.MadeHere ? SettingsNames.WidgetMadeHere : "from the catalog";
-        Preview = ModsPageViewModel.LoadPreview(info?.PreviewPath);
-        CanUseOwnArt = row.MadeHere && Kind == "sprite";
+        Item = item;
+        _enabled = item.Enabled;
+        Preview = item.Kind == InstalledKind.WidgetPack ? ModsPageViewModel.LoadPreview(previewPath) : null;
+        var where = InstalledItems.Where(item.Kind == InstalledKind.WidgetPack ? item.PackKind : null);
+        WhereText = where.Text;
+        WhereLink = where.Link;
+        WhereLinkTitle = where.LinkTitle ?? "";
     }
 
-    /// <summary>A sprite made here (Claude's or the user's own) takes the user's own PNG sheets (spec 3.8 section 6); a catalog
-    /// pack never does.</summary>
-    public bool CanUseOwnArt { get; }
+    public InstalledItem Item { get; }
+    public string Id => Item.Id;
+    public string Source => Item.Source;
+    public string Name => Item.Name;
+    public string Description => Item.Description;
+    public bool HasDescription => Description.Length > 0;
+    public ImageSource? Preview { get; }
+    public bool HasPreview => Preview is not null;
 
+    public bool IsPack => Item.Kind == InstalledKind.WidgetPack;
+    public bool IsSanduhrMod => Item.Kind == InstalledKind.SanduhrIntegration;
+    public bool IsReadOnly => !Item.CanSwitch;
+
+    /// <summary>"palette · 1.0.0 · from the catalog"; "Claude Code mod · 0.1.0 · m".</summary>
+    public string Detail => string.Join(" · ", new[] { KindWord, Item.Version ?? "", Item.Source }.Where(s => s.Length > 0));
+
+    private string KindWord => Item.Kind switch
+    {
+        InstalledKind.WidgetPack => Item.PackKind ?? "",
+        InstalledKind.SanduhrIntegration => SettingsNames.KindSanduhrMod,
+        InstalledKind.ClaudeCodeMod => SettingsNames.KindClaudeCodeMod,
+        _ => SettingsNames.KindClaudeCodePlugin,
+    };
+
+    /// <summary>"On in 2 of 3 folders" for a Claude Code item; nothing for an app-wide pack.</summary>
+    public string ScopeText => InstalledItems.ScopeSummary(Item);
+    public bool HasScope => ScopeText.Length > 0;
+    public string ReadOnlyText => Item.ReadOnlyReason ?? "";
+
+    /// <summary>Where a pack shows (WF3), and "&lt;Page&gt; settings…" to it.</summary>
+    public string WhereText { get; }
+    public string? WhereLink { get; }
+    public string WhereLinkTitle { get; }
+    public bool HasWhere => IsPack && WhereText.Length > 0;
+    public bool HasWhereLink => IsPack && WhereLink is not null;
+    public string WhereLinkName => SettingsNames.WhereLinkFor(WhereLinkTitle, Name);
+
+    /// <summary>Sanduhr's meters mod is switched per folder in its own section, above the list.</summary>
+    public string MetersLink => SettingsIndex.PageId(SettingsPage.Mods) + "#" + SettingsIndex.Meters;
+    public string MetersLinkTitle => SettingsNames.MetersLinkUp;
+
+    /// <summary>The pack's switch, bound one way: the command writes, then the row shows what is on disk (decision 7).</summary>
+    [ObservableProperty] private bool _enabled;
+    public string SwitchName => SettingsNames.PackOnFor(Name);
+
+    internal void ShowEnabled(bool value)
+    {
+        // Not the generated setter: it skips the notice when the value is unchanged, and a click has already flipped the box.
+#pragma warning disable MVVMTK0034
+        _enabled = value;
+#pragma warning restore MVVMTK0034
+        OnPropertyChanged(nameof(Enabled));
+        OnPropertyChanged(nameof(RowName));
+    }
+
+    [RelayCommand]
+    private void Toggle() => _owner.SwitchPack(Id, Name, !Enabled);
+
+    /// <summary>A sprite made here (Claude's or the user's own) takes the user's own PNG sheets (spec 3.8 section 6); a catalog pack never does.</summary>
+    public bool CanUseOwnArt => Item.MadeHere && Item.PackKind == "sprite";
     public string UseOwnArtName => $"Use my own art for {Name}";
 
     [RelayCommand]
     private Task UseOwnArt() => _owner.UseOwnArtAsync(Id, Name);
 
-    public string Id { get; }
-    public string Name { get; }
-    public string Kind { get; }
-    public string Version { get; }
-    public string Description { get; }
-    public string Source { get; }
-    public ImageSource? Preview { get; }
-    public bool HasPreview => Preview is not null;
-    public string Detail => string.Join(" · ", new[] { Kind, Version, Source }.Where(s => s.Length > 0));
     public string UninstallName => SettingsNames.UninstallFor(Name);
-    public string RowName => string.Join(", ", new[] { Name, Kind, "version " + Version, Source }.Where(s => s.Length > 0));
 
     [RelayCommand]
     private Task Uninstall() => _owner.UninstallAsync(Id, Name);
+
+    /// <summary>The row read as one line: a pack's name, kind, version, source and "on" or "off"; a Claude Code item's name, version, scope and
+    /// mod tag, then "read-only" when Sanduhr can't switch it.</summary>
+    public string RowName => IsPack
+        ? string.Join(", ", new[] { Name, Item.PackKind ?? "", "version " + Item.Version, Item.Source, Enabled ? SettingsNames.RowOn : SettingsNames.RowOff }
+            .Where(s => s.Length > 0))
+        : ModsPageText.RowName(Name, Item.Version, ScopeText, Item.IsMod && !IsSanduhrMod,
+              hasFiles: Item.Scope?.Any(s => s.State is FolderState.On or FolderState.Off) == true)
+          + (IsReadOnly ? ", " + SettingsNames.RowReadOnly : "");
 
     public override string ToString() => RowName;
 }
 
 /// <summary>
-/// Settings ▸ Widgets (spec 3.8, sections 2 to 4): the verified catalog with Install and Update, the installed packs with Uninstall (made here ones included), and a
-/// status line for the fetch and the checks. The catalog is fetched only when the page opens (<see cref="Activate"/>) or on
-/// <see cref="SettingsNames.WidgetCatalogCheck"/>, and a pack only when the user installs it. The companion moved to Settings, Desk, Pieces in Settings v2.
+/// Settings, Mods &amp; Widgets (Settings v2 slice 4, spec "Mods &amp; Widgets: one list"): the Installed list over every Claude Code folder and the widget packs, the catalog, and a status line. Until the page flip (Task 12) it is hosted in the Widgets tab.
 /// </summary>
 public sealed partial class ModsPageViewModel : ObservableObject
 {
     private readonly Lazy<WidgetCatalogService> _service;
     private Task? _refreshing;
+    private readonly ClaudeCodeHost? _host;
+    private IReadOnlyList<InstalledItem> _items = [];
+    private Window? _window;
 
-    internal ModsPageViewModel(Func<WidgetCatalogService>? service = null, SettingsStore? store = null)
+    /// <param name="host">The Claude Code folders the list reads; null lists the widget packs only (tests of the catalog and the review).</param>
+    internal ModsPageViewModel(Func<WidgetCatalogService>? service = null, SettingsStore? store = null, ClaudeCodeHost? host = null)
     {
         _service = new Lazy<WidgetCatalogService>(service ?? (() => new WidgetCatalogService()));
-        // settings.json is no longer read here; the parameter stays for callers.
+        _host = host;
+        Confirm = (question, detail) => ThemedDialog.Show(_window, question, detail, MessageBoxButton.YesNo, ThemedDialogKind.Warning,
+            primaryLabel: SettingsNames.UninstallConfirm, secondaryLabel: SettingsNames.UninstallCancel) == MessageBoxResult.Yes;
+        // settings.json is not read here; the store parameter stays for callers.
     }
+
+    /// <summary>Dialogs parent to the Settings window.</summary>
+    public void AttachOwner(Window owner) => _window = owner;
+
+    /// <summary>Asks before Uninstall… (decision 17): the question and its detail in, yes or no out. A seam for tests.</summary>
+    internal Func<string, string, bool> Confirm { get; set; }
+
+    /// <summary>The Claude Code folders as last read (the meters section reads them too).</summary>
+    internal IReadOnlyList<FolderMods> Folders { get; private set; } = [];
 
     /// <summary>Called after a pack is installed or removed (the Desk reloads).</summary>
     public Action? Changed { get; set; }
@@ -165,7 +239,36 @@ public sealed partial class ModsPageViewModel : ObservableObject
     internal WidgetCatalogService Service => _service.Value;
 
     public ObservableCollection<WidgetCatalogRowViewModel> Catalog { get; } = [];
-    public ObservableCollection<InstalledWidgetRowViewModel> Installed { get; } = [];
+    /// <summary>The Installed list as the filters show it (spec, Installed: "All", "Claude Code", "Widgets", and a text filter).</summary>
+    public ObservableCollection<InstalledRowViewModel> Installed { get; } = [];
+
+    [ObservableProperty] private InstalledFilter _filter = InstalledFilter.All;
+    [ObservableProperty] private string _filterText = "";
+    /// <summary>The plugin-count note in plain words, summed over the folders; "" when there is nothing to explain.</summary>
+    [ObservableProperty] private string _note = "";
+    /// <summary>Something is installed, but the filters hide all of it.</summary>
+    [ObservableProperty] private bool _nothingMatches;
+
+    public bool IsFilterAll { get => Filter == InstalledFilter.All; set { if (value) Filter = InstalledFilter.All; } }
+    public bool IsFilterClaudeCode { get => Filter == InstalledFilter.ClaudeCode; set { if (value) Filter = InstalledFilter.ClaudeCode; } }
+    public bool IsFilterWidgets { get => Filter == InstalledFilter.Widgets; set { if (value) Filter = InstalledFilter.Widgets; } }
+
+    partial void OnFilterChanged(InstalledFilter value)
+    {
+        OnPropertyChanged(nameof(IsFilterAll));
+        OnPropertyChanged(nameof(IsFilterClaudeCode));
+        OnPropertyChanged(nameof(IsFilterWidgets));
+        ApplyFilter();
+    }
+
+    partial void OnFilterTextChanged(string value) => ApplyFilter();
+
+    /// <summary>Themes' "Mods &amp; Widgets settings…" lands on the list showing widget packs (spec, Menus).</summary>
+    public void ShowWidgetPacks()
+    {
+        FilterText = "";
+        Filter = InstalledFilter.Widgets;
+    }
 
     [ObservableProperty] private string _status = "";
     [ObservableProperty] private bool _busy;
@@ -238,6 +341,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
     internal Task UninstallAsync(string id, string name)
     {
         if (Busy) return Task.CompletedTask;
+        if (!Confirm(SettingsNames.UninstallQuestion(name), SettingsNames.UninstallDetail)) return Task.CompletedTask;
         var result = Service.Store.Uninstall(id);
         Status = result.Ok ? $"{name} is uninstalled." : result.Error ?? "The widget couldn't be removed.";
         Rebuild();
@@ -265,15 +369,46 @@ public sealed partial class ModsPageViewModel : ObservableObject
         HasCatalog = Catalog.Count > 0;
     }
 
+    /// <summary>Reads every Claude Code folder, the installed packs and the catalog document already fetched (no fetch), and rebuilds the list.</summary>
     private void ReloadInstalled()
     {
-        Installed.Clear();
         WidgetRegistry reg;
         try { reg = Service.Store.Load(); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { reg = WidgetRegistry.Empty; }
-        foreach (var row in reg.Packs)
-            Installed.Add(new InstalledWidgetRowViewModel(this, row, Service.Store.ReadInfo(row.Id)));
-        HasInstalled = Installed.Count > 0;
+        Folders = _host?.ReadFolders() ?? [];
+        _items = InstalledItems.Build(Folders, reg, id => Service.Store.ReadInfo(id), Service.Client.Current);
+        Note = ModsPageText.PlainNote(Folders);
+        HasInstalled = _items.Count > 0;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        Installed.Clear();
+        foreach (var item in _items.Where(i => InstalledItems.Matches(i, Filter, FilterText)))
+            Installed.Add(new InstalledRowViewModel(this, item,
+                item.Kind == InstalledKind.WidgetPack ? Service.Store.ReadInfo(item.Id)?.PreviewPath : null));
+        NothingMatches = HasInstalled && Installed.Count == 0;
+    }
+
+    /// <summary>
+    /// A pack's switch (spec, Installed: "a switch bound to widgets.json enabled"): writes the flag, then shows what is on disk on every row of
+    /// that pack, and tells the consumers (App's Changed, the window's pickers) when it changed.
+    /// </summary>
+    internal void SwitchPack(string id, string name, bool on)
+    {
+        if (Busy)
+        {
+            foreach (var row in Installed.Where(r => r.Id == id)) row.ShowEnabled(row.Enabled);
+            return;
+        }
+        var result = Service.Store.SetEnabled(id, on);
+        // What is on disk now; a pack gone behind the page's back keeps the row's last state (nothing was written).
+        bool now = Service.Store.Load().Find(id)?.Enabled ?? Installed.FirstOrDefault(r => r.Id == id)?.Enabled ?? !on;
+        Status = result.Ok ? (now ? SettingsNames.PackIsOn(name) : SettingsNames.PackIsOff(name)) : result.Error ?? "The widget couldn't be switched.";
+        _items = [.. _items.Select(i => i.Id == id && i.Kind == InstalledKind.WidgetPack ? i with { Enabled = now } : i)];
+        foreach (var row in Installed.Where(r => r.Id == id)) row.ShowEnabled(now);
+        if (result.Ok) Notify();
     }
 
     /// <summary>Picks one PNG for a stage: the dialog's title in, the chosen file's path out (null when cancelled). The app's is

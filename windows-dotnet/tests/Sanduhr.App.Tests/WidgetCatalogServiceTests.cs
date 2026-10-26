@@ -277,6 +277,7 @@ public sealed class WidgetCatalogServiceTests : IDisposable
         WidgetKit.Publish(_net, _key, "2026-10-22T02:23:13Z", v1, effects);
         var svc = Service();
         var page = new ModsPageViewModel(() => svc);
+        page.Confirm = (_, _) => true;
         await page.Activate();
         Assert.StartsWith("The catalog is verified: 2 widgets", page.Status);
 

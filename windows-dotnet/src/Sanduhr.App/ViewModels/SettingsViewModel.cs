@@ -221,7 +221,7 @@ public sealed class SettingsViewModel
         ClaudeCodePage.PiecesChanged += Mods.Refresh;
         Mods.OwnModChanged += ClaudeCodePage.Reload;
         General = new GeneralViewModel(widget: widget);
-        ModsPage = new ModsPageViewModel();
+        ModsPage = new ModsPageViewModel(host: ClaudeCodeHost.For(widget));
         Shortcuts = new ShortcutsViewModel(new SettingsStore(new Paths()), hotKeys);
         Alerts = new AlertsViewModel(widget, () =>
         {

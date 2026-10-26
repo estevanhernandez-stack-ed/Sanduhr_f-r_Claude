@@ -361,6 +361,8 @@ public static class SettingsNames
     public const string FilterClaudeCode = "Claude Code";
     public const string FilterWidgets = "Widgets";
     public const string FilterBoxName = "Filter the installed list";
+    /// <summary>Installed: the filters hide everything (an empty-state line, WF35).</summary>
+    public const string NothingMatches = "Nothing installed matches the filter.";
     /// <summary>A pack's or a folder's on switch: the visible word, then what it switches, for a screen reader.</summary>
     public const string PackOn = "On";
     public static string PackOnFor(string pack) => $"{PackOn}: {pack}";

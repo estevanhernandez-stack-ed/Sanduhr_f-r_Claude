@@ -48,5 +48,28 @@ public abstract class ModsPageFixture : IDisposable
         new(Profile, configDir, () => added, Path.Combine(Root, "appdata"), Path.Combine(Root, "external"), Path.Combine(Root, "legacy"),
             () => activeAccountFolder, ModSource);
 
+    /// <summary>The scratch Sanduhr folders a page's widget store lives under (never the real LocalAppData).</summary>
+    protected Sanduhr.Core.Paths Paths => new(Path.Combine(Root, "appdata"), Path.Combine(Root, "home"), Path.Combine(Root, "local"));
+
+    /// <summary>A Mods &amp; Widgets page over the scratch profile and widgets folder; the network is <paramref name="net"/>, else offline.</summary>
+    internal ModsPageViewModel Page(System.Net.Http.HttpMessageHandler? net = null, Version? running = null, ClaudeCodeHost? host = null) =>
+        new(() => new Sanduhr.App.Services.WidgetCatalogService(Paths, net ?? new AppWindowFixture.OfflineHandler(), running ?? WidgetKit.V380),
+            null, host ?? Host())
+        {
+            Confirm = (_, _) => true,
+        };
+
+    /// <summary>A plugin installed from marketplace "m" into <paramref name="home"/>, its files under the scratch cache.</summary>
+    protected void Plugin(string home, string name, string version, bool mod = false)
+    {
+        var dir = Path.Combine(Root, "cache", name);
+        Put(dir, ".claude-plugin/plugin.json", $$"""{"name":"{{name}}","version":"{{version}}"}""");
+        if (mod) Put(dir, "hooks/hooks.json", """{"modules":["register.tsx"]}""");
+        var record = Path.Combine(home, "plugins", "installed_plugins.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(record)!);
+        var rows = File.Exists(record) ? File.ReadAllText(record)[..^2] + "," : "{\"version\":2,\"plugins\":{";
+        File.WriteAllText(record, rows + $"\"{name}@m\":[{{\"installPath\":\"{dir.Replace("\\", "\\\\")}\",\"version\":\"{version}\"}}]}}}}");
+    }
+
     protected static string SettingsOf(string folder) => Path.Combine(folder, "settings.json");
 }
