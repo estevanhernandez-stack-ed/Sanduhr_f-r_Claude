@@ -12,44 +12,25 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
-/// <summary>One pack of the verified catalog: what it is, whether it is installed, and the one thing its button does.</summary>
-public sealed partial class WidgetCatalogRowViewModel : ObservableObject
+/// <summary>One pack of the verified catalog, merged with its installed row by id (spec, Catalog): Install, Update, or the same switch the
+/// Installed row has, and the line under it.</summary>
+public sealed partial class CatalogRowViewModel : ObservableObject
 {
     private readonly ModsPageViewModel _owner;
 
-    internal WidgetCatalogRowViewModel(ModsPageViewModel owner, WidgetCatalogEntry entry, InstalledWidget? installed,
-        InstalledWidgetInfo? info, bool meetsMinimum)
+    internal CatalogRowViewModel(ModsPageViewModel owner, CatalogRow row, InstalledWidgetInfo? info)
     {
         _owner = owner;
-        Entry = entry;
+        Entry = row.Entry;
+        Action = row.Action;
+        State = row.State;
+        _enabled = row.Installed?.Enabled ?? false;
         Description = info?.Description ?? "";
         Preview = ModsPageViewModel.LoadPreview(info?.PreviewPath);
-        if (installed is { MadeHere: true })
-        {
-            Action = WidgetRowAction.None;
-            State = $"A widget {SettingsNames.WidgetMadeHere} already uses this id.";
-        }
-        else if (installed is null)
-        {
-            Action = meetsMinimum ? WidgetRowAction.Install : WidgetRowAction.None;
-            State = meetsMinimum ? "" : $"Needs Sanduhr {entry.SanduhrMin} or later.";
-        }
-        else if (WidgetCatalog.CompareVersions(entry.Version, installed.Version) > 0)
-        {
-            Action = meetsMinimum ? WidgetRowAction.Update : WidgetRowAction.None;
-            State = meetsMinimum
-                ? $"Version {installed.Version} is installed."
-                : $"Version {installed.Version} is installed. {entry.Version} needs Sanduhr {entry.SanduhrMin} or later.";
-        }
-        else
-        {
-            // Uninstall sits on the installed list, once per pack.
-            Action = WidgetRowAction.None;
-            State = "Installed.";
-        }
     }
 
     public WidgetCatalogEntry Entry { get; }
+    public string Id => Entry.Id;
     public string Name => Entry.Name;
     public string Kind => Entry.Kind;
     public string Version => Entry.Version;
@@ -57,39 +38,52 @@ public sealed partial class WidgetCatalogRowViewModel : ObservableObject
     public ImageSource? Preview { get; }
     public bool HasPreview => Preview is not null;
     public string State { get; }
-    public WidgetRowAction Action { get; }
-    public bool HasAction => Action != WidgetRowAction.None;
+    public CatalogAction Action { get; }
+    public bool HasButton => Action is CatalogAction.Install or CatalogAction.Update;
+    public bool IsSwitch => Action == CatalogAction.Switch;
 
-    /// <summary>"Hourglass · sprite · 1.0.0".</summary>
+    /// <summary>"sprite · 1.0.0".</summary>
     public string Detail => $"{Kind} · {Version}";
 
     public string ActionLabel => Action switch
     {
-        WidgetRowAction.Install => SettingsNames.WidgetInstall,
-        WidgetRowAction.Update => SettingsNames.WidgetUpdate,
+        CatalogAction.Install => SettingsNames.WidgetInstall,
+        CatalogAction.Update => SettingsNames.WidgetUpdate,
         _ => "",
     };
 
-    /// <summary>The button's name for a screen reader: the action and the pack ("Install Hourglass", "Update Hourglass
-    /// to 1.1.0"), so one row's button is told from the next.</summary>
+    /// <summary>The button's name: the action and the pack ("Install Hourglass", "Update Hourglass to 1.1.0").</summary>
     public string ActionName => Action switch
     {
-        WidgetRowAction.Update => $"{SettingsNames.WidgetUpdate} {Name} to {Version}",
-        WidgetRowAction.None => "",
-        _ => $"{ActionLabel} {Name}",
+        CatalogAction.Update => $"{SettingsNames.WidgetUpdate} {Name} to {Version}",
+        CatalogAction.Install => $"{SettingsNames.WidgetInstall} {Name}",
+        _ => "",
     };
 
-    /// <summary>The row read as one line: "Hourglass, sprite, version 1.0.0, installed."</summary>
-    public string RowName => string.Join(", ", new[] { Name, Kind, "version " + Version, State.TrimEnd('.') }
-        .Where(s => !string.IsNullOrEmpty(s)));
+    /// <summary>The pack's switch, bound one way: the command writes, then the row shows what is on disk (decision 7).</summary>
+    [ObservableProperty] private bool _enabled;
+    public string SwitchName => SettingsNames.PackOnFor(Name);
+
+    internal void ShowEnabled(bool value)
+    {
+        // Not the generated setter: it skips the notice when the value is unchanged, and a click has already flipped the box.
+#pragma warning disable MVVMTK0034
+        _enabled = value;
+#pragma warning restore MVVMTK0034
+        OnPropertyChanged(nameof(Enabled));
+    }
 
     [RelayCommand]
     private Task Act() => _owner.ActAsync(this);
 
+    [RelayCommand]
+    private void Toggle() => _owner.SwitchPack(Id, Name, !Enabled);
+
+    /// <summary>The row read as one line: "Hourglass, sprite, version 1.0.0, installed."</summary>
+    public string RowName => string.Join(", ", new[] { Name, Kind, "version " + Version, State.TrimEnd('.') }.Where(s => !string.IsNullOrEmpty(s)));
+
     public override string ToString() => RowName;
 }
-
-public enum WidgetRowAction { None, Install, Update }
 
 /// <summary>
 /// One row of Mods &amp; Widgets' Installed list (Settings v2 slice 4): a widget pack with its on switch and where it shows, Sanduhr's meters
@@ -418,7 +412,55 @@ public sealed partial class ModsPageViewModel : ObservableObject
 
     internal WidgetCatalogService Service => _service.Value;
 
-    public ObservableCollection<WidgetCatalogRowViewModel> Catalog { get; } = [];
+    public ObservableCollection<CatalogRowViewModel> Catalog { get; } = [];
+
+    /// <summary>The Catalog section is open. Opening it fetches the catalog when nothing was fetched in this window (WF6, decision 13).</summary>
+    [ObservableProperty] private bool _catalogOpen;
+    /// <summary>One pack kind to show ("sprite" from the companion row's link), null for every pack (decision 14).</summary>
+    [ObservableProperty] private string? _catalogKind;
+    /// <summary>What the last catalog fetch found: the verified line, or why not (WF40). List actions write <see cref="Status"/> instead.</summary>
+    [ObservableProperty] private string? _catalogStatus;
+    private bool _asked;
+
+    public string CatalogDisclosure => SettingsNames.CatalogDisclosure;
+    public bool ShowingOneKind => CatalogKind is not null;
+    public string? ShowingKindText => CatalogKind == "sprite" ? SettingsNames.ShowingSprites : null;
+    public string ShowEveryPackTitle => SettingsNames.ShowEveryPack;
+
+    partial void OnCatalogOpenChanged(bool value)
+    {
+        if (value) _ = OpenCatalog();
+    }
+
+    partial void OnCatalogKindChanged(string? value)
+    {
+        OnPropertyChanged(nameof(ShowingOneKind));
+        OnPropertyChanged(nameof(ShowingKindText));
+        RebuildCatalog();
+    }
+
+    /// <summary>The catalog was opened: fetch once in this window (an attempt counts; "Check the catalog again" retries).</summary>
+    public Task OpenCatalog()
+    {
+        if (!CatalogOpen) CatalogOpen = true;   // a landing on mods#catalog or the companion link opens it
+        if (_refreshing is { IsCompleted: false } running) return running;
+        if (_asked)
+        {
+            RebuildCatalog();
+            return Task.CompletedTask;
+        }
+        return _refreshing = RefreshAsync();
+    }
+
+    /// <summary>The companion row's "Get one in Mods &amp; Widgets…": the catalog, sprites only.</summary>
+    public void ShowSprites()
+    {
+        CatalogKind = "sprite";
+        _ = OpenCatalog();
+    }
+
+    [RelayCommand]
+    private void ShowEveryPack() => CatalogKind = null;
     /// <summary>The Installed list as the filters show it (spec, Installed: "All", "Claude Code", "Widgets", and a text filter).</summary>
     public ObservableCollection<InstalledRowViewModel> Installed { get; } = [];
 
@@ -457,11 +499,11 @@ public sealed partial class ModsPageViewModel : ObservableObject
 
     public string CheckAgainTitle => SettingsNames.WidgetCatalogCheck;
 
-    /// <summary>The page became visible: list what is installed and fetch the catalog once more.</summary>
+    /// <summary>The page became visible: list what is installed. Nothing is fetched (the catalog asks only when opened, WF6).</summary>
     public Task Activate()
     {
-        ReloadInstalled();
-        return _refreshing is { IsCompleted: false } running ? running : _refreshing = RefreshAsync();
+        ReloadLocal();
+        return Task.CompletedTask;
     }
 
     [RelayCommand]
@@ -469,26 +511,27 @@ public sealed partial class ModsPageViewModel : ObservableObject
 
     private async Task RefreshAsync()
     {
+        _asked = true;
         Busy = true;
-        Status = "Checking the widget catalog…";
+        CatalogStatus = "Checking the widget catalog…";
         try
         {
             var result = await Service.Client.RefreshAsync();
             if (result.Catalog is { } doc)
             {
                 var date = doc.GeneratedAt.ToLocalTime().ToString("d MMMM yyyy", CultureInfo.CurrentCulture);
-                Status = doc.Packs.Count == 1
+                CatalogStatus = doc.Packs.Count == 1
                     ? $"The catalog is verified: 1 widget, published {date}."
                     : $"The catalog is verified: {doc.Packs.Count} widgets, published {date}.";
             }
             else
             {
-                Status = result.Error ?? WidgetCatalogClient.Unreadable;
+                CatalogStatus = result.Error ?? WidgetCatalogClient.Unreadable;
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            Status = "The widgets folder couldn't be read.";
+            CatalogStatus = "The widgets folder couldn't be read.";
         }
         finally
         {
@@ -497,17 +540,17 @@ public sealed partial class ModsPageViewModel : ObservableObject
         }
     }
 
-    internal async Task ActAsync(WidgetCatalogRowViewModel row)
+    internal async Task ActAsync(CatalogRowViewModel row)
     {
         if (Busy) return;
-        if (row.Action is not (WidgetRowAction.Install or WidgetRowAction.Update)) return;
+        if (row.Action is not (CatalogAction.Install or CatalogAction.Update)) return;
         Busy = true;
-        Status = row.Action == WidgetRowAction.Update ? $"Updating {row.Name}…" : $"Installing {row.Name}…";
+        Status = row.Action == CatalogAction.Update ? $"Updating {row.Name}…" : $"Installing {row.Name}…";
         try
         {
             var result = await Service.Client.InstallAsync(row.Entry);
             Status = result.Ok
-                ? (row.Action == WidgetRowAction.Update ? $"{row.Name} is updated to {row.Version}." : $"{row.Name} is installed.")
+                ? (row.Action == CatalogAction.Update ? $"{row.Name} is updated to {row.Version}." : $"{row.Name} is installed.")
                 : result.Error ?? "The widget couldn't be installed.";
             if (result.Ok) Notify();
         }
@@ -532,20 +575,15 @@ public sealed partial class ModsPageViewModel : ObservableObject
     private void Rebuild()
     {
         ReloadInstalled();
+        RebuildCatalog();
+    }
+
+    private void RebuildCatalog()
+    {
         Catalog.Clear();
-        var doc = Service.Client.Current;
-        if (doc is not null)
-        {
-            var reg = Service.Store.Load();
-            var running = Service.Client.Running;
-            foreach (var entry in doc.Packs)
-            {
-                var installed = reg.Find(entry.Id);
-                Catalog.Add(new WidgetCatalogRowViewModel(this, entry, installed,
-                    installed is null ? null : Service.Store.ReadInfo(entry.Id),
-                    WidgetCatalog.MeetsMinimum(entry.SanduhrMin, running)));
-            }
-        }
+        if (Service.Client.Current is { } doc)
+            foreach (var row in InstalledItems.CatalogRows(doc, _items, Service.Client.Running, CatalogKind))
+                Catalog.Add(new CatalogRowViewModel(this, row, row.Installed is null ? null : Service.Store.ReadInfo(row.Entry.Id)));
         HasCatalog = Catalog.Count > 0;
     }
 
@@ -581,6 +619,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
         if (Busy)
         {
             foreach (var row in Installed.Where(r => r.Id == id)) row.ShowEnabled(row.Enabled);
+            foreach (var row in Catalog.Where(r => r.Id == id)) row.ShowEnabled(row.Enabled);
             return;
         }
         var result = Service.Store.SetEnabled(id, on);
@@ -589,6 +628,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
         Status = result.Ok ? (now ? SettingsNames.PackIsOn(name) : SettingsNames.PackIsOff(name)) : result.Error ?? "The widget couldn't be switched.";
         _items = [.. _items.Select(i => i.Id == id && i.Kind == InstalledKind.WidgetPack ? i with { Enabled = now } : i)];
         foreach (var row in Installed.Where(r => r.Id == id)) row.ShowEnabled(now);
+        foreach (var row in Catalog.Where(r => r.Id == id)) row.ShowEnabled(now);
         if (result.Ok) Notify();
     }
 

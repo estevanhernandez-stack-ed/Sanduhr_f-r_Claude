@@ -61,7 +61,7 @@
             <Setter Property="RenderOptions.BitmapScalingMode" Value="NearestNeighbor" />
         </Style>
 
-        <DataTemplate DataType="{x:Type vm:WidgetCatalogRowViewModel}">
+        <DataTemplate DataType="{x:Type vm:CatalogRowViewModel}">
             <Border Background="{DynamicResource Sanduhr.Brush.Bg}" BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
                     BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,8"
                     AutomationProperties.Name="{Binding RowName}">
@@ -82,11 +82,16 @@
                         <TextBlock Text="{Binding Description}" Style="{StaticResource Dim}" Margin="0,2,0,0" />
                         <TextBlock Text="{Binding State}" Style="{StaticResource Dim}" Margin="0,2,0,0" />
                     </StackPanel>
-                    <Button Grid.Column="2" Style="{DynamicResource FlatButton}" VerticalAlignment="Center" Margin="8,0,0,0"
-                            Content="{Binding ActionLabel}" Command="{Binding ActCommand}"
-                            Visibility="{Binding HasAction, Converter={StaticResource BoolVis}}"
-                            IsEnabled="{Binding DataContext.Busy, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={x:Static conv:Bools.Not}}"
-                            AutomationProperties.Name="{Binding ActionName}" />
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0">
+                        <Button Style="{DynamicResource FlatButton}" Content="{Binding ActionLabel}" Command="{Binding ActCommand}"
+                                Visibility="{Binding HasButton, Converter={StaticResource BoolVis}}"
+                                IsEnabled="{Binding DataContext.Busy, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={x:Static conv:Bools.Not}}"
+                                AutomationProperties.Name="{Binding ActionName}" />
+                        <CheckBox Style="{DynamicResource ThemedCheckBox}" Content="{x:Static core:SettingsNames.PackOn}"
+                                  IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding ToggleCommand}"
+                                  Visibility="{Binding IsSwitch, Converter={StaticResource BoolVis}}"
+                                  AutomationProperties.Name="{Binding SwitchName}" />
+                    </StackPanel>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -157,14 +162,18 @@
 
                 <StackPanel views:SettingsAnchor.Id="widgets-catalog">
                     <TextBlock Text="Widget catalog" Style="{StaticResource Heading}" />
-                    <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8"
-                               Text="Sprites, themes, palettes, effects and fonts from the 626 Labs widget catalog. Packs are data only, no code. Sanduhr checks the catalog's signature, then each pack's size, hash and every file before it installs one." />
+                    <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8" Text="{x:Static core:SettingsNames.CatalogDisclosure}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8" Visibility="{Binding ShowingOneKind, Converter={StaticResource BoolVis}}">
+                        <TextBlock Text="{Binding ShowingKindText}" Style="{StaticResource Dim}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <Button Style="{DynamicResource SettingsLinkButton}" Content="{Binding ShowEveryPackTitle}" Command="{Binding ShowEveryPackCommand}"
+                                AutomationProperties.Name="{Binding ShowEveryPackTitle}" />
+                    </StackPanel>
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="StatusLine" Text="{Binding Status}" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center"
+                        <TextBlock x:Name="CatalogStatusLine" Text="{Binding CatalogStatus}" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center"
                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                                    AutomationProperties.Name="Widget catalog status"
                                    AutomationProperties.LiveSetting="Polite" />
@@ -181,6 +190,11 @@
 
                 <StackPanel views:SettingsAnchor.Id="widgets-installed">
                     <TextBlock Text="Installed widgets" Style="{StaticResource Heading}" />
+                    <TextBlock x:Name="StatusLine" Text="{Binding Status}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                               Visibility="{Binding Status, Converter={StaticResource StrVis}}"
+                               AutomationProperties.Name="Widget list status"
+                               AutomationProperties.LiveSetting="Polite" />
                     <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8"
                                Visibility="{Binding HasInstalled, Converter={x:Static conv:Bools.NotVisible}}"
                                Text="Nothing installed yet. Widgets you make with Claude will show here too, marked made here." />
@@ -199,7 +213,7 @@
                     </ListBox>
                     <TextBlock Text="{Binding Note}" Style="{StaticResource Dim}" Margin="0,4,0,0" Visibility="{Binding Note, Converter={StaticResource StrVis}}" />
                     <TextBlock Style="{StaticResource Dim}" Margin="0,4,0,0"
-                               Text="Installed packs live in Sanduhr's own widgets folder on this PC. Opening this page asks GitHub for the catalog, and Install downloads the pack from GitHub; nothing else is sent. Reset Sanduhr removes the folder." />
+                               Text="Installed packs live in Sanduhr's own widgets folder on this PC. Opening the catalog asks GitHub for it, and Install downloads the pack from GitHub; nothing else is sent. Reset Sanduhr removes the folder." />
                 </StackPanel>
 
                 <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />

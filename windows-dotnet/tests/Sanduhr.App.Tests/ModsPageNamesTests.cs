@@ -38,6 +38,18 @@ public sealed class ModsPageNamesTests : AppWindowFixture
         Pump();
     }
 
+    private static List<string> CheckNames(DependencyObject root)
+    {
+        var names = new List<string>();
+        void Collect(DependencyObject node)
+        {
+            if (node is CheckBox && AutomationProperties.GetName(node) is { Length: > 0 } name) names.Add(name);
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++) Collect(VisualTreeHelper.GetChild(node, i));
+        }
+        Collect(root);
+        return names;
+    }
+
     private static List<(Type Kind, string Name)> SetNames(DependencyObject root)
     {
         var names = new List<(Type, string)>();
@@ -81,8 +93,9 @@ public sealed class ModsPageNamesTests : AppWindowFixture
         {
             var tabs = (TabControl)window.FindName("Tabs");
             tabs.SelectedItem = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "Widgets");
+            svm.ModsPage.CatalogOpen = true;
             PumpUntil(() => !svm.ModsPage.Busy && svm.ModsPage.Catalog.Count == 2);
-            Assert.StartsWith("The catalog is verified: 2 widgets", svm.ModsPage.Status);
+            Assert.StartsWith("The catalog is verified: 2 widgets", svm.ModsPage.CatalogStatus);
             var all = NamesOf(window);
 
             var buttons = SetNames(window).Select(n => n.Name).ToList();
@@ -92,6 +105,8 @@ public sealed class ModsPageNamesTests : AppWindowFixture
             Assert.DoesNotContain(SettingsNames.WidgetInstall, buttons);
             Assert.DoesNotContain(SettingsNames.WidgetUninstall.TrimEnd('…'), buttons);
             Assert.Equal(buttons.Count, buttons.Distinct().Count());
+            // The installed palette's catalog row is the same switch as its installed row: two check boxes, one pack.
+            Assert.Equal(2, CheckNames(window).Count(c => c == SettingsNames.PackOnFor("Fixture palette")));
             Assert.Empty(LeaksIn(all));
         }
         finally { window.Close(); }
@@ -108,8 +123,9 @@ public sealed class ModsPageNamesTests : AppWindowFixture
         {
             var tabs = (TabControl)window.FindName("Tabs");
             tabs.SelectedItem = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "Widgets");
-            PumpUntil(() => svm.ModsPage.Status == WidgetCatalogClient.Offline);
-            Assert.Equal(WidgetCatalogClient.Offline, svm.ModsPage.Status);
+            svm.ModsPage.CatalogOpen = true;
+            PumpUntil(() => svm.ModsPage.CatalogStatus == WidgetCatalogClient.Offline);
+            Assert.Equal(WidgetCatalogClient.Offline, svm.ModsPage.CatalogStatus);
             Assert.Empty(svm.ModsPage.Catalog);
             // The real widgets folder was never asked for: the service sits in the test's dev profile.
             Assert.StartsWith(Root, svm.ModsPage.Service.Store.Root);
@@ -136,6 +152,7 @@ public sealed class ModsPageNamesTests : AppWindowFixture
         {
             var tabs = (TabControl)window.FindName("Tabs");
             tabs.SelectedItem = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "Widgets");
+            svm.ModsPage.CatalogOpen = true;
             PumpUntil(() => !svm.ModsPage.Busy);
             svm.ModsPage.ReloadLocal();
             var alpha = svm.ModsPage.Installed.Single(r => r.Name == "alpha");
