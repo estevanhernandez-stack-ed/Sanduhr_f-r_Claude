@@ -188,6 +188,7 @@
                                Visibility="{Binding NothingMatches, Converter={StaticResource BoolVis}}" />
                     <ListBox ItemsSource="{Binding Installed}" ItemContainerStyle="{StaticResource InstalledRowItem}"
                              Background="Transparent" BorderThickness="0" Padding="0" Focusable="False" SelectionMode="Single"
+                             KeyboardNavigation.TabNavigation="Continue"
                              AutomationProperties.Name="{x:Static core:SettingsNames.InstalledSection}">
                         <!-- Just the rows: the page's own ScrollViewer scrolls, not a second one in here. -->
                         <ListBox.Template>

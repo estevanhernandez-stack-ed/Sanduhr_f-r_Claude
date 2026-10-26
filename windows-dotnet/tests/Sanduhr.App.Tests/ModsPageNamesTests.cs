@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using Sanduhr.App.Services;
 using Sanduhr.App.ViewModels;
@@ -18,6 +19,14 @@ namespace Sanduhr.App.Tests;
 [Collection("SettingsWindow")]
 public sealed class ModsPageNamesTests : AppWindowFixture
 {
+    private static IEnumerable<T> All<T>(DependencyObject node) where T : DependencyObject
+    {
+        if (node is T hit) yield return hit;
+        foreach (var child in LogicalTreeHelper.GetChildren(node).OfType<DependencyObject>())
+            foreach (var found in All<T>(child))
+                yield return found;
+    }
+
     private static void PumpUntil(Func<bool> done)
     {
         var until = DateTime.UtcNow.AddSeconds(10);
@@ -137,6 +146,10 @@ public sealed class ModsPageNamesTests : AppWindowFixture
             Assert.Contains(alpha.RowName, names);   // the row itself is a peer a screen reader lands on, not just the text inside it
             var rowPeer = Walk(System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(window)).First(p => p.GetName() == alpha.RowName);
             Assert.True(rowPeer.IsKeyboardFocusable());   // read-only rows have no control inside, so the row itself is the stop
+            // Tab walks every row and every switch in it, as the list did before it was a ListBox (whose default, Once, would
+            // leave the other rows' switches to the arrow keys).
+            var list = All<ListBox>(window).Single(l => AutomationProperties.GetName(l) == SettingsNames.InstalledSection);
+            Assert.Equal(KeyboardNavigationMode.Continue, KeyboardNavigation.GetTabNavigation(list));
             Assert.Empty(LeaksIn(names));
         }
         finally { window.Close(); }
