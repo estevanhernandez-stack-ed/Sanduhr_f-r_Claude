@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **A line on the lock screen (#137).** Settings, Desktop, Lock Screen puts one short line under the lock screen clock: an optional prefix, your Claude usage, when it resets, and how many watchers are waiting for you, for example `Desk 3 · Claude 29% · resets 6:10 PM · 1 waiting for you`. Anyone at the screen can read it, so every part passes one filter that drops paths, emails, web addresses, secrets and long tokens; only counts, percents and times get through, and the page previews the exact line. Usage older than 20 minutes reads "Claude usage unavailable". Turning it on asks for an administrator password once, to install a small helper that sets the lock screen message; turning it off takes the line away first, then removes the helper, and a message you had there before comes back. Off by default.
+
 ## v2.32.0-mac — 2026-10-25
 
 - **What a session starts with, up top.** The Mods & Config card that estimates what a new Claude Code session loads (skill list, agents, MCP servers, the budget warning) sat inside the Catalog tab, where the window's bottom edge cut it at the default size. It now sits above the Catalog, By Folder and Compare tabs, shows on every tab, and Search Settings finds it (#291).
