@@ -57,11 +57,37 @@ extension UsageResponse: Decodable {
     }
 }
 
-/// Minimal shape of `GET /api/organizations`: the uuid, and the capabilities that say which
-/// org carries the subscription usage.
+/// Minimal shape of `GET /api/organizations`: the uuid, the capabilities that say which
+/// org carries the subscription usage, and the tier fields the plan label reads.
 struct Organization: Decodable {
     let uuid: String
     var capabilities: [String]? = nil
+    /// Plan tier string (`default_claude_max_20x`). Display only, so a missing or odd-typed
+    /// value is nil rather than a failed decode.
+    var rateLimitTier: String? = nil
+    var billingType: String? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case uuid, capabilities
+        case rateLimitTier = "rate_limit_tier"
+        case billingType = "billing_type"
+    }
+
+    init(uuid: String, capabilities: [String]? = nil, rateLimitTier: String? = nil,
+         billingType: String? = nil) {
+        self.uuid = uuid
+        self.capabilities = capabilities
+        self.rateLimitTier = rateLimitTier
+        self.billingType = billingType
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        uuid = try c.decode(String.self, forKey: .uuid)
+        capabilities = try c.decodeIfPresent([String].self, forKey: .capabilities)
+        rateLimitTier = (try? c.decodeIfPresent(String.self, forKey: .rateLimitTier)) ?? nil
+        billingType = (try? c.decodeIfPresent(String.self, forKey: .billingType)) ?? nil
+    }
 
     /// A login can carry several orgs (a claude_max subscription org and an API individual org,
     /// seen on Windows 2026-07-19), so the first one is ordering luck. Same rule as Windows'
