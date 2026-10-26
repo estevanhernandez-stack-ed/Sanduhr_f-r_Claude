@@ -797,6 +797,8 @@ public static class SettingsNames
         (ShortcutToOpenSettings, SettingsPage.General),
         (AddAccount, SettingsPage.Accounts),
         (SendTestAlert, SettingsPage.Alerts),
+        (WarnForThisLimit, SettingsPage.Alerts),
+        (ShowThisLimit, SettingsPage.Alerts),
         (ExportMeterHistory, SettingsPage.History),
         (SaveAndApply, SettingsPage.Themes),
         (WhatsNew, SettingsPage.About),

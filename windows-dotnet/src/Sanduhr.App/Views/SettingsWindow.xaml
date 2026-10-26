@@ -1153,7 +1153,9 @@
                             </ScrollViewer.Resources>
                         <StackPanel Margin="16" DataContext="{Binding Alerts}" views:SettingsAnchor.Id="notifications">
                             <TextBlock Text="Alerts" FontSize="14" FontWeight="SemiBold"
+                                       AutomationProperties.HeadingLevel="Level1"
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+                            <views:SectionJumpLinks Page="Alerts" />
                             <TextBlock TextWrapping="Wrap" FontSize="11"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
                                        Text="Get a toast and a soft chime when a tier crosses your thresholds, or when your pace will hit the cap before it resets. Toasts respect Focus Assist. Model-scoped weekly tiers alert silently by default — toast only, no chime." />
@@ -1233,6 +1235,56 @@
                             <CheckBox Content="Reset notifications"
                                       IsChecked="{Binding ResetEnabled}"
                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            </StackPanel>
+
+                            <!-- Each limit (WF13): warnings and hiding per limit; the card menu writes the same keys. "Show this limit" sends
+                                 nothing, so it stays live with alerts off; "Warn for this limit" dims with them (decision 5). -->
+                            <StackPanel Margin="0,4,0,14" views:SettingsAnchor.Id="each-limit">
+                                <TextBlock Text="{x:Static core:SettingsNames.EachLimitSection}" FontSize="13" FontWeight="SemiBold"
+                                           AutomationProperties.HeadingLevel="Level2"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,4" />
+                                <TextBlock Text="{x:Static core:SettingsNames.EachLimitCaption}" FontSize="10.5" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" Margin="0,0,0,8" />
+                                <TextBlock x:Name="EachLimitEmpty" Style="{StaticResource EmptyLine}" Text="{Binding LimitsEmptyText}"
+                                           Tag="{Binding HasItems, ElementName=EachLimitList}"
+                                           views:LiveRegion.Shown="{Binding HasNoLimits}" />
+                                <ItemsControl x:Name="EachLimitList" ItemsSource="{Binding Limits}" Focusable="False"
+                                              AutomationProperties.Name="{x:Static core:SettingsNames.EachLimitListName}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,0,0,8">
+                                                <TextBlock Text="{Binding Label}" FontSize="12" Margin="0,0,0,2"
+                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                <WrapPanel>
+                                                    <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,0"
+                                                              Content="{x:Static core:SettingsNames.WarnForThisLimit}"
+                                                              IsChecked="{Binding WarnOn, Mode=TwoWay}"
+                                                              IsEnabled="{Binding DataContext.AlertsEnabled, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                              AutomationProperties.Name="{Binding WarnName}" />
+                                                    <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                                              Content="{x:Static core:SettingsNames.ShowThisLimit}"
+                                                              IsChecked="{Binding Shown, Mode=TwoWay}"
+                                                              AutomationProperties.Name="{Binding ShowName}" />
+                                                </WrapPanel>
+                                                <TextBlock Text="{x:Static core:SettingsNames.HiddenUntilResetCaption}" FontSize="10.5" TextWrapping="Wrap"
+                                                           Margin="22,2,0,0" Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                                           Visibility="{Binding HiddenUntilReset, Converter={StaticResource BoolVis}}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <StackPanel x:Name="AlertsSoundDependents" IsEnabled="{Binding AlertsEnabled}">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Style.Triggers>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter Property="Opacity" Value="0.45" />
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
                             <CheckBox Content="Sound" IsChecked="{Binding SoundEnabled}" views:SettingsAnchor.Id="sound"
                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
                             <CheckBox Content="Chime for model-scoped weekly tiers"

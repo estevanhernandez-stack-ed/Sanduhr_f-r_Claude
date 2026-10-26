@@ -42,6 +42,7 @@ public static class SettingsIndex
     public const string Thresholds = "thresholds";
     public const string Sound = "sound";
     public const string TestAlert = "test";
+    public const string EachLimit = "each-limit";
     public const string SignInReminders = "signin-reminders";
     // History
     public const string Chart = "chart";
@@ -158,6 +159,9 @@ public static class SettingsIndex
         E("Alerts", SettingsPage.Alerts, Notifications,
             ["notification", "toast", "enable alerts", "projection", "pace", "reset notifications", "Focus Assist"]),
         E("Warn at and Urgent at", SettingsPage.Alerts, Thresholds, ["threshold", "warn", "urgent", "percent"]),
+        E(SettingsNames.EachLimitSection, SettingsPage.Alerts, EachLimit,
+            ["limit", "limits", "each limit", "per limit", "hide", "hidden", "hidden limits", "show", "mute", "stop warnings", "warn again",
+             "until it resets", "promo", "special limit", SettingsNames.WarnForThisLimit, SettingsNames.ShowThisLimit, SettingsNames.HiddenUntilItResets]),
         E("Sound", SettingsPage.Alerts, Sound, ["chime", "sound", "snake", "model-scoped", "mute"]),
         E(SettingsNames.SendTestAlert, SettingsPage.Alerts, TestAlert, ["test", "try"]),
 
@@ -304,6 +308,8 @@ public static class SettingsIndex
         [SettingsNames.AddFolder] = Folders,
         [SettingsNames.FollowAccount] = Follow,
         [SettingsNames.SendTestAlert] = TestAlert,
+        [SettingsNames.WarnForThisLimit] = EachLimit,
+        [SettingsNames.ShowThisLimit] = EachLimit,
         [SettingsNames.SignInReminders] = SignInReminders,
         [SettingsNames.ExportMeterHistory] = HistoryExport,
         [SettingsNames.SaveAndApply] = Paste,
@@ -725,13 +731,13 @@ public static class SettingsIndex
     // ---- reach: menus and reopening ----
 
     /// <summary>
-    /// The section a menu's "&lt;Page&gt; settings…" opens at (spec, Menus table). Slice 5 moves Alerts to
-    /// <c>each-limit</c>; null opens the page top.
+    /// The section a menu's "&lt;Page&gt; settings…" opens at (spec, Menus table). Alerts opens at Each limit
+    /// (slice 5), where the tier card's link lands; null opens the page top.
     /// </summary>
     public static string? MenuAnchor(SettingsPage page) => page switch
     {
         SettingsPage.Accounts => AccountList,
-        SettingsPage.Alerts => Notifications,
+        SettingsPage.Alerts => EachLimit,
         SettingsPage.Desk => DeskPieces,
         SettingsPage.DeskMessage => MessageLines,
         SettingsPage.Launcher => LauncherButtons,
@@ -748,6 +754,7 @@ public static class SettingsIndex
     /// </summary>
     public static IReadOnlyList<(string Title, string Anchor)> JumpLinks(SettingsPage page) => page switch
     {
+        SettingsPage.Alerts => Links(page, Thresholds, EachLimit, Sound, TestAlert),
         SettingsPage.Desk => Links(page, DeskPieces, DeskClicks, DeskDesigns, DeskAdvanced),
         SettingsPage.DeskLook => Links(page, DeskThemeMatch, DeskLook, DeskSizes, DeskInk, DeskPlate),
         // The first is named for the widget it sits in; the others read as their index rows.

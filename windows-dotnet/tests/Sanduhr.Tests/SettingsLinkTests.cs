@@ -108,7 +108,7 @@ public class SettingsLinkTests
 
     [Theory]
     [InlineData(SettingsPage.Accounts, SettingsIndex.AccountList)]
-    [InlineData(SettingsPage.Alerts, SettingsIndex.Notifications)]
+    [InlineData(SettingsPage.Alerts, SettingsIndex.EachLimit)]   // slice 5: the tier card's link lands on its home (WF13)
     [InlineData(SettingsPage.Desk, SettingsIndex.DeskPieces)]
     [InlineData(SettingsPage.DeskMessage, SettingsIndex.MessageLines)]
     [InlineData(SettingsPage.Launcher, SettingsIndex.LauncherButtons)]

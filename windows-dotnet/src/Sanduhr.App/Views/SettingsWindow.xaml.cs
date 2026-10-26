@@ -122,6 +122,7 @@ internal partial class SettingsWindow : Window
             ViewModel.ClaudeCode.Detach();
             ViewModel.Publish.Detach();
             ViewModel.Themes.Detach();
+            ViewModel.Alerts.Detach();
         };
     }
 
