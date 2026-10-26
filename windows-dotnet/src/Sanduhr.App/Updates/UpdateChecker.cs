@@ -97,6 +97,8 @@ public sealed class UpdateChecker
     private Task<UpdateProbeResult>? _inFlight;
     private DateTimeOffset? _last;
     private bool _lastRead;
+    private DateTimeOffset? _enabledAt;
+    private bool _enabledHeld;
 
     public UpdateChecker(Func<bool> enabled, IUpdateProbe probe, string stampPath, Action<string, IUpdateInstaller> onReady,
         Func<DateTimeOffset>? now = null)
@@ -119,12 +121,29 @@ public sealed class UpdateChecker
         await Probe().ConfigureAwait(false);
     }
 
-    /// <summary>The widget's tick (UI thread): free until a day has passed (the stamp is held in memory), then the launch rule, switch included.</summary>
+    /// <summary>How long the tick holds its read of the switch. A switch left off must not cost a settings.json read every 30 seconds.</summary>
+    public static readonly TimeSpan EnabledRefresh = TimeSpan.FromMinutes(5);
+
+    /// <summary>The widget's tick (UI thread): free until a day has passed (the stamp is held in memory), then the launch rule, switch included.
+    /// The switch is read at most once every <see cref="EnabledRefresh"/>; a flip is seen by the next refresh.</summary>
     public void Tick()
     {
         if (ResetGuard.Done || _inFlight is { IsCompleted: false } || !UpdateCheck.Due(true, LastChecked(), _now()))
             return;
-        _ = RunIfDueAsync();
+        if (!HeldEnabled())
+            return;
+        _ = Probe();
+    }
+
+    private bool HeldEnabled()
+    {
+        var now = _now();
+        if (_enabledAt is not { } at || now < at || now - at >= EnabledRefresh)
+        {
+            _enabledHeld = _enabled();
+            _enabledAt = now;
+        }
+        return _enabledHeld;
     }
 
     /// <summary>About, Updates, "Check now": the person asked, so it asks even with the switch off (decision 7). Shares a probe already running.</summary>

@@ -149,6 +149,36 @@ public sealed class UpdateCheckSwitchTests : AppWindowFixture
     }
 
     [Fact]
+    public async Task With_the_switch_off_the_tick_holds_the_last_read_and_refreshes_it_only_every_few_minutes()
+    {
+        var store = new SettingsStore(ScratchPaths());
+        store.SaveUpdateCheck(false);
+        int reads = 0;
+        var probe = new CountingProbe(new UpdateProbeResult(UpdateProbeStatus.UpToDate));
+        var clock = new Clock();
+        var checker = new UpdateChecker(() => { reads++; return store.LoadUpdateCheck(); }, probe, StampPath, (_, _) => { }, () => clock.Now);
+
+        // The stamp is absent, so a check is due on every tick; the switch is read once, not once per tick.
+        for (int i = 0; i < 20; i++)
+        {
+            checker.Tick();
+            clock.Now += TimeSpan.FromSeconds(10);
+        }
+        Assert.Equal(1, reads);
+        Assert.Equal(0, probe.Asked);
+
+        // Turned on: the held read keeps the tick quiet until the refresh is due, then the next tick sees it and asks.
+        store.SaveUpdateCheck(true);
+        checker.Tick();
+        Assert.Equal(1, reads);
+        clock.Now = T0 + UpdateChecker.EnabledRefresh;
+        checker.Tick();
+        await Settled(checker);
+        Assert.Equal(2, reads);   // the refresh's read; the probe's launch rule reads once more only when it runs
+        Assert.Equal(1, probe.Asked);
+    }
+
+    [Fact]
     public void The_Store_build_asks_the_Store_nothing_with_the_switch_off()
     {
         int asked = 0;
