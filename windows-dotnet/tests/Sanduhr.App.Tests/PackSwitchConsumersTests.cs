@@ -149,4 +149,27 @@ public sealed class PackSwitchConsumersTests : AppWindowFixture
 
         Assert.Equal(1, asked);
     });
+
+    [Fact]
+    public void Themes_counts_the_theme_packs_and_follows_a_change() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+        svm.PickerFonts = () => ["EsteFont Pro"];
+        var paths = ScratchPaths();
+        svm.Themes.Widgets = () => InstalledPackKit.Store(paths);   // the scratch widgets folder
+        svm.PacksChanged();
+        Assert.Equal(SettingsNames.ThemePacksLine(0), svm.Themes.ThemePacksLine);
+
+        InstalledPackKit.Install(paths, "good-theme");
+        svm.PacksChanged();
+        Assert.Equal(SettingsNames.ThemePacksLine(1), svm.Themes.ThemePacksLine);
+        Assert.Equal("mods#mods", svm.Themes.PacksLink);
+        Assert.Equal(SettingsNames.LinkTitle(SettingsPage.Mods), svm.Themes.PacksLinkTitle);
+
+        // Owner-confirmed: a pack that is switched off still counts.
+        Assert.True(InstalledPackKit.Store(paths).SetEnabled("good-theme", false).Ok);
+        svm.PacksChanged();
+        Assert.Equal(SettingsNames.ThemePacksLine(1), svm.Themes.ThemePacksLine);
+    });
 }

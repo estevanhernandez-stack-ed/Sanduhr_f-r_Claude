@@ -1930,9 +1930,19 @@
                             <!-- Swatch grid: the same tiles as the widget, bound to the
                                  SAME Themes collection so the active highlight stays in
                                  sync with the widget. Click a tile to switch live. -->
-                            <TextBlock Grid.Row="0" Text="Choose a theme" FontSize="11" views:SettingsAnchor.Id="gallery"
-                                       FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                       Margin="0,0,0,8" />
+                            <StackPanel Grid.Row="0">
+                                <!-- Theme packs (WF40): where they come from, one click away. -->
+                                <WrapPanel Margin="0,0,0,8">
+                                    <TextBlock Text="{Binding ThemePacksLine}" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <Button Style="{StaticResource SettingsLinkButton}" Content="{Binding PacksLinkTitle}"
+                                            views:SettingsLinkTo.Link="{Binding PacksLink}" Command="{Binding ShowPacksClickedCommand}"
+                                            AutomationProperties.Name="{Binding PacksLinkTitle}" />
+                                </WrapPanel>
+                                <TextBlock Text="Choose a theme" FontSize="11" views:SettingsAnchor.Id="gallery"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Margin="0,0,0,8" />
+                            </StackPanel>
                             <Border Grid.Row="1" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
                                     BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
                                     Padding="5,4">

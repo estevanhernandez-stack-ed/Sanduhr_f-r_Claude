@@ -46,8 +46,14 @@ public sealed partial class DeskCompanionViewModel : ObservableObject
     public string RoamName => SettingsNames.WidgetCompanionRoam;
     public string NoneYet => SettingsNames.NoCompanionYet;
     public string GetOneTitle => SettingsNames.GetACompanion;
-    /// <summary>The catalog, where a sprite is installed (the alias table carries it to Mods &amp; Widgets in slice 4).</summary>
-    public string GetOneLink => SettingsIndex.PageId(SettingsPage.Widgets) + "#" + SettingsIndex.WidgetsCatalog;
+    /// <summary>The catalog, where a sprite is installed: Mods &amp; Widgets, Catalog, showing sprites (spec, Desk: the Companion row).</summary>
+    public string GetOneLink => SettingsIndex.PageId(SettingsPage.Mods) + "#" + SettingsIndex.Catalog;
+
+    /// <summary>Set by Settings: the catalog shows sprites only (the link itself opens the place).</summary>
+    public Action? GetOne { get; set; }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void GetOneClicked() => GetOne?.Invoke();
 
     partial void OnSelectedCompanionChanged(CompanionChoice? value)
     {

@@ -398,4 +398,51 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    private static void Press(Button button) =>
+        ((System.Windows.Automation.Provider.IInvokeProvider)new System.Windows.Automation.Peers.ButtonAutomationPeer(button)
+            .GetPattern(System.Windows.Automation.Peers.PatternInterface.Invoke)).Invoke();
+
+    [Fact]
+    public void The_companions_get_one_link_lands_on_the_catalog_showing_sprites() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Desk, SettingsIndex.DeskPieces);
+            Settle(window, guard);
+            var link = Below<Button>(window).Single(b => System.Windows.Automation.AutomationProperties.GetName(b) == SettingsNames.GetACompanion);
+
+            Press(link);
+            Settle(window, guard);
+
+            Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.Catalog), window.Place);
+            Assert.Equal("sprite", svm.ModsPage.CatalogKind);
+            Assert.True(svm.ModsPage.CatalogOpen);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void Themes_link_lands_on_the_installed_list_showing_widget_packs() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            var paths = ScratchPaths();
+            svm.Themes.Widgets = () => InstalledPackKit.Store(paths);   // never the real widgets folder
+            svm.Themes.RefreshThemePacks();
+            window.SelectPage(SettingsPage.Themes);
+            Settle(window, guard);
+            var link = Below<Button>(window).Single(b => System.Windows.Automation.AutomationProperties.GetName(b) == SettingsNames.LinkTitle(SettingsPage.Mods));
+            Assert.Contains(Below<TextBlock>(window), t => t.Text == SettingsNames.ThemePacksLine(0));
+
+            Press(link);
+            Settle(window, guard);
+
+            Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.ModList), window.Place);
+            Assert.Equal(InstalledFilter.Widgets, svm.ModsPage.Filter);
+        }
+        finally { window.Close(); }
+    });
 }

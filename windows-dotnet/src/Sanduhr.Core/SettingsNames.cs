@@ -650,7 +650,7 @@ public static class SettingsNames
     public const string CompanionLine = "The companion is " + DefineCompanion + ".";
     /// <summary>Desk, Pieces, the Companion row with no sprite installed. The link names the page that holds the catalog today.</summary>
     public const string NoCompanionYet = "No companion yet.";
-    public static string GetACompanion => $"Get one in {PageTitle(SettingsPage.Widgets)}…";
+    public static string GetACompanion => $"Get one in {PageTitle(SettingsPage.Mods)}…";
     /// <summary>Desk, Designs: the collapsed section's one-line summary.</summary>
     public static string DesignsSummary(int saved, bool canPutBack) =>
         saved == 0 ? "None saved yet." : $"{saved} saved." + (canPutBack ? " " + PutMyDeskBack + " is ready." : "");

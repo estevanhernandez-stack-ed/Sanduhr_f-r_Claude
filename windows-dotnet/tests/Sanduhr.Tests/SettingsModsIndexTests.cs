@@ -146,4 +146,8 @@ public sealed class SettingsModsIndexTests
         Assert.Empty(SettingsNames.RetiredNames(SettingsNames.FilterWidgets));   // the chip may say "Widgets"
         Assert.Contains("Settings, Mods & Widgets", WhatsNewCards.Table.Single(c => c.Id == "widgets").Body);
     }
+
+    [Fact]
+    public void The_companion_row_names_the_new_page() =>
+        Assert.Equal("Get one in Mods & Widgets…", SettingsNames.GetACompanion);
 }

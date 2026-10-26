@@ -332,7 +332,7 @@ public sealed class CompanionPieceTests : IDisposable
         desk.Reload();
         Assert.False(companion.HasCompanions);
         Assert.Null(companion.SelectedCompanion);
-        Assert.Equal("widgets#widgets-catalog", companion.GetOneLink);
+        Assert.Equal("mods#catalog", companion.GetOneLink);
     }
 
     [Fact]

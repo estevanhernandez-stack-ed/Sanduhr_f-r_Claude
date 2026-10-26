@@ -617,6 +617,8 @@ public partial class App : Application
         _widgetReview.Host = new Desk.WidgetReviewHost(_desk, store, () =>
         {
             _settingsWindow?.ViewModel.ModsPage.ReloadLocal();
+            // A pack Claude made joins the pickers and the Themes pack line.
+            _settingsWindow?.ViewModel.PacksChanged();
             // A palette Claude made joins the Ink presets (3.9.1).
             _settingsWindow?.ViewModel.Desk.Reload();
         });

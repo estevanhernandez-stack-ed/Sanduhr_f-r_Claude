@@ -80,6 +80,7 @@ public sealed class SettingsViewModel
         MessagePage.ReloadFonts(fonts);
         ThemeMatch.Editor.ReloadFonts(fonts);
         Themes.Studio.ReloadFonts(fonts);
+        Themes.RefreshThemePacks();
         Desk.Reload();   // the Ink presets and the companion's sprites
     }
 
@@ -218,6 +219,9 @@ public sealed class SettingsViewModel
         // there reloads the cards and the snapshot switch (wired in the ModsPage setter, so a page a test puts in is wired too).
         ClaudeCodePage.FoldersChanged += () => ModsPage.ReloadLocal();
         ClaudeCodePage.PiecesChanged += () => ModsPage.ReloadLocal();
+        // The companion row's "Get one in Mods & Widgets…" shows sprites; Themes' link shows widget packs (spec, Menus).
+        Desk.Companion.GetOne = () => ModsPage.ShowSprites();
+        Themes.ShowPacks = () => ModsPage.ShowWidgetPacks();
         General = new GeneralViewModel(widget: widget);
         ModsPage = new ModsPageViewModel(host: ClaudeCodeHost.For(widget));
         Shortcuts = new ShortcutsViewModel(new SettingsStore(new Paths()), hotKeys);

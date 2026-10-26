@@ -86,7 +86,6 @@ public class SettingsDeskSplitIndexTests
     {
         Assert.Equal("Watchers are " + SettingsNames.DefineWatchers + ".", SettingsNames.WatchersLine);
         Assert.Equal("The companion is " + SettingsNames.DefineCompanion + ".", SettingsNames.CompanionLine);
-        Assert.Equal("Get one in Widgets…", SettingsNames.GetACompanion);   // follows PageTitle; slice 4 moves the catalog
         Assert.Equal("Where each piece sits now. Move pieces with the rows below or Arrange Desk…", SettingsNames.DeskMapCaption);
     }
 
