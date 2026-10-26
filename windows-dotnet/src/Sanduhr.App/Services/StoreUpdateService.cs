@@ -23,6 +23,7 @@ public sealed class StoreUpdateService
 {
     private readonly RestartToUpdateService _offers;
     private readonly Func<bool> _isPackaged;
+    private readonly Func<bool> _enabled;
     private readonly Func<nint> _ownerWindow;
     private readonly Action<string>? _log;
 
@@ -32,13 +33,26 @@ public sealed class StoreUpdateService
     /// <summary>True once the Store has told us an update is waiting.</summary>
     public bool UpdatePending { get; private set; }
 
+    /// <param name="enabled">Settings, About, Updates' switch (settings.json "update_check"). Off, the Store is never asked (Settings v2, slice 6).</param>
     public StoreUpdateService(
-        RestartToUpdateService offers, Func<nint> ownerWindow, Func<bool>? isPackaged = null, Action<string>? log = null)
+        RestartToUpdateService offers, Func<nint> ownerWindow, Func<bool>? isPackaged = null, Action<string>? log = null, Func<bool>? enabled = null)
     {
         _offers = offers;
         _ownerWindow = ownerWindow;
         _isPackaged = isPackaged ?? (() => Startup.IsPackaged());
         _log = log;
+        _enabled = enabled ?? (() => true);
+    }
+
+    /// <summary>The Store's answer: the waiting update's version, or null. A seam for tests, which never ask the real Store.</summary>
+    internal Func<Task<string?>> Query { get; init; } = AskTheStoreAsync;
+
+    private static async Task<string?> AskTheStoreAsync()
+    {
+        var context = StoreContext.GetDefault();
+        // network: store-update
+        var updates = await context.GetAppAndOptionalStorePackageUpdatesAsync();
+        return updates.Count > 0 ? VersionOf(updates[0]) : null;
     }
 
     /// <summary>Called from the widget's 30-second tick on the UI thread. The Store query itself is
@@ -46,7 +60,7 @@ public sealed class StoreUpdateService
     /// is acted on when it lands (on the UI thread, which the await resumes on).</summary>
     public void Tick(DateTimeOffset now)
     {
-        if (_checking || !StoreUpdate.ShouldCheck(_isPackaged(), _lastCheck, now))
+        if (_checking || !StoreUpdate.ShouldCheck(_isPackaged(), _lastCheck, now, enabled: _enabled()))
             return;
         _lastCheck = now;
         _checking = true;
@@ -58,10 +72,7 @@ public sealed class StoreUpdateService
         string? version = null;
         try
         {
-            var context = StoreContext.GetDefault();
-            var updates = await context.GetAppAndOptionalStorePackageUpdatesAsync();
-            if (updates.Count > 0)
-                version = VersionOf(updates[0]);
+            version = await Query();
         }
         catch (Exception e)
         {
@@ -130,9 +141,11 @@ public sealed class StoreUpdateInstaller : IUpdateInstaller
             try { WinRT.Interop.InitializeWithWindow.Initialize(context, hwnd); }
             catch (Exception e) { _log?.Invoke($"store update owner ({e.GetType().Name})"); }
         }
+        // network: store-update
         var updates = await context.GetAppAndOptionalStorePackageUpdatesAsync();
         if (updates.Count == 0)
             return UpdateInstallResult.NotAvailable;
+        // network: store-update
         var result = await context.RequestDownloadAndInstallStorePackageUpdatesAsync(updates);
         return Map(result.OverallState);
     }

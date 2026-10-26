@@ -50,6 +50,8 @@ public partial class App : Application
     private MenuItem? _restartToUpdateItem;
     private MenuItem? _restartItem;
     private RestartToUpdateService? _restartToUpdate;
+    /// <summary>The GitHub update check (Settings v2, slice 6): launch, the widget's tick and About's Check now share it.</summary>
+    private UpdateChecker? _updateChecker;
     private bool _quitting;
 
     /// <summary>Where Settings was when it last closed, for the app's life (spec, Reopen where it was left). Never saved.</summary>
@@ -171,7 +173,13 @@ public partial class App : Application
         _restartToUpdate.OfferChanged += UpdateRestartItems;
         _vm.RestartToUpdateRequested += () => _restartToUpdate?.Accept();
         _vm.RestartRequested += RestartApp;
-        _vm.AttachStoreUpdateService(new StoreUpdateService(_restartToUpdate, OwnerWindowHandle, log: LogUpdate));
+        // Settings, About, Updates' "Check for updates once a day" (settings.json "update_check") gates both update probes: off, neither the
+        // Store's question nor GitHub's runs on its own. About's Check now asks GitHub through the same checker.
+        var updateSwitch = new SettingsStore(new Sanduhr.Core.Paths());
+        _vm.AttachStoreUpdateService(new StoreUpdateService(_restartToUpdate, OwnerWindowHandle, log: LogUpdate, enabled: updateSwitch.LoadUpdateCheck));
+        _updateChecker = new UpdateChecker(updateSwitch.LoadUpdateCheck, new VelopackUpdateProbe(), UpdateChecker.DefaultStampPath,
+            (version, installer) => Dispatcher.BeginInvoke(() => _restartToUpdate?.Offer(version, installer)));
+        _vm.AttachUpdateChecker(_updateChecker);
 
         // Background, in order, each step on its own: the one-time re-point of pre-3.5.0 registrations to
         // %USERPROFILE%\.sanduhr, then the statusline bridge (WS-E) and the MCP integration refresh. The
@@ -225,11 +233,10 @@ public partial class App : Application
                 Environment.GetEnvironmentVariable(DemoMode.EnvironmentVariable)))
             _vm.StartDemo();
 
-        // Best-effort GitHub/Velopack update probe — fire-and-forget so a slow or offline
-        // network never delays the first paint. No-ops on the Store/MSIX install and in dev.
-        // A downloaded release joins the same Restart to update offer as the Store's.
-        _ = new UpdateChecker().CheckForUpdatesAsync((version, installer) =>
-            Dispatcher.BeginInvoke(() => _restartToUpdate?.Offer(version, installer)));
+        // The GitHub update probe at launch, fire-and-forget so a slow or offline network never delays the first paint. It asks only while
+        // "Check for updates once a day" is on and a day has passed; it no-ops on the Store/MSIX install and in dev. A downloaded release
+        // joins the same Restart to update offer as the Store's.
+        _ = _updateChecker?.RunIfDueAsync();
 
         ScheduleWhatsNewAtLaunch();
 
