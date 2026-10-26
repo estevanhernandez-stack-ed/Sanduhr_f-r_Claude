@@ -398,10 +398,17 @@ public sealed partial class PublishViewModel : ObservableObject
         {
             var record = await _service.SampleAsync(DateTimeOffset.Now);
             var date = record.Payload["date"]?.GetValue<string>() ?? "";
-            var endpoint = _service.Load().Target.EndpointUrl;
-            string? host = Uri.TryCreate(endpoint?.Trim(), UriKind.Absolute, out var uri) ? uri.Host : null;
-            var header = SettingsNames.SampleHeader(date, host);
-            var note = record.Homes.Count == 0 ? SettingsNames.SampleNoFolders : "";
+            var s = _service.Load();
+            var endpoint = s.Target.EndpointUrl;
+            // The senders' own gates: a usable endpoint, and a stored token when the scheme needs one (HasToken is loaded already:
+            // the sample reads no token).
+            bool usable = UsagePublisher.IsUsableEndpoint(endpoint);
+            string? host = usable && Uri.TryCreate(endpoint?.Trim(), UriKind.Absolute, out var uri) ? uri.Host : null;
+            bool tokenMissing = s.AuthScheme != PublishAuthScheme.None && !HasToken;
+            var header = SettingsNames.SampleHeader(date, host, tokenMissing);
+            var note = record.Homes.Count == 0
+                ? SettingsNames.SampleNoFolders(sendable: host is not null && !tokenMissing, dailyOn: s.Enabled)
+                : "";
             var json = record.Payload.ToJsonString(SampleJson);
             if (SampleHook is { } hook)
             {

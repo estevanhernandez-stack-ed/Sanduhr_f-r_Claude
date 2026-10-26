@@ -628,10 +628,17 @@ public class SettingsNamesTests
     [Fact]
     public void The_sample_header_says_where_the_next_record_goes_without_naming_a_button()
     {
-        Assert.Equal("The next record, for 2026-10-24, goes to example.com.", SettingsNames.SampleHeader("2026-10-24", "example.com"));
-        Assert.Equal("The next record, for 2026-10-24, has no endpoint yet, so it goes nowhere.", SettingsNames.SampleHeader("2026-10-24", null));
+        Assert.Equal("The next record, for 2026-10-24, goes to example.com.", SettingsNames.SampleHeader("2026-10-24", "example.com", false));
+        Assert.Equal("The next record, for 2026-10-24, has no endpoint it can go to yet, so it goes nowhere.", SettingsNames.SampleHeader("2026-10-24", null, false));
+        Assert.Equal("The next record, for 2026-10-24, has no endpoint it can go to yet, so it goes nowhere.", SettingsNames.SampleHeader("2026-10-24", null, true));
+        Assert.Equal("The next record, for 2026-10-24, would go to example.com, but it needs a token first, so it goes nowhere yet.",
+            SettingsNames.SampleHeader("2026-10-24", "example.com", true));
         Assert.Equal("No folder is ticked under Folders to share. Publish now waits for one; a daily or agent publish would send this record, "
-            + "naming no folder or project.", SettingsNames.SampleNoFolders);
+            + "naming no folder or project.", SettingsNames.SampleNoFolders(sendable: true, dailyOn: true));
+        Assert.Equal("No folder is ticked under Folders to share, and Publish daily is off, so nothing sends this record.",
+            SettingsNames.SampleNoFolders(sendable: true, dailyOn: false));
+        Assert.Equal("No folder is ticked under Folders to share.", SettingsNames.SampleNoFolders(sendable: false, dailyOn: true));
+        Assert.Equal("No folder is ticked under Folders to share.", SettingsNames.SampleNoFolders(sendable: false, dailyOn: false));
     }
 
     [Fact]
@@ -643,7 +650,8 @@ public class SettingsNamesTests
             SettingsNames.EachLimitCaption, SettingsNames.HiddenUntilResetCaption, SettingsNames.EachLimitSignedOut, SettingsNames.EachLimitNotYet,
             SettingsNames.MetersIntro, SettingsNames.MeterHistorySignedOut, SettingsNames.MeterHistoryEmpty, SettingsNames.WidgetLine,
             SettingsNames.CompactModeCaption, SettingsNames.DeepWorkRange, SettingsNames.JustTheDeskOn, SettingsNames.ShowTheWidgetCaption,
-            SettingsNames.PublishRecordLine, SettingsNames.SampleNoFolders, SettingsNames.SampleFailed, SettingsNames.SampleHeader("2026-10-24", null),
+            SettingsNames.PublishRecordLine, SettingsNames.SampleNoFolders(true, true), SettingsNames.SampleNoFolders(true, false), SettingsNames.SampleNoFolders(false, true),
+            SettingsNames.SampleFailed, SettingsNames.SampleHeader("2026-10-24", null, false), SettingsNames.SampleHeader("2026-10-24", "example.com", true),
         })
         {
             Assert.Empty(SettingsNames.RetiredNames(text));

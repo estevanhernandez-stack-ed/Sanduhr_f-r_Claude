@@ -624,11 +624,18 @@ public static class SettingsNames
         + "and your meters' percentages, reset times and when they were read. Show a sample… builds the next one here and sends nothing.";
     public const string ShowASample = "Show a sample…";
     public const string SampleTitle = "The next record";
-    public static string SampleHeader(string date, string? host) => host is null
-        ? $"The next record, for {date}, has no endpoint yet, so it goes nowhere."
+    /// <summary><paramref name="host"/> is null unless the endpoint is one the senders accept; <paramref name="tokenMissing"/> is true
+    /// when the auth scheme needs a token and none is stored. Either way the record goes nowhere, and the header says so.</summary>
+    public static string SampleHeader(string date, string? host, bool tokenMissing) =>
+        host is null ? $"The next record, for {date}, has no endpoint it can go to yet, so it goes nowhere."
+        : tokenMissing ? $"The next record, for {date}, would go to {host}, but it needs a token first, so it goes nowhere yet."
         : $"The next record, for {date}, goes to {host}.";
-    public const string SampleNoFolders = "No folder is ticked under Folders to share. Publish now waits for one; a daily or agent publish would send this record, "
-        + "naming no folder or project.";
+    /// <summary>The note under a sample with no folder ticked. <paramref name="sendable"/>: the endpoint is usable and any token is stored.</summary>
+    public static string SampleNoFolders(bool sendable, bool dailyOn) =>
+        !sendable ? "No folder is ticked under Folders to share."
+        : dailyOn ? "No folder is ticked under Folders to share. Publish now waits for one; a daily or agent publish would send this record, "
+            + "naming no folder or project."
+        : "No folder is ticked under Folders to share, and Publish daily is off, so nothing sends this record.";
     public const string SampleClose = "Close";
     public const string SampleFailed = "The sample couldn't be built.";
 

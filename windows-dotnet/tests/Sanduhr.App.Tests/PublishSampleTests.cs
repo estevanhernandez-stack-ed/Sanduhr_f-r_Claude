@@ -171,15 +171,15 @@ public sealed class PublishSampleTests : AppWindowFixture
     public void With_no_folder_ticked_the_sample_says_so_and_names_the_destination()
     {
         var (service, net, _, _) = Service(tickFolder: false);
+        service.SetEnabled(true);
         net.Forbid = true;
         string? header = null, note = null, json = null;
         var vm = new PublishViewModel(service) { SampleHook = (h, n, j) => (header, note, json) = (h, n, j) };
 
         vm.ShowSampleCommand.ExecuteAsync(null).GetAwaiter().GetResult();
 
-        Assert.Equal(SettingsNames.SampleNoFolders, note);
-        var date = UsagePublisher.DefaultDate(DateTimeOffset.Now).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-        Assert.Equal(SettingsNames.SampleHeader(date, "example.test"), header);
+        Assert.Equal(SettingsNames.SampleNoFolders(sendable: true, dailyOn: true), note);
+        Assert.Equal(SettingsNames.SampleHeader(Today(), "example.test", false), header);
         Assert.Empty(((JsonArray)JsonNode.Parse(json!)!["homes"]!));
         Assert.Equal(0, net.Calls);
         Assert.False(vm.IsSampling);
@@ -196,7 +196,90 @@ public sealed class PublishSampleTests : AppWindowFixture
         vm.ShowSampleCommand.ExecuteAsync(null).GetAwaiter().GetResult();
 
         var date = UsagePublisher.DefaultDate(DateTimeOffset.Now).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-        Assert.Equal(SettingsNames.SampleHeader(date, null), header);
+        Assert.Equal(SettingsNames.SampleHeader(date, null, false), header);
+    }
+
+    private static string Today() =>
+        UsagePublisher.DefaultDate(DateTimeOffset.Now).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+    private (string? Header, string? Note) Sampled(UsagePublishService service)
+    {
+        string? header = null, note = null;
+        var vm = new PublishViewModel(service) { SampleHook = (h, n, _) => (header, note) = (h, n) };
+        vm.ShowSampleCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+        return (header, note);
+    }
+
+    [Fact]
+    public void An_endpoint_the_senders_refuse_goes_nowhere_in_the_header()
+    {
+        var (service, _, _, _) = Service(tickFolder: true);
+        service.SetEndpointUrl("http://example.com/ingest");   // parses, but is not a usable endpoint
+
+        var (header, note) = Sampled(service);
+
+        Assert.Equal(SettingsNames.SampleHeader(Today(), null, false), header);
+        Assert.Equal("", note);
+    }
+
+    [Fact]
+    public void A_token_scheme_with_no_token_stored_says_it_needs_one_first()
+    {
+        var (service, _, creds, _) = Service(tickFolder: true, tokenScheme: true);   // no token saved
+        creds.Reads = 0;
+
+        var (header, _) = Sampled(service);
+
+        Assert.Equal(SettingsNames.SampleHeader(Today(), "example.test", true), header);
+        Assert.Contains("needs a token first", header);
+    }
+
+    [Fact]
+    public void With_no_folder_and_Publish_daily_off_the_note_says_nothing_sends_the_record()
+    {
+        var (service, _, _, _) = Service(tickFolder: false);
+        service.SetEnabled(false);
+
+        var (header, note) = Sampled(service);
+
+        Assert.Equal(SettingsNames.SampleNoFolders(sendable: true, dailyOn: false), note);
+        Assert.Contains("nothing sends this record", note);
+        Assert.Equal(SettingsNames.SampleHeader(Today(), "example.test", false), header);
+    }
+
+    [Fact]
+    public void With_no_folder_and_Publish_daily_on_the_note_says_a_daily_or_agent_publish_would_send_it()
+    {
+        var (service, _, _, _) = Service(tickFolder: false);
+        service.SetEnabled(true);
+
+        var (_, note) = Sampled(service);
+
+        Assert.Equal(SettingsNames.SampleNoFolders(sendable: true, dailyOn: true), note);
+        Assert.Contains("a daily or agent publish would send this record", note);
+    }
+
+    [Fact]
+    public void With_no_folder_and_nowhere_to_send_the_note_only_names_the_missing_folder()
+    {
+        var (service, _, _, _) = Service(tickFolder: false);
+        service.SetEnabled(true);
+        service.SetEndpointUrl("http://example.com/ingest");
+
+        var (_, note) = Sampled(service);
+
+        Assert.Equal("No folder is ticked under Folders to share.", note);
+    }
+
+    [Fact]
+    public void In_the_normal_case_the_header_names_the_host_and_there_is_no_note()
+    {
+        var (service, _, _, _) = Service(tickFolder: true);
+
+        var (header, note) = Sampled(service);
+
+        Assert.Equal($"The next record, for {Today()}, goes to example.test.", header);
+        Assert.Equal("", note);
     }
 
     [Fact]
