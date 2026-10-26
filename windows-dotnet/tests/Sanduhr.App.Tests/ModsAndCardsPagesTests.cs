@@ -445,4 +445,274 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    // ---- Done (spec, slice 4) and the two pages by keyboard and screen reader (Task 14) ----
+
+    private static string Bare(string label) => label.Trim().TrimEnd('…').TrimEnd(':').Trim();
+
+    private const string FixturePalette = "plain · Fixture palette";
+
+    /// <summary>Done, part 1: an installed palette is one click from where it shows.</summary>
+    [Fact]
+    public void An_installed_palette_is_one_click_from_where_it_shows() => AppHost.Run(() =>
+    {
+        InstalledPackKit.Install(new Paths(), "good-palette");   // the dev profile's widgets folder (SANDUHR_DEV_PROFILE, under %TEMP%)
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            svm.Desk.InkChoice = DeskSettingsViewModel.InkChoices.First(c => c.Mode == DeskInkMode.Light);
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.ModList);
+            Settle(window, guard);
+            var link = Below<Button>(window).Single(b => b.IsVisible && NameOf(b) == SettingsNames.WhereLinkFor(SettingsNames.LinkTitle(SettingsPage.DeskLook), "Fixture palette"));
+
+            Press(link);
+            Settle(window, guard);
+
+            Assert.Equal(new SettingsLink(SettingsPage.DeskLook, SettingsIndex.DeskInk), window.Place);
+            // The anchor is on the page, and the pack's palette is in the picker that page shows.
+            Assert.Single(Below<ComboBox>(window), c => c.IsVisible && c.ItemsSource is IEnumerable<string> items && items.Contains(FixturePalette));
+        }
+        finally { window.Close(); }
+    });
+
+    /// <summary>Done, part 2: switching a pack off removes it from its picker, with no reopen.</summary>
+    [Fact]
+    public void Switching_a_pack_off_removes_it_from_its_picker() => AppHost.Run(() =>
+    {
+        InstalledPackKit.Install(new Paths(), "good-palette");
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            svm.Desk.InkChoice = DeskSettingsViewModel.InkChoices.First(c => c.Mode == DeskInkMode.Light);
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.ModList);
+            Settle(window, guard);
+            Assert.Contains(FixturePalette, svm.Desk.InkPresetNames);
+            var on = Below<CheckBox>(window).Single(c => c.IsVisible && NameOf(c) == SettingsNames.PackOnFor("Fixture palette"));
+            Assert.True(on.IsChecked);
+
+            on.Command.Execute(on.CommandParameter);   // what a click runs: the bound command
+            Settle(window, guard);
+
+            Assert.False(on.IsChecked);
+            Assert.DoesNotContain(FixturePalette, svm.Desk.InkPresetNames);
+            Assert.False(InstalledPackKit.Store(new Paths()).Load().Find("good-palette")!.Enabled);
+
+            // And the picker itself, on the page that shows it.
+            window.SelectPage(SettingsPage.DeskLook, SettingsIndex.DeskInk);
+            Settle(window, guard);
+            var pickers = Below<ComboBox>(window).Where(c => c.IsVisible && c.ItemsSource is IEnumerable<string>).ToList();
+            Assert.NotEmpty(pickers);
+            Assert.DoesNotContain(pickers, c => ((IEnumerable<string>)c.ItemsSource).Contains(FixturePalette));
+        }
+        finally { window.Close(); }
+    });
+
+    /// <summary>Why a visible, enabled control cannot act, or null when it can: a command that can run, a link that resolves, or a binding
+    /// to the model. A toggle in an Expander's header acts through the template.</summary>
+    private static string? CantAct(Control c)
+    {
+        bool Bound(DependencyProperty p) => System.Windows.Data.BindingOperations.GetBindingExpressionBase(c, p) is { HasError: false };
+        switch (c)
+        {
+            case System.Windows.Controls.Primitives.ToggleButton { TemplatedParent: Expander }:
+                return null;
+            case System.Windows.Controls.Primitives.ButtonBase b when b.Command is { } cmd:
+                return cmd.CanExecute(b.CommandParameter) ? null : "its command can't run";
+            case System.Windows.Controls.Primitives.ButtonBase b when SettingsLinkTo.GetLink(b) is { Length: > 0 } link:
+                return SettingsIndex.ParseLink(link) is null ? $"its link \"{link}\" doesn't resolve" : null;
+            case System.Windows.Controls.Primitives.ToggleButton:
+                return Bound(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty) ? null : "it has no command and no binding";
+            case System.Windows.Controls.Primitives.ButtonBase:
+                return "it has no command and no link";
+            case ComboBox cb:
+                return !Bound(System.Windows.Controls.Primitives.Selector.SelectedItemProperty) ? "its selection is not bound"
+                    : cb.Items.Count == 0 ? "it has nothing to choose" : null;
+            case TextBox t:
+                return t.IsReadOnly ? "it is read-only" : Bound(TextBox.TextProperty) ? null : "its text is not bound";
+            default:
+                return null;
+        }
+    }
+
+    private static bool IsActor(Control c) => c is System.Windows.Controls.Primitives.ButtonBase or ComboBox or TextBox;
+
+    private static IEnumerable<string> ControlsThatCantAct(DependencyObject root) =>
+        Below<Control>(root).Where(c => IsActor(c) && c.IsVisible && c.IsEnabled)
+            .Select(c => (Control: c, Why: CantAct(c))).Where(x => x.Why is not null)
+            .Select(x => $"{x.Control.GetType().Name} \"{NameOf(x.Control)}\": {x.Why}");
+
+    private static List<string> ShownNames(DependencyObject root) =>
+        [.. Below<Control>(root).Where(c => IsActor(c) && c.IsVisible).Select(NameOf)];
+
+    private string MissingEntry() =>
+        Path.Combine(Root, "dev", "external", "mods", "v0.1.0-20200101000000", "sanduhr-meters").Replace("\\", "\\\\");
+
+    /// <summary>Done, part 3 (Principle 5): no row shows a control that can't act. Every Installed row, every meters row (Missing and
+    /// Unreadable included) and every Claude Code card: each shown, enabled control acts; read-only, Unreadable and Missing rows hide what can't.</summary>
+    [Fact]
+    public void No_row_shows_a_control_that_cant_act() => AppHost.Run(() =>
+    {
+        var personal = Home(".claude-personal", "{\"enabledPlugins\":{\"alpha@m\":true}}");
+        var cache = Path.Combine(Root, "cache", "alpha");
+        Directory.CreateDirectory(Path.Combine(cache, ".claude-plugin"));
+        File.WriteAllText(Path.Combine(cache, ".claude-plugin", "plugin.json"), """{"name":"alpha","version":"1.0.0"}""");
+        Directory.CreateDirectory(Path.Combine(personal, "plugins"));
+        File.WriteAllText(Path.Combine(personal, "plugins", "installed_plugins.json"),
+            "{\"version\":2,\"plugins\":{\"alpha@m\":[{\"installPath\":\"" + cache.Replace("\\", "\\\\") + "\",\"version\":\"1.0.0\"}]}}");
+        Home(".claude-broken", "{ nope");
+        Home(".claude-missing", "{\"env\":{\"CLAUDE_CODE_PLUGIN_DIRS\":\"" + MissingEntry() + "\"}}");
+        InstalledPackKit.Install(new Paths(), "good-effects");
+        InstalledPackKit.Install(new Paths(), "good-palette");
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.ModList);
+            Settle(window, guard);
+            var page = Below<ModsPage>(window).Single();
+
+            // The fixture reaches every state this test is about.
+            Assert.Contains(svm.ModsPage.Meters, m => m.State == FolderState.Unreadable);
+            Assert.Contains(svm.ModsPage.Meters, m => m.State == FolderState.Missing);
+            Assert.Contains(svm.ModsPage.Installed, r => r.IsReadOnly && !r.IsSanduhrMod);
+            Assert.Contains(svm.ModsPage.Installed, r => r.IsSanduhrMod);
+            Assert.Contains(svm.ModsPage.Installed, r => r.Id == "good-effects");
+
+            // Meters rows: each control shows exactly when its row can act on it (Unreadable shows none).
+            var meterRows = Below<ContentPresenter>(page).Where(p => p.Content is MetersFolderRowViewModel).ToList();
+            Assert.Equal(svm.ModsPage.Meters.Count, meterRows.Count);
+            foreach (var presenter in meterRows)
+            {
+                var vm = (MetersFolderRowViewModel)presenter.Content;
+                var shown = ShownNames(presenter);
+                if (vm.State == FolderState.Unreadable) Assert.Empty(shown);
+                Assert.Equal(vm.CanSwitch, shown.Contains(vm.SwitchName));
+                Assert.Equal(vm.CanUpdate, shown.Contains(vm.UpdateName));
+                Assert.Equal(vm.CanRemove, shown.Contains(vm.RemoveName));
+            }
+
+            // Installed rows: a read-only plugin has no control; Sanduhr's mod has only its link up; a pack has its switch and Uninstall.
+            var items = Below<ListBoxItem>(page).Where(i => i.Content is InstalledRowViewModel).ToList();
+            Assert.Equal(svm.ModsPage.Installed.Count, items.Count);
+            foreach (var item in items)
+            {
+                var vm = (InstalledRowViewModel)item.Content;
+                var shown = ShownNames(item);
+                if (vm.IsPack)
+                {
+                    Assert.Contains(vm.SwitchName, shown);
+                    Assert.Contains(vm.UninstallName, shown);
+                    Assert.Equal(vm.CanUseOwnArt, shown.Contains(vm.UseOwnArtName));
+                    Assert.Equal(vm.HasWhereLink, shown.Contains(vm.WhereLinkName));
+                    Assert.Equal(2 + (vm.CanUseOwnArt ? 1 : 0) + (vm.HasWhereLink ? 1 : 0), shown.Count);
+                }
+                else if (vm.IsSanduhrMod)
+                    Assert.Equal([SettingsNames.MetersLinkUp], shown);
+                else
+                    Assert.True(shown.Count == 0, $"{vm.Name} is read-only and shows {string.Join(", ", shown)}");
+            }
+            var effects = items.Single(i => ((InstalledRowViewModel)i.Content).Id == "good-effects");
+            Assert.DoesNotContain(Below<Button>(effects), b => b.IsVisible && SettingsLinkTo.GetLink(b) is { Length: > 0 });   // no link: nothing draws effects
+
+            Assert.Empty(ControlsThatCantAct(page));
+
+            // The Claude Code cards: every report open, every piece, then the page's own controls.
+            window.SelectPage(SettingsPage.ClaudeCode);
+            foreach (var card in svm.ClaudeCodePage.Folders) card.HoldsOpen = true;
+            Settle(window, guard);
+            Settle(window, guard);
+            var cards = Below<ClaudeCodePage>(window).Single();
+            Assert.Empty(ControlsThatCantAct(cards));
+            foreach (var row in svm.ClaudeCodePage.Folders)
+            {
+                var card = CardOf(Below<Expander>(cards).Single(e => e.DataContext == row))!;
+                var shown = ShownNames(card);
+                if (row.Holds.SettingsUnreadable)
+                    Assert.DoesNotContain(shown, n => n.Contains("Statusline", StringComparison.Ordinal) || n.Contains("hook", StringComparison.OrdinalIgnoreCase));
+                Assert.Equal(row.IsAdded, shown.Contains(row.ForgetName));
+                Assert.Equal(row.Discovered, shown.Contains(row.McpReadableName));
+            }
+        }
+        finally { window.Close(); }
+    });
+
+    /// <summary>Every button and box on the two pages is spoken with its visible label first (WF34; WCAG 2.5.3), item templates included;
+    /// every Installed item is a named stop.</summary>
+    [Fact]
+    public void Every_control_on_the_two_pages_is_spoken_with_its_label_first() => AppHost.Run(() =>
+    {
+        Home(".claude-work");
+        InstalledPackKit.Install(new Paths(), "good-palette");
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            var bad = new List<string>();
+            foreach (var page in new[] { SettingsPage.ClaudeCode, SettingsPage.Mods })
+            {
+                window.SelectPage(page);
+                Settle(window, guard);
+                if (page == SettingsPage.ClaudeCode) foreach (var f in svm.ClaudeCodePage.Folders) f.HoldsOpen = true;
+                Settle(window, guard);
+                DependencyObject root = page == SettingsPage.ClaudeCode ? Below<ClaudeCodePage>(window).Single() : Below<ModsPage>(window).Single();
+                var buttons = Below<System.Windows.Controls.Primitives.ButtonBase>(root).Where(b => b.IsVisible && b.Content is string).ToList();
+                Assert.NotEmpty(buttons);
+                foreach (var b in buttons)
+                {
+                    var name = NameOf(b);
+                    if (name.Length == 0 || !name.StartsWith(Bare((string)b.Content), StringComparison.Ordinal))
+                        bad.Add($"{page}: \"{b.Content}\" is spoken \"{name}\"");
+                }
+                if (page == SettingsPage.Mods)
+                {
+                    var items = Below<ListBoxItem>(root).Where(i => i.Content is InstalledRowViewModel).ToList();
+                    Assert.NotEmpty(items);
+                    foreach (var i in items)
+                        if (NameOf(i) != ((InstalledRowViewModel)i.Content).RowName || !i.Focusable || !i.IsTabStop)
+                            bad.Add($"{page}: Installed item \"{((InstalledRowViewModel)i.Content).Name}\" is spoken \"{NameOf(i)}\" (focusable {i.Focusable}, tab stop {i.IsTabStop})");
+                }
+            }
+            Assert.True(bad.Count == 0, string.Join(Environment.NewLine, bad));
+            Assert.Empty(LeaksIn(NamesOf(window)));
+        }
+        finally { window.Close(); }
+    });
+
+    /// <summary>A landing on Meters above the prompt puts the keyboard on the first folder's switch.</summary>
+    [DesktopFact]
+    public void A_landing_on_meters_focuses_the_first_folders_switch() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            guard.RouteKeyboard();
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.Meters);
+            Settle(window, guard);
+            var focused = Keyboard.FocusedElement as FrameworkElement;
+            Assert.True(focused is CheckBox, $"focus is on {Describe(focused)} on {window.Place}");
+            Assert.Equal(SettingsNames.MetersOnFor(svm.ModsPage.Meters[0].Display), NameOf(focused!));
+            guard.Check();
+        }
+        finally { window.Close(); }
+    });
+
+    /// <summary>A landing on the Installed list puts the keyboard inside that section, never above it or on the page's top.</summary>
+    [DesktopFact]
+    public void A_landing_on_the_installed_list_focuses_inside_the_section() => AppHost.Run(() =>
+    {
+        InstalledPackKit.Install(new Paths(), "good-palette");
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            guard.RouteKeyboard();
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.ModList);
+            Settle(window, guard);
+            Settle(window, guard);
+            var focused = Keyboard.FocusedElement as DependencyObject;
+            var page = Below<ModsPage>(window).Single();
+            var section = VisualTreeHelper.GetParent(Below<TextBlock>(page).Single(t => t.Text == SettingsNames.InstalledSection));
+            Assert.True(focused is not null && IsInside(focused, section),
+                $"focus is on {Describe(focused)} on {window.Place}, not inside the Installed section");
+            guard.Check();
+        }
+        finally { window.Close(); }
+    });
 }
