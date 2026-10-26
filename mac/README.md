@@ -1444,7 +1444,7 @@ The Max plans carry riffs for the capsule's tooltip: Max ×20 has "Plaid Max", "
 
 Settings, Accounts shows each account's plan beside its name. `AccountPlans` keeps the display name per account in the app's defaults under `accountPlans` (`{label: name}`; never the tier, billing type or riffs), set from the active client's fetch and from Following's check of an inactive account, moved on rename, and cleared by Sign Out and Remove Account (Reset Sanduhr removes the whole domain).
 
-`snapshot.json` carries the active account's name as `plan` (null when unknown or signed out), and each `snapshot.<account_ref>.json` carries that seat's. The MCP's `get_usage` returns it as `account.plan`, and the statusline and meters mod read the same field. Demo mode shows invented plans and reads no real one (`DemoMode.plan(for:)`: Work is Max ×20, Personal is Pro). `smoke/smoke state` shows `plan` (the name or null) in `state.yaml`, nothing else about the tier.
+`snapshot.json` carries the active account's name as `plan` (null when unknown or signed out), and each `snapshot.<account_ref>.json` carries that seat's. The MCP's `get_usage` returns it as `account.plan`; the statusline and the meters mod don't show it yet. Demo mode shows invented plans and reads no real one (`DemoMode.plan(for:)`: Work is Max ×20, Personal is Pro). `smoke/smoke state` shows `plan` (the name or null) in `state.yaml`, nothing else about the tier.
 
 ## Lock screen line
 
