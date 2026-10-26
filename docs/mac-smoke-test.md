@@ -2122,7 +2122,8 @@ The line Sanduhr keeps ready for the lock screen: `prefix · Claude 29% · reset
 for you`. The switch writes a text file and registers a root helper that puts the line on the lock
 screen. On a scratch macOS user, or with `~/Library/Application Support/Sanduhr` backed up first, as
 section 45 does. A rebuilt dev build must turn the switch off and on to re-register the helper (see
-mac/README.md, Lock screen line).
+mac/README.md, Lock screen line). `<label>` below is `com.626labs.sanduhr.lockscreen` for a signed
+release and `com.626labs.sanduhr.lockscreen.dev` for a dev build.
 
 1. `smoke/smoke run smoke/scenarios/lock-line.yaml` (from `mac/`) passes: demo mode on, Settings open
    on Lock Screen, `lock_line.text` reads `Claude N%`, a fake watcher in `waiting` adds `waiting for
@@ -2140,8 +2141,12 @@ mac/README.md, Lock screen line).
 6. `smoke/smoke state` shows `lock_line: {on, text, length}` matching the Preview and the switch.
 
 7. Turn the switch on and approve the admin prompt (and System Settings, Login Items, if asked): the
-   caption says On. `launchctl print system/com.626labs.sanduhr.lockline` shows the job; within about
+   caption says On. `launchctl print system/<label>` shows the job, with `last exit code = 0`; within about
    a minute `defaults read /Library/Preferences/com.apple.loginwindow LoginwindowText` is the
    preview's line, and Control-Command-Q shows it on the lock screen.
 8. Turn the switch off: the caption says "Taking the line off the lock screen", then Off; the key is
    gone (or the earlier message is back) and `launchctl print` no longer finds the job.
+9. From 2.33.0 (signed release to signed release): with 2.33.0's helper registered, update. The
+   switch still reads On. Turn it off and on: `launchctl print system/com.626labs.sanduhr.lockscreen`
+   runs with exit code 0, and `launchctl print system/com.626labs.sanduhr.lockline` no longer finds
+   the old job. The line stays on the lock screen throughout.
