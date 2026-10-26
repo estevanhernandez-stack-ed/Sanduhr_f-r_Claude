@@ -637,6 +637,8 @@ public static class SettingsNames
             + "naming no folder or project."
         : "No folder is ticked under Folders to share, and Publish daily is off, so nothing sends this record.";
     public const string SampleClose = "Close";
+    /// <summary>Settings, Widget, Limit order, when the widget has limits and every one is hidden.</summary>
+    public const string LimitOrderAllHidden = "Every limit is hidden. Show one under Alerts, Each limit.";
     public const string SampleFailed = "The sample couldn't be built.";
 
     // ---- Settings v2, slice 3: the Desk split ----

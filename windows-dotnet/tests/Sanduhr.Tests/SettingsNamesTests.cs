@@ -647,7 +647,7 @@ public class SettingsNamesTests
         foreach (var text in new[]
         {
             SettingsNames.SignedOutAccountsLine, SettingsNames.ClearHistoryDetail, SettingsNames.RemoveAccountDetail("Work"),
-            SettingsNames.EachLimitCaption, SettingsNames.HiddenUntilResetCaption, SettingsNames.EachLimitSignedOut, SettingsNames.EachLimitNotYet,
+            SettingsNames.EachLimitCaption, SettingsNames.HiddenUntilResetCaption, SettingsNames.EachLimitSignedOut, SettingsNames.EachLimitNotYet, SettingsNames.LimitOrderAllHidden,
             SettingsNames.MetersIntro, SettingsNames.MeterHistorySignedOut, SettingsNames.MeterHistoryEmpty, SettingsNames.WidgetLine,
             SettingsNames.CompactModeCaption, SettingsNames.DeepWorkRange, SettingsNames.JustTheDeskOn, SettingsNames.ShowTheWidgetCaption,
             SettingsNames.PublishRecordLine, SettingsNames.SampleNoFolders(true, true), SettingsNames.SampleNoFolders(true, false), SettingsNames.SampleNoFolders(false, true),

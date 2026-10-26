@@ -200,6 +200,30 @@ public sealed class WidgetLimitsTests : AppWindowFixture
     });
 
     [Fact]
+    public void With_every_limit_hidden_the_empty_line_points_at_Each_limit_not_at_the_next_check() => AppHost.Run(() =>
+    {
+        var (widget, order) = ThreeShown();
+        try
+        {
+            Assert.Equal(SettingsNames.EachLimitNotYet, ScratchEmpty());
+            foreach (var key in order)
+                widget.HideTier(key);
+
+            Assert.Empty(widget.ShownLimitOrder);
+            Assert.Equal(SettingsNames.LimitOrderAllHidden, widget.LimitsEmptyLine());
+            Assert.Equal("Every limit is hidden. Show one under Alerts, Each limit.", SettingsNames.LimitOrderAllHidden);
+        }
+        finally { widget.Dispose(); }
+
+        string ScratchEmpty()
+        {
+            var (fresh, _) = ScratchWidget("Other");
+            try { return fresh.LimitsEmptyLine(); }
+            finally { fresh.Dispose(); }
+        }
+    });
+
+    [Fact]
     public void Graph_style_and_keep_on_top_write_their_keys() => AppHost.Run(() =>
     {
         var (widget, _) = ScratchWidget("Personal");

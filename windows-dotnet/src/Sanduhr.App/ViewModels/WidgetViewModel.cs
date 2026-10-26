@@ -2081,7 +2081,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>What an empty limits list says (Alerts, Each limit; Widget, Limit order): signed out, or signed in and not fetched yet.</summary>
     public string LimitsEmptyLine() =>
-        ActiveAccount is null && !IsDemo ? SettingsNames.EachLimitSignedOut : SettingsNames.EachLimitNotYet;
+        ActiveAccount is null && !IsDemo ? SettingsNames.EachLimitSignedOut
+        : _shownOrder.Count == 0 && PresentLimitKeys().Any() ? SettingsNames.LimitOrderAllHidden
+        : SettingsNames.EachLimitNotYet;
 
     /// <summary>Settings, Widget, Limit order: the limits the widget shows, in its order (compact mode aside).</summary>
     public IReadOnlyList<string> ShownLimitOrder => _shownOrder;
