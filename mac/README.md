@@ -1450,6 +1450,12 @@ off writes an empty file once; demo mode writes nothing; Reset Sanduhr… remove
 rest of the folder. Nothing shows on the lock screen yet: the root writer is a later build, see
 `docs/lock-screen-line-spec.md`.
 
+
+**Dev builds and the helper.** macOS stores a launch constraint when the helper registers. For an
+ad-hoc signed dev build that pins the exact binary, so after a rebuild launchd refuses the
+registered helper (`launchctl print system/com.626labs.sanduhr.lockline` shows `job state = spawn
+failed`, exit 78, `needs LWCR update`). Turn the switch off and on to register the new build. A
+team-signed release is constrained by team and identifier, which updates keep.
 ## Now playing
 
 Now playing (items 53, 53b) shows what plays on the Mac, in any app that publishes now playing
