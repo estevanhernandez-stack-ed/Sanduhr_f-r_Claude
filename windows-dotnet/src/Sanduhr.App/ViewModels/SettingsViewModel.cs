@@ -221,6 +221,7 @@ public sealed class SettingsViewModel
         ClaudeCodePage.PiecesChanged += () => ModsPage.ReloadLocal();
         // The companion row's "Get one in Mods & Widgets…" shows sprites; Themes' link shows widget packs (spec, Menus).
         Desk.Companion.GetOne = () => ModsPage.ShowSprites();
+        Desk.Companion.TurnOneOn = () => ModsPage.ShowWidgetPacks();
         Themes.ShowPacks = () => ModsPage.ShowWidgetPacks();
         General = new GeneralViewModel(widget: widget);
         ModsPage = new ModsPageViewModel(host: ClaudeCodeHost.For(widget));

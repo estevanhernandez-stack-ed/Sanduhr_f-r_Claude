@@ -61,7 +61,15 @@ public class SettingsIndexTests
         {
             Assert.True(SettingsIndex.NameAnchors.TryGetValue(name, out var anchor), $"no anchor for {name}");
             Assert.NotNull(SettingsIndex.Find(page, anchor));
-            Assert.Contains(SettingsIndex.Search(name), h => h.Entry.Page == page && h.Entry.Anchor == anchor);
+            // A control inside a section whose opening asks the network is not offered by search at all (it could not land inside it).
+            if (SettingsIndex.FetchingSections.ContainsKey((page, anchor!)) && SettingsIndex.CollapsedSections.ContainsKey((page, anchor!))
+                && !SettingsIndex.Anchors.Any(e => e.Title == name))
+            {
+                Assert.DoesNotContain(SettingsIndex.Search(name), h => h.Entry.Title == name);
+                continue;
+            }
+            var lands = SettingsIndex.FetchingSections.TryGetValue((page, anchor!), out var safe) ? safe : anchor;
+            Assert.Contains(SettingsIndex.Search(name), h => h.Entry.Page == page && h.Entry.Anchor == lands);
         }
     }
 

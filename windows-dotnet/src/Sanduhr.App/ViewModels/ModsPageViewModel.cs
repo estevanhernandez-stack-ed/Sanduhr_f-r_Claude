@@ -135,6 +135,12 @@ public sealed partial class InstalledRowViewModel : ObservableObject
     public bool HasScope => ScopeText.Length > 0;
     public string ReadOnlyText => Item.ReadOnlyReason ?? "";
 
+    /// <summary>What a Claude Code mod or plugin touches, in one line ("Draws a band; can run programs."); nothing for a pack, Sanduhr's own
+    /// mod or a row that touches nothing.</summary>
+    public string TouchesText => Item.TouchesLine;
+    public bool HasTouches => TouchesText.Length > 0;
+    private string TouchesSpoken => HasTouches ? char.ToLowerInvariant(TouchesText[0]) + TouchesText[1..].TrimEnd('.') : "";
+
     /// <summary>Where a pack shows (WF3), and "&lt;Page&gt; settings…" to it.</summary>
     public string WhereText { get; }
     public string? WhereLink { get; }
@@ -183,6 +189,7 @@ public sealed partial class InstalledRowViewModel : ObservableObject
             .Where(s => s.Length > 0))
         : ModsPageText.RowName(Name, Item.Version, ScopeText, Item.IsMod && !IsSanduhrMod,
               hasFiles: Item.Scope?.Any(s => s.State is FolderState.On or FolderState.Off) == true)
+          + (HasTouches ? ", " + TouchesSpoken : "")
           + (IsReadOnly ? ", " + SettingsNames.RowReadOnly : "");
 
     public override string ToString() => RowName;
@@ -450,9 +457,10 @@ public sealed partial class ModsPageViewModel : ObservableObject
         return _refreshing = RefreshAsync();
     }
 
-    /// <summary>The companion row's "Get one in Mods &amp; Widgets…": the catalog, sprites only.</summary>
+    /// <summary>The companion row's "Get one in Mods &amp; Widgets…": the catalog, sprites only, for this visit.</summary>
     public void ShowSprites()
     {
+        _linkSetFilter = !_active;
         CatalogKind = "sprite";
         _ = OpenCatalog();
     }
@@ -486,6 +494,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
     /// <summary>Themes' "Mods &amp; Widgets settings…" lands on the list showing widget packs (spec, Menus).</summary>
     public void ShowWidgetPacks()
     {
+        _linkSetFilter = !_active;
         FilterText = "";
         Filter = InstalledFilter.Widgets;
     }
@@ -499,9 +508,25 @@ public sealed partial class ModsPageViewModel : ObservableObject
     /// <summary>The page became visible: list what is installed. Nothing is fetched (the catalog asks only when opened, WF6).</summary>
     public Task Activate()
     {
+        // Every visit starts on All with no text, unless the link that brought you set a filter first (Themes' pack link, the companion's
+        // sprite link): that filter holds for this visit only (owner decision, slice 4 follow-up).
+        if (!_linkSetFilter && !_active)
+        {
+            Filter = InstalledFilter.All;
+            FilterText = "";
+            CatalogKind = null;
+        }
+        _linkSetFilter = false;
+        _active = true;
         ReloadLocal();
         return Task.CompletedTask;
     }
+
+    /// <summary>The page left the screen: a link that lands next sets its filter ahead of the visit.</summary>
+    public void Deactivate() => _active = false;
+
+    private bool _active;
+    private bool _linkSetFilter;
 
     [RelayCommand]
     private Task CheckAgain() => _refreshing is { IsCompleted: false } running ? running : _refreshing = RefreshAsync();

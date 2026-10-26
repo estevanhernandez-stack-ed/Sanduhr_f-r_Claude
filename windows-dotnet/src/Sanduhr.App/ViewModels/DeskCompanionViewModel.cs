@@ -39,6 +39,10 @@ public sealed partial class DeskCompanionViewModel : ObservableObject
     [ObservableProperty] private bool _roams;
     [ObservableProperty] private bool _hasCompanions;
     [ObservableProperty] private string _status = "";
+    /// <summary>Sprites are installed but every one is switched off: the row says so instead of "No companion yet".</summary>
+    [ObservableProperty] private bool _spritesAreOff;
+    /// <summary>No sprite is installed at all: "No companion yet." and the link to the catalog.</summary>
+    [ObservableProperty] private bool _noSprites = true;
 
     /// <summary>The row's first line (WF21).</summary>
     public string Line => SettingsNames.CompanionLine;
@@ -48,6 +52,17 @@ public sealed partial class DeskCompanionViewModel : ObservableObject
     public string GetOneTitle => SettingsNames.GetACompanion;
     /// <summary>The catalog, where a sprite is installed: Mods &amp; Widgets, Catalog, showing sprites (spec, Desk: the Companion row).</summary>
     public string GetOneLink => SettingsIndex.PageId(SettingsPage.Mods) + "#" + SettingsIndex.Catalog;
+
+    public string SpritesOffLine => SettingsNames.SpritesSwitchedOff;
+    public string TurnOneOnTitle => SettingsNames.TurnASpriteOn;
+    /// <summary>The Installed list, where a sprite's switch is (the click also filters it to widgets).</summary>
+    public string TurnOneOnLink => SettingsIndex.PageId(SettingsPage.Mods) + "#" + SettingsIndex.ModList;
+
+    /// <summary>Set by Settings: the Installed list shows widget packs (the link itself opens the place).</summary>
+    public Action? TurnOneOn { get; set; }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void TurnOneOnClicked() => TurnOneOn?.Invoke();
 
     /// <summary>Set by Settings: the catalog shows sprites only (the link itself opens the place).</summary>
     public Action? GetOne { get; set; }
@@ -82,10 +97,16 @@ public sealed partial class DeskCompanionViewModel : ObservableObject
             WidgetRegistry reg;
             try { reg = store.Load(); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { reg = WidgetRegistry.Empty; }
-            foreach (var row in reg.Packs.Where(p => p.Enabled))
+            bool anySprite = false;
+            foreach (var row in reg.Packs)
                 if (store.ReadInfo(row.Id) is { Kind: "sprite" } info)
-                    Companions.Add(new CompanionChoice(row.Id, info.Name));
+                {
+                    anySprite = true;
+                    if (row.Enabled) Companions.Add(new CompanionChoice(row.Id, info.Name));
+                }
             HasCompanions = Companions.Count > 0;
+            SpritesAreOff = !HasCompanions && anySprite;
+            NoSprites = !HasCompanions && !anySprite;
             if (!HasCompanions)
             {
                 SelectedCompanion = null;

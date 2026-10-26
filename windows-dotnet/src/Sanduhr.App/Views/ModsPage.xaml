@@ -166,6 +166,8 @@
                         <!-- A Claude Code item: its scope; Sanduhr's mod links up to its switches, the others say why they can't switch. -->
                         <TextBlock Text="{Binding ScopeText}" FontSize="11" Margin="0,4,0,0" Foreground="{DynamicResource Sanduhr.Brush.Text}"
                                    Visibility="{Binding HasScope, Converter={StaticResource BoolVis}}" />
+                        <TextBlock Text="{Binding TouchesText}" Style="{StaticResource Dim}" Margin="0,2,0,0" TextWrapping="Wrap"
+                                   Visibility="{Binding HasTouches, Converter={StaticResource BoolVis}}" />
                         <TextBlock Text="{Binding ReadOnlyText}" Style="{StaticResource Dim}" Margin="0,2,0,0"
                                    Visibility="{Binding IsReadOnly, Converter={StaticResource BoolVis}}" />
                         <Button Style="{DynamicResource SettingsLinkButton}" Content="{Binding MetersLinkTitle}" HorizontalAlignment="Left" Margin="0,4,0,0"

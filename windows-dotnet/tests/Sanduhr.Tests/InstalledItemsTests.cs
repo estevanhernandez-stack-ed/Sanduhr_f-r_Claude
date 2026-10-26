@@ -45,6 +45,48 @@ public sealed class InstalledItemsTests
         _ => null,
     };
 
+    private static ModItem WithTouches(ModItem m, ModTouches t) => m with { Touches = t };
+
+    [Fact]
+    public void A_claude_code_row_carries_what_it_touches_across_its_folders_and_says_it_in_one_line()
+    {
+        var band = new ModTouches([ModSurface.Band], [ModCapability.Process], []);
+        var net = new ModTouches([ModSurface.Toast, ModSurface.Band], [ModCapability.Http], ["hi"]);
+        var items = InstalledItems.Build(
+        [
+            Folder(".claude", mods: WithTouches(Plugin("alpha", ModState.On, isMod: true), band)),
+            Folder(".claude-work", mods: WithTouches(Plugin("alpha", ModState.On, isMod: true), net)),
+        ], WidgetRegistry.Empty, Info, null);
+
+        var alpha = Assert.Single(items);
+        Assert.Equal([ModSurface.Band, ModSurface.Toast], alpha.Touches!.Surfaces);
+        Assert.Equal([ModCapability.Process, ModCapability.Http], alpha.Touches.Capabilities);
+        Assert.Equal("Draws a band, toasts; can run programs, use the network.", alpha.TouchesLine);
+    }
+
+    [Fact]
+    public void The_touches_line_is_the_old_pages_wording()
+    {
+        Assert.Equal("Draws a band; can run programs.", ModsPageText.DescribeTouches(new([ModSurface.Band], [ModCapability.Process], [])));
+        Assert.Equal("Draws a pane, the status line, slash commands.",
+            ModsPageText.DescribeTouches(new([ModSurface.Pane, ModSurface.Status, ModSurface.Commands], [], [])));
+        Assert.Equal("Can read and write files.", ModsPageText.DescribeTouches(new([], [ModCapability.Files], [])));
+        Assert.Equal("", ModsPageText.DescribeTouches(ModTouches.None));
+    }
+
+    [Fact]
+    public void No_touches_line_for_a_pack_the_meters_mod_or_a_row_that_touches_nothing()
+    {
+        var band = new ModTouches([ModSurface.Band], [], []);
+        var items = InstalledItems.Build(
+        [
+            Folder(".claude", OwnOn(".claude"), IntegrationStatus.Installed, WithTouches(Meters(), band), Plugin("quiet", ModState.On)),
+        ], Packs(Pack("good-palette")), Info, null);
+
+        Assert.Equal(["", "", ""], items.Select(i => i.TouchesLine));
+        Assert.Equal(3, items.Count);
+    }
+
     [Fact]
     public void A_plugin_in_two_folders_is_one_row_with_every_folder_in_its_scope()
     {

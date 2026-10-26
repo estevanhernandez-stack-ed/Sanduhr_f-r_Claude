@@ -105,14 +105,25 @@ public class SettingsDeskSplitIndexTests
     [Fact]
     public void An_anchor_row_whose_target_is_missing_falls_back_to_the_page_row()
     {
-        // A later build without Widgets in the sidebar, where Mods has a catalog but no "mods" section yet: the installed-widgets
-        // link can't land on its own target, so it lands where the Widgets page as a whole went.
+        // A build without Widgets in the sidebar and without the Desk's "pieces" section: the companion link can't land on its own
+        // target, so it lands where the Widgets page as a whole went (the Installed list), never on the Catalog (which would ask GitHub).
+        var anchors = SettingsIndex.Anchors
+            .Where(e => !(e.Page == SettingsPage.Desk && e.Anchor == SettingsIndex.DeskPieces))
+            .ToList();
+        var pages = SettingsNames.Pages.Where(p => p != SettingsPage.Widgets).ToList();
+        Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.ModList),
+            SettingsIndex.Resolve(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion, anchors, pages));
+    }
+
+    [Fact]
+    public void An_anchor_row_whose_target_and_page_row_target_are_both_missing_stays_as_written()
+    {
         var anchors = SettingsIndex.Anchors
             .Where(e => !(e.Page == SettingsPage.Mods && e.Anchor == SettingsIndex.ModList))
             .Append(new SettingsEntry("Catalog", SettingsPage.Mods, "catalog", []))
             .ToList();
         var pages = SettingsNames.Pages.Where(p => p != SettingsPage.Widgets).ToList();
-        Assert.Equal(new SettingsLink(SettingsPage.Mods, "catalog"),
+        Assert.Equal(new SettingsLink(SettingsPage.Widgets, SettingsIndex.WidgetsInstalled),
             SettingsIndex.Resolve(SettingsPage.Widgets, SettingsIndex.WidgetsInstalled, anchors, pages));
     }
 
@@ -120,8 +131,8 @@ public class SettingsDeskSplitIndexTests
     public void A_retired_pages_unknown_anchor_lands_where_the_page_went()
     {
         // Widgets left the sidebar in slice 4: an anchor no row carries lands on the page row's target.
-        Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.Catalog), SettingsIndex.Resolve(SettingsPage.Widgets, "gone"));
-        Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.Catalog), SettingsIndex.Check(SettingsPage.Widgets, "gone"));
+        Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.ModList), SettingsIndex.Resolve(SettingsPage.Widgets, "gone"));
+        Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.ModList), SettingsIndex.Check(SettingsPage.Widgets, "gone"));
     }
 
     [Fact]

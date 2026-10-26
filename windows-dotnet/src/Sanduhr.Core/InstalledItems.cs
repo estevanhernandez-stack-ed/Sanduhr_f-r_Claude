@@ -35,10 +35,16 @@ public sealed record InstalledItem(
     string? ReadOnlyReason,
     bool MadeHere,
     bool IsMod,
-    string Description)
+    string Description,
+    ModTouches? Touches = null)
 {
     public bool CanSwitch => Route != SwitchRoute.None;
     public bool AppScoped => Scope is null;
+
+    /// <summary>What the item touches, in one short line ("Draws a band; can run programs."): only a Claude Code mod or plugin has one, and
+    /// only when the scan found something. A widget pack and Sanduhr's own meters mod have none, and neither does a plugin that touches nothing.</summary>
+    public string TouchesLine =>
+        Kind is InstalledKind.ClaudeCodeMod or InstalledKind.ClaudeCodePlugin && Touches is { } t ? ModsPageText.DescribeTouches(t) : "";
 }
 
 /// <summary>
@@ -111,10 +117,20 @@ public static partial class InstalledItems
             claude.Add(new InstalledItem(id, first.Name, isMod ? InstalledKind.ClaudeCodeMod : InstalledKind.ClaudeCodePlugin, null,
                 source, seen.Select(s => s.Item.Version).FirstOrDefault(v => v is not null), null, scope,
                 scope.Any(s => s.State == FolderState.On), SwitchRoute.None, SettingsNames.ReadOnlyClaudeCode, false, isMod,
-                seen.Select(s => s.Item.Description).FirstOrDefault(d => d.Length > 0) ?? ""));
+                seen.Select(s => s.Item.Description).FirstOrDefault(d => d.Length > 0) ?? "", MergeTouches(seen.Select(s => s.Item.Touches))));
         }
         items.AddRange(claude.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ThenBy(c => c.Id, StringComparer.Ordinal));
         return items;
+    }
+
+    /// <summary>What an id touches across the folders that hold it: every surface and capability any of them has, in the scan's fixed order.</summary>
+    private static ModTouches MergeTouches(IEnumerable<ModTouches> all)
+    {
+        var list = all.ToList();
+        return new ModTouches(
+            Enum.GetValues<ModSurface>().Where(s => list.Any(t => t.Surfaces.Contains(s))).ToList(),
+            Enum.GetValues<ModCapability>().Where(c => list.Any(t => t.Capabilities.Contains(c))).ToList(),
+            [.. list.SelectMany(t => t.Commands).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)]);
     }
 
     /// <summary>Where Sanduhr's meters mod stands in one folder: an unreadable settings.json first, then files gone, then on, off or absent.</summary>

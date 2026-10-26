@@ -16,6 +16,7 @@ public partial class ModsPage : UserControl
         IsVisibleChanged += (_, e) =>
         {
             if (e.NewValue is true) Activate();
+            else (DataContext as ModsPageViewModel)?.Deactivate();
         };
         DataContextChanged += (_, _) =>
         {
