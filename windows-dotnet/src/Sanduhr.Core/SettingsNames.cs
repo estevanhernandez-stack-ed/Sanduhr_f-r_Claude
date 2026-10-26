@@ -407,6 +407,9 @@ public static class SettingsNames
     /// <summary>A folder card's Linked account when no account is signed in (WF32, carried here with the card).</summary>
     public const string AddAccountToLink = "Add an account to link this folder.";
 
+    /// <summary>A folder card's collapsed "What this folder holds": its summary line (a SectionExpander always has one, slice 3 M3).</summary>
+    public const string FolderHoldsHelp = "settings.json, the statusline, hooks, plugin switches, MCP servers, CLAUDE.md and how long transcripts are kept.";
+
     // ---- Settings v2, slice 4: the strings the later tasks would have inlined (preflight P10) ----
 
     /// <summary>InstalledItems (Task 3): where an item came from.</summary>
