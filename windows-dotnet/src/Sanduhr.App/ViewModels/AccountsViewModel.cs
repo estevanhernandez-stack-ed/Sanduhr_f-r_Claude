@@ -236,7 +236,7 @@ public sealed partial class AccountsViewModel : ObservableObject
         {
             _widget.History.ClearAll(item.Label);
         }
-        catch (IOException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             Sounds.PlayError();
             Info(SettingsNames.HistoryNotCleared);

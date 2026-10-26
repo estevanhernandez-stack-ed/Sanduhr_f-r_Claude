@@ -57,6 +57,31 @@ public sealed class AccountsDataTests : AppWindowFixture
     });
 
     [Fact]
+    public void An_access_denied_history_file_says_it_was_not_cleared_instead_of_ending_the_app() => AppHost.Run(() =>
+    {
+        var (widget, accounts, _, told) = Open();
+        var file = ScratchPaths().HistoryFileFor("Personal");
+        try
+        {
+            Pick(accounts, "Personal");
+            int redraws = 0;
+            accounts.HistoryCleared = () => redraws++;
+            File.SetAttributes(file, FileAttributes.ReadOnly);   // WriteAllText then throws UnauthorizedAccessException
+
+            accounts.ClearHistoryCommand.Execute(null);
+
+            Assert.Equal([SettingsNames.HistoryNotCleared], told);
+            Assert.Equal(0, redraws);
+            Assert.Equal([17], widget.History.Load("five_hour", "Personal"));
+        }
+        finally
+        {
+            if (File.Exists(file)) File.SetAttributes(file, FileAttributes.Normal);
+            widget.Dispose();
+        }
+    });
+
+    [Fact]
     public void Declining_clears_nothing() => AppHost.Run(() =>
     {
         var (widget, accounts, _, _) = Open();
