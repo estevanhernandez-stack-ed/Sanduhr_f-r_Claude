@@ -123,6 +123,7 @@ internal partial class SettingsWindow : Window
             ViewModel.Publish.Detach();
             ViewModel.Themes.Detach();
             ViewModel.Alerts.Detach();
+            ViewModel.WidgetPage.Detach();
         };
     }
 
@@ -238,6 +239,10 @@ internal partial class SettingsWindow : Window
         if (page == SettingsPage.Accounts)
             ViewModel.Accounts.Reload();
 
+        // Deep Work length is also written by the focus timer's own stepper: read it again on each visit.
+        if (page == SettingsPage.Widget)
+            ViewModel.WidgetPage.Reload();
+
         // The Claude Code page reads files other tools change: look again each time it is opened. Mods & Widgets lists itself when it
         // becomes visible (ModsPage.Activate).
         if (page == SettingsPage.ClaudeCode)
@@ -288,8 +293,8 @@ internal partial class SettingsWindow : Window
     /// <summary>
     /// Open <paramref name="page"/> and, with an <paramref name="anchor"/> from
     /// <see cref="SettingsIndex"/>, scroll to that section and outline it for 1.5 s. On Claude Usage
-    /// the anchor's view (Overview, Trends, Sessions) is selected first. Widget is not a Settings
-    /// page and is ignored; an anchor the page doesn't have opens the page's top.
+    /// the anchor's view (Overview, Trends, Sessions) is selected first. An anchor the
+    /// page doesn't have opens the page's top.
     /// </summary>
     public void SelectPage(SettingsPage page, string? anchor = null)
     {
@@ -517,10 +522,10 @@ internal partial class SettingsWindow : Window
             _mapChosenOpen = DeskMapFold.IsExpanded;
     }
 
-    /// <summary>Selects the page and anchor a link's text names ("claudecode#folders"); the widget is not a Settings page.</summary>
+    /// <summary>Selects the page and anchor a link's text names ("claudecode#folders"); Widget with no anchor is the widget itself, not Settings.</summary>
     private void OpenLink(string? text)
     {
-        if (text is not null && SettingsIndex.ParseLink(text) is { } link && link.Page != SettingsPage.Widget)
+        if (text is not null && SettingsIndex.ParseLink(text) is { } link && !SettingsIndex.ShowsTheWidget(link))
             SelectPage(link.Page, link.Anchor);
     }
 }

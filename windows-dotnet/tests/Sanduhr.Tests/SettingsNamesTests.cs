@@ -7,18 +7,18 @@ namespace Sanduhr.Tests;
 public class SettingsNamesTests
 {
     // Retired pages stay in the enum for their aliases (old cards, agent text, --settings links) but leave the sidebar: Widgets in
-    // slice 4 (P4), History in slice 5.
+    // slice 4 (P4), History in slice 5. Widget is a page since slice 5 (the widget itself is Widget with no anchor).
     private static readonly SettingsPage[] SidebarPages =
-        [.. Enum.GetValues<SettingsPage>().Where(p => p is not SettingsPage.Widget and not SettingsPage.Widgets and not SettingsPage.History)];
+        [.. Enum.GetValues<SettingsPage>().Where(p => p is not SettingsPage.Widgets and not SettingsPage.History)];
 
     private static IEnumerable<string> CopyOf(WhatsNewCard c) => [c.Title, c.Body];
 
     [Fact]
-    public void Sidebar_has_every_page_but_Widget_exactly_once()
+    public void Sidebar_has_every_live_page_exactly_once()
     {
         foreach (var page in SidebarPages)
             Assert.Single(SettingsNames.Pages, p => p == page);
-        Assert.DoesNotContain(SettingsPage.Widget, SettingsNames.Pages);
+        Assert.Contains(SettingsPage.Widget, SettingsNames.Pages);
         Assert.Equal(SidebarPages.Length, SettingsNames.Pages.Count);
     }
 

@@ -309,7 +309,7 @@ public partial class App : Application
     /// <summary>A card's Show me: the widget, or Settings at the card's page and section (WF17).</summary>
     private void ShowMe(SettingsPage page, string? anchor)
     {
-        if (page == SettingsPage.Widget)
+        if (SettingsIndex.ShowsTheWidget(new SettingsLink(page, anchor)))
             ShowWindow();
         else
             _ = ShowSettingsAsync(page, anchor);
@@ -697,7 +697,7 @@ public partial class App : Application
     /// <summary>A link from outside the app: the widget, or Settings at that page and section.</summary>
     private void OpenSettingsLink(SettingsLink link)
     {
-        if (link.Page == SettingsPage.Widget)
+        if (SettingsIndex.ShowsTheWidget(link))
             ShowWindow();
         else
             _ = ShowSettingsAsync(link.Page, link.Anchor);

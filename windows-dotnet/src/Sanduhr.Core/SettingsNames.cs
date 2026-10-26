@@ -19,8 +19,8 @@ public static class SettingsNames
 {
     // ---- Pages ----
 
-    /// <summary>The sidebar: six groups, each page once. Widget is not a page (Show me on a widget card
-    /// shows the widget itself). Settings v2 names the groups: "Extend" (Claude Code and Mods &amp; Widgets, which holds widget packs too)
+    /// <summary>The sidebar: six groups, each page once. Widget is a page since slice 5; Widget with no anchor still means the widget itself
+    /// (SettingsIndex.ShowsTheWidget). Settings v2 names the groups: "Extend" (Claude Code and Mods &amp; Widgets, which holds widget packs too)
     /// and "Desktop" (the Mac's word, and no longer its first page's title). Retired pages (Widgets since slice 4, History since slice 5) stay in
     /// <see cref="SettingsPage"/> for their aliases but are in no group.</summary>
     public static IReadOnlyList<SettingsGroup> Sidebar { get; } =
@@ -28,7 +28,7 @@ public static class SettingsNames
         new(null, [SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts]),
         new("Usage", [SettingsPage.ClaudeUsage, SettingsPage.Publish]),
         new("Extend", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
-        new("Widget", [SettingsPage.Themes]),
+        new("Widget", [SettingsPage.Widget, SettingsPage.Themes]),
         new("Desktop", [SettingsPage.Desk, SettingsPage.DeskLook, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather,
             SettingsPage.Watchers, SettingsPage.Launcher]),
         new("Help", [SettingsPage.About]),
@@ -48,7 +48,7 @@ public static class SettingsNames
     /// <summary>Every page in sidebar order.</summary>
     public static IReadOnlyList<SettingsPage> Pages { get; } = [.. Sidebar.SelectMany(g => g.Pages)];
 
-    /// <summary>A page's sidebar title. Widget, which is not a page, reads "Widget".</summary>
+    /// <summary>A page's sidebar title.</summary>
     public static string PageTitle(SettingsPage page) => page switch
     {
         SettingsPage.General => "General",
@@ -846,6 +846,11 @@ public static class SettingsNames
         (WidgetCatalogCheck, SettingsPage.Mods),
         (WidgetCompanionPick, SettingsPage.Desk),
         (WidgetCompanionRoam, SettingsPage.Desk),
+        (CompactMode, SettingsPage.Widget),
+        (GraphStyle, SettingsPage.Widget),
+        (KeepWidgetOnTop, SettingsPage.Widget),
+        (DeepWorkLength, SettingsPage.Widget),
+        (LimitOrder, SettingsPage.Widget),
     ];
 
     /// <summary>

@@ -2004,6 +2004,11 @@
                     <views:ModsPage />
                 </TabItem>
 
+                <!-- Settings, Widget (slice 5): the widget's own options and Just the Desk's way back (WF15, WF24, WF32). -->
+                <TabItem Header="Widget" Tag="Widget" AutomationProperties.Name="Widget" DataContext="{Binding WidgetPage}">
+                    <views:WidgetPage />
+                </TabItem>
+
                 <!-- Themes tab (item 8) — swatch grid + agent-assisted theme creation. -->
                 <TabItem Header="Themes" Tag="Themes" AutomationProperties.Name="Themes">
                     <Border x:Name="ThemesRoot" Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="16"

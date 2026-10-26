@@ -90,4 +90,30 @@ public class SettingsSlice5IndexTests
         Assert.NotEmpty(SettingsNames.PathProblems("Settings, History"));
         Assert.Equal("History", SettingsNames.PageTitle(SettingsPage.History));   // kept for the aliases and logs
     }
+
+    [Fact]
+    public void Widget_is_a_page_and_widget_without_an_anchor_still_shows_the_widget()
+    {
+        Assert.Contains(SettingsPage.Widget, SettingsNames.Pages);
+        Assert.Equal("Widget", SettingsNames.GroupTitle(SettingsPage.Widget));
+        Assert.Equal([SettingsPage.Widget, SettingsPage.Themes], SettingsNames.Sidebar.Single(g => g.Title == "Widget").Pages);
+        Assert.True(SettingsIndex.ShowsTheWidget(new SettingsLink(SettingsPage.Widget, null)));
+        Assert.True(SettingsIndex.ShowsTheWidget(SettingsIndex.ParseLink("widget")!));
+        Assert.True(SettingsIndex.ShowsTheWidget(SettingsIndex.ParseLink("widget#tray")!));   // an anchor the page doesn't have drops
+        Assert.False(SettingsIndex.ShowsTheWidget(SettingsIndex.ParseLink("widget#widget-options")!));
+        Assert.Equal(new SettingsLink(SettingsPage.Widget, SettingsIndex.WidgetOptions), SettingsIndex.ParseLink("widget#widget-options"));
+        Assert.Equal(SettingsIndex.WidgetOptions, SettingsIndex.MenuAnchor(SettingsPage.Widget));
+        foreach (var card in WhatsNewCards.Table.Where(c => c.Destination == SettingsPage.Widget))
+            Assert.True(SettingsIndex.ShowsTheWidget(new SettingsLink(card.Destination, card.Anchor)), card.Id);
+    }
+
+    [Theory]
+    [InlineData("compact")]
+    [InlineData("graph style")]
+    [InlineData("on top")]
+    [InlineData("deep work")]
+    [InlineData("limit order")]
+    [InlineData("tier order")]
+    public void Widget_words_find_the_widget_options(string query) =>
+        Assert.Contains(SettingsIndex.Search(query).Take(3), h => h.Entry.Page == SettingsPage.Widget && h.Entry.Anchor == SettingsIndex.WidgetOptions);
 }

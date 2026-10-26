@@ -95,6 +95,9 @@ public sealed class SettingsViewModel
     /// publish-now, status).</summary>
     public PublishViewModel Publish { get; }
 
+    /// <summary>Settings, Widget (Settings v2, slice 5): the widget's own options and Just the Desk's way back.</summary>
+    public WidgetPageViewModel WidgetPage { get; }
+
     /// <summary>Assembly version for About (e.g. "3.0.0").</summary>
     public string Version { get; }
 
@@ -232,6 +235,7 @@ public sealed class SettingsViewModel
             return Task.CompletedTask;
         });
         Publish = new PublishViewModel(widget.Publish);
+        WidgetPage = new WidgetPageViewModel(widget);
         var v = Assembly.GetExecutingAssembly().GetName().Version;
         Version = v is null ? "3.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
 

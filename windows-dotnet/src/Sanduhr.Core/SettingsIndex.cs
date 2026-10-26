@@ -128,6 +128,8 @@ public static class SettingsIndex
     public const string WidgetsInstalled = "widgets-installed";
     // Claude Code (S6)
     public const string GlowWhere = "glow-where";
+    // Widget (slice 5)
+    public const string WidgetOptions = "widget-options";
     // About
     public const string Version = "version";
     public const string Trademark = "trademark";
@@ -301,6 +303,11 @@ public static class SettingsIndex
             ["launcher", "button", "buttons", "shortcut", "shortcuts", "app", "apps", "link", "TouchButton", "Rainmeter",
              SettingsNames.LauncherAddApp, SettingsNames.LauncherAddLink, "image", "label", "PNG", "Chrome app", "PWA", "row", "column"]),
 
+        E(SettingsNames.WidgetOptions, SettingsPage.Widget, WidgetOptions,
+            [SettingsNames.CompactMode, "compact", "Ctrl+D", SettingsNames.GraphStyle, "graph", "sparkline", "classic", "horizon",
+             SettingsNames.KeepWidgetOnTop, "on top", "pin", "always on top", SettingsNames.DeepWorkLength, "deep work", "focus", "timer",
+             SettingsNames.LimitOrder, "tier order", "order", "reorder", "move up", "move down"]),
+
         E("Version", SettingsPage.About, Version,
             ["version", "What's New", "Take the tour", "tour", "release", "update"]),
         E("Trademark", SettingsPage.About, Trademark, ["Anthropic", "trademark", "disclaimer", "affiliated"]),
@@ -314,6 +321,11 @@ public static class SettingsIndex
     /// <summary>Where each name in <see cref="SettingsNames.Table"/> lives on its page.</summary>
     public static IReadOnlyDictionary<string, string> NameAnchors { get; } = new Dictionary<string, string>
     {
+        [SettingsNames.CompactMode] = WidgetOptions,
+        [SettingsNames.GraphStyle] = WidgetOptions,
+        [SettingsNames.KeepWidgetOnTop] = WidgetOptions,
+        [SettingsNames.DeepWorkLength] = WidgetOptions,
+        [SettingsNames.LimitOrder] = WidgetOptions,
         [SettingsNames.TrayShows] = Tray,
         [SettingsNames.ShortcutToOpenSettings] = Shortcuts,
         [SettingsNames.AddAccount] = SignInSection,
@@ -402,6 +414,7 @@ public static class SettingsIndex
         [SettingsPage.DeskLook] = ["look", "fonts", "size", "ink", "color", "colour", "plate"],
         [SettingsPage.Watchers] = ["watcher", "cards", "CI", "progress"],
         [SettingsPage.Launcher] = ["buttons", "apps", "links", "shortcuts"],
+        [SettingsPage.Widget] = ["floating window", "meters window"],
         [SettingsPage.About] = ["help", "version", "trademark", "privacy"],
     };
 
@@ -695,6 +708,12 @@ public static class SettingsIndex
     }
 
     /// <summary>
+    /// Whether a place means the widget itself rather than Settings (Settings v2, slice 5, decision 1): <see cref="SettingsPage.Widget"/>
+    /// with no anchor is what cards, the tour and <c>--settings widget</c> have always meant; with an anchor it is the Widget page.
+    /// </summary>
+    public static bool ShowsTheWidget(SettingsLink link) => link.Page == SettingsPage.Widget && link.Anchor is null;
+
+    /// <summary>
     /// The one checked-anchor rule: (<paramref name="page"/>, <paramref name="anchor"/>) resolved through the aliases
     /// (<see cref="Resolve(SettingsPage, string?)"/>), with the anchor dropped to the page's top when the index has no
     /// such section. Every place a link enters Settings, from <see cref="ParseLink"/> to the App's entry points, passes
@@ -754,6 +773,7 @@ public static class SettingsIndex
         SettingsPage.Desk => DeskPieces,
         SettingsPage.DeskMessage => MessageLines,
         SettingsPage.Launcher => LauncherButtons,
+        SettingsPage.Widget => WidgetOptions,
         _ => null,
     };
 
