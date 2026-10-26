@@ -11,7 +11,7 @@ import SwiftUI
 /// and `widgetLook` is Widget. The two retired pages parse as aliases (`resolve`).
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general, credentials, usage, alerts
-    case deskLayout, deskLook, message, notch, nowPlaying, watchers
+    case deskLayout, deskLook, message, notch, lockScreen, nowPlaying, watchers
     case integrations, mods
     case widgetLook, themes
     case updates, about
@@ -28,6 +28,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .deskLook: "Desk Look"
         case .message: "Message"
         case .notch: "Notch"
+        case .lockScreen: "Lock Screen"
         case .nowPlaying: "Now Playing"
         case .watchers: "Watchers"
         case .integrations: "Claude Code"
@@ -49,6 +50,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .deskLook: "paintbrush"
         case .message: "text.quote"
         case .notch: "rectangle.topthird.inset.filled"
+        case .lockScreen: "lock.display"
         case .nowPlaying: "music.note"
         case .watchers: "eye"
         case .integrations: "puzzlepiece.extension"
@@ -63,7 +65,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// Sidebar groups: a header (nil for the first) and its pages.
     static let groups: [(header: String?, sections: [SettingsSection])] = [
         (nil, [.general, .credentials, .usage, .alerts]),
-        ("Desktop", [.deskLayout, .deskLook, .message, .notch, .nowPlaying, .watchers]),
+        ("Desktop", [.deskLayout, .deskLook, .message, .notch, .lockScreen, .nowPlaying, .watchers]),
         ("Claude Code", [.integrations, .mods]),
         ("Widget", [.widgetLook, .themes]),
         ("Help", [.updates, .about]),
@@ -382,6 +384,7 @@ struct SettingsRoot: View {
         case .deskLook: DeskLookSection().withPreview(.deskLook) { DeskLookPreview(live: deskModel) }
         case .message: DeskMessageSection(model: deskModel, editor: navigation.messageEditor).withPreview(.message) { DeskMessagePreview(live: deskModel) }
         case .notch: DeskNotchSection().withPreview(.notch) { NotchPreview(live: deskModel) }
+        case .lockScreen: LockScreenSettings(vm: vm).settingsViewport()
         case .nowPlaying: NowPlayingSection().withPreview(.nowPlaying) { NowPlayingPreview(live: deskModel) }
         case .watchers: WatchersSection().withPreview(.watchers) { WatchersPreview(live: deskModel) }
         case .updates: UpdatesSection(updates: updates).settingsViewport()
