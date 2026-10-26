@@ -105,9 +105,19 @@ public class SettingsDeskSplitIndexTests
     [Fact]
     public void An_anchor_row_whose_target_is_missing_falls_back_to_the_page_row()
     {
-        // A later build without Widgets in the sidebar, where Mods has a catalog but no "mods" section yet: the installed-widgets
-        // link can't land on its own target, and the page row's target is the same missing section, so it stays as written
-        // rather than landing on the Catalog (which would ask GitHub).
+        // A build without Widgets in the sidebar and without the Desk's "pieces" section: the companion link can't land on its own
+        // target, so it lands where the Widgets page as a whole went (the Installed list), never on the Catalog (which would ask GitHub).
+        var anchors = SettingsIndex.Anchors
+            .Where(e => !(e.Page == SettingsPage.Desk && e.Anchor == SettingsIndex.DeskPieces))
+            .ToList();
+        var pages = SettingsNames.Pages.Where(p => p != SettingsPage.Widgets).ToList();
+        Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.ModList),
+            SettingsIndex.Resolve(SettingsPage.Widgets, SettingsIndex.WidgetsCompanion, anchors, pages));
+    }
+
+    [Fact]
+    public void An_anchor_row_whose_target_and_page_row_target_are_both_missing_stays_as_written()
+    {
         var anchors = SettingsIndex.Anchors
             .Where(e => !(e.Page == SettingsPage.Mods && e.Anchor == SettingsIndex.ModList))
             .Append(new SettingsEntry("Catalog", SettingsPage.Mods, "catalog", []))

@@ -436,7 +436,7 @@ public static class SettingsIndex
         for (int i = 0; i < index.Count; i++)
         {
             var e = index[i];
-            if (boosted.Any(b => ReferenceEquals(b, e)))
+            if (boosted.Any(b => ReferenceEquals(b, e)) || InsideFetching(e))
                 continue;
             if (Matches(q, e.Title))
                 found.Add((new Hit(e, 0), i));
@@ -459,6 +459,12 @@ public static class SettingsIndex
     /// </summary>
     public static IReadOnlyDictionary<(SettingsPage Page, string Anchor), string> FetchingSections { get; } =
         new Dictionary<(SettingsPage Page, string Anchor), string> { [(SettingsPage.Mods, Catalog)] = ModList };
+
+    /// <summary>A control inside a section that fetches when opened ("Check the catalog again", in Catalog): a search could only land beside
+    /// it, never inside it, so it is not offered.</summary>
+    private static bool InsideFetching(SettingsEntry e) =>
+        e.CollapsedIn is not null
+        && FetchingSections.Keys.Any(k => k.Page == e.Page && CollapsedSections.TryGetValue(k, out var title) && title == e.CollapsedIn);
 
     private static SettingsEntry Lands(SettingsEntry e) =>
         e.Anchor is not null && FetchingSections.TryGetValue((e.Page, e.Anchor), out var safe) ? e with { Anchor = safe } : e;

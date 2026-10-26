@@ -150,6 +150,16 @@ public sealed class SettingsModsIndexTests
     }
 
     [Fact]
+    public void A_control_inside_the_catalog_is_not_a_search_result_and_none_is_spoken_as_in_Catalog()
+    {
+        Assert.Empty(SettingsIndex.Search(SettingsNames.WidgetCatalogCheck).Where(h => h.Entry.Title == SettingsNames.WidgetCatalogCheck));
+        foreach (var q in new[] { "catalog", "check", "again", "widgets", "pack", "install", "GitHub", "verified" })
+            Assert.DoesNotContain(SettingsIndex.Search(q), h => h.Entry.CollapsedIn == SettingsNames.CatalogSection);
+        var row = Assert.Single(SettingsIndex.Search("catalog"), h => h.Entry.Title == SettingsNames.CatalogSection);
+        Assert.Equal((SettingsPage.Mods, SettingsIndex.ModList), (row.Entry.Page, row.Entry.Anchor));
+    }
+
+    [Fact]
     public void Prose_that_names_the_page_reads_as_the_page()
     {
         // Slice 1 final review T1: "Settings, Mods & Widgets" read as a page "Mods" before the page had this title.

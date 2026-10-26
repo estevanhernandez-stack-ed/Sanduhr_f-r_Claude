@@ -510,7 +510,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
     {
         // Every visit starts on All with no text, unless the link that brought you set a filter first (Themes' pack link, the companion's
         // sprite link): that filter holds for this visit only (owner decision, slice 4 follow-up).
-        if (!_linkSetFilter)
+        if (!_linkSetFilter && !_active)
         {
             Filter = InstalledFilter.All;
             FilterText = "";

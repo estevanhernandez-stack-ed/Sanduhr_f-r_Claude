@@ -227,6 +227,21 @@ public sealed class ModsPageListTests : ModsPageFixture
     }
 
     [Fact]
+    public void Activate_runs_twice_for_one_visit_and_keeps_the_filter_a_link_just_set()
+    {
+        var page = Seeded();
+        page.Deactivate();
+        page.ShowWidgetPacks();
+        page.Activate();   // IsVisibleChanged
+        page.Activate();   // DataContextChanged, same realization
+        Assert.Equal(InstalledFilter.Widgets, page.Filter);
+
+        page.Deactivate();
+        page.Activate();
+        Assert.Equal(InstalledFilter.All, page.Filter);
+    }
+
+    [Fact]
     public void The_companions_sprite_catalog_link_filters_for_that_visit_only()
     {
         var page = Seeded();
