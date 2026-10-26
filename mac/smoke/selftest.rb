@@ -168,14 +168,17 @@ class FakeApp
       if arg == 'on'
         unless s['demo'] && s['demo']['active']
           @before_demo = { 'meters' => s['meters'], 'demo' => s['demo'] }
+          @before_lock_line = s['lock_line']
           s['meters'] = [{ 'tier' => 'five_hour', 'label' => 'Session (5hr)', 'percent' => 42, 'fill' => 0.42,
                            'pace' => 0.6, 'reset' => 'Today 5:00 PM', 'warning' => false }] if Array(s['meters']).empty?
         end
         # usage_rows counts the Usage page's charts as drawn: 0 until the page opens.
+        s['lock_line'] = { 'on' => false, 'text' => 'Claude 42% · resets 5:00 PM', 'length' => 27 }
         s['demo'] = { 'active' => true, 'widget_tiers' => 3, 'desk_line' => true, 'notch_meters' => true,
                       'accounts' => 2, 'usage_rows' => 0 }
       elsif @before_demo
         s.merge!(@before_demo)
+        s['lock_line'] = @before_lock_line
         @before_demo = nil
       end
     when 'usage'
@@ -215,10 +218,20 @@ class FakeApp
       w = (s['watchers'] ||= { 'count' => 0, 'states' => [], 'placements' => [] })
       case arg
       when 'start' then w.merge!('count' => 1, 'states' => ['running'])
-      when 'wait' then w['states'] = ['waiting'] if w['count'] == 1
+      when 'wait'
+        if w['count'] == 1
+          w['states'] = ['waiting']
+          l = s['lock_line']
+          l['text'] = "#{l['text']} · 1 waiting for you"
+          l['length'] = l['text'].length
+        end
       when 'pass' then w['states'] = ['passed'] if w['count'] == 1
       when 'fail' then w['states'] = ['failed'] if w['count'] == 1
-      when 'clear' then w.merge!('count' => 0, 'states' => [])
+      when 'clear'
+        w.merge!('count' => 0, 'states' => [])
+        l = s['lock_line']
+        l['text'] = l['text'].sub(' · 1 waiting for you', '')
+        l['length'] = l['text'].length
       end
     end
   end
@@ -283,6 +296,10 @@ eq('under icons off in the fixture', state['desk_under_icons'], false)
 # Issue #119: the top-center pill is off, not forced and not up in the fixture; its frame is null
 # until it is. The `on` key is quoted in the fixture, so it reads as a key and not as true.
 eq('pill off in the fixture', state['notch_pill'], { 'on' => false, 'forced' => false, 'shown' => false, 'frame' => nil })
+# #137: the lock screen line is off in the fixture, its switch key quoted like the pill's.
+eq('lock line in the fixture', state['lock_line'].keys, %w[on text length])
+eq('lock line is off and as long as its text', [state['lock_line']['on'], state['lock_line']['length']],
+   [false, state['lock_line']['text'].length])
 no_pieces = { 'desk_frames' => '/\A(?!.*(clock|message))/m' }
 check('the clock and message are click areas in the fixture', State.check(state, no_pieces).length == 1)
 check('off, neither is a click area',
@@ -512,6 +529,15 @@ app_dark = FakeApp.new
 app_dark.action('notch-pill', 'force')
 eq('a forced pill with the island off is not shown', app_dark.state_now['notch_pill'].values_at('on', 'forced', 'shown'), [true, true, false])
 FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-pill'))
+# The shipped lock line scenario on the fixture: demo gives the sample line, a waiting watcher adds
+# its slot, demo is put back off, and the restore reopens the page Settings was on before.
+app_ll = FakeApp.new
+r = Runner.new(app_ll, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-lockline'), io: StringIO.new, settle: 0, poll: 0.01, within: 0.05)
+    .run_file(File.join(Smoke::SCENARIOS, 'lock-line.yaml'))
+eq('lock line scenario passes on the fixture', [r['status'], r['reason']], ['pass', nil])
+eq('lock line scenario drives demo, Settings and the fake watcher', app_ll.actions,
+   ['demo on', 'settings lockScreen', 'watch-test start', 'watch-test wait', 'watch-test clear', 'close-settings', 'demo off', 'settings notch'])
+FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-lockline'))
 eq('changed shortcut keys are put back',
    Restore.plan(base.merge('hot_keys' => { 'settings_keys' => '⌥S' }), base.merge('hot_keys' => { 'settings_keys' => '⌃⌥S' })), [['hot-key', 'settings ⌥S']])
 # The fixture tree holds no Settings page: the state steps run, the tree ones are dropped.
