@@ -13,6 +13,25 @@ public class SettingsSlice5IndexTests
         return hits[0];
     }
 
+    [Theory]
+    [InlineData("history")]
+    [InlineData("meter history")]
+    [InlineData("meters")]
+    [InlineData("usage history")]
+    public void History_words_land_on_the_meter_history_section_first(string query)
+    {
+        var top = Top(query);
+        Assert.Equal((SettingsPage.ClaudeUsage, SettingsIndex.MeterHistory), (top.Entry.Page, top.Entry.Anchor));
+    }
+
+    [Fact]
+    public void History_still_finds_the_accounts_clear_row_below_and_groups_claude_usage_first()
+    {
+        var hits = SettingsIndex.Search("history");
+        Assert.Contains(hits, h => h.Entry.Page == SettingsPage.Accounts && h.Entry.Title == SettingsNames.ClearAccountHistory);
+        Assert.Equal(SettingsPage.ClaudeUsage, SettingsIndex.Grouped(hits)[0].Page);
+    }
+
     [Fact]
     public void The_tier_card_and_the_limits_card_land_on_each_limit()
     {

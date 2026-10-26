@@ -528,6 +528,7 @@ public static class SettingsIndex
         new(["demo"], "privacy", "streamer"),
         new(["codename", "codenames"], "privacy", "streamer-allowlist"),
         new(["widgets", "packs", "pack"], "mods", ModList),
+        new(["history", "meter history", "meters", "usage history"], "claudeusage", MeterHistory),
     ];
 
     /// <summary>The entries a boost names for exactly this query, in boost order, when they are in <paramref name="index"/>.</summary>
