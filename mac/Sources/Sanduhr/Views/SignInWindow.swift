@@ -21,9 +21,11 @@ enum SignInResult: Equatable {
 /// failed Cloudflare's human check), so its `cf_clearance` is bound to Safari and is not kept. No
 /// key, cookie value or page content is logged.
 ///
-/// Google refuses sign-in inside an app's web view, and claude.ai sends an account made with
-/// Google there even from Continue with email. When the view lands on Google's sign-in, a panel
-/// covers the blank page and leads to the browser and a pasted key. Paste stays as the way out at
+/// Continue with Google finishes here (issue #357): Google's `window.open` popup gets a small
+/// window of its own, built from the configuration WebKit passes in, so it shares the process pool
+/// and cookie store and keeps `window.opener` to hand the result back to claude.ai. When Google
+/// closes it, the cookie check finds the session as usual. A Google page that sits blank is
+/// covered by a panel that leads to the browser and a pasted key; paste stays as the way out at
 /// the bottom of the window.
 @MainActor
 final class SignInWindowController: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate {
@@ -31,8 +33,12 @@ final class SignInWindowController: NSObject, NSWindowDelegate, WKNavigationDele
 
     private var window: NSWindow?
     private var webView: WKWebView?
+    /// The sign-in popup's window and view, while one is open.
+    private var popup: NSWindow?
+    private var popupView: WKWebView?
     private var poll: Timer?
     private var loadTimer: Timer?
+    private var blankCheck: Timer?
     private var continuation: CheckedContinuation<SignInResult, Never>?
     private let model = SignInModel()
     private var firstLoadDone = false
@@ -114,6 +120,8 @@ final class SignInWindowController: NSObject, NSWindowDelegate, WKNavigationDele
     }
 
     private func backToChoices() {
+        closePopup()
+        model.googleBlank = false
         webView?.load(URLRequest(url: ClaudeSignIn.loginURL))
     }
 
@@ -136,6 +144,8 @@ final class SignInWindowController: NSObject, NSWindowDelegate, WKNavigationDele
         continuation = nil
         poll?.invalidate(); poll = nil
         loadTimer?.invalidate(); loadTimer = nil
+        blankCheck?.invalidate(); blankCheck = nil
+        closePopup()
         webView?.stopLoading()
         webView?.navigationDelegate = nil
         webView?.uiDelegate = nil
@@ -149,27 +159,35 @@ final class SignInWindowController: NSObject, NSWindowDelegate, WKNavigationDele
 
     // MARK: NSWindowDelegate
 
+    /// The popup closing (by Google or by hand) leaves the sign-in running; the sign-in window
+    /// closing ends it.
     func windowWillClose(_ notification: Notification) {
-        finish(.cancelled)
+        if let popup, notification.object as? NSWindow === popup {
+            closePopup(closingWindow: false)
+        } else {
+            finish(.cancelled)
+        }
     }
 
     // MARK: WKNavigationDelegate
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        if !firstLoadDone {
+        if webView === self.webView, !firstLoadDone {
             firstLoadDone = true
             model.loading = false
         }
-        pageChanged(webView.url)
+        pageChanged()
+        if ClaudeSignIn.isGoogleSignIn(webView.url) { watchForBlank(webView) }
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        pageChanged(webView.url)
+        pageChanged()
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
                  withError error: Error) {
-        guard !firstLoadDone, (error as NSError).code != NSURLErrorCancelled else { return }
+        guard webView === self.webView, !firstLoadDone,
+              (error as NSError).code != NSURLErrorCancelled else { return }
         model.loading = false
         model.error = "claude.ai didn't load. Check your connection and try again."
     }
@@ -181,24 +199,96 @@ final class SignInWindowController: NSObject, NSWindowDelegate, WKNavigationDele
         if navigationAction.navigationType == .linkActivated,
            navigationAction.targetFrame?.isMainFrame ?? true,
            let url = navigationAction.request.url, !ClaudeSignIn.staysInWindow(url) {
-            NSWorkspace.shared.open(url)
+            if ClaudeSignIn.opensInBrowser(url) { NSWorkspace.shared.open(url) }
             return .cancel
         }
         return .allow
     }
 
-    private func pageChanged(_ url: URL?) {
-        model.onGoogle = ClaudeSignIn.isGoogleSignIn(url)
+    private func pageChanged() {
+        model.onGoogle = ClaudeSignIn.isGoogleSignIn(webView?.url)
+            || ClaudeSignIn.isGoogleSignIn(popupView?.url)
+        if !model.onGoogle { model.googleBlank = false }
         checkCookies()
+    }
+
+    /// A loaded Google page gets a few seconds to draw. Still empty after that, the panel covers
+    /// the window (a blank popup closes first, so the panel is what the person sees).
+    private func watchForBlank(_ view: WKWebView) {
+        blankCheck?.invalidate()
+        blankCheck = Timer.scheduledTimer(withTimeInterval: ClaudeSignIn.blankGoogleWait, repeats: false) { [weak self, weak view] _ in
+            MainActor.assumeIsolated {
+                guard let view, ClaudeSignIn.isGoogleSignIn(view.url) else { return }
+                view.evaluateJavaScript("document.body ? document.body.innerText.trim().length : 0") { value, _ in
+                    let length = value as? Int
+                    MainActor.assumeIsolated {
+                        guard let self, ClaudeSignIn.pageLooksBlank(bodyTextLength: length),
+                              ClaudeSignIn.isGoogleSignIn(view.url) else { return }
+                        if view === self.popupView { self.closePopup() }
+                        self.model.googleBlank = true
+                    }
+                }
+            }
+        }
+    }
+
+    /// Takes the popup down. `closingWindow` is false when its window is already closing.
+    private func closePopup(closingWindow: Bool = true) {
+        guard let p = popup else { return }
+        popup = nil
+        popupView?.stopLoading()
+        popupView?.navigationDelegate = nil
+        popupView?.uiDelegate = nil
+        popupView = nil
+        p.delegate = nil
+        window?.removeChildWindow(p)
+        if closingWindow { p.close() }
+        model.onGoogle = ClaudeSignIn.isGoogleSignIn(webView?.url)
     }
 
     // MARK: WKUIDelegate
 
-    /// A sign-in popup (`window.open`) loads in this window instead of dead-ending.
+    /// A sign-in popup (`window.open`) gets a small window of its own, built from the configuration
+    /// WebKit passes in so it keeps `window.opener` and the cookie store; WebKit loads its request.
+    /// A popup to anywhere else opens in the default browser.
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        if let url = navigationAction.request.url { webView.load(URLRequest(url: url)) }
-        return nil
+        guard ClaudeSignIn.popupStaysInWindow(navigationAction.request.url) else {
+            if let url = navigationAction.request.url, ClaudeSignIn.opensInBrowser(url) {
+                NSWorkspace.shared.open(url)
+            }
+            return nil
+        }
+        closePopup()
+        let child = WKWebView(frame: .zero, configuration: configuration)
+        child.navigationDelegate = self
+        child.uiDelegate = self
+        child.setAccessibilityLabel("Sign-in popup")
+        let width = max(windowFeatures.width?.doubleValue ?? 480, 400)
+        let height = max(windowFeatures.height?.doubleValue ?? 640, 500)
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
+                         styleMask: [.titled, .closable, .resizable],
+                         backing: .buffered, defer: false)
+        w.title = window?.title ?? "Sign in to Claude"
+        w.isReleasedWhenClosed = false
+        w.contentView = child
+        w.delegate = self
+        if let parent = window {
+            let f = parent.frame
+            w.setFrameOrigin(NSPoint(x: f.midX - width / 2, y: f.midY - height / 2))
+            parent.addChildWindow(w, ordered: .above)
+        } else {
+            w.center()
+        }
+        popup = w
+        popupView = child
+        w.makeKeyAndOrderFront(nil)
+        return child
+    }
+
+    /// Google's page calls `window.close()` when it hands the result back.
+    func webViewDidClose(_ webView: WKWebView) {
+        if webView === popupView { closePopup() }
     }
 }
 
@@ -208,12 +298,16 @@ final class SignInWindowController: NSObject, NSWindowDelegate, WKNavigationDele
 final class SignInModel {
     var loading = true
     var error: String?
+    /// The page or the popup is on Google's sign-in.
     var onGoogle = false
+    /// A Google page sat blank: the panel covers the window.
+    var googleBlank = false
 
     func reset() {
         loading = true
         error = nil
         onGoogle = false
+        googleBlank = false
     }
 }
 
@@ -229,8 +323,8 @@ private struct SignInChrome: View {
         VStack(spacing: 0) {
             ZStack {
                 WebViewHost(webView: webView)
-                    .opacity(model.error == nil && !model.onGoogle ? 1 : 0)
-                if model.onGoogle {
+                    .opacity(model.error == nil && !model.googleBlank ? 1 : 0)
+                if model.googleBlank {
                     googlePanel
                 } else if let error = model.error {
                     errorPanel(error)
@@ -242,7 +336,9 @@ private struct SignInChrome: View {
             }
             Divider()
             HStack(spacing: 8) {
-                Text("Sanduhr keeps only the session key, in your Keychain.")
+                Text(model.onGoogle
+                     ? "Google sign-in works here. If it stalls, paste a key instead."
+                     : "Sanduhr keeps only the session key, in your Keychain.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -253,14 +349,13 @@ private struct SignInChrome: View {
         }
     }
 
-    /// Over Google's sign-in, which shows a blank page inside apps. claude.ai sends an account
-    /// made with Google to Google even from Continue with email (seen 2026-10-05), so the way in
-    /// for those accounts is the browser and a pasted key.
+    /// Over a Google page that sat blank. Google sign-in normally finishes in the popup; when it
+    /// doesn't draw, the way in is the browser and a pasted key.
     private var googlePanel: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("This account signs in with Google")
+            Text("Google's sign-in didn't load here")
                 .font(.title3.weight(.semibold))
-            Text("Google doesn't allow sign-in inside apps, so this window can't finish it. Sign in in your browser and paste the session key instead:")
+            Text("The page stayed blank. Sign in in your browser and paste the session key instead:")
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 6) {
                 step(1, "Open claude.ai in your browser and sign in with Google.")

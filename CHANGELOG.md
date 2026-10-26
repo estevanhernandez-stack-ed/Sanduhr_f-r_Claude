@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **Continue with Google finishes inside Sanduhr (#357).** Google's sign-in now opens in a small window of its own and hands the result back to claude.ai, so a Google account signs in like an email one: no browser, no copying cookies. The browser-and-paste steps show up only if Google's page stays blank, and Paste a Key Instead is still at the bottom of the window.
+
 ## v2.33.0-mac — 2026-10-26
 
 - **A line on the lock screen (#137).** Settings, Desktop, Lock Screen puts one short line under the lock screen clock: an optional prefix, your Claude usage, when it resets, and how many watchers are waiting for you, for example `Desk 3 · Claude 29% · resets 6:10 PM · 1 waiting for you`. Anyone at the screen can read it, so every part passes one filter that drops paths, emails, web addresses, secrets and long tokens; only counts, percents and times get through, and the page previews the exact line. Usage older than 20 minutes reads "Claude usage unavailable". Turning it on asks for an administrator password once, to install a small helper that sets the lock screen message; turning it off takes the line away first, then removes the helper, and a message you had there before comes back. Off by default.

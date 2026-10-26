@@ -52,9 +52,11 @@ window of its own; once you're signed in, it keeps the session key and closes th
 window's web view stores nothing: its cookies live in memory for that one sign-in and are gone
 when it closes, and no key, cookie or page is logged.
 
-- **Signed up with Google?** Google refuses sign-in inside apps, and claude.ai sends an account
-  made with Google to Google even from Continue with email, so the window can't finish it. When
-  it lands on Google's sign-in, a panel takes over with the steps: sign in in your browser, copy
+- **Signed up with Google?** Continue with Google finishes in the window (#357): Google's popup
+  opens in a small window of its own, built from the configuration WebKit passes in, so it keeps
+  `window.opener` and the cookie store and hands the result back to claude.ai, then closes. Loading
+  the popup in the main view instead is what used to leave Google's page white. If a Google page
+  still sits blank for 4 seconds, a panel covers it with the steps: sign in in your browser, copy
   the `sessionKey` cookie, and paste it (**Open claude.ai in Browser**, **Paste a Key Instead**).
 - **Paste instead:** every sign-in window and the welcome sheet have **Paste a Key Instead**,
   which opens Settings → Accounts with the key field showing; **How do I find this?** under it

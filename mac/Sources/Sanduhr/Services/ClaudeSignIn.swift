@@ -18,6 +18,8 @@ enum ClaudeSignIn {
     static let pollInterval: TimeInterval = 1.5
     /// A first page that hasn't loaded by then shows the error and the paste way out.
     static let loadTimeout: TimeInterval = 30
+    /// How long a loaded Google page may sit with nothing in it before the panel covers it.
+    static let blankGoogleWait: TimeInterval = 4
 
     /// The tail WebKit appends to its user agent so the window reads as the Safari it is. A web view
     /// that claimed to be Chrome failed Cloudflare's human check every time (2026-10-05): the check
@@ -69,9 +71,9 @@ enum ClaudeSignIn {
         return h == "claude.ai" || h.hasSuffix(".claude.ai")
     }
 
-    /// Google's sign-in pages. Google refuses sign-in inside an app's web view (a blank page), and
-    /// claude.ai sends an account made with Google here even from Continue with email, so the
-    /// window covers the page with the browser-and-paste steps.
+    /// Google's sign-in pages. claude.ai sends an account made with Google here even from Continue
+    /// with email. Sign-in finishes here when Google's popup gets a window of its own; the window
+    /// covers a Google page with the browser-and-paste steps only when it sits blank.
     static func isGoogleSignIn(_ url: URL?) -> Bool {
         guard let host = url?.host?.lowercased() else { return false }
         return host == "accounts.google.com" || host.hasPrefix("accounts.google.")
@@ -88,5 +90,29 @@ enum ClaudeSignIn {
             || isGoogleSignIn(url) || host.hasSuffix(".google.com") || host.hasSuffix(".gstatic.com")
             || host == "challenges.cloudflare.com" || host.hasSuffix(".cloudflare.com")
             || host.hasSuffix(".apple.com")
+    }
+
+    /// Where a page's `window.open` goes. A popup on a sign-in host, or one with no address yet
+    /// (a script may open it blank and set the location after), gets a window of its own, so it
+    /// keeps `window.opener` and can hand Google's answer back to claude.ai. Loaded in the main
+    /// view instead, it lost the opener and Google's page went white (Windows 4.0 found it).
+    /// Anything else opens in the default browser.
+    static func popupStaysInWindow(_ url: URL?) -> Bool {
+        guard let url, !url.absoluteString.isEmpty else { return true }
+        return staysInWindow(url)
+    }
+
+    /// A link or popup that leaves the window may go to the default browser only as a web address.
+    /// Any other scheme (`file:`, an app's own scheme) is dropped, so a page can't open files or
+    /// launch apps through the sign-in window.
+    static func opensInBrowser(_ url: URL?) -> Bool {
+        guard let scheme = url?.scheme?.lowercased(), url?.host?.isEmpty == false else { return false }
+        return scheme == "https" || scheme == "http"
+    }
+
+    /// A loaded page with no text in its body: nothing a person can use, so the window offers
+    /// the browser and a pasted key over it.
+    static func pageLooksBlank(bodyTextLength: Int?) -> Bool {
+        (bodyTextLength ?? 0) == 0
     }
 }

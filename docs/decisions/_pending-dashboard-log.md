@@ -114,3 +114,22 @@ GitHub Secrets is what CI reads, and each repo's release doc maps every 1Passwor
 secrets it backs. Rotating a secret means updating both in the same sitting. Rationale: the login
 keychain was reset twice this year (July and September, per the two `login_renamed_*` files), and
 only the renamed keychain saved the irreplaceable Sparkle key.
+
+---
+
+## Entry 5 — Mac Google sign-in: a real popup window, and the paste panel only over a blank page
+
+**Type:** Architectural choice / gotcha
+**Projects:** Sanduhr für Claude (Windows)
+**Date:** 2026-10-26
+
+### Summary
+
+Issue #357, parity with Windows 4.0. The Mac's `createWebViewWith` loaded Google's `window.open`
+URL into the main view and returned nil, so the popup lost `window.opener` and could not hand the
+result back to claude.ai: that fold, not Google refusing embedded browsers, was the white page.
+The popup now gets its own child `NSWindow` with a `WKWebView` built from the configuration
+WebKit passes in (shared process pool and non-persistent store), closed by `webViewDidClose`. The
+browser-and-paste panel no longer covers the page on first sight of `accounts.google.com`; it
+shows only when a loaded Google page has no body text after 4 s. `ClaudeSignInTests` pins the
+popup path with a source scan. Needs the owner's real Google sign-in to confirm on the Mac.
