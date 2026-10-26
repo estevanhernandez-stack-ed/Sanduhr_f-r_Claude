@@ -197,9 +197,10 @@ public sealed class UsageHistory : IUsageHistory
     }
 
     /// <summary>Wipe the history of every registered account, each by the same
-    /// empty-dict write as <see cref="ClearAll"/> (never unlinks). The "All
-    /// accounts" choice of the History tab's Clear button. An account with no
-    /// history file gets none; a legacy history.json is migrated first, then cleared.</summary>
+    /// empty-dict write as <see cref="ClearAll"/> (never unlinks). No UI calls it now: Settings' Clear acts on the selected account
+    /// only, and Reset clears every history*.json through ResetPlan's file match, not
+    /// through this. An account with no history file gets none; a legacy history.json is
+    /// migrated first, then cleared.</summary>
     public void ClearEvery()
     {
         MigrateLegacyIfNeeded(_accounts.GetActive());

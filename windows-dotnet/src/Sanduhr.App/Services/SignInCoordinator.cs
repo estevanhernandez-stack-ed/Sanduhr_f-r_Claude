@@ -22,8 +22,8 @@ public readonly record struct SignInOutcome(bool Added, string? Label)
 /// App-side counterpart to ROROROblox's <c>CookieCapture</c>. Owns the WebView2
 /// runtime pre-check, the per-capture user-data folder lifecycle
 /// (<see cref="WebView2UserDataDirectory"/> rooted at <c>%APPDATA%\Sanduhr\webview2\</c>),
-/// the account-persistence semantics (first-run → "Personal"; subsequent →
-/// named slot + make active), and the graceful WebView2-missing → manual-paste
+/// the account-persistence semantics (every new account is named through the
+/// Label prompt, "Personal" offered first; it becomes active), and the graceful WebView2-missing → manual-paste
 /// degradation.
 ///
 /// Stateless over the OS credential store: it constructs its own
@@ -36,13 +36,21 @@ public sealed class SignInCoordinator
     private readonly AccountStore _accounts;
     private readonly CredentialStore _credentials;
     private readonly WebView2UserDataDirectory _userData;
+    private readonly Func<string, string?> _askLabel;
 
     public SignInCoordinator()
+        : this(new AccountStore(new WindowsCredentialManager(AccountStore.Service)), new Paths(), AskLabel)
     {
-        var paths = new Paths();
-        _accounts = new AccountStore(new WindowsCredentialManager(AccountStore.Service));
+    }
+
+    /// <summary>Tests: an in-memory registry, scratch folders, and the answer to the label prompt (the typed text, or null when
+    /// cancelled). The prompt is given the label it offers.</summary>
+    internal SignInCoordinator(AccountStore accounts, Paths paths, Func<string, string?> askLabel)
+    {
+        _accounts = accounts;
         _credentials = new CredentialStore(_accounts, paths);
         _userData = new WebView2UserDataDirectory(Path.Combine(paths.AppDataDir, "webview2"));
+        _askLabel = askLabel;
     }
 
     /// <summary>
@@ -195,7 +203,7 @@ public sealed class SignInCoordinator
         if (active is null)
         {
             _credentials.Save(cookies.SessionKey, cookies.CfClearance);
-            var label = _accounts.GetActive() ?? "Personal";
+            var label = _accounts.GetActive() ?? AccountLabels.First;
             SetOriginSafe(label, AccountOrigin.Embedded);
             return label;
         }
@@ -211,7 +219,7 @@ public sealed class SignInCoordinator
     /// re-auth.</summary>
     public async Task<SignInOutcome> SignInManual(Window? owner, Func<Window?, Task<SignInOutcome>>? bounceTo = null)
     {
-        var suggested = _accounts.GetActive() is null ? "Personal" : NextFreeLabel();
+        var suggested = AccountLabels.Suggested(_accounts.ListAccounts());
         var window = new ManualKeyWindow(suggested, PersistManual, IsRuntimeAvailable());
         SetOwner(window, owner);
         window.ShowDialog();
@@ -226,46 +234,27 @@ public sealed class SignInCoordinator
 
     // -- persistence semantics ------------------------------------------------
 
-    /// <summary>Embedded-flow save: the first account auto-creates "Personal";
-    /// subsequent ones prompt for a name (defaulting to the next free slot) and
-    /// become active.</summary>
-    private string PersistEmbedded(CapturedCookies cookies)
+    /// <summary>Embedded-flow save (Settings v2, WF30): every new account, the first included, is named through the label prompt,
+    /// "Personal" offered first and "Account N" after; it becomes active. A cancelled, invalid or taken label keeps the offer, so a
+    /// captured sign-in is never thrown away.</summary>
+    internal string PersistEmbedded(CapturedCookies cookies)
     {
-        if (_accounts.GetActive() is null)
-        {
-            _credentials.Save(cookies.SessionKey, cookies.CfClearance);
-            var label = _accounts.GetActive() ?? "Personal";
-            SetOriginSafe(label, AccountOrigin.Embedded);
-            return label;
-        }
-        var name = PromptForAccountName(NextFreeLabel());
+        var existing = _accounts.ListAccounts();
+        var suggested = AccountLabels.Suggested(existing);
+        var name = AccountLabels.Accept(_askLabel(suggested), suggested, existing);
         _accounts.AddAccount(name, cookies.SessionKey!, cookies.CfClearance);
         _accounts.SetActive(name);
         SetOriginSafe(name, AccountOrigin.Embedded);
         return name;
     }
 
-    /// <summary>Ask the user to name a newly-added account during embedded sign-in,
-    /// defaulting to (and falling back to) <paramref name="suggested"/> — the next free
-    /// "Account N" slot. Validated like <c>ManualKeyWindow</c> (1-32 of [A-Za-z0-9 _-],
-    /// unique); an empty, invalid, or cancelled entry keeps the suggested label.</summary>
-    private string PromptForAccountName(string suggested)
+    /// <summary>The label prompt: "Name this account", field "Label", with <paramref name="suggested"/> filled in. Null when cancelled.</summary>
+    private static string? AskLabel(string suggested)
     {
-        var prompt = new TextPromptWindow("Name this account", "Account name", suggested);
+        var prompt = new TextPromptWindow(SettingsNames.NameThisAccount, SettingsNames.AccountLabelField, suggested);
         if (Application.Current?.MainWindow is { IsLoaded: true } main)
             prompt.Owner = main;
-        if (prompt.ShowDialog() != true)
-            return suggested;
-
-        var name = prompt.Value.Trim();
-        var existing = new HashSet<string>(_accounts.ListAccounts(), StringComparer.OrdinalIgnoreCase);
-        if (name.Length == 0
-            || !System.Text.RegularExpressions.Regex.IsMatch(name, "^[A-Za-z0-9 _-]{1,32}$")
-            || existing.Contains(name))
-        {
-            return suggested;
-        }
-        return name;
+        return prompt.ShowDialog() == true ? prompt.Value : null;
     }
 
     /// <summary>Manual-flow save: explicit user-named slot, then make it active.</summary>
@@ -275,17 +264,6 @@ public sealed class SignInCoordinator
         _accounts.SetActive(label);
         SetOriginSafe(label, AccountOrigin.Manual);
         return label;
-    }
-
-    private string NextFreeLabel()
-    {
-        var existing = new HashSet<string>(_accounts.ListAccounts(), StringComparer.OrdinalIgnoreCase);
-        for (int n = 2; ; n++)
-        {
-            var candidate = string.Format(CultureInfo.InvariantCulture, "Account {0}", n);
-            if (!existing.Contains(candidate))
-                return candidate;
-        }
     }
 
     /// <summary>Best-effort origin stamp — the label is absent from the registry

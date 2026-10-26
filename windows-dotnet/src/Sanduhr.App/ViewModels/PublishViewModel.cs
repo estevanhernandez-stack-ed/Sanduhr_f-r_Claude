@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Text.Json;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -369,6 +370,63 @@ public sealed partial class PublishViewModel : ObservableObject
         finally
         {
             IsPublishing = false;
+        }
+    }
+
+    // ---- What gets sent (Settings v2, slice 5; WF28) ----
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ShowSampleCommand))]
+    private bool _isSampling;
+
+    private bool CanSample => _service is not null && !IsSampling;
+
+    /// <summary>Tests read the sample here (header, note, JSON) instead of opening the window.</summary>
+    internal Action<string, string, string>? SampleHook { get; set; }
+
+    private static readonly JsonSerializerOptions SampleJson = new() { WriteIndented = true };
+
+    /// <summary>"Show a sample…": the record the next publish would send, built by the same function, shown read-only. Sends nothing,
+    /// reads no token, writes nothing.</summary>
+    [RelayCommand(CanExecute = nameof(CanSample))]
+    private async Task ShowSample()
+    {
+        if (_service is null)
+            return;
+        IsSampling = true;
+        try
+        {
+            var record = await _service.SampleAsync(DateTimeOffset.Now);
+            var date = record.Payload["date"]?.GetValue<string>() ?? "";
+            var s = _service.Load();
+            var endpoint = s.Target.EndpointUrl;
+            // The senders' own gates: a usable endpoint, and a stored token when the scheme needs one (HasToken is loaded already:
+            // the sample reads no token).
+            bool usable = UsagePublisher.IsUsableEndpoint(endpoint);
+            string? host = usable && Uri.TryCreate(endpoint?.Trim(), UriKind.Absolute, out var uri) ? uri.Host : null;
+            bool tokenMissing = s.AuthScheme != PublishAuthScheme.None && !HasToken;
+            var header = SettingsNames.SampleHeader(date, host, tokenMissing);
+            var note = record.Homes.Count == 0
+                ? SettingsNames.SampleNoFolders(sendable: host is not null && !tokenMissing, dailyOn: s.Enabled)
+                : "";
+            var json = record.Payload.ToJsonString(SampleJson);
+            if (SampleHook is { } hook)
+            {
+                hook(header, note, json);
+                return;
+            }
+            var window = new PublishSampleWindow(header, note, json);
+            if (_owner is { IsLoaded: true })
+                window.Owner = _owner;
+            window.ShowDialog();
+        }
+        catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException or InvalidOperationException or JsonException)
+        {
+            StatusText = SettingsNames.SampleFailed;
+        }
+        finally
+        {
+            IsSampling = false;
         }
     }
 

@@ -26,6 +26,7 @@ public sealed class UsagePublishService
     private readonly SettingsStore _settings;
     private readonly CcLogReader _reader;
     private readonly PublishTokenStore _tokens;
+    private readonly Func<string> _home;
     private int _publishRunning;
     private int _tickRunning;
 
@@ -33,13 +34,18 @@ public sealed class UsagePublishService
     /// records its outcome — ON A WORKER THREAD; UI subscribers marshal.</summary>
     public event Action? StatusChanged;
 
-    public UsagePublishService(SettingsStore settings, CcLogReader reader, Paths paths, PublishTokenStore tokens)
+    /// <summary><paramref name="home"/> is the folder the shared Claude Code folders sit in (the user profile; tests give a scratch one).</summary>
+    public UsagePublishService(SettingsStore settings, CcLogReader reader, Paths paths, PublishTokenStore tokens, Func<string>? home = null)
     {
         _settings = settings;
         _reader = reader;
         _paths = paths;
         _tokens = tokens;
+        _home = home ?? (() => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
     }
+
+    /// <summary>Tests: the network the upload goes to. Null is the real one.</summary>
+    internal System.Net.Http.HttpMessageHandler? Handler { get; set; }
 
     // -- state ------------------------------------------------------------------
 
@@ -207,6 +213,35 @@ public sealed class UsagePublishService
     public sealed record PublishOutcome(
         UsagePublishResult Result, IReadOnlyList<string> Homes, long TotalTokens, int ProjectCount, string QuotaStatus);
 
+    /// <summary>One day's record, as it would be sent: the payload, the folders in it, the token total and the quota's state.</summary>
+    public sealed record PublishRecord(JsonObject Payload, IReadOnlyList<string> Homes, long TotalTokens, string QuotaStatus);
+
+    /// <summary>
+    /// The one builder (Settings v2, WF28): the scheduled publish, Publish now, the MCP's publish_usage and Settings' "Show a sample…"
+    /// all read the record here. Reads the shared folders' logs for <paramref name="date"/> and the widget's snapshot; sends nothing,
+    /// and never touches the publish token (only <see cref="PublishAsync"/> loads it, to post).
+    /// </summary>
+    public PublishRecord BuildRecord(DateOnly date)
+    {
+        var shared = SharedRootNames();
+        var home = _home();
+        var burn = new List<RootDayBurn>(shared.Count);
+        foreach (var root in shared)
+            burn.Add(_reader.BurnForLocalDay(root, Path.Combine(home, root), date));
+
+        var settings = _settings.LoadPublishSettings();
+        var quota = UsagePublisher.ReadQuota(_paths.SnapshotFile, DateTimeOffset.UtcNow);
+        var payload = UsagePublisher.BuildPayload(
+            date, Environment.MachineName, burn,
+            new HashSet<string>(shared, StringComparer.Ordinal), quota, settings.BodyFormat);
+        return new PublishRecord(payload, shared, burn.Sum(b => b.Total), quota.Status);
+    }
+
+    /// <summary>"Show a sample…": the record Publish now would send at <paramref name="nowLocal"/> (yesterday's, local), built off the
+    /// UI thread. Nothing is posted, recorded or written, and no token is read.</summary>
+    public Task<PublishRecord> SampleAsync(DateTimeOffset nowLocal) =>
+        Task.Run(() => BuildRecord(UsagePublisher.DefaultDate(nowLocal)));
+
     /// <summary>Collect, build, post, record. Single-flight: returns null when
     /// another run holds the latch. Never throws — a fault records as a failed
     /// attempt so the status line says so.</summary>
@@ -218,25 +253,16 @@ public sealed class UsagePublishService
         {
             return await Task.Run(async () =>
             {
-                var shared = SharedRootNames();
-                var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                var burn = new List<RootDayBurn>(shared.Count);
-                foreach (var root in shared)
-                    burn.Add(_reader.BurnForLocalDay(root, Path.Combine(home, root), date));
-
+                var record = BuildRecord(date);
                 var settings = _settings.LoadPublishSettings();
-                var quota = UsagePublisher.ReadQuota(_paths.SnapshotFile, DateTimeOffset.UtcNow);
-                var payload = UsagePublisher.BuildPayload(
-                    date, Environment.MachineName, burn,
-                    new HashSet<string>(shared, StringComparer.Ordinal), quota, settings.BodyFormat);
 
                 // The publisher refuses (status 0, no network) on a missing endpoint
                 // or a missing token for a scheme that needs one.
-                var result = await UsagePublisher.PublishAsync(payload, settings.Target, _tokens.Load()).ConfigureAwait(false);
+                var result = await UsagePublisher.PublishAsync(record.Payload, settings.Target, _tokens.Load(), Handler).ConfigureAwait(false);
 
                 Record(result, date);
-                return new PublishOutcome(result, shared, burn.Sum(b => b.Total),
-                    ((JsonArray)payload["byProject"]!).Count, quota.Status);
+                return new PublishOutcome(result, record.Homes, record.TotalTokens,
+                    ((JsonArray)record.Payload["byProject"]!).Count, record.QuotaStatus);
             }).ConfigureAwait(false);
         }
         catch (Exception e)

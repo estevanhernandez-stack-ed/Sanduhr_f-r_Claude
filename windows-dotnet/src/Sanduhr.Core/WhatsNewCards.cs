@@ -137,7 +137,7 @@ public static class WhatsNewCards
         WhatsNewCard.Of("3.5.0", "limits-come-and-go", "Limits that come and go",
             "A promo or special limit can hide until it resets, then come back on its own. Each limit can also stop warning you.",
             "\uE7BA", // Warning
-            WhatsNewPreview.None, SettingsPage.Widget),
+            WhatsNewPreview.None, SettingsPage.Alerts),
         WhatsNewCard.Of("3.5.0", "every-folder", "Every Claude Code folder counts",
             "Every .claude-* folder with a projects folder now counts toward your burn and model usage. A new one is listed, off, until you say yes.",
             "\uE8B7", // Folder
@@ -189,6 +189,7 @@ public static class WhatsNewCards
         "claude-code-page" => SettingsIndex.Folders,
         "shortcut-keys" => SettingsIndex.Shortcuts,
         "tray-shows" => SettingsIndex.Tray,
+        "limits-come-and-go" => SettingsIndex.EachLimit,
         "every-folder" => SettingsIndex.Vault,
         "whats-new" => SettingsIndex.Version,
         _ => null,

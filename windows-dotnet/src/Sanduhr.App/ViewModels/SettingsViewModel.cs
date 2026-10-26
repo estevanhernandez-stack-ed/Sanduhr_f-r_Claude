@@ -20,12 +20,11 @@ public sealed class SettingsViewModel
     /// open folder, installed-themes management.</summary>
     public ThemesViewModel Themes { get; }
 
-    /// <summary>Backs the History tab (item 9): 30-day chart with per-account /
-    /// all-accounts overlay, Week/Month window, CSV export, Clear history.</summary>
+    /// <summary>Backs Claude Usage, Meters (the 30-day meter history; the History page until Settings v2, slice 5).
+    /// The same object as ClaudeCode.Meters.</summary>
     public HistoryTabViewModel History { get; }
 
-    /// <summary>Backs the Claude Usage tab (WS-C): Overview / Trends / Sessions
-    /// over the usage vault + live reader.</summary>
+    /// <summary>Backs Claude Usage: Meters, Overview, Trends and Sessions.</summary>
     public ClaudeCodeTabViewModel ClaudeCode { get; }
 
     /// <summary>Backs the Claude Code page: folders, accounts linked to them, Sanduhr's pieces and the glow.</summary>
@@ -96,6 +95,9 @@ public sealed class SettingsViewModel
     /// publish-now, status).</summary>
     public PublishViewModel Publish { get; }
 
+    /// <summary>Settings, Widget (Settings v2, slice 5): the widget's own options and Just the Desk's way back.</summary>
+    public WidgetPageViewModel WidgetPage { get; }
+
     /// <summary>Assembly version for About (e.g. "3.0.0").</summary>
     public string Version { get; }
 
@@ -104,6 +106,9 @@ public sealed class SettingsViewModel
 
     /// <summary>About's "Take the tour…" button.</summary>
     public ICommand ShowTourCommand { get; }
+
+    /// <summary>About, Version's "Don't show What's New after updates" (slice 5).</summary>
+    public AboutVersionViewModel AboutVersion { get; }
 
     /// <summary>The sidebar search.</summary>
     public SettingsSearchViewModel Search { get; } = new();
@@ -179,10 +184,12 @@ public sealed class SettingsViewModel
     {
         ShowWhatsNewCommand = new RelayCommand(() => showWhatsNew?.Invoke());
         ShowTourCommand = new RelayCommand(() => showTour?.Invoke());
+        AboutVersion = new AboutVersionViewModel(new SettingsStore(new Paths()));
         Accounts = new AccountsViewModel(widget, addAccountAsync, updateSignInAsync);
         Themes = new ThemesViewModel(widget);
         History = new HistoryTabViewModel(widget);
-        ClaudeCode = new ClaudeCodeTabViewModel(widget, new LocalCcViewModel(
+        Accounts.HistoryCleared = History.Refresh;
+        ClaudeCode = new ClaudeCodeTabViewModel(widget, History, new LocalCcViewModel(
             widget, widget.LoadLocalCcShowBreakdowns(), widget.SaveLocalCcShowBreakdowns),
             new CcTrendsViewModel(widget),
             new CcLedgerViewModel(widget, widget.LoadLedgerGroupByProject(), widget.SaveLedgerGroupByProject));
@@ -232,6 +239,7 @@ public sealed class SettingsViewModel
             return Task.CompletedTask;
         });
         Publish = new PublishViewModel(widget.Publish);
+        WidgetPage = new WidgetPageViewModel(widget);
         var v = Assembly.GetExecutingAssembly().GetName().Version;
         Version = v is null ? "3.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
 

@@ -28,7 +28,7 @@ public class SettingsIndexTests
     [Fact]
     public void Subsection_is_set_only_on_Claude_Usage_and_always_there()
     {
-        string?[] views = [SettingsIndex.OverviewView, SettingsIndex.TrendsView, SettingsIndex.SessionsView];
+        string?[] views = [SettingsIndex.MetersView, SettingsIndex.OverviewView, SettingsIndex.TrendsView, SettingsIndex.SessionsView];
         foreach (var e in SettingsIndex.Anchors)
         {
             if (e.Page == SettingsPage.ClaudeUsage)
@@ -105,11 +105,11 @@ public class SettingsIndexTests
     public void Csv_first_hit_is_the_meter_history_export()
     {
         // "Export meter history…" has no "csv" in its title any more; both exports match "csv" through a
-        // synonym (rank 1), and the tie goes to sidebar order: History before Claude Usage.
+        // synonym (rank 1); both sit on Claude Usage, and the tie goes to index order: Meters before Sessions.
         var top = Top("csv");
         Assert.Equal(1, top.Rank);
-        Assert.Equal(SettingsPage.History, top.Entry.Page);
-        Assert.Equal(SettingsIndex.HistoryExport, top.Entry.Anchor);
+        Assert.Equal(SettingsPage.ClaudeUsage, top.Entry.Page);
+        Assert.Equal(SettingsIndex.MeterHistoryExport, top.Entry.Anchor);
         Assert.Equal(SettingsNames.ExportMeterHistory, top.Entry.Title);
         Assert.Contains(SettingsIndex.Search("csv"),
             h => h.Entry.Page == SettingsPage.ClaudeUsage && h.Entry.Anchor == SettingsIndex.Sessions && h.Rank == 1);
@@ -119,8 +119,8 @@ public class SettingsIndexTests
     [InlineData("vault", SettingsPage.ClaudeUsage, SettingsIndex.Vault)]
     [InlineData("history vault", SettingsPage.ClaudeUsage, SettingsIndex.Vault)]
     [InlineData("homes", SettingsPage.Publish, SettingsIndex.Homes)]
-    [InlineData("export", SettingsPage.History, SettingsIndex.HistoryExport)]
-    [InlineData("meter history", SettingsPage.History, SettingsIndex.HistoryExport)]
+    [InlineData("export", SettingsPage.ClaudeUsage, SettingsIndex.MeterHistoryExport)]
+    [InlineData("meter history", SettingsPage.ClaudeUsage, SettingsIndex.MeterHistoryExport)]
     public void Old_words_still_find_the_renamed_controls(string query, SettingsPage page, string anchor) =>
         Assert.Contains(SettingsIndex.Search(query), h => h.Entry.Page == page && h.Entry.Anchor == anchor);
 

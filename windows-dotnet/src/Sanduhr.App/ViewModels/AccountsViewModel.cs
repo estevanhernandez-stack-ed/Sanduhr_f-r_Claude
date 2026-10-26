@@ -1,8 +1,11 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Sanduhr.App.Services;
 using Sanduhr.App.Views;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
@@ -46,6 +49,7 @@ public sealed partial class AccountsViewModel : ObservableObject
     private readonly WidgetViewModel _widget;
     private readonly Func<Task> _addAccountAsync;
     private readonly Func<string, Task> _updateSignInAsync;
+    private readonly Func<string, string> _displayFolder;
     private Window? _owner;
 
     public ObservableCollection<AccountItemViewModel> Accounts { get; } = new();
@@ -61,6 +65,7 @@ public sealed partial class AccountsViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(RenameCommand))]
     [NotifyCanExecuteChangedFor(nameof(SignOutCommand))]
     [NotifyCanExecuteChangedFor(nameof(UpdateSignInCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClearHistoryCommand))]
     private bool _isDemo;
 
     [ObservableProperty]
@@ -68,13 +73,16 @@ public sealed partial class AccountsViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(RenameCommand))]
     [NotifyCanExecuteChangedFor(nameof(SignOutCommand))]
     [NotifyCanExecuteChangedFor(nameof(UpdateSignInCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClearHistoryCommand))]
     private AccountItemViewModel? _selectedAccount;
 
-    public AccountsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync)
+    public AccountsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync,
+        Func<string, string>? displayFolder = null)
     {
         _widget = widget;
         _addAccountAsync = addAccountAsync;
         _updateSignInAsync = updateSignInAsync;
+        _displayFolder = displayFolder ?? (path => ClaudeCodeFolders.Display(path, ClaudeCodeProfile.Dir));
         Reload();
     }
 
@@ -110,6 +118,7 @@ public sealed partial class AccountsViewModel : ObservableObject
         SelectedAccount = Accounts.FirstOrDefault(a => a.Label == prev)
                           ?? Accounts.FirstOrDefault(a => a.IsActive)
                           ?? Accounts.FirstOrDefault();
+        RefreshData();
     }
 
     // Demo mode's samples are not real accounts: nothing to switch, rename, update or remove.
@@ -169,14 +178,9 @@ public sealed partial class AccountsViewModel : ObservableObject
     private async Task SignOut()
     {
         var item = SelectedAccount;
-        if (item is null)
+        if (item is null || IsDemo || _widget.IsDemo)
             return;
-        var text =
-            $"Remove the '{item.Label}' account from Sanduhr?\n\n" +
-            "This deletes its saved sign-in from the Windows Credential Manager " +
-            $"and its usage-history file (history.{item.Label}.json). Cannot be undone.";
-        var result = ThemedDialog.Show(_owner, "Remove account", text, MessageBoxButton.YesNo, ThemedDialogKind.Warning);
-        if (result != MessageBoxResult.Yes)
+        if (!ConfirmRemove(item.Label))
             return;
         await _widget.SignOutAccountAsync(item.Label);
         Reload();
@@ -187,6 +191,80 @@ public sealed partial class AccountsViewModel : ObservableObject
     {
         await _addAccountAsync();
         Reload();
+    }
+
+    // ---- Data for this account (Settings v2, slice 5; WF1, WF27, WF29) ----
+
+    /// <summary>The Data section shows while an account is selected.</summary>
+    public bool HasData => SelectedAccount is not null;
+
+    /// <summary>"Linked to ~\.claude-work." or "No Claude Code folder is linked to this account." (an account links one folder).</summary>
+    [ObservableProperty] private string _linkedFolderText = "";
+
+    /// <summary>Under Remove account…: everything it removes, the same sentence its question shows.</summary>
+    [ObservableProperty] private string _removeCaption = "";
+
+    public string ClearHistoryName => SettingsNames.ClearAccountHistoryNamed(SelectedAccount?.Label ?? "");
+    public string RemoveName => SettingsNames.RemoveAccountNamed(SelectedAccount?.Label ?? "");
+
+    /// <summary>Connected by Settings: the meter history redraws after a clear.</summary>
+    public Action? HistoryCleared { get; set; }
+
+    partial void OnSelectedAccountChanged(AccountItemViewModel? value) => RefreshData();
+
+    private void RefreshData()
+    {
+        var label = SelectedAccount?.Label;
+        var folder = label is null || IsDemo ? null : _widget.AccountFolder(label);
+        LinkedFolderText = label is null ? "" : SettingsNames.LinkedFolderLine(folder is null ? null : _displayFolder(folder));
+        RemoveCaption = label is null ? "" : SettingsNames.RemoveAccountDetail(label);
+        OnPropertyChanged(nameof(HasData));
+        OnPropertyChanged(nameof(ClearHistoryName));
+        OnPropertyChanged(nameof(RemoveName));
+    }
+
+    /// <summary>"Clear this account's history…" (WF1): the selected account's 30-day meter history, after a question with no default
+    /// button. Never in demo mode, whose sample labels can match a real account's.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void ClearHistory()
+    {
+        if (IsDemo || _widget.IsDemo || SelectedAccount is not { } item)
+            return;
+        if (!ConfirmClear(item.Label))
+            return;
+        try
+        {
+            _widget.History.ClearAll(item.Label);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Sounds.PlayError();
+            Info(SettingsNames.HistoryNotCleared);
+            return;
+        }
+        HistoryCleared?.Invoke();
+        Info(SettingsNames.HistoryCleared(item.Label));
+    }
+
+    /// <summary>Tests answer the questions and read the notices here instead of showing them.</summary>
+    internal Func<string, bool>? ConfirmClearHook { get; set; }
+    internal Func<string, bool>? ConfirmRemoveHook { get; set; }
+    internal Action<string>? InfoHook { get; set; }
+
+    private bool ConfirmClear(string label) => ConfirmClearHook is { } hook
+        ? hook(label)
+        : ThemedDialog.ShowConfirm(_owner, SettingsNames.ClearHistoryQuestion(label), SettingsNames.ClearHistoryDetail,
+            SettingsNames.ClearHistoryConfirm, SettingsNames.ClearHistoryCancel);
+
+    private bool ConfirmRemove(string label) => ConfirmRemoveHook is { } hook
+        ? hook(label)
+        : ThemedDialog.ShowConfirm(_owner, SettingsNames.RemoveAccountQuestion(label), SettingsNames.RemoveAccountDetail(label),
+            SettingsNames.RemoveAccountConfirm, SettingsNames.RemoveAccountCancel);
+
+    private void Info(string message)
+    {
+        if (InfoHook is { } hook) { hook(message); return; }
+        ThemedDialog.Show(_owner, SettingsNames.MeterHistoryDialogTitle, message, MessageBoxButton.OK, ThemedDialogKind.Info);
     }
 
     private void ShowError(string message)

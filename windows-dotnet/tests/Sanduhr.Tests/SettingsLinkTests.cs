@@ -33,7 +33,7 @@ public class SettingsLinkTests
     [InlineData("desk#", SettingsPage.Desk, null)]
     [InlineData("desk#nowhere", SettingsPage.Desk, null)]
     [InlineData("about#version", SettingsPage.About, "version")]
-    [InlineData("history#chart", SettingsPage.History, "chart")]
+    [InlineData("history#chart", SettingsPage.ClaudeUsage, "meters")]   // History retired in slice 5: its alias lands on Meters
     [InlineData("widget", SettingsPage.Widget, null)]
     [InlineData("widget#tray", SettingsPage.Widget, null)]
     [InlineData("", SettingsPage.General, null)]
@@ -77,7 +77,7 @@ public class SettingsLinkTests
     [InlineData("desk#pieces", SettingsPage.Desk, "pieces")]
     [InlineData("desk#nowhere", SettingsPage.Desk, null)]
     [InlineData("desk", SettingsPage.Desk, null)]
-    [InlineData("history#chart", SettingsPage.History, "chart")]            // History is a page until slice 5
+    [InlineData("history#chart", SettingsPage.ClaudeUsage, "meters")]   // History retired in slice 5: its alias lands on Meters
     [InlineData("desk#desk-launcher", SettingsPage.Launcher, "launcher")]   // an alias live since slice 3
     [InlineData("deskmessage#message-look", SettingsPage.DeskLook, "sizes")]
     [InlineData("DESKLOOK#INK", SettingsPage.DeskLook, "ink")]
@@ -108,7 +108,7 @@ public class SettingsLinkTests
 
     [Theory]
     [InlineData(SettingsPage.Accounts, SettingsIndex.AccountList)]
-    [InlineData(SettingsPage.Alerts, SettingsIndex.Notifications)]
+    [InlineData(SettingsPage.Alerts, SettingsIndex.EachLimit)]   // slice 5: the tier card's link lands on its home (WF13)
     [InlineData(SettingsPage.Desk, SettingsIndex.DeskPieces)]
     [InlineData(SettingsPage.DeskMessage, SettingsIndex.MessageLines)]
     [InlineData(SettingsPage.Launcher, SettingsIndex.LauncherButtons)]

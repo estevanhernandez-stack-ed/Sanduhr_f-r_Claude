@@ -443,6 +443,20 @@ public class SettingsSourceScanTests
     }
 
     [Fact]
+    public void The_sign_in_window_hides_before_persist_and_closes_even_when_hidden()
+    {
+        // SignInWindow needs WebView2 to construct, so the order is pinned in the source instead.
+        var cs = File.ReadAllText(Path.Combine(AppDir(), "Views", "SignInWindow.xaml.cs"));
+        var hide = cs.IndexOf("Hide();", StringComparison.Ordinal);
+        var persist = cs.IndexOf("_persist(captured)", StringComparison.Ordinal);
+        Assert.True(hide >= 0 && persist > hide, "Hide() must run before _persist(captured): the label prompt must not sit over a frozen window.");
+        var complete = cs[cs.IndexOf("private void CompleteAndClose", StringComparison.Ordinal)..];
+        complete = complete[..complete.IndexOf("// --", StringComparison.Ordinal)];
+        Assert.DoesNotContain("IsVisible", complete);
+        Assert.Contains("_closing", complete);
+    }
+
+    [Fact]
     public void The_trademark_footer_is_one_control_on_seven_pages()
     {
         var views = Path.Combine(AppDir(), "Views");

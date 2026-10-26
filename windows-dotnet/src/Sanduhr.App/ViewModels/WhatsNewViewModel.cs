@@ -67,7 +67,7 @@ public sealed class WhatsNewCardItem
     public override string ToString() => Card.Title;
     public string ShowMeName => $"{ShowMeTitle}: {Card.Title}";
 
-    public string ShowMeToolTip => Card.Destination == SettingsPage.Widget
+    public string ShowMeToolTip => SettingsIndex.ShowsTheWidget(new SettingsLink(Card.Destination, Card.Anchor))
         ? "Shows the widget"
         : $"Opens Settings, {SettingsNames.PageTitle(SettingsIndex.Resolve(Card.Destination, Card.Anchor).Page)}";
 }

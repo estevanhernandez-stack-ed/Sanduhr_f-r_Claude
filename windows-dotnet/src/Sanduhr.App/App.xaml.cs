@@ -309,7 +309,7 @@ public partial class App : Application
     /// <summary>A card's Show me: the widget, or Settings at the card's page and section (WF17).</summary>
     private void ShowMe(SettingsPage page, string? anchor)
     {
-        if (page == SettingsPage.Widget)
+        if (SettingsIndex.ShowsTheWidget(new SettingsLink(page, anchor)))
             ShowWindow();
         else
             _ = ShowSettingsAsync(page, anchor);
@@ -697,7 +697,7 @@ public partial class App : Application
     /// <summary>A link from outside the app: the widget, or Settings at that page and section.</summary>
     private void OpenSettingsLink(SettingsLink link)
     {
-        if (link.Page == SettingsPage.Widget)
+        if (SettingsIndex.ShowsTheWidget(link))
             ShowWindow();
         else
             _ = ShowSettingsAsync(link.Page, link.Anchor);
@@ -771,6 +771,12 @@ public partial class App : Application
         Action showRunnerStatus = () => svm.Desk.CiRunnersStatus = _runners?.Status.Text ?? "";
         RunnerStatusShown += showRunnerStatus;
         svm.QuitRequested = QuitApp;
+        // Settings, Widget, Just the Desk's "Show the widget" (WF32): the widget view model has ended it and redrawn the Desk; the window is App's.
+        svm.WidgetPage.ShowWidgetRequested = () =>
+        {
+            if (_vm is { } widgetVm) svm.Alerts.DeskSignInReminder = widgetVm.LoadDeskSignInReminder();
+            ShowWindow();
+        };
         svm.ResetRequested = () =>
         {
             ShowReset();
@@ -893,17 +899,9 @@ public partial class App : Application
     {
         try
         {
-            if (vm.AccountStore.ListAccounts().Count == 0)
+            if (vm.AccountStore.ListAccounts().Count == 0 || !vm.EndJustTheDesk())
                 return;
-            var store = new SettingsStore(new Sanduhr.Core.Paths());
-            var (state, reminderOn, ended) = JustTheDesk.EndBySignIn(store.LoadJustTheDesk(), store.LoadDeskSignInReminder());
-            if (!ended)
-                return;
-            store.SaveJustTheDesk(state);
-            store.SaveDeskSignInReminder(reminderOn);
-            vm.JustTheDesk = false;
-            if (_settingsWindow?.ViewModel.Alerts is { } alerts) alerts.DeskSignInReminder = reminderOn;
-            vm.RefreshDesk();
+            if (_settingsWindow?.ViewModel.Alerts is { } alerts) alerts.DeskSignInReminder = vm.LoadDeskSignInReminder();
             ShowWindow();
         }
         catch

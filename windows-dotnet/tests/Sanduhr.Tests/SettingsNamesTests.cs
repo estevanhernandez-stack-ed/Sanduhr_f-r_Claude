@@ -7,18 +7,18 @@ namespace Sanduhr.Tests;
 public class SettingsNamesTests
 {
     // Retired pages stay in the enum for their aliases (old cards, agent text, --settings links) but leave the sidebar: Widgets in
-    // slice 4 (P4), History in slice 5.
+    // slice 4 (P4), History in slice 5. Widget is a page since slice 5 (the widget itself is Widget with no anchor).
     private static readonly SettingsPage[] SidebarPages =
-        [.. Enum.GetValues<SettingsPage>().Where(p => p is not SettingsPage.Widget and not SettingsPage.Widgets)];
+        [.. Enum.GetValues<SettingsPage>().Where(p => p is not SettingsPage.Widgets and not SettingsPage.History)];
 
     private static IEnumerable<string> CopyOf(WhatsNewCard c) => [c.Title, c.Body];
 
     [Fact]
-    public void Sidebar_has_every_page_but_Widget_exactly_once()
+    public void Sidebar_has_every_live_page_exactly_once()
     {
         foreach (var page in SidebarPages)
             Assert.Single(SettingsNames.Pages, p => p == page);
-        Assert.DoesNotContain(SettingsPage.Widget, SettingsNames.Pages);
+        Assert.Contains(SettingsPage.Widget, SettingsNames.Pages);
         Assert.Equal(SidebarPages.Length, SettingsNames.Pages.Count);
     }
 
@@ -575,5 +575,95 @@ public class SettingsNamesTests
             Assert.Empty(SettingsNames.RetiredNames(text));
             Assert.Empty(SettingsNames.PathProblems(text));
         }
+    }
+
+    // ---- Settings v2, slice 5: Usage, Accounts, Alerts and Widget ----
+
+    [Fact]
+    public void Slice_5_copy_is_the_specs()
+    {
+        Assert.Equal("Claude Usage, Alerts and the meters fill in after you sign in.", SettingsNames.SignedOutAccountsLine);
+        Assert.Equal("Sign in to start recording your meters. Sanduhr keeps 30 days on this PC.", SettingsNames.MeterHistorySignedOut);
+        Assert.Equal("Sanduhr is in Just the Desk: the widget is hidden.", SettingsNames.JustTheDeskOn);
+        Assert.Equal(("Show the widget", "Warn for this limit", "Show this limit", "Hidden until it resets"),
+            (SettingsNames.ShowTheWidget, SettingsNames.WarnForThisLimit, SettingsNames.ShowThisLimit, SettingsNames.HiddenUntilItResets));
+        Assert.Equal(("Clear this account's history…", "Remove account…", "Show a sample…", "Data for this account", "Linked folders"),
+            (SettingsNames.ClearAccountHistory, SettingsNames.RemoveAccount, SettingsNames.ShowASample, SettingsNames.AccountDataSection,
+             SettingsNames.LinkedFolders));
+        Assert.Equal(("Each limit", "What gets sent", "Limit order", "Deep Work length"),
+            (SettingsNames.EachLimitSection, SettingsNames.PublishSampleSection, SettingsNames.LimitOrder, SettingsNames.DeepWorkLength));
+        Assert.Equal("The widget is " + SettingsNames.DefineWidget + ".", SettingsNames.WidgetLine);
+        Assert.Equal(("Name this account", "Label"), (SettingsNames.NameThisAccount, SettingsNames.AccountLabelField));
+        Assert.Equal("Meters", SettingsNames.MetersView);
+        Assert.Contains("token counts in total, per limit and per project name, and your meters' percentages, reset times and when they were read.",
+            SettingsNames.PublishRecordLine);
+    }
+
+    [Fact]
+    public void Row_names_lead_with_the_visible_label()
+    {
+        Assert.Equal("Warn for this limit, Weekly - Opus", SettingsNames.WarnForLimit("Weekly - Opus"));
+        Assert.Equal("Show this limit, Weekly - Opus", SettingsNames.ShowLimit("Weekly - Opus"));
+        Assert.Equal("Move up, Weekly - Opus", SettingsNames.MoveLimitUp("Weekly - Opus"));
+        Assert.Equal("Move down, Weekly - Opus", SettingsNames.MoveLimitDown("Weekly - Opus"));
+        Assert.Equal("Clear this account's history, Work", SettingsNames.ClearAccountHistoryNamed("Work"));
+        Assert.Equal("Remove account, Work", SettingsNames.RemoveAccountNamed("Work"));
+        Assert.Equal("Deep Work length, minutes", SettingsNames.DeepWorkLengthSpoken);
+    }
+
+    [Fact]
+    public void What_Remove_and_Clear_say_is_everything_they_do()
+    {
+        // SignOutAccountAsync removes the sign-in, the history file, the folder link, the meter files Claude Code reads and the browser
+        // profile (decision 7, P2).
+        Assert.Equal("Removes Work's sign-in from Windows Credential Manager, its meter history (history.Work.json), its Claude Code folder link, "
+            + "the meter files Claude Code reads for it and its browser profile. It can't be undone.", SettingsNames.RemoveAccountDetail("Work"));
+        Assert.Equal("Remove Work from Sanduhr?", SettingsNames.RemoveAccountQuestion("Work"));
+        Assert.Equal("Clear Work's meter history?", SettingsNames.ClearHistoryQuestion("Work"));
+        Assert.Equal("Work's meter history is cleared.", SettingsNames.HistoryCleared("Work"));
+        Assert.Equal("Linked to ~\\.claude-work.", SettingsNames.LinkedFolderLine("~\\.claude-work"));
+        Assert.Equal("No Claude Code folder is linked to this account.", SettingsNames.LinkedFolderLine(null));
+    }
+
+    [Fact]
+    public void The_sample_header_says_where_the_next_record_goes_without_naming_a_button()
+    {
+        Assert.Equal("The next record, for 2026-10-24, goes to example.com.", SettingsNames.SampleHeader("2026-10-24", "example.com", false));
+        Assert.Equal("The next record, for 2026-10-24, has no endpoint it can go to yet, so it goes nowhere.", SettingsNames.SampleHeader("2026-10-24", null, false));
+        Assert.Equal("The next record, for 2026-10-24, has no endpoint it can go to yet, so it goes nowhere.", SettingsNames.SampleHeader("2026-10-24", null, true));
+        Assert.Equal("The next record, for 2026-10-24, would go to example.com, but it needs a token first, so it goes nowhere yet.",
+            SettingsNames.SampleHeader("2026-10-24", "example.com", true));
+        Assert.Equal("No folder is ticked under Folders to share. Publish now waits for one; a daily or agent publish would send this record, "
+            + "naming no folder or project.", SettingsNames.SampleNoFolders(sendable: true, dailyOn: true));
+        Assert.Equal("No folder is ticked under Folders to share, and Publish daily is off, so nothing sends this record.",
+            SettingsNames.SampleNoFolders(sendable: true, dailyOn: false));
+        Assert.Equal("No folder is ticked under Folders to share.", SettingsNames.SampleNoFolders(sendable: false, dailyOn: true));
+        Assert.Equal("No folder is ticked under Folders to share.", SettingsNames.SampleNoFolders(sendable: false, dailyOn: false));
+    }
+
+    [Fact]
+    public void Slice_5_copy_uses_no_retired_name_and_no_bad_path()
+    {
+        foreach (var text in new[]
+        {
+            SettingsNames.SignedOutAccountsLine, SettingsNames.ClearHistoryDetail, SettingsNames.RemoveAccountDetail("Work"),
+            SettingsNames.EachLimitCaption, SettingsNames.HiddenUntilResetCaption, SettingsNames.EachLimitSignedOut, SettingsNames.EachLimitNotYet, SettingsNames.LimitOrderAllHidden,
+            SettingsNames.MetersIntro, SettingsNames.MeterHistorySignedOut, SettingsNames.MeterHistoryEmpty, SettingsNames.WidgetLine,
+            SettingsNames.CompactModeCaption, SettingsNames.DeepWorkRange, SettingsNames.JustTheDeskOn, SettingsNames.ShowTheWidgetCaption,
+            SettingsNames.PublishRecordLine, SettingsNames.SampleNoFolders(true, true), SettingsNames.SampleNoFolders(true, false), SettingsNames.SampleNoFolders(false, true),
+            SettingsNames.SampleFailed, SettingsNames.SampleHeader("2026-10-24", null, false), SettingsNames.SampleHeader("2026-10-24", "example.com", true),
+        })
+        {
+            Assert.Empty(SettingsNames.RetiredNames(text));
+            Assert.Empty(SettingsNames.PathProblems(text));
+            Assert.Empty(SettingsNames.UnknownLinks(text));
+        }
+    }
+
+    [Fact]
+    public void The_key_windows_field_is_called_Label()
+    {
+        Assert.NotEmpty(SettingsNames.RetiredNames("Account name"));
+        Assert.Empty(SettingsNames.RetiredNames("account name"));   // prose that says "the account name" stays
     }
 }

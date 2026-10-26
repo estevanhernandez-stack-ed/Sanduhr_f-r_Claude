@@ -3,7 +3,7 @@ using System.Windows.Media;
 namespace Sanduhr.App.Views;
 
 /// <summary>
-/// Stable per-account color palette for the History tab's all-accounts overlay,
+/// Stable per-account color palette for the Meters view's all-accounts overlay,
 /// ported from <c>history_chart.ACCOUNT_COLORS</c> / <c>color_for_account</c>.
 /// Colors are keyed on an account's position in the registry list so they stay
 /// stable across refreshes; the palette cycles after the 5th account (most users

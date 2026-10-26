@@ -37,16 +37,22 @@ public static class SettingsIndex
     // Accounts
     public const string AccountList = "accounts";
     public const string Follow = "follow";
+    public const string SignInSection = "sign-in";
+    public const string AccountData = "data";
     // Alerts
     public const string Notifications = "notifications";
     public const string Thresholds = "thresholds";
     public const string Sound = "sound";
     public const string TestAlert = "test";
+    public const string EachLimit = "each-limit";
     public const string SignInReminders = "signin-reminders";
-    // History
+    // History (retired in slice 5): kept for the aliases to Claude Usage, Meters
     public const string Chart = "chart";
     public const string HistoryExport = "export";
     // Claude Usage
+    /// <summary>Claude Usage, Meters (slice 5): the meter history and its export.</summary>
+    public const string MeterHistory = "meters";
+    public const string MeterHistoryExport = "meters-export";
     public const string Overview = "overview";
     public const string Vault = "vault";
     public const string Trends = "trends";
@@ -71,6 +77,7 @@ public static class SettingsIndex
     public const string Token = "token";
     public const string Homes = "homes";
     public const string Schedule = "schedule";
+    public const string Sample = "sample";
     // Themes
     public const string Gallery = "gallery";
     public const string Studio = "studio";
@@ -122,6 +129,9 @@ public static class SettingsIndex
     public const string WidgetsInstalled = "widgets-installed";
     // Claude Code (S6)
     public const string GlowWhere = "glow-where";
+    // Widget (slice 5)
+    public const string WidgetOptions = "widget-options";
+    public const string JustTheDeskSection = "just-the-desk";
     // About
     public const string Version = "version";
     public const string Trademark = "trademark";
@@ -130,6 +140,7 @@ public static class SettingsIndex
     public const string Reset = "reset";
 
     /// <summary>The Claude Usage views an anchor can sit in.</summary>
+    public const string MetersView = SettingsNames.MetersView;
     public const string OverviewView = "Overview";
     public const string TrendsView = "Trends";
     public const string SessionsView = "Sessions";
@@ -150,20 +161,29 @@ public static class SettingsIndex
             ["quit", "exit", "close", "close Sanduhr", "stop", "shut down", "end", "sidebar"]),
 
         E("Accounts", SettingsPage.Accounts, AccountList,
-            ["sign in", "sign out", "add account", "rename", "update sign-in", "remove account", "switch",
-             "active account", "sessionKey", "session key", "cookie", "cf_clearance"]),
+            ["switch", "rename", "update sign-in", "active account", "account list"]),
         E(SettingsNames.FollowAccount, SettingsPage.Accounts, Follow,
             ["follow", "auto switch", "in use", "switch automatically", "every 15 minutes"]),
+        E(SettingsNames.SignIn, SettingsPage.Accounts, SignInSection,
+            ["sign in", "add account", "label", "Personal", "sessionKey", "session key", "cookie", "cf_clearance", "Cloudflare",
+             "paste a key", "manual key"]),
+        E(SettingsNames.AccountDataSection, SettingsPage.Accounts, AccountData,
+            ["data", "linked folder", "linked folders", "clear history", "clear this account's history", "meter history", "remove account",
+             "sign out", "delete account", "history file", SettingsNames.LinkedFolders]),
 
         E("Alerts", SettingsPage.Alerts, Notifications,
             ["notification", "toast", "enable alerts", "projection", "pace", "reset notifications", "Focus Assist"]),
         E("Warn at and Urgent at", SettingsPage.Alerts, Thresholds, ["threshold", "warn", "urgent", "percent"]),
+        E(SettingsNames.EachLimitSection, SettingsPage.Alerts, EachLimit,
+            ["limit", "limits", "each limit", "per limit", "hide", "hidden", "hidden limits", "show", "mute", "stop warnings", "warn again",
+             "until it resets", "promo", "special limit", SettingsNames.WarnForThisLimit, SettingsNames.ShowThisLimit, SettingsNames.HiddenUntilItResets]),
         E("Sound", SettingsPage.Alerts, Sound, ["chime", "sound", "snake", "model-scoped", "mute"]),
         E(SettingsNames.SendTestAlert, SettingsPage.Alerts, TestAlert, ["test", "try"]),
 
-        E("History chart", SettingsPage.History, Chart,
-            ["meter history", "30 days", "week", "month", "account", "all accounts", "chart"]),
-        E(SettingsNames.ExportMeterHistory, SettingsPage.History, HistoryExport, ["csv", "export", "export csv", "clear history", "spreadsheet"]),
+        E(SettingsNames.MeterHistorySection, SettingsPage.ClaudeUsage, MeterHistory,
+            ["history", "30 days", "week", "month", "account", "all accounts", "chart", "graph", "meters over time"], MetersView),
+        E(SettingsNames.ExportMeterHistory, SettingsPage.ClaudeUsage, MeterHistoryExport,
+            ["csv", "export", "export csv", "spreadsheet"], MetersView),
 
         E(OverviewView, SettingsPage.ClaudeUsage, Overview,
             ["Claude Code tokens", "today", "last 30 days", "calendar", "projects", "skills", "breakdown"], OverviewView),
@@ -202,6 +222,9 @@ public static class SettingsIndex
         E("Token", SettingsPage.Publish, Token, ["set token", "clear token", "credential", "bearer"]),
         E(SettingsNames.FoldersToShare, SettingsPage.Publish, Homes, ["folders to share", "homes to share", "homes", "folders", "share", ".claude"]),
         E("Publish daily", SettingsPage.Publish, Schedule, ["daily", "schedule", "time", "publish now"]),
+        E(SettingsNames.PublishSampleSection, SettingsPage.Publish, Sample,
+            ["sample", "preview", "what gets sent", "what is sent", "record", "payload", "json", "project names", "machine name",
+             SettingsNames.ShowASample]),
 
         E("Choose a theme", SettingsPage.Themes, Gallery, ["theme", "color", "colour", "gallery", "palette"]),
         E("Studio", SettingsPage.Themes, Studio, ["edit tokens", "glass alpha", "border alpha", "custom theme"]),
@@ -285,8 +308,15 @@ public static class SettingsIndex
             ["launcher", "button", "buttons", "shortcut", "shortcuts", "app", "apps", "link", "TouchButton", "Rainmeter",
              SettingsNames.LauncherAddApp, SettingsNames.LauncherAddLink, "image", "label", "PNG", "Chrome app", "PWA", "row", "column"]),
 
+        E(SettingsNames.WidgetOptions, SettingsPage.Widget, WidgetOptions,
+            [SettingsNames.CompactMode, "compact", "Ctrl+D", SettingsNames.GraphStyle, "graph", "sparkline", "classic", "horizon",
+             SettingsNames.KeepWidgetOnTop, "on top", "pin", "always on top", SettingsNames.DeepWorkLength, "deep work", "focus", "timer",
+             SettingsNames.LimitOrder, "tier order", "order", "reorder", "move up", "move down"]),
+        E(JustTheDesk.ButtonTitle, SettingsPage.Widget, JustTheDeskSection,
+            [SettingsNames.ShowTheWidget, "show the widget", "widget hidden", "hidden widget", "desk only", "no account", "without an account"]),
+
         E("Version", SettingsPage.About, Version,
-            ["version", "What's New", "Take the tour", "tour", "release", "update"]),
+            ["version", "What's New", "Take the tour", "tour", "release", "update", "don't show", "after updates", SettingsNames.HideWhatsNewAfterUpdates]),
         E("Trademark", SettingsPage.About, Trademark, ["Anthropic", "trademark", "disclaimer", "affiliated"]),
         E(SettingsNames.ThirdPartyNotices, SettingsPage.About, Notices, ["license", "licence", "credits", "open source"]),
         E(SettingsNames.WhereSettingsLive, SettingsPage.About, Where,
@@ -298,17 +328,28 @@ public static class SettingsIndex
     /// <summary>Where each name in <see cref="SettingsNames.Table"/> lives on its page.</summary>
     public static IReadOnlyDictionary<string, string> NameAnchors { get; } = new Dictionary<string, string>
     {
+        [SettingsNames.CompactMode] = WidgetOptions,
+        [SettingsNames.GraphStyle] = WidgetOptions,
+        [SettingsNames.KeepWidgetOnTop] = WidgetOptions,
+        [SettingsNames.DeepWorkLength] = WidgetOptions,
+        [SettingsNames.LimitOrder] = WidgetOptions,
+        [SettingsNames.ShowTheWidget] = JustTheDeskSection,
         [SettingsNames.TrayShows] = Tray,
         [SettingsNames.ShortcutToOpenSettings] = Shortcuts,
-        [SettingsNames.AddAccount] = AccountList,
+        [SettingsNames.AddAccount] = SignInSection,
+        [SettingsNames.ClearAccountHistory] = AccountData,
+        [SettingsNames.RemoveAccount] = AccountData,
         [SettingsNames.AddFolder] = Folders,
         [SettingsNames.FollowAccount] = Follow,
         [SettingsNames.SendTestAlert] = TestAlert,
+        [SettingsNames.WarnForThisLimit] = EachLimit,
+        [SettingsNames.ShowThisLimit] = EachLimit,
         [SettingsNames.SignInReminders] = SignInReminders,
-        [SettingsNames.ExportMeterHistory] = HistoryExport,
+        [SettingsNames.ExportMeterHistory] = MeterHistoryExport,
         [SettingsNames.SaveAndApply] = Paste,
         [SettingsNames.WhatsNew] = Version,
         [SettingsNames.TakeTheTour] = Version,
+        [SettingsNames.HideWhatsNewAfterUpdates] = Version,
         [SettingsNames.WhereSettingsLive] = Where,
         [SettingsNames.ThirdPartyNotices] = Notices,
         [SettingsNames.ResetSanduhr] = Reset,
@@ -325,6 +366,7 @@ public static class SettingsIndex
         [SettingsNames.ExportSessions] = Sessions,
         [SettingsNames.SessionArchive] = Vault,
         [SettingsNames.FoldersToShare] = Homes,
+        [SettingsNames.ShowASample] = Sample,
         [SettingsNames.ClaudeCodeGlowHook] = Folders,
         [SettingsNames.TranscriptsKept] = FolderConfig,
         [SettingsNames.LetClaudeReadTotals] = Folders,
@@ -369,7 +411,6 @@ public static class SettingsIndex
         [SettingsPage.General] = ["tray", "startup", "shortcut"],
         [SettingsPage.Accounts] = ["sign in", "account"],
         [SettingsPage.Alerts] = ["notification", "warning"],
-        [SettingsPage.History] = ["meter history", "chart"],
         // "vault" lives on the archive section only: as a page synonym it ties the section at rank 1 and the page row wins.
         [SettingsPage.ClaudeUsage] = ["Claude Code", "tokens", "usage"],
         [SettingsPage.ClaudeCode] = ["Claude Code folders", "folder", "seat", "pieces"],
@@ -383,6 +424,7 @@ public static class SettingsIndex
         [SettingsPage.DeskLook] = ["look", "fonts", "size", "ink", "color", "colour", "plate"],
         [SettingsPage.Watchers] = ["watcher", "cards", "CI", "progress"],
         [SettingsPage.Launcher] = ["buttons", "apps", "links", "shortcuts"],
+        [SettingsPage.Widget] = ["floating window", "meters window"],
         [SettingsPage.About] = ["help", "version", "trademark", "privacy"],
     };
 
@@ -486,6 +528,7 @@ public static class SettingsIndex
         new(["demo"], "privacy", "streamer"),
         new(["codename", "codenames"], "privacy", "streamer-allowlist"),
         new(["widgets", "packs", "pack"], "mods", ModList),
+        new(["history", "meter history", "meters", "usage history"], "claudeusage", MeterHistory),
     ];
 
     /// <summary>The entries a boost names for exactly this query, in boost order, when they are in <paramref name="index"/>.</summary>
@@ -676,6 +719,12 @@ public static class SettingsIndex
     }
 
     /// <summary>
+    /// Whether a place means the widget itself rather than Settings (Settings v2, slice 5, decision 1): <see cref="SettingsPage.Widget"/>
+    /// with no anchor is what cards, the tour and <c>--settings widget</c> have always meant; with an anchor it is the Widget page.
+    /// </summary>
+    public static bool ShowsTheWidget(SettingsLink link) => link.Page == SettingsPage.Widget && link.Anchor is null;
+
+    /// <summary>
     /// The one checked-anchor rule: (<paramref name="page"/>, <paramref name="anchor"/>) resolved through the aliases
     /// (<see cref="Resolve(SettingsPage, string?)"/>), with the anchor dropped to the page's top when the index has no
     /// such section. Every place a link enters Settings, from <see cref="ParseLink"/> to the App's entry points, passes
@@ -725,16 +774,17 @@ public static class SettingsIndex
     // ---- reach: menus and reopening ----
 
     /// <summary>
-    /// The section a menu's "&lt;Page&gt; settings…" opens at (spec, Menus table). Slice 5 moves Alerts to
-    /// <c>each-limit</c>; null opens the page top.
+    /// The section a menu's "&lt;Page&gt; settings…" opens at (spec, Menus table). Alerts opens at Each limit
+    /// (slice 5), where the tier card's link lands; null opens the page top.
     /// </summary>
     public static string? MenuAnchor(SettingsPage page) => page switch
     {
         SettingsPage.Accounts => AccountList,
-        SettingsPage.Alerts => Notifications,
+        SettingsPage.Alerts => EachLimit,
         SettingsPage.Desk => DeskPieces,
         SettingsPage.DeskMessage => MessageLines,
         SettingsPage.Launcher => LauncherButtons,
+        SettingsPage.Widget => WidgetOptions,
         _ => null,
     };
 
@@ -748,6 +798,8 @@ public static class SettingsIndex
     /// </summary>
     public static IReadOnlyList<(string Title, string Anchor)> JumpLinks(SettingsPage page) => page switch
     {
+        SettingsPage.Alerts => Links(page, Thresholds, EachLimit, Sound, TestAlert),
+        SettingsPage.Publish => Links(page, Destination, Token, Homes, Schedule, Sample),
         SettingsPage.Desk => Links(page, DeskPieces, DeskClicks, DeskDesigns, DeskAdvanced),
         SettingsPage.DeskLook => Links(page, DeskThemeMatch, DeskLook, DeskSizes, DeskInk, DeskPlate),
         // The first is named for the widget it sits in; the others read as their index rows.

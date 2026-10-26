@@ -459,6 +459,7 @@ public static partial class Program
             string dir = $"{index:00}-{Slug(header)}";
             if (page == SettingsPage.ClaudeUsage)
             {
+                units.Add(new PassUnit(dir + "-meters", page, SettingsIndex.MetersView, header + " (Meters view)"));
                 units.Add(new PassUnit(dir + "-overview", page, SettingsIndex.OverviewView, header + " (Overview view)"));
                 units.Add(new PassUnit(dir + "-trends", page, SettingsIndex.TrendsView, header + " (Trends view)"));
                 units.Add(new PassUnit(dir + "-sessions", page, SettingsIndex.SessionsView, header + " (Sessions view)"));
@@ -603,9 +604,9 @@ public static partial class Program
         await Settle();
         var sb = new StringBuilder();
         sb.AppendLine("Keyboard focus placed on one control at a time, the window content saved after each (probe/focus-*.png).");
-        async Task Shot(string name, SettingsPage page, Func<UIElement?> find)
+        async Task Shot(string name, SettingsPage page, Func<UIElement?> find, string? view = null)
         {
-            await SelectUnitTop(c, page, null);
+            await SelectUnitTop(c, page, view);
             var el = find();
             if (el is null) { sb.AppendLine($"{name}: control not found"); return; }
             bool ok = TryKeyboardFocus(c, el);
@@ -622,7 +623,7 @@ public static partial class Program
         await Shot("sidebar-other-page", SettingsPage.Alerts, () => TabOf(c, SettingsPage.Mods));
         await Shot("sidebar-quit", SettingsPage.General, () => c.Tabs.Template.FindName("QuitButton", c.Tabs) as UIElement);
         await Shot("title-close", SettingsPage.General, () => Descendants<Button>(c.Root).FirstOrDefault(b => PeerName(b) == "✕"));
-        await Shot("history-week-pill", SettingsPage.History, () => ByName(c.Host, "Week"));
+        await Shot("meters-week-pill", SettingsPage.ClaudeUsage, () => ByName(c.Host, "Week"), SettingsIndex.MetersView);
         await Shot("about-link-button", SettingsPage.About, () => ByName(c.Host, "Velopack project page"));
         await Shot("about-flat-button", SettingsPage.About, () => ByName(c.Host, "What's New"));
         await Shot("desk-combo", SettingsPage.Desk, () => Descendants<ComboBox>(c.Host).FirstOrDefault(b => b.IsVisible && b.IsEnabled));

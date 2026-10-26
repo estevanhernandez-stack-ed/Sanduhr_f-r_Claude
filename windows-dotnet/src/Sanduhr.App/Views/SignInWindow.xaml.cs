@@ -43,6 +43,7 @@ internal partial class SignInWindow : Window
     private DispatcherTimer? _pollTimer;
     private DispatcherTimer? _loadTimeout;
     private bool _loadFailed;
+    private bool _closing;
 
     /// <param name="userDataDir">App-owned WebView2 profile folder (already allocated).</param>
     /// <param name="persist">
@@ -56,6 +57,7 @@ internal partial class SignInWindow : Window
         _persist = persist;
         InitializeComponent();
         Loaded += OnLoaded;
+        Closing += (_, _) => _closing = true;
         Closed += OnClosed;
     }
 
@@ -262,6 +264,9 @@ internal partial class SignInWindow : Window
 
             try
             {
+                // Persist shows the modal label prompt, owned by the main window. Hide first so this
+                // window doesn't sit frozen behind it; CompleteAndClose closes it hidden or not.
+                Hide();
                 var label = _persist(captured);
                 Log("captured + persisted (no value logged)");
                 CompleteAndClose(new SignInResult.Success(label));
@@ -311,8 +316,11 @@ internal partial class SignInWindow : Window
         StopPoll();
         StopLoadTimeout();
         _tcs.TrySetResult(result);
-        if (IsVisible)
+        if (!_closing)
+        {
+            _closing = true;
             Close();
+        }
     }
 
     // -- diagnostics (presence only, never secret values) ---------------------
