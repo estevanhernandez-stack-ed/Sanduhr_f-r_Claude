@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **Your plan on the widget.** The footer shows your plan as a small label, Max ×20, Max, Team or Pro, and on the Max plans its tooltip rotates through a few jokes every few seconds (Reduce Motion keeps the first). Settings, Accounts shows each account's plan beside its name. Claude Code sessions get it too, through the MCP's `get_usage` and the statusline. No new request: the plan comes from the organization answer Sanduhr already fetches, and only its name is kept. API and prepaid accounts show none.
+
 ## v2.33.1-mac — 2026-10-26
 
 - **Continue with Google finishes inside Sanduhr (#357).** Google's sign-in now opens in a small window of its own and hands the result back to claude.ai, so a Google account signs in like an email one: no browser, no copying cookies. The browser-and-paste steps show up only if Google's page stays blank, and Paste a Key Instead is still at the bottom of the window.

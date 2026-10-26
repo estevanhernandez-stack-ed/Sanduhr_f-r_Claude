@@ -2153,3 +2153,23 @@ release and `com.626labs.sanduhr.lockscreen.dev` for a dev build.
    switch still reads On. Turn it off and on: `launchctl print system/com.626labs.sanduhr.lockscreen`
    runs with exit code 0, and `launchctl print system/com.626labs.sanduhr.lockline` no longer finds
    the old job. The line stays on the lock screen throughout.
+
+## 53. Plan label (2.34.0)
+
+The subscription plan on the widget footer and in Settings, Accounts. Back up
+`~/Library/Application Support/Sanduhr` first for the signed-in steps, as section 45 does.
+
+1. Turn demo mode on (`smoke/smoke do demo on`). The footer shows a **Max ×20** capsule at the right,
+   before Use Sonnet. Hover it: the tooltip is a riff ("Plaid Max", "Maximum Overdrive", ...), and
+   after about 4 seconds it changes to the next. Settings, Accounts lists **Work · Max ×20** and
+   **Personal · Pro**. `smoke/smoke state` shows `plan: Max ×20` (the name only, no riff or tier).
+   Switch to Personal: the capsule reads **Pro** and its tooltip is just "Pro".
+2. With System Settings, Accessibility, Display, **Reduce motion** on, hover the Max ×20 capsule
+   again: the tooltip stays on the first riff however long you wait.
+3. Demo mode off, signed in on a real subscription account: the footer capsule and the account's row
+   in Settings, Accounts show its plan (Max ×20, Max, Team or Pro), and
+   `~/Library/Application Support/Sanduhr/snapshot.json` has `"plan": "<the same name>"`. VoiceOver
+   reads the capsule as "Plan: <name>".
+4. Sign Out that account in Settings, Accounts: the capsule leaves the footer, its row shows no plan,
+   and `snapshot.json` reads `"plan": null`. Sign in again: the plan comes back after the first fetch.
+5. An account on an API or prepaid org shows no capsule, no plan text in Accounts and `"plan": null`.

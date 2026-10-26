@@ -1436,6 +1436,16 @@ of the screen's.
   `DeskHitTest` and `desk_frames` follow and `desk_frames_ok` holds during and after the slide.
   `state.yaml` has `dock: {side, autohide, inset}`, `inset` the points applied now.
 
+## Plan label
+
+The widget footer shows the subscription plan as a small capsule at the right, before Use Sonnet: **Max ×20**, **Max**, **Team** or **Pro**. `PlanLabel` (Models/PlanLabel.swift) is a 1:1 port of the Windows `PlanLabel.cs`: the `rate_limit_tier` and `billing_type` of the `/api/organizations` answer the client already fetches (no new request), matched on the lowercased tier (`max_20x`, then `max`, `team`, `pro`) and only for a subscription (`billing_type` of `stripe_subscription`, or a `claude_max`, `claude_pro` or `claude_team` capability; with neither signal it is lenient). An unrecognized tier, an API org or a prepaid one shows no capsule.
+
+The Max plans carry riffs for the capsule's tooltip: Max ×20 has "Plaid Max", "Maximum Overdrive", "Ridiculous Speed" and "Galaxy Brain Max"; Max has "Maximum Effort", "Max Headroom" and "Big Max". They rotate every 4 seconds (`PlanRiffs.interval`); Reduce Motion pins the first. Team and Pro show the plain name. VoiceOver reads "Plan: <name>", never a riff. The capsule is hidden signed out, without numbers on the widget, and before the first fetch.
+
+Settings, Accounts shows each account's plan beside its name. `AccountPlans` keeps the display name per account in the app's defaults under `accountPlans` (`{label: name}`; never the tier, billing type or riffs), set from the active client's fetch and from Following's check of an inactive account, moved on rename, and cleared by Sign Out and Remove Account (Reset Sanduhr removes the whole domain).
+
+`snapshot.json` carries the active account's name as `plan` (null when unknown or signed out), and each `snapshot.<account_ref>.json` carries that seat's. The MCP's `get_usage` returns it as `account.plan`, and the statusline and meters mod read the same field. Demo mode shows invented plans and reads no real one (`DemoMode.plan(for:)`: Work is Max ×20, Personal is Pro). `smoke/smoke state` shows `plan` (the name or null) in `state.yaml`, nothing else about the tier.
+
 ## Lock screen line
 
 Settings, Lock Screen (`lockScreen`, Desktop group after Notch; #137) keeps one line ready for the
