@@ -730,6 +730,15 @@ public static class SettingsNames
     public const string NetThroughClaudeOff =
         "Don't install Sanduhr's MCP server, or remove it from a folder. Each folder's project totals have their own switch.";
 
+    // The rows whose Hosts read as words, not host names (preflight P4, P10, P13). The rows of real host names (Open-Meteo, the catalog) keep
+    // theirs in NetworkDisclosure, from the code that asks them, and are the only ones set in a code font.
+    public const string NetClaudeUsageHosts = "claude.ai (and what claude.ai's page loads)";
+    public const string NetSignInHosts = "claude.ai, and Google's sign-in if you choose it";
+    public const string NetUpdatesHosts = "api.github.com, github.com and GitHub's download hosts";
+    public const string NetStoreHosts = "the Microsoft Store, through Windows";
+    public const string NetPublishHosts = "the endpoint URL you set (and any address it redirects to)";
+    public const string NetThroughClaudeHosts = "the service Claude Code sends your conversation to";
+
     /// <summary>Under the table (decision 3: the spec's sentence, qualified to Sanduhr's own calls).</summary>
     public const string NothingElseLeaves = "Nothing else leaves this PC from Sanduhr. Sanduhr has no analytics.";
     public const string NetWebView2Note =

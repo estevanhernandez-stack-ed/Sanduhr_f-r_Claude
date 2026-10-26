@@ -134,6 +134,8 @@ public static class SettingsIndex
     public const string JustTheDeskSection = "just-the-desk";
     // About
     public const string Version = "version";
+    /// <summary>About, Updates (slice 6). The constant comes first, for NetworkDisclosure's links; Task 8 marks it and indexes it.</summary>
+    public const string Updates = "updates";
     public const string Trademark = "trademark";
     public const string Notices = "notices";
     public const string Where = "where";

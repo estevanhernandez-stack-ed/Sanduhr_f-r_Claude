@@ -124,6 +124,28 @@ public class SettingsSlice6NamesTests
     }
 
     [Fact]
+    public void Hosts_that_are_prose_are_pinned_word_for_word()
+    {
+        // P4, P10, P13: Hosts that read as sentences live here, not in NetworkDisclosure.
+        Assert.Equal("claude.ai (and what claude.ai's page loads)", SettingsNames.NetClaudeUsageHosts);
+        Assert.Equal("claude.ai, and Google's sign-in if you choose it", SettingsNames.NetSignInHosts);
+        Assert.Equal("api.github.com, github.com and GitHub's download hosts", SettingsNames.NetUpdatesHosts);
+        Assert.Equal("the Microsoft Store, through Windows", SettingsNames.NetStoreHosts);
+        Assert.Equal("the endpoint URL you set (and any address it redirects to)", SettingsNames.NetPublishHosts);
+        Assert.Equal("the service Claude Code sends your conversation to", SettingsNames.NetThroughClaudeHosts);
+        foreach (var text in new[]
+        {
+            SettingsNames.NetClaudeUsageHosts, SettingsNames.NetSignInHosts, SettingsNames.NetUpdatesHosts, SettingsNames.NetStoreHosts,
+            SettingsNames.NetPublishHosts, SettingsNames.NetThroughClaudeHosts,
+        })
+        {
+            Assert.Empty(SettingsNames.RetiredNames(text));
+            Assert.Empty(SettingsNames.PathProblems(text));
+            Assert.Empty(SettingsNames.UnknownLinks(text));
+        }
+    }
+
+    [Fact]
     public void Slice_6_copy_uses_no_retired_name_and_no_bad_path()
     {
         foreach (var text in new[]

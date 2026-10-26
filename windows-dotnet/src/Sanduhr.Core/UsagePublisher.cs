@@ -205,6 +205,7 @@ public static class UsagePublisher
         if (needsToken && string.IsNullOrWhiteSpace(token))
             return new UsagePublishResult(0, false, "No publish token stored.", DateTimeOffset.Now);
 
+        // network: publish-usage, publish-agent
         using var http = new HttpClient(handler ?? new HttpClientHandler(), disposeHandler: handler is null)
         {
             Timeout = HttpTimeout,
@@ -232,6 +233,7 @@ public static class UsagePublisher
         HttpResponseMessage resp;
         try
         {
+            // network: publish-usage, publish-agent
             resp = await http.SendAsync(req, ct).ConfigureAwait(false);
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or OperationCanceledException)

@@ -268,6 +268,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         try
         {
+            // network: your-browser
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(DeskClicks.WeatherCreditUrl) { UseShellExecute = true });
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)

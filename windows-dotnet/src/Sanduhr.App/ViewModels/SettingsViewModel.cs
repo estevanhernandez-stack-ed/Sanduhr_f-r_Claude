@@ -271,6 +271,7 @@ public sealed class SettingsViewModel
             return;
         try
         {
+            // network: local
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{folder}\"")
             {
                 UseShellExecute = true,
@@ -284,11 +285,12 @@ public sealed class SettingsViewModel
 
     private static void OpenLink(string? url)
     {
-        // Only the fixed https links from ThirdPartyNotices reach here.
+        // Only fixed https links reach here: ThirdPartyNotices' project pages and the privacy policy (Settings, Privacy).
         if (url is null || !url.StartsWith("https://", StringComparison.Ordinal))
             return;
         try
         {
+            // network: your-browser
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
         }
         catch

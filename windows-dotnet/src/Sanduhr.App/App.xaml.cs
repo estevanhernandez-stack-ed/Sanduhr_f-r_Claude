@@ -1142,6 +1142,7 @@ public partial class App : Application
         {
             try
             {
+                // network: local (the relaunch)
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target.FileName, target.Arguments) { UseShellExecute = false })?.Dispose();
             }
             catch (Exception e)

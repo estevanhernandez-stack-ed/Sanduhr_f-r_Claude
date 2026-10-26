@@ -136,6 +136,7 @@ public sealed partial class DeskReviewBar : UserControl
         if (DeskReviewModel.SafeLink(link) is not { } safe) return;
         try
         {
+            // network: your-browser
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(safe) { UseShellExecute = true });
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)

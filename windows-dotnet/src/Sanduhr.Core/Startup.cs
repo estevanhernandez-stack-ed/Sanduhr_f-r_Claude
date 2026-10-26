@@ -152,5 +152,6 @@ public sealed class StartupManager
     }
 
     private static void DefaultOpenSettings()
+        // network: local (Windows Settings)
         => Process.Start(new ProcessStartInfo(Startup.SettingsUri) { UseShellExecute = true });
 }

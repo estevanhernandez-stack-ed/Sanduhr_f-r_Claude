@@ -52,6 +52,7 @@ internal partial class SettingsWindow : Window
         if (e.Uri is not { Scheme: "https" } uri) return;
         try
         {
+            // network: your-browser
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true })?.Dispose();
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { }
