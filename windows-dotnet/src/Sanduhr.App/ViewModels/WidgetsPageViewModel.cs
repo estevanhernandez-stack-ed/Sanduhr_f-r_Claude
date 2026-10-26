@@ -125,7 +125,7 @@ public sealed partial class InstalledWidgetRowViewModel : ObservableObject
     public ImageSource? Preview { get; }
     public bool HasPreview => Preview is not null;
     public string Detail => string.Join(" · ", new[] { Kind, Version, Source }.Where(s => s.Length > 0));
-    public string UninstallName => $"{SettingsNames.WidgetUninstall} {Name}";
+    public string UninstallName => SettingsNames.UninstallFor(Name);
     public string RowName => string.Join(", ", new[] { Name, Kind, "version " + Version, Source }.Where(s => s.Length > 0));
 
     [RelayCommand]

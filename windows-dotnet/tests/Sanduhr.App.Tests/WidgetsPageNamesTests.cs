@@ -81,7 +81,7 @@ public sealed class WidgetsPageNamesTests : AppWindowFixture
             Assert.Contains("Uninstall Fixture palette", buttons);
             Assert.Contains(SettingsNames.WidgetCatalogCheck, buttons);
             Assert.DoesNotContain(SettingsNames.WidgetInstall, buttons);
-            Assert.DoesNotContain(SettingsNames.WidgetUninstall, buttons);
+            Assert.DoesNotContain(SettingsNames.WidgetUninstall.TrimEnd('…'), buttons);
             Assert.Equal(buttons.Count, buttons.Distinct().Count());
             Assert.Empty(LeaksIn(all));
         }

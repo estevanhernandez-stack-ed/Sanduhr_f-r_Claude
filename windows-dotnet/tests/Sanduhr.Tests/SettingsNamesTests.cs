@@ -411,4 +411,91 @@ public class SettingsNamesTests
         Assert.Contains("Settings, Alerts", SettingsNames.DeskInkCaption);
         Assert.Empty(SettingsNames.PathProblems(SettingsNames.DeskInkCaption));
     }
+
+    // ---- Settings v2, slice 4: Mods & Widgets and the Claude Code cards (spec, Mods & Widgets; Claude Code) ----
+
+    [Fact]
+    public void Mods_and_Widgets_copy_is_the_specs()
+    {
+        Assert.Equal("Everything installed for Sanduhr and for Claude Code, in one list. You can switch Sanduhr's mod and widget packs here; other Claude Code mods are shown read-only.",
+            SettingsNames.ModsIntro);
+        Assert.Equal("Off keeps the mod's entry and files; Remove takes the entry out and puts settings.json back exactly.",
+            SettingsNames.MetersOffVsRemove);
+        Assert.Equal("Read-only: Sanduhr can't switch this yet. Use claude plugin in a terminal.", SettingsNames.ReadOnlyClaudeCode);
+        Assert.Equal("The catalog comes from GitHub. Opening it is the only time Sanduhr asks.", SettingsNames.CatalogDisclosure);
+        Assert.Equal("Couldn't reach the widget catalog. Widget packs add themes, colors, fonts and a Desk companion. Check your connection and try again.",
+            WidgetCatalogClient.Offline);
+        Assert.Equal(("In Themes", "In Desk Look, Ink and color", "In Desk Look, Fonts", "As the Desk companion"),
+            (SettingsNames.ShowsInThemes, SettingsNames.ShowsInInk, SettingsNames.ShowsInFonts, SettingsNames.ShowsAsCompanion));
+        Assert.Equal("Not used yet: Sanduhr has nothing that draws effects packs.", SettingsNames.EffectsUnused);
+        Assert.Equal(("All", "Claude Code", "Widgets"), (SettingsNames.FilterAll, SettingsNames.FilterClaudeCode, SettingsNames.FilterWidgets));
+        Assert.Equal(("Meters above the prompt", "Installed", "Catalog", "What this folder holds"),
+            (SettingsNames.MetersSection, SettingsNames.InstalledSection, SettingsNames.CatalogSection, SettingsNames.FolderHolds));
+        Assert.Equal("A widget pack is " + SettingsNames.DefineWidgetPack + ". A mod is " + SettingsNames.DefineMod + ".",
+            SettingsNames.ModsPageLine);
+    }
+
+    [Fact]
+    public void Counts_and_scopes_read_in_plain_words()
+    {
+        Assert.Equal("On in 2 of 3 folders", SettingsNames.OnInFolders(2, 3));
+        Assert.Equal("1 plugin has no on/off entry in settings.json, so Claude Code treats it as on.", SettingsNames.NoSwitchNote(1));
+        Assert.Equal("3 plugins have no on/off entry in settings.json, so Claude Code treats them as on.", SettingsNames.NoSwitchNote(3));
+        Assert.Equal("1 plugin is switched on in settings.json, but its files aren't there.", SettingsNames.NoFilesNote(1));
+        Assert.Equal("2 plugins are switched on in settings.json, but their files aren't there.", SettingsNames.NoFilesNote(2));
+        Assert.Equal("Theme packs: 3 installed.", SettingsNames.ThemePacksLine(3));
+        Assert.Equal("Not installed in any folder yet.", SettingsNames.GlowHookIn([]));
+        Assert.Equal(@"Installed in ~\.claude.", SettingsNames.GlowHookIn([@"~\.claude"]));
+        Assert.Equal(@"Installed in ~\.claude, ~\.claude-personal and ~\.claude-work.",
+            SettingsNames.GlowHookIn([@"~\.claude", @"~\.claude-personal", @"~\.claude-work"]));
+    }
+
+    [Fact]
+    public void Switches_are_spoken_with_their_visible_word_first()
+    {
+        Assert.Equal("On", SettingsNames.PackOn);
+        Assert.Equal("On: Fixture palette", SettingsNames.PackOnFor("Fixture palette"));
+        Assert.Equal(@"On: Meters above the prompt in ~\.claude", SettingsNames.MetersOnFor(@"~\.claude"));
+        Assert.Equal("Uninstall…", SettingsNames.WidgetUninstall);
+        Assert.Equal("Uninstall Fixture palette?", SettingsNames.UninstallQuestion("Fixture palette"));
+    }
+
+    [Fact]
+    public void Slice_4_copy_uses_no_retired_name_and_no_bad_path()
+    {
+        foreach (var text in new[]
+        {
+            SettingsNames.ModsIntro, SettingsNames.MetersOffVsRemove, SettingsNames.ReadOnlyClaudeCode, SettingsNames.CatalogDisclosure,
+            SettingsNames.ShowsInThemes, SettingsNames.ShowsInInk, SettingsNames.ShowsInFonts, SettingsNames.ShowsAsCompanion,
+            SettingsNames.EffectsUnused, SettingsNames.GlowNeedsHook, SettingsNames.AddAccountToLink, SettingsNames.MetersLinkUp,
+            SettingsNames.UninstallDetail, SettingsNames.ModsPageLine, WidgetCatalogClient.Offline,
+            SettingsNames.FolderUnreadableReason, SettingsNames.NoFolderInMods, SettingsNames.NoFolderInClaudeCode,
+        })
+        {
+            Assert.Empty(SettingsNames.RetiredNames(text));
+            Assert.Empty(SettingsNames.PathProblems(text));
+        }
+    }
+
+    [Fact]
+    public void Slice_4_row_and_status_words_are_pinned()
+    {
+        Assert.Equal(("Sanduhr", "skills folder", "plugin folder", "from the catalog"),
+            (SettingsNames.SourceSanduhr, SettingsNames.SourceSkillsFolder, SettingsNames.SourcePluginFolder, SettingsNames.SourceFromCatalog));
+        Assert.Equal(("Sanduhr's mod", "Claude Code mod", "Claude Code plugin"),
+            (SettingsNames.KindSanduhrMod, SettingsNames.KindClaudeCodeMod, SettingsNames.KindClaudeCodePlugin));
+        Assert.Equal(("read-only", "on", "off"), (SettingsNames.RowReadOnly, SettingsNames.RowOn, SettingsNames.RowOff));
+        Assert.Equal("Palette settings… for Fixture", SettingsNames.WhereLinkFor("Palette settings…", "Fixture"));
+        Assert.Equal("Uninstall Fixture palette", SettingsNames.UninstallFor("Fixture palette"));
+        Assert.Equal("Fixture palette is on.", SettingsNames.PackIsOn("Fixture palette"));
+        Assert.Equal("Fixture palette is off.", SettingsNames.PackIsOff("Fixture palette"));
+        Assert.Equal("This folder's settings.json can't be read, so Sanduhr changes nothing in it.", SettingsNames.FolderUnreadableReason);
+        Assert.Equal(@"Update Meters above the prompt in ~\.claude", SettingsNames.UpdateMetersIn(@"~\.claude"));
+        Assert.Equal(@"Remove Meters above the prompt from ~\.claude", SettingsNames.RemoveMetersFrom(@"~\.claude"));
+        Assert.Equal(("Show", "Widget packs in the catalog", "Update…", "Remove…"),
+            (SettingsNames.ModsShowGroup, SettingsNames.CatalogListName, SettingsNames.UpdateButton, SettingsNames.RemoveButton));
+        Assert.Equal("No Claude Code folder found. Add one in Claude Code settings…", SettingsNames.NoFolderInMods);
+        Assert.Equal(("Claude Code folders", "No Claude Code folder found. Add one with Add folder…"),
+            (SettingsNames.ClaudeCodeFoldersSection, SettingsNames.NoFolderInClaudeCode));
+    }
 }
