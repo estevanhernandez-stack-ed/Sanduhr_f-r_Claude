@@ -648,7 +648,7 @@ public static class SettingsNames
     /// <summary>The Watchers page's first line, and the Companion row's (WF21).</summary>
     public const string WatchersLine = "Watchers are " + DefineWatchers + ".";
     public const string CompanionLine = "The companion is " + DefineCompanion + ".";
-    /// <summary>Desk, Pieces, the Companion row with no sprite installed. The link names the page that holds the catalog today.</summary>
+    /// <summary>Desk, Pieces, the Companion row with no sprite installed. The link opens the catalog on Mods &amp; Widgets, showing sprites.</summary>
     public const string NoCompanionYet = "No companion yet.";
     public static string GetACompanion => $"Get one in {PageTitle(SettingsPage.Mods)}…";
     /// <summary>Desk, Designs: the collapsed section's one-line summary.</summary>
