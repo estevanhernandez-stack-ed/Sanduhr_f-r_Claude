@@ -291,6 +291,55 @@ public class UsagePublisherTests
         Assert.Equal("2026-09-12", (string?)body["date"]);
     }
 
+    [Theory]
+    [InlineData(302)]
+    [InlineData(307)]
+    public async Task A_redirect_is_a_failed_publish_after_exactly_one_request_and_names_only_the_host(int code)
+    {
+        var handler = new StubHandler(_ =>
+        {
+            var r = new HttpResponseMessage((HttpStatusCode)code);
+            r.Headers.Location = new Uri("https://other.example/steal?secret=1");
+            return r;
+        });
+
+        var r = await UsagePublisher.PublishAsync(SamplePayload(), Header, "tok-123", handler);
+
+        Assert.False(r.Ok);
+        Assert.Equal(code, r.StatusCode);
+        Assert.Single(handler.Requests);
+        Assert.Equal($"The endpoint redirected ({code}) to other.example. Sanduhr doesn't follow redirects; set the endpoint to the final address.", r.Message);
+        Assert.DoesNotContain("steal", r.Message);
+        Assert.DoesNotContain("tok-123", r.Message);
+    }
+
+    [Fact]
+    public async Task A_redirect_with_a_relative_or_missing_location_still_fails_without_a_URL_in_the_message()
+    {
+        var rel = new StubHandler(_ =>
+        {
+            var r = new HttpResponseMessage(HttpStatusCode.Found);
+            r.Headers.Location = new Uri("/elsewhere", UriKind.Relative);
+            return r;
+        });
+        var a = await UsagePublisher.PublishAsync(SamplePayload(), Bearer, "k", rel);
+        Assert.False(a.Ok);
+        Assert.Single(rel.Requests);
+        Assert.Equal("The endpoint redirected (302) to collector.example. Sanduhr doesn't follow redirects; set the endpoint to the final address.", a.Message);
+
+        var none = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.Found));
+        var b = await UsagePublisher.PublishAsync(SamplePayload(), Bearer, "k", none);
+        Assert.False(b.Ok);
+        Assert.Equal("The endpoint redirected (302). Sanduhr doesn't follow redirects; set the endpoint to the final address.", b.Message);
+    }
+
+    [Fact]
+    public void The_production_handler_does_not_follow_redirects()
+    {
+        using var h = UsagePublisher.CreateHandler();
+        Assert.False(h.AllowAutoRedirect);
+    }
+
     [Fact]
     public async Task Header_scheme_sends_the_token_as_the_named_header_and_no_Authorization()
     {

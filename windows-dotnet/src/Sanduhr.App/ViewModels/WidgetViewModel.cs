@@ -27,7 +27,7 @@ namespace Sanduhr.App.ViewModels;
 /// </summary>
 public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 {
-    private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan RefreshInterval = UsageSchedule.Refresh;
     private static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan RiffInterval = TimeSpan.FromSeconds(4);
 
@@ -633,6 +633,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// rides the 30-second tick and acts at most every few hours. Null in unit
     /// contexts and inert on the Velopack build.</summary>
     public void AttachStoreUpdateService(StoreUpdateService service) => _storeUpdate = service;
+
+    private Sanduhr.App.Updates.UpdateChecker? _updateChecker;
+
+    /// <summary>The GitHub update check (Settings, About, Updates). Attached by App; rides the 30-second tick, asks at most once a day and
+    /// never while "update_check" is off. Null in unit contexts.</summary>
+    public void AttachUpdateChecker(Sanduhr.App.Updates.UpdateChecker checker) => _updateChecker = checker;
 
     /// <summary>The catalog key of the live palette (what the strip marks active
     /// and settings.json remembers). The theme handoff reports it as
@@ -1548,7 +1554,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // retry window; a failed retry falls back to the honest Fail() text.
         StatusText = "Reconnecting…";
         int generation = _fetcherGeneration;
-        await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(true);
+        await Task.Delay(UsageSchedule.RetryAfterFailure).ConfigureAwait(true);
         if (generation != _fetcherGeneration || _fetcher is null || _lastData is not null || Reason != SignInReason.None)
             return;
         await RefreshCoreAsync().ConfigureAwait(true);
@@ -1659,6 +1665,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // A waiting Store update cannot install while this process holds its
         // files, so the widget tells the person and offers Restart to update.
         _storeUpdate?.Tick(DateTimeOffset.Now);
+        // The GitHub build's daily check, so a widget left running for days still asks once a day (slice 6, decision 8).
+        _updateChecker?.Tick();
 
         if (ShownData is null)
             return;

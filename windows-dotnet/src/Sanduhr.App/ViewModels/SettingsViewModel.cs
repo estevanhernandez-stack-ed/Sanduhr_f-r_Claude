@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using Sanduhr.App.Services;
+using Sanduhr.App.Updates;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
@@ -98,6 +99,9 @@ public sealed class SettingsViewModel
     /// <summary>Settings, Widget (Settings v2, slice 5): the widget's own options and Just the Desk's way back.</summary>
     public WidgetPageViewModel WidgetPage { get; }
 
+    /// <summary>Settings, Privacy (Settings v2, slice 6): what leaves this PC and what Claude can change.</summary>
+    public PrivacyViewModel Privacy { get; }
+
     /// <summary>Assembly version for About (e.g. "3.0.0").</summary>
     public string Version { get; }
 
@@ -109,6 +113,9 @@ public sealed class SettingsViewModel
 
     /// <summary>About, Version's "Don't show What's New after updates" (slice 5).</summary>
     public AboutVersionViewModel AboutVersion { get; }
+
+    /// <summary>About, Updates (slice 6): Check for updates once a day, and Check now.</summary>
+    public AboutUpdatesViewModel AboutUpdates { get; }
 
     /// <summary>The sidebar search.</summary>
     public SettingsSearchViewModel Search { get; } = new();
@@ -180,11 +187,14 @@ public sealed class SettingsViewModel
     public ShortcutsViewModel Shortcuts { get; }
 
     public SettingsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync,
-        GlobalHotKeyService? hotKeys = null, Action? showWhatsNew = null, Action? showTour = null)
+        GlobalHotKeyService? hotKeys = null, Action? showWhatsNew = null, Action? showTour = null,
+        Func<Task<UpdateProbeResult>>? checkForUpdatesNow = null, bool? isStoreBuild = null)
     {
         ShowWhatsNewCommand = new RelayCommand(() => showWhatsNew?.Invoke());
         ShowTourCommand = new RelayCommand(() => showTour?.Invoke());
         AboutVersion = new AboutVersionViewModel(new SettingsStore(new Paths()));
+        // About, Updates (slice 6): App's checker reads "update_check" from this same file; the Store build (StoreUpdateService's rule) shows its line instead.
+        AboutUpdates = new AboutUpdatesViewModel(new SettingsStore(new Paths()), isStoreBuild ?? Sanduhr.Core.Startup.IsPackaged(), checkForUpdatesNow);
         Accounts = new AccountsViewModel(widget, addAccountAsync, updateSignInAsync);
         Themes = new ThemesViewModel(widget);
         History = new HistoryTabViewModel(widget);
@@ -240,6 +250,10 @@ public sealed class SettingsViewModel
         });
         Publish = new PublishViewModel(widget.Publish);
         WidgetPage = new WidgetPageViewModel(widget);
+        // Each consent is read where its own page writes it (slice 6, decision 10): the Desk pages' store, the widget's mcp_roots, publish.enabled.
+        var privacyStore = new SettingsStore(new Paths());
+        Privacy = new PrivacyViewModel(privacyStore, ClaudeCodeHost.For(widget), widget.LoadMcpRoots,
+            publishOn: () => privacyStore.LoadPublishSettings().Enabled);
         var v = Assembly.GetExecutingAssembly().GetName().Version;
         Version = v is null ? "3.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
 
@@ -271,6 +285,7 @@ public sealed class SettingsViewModel
             return;
         try
         {
+            // network: local
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{folder}\"")
             {
                 UseShellExecute = true,
@@ -284,11 +299,12 @@ public sealed class SettingsViewModel
 
     private static void OpenLink(string? url)
     {
-        // Only the fixed https links from ThirdPartyNotices reach here.
+        // Only fixed https links reach here: ThirdPartyNotices' project pages and the privacy policy (Settings, Privacy).
         if (url is null || !url.StartsWith("https://", StringComparison.Ordinal))
             return;
         try
         {
+            // network: your-browser
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
         }
         catch

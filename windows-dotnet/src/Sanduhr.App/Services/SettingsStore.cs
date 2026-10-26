@@ -1058,6 +1058,17 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>Settings, About, Updates' "Check for updates once a day" (settings.json "update_check", Settings v2 slice 6): on when absent.
+    /// Off, no update probe runs on its own (<c>UpdateChecker</c>, <c>StoreUpdateService</c>); "Check now" still asks once.</summary>
+    public bool LoadUpdateCheck() => ReadBool(Read(), "update_check", true);
+
+    public void SaveUpdateCheck(bool on)
+    {
+        var root = Read();
+        root["update_check"] = on;
+        Write(root);
+    }
+
     /// <summary>
     /// Where this install stands with the welcome tour, as <c>WelcomeTour.Format</c> writes it
     /// ("pending", "finished", "skipped", "not_offered"); empty reads as null (not yet decided).

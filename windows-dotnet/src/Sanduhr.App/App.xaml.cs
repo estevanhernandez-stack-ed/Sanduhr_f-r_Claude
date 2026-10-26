@@ -50,6 +50,8 @@ public partial class App : Application
     private MenuItem? _restartToUpdateItem;
     private MenuItem? _restartItem;
     private RestartToUpdateService? _restartToUpdate;
+    /// <summary>The GitHub update check (Settings v2, slice 6): launch, the widget's tick and About's Check now share it.</summary>
+    private UpdateChecker? _updateChecker;
     private bool _quitting;
 
     /// <summary>Where Settings was when it last closed, for the app's life (spec, Reopen where it was left). Never saved.</summary>
@@ -171,7 +173,13 @@ public partial class App : Application
         _restartToUpdate.OfferChanged += UpdateRestartItems;
         _vm.RestartToUpdateRequested += () => _restartToUpdate?.Accept();
         _vm.RestartRequested += RestartApp;
+        // Settings, About, Updates' "Check for updates once a day" (settings.json "update_check") gates the GitHub probe only: off, it asks
+        // nothing on its own, and About's Check now asks through the same checker. The Store build has no switch, so its check ignores it.
+        var updateSwitch = new SettingsStore(new Sanduhr.Core.Paths());
         _vm.AttachStoreUpdateService(new StoreUpdateService(_restartToUpdate, OwnerWindowHandle, log: LogUpdate));
+        _updateChecker = new UpdateChecker(updateSwitch.LoadUpdateCheck, new VelopackUpdateProbe(), UpdateChecker.DefaultStampPath,
+            (version, installer) => Dispatcher.BeginInvoke(() => _restartToUpdate?.Offer(version, installer)));
+        _vm.AttachUpdateChecker(_updateChecker);
 
         // Background, in order, each step on its own: the one-time re-point of pre-3.5.0 registrations to
         // %USERPROFILE%\.sanduhr, then the statusline bridge (WS-E) and the MCP integration refresh. The
@@ -225,11 +233,10 @@ public partial class App : Application
                 Environment.GetEnvironmentVariable(DemoMode.EnvironmentVariable)))
             _vm.StartDemo();
 
-        // Best-effort GitHub/Velopack update probe — fire-and-forget so a slow or offline
-        // network never delays the first paint. No-ops on the Store/MSIX install and in dev.
-        // A downloaded release joins the same Restart to update offer as the Store's.
-        _ = new UpdateChecker().CheckForUpdatesAsync((version, installer) =>
-            Dispatcher.BeginInvoke(() => _restartToUpdate?.Offer(version, installer)));
+        // The GitHub update probe at launch, fire-and-forget so a slow or offline network never delays the first paint. It asks only while
+        // "Check for updates once a day" is on and a day has passed; it no-ops on the Store/MSIX install and in dev. A downloaded release
+        // joins the same Restart to update offer as the Store's.
+        _ = _updateChecker?.RunIfDueAsync();
 
         ScheduleWhatsNewAtLaunch();
 
@@ -373,6 +380,10 @@ public partial class App : Application
     }
 
     /// <summary>"What's New…" from the tray and Settings: the installed version's highlights, or every card.</summary>
+    /// <summary>About, Updates' Check now: the launch checker, asked once whatever the switch says (slice 6, decision 7).</summary>
+    private Task<UpdateProbeResult> CheckForUpdatesNowAsync() =>
+        _updateChecker?.CheckNowAsync() ?? Task.FromResult(new UpdateProbeResult(UpdateProbeStatus.Failed));
+
     private void ShowWhatsNewFromMenu()
     {
         var installed = new SettingsStore(new Sanduhr.Core.Paths()).LoadWhatsNewInstalledVersion();
@@ -729,7 +740,7 @@ public partial class App : Application
 
         var landing = SettingsIndex.Landing(page, anchor, _lastSettings);
         var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync, _hotKeys,
-            ShowWhatsNewFromMenu, ShowTour);
+            ShowWhatsNewFromMenu, ShowTour, checkForUpdatesNow: CheckForUpdatesNowAsync);
         // The Claude Code page re-reads the glow switches and plays "Try it" through the running glow service.
         svm.ClaudeCodePage.GlowReload = () => _glow?.Reload();
         svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };
@@ -1135,6 +1146,7 @@ public partial class App : Application
         {
             try
             {
+                // network: local (the relaunch)
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target.FileName, target.Arguments) { UseShellExecute = false })?.Dispose();
             }
             catch (Exception e)

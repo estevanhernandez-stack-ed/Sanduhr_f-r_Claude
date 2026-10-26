@@ -182,6 +182,7 @@ public sealed class VaultService
         try
         {
             Directory.CreateDirectory(_paths.VaultDir);
+            // network: local
             Process.Start(new ProcessStartInfo("explorer.exe", _paths.VaultDir) { UseShellExecute = true });
         }
         catch (Exception e)

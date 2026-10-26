@@ -25,7 +25,7 @@ public static class SettingsNames
     /// <see cref="SettingsPage"/> for their aliases but are in no group.</summary>
     public static IReadOnlyList<SettingsGroup> Sidebar { get; } =
     [
-        new(null, [SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts]),
+        new(null, [SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts, SettingsPage.Privacy]),
         new("Usage", [SettingsPage.ClaudeUsage, SettingsPage.Publish]),
         new("Extend", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Widget, SettingsPage.Themes]),
@@ -34,8 +34,8 @@ public static class SettingsNames
         new("Help", [SettingsPage.About]),
     ];
 
-    // ---- Page titles added by Settings v2. Desk Look, Watchers and Launcher are pages since slice 3, Mods & Widgets since slice 4;
-    // Privacy (slice 6) is still to come.
+    // ---- Page titles added by Settings v2. Desk Look, Watchers and Launcher are pages since slice 3, Mods & Widgets since slice 4,
+    // Privacy since slice 6.
     public const string PrivacyTitle = "Privacy";
     public const string DeskLookTitle = "Desk Look";
     public const string WatchersTitle = "Watchers";
@@ -43,7 +43,7 @@ public static class SettingsNames
     public const string ModsAndWidgetsTitle = "Mods & Widgets";
 
     /// <summary>The titles of pages still to come, in sidebar order.</summary>
-    public static IReadOnlyList<string> TitlesToCome { get; } = [PrivacyTitle];
+    public static IReadOnlyList<string> TitlesToCome { get; } = [];
 
     /// <summary>Every page in sidebar order.</summary>
     public static IReadOnlyList<SettingsPage> Pages { get; } = [.. Sidebar.SelectMany(g => g.Pages)];
@@ -54,6 +54,7 @@ public static class SettingsNames
         SettingsPage.General => "General",
         SettingsPage.Accounts => "Accounts",
         SettingsPage.Alerts => "Alerts",
+        SettingsPage.Privacy => PrivacyTitle,
         SettingsPage.History => "History",   // retired in slice 5: keeps its old title for aliases and logs
         SettingsPage.ClaudeUsage => "Claude Usage",
         SettingsPage.Publish => "Publish usage",
@@ -640,6 +641,202 @@ public static class SettingsNames
     /// <summary>Settings, Widget, Limit order, when the widget has limits and every one is hidden.</summary>
     public const string LimitOrderAllHidden = "Every limit is hidden. Show one under Alerts, Each limit.";
     public const string SampleFailed = "The sample couldn't be built.";
+    // ---- Settings v2, slice 6: Privacy (WF6, WF10) and About, Updates. Every row says what the code does (decisions 2, 3, 9). ----
+
+    /// <summary>Privacy's first line.</summary>
+    public const string PrivacyLine = "What Sanduhr sends off this PC, and what Claude can change on it.";
+    /// <summary>Privacy's two sections (spec, Privacy: network and agents).</summary>
+    public const string WhatLeavesThisPc = "What leaves this PC";
+    public const string WhatClaudeCanChange = "What Claude can change";
+    /// <summary>What leaves this PC: each row's three lines start with these.</summary>
+    public const string NetworkWhenLabel = "When:";
+    public const string NetworkCarriesLabel = "Carries:";
+    public const string NetworkOffLabel = "Off:";
+
+    // What leaves this PC, one row each (NetworkDisclosure.All, in its order).
+    public const string NetClaudeUsage = "claude.ai, your usage";
+    public static string NetClaudeUsageWhen =>
+        $"When Sanduhr starts, after you sign in, every {(int)UsageSchedule.Refresh.TotalMinutes} minutes for the account in use, and when you refresh or switch accounts. "
+        + $"After you sign in, add an account, switch accounts or leave demo mode, a first ask that fails for a passing reason is tried once more after {(int)UsageSchedule.RetryAfterFailure.TotalSeconds} seconds. "
+        + $"If the hidden window stops, Sanduhr restarts it and asks again after {(int)TransportRecovery.FirstDelay.TotalSeconds} and {(int)TransportRecovery.SecondDelay.TotalSeconds} seconds, "
+        + $"then every {(int)TransportRecovery.SteadyDelay.TotalMinutes} minutes. "
+        + $"With {FollowAccount} on, every {(int)AccountFollow.CheckInterval.TotalMinutes} minutes for each other signed-in account. "
+        + $"Another signed-in account linked to a Claude Code folder you are using is read up to every {(int)UsageSchedule.Refresh.TotalMinutes} minutes too.";
+    public const string NetClaudeUsageCarries =
+        "The account's claude.ai sign-in cookie (sessionKey, and cf_clearance when Cloudflare issued one), and the cookies claude.ai's own page sets. "
+        + "In a hidden window Sanduhr opens claude.ai, and asks it for the account's organizations, usage and routine budget.";
+    public static string NetClaudeUsageOff => $"Remove the account. For another account, also turn off {FollowAccount} and unlink its Claude Code folder.";
+
+    public const string NetSignIn = "claude.ai, sign-in window";
+    public const string NetSignInWhen = "Only while the sign-in window is open. It opens when you ask to sign in: Add account…, Update sign-in…, or the widget's own sign-in button.";
+    public const string NetSignInCarries =
+        "What you type into claude.ai's sign-in page. The window is a browser you drive: claude.ai's pages and, if you choose Continue with Google, Google's.";
+    public const string NetSignInOff = "It opens only when you ask for it.";
+
+    public const string NetWeather = "Open-Meteo, weather";
+    public static string NetWeatherWhen =>
+        "Look up asks once for the city you typed. The forecast runs only while the Desk is on, a place is set and Weather is on the Desk, "
+        + $"at most every {(int)WeatherSchedule.Refresh.TotalMinutes} minutes, and again at once when you change the place or the unit.";
+    public const string NetWeatherCarries =
+        "The city name you typed, for Look up. For the forecast, the place's latitude and longitude rounded to 2 decimals, and your temperature unit. "
+        + "No account, cookie or identifier; the user agent is just \"Sanduhr\".";
+    public const string NetWeatherOff = "Clear the place, or hide the Weather piece.";
+
+    public const string NetCatalog = "GitHub, widget catalog";
+    public const string NetCatalogWhen =
+        "The first time the Catalog section on Mods & Widgets opens after Settings does (you open it, or a link such as the Companion row's "
+        + "Get one… opens it), when you press Check the catalog again, and when you install or update a pack.";
+    public const string NetCatalogCarries =
+        "Requests for the catalog, its signature and the packs you choose. No account, cookie or identifier; the user agent is just \"Sanduhr\".";
+    public const string NetCatalogOff = "Leave the Catalog section closed.";
+
+    public const string NetUpdates = "GitHub, updates";
+    public static string NetUpdatesWhen =>
+        $"Installs from GitHub only: at most once every {(int)UpdateCheck.Interval.TotalHours} hours, when Sanduhr starts or while it runs, "
+        + "and whenever you press Check now. A newer release downloads in the background and installs only when you choose Restart to update.";
+    public const string NetUpdatesCarries = "A request for Sanduhr's list of releases and, when one is newer, its files. No account, usage or file of yours.";
+    public static string NetUpdatesOff => $"Turn off {CheckForUpdatesDaily}. Check now still asks once when you press it.";
+
+    public const string NetStore = "Microsoft Store, updates";
+    public static string NetStoreWhen =>
+        $"Store installs only: every {(int)StoreUpdate.CheckInterval.TotalHours} hours while Sanduhr runs, it asks the Store whether an update is "
+        + "waiting. When you choose Restart to update, the Store installs it.";
+    public const string NetStoreCarries = "Windows asks the Store about Sanduhr's package. Sanduhr adds nothing of yours.";
+    public const string NetStoreOff = "No switch on the Store build: the Microsoft Store keeps Sanduhr up to date.";
+
+    public const string NetPublish = "Your endpoint, Publish usage";
+    public static string NetPublishWhen =>
+        "Each day at the first chance after the time you set, while Publish daily at is on. "
+        + $"If a send fails, it tries again every {(int)PublishScheduler.RetryInterval.TotalMinutes} minutes until one succeeds. "
+        + "It also sends when you press Publish now. Never without an endpoint, or without a token when your endpoint asks for one.";
+    public const string NetPublishCarries =
+        "The day, this PC's name, the folders you ticked, token counts in total, per limit and per project name, and your meters' percentages, "
+        + "reset times and when they were read. The counts are per project name, so the project names in the folders you tick do leave this PC. "
+        + "Your token goes in the header your endpoint asks for.";
+    public const string NetPublishOff = "Turn off Publish daily at, and don't press Publish now.";
+
+    /// <summary>A publish the endpoint answered with a 3xx: it fails, and says where it was sent (the host only, never the URL).</summary>
+    public static string PublishRedirected(int code, string? host) =>
+        host is { Length: > 0 }
+            ? $"The endpoint redirected ({code}) to {host}. Sanduhr doesn't follow redirects; set the endpoint to the final address."
+            : $"The endpoint redirected ({code}). Sanduhr doesn't follow redirects; set the endpoint to the final address.";
+
+    public const string NetPublishAgent = "Your endpoint, when Claude asks";
+    public const string NetPublishAgentWhen = "When Claude calls Sanduhr's publish_usage tool, and only while Publish daily at is on.";
+    public const string NetPublishAgentCarries =
+        "The same record as Publish usage, to the same endpoint, for the day in Claude's request. The widget sends it; the MCP server only passes the request on, on this PC.";
+    public const string NetPublishAgentOff = "Turn off Publish daily at.";
+
+    public const string NetThroughClaude = "Claude's service, through Claude Code";
+    public const string NetThroughClaudeWhen =
+        "When Claude calls one of Sanduhr's MCP tools. The MCP server makes no network call itself: it answers Claude Code on this PC, "
+        + "and Claude Code sends the answer on with your conversation.";
+    /// <summary>The paths an MCP answer carries (ping, get_desk, propose_theme), and the picture behind one of them. One wording for the row and the agent caption.</summary>
+    private const string McpAnswerPaths =
+        "the paths of a small copy of your wallpaper, of Sanduhr's usage file and of a theme Claude saves, which include your Windows user folder; "
+        + "the picture itself, if you let Claude Code open that wallpaper copy";
+    private const string McpAnswerThemeName = "your current theme's name when Claude proposes a theme";
+    public const string NetThroughClaudeCarries =
+        "What the tool answers: your meters, limits and plan, and a short code for the account; "
+        + "your Desk's design (with the name you gave your weather place, if you set one), Launcher buttons, monitors, fonts and Start menu app names; "
+        + "your wallpaper's colors; " + McpAnswerPaths + "; " + McpAnswerThemeName + "; "
+        + "your Desk messages; the names of the Claude Code folders Sanduhr found; "
+        + "and, for each folder where you let Claude read project totals, token counts per project and model with "
+        + "project names, or full project paths when Claude asks.";
+    public const string NetThroughClaudeOff =
+        "Don't install Sanduhr's MCP server, or remove it from a folder. Each folder's project totals have their own switch.";
+
+    // The rows whose Hosts read as words, not host names (preflight P4, P10, P13). The rows of real host names (Open-Meteo, the catalog) keep
+    // theirs in NetworkDisclosure, from the code that asks them, and are the only ones set in a code font.
+    public const string NetClaudeUsageHosts = "claude.ai (and what claude.ai's page loads)";
+    public const string NetSignInHosts = "claude.ai, and Google's sign-in if you choose it";
+    public const string NetUpdatesHosts = "api.github.com, github.com and GitHub's download hosts";
+    public const string NetStoreHosts = "the Microsoft Store, through Windows";
+    public const string NetPublishHosts = "the endpoint URL you set";
+    public const string NetThroughClaudeHosts = "the service Claude Code sends your conversation to";
+
+    /// <summary>Under the table (decision 3: the spec's sentence, qualified to Sanduhr's own calls).</summary>
+    public const string NothingElseLeaves = "Nothing else leaves this PC from Sanduhr. Sanduhr has no analytics.";
+    public const string NetWebView2Note =
+        "The claude.ai rows run in Microsoft Edge WebView2 (the Edge runtime apps use). The pages are claude.ai's own, so claude.ai's code runs in them as in "
+        + "your browser, and like Edge, WebView2 can contact Microsoft, for example to check a page with Microsoft Defender SmartScreen.";
+    public const string NetYourBrowserNote =
+        "A link you click, such as Open-Meteo's credit, a Launcher link or a font's download page, opens in your own browser. "
+        + "That is your browser visiting the page; Sanduhr sends nothing with it.";
+    public const string ReadPrivacyPolicy = "Read the privacy policy";
+
+    // What Claude can change (AgentConsents.All).
+    /// <summary>The spec's line, with "in a folder" dropped: a server set up by hand outside Claude Code folders works too (decision 11).</summary>
+    public const string AgentsIntro = "Claude means any agent that uses Sanduhr's MCP server. Claude reaches these through that server, and each needs it installed.";
+    /// <summary>The install status, counted the way the Claude Code cards count it (decision 11).</summary>
+    public static string McpInstalledStatus(int installed, int folders) =>
+        folders == 0 ? "Sanduhr found no Claude Code folder, so its MCP server isn't installed in one."
+        : installed == 0 ? "Sanduhr's MCP server isn't installed in any Claude Code folder."
+        : installed == folders ? (folders == 1 ? "Sanduhr's MCP server is installed in your Claude Code folder."
+            : $"Sanduhr's MCP server is installed in all {folders} Claude Code folders.")
+        : $"Sanduhr's MCP server is installed in {installed} of {folders} Claude Code folders.";
+    public static string McpStatusLinkName => $"{LinkTitle(SettingsPage.ClaudeCode)}, MCP server";
+    public const string AgentOn = "On";
+    public const string AgentOff = "Off";
+    public const string AgentAsksFirst = "Asks you first";
+    public const string AgentNoSwitch = "No switch";
+    public static string AgentFollowsPublish(bool on) => (on ? AgentOn : AgentOff) + ", with Publish daily at";
+    /// <summary>The folder reads' state: "On for ~\.claude. Off for ~\.claude-work." (per discovered folder).</summary>
+    public static string AgentFolders(IReadOnlyList<(string Folder, bool On)> folders)
+    {
+        if (folders.Count == 0)
+            return "No Claude Code folder found.";
+        static string Join(List<string> names) =>
+            names.Count == 1 ? names[0] : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
+        var on = folders.Where(f => f.On).Select(f => f.Folder).ToList();
+        var off = folders.Where(f => !f.On).Select(f => f.Folder).ToList();
+        var parts = new List<string>();
+        if (on.Count > 0) parts.Add($"On for {Join(on)}.");
+        if (off.Count > 0) parts.Add($"Off for {Join(off)}.");
+        return string.Join(" ", parts);
+    }
+    public const string AgentWatchersCaption = "Live cards on the Desk for work Claude is watching. Off: none show.";
+    public const string AgentDeskDirectCaption =
+        "On: Claude's Desk designs apply at once, after Sanduhr saves your Desk; one that needs a font you don't have still waits. "
+        + "Off: each waits on the Desk for Apply or Dismiss.";
+    public const string AgentSongsDirectCaption = "On: a look Claude suggests for a song is saved at once. Off: each waits as a card on Now playing.";
+    public const string AgentFolderReadsCaption =
+        "Per folder: token counts per project and per model, the folder's session archive, and its recent use beside your meters. "
+        + "Project names go with them, or full project paths when Claude asks.";
+    public const string AgentPublish = "Publish your usage when Claude asks";
+    public const string AgentPublishCaption = "Claude can ask Sanduhr to send the day's record to your endpoint. It follows Publish daily at.";
+    public const string AgentTheme = "Give the widget a theme";
+    public const string AgentThemeCaption = "Claude can save a theme beside yours and switch the widget to it. Choose another one in Themes any time.";
+    public const string AgentMessages = "Suggest Desk messages";
+    public const string AgentMessagesCaption = "Claude's lines wait as Claude's suggestion on Message until you add or dismiss them.";
+    public const string AgentWidgetPacks = "Make a widget pack";
+    public const string AgentWidgetPacksCaption = "A companion, palette or effects pack Claude makes waits for your Apply or Dismiss.";
+    public const string AgentReads = "Read your meters and your Desk";
+    public const string AgentReadsCaption =
+        "Your meters, limits and plan, and a short code for the account; "
+        + "your Desk's design (with the name you gave your weather place, if you set one), Launcher buttons, monitors, fonts and Start menu app names; your wallpaper's colors; "
+        + McpAnswerPaths + "; " + McpAnswerThemeName + "; your Desk messages; "
+        + "and the names of the Claude Code folders Sanduhr found.";
+    /// <summary>Privacy's foot: one line and "About settings…" to about#where (decision 12).</summary>
+    public const string PrivacyWhereLine = "Sanduhr keeps its settings, history, session archive and sign-in keys on this PC. About lists each place.";
+    public static string PrivacyWhereLinkName => $"{LinkTitle(SettingsPage.About)}, {WhereSettingsLive}";
+
+    // About, Updates (spec, About; WF6).
+    public const string UpdatesSection = "Updates";
+    public const string CheckForUpdatesDaily = "Check for updates once a day";
+    public static string UpdatesCaption =>
+        $"Sanduhr asks GitHub for a newer release at most once every {(int)UpdateCheck.Interval.TotalHours} hours, when it starts or while it runs. "
+        + "A new version downloads in the background and installs only when you choose Restart to update.";
+    public const string CheckNow = "Check now";
+    public const string CheckNowCaption = "Check now asks once, even with the switch off.";
+    public const string UpdateChecking = "Checking GitHub for a newer Sanduhr…";
+    public const string UpdateUpToDate = "Sanduhr is up to date.";
+    public static string UpdateReady(string version) => $"Sanduhr {version} is ready. Restart to update is in the tray menu and on the widget.";
+    public const string UpdateNotInstalled = "This copy wasn't installed by Sanduhr's installer, so it can't update itself.";
+    public const string UpdateFailed = "Couldn't reach GitHub. Check your connection and try again.";
+    /// <summary>About's jump link to the Reset section: the section's name, not the command's (preflight P15).</summary>
+    public const string ResetJump = "Reset";
+    public const string StoreKeepsUpToDate = "The Microsoft Store keeps Sanduhr up to date.";
 
     // ---- Settings v2, slice 3: the Desk split ----
 
@@ -813,6 +1010,8 @@ public static class SettingsNames
         (WhatsNew, SettingsPage.About),
         (TakeTheTour, SettingsPage.About),
         (HideWhatsNewAfterUpdates, SettingsPage.About),
+        (CheckForUpdatesDaily, SettingsPage.About),
+        (CheckNow, SettingsPage.About),
         (WhereSettingsLive, SettingsPage.About),
         (ThirdPartyNotices, SettingsPage.About),
         (ResetSanduhr, SettingsPage.About),

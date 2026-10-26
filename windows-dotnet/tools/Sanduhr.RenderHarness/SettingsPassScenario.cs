@@ -626,6 +626,8 @@ public static partial class Program
         await Shot("meters-week-pill", SettingsPage.ClaudeUsage, () => ByName(c.Host, "Week"), SettingsIndex.MetersView);
         await Shot("about-link-button", SettingsPage.About, () => ByName(c.Host, "Velopack project page"));
         await Shot("about-flat-button", SettingsPage.About, () => ByName(c.Host, "What's New"));
+        await Shot("about-updates-switch", SettingsPage.About, () => ByName(c.Host, SettingsNames.CheckForUpdatesDaily));
+        await Shot("privacy-link-button", SettingsPage.Privacy, () => ByName(c.Host, NetworkDisclosure.All[0].OffLinkName));
         await Shot("desk-combo", SettingsPage.Desk, () => Descendants<ComboBox>(c.Host).FirstOrDefault(b => b.IsVisible && b.IsEnabled));
         await Shot("themes-first-control", SettingsPage.Themes, () => FirstFocus(c.Host));
         Keyboard.ClearFocus();

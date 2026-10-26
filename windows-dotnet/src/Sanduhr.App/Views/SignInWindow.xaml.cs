@@ -105,6 +105,7 @@ internal partial class SignInWindow : Window
             // window.opener works and Google can hand its result back.
             WebView.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
 
+            // network: claude-sign-in (the login page, when the window opens)
             WebView.CoreWebView2.Navigate(ClaudeSignIn.LoginUrl);
 
             // Poll fallback — the load-bearing fix for "the window never closed." Plus a
@@ -135,6 +136,7 @@ internal partial class SignInWindow : Window
             var core = await OpenPopupAsync();
             if (core is not null)
             {
+                // network: claude-sign-in (Google's popup, in its own window)
                 e.NewWindow = core;
                 e.Handled = true;
             }
@@ -160,6 +162,7 @@ internal partial class SignInWindow : Window
     {
         e.Handled = true;
         if (!string.IsNullOrEmpty(uri))
+            // network: claude-sign-in (the popup folded into this window, when its own window can't start)
             WebView.CoreWebView2.Navigate(uri);
     }
 
@@ -307,6 +310,7 @@ internal partial class SignInWindow : Window
         LoadingOverlay.Visibility = Visibility.Visible;
         try
         {
+            // network: claude-sign-in (Try again)
             WebView.CoreWebView2?.Navigate(ClaudeSignIn.LoginUrl);
             StartCaptureTimers();
         }
@@ -364,6 +368,7 @@ internal partial class SignInWindow : Window
         if (!onGoogle)
             return;
         Log($"auto-return: still on host={host}, back to the Claude login");
+        // network: claude-sign-in (the auto-return from Google)
         WebView.CoreWebView2?.Navigate(ClaudeSignIn.LoginUrl);
     }
 
@@ -378,6 +383,7 @@ internal partial class SignInWindow : Window
     /// toggle here: the banner hides itself once <see cref="UpdateOAuthNotice"/> sees the
     /// WebView land back on a claude.ai host.</summary>
     private void OnGoogleNoticeBackClick(object sender, RoutedEventArgs e)
+        // network: claude-sign-in (the Google notice's Back)
         => WebView.CoreWebView2?.Navigate(ClaudeSignIn.LoginUrl);
 
     private void OnGoogleNoticePasteClick(object sender, RoutedEventArgs e)

@@ -41,6 +41,7 @@ public class SettingsNamesTests
     [InlineData(SettingsPage.General, "General")]
     [InlineData(SettingsPage.Accounts, "Accounts")]
     [InlineData(SettingsPage.Alerts, "Alerts")]
+    [InlineData(SettingsPage.Privacy, "Privacy")]
     [InlineData(SettingsPage.History, "History")]
     [InlineData(SettingsPage.ClaudeUsage, "Claude Usage")]
     [InlineData(SettingsPage.Publish, "Publish usage")]
@@ -189,7 +190,7 @@ public class SettingsNamesTests
     [Fact]
     public void Titles_to_come_are_pinned_and_open_no_page_yet()
     {
-        Assert.Equal(["Privacy"], SettingsNames.TitlesToCome);   // Desk Look, Watchers, Launcher landed in slice 3; Mods & Widgets in slice 4
+        Assert.Empty(SettingsNames.TitlesToCome);   // Desk Look, Watchers, Launcher landed in slice 3; Mods & Widgets in slice 4; Privacy in slice 6
         foreach (var title in SettingsNames.TitlesToCome)
             Assert.Null(SettingsNames.Linked(title + " settings…"));
     }
@@ -200,6 +201,7 @@ public class SettingsNamesTests
     [InlineData("(Settings, Now playing, Looks)")]
     [InlineData("in the Sanduhr widget (Settings, Publish usage, Destination).")]
     [InlineData("Settings, Claude Usage, Overview")]
+    [InlineData("Settings, Privacy, What leaves this PC")]
     [InlineData("You can take the tour again from Settings, About, or the tray menu.")]
     [InlineData("Show in Explorer, settings, history and themes")]
     [InlineData("has not turned on 'Let Claude show watchers' in Sanduhr (Settings, ")]
@@ -212,7 +214,7 @@ public class SettingsNamesTests
     [InlineData("(Settings, Desk, Watchers)", "no section \"Watchers\" on Desk")]
     [InlineData("in Settings ▸ Claude Usage.", "\"Settings ▸\": write \"Settings, <Page>, <Section>\"")]
     [InlineData("(Settings > Publish usage > Endpoint URL)", "\"Settings >\": write \"Settings, <Page>, <Section>\"")]
-    [InlineData("Open Settings, Privacy.", "no page \"Privacy\" after \"Settings, \"")]
+    [InlineData("Open Settings, Updates.", "no page \"Updates\" after \"Settings, \"")]
     [InlineData("(Settings → Accounts to add or remove)", "\"Settings →\": write \"Settings, <Page>, <Section>\"")]
     public void PathProblems_names_the_problem(string text, string problem) =>
         Assert.Contains(problem, SettingsNames.PathProblems(text));

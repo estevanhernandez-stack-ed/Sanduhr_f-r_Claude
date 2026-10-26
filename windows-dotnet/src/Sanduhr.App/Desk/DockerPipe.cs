@@ -57,6 +57,7 @@ internal sealed partial class DockerPipe : IDockerApi, IDisposable
                 }
             },
         };
+        // network: local (Docker's named pipe; no TCP)
         _http = new HttpClient(handler) { BaseAddress = new Uri("http://docker/"), Timeout = Timeout.InfiniteTimeSpan };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("Sanduhr");
     }
@@ -73,6 +74,7 @@ internal sealed partial class DockerPipe : IDockerApi, IDisposable
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(10));
+        // network: local
         using var response = await _http.GetAsync(PathFor(Call.ListContainers), HttpCompletionOption.ResponseHeadersRead, cts.Token).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         await using var body = await response.Content.ReadAsStreamAsync(cts.Token).ConfigureAwait(false);
@@ -92,6 +94,7 @@ internal sealed partial class DockerPipe : IDockerApi, IDisposable
         // The 10 s limit covers the headers only; the returned stream follows the caller's token alone.
         using var headersCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         headersCts.CancelAfter(TimeSpan.FromSeconds(10));
+        // network: local
         var response = await _http.GetAsync(PathFor(Call.FollowLogs, id), HttpCompletionOption.ResponseHeadersRead, headersCts.Token).ConfigureAwait(false);
         try
         {

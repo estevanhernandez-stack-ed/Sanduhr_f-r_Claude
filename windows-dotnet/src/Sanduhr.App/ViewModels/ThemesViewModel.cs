@@ -263,6 +263,7 @@ public sealed partial class ThemesViewModel : ObservableObject
         try
         {
             Directory.CreateDirectory(dir);
+            // network: local
             Process.Start(new ProcessStartInfo("explorer.exe", dir) { UseShellExecute = true });
         }
         catch

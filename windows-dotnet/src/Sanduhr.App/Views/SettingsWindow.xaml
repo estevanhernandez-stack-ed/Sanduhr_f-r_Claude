@@ -1354,6 +1354,11 @@
                     </Border>
                 </TabItem>
 
+                <!-- Settings, Privacy (slice 6): what leaves this PC and what Claude can change (WF6, WF10). Slice 7 adds Streamer mode at its top. -->
+                <TabItem Header="Privacy" Tag="Privacy" AutomationProperties.Name="Privacy" DataContext="{Binding Privacy}">
+                    <views:PrivacyPage />
+                </TabItem>
+
                 <!-- Claude Usage (WS-C; Settings v2, slice 5): Meters / Overview / Trends / Sessions over the meter history,
                      the session archive and the live session-log reader.
                      DataContext must live ON the TabItem: the CcSection* visibility triggers resolve
@@ -2684,7 +2689,10 @@
                             </ScrollViewer.Resources>
                         <StackPanel Margin="20">
                             <TextBlock Text="About" FontSize="14" FontWeight="SemiBold"
+                                       AutomationProperties.HeadingLevel="Level1"
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+                            <!-- Six sections: jump links (spec, Keyboard and screen reader; slice 5 carry P5). -->
+                            <views:SectionJumpLinks Page="About" />
 
                             <StackPanel views:SettingsAnchor.Id="version">
                                 <TextBlock Text="{Binding AboutVersionLine}" FontSize="13" FontWeight="SemiBold"
@@ -2703,6 +2711,36 @@
                                           Content="{x:Static core:SettingsNames.HideWhatsNewAfterUpdates}"
                                           IsChecked="{Binding HideWhatsNewAfterUpdates, Mode=TwoWay}"
                                           AutomationProperties.Name="{x:Static core:SettingsNames.HideWhatsNewAfterUpdates}" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                            <!-- About, Updates (slice 6; WF6): the GitHub build's daily check and Check now; the Store build's one line. -->
+                            <StackPanel views:SettingsAnchor.Id="updates" DataContext="{Binding AboutUpdates}">
+                                <TextBlock Text="{x:Static core:SettingsNames.UpdatesSection}" FontSize="13" FontWeight="SemiBold"
+                                           AutomationProperties.HeadingLevel="Level2"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                                <StackPanel Visibility="{Binding IsGitHubBuild, Converter={StaticResource BoolVis}}">
+                                    <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                              Content="{x:Static core:SettingsNames.CheckForUpdatesDaily}"
+                                              IsChecked="{Binding CheckDaily, Mode=TwoWay}"
+                                              AutomationProperties.Name="{x:Static core:SettingsNames.CheckForUpdatesDaily}" />
+                                    <TextBlock Text="{Binding Caption, Mode=OneWay}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,8"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                    <Button Style="{StaticResource FlatButton}" Padding="10,4" HorizontalAlignment="Left"
+                                            Content="{x:Static core:SettingsNames.CheckNow}"
+                                            AutomationProperties.Name="{x:Static core:SettingsNames.CheckNow}"
+                                            Command="{Binding CheckNowCommand}" />
+                                    <TextBlock Text="{x:Static core:SettingsNames.CheckNowCaption}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                    <TextBlock Text="{Binding Status}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                                               Visibility="{Binding StatusShown, Converter={StaticResource BoolVis}}"
+                                               views:LiveRegion.Shown="{Binding StatusShown}" />
+                                </StackPanel>
+                                <TextBlock Text="{x:Static core:SettingsNames.StoreKeepsUpToDate}" FontSize="11" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                           Visibility="{Binding IsStoreBuild, Converter={StaticResource BoolVis}}" />
                             </StackPanel>
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />

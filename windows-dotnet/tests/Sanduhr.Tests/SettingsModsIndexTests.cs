@@ -69,7 +69,7 @@ public sealed class SettingsModsIndexTests
         Assert.DoesNotContain(SettingsPage.Widgets, SettingsNames.Pages);
         Assert.Equal("Mods & Widgets", SettingsNames.PageTitle(SettingsPage.Mods));
         Assert.Equal("Mods & Widgets settings…", SettingsNames.LinkTitle(SettingsPage.Mods));
-        Assert.Equal([SettingsNames.PrivacyTitle], SettingsNames.TitlesToCome);
+        Assert.Empty(SettingsNames.TitlesToCome);   // Privacy landed in slice 6
     }
 
     [Fact]

@@ -388,6 +388,7 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         core.NavigationCompleted += OnNav;
         try
         {
+            // network: claude-usage
             core.Navigate(StartPage);
             var done = await Task.WhenAny(navTcs.Task, Task.Delay(NavTimeout, ct)).ConfigureAwait(true);
             bool navOk = done == navTcs.Task && navTcs.Task.Result;
@@ -572,6 +573,7 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
         try
         {
+            // network: claude-usage
             await core.ExecuteScriptAsync(BuildFetchScript(id, url, headers)).ConfigureAwait(true);
             var reply = await tcs.Task.ConfigureAwait(true);
             if (reply.Error == BrowserGoneError)
