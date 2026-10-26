@@ -131,7 +131,7 @@ public class SettingsSlice6NamesTests
         Assert.Equal("claude.ai, and Google's sign-in if you choose it", SettingsNames.NetSignInHosts);
         Assert.Equal("api.github.com, github.com and GitHub's download hosts", SettingsNames.NetUpdatesHosts);
         Assert.Equal("the Microsoft Store, through Windows", SettingsNames.NetStoreHosts);
-        Assert.Equal("the endpoint URL you set (and any address it redirects to)", SettingsNames.NetPublishHosts);
+        Assert.Equal("the endpoint URL you set", SettingsNames.NetPublishHosts);
         Assert.Equal("the service Claude Code sends your conversation to", SettingsNames.NetThroughClaudeHosts);
         foreach (var text in new[]
         {

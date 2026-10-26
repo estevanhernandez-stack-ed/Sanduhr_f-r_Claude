@@ -712,6 +712,12 @@ public static class SettingsNames
         + "Your token goes in the header your endpoint asks for.";
     public const string NetPublishOff = "Turn off Publish daily at, and don't press Publish now.";
 
+    /// <summary>A publish the endpoint answered with a 3xx: it fails, and says where it was sent (the host only, never the URL).</summary>
+    public static string PublishRedirected(int code, string? host) =>
+        host is { Length: > 0 }
+            ? $"The endpoint redirected ({code}) to {host}. Sanduhr doesn't follow redirects; set the endpoint to the final address."
+            : $"The endpoint redirected ({code}). Sanduhr doesn't follow redirects; set the endpoint to the final address.";
+
     public const string NetPublishAgent = "Your endpoint, when Claude asks";
     public const string NetPublishAgentWhen = "When Claude calls Sanduhr's publish_usage tool, and only while Publish daily at is on.";
     public const string NetPublishAgentCarries =
@@ -737,7 +743,7 @@ public static class SettingsNames
     public const string NetSignInHosts = "claude.ai, and Google's sign-in if you choose it";
     public const string NetUpdatesHosts = "api.github.com, github.com and GitHub's download hosts";
     public const string NetStoreHosts = "the Microsoft Store, through Windows";
-    public const string NetPublishHosts = "the endpoint URL you set (and any address it redirects to)";
+    public const string NetPublishHosts = "the endpoint URL you set";
     public const string NetThroughClaudeHosts = "the service Claude Code sends your conversation to";
 
     /// <summary>Under the table (decision 3: the spec's sentence, qualified to Sanduhr's own calls).</summary>

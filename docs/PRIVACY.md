@@ -150,7 +150,7 @@ No account, key, cookie, identifier, machine name or app version goes with these
 
 **Only if you turn on Publish usage** (Settings ▸ Publish usage, off by default, and nothing is sent until you also set an endpoint, and a token when your endpoint asks for one; with no home ticked, a daily or agent publish still sends the record, naming no home or project) there is a second destination, and you choose it:
 
-- The endpoint URL you enter (an https URL you control, or an http one on this PC) receives the daily per-project token counts described in the table above, authenticated the way you configured (bearer token, a header you name, or no credential). If that endpoint redirects, the record follows the redirect.
+- The endpoint URL you enter (an https URL you control, or an http one on this PC) receives the daily per-project token counts described in the table above, authenticated the way you configured (bearer token, a header you name, or no credential). Sanduhr doesn't follow a redirect: a redirected publish fails and says where it was sent.
 - **Show a sample…** (Settings ▸ Publish usage ▸ What gets sent) builds the next record on this PC with the same code that sends it, shows it to you, and sends nothing. It never reads your publish token.
 - If you pick the **626 Labs dashboard** preset, that URL is `https://us-central1-project-626labs.cloudfunctions.net/mcp/api/manage_usage`, authenticated with the key you mint in your own dashboard's Agents panel, and the record goes only to *your* dashboard account.
 

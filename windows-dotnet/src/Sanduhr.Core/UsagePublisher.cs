@@ -183,6 +183,9 @@ public static class UsagePublisher
         => Uri.TryCreate(url?.Trim(), UriKind.Absolute, out var u)
            && (u.Scheme == Uri.UriSchemeHttps || (u.Scheme == Uri.UriSchemeHttp && u.IsLoopback));
 
+    /// <summary>The production handler: it never follows a redirect, so the token reaches only the endpoint the person set.</summary>
+    public static HttpClientHandler CreateHandler() => new() { AllowAutoRedirect = false };
+
     /// <summary>POST the payload to <paramref name="target"/>. The token rides
     /// only in the header the scheme names (none at all for
     /// <see cref="PublishAuthScheme.None"/>); it is never echoed into the
@@ -206,7 +209,7 @@ public static class UsagePublisher
             return new UsagePublishResult(0, false, "No publish token stored.", DateTimeOffset.Now);
 
         // network: publish-usage, publish-agent
-        using var http = new HttpClient(handler ?? new HttpClientHandler(), disposeHandler: handler is null)
+        using var http = new HttpClient(handler ?? CreateHandler(), disposeHandler: handler is null)
         {
             Timeout = HttpTimeout,
         };
@@ -247,6 +250,14 @@ public static class UsagePublisher
             string body = "";
             try { body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false); }
             catch { /* body unavailable — the status code still tells the story */ }
+
+            if (code is >= 300 and <= 399)
+            {
+                Uri? to = resp.Headers.Location;
+                if (to is not null && !to.IsAbsoluteUri)
+                    to = new Uri(new Uri(target.EndpointUrl.Trim(), UriKind.Absolute), to);
+                return new UsagePublishResult(code, false, SettingsNames.PublishRedirected(code, to?.Host), DateTimeOffset.Now);
+            }
 
             string message = resp.StatusCode switch
             {
