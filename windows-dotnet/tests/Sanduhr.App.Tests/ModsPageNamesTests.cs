@@ -13,7 +13,7 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Tests;
 
 /// <summary>
-/// Settings ▸ Widgets in the real Settings window, over a fake GitHub: every row's button is named for its pack
+/// Settings, Mods &amp; Widgets in the real Settings window, over a fake GitHub: every row's button is named for its pack
 /// ("Install Fixture effects", "Uninstall Fixture palette"), no two alike, and no list item reads as a type name.
 /// </summary>
 [Collection("SettingsWindow")]
@@ -92,7 +92,7 @@ public sealed class ModsPageNamesTests : AppWindowFixture
         try
         {
             var tabs = (TabControl)window.FindName("Tabs");
-            tabs.SelectedItem = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "Widgets");
+            tabs.SelectedItem = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "Mods");
             svm.ModsPage.CatalogOpen = true;
             PumpUntil(() => !svm.ModsPage.Busy && svm.ModsPage.Catalog.Count == 2);
             Assert.StartsWith("The catalog is verified: 2 widgets", svm.ModsPage.CatalogStatus);
@@ -122,7 +122,7 @@ public sealed class ModsPageNamesTests : AppWindowFixture
         try
         {
             var tabs = (TabControl)window.FindName("Tabs");
-            tabs.SelectedItem = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "Widgets");
+            tabs.SelectedItem = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "Mods");
             svm.ModsPage.CatalogOpen = true;
             PumpUntil(() => svm.ModsPage.CatalogStatus == WidgetCatalogClient.Offline);
             Assert.Equal(WidgetCatalogClient.Offline, svm.ModsPage.CatalogStatus);
@@ -151,7 +151,7 @@ public sealed class ModsPageNamesTests : AppWindowFixture
         try
         {
             var tabs = (TabControl)window.FindName("Tabs");
-            tabs.SelectedItem = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "Widgets");
+            tabs.SelectedItem = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "Mods");
             svm.ModsPage.CatalogOpen = true;
             PumpUntil(() => !svm.ModsPage.Busy);
             svm.ModsPage.ReloadLocal();

@@ -14,7 +14,7 @@ namespace Sanduhr.App.Tests;
 [Collection("SettingsWindow")]
 public sealed class SettingsWindowNamesTests : AppWindowFixture
 {
-    /// <summary>A home with plugins (one a mod), a hook and an MCP server, so Mods &amp; Config has rows to name.</summary>
+    /// <summary>A home with plugins (one a mod), a hook and an MCP server, so Mods &amp; Widgets and the folder card have rows to name.</summary>
     private static void SeedPersonalHome(string home)
     {
         Directory.CreateDirectory(Path.Combine(home, "projects"));
@@ -65,14 +65,16 @@ public sealed class SettingsWindowNamesTests : AppWindowFixture
         finally { window.Close(); }
         Assert.True(leaks.Count == 0, string.Join(Environment.NewLine, leaks));
 
-        // The rows that did leak read as words now, and the seeded Mods & Config rows are there to be named.
+        // The rows that did leak read as words now, and the seeded plugin rows are there to be named on Mods & Widgets.
         // Demo mode shows its own sample accounts whatever the machine's Credential Manager holds; the active one is marked.
         foreach (var account in DemoMode.Accounts)
             Assert.Contains(account == widget.ShownActiveAccount ? account + ", active" : account, seen["Accounts"]);
         Assert.Contains(seen["ClaudeCode"], n => n.StartsWith(@"Folder ~\.claude"));
-        Assert.Contains("alpha, version 1.2.0, on", seen["Mods"]);
-        Assert.Contains("beta-mod, version 0.1.0, off, mod", seen["Mods"]);
-        Assert.Contains("ghost, on, no files here", seen["Mods"]);
+        Assert.Contains("alpha, version 1.2.0, on in 1 of 2 folders, read-only", seen["Mods"]);
+        Assert.Contains("beta-mod, version 0.1.0, on in 0 of 2 folders, mod, read-only", seen["Mods"]);
+        // ghost is switched on in settings.json with no files behind it: on in that folder, its version unknown.
+        Assert.Contains("ghost, version unknown, on in 1 of 2 folders, read-only", seen["Mods"]);
+        Assert.Contains(@"~\.claude-personal, Not installed", seen["Mods"]);   // the meters row for the folder
         Assert.Contains("Notification, 1 group", seen["ClaudeCode"]);
         Assert.Contains("alpha@m, On", seen["ClaudeCode"]);
     });

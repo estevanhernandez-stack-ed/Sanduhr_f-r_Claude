@@ -202,4 +202,167 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    // ---- the page flip (Task 12) ----
+
+    /// <summary>An offline network that counts what was asked of it.</summary>
+    private sealed class CountingOffline : System.Net.Http.HttpMessageHandler
+    {
+        public int Count;
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken ct)
+        {
+            Interlocked.Increment(ref Count);
+            throw new System.Net.Http.HttpRequestException("offline in tests");
+        }
+    }
+
+    [Fact]
+    public void Landing_on_the_page_sends_no_request() => AppHost.Run(() =>
+    {
+        var net = new CountingOffline();
+        Sanduhr.App.Services.WidgetCatalogService.HandlerOverride = () => net;
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.Meters);
+            Settle(window, guard);
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.ModList);
+            Settle(window, guard);
+            svm.ModsPage.FilterText = "palette";
+            Settle(window, guard);
+            Assert.Equal(0, net.Count);
+
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.Catalog);
+            Settle(window, guard);
+            var until = DateTime.UtcNow.AddSeconds(10);
+            while ((svm.ModsPage.Busy || net.Count == 0) && DateTime.UtcNow < until) { Pump(); Thread.Sleep(15); }
+            Assert.True(net.Count > 0, "opening the catalog asked nothing");
+            Assert.True(svm.ModsPage.CatalogOpen);
+            // P9: the fetch's outcome is the catalog's own line, drawn inside the Catalog section; list actions keep Status.
+            Assert.Equal(WidgetCatalogClient.Offline, svm.ModsPage.CatalogStatus);
+            Settle(window, guard);
+            var catalog = Below<Expander>(window).Single(e => e.Name == "CatalogSection");
+            Assert.Contains(Below<TextBlock>(catalog), t => t.IsVisible && TextOf(t) == WidgetCatalogClient.Offline);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void Old_widget_and_mods_links_land_on_the_new_page() => AppHost.Run(() =>
+    {
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Widgets, SettingsIndex.WidgetsCatalog);
+            Settle(window, guard);
+            Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.Catalog), window.Place);
+            Assert.True(Below<Expander>(window).Single(e => e.Name == "CatalogSection").IsExpanded);
+
+            window.SelectPage(SettingsPage.Widgets);
+            Settle(window, guard);
+            Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.Catalog), window.Place);
+
+            window.SelectPage(SettingsPage.Widgets, SettingsIndex.WidgetsInstalled);
+            Settle(window, guard);
+            Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.ModList), window.Place);
+
+            window.SelectPage(SettingsPage.ClaudeCode, SettingsIndex.Meters);
+            Settle(window, guard);
+            Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.Meters), window.Place);
+
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.ModList);
+            Settle(window, guard);
+            Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.ModList), window.Place);
+
+            var tabs = ((TabControl)window.FindName("Tabs")).Items.OfType<TabItem>().ToList();
+            Assert.DoesNotContain(tabs, t => (string)t.Tag == "Widgets");
+            var mods = Assert.Single(tabs, t => (string)t.Tag == "Mods");
+            Assert.Equal(SettingsNames.ModsAndWidgetsTitle, mods.Header);
+            Assert.Equal(SettingsNames.ModsAndWidgetsTitle, NameOf(mods));
+            Assert.Same(svm.ModsPage, mods.DataContext);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void No_folder_says_so_and_links_to_the_Claude_Code_cards() => AppHost.Run(() =>
+    {
+        // P20: the empty meters line is a sentence and a real link, not prose that names a page.
+        Directory.Delete(Path.Combine(Profile, ".claude"), true);
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.Meters);
+            Settle(window, guard);
+            Assert.False(svm.ModsPage.HasMeterFolders);
+            var page = Below<ModsPage>(window).Single();
+            Assert.Contains(Below<TextBlock>(page), t => t.IsVisible && TextOf(t) == SettingsNames.NoFolderInMods);
+            var link = Assert.Single(Below<Button>(page), b => b.IsVisible && Equals(b.Content, SettingsNames.ClaudeCodeLinkTitle));
+            Assert.Equal("claudecode#folders", SettingsLinkTo.GetLink(link));
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void The_filter_chips_are_named_radios_in_a_named_group_and_filter_the_list() => AppHost.Run(() =>
+    {
+        Home(".claude-work");
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.ModList);
+            Settle(window, guard);
+            var page = Below<ModsPage>(window).Single();
+            var chips = Below<RadioButton>(page).ToList();
+            Assert.Equal([SettingsNames.FilterAll, SettingsNames.FilterClaudeCode, SettingsNames.FilterWidgets], chips.Select(NameOf));
+            Assert.All(chips, c => Assert.True(c.Focusable && c.IsTabStop && c.IsVisible, NameOf(c)));
+            var group = Below<Sanduhr.App.Controls.RadioGroupPanel>(page).Single();
+            Assert.Equal(SettingsNames.ModsShowGroup, NameOf(group));
+            Assert.True(chips[0].IsChecked);
+
+            chips[2].IsChecked = true;   // what a click or Space does
+            Settle(window, guard);
+            Assert.Equal(InstalledFilter.Widgets, svm.ModsPage.Filter);
+            Assert.All(svm.ModsPage.Installed, r => Assert.True(r.IsPack));
+
+            var box = Assert.Single(Below<TextBox>(page), b => NameOf(b) == SettingsNames.FilterBoxName);
+            Assert.True(box.IsTabStop);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void A_meters_change_reloads_the_cards_and_a_card_change_reloads_the_page() => AppHost.Run(() =>
+    {
+        var home = Home(".claude-work", "{}");
+        var byHand = Path.Combine(Root, "elsewhere", "cc");
+        Directory.CreateDirectory(byHand);
+        File.WriteAllText(Path.Combine(byHand, "settings.json"), "{}");
+        var (widget, _) = ScratchWidget("Personal");
+        widget.SaveCcFoldersAdded([byHand]);
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+        var window = new SettingsWindow(svm);
+        var guard = NoActivate.Show(window);
+        try
+        {
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.Meters);
+            Settle(window, guard);
+            svm.ModsPage.AskMetersConsent = _ => true;
+            var row = svm.ModsPage.Meters.Single(m => m.Display == @"~\.claude-work");
+            var card = svm.ClaudeCodePage.Folders.Single(f => f.Display == @"~\.claude-work");
+            Assert.Equal(SettingsNames.FolderNotInstalled, card.MetersText);
+
+            row.ToggleCommand.Execute(null);   // installs into that folder
+
+            Assert.Contains("CLAUDE_CODE_PLUGIN_DIRS", File.ReadAllText(Path.Combine(home, "settings.json")));
+            Assert.Equal(SettingsNames.FolderOn, svm.ClaudeCodePage.Folders.Single(f => f.Display == @"~\.claude-work").MetersText);
+
+            // The other way: a folder the Claude Code page forgets leaves Meters above the prompt.
+            Assert.Contains(svm.ModsPage.Meters, m => ClaudeCodeFolders.Same(m.Folder, byHand));
+            var handRow = svm.ClaudeCodePage.Folders.Single(f => ClaudeCodeFolders.Same(f.Path, byHand));
+            svm.ClaudeCodePage.ForgetFolderCommand.Execute(handRow);
+            Assert.DoesNotContain(svm.ModsPage.Meters, m => ClaudeCodeFolders.Same(m.Folder, byHand));
+        }
+        finally { window.Close(); }
+    });
 }

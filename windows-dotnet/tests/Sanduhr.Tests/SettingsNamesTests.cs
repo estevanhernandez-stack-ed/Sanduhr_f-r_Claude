@@ -567,8 +567,6 @@ public class SettingsNamesTests
         Assert.Equal("Nothing installed yet. Widget packs and Claude Code plugins and mods show here, and so do widgets you make with Claude, marked made here.",
             SettingsNames.InstalledEmpty);
         Assert.StartsWith("Sprites, themes, palettes, effects and fonts from the 626 Labs widget catalog.", SettingsNames.CatalogBlurb);
-        Assert.Equal(("Widget catalog status", "Widget list status", "Meters status"),
-            (SettingsNames.CatalogStatusName, SettingsNames.ListStatusName, SettingsNames.MetersStatusName));
         Assert.Equal("Choose a PNG sprite sheet for each stage. It is copied into the widget and never sent anywhere.", SettingsNames.UseOwnArtHelp);
         foreach (var text in new[] { SettingsNames.InstalledPacksNote, SettingsNames.InstalledEmpty, SettingsNames.CatalogBlurb, SettingsNames.UseOwnArtHelp,
                      SettingsNames.MetersUpdateBody(null, null), SettingsNames.MetersRemoveBody, SettingsNames.SettingsUnreadableStrict })

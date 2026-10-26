@@ -475,10 +475,6 @@ public static class SettingsNames
     public const string CatalogBlurb = "Sprites, themes, palettes, effects and fonts from the 626 Labs widget catalog. Packs are data only, no code. Sanduhr checks the catalog's signature, then each pack's size, hash and every file before it installs one.";
     public const string InstalledPacksNote = "Installed packs live in Sanduhr's own widgets folder on this PC. Sanduhr asks GitHub for the catalog only when you open it "
         + "or check it again, and Install or Update downloads that pack from GitHub. Reset Sanduhr removes the folder.";
-    /// <summary>The page's three status lines, spoken.</summary>
-    public const string CatalogStatusName = "Widget catalog status";
-    public const string ListStatusName = "Widget list status";
-    public const string MetersStatusName = "Meters status";
     /// <summary>Use my own art…'s help text (spec 3.8 section 6).</summary>
     public const string UseOwnArtHelp = "Choose a PNG sprite sheet for each stage. It is copied into the widget and never sent anywhere.";
 
