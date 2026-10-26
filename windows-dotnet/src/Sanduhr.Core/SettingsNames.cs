@@ -823,6 +823,7 @@ public static class SettingsNames
         (ExportSessions, SettingsPage.ClaudeUsage),
         (SessionArchive, SettingsPage.ClaudeUsage),
         (FoldersToShare, SettingsPage.Publish),
+        (ShowASample, SettingsPage.Publish),
         (ClaudeCodeGlowHook, SettingsPage.ClaudeCode),
         (TranscriptsKept, SettingsPage.ClaudeCode),
         (LetClaudeReadTotals, SettingsPage.ClaudeCode),

@@ -1,0 +1,44 @@
+<Window x:Class="Sanduhr.App.Views.PublishSampleWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
+        Title="{x:Static core:SettingsNames.SampleTitle}"
+        Height="520" Width="640" MinHeight="320" MinWidth="420"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{DynamicResource Sanduhr.Brush.Bg}">
+    <!-- Publish usage, What gets sent (WF28): the next record, read-only, exactly as the next publish would send it. -->
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="{x:Static core:SettingsNames.SampleTitle}" FontSize="16" FontWeight="Bold"
+                   AutomationProperties.HeadingLevel="Level1"
+                   Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+        <TextBlock Grid.Row="1" x:Name="HeaderText" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="11"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+        <TextBlock Grid.Row="2" x:Name="NoteText" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="11"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+        <TextBox Grid.Row="3" x:Name="RecordBox" Margin="0,12,0,0" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                 FontFamily="Cascadia Code, Consolas" FontSize="12" TextWrapping="NoWrap"
+                 HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                 AutomationProperties.Name="{x:Static core:SettingsNames.SampleTitle}"
+                 Background="{DynamicResource Sanduhr.Brush.Glass}"
+                 Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                 BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                 CaretBrush="{DynamicResource Sanduhr.Brush.Text}" />
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button x:Name="CloseButton" Content="{x:Static core:SettingsNames.SampleClose}" Padding="20,8" IsDefault="True" IsCancel="True"
+                    AutomationProperties.Name="{x:Static core:SettingsNames.SampleClose}"
+                    Background="{DynamicResource Sanduhr.Brush.Accent}"
+                    Foreground="{DynamicResource Sanduhr.Brush.Bg}" BorderThickness="0"
+                    FontWeight="Bold" Cursor="Hand" Click="OnCloseClick" />
+        </StackPanel>
+    </Grid>
+</Window>

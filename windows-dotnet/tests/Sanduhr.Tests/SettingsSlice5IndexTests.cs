@@ -23,6 +23,27 @@ public class SettingsSlice5IndexTests
     }
 
     [Theory]
+    [InlineData("sample")]
+    [InlineData("what gets sent")]
+    [InlineData("payload")]
+    public void Sample_words_find_what_gets_sent(string query)
+    {
+        var top = Top(query);
+        Assert.Equal((SettingsPage.Publish, SettingsIndex.Sample), (top.Entry.Page, top.Entry.Anchor));
+    }
+
+    [Fact]
+    public void Publish_usage_has_jump_links_to_its_sections_in_page_order()
+    {
+        var links = SettingsIndex.JumpLinks(SettingsPage.Publish);
+        Assert.Equal([SettingsIndex.Destination, SettingsIndex.Token, SettingsIndex.Homes, SettingsIndex.Schedule, SettingsIndex.Sample],
+            links.Select(l => l.Anchor));
+        Assert.All(links, l => Assert.False(string.IsNullOrWhiteSpace(l.Title)));
+        Assert.Equal(SettingsNames.PublishSampleSection, links[^1].Title);
+        Assert.Equal(SettingsIndex.Sample, SettingsIndex.NameAnchors[SettingsNames.ShowASample]);
+    }
+
+    [Theory]
     [InlineData("each limit")]
     [InlineData("limit")]
     [InlineData("warn for this limit")]

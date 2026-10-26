@@ -77,6 +77,7 @@ public static class SettingsIndex
     public const string Token = "token";
     public const string Homes = "homes";
     public const string Schedule = "schedule";
+    public const string Sample = "sample";
     // Themes
     public const string Gallery = "gallery";
     public const string Studio = "studio";
@@ -221,6 +222,9 @@ public static class SettingsIndex
         E("Token", SettingsPage.Publish, Token, ["set token", "clear token", "credential", "bearer"]),
         E(SettingsNames.FoldersToShare, SettingsPage.Publish, Homes, ["folders to share", "homes to share", "homes", "folders", "share", ".claude"]),
         E("Publish daily", SettingsPage.Publish, Schedule, ["daily", "schedule", "time", "publish now"]),
+        E(SettingsNames.PublishSampleSection, SettingsPage.Publish, Sample,
+            ["sample", "preview", "what gets sent", "what is sent", "record", "payload", "json", "project names", "machine name",
+             SettingsNames.ShowASample]),
 
         E("Choose a theme", SettingsPage.Themes, Gallery, ["theme", "color", "colour", "gallery", "palette"]),
         E("Studio", SettingsPage.Themes, Studio, ["edit tokens", "glass alpha", "border alpha", "custom theme"]),
@@ -361,6 +365,7 @@ public static class SettingsIndex
         [SettingsNames.ExportSessions] = Sessions,
         [SettingsNames.SessionArchive] = Vault,
         [SettingsNames.FoldersToShare] = Homes,
+        [SettingsNames.ShowASample] = Sample,
         [SettingsNames.ClaudeCodeGlowHook] = Folders,
         [SettingsNames.TranscriptsKept] = FolderConfig,
         [SettingsNames.LetClaudeReadTotals] = Folders,
@@ -792,6 +797,7 @@ public static class SettingsIndex
     public static IReadOnlyList<(string Title, string Anchor)> JumpLinks(SettingsPage page) => page switch
     {
         SettingsPage.Alerts => Links(page, Thresholds, EachLimit, Sound, TestAlert),
+        SettingsPage.Publish => Links(page, Destination, Token, Homes, Schedule, Sample),
         SettingsPage.Desk => Links(page, DeskPieces, DeskClicks, DeskDesigns, DeskAdvanced),
         SettingsPage.DeskLook => Links(page, DeskThemeMatch, DeskLook, DeskSizes, DeskInk, DeskPlate),
         // The first is named for the widget it sits in; the others read as their index rows.

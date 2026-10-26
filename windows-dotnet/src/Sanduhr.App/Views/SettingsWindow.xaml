@@ -1854,7 +1854,9 @@
                             </ScrollViewer.Resources>
                         <StackPanel Margin="20">
                             <TextBlock Text="Publish usage" FontSize="14" FontWeight="SemiBold"
+                                       AutomationProperties.HeadingLevel="Level1"
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            <views:SectionJumpLinks Page="Publish" />
                             <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,12"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                                        Text="Nothing about your usage comes back to us. If you want it somewhere, send it to yourself: once a day Sanduhr can post token counts per project name (folder names only, never paths) to an endpoint you choose." />
@@ -1974,6 +1976,18 @@
                                        Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
                                        Text="{Binding TimeError}"
                                        Visibility="{Binding TimeError, Converter={StaticResource StrVis}}" />
+
+                            <!-- What gets sent (WF28): every field group of the record, and a sample built by the real builder. -->
+                            <StackPanel Margin="0,6,0,4" views:SettingsAnchor.Id="sample">
+                                <TextBlock Text="{x:Static core:SettingsNames.PublishSampleSection}" FontSize="9" Margin="0,0,0,4"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <TextBlock Text="{x:Static core:SettingsNames.PublishRecordLine}" TextWrapping="Wrap" FontSize="10.5"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" Margin="0,0,0,6" />
+                                <Button Style="{StaticResource FlatButton}" HorizontalAlignment="Left"
+                                        Content="{x:Static core:SettingsNames.ShowASample}"
+                                        AutomationProperties.Name="{x:Static core:SettingsNames.ShowASample}"
+                                        Command="{Binding ShowSampleCommand}" />
+                            </StackPanel>
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,6,0,12" />
 
