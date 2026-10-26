@@ -409,6 +409,14 @@ public static class SettingsNames
 
     /// <summary>A folder card's collapsed "What this folder holds": its summary line (a SectionExpander always has one, slice 3 M3).</summary>
     public const string FolderHoldsHelp = "settings.json, the statusline, hooks, plugin switches, MCP servers, CLAUDE.md and how long transcripts are kept.";
+    /// <summary>The Refresh button's spoken name in one card: the folder it reads (T7-1).</summary>
+    public static string RefreshFolderNamed(string display) => $"{RefreshFolder}, read {display} again";
+    /// <summary>The Claude Code glow section's three switches (P8): the label and the spoken name are the same words.</summary>
+    public const string GlowWhenWaiting = "Glow when Claude is waiting on you";
+    public const string GlowWhenDone = "Glow when Claude finishes";
+    public const string GlowNotInTerminal = "Not while a terminal or editor is in front";
+    /// <summary>A folder card piece's install button help while the piece is absent (P23: the card's own folder).</summary>
+    public static string PieceInstallHelp(string piece) => $"Asks first, then adds {piece} to this folder.";
 
     // ---- Settings v2, slice 4: the strings the later tasks would have inlined (preflight P10) ----
 

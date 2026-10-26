@@ -16,7 +16,8 @@ internal sealed record ClaudeCodeHost(
     string SanduhrExternalDir,
     string SanduhrLegacyModsRoot,
     Func<string?> ActiveAccountFolder,
-    string ModSourceDir)
+    string ModSourceDir,
+    Func<string, string, FolderReport>? ReadReport = null)
 {
     public static ClaudeCodeHost For(WidgetViewModel widget) => new(
         ClaudeCodeProfile.Dir, ClaudeCodeProfile.ConfigDir, widget.LoadCcFoldersAdded,
@@ -37,20 +38,28 @@ internal sealed record ClaudeCodeHost(
     public IReadOnlyList<FolderMods> ReadFolders()
     {
         var integ = Integrations();
-        var list = new List<FolderMods>();
-        foreach (var f in Folders())
+        return [.. Folders().Select(f => ReadFolder(f.Path, integ))];
+    }
+
+    /// <summary>One folder read the same way. A read that throws reads as a folder whose settings.json can't be read, so the others still list.</summary>
+    public FolderMods ReadFolder(string folder, ClaudeCodeIntegrations? integ = null)
+    {
+        integ ??= Integrations();
+        FolderReport report;
+        try { report = (ReadReport ?? ModInventory.Read)(folder, Profile); }
+        catch (Exception)
         {
-            var report = ModInventory.Read(f.Path, Profile);
-            OwnModState? own = null;
-            var meters = IntegrationStatus.NotInstalled;
-            try
-            {
-                own = integ.OwnModStateOf(f.Path);
-                meters = integ.Status(IntegrationKind.Meters, f.Path);
-            }
-            catch (Exception) { /* a folder that can't be read reads as nothing of Sanduhr's */ }
-            list.Add(new FolderMods(f.Path, Display(f.Path), report, own, meters));
+            report = new FolderReport(folder, true, new SettingsState(SettingsKind.Unreadable), null, [], new Dictionary<string, bool>(),
+                [], new McpSummary([], 0), new ClaudeMdInfo(false, 0, 0), new RetentionInfo(null, false, null));
         }
-        return list;
+        OwnModState? own = null;
+        var meters = IntegrationStatus.NotInstalled;
+        try
+        {
+            own = integ.OwnModStateOf(folder);
+            meters = integ.Status(IntegrationKind.Meters, folder);
+        }
+        catch (Exception) { /* a folder that can't be read reads as nothing of Sanduhr's */ }
+        return new FolderMods(folder, Display(folder), report, own, meters);
     }
 }

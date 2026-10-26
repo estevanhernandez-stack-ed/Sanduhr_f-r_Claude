@@ -41,7 +41,7 @@ public sealed partial class FolderHoldsViewModel : ObservableObject
     [ObservableProperty] private bool _retentionWarning;
 
     /// <summary>Refresh's spoken name: the folder it reads.</summary>
-    public string RefreshName => $"{SettingsNames.RefreshFolder}, read {_host.Display(Folder)} again";
+    public string RefreshName => SettingsNames.RefreshFolderNamed(_host.Display(Folder));
 
     /// <summary>Reads the folder the first time the section opens.</summary>
     public void EnsureLoaded()

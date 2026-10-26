@@ -326,6 +326,10 @@ internal partial class SettingsWindow : Window
             ViewModel.Themes.IsStudioMode = false;
 
         Tabs.SelectedItem = tab;
+        // Claude Code, What this folder holds is one anchor on the page: a link to it opens one card's report (slice 4, decision 5). After the
+        // selection, whose page reload rebuilds the cards.
+        if (page == SettingsPage.ClaudeCode && entry?.Anchor == SettingsIndex.FolderConfig)
+            ViewModel.ClaudeCodePage.OpenHoldsForLanding();
         Place = new SettingsLink(page, entry?.Anchor);
         if (entry is null)
             return;
