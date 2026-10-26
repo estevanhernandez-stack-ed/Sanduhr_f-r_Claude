@@ -47,7 +47,8 @@ public class SettingsSlice6NamesTests
         foreach (var text in new[] { SettingsNames.AgentReadsCaption, SettingsNames.NetThroughClaudeCarries })
         {
             Assert.Contains("Launcher buttons", text);
-            Assert.Contains("the path of a small copy of it", text);
+            // ping's snapshot_path and get_desk's wallpaper copy are full paths under the Windows user folder.
+            Assert.Contains("the paths of a small copy of your wallpaper and of Sanduhr's usage file, which include your Windows user folder", text);
             Assert.Contains("the names of the Claude Code folders Sanduhr found", text);
             Assert.Contains("plan", text);
         }

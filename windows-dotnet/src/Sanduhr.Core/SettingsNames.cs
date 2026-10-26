@@ -723,7 +723,8 @@ public static class SettingsNames
         + "and Claude Code sends the answer on with your conversation.";
     public const string NetThroughClaudeCarries =
         "What the tool answers: your meters, limits and plan; your Desk's design, Launcher buttons, monitors, fonts and Start menu app names; "
-        + "your wallpaper's colors and the path of a small copy of it; your Desk messages; the names of the Claude Code folders Sanduhr found; "
+        + "your wallpaper's colors; the paths of a small copy of your wallpaper and of Sanduhr's usage file, which include your Windows user folder; "
+        + "your Desk messages; the names of the Claude Code folders Sanduhr found; "
         + "and, for each folder where you let Claude read project totals, token counts per project and model with "
         + "project names, or full project paths when Claude asks.";
     public const string NetThroughClaudeOff =
@@ -787,8 +788,9 @@ public static class SettingsNames
     public const string AgentWidgetPacksCaption = "A companion, palette or effects pack Claude makes waits for your Apply or Dismiss.";
     public const string AgentReads = "Read your meters and your Desk";
     public const string AgentReadsCaption =
-        "Your meters, limits and plan; your Desk's design, Launcher buttons, monitors, fonts and Start menu app names; your wallpaper's colors "
-        + "and the path of a small copy of it; your Desk messages; and the names of the Claude Code folders Sanduhr found.";
+        "Your meters, limits and plan; your Desk's design, Launcher buttons, monitors, fonts and Start menu app names; your wallpaper's colors; "
+        + "the paths of a small copy of your wallpaper and of Sanduhr's usage file, which include your Windows user folder; your Desk messages; "
+        + "and the names of the Claude Code folders Sanduhr found.";
     /// <summary>Privacy's foot: one line and "About settings…" to about#where (decision 12).</summary>
     public const string PrivacyWhereLine = "Sanduhr keeps its settings, history, session archive and sign-in keys on this PC. About lists each place.";
     public static string PrivacyWhereLinkName => $"{LinkTitle(SettingsPage.About)}, {WhereSettingsLive}";
