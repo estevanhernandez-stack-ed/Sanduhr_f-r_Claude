@@ -129,6 +129,76 @@ public sealed class WidgetLimitsTests : AppWindowFixture
         finally { widget.Dispose(); }
     });
 
+    private static readonly string ThreeLimits =
+        $$"""{ "{{TierModel.FiveHour}}": {"utilization": 10, "resets_at": null}, "{{TierModel.SevenDay}}": {"utilization": 20, "resets_at": null}, "{{TierModel.IguanaNecktie}}": {"utilization": 30, "resets_at": "2099-01-01T00:00:00Z"} }""";
+
+    /// <summary>A scratch widget showing three limits, rendered through the public order setter.</summary>
+    private (WidgetViewModel Widget, string[] Order) ThreeShown()
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        Feed(widget, ThreeLimits);
+        widget.SetLimitOrder([TierModel.FiveHour, TierModel.SevenDay, TierModel.IguanaNecktie]);
+        Assert.Equal(3, widget.ShownLimitOrder.Count);
+        return (widget, [.. widget.ShownLimitOrder]);
+    }
+
+    [Fact]
+    public void A_drag_on_the_widget_reaches_the_shown_order_once_and_a_Settings_move_builds_on_it() => AppHost.Run(() =>
+    {
+        var (widget, order) = ThreeShown();
+        try
+        {
+            int raised = 0;
+            widget.LimitsChanged += () => raised++;
+
+            widget.MoveTier(2, 0);
+
+            Assert.Equal([order[2], order[0], order[1]], widget.ShownLimitOrder);
+            Assert.Equal(1, raised);
+
+            var moved = LimitSettings.Move(widget.ShownLimitOrder, order[0], 1)!;   // Move down on the old first
+            widget.SetLimitOrder(moved);
+            Assert.Equal([order[2], order[1], order[0]], widget.ShownLimitOrder);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void Hiding_a_limit_from_the_card_menu_takes_it_out_of_the_shown_order_once() => AppHost.Run(() =>
+    {
+        var (widget, order) = ThreeShown();
+        try
+        {
+            int raised = 0;
+            widget.LimitsChanged += () => raised++;
+
+            widget.HideTier(order[1]);
+
+            Assert.Equal([order[0], order[2]], widget.ShownLimitOrder);
+            Assert.Equal(1, raised);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void Hiding_a_limit_until_it_resets_takes_it_out_of_the_shown_order_once() => AppHost.Run(() =>
+    {
+        var (widget, order) = ThreeShown();
+        try
+        {
+            int raised = 0;
+            widget.LimitsChanged += () => raised++;
+            Assert.True(widget.CanHideUntilReset(TierModel.IguanaNecktie));
+
+            widget.HideUntilReset(TierModel.IguanaNecktie);
+
+            Assert.DoesNotContain(TierModel.IguanaNecktie, widget.ShownLimitOrder);
+            Assert.Equal(2, widget.ShownLimitOrder.Count);
+            Assert.Equal(1, raised);
+        }
+        finally { widget.Dispose(); }
+    });
+
     [Fact]
     public void Graph_style_and_keep_on_top_write_their_keys() => AppHost.Run(() =>
     {

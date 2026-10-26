@@ -1958,6 +1958,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (oldIndex == newIndex) return;
         Tiers.Move(oldIndex, newIndex);
         PersistOrder();
+        // No re-render mid-drop (it would flicker): the shown order follows the saved one directly.
+        var was = _shownOrder;
+        _shownOrder = [.. _savedOrder.Where(was.Contains)];
+        LimitsChanged?.Invoke();
     }
 
     /// <summary>Hide a tier card and persist the hidden set.</summary>
@@ -1967,6 +1971,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _settings.SaveHiddenTiers(_hidden);
         var vm = Tiers.FirstOrDefault(t => t.TierKey == tierKey);
         if (vm is not null) Tiers.Remove(vm);
+        _shownOrder = [.. _shownOrder.Where(k => k != tierKey)];
         RecomputeHighestForTray();
         LimitsChanged?.Invoke();
     }
@@ -2020,6 +2025,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _settings.SaveLimitState(_limitState);
         var vm = Tiers.FirstOrDefault(t => t.TierKey == tierKey);
         if (vm is not null) Tiers.Remove(vm);
+        _shownOrder = [.. _shownOrder.Where(k => k != tierKey)];
         RecomputeHighestForTray();
         LimitsChanged?.Invoke();
     }
