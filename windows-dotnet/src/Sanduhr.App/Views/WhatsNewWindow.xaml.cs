@@ -27,6 +27,9 @@ internal partial class WhatsNewWindow : Window
     {
         _showMe = showMe;
         InitializeComponent();
+        // About writes the same "Don't show What's New after updates" key: read it again when this window is brought back (slice 6),
+        // as About reads it again when Settings is (slice 5, P14). The tour's model has no such box.
+        Activated += (_, _) => (DataContext as WhatsNewViewModel)?.Reload();
         Closed += (_, _) =>
         {
             if (ReferenceEquals(_open, this)) _open = null;

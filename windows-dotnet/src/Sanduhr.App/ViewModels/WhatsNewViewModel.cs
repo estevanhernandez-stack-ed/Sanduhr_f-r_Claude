@@ -77,6 +77,7 @@ public sealed class WhatsNewViewModel : ObservableObject
 {
     private readonly SettingsStore _store;
     private bool _hideAfterUpdates;
+    private bool _loading;
 
     public string Header { get; }
     public IReadOnlyList<WhatsNewCardItem> Items { get; }
@@ -104,8 +105,17 @@ public sealed class WhatsNewViewModel : ObservableObject
         set
         {
             if (!SetProperty(ref _hideAfterUpdates, value)) return;
+            if (_loading) return;
             _store.SaveWhatsNewHideAfterUpdates(value);
         }
+    }
+
+    /// <summary>Read the key again (About may have changed it while this window was open; slice 6). Raises the change, writes nothing.</summary>
+    public void Reload()
+    {
+        _loading = true;
+        try { HideAfterUpdates = _store.LoadWhatsNewHideAfterUpdates(); }
+        finally { _loading = false; }
     }
 
     /// <summary>The tray glyph at 12% as a WPF image, for the Tray preview.</summary>
