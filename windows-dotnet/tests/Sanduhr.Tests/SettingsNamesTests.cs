@@ -488,6 +488,10 @@ public class SettingsNamesTests
         Assert.Equal(("Installed.", "Version 1.0.0 is installed.", "Needs Sanduhr 9.0.0 or later.", "Version 1.0.0 is installed. 2.0.0 needs Sanduhr 9.0.0 or later."),
             (SettingsNames.CatalogInstalled, SettingsNames.CatalogVersionInstalled("1.0.0"), SettingsNames.CatalogNeedsSanduhr("9.0.0"),
              SettingsNames.CatalogUpdateNeedsSanduhr("1.0.0", "2.0.0", "9.0.0")));
+        // An installed pack with no version still reads as a sentence, never "Version  is installed."
+        Assert.Equal("An older version is installed.", SettingsNames.CatalogVersionInstalled(""));
+        Assert.Equal("An older version is installed. 2.0.0 needs Sanduhr 9.0.0 or later.",
+            SettingsNames.CatalogUpdateNeedsSanduhr("", "2.0.0", "9.0.0"));
         Assert.Equal("Palette settings… for Fixture", SettingsNames.WhereLinkFor("Palette settings…", "Fixture"));
         Assert.Equal("Uninstall Fixture palette", SettingsNames.UninstallFor("Fixture palette"));
         Assert.Equal("Fixture palette is on.", SettingsNames.PackIsOn("Fixture palette"));

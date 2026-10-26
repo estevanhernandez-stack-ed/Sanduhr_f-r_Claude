@@ -347,10 +347,11 @@ public static class SettingsNames
     public const string ShowsAsCompanion = "As the Desk companion";
     /// <summary>The catalog row's state line (Mods &amp; Widgets, Catalog).</summary>
     public const string CatalogInstalled = "Installed.";
-    public static string CatalogVersionInstalled(string version) => $"Version {version} is installed.";
+    public static string CatalogVersionInstalled(string version) =>
+        string.IsNullOrWhiteSpace(version) ? "An older version is installed." : $"Version {version} is installed.";
     public static string CatalogNeedsSanduhr(string min) => $"Needs Sanduhr {min} or later.";
     public static string CatalogUpdateNeedsSanduhr(string installed, string update, string min) =>
-        $"Version {installed} is installed. {update} needs Sanduhr {min} or later.";
+        $"{CatalogVersionInstalled(installed)} {update} needs Sanduhr {min} or later.";
     public static string CatalogIdTaken => $"A widget {WidgetMadeHere} already uses this id.";
     public const string EffectsUnused = "Not used yet: Sanduhr has nothing that draws effects packs.";
     /// <summary>Catalog: the only network call on the page (WF6).</summary>
