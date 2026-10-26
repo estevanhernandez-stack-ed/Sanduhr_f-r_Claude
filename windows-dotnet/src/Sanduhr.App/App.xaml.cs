@@ -893,17 +893,9 @@ public partial class App : Application
     {
         try
         {
-            if (vm.AccountStore.ListAccounts().Count == 0)
+            if (vm.AccountStore.ListAccounts().Count == 0 || !vm.EndJustTheDesk())
                 return;
-            var store = new SettingsStore(new Sanduhr.Core.Paths());
-            var (state, reminderOn, ended) = JustTheDesk.EndBySignIn(store.LoadJustTheDesk(), store.LoadDeskSignInReminder());
-            if (!ended)
-                return;
-            store.SaveJustTheDesk(state);
-            store.SaveDeskSignInReminder(reminderOn);
-            vm.JustTheDesk = false;
-            if (_settingsWindow?.ViewModel.Alerts is { } alerts) alerts.DeskSignInReminder = reminderOn;
-            vm.RefreshDesk();
+            if (_settingsWindow?.ViewModel.Alerts is { } alerts) alerts.DeskSignInReminder = vm.LoadDeskSignInReminder();
             ShowWindow();
         }
         catch

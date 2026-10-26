@@ -1093,6 +1093,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _demoData = null;
         _lastData = null;
         Tiers.Clear();
+        ResetShownOrder();
         ClearTray();   // the sample percent never lingers on the tray unlabelled
         FooterText = "";
         OnPropertyChanged(nameof(DemoAccount));
@@ -1236,6 +1237,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // numbers (WS-E). The next successful fetch rewrites it.
         _snapshotWriter?.Delete();
         Tiers.Clear();
+        ResetShownOrder();
         _alertEngine.Reset();
         _lastData = null;
         StatusText = "Switching account…";
@@ -1341,6 +1343,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (wasActive)
         {
             Tiers.Clear();
+            ResetShownOrder();
             _lastData = null;
             // The snapshot belongs to the active account — removal revokes the
             // artifact, not just the writer (WS-E lifecycle-delete rule).
@@ -1554,8 +1557,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void TogglePin()
     {
-        Pinned = !Pinned;
-        _settings.SavePinned(Pinned);
+        SetPinned(!Pinned);
     }
 
     /// <summary>Toggle compact mode — collapse the card list to the busiest tier and
@@ -1586,10 +1588,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         var styles = (SparklineStyle[])Enum.GetValues(typeof(SparklineStyle));
         int i = Array.IndexOf(styles, SparklineStyle);
-        SparklineStyle = styles[(i + 1) % styles.Length];
-        foreach (var card in Tiers)
-            card.ApplyStyle(SparklineStyle);
-        _settings.SaveSparklineStyle(SparklineStyle);
+        SetSparklineStyle(styles[(i + 1) % styles.Length]);
         Sounds.PlayToggle();
     }
 
@@ -1630,6 +1629,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void ClearSignedInChrome()
     {
         Tiers.Clear();
+        ResetShownOrder();
         _lastData = null;
         HasPlanBadge = false;
         PlanTooltip = "";
@@ -1724,6 +1724,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         var hiddenKeys = new HashSet<string>(_hidden);
         hiddenKeys.UnionWith(_limitState.HiddenUntilReset.Keys);
         var active = TierModel.ActiveTiers(utilByKey, _savedOrder, hiddenKeys);
+        // Settings, Widget, Limit order lists these, in this order, whatever compact mode shows.
+        _shownOrder = [.. active];
         // The Desk draws the visible tiers in order whatever compact mode shows; its Claude line
         // reads session and week whether or not their cards are hidden (spec 5.1).
         _deskTiers = [.. active.Select(k => DeskTierFor(data, k, utilByKey[k]))];
@@ -1789,6 +1791,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         RaiseTray();
 
         RaiseDesk();
+        LimitsChanged?.Invoke();
     }
 
     private static DeskTier DeskTierFor(JsonObject data, string key, double? util) =>
@@ -1965,6 +1968,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         var vm = Tiers.FirstOrDefault(t => t.TierKey == tierKey);
         if (vm is not null) Tiers.Remove(vm);
         RecomputeHighestForTray();
+        LimitsChanged?.Invoke();
     }
 
     // -- limits that come and go (W2) ----------------------------------------
@@ -2017,6 +2021,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         var vm = Tiers.FirstOrDefault(t => t.TierKey == tierKey);
         if (vm is not null) Tiers.Remove(vm);
         RecomputeHighestForTray();
+        LimitsChanged?.Invoke();
     }
 
     /// <summary>Show a hidden limit again, whichever way it was hidden.</summary>
@@ -2031,6 +2036,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         }
         if (ShownData is { } shown)
             RenderCards(shown, DateTimeOffset.UtcNow);
+        LimitsChanged?.Invoke();
     }
 
     /// <summary>Hidden limits (manual and until-reset), in canonical tier order.</summary>
@@ -2044,8 +2050,95 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     public void SetWarnings(string tierKey, bool on)
     {
         bool changed = on ? _mutedTiers.Remove(tierKey) : _mutedTiers.Add(tierKey);
-        if (changed)
-            _settings.SaveAlertMutedTiers(_mutedTiers);
+        if (!changed)
+            return;
+        _settings.SaveAlertMutedTiers(_mutedTiers);
+        LimitsChanged?.Invoke();
+    }
+
+    // -- Settings, Alerts, Each limit and Settings, Widget (Settings v2, slice 5) --
+
+    /// <summary>Raised after a limit's warnings, hiding or order change, from the card menu or Settings, and at the end of every card
+    /// render (a fetch may bring a limit in or take one away). Settings Each limit and Limit order follow it.</summary>
+    public event Action? LimitsChanged;
+
+    private IReadOnlyList<string> _shownOrder = [];
+
+    /// <summary>Settings, Alerts, Each limit (WF13): a row per limit in the shown answer, and per limit a setting still names.</summary>
+    public IReadOnlyList<LimitRow> LimitRows() =>
+        LimitSettings.Rows(PresentLimitKeys(), _hidden, _mutedTiers, _limitState.HiddenUntilReset.Keys);
+
+    // The same test RenderCards uses: a limit the API sends with a null utilization never gets a card, so it gets no row.
+    private IEnumerable<string> PresentLimitKeys() =>
+        ShownData is { } data ? TierModel.EffectiveOrder.Where(k => Util(data, k) is not null).ToList() : [];
+
+    /// <summary>Settings, Widget, Limit order: the limits the widget shows, in its order (compact mode aside).</summary>
+    public IReadOnlyList<string> ShownLimitOrder => _shownOrder;
+
+    /// <summary>Clears the shown order where the cards are cleared without a render (account removed, demo left), and says so.</summary>
+    private void ResetShownOrder()
+    {
+        _shownOrder = [];
+        LimitsChanged?.Invoke();
+    }
+
+    /// <summary>Settings, Alerts, Each limit, Show this limit: shown clears both kinds of hiding (as the card menu Hidden limits
+    /// item does); not shown hides it until shown again.</summary>
+    public void SetShown(string tierKey, bool shown)
+    {
+        if (shown) ShowTier(tierKey);
+        else HideTier(tierKey);
+    }
+
+    /// <summary>Settings, Widget, Limit order: <paramref name="shownOrder"/> first, then every other known limit once, saved to
+    /// "tier_order"; the cards follow at once.</summary>
+    public void SetLimitOrder(IReadOnlyList<string> shownOrder)
+    {
+        var order = LimitSettings.SavedOrder(shownOrder, _savedOrder);
+        _savedOrder.Clear();
+        _savedOrder.AddRange(order);
+        _settings.SaveTierOrder(order);
+        if (ShownData is { } shown)
+            RenderCards(shown, DateTimeOffset.UtcNow);
+        else
+            LimitsChanged?.Invoke();
+    }
+
+    /// <summary>Settings, Widget, Graph style: every card redraws, with no refetch; saved to "sparkline_style".</summary>
+    public void SetSparklineStyle(SparklineStyle style)
+    {
+        if (SparklineStyle == style)
+            return;
+        SparklineStyle = style;
+        foreach (var card in Tiers)
+            card.ApplyStyle(style);
+        _settings.SaveSparklineStyle(style);
+    }
+
+    /// <summary>Settings, Widget, Keep the widget on top: saved to "pinned".</summary>
+    public void SetPinned(bool on)
+    {
+        if (Pinned == on)
+            return;
+        Pinned = on;
+        _settings.SavePinned(on);
+    }
+
+    /// <summary>
+    /// Ends Just the Desk (Settings, Widget, Show the widget, and an added account; <see cref="Sanduhr.Core.JustTheDesk.End"/>): saves
+    /// it off, brings the sign-in reminder back only when Just the Desk silenced it, and redraws the Desk. False when it was not on.
+    /// Showing the widget is the App's.
+    /// </summary>
+    public bool EndJustTheDesk()
+    {
+        var (state, reminderOn, ended) = Sanduhr.Core.JustTheDesk.End(_settings.LoadJustTheDesk(), _settings.LoadDeskSignInReminder());
+        if (!ended)
+            return false;
+        _settings.SaveJustTheDesk(state);
+        _settings.SaveDeskSignInReminder(reminderOn);
+        JustTheDesk = false;
+        RefreshDesk();
+        return true;
     }
 
     private void PersistOrder()
