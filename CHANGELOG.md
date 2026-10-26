@@ -4,7 +4,8 @@
 
 ### Fixes
 
-- Settings ▸ History ▸ Clear history now clears the account the "Account:" picker shows, not the active account. "All accounts" clears every account's history. The confirmation names what it removes.
+- **Continue with Google works in the sign-in window.** Google's sign-in opens in a small window of its own that closes itself when it's done, and Sanduhr finishes signing in. Before, Google's last page stayed blank. Continue with email still works.
+- Clearing meter history now clears one account: Settings ▸ Accounts ▸ Clear this account's history… acts on the selected account only, and its confirmation names what it removes. (Reset still clears every account's history.)
 - Reopening Settings, Claude Code no longer unlinks folders from their accounts or shows "Couldn't save that link." The account list is updated in place, and an empty selection is ignored instead of read as "unlink everything".
 
 ## v3.9.1 — 2026-10-24

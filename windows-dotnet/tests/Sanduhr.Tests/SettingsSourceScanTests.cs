@@ -456,6 +456,71 @@ public class SettingsSourceScanTests
         Assert.Contains("_closing", complete);
     }
 
+    private static string SignInSource()
+        => File.ReadAllText(Path.Combine(AppDir(), "Views", "SignInWindow.xaml.cs"));
+
+    private static string Between(string source, string startMarker, string endMarker)
+    {
+        var start = source.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, "Missing in SignInWindow.xaml.cs: " + startMarker);
+        var rest = source[start..];
+        var end = rest.IndexOf(endMarker, startMarker.Length, StringComparison.Ordinal);
+        return end < 0 ? rest : rest[..end];
+    }
+
+    [Fact]
+    public void Sign_in_popups_get_a_real_window_with_a_deferral_and_log_only_the_host()
+    {
+        var handler = Between(SignInSource(), "OnNewWindowRequested(object? sender", "private void OnNavigationCompleted");
+        Assert.Contains("e.NewWindow =", handler);
+        Assert.Contains("e.GetDeferral()", handler);
+        Assert.Contains(".Complete()", handler);
+        Assert.Contains("finally", handler);
+        Assert.Contains("popup requested: host={SafeHost(e.Uri)}", handler);
+    }
+
+    [Fact]
+    public void The_sign_in_popup_shares_the_environment_and_sets_the_chrome_user_agent()
+    {
+        var cs = SignInSource();
+        Assert.Contains("_environment", cs);
+        Assert.Contains("EnsureCoreWebView2Async(_environment)", cs);
+        var popup = Between(cs, "OpenPopupAsync", "WindowCloseRequested");
+        Assert.Contains("Settings.UserAgent = ClaudeSignIn.BrowserUserAgent", popup);
+        Assert.Contains("BrowserProcessGuard.Current.Adopt", popup);
+    }
+
+    [Fact]
+    public void The_sign_in_popup_closes_on_window_close_requested_and_with_the_sign_in_window()
+    {
+        var cs = SignInSource();
+        Assert.Contains("WindowCloseRequested +=", cs);
+        Assert.Contains("ClosePopup()", Between(cs, "private void OnClosed", "private void StopPoll"));
+        Assert.Contains("ClosePopup()", Between(cs, "private void CompleteAndClose", "// -- diagnostics"));
+    }
+
+    [Fact]
+    public void The_google_auto_return_timer_navigates_back_to_the_login_url()
+    {
+        var cs = SignInSource();
+        Assert.Contains("_autoReturnTimer", cs);
+        var tick = Between(cs, "OnAutoReturnTick", "private void OnGoogleNoticeBackClick");
+        Assert.Contains("Navigate(ClaudeSignIn.LoginUrl)", tick);
+        Assert.Contains("SafeHost(", tick);
+    }
+
+    [Fact]
+    public void No_sign_in_log_line_interpolates_a_url_without_safehost()
+    {
+        var cs = SignInSource();
+        foreach (var line in cs.Split('\n').Where(l => l.Contains("Log($", StringComparison.Ordinal)))
+        {
+            Assert.DoesNotContain("e.Uri}", line);
+            Assert.DoesNotContain(".Source}", line);
+            Assert.DoesNotContain("{e.Uri", line);
+        }
+    }
+
     [Fact]
     public void The_trademark_footer_is_one_control_on_seven_pages()
     {

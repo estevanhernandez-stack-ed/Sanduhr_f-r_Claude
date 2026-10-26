@@ -44,6 +44,13 @@ internal partial class SignInWindow : Window
     private DispatcherTimer? _loadTimeout;
     private bool _loadFailed;
     private bool _closing;
+    private CoreWebView2Environment? _environment;
+    private Window? _popup;
+    private DispatcherTimer? _autoReturnTimer;
+
+    /// <summary>How long the main view may sit on a Google page after Google's cross-domain cookie
+    /// step (accounts.youtube.com) before it is sent back to the Claude login.</summary>
+    private static readonly TimeSpan AutoReturnAfter = TimeSpan.FromSeconds(6);
 
     /// <param name="userDataDir">App-owned WebView2 profile folder (already allocated).</param>
     /// <param name="persist">
@@ -72,10 +79,11 @@ internal partial class SignInWindow : Window
         try
         {
             Log("window loaded; creating environment");
-            var environment = await CoreWebView2Environment.CreateAsync(
+            // Kept so a popup window can join the same profile (shared cookies).
+            _environment = await CoreWebView2Environment.CreateAsync(
                 browserExecutableFolder: null,
                 userDataFolder: _userDataDir);
-            await WebView.EnsureCoreWebView2Async(environment);
+            await WebView.EnsureCoreWebView2Async(_environment);
             // Its browser process ends with Sanduhr, whatever way Sanduhr ends (BrowserProcessGuard).
             BrowserProcessGuard.Current.Adopt(WebView.CoreWebView2);
 
@@ -93,8 +101,8 @@ internal partial class SignInWindow : Window
             WebView.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
             WebView.CoreWebView2.SourceChanged += OnSourceChanged;
 
-            // Keep OAuth/popup flows inside this window rather than dead-ending a
-            // window.open() against a null opener.
+            // OAuth popups (window.open) get a real owned window that shares this profile, so
+            // window.opener works and Google can hand its result back.
             WebView.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
 
             WebView.CoreWebView2.Navigate(ClaudeSignIn.LoginUrl);
@@ -114,12 +122,121 @@ internal partial class SignInWindow : Window
         }
     }
 
-    private void OnNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
+    private async void OnNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
     {
-        // Reuse the top-level WebView for popups so multi-step logins don't break.
+        // Host only: a popup URL can carry tokens in its query.
+        Log($"popup requested: host={SafeHost(e.Uri)}");
+        var uri = e.Uri;
+        var deferral = e.GetDeferral();
+        try
+        {
+            // Google's sign-in hands its result back through window.opener, so the popup needs a
+            // real window (and the same profile) rather than being folded into the main view.
+            var core = await OpenPopupAsync();
+            if (core is not null)
+            {
+                e.NewWindow = core;
+                e.Handled = true;
+            }
+            else
+            {
+                FoldIntoMainView(e, uri);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"popup failed, folding into the main view: {ex.GetType().Name}");
+            ClosePopup();
+            try { FoldIntoMainView(e, uri); } catch { /* sign-in must never get stuck */ }
+        }
+        finally
+        {
+            deferral.Complete();
+        }
+    }
+
+    /// <summary>The fallback: no popup window, so the main view takes the URL (no opener).</summary>
+    private void FoldIntoMainView(CoreWebView2NewWindowRequestedEventArgs e, string? uri)
+    {
         e.Handled = true;
-        if (!string.IsNullOrEmpty(e.Uri))
-            WebView.CoreWebView2.Navigate(e.Uri);
+        if (!string.IsNullOrEmpty(uri))
+            WebView.CoreWebView2.Navigate(uri);
+    }
+
+    /// <summary>Opens the small owned popup window and returns its initialised CoreWebView2,
+    /// or null when it could not start.</summary>
+    private async Task<CoreWebView2?> OpenPopupAsync()
+    {
+        if (_environment is null || _closing)
+            return null;
+        ClosePopup();
+
+        var view = new Microsoft.Web.WebView2.Wpf.WebView2();
+        System.Windows.Automation.AutomationProperties.SetName(view, "Google sign-in");
+        var popup = new Window
+        {
+            Title = "Sign in",
+            Width = 500,
+            Height = 650,
+            Owner = this,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = (System.Windows.Media.Brush?)Background ?? System.Windows.Media.Brushes.Black,
+            Content = view,
+        };
+        popup.PreviewKeyDown += (_, k) =>
+        {
+            if (k.Key == System.Windows.Input.Key.Escape)
+            {
+                k.Handled = true;
+                popup.Close();
+            }
+        };
+        popup.Closed += (_, _) =>
+        {
+            try { view.Dispose(); } catch { /* best-effort */ }
+            if (ReferenceEquals(_popup, popup))
+                _popup = null;
+        };
+        _popup = popup;
+        popup.Show();
+
+        try
+        {
+            await view.EnsureCoreWebView2Async(_environment);
+            var core = view.CoreWebView2;
+            BrowserProcessGuard.Current.Adopt(core);
+            core.Settings.UserAgent = ClaudeSignIn.BrowserUserAgent;
+            if (!string.IsNullOrWhiteSpace(core.DocumentTitle))
+                popup.Title = core.DocumentTitle;
+            core.DocumentTitleChanged += (_, _) =>
+            {
+                if (!string.IsNullOrWhiteSpace(core.DocumentTitle))
+                    popup.Title = core.DocumentTitle;
+            };
+            // Google calls window.close() when it has handed the result back.
+            core.WindowCloseRequested += (_, _) =>
+            {
+                Log("popup closed itself");
+                popup.Close();
+            };
+            return core;
+        }
+        catch (Exception ex)
+        {
+            Log($"popup init failed: {ex.GetType().Name}");
+            if (ReferenceEquals(_popup, popup))
+                popup.Close();
+            return null;
+        }
+    }
+
+    private void ClosePopup()
+    {
+        var popup = _popup;
+        _popup = null;
+        if (popup is null)
+            return;
+        try { popup.Close(); } catch { /* already closing */ }
     }
 
     private void OnNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
@@ -137,12 +254,14 @@ internal partial class SignInWindow : Window
             ShowLoadError("claude.ai didn't load. Check your connection and try again.");
         }
         UpdateOAuthNotice();
+        UpdateAutoReturn();
         _ = TryCaptureAsync("nav");
     }
 
     private void OnSourceChanged(object? sender, CoreWebView2SourceChangedEventArgs e)
     {
         UpdateOAuthNotice();
+        UpdateAutoReturn();
         _ = TryCaptureAsync("source");
     }
 
@@ -208,6 +327,50 @@ internal partial class SignInWindow : Window
         var onGoogle = host.StartsWith("accounts.google", StringComparison.OrdinalIgnoreCase)
                        || host.StartsWith("accounts.youtube", StringComparison.OrdinalIgnoreCase);
         GoogleNotice.Visibility = onGoogle ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>If Google's flow finished its cross-domain cookie step (accounts.youtube.com) but
+    /// the main view never came back to claude.ai, send it back to the Claude login, which picks
+    /// up the live Google session. One-shot: armed on accounts.youtube.com, disarmed on any
+    /// claude.ai page.</summary>
+    private void UpdateAutoReturn()
+    {
+        var host = SafeHost(WebView.CoreWebView2?.Source);
+        if (host.Equals("claude.ai", StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith(".claude.ai", StringComparison.OrdinalIgnoreCase))
+        {
+            StopAutoReturn();
+            return;
+        }
+
+        if (_autoReturnTimer is null && !_captured
+            && host.StartsWith("accounts.youtube", StringComparison.OrdinalIgnoreCase))
+        {
+            Log($"auto-return armed: host={host}");
+            _autoReturnTimer = new DispatcherTimer { Interval = AutoReturnAfter };
+            _autoReturnTimer.Tick += OnAutoReturnTick;
+            _autoReturnTimer.Start();
+        }
+    }
+
+    private void OnAutoReturnTick(object? sender, EventArgs e)
+    {
+        StopAutoReturn();
+        if (_captured || _closing || _popup is not null)
+            return;
+        var host = SafeHost(WebView.CoreWebView2?.Source);
+        var onGoogle = host.StartsWith("accounts.google", StringComparison.OrdinalIgnoreCase)
+                       || host.StartsWith("accounts.youtube", StringComparison.OrdinalIgnoreCase);
+        if (!onGoogle)
+            return;
+        Log($"auto-return: still on host={host}, back to the Claude login");
+        WebView.CoreWebView2?.Navigate(ClaudeSignIn.LoginUrl);
+    }
+
+    private void StopAutoReturn()
+    {
+        _autoReturnTimer?.Stop();
+        _autoReturnTimer = null;
     }
 
     /// <summary>Primary path off the Google-bounce banner — sends the WebView back to the
@@ -288,6 +451,8 @@ internal partial class SignInWindow : Window
     {
         StopPoll();
         StopLoadTimeout();
+        StopAutoReturn();
+        ClosePopup();
         // Close the controller now rather than at finalization, so the sign-in profile's browser
         // process exits with the window.
         try { WebView.Dispose(); } catch { /* best-effort */ }
@@ -315,6 +480,8 @@ internal partial class SignInWindow : Window
     {
         StopPoll();
         StopLoadTimeout();
+        StopAutoReturn();
+        ClosePopup();
         _tcs.TrySetResult(result);
         if (!_closing)
         {

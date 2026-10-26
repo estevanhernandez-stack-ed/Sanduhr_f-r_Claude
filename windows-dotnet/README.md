@@ -106,11 +106,15 @@ a cookie value.
 - The login runs on Anthropic's **real** `claude.ai/login` page inside WebView2.
   Sanduhr never sees the password; it only reads back the resulting session cookie
   from its own jar.
-- **Google OAuth is unreliable inside an embedded WebView2** — Google routinely
-  refuses embedded user-agents (the `disallowed_useragent` block). The reliable
-  path is **email + login-code** (or passkey). Use that when the Google button
-  dead-ends. The sign-in window already presents a clean desktop-Chrome UA as a
-  mitigation, but Google may still block.
+- **Continue with Google works in the sign-in window (since 4.0).** Google's
+  sign-in runs in a popup and hands its result back through `window.opener`, so
+  `SignInWindow` gives each `window.open` a real owned window on the same WebView2
+  environment, with the same desktop-Chrome UA (Google refuses the embedded one,
+  `disallowed_useragent`). Google may add its own device check (g.co/sc). Folding
+  the popup into the main view, as before 4.0, left a blank Google page. If a popup
+  can't start, the URL falls back into the main view, and a one-shot timer sends it
+  back to `claude.ai/login` 6 s after Google's `accounts.youtube.com` step, where
+  the live Google session completes the sign-in. Email + login code still works.
 - Cookies are read **only from the `claude.ai` origin** (`https://claude.ai`); the
   capture never fires on OAuth-provider, analytics, or captcha hosts.
 
