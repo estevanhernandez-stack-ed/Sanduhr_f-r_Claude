@@ -93,7 +93,7 @@ internal partial class SettingsWindow : Window
         ViewModel.Publish.AttachOwner(this);
         ViewModel.Publish.Attach();
         ViewModel.ClaudeCodePage.AttachOwner(this);
-        ViewModel.Mods.AttachOwner(this);
+        ViewModel.ModsPage.AttachOwner(this);
         ViewModel.Desk.Launcher.AttachOwner(this);
         ViewModel.NowPlayingPage.AttachOwner(this);
 
@@ -237,11 +237,10 @@ internal partial class SettingsWindow : Window
                 RenderHistory();
         }
 
-        // The Claude Code pages read files other tools change: look again each time they are opened.
+        // The Claude Code page reads files other tools change: look again each time it is opened. Mods & Widgets lists itself when it
+        // becomes visible (ModsPage.Activate).
         if (page == SettingsPage.ClaudeCode)
             ViewModel.ClaudeCodePage.Reload();
-        else if (page == SettingsPage.Mods)
-            ViewModel.Mods.ReloadFolders();
     }
 
     /// <summary>The page a sidebar entry stands for: its Tag names the <see cref="SettingsPage"/>.</summary>

@@ -1904,95 +1904,9 @@
                     <views:ClaudeCodePage />
                 </TabItem>
 
-                <!-- Mods & Config page (Stage 4.2, slice 1): a read-only look at one folder. -->
-                <TabItem Header="Mods &amp; Config" Tag="Mods" AutomationProperties.Name="Mods &amp; Config" DataContext="{Binding Mods}">
-                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="4,4,0,4">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False" Padding="12,10,16,10">
-                            <ScrollViewer.Resources>
-                                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
-                            </ScrollViewer.Resources>
-                            <StackPanel>
-                                <TextBlock Text="Mods &amp; Config" FontSize="14" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,4" />
-                                <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,12"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                           Text="What one Claude Code folder holds, read from its files. Sanduhr runs nothing here and shows no secret values." />
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                    <TextBlock Text="Folder" FontSize="11.5" VerticalAlignment="Center" Margin="0,0,8,0"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <ComboBox Style="{StaticResource ThemedComboBox}" Width="260"
-                                              ItemsSource="{Binding Folders}" DisplayMemberPath="Display"
-                                              SelectedItem="{Binding SelectedFolder, Mode=TwoWay}"
-                                              AutomationProperties.Name="Folder to look at" />
-                                    <Button Style="{StaticResource FlatButton}" Content="Refresh" Margin="8,0,0,0" Padding="12,5"
-                                            Command="{Binding RefreshCommand}"
-                                            AutomationProperties.Name="Refresh, read this folder again" />
-                                </StackPanel>
-
-                                <!-- Mods -->
-                                <StackPanel views:SettingsAnchor.Id="mods" Margin="0,0,0,16">
-                                    <TextBlock Text="{Binding PluginListTitle}" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,2"
-                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                                    <TextBlock Text="{Binding PluginListNote}" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,6"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                               Visibility="{Binding PluginListNote, Converter={StaticResource StrVis}}" />
-                                    <ItemsControl ItemsSource="{Binding Mods}" Focusable="False"
-                                                  AutomationProperties.Name="Plugins">
-                                        <ItemsControl.ItemContainerStyle>
-                                            <!-- A row reads as "626labs, version 0.1.0, on, mod", not as the type of the item behind it. -->
-                                            <Style TargetType="ContentPresenter">
-                                                <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
-                                            </Style>
-                                        </ItemsControl.ItemContainerStyle>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6" Padding="12,10" Margin="0,0,0,8"
-                                                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
-                                                    <StackPanel>
-                                                        <TextBlock FontSize="12" TextWrapping="Wrap">
-                                                            <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.Text}" /><Run Text="  " /><Run Text="{Binding VersionText, Mode=OneWay}" Foreground="{DynamicResource Sanduhr.Brush.TextDim}" /><Run Text="  " /><Run Text="{Binding StateText, Mode=OneWay}" Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
-                                                            <InlineUIContainer BaselineAlignment="Center">
-                                                                <Border Margin="8,0,0,0" Padding="5,0" CornerRadius="3" BorderThickness="1"
-                                                                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
-                                                                        Visibility="{Binding IsMod, Converter={StaticResource BoolVis}}">
-                                                                    <TextBlock Text="mod" FontSize="9.5" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                                                </Border>
-                                                            </InlineUIContainer>
-                                                        </TextBlock>
-                                                        <TextBlock Text="{Binding Description}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"
-                                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                                                   Visibility="{Binding HasDescription, Converter={StaticResource BoolVis}}" />
-                                                        <TextBlock Text="{Binding Touches}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"
-                                                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                                                   Visibility="{Binding HasTouches, Converter={StaticResource BoolVis}}" />
-                                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
-                                                                    Visibility="{Binding IsSanduhr, Converter={StaticResource BoolVis}}">
-                                                            <Button Style="{StaticResource FlatButton}" Content="Turn off" Padding="10,4" FontSize="11"
-                                                                    Command="{Binding TurnOffCommand}" AutomationProperties.Name="{Binding TurnOffName}"
-                                                                    Visibility="{Binding IsOn, Converter={StaticResource BoolVis}}" />
-                                                            <Button Style="{StaticResource FlatButton}" Content="Turn on" Padding="10,4" FontSize="11"
-                                                                    Command="{Binding TurnOnCommand}" AutomationProperties.Name="{Binding TurnOnName}"
-                                                                    Visibility="{Binding IsOff, Converter={StaticResource BoolVis}}" />
-                                                            <Button Style="{StaticResource FlatButton}" Content="Update…" Padding="10,4" FontSize="11"
-                                                                    Command="{Binding UpdateCommand}" AutomationProperties.Name="{Binding UpdateName}" />
-                                                            <Button Style="{StaticResource FlatButton}" Content="Remove…" Padding="10,4" FontSize="11"
-                                                                    Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
-                                                                    Command="{Binding RemoveCommand}" AutomationProperties.Name="{Binding RemoveName}" />
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-
-                                <TextBlock TextWrapping="Wrap" FontSize="11" AutomationProperties.LiveSetting="Polite"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                           Text="{Binding StatusText}"
-                                           Visibility="{Binding StatusText, Converter={StaticResource StrVis}}" />
-                            </StackPanel>
-                        </ScrollViewer>
-                    </Border>
+                <!-- Settings, Mods & Widgets (slice 4): the one list, drawn by its own control. -->
+                <TabItem Header="Mods &amp; Widgets" Tag="Mods" AutomationProperties.Name="Mods &amp; Widgets" DataContext="{Binding ModsPage}">
+                    <views:ModsPage />
                 </TabItem>
 
                 <!-- Themes tab (item 8) — swatch grid + agent-assisted theme creation. -->
@@ -2634,11 +2548,6 @@
 
                 <TabItem Header="Launcher" Tag="Launcher" AutomationProperties.Name="Launcher" DataContext="{Binding Desk}">
                     <views:LauncherPage />
-                </TabItem>
-
-                <!-- Settings, Widgets (spec 3.8): the signed catalog and the installed packs, drawn by their own control. -->
-                <TabItem Header="Widgets" Tag="Widgets" AutomationProperties.Name="Widgets" DataContext="{Binding ModsPage}">
-                    <views:ModsPage />
                 </TabItem>
 
                 <!-- About (Settings v2): the version, What's New and the tour, the trademark notice,

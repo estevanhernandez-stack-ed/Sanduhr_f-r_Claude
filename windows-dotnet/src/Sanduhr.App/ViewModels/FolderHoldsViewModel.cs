@@ -5,6 +5,15 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
+/// <summary>One line under a section: a name and what it says.</summary>
+public sealed record ModsLine(string Name, string Text)
+{
+    /// <summary>What a screen reader reads for the line: "Notification, 2 groups", never the record's fields.</summary>
+    public string AutomationName => $"{Name}, {Text}";
+
+    public override string ToString() => AutomationName;
+}
+
 /// <summary>
 /// A Claude Code folder card's "What this folder holds" (Settings v2 slice 4; Mods &amp; Config's read-only report, WF4, WF9): settings.json,
 /// the statusline, hooks, plugin switches, MCP servers, CLAUDE.md and how long Claude Code keeps transcripts. Read from files only, when the
@@ -60,7 +69,7 @@ public sealed partial class FolderHoldsViewModel : ObservableObject
         try { report = ModInventory.Read(Folder, _host.Profile); }
         catch (Exception)
         {
-            SettingsSummary = "Couldn't read this folder.";
+            SettingsSummary = SettingsNames.HoldsCantRead;
             Loaded = true;
             return;
         }
@@ -68,56 +77,46 @@ public sealed partial class FolderHoldsViewModel : ObservableObject
         SettingsUnreadable = report.Settings.Kind == SettingsKind.Unreadable;
         (SettingsSummary, SettingsDetail) = report.Settings.Kind switch
         {
-            SettingsKind.Readable => ("Readable", "settings.json parses as JSON."),
+            SettingsKind.Readable => (SettingsNames.SettingsReadable, SettingsNames.SettingsReadableDetail),
             SettingsKind.Unreadable when report.Settings.Line > 0 =>
-                ($"Unreadable: line {report.Settings.Line}, column {report.Settings.Column}",
-                 "Claude Code reads settings.json strictly: no comments, no trailing commas. Sanduhr changes nothing in it while it is unreadable."),
-            SettingsKind.Unreadable => ("Unreadable", "settings.json can't be opened. Sanduhr changes nothing in it."),
-            _ => ("Missing", "This folder has no settings.json yet."),
+                (SettingsNames.SettingsUnreadableAt(report.Settings.Line, report.Settings.Column), SettingsNames.SettingsUnreadableStrict),
+            SettingsKind.Unreadable => (SettingsNames.SettingsUnreadable, SettingsNames.SettingsCantOpen),
+            _ => (SettingsNames.SettingsMissing, SettingsNames.SettingsMissingDetail),
         };
 
         if (report.Statusline is { } sl)
         {
-            StatuslineSummary = sl.IsSanduhr ? "Sanduhr's statusline" : "Someone else's statusline";
+            StatuslineSummary = sl.IsSanduhr ? SettingsNames.StatuslineSanduhrs : SettingsNames.StatuslineSomeoneElses;
             StatuslineCommand = sl.Command;
         }
         else
         {
-            StatuslineSummary = "None";
+            StatuslineSummary = SettingsNames.HoldsNone;
             StatuslineCommand = "";
         }
 
         foreach (var h in report.Hooks)
-            HookLines.Add(new ModsLine(h.Event,
-                $"{h.Groups} {(h.Groups == 1 ? "group" : "groups")}" + (h.Sanduhr > 0 ? $", {h.Sanduhr} from Sanduhr" : "")));
+            HookLines.Add(new ModsLine(h.Event, SettingsNames.HookGroups(h.Groups, h.Sanduhr)));
         int groups = report.Hooks.Sum(h => h.Groups);
-        HooksSummary = report.Hooks.Count == 0
-            ? "None"
-            : $"{groups} {(groups == 1 ? "group" : "groups")} on {report.Hooks.Count} {(report.Hooks.Count == 1 ? "event" : "events")}";
+        HooksSummary = report.Hooks.Count == 0 ? SettingsNames.HoldsNone : SettingsNames.HooksOnEvents(groups, report.Hooks.Count);
 
         foreach (var (name, on) in report.EnabledPlugins.OrderBy(p => p.Key, StringComparer.Ordinal))
-            PluginLines.Add(new ModsLine(name, on ? "On" : "Off"));
+            PluginLines.Add(new ModsLine(name, on ? SettingsNames.FolderOn : SettingsNames.FolderOff));
         int pluginsOn = report.EnabledPlugins.Count(p => p.Value);
         PluginsSummary = ModsPageText.SwitchSummary(pluginsOn, report.EnabledPlugins.Count - pluginsOn);
 
         foreach (var n in report.Mcp.UserServers) McpNames.Add(n);
-        McpSummary = report.Mcp.UserServers.Count == 0
-            ? "None"
-            : $"{report.Mcp.UserServers.Count} {(report.Mcp.UserServers.Count == 1 ? "server" : "servers")}";
-        McpProjects = report.Mcp.LocalProjectCount > 0
-            ? $"{report.Mcp.LocalProjectCount} {(report.Mcp.LocalProjectCount == 1 ? "project has" : "projects have")} their own servers."
-            : "";
+        McpSummary = report.Mcp.UserServers.Count == 0 ? SettingsNames.HoldsNone : SettingsNames.McpServerCount(report.Mcp.UserServers.Count);
+        McpProjects = report.Mcp.LocalProjectCount > 0 ? SettingsNames.McpProjectsOwn(report.Mcp.LocalProjectCount) : "";
 
         ClaudeMdSummary = report.ClaudeMd.Exists
-            ? $"{report.ClaudeMd.Lines} {(report.ClaudeMd.Lines == 1 ? "line" : "lines")}, {FormatBytes(report.ClaudeMd.Bytes)}"
-            : "None";
+            ? SettingsNames.ClaudeMdSize(report.ClaudeMd.Lines, report.ClaudeMd.Bytes)
+            : SettingsNames.HoldsNone;
 
         RetentionWarning = report.Retention.Warning;
         RetentionSummary = report.Retention.Warning
             ? ModInventory.RetentionWarning + "."
-            : report.Retention.CleanupPeriodDays is { } days ? $"{days} days." : "Unknown while settings.json is unreadable.";
+            : report.Retention.CleanupPeriodDays is { } days ? SettingsNames.RetentionDays(days) : SettingsNames.RetentionUnknown;
         Loaded = true;
     }
-
-    private static string FormatBytes(long bytes) => bytes < 1024 ? $"{bytes} bytes" : $"{bytes / 1024.0:0.#} KB";
 }

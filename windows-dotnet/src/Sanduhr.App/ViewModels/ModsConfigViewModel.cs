@@ -31,15 +31,6 @@ internal sealed record ModsConfigHost(
         () => widget.ShownActiveAccount is { } label ? widget.AccountFolder(label) : null);
 }
 
-/// <summary>One line under a section: a name and what it says.</summary>
-public sealed record ModsLine(string Name, string Text)
-{
-    /// <summary>What a screen reader reads for the line: "Notification, 2 groups", never the record's fields.</summary>
-    public string AutomationName => $"{Name}, {Text}";
-
-    public override string ToString() => AutomationName;
-}
-
 /// <summary>One plugin a folder loads. A plugin that also carries mod hooks is a mod and wears a "mod" tag.</summary>
 public sealed partial class ModRowViewModel : ObservableObject
 {

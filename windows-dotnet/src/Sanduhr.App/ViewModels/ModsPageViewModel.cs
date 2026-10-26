@@ -253,8 +253,12 @@ public sealed partial class MetersFolderRowViewModel : ObservableObject
     private void Remove() => _owner.RemoveMeters(this);
 }
 
+/// <summary>A question the meters rows ask before Update… or Remove…: each caller names both buttons, and Remove is the warning.</summary>
+internal sealed record MetersQuestion(string Title, string Message, string Primary, string Secondary, bool Warning);
+
 /// <summary>
-/// Settings, Mods &amp; Widgets (Settings v2 slice 4, spec "Mods &amp; Widgets: one list"): the Installed list over every Claude Code folder and the widget packs, the catalog, and a status line. Until the page flip (Task 12) it is hosted in the Widgets tab.
+/// Settings, Mods &amp; Widgets (Settings v2 slice 4, spec "Mods &amp; Widgets: one list"), the Mods tab: Meters above the prompt per folder, the
+/// Installed list over every Claude Code folder and the widget packs, and the catalog, which asks GitHub only when it is opened.
 /// </summary>
 public sealed partial class ModsPageViewModel : ObservableObject
 {
@@ -273,10 +277,10 @@ public sealed partial class ModsPageViewModel : ObservableObject
         // settings.json is not read here; the store parameter stays for callers.
         AskMetersConsent = folder => IntegrationConsentDialog.Ask(_window, new ConsentSpec(
             SettingsNames.MetersConsentTitle, SettingsNames.MetersConsentIntro, folder, SettingsNames.MetersConsentDetails,
-            "Install")) is not null;
-        Ask = (title, message, primary) => ThemedDialog.Show(_window, title, message, MessageBoxButton.YesNo,
-            primary == "Remove" ? ThemedDialogKind.Warning : ThemedDialogKind.Info,
-            primaryLabel: primary, secondaryLabel: primary == "Update" ? "Not now" : SettingsNames.UninstallCancel) == MessageBoxResult.Yes;
+            SettingsNames.MetersConsentInstall)) is not null;
+        Ask = q => ThemedDialog.Show(_window, q.Title, q.Message, MessageBoxButton.YesNo,
+            q.Warning ? ThemedDialogKind.Warning : ThemedDialogKind.Info,
+            primaryLabel: q.Primary, secondaryLabel: q.Secondary) == MessageBoxResult.Yes;
     }
 
     /// <summary>Dialogs parent to the Settings window.</summary>
@@ -289,7 +293,6 @@ public sealed partial class ModsPageViewModel : ObservableObject
     internal IReadOnlyList<FolderMods> Folders { get; private set; } = [];
 
     // ---- Meters above the prompt (spec, Mods & Widgets, section 1): every folder at once ----
-    // P13: the Update and Remove dialogs and statuses below are transitional copies of ModsConfigViewModel's; Task 12 deletes the original.
 
     public ObservableCollection<MetersFolderRowViewModel> Meters { get; } = [];
     [ObservableProperty] private string _metersStatus = "";
@@ -303,8 +306,8 @@ public sealed partial class ModsPageViewModel : ObservableObject
     /// <summary>Asks before the mod is installed into a folder (the consent dialog that names it): the folder's display in, yes out. A seam for tests.</summary>
     internal Func<string, bool> AskMetersConsent { get; set; }
 
-    /// <summary>Asks before Update… and Remove…: title, message and the primary label in, yes out. A seam for tests.</summary>
-    internal Func<string, string, string, bool> Ask { get; set; }
+    /// <summary>Asks before Update… and Remove…: the question in, yes out. A seam for tests.</summary>
+    internal Func<MetersQuestion, bool> Ask { get; set; }
 
     /// <summary>Brings the rows to the folders as read, in place where a folder is still there, so a switch keeps keyboard focus.</summary>
     private void ShowMeters()
@@ -347,10 +350,11 @@ public sealed partial class ModsPageViewModel : ObservableObject
             {
                 var res = integ.SwitchOwnMod(row.Folder, want);
                 changed = res.Ok;
-                MetersStatus = res.Ok ? (want ? "Meters mod turned on." : "Meters mod turned off.") : Short(res.Message, "Couldn't change the switch.");
+                MetersStatus = res.Ok ? (want ? SettingsNames.MetersTurnedOn : SettingsNames.MetersTurnedOff)
+                    : Short(res.Message, SettingsNames.MetersSwitchFailed);
             }
         }
-        catch (Exception) { MetersStatus = "Couldn't change the switch."; }
+        catch (Exception) { MetersStatus = SettingsNames.MetersSwitchFailed; }
         ReloadLocal();
         if (changed) MetersChanged?.Invoke(installed);
     }
@@ -362,18 +366,14 @@ public sealed partial class ModsPageViewModel : ObservableObject
         {
             var integ = _host.Integrations();
             var state = integ.OwnModStateOf(row.Folder);
-            var version = state.Pinned ?? "the installed version";
-            var current = integ.CurrentModStamp() ?? "the new version";
-            if (!Ask("Update the meters mod?",
-                    $"This folder's meters mod is pinned to {version}. Updating points it at {current}, the version that ships with this Sanduhr. "
-                    + "The mod's files are copied again and one entry in this folder's settings.json changes. The old version's files stay until "
-                    + "Sanduhr prunes them.", "Update"))
+            if (!Ask(new MetersQuestion(SettingsNames.MetersUpdateTitle, SettingsNames.MetersUpdateBody(state.Pinned, integ.CurrentModStamp()),
+                    SettingsNames.MetersUpdateConfirm, SettingsNames.MetersUpdateNotNow, Warning: false)))
                 return;
             var res = integ.UpdateOwnMod(row.Folder);
-            MetersStatus = !res.Ok ? Short(res.Message, "Couldn't update the meters mod.")
-                : res.Outcome == ModUpdateOutcome.Updated ? "Meters mod updated." : "Meters mod is already current.";
+            MetersStatus = !res.Ok ? Short(res.Message, SettingsNames.MetersUpdateFailed)
+                : res.Outcome == ModUpdateOutcome.Updated ? SettingsNames.MetersUpdated : SettingsNames.MetersAlreadyCurrent;
         }
-        catch (Exception) { MetersStatus = "Couldn't update the meters mod."; }
+        catch (Exception) { MetersStatus = SettingsNames.MetersUpdateFailed; }
         ReloadLocal();
         MetersChanged?.Invoke(false);
     }
@@ -383,13 +383,13 @@ public sealed partial class ModsPageViewModel : ObservableObject
         if (_host is null || !row.CanRemove) return;
         try
         {
-            if (!Ask("Remove the meters mod?",
-                    "Takes Sanduhr's entry out of this folder's settings.json and leaves any other mod alone.", "Remove"))
+            if (!Ask(new MetersQuestion(SettingsNames.MetersRemoveTitle, SettingsNames.MetersRemoveBody,
+                    SettingsNames.MetersRemoveConfirm, SettingsNames.MetersRemoveCancel, Warning: true)))
                 return;
             var res = _host.Integrations().Remove(IntegrationKind.Meters, row.Folder);
-            MetersStatus = res.Ok ? "Meters mod removed." : Short(res.Message, "Couldn't remove the meters mod.");
+            MetersStatus = res.Ok ? SettingsNames.MetersRemoved : Short(res.Message, SettingsNames.MetersRemoveFailed);
         }
-        catch (Exception) { MetersStatus = "Couldn't remove the meters mod."; }
+        catch (Exception) { MetersStatus = SettingsNames.MetersRemoveFailed; }
         ReloadLocal();
         MetersChanged?.Invoke(false);
     }
@@ -422,7 +422,6 @@ public sealed partial class ModsPageViewModel : ObservableObject
     [ObservableProperty] private string? _catalogStatus;
     private bool _asked;
 
-    public string CatalogDisclosure => SettingsNames.CatalogDisclosure;
     public bool ShowingOneKind => CatalogKind is not null;
     public string? ShowingKindText => CatalogKind == "sprite" ? SettingsNames.ShowingSprites : null;
     public string ShowEveryPackTitle => SettingsNames.ShowEveryPack;

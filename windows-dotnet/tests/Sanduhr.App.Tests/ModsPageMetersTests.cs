@@ -17,7 +17,7 @@ public sealed class ModsPageMetersTests : ModsPageFixture
         var asked = new List<string>();
         var changed = new List<bool>();
         page.AskMetersConsent = folder => { asked.Add(folder); return consent; };
-        page.Ask = (_, _, _) => true;
+        page.Ask = _ => true;
         page.MetersChanged = installed => changed.Add(installed);
         page.ReloadLocal();
         return (page, asked, changed);
@@ -120,12 +120,15 @@ public sealed class ModsPageMetersTests : ModsPageFixture
         var home = Home(".claude", "{}");
         var (page, _, changed) = Open(consent: true);
         Row(page, ".claude").ToggleCommand.Execute(null);
-        var questions = new List<string>();
-        page.Ask = (title, _, primary) => { questions.Add(title + "|" + primary); return true; };
+        var questions = new List<MetersQuestion>();
+        page.Ask = q => { questions.Add(q); return true; };
 
         Row(page, ".claude").RemoveCommand.Execute(null);
 
-        Assert.Equal(["Remove the meters mod?|Remove"], questions);
+        // Remove is the warning, with Cancel beside it; each caller names its own second button (Task 10 review: no label sniffing).
+        Assert.Equal([new MetersQuestion(SettingsNames.MetersRemoveTitle, SettingsNames.MetersRemoveBody, SettingsNames.MetersRemoveConfirm,
+            SettingsNames.MetersRemoveCancel, Warning: true)], questions);
+        Assert.Equal(SettingsNames.MetersRemoved, page.MetersStatus);
         Assert.Equal([true, false], changed);
         Assert.Equal("{}", File.ReadAllText(SettingsOf(home)));
         Assert.False(Row(page, ".claude").CanRemove);
@@ -138,9 +141,16 @@ public sealed class ModsPageMetersTests : ModsPageFixture
         var home = Home(".claude", "{\"env\":{\"CLAUDE_CODE_PLUGIN_DIRS\":\"" + OldEntry() + "\"}}");
         var (page, _, changed) = Open(consent: true);
         Assert.True(Row(page, ".claude").CanUpdate);
+        var questions = new List<MetersQuestion>();
+        page.Ask = q => { questions.Add(q); return true; };
 
         Row(page, ".claude").UpdateCommand.Execute(null);
 
+        var asked = Assert.Single(questions);
+        Assert.Equal((SettingsNames.MetersUpdateTitle, SettingsNames.MetersUpdateConfirm, SettingsNames.MetersUpdateNotNow, false),
+            (asked.Title, asked.Primary, asked.Secondary, asked.Warning));
+        Assert.StartsWith("This folder's meters mod is pinned to ", asked.Message);
+        Assert.EndsWith("The old version's files stay until Sanduhr prunes them.", asked.Message);
         Assert.DoesNotContain("v0.1.0-20200101000000", File.ReadAllText(SettingsOf(home)));
         Assert.False(Row(page, ".claude").CanUpdate);
         Assert.Equal("Meters mod updated.", page.MetersStatus);
@@ -177,7 +187,7 @@ public sealed class ModsPageMetersTests : ModsPageFixture
         Row(page, ".claude").ToggleCommand.Execute(null);
         var before = File.ReadAllText(SettingsOf(home));
         changed.Clear();
-        page.Ask = (_, _, _) => false;
+        page.Ask = _ => false;
 
         Row(page, ".claude").RemoveCommand.Execute(null);
 
@@ -192,7 +202,7 @@ public sealed class ModsPageMetersTests : ModsPageFixture
         var home = Home(".claude", "{\"env\":{\"CLAUDE_CODE_PLUGIN_DIRS\":\"" + OldEntry() + "\"}}");
         var (page, _, changed) = Open(consent: true);
         var before = File.ReadAllText(SettingsOf(home));
-        page.Ask = (_, _, _) => false;
+        page.Ask = _ => false;
 
         Row(page, ".claude").UpdateCommand.Execute(null);
 
