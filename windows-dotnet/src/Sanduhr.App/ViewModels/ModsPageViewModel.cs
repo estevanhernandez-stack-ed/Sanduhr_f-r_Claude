@@ -153,6 +153,15 @@ public sealed partial class ModsPageViewModel : ObservableObject
     /// <summary>Called after a pack is installed or removed (the Desk reloads).</summary>
     public Action? Changed { get; set; }
 
+    /// <summary>Raised with <see cref="Changed"/>: the Settings window's own pickers read the packs again (SettingsViewModel sets it).</summary>
+    internal Action? SettingsChanged { get; set; }
+
+    private void Notify()
+    {
+        Changed?.Invoke();
+        SettingsChanged?.Invoke();
+    }
+
     internal WidgetCatalogService Service => _service.Value;
 
     public ObservableCollection<WidgetCatalogRowViewModel> Catalog { get; } = [];
@@ -217,7 +226,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
             Status = result.Ok
                 ? (row.Action == WidgetRowAction.Update ? $"{row.Name} is updated to {row.Version}." : $"{row.Name} is installed.")
                 : result.Error ?? "The widget couldn't be installed.";
-            if (result.Ok) Changed?.Invoke();
+            if (result.Ok) Notify();
         }
         finally
         {
@@ -232,7 +241,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
         var result = Service.Store.Uninstall(id);
         Status = result.Ok ? $"{name} is uninstalled." : result.Error ?? "The widget couldn't be removed.";
         Rebuild();
-        if (result.Ok) Changed?.Invoke();
+        if (result.Ok) Notify();
         return Task.CompletedTask;
     }
 
@@ -336,7 +345,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
             ? $"{name} now uses your own art. It stays on this PC."
             : installed.Error ?? $"{name} couldn't be changed.";
         Rebuild();
-        if (installed.Ok) Changed?.Invoke();
+        if (installed.Ok) Notify();
         return Task.CompletedTask;
     }
 

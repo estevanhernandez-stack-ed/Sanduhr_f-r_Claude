@@ -32,7 +32,7 @@ public sealed partial class DeskCompanionViewModel : ObservableObject
     /// <summary>Called after the sprite or roaming changes (the Desk reloads).</summary>
     public Action? Changed { get; set; }
 
-    /// <summary>The installed sprite packs, the companion's choices.</summary>
+    /// <summary>The installed sprite packs that are switched on: the companion's choices.</summary>
     public ObservableCollection<CompanionChoice> Companions { get; } = [];
 
     [ObservableProperty] private CompanionChoice? _selectedCompanion;
@@ -76,7 +76,7 @@ public sealed partial class DeskCompanionViewModel : ObservableObject
             WidgetRegistry reg;
             try { reg = store.Load(); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { reg = WidgetRegistry.Empty; }
-            foreach (var row in reg.Packs)
+            foreach (var row in reg.Packs.Where(p => p.Enabled))
                 if (store.ReadInfo(row.Id) is { Kind: "sprite" } info)
                     Companions.Add(new CompanionChoice(row.Id, info.Name));
             HasCompanions = Companions.Count > 0;

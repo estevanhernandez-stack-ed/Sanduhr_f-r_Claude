@@ -52,7 +52,37 @@ public sealed class SettingsViewModel
     public ThemeMatchViewModel ThemeMatch { get; }
 
     /// <summary>Settings, Mods &amp; Widgets (slice 4): the one list. Nothing is fetched until the catalog is opened.</summary>
-    public ModsPageViewModel ModsPage { get; internal set; } = new();
+    private ModsPageViewModel _modsPage = null!;
+
+    /// <summary>Settings, Mods &amp; Widgets (slice 4): the one list. Tests and the harness put in their own (a fake catalog); the setter wires
+    /// it to this window's pickers.</summary>
+    public ModsPageViewModel ModsPage
+    {
+        get => _modsPage;
+        internal set
+        {
+            _modsPage = value;
+            value.SettingsChanged = PacksChanged;
+        }
+    }
+
+    /// <summary>This PC's font families for the pickers (the bundled ones, the system's, the font packs that are on). A seam for tests.</summary>
+    internal Func<IReadOnlyList<string>> PickerFonts { get; set; } =
+        () => Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies();
+
+    /// <summary>
+    /// A widget pack was switched, installed or removed (Settings v2 slice 4: every consumer honors the switch): the four font pickers, the Ink
+    /// presets and the companion's sprites read again. The widget's theme list is App's (it reloads the themes in the same handler).
+    /// </summary>
+    public void PacksChanged()
+    {
+        var fonts = PickerFonts();
+        Desk.ReloadFonts(fonts);
+        MessagePage.ReloadFonts(fonts);
+        ThemeMatch.Editor.ReloadFonts(fonts);
+        Themes.Studio.ReloadFonts(fonts);
+        Desk.Reload();   // the Ink presets and the companion's sprites
+    }
 
     /// <summary>Backs the General tab's auto-start control (item 10).</summary>
     public GeneralViewModel General { get; }
@@ -191,6 +221,7 @@ public sealed class SettingsViewModel
         ClaudeCodePage.PiecesChanged += Mods.Refresh;
         Mods.OwnModChanged += ClaudeCodePage.Reload;
         General = new GeneralViewModel(widget: widget);
+        ModsPage = new ModsPageViewModel();
         Shortcuts = new ShortcutsViewModel(new SettingsStore(new Paths()), hotKeys);
         Alerts = new AlertsViewModel(widget, () =>
         {
