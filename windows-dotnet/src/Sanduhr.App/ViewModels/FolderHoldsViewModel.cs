@@ -15,7 +15,7 @@ public sealed record ModsLine(string Name, string Text)
 }
 
 /// <summary>
-/// A Claude Code folder card's "What this folder holds" (Settings v2 slice 4; Mods &amp; Config's read-only report, WF4, WF9): settings.json,
+/// A Claude Code folder card's "What this folder holds" (Settings v2 slice 4; the read-only report Mods &amp; Config had, WF4, WF9): settings.json,
 /// the statusline, hooks, plugin switches, MCP servers, CLAUDE.md and how long Claude Code keeps transcripts. Read from files only, when the
 /// section is first opened and on Refresh; nothing runs and nothing is written. Secret values never show (<see cref="ConfigMask"/>).
 /// </summary>

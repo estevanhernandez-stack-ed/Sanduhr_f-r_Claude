@@ -23,7 +23,7 @@ internal interface IWidgetReviewHost
     /// <summary>Puts the Desk back as it was and takes the bar down.</summary>
     void EndPreview();
 
-    /// <summary>A pack was installed: the bar goes, the Desk and Settings ▸ Widgets follow.</summary>
+    /// <summary>A pack was installed: the bar goes, the Desk and Settings, Mods & Widgets follow.</summary>
     void Installed(string packId);
 
     /// <summary>A Desk design is on the desktop for review; a widget waits until it is applied or dismissed.</summary>
@@ -82,7 +82,7 @@ internal sealed class WidgetReviewService : IDisposable
     /// <summary>Encodes a rasterized pixel sheet as PNG (tests pass their own; the app uses WPF's encoder).</summary>
     internal Func<PixelSheetImage, byte[]> EncodePng { get; set; } = WidgetCatalogService.EncodePng;
 
-    /// <summary>A pack was installed (Settings ▸ Widgets and the companion follow).</summary>
+    /// <summary>A pack was installed (Settings, Mods & Widgets and the companion follow).</summary>
     public event Action? Installed;
 
     /// <summary>A pack is on the desktop waiting for Apply or Dismiss.</summary>

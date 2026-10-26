@@ -280,10 +280,14 @@
                         <TextBox Style="{DynamicResource Input}" MinWidth="160" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
                                  AutomationProperties.Name="{x:Static core:SettingsNames.FilterBoxName}" />
                     </DockPanel>
+                    <!-- Live regions (EmptyLine's polite setting, plus the event LiveSetting alone never raises): a filter or an uninstall
+                         that empties the list is announced. -->
                     <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8" Text="{x:Static core:SettingsNames.InstalledEmpty}"
-                               Visibility="{Binding HasInstalled, Converter={x:Static conv:Bools.NotVisible}}" />
+                               Visibility="{Binding HasInstalled, Converter={x:Static conv:Bools.NotVisible}}"
+                               views:LiveRegion.Shown="{Binding HasInstalled, Converter={x:Static conv:Bools.Not}}" />
                     <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8" Text="{x:Static core:SettingsNames.NothingMatches}"
-                               Visibility="{Binding NothingMatches, Converter={StaticResource BoolVis}}" />
+                               Visibility="{Binding NothingMatches, Converter={StaticResource BoolVis}}"
+                               views:LiveRegion.Shown="{Binding NothingMatches}" />
                     <ListBox ItemsSource="{Binding Installed}" ItemContainerStyle="{StaticResource InstalledRowItem}"
                              Background="Transparent" BorderThickness="0" Padding="0" Focusable="False" SelectionMode="Single"
                              KeyboardNavigation.TabNavigation="Continue"

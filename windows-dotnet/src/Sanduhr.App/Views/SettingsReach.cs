@@ -95,3 +95,39 @@ internal sealed class AnchorHighlightAdorner : Adorner
         timer.Start();
     }
 }
+
+/// <summary>
+/// A line that is announced when it appears (an empty-list line, "Nothing matches"): <c>views:LiveRegion.Shown="{Binding NothingMatches}"</c>.
+/// It marks the element a polite live region and, each time the bound value turns true on a loaded element, raises
+/// LiveRegionChanged once layout has shown it. LiveSetting alone announces nothing; the event is what Narrator listens for. The
+/// page's first state is not announced (the element isn't loaded yet), only a change after it.
+/// </summary>
+public static class LiveRegion
+{
+    public static readonly DependencyProperty ShownProperty = DependencyProperty.RegisterAttached(
+        "Shown", typeof(bool), typeof(LiveRegion), new PropertyMetadata(false, OnShownChanged));
+
+    public static bool GetShown(DependencyObject d) => (bool)d.GetValue(ShownProperty);
+    public static void SetShown(DependencyObject d, bool value) => d.SetValue(ShownProperty, value);
+
+    /// <summary>Called after each LiveRegionChanged this raises. A seam for tests.</summary>
+    internal static Action<UIElement>? Raised { get; set; }
+
+    private static void OnShownChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not UIElement el)
+            return;
+        System.Windows.Automation.AutomationProperties.SetLiveSetting(el, System.Windows.Automation.AutomationLiveSetting.Polite);
+        if (e.NewValue is not true || el is FrameworkElement { IsLoaded: false })
+            return;
+        el.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            if (!el.IsVisible || !GetShown(el))
+                return;
+            var peer = System.Windows.Automation.Peers.UIElementAutomationPeer.FromElement(el)
+                ?? System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(el);
+            peer?.RaiseAutomationEvent(System.Windows.Automation.Peers.AutomationEvents.LiveRegionChanged);
+            Raised?.Invoke(el);
+        }));
+    }
+}

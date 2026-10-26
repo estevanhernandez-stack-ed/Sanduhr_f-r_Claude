@@ -13,7 +13,7 @@ using Sanduhr.Core;
 // The Desk companion scenario (spec 3.8 section 4): the first-party hourglass installed into the dev profile's widgets folder
 // through WidgetStore (validated as the catalog client would), then drawn on a composited Desk the way the host places each
 // island: every stage sitting beside the clock, a mood and a trigger, and one roaming frame part way along the bottom. Then
-// Settings, Widgets with the companion section. No network (the catalog fetch gets a 503), no Desk windows, no real
+// Settings, Desk, Pieces with the Companion row. No network (the catalog fetch gets a 503), no Desk windows, no real
 // widgets folder, no session logs read (growth is set by hand).
 public static partial class Program
 {
@@ -147,7 +147,7 @@ public static partial class Program
             await Settle();
         }
 
-        // ---- Settings, Widgets ----
+        // ---- Settings, Desk, Pieces ----
         var desk = store.LoadDesk();
         store.SaveDesk(desk with { Enabled = true, Layout = "clock:bl claude:bl companion:br" });
         var svm = new SettingsViewModel(vm, () => Task.CompletedTask, _ => Task.CompletedTask)

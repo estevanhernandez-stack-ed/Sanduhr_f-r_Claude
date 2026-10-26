@@ -500,6 +500,7 @@ public class SettingsNamesTests
         Assert.Equal("Uninstall Fixture palette", SettingsNames.UninstallFor("Fixture palette"));
         Assert.Equal("Fixture palette is on.", SettingsNames.PackIsOn("Fixture palette"));
         Assert.Equal("Fixture palette is off.", SettingsNames.PackIsOff("Fixture palette"));
+        Assert.Equal("The widget couldn't be switched.", SettingsNames.PackSwitchFailed);
         Assert.Equal("This folder's settings.json can't be read, so Sanduhr changes nothing in it.", SettingsNames.FolderUnreadableReason);
         Assert.Equal(@"Update Meters above the prompt in ~\.claude", SettingsNames.UpdateMetersIn(@"~\.claude"));
         Assert.Equal(@"Remove Meters above the prompt from ~\.claude", SettingsNames.RemoveMetersFrom(@"~\.claude"));

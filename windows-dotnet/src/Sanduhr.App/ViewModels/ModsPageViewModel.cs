@@ -424,7 +424,6 @@ public sealed partial class ModsPageViewModel : ObservableObject
 
     public bool ShowingOneKind => CatalogKind is not null;
     public string? ShowingKindText => CatalogKind == "sprite" ? SettingsNames.ShowingSprites : null;
-    public string ShowEveryPackTitle => SettingsNames.ShowEveryPack;
 
     partial void OnCatalogOpenChanged(bool value)
     {
@@ -496,7 +495,6 @@ public sealed partial class ModsPageViewModel : ObservableObject
     [ObservableProperty] private bool _hasInstalled;
     [ObservableProperty] private bool _hasCatalog;
 
-    public string CheckAgainTitle => SettingsNames.WidgetCatalogCheck;
 
     /// <summary>The page became visible: list what is installed. Nothing is fetched (the catalog asks only when opened, WF6).</summary>
     public Task Activate()
@@ -624,7 +622,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
         var result = Service.Store.SetEnabled(id, on);
         // What is on disk now; a pack gone behind the page's back keeps the row's last state (nothing was written).
         bool now = Service.Store.Load().Find(id)?.Enabled ?? Installed.FirstOrDefault(r => r.Id == id)?.Enabled ?? !on;
-        Status = result.Ok ? (now ? SettingsNames.PackIsOn(name) : SettingsNames.PackIsOff(name)) : result.Error ?? "The widget couldn't be switched.";
+        Status = result.Ok ? (now ? SettingsNames.PackIsOn(name) : SettingsNames.PackIsOff(name)) : result.Error ?? SettingsNames.PackSwitchFailed;
         _items = [.. _items.Select(i => i.Id == id && i.Kind == InstalledKind.WidgetPack ? i with { Enabled = now } : i)];
         foreach (var row in Installed.Where(r => r.Id == id)) row.ShowEnabled(now);
         foreach (var row in Catalog.Where(r => r.Id == id)) row.ShowEnabled(now);

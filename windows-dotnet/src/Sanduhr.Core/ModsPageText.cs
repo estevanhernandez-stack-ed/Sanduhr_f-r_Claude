@@ -1,7 +1,7 @@
 namespace Sanduhr.Core;
 
 /// <summary>
-/// What the plugin list on Mods &amp; Config counts, and the words it uses for them. In Claude Code these are
+/// What the Claude Code plugin rows on Mods &amp; Widgets and the folder cards count, and the words it uses for them. In Claude Code these are
 /// all plugins; a mod is a plugin that also carries mod hooks (<see cref="ModItem.IsMod"/>) and gets a small
 /// "mod" tag. Kept in Core so the counts and wording are tested without a window.
 /// </summary>

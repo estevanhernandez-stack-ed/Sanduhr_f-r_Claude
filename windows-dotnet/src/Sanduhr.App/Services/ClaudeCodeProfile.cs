@@ -1,7 +1,7 @@
 namespace Sanduhr.App.Services;
 
 /// <summary>
-/// Where the Claude Code and Mods &amp; Config pages look for Claude Code folders: the user profile and
+/// Where the Claude Code and Mods &amp; Widgets pages look for Claude Code folders: the user profile and
 /// <c>CLAUDE_CONFIG_DIR</c>. Production reads the real ones. The render harness sets
 /// <see cref="ProfileOverride"/> to a fake profile so no real path, project or account label reaches a
 /// picture. Nothing else in the app should set it.

@@ -95,7 +95,10 @@ public static partial class InstalledItems
             var scope = folders.Select(f =>
             {
                 var here = seen.FirstOrDefault(s => string.Equals(s.Folder, f.Folder, StringComparison.OrdinalIgnoreCase)).Item;
-                var state = here is null ? (f.Report.Settings.Kind == SettingsKind.Unreadable ? FolderState.Unreadable : FolderState.NotInstalled) : here.State switch
+                // A row with no files to load (ModsPageText.HasFiles, the note's own check) is Files missing whatever settings.json says:
+                // switched on with its folder gone, it is not on (Task 12 review I1).
+                var state = here is null ? (f.Report.Settings.Kind == SettingsKind.Unreadable ? FolderState.Unreadable : FolderState.NotInstalled)
+                    : !ModsPageText.HasFiles(here) ? FolderState.Missing : here.State switch
                 {
                     ModState.On => FolderState.On,
                     ModState.Off => FolderState.Off,

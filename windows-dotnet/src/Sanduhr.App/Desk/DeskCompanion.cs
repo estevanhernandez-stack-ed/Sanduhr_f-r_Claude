@@ -115,7 +115,7 @@ internal sealed class CompanionService : IDisposable
         ? Size.Empty
         : new Size(Stage.FrameWidth * Sprite.Scale, Stage.FrameHeight * Sprite.Scale);
 
-    /// <summary>Reads the choice and the pack again (Settings, Widgets, an install or uninstall). Nothing animates until a piece wants it.</summary>
+    /// <summary>Reads the choice and the pack again (Settings, Mods & Widgets, an install or uninstall). Nothing animates until a piece wants it.</summary>
     public void Reload()
     {
         if (_disposed) return;

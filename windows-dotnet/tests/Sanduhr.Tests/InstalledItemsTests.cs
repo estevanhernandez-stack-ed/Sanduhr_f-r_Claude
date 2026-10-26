@@ -72,6 +72,28 @@ public sealed class InstalledItemsTests
     }
 
     [Fact]
+    public void A_plugin_on_in_settings_json_whose_files_are_gone_reads_files_missing_not_on()
+    {
+        // Task 12 review I1: ModInventory reports such a row On with no path (enabledPlugins says true, nothing is installed). The scope
+        // agrees with the note under the list (ModsPageText.HasFiles): it is not loaded, so it is not on.
+        var ghost = new ModItem("ghost", null, "", null, ModOriginKind.Installed, "m", "ghost@m", false, ModState.On, ModTouches.None, false);
+        var items = InstalledItems.Build(
+        [
+            Folder(".claude", mods: ghost),
+            Folder(".claude-work", mods: Plugin("ghost", ModState.On)),
+        ], WidgetRegistry.Empty, Info, null);
+
+        var row = Assert.Single(items);
+        Assert.Equal([FolderState.Missing, FolderState.On], row.Scope!.Select(s => s.State));
+        Assert.Equal("On in 1 of 2 folders", InstalledItems.ScopeSummary(row));
+
+        var alone = InstalledItems.Build([Folder(".claude", mods: ghost)], WidgetRegistry.Empty, Info, null).Single();
+        Assert.Equal(SettingsNames.FolderMissing, InstalledItems.ScopeSummary(alone));
+        Assert.False(alone.Enabled);
+        Assert.Equal(SettingsNames.NoFilesNote(1), ModsPageText.PlainNote([Folder(".claude", mods: ghost)]));
+    }
+
+    [Fact]
     public void Other_Claude_Code_items_are_read_only_and_say_why()
     {
         var items = InstalledItems.Build([Folder(".claude", mods: [Plugin("alpha", ModState.On), Plugin("beta-mod", ModState.Off, isMod: true)])],

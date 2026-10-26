@@ -13,7 +13,7 @@ using Sanduhr.Core;
 // Widgets made with Claude (spec 3.8 section 5): a 16 px pixel sprite built the way propose_widget builds it (pack.json, the
 // LICENSE, sprite.json and a pixel sheet, validated strict), handed to a real WidgetReviewService over the dev profile as the
 // request file would bring it, staged and drawn by the companion's own loader beside the clock with the review bar over the
-// Desk; then the bar alone, Apply, and Settings, Widgets with the pack listed "made here" and Use my own art… on its row.
+// Desk; then the bar alone, Apply, and Settings, Mods & Widgets with the pack listed "made here" and Use my own art… on its row.
 // Off screen only: no Desk windows, no network (the catalog fetch gets a 503), no real widgets folder.
 public static partial class Program
 {
@@ -151,7 +151,7 @@ public static partial class Program
         window.Close();
         companion.EndPreviewPack();
 
-        // ---- Apply, then Settings, Widgets ----
+        // ---- Apply, then Settings, Mods & Widgets ----
         host.Apply!(true);
         Log.Add($"propose-widget: after Apply {File.ReadAllText(Path.Combine(paths.ExternalDir, WidgetProposal.ResultFile))}");
         var svm = new SettingsViewModel(vm, () => Task.CompletedTask, _ => Task.CompletedTask)

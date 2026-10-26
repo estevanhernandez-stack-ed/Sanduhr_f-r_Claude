@@ -332,6 +332,39 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
     });
 
     [Fact]
+    public void A_filter_that_empties_the_list_is_announced() => AppHost.Run(() =>
+    {
+        // Review M3: the empty lines are live regions, and a change raises LiveRegionChanged (LiveSetting alone announces nothing).
+        Home(".claude-work", """{"enabledPlugins":{"a@m":true}}""");
+        var announced = new List<string>();
+        LiveRegion.Raised = e => announced.Add((e as TextBlock)?.Text ?? "");
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.ModList);
+            Settle(window, guard);
+            Assert.True(svm.ModsPage.HasInstalled);
+            Assert.Empty(announced);   // nothing is announced for the page's first state
+
+            svm.ModsPage.FilterText = "nothing is called this";
+            Settle(window, guard);
+
+            Assert.Equal([SettingsNames.NothingMatches], announced);
+            var page = Below<ModsPage>(window).Single();
+            var line = Below<TextBlock>(page).Single(t => t.Text == SettingsNames.NothingMatches);
+            Assert.True(line.IsVisible);
+            Assert.Equal(System.Windows.Automation.AutomationLiveSetting.Polite, System.Windows.Automation.AutomationProperties.GetLiveSetting(line));
+            var empty = Below<TextBlock>(page).Single(t => t.Text == SettingsNames.InstalledEmpty);
+            Assert.Equal(System.Windows.Automation.AutomationLiveSetting.Polite, System.Windows.Automation.AutomationProperties.GetLiveSetting(empty));
+        }
+        finally
+        {
+            LiveRegion.Raised = null;
+            window.Close();
+        }
+    });
+
+    [Fact]
     public void A_meters_change_reloads_the_cards_and_a_card_change_reloads_the_page() => AppHost.Run(() =>
     {
         var home = Home(".claude-work", "{}");

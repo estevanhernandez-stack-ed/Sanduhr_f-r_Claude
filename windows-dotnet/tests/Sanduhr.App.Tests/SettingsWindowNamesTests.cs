@@ -72,8 +72,8 @@ public sealed class SettingsWindowNamesTests : AppWindowFixture
         Assert.Contains(seen["ClaudeCode"], n => n.StartsWith(@"Folder ~\.claude"));
         Assert.Contains("alpha, version 1.2.0, on in 1 of 2 folders, read-only", seen["Mods"]);
         Assert.Contains("beta-mod, version 0.1.0, on in 0 of 2 folders, mod, read-only", seen["Mods"]);
-        // ghost is switched on in settings.json with no files behind it: on in that folder, its version unknown.
-        Assert.Contains("ghost, version unknown, on in 1 of 2 folders, read-only", seen["Mods"]);
+        // ghost is switched on in settings.json with no files behind it: Files missing there, so on in none (review I1), no version to know.
+        Assert.Contains("ghost, on in 0 of 2 folders, read-only", seen["Mods"]);
         Assert.Contains(@"~\.claude-personal, Not installed", seen["Mods"]);   // the meters row for the folder
         Assert.Contains("Notification, 1 group", seen["ClaudeCode"]);
         Assert.Contains("alpha@m, On", seen["ClaudeCode"]);

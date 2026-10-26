@@ -190,7 +190,7 @@ public static class SettingsNames
     public const string ManualKeyCloudflareHelp =
         "Only if Sanduhr says Cloudflare blocked it: copy the Value next to cf_clearance from the same Cookies list and paste it here.";
     public const string ManualKeyCfLabel = "cf_clearance";
-    /// <summary>Mods &amp; Config: re-reads the folder.</summary>
+    /// <summary>A Claude Code card's report: re-reads the folder.</summary>
     public const string RefreshFolder = "Refresh";
     /// <summary>Desk: the switch at the top of the page (settings.json "desk_enabled", off by default). It lists
     /// what the Desk draws, as the tour does (WF16).</summary>
@@ -202,7 +202,7 @@ public static class SettingsNames
     public const string PieceOutdated = "Installed, but not the current version.";
     /// <summary>Claude Code, a folder card's Linked account caption, true before and after an install (WF27).</summary>
     public const string LinkedAccountCaption = "Once the statusline or meters are installed here, they show this account's meters.";
-    /// <summary>Mods &amp; Config: Claude Code's own retention (cleanupPeriodDays), the fourth "history" (WF14).</summary>
+    /// <summary>A Claude Code card's report: Claude Code's own retention (cleanupPeriodDays), the fourth "history" (WF14).</summary>
     public const string TranscriptsKept = "Claude Code keeps transcripts for";
     /// <summary>Themes: a pasted or edited theme with no errors or notes (WF43).</summary>
     public const string ThemeJsonValid = "This theme's JSON is valid.";
@@ -448,6 +448,8 @@ public static class SettingsNames
     /// <summary>SwitchPack's status line (Task 9).</summary>
     public static string PackIsOn(string name) => $"{name} is on.";
     public static string PackIsOff(string name) => $"{name} is off.";
+    /// <summary>SwitchPack's status when widgets.json couldn't be written and the store gave no reason.</summary>
+    public const string PackSwitchFailed = "The widget couldn't be switched.";
     /// <summary>MetersFolderRowViewModel (Task 10): why a folder has no switch, and its Update and Remove spoken names.</summary>
     public const string FolderUnreadableReason = "This folder's settings.json can't be read, so Sanduhr changes nothing in it.";
     public static string UpdateMetersIn(string folder) => $"Update {MetersSection} in {folder}";
