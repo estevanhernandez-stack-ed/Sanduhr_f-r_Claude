@@ -69,10 +69,10 @@ public class SettingsIndexTests
     [InlineData("percent", SettingsPage.General, SettingsIndex.Tray)]
     [InlineData("hotkey", SettingsPage.General, SettingsIndex.Shortcuts)]
     [InlineData("vault", SettingsPage.ClaudeUsage, SettingsIndex.Vault)]
-    [InlineData("statusline", SettingsPage.ClaudeCode, SettingsIndex.Statusline)]
-    [InlineData("MCP", SettingsPage.ClaudeCode, SettingsIndex.Mcp)]
+    [InlineData("statusline", SettingsPage.ClaudeCode, SettingsIndex.Folders)]
+    [InlineData("MCP", SettingsPage.ClaudeCode, SettingsIndex.Folders)]
     [InlineData("glow", SettingsPage.ClaudeCode, SettingsIndex.Glow)]
-    [InlineData("cleanupPeriodDays", SettingsPage.Mods, SettingsIndex.Retention)]
+    [InlineData("cleanupPeriodDays", SettingsPage.ClaudeCode, SettingsIndex.FolderConfig)]
     [InlineData("follow", SettingsPage.Accounts, SettingsIndex.Follow)]
     [InlineData("license", SettingsPage.About, SettingsIndex.Notices)]
     [InlineData("trademark", SettingsPage.About, SettingsIndex.Trademark)]
@@ -88,8 +88,8 @@ public class SettingsIndexTests
     {
         Assert.Null(SettingsIndex.Find(SettingsPage.ClaudeUsage, SettingsIndex.Statusline));
         Assert.Null(SettingsIndex.Find(SettingsPage.ClaudeUsage, SettingsIndex.Mcp));
-        Assert.NotNull(SettingsIndex.Find(SettingsPage.ClaudeCode, SettingsIndex.Statusline));
-        Assert.NotNull(SettingsIndex.Find(SettingsPage.ClaudeCode, SettingsIndex.Mcp));
+        Assert.Equal(new SettingsLink(SettingsPage.ClaudeCode, SettingsIndex.Folders), SettingsIndex.Resolve(SettingsPage.ClaudeCode, SettingsIndex.Statusline));
+        Assert.Equal(new SettingsLink(SettingsPage.ClaudeCode, SettingsIndex.Folders), SettingsIndex.Resolve(SettingsPage.ClaudeCode, SettingsIndex.Mcp));
         Assert.Null(Top("statusline").Entry.Subsection);
     }
 

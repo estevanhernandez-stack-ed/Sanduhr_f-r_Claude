@@ -631,7 +631,7 @@ public static class SettingsNames
         (SessionArchive, SettingsPage.ClaudeUsage),
         (FoldersToShare, SettingsPage.Publish),
         (ClaudeCodeGlowHook, SettingsPage.ClaudeCode),
-        (TranscriptsKept, SettingsPage.Mods),
+        (TranscriptsKept, SettingsPage.ClaudeCode),
         (LetClaudeReadTotals, SettingsPage.ClaudeCode),
         (SnakeSoundAtFull, SettingsPage.Alerts),
         (DeskFont, SettingsPage.DeskLook),

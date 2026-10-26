@@ -57,6 +57,7 @@ public static class SettingsIndex
     public const string Mcp = "mcp";
     public const string Meters = "meters";
     public const string Glow = "glow";
+    public const string FolderConfig = "folder-config";
     // Mods & Config
     public const string ConfigFiles = "config";
     public const string ModList = "mods";
@@ -171,26 +172,21 @@ public static class SettingsIndex
             ["ledger", "sessions", "models", "yesterday", "7 days", "stack by project", "csv"], SessionsView),
 
         E("Folders", SettingsPage.ClaudeCode, Folders,
-            ["folder", "seat", "home", ".claude", "add folder", "forget folder", "linked account", "account folder", "CLAUDE_CONFIG_DIR"]),
-        E("Statusline", SettingsPage.ClaudeCode, Statusline,
-            ["status line", "prompt", "install statusline", "remove statusline", "segments", "combine", "replace", "meters"]),
-        E("MCP server", SettingsPage.ClaudeCode, Mcp,
-            ["MCP", "sanduhr-mcp", "agents", "tools", "burn attribution", "project totals", "quota tools"]),
-        E("Meters above the prompt", SettingsPage.ClaudeCode, Meters,
-            ["mod", "plugin", "meters", "band", "sanduhr-meters", "CLAUDE_CODE_PLUGIN_DIRS"]),
-        E(SettingsNames.ClaudeCodeGlowHook, SettingsPage.ClaudeCode, Glow,
-            ["glow when Claude needs you", "glow", "hooks", "notification", "waiting", "finishes", "edge light", "terminal", "try it"]),
+            ["folder", "seat", "home", ".claude", "add folder", "forget folder", "linked account", "account folder", "CLAUDE_CONFIG_DIR",
+             "statusline", "status line", "prompt", "install statusline", "remove statusline", "segments", "combine", "replace",
+             "MCP", "MCP server", "sanduhr-mcp", "agents", "tools", "project totals", "quota tools", "burn attribution",
+             "glow hook", SettingsNames.ClaudeCodeGlowHook, "hooks", "install", "update", "remove"]),
+        E(SettingsNames.FolderHolds, SettingsPage.ClaudeCode, FolderConfig,
+            ["settings.json", "readable", "unreadable", "statusline command", "hook groups", "plugin switches", "enabledPlugins",
+             "MCP servers", "mcpServers", "CLAUDE.md", "memory", "instructions", "transcripts", "retention", "cleanupPeriodDays",
+             "history kept", "refresh", "inventory", "config"]),
+        E(SettingsNames.DeskGlow, SettingsPage.ClaudeCode, Glow,
+            ["glow when Claude needs you", "glow", "waiting", "finishes", "edge light", "terminal", "try it"]),
         E(SettingsNames.GlowWhere, SettingsPage.ClaudeCode, GlowWhere,
             ["where the glow shows", "screen edge", "monitor", "flash", "taskbar flash", "glow target"]),
 
-        E("Settings and statusline", SettingsPage.Mods, ConfigFiles,
-            ["settings.json", "folder", "hooks", "statusline", "readable", "unreadable", "refresh", "inventory"]),
         E("Plugins", SettingsPage.Mods, ModList,
-            ["mod", "mods", "plugin", "plugins", "installed", "enabledPlugins", "sanduhr-meters", "switch", "on", "off", "update", "remove"]),
-        E("MCP servers", SettingsPage.Mods, McpServers, ["MCP", "servers", "mcpServers", "tools"]),
-        E("CLAUDE.md", SettingsPage.Mods, ClaudeMd, ["memory", "instructions", "lines", "size"]),
-        E(SettingsNames.TranscriptsKept, SettingsPage.Mods, Retention,
-            ["history kept", "retention", "cleanupPeriodDays", "transcripts", "30 days", "delete", "keep"]),
+            ["mod", "mods", "plugin", "plugins", "installed", "sanduhr-meters", "switch", "on", "off", "update", "remove"]),
 
         E("Destination", SettingsPage.Publish, Destination,
             ["endpoint", "URL", "preset", "626 Labs", "dashboard", "auth", "header"]),
@@ -326,8 +322,8 @@ public static class SettingsIndex
         [SettingsNames.ExportSessions] = Sessions,
         [SettingsNames.SessionArchive] = Vault,
         [SettingsNames.FoldersToShare] = Homes,
-        [SettingsNames.ClaudeCodeGlowHook] = Glow,
-        [SettingsNames.TranscriptsKept] = Retention,
+        [SettingsNames.ClaudeCodeGlowHook] = Folders,
+        [SettingsNames.TranscriptsKept] = FolderConfig,
         [SettingsNames.LetClaudeReadTotals] = Folders,
         [SettingsNames.SnakeSoundAtFull] = Sound,
         [SettingsNames.DeskFont] = DeskLook,
@@ -360,6 +356,7 @@ public static class SettingsIndex
         {
             [(SettingsPage.Desk, DeskDesigns)] = SettingsNames.DeskDesigns,
             [(SettingsPage.Desk, DeskAdvanced)] = SettingsNames.DeskAdvanced,
+            [(SettingsPage.ClaudeCode, FolderConfig)] = SettingsNames.FolderHolds,
         };
 
     /// <summary>Words a page goes by besides its title.</summary>
@@ -371,8 +368,8 @@ public static class SettingsIndex
         [SettingsPage.History] = ["meter history", "chart"],
         // "vault" lives on the archive section only: as a page synonym it ties the section at rank 1 and the page row wins.
         [SettingsPage.ClaudeUsage] = ["Claude Code", "tokens", "usage"],
-        [SettingsPage.ClaudeCode] = ["statusline", "MCP", "meters", "mod", "plugin", "hooks", "glow", "folder", "seat"],
-        [SettingsPage.Mods] = ["mod", "plugin", "hooks", "statusline", "MCP", "CLAUDE.md", "retention", "config", "settings.json"],
+        [SettingsPage.ClaudeCode] = ["Claude Code folders", "folder", "seat", "pieces"],
+        [SettingsPage.Mods] = ["mod", "plugin"],
         [SettingsPage.Publish] = ["publish", "upload", "endpoint", "share"],
         [SettingsPage.Themes] = ["theme", "colors", "look"],
         [SettingsPage.Desk] = ["desktop", "wallpaper", "clock", "Rainmeter", "layout", "margins", "taskbar", "telemetry", "CPU", "RAM", "disk"],
