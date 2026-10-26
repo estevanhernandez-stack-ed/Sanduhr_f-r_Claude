@@ -47,8 +47,14 @@ public class SettingsSlice6NamesTests
         foreach (var text in new[] { SettingsNames.AgentReadsCaption, SettingsNames.NetThroughClaudeCarries })
         {
             Assert.Contains("Launcher buttons", text);
-            // ping's snapshot_path and get_desk's wallpaper copy are full paths under the Windows user folder.
-            Assert.Contains("the paths of a small copy of your wallpaper and of Sanduhr's usage file, which include your Windows user folder", text);
+            // ping's snapshot_path, get_desk's wallpaper copy and propose_theme's saved_path are full paths under the Windows user folder.
+            Assert.Contains("the paths of a small copy of your wallpaper, of Sanduhr's usage file and of a theme Claude saves, which include your Windows user folder", text);
+            // propose_theme also answers with previous_key; get_usage with account.ref; get_desk with the weather piece's nickname.
+            Assert.Contains("your current theme's name when Claude proposes a theme", text);
+            Assert.Contains("a short code for the account", text);
+            Assert.Contains("the name you gave your weather place, if you set one", text);
+            // The wallpaper copy exists so Claude can open it; then the picture itself goes with the conversation.
+            Assert.Contains("the picture itself, if you let Claude Code open that wallpaper copy", text);
             Assert.Contains("the names of the Claude Code folders Sanduhr found", text);
             Assert.Contains("plan", text);
         }

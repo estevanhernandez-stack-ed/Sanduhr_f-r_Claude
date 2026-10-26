@@ -728,9 +728,15 @@ public static class SettingsNames
     public const string NetThroughClaudeWhen =
         "When Claude calls one of Sanduhr's MCP tools. The MCP server makes no network call itself: it answers Claude Code on this PC, "
         + "and Claude Code sends the answer on with your conversation.";
+    /// <summary>The paths an MCP answer carries (ping, get_desk, propose_theme), and the picture behind one of them. One wording for the row and the agent caption.</summary>
+    private const string McpAnswerPaths =
+        "the paths of a small copy of your wallpaper, of Sanduhr's usage file and of a theme Claude saves, which include your Windows user folder; "
+        + "the picture itself, if you let Claude Code open that wallpaper copy";
+    private const string McpAnswerThemeName = "your current theme's name when Claude proposes a theme";
     public const string NetThroughClaudeCarries =
-        "What the tool answers: your meters, limits and plan; your Desk's design, Launcher buttons, monitors, fonts and Start menu app names; "
-        + "your wallpaper's colors; the paths of a small copy of your wallpaper and of Sanduhr's usage file, which include your Windows user folder; "
+        "What the tool answers: your meters, limits and plan, and a short code for the account; "
+        + "your Desk's design (with the name you gave your weather place, if you set one), Launcher buttons, monitors, fonts and Start menu app names; "
+        + "your wallpaper's colors; " + McpAnswerPaths + "; " + McpAnswerThemeName + "; "
         + "your Desk messages; the names of the Claude Code folders Sanduhr found; "
         + "and, for each folder where you let Claude read project totals, token counts per project and model with "
         + "project names, or full project paths when Claude asks.";
@@ -804,8 +810,9 @@ public static class SettingsNames
     public const string AgentWidgetPacksCaption = "A companion, palette or effects pack Claude makes waits for your Apply or Dismiss.";
     public const string AgentReads = "Read your meters and your Desk";
     public const string AgentReadsCaption =
-        "Your meters, limits and plan; your Desk's design, Launcher buttons, monitors, fonts and Start menu app names; your wallpaper's colors; "
-        + "the paths of a small copy of your wallpaper and of Sanduhr's usage file, which include your Windows user folder; your Desk messages; "
+        "Your meters, limits and plan, and a short code for the account; "
+        + "your Desk's design (with the name you gave your weather place, if you set one), Launcher buttons, monitors, fonts and Start menu app names; your wallpaper's colors; "
+        + McpAnswerPaths + "; " + McpAnswerThemeName + "; your Desk messages; "
         + "and the names of the Claude Code folders Sanduhr found.";
     /// <summary>Privacy's foot: one line and "About settings…" to about#where (decision 12).</summary>
     public const string PrivacyWhereLine = "Sanduhr keeps its settings, history, session archive and sign-in keys on this PC. About lists each place.";
