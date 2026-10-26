@@ -10,7 +10,7 @@ The subscription plan of the signed-in account, as a short label: **Max ×20**, 
 **Pro**. Windows has shown it in the widget footer since the Python build (`plan.py`, PR #25), with a
 tooltip that rotates through jokes for the Max plans. The Mac already asks `/api/organizations` for
 the tracked org but keeps only `uuid` and `capabilities`, and `snapshot.json` carries `"plan": null`,
-so Claude Code sessions (the MCP's `get_usage` `account.plan`, the statusline, the meters mod) get
+so Claude Code sessions (the MCP's `get_usage` `account.plan`; the statusline and meters mod don't read the field) get
 nothing on a Mac.
 
 ## Non-goals
