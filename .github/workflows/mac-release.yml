@@ -105,7 +105,13 @@ jobs:
             codesign --verify --strict --verbose=2 "$nested"
             codesign -dv "$nested" 2>&1 | grep -q "TeamIdentifier=82BSR56X5J" || { echo "::error::$nested is not signed by the team"; exit 1; }
           done
-          plutil -lint Sanduhr.app/Contents/Library/LaunchDaemons/com.626labs.sanduhr.lockline.plist
+          # The release label and 2.33.0's (kept for unregistering), never the ad-hoc .dev one.
+          LD=Sanduhr.app/Contents/Library/LaunchDaemons
+          for label in com.626labs.sanduhr.lockscreen com.626labs.sanduhr.lockline; do
+            plutil -lint "$LD/$label.plist"
+            [[ "$(plutil -extract Label raw "$LD/$label.plist")" == "$label" ]] || { echo "::error::$label.plist has the wrong Label"; exit 1; }
+          done
+          [[ ! -e "$LD/com.626labs.sanduhr.lockscreen.dev.plist" ]] || { echo "::error::the release carries the dev helper label"; exit 1; }
           spctl --assess --type execute --verbose=2 Sanduhr.app
           spctl --assess --type open --context context:primary-signature --verbose=2 Sanduhr.dmg
           DMG="Sanduhr-$VERSION.dmg"

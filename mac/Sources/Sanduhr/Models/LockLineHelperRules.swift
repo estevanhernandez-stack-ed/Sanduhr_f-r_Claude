@@ -6,10 +6,22 @@ import Foundation
 /// `Helpers/LockLineHelper/main.swift`, and the app compiles it too, so the suite tests the
 /// exact rules the root process runs.
 enum LockLineHelperRules {
-    /// The launchd job, and the plist in `Contents/Library/LaunchDaemons/` that
-    /// `SMAppService.daemon(plistName:)` registers.
-    static let label = "com.626labs.sanduhr.lockline"
-    static let plistName = "com.626labs.sanduhr.lockline.plist"
+    /// The launchd job a Developer ID build registers. Its plist in
+    /// `Contents/Library/LaunchDaemons/` is `plistName(label)`, the name
+    /// `SMAppService.daemon(plistName:)` takes. build.sh writes it from
+    /// `Resources/LaunchDaemons/lockscreen-helper.plist`.
+    static let label = "com.626labs.sanduhr.lockscreen"
+    /// The job an ad-hoc build registers instead (a dev build, or a release build made without
+    /// the signing keys). macOS keeps a helper's background-item record, with the signer it was
+    /// first registered by, across unregistering: an ad-hoc build that registered 2.33.0's label
+    /// left the team-signed release refused at spawn on that Mac ("needs LWCR update"). A label
+    /// of its own keeps the two records apart.
+    static let devLabel = label + ".dev"
+    /// 2.33.0's label. The bundle still carries its plist so the app can unregister a helper
+    /// 2.33.0 registered; nothing registers it any more.
+    static let legacyLabel = "com.626labs.sanduhr.lockline"
+
+    static func plistName(_ label: String) -> String { label + ".plist" }
     /// The helper's executable in `Contents/MacOS/`.
     static let executable = "SanduhrLockLineHelper"
     /// The file the app writes, under the console user's home.
