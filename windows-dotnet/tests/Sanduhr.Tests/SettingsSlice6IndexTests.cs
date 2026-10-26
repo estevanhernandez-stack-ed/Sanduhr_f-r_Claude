@@ -78,4 +78,29 @@ public class SettingsSlice6IndexTests
         Assert.Equal((SettingsPage.Privacy, SettingsIndex.Network), (Top(query).Entry.Page, Top(query).Entry.Anchor));
         Assert.Equal(SettingsPage.Privacy, SettingsIndex.Grouped(SettingsIndex.Search(query))[0].Page);
     }
+
+    [Theory]
+    [InlineData("update")]
+    [InlineData("updates")]
+    public void Update_words_land_on_About_Updates_first(string query)
+    {
+        var top = Top(query);
+        Assert.Equal((SettingsPage.About, SettingsIndex.Updates, -1), (top.Entry.Page, top.Entry.Anchor, top.Rank));
+        if (query == "update")
+            Assert.Contains(SettingsIndex.Search(query), h => h.Entry.Page == SettingsPage.Accounts);   // "Update sign-in…" still found, below
+    }
+
+    [Fact]
+    public void About_has_jump_links_to_its_sections_in_page_order()
+    {
+        var links = SettingsIndex.JumpLinks(SettingsPage.About);
+        Assert.Equal([SettingsIndex.Version, SettingsIndex.Updates, SettingsIndex.Trademark, SettingsIndex.Where, SettingsIndex.Reset, SettingsIndex.Notices],
+            links.Select(l => l.Anchor));
+        Assert.Equal(SettingsNames.UpdatesSection, links[1].Title);
+        // Reset's link is the section's name, not the command's (preflight P15).
+        Assert.Equal(SettingsNames.ResetJump, links[4].Title);
+        Assert.NotEqual(SettingsNames.ResetSanduhr, links[4].Title);
+        Assert.Equal(SettingsIndex.Updates, SettingsIndex.NameAnchors[SettingsNames.CheckForUpdatesDaily]);
+        Assert.Equal(SettingsIndex.Updates, SettingsIndex.NameAnchors[SettingsNames.CheckNow]);
+    }
 }

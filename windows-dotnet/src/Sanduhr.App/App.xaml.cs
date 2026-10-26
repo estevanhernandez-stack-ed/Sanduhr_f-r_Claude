@@ -380,6 +380,10 @@ public partial class App : Application
     }
 
     /// <summary>"What's New…" from the tray and Settings: the installed version's highlights, or every card.</summary>
+    /// <summary>About, Updates' Check now: the launch checker, asked once whatever the switch says (slice 6, decision 7).</summary>
+    private Task<UpdateProbeResult> CheckForUpdatesNowAsync() =>
+        _updateChecker?.CheckNowAsync() ?? Task.FromResult(new UpdateProbeResult(UpdateProbeStatus.Failed));
+
     private void ShowWhatsNewFromMenu()
     {
         var installed = new SettingsStore(new Sanduhr.Core.Paths()).LoadWhatsNewInstalledVersion();
@@ -736,7 +740,7 @@ public partial class App : Application
 
         var landing = SettingsIndex.Landing(page, anchor, _lastSettings);
         var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync, _hotKeys,
-            ShowWhatsNewFromMenu, ShowTour);
+            ShowWhatsNewFromMenu, ShowTour, checkForUpdatesNow: CheckForUpdatesNowAsync);
         // The Claude Code page re-reads the glow switches and plays "Try it" through the running glow service.
         svm.ClaudeCodePage.GlowReload = () => _glow?.Reload();
         svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };

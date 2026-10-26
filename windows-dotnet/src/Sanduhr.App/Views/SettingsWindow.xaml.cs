@@ -247,6 +247,7 @@ internal partial class SettingsWindow : Window
         if (page == SettingsPage.About)
         {
             ViewModel.AboutVersion.Reload();
+            ViewModel.AboutUpdates.Reload();
             CommandManager.InvalidateRequerySuggested();
         }
 

@@ -448,6 +448,7 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
     [InlineData(SettingsPage.NowPlaying)]
     [InlineData(SettingsPage.Alerts)]
     [InlineData(SettingsPage.Publish)]
+    [InlineData(SettingsPage.About)]
     public void Every_jump_link_lands_on_its_section(SettingsPage page) => AppHost.Run(() =>
     {
         var (window, _, guard) = Open("Personal");

@@ -818,6 +818,8 @@ public static class SettingsNames
     public static string UpdateReady(string version) => $"Sanduhr {version} is ready. Restart to update is in the tray menu and on the widget.";
     public const string UpdateNotInstalled = "This copy wasn't installed by Sanduhr's installer, so it can't update itself.";
     public const string UpdateFailed = "Couldn't reach GitHub. Check your connection and try again.";
+    /// <summary>About's jump link to the Reset section: the section's name, not the command's (preflight P15).</summary>
+    public const string ResetJump = "Reset";
     public const string StoreKeepsUpToDate = "The Microsoft Store keeps Sanduhr up to date.";
 
     // ---- Settings v2, slice 3: the Desk split ----
@@ -992,6 +994,8 @@ public static class SettingsNames
         (WhatsNew, SettingsPage.About),
         (TakeTheTour, SettingsPage.About),
         (HideWhatsNewAfterUpdates, SettingsPage.About),
+        (CheckForUpdatesDaily, SettingsPage.About),
+        (CheckNow, SettingsPage.About),
         (WhereSettingsLive, SettingsPage.About),
         (ThirdPartyNotices, SettingsPage.About),
         (ResetSanduhr, SettingsPage.About),

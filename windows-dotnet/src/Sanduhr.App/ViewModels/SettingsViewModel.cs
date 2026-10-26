@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using Sanduhr.App.Services;
+using Sanduhr.App.Updates;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
@@ -113,6 +114,9 @@ public sealed class SettingsViewModel
     /// <summary>About, Version's "Don't show What's New after updates" (slice 5).</summary>
     public AboutVersionViewModel AboutVersion { get; }
 
+    /// <summary>About, Updates (slice 6): Check for updates once a day, and Check now.</summary>
+    public AboutUpdatesViewModel AboutUpdates { get; }
+
     /// <summary>The sidebar search.</summary>
     public SettingsSearchViewModel Search { get; } = new();
 
@@ -183,11 +187,14 @@ public sealed class SettingsViewModel
     public ShortcutsViewModel Shortcuts { get; }
 
     public SettingsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync,
-        GlobalHotKeyService? hotKeys = null, Action? showWhatsNew = null, Action? showTour = null)
+        GlobalHotKeyService? hotKeys = null, Action? showWhatsNew = null, Action? showTour = null,
+        Func<Task<UpdateProbeResult>>? checkForUpdatesNow = null, bool? isStoreBuild = null)
     {
         ShowWhatsNewCommand = new RelayCommand(() => showWhatsNew?.Invoke());
         ShowTourCommand = new RelayCommand(() => showTour?.Invoke());
         AboutVersion = new AboutVersionViewModel(new SettingsStore(new Paths()));
+        // About, Updates (slice 6): App's checker reads "update_check" from this same file; the Store build (StoreUpdateService's rule) shows its line instead.
+        AboutUpdates = new AboutUpdatesViewModel(new SettingsStore(new Paths()), isStoreBuild ?? Sanduhr.Core.Startup.IsPackaged(), checkForUpdatesNow);
         Accounts = new AccountsViewModel(widget, addAccountAsync, updateSignInAsync);
         Themes = new ThemesViewModel(widget);
         History = new HistoryTabViewModel(widget);

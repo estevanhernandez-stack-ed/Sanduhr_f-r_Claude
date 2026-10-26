@@ -298,9 +298,8 @@ public class NetworkDisclosureTests
                 Assert.Empty(SettingsNames.RetiredNames(text));
                 Assert.Empty(SettingsNames.PathProblems(text));
             }
-            // The link lands on a live section, never on one that fetches when opened (decision 17). About, Updates is indexed in Task 8.
-            if (SettingsIndex.Find(row.OffPage, row.OffAnchor) is not null || row.OffAnchor != SettingsIndex.Updates)
-                Assert.Equal(new SettingsLink(row.OffPage, row.OffAnchor), SettingsIndex.Check(row.OffPage, row.OffAnchor));
+            // The link lands on a live section, never on one that fetches when opened (decision 17).
+            Assert.Equal(new SettingsLink(row.OffPage, row.OffAnchor), SettingsIndex.Check(row.OffPage, row.OffAnchor));
             Assert.False(SettingsIndex.FetchingSections.ContainsKey((row.OffPage, row.OffAnchor)), row.Id);
             Assert.Equal(SettingsNames.LinkTitle(row.OffPage), row.OffLinkTitle);
             Assert.StartsWith(row.OffLinkTitle + ", ", row.OffLinkName);

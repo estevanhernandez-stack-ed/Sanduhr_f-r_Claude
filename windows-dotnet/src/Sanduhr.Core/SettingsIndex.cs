@@ -137,7 +137,7 @@ public static class SettingsIndex
     public const string JustTheDeskSection = "just-the-desk";
     // About
     public const string Version = "version";
-    /// <summary>About, Updates (slice 6). The constant comes first, for NetworkDisclosure's links; Task 8 marks it and indexes it.</summary>
+    /// <summary>About, Updates (slice 6): Check for updates once a day and Check now.</summary>
     public const string Updates = "updates";
     public const string Trademark = "trademark";
     public const string Notices = "notices";
@@ -329,6 +329,9 @@ public static class SettingsIndex
 
         E("Version", SettingsPage.About, Version,
             ["version", "What's New", "Take the tour", "tour", "release", "update", "don't show", "after updates", SettingsNames.HideWhatsNewAfterUpdates]),
+        E(SettingsNames.UpdatesSection, SettingsPage.About, Updates,
+            ["update", "updates", "check for updates", SettingsNames.CheckForUpdatesDaily, SettingsNames.CheckNow, "new version", "upgrade",
+             "auto-update", "Velopack", "GitHub", "Microsoft Store", "Restart to update"]),
         E("Trademark", SettingsPage.About, Trademark, ["Anthropic", "trademark", "disclaimer", "affiliated"]),
         E(SettingsNames.ThirdPartyNotices, SettingsPage.About, Notices, ["license", "licence", "credits", "open source"]),
         E(SettingsNames.WhereSettingsLive, SettingsPage.About, Where,
@@ -362,6 +365,8 @@ public static class SettingsIndex
         [SettingsNames.WhatsNew] = Version,
         [SettingsNames.TakeTheTour] = Version,
         [SettingsNames.HideWhatsNewAfterUpdates] = Version,
+        [SettingsNames.CheckForUpdatesDaily] = Updates,
+        [SettingsNames.CheckNow] = Updates,
         [SettingsNames.WhereSettingsLive] = Where,
         [SettingsNames.ThirdPartyNotices] = Notices,
         [SettingsNames.ResetSanduhr] = Reset,
@@ -813,6 +818,9 @@ public static class SettingsIndex
     {
         SettingsPage.Alerts => Links(page, Thresholds, EachLimit, Sound, TestAlert),
         SettingsPage.Publish => Links(page, Destination, Token, Homes, Schedule, Sample),
+        // About (slice 6): six sections once Updates joins (slice 5 carry P5). The labels are the index titles (owner taste 9), but
+        // Reset's is the section's name: the entry's own title is the command (preflight P15).
+        SettingsPage.About => [.. Links(page, Version, Updates, Trademark, Where), (SettingsNames.ResetJump, Reset), .. Links(page, Notices)],
         SettingsPage.Desk => Links(page, DeskPieces, DeskClicks, DeskDesigns, DeskAdvanced),
         SettingsPage.DeskLook => Links(page, DeskThemeMatch, DeskLook, DeskSizes, DeskInk, DeskPlate),
         // The first is named for the widget it sits in; the others read as their index rows.
