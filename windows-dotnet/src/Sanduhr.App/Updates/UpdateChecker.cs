@@ -130,7 +130,9 @@ public sealed class UpdateChecker
     {
         if (ResetGuard.Done || _inFlight is { IsCompleted: false } || !UpdateCheck.Due(true, LastChecked(), _now()))
             return;
-        if (!HeldEnabled())
+        // The held read keeps a switch left off from costing a read per tick; a held "on" is read again before asking, so
+        // turning it off is honoured at once (turning it on may wait for the refresh).
+        if (!HeldEnabled() || !_enabled())
             return;
         _ = Probe();
     }

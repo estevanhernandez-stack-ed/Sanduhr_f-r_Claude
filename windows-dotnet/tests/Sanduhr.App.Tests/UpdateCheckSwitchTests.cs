@@ -174,8 +174,37 @@ public sealed class UpdateCheckSwitchTests : AppWindowFixture
         clock.Now = T0 + UpdateChecker.EnabledRefresh;
         checker.Tick();
         await Settled(checker);
-        Assert.Equal(2, reads);   // the refresh's read; the probe's launch rule reads once more only when it runs
+        Assert.Equal(3, reads);   // the refresh's read, then a fresh read of the held "on" just before asking
         Assert.Equal(1, probe.Asked);
+    }
+
+    [Fact]
+    public async Task A_held_on_is_read_again_before_asking_so_turning_it_off_is_honoured_at_once()
+    {
+        var store = new SettingsStore(ScratchPaths());
+        store.SaveUpdateCheck(true);
+        var probe = new CountingProbe(new UpdateProbeResult(UpdateProbeStatus.UpToDate));
+        var clock = new Clock();
+        var checker = new UpdateChecker(store.LoadUpdateCheck, probe, StampPath, (_, _) => { }, () => clock.Now);
+
+        checker.Tick();                           // holds "on" and asks
+        await Settled(checker);
+        Assert.Equal(1, probe.Asked);
+
+        File.Delete(StampPath);                   // a check is due again within the held window
+        var fresh = new UpdateChecker(() => { var on = store.LoadUpdateCheck(); return on; }, probe, StampPath, (_, _) => { }, () => clock.Now);
+        fresh.Tick();                             // holds "on" again and asks
+        await Settled(fresh);
+        Assert.Equal(2, probe.Asked);
+
+        store.SaveUpdateCheck(false);
+        File.Delete(StampPath);
+        clock.Now += TimeSpan.FromSeconds(30);    // still inside EnabledRefresh: the held value says "on"
+        var stale = typeof(UpdateChecker).GetField("_lastRead", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        stale!.SetValue(fresh, false);            // re-read the (deleted) stamp, as a new day would
+        fresh.Tick();
+        await Settled(fresh);
+        Assert.Equal(2, probe.Asked);             // off, read fresh before asking: nothing asked
     }
 
     [Fact]
