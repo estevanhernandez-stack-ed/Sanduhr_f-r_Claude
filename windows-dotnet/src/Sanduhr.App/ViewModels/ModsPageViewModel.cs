@@ -13,15 +13,15 @@ namespace Sanduhr.App.ViewModels;
 /// <summary>One pack of the verified catalog: what it is, whether it is installed, and the one thing its button does.</summary>
 public sealed partial class WidgetCatalogRowViewModel : ObservableObject
 {
-    private readonly WidgetsPageViewModel _owner;
+    private readonly ModsPageViewModel _owner;
 
-    internal WidgetCatalogRowViewModel(WidgetsPageViewModel owner, WidgetCatalogEntry entry, InstalledWidget? installed,
+    internal WidgetCatalogRowViewModel(ModsPageViewModel owner, WidgetCatalogEntry entry, InstalledWidget? installed,
         InstalledWidgetInfo? info, bool meetsMinimum)
     {
         _owner = owner;
         Entry = entry;
         Description = info?.Description ?? "";
-        Preview = WidgetsPageViewModel.LoadPreview(info?.PreviewPath);
+        Preview = ModsPageViewModel.LoadPreview(info?.PreviewPath);
         if (installed is { MadeHere: true })
         {
             Action = WidgetRowAction.None;
@@ -92,9 +92,9 @@ public enum WidgetRowAction { None, Install, Update }
 /// <summary>One installed pack, from the catalog or made here.</summary>
 public sealed partial class InstalledWidgetRowViewModel : ObservableObject
 {
-    private readonly WidgetsPageViewModel _owner;
+    private readonly ModsPageViewModel _owner;
 
-    internal InstalledWidgetRowViewModel(WidgetsPageViewModel owner, InstalledWidget row, InstalledWidgetInfo? info)
+    internal InstalledWidgetRowViewModel(ModsPageViewModel owner, InstalledWidget row, InstalledWidgetInfo? info)
     {
         _owner = owner;
         Id = row.Id;
@@ -103,7 +103,7 @@ public sealed partial class InstalledWidgetRowViewModel : ObservableObject
         Version = row.Version;
         Description = info?.Description ?? "";
         Source = row.MadeHere ? SettingsNames.WidgetMadeHere : "from the catalog";
-        Preview = WidgetsPageViewModel.LoadPreview(info?.PreviewPath);
+        Preview = ModsPageViewModel.LoadPreview(info?.PreviewPath);
         CanUseOwnArt = row.MadeHere && Kind == "sprite";
     }
 
@@ -139,12 +139,12 @@ public sealed partial class InstalledWidgetRowViewModel : ObservableObject
 /// status line for the fetch and the checks. The catalog is fetched only when the page opens (<see cref="Activate"/>) or on
 /// <see cref="SettingsNames.WidgetCatalogCheck"/>, and a pack only when the user installs it. The companion moved to Settings, Desk, Pieces in Settings v2.
 /// </summary>
-public sealed partial class WidgetsPageViewModel : ObservableObject
+public sealed partial class ModsPageViewModel : ObservableObject
 {
     private readonly Lazy<WidgetCatalogService> _service;
     private Task? _refreshing;
 
-    internal WidgetsPageViewModel(Func<WidgetCatalogService>? service = null, SettingsStore? store = null)
+    internal ModsPageViewModel(Func<WidgetCatalogService>? service = null, SettingsStore? store = null)
     {
         _service = new Lazy<WidgetCatalogService>(service ?? (() => new WidgetCatalogService()));
         // settings.json is no longer read here; the parameter stays for callers.

@@ -449,7 +449,7 @@ public class SettingsSourceScanTests
         int Count(string file) => Regex.Matches(File.ReadAllText(Path.Combine(views, file)), "<views:TrademarkFooter\\b").Count;
         Assert.Equal(4, Count("SettingsWindow.xaml"));   // Desk, Now playing, Weather, About
         Assert.Equal(1, Count("DeskMessagePage.xaml"));
-        Assert.Equal(1, Count("WidgetsPage.xaml"));
+        Assert.Equal(1, Count("ModsPage.xaml"));
         Assert.Equal(1, Count("DeskLookPage.xaml"));
         Assert.Contains("core:SettingsNames.TrademarkNotice", File.ReadAllText(Path.Combine(views, "TrademarkFooter.xaml")));
         Assert.Contains("<views:TrademarkFooter views:SettingsAnchor.Id=\"trademark\"", TabRange("About"));
@@ -650,7 +650,7 @@ public class SettingsSourceScanTests
     {
         Assert.Contains("core:SettingsNames.DeskLine", TabRange("Desk"));
         Assert.Contains("core:SettingsNames.WidgetPackLine",
-            File.ReadAllText(Path.Combine(AppDir(), "Views", "WidgetsPage.xaml")));
+            File.ReadAllText(Path.Combine(AppDir(), "Views", "ModsPage.xaml")));
     }
 
     [Fact]
@@ -713,5 +713,19 @@ public class SettingsSourceScanTests
         string xaml = File.ReadAllText(Path.Combine(AppDir(), "Views", "DeskLookPage.xaml"));
         Assert.DoesNotContain("set under Alerts", xaml, StringComparison.Ordinal);
         Assert.Contains("SettingsNames.DeskInkCaption", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void No_view_borrows_another_pages_statics()
+    {
+        // Slice 3 final review T9: the companion row used views:WidgetsPage.NotVisible, which breaks the Desk page when that page goes.
+        // Shared converters live in Converters/; a view references its own statics or those.
+        var bad = Directory.EnumerateFiles(AppDir(), "*.xaml", SearchOption.AllDirectories)
+            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"\{x:Static views:(\w+Page)\.\w+\}").Select(m => (File: f, Page: m.Groups[1].Value)))
+            .Where(x => !Path.GetFileNameWithoutExtension(x.File).Equals(x.Page, StringComparison.Ordinal))
+            .Select(x => $"{Path.GetFileName(x.File)} uses {x.Page}'s statics")
+            .ToList();
+        Assert.True(bad.Count == 0, string.Join(Environment.NewLine, bad));
+        Assert.False(File.Exists(Path.Combine(AppDir(), "Views", "WidgetsPage.xaml")), "the Widgets view is ModsPage.xaml since slice 4");
     }
 }

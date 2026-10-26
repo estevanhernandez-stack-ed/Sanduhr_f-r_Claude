@@ -16,7 +16,7 @@ namespace Sanduhr.App.Tests;
 /// ("Install Fixture effects", "Uninstall Fixture palette"), no two alike, and no list item reads as a type name.
 /// </summary>
 [Collection("SettingsWindow")]
-public sealed class WidgetsPageNamesTests : AppWindowFixture
+public sealed class ModsPageNamesTests : AppWindowFixture
 {
     private static void PumpUntil(Func<bool> done)
     {
@@ -63,7 +63,7 @@ public sealed class WidgetsPageNamesTests : AppWindowFixture
 
         var svm = new SettingsViewModel(DemoWidget(), () => Task.CompletedTask, _ => Task.CompletedTask)
         {
-            WidgetsPage = new WidgetsPageViewModel(() => service),
+            ModsPage = new ModsPageViewModel(() => service),
         };
         var window = new SettingsWindow(svm);
         OffScreen(window);
@@ -72,8 +72,8 @@ public sealed class WidgetsPageNamesTests : AppWindowFixture
         {
             var tabs = (TabControl)window.FindName("Tabs");
             tabs.SelectedItem = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "Widgets");
-            PumpUntil(() => !svm.WidgetsPage.Busy && svm.WidgetsPage.Catalog.Count == 2);
-            Assert.StartsWith("The catalog is verified: 2 widgets", svm.WidgetsPage.Status);
+            PumpUntil(() => !svm.ModsPage.Busy && svm.ModsPage.Catalog.Count == 2);
+            Assert.StartsWith("The catalog is verified: 2 widgets", svm.ModsPage.Status);
             var all = NamesOf(window);
 
             var buttons = SetNames(window).Select(n => n.Name).ToList();
@@ -99,11 +99,11 @@ public sealed class WidgetsPageNamesTests : AppWindowFixture
         {
             var tabs = (TabControl)window.FindName("Tabs");
             tabs.SelectedItem = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "Widgets");
-            PumpUntil(() => svm.WidgetsPage.Status == WidgetCatalogClient.Offline);
-            Assert.Equal(WidgetCatalogClient.Offline, svm.WidgetsPage.Status);
-            Assert.Empty(svm.WidgetsPage.Catalog);
+            PumpUntil(() => svm.ModsPage.Status == WidgetCatalogClient.Offline);
+            Assert.Equal(WidgetCatalogClient.Offline, svm.ModsPage.Status);
+            Assert.Empty(svm.ModsPage.Catalog);
             // The real widgets folder was never asked for: the service sits in the test's dev profile.
-            Assert.StartsWith(Root, svm.WidgetsPage.Service.Store.Root);
+            Assert.StartsWith(Root, svm.ModsPage.Service.Store.Root);
         }
         finally { window.Close(); }
     });

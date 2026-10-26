@@ -248,7 +248,7 @@ public sealed class WidgetCatalogServiceTests : IDisposable
         var palette = Packed("good-palette", "Fixture palette", "palette");
         using var stranger = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         WidgetKit.Publish(_net, stranger, "2026-10-22T02:23:13Z", palette);
-        var page = new WidgetsPageViewModel(() => Service());
+        var page = new ModsPageViewModel(() => Service());
         await page.Activate();
         Assert.Equal("The widget catalog couldn't be verified.", page.Status);
         Assert.Empty(page.Catalog);
@@ -262,7 +262,7 @@ public sealed class WidgetCatalogServiceTests : IDisposable
         var files = WidgetKit.Pack("good-palette");
         var v = PackValidator.Validate(files, "good-palette", strict: true);
         Assert.True(svc.Store.Install(files, v.Manifest!, WidgetSource.Claude).Ok);
-        var page = new WidgetsPageViewModel(() => svc);
+        var page = new ModsPageViewModel(() => svc);
         await page.Activate();
         Assert.Equal(WidgetCatalogClient.Offline, page.Status);
         var row = Assert.Single(page.Installed);
@@ -276,7 +276,7 @@ public sealed class WidgetCatalogServiceTests : IDisposable
         var effects = Packed("good-effects", "Fixture effects", "effects");
         WidgetKit.Publish(_net, _key, "2026-10-22T02:23:13Z", v1, effects);
         var svc = Service();
-        var page = new WidgetsPageViewModel(() => svc);
+        var page = new ModsPageViewModel(() => svc);
         await page.Activate();
         Assert.StartsWith("The catalog is verified: 2 widgets", page.Status);
 
@@ -320,7 +320,7 @@ public sealed class WidgetCatalogServiceTests : IDisposable
     {
         var palette = Packed("good-palette", "Fixture palette", "palette");
         WidgetKit.Publish(_net, _key, "2026-10-22T02:23:13Z", palette);
-        var page = new WidgetsPageViewModel(() => Service(new Version(3, 7, 2, 0)));
+        var page = new ModsPageViewModel(() => Service(new Version(3, 7, 2, 0)));
         await page.Activate();
         var row = Assert.Single(page.Catalog);
         Assert.Equal((WidgetRowAction.None, "Needs Sanduhr 3.8.0 or later."), (row.Action, row.State));

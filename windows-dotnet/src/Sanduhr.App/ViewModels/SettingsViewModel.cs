@@ -51,9 +51,8 @@ public sealed class SettingsViewModel
     /// <summary>Settings, Desk Look, Match the widget theme (theme match).</summary>
     public ThemeMatchViewModel ThemeMatch { get; }
 
-    /// <summary>Settings, Widgets (spec 3.8): the signed catalog and the installed packs. Nothing is fetched until the
-    /// page opens.</summary>
-    public WidgetsPageViewModel WidgetsPage { get; internal set; } = new();
+    /// <summary>Settings, Mods &amp; Widgets (slice 4): the one list. Nothing is fetched until the catalog is opened.</summary>
+    public ModsPageViewModel ModsPage { get; internal set; } = new();
 
     /// <summary>Backs the General tab's auto-start control (item 10).</summary>
     public GeneralViewModel General { get; }

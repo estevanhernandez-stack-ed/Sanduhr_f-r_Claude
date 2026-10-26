@@ -152,7 +152,7 @@ public static partial class Program
         store.SaveDesk(desk with { Enabled = true, Layout = "clock:bl claude:bl companion:br" });
         var svm = new SettingsViewModel(vm, () => Task.CompletedTask, _ => Task.CompletedTask)
         {
-            WidgetsPage = new WidgetsPageViewModel(() => new WidgetCatalogService(paths, new NoNetwork()), store),
+            ModsPage = new ModsPageViewModel(() => new WidgetCatalogService(paths, new NoNetwork()), store),
         };
         var swType = asm.GetType("Sanduhr.App.Views.SettingsWindow")!;
         var sw = (Window)Activator.CreateInstance(swType, svm)!;

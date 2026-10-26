@@ -616,7 +616,7 @@ public partial class App : Application
         Desk.WidgetReviewService.Current = _widgetReview;
         _widgetReview.Host = new Desk.WidgetReviewHost(_desk, store, () =>
         {
-            _settingsWindow?.ViewModel.WidgetsPage.ReloadLocal();
+            _settingsWindow?.ViewModel.ModsPage.ReloadLocal();
             // A palette Claude made joins the Ink presets (3.9.1).
             _settingsWindow?.ViewModel.Desk.Reload();
         });
@@ -752,7 +752,7 @@ public partial class App : Application
         // An install or uninstall (a companion sprite included), theme, font or palette pack.
         // 3.9.1: it also reloads the theme list, since an installed theme pack joins it and an uninstalled one leaves it.
         // A font pack changes what the Desk and a design may draw in: drop their font lists before the Desk redraws.
-        svm.WidgetsPage.Changed = () =>
+        svm.ModsPage.Changed = () =>
         {
             _themeFonts = Desk.DeskFonts.ForThisPc(new Sanduhr.Core.Paths());
             _vm?.ReloadUserThemes();

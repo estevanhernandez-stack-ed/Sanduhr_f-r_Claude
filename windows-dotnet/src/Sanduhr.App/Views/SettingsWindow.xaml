@@ -2944,8 +2944,8 @@
                 </TabItem>
 
                 <!-- Settings, Widgets (spec 3.8): the signed catalog and the installed packs, drawn by their own control. -->
-                <TabItem Header="Widgets" Tag="Widgets" AutomationProperties.Name="Widgets" DataContext="{Binding WidgetsPage}">
-                    <views:WidgetsPage />
+                <TabItem Header="Widgets" Tag="Widgets" AutomationProperties.Name="Widgets" DataContext="{Binding ModsPage}">
+                    <views:ModsPage />
                 </TabItem>
 
                 <!-- About (Settings v2): the version, What's New and the tour, the trademark notice,

@@ -156,7 +156,7 @@ public static partial class Program
         Log.Add($"propose-widget: after Apply {File.ReadAllText(Path.Combine(paths.ExternalDir, WidgetProposal.ResultFile))}");
         var svm = new SettingsViewModel(vm, () => Task.CompletedTask, _ => Task.CompletedTask)
         {
-            WidgetsPage = new WidgetsPageViewModel(() => new WidgetCatalogService(paths, new NoNetwork()), store),
+            ModsPage = new ModsPageViewModel(() => new WidgetCatalogService(paths, new NoNetwork()), store),
         };
         var swType = asm.GetType("Sanduhr.App.Views.SettingsWindow")!;
         var sw = (Window)Activator.CreateInstance(swType, svm)!;
@@ -169,7 +169,7 @@ public static partial class Program
         swType.GetMethod("SelectPage")!.Invoke(sw, [SettingsPage.Widgets, SettingsIndex.WidgetsInstalled]);
         await Settle();
         await Settle();
-        Log.Add($"propose-widget: installed={string.Join("|", svm.WidgetsPage.Installed.Select(r => r.RowName + (r.CanUseOwnArt ? " [own art]" : "")))}");
+        Log.Add($"propose-widget: installed={string.Join("|", svm.ModsPage.Installed.Select(r => r.RowName + (r.CanUseOwnArt ? " [own art]" : "")))}");
         Save((FrameworkElement)sw.Content, "propose-widget-settings-installed");
         sw.Close();
         await Settle();
