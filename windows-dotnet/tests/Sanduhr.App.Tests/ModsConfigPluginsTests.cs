@@ -1,4 +1,5 @@
 using System.IO;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.Tests;
 
@@ -41,9 +42,7 @@ public sealed class ModsConfigPluginsTests : ModsConfigFixture
     {
         var page = Page(configDir: Build());
         Assert.Equal("2 on, 1 off", page.PluginsSummary);
-        Assert.StartsWith("settings.json has 3 plugin switches (2 on, 1 off). The list differs because", page.PluginListNote);
-        Assert.Contains("1 has no switch in settings.json", page.PluginListNote);
-        Assert.Contains("1 is switched in settings.json or listed as installed, but the files are not in this folder", page.PluginListNote);
+        Assert.Equal(SettingsNames.NoSwitchNote(1) + " " + SettingsNames.NoFilesNote(1), page.PluginListNote);
     }
 
     [Fact]

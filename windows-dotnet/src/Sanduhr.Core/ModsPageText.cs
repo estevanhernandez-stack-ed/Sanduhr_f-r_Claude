@@ -44,20 +44,25 @@ public static class ModsPageText
         t.Listed == 0 ? "Plugins (none)" : $"Plugins ({t.Installed} installed, {t.On} on)";
 
     /// <summary>
-    /// Why the list and the settings.json switches do not add up to the same number, or "" when they do.
+    /// The note under the Installed list, over every folder, in the spec's plain words: how many plugins have no on/off entry in
+    /// settings.json (Claude Code treats them as on), then how many are switched on with no files. Each count is of distinct plugin ids,
+    /// so one plugin in three folders counts once, as the list shows one row. "" when both are 0.
     /// </summary>
-    public static string Reconcile(PluginTally t, int switchesOn, int switchesOff)
+    public static string PlainNote(IReadOnlyList<FolderMods> folders)
     {
+        var noSwitch = new HashSet<string>(StringComparer.Ordinal);
+        var noFiles = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var f in folders)
+            foreach (var m in f.Report.Mods.Where(m => !m.IsSanduhr))
+            {
+                var id = m.Key ?? m.Name;
+                if (!HasFiles(m)) noFiles.Add(id);
+                else if (m.Key is null || !f.Report.EnabledPlugins.ContainsKey(m.Key)) noSwitch.Add(id);
+            }
         var parts = new List<string>();
-        if (t.NoSwitch > 0)
-            parts.Add($"{t.NoSwitch} {(t.NoSwitch == 1 ? "has" : "have")} no switch in settings.json " +
-                      "(loaded from a plugin folder, or installed here and never switched)");
-        if (t.NoFiles > 0)
-            parts.Add($"{t.NoFiles} {(t.NoFiles == 1 ? "is" : "are")} switched in settings.json or listed as installed, " +
-                      "but the files are not in this folder");
-        if (parts.Count == 0) return "";
-        return $"settings.json has {switchesOn + switchesOff} plugin switches ({switchesOn} on, {switchesOff} off). " +
-               "The list differs because " + string.Join("; ", parts) + ".";
+        if (noSwitch.Count > 0) parts.Add(SettingsNames.NoSwitchNote(noSwitch.Count));
+        if (noFiles.Count > 0) parts.Add(SettingsNames.NoFilesNote(noFiles.Count));
+        return string.Join(" ", parts);
     }
 
     /// <summary>

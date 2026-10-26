@@ -485,6 +485,9 @@ public class SettingsNamesTests
         Assert.Equal(("Sanduhr's mod", "Claude Code mod", "Claude Code plugin"),
             (SettingsNames.KindSanduhrMod, SettingsNames.KindClaudeCodeMod, SettingsNames.KindClaudeCodePlugin));
         Assert.Equal(("read-only", "on", "off"), (SettingsNames.RowReadOnly, SettingsNames.RowOn, SettingsNames.RowOff));
+        Assert.Equal(("Installed.", "Version 1.0.0 is installed.", "Needs Sanduhr 9.0.0 or later.", "Version 1.0.0 is installed. 2.0.0 needs Sanduhr 9.0.0 or later."),
+            (SettingsNames.CatalogInstalled, SettingsNames.CatalogVersionInstalled("1.0.0"), SettingsNames.CatalogNeedsSanduhr("9.0.0"),
+             SettingsNames.CatalogUpdateNeedsSanduhr("1.0.0", "2.0.0", "9.0.0")));
         Assert.Equal("Palette settings… for Fixture", SettingsNames.WhereLinkFor("Palette settings…", "Fixture"));
         Assert.Equal("Uninstall Fixture palette", SettingsNames.UninstallFor("Fixture palette"));
         Assert.Equal("Fixture palette is on.", SettingsNames.PackIsOn("Fixture palette"));

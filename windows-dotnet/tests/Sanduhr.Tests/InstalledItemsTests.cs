@@ -203,4 +203,111 @@ public sealed class InstalledItemsTests
         var items = InstalledItems.Build([Folder(".claude", mods: Plugin("alpha", ModState.Off))], WidgetRegistry.Empty, Info, null);
         Assert.Equal("Off", InstalledItems.ScopeSummary(Assert.Single(items)));
     }
+
+    // ---- the catalog merged by id, where it shows, the filters ----
+
+    private static readonly Version Running = new(4, 0, 0, 0);
+
+    private static WidgetCatalogDocument Catalog(params WidgetCatalogEntry[] entries) => new(At, "2026-10-25T12:00:00Z", entries);
+
+    private static WidgetCatalogEntry Entry(string id, string kind, string version = "1.0.0", string min = "3.8.0") =>
+        new(id, "Name of " + id, kind, version, min, $"https://x/{id}.zip", new string('a', 64), 10);
+
+    [Fact]
+    public void A_catalog_pack_appears_once_with_install_update_or_the_switch()
+    {
+        var catalog = Catalog(Entry("good-palette", "palette", "1.1.0"), Entry("good-theme", "theme"), Entry("good-font", "font"));
+        var items = InstalledItems.Build([], Packs(Pack("good-palette"), Pack("good-theme", on: false)), Info, catalog);
+
+        var rows = InstalledItems.CatalogRows(catalog, items, Running);
+
+        Assert.Equal(["good-palette", "good-theme", "good-font"], rows.Select(r => r.Entry.Id));
+        Assert.Equal((CatalogAction.Update, "Version 1.0.0 is installed."), (rows[0].Action, rows[0].State));
+        Assert.Equal((CatalogAction.Switch, "Installed."), (rows[1].Action, rows[1].State));
+        Assert.False(rows[1].Installed!.Enabled);
+        Assert.Equal((CatalogAction.Install, ""), (rows[2].Action, rows[2].State));
+        Assert.Null(rows[2].Installed);
+    }
+
+    [Fact]
+    public void A_pack_above_the_running_version_offers_nothing_but_says_why()
+    {
+        var rows = InstalledItems.CatalogRows(Catalog(Entry("good-font", "font", min: "9.0.0")), [], Running);
+        Assert.Equal((CatalogAction.None, "Needs Sanduhr 9.0.0 or later."), (rows[0].Action, rows[0].State));
+    }
+
+    [Fact]
+    public void An_update_above_the_running_version_keeps_the_switch_and_says_why()
+    {
+        var items = InstalledItems.Build([], Packs(Pack("good-palette")), Info, null);
+        var rows = InstalledItems.CatalogRows(Catalog(Entry("good-palette", "palette", "2.0.0", min: "9.0.0")), items, Running);
+        Assert.Equal((CatalogAction.Switch, "Version 1.0.0 is installed. 2.0.0 needs Sanduhr 9.0.0 or later."), (rows[0].Action, rows[0].State));
+    }
+
+    [Fact]
+    public void A_catalog_id_that_a_pack_made_here_holds_offers_nothing()
+    {
+        var items = InstalledItems.Build([], Packs(Pack("my-sprite", source: WidgetSource.Claude)), Info, null);
+        var rows = InstalledItems.CatalogRows(Catalog(Entry("my-sprite", "sprite")), items, Running);
+        Assert.Equal((CatalogAction.None, $"A widget {SettingsNames.WidgetMadeHere} already uses this id."), (rows[0].Action, rows[0].State));
+    }
+
+    [Fact]
+    public void The_catalog_can_show_one_kind()
+    {
+        var rows = InstalledItems.CatalogRows(Catalog(Entry("good-sprite", "sprite"), Entry("good-font", "font")), [], Running, kind: "sprite");
+        Assert.Equal(["good-sprite"], rows.Select(r => r.Entry.Id));
+    }
+
+    [Theory]
+    [InlineData("theme", "In Themes", "themes#gallery", "Themes settings…")]
+    [InlineData("palette", "In Desk Look, Ink and color", "desklook#ink", "Desk Look settings…")]
+    [InlineData("font", "In Desk Look, Fonts", "desklook#look", "Desk Look settings…")]
+    [InlineData("sprite", "As the Desk companion", "desk#pieces", "Desk settings…")]
+    public void Each_kind_says_where_it_shows_and_links_there(string kind, string text, string link, string title)
+    {
+        var where = InstalledItems.Where(kind);
+        Assert.Equal((text, link, title), (where.Text, where.Link, where.LinkTitle));
+        var place = SettingsIndex.ParseLink(where.Link)!;
+        Assert.NotNull(place.Anchor);   // the link lands on its section, not a page top
+    }
+
+    [Fact]
+    public void Effects_say_they_are_unused_and_link_nowhere()
+    {
+        Assert.Equal(new WhereItShows(SettingsNames.EffectsUnused, null, null), InstalledItems.Where("effects"));
+        Assert.Equal(new WhereItShows("", null, null), InstalledItems.Where(null));
+    }
+
+    [Fact]
+    public void The_filters_split_Claude_Code_from_widgets_and_the_text_matches_name_kind_or_source()
+    {
+        var items = InstalledItems.Build(
+            [Folder(".claude", OwnOn(".claude"), IntegrationStatus.Installed, Meters(), Plugin("alpha", ModState.On))],
+            Packs(Pack("good-palette"), Pack("my-sprite", source: WidgetSource.Claude)), Info, null);
+
+        string[] Names(InstalledFilter f, string? text = null) =>
+            [.. items.Where(i => InstalledItems.Matches(i, f, text)).Select(i => i.Name)];
+
+        Assert.Equal(4, Names(InstalledFilter.All).Length);
+        Assert.Equal([SettingsNames.MetersSection, "alpha"], Names(InstalledFilter.ClaudeCode));
+        Assert.Equal(["Fixture palette", "My sprite"], Names(InstalledFilter.Widgets));
+        Assert.Equal(["My sprite"], Names(InstalledFilter.All, "SPRITE"));
+        Assert.Equal(["My sprite"], Names(InstalledFilter.All, "made here"));
+        Assert.Equal(["alpha"], Names(InstalledFilter.ClaudeCode, "alp"));
+        Assert.Empty(Names(InstalledFilter.Widgets, "alpha"));
+        Assert.Equal(4, Names(InstalledFilter.All, "   ").Length);
+    }
+
+    [Fact]
+    public void In_a_folder_whose_settings_cannot_be_read_a_plugin_is_unreadable_there_not_absent()
+    {
+        var unreadable = new FolderMods(@"C:\home\.claude-work", @"~\.claude-work",
+            Report(@"C:\home\.claude-work") with { Settings = new SettingsState(SettingsKind.Unreadable, 3, 7, "bad") },
+            NoOwn(".claude-work"), IntegrationStatus.NotInstalled);
+        var items = InstalledItems.Build([Folder(".claude", mods: Plugin("alpha", ModState.On)), unreadable], WidgetRegistry.Empty, Info, null);
+
+        var alpha = Assert.Single(items, i => i.Id == "alpha@m");
+        Assert.Equal([FolderState.On, FolderState.Unreadable], alpha.Scope!.Select(s => s.State));
+    }
 }

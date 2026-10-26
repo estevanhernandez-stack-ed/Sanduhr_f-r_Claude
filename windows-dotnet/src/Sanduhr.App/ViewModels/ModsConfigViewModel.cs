@@ -264,7 +264,7 @@ public sealed partial class ModsConfigViewModel : ObservableObject
             Mods.Add(new ModRowViewModel(this, item, own));
         var tally = ModsPageText.Tally(report.Mods, report.EnabledPlugins);
         PluginListTitle = ModsPageText.ListTitle(tally);
-        PluginListNote = ModsPageText.Reconcile(tally, pluginsOn, pluginsOff);
+        PluginListNote = ModsPageText.PlainNote([new FolderMods(folder.Path, folder.Display, report, own, IntegrationStatus.NotInstalled)]);
 
         // MCP servers: names only
         foreach (var n in report.Mcp.UserServers) McpNames.Add(n);

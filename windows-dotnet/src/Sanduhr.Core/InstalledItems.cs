@@ -95,7 +95,7 @@ public static partial class InstalledItems
             var scope = folders.Select(f =>
             {
                 var here = seen.FirstOrDefault(s => string.Equals(s.Folder, f.Folder, StringComparison.OrdinalIgnoreCase)).Item;
-                var state = here is null ? FolderState.NotInstalled : here.State switch
+                var state = here is null ? (f.Report.Settings.Kind == SettingsKind.Unreadable ? FolderState.Unreadable : FolderState.NotInstalled) : here.State switch
                 {
                     ModState.On => FolderState.On,
                     ModState.Off => FolderState.Off,
@@ -144,4 +144,78 @@ public static partial class InstalledItems
         { Count: 1 } one => StateWord(one[0].State),
         var many => SettingsNames.OnInFolders(many.Count(s => s.State == FolderState.On), many.Count),
     };
+}
+
+/// <summary>What a catalog row's one control does (spec, Catalog: "Install, Update, or the switch").</summary>
+public enum CatalogAction { Install, Update, Switch, None }
+
+/// <summary>A catalog pack merged with its installed row by id, and the line under it.</summary>
+public sealed record CatalogRow(WidgetCatalogEntry Entry, CatalogAction Action, string State, InstalledItem? Installed);
+
+/// <summary>Where an installed pack shows (WF3), and the link that opens that place.</summary>
+public sealed record WhereItShows(string Text, string? Link, string? LinkTitle);
+
+/// <summary>The Installed list's filter chips.</summary>
+public enum InstalledFilter { All, ClaudeCode, Widgets }
+
+public static partial class InstalledItems
+{
+    /// <summary>
+    /// The catalog's packs in catalog order, each once, with its control: Install when not installed, Update when the catalog is newer and
+    /// this Sanduhr meets its minimum, the switch otherwise. An id held by a pack made here offers nothing. <paramref name="kind"/> shows one
+    /// pack kind (the companion row's link shows sprites).
+    /// </summary>
+    public static IReadOnlyList<CatalogRow> CatalogRows(WidgetCatalogDocument catalog, IReadOnlyList<InstalledItem> items, Version running,
+        string? kind = null)
+    {
+        var rows = new List<CatalogRow>();
+        foreach (var entry in catalog.Packs)
+        {
+            if (kind is not null && entry.Kind != kind) continue;
+            var installed = items.FirstOrDefault(i => i.Kind == InstalledKind.WidgetPack && i.Id == entry.Id);
+            bool meets = WidgetCatalog.MeetsMinimum(entry.SanduhrMin, running);
+            rows.Add(installed switch
+            {
+                { MadeHere: true } => new(entry, CatalogAction.None, SettingsNames.CatalogIdTaken, installed),
+                null => meets
+                    ? new(entry, CatalogAction.Install, "", null)
+                    : new(entry, CatalogAction.None, SettingsNames.CatalogNeedsSanduhr(entry.SanduhrMin), null),
+                _ when WidgetCatalog.CompareVersions(entry.Version, installed.Version) > 0 => meets
+                    ? new(entry, CatalogAction.Update, SettingsNames.CatalogVersionInstalled(installed.Version ?? ""), installed)
+                    : new(entry, CatalogAction.Switch,
+                        SettingsNames.CatalogUpdateNeedsSanduhr(installed.Version ?? "", entry.Version, entry.SanduhrMin), installed),
+                _ => new(entry, CatalogAction.Switch, SettingsNames.CatalogInstalled, installed),
+            });
+        }
+        return rows;
+    }
+
+    /// <summary>Where a pack of <paramref name="packKind"/> shows, with "&lt;Page&gt; settings…" to that section. Effects have no consumer yet.</summary>
+    public static WhereItShows Where(string? packKind) => packKind switch
+    {
+        "theme" => new(SettingsNames.ShowsInThemes, Link(SettingsPage.Themes, SettingsIndex.Gallery), SettingsNames.LinkTitle(SettingsPage.Themes)),
+        "palette" => new(SettingsNames.ShowsInInk, Link(SettingsPage.DeskLook, SettingsIndex.DeskInk), SettingsNames.LinkTitle(SettingsPage.DeskLook)),
+        "font" => new(SettingsNames.ShowsInFonts, Link(SettingsPage.DeskLook, SettingsIndex.DeskLook), SettingsNames.LinkTitle(SettingsPage.DeskLook)),
+        "sprite" => new(SettingsNames.ShowsAsCompanion, Link(SettingsPage.Desk, SettingsIndex.DeskPieces), SettingsNames.LinkTitle(SettingsPage.Desk)),
+        "effects" => new(SettingsNames.EffectsUnused, null, null),
+        _ => new("", null, null),
+    };
+
+    private static string Link(SettingsPage page, string anchor) => SettingsIndex.PageId(page) + "#" + anchor;
+
+    /// <summary>The chips (All, Claude Code, Widgets) and the text filter, any case, over the name, id, pack kind, source and mod tag.</summary>
+    public static bool Matches(InstalledItem item, InstalledFilter filter, string? text)
+    {
+        bool kind = filter switch
+        {
+            InstalledFilter.ClaudeCode => item.Kind != InstalledKind.WidgetPack,
+            InstalledFilter.Widgets => item.Kind == InstalledKind.WidgetPack,
+            _ => true,
+        };
+        if (!kind) return false;
+        if (string.IsNullOrWhiteSpace(text)) return true;
+        var t = text.Trim();
+        return new[] { item.Name, item.Id, item.PackKind ?? "", item.Source, item.IsMod ? "mod" : "" }
+            .Any(s => s.Contains(t, StringComparison.OrdinalIgnoreCase));
+    }
 }
