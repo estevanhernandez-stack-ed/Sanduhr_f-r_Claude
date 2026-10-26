@@ -62,6 +62,36 @@ struct ClaudeSignInTests {
         }
     }
 
+    @Test func signInPopupsGetAWindowOfTheirOwn() {
+        for s in ["https://accounts.google.com/o/oauth2/v2/auth?client_id=x", "https://claude.ai/login/google",
+                  "about:blank", ""] {
+            #expect(ClaudeSignIn.popupStaysInWindow(URL(string: s)), "\(s)")
+        }
+        #expect(ClaudeSignIn.popupStaysInWindow(nil))
+        #expect(!ClaudeSignIn.popupStaysInWindow(URL(string: "https://docs.example.com/help")))
+    }
+
+    @Test func aPageWithNoTextIsBlank() {
+        #expect(ClaudeSignIn.pageLooksBlank(bodyTextLength: 0))
+        #expect(ClaudeSignIn.pageLooksBlank(bodyTextLength: nil))
+        #expect(!ClaudeSignIn.pageLooksBlank(bodyTextLength: 120))
+    }
+
+    /// The popup keeps the configuration WebKit passes in (process pool and data store, so the
+    /// opener and cookies are shared). Folding it back into the main view broke Google's sign-in.
+    @Test func thePopupIsBuiltFromWebKitsConfiguration() throws {
+        let file = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/Sanduhr/Views/SignInWindow.swift")
+        let source = try String(contentsOf: file, encoding: .utf8)
+        let start = try #require(source.range(of: "createWebViewWith configuration: WKWebViewConfiguration"))
+        let end = try #require(source.range(of: "func webViewDidClose", range: start.upperBound..<source.endIndex))
+        let body = source[start.upperBound..<end.lowerBound]
+        #expect(body.contains("WKWebView(frame: .zero, configuration: configuration)"))
+        #expect(body.contains("ClaudeSignIn.popupStaysInWindow"))
+        #expect(!body.contains("webView.load("))
+    }
+
     @Test func theWindowPresentsItselfAsSafari() {
         #expect(ClaudeSignIn.applicationName(safariVersion: "26.6.2") == "Version/26.6.2 Safari/605.1.15")
         #expect(ClaudeSignIn.applicationName(safariVersion: nil) == "Version/18.0 Safari/605.1.15")
