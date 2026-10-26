@@ -34,9 +34,10 @@ public static class StoreUpdate
     /// A null <paramref name="lastCheck"/> is "never asked", which checks once
     /// shortly after start.</summary>
     public static bool ShouldCheck(
-        bool isPackaged, DateTimeOffset? lastCheck, DateTimeOffset now, TimeSpan? interval = null)
+        bool isPackaged, DateTimeOffset? lastCheck, DateTimeOffset now, TimeSpan? interval = null, bool enabled = true)
     {
-        if (!isPackaged)
+        // enabled: settings.json "update_check" (Settings, About, Updates). Off, no update probe runs on its own (Settings v2, slice 6).
+        if (!isPackaged || !enabled)
             return false;
         if (lastCheck is not { } last)
             return true;

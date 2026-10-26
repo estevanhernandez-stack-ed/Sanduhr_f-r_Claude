@@ -27,7 +27,7 @@ namespace Sanduhr.App.ViewModels;
 /// </summary>
 public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 {
-    private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan RefreshInterval = UsageSchedule.Refresh;
     private static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan RiffInterval = TimeSpan.FromSeconds(4);
 
@@ -1548,7 +1548,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // retry window; a failed retry falls back to the honest Fail() text.
         StatusText = "Reconnecting…";
         int generation = _fetcherGeneration;
-        await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(true);
+        await Task.Delay(UsageSchedule.RetryAfterFailure).ConfigureAwait(true);
         if (generation != _fetcherGeneration || _fetcher is null || _lastData is not null || Reason != SignInReason.None)
             return;
         await RefreshCoreAsync().ConfigureAwait(true);

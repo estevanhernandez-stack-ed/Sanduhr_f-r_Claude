@@ -102,6 +102,7 @@ public class SettingsKeysContractTests
         "tier_order",
         "tour_state",
         "tray_mode",
+        "update_check",
         "vault_prompted",
         "vault_roots",
         "vault_store_full_paths",
