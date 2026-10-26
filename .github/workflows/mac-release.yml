@@ -91,17 +91,21 @@ jobs:
           for bin in Sanduhr.app/Contents/MacOS/Sanduhr \
                      Sanduhr.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate \
                      Sanduhr.app/Contents/Frameworks/MediaRemoteAdapter.framework/Versions/A/MediaRemoteAdapter \
-                     Sanduhr.app/Contents/Helpers/MediaRemoteAdapterTestClient; do
+                     Sanduhr.app/Contents/Helpers/MediaRemoteAdapterTestClient \
+                     Sanduhr.app/Contents/MacOS/SanduhrLockLineHelper; do
             archs="$(lipo -archs "$bin")"
             echo "$bin: $archs"
             [[ "$archs" == *arm64* && "$archs" == *x86_64* ]] || { echo "::error::$bin is '$archs'"; exit 1; }
           done
-          # The now playing adapter is signed with the app's identity (build.sh, inside-out).
+          # The now playing adapter and the lock screen line helper are signed with the app's
+          # identity (build.sh, inside-out); the helper runs as root, so it must be the team's.
           for nested in Sanduhr.app/Contents/Frameworks/MediaRemoteAdapter.framework \
-                        Sanduhr.app/Contents/Helpers/MediaRemoteAdapterTestClient; do
+                        Sanduhr.app/Contents/Helpers/MediaRemoteAdapterTestClient \
+                        Sanduhr.app/Contents/MacOS/SanduhrLockLineHelper; do
             codesign --verify --strict --verbose=2 "$nested"
             codesign -dv "$nested" 2>&1 | grep -q "TeamIdentifier=82BSR56X5J" || { echo "::error::$nested is not signed by the team"; exit 1; }
           done
+          plutil -lint Sanduhr.app/Contents/Library/LaunchDaemons/com.626labs.sanduhr.lockline.plist
           spctl --assess --type execute --verbose=2 Sanduhr.app
           spctl --assess --type open --context context:primary-signature --verbose=2 Sanduhr.dmg
           DMG="Sanduhr-$VERSION.dmg"

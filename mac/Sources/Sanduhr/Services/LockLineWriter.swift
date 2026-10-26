@@ -2,9 +2,9 @@ import AppKit
 import Foundation
 
 /// Keeps `~/Library/Application Support/Sanduhr/lock-line.txt` (#137) holding the composed lock
-/// screen line, or nothing. The root helper that puts it on the lock screen is a later build
-/// (docs/lock-screen-line-spec.md); this half only keeps the text ready, and rewrites the file
-/// only when the text changed.
+/// screen line, or nothing. The root helper (LockLineDaemon) puts it on the lock screen
+/// (docs/lock-screen-line-spec.md); this keeps the text ready, and rewrites the file only when
+/// the text changed.
 final class LockLineWriter {
     static let fileName = "lock-line.txt"
     /// Usage older than this reads as unavailable on the lock screen.
@@ -127,6 +127,17 @@ final class LockLineController {
             ws.addObserver(self, selector: #selector(sessionEvent(_:)), name: name, object: nil)
         }
         refresh()
+        sweepHelper()
+    }
+
+    /// A helper registered while the switch is off (a reset, a crash mid-turn-off, defaults
+    /// cleared by hand) is removed once it has taken the line away: the file is already empty
+    /// or gone, so its next run clears the line or puts the earlier message back.
+    private func sweepHelper() {
+        guard !UserDefaults.desk.bool(forKey: LockLineKeys.on), LockLineDaemon.state != .off,
+              LockLineDaemon.state != .missing else { return }
+        let shown = LockLineDaemon.currentLoginText() ?? ""
+        Task { @MainActor in await LockLineDaemon.remove(lastLine: shown) }
     }
 
     @objc private func sessionEvent(_ note: Notification) {

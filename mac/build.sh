@@ -116,6 +116,24 @@ cp -R "$ADAPTER_OUT/MediaRemoteAdapter.framework" "$APP/Contents/Frameworks/"
 mkdir -p "$APP/Contents/Helpers" "$APP/Contents/Resources/NowPlaying"
 install -m 0755 "$ADAPTER_OUT/MediaRemoteAdapterTestClient" "$APP/Contents/Helpers/MediaRemoteAdapterTestClient"
 install -m 0644 Vendor/mediaremote-adapter/bin/mediaremote-adapter.pl "$APP/Contents/Resources/NowPlaying/mediaremote-adapter.pl"
+# The lock screen line's root helper (#137, docs/lock-screen-line-spec.md): one small universal
+# executable in MacOS/ and its launchd plist in Library/LaunchDaemons/, registered by the app
+# with SMAppService.daemon only when the Lock Screen switch is on. It shares its rules file with
+# the app so the suite tests what root runs.
+echo "→ Building the lock screen line helper..."
+HELPER_OUT=".build/lockline-helper"
+mkdir -p "$HELPER_OUT"
+for arch in arm64 x86_64; do
+    xcrun swiftc -O -target "$arch-apple-macos14.0" -framework SystemConfiguration \
+        Helpers/LockLineHelper/main.swift Sources/Sanduhr/Models/LockLineHelperRules.swift \
+        -o "$HELPER_OUT/SanduhrLockLineHelper-$arch"
+done
+lipo -create "$HELPER_OUT/SanduhrLockLineHelper-arm64" "$HELPER_OUT/SanduhrLockLineHelper-x86_64" \
+    -output "$HELPER_OUT/SanduhrLockLineHelper"
+install -m 0755 "$HELPER_OUT/SanduhrLockLineHelper" "$APP/Contents/MacOS/SanduhrLockLineHelper"
+mkdir -p "$APP/Contents/Library/LaunchDaemons"
+install -m 0644 Resources/LaunchDaemons/com.626labs.sanduhr.lockline.plist \
+    "$APP/Contents/Library/LaunchDaemons/com.626labs.sanduhr.lockline.plist"
 # The third-party notices (Sparkle, mediaremote-adapter, EsteFont Pro, EsteFont 26), opened from Settings, About.
 install -m 0644 THIRD-PARTY-NOTICES.txt "$APP/Contents/Resources/THIRD-PARTY-NOTICES.txt"
 # EsteFont Pro and EsteFont 26 (items 58, 65 (e)): registered for Sanduhr's process at launch
@@ -175,6 +193,15 @@ else
             --timestamp \
             "$nested"
     done
+
+    # The lock screen line helper, with its own identifier: launchd runs it as root.
+    echo "→ Signing the lock screen line helper..."
+    codesign --force \
+        --sign "$SIGN_IDENTITY" \
+        --options runtime \
+        --timestamp \
+        --identifier com.626labs.sanduhr.lockline \
+        "$APP/Contents/MacOS/SanduhrLockLineHelper"
 
     # The one entitlement: Apple Events, for Settings, Desk, Now Playing's "Ask Music and Spotify
     # directly" (hardened runtime refuses them without it; macOS still asks the user first).

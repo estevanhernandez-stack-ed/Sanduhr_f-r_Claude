@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// Settings, Lock Screen (#137): the line Sanduhr keeps ready for the lock screen. The root
-/// writer that shows it there is a later build (docs/lock-screen-line-spec.md); for now the
-/// page keeps `lock-line.txt` current and previews it.
+/// Settings, Lock Screen (#137, docs/lock-screen-line-spec.md): the line Sanduhr puts on the lock
+/// screen. The switch keeps `lock-line.txt` current and installs the root helper
+/// (LockLineDaemon) that writes it to the lock screen; turning it off takes the line away and
+/// removes the helper.
 struct LockScreenSettings: View {
     let vm: UsageViewModel
     @AppStorage(LockLineKeys.on, store: .desk) private var enabled = false
@@ -12,17 +13,11 @@ struct LockScreenSettings: View {
     @AppStorage(LockLineKeys.waiting, store: .desk) private var showWaiting = true
 
     static let switchTitle = "Show a line on the lock screen"
-    static let laterBuild = "The lock screen writer comes in a later build; for now Sanduhr keeps the line ready."
     static let readable = "Anyone at the screen can read this line. Sanduhr only puts counts, percents and times in it."
 
     var body: some View {
         Form {
-            Section {
-                Toggle(Self.switchTitle, isOn: $enabled)
-                    .onChange(of: enabled) { _, _ in LockLineController.shared.refresh() }
-                    .settingsAnchor(SettingsAnchor.lockLine)
-                Text(Self.laterBuild).font(.caption).foregroundStyle(.secondary)
-            }
+            LockLineSwitchSection(enabled: $enabled)
             LockLinePrefixSection(prefix: $prefix)
             Section("Show") {
                 Toggle("Claude usage", isOn: $showUsage)
@@ -73,6 +68,56 @@ private struct LockLinePreviewSection: View {
             Text(LockScreenSettings.readable)
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// The switch and the helper's state under it: installed, waiting for macOS's OK, or off, and
+/// what macOS said when it refused.
+private struct LockLineSwitchSection: View {
+    @Binding var enabled: Bool
+    @State private var state = LockLineDaemon.state
+    @State private var problem: String?
+
+    var body: some View {
+        Section {
+            Toggle(LockScreenSettings.switchTitle, isOn: $enabled)
+                .onChange(of: enabled) { _, on in apply(on) }
+                .settingsAnchor(SettingsAnchor.lockLine)
+            Text(LockLineDaemon.caption(state))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if state == .needsApproval {
+                Button("Open Login Items…") { LockLineDaemon.openLoginItems() }
+            }
+            if let problem {
+                Text(problem)
+                    .font(.caption).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .onAppear { state = LockLineDaemon.state }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            state = LockLineDaemon.state
+        }
+    }
+
+    private func apply(_ on: Bool) {
+        problem = nil
+        if on {
+            LockLineController.shared.refresh(force: true)
+            do { try LockLineDaemon.install() } catch {
+                problem = "macOS did not install the lock screen helper: \(error.localizedDescription)"
+            }
+            state = LockLineDaemon.state
+        } else {
+            let shown = LockLineDaemon.currentLoginText() ?? ""
+            let wasOn = state == .on
+            LockLineController.shared.refresh()
+            Task { @MainActor in
+                await LockLineDaemon.remove(lastLine: wasOn ? shown : "")
+                state = LockLineDaemon.state
+            }
         }
     }
 }
