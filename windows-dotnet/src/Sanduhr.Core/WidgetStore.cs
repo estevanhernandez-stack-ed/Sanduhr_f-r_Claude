@@ -407,6 +407,33 @@ public sealed class WidgetStore
         }
     }
 
+    /// <summary>
+    /// Switches an installed pack on or off (Settings v2, Mods &amp; Widgets): its row's <c>enabled</c>, which <see cref="InstalledOfKind"/>
+    /// and the companion read. Only that row changes; the pack's files stay. Writing the value it already has writes nothing.
+    /// </summary>
+    public WidgetStoreResult SetEnabled(string id, bool enabled)
+    {
+        if (!IsSafeId(id))
+            return WidgetStoreResult.Failed("That isn't an installed widget.");
+        lock (_gate)
+        {
+            var reg = Load();
+            if (reg.Find(id) is not { } row)
+                return WidgetStoreResult.Failed("That widget isn't installed.");
+            if (row.Enabled == enabled)
+                return WidgetStoreResult.Done;
+            try
+            {
+                Save(reg with { Packs = [.. reg.Packs.Select(p => p.Id == id ? p with { Enabled = enabled } : p)] });
+                return WidgetStoreResult.Done;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                return WidgetStoreResult.Failed("The widget couldn't be switched: " + Plain(e));
+            }
+        }
+    }
+
     /// <summary>Deletes what an interrupted install or uninstall left in <c>.staging\</c>.</summary>
     public void CleanStaging()
     {

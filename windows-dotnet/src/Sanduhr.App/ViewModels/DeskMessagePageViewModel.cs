@@ -409,12 +409,12 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
             _handoff.Decided += OnDecided;
             _handoff.Applied += OnApplied;
         }
-        FontOptions = BuildFontOptions();
+        FontOptions = new(BuildFontOptions());
         ColorOptions = [FollowsInk, .. DeskInkPresets.All.Select(p => new MessageChoice<string>(p.Name, p.Value)), CustomInkChoice];
         SecondsOptions = [.. MessageSpecialModes.Presets.Select(s => new MessageChoice<double>(MessageSpecialModes.Label(s), s))];
     }
 
-    private readonly IReadOnlyList<string> _fontFamilies;
+    private IReadOnlyList<string> _fontFamilies;
 
     /// <summary>Today, for a new date row's starting month and day.</summary>
     internal DateTime Today => DateTime.Today;
@@ -806,7 +806,7 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
         set => Apply(_settings with { Glow = value });
     }
 
-    public IReadOnlyList<MessageChoice<string>> FontOptions { get; }
+    public ObservableCollection<MessageChoice<string>> FontOptions { get; }
 
     private IReadOnlyList<MessageChoice<string>> BuildFontOptions()
     {
@@ -815,6 +815,13 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
         if (_settings.Font.Length > 0 && list.All(c => c.Value != _settings.Font))
             list.Add(new MessageChoice<string>(_settings.Font, _settings.Font));
         return list;
+    }
+
+    /// <summary>The font packs changed: the Message font list follows, keeping the saved family listed (BuildFontOptions already does).</summary>
+    public void ReloadFonts(IReadOnlyList<string> families)
+    {
+        _fontFamilies = families;
+        FontListSync.Sync(FontOptions, BuildFontOptions());
     }
 
     public MessageChoice<string> Font

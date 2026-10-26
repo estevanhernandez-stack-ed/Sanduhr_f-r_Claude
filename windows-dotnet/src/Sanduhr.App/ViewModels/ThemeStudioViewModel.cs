@@ -129,6 +129,16 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
             Rows.Add(new ThemeTokenRowViewModel(this, field, label, job));
     }
 
+    /// <summary>The font packs changed: the Font picker and the Desk font row follow; the draft's font stays listed.</summary>
+    public void ReloadFonts(IReadOnlyList<string> families)
+    {
+        var wanted = new List<string> { SettingsNames.ThemeDefaultFont };
+        wanted.AddRange(families);
+        if (_draft.Font is { Length: > 0 } f && !wanted.Contains(f)) wanted.Add(f);
+        FontListSync.Sync(_fontChoices, wanted);
+        DeskEditor.ReloadFonts(families);
+    }
+
     /// <summary>Called when the studio becomes visible: start from the active
     /// theme unless a draft is already in progress.</summary>
     public void Activate()

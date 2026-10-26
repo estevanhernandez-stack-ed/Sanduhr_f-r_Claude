@@ -65,7 +65,10 @@ internal static class AppHost
             catch (Exception e)
             {
                 var reason = watch.RoutesFocus ? watch.Interference() : null;
-                failure = ExceptionDispatchInfo.Capture(reason is null ? e : new SkipException(reason));
+                failure = ExceptionDispatchInfo.Capture(
+                    reason is not null ? new SkipException(reason)
+                    : watch.RoutesFocus ? new Xunit.Sdk.XunitException($"{e.Message}\n{watch.Diagnosis()}", e)
+                    : e);
             }
         });
         failure?.Throw();

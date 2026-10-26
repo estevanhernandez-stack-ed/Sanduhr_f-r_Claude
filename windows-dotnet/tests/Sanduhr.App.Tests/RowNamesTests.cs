@@ -38,9 +38,7 @@ public class RowNamesTests
         Reads("Fort Worth, Texas, United States", WeatherPlace.Create("Fort Worth", "Texas", "United States", 32.75, -97.33));
 
     [Fact]
-    public void ModsLinesAndFolderOptionsReadAsWords()
-    {
+    public void ModsLinesReadAsWords() =>
+        // Mods & Config's folder picker (ModsFolderOption) retired with the page in slice 4; the cards' report lines remain.
         Reads("Notification, 2 groups", new ModsLine("Notification", "2 groups"));
-        Reads(@"~\.claude-personal", new ModsFolderOption(@"C:\u\.claude-personal", @"~\.claude-personal"));
-    }
 }

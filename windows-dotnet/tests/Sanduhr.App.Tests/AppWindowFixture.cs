@@ -44,6 +44,15 @@ public abstract class AppWindowFixture : IDisposable
 
     protected string Profile => Path.Combine(Root, "profile");
 
+    /// <summary>A Claude Code home (it has a projects folder) under the scratch profile, with the given settings.json text.</summary>
+    protected string Home(string name, string settings = "{}")
+    {
+        var dir = Path.Combine(Profile, name);
+        Directory.CreateDirectory(Path.Combine(dir, "projects"));
+        File.WriteAllText(Path.Combine(dir, "settings.json"), settings);
+        return dir;
+    }
+
     protected AppWindowFixture()
     {
         Environment.SetEnvironmentVariable("SANDUHR_DEV_PROFILE", Path.Combine(Root, "dev"));
@@ -51,8 +60,7 @@ public abstract class AppWindowFixture : IDisposable
         ClaudeCodeProfile.ProfileOverride = Profile;
         ClaudeCodeProfile.ConfigDirOverride = "";
         ClaudeCodeViewModel.ForgetSessionChoice();
-        ModsConfigViewModel.ForgetSessionChoice();
-        // Settings ▸ Widgets fetches the catalog when it opens: never the real network from a test.
+        // Mods & Widgets fetches the catalog when it opens: never the real network from a test.
         WidgetCatalogService.HandlerOverride = () => new OfflineHandler();
         NoLiveMedia();
     }
@@ -73,7 +81,6 @@ public abstract class AppWindowFixture : IDisposable
         Sanduhr.App.Desk.NowPlayingHub.Current = _oldHub;
         Sanduhr.App.Desk.NowPlayingLookService.Current = _oldLooks;
         ClaudeCodeViewModel.ForgetSessionChoice();
-        ModsConfigViewModel.ForgetSessionChoice();
         try { Directory.Delete(Root, true); } catch (IOException) { }
     }
 

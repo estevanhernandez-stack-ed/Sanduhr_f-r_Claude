@@ -855,7 +855,7 @@ public static partial class Program
         await Settle();
     }
 
-    /// <summary>The harness never touches the network: Settings ▸ Widgets fetches the catalog when it opens, so it gets a
+    /// <summary>The harness never touches the network: Settings, Mods & Widgets fetches the catalog when it opens, so it gets a
     /// network that is never there and draws its offline line.</summary>
     sealed class OfflineHandler : System.Net.Http.HttpMessageHandler
     {

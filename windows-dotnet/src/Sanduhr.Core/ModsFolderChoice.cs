@@ -1,7 +1,7 @@
 namespace Sanduhr.Core;
 
 /// <summary>
-/// Which Claude Code folder Mods &amp; Config opens on. The folder you used last wins; failing that, the one
+/// Which Claude Code folder card opens "What this folder holds" when a link lands on Claude Code, folder-config (Settings v2 slice 4). The folder you used last wins; failing that, the one
 /// Claude Code actually runs from (<c>CLAUDE_CONFIG_DIR</c>), then the one linked to the active account, then the one
 /// with the most plugins switched on, then the first. Opening on a folder you do not use made the page read
 /// "everything off".

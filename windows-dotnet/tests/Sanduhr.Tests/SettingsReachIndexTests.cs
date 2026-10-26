@@ -157,8 +157,14 @@ public class SettingsReachIndexTests
     {
         var margins = new SettingsEntry("Margins", SettingsPage.Desk, SettingsIndex.DeskMargins, ["edge"], CollapsedIn: "Advanced");
         Assert.Equal("Advanced", SettingsIndex.Search("edge", [margins]).Single().Entry.CollapsedIn);
-        // Slice 3 folds Designs and Advanced on the Desk page; nothing else is collapsed.
-        Assert.All(SettingsIndex.All.Where(e => e.CollapsedIn is not null), e => Assert.Equal(SettingsPage.Desk, e.Page));
+        // Slice 3 folds Designs and Advanced on the Desk page; slice 4 folds "What this folder holds" on Claude Code and the Catalog on
+        // Mods & Widgets (P1). Nothing else is collapsed.
+        Assert.Equal(
+            new[] { (SettingsPage.ClaudeCode, SettingsNames.FolderHolds), (SettingsPage.Desk, SettingsNames.DeskAdvanced), (SettingsPage.Desk, SettingsNames.DeskDesigns),
+                (SettingsPage.Mods, SettingsNames.CatalogSection) }
+                .OrderBy(p => p.Item1).ThenBy(p => p.Item2, StringComparer.Ordinal),
+            SettingsIndex.All.Where(e => e.CollapsedIn is not null).Select(e => (e.Page, e.CollapsedIn!)).Distinct()
+                .OrderBy(p => p.Item1).ThenBy(p => p.Item2, StringComparer.Ordinal));
         Assert.Contains(SettingsIndex.All, e => e.CollapsedIn == SettingsNames.DeskAdvanced);
     }
 }

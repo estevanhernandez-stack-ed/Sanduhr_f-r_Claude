@@ -8,7 +8,7 @@ namespace Sanduhr.App.ViewModels;
 
 /// <summary>
 /// Backs the Settings window's pages. It owns one view model per page (accounts, alerts, history, Claude Usage and
-/// Claude Code, publish, themes, the Desk pages, Now Playing, Weather and Widgets), the search box's
+/// Claude Code, publish, themes, the Desk pages, Now Playing, Weather and Mods &amp; Widgets), the search box's
 /// <see cref="Search"/>, the shortcut recorder, and the commands the About page and the sidebar's foot call: What's
 /// New, the tour, open a folder or link, Reset and Quit.
 /// </summary>
@@ -31,8 +31,6 @@ public sealed class SettingsViewModel
     /// <summary>Backs the Claude Code page: folders, accounts linked to them, Sanduhr's pieces and the glow.</summary>
     public ClaudeCodeViewModel ClaudeCodePage { get; }
 
-    /// <summary>Backs the Mods &amp; Config page: a read-only look at one folder, plus the meters mod switch.</summary>
-    public ModsConfigViewModel Mods { get; }
     /// <summary>Settings, Desk (spec 5.1).</summary>
     public DeskSettingsViewModel Desk { get; }
 
@@ -51,9 +49,40 @@ public sealed class SettingsViewModel
     /// <summary>Settings, Desk Look, Match the widget theme (theme match).</summary>
     public ThemeMatchViewModel ThemeMatch { get; }
 
-    /// <summary>Settings, Widgets (spec 3.8): the signed catalog and the installed packs. Nothing is fetched until the
-    /// page opens.</summary>
-    public WidgetsPageViewModel WidgetsPage { get; internal set; } = new();
+    /// <summary>Settings, Mods &amp; Widgets (slice 4): the one list. Nothing is fetched until the catalog is opened.</summary>
+    private ModsPageViewModel _modsPage = null!;
+
+    /// <summary>Settings, Mods &amp; Widgets (slice 4): the one list. Tests and the harness put in their own (a fake catalog); the setter wires
+    /// it to this window's pickers.</summary>
+    public ModsPageViewModel ModsPage
+    {
+        get => _modsPage;
+        internal set
+        {
+            _modsPage = value;
+            value.SettingsChanged = PacksChanged;
+            value.MetersChanged = installed => ClaudeCodePage.AfterMetersChange(installed);
+        }
+    }
+
+    /// <summary>This PC's font families for the pickers (the bundled ones, the system's, the font packs that are on). A seam for tests.</summary>
+    internal Func<IReadOnlyList<string>> PickerFonts { get; set; } =
+        () => Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies();
+
+    /// <summary>
+    /// A widget pack was switched, installed or removed (Settings v2 slice 4: every consumer honors the switch): the four font pickers, the Ink
+    /// presets and the companion's sprites read again. The widget's theme list is App's (it reloads the themes in the same handler).
+    /// </summary>
+    public void PacksChanged()
+    {
+        var fonts = PickerFonts();
+        Desk.ReloadFonts(fonts);
+        MessagePage.ReloadFonts(fonts);
+        ThemeMatch.Editor.ReloadFonts(fonts);
+        Themes.Studio.ReloadFonts(fonts);
+        Themes.RefreshThemePacks();
+        Desk.Reload();   // the Ink presets and the companion's sprites
+    }
 
     /// <summary>Backs the General tab's auto-start control (item 10).</summary>
     public GeneralViewModel General { get; }
@@ -158,7 +187,6 @@ public sealed class SettingsViewModel
             new CcTrendsViewModel(widget),
             new CcLedgerViewModel(widget, widget.LoadLedgerGroupByProject(), widget.SaveLedgerGroupByProject));
         ClaudeCodePage = new ClaudeCodeViewModel(widget);
-        Mods = new ModsConfigViewModel(widget);
         Desk = new DeskSettingsViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies(),
             inkPresets: () => PackInkPresets.Merged(new WidgetStore(new Paths().WidgetsDir, Sanduhr.App.Services.WidgetCatalogService.EncodePng)));
         var msgPaths = new Paths();
@@ -187,11 +215,15 @@ public sealed class SettingsViewModel
         // The glow's spot is placed by the Claude Code page through its own store: the Desk page reads it again (App replaces this
         // with one that also reloads the running Desk).
         ClaudeCodePage.DeskReload = Desk.Reload;
-        // The two pages share one folder list and one set of installed pieces.
-        ClaudeCodePage.FoldersChanged += Mods.ReloadFolders;
-        ClaudeCodePage.PiecesChanged += Mods.Refresh;
-        Mods.OwnModChanged += ClaudeCodePage.Reload;
+        // The two pages share one folder list and one set of installed pieces: a card's change reloads Mods & Widgets, and a meters change
+        // there reloads the cards and the snapshot switch (wired in the ModsPage setter, so a page a test puts in is wired too).
+        ClaudeCodePage.FoldersChanged += () => ModsPage.ReloadLocal();
+        ClaudeCodePage.PiecesChanged += () => ModsPage.ReloadLocal();
+        // The companion row's "Get one in Mods & Widgets…" shows sprites; Themes' link shows widget packs (spec, Menus).
+        Desk.Companion.GetOne = () => ModsPage.ShowSprites();
+        Themes.ShowPacks = () => ModsPage.ShowWidgetPacks();
         General = new GeneralViewModel(widget: widget);
+        ModsPage = new ModsPageViewModel(host: ClaudeCodeHost.For(widget));
         Shortcuts = new ShortcutsViewModel(new SettingsStore(new Paths()), hotKeys);
         Alerts = new AlertsViewModel(widget, () =>
         {

@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Sanduhr.App.ViewModels"
              xmlns:views="clr-namespace:Sanduhr.App.Views"
+             xmlns:conv="clr-namespace:Sanduhr.App.Converters"
              xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
              Focusable="False">
     <!-- Settings, Desk, Pieces (spec, Desk: the split): one row per piece. Show is the piece's name; then Place, Size and Monitor,
@@ -40,11 +41,11 @@
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                            AutomationProperties.Name="Companion status" AutomationProperties.LiveSetting="Polite"
                            Visibility="{Binding HasCompanions, Converter={StaticResource BoolVis}}" />
-                <WrapPanel Visibility="{Binding HasCompanions, Converter={x:Static views:WidgetsPage.NotVisible}}">
+                <WrapPanel Visibility="{Binding HasCompanions, Converter={x:Static conv:Bools.NotVisible}}">
                     <TextBlock Text="{Binding NoneYet}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"
                                Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                     <Button Style="{DynamicResource SettingsLinkButton}" Content="{Binding GetOneTitle}"
-                            views:SettingsLinkTo.Link="{Binding GetOneLink}"
+                            views:SettingsLinkTo.Link="{Binding GetOneLink}" Command="{Binding GetOneClickedCommand}"
                             AutomationProperties.Name="{Binding GetOneTitle}" />
                 </WrapPanel>
             </StackPanel>

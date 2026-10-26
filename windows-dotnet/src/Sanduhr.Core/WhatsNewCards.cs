@@ -23,7 +23,7 @@ public static class WhatsNewCards
     private static WhatsNewCard[] Release380() =>
     [
         WhatsNewCard.Of("3.8.0", "widgets", "Widgets for your Desk",
-            "Settings, Widgets installs packs from the 626 Labs catalog: sprites, themes, palettes and effects. Packs are data only, signed, and checked again before they install.",
+            "Settings, Mods & Widgets installs packs from the 626 Labs catalog: sprites, themes, palettes and effects. Packs are data only, signed, and checked again before they install.",
             "", // Puzzle
             WhatsNewPreview.None, SettingsPage.Widgets),
         WhatsNewCard.Of("3.8.0", "companion", "A companion on your Desk",

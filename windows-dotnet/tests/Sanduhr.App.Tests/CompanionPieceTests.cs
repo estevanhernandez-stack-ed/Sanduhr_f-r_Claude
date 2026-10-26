@@ -332,7 +332,7 @@ public sealed class CompanionPieceTests : IDisposable
         desk.Reload();
         Assert.False(companion.HasCompanions);
         Assert.Null(companion.SelectedCompanion);
-        Assert.Equal("widgets#widgets-catalog", companion.GetOneLink);
+        Assert.Equal("mods#catalog", companion.GetOneLink);
     }
 
     [Fact]
@@ -352,7 +352,7 @@ public sealed class CompanionPieceTests : IDisposable
         Assert.Contains("AutomationProperties.Name=\"{x:Static core:SettingsNames.WidgetCompanionPick}\"", panel);
         Assert.Contains("AutomationProperties.Name=\"{x:Static core:SettingsNames.WidgetCompanionRoam}\"", panel);
         Assert.Contains("views:SettingsLinkTo.Link=\"{Binding GetOneLink}\"", panel);
-        Assert.DoesNotContain("widgets-companion", File.ReadAllText(Path.Combine(AppDir(), "Views", "WidgetsPage.xaml")));
+        Assert.DoesNotContain("widgets-companion", File.ReadAllText(Path.Combine(AppDir(), "Views", "ModsPage.xaml")));
         Assert.Contains((SettingsNames.WidgetCompanionPick, SettingsPage.Desk), SettingsNames.Table);
         Assert.Contains((SettingsNames.WidgetCompanionRoam, SettingsPage.Desk), SettingsNames.Table);
     }

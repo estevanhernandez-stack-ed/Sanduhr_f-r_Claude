@@ -20,8 +20,9 @@ public static class SettingsNames
     // ---- Pages ----
 
     /// <summary>The sidebar: six groups, each page once. Widget is not a page (Show me on a widget card
-    /// shows the widget itself). Settings v2 names the groups: "Extend" (it will hold widget packs, which
-    /// are not Claude Code's) and "Desktop" (the Mac's word, and no longer its first page's title).</summary>
+    /// shows the widget itself). Settings v2 names the groups: "Extend" (Claude Code and Mods &amp; Widgets, which holds widget packs too)
+    /// and "Desktop" (the Mac's word, and no longer its first page's title). Retired pages (Widgets since slice 4) stay in
+    /// <see cref="SettingsPage"/> for their aliases but are in no group.</summary>
     public static IReadOnlyList<SettingsGroup> Sidebar { get; } =
     [
         new(null, [SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts]),
@@ -29,12 +30,12 @@ public static class SettingsNames
         new("Extend", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Themes]),
         new("Desktop", [SettingsPage.Desk, SettingsPage.DeskLook, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather,
-            SettingsPage.Watchers, SettingsPage.Launcher, SettingsPage.Widgets]),
+            SettingsPage.Watchers, SettingsPage.Launcher]),
         new("Help", [SettingsPage.About]),
     ];
 
-    // ---- Page titles added by Settings v2. Desk Look, Watchers and Launcher are pages since slice 3; Privacy (slice 6) and
-    // Mods & Widgets (slice 4, the Mods page's new title) are still to come.
+    // ---- Page titles added by Settings v2. Desk Look, Watchers and Launcher are pages since slice 3, Mods & Widgets since slice 4;
+    // Privacy (slice 6) is still to come.
     public const string PrivacyTitle = "Privacy";
     public const string DeskLookTitle = "Desk Look";
     public const string WatchersTitle = "Watchers";
@@ -42,7 +43,7 @@ public static class SettingsNames
     public const string ModsAndWidgetsTitle = "Mods & Widgets";
 
     /// <summary>The titles of pages still to come, in sidebar order.</summary>
-    public static IReadOnlyList<string> TitlesToCome { get; } = [PrivacyTitle, ModsAndWidgetsTitle];
+    public static IReadOnlyList<string> TitlesToCome { get; } = [PrivacyTitle];
 
     /// <summary>Every page in sidebar order.</summary>
     public static IReadOnlyList<SettingsPage> Pages { get; } = [.. Sidebar.SelectMany(g => g.Pages)];
@@ -57,7 +58,7 @@ public static class SettingsNames
         SettingsPage.ClaudeUsage => "Claude Usage",
         SettingsPage.Publish => "Publish usage",
         SettingsPage.ClaudeCode => "Claude Code",
-        SettingsPage.Mods => "Mods & Config",
+        SettingsPage.Mods => ModsAndWidgetsTitle,
         SettingsPage.Themes => "Themes",
         SettingsPage.Desk => "Desk",
         SettingsPage.DeskMessage => "Message",
@@ -66,7 +67,7 @@ public static class SettingsNames
         SettingsPage.DeskLook => DeskLookTitle,
         SettingsPage.Watchers => WatchersTitle,
         SettingsPage.Launcher => LauncherTitle,
-        SettingsPage.Widgets => "Widgets",
+        SettingsPage.Widgets => "Widgets",   // retired in slice 4: keeps its old title for aliases and logs
         SettingsPage.About => "About",
         SettingsPage.Widget => "Widget",
         _ => page.ToString(),
@@ -189,7 +190,7 @@ public static class SettingsNames
     public const string ManualKeyCloudflareHelp =
         "Only if Sanduhr says Cloudflare blocked it: copy the Value next to cf_clearance from the same Cookies list and paste it here.";
     public const string ManualKeyCfLabel = "cf_clearance";
-    /// <summary>Mods &amp; Config: re-reads the folder.</summary>
+    /// <summary>A Claude Code card's report: re-reads the folder.</summary>
     public const string RefreshFolder = "Refresh";
     /// <summary>Desk: the switch at the top of the page (settings.json "desk_enabled", off by default). It lists
     /// what the Desk draws, as the tour does (WF16).</summary>
@@ -201,7 +202,7 @@ public static class SettingsNames
     public const string PieceOutdated = "Installed, but not the current version.";
     /// <summary>Claude Code, a folder card's Linked account caption, true before and after an install (WF27).</summary>
     public const string LinkedAccountCaption = "Once the statusline or meters are installed here, they show this account's meters.";
-    /// <summary>Mods &amp; Config: Claude Code's own retention (cleanupPeriodDays), the fourth "history" (WF14).</summary>
+    /// <summary>A Claude Code card's report: Claude Code's own retention (cleanupPeriodDays), the fourth "history" (WF14).</summary>
     public const string TranscriptsKept = "Claude Code keeps transcripts for";
     /// <summary>Themes: a pasted or edited theme with no errors or notes (WF43).</summary>
     public const string ThemeJsonValid = "This theme's JSON is valid.";
@@ -315,7 +316,7 @@ public static class SettingsNames
     /// <summary>Widgets: a catalog row's buttons and an installed row's. Each carries its pack's name for a screen reader.</summary>
     public const string WidgetInstall = "Install";
     public const string WidgetUpdate = "Update";
-    public const string WidgetUninstall = "Uninstall";
+    public const string WidgetUninstall = "Uninstall…";
     /// <summary>Widgets: how a Claude-made or the user's own pack is listed (spec 3.8, section 3).</summary>
     public const string WidgetMadeHere = "made here";
     /// <summary>Widgets: an installed sprite made here takes the user's own PNG sheets, one per stage (spec 3.8, section 6).</summary>
@@ -324,6 +325,214 @@ public static class SettingsNames
     public const string WidgetCompanionPick = "Companion sprite";
     /// <summary>Desk, Pieces, the Companion row: it walks the screen's edges (never with Windows' animations off).</summary>
     public const string WidgetCompanionRoam = "Let it roam";
+
+    // ---- Settings v2, slice 4: Mods & Widgets (spec, Mods & Widgets: one list) ----
+
+    /// <summary>Mods &amp; Widgets: the page's first line (WF21).</summary>
+    public const string ModsPageLine = "A widget pack is " + DefineWidgetPack + ". A mod is " + DefineMod + ".";
+    /// <summary>Mods &amp; Widgets: the intro (WF39). It no longer says "Sanduhr runs nothing here".</summary>
+    public const string ModsIntro = "Everything installed for Sanduhr and for Claude Code, in one list. You can switch Sanduhr's mod and widget packs here; other Claude Code mods are shown read-only.";
+    /// <summary>Mods &amp; Widgets' three sections, and the Claude Code card's collapsed report.</summary>
+    public const string MetersSection = "Meters above the prompt";
+    public const string InstalledSection = "Installed";
+    public const string CatalogSection = "Catalog";
+    public const string FolderHolds = "What this folder holds";
+    /// <summary>Meters above the prompt: how Off differs from Remove (WF9).</summary>
+    public const string MetersOffVsRemove = "Off keeps the mod's entry and files; Remove takes the entry out and puts settings.json back exactly.";
+    /// <summary>A Claude Code plugin or mod Sanduhr can't switch (Principle 5, WF39, mods-parity R1 and R6).</summary>
+    public const string ReadOnlyClaudeCode = "Read-only: Sanduhr can't switch this yet. Use claude plugin in a terminal.";
+    /// <summary>Where an installed widget pack shows (WF3), by kind.</summary>
+    public const string ShowsInThemes = "In Themes";
+    public const string ShowsInInk = "In Desk Look, Ink and color";
+    public const string ShowsInFonts = "In Desk Look, Fonts";
+    public const string ShowsAsCompanion = "As the Desk companion";
+    /// <summary>The catalog row's state line (Mods &amp; Widgets, Catalog).</summary>
+    public const string CatalogInstalled = "Installed.";
+    public static string CatalogVersionInstalled(string version) =>
+        string.IsNullOrWhiteSpace(version) ? "An older version is installed." : $"Version {version} is installed.";
+    public static string CatalogNeedsSanduhr(string min) => $"Needs Sanduhr {min} or later.";
+    public static string CatalogUpdateNeedsSanduhr(string installed, string update, string min) =>
+        $"{CatalogVersionInstalled(installed)} {update} needs Sanduhr {min} or later.";
+    public static string CatalogIdTaken => $"A widget {WidgetMadeHere} already uses this id.";
+    public const string EffectsUnused = "Not used yet: Sanduhr has nothing that draws effects packs.";
+    /// <summary>Catalog: the only network call on the page (WF6).</summary>
+    public const string CatalogDisclosure = "The catalog comes from GitHub. Sanduhr asks only when you open it, check it again, or install or update a pack.";
+    /// <summary>Installed: the filter chips and the text filter's spoken name.</summary>
+    public const string FilterAll = "All";
+    public const string FilterClaudeCode = "Claude Code";
+    public const string FilterWidgets = "Widgets";
+    public const string FilterBoxName = "Filter the installed list";
+    /// <summary>Installed: the filters hide everything (an empty-state line, WF35).</summary>
+    public const string NothingMatches = "Nothing installed matches the filter.";
+    /// <summary>A pack's or a folder's on switch: the visible word, then what it switches, for a screen reader.</summary>
+    public const string PackOn = "On";
+    public static string PackOnFor(string pack) => $"{PackOn}: {pack}";
+    public static string MetersIn(string folder) => $"{MetersSection} in {folder}";
+    public static string MetersOnFor(string folder) => $"{PackOn}: {MetersIn(folder)}";
+    /// <summary>A Claude Code card's meters line, spoken with its state: the section in the folder, then On, Off, Files missing or Can't be read.</summary>
+    public static string MetersSpoken(string folder, string state) => $"{MetersIn(folder)}: {state}";
+    /// <summary>The names of a card's report lists, read before their items.</summary>
+    public const string ReportHooks = "Hooks";
+    public const string ReportPluginSwitches = "Plugin switches";
+    public const string ReportMcpServers = "MCP servers";
+    /// <summary>Installed: Sanduhr's meters mod row links up to its section.</summary>
+    public const string MetersLinkUp = "Switch it per folder\u2026";
+    /// <summary>A scope over folders: "On in 2 of 3 folders". One folder reads its state alone.</summary>
+    public static string OnInFolders(int on, int of) => $"On in {on} of {of} folders";
+    public const string FolderOn = "On";
+    public const string FolderOff = "Off";
+    public const string FolderMissing = "Files missing";
+    public const string FolderNotInstalled = "Not installed";
+    public const string FolderUnreadable = "Can't be read";
+    /// <summary>Installed: the reconcile note in plain words (spec, Installed), counting distinct plugins across the folders (P11).</summary>
+    public static string NoSwitchNote(int n) => n == 1
+        ? "1 plugin has no on/off entry in settings.json, so Claude Code treats it as on."
+        : $"{n} plugins have no on/off entry in settings.json, so Claude Code treats them as on.";
+    public static string NoFilesNote(int n) => n == 1
+        ? "1 plugin is switched on in settings.json, but its files aren't there."
+        : $"{n} plugins are switched on in settings.json, but their files aren't there.";
+    /// <summary>Catalog: the companion row's link shows sprites only until "Show every pack".</summary>
+    public const string ShowingSprites = "Showing sprites only.";
+    public const string ShowEveryPack = "Show every pack";
+    /// <summary>The Uninstall button asks first.</summary>
+    public static string UninstallQuestion(string pack) => $"Uninstall {pack}?";
+    public const string UninstallDetail = "Its files leave Sanduhr's widgets folder on this PC.";
+    public const string UninstallConfirm = "Uninstall";
+    public const string UninstallCancel = "Cancel";
+    /// <summary>The Uninstall button's spoken name: "Uninstall Fixture palette" (no ellipsis; the dialog follows).</summary>
+    public static string UninstallFor(string pack) => $"Uninstall {pack}";
+    /// <summary>Themes: the theme packs line above the gallery (WF40).</summary>
+    public static string ThemePacksLine(int n) => $"Theme packs: {n} installed.";
+
+    // ---- Settings v2, slice 4: the Claude Code cards (spec, Claude Code) ----
+
+    /// <summary>The Claude Code glow section: what it needs, and which folders have it (WF11).</summary>
+    public const string GlowNeedsHook = "Needs the " + ClaudeCodeGlowHook + " in a folder above.";
+    public static string GlowHookIn(IReadOnlyList<string> folders) => folders.Count switch
+    {
+        0 => "Not installed in any folder yet.",
+        1 => $"Installed in {folders[0]}.",
+        _ => $"Installed in {string.Join(", ", folders.Take(folders.Count - 1))} and {folders[^1]}.",
+    };
+    /// <summary>A folder card's Linked account when no account is signed in (WF32, carried here with the card).</summary>
+    public const string AddAccountToLink = "Add an account to link this folder.";
+
+    /// <summary>A folder card's collapsed "What this folder holds": its summary line (a SectionExpander always has one, slice 3 M3).</summary>
+    public const string FolderHoldsHelp = "settings.json, the statusline, hooks, plugin switches, MCP servers, CLAUDE.md and how long transcripts are kept.";
+    /// <summary>The Refresh button's spoken name in one card: the folder it reads (T7-1).</summary>
+    public static string RefreshFolderNamed(string display) => $"{RefreshFolder}, read {display} again";
+    /// <summary>The Claude Code glow section's three switches (P8): the label and the spoken name are the same words.</summary>
+    public const string GlowWhenWaiting = "Glow when Claude is waiting on you";
+    public const string GlowWhenDone = "Glow when Claude finishes";
+    public const string GlowNotInTerminal = "Not while a terminal or editor is in front";
+    /// <summary>A folder card piece's install button help while the piece is absent (P23: the card's own folder).</summary>
+    public static string PieceInstallHelp(string piece) => $"Asks first, then adds {piece} to this folder.";
+
+    // ---- Settings v2, slice 4: the strings the later tasks would have inlined (preflight P10) ----
+
+    /// <summary>InstalledItems (Task 3): where an item came from.</summary>
+    public const string SourceSanduhr = "Sanduhr";
+    public const string SourceSkillsFolder = "skills folder";
+    public const string SourcePluginFolder = "plugin folder";
+    public const string SourceFromCatalog = "from the catalog";
+    /// <summary>InstalledRowViewModel (Task 9): the kind word on a Claude Code row.</summary>
+    public const string KindSanduhrMod = "Sanduhr's mod";
+    public const string KindClaudeCodeMod = "Claude Code mod";
+    public const string KindClaudeCodePlugin = "Claude Code plugin";
+    /// <summary>InstalledRowViewModel.RowName (Task 9): the words a row is read with.</summary>
+    public const string RowReadOnly = "read-only";
+    public const string RowOn = "on";
+    public const string RowOff = "off";
+    /// <summary>InstalledRowViewModel.WhereLinkName (Task 9): "Themes settings... for Fixture palette".</summary>
+    public static string WhereLinkFor(string linkTitle, string pack) => $"{linkTitle} for {pack}";
+    /// <summary>SwitchPack's status line (Task 9).</summary>
+    public static string PackIsOn(string name) => $"{name} is on.";
+    public static string PackIsOff(string name) => $"{name} is off.";
+    /// <summary>SwitchPack's status when widgets.json couldn't be written and the store gave no reason.</summary>
+    public const string PackSwitchFailed = "The widget couldn't be switched.";
+    /// <summary>MetersFolderRowViewModel (Task 10): why a folder has no switch, and its Update and Remove spoken names.</summary>
+    public const string FolderUnreadableReason = "This folder's settings.json can't be read, so Sanduhr changes nothing in it.";
+    public static string UpdateMetersIn(string folder) => $"Update {MetersSection} in {folder}";
+    public static string RemoveMetersFrom(string folder) => $"Remove {MetersSection} from {folder}";
+    /// <summary>The consent dialog before the meters mod is installed into a folder (Task 10), and the install's two statuses.</summary>
+    public const string MetersConsentTitle = "Draw your meters above the Claude Code prompt?";
+    public const string MetersConsentIntro = "Sanduhr adds a mod that draws your session and weekly meters in a band above the prompt.";
+    public const string MetersConsentDetails = "What gets written: the mod's folder, copied under %USERPROFILE%\\.sanduhr\\mods, and one entry in this folder's settings.json under "
+        + "env, CLAUDE_CODE_PLUGIN_DIRS. The mod reads only Sanduhr's snapshot file. Off keeps the entry and files; Remove takes out only "
+        + "Sanduhr's entry and leaves any other folder in that list alone.";
+    public const string MetersInstalled = "Meters installed. New Claude Code sessions show them.";
+    public const string MetersInstallFailed = "Couldn't install the meters.";
+    /// <summary>ModsPage.xaml (Task 12).</summary>
+    public const string ModsShowGroup = "Show";
+    public const string CatalogListName = "Widget packs in the catalog";
+    public const string UpdateButton = "Update\u2026";
+    public const string RemoveButton = "Remove\u2026";
+    /// <summary>Meters above the prompt with no folder (P20): the sentence, then a <see cref="ClaudeCodeLinkTitle"/> link to claudecode#folders.</summary>
+    public const string NoFolderInMods = "No Claude Code folder found. Add one in";
+    /// <summary>"Claude Code settings…", for a page that binds it with x:Static.</summary>
+    public static string ClaudeCodeLinkTitle => LinkTitle(SettingsPage.ClaudeCode);
+    /// <summary>Mods &amp; Widgets (Task 12): the Installed list's empty line, the catalog's line, and the page's privacy line. The last says
+    /// exactly when GitHub is asked: the catalog when it is opened or checked again, a pack when it is installed or updated (Task 11 review).</summary>
+    public const string InstalledEmpty = "Nothing installed yet. Widget packs and Claude Code plugins and mods show here, and so do widgets you make with Claude, marked made here.";
+    public const string CatalogBlurb = "Sprites, themes, palettes, effects and fonts from the 626 Labs widget catalog. Packs are data only, no code. Sanduhr checks the catalog's signature, then each pack's size, hash and every file before it installs one.";
+    public const string InstalledPacksNote = "Installed packs live in Sanduhr's own widgets folder on this PC. Sanduhr asks GitHub for the catalog only when you open it "
+        + "or check it again, and Install or Update downloads that pack from GitHub. Reset Sanduhr removes the folder.";
+    /// <summary>Use my own art…'s help text (spec 3.8 section 6).</summary>
+    public const string UseOwnArtHelp = "Choose a PNG sprite sheet for each stage. It is copied into the widget and never sent anywhere.";
+
+    // ---- Copy moved out of Mods & Config when it retired (Task 12, P13): a card's "What this folder holds" and the meters rows ----
+
+    public const string HoldsCantRead = "Couldn't read this folder.";
+    public const string SettingsReadable = "Readable";
+    public const string SettingsReadableDetail = "settings.json parses as JSON.";
+    public static string SettingsUnreadableAt(int line, int column) => $"Unreadable: line {line}, column {column}";
+    public const string SettingsUnreadableStrict = "Claude Code reads settings.json strictly: no comments, no trailing commas. Sanduhr changes nothing in it while it is unreadable.";
+    public const string SettingsUnreadable = "Unreadable";
+    public const string SettingsCantOpen = "settings.json can't be opened. Sanduhr changes nothing in it.";
+    public const string SettingsMissing = "Missing";
+    public const string SettingsMissingDetail = "This folder has no settings.json yet.";
+    public const string StatuslineSanduhrs = "Sanduhr's statusline";
+    public const string StatuslineSomeoneElses = "Someone else's statusline";
+    public const string HoldsNone = "None";
+    /// <summary>One hook event's line: "2 groups, 1 from Sanduhr".</summary>
+    public static string HookGroups(int groups, int fromSanduhr) =>
+        $"{groups} {(groups == 1 ? "group" : "groups")}" + (fromSanduhr > 0 ? $", {fromSanduhr} from Sanduhr" : "");
+    /// <summary>The hooks summary: "3 groups on 2 events".</summary>
+    public static string HooksOnEvents(int groups, int events) =>
+        $"{groups} {(groups == 1 ? "group" : "groups")} on {events} {(events == 1 ? "event" : "events")}";
+    public static string McpServerCount(int n) => $"{n} {(n == 1 ? "server" : "servers")}";
+    public static string McpProjectsOwn(int n) => $"{n} {(n == 1 ? "project has" : "projects have")} their own servers.";
+    /// <summary>CLAUDE.md's size: "40 lines, 2 KB".</summary>
+    public static string ClaudeMdSize(int lines, long bytes) =>
+        $"{lines} {(lines == 1 ? "line" : "lines")}, " + (bytes < 1024 ? $"{bytes} bytes" : $"{bytes / 1024.0:0.#} KB");
+    public static string RetentionDays(int days) => $"{days} days.";
+    public const string RetentionUnknown = "Unknown while settings.json is unreadable.";
+
+    public const string MetersTurnedOn = "Meters mod turned on.";
+    public const string MetersTurnedOff = "Meters mod turned off.";
+    public const string MetersSwitchFailed = "Couldn't change the switch.";
+    /// <summary>The meters consent dialog's primary button.</summary>
+    public const string MetersConsentInstall = "Install";
+    public const string MetersUpdateTitle = "Update the meters mod?";
+    /// <summary>The Update question's body: the pinned version and the one this Sanduhr ships.</summary>
+    public static string MetersUpdateBody(string? pinned, string? current) =>
+        $"This folder's meters mod is pinned to {pinned ?? "the installed version"}. Updating points it at {current ?? "the new version"}, the version that ships with this Sanduhr. "
+        + "The mod's files are copied again and one entry in this folder's settings.json changes. The old version's files stay until "
+        + "Sanduhr prunes them.";
+    public const string MetersUpdateConfirm = "Update";
+    public const string MetersUpdateNotNow = "Not now";
+    public const string MetersUpdated = "Meters mod updated.";
+    public const string MetersAlreadyCurrent = "Meters mod is already current.";
+    public const string MetersUpdateFailed = "Couldn't update the meters mod.";
+    public const string MetersRemoveTitle = "Remove the meters mod?";
+    public const string MetersRemoveBody = "Takes Sanduhr's entry out of this folder's settings.json and leaves any other mod alone.";
+    public const string MetersRemoveConfirm = "Remove";
+    public const string MetersRemoveCancel = "Cancel";
+    public const string MetersRemoved = "Meters mod removed.";
+    public const string MetersRemoveFailed = "Couldn't remove the meters mod.";
+    /// <summary>ClaudeCodePage.xaml (Task 8).</summary>
+    public const string ClaudeCodeFoldersSection = "Claude Code folders";
+    public const string NoFolderInClaudeCode = "No Claude Code folder found. Add one with Add folder\u2026";
 
     // ---- Settings v2, slice 3: the Desk split ----
 
@@ -439,9 +648,9 @@ public static class SettingsNames
     /// <summary>The Watchers page's first line, and the Companion row's (WF21).</summary>
     public const string WatchersLine = "Watchers are " + DefineWatchers + ".";
     public const string CompanionLine = "The companion is " + DefineCompanion + ".";
-    /// <summary>Desk, Pieces, the Companion row with no sprite installed. The link names the page that holds the catalog today.</summary>
+    /// <summary>Desk, Pieces, the Companion row with no sprite installed. The link opens the catalog on Mods &amp; Widgets, showing sprites.</summary>
     public const string NoCompanionYet = "No companion yet.";
-    public static string GetACompanion => $"Get one in {PageTitle(SettingsPage.Widgets)}…";
+    public static string GetACompanion => $"Get one in {PageTitle(SettingsPage.Mods)}…";
     /// <summary>Desk, Designs: the collapsed section's one-line summary.</summary>
     public static string DesignsSummary(int saved, bool canPutBack) =>
         saved == 0 ? "None saved yet." : $"{saved} saved." + (canPutBack ? " " + PutMyDeskBack + " is ready." : "");
@@ -461,8 +670,6 @@ public static class SettingsNames
 
     /// <summary>The Desk page's first line.</summary>
     public const string DeskLine = "The Desk is " + DefineDesk + ".";
-    /// <summary>The Widgets page's first line (Mods &amp; Widgets' in slice 4).</summary>
-    public const string WidgetPackLine = "A widget pack is " + DefineWidgetPack + ".";
 
     /// <summary>Every core word and its definition.</summary>
     public static IReadOnlyList<(string Word, string Definition)> CoreWords { get; } =
@@ -512,7 +719,7 @@ public static class SettingsNames
         (SessionArchive, SettingsPage.ClaudeUsage),
         (FoldersToShare, SettingsPage.Publish),
         (ClaudeCodeGlowHook, SettingsPage.ClaudeCode),
-        (TranscriptsKept, SettingsPage.Mods),
+        (TranscriptsKept, SettingsPage.ClaudeCode),
         (LetClaudeReadTotals, SettingsPage.ClaudeCode),
         (SnakeSoundAtFull, SettingsPage.Alerts),
         (DeskFont, SettingsPage.DeskLook),
@@ -531,7 +738,7 @@ public static class SettingsNames
         (WeatherShowAs, SettingsPage.Weather),
         (NowPlayingBarsGradient, SettingsPage.NowPlaying),
         (GlowWhere, SettingsPage.ClaudeCode),
-        (WidgetCatalogCheck, SettingsPage.Widgets),
+        (WidgetCatalogCheck, SettingsPage.Mods),
         (WidgetCompanionPick, SettingsPage.Desk),
         (WidgetCompanionRoam, SettingsPage.Desk),
     ];
@@ -588,6 +795,9 @@ public static class SettingsNames
         ("Pin always on top", KeepWidgetOnTop, false),
         ("Don't show after updates", HideWhatsNewAfterUpdates, false),
         ("Where each piece sits", PiecesSection, true),
+        ("Mods & Config", ModsAndWidgetsTitle, false),
+        // Whole only (P3): "Widgets settings…" is inside "Mods & Widgets settings…", the page's own link title.
+        ("Widgets settings…", LinkTitle(SettingsPage.Mods), true),
     ];
 
     /// <summary>The retired names <paramref name="text"/> still uses, empty when it uses none.</summary>

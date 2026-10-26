@@ -749,7 +749,7 @@ public static class ToolCatalog
         "period_ms integer 400-10000, color '#rrggbb' or 'ink'}. " +
         "Sanduhr checks the pack again and previews it on the Desk (a sprite as the companion, a palette as the Desk ink) with a " +
         "review bar: previewing means the user is looking at it; it installs only when they press Apply (applied, as a local " +
-        "widget made here, listed in Settings, Widgets; companion true when they made a sprite the companion), and Dismiss " +
+        "widget made here, listed in Settings, Mods & Widgets, Installed; companion true when they made a sprite the companion), and Dismiss " +
         "answers rejected with reason dismissed and writes nothing. 'Let Claude change the Desk directly' does not cover " +
         "widgets: a new pack always waits for Apply. queued means Sanduhr did not answer: it is not running. Nothing is uploaded; " +
         "sharing a pack is a pull request to the sanduhr-widgets catalog.";

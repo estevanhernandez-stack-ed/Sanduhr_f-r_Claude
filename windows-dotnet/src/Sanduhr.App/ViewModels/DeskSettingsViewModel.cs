@@ -202,7 +202,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         _monitors = monitors ?? Sanduhr.App.Desk.DeskMonitorSource.Read;
         Monitors = _monitors();
         _saved = store.LoadDesk();
-        FontChoices = [.. fontFamilies, SystemFont];
+        FontChoices = new([.. fontFamilies, SystemFont]);
         Pieces =
         [
             new DeskPieceRow(this, "message", SettingsNames.DeskMessage),
@@ -284,6 +284,16 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(Settings));
     }
 
+    /// <summary>The font packs changed (one switched, installed or removed): the Desk font list follows. The saved family stays listed, so the
+    /// box never goes blank and nothing rewrites the setting, while the Desk draws its fallback for a family this PC no longer has.</summary>
+    public void ReloadFonts(IReadOnlyList<string> families)
+    {
+        var wanted = new List<string>(families);
+        if (Font != SystemFont && !wanted.Contains(Font)) wanted.Add(Font);
+        wanted.Add(SystemFont);
+        FontListSync.Sync(FontChoices, wanted);
+    }
+
     /// <summary>Everything on the page is read again from the settings (a design was applied or switched to): the pieces, the font, the
     /// ink, the plate, the Launcher and the designs.</summary>
     public void RefreshFromStore()
@@ -303,7 +313,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     private DeskSettings? _pending;
 
     public ObservableCollection<DeskPieceRow> Pieces { get; }
-    public IReadOnlyList<string> FontChoices { get; }
+    public ObservableCollection<string> FontChoices { get; }
 
     [ObservableProperty] private bool _enabled;
     [ObservableProperty] private string _font = BundledFonts.Family;

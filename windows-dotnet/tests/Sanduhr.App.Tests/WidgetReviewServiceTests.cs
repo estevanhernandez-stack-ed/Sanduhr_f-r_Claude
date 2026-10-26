@@ -312,7 +312,7 @@ public sealed class WidgetReviewServiceTests : IDisposable
             }
             string art = Path.Combine(_root, "my-art.png");
             File.WriteAllBytes(art, Png(32, 8));
-            var page = new WidgetsPageViewModel(() => new WidgetCatalogService(_paths), _store);
+            var page = new ModsPageViewModel(() => new WidgetCatalogService(_paths), _store);
             page.ReloadLocal();
             var row = Assert.Single(page.Installed);
             Assert.True(row.CanUseOwnArt);
@@ -344,7 +344,7 @@ public sealed class WidgetReviewServiceTests : IDisposable
             }
             string art = Path.Combine(_root, "odd.png");
             File.WriteAllBytes(art, Png(30, 8));
-            var page = new WidgetsPageViewModel(() => new WidgetCatalogService(_paths), _store);
+            var page = new ModsPageViewModel(() => new WidgetCatalogService(_paths), _store);
             page.ReloadLocal();
             page.PickImage = _ => art;
             page.Installed[0].UseOwnArtCommand.Execute(null);
@@ -373,7 +373,7 @@ public sealed class WidgetReviewServiceTests : IDisposable
             var palette = Palette();
             Assert.True(Installed.Install(palette.Files, palette.Manifest, WidgetSource.Claude).Ok);
 
-            var page = new WidgetsPageViewModel(() => new WidgetCatalogService(_paths), _store);
+            var page = new ModsPageViewModel(() => new WidgetCatalogService(_paths), _store);
             page.ReloadLocal();
             Assert.Equal(2, page.Installed.Count);
             Assert.All(page.Installed, r => Assert.False(r.CanUseOwnArt));

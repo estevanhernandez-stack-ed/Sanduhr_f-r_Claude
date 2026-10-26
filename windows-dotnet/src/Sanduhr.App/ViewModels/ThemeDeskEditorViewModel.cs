@@ -20,6 +20,15 @@ public sealed partial class ThemeDeskEditorViewModel : ObservableObject
         _fontChoices = new ObservableCollection<string>([SettingsNames.ThemeDeskFromTheme, .. fontFamilies]);
     }
 
+    /// <summary>The font packs changed: the Desk font row's choices follow; the shown theme's font stays listed (as <see cref="Load"/> keeps it).</summary>
+    public void ReloadFonts(IReadOnlyList<string> families)
+    {
+        var wanted = new List<string> { SettingsNames.ThemeDeskFromTheme };
+        wanted.AddRange(families);
+        if (_desk.Font is { Length: > 0 } f && !wanted.Contains(f)) wanted.Add(f);
+        FontListSync.Sync(_fontChoices, wanted);
+    }
+
     /// <summary>The Desk font row's choices: "From the theme" (no desk.font), then this PC's families.</summary>
     private readonly ObservableCollection<string> _fontChoices;
     public IReadOnlyList<string> FontChoices => _fontChoices;

@@ -84,6 +84,36 @@ public sealed partial class ThemesViewModel : ObservableObject
         if (_isStudioMode)
             Studio.Activate();
         RefreshList();
+        RefreshThemePacks();
+    }
+
+    /// <summary>The installed widget packs (Settings' own folder). A seam for tests.</summary>
+    internal Func<WidgetStore> Widgets { get; set; } =
+        () => new WidgetStore(new Sanduhr.Core.Paths().WidgetsDir, Sanduhr.App.Services.WidgetCatalogService.EncodePng);
+
+    /// <summary>"Theme packs: 2 installed." above the gallery, with "Mods &amp; Widgets settings…" (spec, Themes; WF40). Packs that are off count.</summary>
+    [ObservableProperty] private string _themePacksLine = "";
+
+    public string PacksLink => SettingsIndex.PageId(SettingsPage.Mods) + "#" + SettingsIndex.ModList;
+    public string PacksLinkTitle => SettingsNames.LinkTitle(SettingsPage.Mods);
+
+    /// <summary>Set by Settings: the Installed list shows widget packs (the link itself opens the place).</summary>
+    public Action? ShowPacks { get; set; }
+
+    [RelayCommand]
+    private void ShowPacksClicked() => ShowPacks?.Invoke();
+
+    /// <summary>Counts the theme packs again (a pack was installed, removed or switched).</summary>
+    public void RefreshThemePacks()
+    {
+        int n = 0;
+        try
+        {
+            var store = Widgets();
+            n = store.Load().Packs.Count(p => store.ReadInfo(p.Id)?.Kind == "theme");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        ThemePacksLine = SettingsNames.ThemePacksLine(n);
     }
 
     /// <summary>Settings is closing or the Themes tab is leaving: put the saved

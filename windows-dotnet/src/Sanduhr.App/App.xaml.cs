@@ -616,7 +616,9 @@ public partial class App : Application
         Desk.WidgetReviewService.Current = _widgetReview;
         _widgetReview.Host = new Desk.WidgetReviewHost(_desk, store, () =>
         {
-            _settingsWindow?.ViewModel.WidgetsPage.ReloadLocal();
+            _settingsWindow?.ViewModel.ModsPage.ReloadLocal();
+            // A pack Claude made joins the pickers and the Themes pack line.
+            _settingsWindow?.ViewModel.PacksChanged();
             // A palette Claude made joins the Ink presets (3.9.1).
             _settingsWindow?.ViewModel.Desk.Reload();
         });
@@ -749,10 +751,10 @@ public partial class App : Application
         svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); _looks?.SettingsChanged(); };
         // get_desk reports the weather nickname (#315), so a change rewrites desk-state.json too.
         svm.WeatherPage.Changed = () => { _desk?.Reload(); _deskDesign?.Refresh(); };
-        // An install or uninstall (a companion sprite included), theme, font or palette pack.
+        // A pack installed, uninstalled or switched on or off (a companion sprite included), theme, font or palette pack.
         // 3.9.1: it also reloads the theme list, since an installed theme pack joins it and an uninstalled one leaves it.
         // A font pack changes what the Desk and a design may draw in: drop their font lists before the Desk redraws.
-        svm.WidgetsPage.Changed = () =>
+        svm.ModsPage.Changed = () =>
         {
             _themeFonts = Desk.DeskFonts.ForThisPc(new Sanduhr.Core.Paths());
             _vm?.ReloadUserThemes();
