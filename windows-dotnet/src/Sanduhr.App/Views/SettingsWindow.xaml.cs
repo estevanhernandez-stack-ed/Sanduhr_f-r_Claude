@@ -106,6 +106,8 @@ internal partial class SettingsWindow : Window
         Loaded += (_, _) => RenderHistory();
         PreviewKeyDown += OnRecorderPreviewKeyDown;
         Deactivated += (_, _) => ViewModel.Shortcuts.CancelRecording();
+        // The What's New window is non-modal and writes the same key: read it again when Settings is brought back (P14).
+        Activated += (_, _) => ViewModel.AboutVersion.Reload();
         Closed += (_, _) =>
         {
             ViewModel.Desk.Flush();
@@ -238,6 +240,14 @@ internal partial class SettingsWindow : Window
         // Accounts shows the selected account's folder link, which the Claude Code page changes: read it again on each visit.
         if (page == SettingsPage.Accounts)
             ViewModel.Accounts.Reload();
+
+        // About: the What's New window shares its switch, and "Show in Explorer" for the session archive dims until there is one
+        // (slice 1 T4): read the one and ask the commands again on each visit.
+        if (page == SettingsPage.About)
+        {
+            ViewModel.AboutVersion.Reload();
+            CommandManager.InvalidateRequerySuggested();
+        }
 
         // Deep Work length is also written by the focus timer's own stepper: read it again on each visit.
         if (page == SettingsPage.Widget)

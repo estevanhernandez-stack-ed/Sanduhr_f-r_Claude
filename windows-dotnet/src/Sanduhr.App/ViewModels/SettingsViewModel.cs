@@ -107,6 +107,9 @@ public sealed class SettingsViewModel
     /// <summary>About's "Take the tour…" button.</summary>
     public ICommand ShowTourCommand { get; }
 
+    /// <summary>About, Version's "Don't show What's New after updates" (slice 5).</summary>
+    public AboutVersionViewModel AboutVersion { get; }
+
     /// <summary>The sidebar search.</summary>
     public SettingsSearchViewModel Search { get; } = new();
 
@@ -181,6 +184,7 @@ public sealed class SettingsViewModel
     {
         ShowWhatsNewCommand = new RelayCommand(() => showWhatsNew?.Invoke());
         ShowTourCommand = new RelayCommand(() => showTour?.Invoke());
+        AboutVersion = new AboutVersionViewModel(new SettingsStore(new Paths()));
         Accounts = new AccountsViewModel(widget, addAccountAsync, updateSignInAsync);
         Themes = new ThemesViewModel(widget);
         History = new HistoryTabViewModel(widget);

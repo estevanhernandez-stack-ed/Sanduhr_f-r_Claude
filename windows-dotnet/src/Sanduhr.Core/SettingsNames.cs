@@ -155,7 +155,7 @@ public static class SettingsNames
     public const string GraphStyle = "Graph style";
     /// <summary>The widget's icon strip: keeps the widget above other windows (settings.json "pinned").</summary>
     public const string KeepWidgetOnTop = "Keep the widget on top";
-    /// <summary>The What's New window (settings.json "whats_new_hide_after_updates").</summary>
+    /// <summary>About, Version, and the What's New window (settings.json "whats_new_hide_after_updates"): one key, two boxes.</summary>
     public const string HideWhatsNewAfterUpdates = "Don't show What's New after updates";
     /// <summary>Claude Code: picks a folder Sanduhr did not find.</summary>
     public const string AddFolder = "Add folder…";
@@ -803,6 +803,7 @@ public static class SettingsNames
         (SaveAndApply, SettingsPage.Themes),
         (WhatsNew, SettingsPage.About),
         (TakeTheTour, SettingsPage.About),
+        (HideWhatsNewAfterUpdates, SettingsPage.About),
         (WhereSettingsLive, SettingsPage.About),
         (ThirdPartyNotices, SettingsPage.About),
         (ResetSanduhr, SettingsPage.About),

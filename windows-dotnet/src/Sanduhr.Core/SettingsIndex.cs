@@ -316,7 +316,7 @@ public static class SettingsIndex
             [SettingsNames.ShowTheWidget, "show the widget", "widget hidden", "hidden widget", "desk only", "no account", "without an account"]),
 
         E("Version", SettingsPage.About, Version,
-            ["version", "What's New", "Take the tour", "tour", "release", "update"]),
+            ["version", "What's New", "Take the tour", "tour", "release", "update", "don't show", "after updates", SettingsNames.HideWhatsNewAfterUpdates]),
         E("Trademark", SettingsPage.About, Trademark, ["Anthropic", "trademark", "disclaimer", "affiliated"]),
         E(SettingsNames.ThirdPartyNotices, SettingsPage.About, Notices, ["license", "licence", "credits", "open source"]),
         E(SettingsNames.WhereSettingsLive, SettingsPage.About, Where,
@@ -349,6 +349,7 @@ public static class SettingsIndex
         [SettingsNames.SaveAndApply] = Paste,
         [SettingsNames.WhatsNew] = Version,
         [SettingsNames.TakeTheTour] = Version,
+        [SettingsNames.HideWhatsNewAfterUpdates] = Version,
         [SettingsNames.WhereSettingsLive] = Where,
         [SettingsNames.ThirdPartyNotices] = Notices,
         [SettingsNames.ResetSanduhr] = Reset,

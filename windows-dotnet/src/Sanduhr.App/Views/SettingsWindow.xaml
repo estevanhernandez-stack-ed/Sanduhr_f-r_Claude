@@ -2699,6 +2699,10 @@
                                             ToolTip="Walks through what Sanduhr does, one step at a time"
                                             Command="{Binding ShowTourCommand}" />
                                 </StackPanel>
+                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,10,0,0" DataContext="{Binding AboutVersion}"
+                                          Content="{x:Static core:SettingsNames.HideWhatsNewAfterUpdates}"
+                                          IsChecked="{Binding HideWhatsNewAfterUpdates, Mode=TwoWay}"
+                                          AutomationProperties.Name="{x:Static core:SettingsNames.HideWhatsNewAfterUpdates}" />
                             </StackPanel>
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
