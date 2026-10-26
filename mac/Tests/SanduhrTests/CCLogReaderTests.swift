@@ -566,7 +566,7 @@ struct CCLogWalkTests {
             let bulk = fs.logFiles(under: dir)
             let slow = fs.jsonlFiles(under: dir).compactMap { p in fs.stat(p).map { CCLogFile(path: p, stat: $0) } }
             #expect(bulk == slow, "\(dir)")
-            #expect(bulk.map(\.path) == bulk.map(\.path).sorted())
+            #expect(bulk.map(\.path) == bulk.map(\.path).sorted(by: CCLogBulkWalk.pathPrecedes))
         }
         #expect(fs.logFiles(under: p1).map { ($0.path as NSString).lastPathComponent } == ["a.jsonl", "b.jsonl"])
         #expect(fs.logFiles(under: p1).map(\.stat.size) == [8, 3000])
@@ -576,6 +576,25 @@ struct CCLogWalkTests {
         let reader = CCLogReader(root: root, fileSystem: fs)
         #expect(reader.discoverLogs() == fs.logFiles(under: p1) + fs.logFiles(under: p2))
         #expect(reader.discoverLogFiles() == reader.discoverLogs().map(\.path))
+    }
+
+    /// The walk's order is the bytes of the path, which differs from `String <`, which compares
+    /// canonically equivalent text as equal: a decomposed "e\u{301}" (bytes 65 CC 81) is "\u{E9}" to
+    /// `String <`, so it sorts after "f", while by bytes it sorts before it. APFS keeps the name
+    /// as written, so the walk reports it decomposed.
+    @Test func theWalkSortsByBytesNotUnicodeComparison() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("cc-order-\(UUID().uuidString)").path
+        defer { try? fm.removeItem(atPath: root) }
+        try fm.createDirectory(atPath: root, withIntermediateDirectories: true)
+        let accented = "e\u{301}.jsonl", plain = "f.jsonl"
+        #expect(plain < accented)
+        #expect(CCLogBulkWalk.pathPrecedes(accented, plain))
+        for name in [accented, plain] { try "x".write(toFile: root + "/" + name, atomically: true, encoding: .utf8) }
+        let fs = LocalCCLogFileSystem()
+        let names = fs.logFiles(under: root).map { ($0.path as NSString).lastPathComponent }
+        #expect(names == [accented, plain])
+        #expect(fs.jsonlFiles(under: root).map { ($0 as NSString).lastPathComponent } == [accented, plain])
     }
 
     /// A file system that offers only the old pair gets the bulk walk from them.

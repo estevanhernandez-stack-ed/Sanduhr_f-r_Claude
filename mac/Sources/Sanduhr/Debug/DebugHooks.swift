@@ -165,6 +165,24 @@ enum DebugHooks {
         case .modsConfig(let tab, let seat):
             SettingsWindowController.shared.show(.mods)
             SettingsWindowController.shared.modsPage.showTab(tab, seat: seat)
+        case .modsSheet(let sheet):
+            let mods = SettingsWindowController.shared.modsPage
+            SettingsWindowController.shared.show(.mods)
+            mods.showTab(.bySeat, seat: nil)
+            let demo = app.viewModel.demo
+            // The page reads the folders off the main thread: wait for them, then open the sheet.
+            Task { @MainActor in
+                for _ in 0..<100 where !mods.loaded { try? await Task.sleep(nanoseconds: 100_000_000) }
+                guard mods.loaded else { return }
+                switch sheet {
+                case .export:
+                    if let seat = mods.shownSeat(demo: demo) { await mods.startConfigExport(seat) }
+                case .exportSample:
+                    mods.configExport = SampleConfigPack.exportState()
+                case .importSample:
+                    mods.configImport = SampleConfigPack.state(seat: SampleConfigPack.seat)
+                }
+            }
         case .resetDryRun:
             // Reads the plan only: no step runs (Reset.perform is the sheet's alone).
             resetDryRun = Reset.dryRun(in: .standard)

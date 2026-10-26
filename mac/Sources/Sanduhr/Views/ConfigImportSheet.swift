@@ -24,6 +24,9 @@ struct ConfigImportState: Identifiable {
     var cliFailures: [String] = []
     /// Opened from Claude's `propose_config` (slice K): its record, decided by the import.
     var proposalID: String?
+    /// The invented pack the `mods-config import-sample` debug hook opens for screenshots: its
+    /// rows are built in code, never planned against a folder, and Import writes nothing.
+    var sample = false
 
     var label: String { pack.manifest["label"] as? String ?? "Config" }
 
@@ -31,6 +34,7 @@ struct ConfigImportState: Identifiable {
     var hasSeat: Bool { !seat.isEmpty }
 
     mutating func plan(home: String = NSHomeDirectory()) {
+        guard !sample else { return }
         guard hasSeat else { rows = []; chosen = []; return }
         rows = ConfigImport.plan(pack, seat: seat, home: home, cli: cli)
         chosen = Set(rows.filter { $0.choosable && $0.kind != .instructions }.map(\.id))
@@ -124,6 +128,8 @@ extension ModsPageModel {
     /// refused when a session runs in the seat by now.
     func finishConfigImport(_ given: ConfigImportState) async -> ConfigImportState {
         var state = given
+        // The debug sample writes nothing: Import just closes the sheet.
+        if state.sample { configImport = nil; return state }
         let chosen = state.rows.filter { state.chosen.contains($0.id) }
         var (record, failure) = ConfigImport.apply(chosen.filter { $0.kind != .keptMod }, env: state.env, seat: state.seat,
                                                    label: state.label, packSHA256: state.packSHA256)
@@ -291,12 +297,16 @@ struct ConfigImportSheet: View {
     @ViewBuilder private var choosing: some View {
         Picker("Into", selection: Binding(get: { state.seat }, set: { pick($0) })) {
             if !state.hasSeat { Text("Choose a folder…").tag("") }
-            ForEach(model.pickerSeats(demo: demo)) { s in
-                Text(s.label + (s.isWork ? " (work)" : "") + "  " + model.display(s.path)).tag(s.path)
+            if state.sample {
+                Text(SampleConfigPack.seatLabel + "  " + SampleConfigPack.seat).tag(SampleConfigPack.seat)
+            } else {
+                ForEach(model.pickerSeats(demo: demo)) { s in
+                    Text(s.label + (s.isWork ? " (work)" : "") + "  " + model.display(s.path)).tag(s.path)
+                }
+                if let other { Text(model.display(other)).tag(other) }
+                Divider()
+                Text("Other Folder…").tag(Self.otherTag)
             }
-            if let other { Text(model.display(other)).tag(other) }
-            Divider()
-            Text("Other Folder…").tag(Self.otherTag)
         }
         .frame(maxWidth: 420)
         Text("Only what this folder doesn't have yet can be brought over. What it has, the same or its own, stays as it is. Plugins and MCP servers are shown as the commands to run.")
@@ -308,7 +318,7 @@ struct ConfigImportSheet: View {
             Text("This pack comes from a folder marked work, and this one isn't. Check it carries nothing that names work: people, products, endpoints, internal repos.")
                 .font(.caption.weight(.semibold)).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
         }
-        if FileManager.default.fileExists(atPath: (state.seat as NSString).appendingPathComponent(".git")) {
+        if !state.sample, FileManager.default.fileExists(atPath: (state.seat as NSString).appendingPathComponent(".git")) {
             Text("This folder is a git clone: its next sync commits what the import writes.")
                 .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
         }

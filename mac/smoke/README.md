@@ -151,7 +151,13 @@ domain's contents. `reset_dry_run` is null until one ran. Any other arg is an er
 and the selftest fails a scenario whose `reset` step is anything but `--dry-run`),
 `mods-config catalog|seat [n]` (item 71, slice 1: Settings, Mods & Config on its Catalog or By Folder tab, as the tab
 bar picks it; `seat 2` opens By Folder at the second folder; the hook's word stays `seat` while the tab says
-By Folder since 2026-10-17. Reads only, changes no folder and no preference).
+By Folder since 2026-10-17. Reads only, changes no folder and no preference). `mods-config export` opens the Export
+Config sheet on the shown folder, as its button does; `mods-config import-sample` opens Compare on import (the Open
+Config Pack sheet) over an invented pack (`SampleConfigPack`: made-up names, no paths, seven rows) whose Into list is
+one invented folder, `Sample`, `~/.claude-sample`; `mods-config export-sample` opens Export Config over invented rows
+(two that can't travel, an MCP server with a `${NAME}`). A sample's Import and Export close the sheet and write
+nothing. The sheets open after the page has read the folders, a beat after the action returns,
+so add a `wait` before the snapshot; state.yaml has no key for them.
 
 ## Scenarios
 
