@@ -583,9 +583,9 @@ public static class SettingsNames
 
     // ---- Settings v2, slice 5: Claude Usage, Meters (WF14, WF32) ----
 
-    /// <summary>The Meters view's chart section ("meter history", WF14); was "History chart".</summary>
     /// <summary>The Meters pill in Claude Usage (P10); SettingsIndex's subsection string must be this.</summary>
     public const string MetersView = "Meters";
+    /// <summary>The Meters view's chart section ("meter history", WF14); was "History chart".</summary>
     public const string MeterHistorySection = "Meter history";
     public const string MetersIntro =
         "Rolling 30-day meter history, kept on this PC and never uploaded. Export it as CSV to read in a spreadsheet or with any agent.";
