@@ -118,13 +118,11 @@ public class SettingsDeskSplitIndexTests
     }
 
     [Fact]
-    public void A_live_page_keeps_an_anchor_no_alias_carries()
+    public void A_retired_pages_unknown_anchor_lands_where_the_page_went()
     {
-        // While the old page is in the sidebar there is no page row to fall back to: the link stays, and Check drops the dead
-        // anchor to the page top.
-        Assert.Equal(new SettingsLink(SettingsPage.Widgets, "gone"),
-            SettingsIndex.Resolve(SettingsPage.Widgets, "gone", SettingsIndex.Anchors, SettingsNames.Pages));
-        Assert.Equal(new SettingsLink(SettingsPage.Widgets, null), SettingsIndex.Check(SettingsPage.Widgets, "gone"));
+        // Widgets left the sidebar in slice 4: an anchor no row carries lands on the page row's target.
+        Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.Catalog), SettingsIndex.Resolve(SettingsPage.Widgets, "gone"));
+        Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.Catalog), SettingsIndex.Check(SettingsPage.Widgets, "gone"));
     }
 
     [Fact]
@@ -140,7 +138,7 @@ public class SettingsDeskSplitIndexTests
     {
         var desktop = SettingsNames.Sidebar.Single(g => g.Title == "Desktop").Pages;
         Assert.Equal([SettingsPage.Desk, SettingsPage.DeskLook, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather,
-            SettingsPage.Watchers, SettingsPage.Launcher, SettingsPage.Widgets], desktop);
+            SettingsPage.Watchers, SettingsPage.Launcher], desktop);
         Assert.Equal(["desklook", "watchers", "launcher"],
             new[] { SettingsPage.DeskLook, SettingsPage.Watchers, SettingsPage.Launcher }.Select(SettingsIndex.PageId));
     }

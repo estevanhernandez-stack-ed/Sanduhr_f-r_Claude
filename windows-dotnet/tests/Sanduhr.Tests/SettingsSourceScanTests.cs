@@ -646,10 +646,10 @@ public class SettingsSourceScanTests
     }
 
     [Fact]
-    public void The_Desk_and_Widgets_pages_open_with_their_definitions()
+    public void The_Desk_and_Mods_pages_open_with_their_definitions()
     {
         Assert.Contains("core:SettingsNames.DeskLine", TabRange("Desk"));
-        Assert.Contains("core:SettingsNames.WidgetPackLine",
+        Assert.Contains("core:SettingsNames.ModsPageLine",
             File.ReadAllText(Path.Combine(AppDir(), "Views", "ModsPage.xaml")));
     }
 

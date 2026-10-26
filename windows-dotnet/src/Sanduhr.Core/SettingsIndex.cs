@@ -58,12 +58,14 @@ public static class SettingsIndex
     public const string Meters = "meters";
     public const string Glow = "glow";
     public const string FolderConfig = "folder-config";
-    // Mods & Config
+    // Mods & Widgets (slice 4): meters reuses Meters ("meters"), the Installed list keeps ModList ("mods"). ConfigFiles, McpServers,
+    // ClaudeMd and Retention were Mods & Config's (slice 1): kept for the aliases to the Claude Code cards.
     public const string ConfigFiles = "config";
     public const string ModList = "mods";
     public const string McpServers = "mcpservers";
     public const string ClaudeMd = "claudemd";
     public const string Retention = "retention";
+    public const string Catalog = "catalog";
     // Publish usage
     public const string Destination = "destination";
     public const string Token = "token";
@@ -114,7 +116,7 @@ public static class SettingsIndex
     public const string NowPlayingLooks = "np-looks";
     public const string WeatherPlace = "weather-place";
     public const string WeatherCredit = "weather-credit";
-    // Desk: Widgets (3.8)
+    // Widgets (3.8), retired in slice 4: kept for the aliases
     public const string WidgetsCatalog = "widgets-catalog";
     public const string WidgetsCompanion = "widgets-companion";
     public const string WidgetsInstalled = "widgets-installed";
@@ -185,8 +187,15 @@ public static class SettingsIndex
         E(SettingsNames.GlowWhere, SettingsPage.ClaudeCode, GlowWhere,
             ["where the glow shows", "screen edge", "monitor", "flash", "taskbar flash", "glow target"]),
 
-        E("Plugins", SettingsPage.Mods, ModList,
-            ["mod", "mods", "plugin", "plugins", "installed", "sanduhr-meters", "switch", "on", "off", "update", "remove"]),
+        E(SettingsNames.MetersSection, SettingsPage.Mods, Meters,
+            ["meters", "mod", "sanduhr-meters", "band", "above the prompt", "CLAUDE_CODE_PLUGIN_DIRS", "turn on", "turn off", "per folder",
+             "update", "remove"]),
+        E(SettingsNames.InstalledSection, SettingsPage.Mods, ModList,
+            ["installed", "mod", "mods", "plugin", "plugins", "widget pack", "theme pack", "palette", "font", "sprite", "effects",
+             "uninstall", "made here", "my widgets", "use my own art", "read-only", "switch", "on", "off", "filter", "where it shows"]),
+        E(SettingsNames.CatalogSection, SettingsPage.Mods, Catalog,
+            ["catalog", "install", "download", "hourglass", "OLED Neon", "signature", "verified", "GitHub", "companion", "pet",
+             "theme pack", "palette", "font", "sprite", "effects", "check the catalog"]),
 
         E("Destination", SettingsPage.Publish, Destination,
             ["endpoint", "URL", "preset", "626 Labs", "dashboard", "auth", "header"]),
@@ -276,12 +285,6 @@ public static class SettingsIndex
             ["launcher", "button", "buttons", "shortcut", "shortcuts", "app", "apps", "link", "TouchButton", "Rainmeter",
              SettingsNames.LauncherAddApp, SettingsNames.LauncherAddLink, "image", "label", "PNG", "Chrome app", "PWA", "row", "column"]),
 
-        E("Widget catalog", SettingsPage.Widgets, WidgetsCatalog,
-            ["widgets", "catalog", "install", "download", "sprite", "companion", "pet", "palette", "effects", "font", "theme pack",
-             "hourglass", "OLED Neon", "signature", "verified", "GitHub"]),
-        E("Installed widgets", SettingsPage.Widgets, WidgetsInstalled,
-            ["installed", "uninstall", "remove", "update", "made here", "my widgets", "packs"]),
-
         E("Version", SettingsPage.About, Version,
             ["version", "What's New", "Take the tour", "tour", "release", "update"]),
         E("Trademark", SettingsPage.About, Trademark, ["Anthropic", "trademark", "disclaimer", "affiliated"]),
@@ -341,13 +344,13 @@ public static class SettingsIndex
         [SettingsNames.WeatherShowAs] = WeatherPlace,
         [SettingsNames.NowPlayingBarsGradient] = NowPlayingBars,
         [SettingsNames.GlowWhere] = GlowWhere,
-        [SettingsNames.WidgetCatalogCheck] = WidgetsCatalog,
+        [SettingsNames.WidgetCatalogCheck] = Catalog,
         [SettingsNames.WidgetCompanionPick] = DeskPieces,
         [SettingsNames.WidgetCompanionRoam] = DeskPieces,
     };
 
     /// <summary>
-    /// The sections that start collapsed (spec, Desk: Designs and Advanced), by page and anchor, with the name a search row gives
+    /// The sections that start collapsed (spec, Desk: Designs and Advanced; slice 4: a card's report and the Catalog), by page and anchor, with the name a search row gives
     /// what sits in them: "Let Claude change the Desk directly (in Designs)". A name in <see cref="SettingsNames.Table"/> whose
     /// anchor is one of these is inside it; the section's own row is not. Declared before <see cref="All"/>, which reads it.
     /// </summary>
@@ -357,6 +360,7 @@ public static class SettingsIndex
             [(SettingsPage.Desk, DeskDesigns)] = SettingsNames.DeskDesigns,
             [(SettingsPage.Desk, DeskAdvanced)] = SettingsNames.DeskAdvanced,
             [(SettingsPage.ClaudeCode, FolderConfig)] = SettingsNames.FolderHolds,
+            [(SettingsPage.Mods, Catalog)] = SettingsNames.CatalogSection,
         };
 
     /// <summary>Words a page goes by besides its title.</summary>
@@ -369,7 +373,7 @@ public static class SettingsIndex
         // "vault" lives on the archive section only: as a page synonym it ties the section at rank 1 and the page row wins.
         [SettingsPage.ClaudeUsage] = ["Claude Code", "tokens", "usage"],
         [SettingsPage.ClaudeCode] = ["Claude Code folders", "folder", "seat", "pieces"],
-        [SettingsPage.Mods] = ["mod", "plugin"],
+        [SettingsPage.Mods] = ["mod", "plugin", "widget packs", "extensions", "add-ons"],
         [SettingsPage.Publish] = ["publish", "upload", "endpoint", "share"],
         [SettingsPage.Themes] = ["theme", "colors", "look"],
         [SettingsPage.Desk] = ["desktop", "wallpaper", "clock", "Rainmeter", "layout", "margins", "taskbar", "telemetry", "CPU", "RAM", "disk"],
@@ -379,7 +383,6 @@ public static class SettingsIndex
         [SettingsPage.DeskLook] = ["look", "fonts", "size", "ink", "color", "colour", "plate"],
         [SettingsPage.Watchers] = ["watcher", "cards", "CI", "progress"],
         [SettingsPage.Launcher] = ["buttons", "apps", "links", "shortcuts"],
-        [SettingsPage.Widgets] = ["widget packs", "sprite", "catalog"],
         [SettingsPage.About] = ["help", "version", "trademark", "privacy"],
     };
 

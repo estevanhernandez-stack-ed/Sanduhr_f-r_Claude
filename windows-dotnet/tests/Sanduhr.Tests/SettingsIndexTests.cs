@@ -189,18 +189,11 @@ public class SettingsIndexTests
     }
 
     [Fact]
-    public void Widgets_is_a_Desk_page_search_finds_by_its_words()
+    public void Widget_words_find_Mods_and_Widgets()
     {
-        Assert.Equal("Desktop", SettingsNames.GroupTitle(SettingsPage.Widgets));
-        Assert.Equal("Widgets", SettingsNames.PageTitle(SettingsPage.Widgets));
-        Assert.Equal(SettingsPage.Widgets, SettingsIndex.Search("widgets")[0].Entry.Page);
-        foreach (var (query, anchor) in new[]
-        {
-            ("hourglass", SettingsIndex.WidgetsCatalog), ("install", SettingsIndex.WidgetsCatalog), ("companion", SettingsIndex.WidgetsCatalog),
-            ("uninstall", SettingsIndex.WidgetsInstalled), ("made here", SettingsIndex.WidgetsInstalled),
-            ("check the catalog", SettingsIndex.WidgetsCatalog),
-        })
-            Assert.Contains(SettingsIndex.Search(query), h => h.Entry.Page == SettingsPage.Widgets && h.Entry.Anchor == anchor);
-        Assert.Contains((SettingsNames.WidgetCatalogCheck, SettingsPage.Widgets), SettingsNames.Table);
+        Assert.Null(SettingsNames.GroupTitle(SettingsPage.Widgets));
+        Assert.Equal("Extend", SettingsNames.GroupTitle(SettingsPage.Mods));
+        Assert.Equal(SettingsPage.Mods, SettingsIndex.Search("widgets")[0].Entry.Page);
+        Assert.Contains((SettingsNames.WidgetCatalogCheck, SettingsPage.Mods), SettingsNames.Table);
     }
 }

@@ -158,7 +158,7 @@
             <StackPanel Margin="20">
                 <TextBlock Text="Widgets" FontSize="14" FontWeight="SemiBold"
                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,4" />
-                <TextBlock Text="{x:Static core:SettingsNames.WidgetPackLine}" Style="{StaticResource Dim}" Margin="0,0,0,12" />
+                <TextBlock Text="{x:Static core:SettingsNames.ModsPageLine}" Style="{StaticResource Dim}" Margin="0,0,0,12" />
 
                 <StackPanel views:SettingsAnchor.Id="widgets-catalog">
                     <TextBlock Text="Widget catalog" Style="{StaticResource Heading}" />

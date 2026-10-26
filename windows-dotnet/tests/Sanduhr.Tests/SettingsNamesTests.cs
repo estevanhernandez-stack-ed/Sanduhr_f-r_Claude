@@ -6,8 +6,10 @@ namespace Sanduhr.Tests;
 /// <summary>The names table: sidebar, page titles, links, retired names, and that the cards and tour use them.</summary>
 public class SettingsNamesTests
 {
+    // Retired pages stay in the enum for their aliases (old cards, agent text, --settings links) but leave the sidebar: Widgets in
+    // slice 4 (P4), History in slice 5.
     private static readonly SettingsPage[] SidebarPages =
-        [.. Enum.GetValues<SettingsPage>().Where(p => p != SettingsPage.Widget)];
+        [.. Enum.GetValues<SettingsPage>().Where(p => p is not SettingsPage.Widget and not SettingsPage.Widgets)];
 
     private static IEnumerable<string> CopyOf(WhatsNewCard c) => [c.Title, c.Body];
 
@@ -160,8 +162,10 @@ public class SettingsNamesTests
         var all = WhatsNewCards.Table.Select(c => c.Destination)
             .Concat(WelcomeTour.Table.Select(t => t.Card.Destination))
             .Concat(WelcomeTour.Table.Select(t => WelcomeTour.SignedOut(t).Card.Destination));
+        // A retired page passes when its alias lands on a sidebar page (P5): the three 3.8.0 cards keep Widgets and land on Mods & Widgets.
         foreach (var d in all)
-            Assert.True(d == SettingsPage.Widget || SettingsNames.Pages.Contains(d), d.ToString());
+            Assert.True(d == SettingsPage.Widget || SettingsNames.Pages.Contains(d) || SettingsNames.Pages.Contains(SettingsIndex.Resolve(d, null).Page),
+                d.ToString());
     }
 
     [Fact]
@@ -185,7 +189,7 @@ public class SettingsNamesTests
     [Fact]
     public void Titles_to_come_are_pinned_and_open_no_page_yet()
     {
-        Assert.Equal(["Privacy", "Mods & Widgets"], SettingsNames.TitlesToCome);   // Desk Look, Watchers, Launcher landed in slice 3
+        Assert.Equal(["Privacy"], SettingsNames.TitlesToCome);   // Desk Look, Watchers, Launcher landed in slice 3; Mods & Widgets in slice 4
         foreach (var title in SettingsNames.TitlesToCome)
             Assert.Null(SettingsNames.Linked(title + " settings…"));
     }
@@ -393,7 +397,7 @@ public class SettingsNamesTests
             },
             SettingsNames.CoreWords);
         Assert.Equal("The Desk is the clock, meters and pieces Sanduhr draws on your desktop.", SettingsNames.DeskLine);
-        Assert.Equal("A widget pack is an add-on for Sanduhr: a theme, colors, a font or a companion.", SettingsNames.WidgetPackLine);
+        Assert.Equal("A widget pack is an add-on for Sanduhr: a theme, colors, a font or a companion. A mod is an add-on that Claude Code loads.", SettingsNames.ModsPageLine);
     }
 
     [Fact]
@@ -501,7 +505,10 @@ public class SettingsNamesTests
         Assert.Equal(@"Remove Meters above the prompt from ~\.claude", SettingsNames.RemoveMetersFrom(@"~\.claude"));
         Assert.Equal(("Show", "Widget packs in the catalog", "Update…", "Remove…"),
             (SettingsNames.ModsShowGroup, SettingsNames.CatalogListName, SettingsNames.UpdateButton, SettingsNames.RemoveButton));
-        Assert.Equal("No Claude Code folder found. Add one in Claude Code settings…", SettingsNames.NoFolderInMods);
+        // P20: the sentence, then a real "Claude Code settings…" link to claudecode#folders.
+        Assert.Equal("No Claude Code folder found. Add one in", SettingsNames.NoFolderInMods);
+        Assert.Equal("Claude Code settings…", SettingsNames.ClaudeCodeLinkTitle);
+        Assert.Equal(SettingsPage.ClaudeCode, SettingsNames.Linked(SettingsNames.ClaudeCodeLinkTitle));
         Assert.Equal(("Claude Code folders", "No Claude Code folder found. Add one with Add folder…"),
             (SettingsNames.ClaudeCodeFoldersSection, SettingsNames.NoFolderInClaudeCode));
         Assert.Equal("Draw your meters above the Claude Code prompt?", SettingsNames.MetersConsentTitle);
@@ -510,5 +517,64 @@ public class SettingsNamesTests
         Assert.EndsWith("leaves any other folder in that list alone.", SettingsNames.MetersConsentDetails);
         Assert.Equal(("Meters installed. New Claude Code sessions show them.", "Couldn't install the meters."),
             (SettingsNames.MetersInstalled, SettingsNames.MetersInstallFailed));
+    }
+
+    [Fact]
+    public void Copy_moved_out_of_Mods_and_Config_is_pinned()
+    {
+        // P13: Mods & Config is gone (slice 4, Task 12); what FolderHoldsViewModel and the meters rows copied from it lives here now, word for word.
+        Assert.Equal(("Couldn't read this folder.", "Readable", "settings.json parses as JSON."),
+            (SettingsNames.HoldsCantRead, SettingsNames.SettingsReadable, SettingsNames.SettingsReadableDetail));
+        Assert.Equal("Unreadable: line 3, column 7", SettingsNames.SettingsUnreadableAt(3, 7));
+        Assert.Equal("Claude Code reads settings.json strictly: no comments, no trailing commas. Sanduhr changes nothing in it while it is unreadable.",
+            SettingsNames.SettingsUnreadableStrict);
+        Assert.Equal(("Unreadable", "settings.json can't be opened. Sanduhr changes nothing in it."),
+            (SettingsNames.SettingsUnreadable, SettingsNames.SettingsCantOpen));
+        Assert.Equal(("Missing", "This folder has no settings.json yet."), (SettingsNames.SettingsMissing, SettingsNames.SettingsMissingDetail));
+        Assert.Equal(("Sanduhr's statusline", "Someone else's statusline", "None"),
+            (SettingsNames.StatuslineSanduhrs, SettingsNames.StatuslineSomeoneElses, SettingsNames.HoldsNone));
+        Assert.Equal(("1 group", "2 groups, 1 from Sanduhr"), (SettingsNames.HookGroups(1, 0), SettingsNames.HookGroups(2, 1)));
+        Assert.Equal(("1 group on 1 event", "3 groups on 2 events"), (SettingsNames.HooksOnEvents(1, 1), SettingsNames.HooksOnEvents(3, 2)));
+        Assert.Equal(("1 server", "2 servers"), (SettingsNames.McpServerCount(1), SettingsNames.McpServerCount(2)));
+        Assert.Equal(("1 project has their own servers.", "2 projects have their own servers."),
+            (SettingsNames.McpProjectsOwn(1), SettingsNames.McpProjectsOwn(2)));
+        Assert.Equal(("1 line, 512 bytes", "40 lines, 2 KB"), (SettingsNames.ClaudeMdSize(1, 512), SettingsNames.ClaudeMdSize(40, 2048)));
+        Assert.Equal(("30 days.", "Unknown while settings.json is unreadable."), (SettingsNames.RetentionDays(30), SettingsNames.RetentionUnknown));
+
+        Assert.Equal(("Meters mod turned on.", "Meters mod turned off.", "Couldn't change the switch.", "Install"),
+            (SettingsNames.MetersTurnedOn, SettingsNames.MetersTurnedOff, SettingsNames.MetersSwitchFailed, SettingsNames.MetersConsentInstall));
+        Assert.Equal(("Update the meters mod?", "Update", "Not now"),
+            (SettingsNames.MetersUpdateTitle, SettingsNames.MetersUpdateConfirm, SettingsNames.MetersUpdateNotNow));
+        Assert.Equal("This folder's meters mod is pinned to 0.1.0. Updating points it at 0.2.0, the version that ships with this Sanduhr. "
+            + "The mod's files are copied again and one entry in this folder's settings.json changes. The old version's files stay until "
+            + "Sanduhr prunes them.", SettingsNames.MetersUpdateBody("0.1.0", "0.2.0"));
+        Assert.StartsWith("This folder's meters mod is pinned to the installed version. Updating points it at the new version,",
+            SettingsNames.MetersUpdateBody(null, null));
+        Assert.Equal(("Meters mod updated.", "Meters mod is already current.", "Couldn't update the meters mod."),
+            (SettingsNames.MetersUpdated, SettingsNames.MetersAlreadyCurrent, SettingsNames.MetersUpdateFailed));
+        Assert.Equal(("Remove the meters mod?", "Takes Sanduhr's entry out of this folder's settings.json and leaves any other mod alone.", "Remove", "Cancel"),
+            (SettingsNames.MetersRemoveTitle, SettingsNames.MetersRemoveBody, SettingsNames.MetersRemoveConfirm, SettingsNames.MetersRemoveCancel));
+        Assert.Equal(("Meters mod removed.", "Couldn't remove the meters mod."), (SettingsNames.MetersRemoved, SettingsNames.MetersRemoveFailed));
+    }
+
+    [Fact]
+    public void The_Mods_and_Widgets_page_copy_is_pinned_and_says_only_what_the_code_does()
+    {
+        // Task 11 review: GitHub is asked when the catalog opens, on "Check the catalog again", and for an Install or Update download. Nothing else.
+        Assert.Equal("Installed packs live in Sanduhr's own widgets folder on this PC. Sanduhr asks GitHub for the catalog only when you open it "
+            + "or check it again, and Install or Update downloads that pack from GitHub. Reset Sanduhr removes the folder.", SettingsNames.InstalledPacksNote);
+        Assert.Equal("The catalog comes from GitHub. Opening it is the only time Sanduhr asks.", SettingsNames.CatalogDisclosure);   // the spec's words
+        Assert.Equal("Nothing installed yet. Widget packs and Claude Code plugins and mods show here, and so do widgets you make with Claude, marked made here.",
+            SettingsNames.InstalledEmpty);
+        Assert.StartsWith("Sprites, themes, palettes, effects and fonts from the 626 Labs widget catalog.", SettingsNames.CatalogBlurb);
+        Assert.Equal(("Widget catalog status", "Widget list status", "Meters status"),
+            (SettingsNames.CatalogStatusName, SettingsNames.ListStatusName, SettingsNames.MetersStatusName));
+        Assert.Equal("Choose a PNG sprite sheet for each stage. It is copied into the widget and never sent anywhere.", SettingsNames.UseOwnArtHelp);
+        foreach (var text in new[] { SettingsNames.InstalledPacksNote, SettingsNames.InstalledEmpty, SettingsNames.CatalogBlurb, SettingsNames.UseOwnArtHelp,
+                     SettingsNames.MetersUpdateBody(null, null), SettingsNames.MetersRemoveBody, SettingsNames.SettingsUnreadableStrict })
+        {
+            Assert.Empty(SettingsNames.RetiredNames(text));
+            Assert.Empty(SettingsNames.PathProblems(text));
+        }
     }
 }

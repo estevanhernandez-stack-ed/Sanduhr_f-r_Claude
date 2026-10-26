@@ -69,11 +69,8 @@ public class SettingsLinkTests
         // Desk's Launcher became a page in slice 3: the old section lands at the page's place line.
         Assert.Equal(new SettingsLink(SettingsPage.Launcher, SettingsIndex.LauncherPlace),
             SettingsIndex.Check(SettingsPage.Desk, SettingsIndex.DeskLauncher));
-        // An alias whose target isn't there yet does nothing: Claude Code's meters wait for Mods & Widgets (slice 4), so a build
-        // without the old section sends the link to the page's top.
-        var withoutMeters = SettingsIndex.Anchors.Where(e => !(e.Page == SettingsPage.ClaudeCode && e.Anchor == SettingsIndex.Meters)).ToList();
-        Assert.Equal(new SettingsLink(SettingsPage.ClaudeCode, null),
-            SettingsIndex.Check(SettingsPage.ClaudeCode, SettingsIndex.Meters, withoutMeters, SettingsNames.Pages));
+        // Claude Code's meters landed on Mods & Widgets in slice 4: the alias is live.
+        Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.Meters), SettingsIndex.Check(SettingsPage.ClaudeCode, SettingsIndex.Meters));
     }
 
     [Theory]
