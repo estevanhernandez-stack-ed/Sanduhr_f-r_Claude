@@ -70,6 +70,10 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   and visible now, which it is not while the pointer is in the menu bar or the bar is hidden; `frame`, `[x, y, w, h]` in
   whole points from the primary screen's top left while the pill is up, null otherwise. The `on` key is quoted in
   the file, so YAML reads a key and not `true`; its window is kind `pill` in tree.yaml),
+  `lock_line` (#137, the lock screen line: `on`, Settings, Lock Screen's switch, desk suite key `lockLine`, quoted in the
+  file like `notch_pill`'s; `text`, the line as the writer would compose it now from the live or demo numbers and the
+  watchers waiting, the same string the page's preview draws, sanitized counts, percents and times only, so it may
+  appear in snapshots; `length`, its character count),
   `notch_left`, `notch_right`, `notch_strip` (what each place on the island shows, a
   `NotchContent` raw value such as `meetingOrTime`, `meters` or `nothing`; the default when unset),
   `camera_in_use` (an app is using a camera; only watched while the camera light switch is on),

@@ -57,6 +57,8 @@ struct DebugStateInput {
     var usageTab = UsageTab.overview
     /// Claude Usage, Meters (item 37): its choices and what it draws, counts only.
     var meterHistory = MeterHistoryDebug()
+    /// The lock screen line (#137): its switch and the line as composed now.
+    var lockLine = LockLineDebug()
     /// Just the Desk (BACKLOG #4): chosen on the welcome sheet and not yet ended by a sign-in.
     var justTheDesk = false
     /// Demo mode (slice 4): on, and what each surface shows, counts and flags only.
@@ -181,6 +183,15 @@ struct NotchPillDebug: Equatable {
     var forced = false
     var shown = false
     var frame: CGRect?
+}
+
+/// state.yaml's `lock_line:` (#137): the switch (`on`, quoted like `notch_pill`'s), the line as the
+/// writer would compose it now (sanitized counts, percents and times only, by construction) and its
+/// character count.
+struct LockLineDebug: Equatable {
+    var on = false
+    var text = ""
+    var length: Int { text.count }
 }
 
 /// state.yaml's `dock:` (item 56): the Dock's side and auto-hide (its own settings, read only),
@@ -368,6 +379,11 @@ enum DebugState {
         } ?? .null
         return .map([YAMLPair("on", .bool(p.on)), YAMLPair("forced", .bool(p.forced)),
                      YAMLPair("shown", .bool(p.shown)), YAMLPair("frame", frame)])
+    }
+
+    /// `lock_line:` (#137): the switch, the composed line and its length.
+    static func lockLineYAML(_ l: LockLineDebug) -> YAMLNode {
+        .map([YAMLPair("on", .bool(l.on)), YAMLPair("text", .string(l.text)), YAMLPair("length", .int(l.length))])
     }
 
     /// `dock:` (item 56): side, auto-hide and the inset applied now.
@@ -621,6 +637,7 @@ enum DebugState {
         pairs.append(("message_editor", messageEditorYAML(s.messageEditor)))
         pairs.append(("hot_keys", hotKeysYAML(s.hotKeys)))
         pairs.append(("meter_history", meterHistoryYAML(s.meterHistory)))
+        pairs.append(("lock_line", lockLineYAML(s.lockLine)))
         pairs.append(("just_the_desk", .bool(s.justTheDesk)))
         pairs.append(("demo", demoYAML(s.demo)))
         pairs.append(("reset_dry_run", s.resetDryRun.map(resetDryRunYAML) ?? .null))

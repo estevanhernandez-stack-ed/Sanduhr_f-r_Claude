@@ -2115,3 +2115,25 @@ is what the smoke tools use: `smoke/smoke do notch-pill force` (from `mac/`) wri
    forced: false, shown: false, frame: null}`.
 8. On a notched Mac with the override cleared: switch the setting on. Nothing shows, the island draws
    as before, and `smoke/smoke state` reads `shown: false` with `has_notch: true`. Switch it off.
+
+## 52. Lock screen line (issue #137)
+
+The line Sanduhr keeps ready for the lock screen: `prefix · Claude 29% · resets 6:10 PM · 1 waiting
+for you`. This build writes only the text file; the lock screen itself shows it once the root writer
+ships, in a later build. On a scratch macOS user, or with `~/Library/Application Support/Sanduhr`
+backed up first, as section 45 does, since the last step writes there with the switch on.
+
+1. `smoke/smoke run smoke/scenarios/lock-line.yaml` (from `mac/`) passes: demo mode on, Settings open
+   on Lock Screen, `lock_line.text` reads `Claude N%`, a fake watcher in `waiting` adds `waiting for
+   you`, then Settings closes and demo mode goes back off. It writes no file.
+2. Turn demo mode on (`smoke/smoke do demo on`), then Settings, Lock Screen. The Preview shows the
+   line, for example `Claude 42% · resets 5:00 PM`, with its count out of 80 characters.
+3. Type a prefix with a path in it (`/Users/me/work`): the field shows its orange reason and the
+   prefix drops out of the Preview. A plain prefix (`on call`) leads the line again.
+4. Untick each slot in turn, usage, reset and waiting: its part leaves the Preview. With usage and
+   reset both off the line is the prefix alone, or empty.
+5. Demo mode off and signed in, switch on **Show a line on the lock screen**: within 5 minutes, or at
+   once when you lock the screen (Control-Command-Q) and come back, `~/Library/Application
+   Support/Sanduhr/lock-line.txt` holds the Preview's text. Switch it off: the file is emptied once.
+   In demo mode the file is never written, whatever the switch says.
+6. `smoke/smoke state` shows `lock_line: {on, text, length}` matching the Preview and the switch.

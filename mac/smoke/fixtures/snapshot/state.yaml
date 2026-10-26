@@ -239,6 +239,10 @@ meter_history:
   window: week
   rows: 2
   series: 2
+lock_line:
+  "on": false
+  text: Claude 42% · resets 5:00 PM
+  length: 27
 just_the_desk: false
 demo:
   active: false
