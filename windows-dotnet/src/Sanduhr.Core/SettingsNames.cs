@@ -705,9 +705,10 @@ public static class SettingsNames
     public const string NetStoreOff = "No switch on the Store build: the Microsoft Store keeps Sanduhr up to date.";
 
     public const string NetPublish = "Your endpoint, Publish usage";
-    public const string NetPublishWhen =
-        "Each day at the time you set while Publish daily at is on, and when you press Publish now. Never without an endpoint, "
-        + "or without a token when your endpoint asks for one.";
+    public static string NetPublishWhen =>
+        "Each day at the first chance after the time you set, while Publish daily at is on. "
+        + $"If a send fails, it tries again every {(int)PublishScheduler.RetryInterval.TotalMinutes} minutes until one succeeds. "
+        + "It also sends when you press Publish now. Never without an endpoint, or without a token when your endpoint asks for one.";
     public const string NetPublishCarries =
         "The day, this PC's name, the folders you ticked, token counts in total, per limit and per project name, and your meters' percentages, "
         + "reset times and when they were read. The counts are per project name, so the project names in the folders you tick do leave this PC. "
@@ -723,7 +724,7 @@ public static class SettingsNames
     public const string NetPublishAgent = "Your endpoint, when Claude asks";
     public const string NetPublishAgentWhen = "When Claude calls Sanduhr's publish_usage tool, and only while Publish daily at is on.";
     public const string NetPublishAgentCarries =
-        "The same record as Publish usage, to the same endpoint. The widget sends it; the MCP server only passes the request on, on this PC.";
+        "The same record as Publish usage, to the same endpoint, for the day in Claude's request. The widget sends it; the MCP server only passes the request on, on this PC.";
     public const string NetPublishAgentOff = "Turn off Publish daily at.";
 
     public const string NetThroughClaude = "Claude's service, through Claude Code";

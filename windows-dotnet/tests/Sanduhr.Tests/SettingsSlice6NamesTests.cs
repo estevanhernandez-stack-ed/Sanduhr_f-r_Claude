@@ -93,6 +93,19 @@ public class SettingsSlice6NamesTests
     }
 
     [Fact]
+    public void The_publish_rows_say_when_it_sends_when_it_retries_and_whose_date()
+    {
+        // PublishScheduler.Decide runs at the first tick at or after the time (so at launch if the PC was off), and RetryInterval spaces retries.
+        Assert.Equal("Each day at the first chance after the time you set, while Publish daily at is on. "
+            + $"If a send fails, it tries again every {(int)PublishScheduler.RetryInterval.TotalMinutes} minutes until one succeeds. "
+            + "It also sends when you press Publish now. Never without an endpoint, or without a token when your endpoint asks for one.", SettingsNames.NetPublishWhen);
+        Assert.Contains("every 15 minutes", SettingsNames.NetPublishWhen);
+        // A publish_usage request names its own date.
+        Assert.Equal("The same record as Publish usage, to the same endpoint, for the day in Claude's request. "
+            + "The widget sends it; the MCP server only passes the request on, on this PC.", SettingsNames.NetPublishAgentCarries);
+    }
+
+    [Fact]
     public void Every_number_comes_from_the_code_that_acts_on_it()
     {
         Assert.Contains($"every {(int)UsageSchedule.Refresh.TotalMinutes} minutes for the account in use", SettingsNames.NetClaudeUsageWhen);
