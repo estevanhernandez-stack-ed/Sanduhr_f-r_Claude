@@ -64,6 +64,8 @@ enum SettingsAnchor {
     static let cameraLight = "camera-light"
     static let size = "size"
     static let textColor = "text-color"
+    // Lock Screen
+    static let lockLine = "lock-line"
     // Now Playing
     static let source = "source"
     static let show = "show"
@@ -106,7 +108,7 @@ enum SettingsAnchor {
     static let advanced = "advanced"
 
     /// Every anchor in sidebar order, page by page, with its title and synonyms.
-    static let all: [SettingsEntry] = general + accountsAndAlerts + deskPages + notchPages + claudeCodePages + widgetAndHelp
+    static let all: [SettingsEntry] = general + accountsAndAlerts + deskPages + notchPages + lockScreenPages + claudeCodePages + widgetAndHelp
 
     private static let general: [SettingsEntry] = [
         SettingsEntry(title: "Surfaces", page: .general, anchor: surfaces, synonyms: ["status", "desk on", "notch on"]),
@@ -159,6 +161,12 @@ enum SettingsAnchor {
         SettingsEntry(title: "Rotation", page: .message, anchor: rotation,
                       synonyms: ["Change the line", "hourly", "Mix every-day lines", "On special days"]),
         SettingsEntry(title: "Ask Claude", page: .message, anchor: askClaude, synonyms: ["suggest", "Let Claude change the messages"]),
+    ]
+
+    private static let lockScreenPages: [SettingsEntry] = [
+        SettingsEntry(title: "Show a line on the lock screen", page: .lockScreen, anchor: lockLine,
+                      synonyms: ["lock screen", "login window", "loginwindow", "locked", "prefix", "Claude usage",
+                                 "Reset time", "Watchers waiting for you"]),
     ]
 
     private static let notchPages: [SettingsEntry] = [

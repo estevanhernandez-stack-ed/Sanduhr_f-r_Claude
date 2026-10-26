@@ -1434,6 +1434,22 @@ of the screen's.
   `DeskHitTest` and `desk_frames` follow and `desk_frames_ok` holds during and after the slide.
   `state.yaml` has `dock: {side, autohide, inset}`, `inset` the points applied now.
 
+## Lock screen line
+
+Settings, Lock Screen (`lockScreen`, Desktop group after Notch; #137) keeps one line ready for the
+lock screen: `prefix · Claude 29% · resets 6:10 PM · 1 waiting for you`, composed by `LockLine`
+(sanitized, 80 characters at most). Desk defaults keys: `lockLine` (off), `lockLinePrefix`,
+`lockLineUsage`, `lockLineReset`, `lockLineWaiting` (each on). While the switch is on and demo mode
+is off, `LockLineController` composes from the view model and the watchers waiting on you and
+`LockLineWriter` writes `~/Library/Application Support/Sanduhr/lock-line.txt` atomically, only when
+the text changed. The usage slot is the highest-utilization limit with its own reset time, and reads
+"Claude usage unavailable" when the last fetch is older than 20 minutes or the status is not normal.
+The line is recomposed every 5 minutes while the session is active, when a setting changes, and as
+the session resigns or the screens sleep; nothing runs while the session is away. Turning the switch
+off writes an empty file once; demo mode writes nothing; Reset Sanduhr… removes the file with the
+rest of the folder. Nothing shows on the lock screen yet: the root writer is a later build, see
+`docs/lock-screen-line-spec.md`.
+
 ## Now playing
 
 Now playing (items 53, 53b) shows what plays on the Mac, in any app that publishes now playing
@@ -1688,13 +1704,13 @@ state.yaml's `menu_submenus` and `scenarios/settings-names.yaml`.
 
 ## Settings pages
 
-Settings v2, slice 2 (item 72): sixteen pages in five groups, each feature with one home and every
+Settings v2, slice 2 (item 72): sixteen pages in five groups (Lock Screen, #137, makes seventeen), each feature with one home and every
 other mention a status line and a "<Page> Settings…" link.
 
 | Group | Pages (raw value) |
 | --- | --- |
 | (none) | General (`general`), Accounts (`credentials`), Usage (`usage`), Alerts (`alerts`) |
-| Desktop | Desk (`deskLayout`), Desk Look (`deskLook`), Message (`message`), Notch (`notch`), Now Playing (`nowPlaying`), Watchers (`watchers`) |
+| Desktop | Desk (`deskLayout`), Desk Look (`deskLook`), Message (`message`), Notch (`notch`), Lock Screen (`lockScreen`), Now Playing (`nowPlaying`), Watchers (`watchers`) |
 | Claude Code | Claude Code (`integrations`), Mods & Config (`mods`) |
 | Widget | Widget (`widgetLook`), Themes (`themes`) |
 | Help | Updates (`updates`), About (`about`) |

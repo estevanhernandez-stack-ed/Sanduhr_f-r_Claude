@@ -103,6 +103,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Build menu bar status item.
         setupStatusItem()
 
+        // The lock screen line (#137): keeps lock-line.txt current while its switch is on.
+        LockLineController.shared.start(viewModel: viewModel)
+
         // Wire up status-item updates.
         viewModel.onUsageUpdate = { [weak self] in
             self?.renderStatusItem()
