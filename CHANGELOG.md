@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.32.0-mac — 2026-10-25
 
 - **What a session starts with, up top.** The Mods & Config card that estimates what a new Claude Code session loads (skill list, agents, MCP servers, the budget warning) sat inside the Catalog tab, where the window's bottom edge cut it at the default size. It now sits above the Catalog, By Folder and Compare tabs, shows on every tab, and Search Settings finds it (#291).
 
