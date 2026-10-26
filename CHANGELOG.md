@@ -4,6 +4,10 @@
 
 - **Continue with Google finishes inside Sanduhr (#357).** Google's sign-in now opens in a small window of its own and hands the result back to claude.ai, so a Google account signs in like an email one: no browser, no copying cookies. The browser-and-paste steps show up only if Google's page stays blank, and Paste a Key Instead is still at the bottom of the window.
 
+- **Links leave the sign-in window only as web addresses.** A link or popup that goes off the sign-in hosts opens in your browser only when it is an `http` or `https` address; anything else is dropped. The welcome sheet, Settings, Accounts, the setup guide and the privacy page now say Google sign-in works in the window.
+
+- **The lock screen helper under a new name.** The helper that puts the line on the lock screen now registers as `com.626labs.sanduhr.lockscreen`. On a Mac where a development build of Sanduhr had registered it first, macOS kept refusing to start the released helper, and the line never showed. If the lock screen line didn't show for you in 2.33.0, turn Settings, Lock Screen off and on once. A 2.33.0 helper that works keeps working until you do.
+
 ## v2.33.0-mac — 2026-10-26
 
 - **A line on the lock screen (#137).** Settings, Desktop, Lock Screen puts one short line under the lock screen clock: an optional prefix, your Claude usage, when it resets, and how many watchers are waiting for you, for example `Desk 3 · Claude 29% · resets 6:10 PM · 1 waiting for you`. Anyone at the screen can read it, so every part passes one filter that drops paths, emails, web addresses, secrets and long tokens; only counts, percents and times get through, and the page previews the exact line. Usage older than 20 minutes reads "Claude usage unavailable". Turning it on asks for an administrator password once, to install a small helper that sets the lock screen message; turning it off takes the line away first, then removes the helper, and a message you had there before comes back. Off by default.
