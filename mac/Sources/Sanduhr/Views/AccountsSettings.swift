@@ -224,7 +224,7 @@ private struct KeyFields: View {
                 .help(hasKey && !expired
                       ? "Signs in once more and replaces this account's saved key, for example to use a different claude.ai account. You're signed in now."
                       : "Opens claude.ai's own sign-in.")
-            Text("Opens claude.ai's own sign-in. An account that signs in with Google needs a pasted key: Google doesn't allow sign-in inside apps.")
+            Text("Opens claude.ai's own sign-in, Continue with Google included. If Google's page stays blank, sign in in your browser and paste the key instead.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -26,7 +26,7 @@ You get your own claude.ai usage on your Mac, refreshed every 5 minutes.
 3. Click **Sign In to Claude…**. A window opens with claude.ai's own sign-in page.
 4. Sign in the way you normally do. When you're in, the window closes by itself and your numbers appear.
 
-**Signed up with Google?** Google doesn't allow sign-in inside apps, so the window can't finish it. When it reaches Google's page, it shows the steps instead:
+**Signed up with Google?** Choose **Continue with Google**. Google's sign-in opens in a small window of its own and closes itself when you're done, and the sign-in window closes with it. If Google's page stays blank, the window shows these steps instead:
 
 1. Click **Open claude.ai in Browser** and sign in there with Google.
 2. Open the browser's developer tools. In Chrome press Option+Command+I, then click **Application**. In Safari choose Develop, Show Web Inspector, then **Storage**.
