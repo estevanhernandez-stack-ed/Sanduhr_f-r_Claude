@@ -132,13 +132,13 @@ public class SettingsReachIndexTests
     }
 
     [Fact]
-    public void Pack_words_land_on_the_catalog_once_Mods_and_Widgets_has_one()
+    public void Pack_words_land_on_the_installed_list_never_the_catalog()
     {
         var later = SettingsIndex.All.Append(new SettingsEntry("Catalog", SettingsPage.Mods, "catalog", [])).ToList();
         foreach (var q in new[] { "widgets", "packs", "pack" })
         {
             var top = SettingsIndex.Search(q, later)[0];
-            Assert.Equal((SettingsPage.Mods, "catalog"), (top.Entry.Page, top.Entry.Anchor));
+            Assert.Equal((SettingsPage.Mods, "mods"), (top.Entry.Page, top.Entry.Anchor));
         }
     }
 

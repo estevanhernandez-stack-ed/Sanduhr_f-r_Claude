@@ -253,14 +253,17 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
         var (window, svm, guard) = Open("Personal");
         try
         {
+            // An old Widgets link lands on the Installed list: the Catalog stays shut and nothing is fetched on the way.
             window.SelectPage(SettingsPage.Widgets, SettingsIndex.WidgetsCatalog);
             Settle(window, guard);
-            Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.Catalog), window.Place);
-            Assert.True(Below<Expander>(window).Single(e => e.Name == "CatalogSection").IsExpanded);
+            Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.ModList), window.Place);
+            Assert.False(Below<Expander>(window).Single(e => e.Name == "CatalogSection").IsExpanded);
+            Assert.False(svm.ModsPage.CatalogOpen);
 
             window.SelectPage(SettingsPage.Widgets);
             Settle(window, guard);
-            Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.Catalog), window.Place);
+            Assert.Equal(new SettingsLink(SettingsPage.Mods, SettingsIndex.ModList), window.Place);
+            Assert.False(svm.ModsPage.CatalogOpen);
 
             window.SelectPage(SettingsPage.Widgets, SettingsIndex.WidgetsInstalled);
             Settle(window, guard);

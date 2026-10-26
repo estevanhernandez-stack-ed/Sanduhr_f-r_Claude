@@ -80,6 +80,32 @@ public static class ModsPageText
         return string.Join(", ", parts);
     }
 
+    /// <summary>What a mod or plugin touches, as the old Mods &amp; Config page said it: "Draws a band; can run programs." Empty when the scan
+    /// found no surface and no capability.</summary>
+    public static string DescribeTouches(ModTouches t)
+    {
+        var parts = new List<string>();
+        if (t.Surfaces.Count > 0)
+            parts.Add("Draws " + string.Join(", ", t.Surfaces.Select(s => s switch
+            {
+                ModSurface.Band => "a band",
+                ModSurface.Pane => "a pane",
+                ModSurface.Status => "the status line",
+                ModSurface.Toast => "toasts",
+                _ => "slash commands",
+            })));
+        if (t.Capabilities.Count > 0)
+            parts.Add("can " + string.Join(", ", t.Capabilities.Select(c => c switch
+            {
+                ModCapability.Process => "run programs",
+                ModCapability.Http => "use the network",
+                _ => "read and write files",
+            })));
+        if (parts.Count == 0) return "";
+        var line = string.Join("; ", parts);
+        return char.ToUpperInvariant(line[0]) + line[1..] + ".";
+    }
+
     /// <summary>The version as the row shows it: "v0.1.0", or nothing when it is unknown.</summary>
     public static string VersionText(string? version) =>
         ModInventory.CleanVersion(version) is { } v ? "v" + v.TrimStart('v', 'V') : "";

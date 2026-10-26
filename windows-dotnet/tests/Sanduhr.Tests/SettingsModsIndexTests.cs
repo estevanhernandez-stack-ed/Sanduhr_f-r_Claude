@@ -85,11 +85,11 @@ public sealed class SettingsModsIndexTests
     }
 
     [Theory]
-    [InlineData(SettingsPage.Widgets, "widgets-catalog", SettingsPage.Mods, "catalog")]
+    [InlineData(SettingsPage.Widgets, "widgets-catalog", SettingsPage.Mods, "mods")]
     [InlineData(SettingsPage.Widgets, "widgets-installed", SettingsPage.Mods, "mods")]
     [InlineData(SettingsPage.Widgets, "widgets-companion", SettingsPage.Desk, "pieces")]
-    [InlineData(SettingsPage.Widgets, null, SettingsPage.Mods, "catalog")]
-    [InlineData(SettingsPage.Widgets, "gone", SettingsPage.Mods, "catalog")]
+    [InlineData(SettingsPage.Widgets, null, SettingsPage.Mods, "mods")]
+    [InlineData(SettingsPage.Widgets, "gone", SettingsPage.Mods, "mods")]
     [InlineData(SettingsPage.ClaudeCode, "meters", SettingsPage.Mods, "meters")]
     public void Every_slice_4_alias_lands_on_its_new_home(SettingsPage from, string? anchor, SettingsPage to, string toAnchor)
     {
@@ -111,19 +111,19 @@ public sealed class SettingsModsIndexTests
         Assert.Equal(new SettingsLink(to, toAnchor), SettingsIndex.ParseLink(link));
 
     [Fact]
-    public void Pack_words_land_on_the_catalog_now_that_it_is_live()
+    public void Pack_words_land_on_the_installed_list_never_the_catalog()
     {
         // Slice 2's per-slice boost check (final review T4): each slice pins its own boost against the real index.
         foreach (var q in new[] { "widgets", "packs", "pack" })
         {
             var top = SettingsIndex.Search(q)[0];
-            Assert.Equal((SettingsPage.Mods, SettingsIndex.Catalog, -1), (top.Entry.Page, top.Entry.Anchor, top.Rank));
+            Assert.Equal((SettingsPage.Mods, SettingsIndex.ModList, -1), (top.Entry.Page, top.Entry.Anchor, top.Rank));
         }
     }
 
     [Theory]
-    [InlineData("hourglass", SettingsIndex.Catalog)]
-    [InlineData("install", SettingsIndex.Catalog)]
+    [InlineData("hourglass", SettingsIndex.ModList)]
+    [InlineData("install", SettingsIndex.ModList)]
     [InlineData("uninstall", SettingsIndex.ModList)]
     [InlineData("made here", SettingsIndex.ModList)]
     [InlineData("read-only", SettingsIndex.ModList)]
@@ -131,6 +131,22 @@ public sealed class SettingsModsIndexTests
     public void Mods_and_Widgets_words_land_on_their_section(string query, string anchor)
     {
         Assert.Contains(SettingsIndex.Search(query), h => h.Entry.Page == SettingsPage.Mods && h.Entry.Anchor == anchor);
+    }
+
+    [Fact]
+    public void No_search_result_lands_on_a_collapsed_section_whose_expansion_fetches()
+    {
+        // Opening the Catalog asks GitHub. A search never does that for the person: every title and synonym in the index, and
+        // every boost word, lands on a hit that is not the Catalog; the person opens the Catalog themselves.
+        var queries = SettingsIndex.All.Select(e => e.Title)
+            .Concat(SettingsIndex.All.SelectMany(e => e.Synonyms))
+            .Concat(SettingsIndex.Boosts.SelectMany(b => b.Queries))
+            .Concat(["catalog", "check the catalog", "widgets", "pack", "packs", "install", "download"])
+            .Distinct().ToList();
+        foreach (var q in queries)
+            Assert.DoesNotContain(SettingsIndex.Search(q), h => h.Entry.Page == SettingsPage.Mods && h.Entry.Anchor == SettingsIndex.Catalog);
+        // The Catalog is still a section of the page and still found by name, on the Installed list that sits above it.
+        Assert.Contains(SettingsIndex.Search("catalog"), h => h.Entry.Page == SettingsPage.Mods && h.Entry.Anchor == SettingsIndex.ModList);
     }
 
     [Fact]

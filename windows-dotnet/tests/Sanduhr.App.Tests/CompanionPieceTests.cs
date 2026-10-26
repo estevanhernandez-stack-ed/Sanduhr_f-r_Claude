@@ -336,6 +336,55 @@ public sealed class CompanionPieceTests : IDisposable
     }
 
     [Fact]
+    public void Sprites_installed_but_all_switched_off_say_so_and_link_to_the_installed_list_not_no_companion_yet()
+    {
+        Install("companion:bl", roam: false);
+        var svc = new WidgetCatalogService(_paths, new FakeGitHub(), WidgetKit.V380, []);
+        var desk = new DeskSettingsViewModel(_store, [], () => [], widgets: () => svc.Store);
+        var companion = Assert.IsType<DeskCompanionViewModel>(desk.Pieces.Single(p => p.Widget == CompanionSettings.Widget).Companion);
+        int turnedOn = 0;
+        companion.TurnOneOn = () => turnedOn++;
+
+        Assert.True(svc.Store.SetEnabled(PackId, false).Ok);
+        desk.Reload();
+
+        Assert.False(companion.HasCompanions);
+        Assert.True(companion.SpritesAreOff);
+        Assert.False(companion.NoSprites);
+        Assert.Equal("Your sprites are switched off.", companion.SpritesOffLine);
+        Assert.Equal(SettingsNames.SpritesSwitchedOff, companion.SpritesOffLine);
+        Assert.Equal("mods#mods", companion.TurnOneOnLink);
+        Assert.Equal(SettingsNames.TurnASpriteOn, companion.TurnOneOnTitle);
+        Assert.Empty(SettingsNames.PathProblems(SettingsNames.SpritesSwitchedOff + " " + SettingsNames.TurnASpriteOn));
+        companion.TurnOneOnClickedCommand.Execute(null);
+        Assert.Equal(1, turnedOn);
+
+        // Switched back on: the row lists the sprite and neither line shows.
+        Assert.True(svc.Store.SetEnabled(PackId, true).Ok);
+        desk.Reload();
+        Assert.True(companion.HasCompanions);
+        Assert.False(companion.SpritesAreOff);
+        Assert.False(companion.NoSprites);
+    }
+
+    [Fact]
+    public void With_no_sprite_installed_the_row_still_says_no_companion_yet_and_gets_one_from_the_catalog()
+    {
+        Install("companion:bl", roam: false);
+        var svc = new WidgetCatalogService(_paths, new FakeGitHub(), WidgetKit.V380, []);
+        var desk = new DeskSettingsViewModel(_store, [], () => [], widgets: () => svc.Store);
+        var companion = Assert.IsType<DeskCompanionViewModel>(desk.Pieces.Single(p => p.Widget == CompanionSettings.Widget).Companion);
+        Assert.True(svc.Store.Uninstall(PackId).Ok);
+        desk.Reload();
+
+        Assert.False(companion.HasCompanions);
+        Assert.False(companion.SpritesAreOff);
+        Assert.True(companion.NoSprites);
+        Assert.Equal("No companion yet.", companion.NoneYet);
+        Assert.Equal("mods#catalog", companion.GetOneLink);
+    }
+
+    [Fact]
     public void A_fresh_companion_is_shown_at_its_default_place()
     {
         Install("clock:bl", roam: false);

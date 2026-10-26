@@ -41,7 +41,14 @@
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                            AutomationProperties.Name="Companion status" AutomationProperties.LiveSetting="Polite"
                            Visibility="{Binding HasCompanions, Converter={StaticResource BoolVis}}" />
-                <WrapPanel Visibility="{Binding HasCompanions, Converter={x:Static conv:Bools.NotVisible}}">
+                <WrapPanel Visibility="{Binding SpritesAreOff, Converter={StaticResource BoolVis}}">
+                    <TextBlock Text="{Binding SpritesOffLine}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                    <Button Style="{DynamicResource SettingsLinkButton}" Content="{Binding TurnOneOnTitle}"
+                            views:SettingsLinkTo.Link="{Binding TurnOneOnLink}" Command="{Binding TurnOneOnClickedCommand}"
+                            AutomationProperties.Name="{Binding TurnOneOnTitle}" />
+                </WrapPanel>
+                <WrapPanel Visibility="{Binding NoSprites, Converter={StaticResource BoolVis}}">
                     <TextBlock Text="{Binding NoneYet}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"
                                Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                     <Button Style="{DynamicResource SettingsLinkButton}" Content="{Binding GetOneTitle}"

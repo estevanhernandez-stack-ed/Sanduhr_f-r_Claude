@@ -444,13 +444,24 @@ public static class SettingsIndex
                 found.Add((new Hit(e, 1), i));
         }
         int PageOrder(SettingsPage p) { var at = IndexOf(order, p); return at < 0 ? int.MaxValue : at; }
-        return [.. boosted.Select(e => new Hit(e, -1)),
+        return [.. boosted.Select(e => new Hit(Lands(e), -1)),
             .. found
             .OrderBy(f => f.Hit.Rank)
             .ThenBy(f => PageOrder(f.Hit.Entry.Page))
             .ThenBy(f => f.I)
-            .Select(f => f.Hit)];
+            .Select(f => f.Hit with { Entry = Lands(f.Hit.Entry) })];
     }
+
+    /// <summary>
+    /// Sections whose expansion asks the network (Mods &amp; Widgets' Catalog asks GitHub when it opens). A search never lands on one: the
+    /// person opens it themselves, or follows a link that says it gets something. Search rows for the section, and for the controls inside
+    /// it, land on <see cref="ModList"/> instead, the section above it.
+    /// </summary>
+    public static IReadOnlyDictionary<(SettingsPage Page, string Anchor), string> FetchingSections { get; } =
+        new Dictionary<(SettingsPage Page, string Anchor), string> { [(SettingsPage.Mods, Catalog)] = ModList };
+
+    private static SettingsEntry Lands(SettingsEntry e) =>
+        e.Anchor is not null && FetchingSections.TryGetValue((e.Page, e.Anchor), out var safe) ? e with { Anchor = safe } : e;
 
     /// <summary>
     /// A word that lands on one section above every title match (spec, Search, Synonyms). Like an alias it names its page
@@ -468,7 +479,7 @@ public static class SettingsIndex
         new(["stream", "streamer", "screen share", "hide names", "obs"], "privacy", "streamer"),
         new(["demo"], "privacy", "streamer"),
         new(["codename", "codenames"], "privacy", "streamer-allowlist"),
-        new(["widgets", "packs", "pack"], "mods", "catalog"),
+        new(["widgets", "packs", "pack"], "mods", ModList),
     ];
 
     /// <summary>The entries a boost names for exactly this query, in boost order, when they are in <paramref name="index"/>.</summary>
@@ -568,7 +579,7 @@ public static class SettingsIndex
     [
         new(SettingsPage.History, Chart, "claudeusage", "meters"),
         new(SettingsPage.History, HistoryExport, "claudeusage", "meters-export"),
-        new(SettingsPage.Widgets, WidgetsCatalog, "mods", "catalog"),
+        new(SettingsPage.Widgets, WidgetsCatalog, "mods", ModList),
         new(SettingsPage.Widgets, WidgetsInstalled, "mods", ModList),
         new(SettingsPage.Widgets, WidgetsCompanion, "desk", DeskPieces),
         new(SettingsPage.Desk, DeskLook, "desklook", "look"),
@@ -587,7 +598,7 @@ public static class SettingsIndex
         new(SettingsPage.Mods, ClaudeMd, "claudecode", "folder-config"),
         new(SettingsPage.Mods, Retention, "claudecode", "folder-config"),
         new(SettingsPage.History, null, "claudeusage", "meters"),
-        new(SettingsPage.Widgets, null, "mods", "catalog"),
+        new(SettingsPage.Widgets, null, "mods", ModList),
     ];
 
     /// <summary>

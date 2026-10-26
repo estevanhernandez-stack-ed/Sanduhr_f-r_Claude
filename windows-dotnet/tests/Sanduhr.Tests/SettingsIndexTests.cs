@@ -61,7 +61,9 @@ public class SettingsIndexTests
         {
             Assert.True(SettingsIndex.NameAnchors.TryGetValue(name, out var anchor), $"no anchor for {name}");
             Assert.NotNull(SettingsIndex.Find(page, anchor));
-            Assert.Contains(SettingsIndex.Search(name), h => h.Entry.Page == page && h.Entry.Anchor == anchor);
+            // A name inside a section whose opening asks the network is found on the section above it (a search never fetches).
+            var lands = SettingsIndex.FetchingSections.TryGetValue((page, anchor!), out var safe) ? safe : anchor;
+            Assert.Contains(SettingsIndex.Search(name), h => h.Entry.Page == page && h.Entry.Anchor == lands);
         }
     }
 

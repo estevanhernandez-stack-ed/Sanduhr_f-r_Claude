@@ -166,6 +166,81 @@ public sealed class ModsPageListTests : ModsPageFixture
     }
 
     [Fact]
+    public void A_claude_code_row_shows_what_it_touches_in_one_line_and_speaks_it()
+    {
+        var home = Home(".claude", "{\"enabledPlugins\":{\"drawer@m\":true,\"quiet@m\":true}}");
+        Plugin(home, "drawer", "1.0.0", mod: true);
+        Put(Path.Combine(Root, "cache", "drawer"), "hooks/register.tsx", "const x = AbovePrompt; $.process.run('git');");
+        Plugin(home, "quiet", "1.0.0");
+        InstalledPackKit.Install(Paths, "good-palette");
+        var page = Page();
+        page.ReloadLocal();
+
+        var drawer = page.Installed.Single(r => r.Name == "drawer");
+        Assert.True(drawer.HasTouches);
+        Assert.Equal("Draws a band; can run programs.", drawer.TouchesText);
+        Assert.Equal("drawer, version 1.0.0, on, mod, draws a band; can run programs, read-only", drawer.RowName);
+
+        var quiet = page.Installed.Single(r => r.Name == "quiet");
+        Assert.False(quiet.HasTouches);
+        Assert.Equal("quiet, version 1.0.0, on, read-only", quiet.RowName);   // unchanged: nothing to say
+        Assert.False(page.Installed.Single(r => r.Id == "good-palette").HasTouches);
+    }
+
+    [Fact]
+    public void Each_visit_starts_on_All_unless_the_link_that_brought_you_set_a_filter()
+    {
+        var page = Seeded();
+        page.Activate();
+        page.IsFilterWidgets = true;
+        page.FilterText = "theme";
+        Assert.Equal(["Fixture theme"], page.Installed.Select(r => r.Name));
+
+        page.Deactivate();
+        page.Activate();   // the next plain visit
+        Assert.Equal((InstalledFilter.All, ""), (page.Filter, page.FilterText));
+        Assert.Equal(5, page.Installed.Count);
+
+        // The Themes link: the filter is set before the page shows, and holds for that visit only.
+        page.Deactivate();
+        page.ShowWidgetPacks();
+        page.Activate();
+        Assert.Equal((InstalledFilter.Widgets, ""), (page.Filter, page.FilterText));
+        Assert.Equal(["Fixture palette", "Fixture theme"], page.Installed.Select(r => r.Name));
+
+        page.Deactivate();
+        page.Activate();
+        Assert.Equal((InstalledFilter.All, ""), (page.Filter, page.FilterText));
+    }
+
+    [Fact]
+    public void A_link_that_lands_while_the_page_is_already_showing_filters_for_that_visit_and_the_next_visit_is_All()
+    {
+        var page = Seeded();
+        page.Activate();
+        page.ShowWidgetPacks();   // the click landed after the page showed
+        Assert.Equal(InstalledFilter.Widgets, page.Filter);
+
+        page.Deactivate();
+        page.Activate();
+        Assert.Equal(InstalledFilter.All, page.Filter);
+    }
+
+    [Fact]
+    public void The_companions_sprite_catalog_link_filters_for_that_visit_only()
+    {
+        var page = Seeded();
+        page.Deactivate();
+        page.ShowSprites();
+        page.Activate();
+        Assert.Equal("sprite", page.CatalogKind);
+
+        page.Deactivate();
+        page.Activate();
+        Assert.Null(page.CatalogKind);
+    }
+
+    [Fact]
     public void The_note_counts_plugins_without_a_switch_or_files_in_plain_words()
     {
         var personal = Home(".claude", "{\"enabledPlugins\":{\"ghost@m\":true}}");

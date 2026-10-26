@@ -651,6 +651,9 @@ public static class SettingsNames
     /// <summary>Desk, Pieces, the Companion row with no sprite installed. The link opens the catalog on Mods &amp; Widgets, showing sprites.</summary>
     public const string NoCompanionYet = "No companion yet.";
     public static string GetACompanion => $"Get one in {PageTitle(SettingsPage.Mods)}…";
+    /// <summary>The Companion row when sprites are installed but every one is switched off; the link opens the Installed list showing widgets.</summary>
+    public const string SpritesSwitchedOff = "Your sprites are switched off.";
+    public static string TurnASpriteOn => $"Turn one on in {PageTitle(SettingsPage.Mods)}…";
     /// <summary>Desk, Designs: the collapsed section's one-line summary.</summary>
     public static string DesignsSummary(int saved, bool canPutBack) =>
         saved == 0 ? "None saved yet." : $"{saved} saved." + (canPutBack ? " " + PutMyDeskBack + " is ready." : "");
