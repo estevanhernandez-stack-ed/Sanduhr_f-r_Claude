@@ -409,6 +409,8 @@ enum DebugHooks {
         s.settingsPreview = settings.isOpen ? SettingsPreviewKind.of(settings.section) : nil
         s.usagePageOpen = settings.isOpen && settings.section == .usage
         s.usageTab = settings.usageTab
+        s.lockLine = LockLineDebug(on: UserDefaults.desk.bool(forKey: LockLineKeys.on),
+                                   text: LockLineController.line(vm: vm, now: Date()))
         s.justTheDesk = JustTheDesk.isOn()
         s.demo = DemoDebug(on: vm.demo, widgetTiers: vm.visibleTiers().count, deskLine: desk.model.claudeLine != nil,
                            notchMeters: desk.model.claudeCompact != nil, accounts: vm.accountLabels.count,

@@ -1,0 +1,29 @@
+# Issue #137: the lock screen line's composer, read through state.yaml's `lock_line` (`on` quoted
+# in the file; `text`, the line as the writer would compose it now; `length`, its character count).
+# Demo mode gives fresh sample usage, so the line reads "Claude N%" without a sign-in; the Lock
+# Screen page opens to the same preview. A fake watcher put in `waiting` adds "1 waiting for you"
+# (watch-test is the same store the real watchers feed). Nothing here writes lock-line.txt (demo
+# mode never writes) and the lock itself, the root writer, is not part of this scenario yet.
+# The restore plan turns demo off if a run turned it on; the watcher is cleared here.
+# By hand: docs/mac-smoke-test.md, section 52, "Lock screen line".
+name: Lock screen line over demo usage and a fake watcher
+steps:
+  - do: demo
+    arg: "on"
+  - do: settings
+    arg: lockScreen
+  - expect_state: { settings_open: true, settings_section: lockScreen }
+  - expect_state:
+      lock_line.text: '/Claude \d+%/'
+      lock_line.length: '/^[1-9]\d*$/'
+  - do: watch-test
+    arg: start
+  - do: watch-test
+    arg: wait
+  - expect_state:
+      lock_line.text: '/waiting for you/'
+  - do: watch-test
+    arg: clear
+  - do: close-settings
+  - do: demo
+    arg: "off"

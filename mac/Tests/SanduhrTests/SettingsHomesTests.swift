@@ -24,20 +24,20 @@ private func snapshot(_ d: UserDefaults) -> [String: String] {
 
 @Suite("Settings v2 pages")
 struct SettingsPagesTests {
-    @Test func sixteenPagesInFiveGroups() {
-        #expect(SettingsSection.allCases.count == 16)
-        #expect(SettingsSection.groups.map(\.sections.count) == [4, 6, 2, 2, 2])
+    @Test func seventeenPagesInFiveGroups() {
+        #expect(SettingsSection.allCases.count == 17)
+        #expect(SettingsSection.groups.map(\.sections.count) == [4, 7, 2, 2, 2])
         #expect(SettingsSection.groups.flatMap(\.sections) == SettingsSection.allCases)
         #expect(SettingsSection.allCases.map(\.title) == [
             "General", "Accounts", "Usage", "Alerts",
-            "Desk", "Desk Look", "Message", "Notch", "Now Playing", "Watchers",
+            "Desk", "Desk Look", "Message", "Notch", "Lock Screen", "Now Playing", "Watchers",
             "Claude Code", "Mods & Config", "Widget", "Themes", "Updates", "About",
         ])
     }
 
     @Test func rawValuesThatNamePagesAreKept() {
         for raw in ["general", "alerts", "credentials", "usage", "deskLook", "message", "notch", "nowPlaying",
-                    "themes", "updates", "about", "integrations", "mods", "deskLayout", "widgetLook", "watchers"] {
+                    "themes", "updates", "about", "integrations", "mods", "deskLayout", "widgetLook", "watchers", "lockScreen"] {
             #expect(SettingsSection(rawValue: raw) != nil, "\(raw)")
             #expect(SettingsSection.resolve(raw)?.anchor == nil, "\(raw)")
         }
