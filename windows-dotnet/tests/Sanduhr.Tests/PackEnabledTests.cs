@@ -59,7 +59,7 @@ public sealed class PackEnabledTests : IDisposable
 
     [Theory]
     [InlineData("not-installed")]
-    [InlineData("..\evil")]
+    [InlineData("..\\evil")]
     [InlineData("")]
     public void SetEnabled_refuses_an_id_that_is_not_an_installed_pack(string id)
     {
