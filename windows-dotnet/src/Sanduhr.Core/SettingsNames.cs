@@ -534,6 +534,104 @@ public static class SettingsNames
     public const string ClaudeCodeFoldersSection = "Claude Code folders";
     public const string NoFolderInClaudeCode = "No Claude Code folder found. Add one with Add folder\u2026";
 
+    // ---- Settings v2, slice 5: Accounts (spec, Accounts; WF1, WF27, WF29, WF30, WF32) ----
+
+    /// <summary>The label prompt every embedded sign-in shows, and the manual key window's field (one name: "Label").</summary>
+    public const string NameThisAccount = "Name this account";
+    public const string AccountLabelField = "Label";
+    /// <summary>Accounts, Data for this account: what Sanduhr keeps for the selected account.</summary>
+    public const string AccountDataSection = "Data for this account";
+    public const string LinkedFolders = "Linked folders";
+    /// <summary>An account links at most one Claude Code folder (settings.json "account_folders" maps a label to one path).</summary>
+    public static string LinkedFolderLine(string? folder) =>
+        folder is null ? "No Claude Code folder is linked to this account." : $"Linked to {folder}.";
+    /// <summary>Accounts, Data: the one per-account erase (WF1), spoken with the account.</summary>
+    public const string ClearAccountHistory = "Clear this account's history…";
+    public static string ClearAccountHistoryNamed(string account) => $"Clear this account's history, {account}";
+    public static string ClearHistoryQuestion(string account) => $"Clear {account}'s meter history?";
+    public const string ClearHistoryDetail =
+        "This permanently removes the 30 days of meter history Sanduhr keeps for this account on this PC. The sparklines and the meter history start again from the next check. Its sign-in is kept.";
+    public const string ClearHistoryConfirm = "Clear";
+    public const string ClearHistoryCancel = "Cancel";
+    public static string HistoryCleared(string account) => $"{account}'s meter history is cleared.";
+    public const string HistoryNotCleared = "The meter history couldn't be cleared.";
+    /// <summary>Accounts, Data: Remove account…, with everything it removes said under it (WF29, decision 7).</summary>
+    public const string RemoveAccount = "Remove account…";
+    public static string RemoveAccountNamed(string account) => $"Remove account, {account}";
+    public static string RemoveAccountQuestion(string account) => $"Remove {account} from Sanduhr?";
+    public static string RemoveAccountDetail(string account) =>
+        $"Removes {account}'s sign-in from Windows Credential Manager, its meter history (history.{account}.json), its Claude Code folder link, "
+        + "the meter files Claude Code reads for it and its browser profile. It can't be undone.";
+    public const string RemoveAccountConfirm = "Remove";
+    public const string RemoveAccountCancel = "Cancel";
+    /// <summary>Accounts while signed out (Principle 6).</summary>
+    public const string SignedOutAccountsLine = "Claude Usage, Alerts and the meters fill in after you sign in.";
+
+    // ---- Settings v2, slice 5: Alerts, Each limit (WF13) ----
+
+    public const string EachLimitSection = "Each limit";
+    public const string EachLimitCaption = "The limit card's menu on the widget changes the same switches.";
+    public const string EachLimitListName = "Limits";
+    public const string WarnForThisLimit = "Warn for this limit";
+    public static string WarnForLimit(string limit) => $"{WarnForThisLimit}, {limit}";
+    public const string ShowThisLimit = "Show this limit";
+    public static string ShowLimit(string limit) => $"{ShowThisLimit}, {limit}";
+    public const string HiddenUntilItResets = "Hidden until it resets";
+    public const string HiddenUntilResetCaption = HiddenUntilItResets + ". Tick " + ShowThisLimit + " to bring it back now.";
+    public const string EachLimitSignedOut = "Your limits show here after you sign in.";
+    public const string EachLimitNotYet = "Your limits show here after Sanduhr checks your usage.";
+
+    // ---- Settings v2, slice 5: Claude Usage, Meters (WF14, WF32) ----
+
+    /// <summary>The Meters view's chart section ("meter history", WF14); was "History chart".</summary>
+    /// <summary>The Meters pill in Claude Usage (P10); SettingsIndex's subsection string must be this.</summary>
+    public const string MetersView = "Meters";
+    public const string MeterHistorySection = "Meter history";
+    public const string MetersIntro =
+        "Rolling 30-day meter history, kept on this PC and never uploaded. Export it as CSV to read in a spreadsheet or with any agent.";
+    public const string MeterHistorySignedOut = "Sign in to start recording your meters. Sanduhr keeps 30 days on this PC.";
+    public const string MeterHistoryEmpty = "No meter history yet. It fills in each time Sanduhr checks your meters.";
+    public const string ExportMeterHistoryTitle = "Export meter history";
+    public const string MeterHistoryDialogTitle = "Meter history";
+
+    // ---- Settings v2, slice 5: the Widget page (WF15, WF24, WF32) ----
+
+    /// <summary>The Widget page's first line (WF21; slice 1 P14).</summary>
+    public const string WidgetLine = "The widget is " + DefineWidget + ".";
+    /// <summary>The page's options section in search; the page title is already "Widget".</summary>
+    public const string WidgetOptions = "Widget options";
+    public const string GraphStyleClassic = "Classic line";
+    public const string GraphStyleHorizon = "Horizon bands";
+    public const string DeepWorkLength = "Deep Work length";
+    public const string DeepWorkMinutes = "minutes";
+    public static string DeepWorkLengthSpoken => $"{DeepWorkLength}, {DeepWorkMinutes}";
+    public const string DeepWorkRange = "Use a whole number of minutes from 1 to 120. Not saved.";
+    public const string CompactModeCaption = "Ctrl+D on the widget does the same. The widget opens full size at each launch.";
+    public const string LimitOrder = "Limit order";
+    public const string LimitOrderListName = "Limits in the widget's order";
+    public static string MoveLimitUp(string limit) => $"{MoveUp}, {limit}";
+    public static string MoveLimitDown(string limit) => $"{MoveDown}, {limit}";
+    public const string JustTheDeskOn = "Sanduhr is in Just the Desk: the widget is hidden.";
+    public const string ShowTheWidget = "Show the widget";
+    public const string ShowTheWidgetCaption = "Ends Just the Desk and shows the widget, which offers Sign in. The Desk stays on.";
+
+    // ---- Settings v2, slice 5: Publish usage, What gets sent (WF28) ----
+
+    public const string PublishSampleSection = "What gets sent";
+    /// <summary>Every field group of the record (UsagePublisher.BuildPayload), and that the sample sends nothing (decision 10).</summary>
+    public const string PublishRecordLine =
+        "Each record carries the day, this PC's name, the folders you ticked, token counts in total, per limit and per project name, "
+        + "and your meters' percentages, reset times and when they were read. Show a sample… builds the next one here and sends nothing.";
+    public const string ShowASample = "Show a sample…";
+    public const string SampleTitle = "The next record";
+    public static string SampleHeader(string date, string? host) => host is null
+        ? $"The next record, for {date}, has no endpoint yet, so it goes nowhere."
+        : $"The next record, for {date}, goes to {host}.";
+    public const string SampleNoFolders = "No folder is ticked under Folders to share. Publish now waits for one; a daily or agent publish would send this record, "
+        + "naming no folder or project.";
+    public const string SampleClose = "Close";
+    public const string SampleFailed = "The sample couldn't be built.";
+
     // ---- Settings v2, slice 3: the Desk split ----
 
     /// <summary>A page's row of jump links, spoken (spec, Keyboard and screen reader).</summary>
