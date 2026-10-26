@@ -1704,7 +1704,7 @@ state.yaml's `menu_submenus` and `scenarios/settings-names.yaml`.
 
 ## Settings pages
 
-Settings v2, slice 2 (item 72): sixteen pages in five groups (Lock Screen, #137, makes seventeen), each feature with one home and every
+Settings v2, slice 2 (item 72): seventeen pages in five groups (Lock Screen joined Desktop for #137), each feature with one home and every
 other mention a status line and a "<Page> Settings…" link.
 
 | Group | Pages (raw value) |
