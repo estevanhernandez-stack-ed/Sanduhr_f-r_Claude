@@ -182,10 +182,10 @@ public sealed class UpdateCheckSwitchTests : AppWindowFixture
     public void The_Store_build_ignores_update_check_so_a_carried_over_false_cannot_silence_it()
     {
         int asked = 0;
-        // The offers are only reached once the query answers a version; nothing here may touch the real Store.
+        // The query never answers, so the offers (null here) are never reached and nothing touches the real Store.
         var service = new StoreUpdateService(null!, () => 0, isPackaged: () => true)
         {
-            Query = () => { asked++; return Task.FromResult<string?>(null); },
+            Query = () => { asked++; return new TaskCompletionSource<string?>().Task; },
         };
 
         service.Tick(T0);
