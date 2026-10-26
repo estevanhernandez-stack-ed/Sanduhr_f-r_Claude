@@ -182,6 +182,7 @@ public sealed class SettingsViewModel
         Accounts = new AccountsViewModel(widget, addAccountAsync, updateSignInAsync);
         Themes = new ThemesViewModel(widget);
         History = new HistoryTabViewModel(widget);
+        Accounts.HistoryCleared = History.Refresh;
         ClaudeCode = new ClaudeCodeTabViewModel(widget, new LocalCcViewModel(
             widget, widget.LoadLocalCcShowBreakdowns(), widget.SaveLocalCcShowBreakdowns),
             new CcTrendsViewModel(widget),

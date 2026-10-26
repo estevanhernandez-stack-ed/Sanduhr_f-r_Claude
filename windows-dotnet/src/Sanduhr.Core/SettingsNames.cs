@@ -808,6 +808,8 @@ public static class SettingsNames
         (ResetSanduhr, SettingsPage.About),
         (AddFolder, SettingsPage.ClaudeCode),
         (FollowAccount, SettingsPage.Accounts),
+        (ClearAccountHistory, SettingsPage.Accounts),
+        (RemoveAccount, SettingsPage.Accounts),
         (DeskSwitch, SettingsPage.Desk),
         (DeskInkPicker, SettingsPage.DeskLook),
         (ArrangeDesk, SettingsPage.Desk),
@@ -903,6 +905,8 @@ public static class SettingsNames
         ("Widgets settings…", LinkTitle(SettingsPage.Mods), true),
         // Slice 5: the account's name is its Label, in the key window as in the sign-in prompt (decision 8).
         ("Account name", AccountLabelField, true),
+        // Slice 5: History's Clear became Accounts' per-account erase (WF1).
+        ("Clear history", ClearAccountHistory, true),
     ];
 
     /// <summary>The retired names <paramref name="text"/> still uses, empty when it uses none.</summary>

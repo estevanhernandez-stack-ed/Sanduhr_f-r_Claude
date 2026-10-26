@@ -38,4 +38,24 @@ public class SettingsSlice5IndexTests
         Assert.Equal([SettingsIndex.Thresholds, SettingsIndex.EachLimit, SettingsIndex.Sound, SettingsIndex.TestAlert], links.Select(l => l.Anchor));
         Assert.All(links, l => Assert.False(string.IsNullOrWhiteSpace(l.Title)));
     }
+
+    [Theory]
+    [InlineData("clear history", SettingsIndex.AccountData)]
+    [InlineData("remove account", SettingsIndex.AccountData)]
+    [InlineData("linked folder", SettingsIndex.AccountData)]
+    [InlineData("add account", SettingsIndex.SignInSection)]
+    [InlineData("sessionKey", SettingsIndex.SignInSection)]
+    [InlineData("label", SettingsIndex.SignInSection)]
+    public void Account_words_find_their_section(string query, string anchor)
+    {
+        var top = Top(query);
+        Assert.Equal((SettingsPage.Accounts, anchor), (top.Entry.Page, top.Entry.Anchor));
+    }
+
+    [Fact]
+    public void Clear_history_is_retired_as_a_label_but_the_new_one_is_live()
+    {
+        Assert.NotEmpty(SettingsNames.RetiredNames("Clear history"));
+        Assert.Empty(SettingsNames.RetiredNames(SettingsNames.ClearAccountHistory));
+    }
 }

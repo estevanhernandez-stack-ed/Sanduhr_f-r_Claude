@@ -238,6 +238,10 @@ internal partial class SettingsWindow : Window
                 RenderHistory();
         }
 
+        // Accounts shows the selected account's folder link, which the Claude Code page changes: read it again on each visit.
+        if (page == SettingsPage.Accounts)
+            ViewModel.Accounts.Reload();
+
         // The Claude Code page reads files other tools change: look again each time it is opened. Mods & Widgets lists itself when it
         // becomes visible (ModsPage.Activate).
         if (page == SettingsPage.ClaudeCode)

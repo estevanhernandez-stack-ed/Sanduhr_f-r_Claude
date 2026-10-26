@@ -37,6 +37,8 @@ public static class SettingsIndex
     // Accounts
     public const string AccountList = "accounts";
     public const string Follow = "follow";
+    public const string SignInSection = "sign-in";
+    public const string AccountData = "data";
     // Alerts
     public const string Notifications = "notifications";
     public const string Thresholds = "thresholds";
@@ -151,10 +153,15 @@ public static class SettingsIndex
             ["quit", "exit", "close", "close Sanduhr", "stop", "shut down", "end", "sidebar"]),
 
         E("Accounts", SettingsPage.Accounts, AccountList,
-            ["sign in", "sign out", "add account", "rename", "update sign-in", "remove account", "switch",
-             "active account", "sessionKey", "session key", "cookie", "cf_clearance"]),
+            ["switch", "rename", "update sign-in", "active account", "account list"]),
         E(SettingsNames.FollowAccount, SettingsPage.Accounts, Follow,
             ["follow", "auto switch", "in use", "switch automatically", "every 15 minutes"]),
+        E(SettingsNames.SignIn, SettingsPage.Accounts, SignInSection,
+            ["sign in", "add account", "label", "Personal", "sessionKey", "session key", "cookie", "cf_clearance", "Cloudflare",
+             "paste a key", "manual key"]),
+        E(SettingsNames.AccountDataSection, SettingsPage.Accounts, AccountData,
+            ["data", "linked folder", "linked folders", "clear history", "clear this account's history", "meter history", "remove account",
+             "sign out", "delete account", "history file", SettingsNames.LinkedFolders]),
 
         E("Alerts", SettingsPage.Alerts, Notifications,
             ["notification", "toast", "enable alerts", "projection", "pace", "reset notifications", "Focus Assist"]),
@@ -167,7 +174,7 @@ public static class SettingsIndex
 
         E("History chart", SettingsPage.History, Chart,
             ["meter history", "30 days", "week", "month", "account", "all accounts", "chart"]),
-        E(SettingsNames.ExportMeterHistory, SettingsPage.History, HistoryExport, ["csv", "export", "export csv", "clear history", "spreadsheet"]),
+        E(SettingsNames.ExportMeterHistory, SettingsPage.History, HistoryExport, ["csv", "export", "export csv", "spreadsheet"]),
 
         E(OverviewView, SettingsPage.ClaudeUsage, Overview,
             ["Claude Code tokens", "today", "last 30 days", "calendar", "projects", "skills", "breakdown"], OverviewView),
@@ -304,7 +311,9 @@ public static class SettingsIndex
     {
         [SettingsNames.TrayShows] = Tray,
         [SettingsNames.ShortcutToOpenSettings] = Shortcuts,
-        [SettingsNames.AddAccount] = AccountList,
+        [SettingsNames.AddAccount] = SignInSection,
+        [SettingsNames.ClearAccountHistory] = AccountData,
+        [SettingsNames.RemoveAccount] = AccountData,
         [SettingsNames.AddFolder] = Folders,
         [SettingsNames.FollowAccount] = Follow,
         [SettingsNames.SendTestAlert] = TestAlert,

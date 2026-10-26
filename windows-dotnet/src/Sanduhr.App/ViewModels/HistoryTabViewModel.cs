@@ -25,7 +25,7 @@ public sealed record LegendItem(string Label, Brush Swatch)
 /// <summary>
 /// Backs the Settings → History tab — the 30-day usage chart with the per-account
 /// vs all-accounts overlay toggle, the Week/Month window selector, the legend, and
-/// the CSV export + Clear-history actions. Ported from
+/// the CSV export (Clear moved to Accounts, Data for this account, in Settings v2). Ported from
 /// <c>settings_dialog._build_history_tab</c> + the surrounding handlers.
 ///
 /// The chart itself is a custom-render control (<see cref="HistoryChart"/>); this
@@ -78,7 +78,10 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         _widget.AccountsChanged -= RefreshAccountOptions;
     }
 
-    /// <summary>Export and Clear act on real history files: never while demo mode shows sample
+    /// <summary>Redraw the chart (Accounts cleared a history, or the Meters view came into view).</summary>
+    public void Refresh() => Changed?.Invoke();
+
+    /// <summary>Export acts on real history files: never while demo mode shows sample
     /// accounts, whose labels can match a real account's ("Personal").</summary>
     private bool NotDemo => !_widget.IsDemo;
 
@@ -94,7 +97,6 @@ public sealed partial class HistoryTabViewModel : ObservableObject
             AccountOptions.Add(new AccountOption(label, label));
         SelectedOption = AccountOptions.FirstOrDefault(o => o.Account == prev) ?? AccountOptions[0];
         ExportCsvCommand.NotifyCanExecuteChanged();
-        ClearHistoryCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnSelectedOptionChanged(AccountOption? value)
@@ -237,42 +239,6 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         }
     }
 
-    [RelayCommand(CanExecute = nameof(NotDemo))]
-    private void ClearHistory()
-    {
-        // CanExecute is not enforced on a programmatic Execute; demo labels can match a real account's.
-        if (_widget.IsDemo) return;
-        // The account the "Account:" picker shows: one account, or every account on "All accounts".
-        string? account = SelectedOption?.Account;
-        if (!Confirm(ClearConfirmation(account)))
-            return;
-
-        try
-        {
-            if (account is null)
-                _widget.History.ClearEvery();
-            else
-                _widget.History.ClearAll(account);
-        }
-        catch (IOException e)
-        {
-            Sounds.PlayError();
-            Info($"Could not clear history file:\n{e.Message}");
-            return;
-        }
-        Changed?.Invoke();
-        Info($"Local usage history removed for {account ?? "every account"}.");
-    }
-
-    /// <summary>What the Clear history confirmation says: it names the account whose history goes, or every account.</summary>
-    internal static string ClearConfirmation(string? account) =>
-        $"This permanently removes the 30-day usage history of {account ?? "every account"}. " +
-        "Sparkline and history chart will be empty until new data " +
-        "accumulates.\n\nCredentials are not affected.";
-
-    /// <summary>Tests answer the dialogs here instead of showing them.</summary>
-    internal Func<string, bool>? ConfirmHook { get; set; }
-
     /// <summary>Tests read the notices here instead of showing them.</summary>
     internal Action<string>? InfoHook { get; set; }
 
@@ -281,10 +247,4 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         if (InfoHook is not null) { InfoHook(message); return; }
         ThemedDialog.Show(_owner, "History", message, MessageBoxButton.OK, ThemedDialogKind.Info);
     }
-
-    private bool Confirm(string message)
-        => ConfirmHook is not null
-            ? ConfirmHook(message)
-            : ThemedDialog.Show(_owner, "Clear history?", message, MessageBoxButton.YesNo, ThemedDialogKind.Warning)
-              == MessageBoxResult.Yes;
 }
