@@ -21,15 +21,6 @@ public class StoreUpdateTests
     }
 
     [Fact]
-    public void With_update_check_off_the_store_is_never_asked()
-    {
-        // Settings, About, Updates' switch gates both probes (slice 6, decision 6).
-        Assert.False(StoreUpdate.ShouldCheck(true, null, Now, enabled: false));
-        Assert.False(StoreUpdate.ShouldCheck(true, Now.AddDays(-30), Now, enabled: false));
-        Assert.True(StoreUpdate.ShouldCheck(true, null, Now, enabled: true));
-    }
-
-    [Fact]
     public void First_check_happens_then_waits_out_the_interval()
     {
         Assert.True(StoreUpdate.ShouldCheck(true, null, Now));

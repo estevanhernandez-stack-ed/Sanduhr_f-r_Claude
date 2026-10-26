@@ -23,7 +23,6 @@ public sealed class StoreUpdateService
 {
     private readonly RestartToUpdateService _offers;
     private readonly Func<bool> _isPackaged;
-    private readonly Func<bool> _enabled;
     private readonly Func<nint> _ownerWindow;
     private readonly Action<string>? _log;
 
@@ -33,15 +32,13 @@ public sealed class StoreUpdateService
     /// <summary>True once the Store has told us an update is waiting.</summary>
     public bool UpdatePending { get; private set; }
 
-    /// <param name="enabled">Settings, About, Updates' switch (settings.json "update_check"). Off, the Store is never asked (Settings v2, slice 6).</param>
     public StoreUpdateService(
-        RestartToUpdateService offers, Func<nint> ownerWindow, Func<bool>? isPackaged = null, Action<string>? log = null, Func<bool>? enabled = null)
+        RestartToUpdateService offers, Func<nint> ownerWindow, Func<bool>? isPackaged = null, Action<string>? log = null)
     {
         _offers = offers;
         _ownerWindow = ownerWindow;
         _isPackaged = isPackaged ?? (() => Startup.IsPackaged());
         _log = log;
-        _enabled = enabled ?? (() => true);
     }
 
     /// <summary>The Store's answer: the waiting update's version, or null. A seam for tests, which never ask the real Store.</summary>
@@ -60,7 +57,7 @@ public sealed class StoreUpdateService
     /// is acted on when it lands (on the UI thread, which the await resumes on).</summary>
     public void Tick(DateTimeOffset now)
     {
-        if (_checking || !StoreUpdate.ShouldCheck(_isPackaged(), _lastCheck, now, enabled: _enabled()))
+        if (_checking || !StoreUpdate.ShouldCheck(_isPackaged(), _lastCheck, now))
             return;
         _lastCheck = now;
         _checking = true;

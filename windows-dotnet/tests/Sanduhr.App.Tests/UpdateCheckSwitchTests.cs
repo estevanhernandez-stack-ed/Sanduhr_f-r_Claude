@@ -6,8 +6,8 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Tests;
 
 /// <summary>
-/// Settings v2, slice 6: "Check for updates once a day" (settings.json "update_check") gates every update probe. Off, nothing asks: not at
-/// launch, not on the widget's tick, not on the Store build's timer. Check now asks once whatever the switch says. The probe is the only code
+/// Settings v2, slice 6: "Check for updates once a day" (settings.json "update_check") gates the GitHub probe. Off, the GitHub build asks nothing: not at
+/// launch, not on the widget's tick. The Store build has no switch and ignores it. Check now asks once whatever the switch says. The probe is the only code
 /// that asks GitHub for a release (NetworkDisclosureTests pins Velopack's four calls to its file, and the last test here pins who builds it), so a counting
 /// probe that counts zero is zero HTTP.
 /// </summary>
@@ -179,11 +179,25 @@ public sealed class UpdateCheckSwitchTests : AppWindowFixture
     }
 
     [Fact]
-    public void The_Store_build_asks_the_Store_nothing_with_the_switch_off()
+    public void The_Store_build_ignores_update_check_so_a_carried_over_false_cannot_silence_it()
     {
         int asked = 0;
-        // The offers are never reached with the switch off; nothing here may touch the real Store.
-        var service = new StoreUpdateService(null!, () => 0, isPackaged: () => true, enabled: () => false)
+        // The offers are only reached once the query answers a version; nothing here may touch the real Store.
+        var service = new StoreUpdateService(null!, () => 0, isPackaged: () => true)
+        {
+            Query = () => { asked++; return Task.FromResult<string?>(null); },
+        };
+
+        service.Tick(T0);
+
+        Assert.Equal(1, asked);
+    }
+
+    [Fact]
+    public void The_GitHub_build_never_asks_the_Store_whatever_the_switch_says()
+    {
+        int asked = 0;
+        var service = new StoreUpdateService(null!, () => 0, isPackaged: () => false)
         {
             Query = () => { asked++; return Task.FromResult<string?>(null); },
         };
@@ -204,7 +218,7 @@ public sealed class UpdateCheckSwitchTests : AppWindowFixture
     }
 
     /// <summary>"Not anywhere else": one Velopack probe is built, in App, straight into the one checker; only the checker asks it; App wires the
-    /// switch into the Store service too.</summary>
+    /// switch into the checker alone (the Store service takes none).</summary>
     [Fact]
     public void Nothing_but_the_checker_asks_the_probe()
     {
@@ -221,7 +235,8 @@ public sealed class UpdateCheckSwitchTests : AppWindowFixture
 
         var askers = files.Where(f => f.Value.Contains(".FindAsync(", StringComparison.Ordinal)).Select(f => f.Key).ToList();
         Assert.Equal(["UpdateChecker.cs"], askers);
-        Assert.Contains("enabled: updateSwitch.LoadUpdateCheck", app);
+        Assert.Contains("new UpdateChecker(updateSwitch.LoadUpdateCheck", app);
+        Assert.DoesNotContain("enabled: updateSwitch", app);
         Assert.DoesNotContain("CheckForUpdatesAsync(", app);
     }
 }

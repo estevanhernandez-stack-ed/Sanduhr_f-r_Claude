@@ -173,10 +173,10 @@ public partial class App : Application
         _restartToUpdate.OfferChanged += UpdateRestartItems;
         _vm.RestartToUpdateRequested += () => _restartToUpdate?.Accept();
         _vm.RestartRequested += RestartApp;
-        // Settings, About, Updates' "Check for updates once a day" (settings.json "update_check") gates both update probes: off, neither the
-        // Store's question nor GitHub's runs on its own. About's Check now asks GitHub through the same checker.
+        // Settings, About, Updates' "Check for updates once a day" (settings.json "update_check") gates the GitHub probe only: off, it asks
+        // nothing on its own, and About's Check now asks through the same checker. The Store build has no switch, so its check ignores it.
         var updateSwitch = new SettingsStore(new Sanduhr.Core.Paths());
-        _vm.AttachStoreUpdateService(new StoreUpdateService(_restartToUpdate, OwnerWindowHandle, log: LogUpdate, enabled: updateSwitch.LoadUpdateCheck));
+        _vm.AttachStoreUpdateService(new StoreUpdateService(_restartToUpdate, OwnerWindowHandle, log: LogUpdate));
         _updateChecker = new UpdateChecker(updateSwitch.LoadUpdateCheck, new VelopackUpdateProbe(), UpdateChecker.DefaultStampPath,
             (version, installer) => Dispatcher.BeginInvoke(() => _restartToUpdate?.Offer(version, installer)));
         _vm.AttachUpdateChecker(_updateChecker);
