@@ -12,6 +12,10 @@ import Foundation
 enum DemoMode {
     /// The sample accounts, the active one first. Names only: no key, no folder, no data choices.
     static let accounts = ["Work", "Personal"]
+    /// The samples' plan names, so Accounts shows a plan in demo mode without reading a stored real one.
+    static func plan(for account: String) -> String? {
+        account == accounts[0] ? "Max \u{00D7}20" : account == accounts[1] ? "Pro" : nil
+    }
 
     /// The account demo mode starts on.
     static var active: String { accounts[0] }

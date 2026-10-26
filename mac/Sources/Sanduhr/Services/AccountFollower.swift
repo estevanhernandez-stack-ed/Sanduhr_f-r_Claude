@@ -28,6 +28,10 @@ final class AccountFollower {
     /// no request is made for that alone.
     var onResult: (String, Result<UsageResponse, Error>) -> Void = { _, _ in }
 
+    /// An inactive account's plan name as its check read it (nil: no subscription plan, or the
+    /// lookup failed). Called before `onResult`, so the seat's snapshot carries it.
+    var onPlan: (String, String?) -> Void = { _, _ in }
+
     private var timer: Timer?
     private var firstCheck: Task<Void, Never>?
     private var checking = false
@@ -147,7 +151,10 @@ final class AccountFollower {
         do {
             let usage = try await api.getUsage()
             // Renamed, signed out or removed while the request ran: the answer belongs to no one.
+            // The org is cached on this client by now: no extra request.
+            let planName = (try? await api.plan())?.name
             guard clients[label]?.api === api else { return }
+            onPlan(label, planName)
             onResult(label, .success(usage))
             guard let util = usage.tiers[.fiveHour]?.utilization else { return }
             state.record(label, utilization: util, at: now())
