@@ -451,6 +451,14 @@ public static class SettingsNames
     public const string FolderUnreadableReason = "This folder's settings.json can't be read, so Sanduhr changes nothing in it.";
     public static string UpdateMetersIn(string folder) => $"Update {MetersSection} in {folder}";
     public static string RemoveMetersFrom(string folder) => $"Remove {MetersSection} from {folder}";
+    /// <summary>The consent dialog before the meters mod is installed into a folder (Task 10), and the install's two statuses.</summary>
+    public const string MetersConsentTitle = "Draw your meters above the Claude Code prompt?";
+    public const string MetersConsentIntro = "Sanduhr adds a mod that draws your session and weekly meters in a band above the prompt.";
+    public const string MetersConsentDetails = "What gets written: the mod's folder, copied under %USERPROFILE%\\.sanduhr\\mods, and one entry in this folder's settings.json under "
+        + "env, CLAUDE_CODE_PLUGIN_DIRS. The mod reads only Sanduhr's snapshot file. Off keeps the entry and files; Remove takes out only "
+        + "Sanduhr's entry and leaves any other folder in that list alone.";
+    public const string MetersInstalled = "Meters installed. New Claude Code sessions show them.";
+    public const string MetersInstallFailed = "Couldn't install the meters.";
     /// <summary>ModsPage.xaml (Task 12).</summary>
     public const string ModsShowGroup = "Show";
     public const string CatalogListName = "Widget packs in the catalog";

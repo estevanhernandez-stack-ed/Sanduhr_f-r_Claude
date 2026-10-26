@@ -118,7 +118,7 @@ public sealed class ModsPageMetersTests : ModsPageFixture
     public void Remove_asks_and_puts_settings_json_back_exactly()
     {
         var home = Home(".claude", "{}");
-        var (page, _, _) = Open(consent: true);
+        var (page, _, changed) = Open(consent: true);
         Row(page, ".claude").ToggleCommand.Execute(null);
         var questions = new List<string>();
         page.Ask = (title, _, primary) => { questions.Add(title + "|" + primary); return true; };
@@ -126,6 +126,7 @@ public sealed class ModsPageMetersTests : ModsPageFixture
         Row(page, ".claude").RemoveCommand.Execute(null);
 
         Assert.Equal(["Remove the meters mod?|Remove"], questions);
+        Assert.Equal([true, false], changed);
         Assert.Equal("{}", File.ReadAllText(SettingsOf(home)));
         Assert.False(Row(page, ".claude").CanRemove);
         Assert.Equal(FolderState.NotInstalled, Row(page, ".claude").State);
@@ -166,6 +167,38 @@ public sealed class ModsPageMetersTests : ModsPageFixture
         Assert.False(System.Text.Json.Nodes.JsonNode.Parse(text)!["enabledPlugins"]!["sanduhr-meters@inline"]!.GetValue<bool>());
         Assert.False(Row(page, ".claude").IsOn);
         Assert.Equal([false], changed);
+    }
+
+    [Fact]
+    public void Declining_Remove_writes_nothing_and_tells_no_one()
+    {
+        var home = Home(".claude", "{}");
+        var (page, _, changed) = Open(consent: true);
+        Row(page, ".claude").ToggleCommand.Execute(null);
+        var before = File.ReadAllText(SettingsOf(home));
+        changed.Clear();
+        page.Ask = (_, _, _) => false;
+
+        Row(page, ".claude").RemoveCommand.Execute(null);
+
+        Assert.Equal(before, File.ReadAllText(SettingsOf(home)));
+        Assert.True(Row(page, ".claude").CanRemove);
+        Assert.Empty(changed);
+    }
+
+    [Fact]
+    public void Declining_Update_writes_nothing_and_tells_no_one()
+    {
+        var home = Home(".claude", "{\"env\":{\"CLAUDE_CODE_PLUGIN_DIRS\":\"" + OldEntry() + "\"}}");
+        var (page, _, changed) = Open(consent: true);
+        var before = File.ReadAllText(SettingsOf(home));
+        page.Ask = (_, _, _) => false;
+
+        Row(page, ".claude").UpdateCommand.Execute(null);
+
+        Assert.Equal(before, File.ReadAllText(SettingsOf(home)));
+        Assert.True(Row(page, ".claude").CanUpdate);
+        Assert.Empty(changed);
     }
 
     [Fact]

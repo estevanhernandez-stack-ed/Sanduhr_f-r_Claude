@@ -278,16 +278,11 @@ public sealed partial class ModsPageViewModel : ObservableObject
         Confirm = (question, detail) => ThemedDialog.ShowConfirm(_window, question, detail, SettingsNames.UninstallConfirm, SettingsNames.UninstallCancel);
         // settings.json is not read here; the store parameter stays for callers.
         AskMetersConsent = folder => IntegrationConsentDialog.Ask(_window, new ConsentSpec(
-            "Draw your meters above the Claude Code prompt?",
-            "Sanduhr adds a mod that draws your session and weekly meters in a band above the prompt.",
-            folder,
-            "What gets written: the mod's folder, copied under %USERPROFILE%\\.sanduhr\\mods, and one entry in this folder's settings.json under "
-            + "env, CLAUDE_CODE_PLUGIN_DIRS. The mod reads only Sanduhr's snapshot file. Off keeps the entry and files; Remove takes out only "
-            + "Sanduhr's entry and leaves any other folder in that list alone.",
+            SettingsNames.MetersConsentTitle, SettingsNames.MetersConsentIntro, folder, SettingsNames.MetersConsentDetails,
             "Install")) is not null;
         Ask = (title, message, primary) => ThemedDialog.Show(_window, title, message, MessageBoxButton.YesNo,
             primary == "Remove" ? ThemedDialogKind.Warning : ThemedDialogKind.Info,
-            primaryLabel: primary, secondaryLabel: SettingsNames.UninstallCancel) == MessageBoxResult.Yes;
+            primaryLabel: primary, secondaryLabel: primary == "Update" ? "Not now" : SettingsNames.UninstallCancel) == MessageBoxResult.Yes;
     }
 
     /// <summary>Dialogs parent to the Settings window.</summary>
@@ -351,7 +346,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
                 {
                     var res = integ.Install(IntegrationKind.Meters, row.Folder);
                     installed = changed = res.Ok;
-                    MetersStatus = res.Ok ? "Meters installed. New Claude Code sessions show them." : Short(res.Message, "Couldn't install the meters.");
+                    MetersStatus = res.Ok ? SettingsNames.MetersInstalled : Short(res.Message, SettingsNames.MetersInstallFailed);
                 }
             }
             else

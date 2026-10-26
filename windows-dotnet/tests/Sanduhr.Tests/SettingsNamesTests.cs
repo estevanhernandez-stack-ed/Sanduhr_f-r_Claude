@@ -504,5 +504,11 @@ public class SettingsNamesTests
         Assert.Equal("No Claude Code folder found. Add one in Claude Code settings…", SettingsNames.NoFolderInMods);
         Assert.Equal(("Claude Code folders", "No Claude Code folder found. Add one with Add folder…"),
             (SettingsNames.ClaudeCodeFoldersSection, SettingsNames.NoFolderInClaudeCode));
+        Assert.Equal("Draw your meters above the Claude Code prompt?", SettingsNames.MetersConsentTitle);
+        Assert.Equal("Sanduhr adds a mod that draws your session and weekly meters in a band above the prompt.", SettingsNames.MetersConsentIntro);
+        Assert.StartsWith(@"What gets written: the mod's folder, copied under %USERPROFILE%\.sanduhr\mods, and one entry", SettingsNames.MetersConsentDetails);
+        Assert.EndsWith("leaves any other folder in that list alone.", SettingsNames.MetersConsentDetails);
+        Assert.Equal(("Meters installed. New Claude Code sessions show them.", "Couldn't install the meters."),
+            (SettingsNames.MetersInstalled, SettingsNames.MetersInstallFailed));
     }
 }
