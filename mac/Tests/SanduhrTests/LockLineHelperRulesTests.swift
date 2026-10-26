@@ -81,4 +81,11 @@ struct LockLineDaemonTests {
             #expect(LockLineDaemon.caption(s).hasSuffix("."))
         }
     }
+
+    @Test func aThrownRegisterIsOnlyAProblemWhenTheHelperIsNotThere() {
+        struct E: LocalizedError { var errorDescription: String? { "Operation not permitted" } }
+        #expect(LockLineDaemon.installProblem(E(), after: .on) == nil)
+        #expect(LockLineDaemon.installProblem(E(), after: .needsApproval) == nil)
+        #expect(LockLineDaemon.installProblem(E(), after: .off)?.contains("Operation not permitted") == true)
+    }
 }

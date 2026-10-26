@@ -107,7 +107,9 @@ private struct LockLineSwitchSection: View {
         if on {
             LockLineController.shared.refresh(force: true)
             do { try LockLineDaemon.install() } catch {
-                problem = "macOS did not install the lock screen helper: \(error.localizedDescription)"
+                // register() also throws when macOS wants the Login Items OK first; the state is
+                // the truth, so only a helper that is neither on nor waiting for an OK failed.
+                problem = LockLineDaemon.installProblem(error, after: LockLineDaemon.state)
             }
             state = LockLineDaemon.state
         } else {

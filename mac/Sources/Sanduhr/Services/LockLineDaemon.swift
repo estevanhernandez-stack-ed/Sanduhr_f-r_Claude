@@ -59,6 +59,15 @@ enum LockLineDaemon {
 
     static let clearWait: TimeInterval = 90
 
+    /// What Settings says when `register()` threw: nothing when the helper ended up on or is only
+    /// waiting for the Login Items OK (macOS throws in both cases on 26), else macOS's reason.
+    static func installProblem(_ error: Error, after state: State) -> String? {
+        switch state {
+        case .on, .needsApproval: nil
+        case .off, .missing: "macOS did not install the lock screen helper: \(error.localizedDescription)"
+        }
+    }
+
     /// `LoginwindowText` as macOS has it now (world-readable, so no privilege needed).
     static func currentLoginText() -> String? {
         CFPreferencesCopyValue(LockLineHelperRules.key as CFString, LockLineHelperRules.domain as CFString,
