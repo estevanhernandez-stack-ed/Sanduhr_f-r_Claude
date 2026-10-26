@@ -60,8 +60,7 @@ public abstract class AppWindowFixture : IDisposable
         ClaudeCodeProfile.ProfileOverride = Profile;
         ClaudeCodeProfile.ConfigDirOverride = "";
         ClaudeCodeViewModel.ForgetSessionChoice();
-        ModsConfigViewModel.ForgetSessionChoice();
-        // Settings ▸ Widgets fetches the catalog when it opens: never the real network from a test.
+        // Mods & Widgets fetches the catalog when it opens: never the real network from a test.
         WidgetCatalogService.HandlerOverride = () => new OfflineHandler();
         NoLiveMedia();
     }
@@ -82,7 +81,6 @@ public abstract class AppWindowFixture : IDisposable
         Sanduhr.App.Desk.NowPlayingHub.Current = _oldHub;
         Sanduhr.App.Desk.NowPlayingLookService.Current = _oldLooks;
         ClaudeCodeViewModel.ForgetSessionChoice();
-        ModsConfigViewModel.ForgetSessionChoice();
         try { Directory.Delete(Root, true); } catch (IOException) { }
     }
 
