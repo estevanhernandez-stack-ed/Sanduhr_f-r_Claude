@@ -36,13 +36,21 @@ public static class JustTheDesk
         return (new JustTheDeskState(true, silenced), false, true);
     }
 
-    /// <summary>Adding an account ends Just the Desk. Not on: nothing changes. On: off, and the reminder
-    /// returns only if Just the Desk silenced it.</summary>
-    public static (JustTheDeskState State, bool ReminderOn, bool Ended) EndBySignIn(JustTheDeskState state, bool reminderOn)
+    /// <summary>Ends Just the Desk. Not on: nothing changes. On: off, and the reminder returns only if Just the Desk silenced it.
+    /// The one rule for both ways out: an added account and Settings, Widget's "Show the widget" (WF32).</summary>
+    public static (JustTheDeskState State, bool ReminderOn, bool Ended) End(JustTheDeskState state, bool reminderOn)
     {
         if (!state.On) return (state, reminderOn, false);
         return (JustTheDeskState.Off, state.SilencedReminder || reminderOn, true);
     }
+
+    /// <summary>Adding an account ends Just the Desk (<see cref="End"/>).</summary>
+    public static (JustTheDeskState State, bool ReminderOn, bool Ended) EndBySignIn(JustTheDeskState state, bool reminderOn) =>
+        End(state, reminderOn);
+
+    /// <summary>Settings, Widget's "Show the widget" ends Just the Desk the same way signing in does (spec, Widget).</summary>
+    public static (JustTheDeskState State, bool ReminderOn, bool Ended) EndByShowWidget(JustTheDeskState state, bool reminderOn) =>
+        End(state, reminderOn);
 
     /// <summary>The first-run flow shows only with no account and Just the Desk not chosen.</summary>
     public static bool Onboarding(bool hasAccount, bool justTheDesk) => !hasAccount && !justTheDesk;
