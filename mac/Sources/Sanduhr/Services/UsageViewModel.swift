@@ -186,6 +186,10 @@ final class UsageViewModel {
     /// Demo mode (DemoMode, slice 4): the sample accounts and numbers stand in for the real ones
     /// on every surface. In memory only; the real state waits in `demoSession` and comes back with off.
     private(set) var demo = false
+    /// The active account's plan badge, from the same client that fetches usage. Nil signed out,
+    /// between accounts, in demo mode (item 4 owns demo plans) and until the first fetch answers.
+    private(set) var plan: PlanBadge?
+    var planName: String? { plan?.name }
     @ObservationIgnored private var demoSession = DemoSession()
 
     /// The real accounts, whatever demo mode shows: what the Claude Code folders, the Mods page and
@@ -660,7 +664,7 @@ final class UsageViewModel {
             seatMeters.seed(s.usage, at: s.lastUpdated, label: apiAccount)
             return
         }
-        seatMeters.seed(usage, at: lastUpdated, label: apiAccount)
+        seatMeters.seed(usage, at: lastUpdated, label: apiAccount, plan: planName)
     }
 
     nonisolated private static func signedIn(_ accounts: AccountRegistry) -> Set<String> {
@@ -787,6 +791,7 @@ final class UsageViewModel {
             endSwitchVeil()
             let shown = demoSession.start(shownState, now: now)
             demo = true
+            plan = nil
             seatMeters.paused = true
             apply(shown)
             refreshLocalBurn()
@@ -939,6 +944,7 @@ final class UsageViewModel {
         countdownTimer = nil
         api = nil
         apiAccount = nil
+        plan = nil
         usage = nil
         lastUpdated = nil
         refreshLocalBurn()
@@ -986,7 +992,7 @@ final class UsageViewModel {
             // So is one that lands under demo mode.
             guard DemoSession.answerApplies(sameClient: self.api === api, demo: demo) else { return }
             showFailure(error, accountRef: ref)
-            if apiAccount == account { seatMeters.activeAnswered(account, .failure(error)) }
+            if apiAccount == account { seatMeters.activeAnswered(account, .failure(error), plan: planName) }
             endSwitchVeil()
             return
         }
@@ -997,12 +1003,17 @@ final class UsageViewModel {
         Self.reconcileHidden(u, now: Date())
         self.usage = u
         self.lastUpdated = Date()
+        // The org list is cached on the client by now, so this adds no request. A plan failure
+        // never fails the fetch.
+        let badge = try? await api.plan()
+        guard DemoSession.answerApplies(sameClient: self.api === api, demo: demo) else { return }
+        self.plan = badge
         // A fresh refresh re-anchors the local burn: the badges start again from zero.
         self.localBurn = LocalBurn()
         refreshLocalBurn()
         vault.trigger()
         Notifier.shared.evaluate(u)
-        SnapshotWriter.writeOk(u, accountRef: ref)
+        SnapshotWriter.writeOk(u, accountRef: ref, plan: planName)
         follower.recordActive(account, usage: u)
         // One write of the history file per fetch, off the main thread, skipped while the
         // account's Meter history is off (item 43). The sparklines gain the same points in memory.
@@ -1015,7 +1026,7 @@ final class UsageViewModel {
         // A switch's new numbers: they fade in.
         endSwitchVeil()
         // The active account's seat file, then the round of inactive seats in use.
-        if apiAccount == account { seatMeters.activeAnswered(account, .success(u)) }
+        if apiAccount == account { seatMeters.activeAnswered(account, .success(u), plan: planName) }
     }
 
     /// A failed fetch: the status line and snapshot.json's error kind.
@@ -1026,7 +1037,7 @@ final class UsageViewModel {
         case .http(let c)?: status = .error("HTTP \(c)", isAuth: false)
         default: status = .error(error.localizedDescription, isAuth: false)
         }
-        SnapshotWriter.writeError(SnapshotWriter.errorKind(error), accountRef: ref)
+        SnapshotWriter.writeError(SnapshotWriter.errorKind(error), accountRef: ref, plan: planName)
     }
 
     // MARK: Local Claude Code activity (item 45)
