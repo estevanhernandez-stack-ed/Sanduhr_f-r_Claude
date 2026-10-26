@@ -107,4 +107,38 @@ public sealed class ModsPageNamesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    [DesktopFact]
+    public void Every_installed_row_read_only_ones_too_is_one_named_stop_that_says_so() => AppHost.Run(() =>
+    {
+        var home = Home(".claude", "{\"enabledPlugins\":{\"alpha@m\":true}}");
+        var cache = Path.Combine(Root, "cache", "alpha");
+        Directory.CreateDirectory(Path.Combine(cache, ".claude-plugin"));
+        File.WriteAllText(Path.Combine(cache, ".claude-plugin", "plugin.json"), "{\"name\":\"alpha\",\"version\":\"1.2.0\"}");
+        Directory.CreateDirectory(Path.Combine(home, "plugins"));
+        File.WriteAllText(Path.Combine(home, "plugins", "installed_plugins.json"),
+            "{\"version\":2,\"plugins\":{\"alpha@m\":[{\"installPath\":\"" + cache.Replace("\\", "\\\\") + "\",\"version\":\"1.2.0\"}]}}");
+
+        var svm = new SettingsViewModel(DemoWidget(), () => Task.CompletedTask, _ => Task.CompletedTask);
+        var window = new SettingsWindow(svm);
+        OffScreen(window);
+        window.Show();
+        try
+        {
+            var tabs = (TabControl)window.FindName("Tabs");
+            tabs.SelectedItem = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "Widgets");
+            PumpUntil(() => !svm.ModsPage.Busy);
+            svm.ModsPage.ReloadLocal();
+            var alpha = svm.ModsPage.Installed.Single(r => r.Name == "alpha");
+            Assert.True(alpha.IsReadOnly);
+            Assert.Contains("read-only", alpha.RowName);
+
+            var names = NamesOf(window);
+            Assert.Contains(alpha.RowName, names);   // the row itself is a peer a screen reader lands on, not just the text inside it
+            var rowPeer = Walk(System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(window)).First(p => p.GetName() == alpha.RowName);
+            Assert.True(rowPeer.IsKeyboardFocusable());   // read-only rows have no control inside, so the row itself is the stop
+            Assert.Empty(LeaksIn(names));
+        }
+        finally { window.Close(); }
+    });
 }

@@ -12,6 +12,32 @@
         <BooleanToVisibilityConverter x:Key="BoolVis" />
         <conv:StringToVisibilityConverter x:Key="StrVis" />
 
+        <!-- A row is one stop, as the accounts list is: a ListBox item that Tab and arrow keys reach and a screen reader names with its state
+             ("..., read-only" for a Claude Code item that has no control of its own). Nothing here selects; the ring is the theme's accent. -->
+        <Style x:Key="RowFocus">
+            <Setter Property="Control.Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Rectangle Stroke="{DynamicResource Sanduhr.Brush.Accent}" StrokeThickness="2" RadiusX="6" RadiusY="6" Margin="-1,-1,-1,7" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="InstalledRowItem" TargetType="ListBoxItem">
+            <Setter Property="Focusable" Value="True" />
+            <Setter Property="IsTabStop" Value="True" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource RowFocus}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="AutomationProperties.Name" Value="{Binding RowName}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <ContentPresenter />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="Heading" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -67,8 +93,7 @@
 
         <DataTemplate DataType="{x:Type vm:InstalledRowViewModel}">
             <Border Background="{DynamicResource Sanduhr.Brush.Bg}" BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
-                    BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,8"
-                    AutomationProperties.Name="{Binding RowName}">
+                    BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,8">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -161,8 +186,16 @@
                                Text="Nothing installed yet. Widgets you make with Claude will show here too, marked made here." />
                     <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8" Text="{x:Static core:SettingsNames.NothingMatches}"
                                Visibility="{Binding NothingMatches, Converter={StaticResource BoolVis}}" />
-                    <ItemsControl ItemsSource="{Binding Installed}" Focusable="False"
-                                  AutomationProperties.Name="{x:Static core:SettingsNames.InstalledSection}" />
+                    <ListBox ItemsSource="{Binding Installed}" ItemContainerStyle="{StaticResource InstalledRowItem}"
+                             Background="Transparent" BorderThickness="0" Padding="0" Focusable="False" SelectionMode="Single"
+                             AutomationProperties.Name="{x:Static core:SettingsNames.InstalledSection}">
+                        <!-- Just the rows: the page's own ScrollViewer scrolls, not a second one in here. -->
+                        <ListBox.Template>
+                            <ControlTemplate TargetType="ListBox">
+                                <ItemsPresenter />
+                            </ControlTemplate>
+                        </ListBox.Template>
+                    </ListBox>
                     <TextBlock Text="{Binding Note}" Style="{StaticResource Dim}" Margin="0,4,0,0" Visibility="{Binding Note, Converter={StaticResource StrVis}}" />
                     <TextBlock Style="{StaticResource Dim}" Margin="0,4,0,0"
                                Text="Installed packs live in Sanduhr's own widgets folder on this PC. Opening this page asks GitHub for the catalog, and Install downloads the pack from GitHub; nothing else is sent. Reset Sanduhr removes the folder." />

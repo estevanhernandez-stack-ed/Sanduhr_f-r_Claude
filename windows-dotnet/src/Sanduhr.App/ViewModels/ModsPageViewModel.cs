@@ -210,8 +210,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
     {
         _service = new Lazy<WidgetCatalogService>(service ?? (() => new WidgetCatalogService()));
         _host = host;
-        Confirm = (question, detail) => ThemedDialog.Show(_window, question, detail, MessageBoxButton.YesNo, ThemedDialogKind.Warning,
-            primaryLabel: SettingsNames.UninstallConfirm, secondaryLabel: SettingsNames.UninstallCancel) == MessageBoxResult.Yes;
+        Confirm = (question, detail) => ThemedDialog.ShowConfirm(_window, question, detail, SettingsNames.UninstallConfirm, SettingsNames.UninstallCancel);
         // settings.json is not read here; the store parameter stays for callers.
     }
 

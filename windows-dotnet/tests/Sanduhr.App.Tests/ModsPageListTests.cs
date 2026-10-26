@@ -99,10 +99,29 @@ public sealed class ModsPageListTests : ModsPageFixture
         var palette = page.Installed.Single(r => r.Id == "good-palette");
         Assert.True(InstalledPackKit.Store(Paths).Uninstall("good-palette").Ok);   // gone behind the page's back
 
+        var notices = new List<string?>();
+        palette.PropertyChanged += (_, e) => notices.Add(e.PropertyName);
+
         palette.ToggleCommand.Execute(null);
 
         Assert.Equal("That widget isn't installed.", page.Status);
         Assert.True(palette.Enabled);   // unchanged: nothing was written
+        // The box already flipped under the click; this notice is what makes the OneWay binding push the true value back.
+        Assert.Contains(nameof(InstalledRowViewModel.Enabled), notices);
+    }
+
+    [Fact]
+    public void The_uninstall_dialog_has_no_default_button_and_escape_cancels()
+    {
+        Sta.Run(() =>
+        {
+            _ = System.IO.Packaging.PackUriHelper.UriSchemePack;
+            var dlg = Sanduhr.App.Views.ThemedDialog.BuildConfirm("Uninstall X?", "detail", "Uninstall", "Cancel");
+            Assert.False(dlg.PrimaryButton.IsDefault);   // Enter picks nothing: the primary choice deletes the person's pack
+            Assert.True(dlg.SecondaryButton.IsCancel);   // Escape cancels
+            Assert.Equal("Uninstall", dlg.PrimaryButton.Content);
+            Assert.Equal(System.Windows.MessageBoxResult.None, dlg.Result);
+        });
     }
 
     [Fact]
