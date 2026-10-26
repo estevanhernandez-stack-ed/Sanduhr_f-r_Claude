@@ -53,6 +53,9 @@ public class ForegroundSkipTests
         });
         Assert.IsNotType<SkipException>(e);
         Assert.Contains("focused nothing", e.Message);
+        // The failure carries what the foreground did, so the next real one says whether an outside app was involved.
+        Assert.Contains("[foreground at start: testhost", e.Message);
+        Assert.Contains("foreground events during the test: 0]", e.Message);
     }
 
     [Fact]

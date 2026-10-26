@@ -39,12 +39,13 @@ internal sealed class ForegroundWatch : IDisposable
     private readonly WinEventProc _proc;   // held: the hook calls it for as long as it lives
     private IntPtr _hook;
     private IntPtr _seen;
+    private int _events;
 
     private ForegroundWatch(ForegroundProbe probe)
     {
         _probe = probe;
         _start = probe.Query();
-        _proc = (_, _, hwnd, _, _, _, _) => Note(hwnd);
+        _proc = (_, _, hwnd, _, _, _, _) => { _events++; Note(hwnd); };
         if (ReferenceEquals(probe, ForegroundProbe.Real))
             _hook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, _proc, 0, 0, WINEVENT_OUTOFCONTEXT);
     }
@@ -72,6 +73,17 @@ internal sealed class ForegroundWatch : IDisposable
         if (_seen == IntPtr.Zero) return null;
         var (pid, name) = _probe.Describe(_seen);
         return $"Skipped: the foreground changed to {name} ({pid}) during the test; focus results are not reliable.";
+    }
+
+    /// <summary>
+    /// What the foreground did during a focus test that failed without counting as interference, so the next such failure
+    /// says whether an outside app was involved: who held the foreground at the start and now, and how many foreground
+    /// events the hook saw (one that re-activates the same window still counts).
+    /// </summary>
+    public string Diagnosis()
+    {
+        string Who(IntPtr hwnd) => hwnd == IntPtr.Zero ? "none" : $"{_probe.Describe(hwnd).Name} ({_probe.Describe(hwnd).Pid})";
+        return $"[foreground at start: {Who(_start)}; at failure: {Who(_probe.Query())}; foreground events during the test: {_events}]";
     }
 
     public void Dispose()
