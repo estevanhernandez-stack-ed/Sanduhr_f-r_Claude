@@ -657,7 +657,9 @@ public static class SettingsNames
     public const string NetClaudeUsage = "claude.ai, your usage";
     public static string NetClaudeUsageWhen =>
         $"When Sanduhr starts, after you sign in, every {(int)UsageSchedule.Refresh.TotalMinutes} minutes for the account in use, and when you refresh or switch accounts. "
-        + "A failed ask is tried again within seconds. "
+        + $"After you sign in, add an account, switch accounts or leave demo mode, a first ask that fails for a passing reason is tried once more after {(int)UsageSchedule.RetryAfterFailure.TotalSeconds} seconds. "
+        + $"If the hidden window stops, Sanduhr restarts it and asks again after {(int)TransportRecovery.FirstDelay.TotalSeconds} and {(int)TransportRecovery.SecondDelay.TotalSeconds} seconds, "
+        + $"then every {(int)TransportRecovery.SteadyDelay.TotalMinutes} minutes. "
         + $"With {FollowAccount} on, every {(int)AccountFollow.CheckInterval.TotalMinutes} minutes for each other signed-in account. "
         + $"Another signed-in account linked to a Claude Code folder you are using is read up to every {(int)UsageSchedule.Refresh.TotalMinutes} minutes too.";
     public const string NetClaudeUsageCarries =

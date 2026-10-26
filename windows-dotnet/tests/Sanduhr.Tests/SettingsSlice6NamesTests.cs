@@ -35,7 +35,11 @@ public class SettingsSlice6NamesTests
     public void Preflight_rulings_are_in_the_words()
     {
         // P4: the usage row names every ask and every cookie.
-        Assert.StartsWith("When Sanduhr starts, after you sign in, every 5 minutes for the account in use, and when you refresh or switch accounts. A failed ask is tried again within seconds.", SettingsNames.NetClaudeUsageWhen);
+        Assert.StartsWith("When Sanduhr starts, after you sign in, every 5 minutes for the account in use, and when you refresh or switch accounts. "
+            + "After you sign in, add an account, switch accounts or leave demo mode, a first ask that fails for a passing reason is tried once more after 5 seconds. "
+            + "If the hidden window stops, Sanduhr restarts it and asks again after 5 and 30 seconds, then every 5 minutes. ", SettingsNames.NetClaudeUsageWhen);
+        // An ordinary failed 5-minute ask is not retried, and the row no longer says every failed ask is.
+        Assert.DoesNotContain("A failed ask is tried again", SettingsNames.NetClaudeUsageWhen);
         Assert.Contains("cf_clearance when Cloudflare issued one", SettingsNames.NetClaudeUsageCarries);
         Assert.Contains("the cookies claude.ai's own page sets", SettingsNames.NetClaudeUsageCarries);
         Assert.DoesNotContain("if you pasted one", SettingsNames.NetClaudeUsageCarries);
@@ -93,6 +97,14 @@ public class SettingsSlice6NamesTests
     {
         Assert.Contains($"every {(int)UsageSchedule.Refresh.TotalMinutes} minutes for the account in use", SettingsNames.NetClaudeUsageWhen);
         Assert.Contains($"every {(int)AccountFollow.CheckInterval.TotalMinutes} minutes", SettingsNames.NetClaudeUsageWhen);
+        // The retry and the hidden window's restarts, from the constants the timers run on.
+        Assert.Contains($"tried once more after {(int)UsageSchedule.RetryAfterFailure.TotalSeconds} seconds", SettingsNames.NetClaudeUsageWhen);
+        Assert.Contains($"asks again after {(int)TransportRecovery.FirstDelay.TotalSeconds} and {(int)TransportRecovery.SecondDelay.TotalSeconds} seconds, "
+            + $"then every {(int)TransportRecovery.SteadyDelay.TotalMinutes} minutes", SettingsNames.NetClaudeUsageWhen);
+        Assert.Equal(TransportRecovery.FirstDelay, TransportRecovery.DelayAfter(0));
+        Assert.Equal(TransportRecovery.SecondDelay, TransportRecovery.DelayAfter(1));
+        Assert.Equal(TransportRecovery.SteadyDelay, TransportRecovery.DelayAfter(2));
+        Assert.Equal(TransportRecovery.SteadyDelay, TransportRecovery.DelayAfter(9));
         Assert.Contains($"every {(int)WeatherSchedule.Refresh.TotalMinutes} minutes", SettingsNames.NetWeatherWhen);
         Assert.Contains($"every {(int)UpdateCheck.Interval.TotalHours} hours", SettingsNames.NetUpdatesWhen);
         Assert.Contains($"every {(int)UpdateCheck.Interval.TotalHours} hours", SettingsNames.UpdatesCaption);
