@@ -2035,8 +2035,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             _settings.SaveLimitState(_limitState);
         }
         if (ShownData is { } shown)
-            RenderCards(shown, DateTimeOffset.UtcNow);
-        LimitsChanged?.Invoke();
+            RenderCards(shown, DateTimeOffset.UtcNow);   // raises LimitsChanged itself
+        else
+            LimitsChanged?.Invoke();
     }
 
     /// <summary>Hidden limits (manual and until-reset), in canonical tier order.</summary>
