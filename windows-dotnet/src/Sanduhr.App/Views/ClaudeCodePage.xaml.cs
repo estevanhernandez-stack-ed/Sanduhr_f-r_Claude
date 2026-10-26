@@ -32,7 +32,8 @@ public partial class ClaudeCodePage : UserControl
         {
             if (Cards.ItemContainerGenerator.ContainerFromItem(row) is not FrameworkElement card) return;
             card.UpdateLayout();
-            card.BringIntoView();
+            // A card with its report open is taller than the window: ask for its top, so the card's name lands in view.
+            card.BringIntoView(new Rect(0, 0, card.ActualWidth, Math.Min(card.ActualHeight, 48)));
             if (FindHeader(card) is { IsVisible: true } header)
                 header.Focus();
         }));

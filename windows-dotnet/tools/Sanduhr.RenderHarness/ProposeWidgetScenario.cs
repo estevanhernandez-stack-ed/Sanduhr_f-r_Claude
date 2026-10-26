@@ -166,7 +166,7 @@ public static partial class Program
         sw.Top = -20000;
         sw.Height = 1300;
         await Settle();
-        swType.GetMethod("SelectPage")!.Invoke(sw, [SettingsPage.Widgets, SettingsIndex.WidgetsInstalled]);
+        swType.GetMethod("SelectPage")!.Invoke(sw, [SettingsPage.Mods, SettingsIndex.ModList]);
         await Settle();
         await Settle();
         Log.Add($"propose-widget: installed={string.Join("|", svm.ModsPage.Installed.Select(r => r.RowName + (r.CanUseOwnArt ? " [own art]" : "")))}");
