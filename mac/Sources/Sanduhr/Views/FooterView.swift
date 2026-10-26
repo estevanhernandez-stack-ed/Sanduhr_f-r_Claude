@@ -78,7 +78,8 @@ private struct PlanCapsule: View {
             .foregroundStyle(color)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(Capsule().fill(Color.white.opacity(0.13)))
+            // Tinted by the accent, not white: a white wash vanishes on the light glass themes.
+            .background(Capsule().fill(color.opacity(0.14)))
             .help(PlanRiffs.tooltip(name: plan.name, riffs: plan.riffs, index: index))
     }
 }
