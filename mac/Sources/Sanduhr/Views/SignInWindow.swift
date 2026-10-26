@@ -199,7 +199,7 @@ final class SignInWindowController: NSObject, NSWindowDelegate, WKNavigationDele
         if navigationAction.navigationType == .linkActivated,
            navigationAction.targetFrame?.isMainFrame ?? true,
            let url = navigationAction.request.url, !ClaudeSignIn.staysInWindow(url) {
-            NSWorkspace.shared.open(url)
+            if ClaudeSignIn.opensInBrowser(url) { NSWorkspace.shared.open(url) }
             return .cancel
         }
         return .allow
@@ -254,7 +254,9 @@ final class SignInWindowController: NSObject, NSWindowDelegate, WKNavigationDele
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         guard ClaudeSignIn.popupStaysInWindow(navigationAction.request.url) else {
-            if let url = navigationAction.request.url { NSWorkspace.shared.open(url) }
+            if let url = navigationAction.request.url, ClaudeSignIn.opensInBrowser(url) {
+                NSWorkspace.shared.open(url)
+            }
             return nil
         }
         closePopup()

@@ -71,6 +71,17 @@ struct ClaudeSignInTests {
         #expect(!ClaudeSignIn.popupStaysInWindow(URL(string: "https://docs.example.com/help")))
     }
 
+    @Test func onlyWebAddressesLeaveForTheBrowser() {
+        for s in ["https://docs.example.com/help", "http://claude.ai/login"] {
+            #expect(ClaudeSignIn.opensInBrowser(URL(string: s)), "\(s)")
+        }
+        for s in ["file:///etc/hosts", "x-apple.systempreferences:com.apple.preference", "mailto:a@example.com",
+                  "javascript:alert(1)", "https://", "ssh://example.com"] {
+            #expect(!ClaudeSignIn.opensInBrowser(URL(string: s)), "\(s)")
+        }
+        #expect(!ClaudeSignIn.opensInBrowser(nil))
+    }
+
     @Test func aPageWithNoTextIsBlank() {
         #expect(ClaudeSignIn.pageLooksBlank(bodyTextLength: 0))
         #expect(ClaudeSignIn.pageLooksBlank(bodyTextLength: nil))

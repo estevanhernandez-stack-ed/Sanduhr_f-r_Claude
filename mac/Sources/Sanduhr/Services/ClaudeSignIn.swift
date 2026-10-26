@@ -102,6 +102,14 @@ enum ClaudeSignIn {
         return staysInWindow(url)
     }
 
+    /// A link or popup that leaves the window may go to the default browser only as a web address.
+    /// Any other scheme (`file:`, an app's own scheme) is dropped, so a page can't open files or
+    /// launch apps through the sign-in window.
+    static func opensInBrowser(_ url: URL?) -> Bool {
+        guard let scheme = url?.scheme?.lowercased(), url?.host?.isEmpty == false else { return false }
+        return scheme == "https" || scheme == "http"
+    }
+
     /// A loaded page with no text in its body: nothing a person can use, so the window offers
     /// the browser and a pasted key over it.
     static func pageLooksBlank(bodyTextLength: Int?) -> Bool {
