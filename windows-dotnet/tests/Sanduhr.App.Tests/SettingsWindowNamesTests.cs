@@ -52,6 +52,7 @@ public sealed class SettingsWindowNamesTests : AppWindowFixture
         var seen = new Dictionary<string, List<string>>();
         try
         {
+            svm.ClaudeCodePage.Folders.Single(f => f.Display == @"~\.claude-personal").HoldsOpen = true;
             var tabs = (TabControl)window.FindName("Tabs");
             foreach (var item in tabs.Items.OfType<TabItem>())
             {
@@ -72,8 +73,8 @@ public sealed class SettingsWindowNamesTests : AppWindowFixture
         Assert.Contains("alpha, version 1.2.0, on", seen["Mods"]);
         Assert.Contains("beta-mod, version 0.1.0, off, mod", seen["Mods"]);
         Assert.Contains("ghost, on, no files here", seen["Mods"]);
-        Assert.Contains("Notification, 1 group", seen["Mods"]);
-        Assert.Contains("alpha@m, On", seen["Mods"]);
+        Assert.Contains("Notification, 1 group", seen["ClaudeCode"]);
+        Assert.Contains("alpha@m, On", seen["ClaudeCode"]);
     });
 
     [Fact]

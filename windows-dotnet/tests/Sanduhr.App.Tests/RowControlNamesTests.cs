@@ -91,7 +91,7 @@ public sealed class RowControlNamesTests : AppWindowFixture
             @"C:\Users\someone-with-a-very-long-profile-name\AppData\Roaming\claude-code\.claude-work" })
         {
             var row = new Sanduhr.App.ViewModels.CcFolderRowViewModel(
-                page, new Sanduhr.Core.CcFolder(folder, "x", false), folder, Sanduhr.App.ViewModels.ClaudeCodeViewModel.NoAccount, false);
+                page, new Sanduhr.Core.CcFolder(folder, "x", false), folder, Sanduhr.App.ViewModels.ClaudeCodeViewModel.NoAccount, false, true);
             Assert.StartsWith(Sanduhr.Core.SettingsNames.ForgetFolder, row.ForgetName);
             Assert.EndsWith(folder, row.ForgetName);
             Assert.StartsWith(Sanduhr.Core.SettingsNames.LetClaudeReadTotals, row.McpReadableName);

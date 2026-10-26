@@ -88,7 +88,8 @@ public sealed class FolderHoldsTests : ModsPageFixture
         holds.RefreshCommand.Execute(null);
 
         Assert.Equal("2 servers", holds.McpSummary);
-        Assert.StartsWith("Refresh", holds.RefreshName);
+        Assert.Equal(@"Refresh, read ~\.claude again", holds.RefreshName);
+        Assert.Equal(SettingsNames.RefreshFolderNamed(@"~\.claude"), holds.RefreshName);
     }
 
     [Fact]
@@ -98,6 +99,20 @@ public sealed class FolderHoldsTests : ModsPageFixture
         Home(".claude-work", "{ broken");
         var folders = Host().ReadFolders();
         Assert.Equal([@"~\.claude", @"~\.claude-work"], folders.Select(f => f.Display));
+        Assert.Equal([FolderState.NotInstalled, FolderState.Unreadable], folders.Select(InstalledItems.MetersState));
+    }
+
+    [Fact]
+    public void A_folder_whose_read_throws_still_lists_and_the_others_are_read()
+    {
+        Home(".claude", "{}");
+        Home(".claude-bad", "{}");
+        var host = Host() with { ReadReport = (folder, profile) => folder.EndsWith(".claude-bad", StringComparison.OrdinalIgnoreCase)
+            ? throw new InvalidOperationException("boom") : ModInventory.Read(folder, profile) };
+
+        var folders = host.ReadFolders();
+
+        Assert.Equal([@"~\.claude", @"~\.claude-bad"], folders.Select(f => f.Display));
         Assert.Equal([FolderState.NotInstalled, FolderState.Unreadable], folders.Select(InstalledItems.MetersState));
     }
 }
