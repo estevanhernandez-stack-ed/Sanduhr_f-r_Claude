@@ -134,7 +134,8 @@ private struct AccountList: View {
                 get: { adding ? nil : selection },
                 set: { if let s = $0 { selection = s; adding = false } })) { label in
                 AccountRow(label: label, active: label == vm.activeAccount,
-                           signedIn: vm.signedInAccounts.contains(label))
+                           signedIn: vm.signedInAccounts.contains(label),
+                           plan: vm.accountPlans[label])
                     .tag(label)
             }
             .frame(height: 180)
@@ -148,6 +149,8 @@ private struct AccountRow: View {
     let label: String
     let active: Bool
     let signedIn: Bool
+    /// The account's kept plan name; nothing is drawn when unknown.
+    var plan: String?
 
     var body: some View {
         HStack(spacing: 6) {
@@ -155,7 +158,12 @@ private struct AccountRow: View {
                 .foregroundStyle(active ? Color.accentColor : Color.secondary)
                 .font(.caption)
             VStack(alignment: .leading, spacing: 1) {
-                Text(label)
+                HStack(spacing: 5) {
+                    Text(label)
+                    if let plan = AccountPlans.caption(plan) {
+                        Text(plan).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
                 if !signedIn {
                     Text("Signed out").font(.caption2).foregroundStyle(.secondary)
                 }
@@ -163,7 +171,18 @@ private struct AccountRow: View {
             Spacer(minLength: 0)
             if active { AccountPill.active }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(rowSpeech)
+    }
+}
+
+extension AccountRow {
+    /// "Work, Max ×20, Active, Signed out": the plan reads as part of the account.
+    fileprivate var rowSpeech: String {
+        var parts = [AccountPlans.spokenLabel(label, plan: plan)]
+        if active { parts.append("Active") }
+        if !signedIn { parts.append("Signed out") }
+        return parts.joined(separator: ", ")
     }
 }
 
@@ -333,6 +352,9 @@ private struct AccountDetail: View {
     private var header: some View {
         HStack(spacing: 8) {
             Text(label).font(.title3.weight(.semibold))
+            if let plan = AccountPlans.caption(vm.accountPlans[label]) {
+                Text(plan).font(.caption).foregroundStyle(.secondary)
+            }
             if isActive { AccountPill.active }
             AccountPill.status(hasKey: hasKey, expired: expired)
             Spacer()
@@ -757,7 +779,8 @@ private struct DemoAccounts: View {
     private var list: some View {
         VStack(alignment: .leading, spacing: 8) {
             List(DemoAccountsLayout.labels, id: \.self, selection: $selection) { label in
-                AccountRow(label: label, active: label == vm.activeAccount, signedIn: true).tag(label)
+                AccountRow(label: label, active: label == vm.activeAccount, signedIn: true,
+                           plan: DemoMode.plan(for: label)).tag(label)
             }
             .frame(height: 180)
             Button("Add Account…") {}.allowsHitTesting(false)
@@ -769,6 +792,9 @@ private struct DemoAccounts: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 Text(label).font(.title3.weight(.semibold))
+                if let plan = AccountPlans.caption(DemoMode.plan(for: label)) {
+                    Text(plan).font(.caption).foregroundStyle(.secondary)
+                }
                 if label == vm.activeAccount { AccountPill.active }
                 AccountPill.status(hasKey: true, expired: false)
                 Spacer()

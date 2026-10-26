@@ -160,6 +160,8 @@ final class UsageViewModel {
     /// Every account's data choices (AccountData), as Settings, Accounts, Data shows them. Holds
     /// linked folder paths: never logged or written to state.yaml.
     private(set) var accountDataChoices: [String: AccountDataChoices] = AccountData.allChoices(in: KeychainStore.accounts.defaults)
+    /// Every named account's kept plan name (AccountPlans), as Settings, Accounts shows it.
+    private(set) var accountPlans: [String: String] = AccountPlans.allPlans(in: KeychainStore.accounts.defaults)
     /// Live Claude Code activity (item 45): the tokens the shown account's linked folder used
     /// since the last meter refresh, by tier, for the cards' "+Nk". Zero after each refresh, grown
     /// by the 30-second scans; empty when its activity is Not tracked or no folder is linked.
@@ -322,6 +324,8 @@ final class UsageViewModel {
         follower.context = { [weak self] in self?.followContext() ?? AccountFollow.State() }
         follower.onSwitch = { [weak self] label in self?.switchAccount(to: label, automatic: true) }
         follower.onReadings = { [weak self] in self?.refreshInUse() }
+        follower.onPlan = { [weak self] label, name in self?.keepPlan(name, for: label) }
+        seatMeters.planFor = { AccountPlans.plan(for: $0, in: KeychainStore.accounts.defaults) }
         follower.onResult = { [weak self] label, result in self?.seatMeters.followerAnswered(label, result) }
         seatMeters.context = { [weak self] in self?.seatContext() ?? SeatMeters.Context() }
         follower.apply(enabled: followEnabled)
@@ -425,6 +429,13 @@ final class UsageViewModel {
         if wasActive { showActiveAccount(leaving: accountLabel) } else { reloadAccounts() }
         refreshInUse()
         return result
+    }
+
+    /// Keeps an account's plan name (nil clears it) and refreshes what Accounts shows.
+    private func keepPlan(_ name: String?, for account: String?) {
+        AccountPlans.set(name, for: account, in: KeychainStore.accounts.defaults)
+        let kept = AccountPlans.allPlans(in: KeychainStore.accounts.defaults)
+        if kept != accountPlans { accountPlans = kept }
     }
 
     /// Rename an account; its secrets, history file and sign-in marker follow (AccountRegistry).
@@ -628,6 +639,8 @@ final class UsageViewModel {
         }
         let off = Set(MeterHistory.offLabels(in: accounts.defaults))
         if off != historyOffAccounts { historyOffAccounts = off }
+        let kept = AccountPlans.allPlans(in: accounts.defaults)
+        if kept != accountPlans { accountPlans = kept }
         let data = AccountData.allChoices(in: accounts.defaults)
         if data != accountDataChoices {
             accountDataChoices = data
@@ -1008,6 +1021,7 @@ final class UsageViewModel {
         let badge = try? await api.plan()
         guard DemoSession.answerApplies(sameClient: self.api === api, demo: demo) else { return }
         self.plan = badge
+        keepPlan(badge?.name, for: account)
         // A fresh refresh re-anchors the local burn: the badges start again from zero.
         self.localBurn = LocalBurn()
         refreshLocalBurn()

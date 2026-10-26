@@ -42,6 +42,9 @@ final class SeatMeters {
     var makeClient: (AccountCredentials) -> UsageFetching = {
         ClaudeAPI(sessionKey: $0.sessionKey ?? "", cfClearance: $0.cfClearance)
     }
+    /// The kept plan name of an account (AccountPlans), for the seats the view model's own plan
+    /// does not cover.
+    var planFor: (String) -> String? = { _ in nil }
     var now: () -> Date = Date.init
     var sleep: (TimeInterval) async -> Void = { try? await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) }
     /// Whether Claude Code wrote to a seat folder lately. Runs off the main thread.
@@ -156,11 +159,12 @@ final class SeatMeters {
         write(label, result)
     }
 
-    /// `plan` is the seat's plan name: the active account's from the view model, nil for the rest
-    /// until the per-account plan cache (item 3) fills it.
+    /// `plan` is the seat's plan name: the active account's from the view model, else the kept one
+    /// for that account (`planFor`), else nil.
     private func write(_ label: String?, _ result: Result<UsageResponse, Error>, plan: String? = nil) {
         guard !stopped, let target = target(label) else { return }
         let ref = AccountRef.of(label)
+        let plan = plan ?? label.flatMap(planFor)
         switch result {
         case .success(let u): SnapshotWriter.writeOk(u, accountRef: ref, plan: plan, now: now(), to: target)
         case .failure(let e): SnapshotWriter.writeError(SnapshotWriter.errorKind(e), accountRef: ref, plan: plan, now: now(), to: target)

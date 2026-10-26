@@ -336,6 +336,18 @@ struct SeatMetersTests {
         #expect(five(w.file("Work")) == 50)
     }
 
+    @Test func inactiveSeatsCarryTheirOwnKeptPlanElseNull() async throws {
+        let w = try World()
+        w.meters.planFor = { ["Home": "Pro"][$0] }
+        w.meters.followerAnswered("Home", .success(usage(33)))
+        #expect(json(w.file("Home"))?["plan"] as? String == "Pro")
+        w.answers["Lab"] = .success(usage(5))
+        w.context.inUse = ["Lab"]
+        await w.activeAnswers()
+        #expect(json(w.file("Lab"))?["plan"] is NSNull)
+        #expect(json(w.file("Work"))?["plan"] is NSNull)
+    }
+
     @Test func syncKeepsSignedOutSeatsAndRenameMovesTheFile() async throws {
         let w = try World()
         w.context.signedIn = ["Work", "Home"]
