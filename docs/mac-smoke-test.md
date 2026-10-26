@@ -2119,9 +2119,10 @@ is what the smoke tools use: `smoke/smoke do notch-pill force` (from `mac/`) wri
 ## 52. Lock screen line (issue #137)
 
 The line Sanduhr keeps ready for the lock screen: `prefix · Claude 29% · resets 6:10 PM · 1 waiting
-for you`. This build writes only the text file; the lock screen itself shows it once the root writer
-ships, in a later build. On a scratch macOS user, or with `~/Library/Application Support/Sanduhr`
-backed up first, as section 45 does, since the last step writes there with the switch on.
+for you`. The switch writes a text file and registers a root helper that puts the line on the lock
+screen. On a scratch macOS user, or with `~/Library/Application Support/Sanduhr` backed up first, as
+section 45 does. A rebuilt dev build must turn the switch off and on to re-register the helper (see
+mac/README.md, Lock screen line).
 
 1. `smoke/smoke run smoke/scenarios/lock-line.yaml` (from `mac/`) passes: demo mode on, Settings open
    on Lock Screen, `lock_line.text` reads `Claude N%`, a fake watcher in `waiting` adds `waiting for
@@ -2137,3 +2138,10 @@ backed up first, as section 45 does, since the last step writes there with the s
    Support/Sanduhr/lock-line.txt` holds the Preview's text. Switch it off: the file is emptied once.
    In demo mode the file is never written, whatever the switch says.
 6. `smoke/smoke state` shows `lock_line: {on, text, length}` matching the Preview and the switch.
+
+7. Turn the switch on and approve the admin prompt (and System Settings, Login Items, if asked): the
+   caption says On. `launchctl print system/com.626labs.sanduhr.lockline` shows the job; within about
+   a minute `defaults read /Library/Preferences/com.apple.loginwindow LoginwindowText` is the
+   preview's line, and Control-Command-Q shows it on the lock screen.
+8. Turn the switch off: the caption says "Taking the line off the lock screen", then Off; the key is
+   gone (or the earlier message is back) and `launchctl print` no longer finds the job.
