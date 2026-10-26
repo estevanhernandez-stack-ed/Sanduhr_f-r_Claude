@@ -771,6 +771,12 @@ public partial class App : Application
         Action showRunnerStatus = () => svm.Desk.CiRunnersStatus = _runners?.Status.Text ?? "";
         RunnerStatusShown += showRunnerStatus;
         svm.QuitRequested = QuitApp;
+        // Settings, Widget, Just the Desk's "Show the widget" (WF32): the widget view model has ended it and redrawn the Desk; the window is App's.
+        svm.WidgetPage.ShowWidgetRequested = () =>
+        {
+            if (_vm is { } widgetVm) svm.Alerts.DeskSignInReminder = widgetVm.LoadDeskSignInReminder();
+            ShowWindow();
+        };
         svm.ResetRequested = () =>
         {
             ShowReset();

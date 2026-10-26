@@ -100,6 +100,21 @@ public sealed partial class WidgetPageViewModel : ObservableObject
         set => _widget.SetPinned(value);
     }
 
+    /// <summary>Just the Desk is on ("just_the_desk"): the section with "Show the widget" shows (WF32).</summary>
+    public bool IsJustTheDesk => _widget.JustTheDesk;
+
+    /// <summary>Connected by App: show the widget window and sync an open Settings window's reminder box.</summary>
+    public Action? ShowWidgetRequested { get; set; }
+
+    /// <summary>"Show the widget": ends Just the Desk the way signing in does (the reminder back only if Just the Desk silenced it),
+    /// then asks App to show the widget, which offers Sign in.</summary>
+    [RelayCommand]
+    private void ShowWidget()
+    {
+        _widget.EndJustTheDesk();
+        ShowWidgetRequested?.Invoke();
+    }
+
     /// <summary>Deep Work length in minutes ("focus_mode_duration"), 1 to 120 like the focus timer's own stepper.</summary>
     [ObservableProperty] private string _deepWorkMinutes;
 
@@ -147,6 +162,7 @@ public sealed partial class WidgetPageViewModel : ObservableObject
             case nameof(WidgetViewModel.IsCompact): OnPropertyChanged(nameof(IsCompact)); break;
             case nameof(WidgetViewModel.SparklineStyle): OnPropertyChanged(nameof(SelectedGraphStyle)); break;
             case nameof(WidgetViewModel.Pinned): OnPropertyChanged(nameof(KeepOnTop)); break;
+            case nameof(WidgetViewModel.JustTheDesk): OnPropertyChanged(nameof(IsJustTheDesk)); break;
         }
     }
 

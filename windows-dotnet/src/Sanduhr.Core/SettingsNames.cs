@@ -289,7 +289,7 @@ public static class SettingsNames
     public const string MessageColor = "Message color";
     /// <summary>Desk, Behavior: the Desk's sign-in reminder switch (settings.json "desk_sign_in_reminder", on by default; WF32).</summary>
     public const string SignInReminders = SignInReminder.Title;
-    /// <summary>The first-run card's third action (settings.json "just_the_desk"); it has no Settings control.</summary>
+    /// <summary>The first-run card's third action (settings.json "just_the_desk"), and the Widget page's Just the Desk section.</summary>
     public const string JustTheDeskButton = JustTheDesk.ButtonTitle;
     /// <summary>Now playing: the widget's line (settings.json "now_playing.widget", off by default).</summary>
     public const string NowPlayingInWidget = "Show what's playing in the widget";
@@ -851,6 +851,7 @@ public static class SettingsNames
         (KeepWidgetOnTop, SettingsPage.Widget),
         (DeepWorkLength, SettingsPage.Widget),
         (LimitOrder, SettingsPage.Widget),
+        (ShowTheWidget, SettingsPage.Widget),
     ];
 
     /// <summary>

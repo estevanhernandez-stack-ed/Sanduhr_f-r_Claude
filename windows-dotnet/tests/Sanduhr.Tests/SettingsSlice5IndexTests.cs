@@ -116,4 +116,14 @@ public class SettingsSlice5IndexTests
     [InlineData("tier order")]
     public void Widget_words_find_the_widget_options(string query) =>
         Assert.Contains(SettingsIndex.Search(query).Take(3), h => h.Entry.Page == SettingsPage.Widget && h.Entry.Anchor == SettingsIndex.WidgetOptions);
+
+    [Fact]
+    public void Just_the_Desk_has_a_section_and_the_query_still_has_an_always_visible_hit()
+    {
+        Assert.NotNull(SettingsIndex.Find(SettingsPage.Widget, SettingsIndex.JustTheDeskSection));
+        Assert.Equal((SettingsPage.Widget, SettingsIndex.JustTheDeskSection),
+            (Top("show the widget").Entry.Page, Top("show the widget").Entry.Anchor));
+        // P16: the Widget section is collapsed unless the mode is on, so the Desk row keeps the words too.
+        Assert.Contains(SettingsIndex.Search("Just the Desk"), h => h.Entry.Page == SettingsPage.Desk && h.Entry.Anchor == SettingsIndex.SignInReminders);
+    }
 }
