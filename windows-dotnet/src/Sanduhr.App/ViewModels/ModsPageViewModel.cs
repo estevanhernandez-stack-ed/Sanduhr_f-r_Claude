@@ -195,6 +195,71 @@ public sealed partial class InstalledRowViewModel : ObservableObject
 }
 
 /// <summary>
+/// One folder's row under Meters above the prompt (Settings v2 slice 4, WF9): an On switch that writes enabledPlugins through SwitchOwnMod (or,
+/// where the mod isn't installed, asks and installs it), "Update…" while the entry is outdated, "Remove…" while it is listed. A folder whose
+/// settings.json can't be read shows why and nothing that would write.
+/// </summary>
+public sealed partial class MetersFolderRowViewModel : ObservableObject
+{
+    private readonly ModsPageViewModel _owner;
+
+    internal MetersFolderRowViewModel(ModsPageViewModel owner, FolderMods folder)
+    {
+        _owner = owner;
+        Folder = folder.Folder;
+        Display = folder.Display;
+        Show(folder);
+    }
+
+    public string Folder { get; }
+    public string Display { get; }
+
+    [ObservableProperty] private FolderState _state;
+    [ObservableProperty] private bool _isOn;
+    [ObservableProperty] private bool _canUpdate;
+    [ObservableProperty] private bool _canRemove;
+
+    public bool CanSwitch => State != FolderState.Unreadable;
+    public string StateText => InstalledItems.StateWord(State);
+    public string Reason => State == FolderState.Unreadable ? SettingsNames.FolderUnreadableReason : "";
+    public bool HasReason => Reason.Length > 0;
+
+    public string SwitchName => SettingsNames.MetersOnFor(Display);
+    /// <summary>The row read as one line: "~\.claude, On".</summary>
+    public string RowName => $"{Display}, {StateText}";
+    public string UpdateName => SettingsNames.UpdateMetersIn(Display);
+    public string RemoveName => SettingsNames.RemoveMetersFrom(Display);
+
+    /// <summary>Shows what the folder holds now. Always raises IsOn, so a switch the person flipped and that was refused flips back (decision 7).
+    /// IsOn is what settings.json says, so a folder whose files are gone (Files missing) can still be switched off (P12).</summary>
+    internal void Show(FolderMods folder)
+    {
+        State = InstalledItems.MetersState(folder);
+        // Not the generated setter: it skips the notice when the value is unchanged, and a click has already flipped the box.
+#pragma warning disable MVVMTK0034
+        _isOn = State != FolderState.Unreadable && folder.Own is { Listed: true, IsOn: true };
+#pragma warning restore MVVMTK0034
+        OnPropertyChanged(nameof(IsOn));
+        CanRemove = State != FolderState.Unreadable && folder.Own is { Listed: true };
+        CanUpdate = CanRemove && folder.Meters == IntegrationStatus.Outdated;
+        OnPropertyChanged(nameof(CanSwitch));
+        OnPropertyChanged(nameof(StateText));
+        OnPropertyChanged(nameof(RowName));
+        OnPropertyChanged(nameof(Reason));
+        OnPropertyChanged(nameof(HasReason));
+    }
+
+    [RelayCommand]
+    private void Toggle() => _owner.SwitchMeters(this);
+
+    [RelayCommand]
+    private void Update() => _owner.UpdateMeters(this);
+
+    [RelayCommand]
+    private void Remove() => _owner.RemoveMeters(this);
+}
+
+/// <summary>
 /// Settings, Mods &amp; Widgets (Settings v2 slice 4, spec "Mods &amp; Widgets: one list"): the Installed list over every Claude Code folder and the widget packs, the catalog, and a status line. Until the page flip (Task 12) it is hosted in the Widgets tab.
 /// </summary>
 public sealed partial class ModsPageViewModel : ObservableObject
@@ -212,6 +277,17 @@ public sealed partial class ModsPageViewModel : ObservableObject
         _host = host;
         Confirm = (question, detail) => ThemedDialog.ShowConfirm(_window, question, detail, SettingsNames.UninstallConfirm, SettingsNames.UninstallCancel);
         // settings.json is not read here; the store parameter stays for callers.
+        AskMetersConsent = folder => IntegrationConsentDialog.Ask(_window, new ConsentSpec(
+            "Draw your meters above the Claude Code prompt?",
+            "Sanduhr adds a mod that draws your session and weekly meters in a band above the prompt.",
+            folder,
+            "What gets written: the mod's folder, copied under %USERPROFILE%\\.sanduhr\\mods, and one entry in this folder's settings.json under "
+            + "env, CLAUDE_CODE_PLUGIN_DIRS. The mod reads only Sanduhr's snapshot file. Off keeps the entry and files; Remove takes out only "
+            + "Sanduhr's entry and leaves any other folder in that list alone.",
+            "Install")) is not null;
+        Ask = (title, message, primary) => ThemedDialog.Show(_window, title, message, MessageBoxButton.YesNo,
+            primary == "Remove" ? ThemedDialogKind.Warning : ThemedDialogKind.Info,
+            primaryLabel: primary, secondaryLabel: SettingsNames.UninstallCancel) == MessageBoxResult.Yes;
     }
 
     /// <summary>Dialogs parent to the Settings window.</summary>
@@ -222,6 +298,116 @@ public sealed partial class ModsPageViewModel : ObservableObject
 
     /// <summary>The Claude Code folders as last read (the meters section reads them too).</summary>
     internal IReadOnlyList<FolderMods> Folders { get; private set; } = [];
+
+    // ---- Meters above the prompt (spec, Mods & Widgets, section 1): every folder at once ----
+    // P13: the Update and Remove dialogs and statuses below are transitional copies of ModsConfigViewModel's; Task 12 deletes the original.
+
+    public ObservableCollection<MetersFolderRowViewModel> Meters { get; } = [];
+    [ObservableProperty] private string _metersStatus = "";
+    public bool HasMeterFolders => Meters.Count > 0;
+    public string MetersCaption => SettingsNames.MetersOffVsRemove;
+
+    /// <summary>Raised after a folder's meters were switched, installed, updated or removed (true after an install): the Claude Code cards
+    /// read again and the snapshot switch follows (decision 22).</summary>
+    public Action<bool>? MetersChanged { get; set; }
+
+    /// <summary>Asks before the mod is installed into a folder (the consent dialog that names it): the folder's display in, yes out. A seam for tests.</summary>
+    internal Func<string, bool> AskMetersConsent { get; set; }
+
+    /// <summary>Asks before Update… and Remove…: title, message and the primary label in, yes out. A seam for tests.</summary>
+    internal Func<string, string, string, bool> Ask { get; set; }
+
+    /// <summary>Brings the rows to the folders as read, in place where a folder is still there, so a switch keeps keyboard focus.</summary>
+    private void ShowMeters()
+    {
+        var wanted = Folders;
+        for (int i = Meters.Count - 1; i >= 0; i--)
+            if (!wanted.Any(f => ClaudeCodeFolders.Same(f.Folder, Meters[i].Folder))) Meters.RemoveAt(i);
+        for (int i = 0; i < wanted.Count; i++)
+        {
+            var row = Meters.FirstOrDefault(m => ClaudeCodeFolders.Same(m.Folder, wanted[i].Folder));
+            if (row is null) Meters.Insert(Math.Min(i, Meters.Count), new MetersFolderRowViewModel(this, wanted[i]));
+            else row.Show(wanted[i]);
+        }
+        OnPropertyChanged(nameof(HasMeterFolders));
+    }
+
+    internal void SwitchMeters(MetersFolderRowViewModel row)
+    {
+        if (_host is null || !row.CanSwitch)
+        {
+            ReloadLocal();
+            return;
+        }
+        bool want = !row.IsOn;
+        bool installed = false, changed = false;
+        try
+        {
+            var integ = _host.Integrations();
+            if (want && !integ.OwnModStateOf(row.Folder).Listed)
+            {
+                // Decision 6: the mod isn't here, so ask first and install; SwitchOwnMod would install silently.
+                if (AskMetersConsent(row.Display))
+                {
+                    var res = integ.Install(IntegrationKind.Meters, row.Folder);
+                    installed = changed = res.Ok;
+                    MetersStatus = res.Ok ? "Meters installed. New Claude Code sessions show them." : Short(res.Message, "Couldn't install the meters.");
+                }
+            }
+            else
+            {
+                var res = integ.SwitchOwnMod(row.Folder, want);
+                changed = res.Ok;
+                MetersStatus = res.Ok ? (want ? "Meters mod turned on." : "Meters mod turned off.") : Short(res.Message, "Couldn't change the switch.");
+            }
+        }
+        catch (Exception) { MetersStatus = "Couldn't change the switch."; }
+        ReloadLocal();
+        if (changed) MetersChanged?.Invoke(installed);
+    }
+
+    internal void UpdateMeters(MetersFolderRowViewModel row)
+    {
+        if (_host is null || !row.CanUpdate) return;
+        try
+        {
+            var integ = _host.Integrations();
+            var state = integ.OwnModStateOf(row.Folder);
+            var version = state.Pinned ?? "the installed version";
+            var current = integ.CurrentModStamp() ?? "the new version";
+            if (!Ask("Update the meters mod?",
+                    $"This folder's meters mod is pinned to {version}. Updating points it at {current}, the version that ships with this Sanduhr. "
+                    + "The mod's files are copied again and one entry in this folder's settings.json changes. The old version's files stay until "
+                    + "Sanduhr prunes them.", "Update"))
+                return;
+            var res = integ.UpdateOwnMod(row.Folder);
+            MetersStatus = !res.Ok ? Short(res.Message, "Couldn't update the meters mod.")
+                : res.Outcome == ModUpdateOutcome.Updated ? "Meters mod updated." : "Meters mod is already current.";
+        }
+        catch (Exception) { MetersStatus = "Couldn't update the meters mod."; }
+        ReloadLocal();
+        MetersChanged?.Invoke(false);
+    }
+
+    internal void RemoveMeters(MetersFolderRowViewModel row)
+    {
+        if (_host is null || !row.CanRemove) return;
+        try
+        {
+            if (!Ask("Remove the meters mod?",
+                    "Takes Sanduhr's entry out of this folder's settings.json and leaves any other mod alone.", "Remove"))
+                return;
+            var res = _host.Integrations().Remove(IntegrationKind.Meters, row.Folder);
+            MetersStatus = res.Ok ? "Meters mod removed." : Short(res.Message, "Couldn't remove the meters mod.");
+        }
+        catch (Exception) { MetersStatus = "Couldn't remove the meters mod."; }
+        ReloadLocal();
+        MetersChanged?.Invoke(false);
+    }
+
+    private string Short(string message, string fallback) =>
+        string.IsNullOrWhiteSpace(message) ? fallback
+            : _host is null ? message : message.Replace(_host.Profile, "~", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Called after a pack is installed or removed (the Desk reloads).</summary>
     public Action? Changed { get; set; }
@@ -379,6 +565,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
         Note = ModsPageText.PlainNote(Folders);
         HasInstalled = _items.Count > 0;
         ApplyFilter();
+        ShowMeters();
     }
 
     private void ApplyFilter()
