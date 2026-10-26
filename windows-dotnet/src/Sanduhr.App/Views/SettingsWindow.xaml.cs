@@ -26,7 +26,7 @@ namespace Sanduhr.App.Views;
 /// app-level <c>Sanduhr.Brush.*</c> DynamicResources, so the whole window —
 /// including the title bar — re-tints live when the active theme changes.
 ///
-/// The History chart and the Claude Usage Overview bar strip are custom
+/// The meter history chart (Claude Usage, Meters) and the Overview bar strip are custom
 /// <c>OnRender</c> controls that can't bind their data declaratively, so this
 /// code-behind bridges them: it re-pushes data on the VMs' <c>Changed</c>
 /// events, renders the chart on load, and drives the Claude Usage tab's show +
@@ -214,9 +214,7 @@ internal partial class SettingsWindow : Window
 
     /// <summary>Refresh + timer-arm the Claude Usage tab only while it's selected so
     /// we don't walk session logs on a tab the user can't see (parity with the
-    /// Python tab's showEvent/hideEvent). The History chart re-renders on
-    /// (re)selection too, since the control has no size until its tab is first
-    /// realized.</summary>
+    /// Python tab's showEvent/hideEvent). Meters re-renders through its refresh.</summary>
     private async void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(e.OriginalSource, Tabs))
@@ -234,8 +232,6 @@ internal partial class SettingsWindow : Window
         else
         {
             _localCcTimer.Stop();
-            if (page == SettingsPage.History)
-                RenderHistory();
         }
 
         // Accounts shows the selected account's folder link, which the Claude Code page changes: read it again on each visit.
@@ -314,6 +310,7 @@ internal partial class SettingsWindow : Window
             {
                 var command = view switch
                 {
+                    SettingsIndex.MetersView => ViewModel.ClaudeCode.SetMetersCommand,
                     SettingsIndex.TrendsView => ViewModel.ClaudeCode.SetTrendsCommand,
                     SettingsIndex.SessionsView => ViewModel.ClaudeCode.SetSessionsCommand,
                     _ => ViewModel.ClaudeCode.SetOverviewCommand,

@@ -320,13 +320,13 @@ public sealed class SettingsReachTests : AppWindowFixture
         var (signedOut, _) = ScratchWidget();
         var tab = new HistoryTabViewModel(signedOut);
         tab.BuildRows();
-        Assert.Equal(HistoryTabViewModel.SignedOutLine, tab.EmptyText);
+        Assert.Equal(SettingsNames.MeterHistorySignedOut, tab.EmptyText);
         Assert.True(tab.HasEmptyText);
 
         var (work, _) = ScratchWidget("Work");
         var workTab = new HistoryTabViewModel(work);
         workTab.BuildRows();
-        Assert.Equal(HistoryTabViewModel.NoHistoryLine, workTab.EmptyText);
+        Assert.Equal(SettingsNames.MeterHistoryEmpty, workTab.EmptyText);
 
         work.History.AppendForAccount("five_hour", 41, "Work");
         Assert.NotEmpty(workTab.BuildRows());
@@ -335,15 +335,15 @@ public sealed class SettingsReachTests : AppWindowFixture
     });
 
     [Fact]
-    public void Signed_out_the_History_page_reads_its_empty_line() => AppHost.Run(() =>
+    public void Signed_out_the_Meters_view_reads_its_empty_line() => AppHost.Run(() =>
     {
         var (window, _, guard) = Open();
         try
         {
-            Land(window, guard, SettingsPage.History, SettingsIndex.Chart);
+            Land(window, guard, SettingsPage.ClaudeUsage, SettingsIndex.MeterHistory);
             var line = (TextBlock)window.FindName("HistoryEmptyText");
             Assert.True(line.IsVisible);
-            Assert.Equal(HistoryTabViewModel.SignedOutLine, line.Text);
+            Assert.Equal(SettingsNames.MeterHistorySignedOut, line.Text);
             Assert.Equal(Visibility.Hidden, ((FrameworkElement)window.FindName("Chart")).Visibility);
         }
         finally { window.Close(); }

@@ -9,7 +9,7 @@ public class SettingsNamesTests
     // Retired pages stay in the enum for their aliases (old cards, agent text, --settings links) but leave the sidebar: Widgets in
     // slice 4 (P4), History in slice 5.
     private static readonly SettingsPage[] SidebarPages =
-        [.. Enum.GetValues<SettingsPage>().Where(p => p is not SettingsPage.Widget and not SettingsPage.Widgets)];
+        [.. Enum.GetValues<SettingsPage>().Where(p => p is not SettingsPage.Widget and not SettingsPage.Widgets and not SettingsPage.History)];
 
     private static IEnumerable<string> CopyOf(WhatsNewCard c) => [c.Title, c.Body];
 

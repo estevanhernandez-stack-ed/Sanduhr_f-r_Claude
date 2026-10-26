@@ -21,12 +21,12 @@ public static class SettingsNames
 
     /// <summary>The sidebar: six groups, each page once. Widget is not a page (Show me on a widget card
     /// shows the widget itself). Settings v2 names the groups: "Extend" (Claude Code and Mods &amp; Widgets, which holds widget packs too)
-    /// and "Desktop" (the Mac's word, and no longer its first page's title). Retired pages (Widgets since slice 4) stay in
+    /// and "Desktop" (the Mac's word, and no longer its first page's title). Retired pages (Widgets since slice 4, History since slice 5) stay in
     /// <see cref="SettingsPage"/> for their aliases but are in no group.</summary>
     public static IReadOnlyList<SettingsGroup> Sidebar { get; } =
     [
         new(null, [SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts]),
-        new("Usage", [SettingsPage.History, SettingsPage.ClaudeUsage, SettingsPage.Publish]),
+        new("Usage", [SettingsPage.ClaudeUsage, SettingsPage.Publish]),
         new("Extend", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Themes]),
         new("Desktop", [SettingsPage.Desk, SettingsPage.DeskLook, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather,
@@ -54,7 +54,7 @@ public static class SettingsNames
         SettingsPage.General => "General",
         SettingsPage.Accounts => "Accounts",
         SettingsPage.Alerts => "Alerts",
-        SettingsPage.History => "History",
+        SettingsPage.History => "History",   // retired in slice 5: keeps its old title for aliases and logs
         SettingsPage.ClaudeUsage => "Claude Usage",
         SettingsPage.Publish => "Publish usage",
         SettingsPage.ClaudeCode => "Claude Code",
@@ -799,7 +799,7 @@ public static class SettingsNames
         (SendTestAlert, SettingsPage.Alerts),
         (WarnForThisLimit, SettingsPage.Alerts),
         (ShowThisLimit, SettingsPage.Alerts),
-        (ExportMeterHistory, SettingsPage.History),
+        (ExportMeterHistory, SettingsPage.ClaudeUsage),
         (SaveAndApply, SettingsPage.Themes),
         (WhatsNew, SettingsPage.About),
         (TakeTheTour, SettingsPage.About),
@@ -907,6 +907,10 @@ public static class SettingsNames
         ("Account name", AccountLabelField, true),
         // Slice 5: History's Clear became Accounts' per-account erase (WF1).
         ("Clear history", ClearAccountHistory, true),
+        // Slice 5: the History page is Claude Usage's Meters view (WF14). Whole only: "meter history" and the Meters view's names are live.
+        ("History", PageTitle(SettingsPage.ClaudeUsage), true),
+        ("History chart", MeterHistorySection, true),
+        ("History settings…", LinkTitle(SettingsPage.ClaudeUsage), true),
     ];
 
     /// <summary>The retired names <paramref name="text"/> still uses, empty when it uses none.</summary>

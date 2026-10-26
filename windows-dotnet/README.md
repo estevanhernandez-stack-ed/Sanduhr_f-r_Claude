@@ -150,7 +150,7 @@ no snapshot, history, alert or limit state. New `settings.json` key: `tour_state
 ### Since 3.4.3: Mac parity, Stage 3
 
 Settings v2 (`docs/settings-v2-spec.md`): Settings is a sidebar in four groups (General,
-Accounts, Alerts; Usage: History, Claude Usage, Publish usage; Widget: Themes; Help: About) with
+Accounts, Alerts; Usage: Claude Usage (its first view, Meters, is the 30-day meter history), Publish usage; Widget: Themes; Help: About) with
 a search box that finds pages, sections and controls by name and synonyms and opens them in view.
 General shows a live tray preview. About holds the version, What's New… and Take the tour…, the
 trademark notice, where settings live (with Show in Explorer) and the third-party notices.

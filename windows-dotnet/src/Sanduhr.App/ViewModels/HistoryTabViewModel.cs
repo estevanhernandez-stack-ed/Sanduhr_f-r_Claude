@@ -11,7 +11,7 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
-/// <summary>An account choice in the History tab's selector. <c>Account == null</c>
+/// <summary>An account choice in the Meters view's selector. <c>Account == null</c>
 /// is the "All accounts" overlay.</summary>
 public sealed record AccountOption(string Display, string? Account);
 
@@ -23,7 +23,7 @@ public sealed record LegendItem(string Label, Brush Swatch)
 }
 
 /// <summary>
-/// Backs the Settings → History tab — the 30-day usage chart with the per-account
+/// Backs Settings, Claude Usage, Meters — the 30-day meter history with the per-account
 /// vs all-accounts overlay toggle, the Week/Month window selector, the legend, and
 /// the CSV export (Clear moved to Accounts, Data for this account, in Settings v2). Ported from
 /// <c>settings_dialog._build_history_tab</c> + the surrounding handlers.
@@ -137,11 +137,8 @@ public sealed partial class HistoryTabViewModel : ObservableObject
     /// <summary>The empty-state line shows in place of the chart.</summary>
     public bool HasEmptyText => EmptyText.Length > 0;
 
-    internal const string SignedOutLine = "Sign in to start recording your meters. Sanduhr keeps 30 days on this PC.";
-    internal const string NoHistoryLine = "No history yet. Data accumulates as you use Sanduhr.";
-
     /// <summary>The empty-state line for a chart with or without rows.</summary>
-    internal static string EmptyLine(bool signedIn, bool hasRows) => hasRows ? "" : signedIn ? NoHistoryLine : SignedOutLine;
+    internal static string EmptyLine(bool signedIn, bool hasRows) => hasRows ? "" : signedIn ? SettingsNames.MeterHistoryEmpty : SettingsNames.MeterHistorySignedOut;
 
     /// <summary>The chart rows (see <see cref="Rows"/>), and the empty-state line that goes with them.</summary>
     public IReadOnlyList<ChartRow> BuildRows()
@@ -216,7 +213,7 @@ public sealed partial class HistoryTabViewModel : ObservableObject
 
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
-            Title = "Export usage history",
+            Title = SettingsNames.ExportMeterHistoryTitle,
             FileName = defaultName,
             Filter = "CSV files (*.csv)|*.csv",
             DefaultExt = ".csv",
@@ -245,6 +242,6 @@ public sealed partial class HistoryTabViewModel : ObservableObject
     private void Info(string message)
     {
         if (InfoHook is not null) { InfoHook(message); return; }
-        ThemedDialog.Show(_owner, "History", message, MessageBoxButton.OK, ThemedDialogKind.Info);
+        ThemedDialog.Show(_owner, SettingsNames.MeterHistoryDialogTitle, message, MessageBoxButton.OK, ThemedDialogKind.Info);
     }
 }

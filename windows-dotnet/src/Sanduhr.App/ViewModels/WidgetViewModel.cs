@@ -394,11 +394,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>The per-account usage history store — shared with the Settings
-    /// History tab (chart + CSV export) so it reads the same files the live
+    /// Claude Usage, Meters (chart + CSV export) so it reads the same files the live
     /// widget writes.</summary>
     public UsageHistory History => _history;
 
-    /// <summary>The multi-account registry — the Settings History tab's account
+    /// <summary>The multi-account registry — the Settings Meters view's account
     /// selector + CSV export read account labels from here.</summary>
     public AccountStore AccountStore => _accounts;
 

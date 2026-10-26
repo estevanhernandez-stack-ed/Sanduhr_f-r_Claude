@@ -46,10 +46,13 @@ public static class SettingsIndex
     public const string TestAlert = "test";
     public const string EachLimit = "each-limit";
     public const string SignInReminders = "signin-reminders";
-    // History
+    // History (retired in slice 5): kept for the aliases to Claude Usage, Meters
     public const string Chart = "chart";
     public const string HistoryExport = "export";
     // Claude Usage
+    /// <summary>Claude Usage, Meters (slice 5): the meter history and its export.</summary>
+    public const string MeterHistory = "meters";
+    public const string MeterHistoryExport = "meters-export";
     public const string Overview = "overview";
     public const string Vault = "vault";
     public const string Trends = "trends";
@@ -133,6 +136,7 @@ public static class SettingsIndex
     public const string Reset = "reset";
 
     /// <summary>The Claude Usage views an anchor can sit in.</summary>
+    public const string MetersView = SettingsNames.MetersView;
     public const string OverviewView = "Overview";
     public const string TrendsView = "Trends";
     public const string SessionsView = "Sessions";
@@ -172,9 +176,10 @@ public static class SettingsIndex
         E("Sound", SettingsPage.Alerts, Sound, ["chime", "sound", "snake", "model-scoped", "mute"]),
         E(SettingsNames.SendTestAlert, SettingsPage.Alerts, TestAlert, ["test", "try"]),
 
-        E("History chart", SettingsPage.History, Chart,
-            ["meter history", "30 days", "week", "month", "account", "all accounts", "chart"]),
-        E(SettingsNames.ExportMeterHistory, SettingsPage.History, HistoryExport, ["csv", "export", "export csv", "spreadsheet"]),
+        E(SettingsNames.MeterHistorySection, SettingsPage.ClaudeUsage, MeterHistory,
+            ["history", "30 days", "week", "month", "account", "all accounts", "chart", "graph", "meters over time"], MetersView),
+        E(SettingsNames.ExportMeterHistory, SettingsPage.ClaudeUsage, MeterHistoryExport,
+            ["csv", "export", "export csv", "spreadsheet"], MetersView),
 
         E(OverviewView, SettingsPage.ClaudeUsage, Overview,
             ["Claude Code tokens", "today", "last 30 days", "calendar", "projects", "skills", "breakdown"], OverviewView),
@@ -320,7 +325,7 @@ public static class SettingsIndex
         [SettingsNames.WarnForThisLimit] = EachLimit,
         [SettingsNames.ShowThisLimit] = EachLimit,
         [SettingsNames.SignInReminders] = SignInReminders,
-        [SettingsNames.ExportMeterHistory] = HistoryExport,
+        [SettingsNames.ExportMeterHistory] = MeterHistoryExport,
         [SettingsNames.SaveAndApply] = Paste,
         [SettingsNames.WhatsNew] = Version,
         [SettingsNames.TakeTheTour] = Version,
@@ -384,7 +389,6 @@ public static class SettingsIndex
         [SettingsPage.General] = ["tray", "startup", "shortcut"],
         [SettingsPage.Accounts] = ["sign in", "account"],
         [SettingsPage.Alerts] = ["notification", "warning"],
-        [SettingsPage.History] = ["meter history", "chart"],
         // "vault" lives on the archive section only: as a page synonym it ties the section at rank 1 and the page row wins.
         [SettingsPage.ClaudeUsage] = ["Claude Code", "tokens", "usage"],
         [SettingsPage.ClaudeCode] = ["Claude Code folders", "folder", "seat", "pieces"],

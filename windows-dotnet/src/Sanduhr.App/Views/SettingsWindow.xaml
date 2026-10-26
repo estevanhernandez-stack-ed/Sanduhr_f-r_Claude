@@ -467,6 +467,14 @@
 
         <!-- Claude Usage sub-nav pills (Overview / Trends / Sessions) — same
              accent-fill-when-active grammar as the History RangePills. -->
+        <Style x:Key="CcNavMeters" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Section}" Value="Meters">
+                    <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="CcNavOverview" TargetType="Button" BasedOn="{StaticResource FlatButton}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Section}" Value="Overview">
@@ -575,6 +583,14 @@
              property — a plain {Binding Section} DataTrigger would silently
              never fire and every section would stay Collapsed. The trigger
              must reach the tab VM through the ancestor TabItem. -->
+        <Style x:Key="CcSectionMeters" TargetType="Grid">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Section, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="Meters">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="CcSectionOverview" TargetType="Grid">
             <Setter Property="Visibility" Value="Collapsed" />
             <Style.Triggers>
@@ -1338,97 +1354,8 @@
                     </Border>
                 </TabItem>
 
-                <!-- History tab (item 9) — 30-day usage chart + CSV export. -->
-                <TabItem Header="History" Tag="History" AutomationProperties.Name="History">
-                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="16"
-                            DataContext="{Binding History}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
-                                       Text="Rolling 30-day meter history. Stored locally only, never uploaded. Export as CSV to analyze with any agent." />
-
-                            <!-- Window + account selector row -->
-                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8" views:SettingsAnchor.Id="chart">
-                                <TextBlock Text="Window:" VerticalAlignment="Center" FontSize="12"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
-                                <Button Content="Week" Style="{StaticResource RangePillWeek}"
-                                        Command="{Binding SetWeekCommand}" />
-                                <Button Content="Month" Style="{StaticResource RangePillMonth}"
-                                        Command="{Binding SetMonthCommand}" />
-                                <TextBlock Text="Account:" VerticalAlignment="Center" FontSize="12"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="12,0,8,0" />
-                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="170"
-                                          VerticalAlignment="Center"
-                                          AutomationProperties.Name="Account, meter history"
-                                          ItemsSource="{Binding AccountOptions}"
-                                          DisplayMemberPath="Display"
-                                          SelectedItem="{Binding SelectedOption, Mode=TwoWay}" />
-                            </StackPanel>
-
-                            <!-- Legend — only when 'All accounts' is selected. -->
-                            <ItemsControl Grid.Row="2" ItemsSource="{Binding Legend}" Margin="0,0,0,4"
-                                          Visibility="{Binding ShowLegend, Converter={StaticResource BoolVis}}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel Orientation="Horizontal" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,12,2" VerticalAlignment="Center">
-                                            <Ellipse Width="10" Height="10" VerticalAlignment="Center"
-                                                     Fill="{Binding Swatch}" Margin="0,0,5,0" />
-                                            <TextBlock Text="{Binding Label}" FontSize="11" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-
-                            <!-- The chart (custom-render control; data pushed from code-behind). With nothing to draw it
-                                 gives way to a line a screen reader can read (WF32, WF35). -->
-                            <Border Grid.Row="3" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
-                                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
-                                    Padding="8" Margin="0,4,0,0">
-                                <Grid>
-                                    <views:HistoryChart x:Name="Chart">
-                                        <views:HistoryChart.Style>
-                                            <Style TargetType="views:HistoryChart">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding HasEmptyText}" Value="True">
-                                                        <Setter Property="Visibility" Value="Hidden" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </views:HistoryChart.Style>
-                                    </views:HistoryChart>
-                                    <TextBlock x:Name="HistoryEmptyText" Text="{Binding EmptyText}" TextWrapping="Wrap" FontSize="12"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="12"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                               AutomationProperties.LiveSetting="Polite"
-                                               Visibility="{Binding HasEmptyText, Converter={StaticResource BoolVis}}" />
-                                </Grid>
-                            </Border>
-
-                            <!-- Action row -->
-                            <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,12,0,0" views:SettingsAnchor.Id="export">
-                                <Button Style="{StaticResource AccentButton}" Content="{x:Static core:SettingsNames.ExportMeterHistory}"
-                                        Command="{Binding ExportCsvCommand}" />
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                </TabItem>
-
-                <!-- Claude Usage tab (WS-C): Overview / Trends / Sessions over
-                     the usage vault + live session-log reader.
+                <!-- Claude Usage (WS-C; Settings v2, slice 5): Meters / Overview / Trends / Sessions over the meter history,
+                     the session archive and the live session-log reader.
                      DataContext must live ON the TabItem: the CcSection* visibility triggers resolve
                      DataContext.Section through AncestorType=TabItem (a child-level DataContext never
                      reaches them). -->
@@ -1442,6 +1369,8 @@
 
                             <!-- Sub-nav -->
                             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                <Button Content="{x:Static core:SettingsNames.MetersView}" Style="{StaticResource CcNavMeters}"
+                                        Command="{Binding SetMetersCommand}" />
                                 <Button Content="Overview" Style="{StaticResource CcNavOverview}"
                                         Command="{Binding SetOverviewCommand}" />
                                 <Button Content="Trends" Style="{StaticResource CcNavTrends}"
@@ -1449,6 +1378,88 @@
                                 <Button Content="Sessions" Style="{StaticResource CcNavSessions}"
                                         Command="{Binding SetSessionsCommand}" />
                             </StackPanel>
+
+                            <!-- Meters (Settings v2, slice 5): the 30-day meter history, the History page until now (WF14). Its DataContext is
+                                 the HistoryTabViewModel; the window pushes the chart's rows (SettingsWindow.RenderHistory). -->
+                            <Grid Grid.Row="1" Style="{StaticResource CcSectionMeters}" DataContext="{Binding Meters}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                           Text="{x:Static core:SettingsNames.MetersIntro}" />
+
+                                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8" views:SettingsAnchor.Id="meters">
+                                    <TextBlock Text="Window:" VerticalAlignment="Center" FontSize="12"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
+                                    <Button Content="Week" Style="{StaticResource RangePillWeek}"
+                                            Command="{Binding SetWeekCommand}" />
+                                    <Button Content="Month" Style="{StaticResource RangePillMonth}"
+                                            Command="{Binding SetMonthCommand}" />
+                                    <TextBlock Text="Account:" VerticalAlignment="Center" FontSize="12"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="12,0,8,0" />
+                                    <ComboBox Style="{StaticResource ThemedComboBox}" Width="170"
+                                              VerticalAlignment="Center"
+                                              AutomationProperties.Name="Account, meter history"
+                                              ItemsSource="{Binding AccountOptions}"
+                                              DisplayMemberPath="Display"
+                                              SelectedItem="{Binding SelectedOption, Mode=TwoWay}" />
+                                </StackPanel>
+
+                                <!-- Legend, only when All accounts is selected. -->
+                                <ItemsControl Grid.Row="2" ItemsSource="{Binding Legend}" Margin="0,0,0,4" Focusable="False"
+                                              Visibility="{Binding ShowLegend, Converter={StaticResource BoolVis}}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,12,2" VerticalAlignment="Center">
+                                                <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+                                                         Fill="{Binding Swatch}" Margin="0,0,5,0" />
+                                                <TextBlock Text="{Binding Label}" FontSize="11" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- The chart; with nothing to draw it gives way to a line a screen reader can read (WF32, WF35). -->
+                                <Border Grid.Row="3" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6" MinHeight="160"
+                                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
+                                        Padding="8" Margin="0,4,0,0">
+                                    <Grid>
+                                        <views:HistoryChart x:Name="Chart">
+                                            <views:HistoryChart.Style>
+                                                <Style TargetType="views:HistoryChart">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasEmptyText}" Value="True">
+                                                            <Setter Property="Visibility" Value="Hidden" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </views:HistoryChart.Style>
+                                        </views:HistoryChart>
+                                        <TextBlock x:Name="HistoryEmptyText" Text="{Binding EmptyText}" TextWrapping="Wrap" FontSize="12"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="12"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                                   views:LiveRegion.Shown="{Binding HasEmptyText}"
+                                                   Visibility="{Binding HasEmptyText, Converter={StaticResource BoolVis}}" />
+                                    </Grid>
+                                </Border>
+
+                                <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,12,0,0" views:SettingsAnchor.Id="meters-export">
+                                    <Button Style="{StaticResource AccentButton}" Content="{x:Static core:SettingsNames.ExportMeterHistory}"
+                                            Command="{Binding ExportCsvCommand}" Margin="0" />
+                                </StackPanel>
+                            </Grid>
 
                             <!-- Overview -->
                             <Grid Grid.Row="1" Style="{StaticResource CcSectionOverview}"
