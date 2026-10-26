@@ -356,7 +356,7 @@ public static class SettingsNames
     public static string CatalogIdTaken => $"A widget {WidgetMadeHere} already uses this id.";
     public const string EffectsUnused = "Not used yet: Sanduhr has nothing that draws effects packs.";
     /// <summary>Catalog: the only network call on the page (WF6).</summary>
-    public const string CatalogDisclosure = "The catalog comes from GitHub. Opening it is the only time Sanduhr asks.";
+    public const string CatalogDisclosure = "The catalog comes from GitHub. Sanduhr asks only when you open it, check it again, or install or update a pack.";
     /// <summary>Installed: the filter chips and the text filter's spoken name.</summary>
     public const string FilterAll = "All";
     public const string FilterClaudeCode = "Claude Code";

@@ -175,6 +175,7 @@
                     <StackPanel Grid.Column="2" VerticalAlignment="Top" Margin="8,0,0,0" Visibility="{Binding IsPack, Converter={StaticResource BoolVis}}">
                         <CheckBox Style="{DynamicResource ThemedCheckBox}" Content="{x:Static core:SettingsNames.PackOn}"
                                   IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding ToggleCommand}"
+                                  IsEnabled="{Binding DataContext.Busy, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={x:Static conv:Bools.Not}}"
                                   AutomationProperties.Name="{Binding SwitchName}" />
                         <Button Style="{DynamicResource FlatButton}" Margin="0,6,0,0"
                                 Content="{x:Static core:SettingsNames.WidgetUninstall}" Command="{Binding UninstallCommand}"
@@ -220,6 +221,7 @@
                         <CheckBox Style="{DynamicResource ThemedCheckBox}" Content="{x:Static core:SettingsNames.PackOn}"
                                   IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding ToggleCommand}"
                                   Visibility="{Binding IsSwitch, Converter={StaticResource BoolVis}}"
+                                  IsEnabled="{Binding DataContext.Busy, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={x:Static conv:Bools.Not}}"
                                   AutomationProperties.Name="{Binding SwitchName}" />
                     </StackPanel>
                 </Grid>

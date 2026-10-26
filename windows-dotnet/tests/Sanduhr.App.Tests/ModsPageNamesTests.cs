@@ -113,6 +113,59 @@ public sealed class ModsPageNamesTests : AppWindowFixture
     });
 
     [Fact]
+    public void While_the_page_is_busy_every_pack_switch_is_disabled_instead_of_snapping_back() => AppHost.Run(() =>
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var net = new FakeGitHub();
+        var palette = WidgetKit.Pack("good-palette");
+        var paletteZip = WidgetKit.Zip(palette);
+        WidgetKit.Publish(net, key, "2026-10-22T02:23:13Z",
+            (WidgetKit.Entry("good-palette", "Fixture palette", "palette", "1.0.0", paletteZip), paletteZip));
+        var service = new WidgetCatalogService(new Paths(), net, WidgetKit.V380, [WidgetKit.Spki(key)]);
+        Assert.StartsWith(Root, service.Store.Root);
+        var v = PackValidator.Validate(palette, "good-palette", strict: true);
+        Assert.True(service.Store.Install(palette, v.Manifest!, WidgetSource.Catalog).Ok);
+
+        var svm = new SettingsViewModel(DemoWidget(), () => Task.CompletedTask, _ => Task.CompletedTask)
+        {
+            ModsPage = new ModsPageViewModel(() => service) { Confirm = (_, _) => true },
+        };
+        var window = new SettingsWindow(svm);
+        OffScreen(window);
+        window.Show();
+        try
+        {
+            var tabs = (TabControl)window.FindName("Tabs");
+            tabs.SelectedItem = tabs.Items.OfType<TabItem>().First(t => (string)t.Tag == "Mods");
+            svm.ModsPage.CatalogOpen = true;
+            PumpUntil(() => !svm.ModsPage.Busy && svm.ModsPage.Catalog.Count == 1);
+            string name = SettingsNames.PackOnFor("Fixture palette");
+            List<CheckBox> Switches()
+            {
+                var found = new List<CheckBox>();
+                void Walk(DependencyObject node)
+                {
+                    if (node is CheckBox c && AutomationProperties.GetName(c) == name) found.Add(c);
+                    for (int i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++) Walk(VisualTreeHelper.GetChild(node, i));
+                }
+                Walk(window);
+                return found;
+            }
+            Assert.Equal(2, Switches().Count);
+            Assert.All(Switches(), c => Assert.True(c.IsEnabled));
+
+            svm.ModsPage.Busy = true;
+            Pump();
+            Assert.All(Switches(), c => Assert.False(c.IsEnabled));   // the installed row's and the catalog row's
+
+            svm.ModsPage.Busy = false;
+            Pump();
+            Assert.All(Switches(), c => Assert.True(c.IsEnabled));
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public void Offline_the_page_says_so_and_lists_nothing_from_the_catalog() => AppHost.Run(() =>
     {
         var svm = new SettingsViewModel(DemoWidget(), () => Task.CompletedTask, _ => Task.CompletedTask);

@@ -19,7 +19,7 @@ public sealed class InstalledItemsTests
             ModInventory.SanduhrModName + "@inline", true, state, ModTouches.None, true);
 
     private static FolderReport Report(string folder, params ModItem[] mods) =>
-        new(folder, true, SettingsState.Readable, null, [], new Dictionary<string, bool>(), mods,
+        new(folder, true, SettingsState.Readable, null, [], mods.Where(m => m.Key is not null && m.State != ModState.Missing).ToDictionary(m => m.Key!, m => m.State == ModState.On), mods,
             new McpSummary([], 0), new ClaudeMdInfo(false, 0, 0), new RetentionInfo(30, false, null));
 
     private static OwnModState NoOwn(string name) => new(@"C:\home\" + name, true, null, null, null, null, false);

@@ -45,7 +45,7 @@ public static class ModsPageText
 
     /// <summary>
     /// The note under the Installed list, over every folder, in the spec's plain words: how many plugins have no on/off entry in
-    /// settings.json (Claude Code treats them as on), then how many are switched on with no files. Each count is of distinct plugin ids,
+    /// settings.json (Claude Code treats them as on), then how many are switched on (true in settings.json) with no files; a plugin that is off, or only listed, is not counted. Each count is of distinct plugin ids,
     /// so one plugin in three folders counts once, as the list shows one row. "" when both are 0.
     /// </summary>
     public static string PlainNote(IReadOnlyList<FolderMods> folders)
@@ -56,7 +56,7 @@ public static class ModsPageText
             foreach (var m in f.Report.Mods.Where(m => !m.IsSanduhr))
             {
                 var id = m.Key ?? m.Name;
-                if (!HasFiles(m)) noFiles.Add(id);
+                if (!HasFiles(m)) { if (m.Key is not null && f.Report.EnabledPlugins.TryGetValue(m.Key, out var on) && on) noFiles.Add(id); }
                 else if (m.Key is null || !f.Report.EnabledPlugins.ContainsKey(m.Key)) noSwitch.Add(id);
             }
         var parts = new List<string>();

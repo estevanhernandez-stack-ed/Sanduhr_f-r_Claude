@@ -69,7 +69,7 @@ public sealed class WhatsNewCardItem
 
     public string ShowMeToolTip => Card.Destination == SettingsPage.Widget
         ? "Shows the widget"
-        : $"Opens Settings, {SettingsNames.PageTitle(Card.Destination)}";
+        : $"Opens Settings, {SettingsNames.PageTitle(SettingsIndex.Resolve(Card.Destination, Card.Anchor).Page)}";
 }
 
 /// <summary>What the What's New window binds to: the header, the cards, and the persisted "don't show after updates" flag.</summary>

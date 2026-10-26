@@ -67,11 +67,24 @@ public class ModsPageTextTests
     public void A_plugin_in_two_folders_counts_once_in_the_note()
     {
         var noSwitch = new Dictionary<string, bool>();
-        var one = NoteFolder("a", noSwitch, NoteItem("alpha", ModState.On, @"C:\a", "alpha@skills-dir"), NoteItem("ghost", ModState.On, null, "ghost@m"));
-        var two = NoteFolder("b", noSwitch, NoteItem("alpha", ModState.On, @"C:\a", "alpha@skills-dir"), NoteItem("ghost", ModState.On, null, "ghost@m"));
+        var ghostOn = new Dictionary<string, bool> { ["ghost@m"] = true };
+        var one = NoteFolder("a", ghostOn, NoteItem("alpha", ModState.On, @"C:\a", "alpha@skills-dir"), NoteItem("ghost", ModState.On, null, "ghost@m"));
+        var two = NoteFolder("b", ghostOn, NoteItem("alpha", ModState.On, @"C:\a", "alpha@skills-dir"), NoteItem("ghost", ModState.On, null, "ghost@m"));
         var three = NoteFolder("c", noSwitch, NoteItem("alpha", ModState.On, @"C:\a", "alpha@skills-dir"));
 
         Assert.Equal(SettingsNames.NoSwitchNote(1) + " " + SettingsNames.NoFilesNote(1), ModsPageText.PlainNote([one, two, three]));
+    }
+
+    [Fact]
+    public void The_files_missing_count_is_of_plugins_switched_on_not_off_or_only_listed()
+    {
+        // "switched on in settings.json, but its files aren't there" must be true of every plugin it counts.
+        var f = NoteFolder("a", new Dictionary<string, bool> { ["off@m"] = false, ["on@m"] = true },
+            NoteItem("off", ModState.Off, null, "off@m"), NoteItem("listed", ModState.On, null, "listed@m"), NoteItem("on", ModState.On, null, "on@m"));
+
+        Assert.Equal(SettingsNames.NoFilesNote(1), ModsPageText.PlainNote([f]));
+        var onlyOff = NoteFolder("b", new Dictionary<string, bool> { ["off@m"] = false }, NoteItem("off", ModState.Off, null, "off@m"));
+        Assert.Equal("", ModsPageText.PlainNote([onlyOff]));
     }
 
     [Fact]

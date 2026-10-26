@@ -426,7 +426,7 @@ public class SettingsNamesTests
         Assert.Equal("Off keeps the mod's entry and files; Remove takes the entry out and puts settings.json back exactly.",
             SettingsNames.MetersOffVsRemove);
         Assert.Equal("Read-only: Sanduhr can't switch this yet. Use claude plugin in a terminal.", SettingsNames.ReadOnlyClaudeCode);
-        Assert.Equal("The catalog comes from GitHub. Opening it is the only time Sanduhr asks.", SettingsNames.CatalogDisclosure);
+        Assert.Equal("The catalog comes from GitHub. Sanduhr asks only when you open it, check it again, or install or update a pack.", SettingsNames.CatalogDisclosure);
         Assert.Equal("Couldn't reach the widget catalog. Widget packs add themes, colors, fonts and a Desk companion. Check your connection and try again.",
             WidgetCatalogClient.Offline);
         Assert.Equal(("In Themes", "In Desk Look, Ink and color", "In Desk Look, Fonts", "As the Desk companion"),
@@ -564,7 +564,7 @@ public class SettingsNamesTests
         // Task 11 review: GitHub is asked when the catalog opens, on "Check the catalog again", and for an Install or Update download. Nothing else.
         Assert.Equal("Installed packs live in Sanduhr's own widgets folder on this PC. Sanduhr asks GitHub for the catalog only when you open it "
             + "or check it again, and Install or Update downloads that pack from GitHub. Reset Sanduhr removes the folder.", SettingsNames.InstalledPacksNote);
-        Assert.Equal("The catalog comes from GitHub. Opening it is the only time Sanduhr asks.", SettingsNames.CatalogDisclosure);   // the spec's words
+        Assert.Equal("The catalog comes from GitHub. Sanduhr asks only when you open it, check it again, or install or update a pack.", SettingsNames.CatalogDisclosure);   // the controller's ruling, 2026-10-25: exact, since Check again, Install and Update ask too
         Assert.Equal("Nothing installed yet. Widget packs and Claude Code plugins and mods show here, and so do widgets you make with Claude, marked made here.",
             SettingsNames.InstalledEmpty);
         Assert.StartsWith("Sprites, themes, palettes, effects and fonts from the 626 Labs widget catalog.", SettingsNames.CatalogBlurb);
