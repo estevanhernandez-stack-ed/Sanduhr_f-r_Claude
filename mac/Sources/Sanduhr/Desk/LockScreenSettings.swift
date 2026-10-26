@@ -78,13 +78,14 @@ private struct LockLineSwitchSection: View {
     @Binding var enabled: Bool
     @State private var state = LockLineDaemon.state
     @State private var problem: String?
+    @State private var removing = false
 
     var body: some View {
         Section {
             Toggle(LockScreenSettings.switchTitle, isOn: $enabled)
                 .onChange(of: enabled) { _, on in apply(on) }
                 .settingsAnchor(SettingsAnchor.lockLine)
-            Text(LockLineDaemon.caption(state))
+            Text(removing ? LockLineDaemon.removingCaption : LockLineDaemon.caption(state))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if state == .needsApproval {
@@ -116,9 +117,19 @@ private struct LockLineSwitchSection: View {
             let shown = LockLineDaemon.currentLoginText() ?? ""
             let wasOn = state == .on
             LockLineController.shared.refresh()
+            guard wasOn else {
+                Task { @MainActor in
+                    await LockLineDaemon.remove(lastLine: "")
+                    state = LockLineDaemon.state
+                }
+                return
+            }
+            removing = true
             Task { @MainActor in
-                await LockLineDaemon.remove(lastLine: wasOn ? shown : "")
+                let removed = await LockLineDaemon.remove(lastLine: shown)
+                removing = false
                 state = LockLineDaemon.state
+                if !removed { problem = LockLineDaemon.stillUp }
             }
         }
     }

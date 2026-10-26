@@ -79,16 +79,16 @@ if user != nil {
     case .set(let text):
         setText(text)
         writeState(lastPath, text)
-        log.info("set")
+        log.notice("set")
     case .restore(let text):
         setText(text)
         writeState(lastPath, nil)
         writeState(originalPath, nil)
-        log.info("restored the earlier message")
+        log.notice("restored the earlier message")
     case .clear:
         setText(nil)
         writeState(lastPath, nil)
-        log.info("cleared")
+        log.notice("cleared")
     }
 }
 exit(0)

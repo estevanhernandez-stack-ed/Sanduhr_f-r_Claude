@@ -15,8 +15,6 @@
 	<key>StartInterval</key>
 	<integer>60</integer>
 	<key>ProcessType</key>
-	<string>Background</string>
-	<key>LowPriorityIO</key>
-	<true/>
+	<string>Standard</string>
 </dict>
 </plist>

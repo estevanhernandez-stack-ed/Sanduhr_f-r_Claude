@@ -46,18 +46,24 @@ enum LockLineDaemon {
         try service.register()
     }
 
-    /// Removes the helper after it has taken Sanduhr's line off the lock screen (or put back the
-    /// message that was there before): the app has already written an empty `lock-line.txt`,
-    /// and the helper runs once a minute, so this waits up to `clearWait` for the key to change.
-    static func remove(lastLine: String) async {
+    /// Removes the helper once it has taken Sanduhr's line off the lock screen (or put back the
+    /// message that was there before). The app has already written an empty `lock-line.txt`
+    /// and the helper runs once a minute, so this waits for the key to change, up to `clearWait`.
+    /// It never unregisters while the line is still up: a helper removed first would leave the
+    /// line there with nothing to take it away (seen on the first real turn-off). If the wait
+    /// runs out, the helper stays and the launch sweep tries again. True when removed.
+    @discardableResult
+    static func remove(lastLine: String) async -> Bool {
         let deadline = Date().addingTimeInterval(clearWait)
-        while Date() < deadline, currentLoginText() == lastLine, !lastLine.isEmpty {
+        while !lastLine.isEmpty, currentLoginText() == lastLine {
+            guard Date() < deadline else { return false }
             try? await Task.sleep(for: .seconds(5))
         }
         try? await service.unregister()
+        return true
     }
 
-    static let clearWait: TimeInterval = 90
+    static let clearWait: TimeInterval = 10 * 60
 
     /// What Settings says when `register()` threw: nothing when the helper ended up on or is only
     /// waiting for the Login Items OK (macOS throws in both cases on 26), else macOS's reason.
@@ -73,6 +79,9 @@ enum LockLineDaemon {
         CFPreferencesCopyValue(LockLineHelperRules.key as CFString, LockLineHelperRules.domain as CFString,
                                kCFPreferencesAnyUser, kCFPreferencesAnyHost) as? String
     }
+
+    static let removingCaption = "Taking the line off the lock screen; this can take a minute."
+    static let stillUp = "The line is still on the lock screen. Sanduhr keeps the helper until it is gone and tries again at its next launch."
 
     static func openLoginItems() { SMAppService.openSystemSettingsLoginItems() }
 }
