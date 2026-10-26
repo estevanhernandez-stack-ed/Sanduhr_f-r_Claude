@@ -123,10 +123,10 @@ final class SeatMeters {
 
     /// The active account's seat starts from the numbers on screen, stamped with their fetch time,
     /// rather than waiting for the next fetch.
-    func seed(_ usage: UsageResponse?, at: Date?, label: String?) {
+    func seed(_ usage: UsageResponse?, at: Date?, label: String?, plan: String? = nil) {
         guard let usage, let at, let target = target(label),
               !FileManager.default.fileExists(atPath: target.path) else { return }
-        SnapshotWriter.writeOk(usage, accountRef: AccountRef.of(label), now: at, to: target)
+        SnapshotWriter.writeOk(usage, accountRef: AccountRef.of(label), plan: plan, now: at, to: target)
     }
 
     /// A renamed account: its seat file moves to the new ref, its client and times follow.
@@ -142,8 +142,8 @@ final class SeatMeters {
 
     /// The active account's fetch answered: its seat file gets the same, then a round runs unless
     /// the fetch failed on the network (claude.ai unreachable or limiting: nothing more is asked).
-    func activeAnswered(_ label: String?, _ result: Result<UsageResponse, Error>) {
-        write(label, result)
+    func activeAnswered(_ label: String?, _ result: Result<UsageResponse, Error>, plan: String? = nil) {
+        write(label, result, plan: plan)
         if case .failure(let e) = result, SnapshotWriter.errorKind(e) == "network" { return }
         startRound()
     }
@@ -156,12 +156,14 @@ final class SeatMeters {
         write(label, result)
     }
 
-    private func write(_ label: String?, _ result: Result<UsageResponse, Error>) {
+    /// `plan` is the seat's plan name: the active account's from the view model, nil for the rest
+    /// until the per-account plan cache (item 3) fills it.
+    private func write(_ label: String?, _ result: Result<UsageResponse, Error>, plan: String? = nil) {
         guard !stopped, let target = target(label) else { return }
         let ref = AccountRef.of(label)
         switch result {
-        case .success(let u): SnapshotWriter.writeOk(u, accountRef: ref, now: now(), to: target)
-        case .failure(let e): SnapshotWriter.writeError(SnapshotWriter.errorKind(e), accountRef: ref, now: now(), to: target)
+        case .success(let u): SnapshotWriter.writeOk(u, accountRef: ref, plan: plan, now: now(), to: target)
+        case .failure(let e): SnapshotWriter.writeError(SnapshotWriter.errorKind(e), accountRef: ref, plan: plan, now: now(), to: target)
         }
     }
 
