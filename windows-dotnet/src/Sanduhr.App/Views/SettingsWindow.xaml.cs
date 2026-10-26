@@ -372,7 +372,7 @@ internal partial class SettingsWindow : Window
                 tab.Focus();
                 return;
             }
-            target.BringIntoView();
+            ScrollToTop(target);
             if (TryFindResource("Sanduhr.Brush.Accent") is Brush accent)
                 AnchorHighlightAdorner.Flash(target, accent, TimeSpan.FromSeconds(1.5));
             // Keyboard users land on the section: its first control that takes focus, else the
@@ -385,6 +385,34 @@ internal partial class SettingsWindow : Window
             else
                 tab.Focus();
         }));
+    }
+
+    /// <summary>The breathing room above a landed section's top edge.</summary>
+    internal const double LandingTopMargin = 8;
+
+    /// <summary>
+    /// A landing (search, a link, a jump link) puts the section's top at the top of its page, or as high as the page scrolls near its end,
+    /// so most of the section shows. BringIntoView alone scrolls the least it can and leaves a section below the fold at the bottom edge.
+    /// </summary>
+    internal static void ScrollToTop(FrameworkElement target)
+    {
+        ScrollViewer? scroller = null;
+        for (DependencyObject? d = VisualTreeHelper.GetParent(target); d is not null; d = VisualTreeHelper.GetParent(d))
+        {
+            if (d is ScrollViewer sv && sv.ScrollableHeight >= 0 && sv.VerticalScrollBarVisibility != ScrollBarVisibility.Disabled)
+            {
+                scroller = sv;
+                break;
+            }
+        }
+        if (scroller is null)
+        {
+            target.BringIntoView();
+            return;
+        }
+        var top = target.TransformToAncestor(scroller).Transform(new Point(0, 0)).Y;
+        scroller.ScrollToVerticalOffset(Math.Max(0, scroller.VerticalOffset + top - LandingTopMargin));
+        scroller.UpdateLayout();
     }
 
     private static bool IsInside(DependencyObject element, DependencyObject root)

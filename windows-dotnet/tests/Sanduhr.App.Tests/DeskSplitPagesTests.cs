@@ -464,10 +464,28 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
                 Assert.Equal(new SettingsLink(page, anchor), window.Place);
                 if (Marked(window, page, anchor) is Expander expander)
                     Assert.True(expander.IsExpanded, anchor + " did not open");
+                AssertLandsAtTop(Marked(window, page, anchor), anchor);
             }
         }
         finally { window.Close(); }
     });
+
+    // A landing puts the section's top at the top of its page (owner, 2026-10-26: "as high as it can to show most of that section"),
+    // or the page is scrolled as far as it goes.
+    private static void AssertLandsAtTop(DependencyObject? target, string anchor)
+    {
+        var element = Assert.IsAssignableFrom<FrameworkElement>(target);
+        ScrollViewer? scroller = null;
+        for (var d = VisualTreeHelper.GetParent(element); d is not null && scroller is null; d = VisualTreeHelper.GetParent(d))
+            scroller = d as ScrollViewer;
+        Assert.NotNull(scroller);
+        var top = element.TransformToAncestor(scroller!).Transform(new Point(0, 0)).Y;
+        bool atTop = Math.Abs(top - SettingsWindow.LandingTopMargin) <= 2;
+        bool atEnd = scroller!.VerticalOffset >= scroller.ScrollableHeight - 1;
+        bool atStart = scroller.VerticalOffset <= 0 && top <= SettingsWindow.LandingTopMargin + 2;
+        Assert.True(atTop || atEnd || atStart,
+            $"{anchor}: top {top:0} px below the page top (offset {scroller.VerticalOffset:0} of {scroller.ScrollableHeight:0})");
+    }
 
     [Fact]
     public void The_jump_links_reach_UI_Automation_as_one_named_group_of_the_links_alone() => AppHost.Run(() =>
