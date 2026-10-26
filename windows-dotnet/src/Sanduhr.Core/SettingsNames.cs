@@ -899,6 +899,8 @@ public static class SettingsNames
         ("Mods & Config", ModsAndWidgetsTitle, false),
         // Whole only (P3): "Widgets settings…" is inside "Mods & Widgets settings…", the page's own link title.
         ("Widgets settings…", LinkTitle(SettingsPage.Mods), true),
+        // Slice 5: the account's name is its Label, in the key window as in the sign-in prompt (decision 8).
+        ("Account name", AccountLabelField, true),
     ];
 
     /// <summary>The retired names <paramref name="text"/> still uses, empty when it uses none.</summary>

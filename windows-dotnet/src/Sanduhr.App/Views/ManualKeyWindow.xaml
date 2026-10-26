@@ -50,9 +50,9 @@
                        Text="{x:Static core:SettingsNames.ManualKeySteps}" />
         </StackPanel>
 
-        <TextBlock Grid.Row="2" Text="Account name" FontSize="11"
+        <TextBlock Grid.Row="2" Text="{x:Static core:SettingsNames.AccountLabelField}" FontSize="11"
                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,16,0,4" />
-        <TextBox Grid.Row="3" x:Name="LabelBox" FontSize="13" Padding="8,6"
+        <TextBox Grid.Row="3" x:Name="LabelBox" AutomationProperties.Name="{x:Static core:SettingsNames.AccountLabelField}" FontSize="13" Padding="8,6"
                  Background="{DynamicResource Sanduhr.Brush.Glass}"
                  Foreground="{DynamicResource Sanduhr.Brush.Text}"
                  BorderBrush="{DynamicResource Sanduhr.Brush.Border}"

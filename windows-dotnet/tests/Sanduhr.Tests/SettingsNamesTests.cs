@@ -651,4 +651,11 @@ public class SettingsNamesTests
             Assert.Empty(SettingsNames.UnknownLinks(text));
         }
     }
+
+    [Fact]
+    public void The_key_windows_field_is_called_Label()
+    {
+        Assert.NotEmpty(SettingsNames.RetiredNames("Account name"));
+        Assert.Empty(SettingsNames.RetiredNames("account name"));   // prose that says "the account name" stays
+    }
 }
