@@ -13,14 +13,6 @@ public sealed class ClaudeCodeFolderChoiceTests : AppWindowFixture
 
     public ClaudeCodeFolderChoiceTests() => ClaudeCodeViewModel.ForgetSessionChoice();
 
-    private string Home(string name, string settings)
-    {
-        var dir = Path.Combine(Profile, name);
-        Directory.CreateDirectory(Path.Combine(dir, "projects"));
-        File.WriteAllText(Path.Combine(dir, "settings.json"), settings);
-        return dir;
-    }
-
     private static string Opened(ClaudeCodeViewModel page)
     {
         var card = page.OpenHoldsForLanding()!;

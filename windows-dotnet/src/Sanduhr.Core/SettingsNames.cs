@@ -364,7 +364,14 @@ public static class SettingsNames
     /// <summary>A pack's or a folder's on switch: the visible word, then what it switches, for a screen reader.</summary>
     public const string PackOn = "On";
     public static string PackOnFor(string pack) => $"{PackOn}: {pack}";
-    public static string MetersOnFor(string folder) => $"{PackOn}: {MetersSection} in {folder}";
+    public static string MetersIn(string folder) => $"{MetersSection} in {folder}";
+    public static string MetersOnFor(string folder) => $"{PackOn}: {MetersIn(folder)}";
+    /// <summary>A Claude Code card's meters line, spoken with its state: the section in the folder, then On, Off, Files missing or Can't be read.</summary>
+    public static string MetersSpoken(string folder, string state) => $"{MetersIn(folder)}: {state}";
+    /// <summary>The names of a card's report lists, read before their items.</summary>
+    public const string ReportHooks = "Hooks";
+    public const string ReportPluginSwitches = "Plugin switches";
+    public const string ReportMcpServers = "MCP servers";
     /// <summary>Installed: Sanduhr's meters mod row links up to its section.</summary>
     public const string MetersLinkUp = "Switch it per folder\u2026";
     /// <summary>A scope over folders: "On in 2 of 3 folders". One folder reads its state alone.</summary>

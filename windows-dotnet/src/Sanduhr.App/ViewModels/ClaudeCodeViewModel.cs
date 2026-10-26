@@ -29,7 +29,9 @@ public sealed partial class CcFolderRowViewModel : ObservableObject
     [ObservableProperty] private string _linkedAccount = ClaudeCodeViewModel.NoAccount;
     [ObservableProperty] private bool _mcpReadable;
     /// <summary>The meters above the prompt in this folder: On, Off, Files missing, Not installed or Can't be read. A status line, never a control (WF9).</summary>
-    [ObservableProperty] private string _metersText = "";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MetersSpoken))]
+    private string _metersText = "";
     /// <summary>"What this folder holds" is open: the folder is read then.</summary>
     [ObservableProperty] private bool _holdsOpen;
 
@@ -102,7 +104,8 @@ public sealed partial class CcFolderRowViewModel : ObservableObject
     public string MetersLine => SettingsNames.MetersSection + ":";
     public string MetersLink => SettingsIndex.PageId(SettingsPage.Mods) + "#" + SettingsIndex.Meters;
     public string MetersLinkTitle => SettingsNames.LinkTitle(SettingsPage.Mods);
-    public string MetersLinkName => $"{SettingsNames.LinkTitle(SettingsPage.Mods)} {SettingsNames.MetersSection} in {Display}";
+    public string MetersSpoken => SettingsNames.MetersSpoken(Display, MetersText);
+    public string MetersLinkName => $"{SettingsNames.LinkTitle(SettingsPage.Mods)} {SettingsNames.MetersIn(Display)}";
 
     public override string ToString() => AutomationName;
 

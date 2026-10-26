@@ -13,14 +13,6 @@ namespace Sanduhr.App.Tests;
 [Collection("SettingsWindow")]
 public sealed class ClaudeCodeCardsTests : AppWindowFixture
 {
-    private string Home(string name, string settings = "{}")
-    {
-        var dir = Path.Combine(Profile, name);
-        Directory.CreateDirectory(Path.Combine(dir, "projects"));
-        File.WriteAllText(Path.Combine(dir, "settings.json"), settings);
-        return dir;
-    }
-
     private (ClaudeCodeViewModel Page, List<ConsentSpec> Asked) Page(Func<ConsentSpec, ConsentChoice?>? answer = null)
     {
         var (widget, _) = ScratchWidget("Personal");

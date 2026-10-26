@@ -119,7 +119,7 @@
 
                                     <!-- Meters above the prompt: a status line here, the controls on Mods & Widgets (WF9, the Mac's layout). -->
                                     <WrapPanel Margin="0,2,0,0">
-                                        <TextBlock FontSize="11.5" VerticalAlignment="Center" Margin="0,0,8,0">
+                                        <TextBlock FontSize="11.5" VerticalAlignment="Center" Margin="0,0,8,0" AutomationProperties.Name="{Binding MetersSpoken}">
                                             <Run Text="{Binding MetersLine, Mode=OneWay}" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                             <Run Text="{Binding MetersText, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                         </TextBlock>
@@ -157,7 +157,7 @@
                                             <TextBlock FontSize="11.5" TextWrapping="Wrap" Margin="0,8,0,0">
                                                 <Run Text="Hooks: " Style="{StaticResource ReportLabel}" /><Run Text="{Binding HooksSummary, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                             </TextBlock>
-                                            <ItemsControl ItemsSource="{Binding HookLines}" Focusable="False" Margin="0,2,0,0" AutomationProperties.Name="Hooks">
+                                            <ItemsControl ItemsSource="{Binding HookLines}" Focusable="False" Margin="0,2,0,0" AutomationProperties.Name="{x:Static core:SettingsNames.ReportHooks}">
                                                 <ItemsControl.ItemContainerStyle>
                                                     <Style TargetType="ContentPresenter">
                                                         <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
@@ -174,7 +174,7 @@
                                             <TextBlock FontSize="11.5" TextWrapping="Wrap" Margin="0,8,0,0">
                                                 <Run Text="Plugin switches: " Style="{StaticResource ReportLabel}" /><Run Text="{Binding PluginsSummary, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                             </TextBlock>
-                                            <ItemsControl ItemsSource="{Binding PluginLines}" Focusable="False" Margin="0,2,0,0" AutomationProperties.Name="Plugin switches">
+                                            <ItemsControl ItemsSource="{Binding PluginLines}" Focusable="False" Margin="0,2,0,0" AutomationProperties.Name="{x:Static core:SettingsNames.ReportPluginSwitches}">
                                                 <ItemsControl.ItemContainerStyle>
                                                     <Style TargetType="ContentPresenter">
                                                         <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
@@ -191,7 +191,7 @@
                                             <TextBlock FontSize="11.5" TextWrapping="Wrap" Margin="0,8,0,0">
                                                 <Run Text="MCP servers: " Style="{StaticResource ReportLabel}" /><Run Text="{Binding McpSummary, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                             </TextBlock>
-                                            <ItemsControl ItemsSource="{Binding McpNames}" Focusable="False" AutomationProperties.Name="MCP servers">
+                                            <ItemsControl ItemsSource="{Binding McpNames}" Focusable="False" AutomationProperties.Name="{x:Static core:SettingsNames.ReportMcpServers}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <TextBlock Text="{Binding}" FontFamily="Cascadia Code, Consolas" FontSize="11" Margin="12,1,0,0"

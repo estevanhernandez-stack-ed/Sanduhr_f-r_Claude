@@ -44,6 +44,15 @@ public abstract class AppWindowFixture : IDisposable
 
     protected string Profile => Path.Combine(Root, "profile");
 
+    /// <summary>A Claude Code home (it has a projects folder) under the scratch profile, with the given settings.json text.</summary>
+    protected string Home(string name, string settings = "{}")
+    {
+        var dir = Path.Combine(Profile, name);
+        Directory.CreateDirectory(Path.Combine(dir, "projects"));
+        File.WriteAllText(Path.Combine(dir, "settings.json"), settings);
+        return dir;
+    }
+
     protected AppWindowFixture()
     {
         Environment.SetEnvironmentVariable("SANDUHR_DEV_PROFILE", Path.Combine(Root, "dev"));

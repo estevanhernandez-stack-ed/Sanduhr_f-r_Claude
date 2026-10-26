@@ -42,14 +42,6 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
     /// <summary>A TextBlock's words, inlines (Runs) included.</summary>
     private static string TextOf(TextBlock t) => new System.Windows.Documents.TextRange(t.ContentStart, t.ContentEnd).Text;
 
-    private string Home(string name, string settings = "{}")
-    {
-        var dir = Path.Combine(Profile, name);
-        Directory.CreateDirectory(Path.Combine(dir, "projects"));
-        File.WriteAllText(Path.Combine(dir, "settings.json"), settings);
-        return dir;
-    }
-
     [Fact]
     public void A_link_to_folder_config_opens_the_chosen_cards_report_in_view() => AppHost.Run(() =>
     {
@@ -160,7 +152,7 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
     });
 
     [Fact]
-    public void An_unreadable_folders_card_shows_the_reason_and_no_install_or_switch() => AppHost.Run(() =>
+    public void An_unreadable_folders_card_shows_the_reason_and_no_statusline_or_hook_install() => AppHost.Run(() =>
     {
         // Plan decision 8 / T7-5: the reason is on the card, and nothing on it can act on the broken settings.json.
         Home(".claude-broken", "{ nope");
@@ -181,9 +173,32 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
             Assert.Contains(texts, t => t == "This folder's settings.json can't be read, so nothing is changed.");
 
             // No Install, Change or Update button shows for the statusline or the glow hook: both stay out of a settings.json they can't read.
+            // "Install MCP server" is deliberately not asserted: it writes .claude.json, not the unreadable settings.json.
             Assert.DoesNotContain(Below<Button>(card), b => b.IsVisible && NameOf(b) is "Install Statusline" or "Install Claude Code glow hook");
             // The one switch on the card is the MCP read switch, which is Sanduhr's own setting and not in the folder.
             Assert.Equal([row.McpReadableName], Below<CheckBox>(card).Select(NameOf).ToList());
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void The_meters_line_on_each_card_is_spoken_with_its_state() => AppHost.Run(() =>
+    {
+        Home(".claude-broken", "{ nope");
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.ClaudeCode);
+            Settle(window, guard);
+            foreach (var row in svm.ClaudeCodePage.Folders)
+            {
+                var card = CardOf(Below<Expander>(window).Single(e => e.DataContext == row))!;
+                var line = Below<TextBlock>(card).Single(t => TextOf(t).StartsWith(SettingsNames.MetersSection + ":"));
+                var spoken = NameOf(line);
+                Assert.Contains(row.MetersText, spoken, StringComparison.Ordinal);
+                Assert.Contains(row.Display, spoken, StringComparison.Ordinal);
+            }
+            Assert.Contains(SettingsNames.FolderUnreadable, NameOf(Below<TextBlock>(window).Single(t => TextOf(t).StartsWith(SettingsNames.MetersSection + ":") && TextOf(t).Contains(SettingsNames.FolderUnreadable))));
         }
         finally { window.Close(); }
     });
