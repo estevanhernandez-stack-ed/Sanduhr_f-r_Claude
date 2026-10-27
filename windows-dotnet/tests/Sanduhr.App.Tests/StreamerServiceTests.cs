@@ -176,6 +176,35 @@ public sealed class StreamerServiceTests : AppWindowFixture
         Assert.False(File.Exists(paths.StreamerStateFile));
     }
 
+    /// <summary>Preflight P20: a stale installed script (v5, which ignores streamer.json) is rewritten when streamer mode turns on.</summary>
+    [Fact]
+    public void Turning_it_on_refreshes_a_stale_installed_statusline_script()
+    {
+        var (service, paths, _) = Make();
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.StatuslineScriptFile)!);
+        File.WriteAllText(paths.StatuslineScriptFile, "# Version 5, ignores streamer.json");
+        service.Load();
+        service.SetOn(true);
+        Assert.Equal(StatuslineScript.Content, File.ReadAllText(paths.StatuslineScriptFile));
+    }
+
+    [Fact]
+    public void Turning_it_on_leaves_an_up_to_date_script_alone_and_installs_none_that_was_never_there()
+    {
+        var (service, paths, _) = Make();
+        service.Load();
+        service.SetOn(true);
+        Assert.False(File.Exists(paths.StatuslineScriptFile), "the person never enabled the statusline");
+        service.SetOn(false);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.StatuslineScriptFile)!);
+        File.WriteAllText(paths.StatuslineScriptFile, StatuslineScript.Content, new System.Text.UTF8Encoding(true));
+        var stamp = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(paths.StatuslineScriptFile, stamp);
+        service.SetOn(true);
+        Assert.Equal(stamp, File.GetLastWriteTimeUtc(paths.StatuslineScriptFile));
+    }
+
     [Fact]
     public void The_widget_owns_one_and_its_dispose_flushes()
     {

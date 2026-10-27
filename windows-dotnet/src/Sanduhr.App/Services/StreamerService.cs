@@ -56,7 +56,26 @@ public sealed class StreamerService : IDisposable
         if (on == On)
             return;
         _store.SaveStreamerMode(on);
+        if (on)
+            RefreshStatuslineScript();
         Apply(on, announce: true);
+    }
+
+    /// <summary>Preflight P20: a script installed before v6 ignores streamer.json and prints the real label, and the start-up rewrite may
+    /// have failed (the file busy). So turning the switch on rewrites an installed copy that differs from the current one. A script
+    /// that was never installed stays uninstalled: the person didn't ask for the statusline.</summary>
+    private void RefreshStatuslineScript()
+    {
+        try
+        {
+            var file = _paths.StatuslineScriptFile;
+            if (!File.Exists(file) || File.ReadAllText(file) == StatuslineScript.Content)
+                return;
+            new StatuslineInstaller(_profileDir(), _paths.StatuslineBinDir).InstallScript();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     /// <summary>Shuffle codenames… (spec): a new salt, an empty map; the allowlist is kept.</summary>
