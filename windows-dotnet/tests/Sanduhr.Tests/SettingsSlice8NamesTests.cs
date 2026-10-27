@@ -107,8 +107,11 @@ public class SettingsSlice8NamesTests
         Assert.Contains("A folder you untick keeps its entries exactly as they are, and Sanduhr keeps the files those entries run "
             + "(the statusline script, the MCP launcher and server, the meters mod, each while an entry of its kind is kept) and its record of them, "
             + "so Settings, Claude Code can remove them later.", privacy);
-        Assert.Contains("Sanduhr also keeps those files and its record while its record of what it installed can't be read or an entry failed to come out.", privacy);
-        Assert.Contains("It removes the statusline script only when no statusline entry is kept, that record can be read and no statusline entry failed to come out.", privacy);
+        Assert.Contains("Sanduhr also keeps its record and the meters mod's copy while its record of what it installed can't be read or an entry failed to come out. "
+            + "The MCP server has no such record, so Sanduhr takes it out of every folder except the ones you unticked, and when each of those worked and no MCP entry is kept "
+            + "it removes the MCP launcher and server copies (all but a copy a running Claude Code session holds), whatever the state of the record and whatever else failed. "
+            + "It removes the statusline script only when no statusline entry is kept, that record can be read and no statusline entry failed to come out or had to be left. "
+            + "When that record can't be read or is missing, Sanduhr removes only the statusline entries it lists, because without a record it can't tell a command of yours chained into the statusline from its own.", privacy);
         Assert.Contains("The Settings part removes `mcp-settings.json` and the MCP switch whatever is kept, so a kept MCP server stays registered "
             + "but answers without your usage until you add it again in Settings, Claude Code.", privacy);
     }
