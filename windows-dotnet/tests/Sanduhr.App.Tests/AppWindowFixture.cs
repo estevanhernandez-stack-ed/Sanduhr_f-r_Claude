@@ -155,6 +155,13 @@ public abstract class AppWindowFixture : IDisposable
             RealizeEveryItem(System.Windows.Media.VisualTreeHelper.GetChild(root, i));
     }
 
+    /// <summary>
+    /// Isolation hazard: <c>Invoke(..., ApplicationIdle)</c> pushes a nested dispatcher frame on the one app thread. Any work another test
+    /// collection has queued for <c>AppHost.Run</c> (Send priority) can run inside that frame, in the middle of this test, with this test's
+    /// process-wide state live (<c>StreamerMode</c>, <c>ClaudeCodeProfile</c> overrides, open windows). Collections stay apart by inventory
+    /// (a class that touches a process-wide static joins the SettingsWindow collection), not by a mechanism, so a new class that reaches
+    /// one without joining it can surface here as a flake in somebody else's test (final review M5).
+    /// </summary>
     protected static void Pump() =>
         System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
 
