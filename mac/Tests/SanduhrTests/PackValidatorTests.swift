@@ -735,6 +735,42 @@ struct PackValidatorTests {
         #expect(message(bad) == "Error -3 while decompressing data: incorrect data check")
     }
 
+    /// Found by a differential fuzz against Python's `zlib.decompressobj().decompress(data, limit)`
+    /// (libz 1.2.12). zlib stops producing once the limit is reached and never looks at the next
+    /// symbol, so a bad back-reference right after the limit is not an error.
+    @Test(arguments: [
+        (1, "789c63404000000003"),
+        (1, "789cab0241007b005b"),
+        (2, "78da636047606007000028000f"),
+        (6, "78da5a72829d9d5d00070301e2"),
+    ])
+    func aBadBackReferenceAfterTheLimitIsNeverDecoded(limit: Int, stream: String) throws {
+        #expect(try PackInflate.inflatedLength(hex(stream), limit: limit) == limit)
+    }
+
+    private func zlibMessage(_ stream: String, limit: Int = 1_000_000) -> String? {
+        do { _ = try PackInflate.inflatedLength(hex(stream), limit: limit); return nil } catch let e as PackInflate.Corrupt { return e.message } catch { return "\(error)" }
+    }
+
+    /// The libz Python links on macOS words a bad code differently in its fast loop (plenty of input
+    /// and output room left); with little input left, or the output nearly full, it says what stock zlib says.
+    @Test func aBadDistanceCodeIsWordedByWhichZlibLoopFindsIt() {
+        let whole = "Error -3 while decompressing data: invalid literal/length/distance code"
+        #expect(zlibMessage("7801eb6160676767606067e803521fdf3c01b21810fcd819d85f06b9311832f883a43e2a14000519d8ff029534680300f035099f") == whole)
+        #expect(zlibMessage("78016367e066673065601066606760607f117ef38ddd8c817d353b430b3b3b033b10fb03490976f60decec67a6015530300000a28806f0") == whole)
+        // The same streams cut short, and the first with its output nearly full: the slow loop's wording.
+        let plain = "Error -3 while decompressing data: invalid distance code"
+        #expect(zlibMessage("7801eb6160676767606067e803521fdf3c01b21810fcd819d85f06b9311832f883a43e2a14000519") == plain)
+        #expect(zlibMessage("78016367e066673065601066606760607f117ef38ddd8c817d353b430b3b3b033b10fb03490976f6") == plain)
+        #expect(zlibMessage("7801eb6160676767606067e803521fdf3c01b21810fcd819d85f06b9311832f883a43e2a14000519d8ff029534680300f035099f", limit: 200) == plain)
+    }
+
+    /// A dynamic block may declare no distance codes at all (zlib's `max == 0` table); a distance in
+    /// it then fails to decode instead of failing the table.
+    @Test func aDynamicBlockWithNoDistanceCodesIsAValidTable() {
+        #expect(zlibMessage("78da6364606064646460045260080220087d0009") == "Error -3 while decompressing data: invalid distance code")
+    }
+
     @Test func aCorruptPngStreamIsReportedWithZlibsReason() throws {
         var p = good("good-palette")
         try editJson(&p, "pack.json") { $0["preview"] = "preview.png" }

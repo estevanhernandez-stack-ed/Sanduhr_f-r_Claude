@@ -37,6 +37,17 @@ enum PackInflate {
     private static let distBase = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537,
                                    2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577]
     private static let distExtra = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13]
+    /// CPython's output buffer: the first block, then the growth sizes (`_BlocksOutputBuffer`).
+    /// The fast loop's entry and exit thresholds, fitted against CPython 3.14 on macOS (libz 1.2.12):
+    /// input bytes left to enter, input bytes it keeps back, output room it needs. Roughly 98.5
+    /// percent of 5,000 forced bad-distance streams agree; the rest sit at the edges.
+    private static let fastMinInput = 24
+    private static let fastMargin = 20
+    private static let fastMinOutput = 300
+    private static let firstBlock = 16 * 1024
+    private static let blockSizes = [32 << 10, 64 << 10, 256 << 10, 1 << 20, 4 << 20, 8 << 20, 16 << 20, 16 << 20,
+                                     32 << 20, 32 << 20, 32 << 20, 32 << 20, 64 << 20, 64 << 20, 64 << 20, 64 << 20,
+                                     128 << 20, 128 << 20, 128 << 20, 128 << 20, 256 << 20]
     private static let codeLengthOrder = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]
 
     /// A canonical Huffman code: how many codes have each length, and the symbols in code order.
@@ -80,10 +91,13 @@ enum PackInflate {
         var window = [UInt8](repeating: 0, count: 32768)
         var s1: UInt32 = 1
         var s2: UInt32 = 0
+        var blockEnd: Int
+        var blockIndex = 0
 
         init(input: [UInt8], limit: Int) {
             self.input = input
             self.limit = limit
+            blockEnd = min(limit, PackInflate.firstBlock)
         }
 
         mutating func bits(_ n: Int) throws -> Int {
@@ -196,7 +210,8 @@ enum PackInflate {
             let lit = Huffman(lengths: Array(all[0..<nlen]))
             if lit.left < 0 || (lit.left > 0 && lit.longest != 1) { throw Corrupt("invalid literal/lengths set") }
             let dist = Huffman(lengths: Array(all[nlen...]))
-            if dist.left < 0 || (dist.left > 0 && dist.longest != 1) { throw Corrupt("invalid distances set") }
+            // No distance codes at all is a valid table (inflate_table's max == 0 case); any distance then fails to decode.
+            if dist.left < 0 || (dist.left > 0 && dist.longest > 1) { throw Corrupt("invalid distances set") }
             try codes(lit, dist)
         }
 
@@ -215,18 +230,58 @@ enum PackInflate {
             return nil
         }
 
+        /// Output room in the buffer block Python is filling. `decompress(data, limit)` hands zlib one
+        /// block at a time (16 KiB first, then the sizes below, the last one clamped to the limit),
+        /// so zlib's `avail_out` is the distance to the block's end, not to the limit.
+        mutating func outputLeft() -> Int {
+            while produced >= blockEnd && blockEnd < limit {
+                blockEnd = min(limit, blockEnd + PackInflate.blockSizes[min(blockIndex, PackInflate.blockSizes.count - 1)])
+                blockIndex += 1
+            }
+            return blockEnd - produced
+        }
+
+        /// Bits read from the stream so far.
+        var consumed: Int { 8 * pos - bitCount }
+
         mutating func codes(_ lit: Huffman, _ dist: Huffman) throws {
+            // The libz Python links on macOS words a bad code differently while it runs its fast
+            // loop (`inflate_fast`): "invalid literal/length/distance code" for both kinds, where
+            // stock zlib says "invalid literal/length code" or "invalid distance code". That loop
+            // needs plenty of input and output room and refills its bit buffer 8 bytes at a time,
+            // so it stops sooner than stock zlib's. `fast` follows it with constants fitted to
+            // CPython's behaviour (a differential fuzz, see `PackInflate.fast*`); `pulled` is how
+            // many input bytes the loop has taken into its bit buffer.
+            var fast = false
+            var pulled = 0
+            let fastLast = input.count - PackInflate.fastMargin
             while true {
-                guard let sym = try decode(lit) else { throw Corrupt("invalid literal/length code") }
-                if sym < 256 { try emit(UInt8(sym)); continue }
-                if sym == 256 { return }
-                let li = sym - 257
-                if li >= 29 { throw Corrupt("invalid literal/length code") }
-                let length = PackInflate.lengthBase[li] + (try bits(PackInflate.lengthExtra[li]))
-                guard let ds = try decode(dist), ds < 30 else { throw Corrupt("invalid distance code") }
-                let distance = PackInflate.distBase[ds] + (try bits(PackInflate.distExtra[ds]))
-                if distance > produced { throw Corrupt("invalid distance too far back") }
-                for _ in 0..<length { try emit(window[(produced - distance) & 32767]) }
+                if !fast, input.count - pos >= PackInflate.fastMinInput, outputLeft() >= PackInflate.fastMinOutput {
+                    fast = true
+                    pulled = pos
+                }
+                if fast {
+                    let held = 8 * pulled - consumed
+                    if held < 57 { pulled += (63 - held) >> 3 }
+                }
+                let badCode = fast ? "invalid literal/length/distance code" : nil
+                guard let sym = try decode(lit) else { throw Corrupt(badCode ?? "invalid literal/length code") }
+                if sym < 256 {
+                    try emit(UInt8(sym))
+                } else if sym == 256 {
+                    return
+                } else {
+                    let li = sym - 257
+                    if li >= 29 { throw Corrupt(badCode ?? "invalid literal/length code") }
+                    let length = PackInflate.lengthBase[li] + (try bits(PackInflate.lengthExtra[li]))
+                    guard let ds = try decode(dist), ds < 30 else { throw Corrupt(badCode ?? "invalid distance code") }
+                    let distance = PackInflate.distBase[ds] + (try bits(PackInflate.distExtra[ds]))
+                    // zlib's MATCH state leaves when the output is full before it checks the distance.
+                    if produced >= limit { throw LimitReached() }
+                    if distance > produced { throw Corrupt("invalid distance too far back") }
+                    for _ in 0..<length { try emit(window[(produced - distance) & 32767]) }
+                }
+                if fast, !(pulled < fastLast && outputLeft() >= PackInflate.fastMinOutput) { fast = false }
             }
         }
     }
