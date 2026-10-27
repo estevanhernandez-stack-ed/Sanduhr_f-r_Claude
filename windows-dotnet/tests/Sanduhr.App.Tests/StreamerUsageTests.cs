@@ -304,6 +304,34 @@ public sealed class StreamerUsageTests : AppWindowFixture
         finally { widget.Dispose(); }
     });
 
+    /// <summary>A group that spans two homes carries the synthesized root "both" (final review M3): it names no folder, so it gets no codename and
+    /// no allowlist entry.</summary>
+    [Fact]
+    public void A_merged_group_spanning_two_homes_gets_no_phantom_folder_codename() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            widget.Streamer.SetOn(true);
+            var ledger = new CcLedgerViewModel(widget, true, _ => { });
+            ledger.PresentForTests([
+                Session(uuid: "u1", root: ".claude-qxwork", cwd: $@"{Profile}\qxproject"),
+                Session(uuid: "u2", root: ".claude-qxother", cwd: $@"{Profile}\qxproject"),
+            ]);
+            var row = Assert.Single(ledger.Rows);
+            Assert.True(row.IsGroup);
+            Assert.Equal("both", row.Info.Root);
+            row.IsExpanded = true;
+            NoSentinel("group detail", row.DetailText);
+            row.RefreshNames();
+            NoSentinel("group detail after a reload", row.DetailText);
+            Assert.DoesNotContain(widget.Streamer.Entries(), e => e.Category == CodenameCategory.Folder && e.Real.EndsWith("both", StringComparison.OrdinalIgnoreCase));
+            // The two real homes are masked as folders, as before.
+            Assert.Equal(2, widget.Streamer.Entries().Count(e => e.Category == CodenameCategory.Folder && e.Real.Contains("qx", StringComparison.OrdinalIgnoreCase)));
+        }
+        finally { widget.Dispose(); }
+    });
+
     [Fact]
     public void A_collapsed_rows_built_detail_is_dropped_when_names_change() => AppHost.Run(() =>
     {
