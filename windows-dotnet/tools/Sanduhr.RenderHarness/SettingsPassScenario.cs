@@ -73,7 +73,7 @@ public static partial class Program
         public required MethodInfo Select;
         public required FrameworkElement Root;     // the window's content
         public required ContentPresenter Host;     // the selected page's host
-        public bool KeyboardWorks;
+        public bool? KeyboardWorks;
     }
 
     static TabItem TabOf(PassCtx c, SettingsPage page) =>
@@ -590,7 +590,7 @@ public static partial class Program
             if (Part("menucheck")) PassMenuCheck(light);
             if (Part("dialog")) PassDialog(c, light);
         }
-        Log.Add($"settings-pass: foreground window before {foreground0}, after {GetForegroundWindow()}; keyboard routing worked: {c.KeyboardWorks}");
+        Log.Add($"settings-pass: foreground window before {foreground0}, after {GetForegroundWindow()}; keyboard routing worked: {(c.KeyboardWorks is { } k ? k.ToString() : "not run")}");
 
         sw.Close();
         await Settle();
