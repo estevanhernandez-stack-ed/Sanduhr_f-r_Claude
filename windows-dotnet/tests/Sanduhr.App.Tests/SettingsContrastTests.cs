@@ -98,3 +98,39 @@ public sealed class SidebarSelectedLabelTests : AppWindowFixture
         }
     });
 }
+
+/// <summary>Settings v2, slice 8, decision D2 (task 8b): accent-coloured text in Settings draws in Sanduhr.Brush.AccentText, not Accent.</summary>
+[Collection("SettingsWindow")]
+public sealed class AccentTextTests : AppWindowFixture
+{
+    [Theory]
+    [InlineData("obsidian")]
+    [InlineData("aurora")]
+    public void SettingsLinkButton_foreground_resolves_to_AccentText_which_reads_on_Glass(string key) => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Qxalpha");
+        Sanduhr.App.Views.SettingsWindow? window = null;
+        try
+        {
+            var svm = new Sanduhr.App.ViewModels.SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask,
+                checkForUpdatesNow: () => Task.FromResult(new Sanduhr.App.Updates.UpdateProbeResult(Sanduhr.App.Updates.UpdateProbeStatus.UpToDate)),
+                isStoreBuild: false);
+            window = new Sanduhr.App.Views.SettingsWindow(svm);
+            var def = ThemeCatalog.BuiltIns[key];
+            new ThemePalette(key, def).Apply(window.Resources);
+            var style = (Style)window.FindResource("SettingsLinkButton");
+            var button = new System.Windows.Controls.Button { Style = style, Content = "Open" };
+            button.Resources.MergedDictionaries.Add(window.Resources);
+            button.ApplyTemplate();
+            var text = (System.Windows.Controls.TextBlock)button.Template.FindName("t", button);
+            var expected = (Color)ColorConverter.ConvertFromString(ThemeContrast.AccentText(def));
+            Assert.Equal(expected, ((SolidColorBrush)window.Resources["Sanduhr.Brush.AccentText"]).Color);
+            Assert.Equal(expected, ((SolidColorBrush)text.Foreground).Color);
+        }
+        finally
+        {
+            window?.Close();
+            widget.Dispose();
+        }
+    });
+}

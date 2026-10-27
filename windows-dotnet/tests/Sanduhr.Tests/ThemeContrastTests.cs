@@ -129,4 +129,41 @@ public class ThemeContrastTests
         var custom = ThemeCatalog.BuiltIns["aurora"] with { Accent = "#1e3a8a" };
         Assert.Equal(custom.Text, ThemeContrast.SelectedLabel(custom));
     }
+
+    /// <summary>Decision D2 (task 8b): accent-coloured text reads 4.5:1 on Glass in every built-in, and is Accent itself where Accent already does.</summary>
+    [Theory]
+    [MemberData(nameof(BuiltIns))]
+    public void AccentText_reads_on_Glass_and_is_Accent_where_Accent_already_does(string key)
+    {
+        var def = ThemeCatalog.BuiltIns[key];
+        ThemeLint.TryParseHex(def.Glass, out var glass);
+        ThemeLint.TryParseHex(def.Accent, out var accent);
+        string text = ThemeContrast.AccentText(def);
+        Assert.True(ThemeContrast.Ratio(text, glass) >= ThemeContrast.TextMin, $"{key}: {text}");
+        if (ThemeContrast.Ratio(def.Accent, glass) >= ThemeContrast.TextMin) Assert.Equal(def.Accent, text);
+        else Assert.NotEqual(def.Accent, text);
+    }
+
+    /// <summary>Obsidian is the fallback and first-run theme: its accent text lands near the owner-approved #7870ff (4.51:1), same hue.</summary>
+    [Fact]
+    public void Obsidians_AccentText_is_the_lightest_least_step_near_7870ff()
+    {
+        var def = ThemeCatalog.BuiltIns["obsidian"];
+        string text = ThemeContrast.AccentText(def);
+        ThemeLint.TryParseHex(def.Glass, out var glass);
+        Assert.Equal("#7870ff", text);
+        Assert.InRange(ThemeContrast.Ratio(text, glass), 4.5, 4.6);
+    }
+
+    [Fact]
+    public void AccentText_never_throws_on_a_bad_hex_and_a_light_page_gets_a_darker_accent()
+    {
+        var def = ThemeCatalog.BuiltIns["obsidian"];
+        Assert.Equal("nope", ThemeContrast.AccentText(def with { Accent = "nope" }));
+        Assert.Equal(def.Accent, ThemeContrast.AccentText(def with { Glass = "" }));
+        var light = def with { Glass = "#ffffff", Accent = "#9a9aff" };
+        ThemeLint.TryParseHex("#ffffff", out var white);
+        string text = ThemeContrast.AccentText(light);
+        Assert.True(ThemeContrast.Ratio(text, white) >= ThemeContrast.TextMin, text);
+    }
 }

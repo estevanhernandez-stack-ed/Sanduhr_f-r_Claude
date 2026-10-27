@@ -57,6 +57,48 @@ public static class ThemeContrast
             && ThemeLint.Contrast(ThemeLint.Luminance(accent), ThemeLint.Luminance(glass)) >= TextMin
             ? def.Accent : def.Text;
 
+    /// <summary>Accent drawn as text on Glass (slice 8 decision D2, task 8b): Accent itself where it reads <see cref="TextMin"/> on Glass,
+    /// else Accent with its HSL lightness moved, and only its lightness, the least step that reads (toward white on a dark Glass, toward
+    /// black on a light one). The step is checked on the 8-bit color that gets painted. Obsidian's #6c63ff becomes about #7870ff.
+    /// Non-text uses (fills, borders, focus rings, the banner's border) keep Accent: 3:1 applies to them. Returns Accent when either color
+    /// does not parse, and Text when no lightness reads (P8).</summary>
+    public static string AccentText(ThemeDefinition def)
+    {
+        if (!ThemeLint.TryParseHex(def.Accent, out var accent) || !ThemeLint.TryParseHex(def.Glass, out var glass)) return def.Accent;
+        double glassLum = ThemeLint.Luminance(glass);
+        if (ThemeLint.Contrast(ThemeLint.Luminance(accent), glassLum) >= TextMin) return def.Accent;
+        var (h, sat, l) = ToHsl(accent);
+        int dir = glassLum > 0.18 ? -1 : 1;   // lighter text on a dark page, darker text on a light one
+        for (int i = 1; i <= 1000; i++)
+        {
+            double nl = l + dir * i * 0.001;
+            if (nl < 0 || nl > 1) break;
+            var c = FromHsl(h, sat, nl);
+            c = (Byte(c.R) / 255.0, Byte(c.G) / 255.0, Byte(c.B) / 255.0);
+            if (ThemeLint.Contrast(ThemeLint.Luminance(c), glassLum) >= TextMin) return Hex(c);
+        }
+        return def.Text;
+    }
+
+    private static (double H, double S, double L) ToHsl((double R, double G, double B) c)
+    {
+        double max = Math.Max(c.R, Math.Max(c.G, c.B)), min = Math.Min(c.R, Math.Min(c.G, c.B)), d = max - min, l = (max + min) / 2;
+        if (d == 0) return (0, 0, l);
+        double s = d / (1 - Math.Abs(2 * l - 1));
+        double h = max == c.R ? ((c.G - c.B) / d + 6) % 6 : max == c.G ? (c.B - c.R) / d + 2 : (c.R - c.G) / d + 4;
+        return (h, s, l);
+    }
+
+    private static (double R, double G, double B) FromHsl(double h, double s, double l)
+    {
+        double c = (1 - Math.Abs(2 * l - 1)) * s, x = c * (1 - Math.Abs(h % 2 - 1)), m = l - c / 2;
+        var (r, g, b) = (int)h switch
+        {
+            0 => (c, x, 0.0), 1 => (x, c, 0.0), 2 => (0.0, c, x), 3 => (0.0, x, c), 4 => (x, 0.0, c), _ => (c, 0.0, x),
+        };
+        return (r + m, g + m, b + m);
+    }
+
     /// <summary>A surface as <c>#rrggbb</c>, for messages and the harness.</summary>
     public static string Hex((double R, double G, double B) c) => $"#{Byte(c.R):x2}{Byte(c.G):x2}{Byte(c.B):x2}";
 
