@@ -46,7 +46,19 @@ public sealed partial class LauncherButtonRow : ObservableObject
 
     /// <summary>The line under the title: what the button opens.</summary>
     /// <summary>A link's full URL can name a private repo, so while streamer mode is on it shows scheme://host/… with the host as its codename.</summary>
-    public string Detail => Kind == LauncherKind.Link ? StreamerMode.Mask.Endpoint(Target) : (AppName is null ? "App" : $"App, {AppName}");
+    public string Detail => Kind == LauncherKind.Link ? LinkDetail() : (AppName is null ? "App" : $"App, {AppName}");
+
+    /// <summary>The link as typed while off. While on, scheme://{codename}/… where the codename is <see cref="LinkHostShown"/>: the host key the title, the Desk
+    /// piece and the allowlist use, so one link has one codename (final review I1).</summary>
+    private string LinkDetail()
+    {
+        if (!StreamerMode.On)
+            return StreamerMode.Mask.Endpoint(Target);
+        if (!Uri.TryCreate(Target?.Trim(), UriKind.Absolute, out var uri) || string.IsNullOrEmpty(uri.Host))
+            return LinkHostShown;
+        var rest = uri.PathAndQuery is "" or "/" ? "" : "/…";
+        return $"{uri.Scheme}://{LinkHostShown}{rest}";   // streamer: masked - LinkHostShown is Mask.Name(Host, LinkHost)
+    }
 
     /// <summary>"Use the app's icon" for an app; a link has no app, so it goes back to the link glyph.</summary>
     public string UseDefaultImageText => IsApp ? "Use the app's icon" : "Use the link icon";

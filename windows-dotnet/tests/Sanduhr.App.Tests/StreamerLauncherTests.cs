@@ -66,6 +66,33 @@ public sealed class StreamerLauncherTests : AppWindowFixture
     }
 
     [Fact]
+    public void One_link_has_one_codename_in_the_title_the_detail_the_Desk_piece_and_the_allowlist()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "sanduhr-sl-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(root);
+        try
+        {
+            var paths = new Paths(appDataBase: root, localAppDataBase: Path.Combine(root, "local"));
+            var store = new SettingsStore(paths);
+            var link = LauncherButton.Create(LauncherKind.Link, "https://www.qxhost.dev/x")!;
+            store.SaveLauncher(new LauncherModel(LauncherOrientation.Column, [link]));
+            var vm = new LauncherSettingsViewModel(store, paths, () => true);
+            var book = CodenameBook.New();
+            StreamerMode.Use(new StreamerMask(true, book, Profile));
+            vm.Reload();
+            var row = vm.Rows[0];
+            var code = row.Title;
+            Assert.DoesNotContain("qx", code, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal($"https://{code}/…", row.Detail);
+            Assert.Equal(code, StreamerMode.LauncherName(link, null));
+            Assert.Equal(code, row.Subject);
+            var hosts = book.Entries().Where(e => e.Category == CodenameCategory.Host && e.Real.Contains("qxhost", StringComparison.Ordinal)).ToList();
+            Assert.Single(hosts);
+        }
+        finally { try { Directory.Delete(root, true); } catch (IOException) { } }
+    }
+
+    [Fact]
     public void A_raw_target_title_goes_through_the_path_mask_while_on()
     {
         var (vm, root) = Open();
