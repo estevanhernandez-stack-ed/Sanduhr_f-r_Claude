@@ -11,6 +11,22 @@ namespace Sanduhr.App.Tests;
 [Collection("SettingsWindow")]
 public sealed class StreamerWidgetTests : AppWindowFixture
 {
+    /// <summary>The widget's session-log reader joins its folder names to the profile folder the pages use, so a test that points that folder at
+    /// a scratch profile reads the scratch one and never the PC's own ~\.claude (final review, ruled item b).</summary>
+    [Fact]
+    public void The_widgets_log_reader_reads_the_profile_folder_the_pages_use() => AppHost.Run(() =>
+    {
+        Home(".claude-qxwork");
+        var (widget, _) = ScratchWidget("Qxalpha");
+        try
+        {
+            var roots = widget.CcReader.SearchRoots();
+            Assert.NotEmpty(roots);
+            Assert.All(roots, r => Assert.StartsWith(Profile, r, StringComparison.OrdinalIgnoreCase));
+        }
+        finally { widget.Dispose(); }
+    });
+
     [Fact]
     public void The_chip_shows_the_codename_and_says_streamer_mode_is_on() => AppHost.Run(() =>
     {

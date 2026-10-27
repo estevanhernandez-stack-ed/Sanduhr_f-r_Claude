@@ -343,7 +343,7 @@ internal sealed class CompanionService : IDisposable
     {
         try
         {
-            var reader = new CcLogReader(null, () => ClaudeCodeHomes.Discover(ClaudeCodeProfile.Dir, ClaudeCodeProfile.ConfigDir));   // streamer: key - folders handed to the log reader for token counts, never drawn
+            var reader = new CcLogReader(ClaudeCodeProfile.Dir, () => ClaudeCodeHomes.Discover(ClaudeCodeProfile.Dir, ClaudeCodeProfile.ConfigDir));   // streamer: key - folders handed to the log reader for token counts, never drawn
             return [.. reader.TokensByDay(daysBack: 60).Keys.Select(d => new CodingDay(d, TimeSpan.Zero))];
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)

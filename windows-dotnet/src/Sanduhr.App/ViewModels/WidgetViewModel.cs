@@ -711,7 +711,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         Streamer.Load();
         StreamerOn = Streamer.On;
         Streamer.Changed += OnStreamerChanged;
-        _ccReader = new CcLogReader(null, () => ClaudeCodeHomes.Discover(
+        _ccReader = new CcLogReader(ClaudeCodeProfile.Dir, () => ClaudeCodeHomes.Discover(   // streamer: notname - the profile folder the log reader joins its folder names to, never drawn
             ClaudeCodeProfile.Dir,   // streamer: notname - profile folders handed to the log reader, never drawn
             ClaudeCodeProfile.ConfigDir));
 

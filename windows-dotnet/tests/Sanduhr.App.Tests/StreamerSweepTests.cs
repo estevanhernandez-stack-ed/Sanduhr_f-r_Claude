@@ -55,11 +55,6 @@ public sealed class StreamerSweepTests : AppWindowFixture
         File.WriteAllText(path, ev.ToJsonString() + "\n");
     }
 
-    /// <summary>The widget's session-log reader joins folder names to the real user profile; point it at the scratch one so the sweep reads
-    /// its own transcripts and nothing on the PC.</summary>
-    private static void PointReaderAt(WidgetViewModel widget, string home) =>
-        typeof(CcLogReader).GetField("_homeDir", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(widget.CcReader, home);
-
     private Rig Open()
     {
         var settings = JsonSerializer.Serialize(new
@@ -71,7 +66,6 @@ public sealed class StreamerSweepTests : AppWindowFixture
         Home(".claude-qx home");
         // Three folders: ~\.claude (the fixture's), ~\.claude-qxwork and ~\.claude-qx home. Two accounts.
         var (widget, _) = ScratchWidget("Qxalpha", Shown);
-        PointReaderAt(widget, Profile);
         widget.SetAccountFolder("Qxalpha", Path.Combine(Profile, ".claude-qxwork"));
 
         // Projects and skills come from the session logs: one transcript per project, three edge shapes.

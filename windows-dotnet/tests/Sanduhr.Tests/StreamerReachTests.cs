@@ -209,7 +209,7 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "cant", 4),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "key", 18),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "masked", 3),
-        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "notname", 17),
+        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "notname", 18),
         ("Sanduhr.App/Views/DeskLayoutMap.cs", "notname", 1),
         ("Sanduhr.App/Views/IntegrationConsentDialog.xaml.cs", "notname", 1),
         ("Sanduhr.App/Views/ManualKeyWindow.xaml.cs", "masked", 1),
