@@ -81,4 +81,35 @@ public class SettingsSlice8NamesTests
                 Assert.EndsWith(".", text);
         }
     }
+
+    /// <summary>docs/PRIVACY.md says what an unticked folder keeps (decision 16), in the dialog's words, and drops "so they keep working"
+    /// (preflight P2): a reset Settings part removes the MCP consent, so a kept server answers without usage.</summary>
+    [Fact]
+    public void PRIVACY_says_what_an_unticked_folder_keeps()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "docs", "PRIVACY.md")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        var privacy = File.ReadAllText(Path.Combine(dir!.FullName, "docs", "PRIVACY.md")).Replace("\r\n", "\n");
+        // The Windows rows only: the Mac paragraph is another surface's claim.
+        foreach (var line in privacy.Split('\n').Where(l => l.StartsWith("| **Reset Sanduhr…**") || l.StartsWith("- **Clear local storage:**")))
+        {
+            Assert.DoesNotContain("so they keep working", line);
+            Assert.DoesNotContain("can't be removed from Sanduhr later", line);
+        }
+        // The Clear local storage bullet.
+        Assert.Contains("Its first part lists each Claude Code folder that holds Sanduhr's entries, each with its own checkbox. "
+            + "A folder you untick keeps its entries exactly as they are, and Sanduhr keeps the files they run and its record of them, "
+            + "so Settings, Claude Code can remove them later. "
+            + "If you also reset Settings, a kept MCP server stays registered but answers without your usage until you add it again in Settings, Claude Code.", privacy);
+        // The Reset row.
+        Assert.Contains("A folder you untick keeps its entries exactly as they are, and Sanduhr keeps the files those entries run "
+            + "(the statusline script, the MCP launcher and server, the meters mod, each while an entry of its kind is kept) and its record of them, "
+            + "so Settings, Claude Code can remove them later.", privacy);
+        Assert.Contains("Sanduhr also keeps those files and its record while its record of what it installed can't be read or an entry failed to come out.", privacy);
+        Assert.Contains("It removes the statusline script only when no statusline entry is kept, that record can be read and no statusline entry failed to come out.", privacy);
+        Assert.Contains("The Settings part removes `mcp-settings.json` and the MCP switch whatever is kept, so a kept MCP server stays registered "
+            + "but answers without your usage until you add it again in Settings, Claude Code.", privacy);
+    }
 }

@@ -2895,9 +2895,15 @@
                                                Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                 </Grid>
                                 <StackPanel views:SettingsAnchor.Id="reset" Margin="0,12,0,0" HorizontalAlignment="Left">
-                                    <Button Style="{StaticResource FlatButton}" Padding="10,4" Content="{Binding ResetSanduhrTitle}"
-                                            AutomationProperties.Name="{x:Static core:SettingsNames.ResetSanduhr}" AutomationProperties.HelpText="Removes what Sanduhr keeps on this PC. You choose which parts."
+                                    <Button x:Name="ResetSanduhrButton" Style="{StaticResource FlatButton}" Padding="10,4" Content="{Binding ResetSanduhrTitle}"
+                                            HorizontalAlignment="Left"
+                                            AutomationProperties.Name="{x:Static core:SettingsNames.ResetSanduhr}"
+                                            AutomationProperties.HelpText="{x:Static core:SettingsNames.ResetSanduhrCaption}"
                                             Command="{Binding ResetSanduhrCommand}" />
+                                    <!-- Settings v2, slice 8 (spec, Reset): what it removes, so nobody has to open the dialog to learn it. -->
+                                    <TextBlock x:Name="ResetCaption" Text="{x:Static core:SettingsNames.ResetSanduhrCaption}"
+                                               FontSize="11" TextWrapping="Wrap" MaxWidth="460" Margin="0,6,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                                 </StackPanel>
                             </StackPanel>
 

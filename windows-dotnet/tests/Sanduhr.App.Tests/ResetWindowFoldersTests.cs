@@ -398,6 +398,33 @@ public sealed class ResetWindowFoldersTests : AppWindowFixture
         finally { window.Close(); }
     });
 
+    [Fact]
+    public void About_says_what_Reset_removes_under_the_button() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Qxalpha");
+        SettingsWindow? window = null;
+        try
+        {
+            var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask,
+                checkForUpdatesNow: () => Task.FromResult(new UpdateProbeResult(UpdateProbeStatus.UpToDate)), isStoreBuild: false);
+            window = new SettingsWindow(svm);
+            var guard = NoActivate.Show(window);
+            window.SelectPage(SettingsPage.About, SettingsIndex.Reset);
+            window.UpdateLayout();
+            guard.Check();
+            var caption = (TextBlock)window.FindName("ResetCaption");
+            Assert.Equal(SettingsNames.ResetSanduhrCaption, caption.Text);
+            Assert.Equal(Visibility.Visible, caption.Visibility);
+            var button = (Button)window.FindName("ResetSanduhrButton");
+            Assert.Equal(SettingsNames.ResetSanduhrCaption, System.Windows.Automation.AutomationProperties.GetHelpText(button));
+        }
+        finally
+        {
+            window?.Close();
+            widget.Dispose();
+        }
+    });
+
     private static IEnumerable<CheckBox> Boxes(ResetWindow window)
     {
         window.UpdateLayout();
