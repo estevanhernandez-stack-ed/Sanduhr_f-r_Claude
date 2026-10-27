@@ -35,6 +35,7 @@ actor ClaudeAPI {
     private let sessionKey: String
     private let cfClearance: String?
     private var orgID: String?
+    private var org: Organization?
     private let session: URLSession
 
     init(sessionKey: String, cfClearance: String?) {
@@ -62,12 +63,23 @@ actor ClaudeAPI {
     /// The organization this client tracks (`Organization.tracked`), fetched once per client. The
     /// Data section compares it in memory with a Claude Code folder's; never stored or logged.
     func organizationID() async throws -> String {
-        if let orgID { return orgID }
+        try await trackedOrganization().uuid
+    }
+
+    /// The tracked organization's plan badge, from the same single `/organizations` call the uuid
+    /// comes from: no extra request. Nil for API and prepaid orgs. Never stored or logged.
+    func plan() async throws -> PlanBadge? {
+        PlanLabel.resolve(try await trackedOrganization())
+    }
+
+    private func trackedOrganization() async throws -> Organization {
+        if let org { return org }
         let url = Self.base.appendingPathComponent("organizations")
         let orgs: [Organization] = try await getJSON(url)
-        guard let org = Organization.tracked(in: orgs) else { throw APIError.noOrganizations }
-        orgID = org.uuid
-        return org.uuid
+        guard let found = Organization.tracked(in: orgs) else { throw APIError.noOrganizations }
+        org = found
+        orgID = found.uuid
+        return found
     }
 
     // MARK: Internal

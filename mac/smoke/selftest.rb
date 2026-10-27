@@ -250,6 +250,7 @@ eq('credentials store is a name, never a value', state['credentials_store'], 'fi
 # Item 36: the account is a hash, never a label; following is two switches.
 check('account_ref is 8 hex digits', state['account_ref'].to_s =~ /\A[0-9a-f]{8}\z/)
 eq('accounts count', state['accounts_count'], 2)
+eq('plan is a name, never a riff or tier', state['plan'], 'Max ×20')
 eq('follow off by default', [state['follow'], state['follow_paused']], [false, false])
 # Item 43: the active account's Meter history, 30 days unless switched off (0); never a label.
 eq('meter history kept 30 days by default', state['history_days'], 30)

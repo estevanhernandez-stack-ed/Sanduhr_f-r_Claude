@@ -1,0 +1,103 @@
+{
+  "run": "plan-label",
+  "repo": "/Users/102702/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "23b5701c6176dcb09cdab4439f557c42fc3c1d80",
+  "integration_branch": "cart/plan-label",
+  "integration_worktree": "/Users/102702/.cwt/sanduhr-f-r-clau-plan-label/int",
+  "worktree_root": "/Users/102702/.cwt/sanduhr-f-r-clau-plan-label",
+  "builder_branch": "main",
+  "uncommitted_at_start": [],
+  "started_at": "2026-10-26T23:05:29.658Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "plan-label-core",
+      "title": "PlanLabel port and org decode",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/plan-label--01-plan-label-core",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh (1901 pass, orchestrator re-run)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "snapshot-plan",
+      "title": "The active plan in the view model and snapshot.json",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/plan-label--02-snapshot-plan",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh (1906 pass, orchestrator re-run)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "accounts-plan",
+      "title": "Each account's plan in Settings, Accounts",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/plan-label--03-accounts-plan",
+      "worktree": "",
+      "on": 2,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh (1916 pass, orchestrator re-run)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "footer-capsule",
+      "title": "Footer capsule, riffs, demo plan, smoke state",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/plan-label--04-footer-capsule",
+      "worktree": "",
+      "on": 2,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh (1924 pass) && ruby smoke/selftest.rb (1031 pass), orchestrator re-run",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "docs-and-card",
+      "title": "PRIVACY, README, smoke doc, What's New card, CHANGELOG",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/plan-label--05-docs-and-card",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh (1925 pass), orchestrator re-run after doc correction",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}

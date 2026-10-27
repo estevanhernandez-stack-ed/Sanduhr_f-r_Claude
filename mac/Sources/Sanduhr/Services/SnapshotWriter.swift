@@ -15,7 +15,7 @@ enum SnapshotWriter {
             .appendingPathComponent("snapshot.json")
     }
 
-    static func writeOk(_ usage: UsageResponse, accountRef: String?, now: Date = Date(), to target: URL = url) {
+    static func writeOk(_ usage: UsageResponse, accountRef: String?, plan: String? = nil, now: Date = Date(), to target: URL = url) {
         var tiers: [[String: Any]] = []
         for tier in Tier.allCases {
             guard let t = usage.tiers[tier], let util = t.utilization else { continue }
@@ -27,19 +27,19 @@ enum SnapshotWriter {
                 "limit": NSNull(),
             ])
         }
-        write(status: "ok", errorKind: nil, tiers: tiers, accountRef: accountRef, now: now, to: target)
+        write(status: "ok", errorKind: nil, tiers: tiers, accountRef: accountRef, plan: plan, now: now, to: target)
     }
 
     /// On a failed fetch keep the last good tiers, so readers can say "sign in again"
     /// rather than "is the widget running?".
-    static func writeError(_ kind: String, accountRef: String?, now: Date = Date(), to target: URL = url) {
+    static func writeError(_ kind: String, accountRef: String?, plan: String? = nil, now: Date = Date(), to target: URL = url) {
         var tiers: [[String: Any]] = []
         if let data = try? Data(contentsOf: target),
            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let last = obj["tiers"] as? [[String: Any]] {
             tiers = last
         }
-        write(status: "error", errorKind: kind, tiers: tiers, accountRef: accountRef, now: now, to: target)
+        write(status: "error", errorKind: kind, tiers: tiers, accountRef: accountRef, plan: plan, now: now, to: target)
     }
 
     /// After Sign Out: an auth error with no tiers, so readers say "sign in again" and drop the
@@ -47,7 +47,7 @@ enum SnapshotWriter {
     /// shared set's auth kind (the statusline shows "reauth needed", the MCP server points to
     /// Settings, Credentials); the set is closed, so sign-out adds no kind of its own.
     static func writeSignedOut(accountRef: String?, now: Date = Date(), to target: URL = url) {
-        write(status: "error", errorKind: "session_expired", tiers: [], accountRef: accountRef, now: now, to: target)
+        write(status: "error", errorKind: "session_expired", tiers: [], accountRef: accountRef, plan: nil, now: now, to: target)
     }
 
     /// The error kind a failed fetch writes: `session_expired` and `cloudflare` ask for a new sign-in,
@@ -74,7 +74,7 @@ enum SnapshotWriter {
     }
 
     private static func write(status: String, errorKind: String?, tiers: [[String: Any]], accountRef: String?,
-                              now: Date, to target: URL = url) {
+                              plan: String?, now: Date, to target: URL = url) {
         // Reset Sanduhr… ran: no snapshot comes back.
         guard !ResetGate.isOn else { return }
         let root: [String: Any] = [
@@ -82,7 +82,7 @@ enum SnapshotWriter {
             "writer_version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown",
             "captured_at": ISO8601.stamp(now),
             "account_ref": accountRef ?? NSNull(),
-            "plan": NSNull(),
+            "plan": plan ?? NSNull(),
             "status": status,
             "error_kind": errorKind ?? NSNull(),
             "tiers": tiers,

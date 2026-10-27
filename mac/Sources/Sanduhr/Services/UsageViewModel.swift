@@ -160,6 +160,8 @@ final class UsageViewModel {
     /// Every account's data choices (AccountData), as Settings, Accounts, Data shows them. Holds
     /// linked folder paths: never logged or written to state.yaml.
     private(set) var accountDataChoices: [String: AccountDataChoices] = AccountData.allChoices(in: KeychainStore.accounts.defaults)
+    /// Every named account's kept plan name (AccountPlans), as Settings, Accounts shows it.
+    private(set) var accountPlans: [String: String] = AccountPlans.allPlans(in: KeychainStore.accounts.defaults)
     /// Live Claude Code activity (item 45): the tokens the shown account's linked folder used
     /// since the last meter refresh, by tier, for the cards' "+Nk". Zero after each refresh, grown
     /// by the 30-second scans; empty when its activity is Not tracked or no folder is linked.
@@ -186,6 +188,15 @@ final class UsageViewModel {
     /// Demo mode (DemoMode, slice 4): the sample accounts and numbers stand in for the real ones
     /// on every surface. In memory only; the real state waits in `demoSession` and comes back with off.
     private(set) var demo = false
+    /// The active account's plan badge, from the same client that fetches usage. Nil signed out,
+    /// between accounts, in demo mode (item 4 owns demo plans) and until the first fetch answers.
+    private(set) var plan: PlanBadge?
+    var planName: String? { plan?.name }
+    /// The badge the footer shows: demo mode's sample plan for the shown sample account (never a
+    /// real one), otherwise the fetched plan.
+    var shownPlan: PlanBadge? {
+        demo ? PlanLabel.badge(named: activeAccount.flatMap(DemoMode.plan(for:))) : plan
+    }
     @ObservationIgnored private var demoSession = DemoSession()
 
     /// The real accounts, whatever demo mode shows: what the Claude Code folders, the Mods page and
@@ -318,6 +329,8 @@ final class UsageViewModel {
         follower.context = { [weak self] in self?.followContext() ?? AccountFollow.State() }
         follower.onSwitch = { [weak self] label in self?.switchAccount(to: label, automatic: true) }
         follower.onReadings = { [weak self] in self?.refreshInUse() }
+        follower.onPlan = { [weak self] label, name in self?.keepPlan(name, for: label) }
+        seatMeters.planFor = { AccountPlans.plan(for: $0, in: KeychainStore.accounts.defaults) }
         follower.onResult = { [weak self] label, result in self?.seatMeters.followerAnswered(label, result) }
         seatMeters.context = { [weak self] in self?.seatContext() ?? SeatMeters.Context() }
         follower.apply(enabled: followEnabled)
@@ -421,6 +434,13 @@ final class UsageViewModel {
         if wasActive { showActiveAccount(leaving: accountLabel) } else { reloadAccounts() }
         refreshInUse()
         return result
+    }
+
+    /// Keeps an account's plan name (nil clears it) and refreshes what Accounts shows.
+    private func keepPlan(_ name: String?, for account: String?) {
+        AccountPlans.set(name, for: account, in: KeychainStore.accounts.defaults)
+        let kept = AccountPlans.allPlans(in: KeychainStore.accounts.defaults)
+        if kept != accountPlans { accountPlans = kept }
     }
 
     /// Rename an account; its secrets, history file and sign-in marker follow (AccountRegistry).
@@ -624,6 +644,8 @@ final class UsageViewModel {
         }
         let off = Set(MeterHistory.offLabels(in: accounts.defaults))
         if off != historyOffAccounts { historyOffAccounts = off }
+        let kept = AccountPlans.allPlans(in: accounts.defaults)
+        if kept != accountPlans { accountPlans = kept }
         let data = AccountData.allChoices(in: accounts.defaults)
         if data != accountDataChoices {
             accountDataChoices = data
@@ -660,7 +682,7 @@ final class UsageViewModel {
             seatMeters.seed(s.usage, at: s.lastUpdated, label: apiAccount)
             return
         }
-        seatMeters.seed(usage, at: lastUpdated, label: apiAccount)
+        seatMeters.seed(usage, at: lastUpdated, label: apiAccount, plan: planName)
     }
 
     nonisolated private static func signedIn(_ accounts: AccountRegistry) -> Set<String> {
@@ -787,6 +809,7 @@ final class UsageViewModel {
             endSwitchVeil()
             let shown = demoSession.start(shownState, now: now)
             demo = true
+            plan = nil
             seatMeters.paused = true
             apply(shown)
             refreshLocalBurn()
@@ -939,6 +962,7 @@ final class UsageViewModel {
         countdownTimer = nil
         api = nil
         apiAccount = nil
+        plan = nil
         usage = nil
         lastUpdated = nil
         refreshLocalBurn()
@@ -986,7 +1010,7 @@ final class UsageViewModel {
             // So is one that lands under demo mode.
             guard DemoSession.answerApplies(sameClient: self.api === api, demo: demo) else { return }
             showFailure(error, accountRef: ref)
-            if apiAccount == account { seatMeters.activeAnswered(account, .failure(error)) }
+            if apiAccount == account { seatMeters.activeAnswered(account, .failure(error), plan: planName) }
             endSwitchVeil()
             return
         }
@@ -997,12 +1021,18 @@ final class UsageViewModel {
         Self.reconcileHidden(u, now: Date())
         self.usage = u
         self.lastUpdated = Date()
+        // The org list is cached on the client by now, so this adds no request. A plan failure
+        // never fails the fetch.
+        let badge = try? await api.plan()
+        guard DemoSession.answerApplies(sameClient: self.api === api, demo: demo) else { return }
+        self.plan = badge
+        keepPlan(badge?.name, for: account)
         // A fresh refresh re-anchors the local burn: the badges start again from zero.
         self.localBurn = LocalBurn()
         refreshLocalBurn()
         vault.trigger()
         Notifier.shared.evaluate(u)
-        SnapshotWriter.writeOk(u, accountRef: ref)
+        SnapshotWriter.writeOk(u, accountRef: ref, plan: planName)
         follower.recordActive(account, usage: u)
         // One write of the history file per fetch, off the main thread, skipped while the
         // account's Meter history is off (item 43). The sparklines gain the same points in memory.
@@ -1015,7 +1045,7 @@ final class UsageViewModel {
         // A switch's new numbers: they fade in.
         endSwitchVeil()
         // The active account's seat file, then the round of inactive seats in use.
-        if apiAccount == account { seatMeters.activeAnswered(account, .success(u)) }
+        if apiAccount == account { seatMeters.activeAnswered(account, .success(u), plan: planName) }
     }
 
     /// A failed fetch: the status line and snapshot.json's error kind.
@@ -1026,7 +1056,7 @@ final class UsageViewModel {
         case .http(let c)?: status = .error("HTTP \(c)", isAuth: false)
         default: status = .error(error.localizedDescription, isAuth: false)
         }
-        SnapshotWriter.writeError(SnapshotWriter.errorKind(error), accountRef: ref)
+        SnapshotWriter.writeError(SnapshotWriter.errorKind(error), accountRef: ref, plan: planName)
     }
 
     // MARK: Local Claude Code activity (item 45)

@@ -223,6 +223,7 @@ final class AccountRegistry: @unchecked Sendable {
         SignInGate.rename(old, to: new, in: defaults)
         MeterHistory.rename(old, to: new, in: defaults)
         AccountData.rename(old, to: new, in: defaults)
+        AccountPlans.rename(old, to: new, in: defaults)
     }
 
     /// Writes each value and reads it back. On a failure the slots written so far are deleted
@@ -251,6 +252,7 @@ final class AccountRegistry: @unchecked Sendable {
     @discardableResult
     func signOut(_ label: String?) -> SignOutResult {
         SignInGate.forget(label, in: defaults)
+        if let label { AccountPlans.forget(label, in: defaults) }
         return SignOut.run(backends: stores, accounts: Self.signOutSlots(for: label))
     }
 
@@ -291,6 +293,7 @@ final class AccountRegistry: @unchecked Sendable {
         history?.delete(label)
         MeterHistory.forget(label, in: defaults)
         AccountData.forget(label, in: defaults)
+        AccountPlans.forget(label, in: defaults)
         list.remove(at: index)
         writeList(list)
         if wasActive {

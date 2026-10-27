@@ -109,6 +109,8 @@ struct DebugStateInput {
     /// The active account as snapshot.json names it (AccountRef), never its label.
     var accountRef: String?
     var accountsCount = 0
+    /// The active account's plan name (demo mode: the sample's), or nil. Never a riff or a tier.
+    var plan: String?
     /// The active account's Meter history: 30 days, or 0 when off (MeterHistory). No label.
     var historyDays = MeterHistory.days
     /// The active account's data choices (AccountData): values and whether a folder is linked,
@@ -611,6 +613,7 @@ enum DebugState {
         pairs.append(("credentials_store", .string(s.credentialsStore.rawValue)))
         pairs.append(("account_ref", s.accountRef.map(YAMLNode.string) ?? .null))
         pairs.append(("accounts_count", .int(s.accountsCount)))
+        pairs.append(("plan", s.plan.map(YAMLNode.string) ?? .null))
         pairs.append(("history_days", .int(s.historyDays)))
         pairs.append(("data", accountDataYAML(s.accountData)))
         pairs.append(("local_activity", localActivityYAML(reading: s.localActivityReading,

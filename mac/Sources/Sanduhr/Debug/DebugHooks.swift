@@ -471,6 +471,7 @@ enum DebugHooks {
         s.credentialsStore = KeychainStore.kind
         s.accountRef = AccountRef.of(KeychainStore.accounts.active)
         s.accountsCount = KeychainStore.accounts.labels.count
+        s.plan = vm.shownPlan?.name
         s.historyDays = MeterHistory.days(KeychainStore.accounts.active, in: KeychainStore.accounts.defaults)
         s.accountData = AccountData.choices(for: KeychainStore.accounts.active, in: KeychainStore.accounts.defaults)
         s.localActivityReading = vm.localActivityReading
