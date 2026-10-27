@@ -22,8 +22,8 @@ enum WidgetZip {
     /// The largest single file FORMAT 3 allows (a font, 5 MB; images and pixel sheets are 2 MB).
     static let maxEntryBytes = PackValidator.maxFontBytes
     static let maxTotalBytes = PackValidator.maxPackBytes
-    /// The largest zip a pack can be: the files' 10 MB plus the zip's own headers (Windows' `WidgetCatalog.MaxZipBytes`).
-    static let maxZipBytes = PackValidator.maxPackBytes + 256 * 1024
+    /// The largest zip a pack can be: the catalog's limit on a pack's `size`.
+    static let maxZipBytes = WidgetCatalog.maxZipBytes
 
     private static let eocdSig = 0x06054b50
     private static let centralSig = 0x02014b50

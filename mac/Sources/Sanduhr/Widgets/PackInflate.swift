@@ -196,7 +196,8 @@ enum PackInflate {
             let lit = Huffman(lengths: Array(all[0..<nlen]))
             if lit.left < 0 || (lit.left > 0 && lit.longest != 1) { throw Corrupt("invalid literal/lengths set") }
             let dist = Huffman(lengths: Array(all[nlen...]))
-            if dist.left < 0 || (dist.left > 0 && dist.longest != 1) { throw Corrupt("invalid distances set") }
+            // No distance codes at all is a valid table (inflate_table's max == 0 case); any distance then fails to decode.
+            if dist.left < 0 || (dist.left > 0 && dist.longest > 1) { throw Corrupt("invalid distances set") }
             try codes(lit, dist)
         }
 
@@ -216,17 +217,25 @@ enum PackInflate {
         }
 
         mutating func codes(_ lit: Huffman, _ dist: Huffman) throws {
+            // Stock zlib's wording, as Linux CI's validate.py and Windows report it. The libz macOS
+            // ships says "invalid literal/length/distance code" in its fast loop; that is not followed.
             while true {
                 guard let sym = try decode(lit) else { throw Corrupt("invalid literal/length code") }
-                if sym < 256 { try emit(UInt8(sym)); continue }
-                if sym == 256 { return }
-                let li = sym - 257
-                if li >= 29 { throw Corrupt("invalid literal/length code") }
-                let length = PackInflate.lengthBase[li] + (try bits(PackInflate.lengthExtra[li]))
-                guard let ds = try decode(dist), ds < 30 else { throw Corrupt("invalid distance code") }
-                let distance = PackInflate.distBase[ds] + (try bits(PackInflate.distExtra[ds]))
-                if distance > produced { throw Corrupt("invalid distance too far back") }
-                for _ in 0..<length { try emit(window[(produced - distance) & 32767]) }
+                if sym < 256 {
+                    try emit(UInt8(sym))
+                } else if sym == 256 {
+                    return
+                } else {
+                    let li = sym - 257
+                    if li >= 29 { throw Corrupt("invalid literal/length code") }
+                    let length = PackInflate.lengthBase[li] + (try bits(PackInflate.lengthExtra[li]))
+                    guard let ds = try decode(dist), ds < 30 else { throw Corrupt("invalid distance code") }
+                    let distance = PackInflate.distBase[ds] + (try bits(PackInflate.distExtra[ds]))
+                    // zlib's MATCH state leaves when the output is full before it checks the distance.
+                    if produced >= limit { throw LimitReached() }
+                    if distance > produced { throw Corrupt("invalid distance too far back") }
+                    for _ in 0..<length { try emit(window[(produced - distance) & 32767]) }
+                }
             }
         }
     }
