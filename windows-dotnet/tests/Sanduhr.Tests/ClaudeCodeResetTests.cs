@@ -248,7 +248,7 @@ public sealed class ClaudeCodeResetTests : IDisposable
         InstallAll(home);
         string file = Path.Combine(home, "settings.json");
 
-        var failures = ClaudeCodeReset.UndoKeeping(Scope(), [new ResetFolder(home, [IntegrationKind.Hooks])]);
+        var failures = ClaudeCodeReset.UndoKeeping(Scope(), [new ResetFolder(home, [IntegrationKind.Hooks])]).Failures;
 
         Assert.Empty(failures);
         var after = JsonNode.Parse(File.ReadAllText(file))!;
@@ -268,7 +268,7 @@ public sealed class ClaudeCodeResetTests : IDisposable
         string home = Home(".claude-both");
         InstallAll(home);
 
-        Assert.Empty(ClaudeCodeReset.UndoKeeping(Scope(), [new ResetFolder(home, [IntegrationKind.Statusline])]));
+        Assert.Empty(ClaudeCodeReset.UndoKeeping(Scope(), [new ResetFolder(home, [IntegrationKind.Statusline])]).Failures);
 
         var after = JsonNode.Parse(File.ReadAllText(Path.Combine(home, "settings.json")))!;
         Assert.NotNull(after["statusLine"]);
@@ -306,5 +306,36 @@ public sealed class ClaudeCodeResetTests : IDisposable
         Assert.Empty(ClaudeCodeReset.Undo(Scope(), []));
 
         Assert.True(File.Exists(theirs));
+    }
+
+    [Fact]
+    public void The_result_names_each_kind_that_came_out_and_where()
+    {
+        string undo = Home(".claude-undo");
+        InstallAll(undo);
+
+        var result = ClaudeCodeReset.UndoKeeping(Scope(), []);
+
+        Assert.Empty(result.Failures);
+        Assert.Empty(result.Left);
+        Assert.True(result.McpOut && result.StatuslineOut);
+        foreach (var kind in new[] { IntegrationKind.Meters, IntegrationKind.Hooks, IntegrationKind.Statusline, IntegrationKind.Mcp })
+            Assert.Contains(result.Removed, r => r.Kind == kind && ClaudeCodeFolders.Same(r.Folder, undo));
+    }
+
+    [Fact]
+    public void Unreadable_receipts_still_remove_the_mcp_entries_and_report_the_receipt_bound_kinds_as_left()
+    {
+        string undo = Home(".claude-undo");
+        InstallAll(undo);
+        File.WriteAllText(Receipts, "{ not a list");
+
+        var result = ClaudeCodeReset.UndoKeeping(Scope(), []);
+
+        Assert.False(Mcp().IsRegistered(".claude-undo"));
+        Assert.True(result.McpOut);
+        Assert.False(result.StatuslineOut);
+        Assert.Contains(result.Removed, r => r.Kind == IntegrationKind.Mcp);
+        Assert.DoesNotContain(result.Removed, r => r.Kind == IntegrationKind.Statusline);
     }
 }

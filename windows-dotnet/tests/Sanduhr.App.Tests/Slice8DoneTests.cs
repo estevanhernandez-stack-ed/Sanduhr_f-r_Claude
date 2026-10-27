@@ -104,7 +104,7 @@ public sealed class Slice8DoneTests : AppWindowFixture
     {
         var paths = ScratchPaths();
         var service = new ResetService(paths, w.Accounts, new PublishTokenStore(new MemoryCredentials()),
-            k => Task.Run<IReadOnlyList<string>>(() => ClaudeCodeViewModel.UndoEverything(w.Widget, k)),
+            k => Task.Run(() => ClaudeCodeViewModel.UndoEverything(w.Widget, k)),
             () => { },
             clearMcpSwitches: () => new SettingsStore(paths).ClearMcpSwitchesForReset(),
             clearStatuslineSwitches: () => new SettingsStore(paths).ClearStatuslineSwitchesForReset());

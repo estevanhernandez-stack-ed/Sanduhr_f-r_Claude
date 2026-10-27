@@ -1085,7 +1085,7 @@ public partial class App : Application
             paths,
             vm.AccountStore,
             new PublishTokenStore(new WindowsCredentialManager(AccountStore.Service)),
-            keep => Task.Run<IReadOnlyList<string>>(() => ClaudeCodeViewModel.UndoEverything(vm, keep)),
+            keep => Task.Run(() => ClaudeCodeViewModel.UndoEverything(vm, keep)),
             () =>
             {
                 ResetGuard.MarkDone();

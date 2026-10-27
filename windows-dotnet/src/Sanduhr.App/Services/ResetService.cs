@@ -24,7 +24,7 @@ internal sealed class ResetService
     private readonly Paths _paths;
     private readonly AccountStore _accounts;
     private readonly PublishTokenStore _publishToken;
-    private readonly Func<IReadOnlyCollection<ResetFolder>, Task<IReadOnlyList<string>>> _undoClaudeCodeEntries;
+    private readonly Func<IReadOnlyCollection<ResetFolder>, Task<ClaudeCodeUndoResult>> _undoClaudeCodeEntries;
     private readonly Action _stopBackgroundWork;
     private readonly Func<Task<int>>? _deleteAccountProfiles;
 
@@ -37,7 +37,7 @@ internal sealed class ResetService
         Paths paths,
         AccountStore accounts,
         PublishTokenStore publishToken,
-        Func<IReadOnlyCollection<ResetFolder>, Task<IReadOnlyList<string>>> undoClaudeCodeEntries,
+        Func<IReadOnlyCollection<ResetFolder>, Task<ClaudeCodeUndoResult>> undoClaudeCodeEntries,
         Action stopBackgroundWork,
         Func<Task<int>>? deleteAccountProfiles = null,
         Action? clearMcpSwitches = null,
@@ -105,13 +105,32 @@ internal sealed class ResetService
         var failures = new List<string>();
         // Read before the undo: a receipt save moves a damaged file aside and leaves a readable one (slice 8 decision 4, P1).
         bool unreadable = ResetPlan.ReceiptsUnreadable(_paths);
+        ClaudeCodeUndoResult? undone = null;
         try
         {
-            failures.AddRange(await _undoClaudeCodeEntries(keep));
+            undone = await _undoClaudeCodeEntries(keep);
+            failures.AddRange(undone.Failures);
         }
         catch (Exception)
         {
             failures.Add("a Claude Code entry");
+        }
+
+        bool Kept(IntegrationKind kind) => keep.Any(f => f.Kinds.Contains(kind));
+        bool keepsMcp = Kept(IntegrationKind.Mcp);
+        // The statusline switch also means "the meters mod reads the snapshot" (SnapshotConsumers), so a kept meters mod holds it.
+        bool keepsStatusline = Kept(IntegrationKind.Statusline) || Kept(IntegrationKind.Meters);
+
+        // Each kind's switch goes off by what the undo took out of that kind, whatever the other kinds or the receipts did: a
+        // switch left on re-creates the projection, the launcher or the script at the next launch. A kind the undo could not take
+        // out (a failure, or an entry it was not safe to open) keeps its switch, so its entry can still be removed. A Settings
+        // part that runs later deletes the file anyway.
+        if (undone is not null)
+        {
+            if (!keepsMcp && undone.McpOut)
+                try { _clearMcpSwitches?.Invoke(); } catch (Exception) { /* best effort */ }
+            if (!keepsStatusline && undone.StatuslineOut && !unreadable)
+                try { _clearStatuslineSwitches?.Invoke(); } catch (Exception) { /* best effort */ }
         }
 
         // A failed entry (a statusline one included) keeps its receipt and the files it points at, so it can still be removed
@@ -119,18 +138,6 @@ internal sealed class ResetService
         // after a failure. Past that the rest goes per kind, by what a kept entry still runs (P3).
         if (failures.Count == 0 && !unreadable)
         {
-            bool Kept(IntegrationKind kind) => keep.Any(f => f.Kinds.Contains(kind));
-            bool keepsMcp = Kept(IntegrationKind.Mcp);
-            // The statusline switch also means "the meters mod reads the snapshot" (SnapshotConsumers), so a kept meters mod holds it.
-            bool keepsStatusline = Kept(IntegrationKind.Statusline) || Kept(IntegrationKind.Meters);
-
-            // The entries are out: their switches go off too, or the next launch re-creates the projection, the launcher and the
-            // script. A Settings part that runs later deletes the file anyway.
-            if (!keepsMcp)
-                try { _clearMcpSwitches?.Invoke(); } catch (Exception) { /* best effort */ }
-            if (!keepsStatusline)
-                try { _clearStatuslineSwitches?.Invoke(); } catch (Exception) { /* best effort */ }
-
             failures.AddRange(await DeleteItemsAsync(ResetPart.ClaudeCodeEntries,
                 item => !StaysForKept(item, keep.Count > 0, keepsMcp, Kept(IntegrationKind.Statusline), Kept(IntegrationKind.Meters))));
         }

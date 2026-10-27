@@ -860,10 +860,10 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
 
     /// <summary>
     /// Reset Sanduhr…: undoes Sanduhr's entries in every Claude Code folder but the kinds kept in <paramref name="keep"/> (real folders,
-    /// never what a row shows), through <see cref="ClaudeCodeReset.UndoKeeping"/>. Returns the kinds of failures, never a path. Safe to
+    /// never what a row shows), through <see cref="ClaudeCodeReset.UndoKeeping"/>. Returns what each kind did (failures as kinds, never a path). Safe to
     /// call off the UI thread.
     /// </summary>
-    public static IReadOnlyList<string> UndoEverything(WidgetViewModel widget, IReadOnlyCollection<ResetFolder>? keep = null)
+    public static ClaudeCodeUndoResult UndoEverything(WidgetViewModel widget, IReadOnlyCollection<ResetFolder>? keep = null)
     {
         var profile = ClaudeCodeProfile.Dir;   // streamer: key - profile folder handed to the reset logic, never drawn
         var scope = new ClaudeCodeResetScope(

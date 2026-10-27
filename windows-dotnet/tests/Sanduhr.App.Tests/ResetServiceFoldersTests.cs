@@ -57,14 +57,21 @@ public sealed class ResetServiceFoldersTests : IDisposable
         public int StatuslineCleared;
     }
 
-    private Harness Make(IReadOnlyList<string>? undoFailures = null)
+    /// <summary>What the Core undo reports when the receipts can't be read and nothing is kept: the MCP entries came out (they need no
+    /// receipt), the receipt-bound kinds were not touched.</summary>
+    private static readonly ClaudeCodeUndoResult UnreadableUndo =
+        new([], [], [], [IntegrationKind.Meters, IntegrationKind.Hooks, IntegrationKind.Statusline]);
+
+    private static ClaudeCodeUndoResult Failed(string phrase, IntegrationKind kind) => new([phrase], [], [], [kind]);
+
+    private Harness Make(ClaudeCodeUndoResult? undo = null, Func<IReadOnlyCollection<ResetFolder>, ClaudeCodeUndoResult>? real = null)
     {
         Harness? h = null;
         var service = new ResetService(
             _paths,
             new AccountStore(new AppWindowFixture.MemoryCredentials()),
             new PublishTokenStore(new AppWindowFixture.MemoryCredentials()),
-            keep => { h!.Asked.Add(keep); return Task.FromResult(undoFailures ?? []); },
+            keep => { h!.Asked.Add(keep); return Task.FromResult(real is not null ? real(keep) : undo ?? ClaudeCodeUndoResult.Clean); },
             () => { },
             clearMcpSwitches: () => h!.McpCleared++,
             clearStatuslineSwitches: () => h!.StatuslineCleared++);
@@ -99,12 +106,12 @@ public sealed class ResetServiceFoldersTests : IDisposable
     {
         var files = Seed();
         File.WriteAllText(Receipts, "{ not a list");
-        var h = Make();
+        var h = Make(UnreadableUndo);
 
         await h.Service.RunAsync(ClaudeCodeOnly, []);
 
         Assert.All(files, f => Assert.True(File.Exists(f), $"{Path.GetFileName(f)} was deleted"));
-        Assert.Equal(0, h.McpCleared);
+        Assert.Equal(1, h.McpCleared);   // the MCP entries came out, so nothing may reinstall them
         Assert.Equal(0, h.StatuslineCleared);
     }
 
@@ -113,25 +120,26 @@ public sealed class ResetServiceFoldersTests : IDisposable
     {
         var files = Seed();
         File.WriteAllText(Receipts + ".unreadable", "{ not a list");
-        var h = Make();
+        var h = Make(UnreadableUndo);
 
         await h.Service.RunAsync(ClaudeCodeOnly, []);
 
         Assert.All(files, f => Assert.True(File.Exists(f), $"{Path.GetFileName(f)} was deleted"));
-        Assert.Equal(0, h.McpCleared + h.StatuslineCleared);
+        Assert.Equal(0, h.StatuslineCleared);
     }
 
     [Fact]
     public async Task A_failed_statusline_undo_keeps_the_receipts_and_every_copy()
     {
         var files = Seed();
-        var h = Make(["a statusline entry"]);
+        var h = Make(Failed("a statusline entry", IntegrationKind.Statusline));
 
         var results = await h.Service.RunAsync(ClaudeCodeOnly, []);
 
         Assert.False(Assert.Single(results).Ok);
         Assert.All(files, f => Assert.True(File.Exists(f), $"{Path.GetFileName(f)} was deleted"));
-        Assert.Equal(0, h.McpCleared + h.StatuslineCleared);
+        Assert.Equal(1, h.McpCleared);   // the MCP entries came out cleanly
+        Assert.Equal(0, h.StatuslineCleared);
     }
 
     /// <summary>Today's reset, pinned: passes before and after this task.</summary>
@@ -263,5 +271,81 @@ public sealed class ResetServiceFoldersTests : IDisposable
 
         Assert.False(File.Exists(McpSettings));   // the Settings part's own list; the dialog line (Task 5) tells the person
         Assert.True(File.Exists(McpLauncher));
+    }
+
+    // ---- real files: Core's own per-kind result drives the switches (final review, fix wave (a)) ----
+
+    private string Profile => Path.Combine(_root, "home");
+
+    private string RealHome(string name)
+    {
+        var dir = Path.Combine(Profile, name);
+        Directory.CreateDirectory(Path.Combine(dir, "projects"));
+        File.WriteAllText(Path.Combine(dir, "settings.json"), "{\n  \"theme\": \"dark\"\n}\n");
+        return dir;
+    }
+
+    private McpIntegrationInstaller RealMcp() => new(Profile, _paths.AppDataDir, externalDir: Ext);
+
+    private StatuslineInstaller RealStatusline() => new(Profile, _paths.StatuslineBinDir, null, _paths.AppDataDir);
+
+    private ClaudeCodeResetScope RealScope() => new(Profile, _paths.AppDataDir, Ext, _paths.StatuslineBinDir,
+        ClaudeCodeFolders.Build(Profile, null, []), null, []);
+
+    private void InstallMcp(string folder)
+    {
+        var mcp = RealMcp();
+        Assert.True(mcp.Register(Path.GetFileName(folder)).Ok);
+        Directory.CreateDirectory(Path.GetDirectoryName(mcp.LauncherPath)!);
+        File.WriteAllText(mcp.LauncherPath, "@echo off");
+    }
+
+    private void InstallStatusline(string folder)
+    {
+        var s = RealStatusline();
+        Assert.True(s.InstallScript());
+        Assert.True(s.Install(folder, StatuslineMode.Replace, StatuslineInstaller.DefaultSegments, StatuslineInstaller.JoinLine));
+    }
+
+    [Fact]
+    public async Task Unreadable_receipts_with_nothing_kept_remove_the_mcp_entries_and_clear_the_mcp_switch_but_not_the_statusline_one()
+    {
+        string home = RealHome(".claude-a");
+        InstallStatusline(home);
+        InstallMcp(home);
+        Directory.CreateDirectory(Path.GetDirectoryName(Receipts)!);
+        File.WriteAllText(Receipts, "{ not a list");
+        var h = Make(real: keep => ClaudeCodeReset.UndoKeeping(RealScope(), keep));
+
+        await h.Service.RunAsync(ClaudeCodeOnly, []);
+
+        Assert.False(RealMcp().IsRegistered(".claude-a"), "the MCP entry is still registered");
+        Assert.Equal(1, h.McpCleared);          // so mcp_enabled does not bring the launcher back at the next launch
+        Assert.Equal(0, h.StatuslineCleared);   // the statusline can't be told apart from the person's own, so it stays
+        Assert.Equal(StatuslineStatus.Installed, RealStatusline().Status(".claude-a"));
+        Assert.True(File.Exists(RealStatusline().ScriptPath));
+    }
+
+    [Fact]
+    public async Task A_failed_statusline_undo_beside_a_clean_mcp_undo_clears_only_the_mcp_switch_and_keeps_the_script()
+    {
+        string sFolder = RealHome(".claude-s"), mFolder = RealHome(".claude-m");
+        InstallStatusline(sFolder);
+        InstallMcp(mFolder);
+        var h = Make(real: keep => ClaudeCodeReset.UndoKeeping(RealScope(), keep));
+
+        // The statusline's settings.json can be read but not replaced, so its Remove fails.
+        using (new FileStream(Path.Combine(sFolder, "settings.json"), FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            var results = await h.Service.RunAsync(ClaudeCodeOnly, []);
+            Assert.False(Assert.Single(results).Ok);
+        }
+
+        Assert.False(RealMcp().IsRegistered(".claude-m"));
+        Assert.Equal(1, h.McpCleared);
+        Assert.Equal(0, h.StatuslineCleared);
+        Assert.Equal(StatuslineStatus.Installed, RealStatusline().Status(".claude-s"));
+        Assert.True(File.Exists(RealStatusline().ScriptPath), "the statusline script went with a statusline still installed");
+        Assert.True(File.Exists(Receipts), "the receipts went after a failure");
     }
 }

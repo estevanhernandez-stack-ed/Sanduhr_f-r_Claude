@@ -110,7 +110,7 @@ public sealed class ResetWindowFoldersTests : AppWindowFixture
             IReadOnlyCollection<ResetFolder>? asked = null;
             var service = new ResetService(ScratchPaths(), new Sanduhr.Core.AccountStore(new MemoryCredentials()),
                 new PublishTokenStore(new MemoryCredentials()),
-                k => { asked = k; return Task.FromResult<IReadOnlyList<string>>([]); }, () => { });
+                k => { asked = k; return Task.FromResult(ClaudeCodeUndoResult.Clean); }, () => { });
             var window = new ResetWindow(service, list);
             OffScreen(window);
             window.Show();

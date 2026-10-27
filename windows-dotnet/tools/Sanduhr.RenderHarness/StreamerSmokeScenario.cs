@@ -1609,7 +1609,7 @@ public static partial class Program
             Assert(10, File.Exists(codenamesFile) && File.Exists(streamerFile) && File.Exists(tmpDecoy1) && File.Exists(tmpDecoy2), "before Reset: codenames.json, streamer.json and both .tmp files exist");
 
             var service = new ResetService(new Paths(), r2.Accounts, new PublishTokenStore(r2.Creds),
-                keep => Task.FromResult<IReadOnlyList<string>>([]),
+                keep => Task.FromResult(ClaudeCodeUndoResult.Clean),
                 () => ResetGuard.MarkDone(),
                 null, null, null);
             var results = await service.RunAsync(new ResetChoices(ClaudeCodeEntries: false, Accounts: false, History: false, Themes: false, Settings: true), []);
