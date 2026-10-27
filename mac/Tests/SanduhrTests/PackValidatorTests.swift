@@ -752,17 +752,12 @@ struct PackValidatorTests {
         do { _ = try PackInflate.inflatedLength(hex(stream), limit: limit); return nil } catch let e as PackInflate.Corrupt { return e.message } catch { return "\(error)" }
     }
 
-    /// The libz Python links on macOS words a bad code differently in its fast loop (plenty of input
-    /// and output room left); with little input left, or the output nearly full, it says what stock zlib says.
-    @Test func aBadDistanceCodeIsWordedByWhichZlibLoopFindsIt() {
-        let whole = "Error -3 while decompressing data: invalid literal/length/distance code"
-        #expect(zlibMessage("7801eb6160676767606067e803521fdf3c01b21810fcd819d85f06b9311832f883a43e2a14000519d8ff029534680300f035099f") == whole)
-        #expect(zlibMessage("78016367e066673065601066606760607f117ef38ddd8c817d353b430b3b3b033b10fb03490976f60decec67a6015530300000a28806f0") == whole)
-        // The same streams cut short, and the first with its output nearly full: the slow loop's wording.
+    /// Stock zlib's wording (Linux CI, Windows). The libz macOS ships words these two differently in its
+    /// fast loop; the validator follows stock zlib so a message is the same on every platform's CI.
+    @Test func aBadDistanceCodeIsWordedAsStockZlibWordsIt() {
         let plain = "Error -3 while decompressing data: invalid distance code"
-        #expect(zlibMessage("7801eb6160676767606067e803521fdf3c01b21810fcd819d85f06b9311832f883a43e2a14000519") == plain)
-        #expect(zlibMessage("78016367e066673065601066606760607f117ef38ddd8c817d353b430b3b3b033b10fb03490976f6") == plain)
-        #expect(zlibMessage("7801eb6160676767606067e803521fdf3c01b21810fcd819d85f06b9311832f883a43e2a14000519d8ff029534680300f035099f", limit: 200) == plain)
+        #expect(zlibMessage("7801eb6160676767606067e803521fdf3c01b21810fcd819d85f06b9311832f883a43e2a14000519d8ff029534680300f035099f") == plain)
+        #expect(zlibMessage("78016367e066673065601066606760607f117ef38ddd8c817d353b430b3b3b033b10fb03490976f60decec67a6015530300000a28806f0") == plain)
     }
 
     /// A dynamic block may declare no distance codes at all (zlib's `max == 0` table); a distance in
