@@ -167,7 +167,11 @@ struct MessageLook: Hashable {
 
 /// The owner's now-playing mod's named palettes, a gradient each.
 enum MessagePalette {
-    static let all: [(name: String, colors: [String])] = [
+    typealias Palette = (name: String, colors: [String])
+
+    /// The compiled-in palettes. Seeded now-playing looks pick from these only, so installing a
+    /// palette pack never changes the look a song already has.
+    static let builtIn: [Palette] = [
         ("synthwave", ["ff2a6d", "d16ba5", "05d9e8"]),
         ("sunset", ["ff7e5f", "feb47b", "ffd86f"]),
         ("ocean", ["00c6ff", "4f8bff", "a18cff"]),
@@ -177,6 +181,22 @@ enum MessagePalette {
         ("toxic", ["b6ff00", "00ff9c", "00c3ff"]),
         ("gold", ["f7971e", "ffd200", "fff6b7"]),
     ]
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var packs: [Palette] = []
+
+    /// The built-ins, then the palettes of installed palette packs (PackInkPresets), named as the
+    /// pack names them.
+    static var all: [Palette] {
+        lock.lock(); defer { lock.unlock() }
+        return builtIn + packs
+    }
+
+    /// Replaces the pack palettes; an uninstalled pack's palettes leave `all` with it.
+    static func setPacks(_ palettes: [Palette]) {
+        lock.lock(); defer { lock.unlock() }
+        packs = palettes
+    }
 
     static func colors(_ name: String) -> [String]? {
         all.first { $0.name == name }?.colors
