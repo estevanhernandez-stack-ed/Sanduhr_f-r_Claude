@@ -51,6 +51,20 @@ public class SettingsSlice7NamesTests
         Assert.Contains("MCP server", more);
         Assert.Contains("full paths and folder names", more);
         Assert.Contains("watcher cards (the folders in an absolute Windows path in it are hidden)", more);
+        // Claude's own words on the Desk show as Claude wrote them (final review M6): the review bar's title and note, and Message's suggestions.
+        Assert.Contains("what Claude proposes for the Desk, which shows as Claude wrote it (the review bar's title and note, and the suggestions on Message)", more);
+    }
+
+    /// <summary>docs/PRIVACY.md says what streamer mode can't hide in the same words as the Privacy page (final review, ruled item c).</summary>
+    [Fact]
+    public void PRIVACY_carries_the_cant_hide_sentence_word_for_word()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "docs", "PRIVACY.md")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        var privacy = File.ReadAllText(Path.Combine(dir!.FullName, "docs", "PRIVACY.md"));
+        Assert.Contains("**What streamer mode cannot hide.** " + SettingsNames.StreamerCantReach.Split(". ")[0] + ". " + SettingsNames.StreamerCantReachMore, privacy);
     }
 
     /// <summary>The demo line: the search word "demo" lands on it (spec), and it says how demo mode starts, as DemoMode does.</summary>

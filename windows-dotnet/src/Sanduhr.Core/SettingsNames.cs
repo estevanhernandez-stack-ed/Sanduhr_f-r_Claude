@@ -849,8 +849,8 @@ public static class SettingsNames
     /// <summary>The rest of what it can't reach, exactly (slice 7 decision 11; preflight P4; owner P6 = A, 2026-10-26: MCP answers keep full paths).</summary>
     public const string StreamerCantReachMore =
         "Also not covered: what you type yourself (Desk messages, a place's Show it as name, a new account's name); windows Windows opens "
-        + "for Sanduhr (Explorer, the Save dialog), which show your user folder; the task text on Claude Code's watcher cards (the folders in an absolute Windows path in it are hidden); claude.ai's "
-        + "own pages in the sign-in window; and what Sanduhr's MCP server answers Claude, which keeps full paths and folder names and "
+        + "for Sanduhr (Explorer, the Save dialog), which show your user folder; the task text on Claude Code's watcher cards (the folders in an absolute Windows path in it are hidden); what Claude proposes for the Desk, which shows as "
+        + "Claude wrote it (the review bar's title and note, and the suggestions on Message); claude.ai's own pages in the sign-in window; and what Sanduhr's MCP server answers Claude, which keeps full paths and folder names and "
         + "becomes part of your conversation.";
     /// <summary>Under the switch: the search word "demo" lands here (spec, Search). True to DemoMode: it starts only from the command line or SANDUHR_DEMO.</summary>
     public const string StreamerDemoLine =
