@@ -53,11 +53,12 @@ private struct ResetBed {
     }
 
     /// Sanduhr's own files beside the integrations: history, snapshots, seats, the vault, a theme,
-    /// the Desk's messages.
+    /// the widgets folder, the Desk's messages.
     func writeSanduhrFiles() {
         for rel in ["Support/Sanduhr/history.Personal.json", "Support/Sanduhr/snapshot.json",
                     "Support/Sanduhr/snapshot.0f1e2d3c.json", "Support/Sanduhr/seats.json",
-                    "Support/Sanduhr/vault/2026-10.jsonl", "Support/Sanduhr/themes/mine.json"] {
+                    "Support/Sanduhr/vault/2026-10.jsonl", "Support/Sanduhr/themes/mine.json",
+                    "Support/Sanduhr/widgets/widgets.json"] {
             let url = URL(fileURLWithPath: rig.home.at(rel))
             try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             FileManager.default.createFile(atPath: url.path, contents: Data("{}".utf8))
@@ -126,9 +127,9 @@ struct ResetTests {
         // Accounts by Remove Account, then the keys from before accounts.
         let keys = steps.filter { $0.part == .accounts }.map(\.kind)
         #expect(keys == [.account, .account, .legacyKeys])
-        // Files: Sanduhr's folder, the messages, the themes; preferences, one step per domain, last.
+        // Files: Sanduhr's folder, the messages, the themes, the widgets; preferences, one step per domain, last.
         #expect(steps.filter { $0.part != .claudeCode && $0.part != .accounts }.map(\.kind)
-                == [.supportFiles, .deskMessages, .themes, .preferences, .preferences])
+                == [.supportFiles, .deskMessages, .themes, .widgets, .preferences, .preferences])
     }
 
     @Test func everythingCheckedLeavesEachFolderAsItWasAndNothingOfSanduhrs() throws {
@@ -213,10 +214,11 @@ struct ResetTests {
             Row(part: "claude_code", kind: "claude_code_entry", count: receipts),
             Row(part: "accounts", kind: "account", count: 2),
             Row(part: "accounts", kind: "legacy_keys", count: 1),
-            // integrations, history, seats, two snapshots, the vault (themes are their own part).
+            // integrations, history, seats, two snapshots, the vault (themes and widgets are their own parts).
             Row(part: "records", kind: "support_files", count: 6),
             Row(part: "desk_messages", kind: "desk_messages", count: 1),
             Row(part: "themes", kind: "themes", count: 1),
+            Row(part: "widgets", kind: "widgets", count: 1),
             Row(part: "settings", kind: "preferences", count: 2),
         ])
         #expect(report.folders == 2)
@@ -374,6 +376,37 @@ struct ResetTests {
 
         #expect(try FileManager.default.contentsOfDirectory(atPath: b.supportDir.path) == [ResetEnvironment.themesName])
         for s in b.suites { #expect(b.persisted(s).isEmpty) }
+    }
+
+    @Test func widgetsAreTheirOwnPartNextToThemes() throws {
+        #expect(ResetPart.allCases.firstIndex(of: .widgets) == ResetPart.allCases.firstIndex(of: .themes)! + 1)
+        let b = ResetBed()
+        defer { b.cleanUp() }
+        b.writeSanduhrFiles()
+        let widgets = b.supportDir.appendingPathComponent(ResetEnvironment.widgetsName)
+
+        // Records alone leaves the widgets folder (and the themes) where they are.
+        _ = Reset.perform(Reset.plan([.records], in: b.env), in: b.env)
+        #expect(FileManager.default.fileExists(atPath: widgets.path))
+        #expect(try Set(FileManager.default.contentsOfDirectory(atPath: b.supportDir.path))
+                == [ResetEnvironment.themesName, ResetEnvironment.widgetsName])
+
+        // Unchecked, it stays whatever else is checked; checked, it goes and nothing is made again.
+        var parts = Set(ResetPart.allCases)
+        parts.remove(.widgets)
+        _ = Reset.perform(Reset.plan(parts, in: b.env), in: b.env)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: b.supportDir.path) == [ResetEnvironment.widgetsName])
+        let results = Reset.perform(Reset.plan([.widgets], in: b.env), in: b.env)
+        #expect(results.map(\.step.kind) == [.widgets] && results.allSatisfy(\.ok))
+        #expect(!FileManager.default.fileExists(atPath: widgets.path))
+        #expect(Reset.plan([.widgets], in: b.env).isEmpty)
+
+        // The quit sweep takes a stray widgets folder only when the part was checked.
+        try FileManager.default.createDirectory(at: widgets, withIntermediateDirectories: true)
+        Reset.sweep([.themes], in: b.env)
+        #expect(FileManager.default.fileExists(atPath: widgets.path))
+        Reset.sweep([.widgets], in: b.env)
+        #expect(!FileManager.default.fileExists(atPath: widgets.path))
     }
 
     @Test func theHookTakesOnlyTheDryRun() {
