@@ -31,6 +31,7 @@ public class SettingsSlice8NamesTests
         Assert.Equal("Claude Code folders to reset", SettingsNames.ResetFoldersName);
         Assert.Equal("No Claude Code folder holds anything of Sanduhr's.", SettingsNames.ResetNoFolders);
         Assert.Equal("Unticked folders keep Sanduhr's entries and the files they need. Remove them later in Settings, Claude Code.", SettingsNames.ResetFoldersKept);
+        Assert.Equal("With this part unticked, every folder keeps Sanduhr's entries and the files they need.", SettingsNames.ResetFoldersPartOff);
         Assert.Equal("Their meters stay empty until you sign in to Sanduhr again.", SettingsNames.ResetKeptSignIn);
         Assert.Equal("With the settings reset, their meters come back once you open Settings, Claude Code.", SettingsNames.ResetKeptSettings);
         Assert.Equal("With the settings reset, its MCP server stays but answers without your usage until you add it again in Settings, Claude Code.", SettingsNames.ResetKeptMcpSettings);
@@ -69,7 +70,7 @@ public class SettingsSlice8NamesTests
     {
         foreach (var text in new[]
         {
-            SettingsNames.ResetSanduhrCaption, SettingsNames.ResetFoldersName, SettingsNames.ResetNoFolders, SettingsNames.ResetFoldersKept,
+            SettingsNames.ResetSanduhrCaption, SettingsNames.ResetFoldersName, SettingsNames.ResetNoFolders, SettingsNames.ResetFoldersKept, SettingsNames.ResetFoldersPartOff,
             SettingsNames.ResetKeptSignIn, SettingsNames.ResetKeptSettings, SettingsNames.ResetKeptMcpSettings, SettingsNames.ResetKeptAdded,
             SettingsNames.ResetReceiptsUnreadable,
         })

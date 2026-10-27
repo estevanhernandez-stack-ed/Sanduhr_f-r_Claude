@@ -914,6 +914,9 @@ public static class SettingsNames
     public const string ResetNoFolders = "No Claude Code folder holds anything of Sanduhr's.";
     /// <summary>Shown while a folder is kept (the part or a row is unticked). Keeping is per kind: the entries and the files they run stay.</summary>
     public const string ResetFoldersKept = "Unticked folders keep Sanduhr's entries and the files they need. Remove them later in Settings, Claude Code.";
+    /// <summary>Shown instead of <see cref="ResetFoldersKept"/> while the Claude Code part itself is unticked: the rows stay ticked but
+    /// dimmed, and every folder is kept (preflight P12).</summary>
+    public const string ResetFoldersPartOff = "With this part unticked, every folder keeps Sanduhr's entries and the files they need.";
     /// <summary>Also shown while a kept folder has meters and Accounts and sign-in keys is ticked.</summary>
     public const string ResetKeptSignIn = "Their meters stay empty until you sign in to Sanduhr again.";
     /// <summary>Also shown while a kept folder has meters and Settings is ticked: statusline_enabled goes with settings.json and comes back

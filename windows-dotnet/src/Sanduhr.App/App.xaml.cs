@@ -1100,7 +1100,11 @@ public partial class App : Application
             vm.InactiveReader.DeleteAllProfilesAsync,
             () => new SettingsStore(paths).ClearMcpSwitchesForReset(),
             () => new SettingsStore(paths).ClearStatuslineSwitchesForReset());
-        ResetWindow.ShowFor(_settingsWindow, service, QuitApp);
+        var folders = ResetFolderListViewModel.Read(vm);
+        var svm = _settingsWindow?.ViewModel;
+        if (svm is not null) svm.ResetFolders = folders;   // a streamer flip renames the rows (decision 13)
+        try { ResetWindow.ShowFor(_settingsWindow, service, folders, QuitApp); }
+        finally { if (svm is not null) svm.ResetFolders = null; }
     }
 
     /// <summary>The tray's restart items follow the update offer and the transport's state.</summary>

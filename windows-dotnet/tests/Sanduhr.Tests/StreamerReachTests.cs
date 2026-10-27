@@ -196,6 +196,8 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/PrivacyViewModel.cs", "masked", 1),
         ("Sanduhr.App/ViewModels/PublishViewModel.cs", "key", 5),
         ("Sanduhr.App/ViewModels/PublishViewModel.cs", "masked", 4),
+        ("Sanduhr.App/ViewModels/ResetFolderListViewModel.cs", "key", 4),      // slice 8: Reset's rows key on real folders
+        ("Sanduhr.App/ViewModels/ResetFolderListViewModel.cs", "masked", 1),   // slice 8: and draw them through ShowFolder (carry)
         ("Sanduhr.App/ViewModels/StreamerSettingsViewModel.cs", "key", 1),
         ("Sanduhr.App/ViewModels/ThemeDeskEditorViewModel.cs", "notname", 3),
         ("Sanduhr.App/ViewModels/ThemeMatchViewModel.cs", "cant", 4),
@@ -214,6 +216,7 @@ public class StreamerReachTests
         ("Sanduhr.App/Views/IntegrationConsentDialog.xaml.cs", "notname", 1),
         ("Sanduhr.App/Views/ManualKeyWindow.xaml.cs", "masked", 1),
         ("Sanduhr.App/Views/McpConsentDialog.xaml.cs", "masked", 3),
+        ("Sanduhr.App/Views/ResetWindow.xaml.cs", "key", 1),      // slice 8: the real paths of the unticked rows
         ("Sanduhr.App/Views/SectionJumpLinks.cs", "notname", 1),
         ("Sanduhr.App/Views/SignInWindow.xaml.cs", "masked", 3),
         ("Sanduhr.App/Views/SignInWindow.xaml.cs", "notname", 1),
@@ -221,7 +224,7 @@ public class StreamerReachTests
     ];
 
     /// <summary>The floor: fewer lines than this means the shapes stopped seeing the code (the count this inventory pinned, re-derived by an independent pass: 320 lines in 70 files).</summary>
-    private const int Floor = 322;
+    private const int Floor = 327;
 
     [Fact]
     public void Every_reader_of_a_name_carries_a_marker()
