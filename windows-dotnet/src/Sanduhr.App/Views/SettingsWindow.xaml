@@ -1560,7 +1560,7 @@
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Grid Margin="4,3" Background="Transparent" ContextMenuService.IsEnabled="{Binding CanShowRealName}"
-                                                              Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=TabItem}}">
+                                                              Tag="{Binding DataContext.ClaudeCode, RelativeSource={RelativeSource AncestorType=Window}}">
                                                             <Grid.ContextMenu>
                                                                 <ContextMenu>
                                                                     <MenuItem Header="{x:Static core:SettingsNames.ShowRealNameOnStream}"
@@ -1602,7 +1602,7 @@
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Grid Margin="4,3" Background="Transparent" ContextMenuService.IsEnabled="{Binding CanShowRealName}"
-                                                              Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=TabItem}}">
+                                                              Tag="{Binding DataContext.ClaudeCode, RelativeSource={RelativeSource AncestorType=Window}}">
                                                             <Grid.ContextMenu>
                                                                 <ContextMenu>
                                                                     <MenuItem Header="{x:Static core:SettingsNames.ShowRealNameOnStream}"
@@ -1707,7 +1707,7 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid Margin="0,1" Background="Transparent" ContextMenuService.IsEnabled="{Binding CanShowRealName}"
-                                                      Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=TabItem}}">
+                                                      Tag="{Binding DataContext.ClaudeCode, RelativeSource={RelativeSource AncestorType=Window}}">
                                                     <Grid.ContextMenu>
                                                         <ContextMenu>
                                                             <MenuItem Header="{x:Static core:SettingsNames.ShowRealNameOnStream}"
@@ -1815,7 +1815,7 @@
                                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                                     <Setter Property="Focusable" Value="False" />
                                                     <Setter Property="ContextMenuService.IsEnabled" Value="{Binding CanShowRealName}" />
-                                                    <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=TabItem}}" />
+                                                    <Setter Property="Tag" Value="{Binding DataContext.ClaudeCode, RelativeSource={RelativeSource AncestorType=Window}}" />
                                                     <Setter Property="ContextMenu">
                                                         <Setter.Value>
                                                             <ContextMenu>
