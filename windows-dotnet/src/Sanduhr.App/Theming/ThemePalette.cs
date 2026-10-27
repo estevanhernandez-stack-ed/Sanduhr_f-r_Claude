@@ -64,7 +64,7 @@ public sealed class ThemePalette
 
     /// <summary>Chrome strip glass alpha — denser than cards so light text stays
     /// legible against Mica bleed (widget.apply_theme: 0.92, or 1.0 for opt-out).</summary>
-    public double ChromeAlpha => Definition.OptsOutOfMica ? 1.0 : 0.92;
+    public double ChromeAlpha => ThemeContrast.ChromeAlpha(Definition);
 
     /// <summary>Card corner radius (the theme's <c>card_corner_radius</c>);
     /// defaults to the obsidian 10 px, Matrix tightens to 2 px.</summary>
