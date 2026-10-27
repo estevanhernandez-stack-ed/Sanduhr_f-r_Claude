@@ -365,4 +365,33 @@ public sealed class ClaudeCodeResetTests : IDisposable
         Assert.False(result.StatuslineOut);
         Assert.True(File.Exists(statusline.ScriptPath), "the script went with a statusline still installed");
     }
+
+    [Fact]
+    public void A_readable_installs_json_without_the_folders_receipt_puts_the_chained_command_back()
+    {
+        // Carry (after slice 8): the record can be read but has no statusline receipt for this folder. Reset removes Sanduhr's line
+        // and the person's chained command comes back as their own statusLine.
+        string home = Home(".claude-chain");
+        const string theirs = "my-own-line.cmd --fancy";
+        File.WriteAllText(Path.Combine(home, "settings.json"),
+            "{\n  \"theme\": \"dark\",\n  \"statusLine\": { \"type\": \"command\", \"command\": \"" + theirs + "\" }\n}\n");
+        var statusline = new StatuslineInstaller(Profile, BinDir, null, SanduhrDir);
+        Assert.True(statusline.InstallScript());
+        Assert.True(statusline.Install(home, StatuslineMode.Combine, StatuslineInstaller.DefaultSegments, StatuslineInstaller.JoinLine));
+        // Readable, and silent about this folder: an empty list would delete installs.json, so another folder keeps it alive.
+        InstallAll(Home(".claude-other"));
+        var store = new ReceiptStore(Receipts);
+        Assert.True(store.Save([.. store.Load().Records.Where(r => !ClaudeCodeFolders.Same(r.Folder, home))]));
+        Assert.True(File.Exists(Receipts));
+        Assert.DoesNotContain(store.Load().Records, r => ClaudeCodeFolders.Same(r.Folder, home));
+
+        var result = ClaudeCodeReset.UndoKeeping(Scope(), []);
+
+        var json = JsonNode.Parse(File.ReadAllText(Path.Combine(home, "settings.json")))!;
+        Assert.Equal(theirs, json["statusLine"]?["command"]?.GetValue<string>());
+        Assert.Equal("command", json["statusLine"]?["type"]?.GetValue<string>());
+        Assert.Equal("dark", json["theme"]?.GetValue<string>());
+        Assert.Contains(result.Removed, r => r.Kind == IntegrationKind.Statusline);
+        Assert.DoesNotContain("a statusline entry", result.Failures);
+    }
 }

@@ -475,15 +475,22 @@ public sealed class StatuslineInstaller
                 }
                 var top = JsonEdit.TopObject(original);
                 if (top.Member(KeyName) is not { } member
-                    || TryParseCommand(CommandOf(JsonEdit.Text(original, member))) is null)
+                    || TryParseCommand(CommandOf(JsonEdit.Text(original, member))) is not { } ours)
                 {
                     done = true; // absent or no longer Sanduhr's: leave it alone
                     break;
                 }
+                // The receipt's copy wins, byte for byte. With no copy of their line on record, a command chained inside Sanduhr's
+                // comes back as their own statusLine (decoded from Sanduhr's command line), so removing never loses it. Only the
+                // command comes back: fields beside it (padding) were never chained.
                 byte[] result = receipt?.Previous is { } previous
                     ? JsonEdit.Restore(original, top, KeyName, Encoding.UTF8.GetBytes(previous))
-                    : JsonEdit.Remove(original, top, KeyName,
-                        receipt?.EmptyInner is { } inner ? Encoding.UTF8.GetBytes(inner) : null);
+                    : ours.Chain is { Length: > 0 } chain
+                        ? JsonEdit.Set(original, top, KeyName, JsonEdit.Value.Obj(
+                            new JsonEdit.Pair("type", JsonEdit.Value.Str("command")),
+                            new JsonEdit.Pair("command", JsonEdit.Value.Str(chain)))).Bytes
+                        : JsonEdit.Remove(original, top, KeyName,
+                            receipt?.EmptyInner is { } inner ? Encoding.UTF8.GetBytes(inner) : null);
                 bool delete = receipt?.CreatedFile == true && JsonEdit.TopObject(result).Members.Count == 0;
                 done = TryCommit(commit, path, original, delete ? null : result, backup: false);
             }
