@@ -450,10 +450,13 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         _ink = _store.LoadDeskInk();
         InkChoice = InkChoices.First(c => c.Mode == _ink.Mode);
         InkColors = _ink.Color;
-        InkPreset = _inkList.FirstOrDefault(p => p.Value == _ink.Color).Name;
+        InkPreset = PresetShown();
         InkShadow = _ink.Shadow;
         _loadingInk = false;
     }
+
+    /// <summary>The Colors row names a preset only while the ink is Custom: Light, Dark and Theme ignore the saved colours.</summary>
+    private string? PresetShown() => _ink.Mode == DeskInkMode.Custom ? _inkList.FirstOrDefault(p => p.Value == _ink.Color).Name : null;
 
     /// <summary>Reads the preset list again (a palette pack was installed or removed) and keeps the ink's own preset selected: the
     /// ink stores colors, not a reference to a pack, so a removed pack's entry just stops being selected.</summary>
@@ -463,7 +466,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         bool was = _loadingInk;
         _loadingInk = true;
         InkPresetNames = [.. _inkList.Select(p => p.Name)];
-        InkPreset = _inkList.FirstOrDefault(p => p.Value == _ink.Color).Name;
+        InkPreset = PresetShown();
         _loadingInk = was;
     }
 
@@ -471,7 +474,11 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsCustomInk));
         OnPropertyChanged(nameof(ShowsInkColors));
+        if (_loadingInk) return;   // a preset pick, typed colours or a load set the mode: they name the preset themselves
         SaveInk(_ink with { Mode = value.Mode });
+        _loadingInk = true;
+        InkPreset = PresetShown();
+        _loadingInk = false;
     }
 
     partial void OnInkPresetChanged(string? value)

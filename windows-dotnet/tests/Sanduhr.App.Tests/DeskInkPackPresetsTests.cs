@@ -104,4 +104,39 @@ public sealed class DeskInkPackPresetsTests : IDisposable
         Assert.Equal(DeskInkMode.Custom, _store.LoadDeskInk().Mode);
         Assert.Equal("9ad7ff", _store.LoadDeskInk().Color);
     }
+
+    [Theory]
+    [InlineData(DeskInkMode.Light)]
+    [InlineData(DeskInkMode.Dark)]
+    [InlineData(DeskInkMode.Theme)]
+    public void The_Colors_row_names_a_preset_only_in_Custom(DeskInkMode other)
+    {
+        // OD1 (S3 T7): the row names a preset only while the ink is Custom.
+        var page = Page();
+        page.InkPreset = "Sky";
+        Assert.Equal(DeskInkMode.Custom, page.InkChoice.Mode);
+        Assert.Equal("Sky", page.InkPreset);
+        var saved = _store.LoadDeskInk();
+
+        page.InkChoice = DeskSettingsViewModel.InkChoices.First(c => c.Mode == other);
+        Assert.Null(page.InkPreset);
+        Assert.Equal(saved with { Mode = other }, _store.LoadDeskInk());      // only the mode saved; the colour is still the preset's
+        Assert.Equal("9ad7ff", _store.LoadDeskInk().Color);
+
+        page.InkChoice = DeskSettingsViewModel.InkChoices.First(c => c.Mode == DeskInkMode.Custom);
+        Assert.Equal("Sky", page.InkPreset);                                  // the saved colours still match it
+        Assert.Equal(saved, _store.LoadDeskInk());
+    }
+
+    [Fact]
+    public void A_reload_saved_as_Light_with_a_presets_colours_names_no_preset()
+    {
+        _store.SaveDeskInk(new DeskInkSettings(DeskInkMode.Light, "9ad7ff", false));
+        var page = Page();
+        Assert.Equal(DeskInkMode.Light, page.InkChoice.Mode);
+        Assert.Null(page.InkPreset);
+        page.Reload();
+        Assert.Null(page.InkPreset);
+        Assert.Equal("9ad7ff", _store.LoadDeskInk().Color);
+    }
 }
