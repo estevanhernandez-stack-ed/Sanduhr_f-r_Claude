@@ -32,4 +32,16 @@ public static class StreamerMode
                 text = text.Replace(path, Mask.Folder(path), StringComparison.OrdinalIgnoreCase);
         return Mask.Paths(text);
     }
+    /// <summary>A Launcher button's name on the Desk and in its toasts (its label, else its app's name, else its site or target).
+    /// The person's own label and an app's Start menu name show as they are; an unlabelled link names its site by the host's codename
+    /// and a raw target goes through the path mask, as the Settings row does (slice 7, P3 at the Desk).</summary>
+    public static string LauncherName(LauncherButton button, string? appName)
+    {
+        if (button.Label is { Length: > 0 } || !string.IsNullOrWhiteSpace(appName))
+            return button.DisplayName(appName);
+        return button.Kind == LauncherKind.Link
+            ? Mask.Name(CodenameCategory.Host, LauncherTarget.LinkHost(button.Target))
+            : Mask.Paths(button.Target);
+    }
+
 }

@@ -79,4 +79,19 @@ public sealed class StreamerLauncherTests : AppWindowFixture
         }
         finally { try { Directory.Delete(root, true); } catch (IOException) { } }
     }
+    [Fact]
+    public void The_Desk_names_an_unlabelled_link_by_its_hosts_codename_and_a_raw_target_through_the_path_mask_while_on()
+    {
+        var link = LauncherButton.Create(LauncherKind.Link, "https://qxowner.dev/notes")!;
+        var raw = LauncherButton.Create(LauncherKind.App, RawPath, null, null, null)!;
+        var labelled = LauncherButton.Create(LauncherKind.Link, "https://qxowner.dev/notes", null, "Notes", null)!;
+        Assert.Equal("qxowner.dev", StreamerMode.LauncherName(link, null));
+
+        StreamerMode.Use(new StreamerMask(true, CodenameBook.New(), Profile));
+        Assert.DoesNotContain("qx", StreamerMode.LauncherName(link, null), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("qxuser", StreamerMode.LauncherName(raw, null));
+        Assert.Equal("Visual Studio Code", StreamerMode.LauncherName(raw, "Visual Studio Code"));   // an app's Start menu name identifies no one
+        Assert.Equal("Notes", StreamerMode.LauncherName(labelled, null));                           // what the person typed (the caption says so)
+    }
+
 }

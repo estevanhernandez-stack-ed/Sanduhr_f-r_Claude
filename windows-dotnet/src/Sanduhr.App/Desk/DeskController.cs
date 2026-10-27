@@ -230,7 +230,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         if (_stopped || index < 0 || index >= _launcher.Buttons.Count) return;
         var button = _launcher.Buttons[index];
-        var name = button.DisplayName(_launcherApps?.NameOf(button.Target));
+        var name = StreamerMode.LauncherName(button, _launcherApps?.NameOf(button.Target));
         Func<string, bool>? exists = _launcherApps is null ? null : _launcherApps.ExistsNow;
         Task.Run(() => LauncherApps.Open(button, exists)).ContinueWith(t =>
         {
