@@ -223,8 +223,8 @@ public class StreamerReachTests
         ("Sanduhr.App/Views/VaultConsentDialog.xaml.cs", "masked", 1),
     ];
 
-    /// <summary>The floor: fewer lines than this means the shapes stopped seeing the code (the count this inventory pinned, re-derived by an independent pass: 320 lines in 70 files).</summary>
-    private const int Floor = 327;
+    /// <summary>The floor: fewer lines than this means the shapes stopped seeing the code (the count this inventory pinned, re-derived by an independent pass: 328 lines in 72 files, the pinned total).</summary>
+    private const int Floor = 328;
 
     [Fact]
     public void Every_reader_of_a_name_carries_a_marker()
