@@ -125,6 +125,8 @@ public partial class App : Application
 
         SetupTray();
         SyncTrayRotation();
+        // Streamer mode (slice 7): App lives as long as the widget, so this is never detached.
+        _vm.Streamer.Changed += OnStreamerChanged;
         Instance?.Listen(message => Dispatcher.BeginInvoke(() => { if (!_quitting) OnSecondLaunch(message); }));
         SetupHotKeys();
         StartGlow();
@@ -444,6 +446,11 @@ public partial class App : Application
         var refresh = new MenuItem { Header = SettingsNames.RefreshUsageNow };
         refresh.Click += (_, _) => _vm?.RefreshCommand.Execute(null);
 
+        // Streamer mode (spec: a tray item with a checked state, writing the same key as Privacy's switch).
+        var streamer = new MenuItem { Header = SettingsNames.StreamerMenuItemHeader, IsCheckable = true };
+        streamer.Click += (_, _) => _vm?.Streamer.SetOn(streamer.IsChecked);
+        menu.Opened += (_, _) => streamer.IsChecked = _vm?.Streamer.On ?? false;
+
         // Accounts ▸ quick-switch submenu — repopulated on open so the live registry
         // and active marker stay current.
         var accounts = new MenuItem { Header = "Accounts" };
@@ -490,6 +497,7 @@ public partial class App : Application
         menu.Items.Add(_putBackItem);
         menu.Items.Add(refresh);
         menu.Items.Add(BuildTrayShowsMenu());
+        menu.Items.Add(streamer);
         menu.Items.Add(new Separator());
         menu.Items.Add(accounts);
         menu.Items.Add(addAccount);
@@ -969,11 +977,21 @@ public partial class App : Application
         _tray.Icon = icon;
         _trayIcon?.Dispose();
         _trayIcon = icon;
-        _tray.ToolTipText = reading is null
+        _tray.ToolTipText = SettingsNames.TrayTooltip(_vm?.Streamer.On == true, reading is null
             ? "Sanduhr für Claude — no data yet"
             : _vm?.IsDemo == true
                 ? $"Sanduhr für Claude — {DemoMode.TrayLabel(reading.Label, reading.Percent)}"
-                : $"Sanduhr für Claude — {reading.Label} {reading.Percent}%";
+                : $"Sanduhr für Claude — {reading.Label} {reading.Percent}%");
+    }
+
+    /// <summary>Streamer mode moved (slice 7): the tooltip's prefix, the Desk and the Watchers runner line follow. App lives as long as the
+    /// widget, so this subscription is never detached.</summary>
+    private void OnStreamerChanged()
+    {
+        if (_tray is not null)
+            OnTrayReadingChanged(_vm?.CurrentTrayReading);
+        _desk?.Reload();
+        RunnerStatusShown?.Invoke();
     }
 
     /// <summary>"Tray shows" submenu: one checkable item per mode, checks refreshed on open.</summary>

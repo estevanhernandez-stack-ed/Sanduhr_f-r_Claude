@@ -1,5 +1,6 @@
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Sanduhr.App.Services;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
@@ -162,9 +163,11 @@ public sealed class WelcomeTourViewModel : ObservableObject
             .Select(t => new MeterPreviewRow(t.Label, (int)Math.Round(t.Utilization), t.BarColor))
             .ToList();
 
+    internal string ChipPreview => ChipText();
+
     /// <summary>The chip's text: the demo sample, the active account, or a plain placeholder.</summary>
     private string ChipText() =>
         _widget.DemoAccount is { } demo ? DemoMode.ChipText(demo)
-        : _widget.ActiveAccount is { } active ? active
+        : _widget.ActiveAccount is { } active ? StreamerMode.Mask.Name(CodenameCategory.Account, active)   // slice 7, CP 5
         : "No account yet";
 }

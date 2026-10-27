@@ -40,10 +40,9 @@ internal static class AccountMenuBuilder
                 bool isActive = label == active;
                 // Follow saw this account in use in its latest check: the menu is rebuilt on every
                 // open, so the mark is as fresh as the follower's last reading.
-                var mark = !isActive && inUse.Contains(label) ? " · in use" : "";
                 items.Add(new MenuItem
                 {
-                    Header = (isActive ? $"●  {label}" : $"     {label}") + mark,
+                    Header = Header(label, isActive, !isActive && inUse.Contains(label), vm.IsDemo),
                     Command = switchCommand,
                     CommandParameter = label,
                     // The active account is the no-op target; dim it so the live one reads clearly.
@@ -60,5 +59,14 @@ internal static class AccountMenuBuilder
 
         if (includeManage)
             items.Add(new MenuItem { Header = SettingsNames.LinkTitle(SettingsPage.Accounts), Command = vm.OpenSettingsPageCommand, CommandParameter = SettingsPage.Accounts });
+    }
+
+    /// <summary>A row's text: the bullet for the active account, the label (its codename while streamer mode is on, slice 7 M2), and
+    /// " · in use" when Follow saw it in use. The row's command still takes the real label. Demo's sample labels are not real names
+    /// and stay out of the codename book (preflight P17).</summary>
+    internal static string Header(string label, bool isActive, bool inUse, bool demo = false)
+    {
+        var shown = demo ? label : StreamerMode.Mask.Name(CodenameCategory.Account, label);   // streamer: demo
+        return (isActive ? $"●  {shown}" : $"     {shown}") + (inUse ? " · in use" : "");
     }
 }

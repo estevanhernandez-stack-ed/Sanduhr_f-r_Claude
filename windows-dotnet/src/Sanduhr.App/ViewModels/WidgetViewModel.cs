@@ -131,6 +131,15 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// a single account the switcher is a flat, non-interactive label.</summary>
     [ObservableProperty] private bool _accountSwitcherClickable;
 
+    /// <summary>Streamer mode is on (slice 7): the chip draws its eye-slash glyph (owner taste 4).</summary>
+    [ObservableProperty] private bool _streamerOn;
+
+    /// <summary>The chip as spoken: its text, then "Streamer mode on" while on (SettingsNames.StreamerChipName).</summary>
+    [ObservableProperty] private string _accountSwitcherName = "";
+
+    /// <summary>Test seam: runs a message through the same Fail path the refresh error uses.</summary>
+    internal void FailForTests(string message) => Fail($"Error: {Truncate(StreamerMode.Mask.Paths(message), 200)}");
+
     [ObservableProperty] private string _footerText = "";
     [ObservableProperty] private string _planBadgeName = "";
     [ObservableProperty] private string _planTooltip = "";
@@ -700,6 +709,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             () => ClaudeCodeProfile.Dir,
             post: a => ui.BeginInvoke(a, DispatcherPriority.Background));
         Streamer.Load();
+        StreamerOn = Streamer.On;
+        Streamer.Changed += OnStreamerChanged;
         _ccReader = new CcLogReader(null, () => ClaudeCodeHomes.Discover(
             ClaudeCodeProfile.Dir,
             ClaudeCodeProfile.ConfigDir));
@@ -1530,7 +1541,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             if (_transport.Lost)
                 Fail(TransportLostStatus);
             else
-                Fail($"Error: {Truncate(ex.Message, 60)}");
+                Fail($"Error: {Truncate(StreamerMode.Mask.Paths(ex.Message), 60)}");   // M8: an exception's text can carry a path
             return RefreshOutcome.Other;
         }
         finally
@@ -1651,6 +1662,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         HasPlanBadge = false;
         PlanTooltip = "";
         AccountSwitcherText = "";
+        AccountSwitcherName = "";
         AccountSwitcherClickable = false;
         FooterText = "";
     }
@@ -1932,11 +1944,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         PlanTooltip = _riffs[_riffIndex];
     }
 
-    private void RefreshAccountLabel()
+    internal void RefreshAccountLabel()   // internal: the chip tests read it without Start()
     {
         if (IsDemo)
         {
-            AccountSwitcherText = $"⇆ {DemoMode.ChipText(_demoAccount)}";
+            AccountSwitcherText = $"⇆ {DemoMode.ChipText(_demoAccount)}";   // streamer: demo (sample names are not real)
+            AccountSwitcherName = AccountSwitcherText;
             AccountSwitcherClickable = true;
             return;
         }
@@ -1944,12 +1957,25 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (active is null)
         {
             AccountSwitcherText = "";
+            AccountSwitcherName = "";
             AccountSwitcherClickable = false;
             return;
         }
         bool multiple = _accounts.ListAccounts().Count > 1;
-        AccountSwitcherText = multiple ? $"⇆ {active}" : active;
+        // Streamer mode (slice 7, M1): the chip names the account by its codename; the indicator says why.
+        var shown = StreamerMode.Mask.Name(CodenameCategory.Account, active);
+        AccountSwitcherText = multiple ? $"⇆ {shown}" : shown;
+        AccountSwitcherName = SettingsNames.StreamerChipName(AccountSwitcherText, StreamerMode.On);
         AccountSwitcherClickable = multiple;
+    }
+
+    /// <summary>The switch moved, the codenames were shuffled or a name was shown (slice 7): the chip and the Desk read their names again.
+    /// The widget listens to its own service, and detaches in Dispose.</summary>
+    private void OnStreamerChanged()
+    {
+        StreamerOn = Streamer.On;
+        RefreshAccountLabel();
+        DeskUsageChanged?.Invoke();
     }
 
     private void UpdateFooter()
@@ -2241,6 +2267,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _riffTimer.Stop();
         _statusNoticeTimer?.Stop();
         _themeHandoff?.Dispose();
+        Streamer.Changed -= OnStreamerChanged;
         Streamer.Dispose();
         _follower.Stop();
         _seatMeters.Stop();

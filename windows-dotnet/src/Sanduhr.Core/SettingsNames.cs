@@ -840,6 +840,8 @@ public static class SettingsNames
 
     // Streamer mode (Settings v2, slice 7; spec, Streamer mode; WF7). The switch, its caption, Shuffle's words and the banner are the spec's.
     public const string StreamerSection = "Streamer mode";
+    /// <summary>The tray's and the widget's right-click item: one name for both, so they can't drift (Principle 2).</summary>
+    public const string StreamerMenuItemHeader = StreamerSection;
     public const string StreamerSwitch = "Streamer mode: hide accounts, folders and projects";
     public const string StreamerCaption = "Live numbers stay. Names become codenames until you choose to show one.";
     public const string StreamerCantReach = "Claude Code's own screen isn't covered. Check what it shows before you share it.";
