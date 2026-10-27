@@ -34,6 +34,8 @@ public partial class ClaudeCodePage : UserControl
             card.UpdateLayout();
             // A card with its report open is taller than the window: ask for its top, so the card's name lands in view.
             card.BringIntoView(new Rect(0, 0, card.ActualWidth, Math.Min(card.ActualHeight, 48)));
+            if (TryFindResource("Sanduhr.Brush.Accent") is Brush accent)
+                AnchorHighlightAdorner.Flash(card, accent, AnchorHighlightAdorner.Duration);
             if (FindHeader(card) is { IsVisible: true } header)
                 header.Focus();
         }));

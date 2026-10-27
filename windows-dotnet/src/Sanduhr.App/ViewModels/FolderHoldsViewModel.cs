@@ -67,9 +67,21 @@ public sealed partial class FolderHoldsViewModel : ObservableObject
         PluginLines.Clear();
         McpNames.Clear();
         FolderReport report;
-        try { report = ModInventory.Read(Folder, _host.Profile); }
+        try { report = (_host.ReadReport ?? ModInventory.Read)(Folder, _host.Profile); }
         catch (Exception)
         {
+            // Slice 4 row 25: a failed read leaves no line from the last one.
+            SettingsDetail = "";
+            SettingsUnreadable = false;
+            StatuslineSummary = "";
+            StatuslineCommand = "";
+            HooksSummary = "";
+            PluginsSummary = "";
+            McpSummary = "";
+            McpProjects = "";
+            ClaudeMdSummary = "";
+            RetentionSummary = "";
+            RetentionWarning = false;
             SettingsSummary = SettingsNames.HoldsCantRead;
             Loaded = true;
             return;

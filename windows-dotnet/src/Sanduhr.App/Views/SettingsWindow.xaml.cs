@@ -353,8 +353,9 @@ internal partial class SettingsWindow : Window
         Tabs.SelectedItem = tab;
         // Claude Code, What this folder holds is one anchor on the page: a link to it opens one card's report (slice 4, decision 5). After the
         // selection, whose page reload rebuilds the cards.
+        bool cardOpened = false;
         if (page == SettingsPage.ClaudeCode && entry?.Anchor == SettingsIndex.FolderConfig)
-            ViewModel.ClaudeCodePage.OpenHoldsForLanding();
+            cardOpened = ViewModel.ClaudeCodePage.OpenHoldsForLanding() is not null;
         Place = new SettingsLink(page, entry?.Anchor);
         if (entry is null)
             return;
@@ -376,8 +377,10 @@ internal partial class SettingsWindow : Window
                 return;
             }
             ScrollToTop(target);
-            if (TryFindResource("Sanduhr.Brush.Accent") is Brush accent)
-                AnchorHighlightAdorner.Flash(target, accent, TimeSpan.FromSeconds(1.5));
+            // Claude Code's folder-config lands on a card list; when a card opened, the page flashes that one card (slice 4 row 28).
+            bool cardFlashes = cardOpened && entry.Anchor == SettingsIndex.FolderConfig;
+            if (!cardFlashes && TryFindResource("Sanduhr.Brush.Accent") is Brush accent)
+                AnchorHighlightAdorner.Flash(target, accent, AnchorHighlightAdorner.Duration);
             // Keyboard users land on the section: its first control that takes focus, else the
             // next one after a heading, else the page's sidebar entry.
             if (FirstFocusable(target) is { } control)

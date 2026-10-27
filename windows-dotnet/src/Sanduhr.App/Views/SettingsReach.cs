@@ -65,6 +65,9 @@ public static class SettingsLinkTo
 /// <summary>A rounded accent outline around a section search or a link just opened, for 1.5 s.</summary>
 internal sealed class AnchorHighlightAdorner : Adorner
 {
+    /// <summary>How long a landing's outline shows.</summary>
+    public static readonly TimeSpan Duration = TimeSpan.FromSeconds(1.5);
+
     private readonly Pen _pen;
 
     private AnchorHighlightAdorner(UIElement adorned, Brush brush) : base(adorned)
