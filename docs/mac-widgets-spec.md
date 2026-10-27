@@ -337,7 +337,7 @@ Windows' Settings ▸ Weather and Desk piece, with the #315 nickname.
 Windows draws the bars from the playing app's peak meter, an audio level only. The Mac has no
 public per-app level that doesn't involve capture: the route macOS offers is a Core Audio process
 tap (macOS 14.2+), which hands the app the audio itself and asks for the System Audio Recording
-permission. A spike confirms that before anything is built (owner call 1).
+permission. A spike confirms that before anything is built (settled call 6).
 - **If the owner takes the tap:** its own switch, off by default, under Now playing; the tap reads
   only the playing app's output, computes a peak per frame in memory, and keeps and sends nothing.
   Then Windows' `AudioBarMotion` as built: attack, decay, a peak cap that holds 9 frames and then
@@ -406,12 +406,7 @@ drawing and 5 need live checks on the Desk.
 3. **Reset** gets a Widgets checkbox of its own.
 4. **`sanduhr_min`** stays the shared, Windows-numbered pack-format level (section 1).
 5. **OLED care** ships in 2.35.0 with the companion.
-
-## Owner calls left
-
-1. **Bars and the audio tap (2.38.0).** Take the tap behind its own off-by-default switch and the
-   System Audio Recording permission, or keep the position bar on the Mac? Recommended: run the
-   spike first; ship the tap only if the permission prompt reads as honestly as the PRIVACY line
-   will.
-2. **CI watchers on a Mac (2.38.0).** Worth building if a Mac runs runner containers; today the
-   runners live on Neb and Dunder. Recommended: build it for parity, after the rest of 2.38.0.
+6. **Bars (2.38.0): spike first.** A short spike confirms whether a Core Audio process tap needs the
+   System Audio Recording permission and how its prompt reads. The tap ships behind its own
+   off-by-default switch only if that prompt is acceptable; otherwise the Mac keeps its position bar.
+7. **CI watchers (2.38.0): built for parity, last in the release.**
