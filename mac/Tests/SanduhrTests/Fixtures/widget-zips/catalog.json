@@ -1,0 +1,46 @@
+{
+  "generated_at": "2026-10-22T02:23:13Z",
+  "packs": [
+    {
+      "id": "hourglass",
+      "kind": "sprite",
+      "name": "Hourglass",
+      "sanduhr_min": "3.8.0",
+      "sha256": "551c75b56192b045a02b307aafffdac24b5965d4626c1e5b37fb14182c48fd67",
+      "size": 34521,
+      "url": "https://github.com/626Labs-LLC/sanduhr-widgets/releases/download/v1.0.0/hourglass-1.0.0.zip",
+      "version": "1.0.0"
+    },
+    {
+      "id": "oled-neon",
+      "kind": "theme",
+      "name": "OLED Neon",
+      "sanduhr_min": "3.8.0",
+      "sha256": "a20dd4f282e9ec25c6022a5c88c12cf6f3cce5eb34c8873c93bd5890c4deea79",
+      "size": 22737,
+      "url": "https://github.com/626Labs-LLC/sanduhr-widgets/releases/download/v1.0.0/oled-neon-1.0.0.zip",
+      "version": "1.0.0"
+    },
+    {
+      "id": "oled-neon-effects",
+      "kind": "effects",
+      "name": "OLED Neon Effects",
+      "sanduhr_min": "3.8.0",
+      "sha256": "939a1a6dd20dafc1bb2ec51131737e60788a987750e0025725c4027682140dfc",
+      "size": 20577,
+      "url": "https://github.com/626Labs-LLC/sanduhr-widgets/releases/download/v1.0.0/oled-neon-effects-1.0.0.zip",
+      "version": "1.0.0"
+    },
+    {
+      "id": "oled-neon-palettes",
+      "kind": "palette",
+      "name": "OLED Neon Palettes",
+      "sanduhr_min": "3.8.0",
+      "sha256": "e1889c8f5a01d44b7d0a4849452e992d160d941110c973bf7b0d73f531a4b58e",
+      "size": 20955,
+      "url": "https://github.com/626Labs-LLC/sanduhr-widgets/releases/download/v1.0.0/oled-neon-palettes-1.0.0.zip",
+      "version": "1.0.0"
+    }
+  ],
+  "schema_version": 1
+}
