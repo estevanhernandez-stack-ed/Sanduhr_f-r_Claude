@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "bad-null-effects",
+  "name": "Fixture effects",
+  "version": "1.0.0",
+  "author": "Fixture Author",
+  "license": "MIT",
+  "kind": "effects",
+  "sanduhr_min": "3.8.0",
+  "description": "A fixture pack for the validator tests.",
+  "files": [
+    "effects.json"
+  ]
+}

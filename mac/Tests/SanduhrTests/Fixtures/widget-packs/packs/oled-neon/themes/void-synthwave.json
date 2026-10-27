@@ -1,0 +1,30 @@
+{
+  "name": "Void Synthwave",
+  "bg": "#000000",
+  "glass": "#000000",
+  "glass_on_mica": "#000000",
+  "title_bg": "#000000",
+  "border": "#3d1126",
+  "text": "#e6e6e6",
+  "text_secondary": "#b3a8ae",
+  "text_dim": "#7d7076",
+  "text_muted": "#52474c",
+  "accent": "#ff2a6d",
+  "bar_bg": "#1a0a12",
+  "footer_bg": "#000000",
+  "pace_marker": "#ffd23f",
+  "sparkline": "#ff2a6d",
+  "glass_alpha": 1.0,
+  "border_alpha": 0.6,
+  "border_tint": "#ff2a6d",
+  "accent_bloom": {
+    "blur": 6,
+    "alpha": 0.55
+  },
+  "inner_highlight": {
+    "color": "#ff2a6d",
+    "alpha": 0.2
+  },
+  "opts_out_of_mica": true,
+  "card_corner_radius": 12
+}

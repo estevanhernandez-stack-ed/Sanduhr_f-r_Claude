@@ -1,0 +1,30 @@
+{
+  "name": "Void Aurora",
+  "bg": "#000000",
+  "glass": "#000000",
+  "glass_on_mica": "#000000",
+  "title_bg": "#000000",
+  "border": "#0b3a2a",
+  "text": "#e6e6e6",
+  "text_secondary": "#a8b3ae",
+  "text_dim": "#6f7a75",
+  "text_muted": "#49524e",
+  "accent": "#00f5a0",
+  "bar_bg": "#06160f",
+  "footer_bg": "#000000",
+  "pace_marker": "#ff4fa3",
+  "sparkline": "#00f5a0",
+  "glass_alpha": 1.0,
+  "border_alpha": 0.6,
+  "border_tint": "#00f5a0",
+  "accent_bloom": {
+    "blur": 6,
+    "alpha": 0.55
+  },
+  "inner_highlight": {
+    "color": "#00f5a0",
+    "alpha": 0.2
+  },
+  "opts_out_of_mica": true,
+  "card_corner_radius": 12
+}

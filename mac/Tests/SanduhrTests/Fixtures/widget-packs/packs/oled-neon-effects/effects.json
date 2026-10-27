@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "effects": [
+    {
+      "name": "breathe",
+      "type": "pulse",
+      "intensity": 0.35,
+      "period_ms": 4000,
+      "color": "ink"
+    },
+    {
+      "name": "heartbeat",
+      "type": "pulse",
+      "intensity": 0.6,
+      "period_ms": 1200,
+      "color": "#ff2a6d"
+    },
+    {
+      "name": "scanline",
+      "type": "sweep",
+      "intensity": 0.5,
+      "period_ms": 3200,
+      "color": "ink"
+    },
+    {
+      "name": "aurora-sweep",
+      "type": "sweep",
+      "intensity": 0.4,
+      "period_ms": 6000,
+      "color": "#00f5a0"
+    },
+    {
+      "name": "embers",
+      "type": "shimmer",
+      "intensity": 0.45,
+      "period_ms": 2400,
+      "color": "#ff6a1a"
+    },
+    {
+      "name": "halo",
+      "type": "glow",
+      "intensity": 0.55,
+      "period_ms": 5000,
+      "color": "ink"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "Void Toxic",
+  "bg": "#000000",
+  "glass": "#000000",
+  "glass_on_mica": "#000000",
+  "title_bg": "#000000",
+  "border": "#2c3d00",
+  "text": "#e6e6e6",
+  "text_secondary": "#b0b5a4",
+  "text_dim": "#78806b",
+  "text_muted": "#4e5446",
+  "accent": "#b6ff00",
+  "bar_bg": "#0d1400",
+  "footer_bg": "#000000",
+  "pace_marker": "#ff2a6d",
+  "sparkline": "#b6ff00",
+  "glass_alpha": 1.0,
+  "border_alpha": 0.6,
+  "border_tint": "#b6ff00",
+  "accent_bloom": {
+    "blur": 6,
+    "alpha": 0.55
+  },
+  "inner_highlight": {
+    "color": "#b6ff00",
+    "alpha": 0.2
+  },
+  "opts_out_of_mica": true,
+  "card_corner_radius": 12
+}
