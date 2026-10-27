@@ -254,8 +254,8 @@ public sealed partial class MetersFolderRowViewModel : ObservableObject
     public bool HasReason => Reason.Length > 0;
 
     public string SwitchName => SettingsNames.MetersOnFor(Display);
-    /// <summary>The row read as one line: "~\.claude, On".</summary>
-    public string RowName => $"{Display}, {StateText}";
+    /// <summary>The row read as one line: "~\.claude, On", with the reason when there is one.</summary>
+    public string RowName => HasReason ? $"{Display}, {StateText}. {Reason}" : $"{Display}, {StateText}";
     public string UpdateName => SettingsNames.UpdateMetersIn(Display);
     public string RemoveName => SettingsNames.RemoveMetersFrom(Display);
 

@@ -681,9 +681,9 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
         finally { window.Close(); }
     });
 
-    /// <summary>A landing on Meters above the prompt puts the keyboard on the first folder's switch.</summary>
+    /// <summary>A landing on Meters above the prompt puts the keyboard on the first folder's row (task 4: the row is the stop, its switch is one Tab on).</summary>
     [DesktopFact]
-    public void A_landing_on_meters_focuses_the_first_folders_switch() => AppHost.Run(() =>
+    public void A_landing_on_meters_focuses_the_first_folders_row() => AppHost.Run(() =>
     {
         var (window, svm, guard) = Open("Personal");
         try
@@ -692,8 +692,8 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
             window.SelectPage(SettingsPage.Mods, SettingsIndex.Meters);
             Settle(window, guard);
             var focused = Keyboard.FocusedElement as FrameworkElement;
-            Assert.True(focused is CheckBox, $"focus is on {Describe(focused)} on {window.Place}");
-            Assert.Equal(SettingsNames.MetersOnFor(svm.ModsPage.Meters[0].Display), NameOf(focused!));
+            Assert.True(focused is ListBoxItem, $"focus is on {Describe(focused)} on {window.Place}");
+            Assert.Equal(svm.ModsPage.Meters[0].RowName, NameOf(focused!));
             guard.Check();
         }
         finally { window.Close(); }

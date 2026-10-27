@@ -34,7 +34,7 @@
             <Setter Property="FontSize" Value="11" />
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-            <Setter Property="AutomationProperties.LiveSetting" Value="Polite" />
+            <Setter Property="views:LiveRegion.Announces" Value="True" />
         </Style>
 
         <!-- A pack's preview: pixel art, so nearest-neighbour, never smoothed. -->
@@ -74,6 +74,21 @@
                     </ContextMenu>
                 </Setter.Value>
             </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <ContentPresenter />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="MetersRowItem" TargetType="ListBoxItem">
+            <Setter Property="Focusable" Value="True" />
+            <Setter Property="IsTabStop" Value="True" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource RowFocus}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="AutomationProperties.Name" Value="{Binding RowName}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
@@ -260,18 +275,22 @@
                     <!-- No folder (P20): the sentence, then the link to the Claude Code page's folders. -->
                     <WrapPanel Style="{DynamicResource EmptyLinkLine}" Tag="{Binding HasMeterFolders}">
                         <TextBlock Text="{x:Static core:SettingsNames.NoFolderInMods}" FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0"
+                                   views:LiveRegion.Shown="{Binding HasMeterFolders, Converter={x:Static conv:Bools.Not}}"
                                    Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                         <Button Style="{DynamicResource SettingsLinkButton}" Content="{x:Static core:SettingsNames.ClaudeCodeLinkTitle}"
                                 views:SettingsLinkTo.Link="claudecode#folders"
                                 AutomationProperties.Name="{x:Static core:SettingsNames.ClaudeCodeLinkTitle}" />
                     </WrapPanel>
-                    <ItemsControl ItemsSource="{Binding Meters}" Focusable="False" AutomationProperties.Name="{x:Static core:SettingsNames.MetersSection}">
-                        <ItemsControl.ItemContainerStyle>
-                            <Style TargetType="ContentPresenter">
-                                <Setter Property="AutomationProperties.Name" Value="{Binding RowName}" />
-                            </Style>
-                        </ItemsControl.ItemContainerStyle>
-                    </ItemsControl>
+                    <ListBox ItemsSource="{Binding Meters}" ItemContainerStyle="{StaticResource MetersRowItem}"
+                             Background="Transparent" BorderThickness="0" Padding="0" Focusable="False" SelectionMode="Single"
+                             KeyboardNavigation.TabNavigation="Continue"
+                             AutomationProperties.Name="{x:Static core:SettingsNames.MetersSection}">
+                        <ListBox.Template>
+                            <ControlTemplate TargetType="ListBox">
+                                <ItemsPresenter />
+                            </ControlTemplate>
+                        </ListBox.Template>
+                    </ListBox>
                     <TextBlock Text="{Binding MetersStatus}" Style="{StaticResource Status}" Margin="0,4,0,0"
                                Visibility="{Binding MetersStatus, Converter={StaticResource StrVis}}" />
                 </StackPanel>

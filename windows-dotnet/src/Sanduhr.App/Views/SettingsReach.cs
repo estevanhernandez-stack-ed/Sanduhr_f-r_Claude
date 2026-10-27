@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -110,6 +112,65 @@ public static class LiveRegion
     public static bool GetShown(DependencyObject d) => (bool)d.GetValue(ShownProperty);
     public static void SetShown(DependencyObject d, bool value) => d.SetValue(ShownProperty, value);
 
+    /// <summary>
+    /// A status line whose text is the news (an outcome: "Installed.", "Couldn't reach the catalog."):
+    /// <c>views:LiveRegion.Announces="True"</c> on a TextBlock. It marks the line a polite live region and raises LiveRegionChanged
+    /// each time the text changes to something non-empty on a loaded, visible line. The page's first text is not announced. The
+    /// same text twice is one change, so a line that repeats a message clears it first (as About's status does).
+    /// </summary>
+    public static readonly DependencyProperty AnnouncesProperty = DependencyProperty.RegisterAttached(
+        "Announces", typeof(bool), typeof(LiveRegion), new PropertyMetadata(false, OnAnnouncesChanged));
+
+    public static bool GetAnnounces(DependencyObject d) => (bool)d.GetValue(AnnouncesProperty);
+    public static void SetAnnounces(DependencyObject d, bool value) => d.SetValue(AnnouncesProperty, value);
+
+    private static readonly DependencyPropertyDescriptor TextDescriptor =
+        DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty, typeof(TextBlock));
+
+    // Whether the text hook is on. Every add and remove goes through Hook, which acts only on a change of this flag, so a
+    // doubled Unloaded or Loaded can never hook twice (preflight P11).
+    private static readonly DependencyProperty IsHookedProperty = DependencyProperty.RegisterAttached(
+        "IsHooked", typeof(bool), typeof(LiveRegion), new PropertyMetadata(false));
+
+    private static void Hook(TextBlock tb, bool on)
+    {
+        if ((bool)tb.GetValue(IsHookedProperty) == on) return;
+        tb.SetValue(IsHookedProperty, on);
+        if (on) TextDescriptor.AddValueChanged(tb, OnAnnouncedTextChanged);
+        else TextDescriptor.RemoveValueChanged(tb, OnAnnouncedTextChanged);
+    }
+
+    private static void OnAnnouncesChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not TextBlock tb) return;
+        tb.Unloaded -= OnAnnouncerUnloaded;
+        tb.Loaded -= OnAnnouncerLoaded;
+        if (e.NewValue is true)
+        {
+            System.Windows.Automation.AutomationProperties.SetLiveSetting(tb, System.Windows.Automation.AutomationLiveSetting.Polite);
+            tb.Unloaded += OnAnnouncerUnloaded;
+            tb.Loaded += OnAnnouncerLoaded;
+            Hook(tb, true);
+        }
+        else Hook(tb, false);
+    }
+
+    private static void OnAnnouncerUnloaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is TextBlock tb) Hook(tb, false);
+    }
+
+    private static void OnAnnouncerLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is TextBlock tb && GetAnnounces(tb)) Hook(tb, true);
+    }
+
+    private static void OnAnnouncedTextChanged(object? sender, EventArgs e)
+    {
+        if (sender is TextBlock { IsLoaded: true } tb && tb.Text.Length > 0)
+            RaiseSoon(tb, () => tb.Text.Length > 0);
+    }
+
     /// <summary>Called after each LiveRegionChanged this raises. A seam for tests.</summary>
     internal static Action<UIElement>? Raised { get; set; }
 
@@ -120,9 +181,15 @@ public static class LiveRegion
         System.Windows.Automation.AutomationProperties.SetLiveSetting(el, System.Windows.Automation.AutomationLiveSetting.Polite);
         if (e.NewValue is not true || el is FrameworkElement { IsLoaded: false })
             return;
+        RaiseSoon(el, () => GetShown(el));
+    }
+
+    /// <summary>Raises LiveRegionChanged once layout has shown <paramref name="el"/>, if it is still visible and <paramref name="still"/> holds.</summary>
+    private static void RaiseSoon(UIElement el, Func<bool> still)
+    {
         el.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
-            if (!el.IsVisible || !GetShown(el))
+            if (!el.IsVisible || !still())
                 return;
             var peer = System.Windows.Automation.Peers.UIElementAutomationPeer.FromElement(el)
                 ?? System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(el);

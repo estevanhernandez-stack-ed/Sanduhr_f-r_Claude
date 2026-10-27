@@ -53,6 +53,7 @@ public sealed class ModsPageMetersTests : ModsPageFixture
         Assert.False(row.CanRemove);
         Assert.True(row.HasReason);
         Assert.Equal(SettingsNames.FolderUnreadableReason, row.Reason);
+        Assert.Contains(row.Reason, row.RowName);
         row.ToggleCommand.Execute(null);
         Assert.Empty(asked);
         Assert.Equal("{ broken", File.ReadAllText(SettingsOf(work)));

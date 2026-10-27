@@ -25,7 +25,7 @@
                     <TextBlock Text="{Binding Description}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"
                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                     <TextBlock Text="{Binding StatusText}" FontSize="10.5" TextWrapping="Wrap" Margin="0,4,0,0"
-                               AutomationProperties.LiveSetting="Polite" Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                               views:LiveRegion.Announces="True" Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
                     <Button Style="{DynamicResource FlatButton}" Content="{Binding InstallLabel}" Padding="10,5" FontSize="11"
@@ -245,7 +245,7 @@
                     <TextBlock Text="{x:Static core:SettingsNames.GlowNeedsHook}" FontSize="11" TextWrapping="Wrap"
                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                     <TextBlock Text="{Binding GlowHookStatus}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,10"
-                               AutomationProperties.LiveSetting="Polite" Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                               views:LiveRegion.Announces="True" Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                     <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,0,0,6" Content="{x:Static core:SettingsNames.GlowWhenWaiting}"
                               AutomationProperties.Name="{x:Static core:SettingsNames.GlowWhenWaiting}"
                               IsChecked="{Binding GlowWaiting, Mode=TwoWay}" />
@@ -283,7 +283,7 @@
                     </StackPanel>
                 </StackPanel>
 
-                <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"
+                <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,8,0,0" views:LiveRegion.Announces="True"
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Text="{Binding StatusText}"
                            Visibility="{Binding StatusText, Converter={StaticResource StrVis}}" />
             </StackPanel>
