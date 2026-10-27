@@ -1609,10 +1609,10 @@ public static partial class Program
             Assert(10, File.Exists(codenamesFile) && File.Exists(streamerFile) && File.Exists(tmpDecoy1) && File.Exists(tmpDecoy2), "before Reset: codenames.json, streamer.json and both .tmp files exist");
 
             var service = new ResetService(new Paths(), r2.Accounts, new PublishTokenStore(r2.Creds),
-                () => Task.FromResult<IReadOnlyList<string>>([]),
+                keep => Task.FromResult<IReadOnlyList<string>>([]),
                 () => ResetGuard.MarkDone(),
-                null, null);
-            var results = await service.RunAsync(new ResetChoices(ClaudeCodeEntries: false, Accounts: false, History: false, Themes: false, Settings: true));
+                null, null, null);
+            var results = await service.RunAsync(new ResetChoices(ClaudeCodeEntries: false, Accounts: false, History: false, Themes: false, Settings: true), []);
             Assert(10, results.All(x => x.Ok), $"Reset (All settings) ran: {string.Join(", ", results.Select(x => x.Part + "=" + (x.Ok ? "ok" : "failed")))}");
             Assert(10, !File.Exists(codenamesFile) && !File.Exists(tmpDecoy1), "Reset removed codenames.json and codenames.json.tmp");
             Assert(10, !File.Exists(streamerFile) && !File.Exists(tmpDecoy2), "Reset removed streamer.json and streamer.json.tmp");

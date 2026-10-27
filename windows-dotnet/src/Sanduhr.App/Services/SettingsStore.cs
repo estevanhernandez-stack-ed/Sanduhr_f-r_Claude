@@ -70,7 +70,15 @@ public sealed class SettingsStore
     /// and it is narrow on purpose: it only edits an existing settings.json, changes only those four keys, and does NOT
     /// re-sync <c>mcp-settings.json</c> (the same step deletes that file). Never throws; false when nothing was written.
     /// </summary>
-    public bool ClearClaudeCodeSwitchesForReset()
+    public bool ClearClaudeCodeSwitchesForReset() => ClearForReset(ResetSettings.ClearClaudeCodeSwitches);
+
+    /// <summary>Reset's per-kind variant: only <c>mcp_enabled</c> and <c>mcp_cc_home</c>, for a reset that keeps a statusline or meters folder.</summary>
+    public bool ClearMcpSwitchesForReset() => ClearForReset(ResetSettings.ClearMcpSwitches);
+
+    /// <summary>Reset's per-kind variant: only <c>statusline_enabled</c> and <c>statusline_cc_home</c>, for a reset that keeps an MCP folder.</summary>
+    public bool ClearStatuslineSwitchesForReset() => ClearForReset(ResetSettings.ClearStatuslineSwitches);
+
+    private bool ClearForReset(Func<JsonObject, bool> clear)
     {
         try
         {
@@ -78,7 +86,7 @@ public sealed class SettingsStore
                 return false;
             if (JsonNode.Parse(File.ReadAllText(_path)) is not JsonObject root)
                 return false;
-            if (!ResetSettings.ClearClaudeCodeSwitches(root))
+            if (!clear(root))
                 return false;
             File.WriteAllText(_path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
             return true;

@@ -11,19 +11,23 @@ namespace Sanduhr.Core;
 public static class ResetSettings
 {
     /// <summary>Sets the two switches false and removes the two home names. Returns whether anything changed.</summary>
-    public static bool ClearClaudeCodeSwitches(JsonObject root)
+    public static bool ClearClaudeCodeSwitches(JsonObject root) => ClearMcpSwitches(root) | ClearStatuslineSwitches(root);
+
+    /// <summary>The MCP pair: <c>mcp_enabled</c> false and <c>mcp_cc_home</c> removed. Returns whether anything changed.</summary>
+    public static bool ClearMcpSwitches(JsonObject root) => Clear(root, "mcp_enabled", "mcp_cc_home");
+
+    /// <summary>The statusline pair: <c>statusline_enabled</c> false and <c>statusline_cc_home</c> removed. Returns whether anything changed.</summary>
+    public static bool ClearStatuslineSwitches(JsonObject root) => Clear(root, "statusline_enabled", "statusline_cc_home");
+
+    private static bool Clear(JsonObject root, string switchKey, string homeKey)
     {
         bool changed = false;
-        foreach (var key in new[] { "mcp_enabled", "statusline_enabled" })
+        if (root.TryGetPropertyValue(switchKey, out var node) && !IsFalse(node))
         {
-            if (root.TryGetPropertyValue(key, out var node) && !IsFalse(node))
-            {
-                root[key] = false;
-                changed = true;
-            }
+            root[switchKey] = false;
+            changed = true;
         }
-        foreach (var key in new[] { "mcp_cc_home", "statusline_cc_home" })
-            changed |= root.Remove(key);
+        changed |= root.Remove(homeKey);
         return changed;
     }
 

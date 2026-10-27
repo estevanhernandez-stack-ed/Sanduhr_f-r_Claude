@@ -1085,7 +1085,7 @@ public partial class App : Application
             paths,
             vm.AccountStore,
             new PublishTokenStore(new WindowsCredentialManager(AccountStore.Service)),
-            () => Task.Run<IReadOnlyList<string>>(() => ClaudeCodeViewModel.UndoEverything(vm)),
+            keep => Task.Run<IReadOnlyList<string>>(() => ClaudeCodeViewModel.UndoEverything(vm, keep)),
             () =>
             {
                 ResetGuard.MarkDone();
@@ -1098,7 +1098,8 @@ public partial class App : Application
                 _vm?.NowPlaying?.Dispose();
             },
             vm.InactiveReader.DeleteAllProfilesAsync,
-            () => new SettingsStore(paths).ClearClaudeCodeSwitchesForReset());
+            () => new SettingsStore(paths).ClearMcpSwitchesForReset(),
+            () => new SettingsStore(paths).ClearStatuslineSwitchesForReset());
         ResetWindow.ShowFor(_settingsWindow, service, QuitApp);
     }
 

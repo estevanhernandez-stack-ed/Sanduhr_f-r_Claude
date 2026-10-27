@@ -43,6 +43,26 @@ public class ResetSettingsTests
     }
 
     [Fact]
+    public void The_two_pairs_clear_on_their_own()
+    {
+        const string json = """{"mcp_enabled":true,"statusline_enabled":true,"mcp_cc_home":".claude","statusline_cc_home":".claude-work"}""";
+
+        var mcp = Parse(json);
+        Assert.True(ResetSettings.ClearMcpSwitches(mcp));
+        Assert.False((bool)mcp["mcp_enabled"]!);
+        Assert.Null(mcp["mcp_cc_home"]);
+        Assert.True((bool)mcp["statusline_enabled"]!);
+        Assert.Equal(".claude-work", (string)mcp["statusline_cc_home"]!);
+
+        var statusline = Parse(json);
+        Assert.True(ResetSettings.ClearStatuslineSwitches(statusline));
+        Assert.False((bool)statusline["statusline_enabled"]!);
+        Assert.Null(statusline["statusline_cc_home"]);
+        Assert.True((bool)statusline["mcp_enabled"]!);
+        Assert.Equal(".claude", (string)statusline["mcp_cc_home"]!);
+    }
+
+    [Fact]
     public void A_switch_of_the_wrong_type_is_replaced_by_false()
     {
         var root = Parse("""{"mcp_enabled":"yes"}""");

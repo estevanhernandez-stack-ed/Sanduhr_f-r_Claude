@@ -859,65 +859,21 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     // ------------------------------------------------------------------ reset
 
     /// <summary>
-    /// Reset Sanduhr…: undoes every receipt (meters mod, glow hooks), takes Sanduhr's statusline out of each
-    /// folder where it is still Sanduhr's, and deregisters the MCP server. Returns the kinds of failures,
-    /// never a path. Safe to call off the UI thread.
+    /// Reset Sanduhr…: undoes Sanduhr's entries in every Claude Code folder but the kinds kept in <paramref name="keep"/> (real folders,
+    /// never what a row shows), through <see cref="ClaudeCodeReset.UndoKeeping"/>. Returns the kinds of failures, never a path. Safe to
+    /// call off the UI thread.
     /// </summary>
-    public static IReadOnlyList<string> UndoEverything(WidgetViewModel widget)
+    public static IReadOnlyList<string> UndoEverything(WidgetViewModel widget, IReadOnlyCollection<ResetFolder>? keep = null)
     {
-        var failures = new List<string>();
         var profile = ClaudeCodeProfile.Dir;   // streamer: key - profile folder handed to the reset logic, never drawn
-        var sanduhrDir = widget.SanduhrAppDataDir;
-        var folders = ClaudeCodeFolders.Build(profile, ClaudeCodeProfile.ConfigDir, widget.LoadCcFoldersAdded());   // streamer: key - folder list handed to the reset logic, never drawn
-
-        try
-        {
-            var integ = new ClaudeCodeIntegrations(profile, sanduhrDir, externalDir: widget.SanduhrExternalDir)
-            {
-                LegacyModsRoots = [widget.SanduhrLegacyModsRoot],
-            };
-            if (integ.UndoAll().Any(r => !r.Ok))
-                failures.Add("a Claude Code entry");
-        }
-        catch (Exception) { failures.Add("a Claude Code entry"); }
-
-        var statusline = new StatuslineInstaller(profile, widget.StatuslineBinDir, null, sanduhrDir);
-        // Known folders first, then any folder a receipt names that is no longer in the list, so Reset
-        // never leaves an orphan statusLine. Each folder once.
-        var statuslineFolders = folders.Select(f => f.Path).ToList();   // streamer: key - folder paths handed to the reset logic, never drawn
-        try
-        {
-            var (receipts, _) = SnapshotConsumers.ReadReceipts(
-                Path.Combine(sanduhrDir, "integrations", "installs.json"));
-            foreach (var folder in SnapshotConsumers.StatuslineReceiptFolders(receipts))
-                if (!statuslineFolders.Any(p => ClaudeCodeFolders.Same(p, folder)))
-                    statuslineFolders.Add(folder);
-        }
-        catch (Exception) { failures.Add("a statusline entry"); }
-        foreach (var folder in statuslineFolders)
-        {
-            try
-            {
-                // A rooted second argument to Path.Combine returns it, so a full folder path works as the home name.
-                if (statusline.IsRegistered(folder) && !statusline.Remove(folder))
-                    failures.Add("a statusline entry");
-            }
-            catch (Exception) { failures.Add("a statusline entry"); }
-        }
-        try { statusline.RemoveScript(); } catch (Exception) { failures.Add("the statusline script"); }
-
-        try
-        {
-            var mcp = new McpIntegrationInstaller(profile, sanduhrDir, externalDir: widget.SanduhrExternalDir);
-            var homes = folders.Where(f => f.Discovered).Select(f => f.Name)
-                .Concat(widget.LoadMcpCcHome() is { Length: > 0 } saved ? [saved] : [])
-                .Distinct(StringComparer.OrdinalIgnoreCase);
-            // A failed deregister keeps the launcher and server files, as the reset promises.
-            if (!mcp.UndoAll(homes))
-                failures.Add("an MCP server entry");
-        }
-        catch (Exception) { failures.Add("an MCP server entry"); }
-
-        return failures.Distinct().ToList();
+        var scope = new ClaudeCodeResetScope(
+            profile,
+            widget.SanduhrAppDataDir,
+            widget.SanduhrExternalDir,
+            widget.StatuslineBinDir,
+            ClaudeCodeFolders.Build(profile, ClaudeCodeProfile.ConfigDir, widget.LoadCcFoldersAdded()),   // streamer: key - folder list handed to the reset logic, never drawn
+            widget.LoadMcpCcHome(),
+            [widget.SanduhrLegacyModsRoot]);
+        return ClaudeCodeReset.UndoKeeping(scope, keep ?? []);
     }
 }

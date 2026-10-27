@@ -11,10 +11,12 @@ namespace Sanduhr.App.Services;
 /// <see cref="ResetPlan.Inventory"/> lists. Failures are reported by kind ("a profile folder"), and
 /// nothing here logs: not a path, not an account label.
 ///
-/// The Claude Code undo is the orchestrator's: <c>undoClaudeCodeEntries</c> returns the kinds of
-/// failures (empty when every entry went). Sanduhr's own copies of those entries (receipts, mods,
-/// the MCP server copy, the bin scripts) are deleted only when the undo reported none, because a failed
-/// folder keeps its receipt so Settings can still remove that entry after the next launch.
+/// The Claude Code undo is the orchestrator's: <c>undoClaudeCodeEntries</c> takes the folders (and kinds) to leave as they are and
+/// returns the kinds of failures (empty when every entry went). Sanduhr's own copies of those entries (receipts, mods, the MCP server
+/// copy, the bin scripts) are deleted only when the undo reported none and the receipts could be read, and then per kind: a kept
+/// folder keeps the receipts, and the files and switch of each kind it still runs (the statusline script and switch for a kept
+/// statusline or meters mod, the MCP launcher, server, projection and switch for a kept MCP entry, the mods for a kept meters mod).
+/// A failed or kept folder keeps its receipt so Settings can still remove that entry after the next launch.
 /// <c>backups\</c> is never touched.
 /// </summary>
 internal sealed class ResetService
@@ -22,24 +24,27 @@ internal sealed class ResetService
     private readonly Paths _paths;
     private readonly AccountStore _accounts;
     private readonly PublishTokenStore _publishToken;
-    private readonly Func<Task<IReadOnlyList<string>>> _undoClaudeCodeEntries;
+    private readonly Func<IReadOnlyCollection<ResetFolder>, Task<IReadOnlyList<string>>> _undoClaudeCodeEntries;
     private readonly Action _stopBackgroundWork;
     private readonly Func<Task<int>>? _deleteAccountProfiles;
 
-    /// <summary>Turns the Claude Code switches off in settings.json once the entries are out (see
-    /// <see cref="SettingsStore.ClearClaudeCodeSwitchesForReset"/>); null in contexts without a store.</summary>
-    private readonly Action? _clearClaudeCodeSwitches;
+    /// <summary>Turn the MCP pair and the statusline pair of switches off in settings.json once their entries are out (see
+    /// <see cref="SettingsStore.ClearMcpSwitchesForReset"/>); null in contexts without a store.</summary>
+    private readonly Action? _clearMcpSwitches;
+    private readonly Action? _clearStatuslineSwitches;
 
     public ResetService(
         Paths paths,
         AccountStore accounts,
         PublishTokenStore publishToken,
-        Func<Task<IReadOnlyList<string>>> undoClaudeCodeEntries,
+        Func<IReadOnlyCollection<ResetFolder>, Task<IReadOnlyList<string>>> undoClaudeCodeEntries,
         Action stopBackgroundWork,
         Func<Task<int>>? deleteAccountProfiles = null,
-        Action? clearClaudeCodeSwitches = null)
+        Action? clearMcpSwitches = null,
+        Action? clearStatuslineSwitches = null)
     {
-        _clearClaudeCodeSwitches = clearClaudeCodeSwitches;
+        _clearMcpSwitches = clearMcpSwitches;
+        _clearStatuslineSwitches = clearStatuslineSwitches;
         _deleteAccountProfiles = deleteAccountProfiles;
         _paths = paths;
         _accounts = accounts;
@@ -48,8 +53,16 @@ internal sealed class ResetService
         _stopBackgroundWork = stopBackgroundWork;
     }
 
+    /// <summary>
+    /// Whether ticking Settings leaves a kept MCP entry without its consent: <c>mcp-settings.json</c> and <c>mcp_enabled</c> go with the
+    /// Settings part, so the kept server answers without usage until Install sets them again. The dialog shows
+    /// <see cref="SettingsNames.ResetKeptMcpSettings"/> while this is true.
+    /// </summary>
+    public static bool KeptMcpLosesItsSettings(ResetChoices choices, IReadOnlyCollection<ResetFolder> keep)
+        => choices.Settings && keep.Any(f => f.Kinds.Contains(IntegrationKind.Mcp));
+
     /// <summary>Runs the checked parts. <paramref name="started"/> is told which part is about to run.</summary>
-    public async Task<IReadOnlyList<ResetStepResult>> RunAsync(ResetChoices choices, Action<ResetPart>? started = null)
+    public async Task<IReadOnlyList<ResetStepResult>> RunAsync(ResetChoices choices, IReadOnlyCollection<ResetFolder> keepFolders, Action<ResetPart>? started = null)
     {
         // Follow and seat meters off before anything is removed, so nothing re-creates a file or
         // re-reads a key that is about to go. A stop that throws must not block the reset.
@@ -60,7 +73,7 @@ internal sealed class ResetService
             started?.Invoke(part);
             return part switch
             {
-                ResetPart.ClaudeCodeEntries => await ClaudeCodeEntriesAsync(),
+                ResetPart.ClaudeCodeEntries => await ClaudeCodeEntriesAsync(keepFolders),
                 ResetPart.Accounts => await AccountsAsync(),
                 _ => await DeleteInventoryAsync(part),
             };
@@ -87,27 +100,54 @@ internal sealed class ResetService
         }
     }
 
-    private async Task<ResetStepResult> ClaudeCodeEntriesAsync()
+    private async Task<ResetStepResult> ClaudeCodeEntriesAsync(IReadOnlyCollection<ResetFolder> keep)
     {
         var failures = new List<string>();
+        // Read before the undo: a receipt save moves a damaged file aside and leaves a readable one (slice 8 decision 4, P1).
+        bool unreadable = ResetPlan.ReceiptsUnreadable(_paths);
         try
         {
-            failures.AddRange(await _undoClaudeCodeEntries());
+            failures.AddRange(await _undoClaudeCodeEntries(keep));
         }
         catch (Exception)
         {
             failures.Add("a Claude Code entry");
         }
 
-        // A failed entry keeps its receipt (and the files it points at) so it can still be removed later.
-        if (failures.Count == 0)
+        // A failed entry (a statusline one included) keeps its receipt and the files it points at, so it can still be removed
+        // later. So does every kept folder, and every entry when the receipts can't be read (R12): the receipts file never goes
+        // after a failure. Past that the rest goes per kind, by what a kept entry still runs (P3).
+        if (failures.Count == 0 && !unreadable)
         {
-            // The entries are out: their switches go off too, or the next launch re-creates the projection,
-            // the launcher and the script. A Settings part that runs later deletes the file anyway.
-            try { _clearClaudeCodeSwitches?.Invoke(); } catch (Exception) { /* best effort */ }
-            failures.AddRange(await DeleteItemsAsync(ResetPart.ClaudeCodeEntries));
+            bool Kept(IntegrationKind kind) => keep.Any(f => f.Kinds.Contains(kind));
+            bool keepsMcp = Kept(IntegrationKind.Mcp);
+            // The statusline switch also means "the meters mod reads the snapshot" (SnapshotConsumers), so a kept meters mod holds it.
+            bool keepsStatusline = Kept(IntegrationKind.Statusline) || Kept(IntegrationKind.Meters);
+
+            // The entries are out: their switches go off too, or the next launch re-creates the projection, the launcher and the
+            // script. A Settings part that runs later deletes the file anyway.
+            if (!keepsMcp)
+                try { _clearMcpSwitches?.Invoke(); } catch (Exception) { /* best effort */ }
+            if (!keepsStatusline)
+                try { _clearStatuslineSwitches?.Invoke(); } catch (Exception) { /* best effort */ }
+
+            failures.AddRange(await DeleteItemsAsync(ResetPart.ClaudeCodeEntries,
+                item => !StaysForKept(item, keep.Count > 0, keepsMcp, Kept(IntegrationKind.Statusline), Kept(IntegrationKind.Meters))));
         }
         return ResetStepResult.Failed(ResetPart.ClaudeCodeEntries, Distinct(failures));
+    }
+
+    /// <summary>Whether a Claude Code inventory item stays because a kept entry still needs it. Named by leaf, like the inventory lists
+    /// them: the receipts folder, the mods, the MCP server and its projection, and <c>bin\</c> (the statusline script and the MCP launcher).</summary>
+    private static bool StaysForKept(ResetItem item, bool anyKept, bool mcp, bool statusline, bool meters)
+    {
+        string name = Path.GetFileName(item.Path.TrimEnd('\\', '/'));   // streamer: notname - leaf compared to Sanduhr's own names, never drawn
+        if (name.Equals(ResetPlan.IntegrationsName, StringComparison.OrdinalIgnoreCase)) return anyKept;
+        if (name.Equals(ResetPlan.ModsName, StringComparison.OrdinalIgnoreCase)) return meters;
+        if (name.Equals(ResetPlan.McpName, StringComparison.OrdinalIgnoreCase)
+            || name.Equals(ResetPlan.McpSettingsName, StringComparison.OrdinalIgnoreCase)) return mcp;
+        if (name.Equals(ResetPlan.BinName, StringComparison.OrdinalIgnoreCase)) return mcp || statusline;
+        return anyKept;   // a name this doesn't know stays while anything is kept
     }
 
     private async Task<ResetStepResult> AccountsAsync()
@@ -148,7 +188,7 @@ internal sealed class ResetService
     private async Task<ResetStepResult> DeleteInventoryAsync(ResetPart part)
         => ResetStepResult.Failed(part, Distinct(await DeleteItemsAsync(part)));
 
-    private async Task<List<string>> DeleteItemsAsync(ResetPart part)
+    private async Task<List<string>> DeleteItemsAsync(ResetPart part, Func<ResetItem, bool>? include = null)
     {
         var failures = new List<string>();
         IReadOnlyList<ResetItem> items;
@@ -158,7 +198,7 @@ internal sealed class ResetService
             failures.Add("the list of files");
             return failures;
         }
-        foreach (var item in items)
+        foreach (var item in items.Where(i => include?.Invoke(i) ?? true))
             if (!await TryDeleteAsync(item))
                 failures.Add(KindOf(part, item));
         return failures;

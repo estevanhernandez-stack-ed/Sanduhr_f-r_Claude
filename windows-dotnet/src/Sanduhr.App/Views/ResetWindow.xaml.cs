@@ -157,7 +157,7 @@ internal partial class ResetWindow : Window
         IReadOnlyList<ResetStepResult> results;
         try
         {
-            results = await _service.RunAsync(choices,
+            results = await _service.RunAsync(choices, [],
                 part => ShowRunning($"Resetting: {PartLabel(part)}"));
         }
         catch (Exception)
