@@ -59,7 +59,10 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
                 window.SelectPage(page);
                 Settle(window, guard);
                 Assert.Equal(new SettingsLink(page, null), window.Place);
-                Assert.True(TabOf(window, page).IsSelected);
+                var tab = TabOf(window, page);
+                Assert.True(tab.IsSelected);
+                Assert.NotNull(tab.Content);
+                Assert.True(((UIElement)tab.Content).IsVisible, $"{page}'s content is not shown");
             }
         }
         finally { window.Close(); }
@@ -145,11 +148,13 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         var (window, svm, guard) = Open("Personal");
         try
         {
-            foreach (var page in new[] { SettingsPage.NowPlaying, SettingsPage.Weather, SettingsPage.DeskMessage })
+            foreach (var (page, anchor) in new[] { (SettingsPage.NowPlaying, "Bottom right"), (SettingsPage.Weather, "Top right"), (SettingsPage.DeskMessage, "Bottom left") })
             {
                 window.SelectPage(page);
                 Settle(window, guard);
                 var status = Below<DeskPieceStatusPanel>((DependencyObject)TabOf(window, page).Content).Single();
+                var line = (TextBlock)status.FindName("StatusText");
+                Assert.Equal(SettingsNames.NotOnDesk, line.Text);
                 var place = (Button)status.FindName("PlaceButton");
                 Assert.True(place.IsVisible);
                 Assert.Equal(SettingsNames.PlaceOnDesk, System.Windows.Automation.AutomationProperties.GetName(place));
@@ -158,10 +163,36 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
                 place.Command.Execute(place.CommandParameter);
                 Settle(window, guard);
                 Assert.False(place.IsVisible);
+                Assert.Equal(SettingsNames.PieceStatus(anchor, svm.Desk.Enabled), line.Text);
                 var link = (Button)status.FindName("DeskLink");
                 Assert.True(link.IsVisible);
                 Assert.Equal("desk#pieces", SettingsLinkTo.GetLink(link));
             }
+        }
+        finally { window.Close(); }
+    });
+
+    /// <summary>A click on a button with no link falls through; one with a link is taken by the window and opens its place (11b).</summary>
+    [Fact]
+    public void A_click_passes_through_OnSettingsLinkClick_only_when_the_button_has_a_link() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Weather);
+            Settle(window, guard);
+            var status = Below<DeskPieceStatusPanel>((DependencyObject)TabOf(window, SettingsPage.Weather).Content).Single();
+            var place = (Button)status.FindName("PlaceButton");
+            Assert.True(string.IsNullOrEmpty(SettingsLinkTo.GetLink(place)), "the Place button was meant to be link-less");
+            var plain = new RoutedEventArgs(ButtonBase.ClickEvent, place);
+            place.RaiseEvent(plain);
+            Assert.False(plain.Handled, "a link-less button's click was taken by the window");
+
+            var link = (Button)status.FindName("DeskLink");
+            Assert.False(string.IsNullOrEmpty(SettingsLinkTo.GetLink(link)));
+            var linked = new RoutedEventArgs(ButtonBase.ClickEvent, link);
+            link.RaiseEvent(linked);
+            Assert.True(linked.Handled, "a linked button's click was not taken by the window");
         }
         finally { window.Close(); }
     });
@@ -362,7 +393,9 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
                 Assert.True(peer.HasKeyboardFocus(), title + ": the Expander's peer reports the focus");
 
                 // The header text is drawn by the toggle's own template: none of it is a control element beside the toggle.
-                foreach (var text in Below<TextBlock>(toggle))
+                var texts = Below<TextBlock>(toggle).ToList();
+                Assert.NotEmpty(texts);
+                foreach (var text in texts)
                 {
                     var tp = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(text);
                     Assert.False(tp is not null && tp.IsControlElement(), title + ": header text '" + text.Text + "' is a control element");
@@ -375,6 +408,8 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
             }
             var designs = (Expander)window.FindName("DeskDesignsSection");
             Assert.Equal(svm.Desk.Designs.Summary, System.Windows.Automation.AutomationProperties.GetHelpText(Below<ToggleButton>(designs).First()));
+            var designsPeer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(designs);
+            Assert.Equal(svm.Desk.Designs.Summary, designsPeer.GetHelpText());
             Assert.Equal(System.Windows.Automation.AutomationHeadingLevel.Level2,
                 System.Windows.Automation.AutomationProperties.GetHeadingLevel(designs));
         }

@@ -372,16 +372,18 @@ public sealed class SettingsReachTests : AppWindowFixture
     public void A_live_media_hub_never_reaches_the_Settings_window() => AppHost.Run(() =>
     {
         var leaked = new Sanduhr.App.Desk.NowPlayingHub();
-        leaked.Service.SeenApps = ["Spotify.exe"];
-        Sanduhr.App.Desk.NowPlayingHub.Current = leaked;
-        var (window, svm, guard) = Open("Personal");
+        SettingsWindow? window = null;
         try
         {
+            leaked.Service.SeenApps = ["Spotify.exe"];
+            Sanduhr.App.Desk.NowPlayingHub.Current = leaked;
+            var (w, svm, guard) = Open("Personal");
+            window = w;
             Land(window, guard, SettingsPage.NowPlaying, SettingsIndex.NowPlayingApps);
             Assert.Empty(svm.NowPlayingPage.Apps);
             Assert.True(((FrameworkElement)window.FindName("NowPlayingAppsEmpty")).IsVisible, "NowPlayingAppsEmpty is not shown");
         }
-        finally { window.Close(); leaked.Dispose(); }
+        finally { window?.Close(); leaked.Dispose(); }
     });
 
     [Fact]
@@ -524,8 +526,16 @@ public sealed class SettingsReachTests : AppWindowFixture
             bool Shows(string key, DependencyProperty property, bool value) =>
                 TemplateTriggers(key).Any(t => t.Property == property && Equals(t.Value, value));
 
+            // A ring that sets nothing visible is no ring: the trigger must set a border or a visibility.
+            DependencyProperty[] visible = [Border.BorderBrushProperty, Border.BorderThicknessProperty, Control.BorderBrushProperty, UIElement.VisibilityProperty];
+            bool RingDraws(string key) =>
+                TemplateTriggers(key).Any(t => t.Property == UIElement.IsKeyboardFocusedProperty && Equals(t.Value, true)
+                    && t.Setters.OfType<Setter>().Any(s => visible.Contains(s.Property)));
             foreach (var key in new[] { "FlatButton", "AccentButton", "SettingsLinkButton", "ThemedCheckBox" })
+            {
                 Assert.True(Shows(key, UIElement.IsKeyboardFocusedProperty, true), $"{key} draws no focus ring");
+                Assert.True(RingDraws(key), $"{key}'s focus trigger sets nothing visible");
+            }
             foreach (var key in new[] { "FlatButton", "ThemedComboBox", "ThemedCheckBox" })
                 Assert.True(Shows(key, UIElement.IsEnabledProperty, false), $"{key} does not draw disabled");
             // The History and Claude Usage pills are FlatButtons with the same template.
