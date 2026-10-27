@@ -460,4 +460,20 @@ public class StreamerReachTests
         Assert.DoesNotContain("Codenames", csproj);
         Assert.DoesNotContain("StreamerFile", csproj);
     }
+
+    /// <summary>Decision 2: the alert toasts carry a tier label and the update toast a version, so neither reads a name. The scan finds one
+    /// site in the alert service, a log-file write marked "notname", and none in the restart-to-update service; a name reaching either toast
+    /// would be a new site here, unmasked or marked otherwise.</summary>
+    [Fact]
+    public void Toasts_read_no_name()
+    {
+        var sites = Scan().Where(s => s.File.EndsWith("AlertService.cs", StringComparison.Ordinal)
+                                      || s.File.EndsWith("RestartToUpdateService.cs", StringComparison.Ordinal)).ToList();
+        Assert.All(sites, s =>
+        {
+            Assert.Equal("notname", s.Id);
+            Assert.Contains("never drawn", s.Reason ?? "");
+        });
+        Assert.DoesNotContain(sites, s => s.File.EndsWith("RestartToUpdateService.cs", StringComparison.Ordinal));
+    }
 }
