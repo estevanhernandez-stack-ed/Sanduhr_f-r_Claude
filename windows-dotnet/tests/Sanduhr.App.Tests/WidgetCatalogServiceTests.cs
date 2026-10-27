@@ -143,6 +143,7 @@ internal static class WidgetKit
 /// caps), WPF's PNG encoding of pixel sheets, and install, update and uninstall through the Settings page's view model.
 /// All over <see cref="FakeGitHub"/> and a scratch LocalAppData: no real network, no real Sanduhr folder.
 /// </summary>
+[Collection("SettingsWindow")]
 public sealed class WidgetCatalogServiceTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "sanduhr-widget-svc-" + Guid.NewGuid().ToString("N")[..10]);

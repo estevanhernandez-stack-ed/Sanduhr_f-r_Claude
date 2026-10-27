@@ -510,6 +510,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <c>externalDir</c>.</summary>
     public string SanduhrExternalDir => _paths.ExternalDir;
 
+    /// <summary>Streamer mode (Settings v2, slice 7): the switch, the codename book and streamer.json.</summary>
+    public StreamerService Streamer { get; }
+
     /// <summary>The pre-3.5.0 meters mod root (<c>%APPDATA%\Sanduhr\mods</c>): entries under it still read as
     /// Sanduhr's, so Install, Status and Reset handle them.</summary>
     public string SanduhrLegacyModsRoot => _paths.LegacyModsRoot;
@@ -689,6 +692,14 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _credentials = new CredentialStore(_accounts, _paths);
         _history = new UsageHistory(_accounts, _paths);
         _settings = new SettingsStore(_paths);
+        // Streamer mode (Settings v2, slice 7): the widget owns the switch, the codename book and streamer.json; StreamerMode.Mask is set here.
+        // The dispatcher is read once, here, so a mask call from another thread still posts its save to the UI thread (preflight P10).
+        var ui = Dispatcher.CurrentDispatcher;
+        Streamer = new StreamerService(_paths, _settings,
+            () => ClaudeCodeFolders.Build(ClaudeCodeProfile.Dir, ClaudeCodeProfile.ConfigDir, _settings.LoadCcFoldersAdded()),
+            () => ClaudeCodeProfile.Dir,
+            post: a => ui.BeginInvoke(a, DispatcherPriority.Background));
+        Streamer.Load();
         _ccReader = new CcLogReader(null, () => ClaudeCodeHomes.Discover(
             ClaudeCodeProfile.Dir,
             ClaudeCodeProfile.ConfigDir));
@@ -2230,6 +2241,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _riffTimer.Stop();
         _statusNoticeTimer?.Stop();
         _themeHandoff?.Dispose();
+        Streamer.Dispose();
         _follower.Stop();
         _seatMeters.Stop();
         StopTransportRecovery();

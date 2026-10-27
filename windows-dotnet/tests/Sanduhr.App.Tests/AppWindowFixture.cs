@@ -63,6 +63,8 @@ public abstract class AppWindowFixture : IDisposable
         // Mods & Widgets fetches the catalog when it opens: never the real network from a test.
         WidgetCatalogService.HandlerOverride = () => new OfflineHandler();
         NoLiveMedia();
+        // Streamer mode is process-wide (slice 7): every test starts with it off, whatever the last one left.
+        StreamerMode.Reset();
     }
 
     /// <summary>A network that is never there: every request fails as if the PC were offline.</summary>
@@ -81,6 +83,7 @@ public abstract class AppWindowFixture : IDisposable
         Sanduhr.App.Desk.NowPlayingHub.Current = _oldHub;
         Sanduhr.App.Desk.NowPlayingLookService.Current = _oldLooks;
         ClaudeCodeViewModel.ForgetSessionChoice();
+        StreamerMode.Reset();
         try { Directory.Delete(Root, true); } catch (IOException) { }
     }
 
