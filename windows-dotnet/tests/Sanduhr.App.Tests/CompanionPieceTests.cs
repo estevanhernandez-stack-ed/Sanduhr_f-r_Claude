@@ -1,6 +1,10 @@
 using System.IO;
 using System.Text;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Automation.Peers;
+using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Sanduhr.App.Desk;
@@ -334,6 +338,33 @@ public sealed class CompanionPieceTests : IDisposable
         Assert.False(companion.HasCompanions);
         Assert.Null(companion.SelectedCompanion);
         Assert.Equal("mods#catalog", companion.GetOneLink);
+    }
+
+    [Fact]
+    public void The_companion_status_line_speaks_its_text_not_a_label() => Sta.Run(() =>
+    {
+        // Item 12 (S3 T7): a TextBlock with no Name speaks its Text, so the live status is read, not "Companion status".
+        Install("clock:bl companion:bl", roam: false);
+        var svc = new WidgetCatalogService(_paths, new FakeGitHub(), WidgetKit.V380, []);
+        var desk = new DeskSettingsViewModel(_store, [], () => [], widgets: () => svc.Store);
+        var page = new Sanduhr.App.Views.DeskPiecesPanel { DataContext = desk };
+        page.Measure(new Size(760, 2000));
+        page.Arrange(new Rect(0, 0, 760, 2000));
+        page.UpdateLayout();
+        var line = Below<TextBlock>(page).Single(t => BindingOperations.GetBinding(t, TextBlock.TextProperty)?.Path.Path == "Status");
+        Assert.Equal("", AutomationProperties.GetName(line));
+        Assert.Equal(line.Text, new TextBlockAutomationPeer(line).GetName());
+        Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(line));
+    });
+
+    private static IEnumerable<T> Below<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T t) yield return t;
+            foreach (var deeper in Below<T>(child)) yield return deeper;
+        }
     }
 
     [Fact]

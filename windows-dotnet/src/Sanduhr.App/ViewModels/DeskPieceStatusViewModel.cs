@@ -25,7 +25,7 @@ public sealed partial class DeskPieceStatusViewModel : ObservableObject
 
     public string Widget { get; }
 
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsHidden), nameof(CanPlace))] private bool _isPlaced;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsHidden))] private bool _isPlaced;
     [ObservableProperty] private string _text = "";
 
     public bool IsHidden => !IsPlaced;

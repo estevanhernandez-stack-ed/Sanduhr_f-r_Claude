@@ -76,7 +76,7 @@
                                Text="No buttons yet. Add an app or a link."
                                Visibility="{Binding HasNoButtons, Converter={StaticResource BoolVis}}" />
 
-                    <ItemsControl ItemsSource="{Binding Rows}" Focusable="False" Margin="0,10,0,0"
+                    <ItemsControl x:Name="ButtonRows" ItemsSource="{Binding Rows}" Focusable="False" Margin="0,10,0,0"
                                   AutomationProperties.Name="Launcher buttons">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
