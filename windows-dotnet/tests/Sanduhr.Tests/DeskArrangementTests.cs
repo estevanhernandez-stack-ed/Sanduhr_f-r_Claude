@@ -357,6 +357,7 @@ public class DeskArrangementTests
     [InlineData("clock", DeskAnchor.BL)]
     [InlineData("claude", DeskAnchor.BL)]
     [InlineData("meters", DeskAnchor.BL)]
+    [InlineData("meetings", DeskAnchor.BL)]
     [InlineData("glow", DeskAnchor.TC)]
     public void DefaultPlaceFor_is_the_specs_table(string widget, DeskAnchor expected) =>
         Assert.Equal(expected, DeskArrangement.DefaultPlaceFor(widget));

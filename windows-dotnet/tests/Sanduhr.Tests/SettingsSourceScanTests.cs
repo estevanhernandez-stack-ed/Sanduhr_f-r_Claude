@@ -765,8 +765,10 @@ public class SettingsSourceScanTests
     {
         // "(Settings, " + "Desk);" escapes PathProblems: the page is in the next literal (slice 1 review, split literals). Keep a
         // place in one literal; wrap the prose around it instead.
+        // "Settings," alone, or "Settings, <Page title>," (the sentence's own path cut after a page).
+        var openers = SettingsNames.Pages.Select(p => "Settings, " + SettingsNames.PageTitle(p) + ",").Append("Settings,").ToList();
         var split = CsStrings().Concat(CoreAndMcpStrings())
-            .Where(x => x.Text.TrimEnd().EndsWith("Settings,", StringComparison.Ordinal))
+            .Where(x => openers.Any(o => x.Text.TrimEnd().EndsWith(o, StringComparison.Ordinal)))
             .Select(x => $"{x.Where}: \"{x.Text}\"")
             .ToList();
         Assert.True(split.Count == 0, "A Settings path split across literals: " + string.Join(", ", split));
@@ -828,7 +830,7 @@ public class SettingsSourceScanTests
         // Slice 3 final review T9: the companion row used views:WidgetsPage.NotVisible, which breaks the Desk page when that page goes.
         // Shared converters live in Converters/; a view references its own statics or those.
         var bad = Directory.EnumerateFiles(AppDir(), "*.xaml", SearchOption.AllDirectories)
-            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"\{x:Static views:(\w+Page)\.\w+\}").Select(m => (File: f, Page: m.Groups[1].Value)))
+            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"\{x:Static views:(\w+)\.\w+\}").Select(m => (File: f, Page: m.Groups[1].Value)))
             .Where(x => !Path.GetFileNameWithoutExtension(x.File).Equals(x.Page, StringComparison.Ordinal))
             .Select(x => $"{Path.GetFileName(x.File)} uses {x.Page}'s statics")
             .ToList();

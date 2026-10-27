@@ -44,6 +44,16 @@ public class SettingsDeskSplitIndexTests
         Assert.Empty(SettingsIndex.JumpLinks(SettingsPage.Weather));
     }
 
+    private const string HeadingLike = "<TextBlock\\b(?=[^>]*FontSize=\"1[34]\")(?=[^>]*FontWeight=\"SemiBold\")[^>]*>";
+
+    [Fact]
+    public void The_heading_scan_sees_FontWeight_before_FontSize()
+    {
+        Assert.Single(Regex.Matches("<TextBlock FontWeight=\"SemiBold\" FontSize=\"14\" Text=\"Pieces\" />", HeadingLike));
+        Assert.Single(Regex.Matches("<TextBlock FontSize=\"13\" FontWeight=\"SemiBold\" Text=\"Pieces\" />", HeadingLike));
+        Assert.Empty(Regex.Matches("<TextBlock FontSize=\"12\" FontWeight=\"SemiBold\" Text=\"Pieces\" />", HeadingLike));
+    }
+
     [Fact]
     public void The_Desk_split_pages_mark_their_headings()
     {
@@ -52,7 +62,7 @@ public class SettingsDeskSplitIndexTests
                 .Select(p => File.ReadAllText(Path.Combine(AppDir(), "Views", p + ".xaml"))));
         var bad = new List<string>();
         foreach (var src in sources)
-            foreach (Match t in Regex.Matches(src, "<TextBlock\\b[^>]*FontSize=\"1[34]\"[^>]*FontWeight=\"SemiBold\"[^>]*>"))
+            foreach (Match t in Regex.Matches(src, HeadingLike))
                 // a list row's own title (the Launcher's buttons) is data, not a section heading
                 if (!t.Value.Contains("Text=\"{Binding", StringComparison.Ordinal) && !t.Value.Contains("AutomationProperties.HeadingLevel=\"Level", StringComparison.Ordinal))
                     bad.Add(t.Value);
