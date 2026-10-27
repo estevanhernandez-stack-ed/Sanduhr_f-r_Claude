@@ -182,8 +182,10 @@ public class ResetPlanTests : IDisposable
         Touch(Path.Combine(paths.ExternalDirPath, StreamerFile.FileName));
         Touch(Path.Combine(paths.ExternalDirPath, "streamer.json.bak"));   // someone else's name in the shared folder
         Touch(Path.Combine(paths.ExternalDirPath, "streamer.json.tmp"));   // a crashed write: Sanduhr's own name (preflight P19)
+        Touch(paths.CodenamesFile + ".tmp");   // Codenames.Save leaves it when the move fails; it holds the salt and every real name (final review M2)
         var settings = ResetPlan.Inventory(paths)[ResetPart.Settings].Select(i => i.Path).ToList();
         Assert.Contains(paths.CodenamesFile, settings);
+        Assert.Contains(paths.CodenamesFile + ".tmp", settings);
         Assert.Contains(Path.Combine(paths.ExternalDirPath, StreamerFile.FileName), settings);
         Assert.Contains(Path.Combine(paths.ExternalDirPath, "streamer.json.tmp"), settings);
         Assert.DoesNotContain(Path.Combine(paths.ExternalDirPath, "streamer.json.bak"), settings);
