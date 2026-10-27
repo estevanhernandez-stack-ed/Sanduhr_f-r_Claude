@@ -149,7 +149,7 @@
                 <Run Text="{Binding Field, Mode=OneWay}" FontFamily="Cascadia Code, Consolas">
                     <Run.Style>
                         <Style TargetType="Run">
-                            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.AccentText}" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsError}" Value="True">
                                     <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.PaceMarker}" />
@@ -241,7 +241,14 @@
                                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                             <Border x:Name="bd" Padding="10,7" Margin="0,1" CornerRadius="6"
                                     Background="Transparent" BorderBrush="Transparent" BorderThickness="1">
-                                <ContentPresenter ContentSource="Header" />
+                                <Grid>
+                                    <!-- Settings v2, slice 8 (WF37): the selected row's accent bar, 3 x 16 DIP, 2 DIP in from the row's edge
+                                         (1 border + 10 padding - 9). -->
+                                    <Border x:Name="bar" Width="3" Height="16" CornerRadius="1.5" Margin="-9,0,0,0"
+                                            HorizontalAlignment="Left" VerticalAlignment="Center" Visibility="Hidden"
+                                            Background="{DynamicResource Sanduhr.Brush.Accent}" />
+                                    <ContentPresenter ContentSource="Header" />
+                                </Grid>
                             </Border>
                         </StackPanel>
                         <ControlTemplate.Triggers>
@@ -253,7 +260,8 @@
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="bd" Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
-                                <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                <Setter TargetName="bar" Property="Visibility" Value="Visible" />
+                                <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.SelectedLabel}" />
                                 <Setter Property="FontWeight" Value="SemiBold" />
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
@@ -650,7 +658,7 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="ring" BorderThickness="1" BorderBrush="Transparent" CornerRadius="3" Padding="2,0">
                             <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
-                                       Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                       Foreground="{DynamicResource Sanduhr.Brush.AccentText}" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -999,7 +1007,7 @@
                                         <ControlTemplate TargetType="Button">
                                             <Border x:Name="ring" BorderThickness="1" BorderBrush="Transparent" CornerRadius="3" Padding="2,0">
                                                 <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
-                                                           Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                           Foreground="{DynamicResource Sanduhr.Brush.AccentText}" />
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
@@ -1039,7 +1047,7 @@
                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                                            Text="Track multiple Claude accounts in one install. Switch which one is active to send fetches and history to that account. Each account's history is stored in its own file." />
                                 <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,8"
-                                           Foreground="{DynamicResource Sanduhr.Brush.Accent}"
+                                           Foreground="{DynamicResource Sanduhr.Brush.AccentText}"
                                            Visibility="{Binding IsDemo, Converter={StaticResource BoolVis}}"
                                            Text="Demo mode: these are sample accounts. End demo mode from the tray menu to manage your own." />
                                 <StackPanel Margin="0,0,0,12" views:SettingsAnchor.Id="follow">
@@ -1095,13 +1103,13 @@
                                                             <ColumnDefinition Width="Auto" />
                                                         </Grid.ColumnDefinitions>
                                                         <TextBlock Grid.Column="0" Text="{Binding Marker}"
-                                                                   Foreground="{DynamicResource Sanduhr.Brush.Accent}" FontSize="12"
+                                                                   Foreground="{DynamicResource Sanduhr.Brush.AccentText}" FontSize="12"
                                                                    VerticalAlignment="Center" />
                                                         <TextBlock Grid.Column="1" Text="{Binding Shown}"
                                                                    Foreground="{DynamicResource Sanduhr.Brush.Text}" FontSize="13"
                                                                    VerticalAlignment="Center" />
                                                         <TextBlock Grid.Column="2" Text="active" FontSize="10"
-                                                                   Foreground="{DynamicResource Sanduhr.Brush.Accent}"
+                                                                   Foreground="{DynamicResource Sanduhr.Brush.AccentText}"
                                                                    VerticalAlignment="Center"
                                                                    Visibility="{Binding IsActive, Converter={StaticResource BoolVis}}" />
                                                     </Grid>
@@ -2084,6 +2092,12 @@
 
                 <!-- Themes tab (item 8) — swatch grid + agent-assisted theme creation. -->
                 <TabItem Header="Themes" Tag="Themes" AutomationProperties.Name="Themes">
+                    <!-- Settings v2, slice 8 (WF49): one scrolling page, so both lists show everything they hold. -->
+                    <ScrollViewer x:Name="ThemesPageScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                  Focusable="False">
+                    <ScrollViewer.Resources>
+                        <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                    </ScrollViewer.Resources>
                     <Border x:Name="ThemesRoot" Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="16"
                             DataContext="{Binding Themes}">
                         <Grid>
@@ -2092,7 +2106,7 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -2119,14 +2133,8 @@
                             <Border Grid.Row="1" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
                                     BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
                                     Padding="5,4">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                              HorizontalScrollBarVisibility="Disabled" MaxHeight="112">
-                                    <ScrollViewer.Resources>
-                                        <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
-                                    </ScrollViewer.Resources>
-                                    <ListBox x:Name="ThemeGallery" Style="{StaticResource ThemeSwatchList}"
-                                             ItemsSource="{Binding Themes}" AutomationProperties.Name="Choose a theme" />
-                                </ScrollViewer>
+                                <ListBox x:Name="ThemeGallery" Style="{StaticResource ThemeSwatchList}"
+                                         ItemsSource="{Binding Themes}" AutomationProperties.Name="Choose a theme" />
                             </Border>
 
                             <Border Grid.Row="2" Height="1" Background="{DynamicResource Sanduhr.Brush.Border}"
@@ -2134,14 +2142,9 @@
 
                             <!-- Editor: Paste (a theme JSON, lint findings before Save) or Studio
                                  (token rows; the widget itself is the live preview). -->
-                            <!-- The editor scrolls inside the flexible row: at a short window the token
-                                 list would otherwise push "Save & apply" below the frame, and the grid
-                                 itself does not scroll. Installed themes and their buttons stay pinned. -->
-                            <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled">
-                                <ScrollViewer.Resources>
-                                    <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
-                                </ScrollViewer.Resources>
+                            <!-- The editor sits on the page, which scrolls as one (slice 8, WF49): an inner scroller would
+                                 swallow the wheel over the editor. -->
+                            <Border Grid.Row="4">
                                 <StackPanel>
                                 <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,0,8" views:SettingsAnchor.Id="studio"
                                           Content="Studio: edit the tokens, watch the widget re-tint live"
@@ -2336,21 +2339,27 @@
                                     </StackPanel>
                                 </StackPanel>
                                 </StackPanel>
-                            </ScrollViewer>
+                            </Border>
                             <!-- Installed user themes -->
                             <TextBlock Grid.Row="7" Text="Installed user themes" FontSize="11" views:SettingsAnchor.Id="installed"
                                        FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                        Margin="0,16,0,6" />
 
-                            <Border Grid.Row="8" Height="72" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                            <Border Grid.Row="8" MinHeight="72" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
                                     BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
                                 <Grid>
+                                    <!-- No scroll host of its own (slice 8, WF49): the page scrolls, and the wheel reaches it. -->
                                     <ListBox x:Name="ThemesList" AutomationProperties.Name="Installed user themes"
                                              ItemsSource="{Binding InstalledThemes}"
                                              SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
                                              Background="Transparent" BorderThickness="0"
-                                             Foreground="{DynamicResource Sanduhr.Brush.Text}"
-                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                                             Foreground="{DynamicResource Sanduhr.Brush.Text}">
+                                        <ListBox.Template>
+                                            <ControlTemplate TargetType="ListBox">
+                                                <ItemsPresenter Margin="2" />
+                                            </ControlTemplate>
+                                        </ListBox.Template>
+                                    </ListBox>
                                     <TextBlock Text="No user themes yet. Paste one above or drop a JSON in the themes folder."
                                                Foreground="{DynamicResource Sanduhr.Brush.TextDim}" FontSize="11"
                                                TextWrapping="Wrap" TextAlignment="Center" MaxWidth="280"
@@ -2370,6 +2379,7 @@
                             </StackPanel>
                         </Grid>
                     </Border>
+                    </ScrollViewer>
                 </TabItem>
 
                 <!-- Desk (Settings v2, slice 3: the split, WF22, WF8): the switch, Arrange, the map on top, every piece (Show, place, order),
@@ -2719,8 +2729,8 @@
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
                             <StackPanel views:SettingsAnchor.Id="weather-credit">
                                 <TextBlock FontSize="11" TextWrapping="Wrap"><Hyperlink NavigateUri="{Binding CreditUrl}" RequestNavigate="Hyperlink_RequestNavigate"
-                                               Foreground="{DynamicResource Sanduhr.Brush.Accent}" AutomationProperties.Name="Weather data by Open-Meteo.com"><Run Text="{Binding Credit, Mode=OneWay}" /></Hyperlink><Run Text=" (CC BY 4.0, " Foreground="{DynamicResource Sanduhr.Brush.TextDim}" /><Hyperlink NavigateUri="{Binding LicenceUrl}" RequestNavigate="Hyperlink_RequestNavigate"
-                                               Foreground="{DynamicResource Sanduhr.Brush.Accent}" AutomationProperties.Name="The licence"><Run Text="licence" /></Hyperlink><Run Text="). Place search by GeoNames (CC BY 4.0)." Foreground="{DynamicResource Sanduhr.Brush.TextDim}" /></TextBlock>
+                                               Foreground="{DynamicResource Sanduhr.Brush.AccentText}" AutomationProperties.Name="Weather data by Open-Meteo.com"><Run Text="{Binding Credit, Mode=OneWay}" /></Hyperlink><Run Text=" (CC BY 4.0, " Foreground="{DynamicResource Sanduhr.Brush.TextDim}" /><Hyperlink NavigateUri="{Binding LicenceUrl}" RequestNavigate="Hyperlink_RequestNavigate"
+                                               Foreground="{DynamicResource Sanduhr.Brush.AccentText}" AutomationProperties.Name="The licence"><Run Text="licence" /></Hyperlink><Run Text="). Place search by GeoNames (CC BY 4.0)." Foreground="{DynamicResource Sanduhr.Brush.TextDim}" /></TextBlock>
                             </StackPanel>
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
                             <views:TrademarkFooter />
@@ -2895,9 +2905,15 @@
                                                Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                 </Grid>
                                 <StackPanel views:SettingsAnchor.Id="reset" Margin="0,12,0,0" HorizontalAlignment="Left">
-                                    <Button Style="{StaticResource FlatButton}" Padding="10,4" Content="{Binding ResetSanduhrTitle}"
-                                            AutomationProperties.Name="{x:Static core:SettingsNames.ResetSanduhr}" AutomationProperties.HelpText="Removes what Sanduhr keeps on this PC. You choose which parts."
+                                    <Button x:Name="ResetSanduhrButton" Style="{StaticResource FlatButton}" Padding="10,4" Content="{Binding ResetSanduhrTitle}"
+                                            HorizontalAlignment="Left"
+                                            AutomationProperties.Name="{x:Static core:SettingsNames.ResetSanduhr}"
+                                            AutomationProperties.HelpText="{x:Static core:SettingsNames.ResetSanduhrCaption}"
                                             Command="{Binding ResetSanduhrCommand}" />
+                                    <!-- Settings v2, slice 8 (spec, Reset): what it removes, so nobody has to open the dialog to learn it. -->
+                                    <TextBlock x:Name="ResetCaption" Text="{x:Static core:SettingsNames.ResetSanduhrCaption}"
+                                               FontSize="11" TextWrapping="Wrap" MaxWidth="460" Margin="0,6,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                                 </StackPanel>
                             </StackPanel>
 
@@ -2931,7 +2947,7 @@
                                                         <ControlTemplate TargetType="Button">
                                                             <Border x:Name="ring" BorderThickness="1" BorderBrush="Transparent" CornerRadius="3" Padding="2,0">
                                                                 <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
-                                                                           Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                                           Foreground="{DynamicResource Sanduhr.Brush.AccentText}" />
                                                             </Border>
                                                             <ControlTemplate.Triggers>
                                                                 <Trigger Property="IsMouseOver" Value="True">
@@ -2973,7 +2989,7 @@
                                                         <ControlTemplate TargetType="Button">
                                                             <Border x:Name="ring" BorderThickness="1" BorderBrush="Transparent" CornerRadius="3" Padding="2,0">
                                                                 <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
-                                                                           Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                                           Foreground="{DynamicResource Sanduhr.Brush.AccentText}" />
                                                             </Border>
                                                             <ControlTemplate.Triggers>
                                                                 <Trigger Property="IsMouseOver" Value="True">

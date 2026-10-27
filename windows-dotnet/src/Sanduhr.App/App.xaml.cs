@@ -1085,7 +1085,7 @@ public partial class App : Application
             paths,
             vm.AccountStore,
             new PublishTokenStore(new WindowsCredentialManager(AccountStore.Service)),
-            () => Task.Run<IReadOnlyList<string>>(() => ClaudeCodeViewModel.UndoEverything(vm)),
+            keep => Task.Run(() => ClaudeCodeViewModel.UndoEverything(vm, keep)),
             () =>
             {
                 ResetGuard.MarkDone();
@@ -1098,8 +1098,13 @@ public partial class App : Application
                 _vm?.NowPlaying?.Dispose();
             },
             vm.InactiveReader.DeleteAllProfilesAsync,
-            () => new SettingsStore(paths).ClearClaudeCodeSwitchesForReset());
-        ResetWindow.ShowFor(_settingsWindow, service, QuitApp);
+            () => new SettingsStore(paths).ClearMcpSwitchesForReset(),
+            () => new SettingsStore(paths).ClearStatuslineSwitchesForReset());
+        var folders = ResetFolderListViewModel.Read(vm);
+        var svm = _settingsWindow?.ViewModel;
+        if (svm is not null) svm.ResetFolders = folders;   // a streamer flip renames the rows (decision 13)
+        try { ResetWindow.ShowFor(_settingsWindow, service, folders, QuitApp); }
+        finally { if (svm is not null) svm.ResetFolders = null; }
     }
 
     /// <summary>The tray's restart items follow the update offer and the transport's state.</summary>

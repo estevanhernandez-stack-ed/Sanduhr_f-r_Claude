@@ -953,21 +953,21 @@ public static partial class Program
             PaceMarker = S("pace_marker"), Sparkline = S("sparkline"), GlassAlpha = j["glass_alpha"]!.GetValue<double>(),
         }));
         var sb = new StringBuilder();
-        sb.AppendLine("WCAG contrast ratios of Settings text brushes on the page surface (Glass over Bg at the theme's glass alpha) and on the sidebar (TitleBg).");
-        sb.AppendLine("Thresholds: 4.5 for body text, 3.0 for large text and focus indicators. Marked LOW below 4.5.");
+        sb.AppendLine("WCAG contrast ratios of Settings text brushes on the surfaces Settings paints (ThemeContrast.SettingsSurfaces, slice 8):");
+        sb.AppendLine("the page card (Glass), a well inside a page (Bg) and the sidebar (TitleBg at the chrome alpha over Bg). The window is opaque: no Mica.");
+        sb.AppendLine($"Thresholds: {ThemeContrast.TextMin} for body text (TextDim's floor is {ThemeContrast.DimFloor}), {ThemeContrast.NonTextMin} for indicators. Marked LOW below 4.5.");
         foreach (var (key, d) in defs)
         {
-            Color bg = Hex(d.Bg);
-            Color page = Over(Hex(d.Glass), d.GlassAlpha, bg);
-            Color side = Hex(d.TitleBg);
+            var surfaces = ThemeContrast.SettingsSurfaces(d);
             sb.AppendLine();
-            sb.AppendLine($"## {key} (glass alpha {d.GlassAlpha:0.00}; page surface {page}; sidebar {side})");
-            foreach (var (name, hex) in new[] { ("Text", d.Text), ("TextSecondary", d.TextSecondary), ("TextDim", d.TextDim), ("TextMuted", d.TextMuted), ("Accent", d.Accent), ("PaceMarker", d.PaceMarker) })
+            sb.AppendLine($"## {key} ({string.Join("; ", surfaces.Select(s => $"{s.Name} {ThemeContrast.Hex(s.Color)}"))})");
+            foreach (var (name, hex) in new[] { ("Text", d.Text), ("TextSecondary", d.TextSecondary), ("TextDim", d.TextDim), ("TextMuted", d.TextMuted), ("Accent", d.Accent), ("PaceMarker", d.PaceMarker), ("SelectedLabel", ThemeContrast.SelectedLabel(d)) })
             {
-                double rp = Ratio(Hex(hex), page), rs = Ratio(Hex(hex), side);
-                sb.AppendLine($"  {name,-14} {hex}  on page {rp,5:0.0}{(rp < 4.5 ? " LOW" : "    ")}   on sidebar {rs,5:0.0}{(rs < 4.5 ? " LOW" : "")}");
+                var parts = surfaces.Select(s => (s.Name, R: ThemeContrast.Ratio(hex, s.Color))).ToList();
+                double worst = parts.Min(p => p.R);
+                sb.AppendLine($"  {name,-14} {hex}  " + string.Join("  ", parts.Select(p => $"{p.Name} {p.R,5:0.0}")) + (worst < 4.5 ? "  LOW" : ""));
             }
-            sb.AppendLine($"  Border vs page {Ratio(Hex(d.Border), page):0.0} (non-text, wants 3.0); Accent vs page {Ratio(Hex(d.Accent), page):0.0} (focus ring colour, wants 3.0)");
+            sb.AppendLine($"  Border vs page {ThemeContrast.Ratio(d.Border, surfaces[0].Color):0.0} (non-text, wants 3.0); Accent vs page {ThemeContrast.Ratio(d.Accent, surfaces[0].Color):0.0} (focus ring and the selected row's bar, wants 3.0)");
         }
         PassWrite("contrast.txt", sb.ToString());
     }

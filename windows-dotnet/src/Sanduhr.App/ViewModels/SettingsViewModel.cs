@@ -294,6 +294,10 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
         });
     }
 
+    /// <summary>Reset's folder list while the dialog is open (slice 8, decision 13): ReloadNames renames its rows with every page's names.
+    /// App.ShowReset sets it and clears it when the dialog closes.</summary>
+    internal ResetFolderListViewModel? ResetFolders { get; set; }
+
     /// <summary>
     /// Streamer mode moved, the codenames were shuffled, or a name was shown or hidden (slice 7 decision 15): every page that masks a name
     /// builds its text again, so nothing on an open page keeps a real name or an old codename. Tasks 9 to 12 add their pages here.
@@ -316,6 +320,7 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
         ClaudeCode.Ledger.RefreshNames();
         Publish.RefreshNames();
         WeatherPage.RefreshNames();
+        ResetFolders?.RefreshNames();   // slice 8: Reset's rows, while the dialog is open
         OnPropertyChanged(nameof(SettingsFolderShown));
         OnPropertyChanged(nameof(LocalFolderShown));
         OnPropertyChanged(nameof(ClaudeCodeFilesFolderShown));

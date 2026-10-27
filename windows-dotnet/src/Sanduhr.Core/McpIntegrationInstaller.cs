@@ -399,12 +399,13 @@ public sealed class McpIntegrationInstaller
     /// <summary>The reset path: deregister the server from every home, then delete the launcher and the
     /// version dirs, but only when every deregister succeeded. A failed entry keeps its files, so the
     /// registration Claude Code still holds keeps working until the user removes it by hand.</summary>
-    public bool UndoAll(IEnumerable<string> ccHomeNames)
+    /// <param name="removeFiles">False while Reset keeps a folder whose entry still runs the launcher (slice 8, R12).</param>
+    public bool UndoAll(IEnumerable<string> ccHomeNames, bool removeFiles = true)
     {
         bool all = true;
         foreach (var home in ccHomeNames)
             all &= Deregister(home);
-        if (all)
+        if (all && removeFiles)
             RemoveIntegrationFiles();
         return all;
     }

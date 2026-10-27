@@ -64,7 +64,7 @@ public sealed class ThemePalette
 
     /// <summary>Chrome strip glass alpha — denser than cards so light text stays
     /// legible against Mica bleed (widget.apply_theme: 0.92, or 1.0 for opt-out).</summary>
-    public double ChromeAlpha => Definition.OptsOutOfMica ? 1.0 : 0.92;
+    public double ChromeAlpha => ThemeContrast.ChromeAlpha(Definition);
 
     /// <summary>Card corner radius (the theme's <c>card_corner_radius</c>);
     /// defaults to the obsidian 10 px, Matrix tightens to 2 px.</summary>
@@ -169,6 +169,10 @@ public sealed class ThemePalette
         SetBrush(res, "Sanduhr.Brush.TextDim", TextDim);
         SetBrush(res, "Sanduhr.Brush.TextMuted", TextMuted);
         SetBrush(res, "Sanduhr.Brush.Accent", Accent);
+        // The selected sidebar row's label (Settings v2, slice 8; WF37): Accent where it reads 4.5:1 on the row, else Text.
+        SetBrush(res, "Sanduhr.Brush.SelectedLabel", Hex(ThemeContrast.SelectedLabel(Definition)));
+        // Accent drawn as text (Settings v2, slice 8, D2): Accent where it reads 4.5:1 on Glass, else raised in lightness. Fills and borders keep Accent.
+        SetBrush(res, "Sanduhr.Brush.AccentText", Hex(ThemeContrast.AccentText(Definition)));
         SetBrush(res, "Sanduhr.Brush.Success", Success);
         SetBrush(res, "Sanduhr.Brush.PaceMarker", PaceMarker);
 
