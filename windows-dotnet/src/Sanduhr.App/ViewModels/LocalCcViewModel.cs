@@ -29,7 +29,7 @@ public sealed partial class VaultRootToggleViewModel : ObservableObject
     public string Name { get; }
 
     /// <summary>The folder as shown: its codename while streamer mode hides it (slice 7, CP 11). <see cref="Name"/> stays the key.</summary>
-    public string Shown { get; }
+    public string Shown { get; private set; }
 
     [ObservableProperty] private bool _isEnabled;
 
@@ -40,6 +40,13 @@ public sealed partial class VaultRootToggleViewModel : ObservableObject
         Shown = StreamerMode.Mask.FolderName(name);   // streamer: masked - CP 11: Mask.FolderName masks on this line
         IsEnabled = enabled;
         _loading = false;
+    }
+
+    /// <summary>Redraws the folder's name after streamer mode flips or Shuffle draws new codenames (the checkbox is built once).</summary>
+    public void RefreshShown()
+    {
+        Shown = StreamerMode.Mask.FolderName(Name);   // streamer: masked - CP 11: Mask.FolderName masks on this line
+        OnPropertyChanged(nameof(Shown));
     }
 
     partial void OnIsEnabledChanged(bool value)
@@ -433,7 +440,12 @@ public sealed partial class LocalCcViewModel : ObservableObject
     }
 
     /// <summary>Streamer mode moved (slice 7): the tables read their names again.</summary>
-    public void RefreshNames() => FillBreakdowns();
+    public void RefreshNames()
+    {
+        FillBreakdowns();
+        foreach (var root in Roots)
+            root.RefreshShown();
+    }
 
     /// <summary>Tests fill the two tables as an apply of the archive's top ten would.</summary>
     internal void ShowTopForTests(IEnumerable<(string Name, long Tokens)> projects, IEnumerable<(string Name, long Tokens)> skills)

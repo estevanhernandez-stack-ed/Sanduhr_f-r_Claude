@@ -372,6 +372,28 @@ public sealed class StreamerUsageTests : AppWindowFixture
     });
 
     [Fact]
+    public void The_session_archives_folders_follow_the_switch_while_settings_is_open() => AppHost.Run(() =>
+    {
+        // Streamer smoke, check 8: the folder checkboxes were built once, so turning streamer mode on with Settings open left real names.
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            var overview = new LocalCcViewModel(widget, true, _ => { });
+            overview.Roots.Add(new VaultRootToggleViewModel(overview, ".claude-qxwork", true));
+            Assert.Equal(".claude-qxwork", overview.Roots[0].Shown);
+            widget.Streamer.SetOn(true);
+            overview.RefreshNames();
+            NoSentinel("archive folder", overview.Roots[0].Shown);
+            Assert.Equal(".claude-qxwork", overview.Roots[0].Name);
+            Assert.True(overview.Roots[0].IsEnabled);
+            widget.Streamer.SetOn(false);
+            overview.RefreshNames();
+            Assert.Equal(".claude-qxwork", overview.Roots[0].Shown);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
     public void The_session_archives_folders_are_codenames_and_keep_their_keys() => AppHost.Run(() =>
     {
         On(Profile);

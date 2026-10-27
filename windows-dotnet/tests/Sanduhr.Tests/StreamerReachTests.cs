@@ -188,7 +188,7 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/LauncherSettingsViewModel.cs", "key", 1),
         ("Sanduhr.App/ViewModels/LauncherSettingsViewModel.cs", "notname", 1),
         ("Sanduhr.App/ViewModels/LocalCcViewModel.cs", "key", 6),
-        ("Sanduhr.App/ViewModels/LocalCcViewModel.cs", "masked", 5),
+        ("Sanduhr.App/ViewModels/LocalCcViewModel.cs", "masked", 6),   // streamer smoke: archive folder names redraw on the switch
         ("Sanduhr.App/ViewModels/ModsPageViewModel.cs", "key", 1),
         ("Sanduhr.App/ViewModels/ModsPageViewModel.cs", "masked", 5),
         ("Sanduhr.App/ViewModels/ModsPageViewModel.cs", "notname", 1),
@@ -221,7 +221,7 @@ public class StreamerReachTests
     ];
 
     /// <summary>The floor: fewer lines than this means the shapes stopped seeing the code (the count this inventory pinned, re-derived by an independent pass: 320 lines in 70 files).</summary>
-    private const int Floor = 320;
+    private const int Floor = 322;
 
     [Fact]
     public void Every_reader_of_a_name_carries_a_marker()
