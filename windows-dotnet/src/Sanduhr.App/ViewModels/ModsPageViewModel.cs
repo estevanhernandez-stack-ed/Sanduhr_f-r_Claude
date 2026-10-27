@@ -361,6 +361,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
 
     internal void SwitchMeters(MetersFolderRowViewModel row)
     {
+        MetersStatus = "";   // an outcome that repeats is still news: the line announces a change of text
         if (_host is null || !row.CanSwitch)
         {
             ReloadLocal();
@@ -396,6 +397,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
 
     internal void UpdateMeters(MetersFolderRowViewModel row)
     {
+        MetersStatus = "";   // an outcome that repeats is still news: the line announces a change of text
         if (_host is null || !row.CanUpdate) return;
         try
         {
@@ -415,6 +417,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
 
     internal void RemoveMeters(MetersFolderRowViewModel row)
     {
+        MetersStatus = "";   // an outcome that repeats is still news: the line announces a change of text
         if (_host is null || !row.CanRemove) return;
         try
         {
@@ -622,6 +625,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
     {
         if (Busy) return Task.CompletedTask;
         if (!Confirm(SettingsNames.UninstallQuestion(name), SettingsNames.UninstallDetail)) return Task.CompletedTask;
+        Status = "";   // a repeated outcome is still announced
         var result = Service.Store.Uninstall(id);
         Status = result.Ok ? $"{name} is uninstalled." : result.Error ?? "The widget couldn't be removed.";
         Rebuild();
@@ -686,6 +690,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
             foreach (var row in Catalog.Where(r => r.Id == id)) row.ShowEnabled(row.Enabled);
             return;
         }
+        Status = "";   // a repeated outcome is still announced
         var result = Service.Store.SetEnabled(id, on);
         // What is on disk now; a pack gone behind the page's back keeps the row's last state (nothing was written).
         bool now = Service.Store.Load().Find(id)?.Enabled ?? Installed.FirstOrDefault(r => r.Id == id)?.Enabled ?? !on;
@@ -712,6 +717,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
     internal Task UseOwnArtAsync(string id, string name)
     {
         if (Busy) return Task.CompletedTask;
+        Status = "";   // a repeated outcome is still announced
         var files = Service.Store.ReadFiles(id);
         if (files is null || WidgetOwnArt.Sprite(files) is not { } sprite)
         {

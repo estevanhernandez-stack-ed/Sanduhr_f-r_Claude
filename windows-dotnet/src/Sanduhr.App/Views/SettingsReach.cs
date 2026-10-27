@@ -150,7 +150,8 @@ public static class LiveRegion
             System.Windows.Automation.AutomationProperties.SetLiveSetting(tb, System.Windows.Automation.AutomationLiveSetting.Polite);
             tb.Unloaded += OnAnnouncerUnloaded;
             tb.Loaded += OnAnnouncerLoaded;
-            Hook(tb, true);
+            // Hooked on Loaded, or now when it is already loaded: an element that never loads is never held by the descriptor's table.
+            if (tb.IsLoaded) Hook(tb, true);
         }
         else Hook(tb, false);
     }
@@ -168,7 +169,11 @@ public static class LiveRegion
     private static void OnAnnouncedTextChanged(object? sender, EventArgs e)
     {
         if (sender is TextBlock { IsLoaded: true } tb && tb.Text.Length > 0)
-            RaiseSoon(tb, () => tb.Text.Length > 0);
+        {
+            // Two changes in one frame announce the last text once: an earlier change sees a different text by then and stands down.
+            var text = tb.Text;
+            RaiseSoon(tb, () => tb.Text == text);
+        }
     }
 
     /// <summary>Called after each LiveRegionChanged this raises. A seam for tests.</summary>

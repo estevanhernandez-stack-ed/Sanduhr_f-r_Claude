@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using Sanduhr.App.ViewModels;
 using Sanduhr.App.Views;
@@ -132,5 +133,114 @@ public sealed class ModsPageHeardTests : AppWindowFixture
             Assert.Equal(["Outcome once."], announced);
         }
         finally { LiveRegion.Raised = null; window.Close(); }
+    });
+
+    [Fact]
+    public void Two_identical_outcomes_in_a_row_are_announced_twice() => AppHost.Run(() =>
+    {
+        InstalledPackKit.Install(new Paths(), "good-palette");
+        var announced = new List<string>();
+        LiveRegion.Raised = el => announced.Add((el as TextBlock)?.Text ?? "");
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.ModList);
+            Settle(window, guard);
+            Assert.Empty(announced);
+
+            svm.ModsPage.SwitchPack("good-palette", "Good palette", true);
+            Settle(window, guard);
+            var first = svm.ModsPage.Status;
+            svm.ModsPage.SwitchPack("good-palette", "Good palette", true);
+            Settle(window, guard);
+
+            Assert.Equal(first, svm.ModsPage.Status);
+            Assert.Equal([first, first], announced);
+        }
+        finally { LiveRegion.Raised = null; window.Close(); }
+    });
+
+    [Fact]
+    public void Two_changes_in_one_frame_announce_the_last_text_once() => AppHost.Run(() =>
+    {
+        Home(".claude-work", """{"enabledPlugins":{"a@m":true}}""");
+        var announced = new List<string>();
+        LiveRegion.Raised = el => announced.Add((el as TextBlock)?.Text ?? "");
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.ModList);
+            Settle(window, guard);
+
+            svm.ModsPage.Status = "First.";
+            svm.ModsPage.Status = "Second.";
+            Settle(window, guard);
+
+            Assert.Equal(["Second."], announced);
+        }
+        finally { LiveRegion.Raised = null; window.Close(); }
+    });
+
+    [Fact]
+    public void Loaded_twice_in_a_row_still_announces_a_change_once() => AppHost.Run(() =>
+    {
+        Home(".claude-work", """{"enabledPlugins":{"a@m":true}}""");
+        var announced = new List<string>();
+        LiveRegion.Raised = el => announced.Add((el as TextBlock)?.Text ?? "");
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.ModList);
+            Settle(window, guard);
+            var line = (TextBlock)Below<ModsPage>(window).Single().FindName("StatusLine");
+            line.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent, line));
+            line.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent, line));
+
+            svm.ModsPage.Status = "Outcome once.";
+            Settle(window, guard);
+
+            Assert.Equal(["Outcome once."], announced);
+        }
+        finally { LiveRegion.Raised = null; window.Close(); }
+    });
+
+    [Fact]
+    public void A_text_block_set_to_announce_before_it_loads_is_not_hooked_until_it_loads() => AppHost.Run(() =>
+    {
+        var hooked = (DependencyProperty)typeof(LiveRegion).GetField("IsHookedProperty", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!.GetValue(null)!;
+        var tb = new TextBlock();
+        LiveRegion.SetAnnounces(tb, true);
+        Assert.False((bool)tb.GetValue(hooked));
+        tb.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent, tb));
+        Assert.True((bool)tb.GetValue(hooked));
+        tb.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent, tb));
+        Assert.False((bool)tb.GetValue(hooked));
+    });
+
+    /// <summary>A meters row is one stop; its switch is the next Tab.</summary>
+    [DesktopFact]
+    public void The_meters_switch_is_one_Tab_past_its_row() => AppHost.Run(() =>
+    {
+        Home(".claude", "{}");
+        var (window, svm, guard) = Open("Personal");
+        try
+        {
+            guard.RouteKeyboard();
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.Meters);
+            Settle(window, guard);
+            var page = Below<ModsPage>(window).Single();
+            var first = svm.ModsPage.Meters[0];
+            var item = Below<ListBoxItem>(page).Single(i => i.Content == first);
+            Assert.True(item.Focus(), "the row did not take focus");
+            Assert.Same(item, Keyboard.FocusedElement);
+
+            item.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
+
+            var focused = Keyboard.FocusedElement as CheckBox;
+            Assert.NotNull(focused);
+            Assert.Equal(first.SwitchName, System.Windows.Automation.AutomationProperties.GetName(focused));
+            guard.Check();
+        }
+        finally { window.Close(); }
     });
 }
