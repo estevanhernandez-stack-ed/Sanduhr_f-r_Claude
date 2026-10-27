@@ -89,10 +89,10 @@ internal sealed class DeskMessageSource : IDisposable
         if (_watcher is not null) return;
         try
         {
-            var dir = Path.GetDirectoryName(_path)!;
-            _watcher = new FileSystemWatcher(dir, Path.GetFileName(_path))
+            var dir = Path.GetDirectoryName(_path)!;   // streamer: notname - folder of the message file being watched, never drawn
+            _watcher = new FileSystemWatcher(dir, Path.GetFileName(_path))   // streamer: notname - watcher pattern, never drawn
             {
-                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,   // streamer: notname - NotifyFilters.FileName is a watcher flag, not a name
             };
             FileSystemEventHandler on = (_, _) => Application.Current?.Dispatcher.BeginInvoke(() => { _debounce.Stop(); _debounce.Start(); });
             _watcher.Changed += on;

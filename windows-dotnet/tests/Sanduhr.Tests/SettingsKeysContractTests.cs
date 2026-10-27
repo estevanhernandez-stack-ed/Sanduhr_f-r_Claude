@@ -96,6 +96,7 @@ public class SettingsKeysContractTests
         "sparkline_style",
         "statusline_cc_home",
         "statusline_enabled",
+        "streamer_mode",
         "theme",
         "themes_expanded",
         "themes_studio",

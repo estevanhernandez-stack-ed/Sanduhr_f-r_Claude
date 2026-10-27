@@ -38,11 +38,11 @@ internal sealed class DeskMessageHandoffService : IDisposable
     public void Start()
     {
         if (!Enabled || _watcher is not null) return;
-        var dir = Path.GetDirectoryName(Handoff.Paths.Request)!;
+        var dir = Path.GetDirectoryName(Handoff.Paths.Request)!;   // streamer: notname - folder of the handoff request file, never drawn
         try
         {
             Directory.CreateDirectory(dir);
-            _watcher = new FileSystemWatcher(dir, MessageProposal.RequestFile) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };
+            _watcher = new FileSystemWatcher(dir, MessageProposal.RequestFile) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };   // streamer: notname - NotifyFilters.FileName is a watcher flag, not a name
             _watcher.Created += (_, _) => Check();
             _watcher.Changed += (_, _) => Check();
             _watcher.Renamed += (_, _) => Check();
@@ -153,7 +153,7 @@ internal sealed class WatcherStore : IDisposable, IRunnerSink
     internal void ClearRunners()
     {
         if (_disposed) return;
-        Board.Clear(WatcherSource.Runner);
+        Board.Clear(WatcherSource.Runner);   // streamer: notname - WatcherSource.Runner is an enum member
         Changed?.Invoke();
     }
 
@@ -165,7 +165,7 @@ internal sealed class WatcherStore : IDisposable, IRunnerSink
         try
         {
             Directory.CreateDirectory(_dir);
-            _watcher = new FileSystemWatcher(_dir, WatcherRequest.RequestPattern) { NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite };
+            _watcher = new FileSystemWatcher(_dir, WatcherRequest.RequestPattern) { NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite };   // streamer: notname - NotifyFilters.FileName is a watcher flag, not a name
             // A request lands by rename from a temp name, so Created alone would miss it.
             _watcher.Created += (_, _) => Application.Current?.Dispatcher.BeginInvoke(ReadAll);
             _watcher.Renamed += (_, _) => Application.Current?.Dispatcher.BeginInvoke(ReadAll);

@@ -110,9 +110,32 @@ public sealed partial class CcFolderRowViewModel : ObservableObject
     public override string ToString() => AutomationName;
 
     /// <summary>The account choices (the page's list), bound directly so the combo never depends on a RelativeSource walk to the page.</summary>
-    public ObservableCollection<string> AccountOptions => _owner.AccountOptions;
+    public ObservableCollection<AccountChoice> AccountOptions => _owner.AccountOptions;
+
+    /// <summary>Streamer mode hides this folder's name: the card's menu offers "Show the real name on stream" (decision 16).</summary>
+    public bool CanShowRealName => StreamerMode.Mask.HidesFolder(Path);
+
+    [RelayCommand]
+    private void ShowRealName() => _owner.ShowRealName(this);
     public bool LinkEnabled => _owner.LinkEnabled;
     public System.Windows.Input.ICommand ForgetCommand => _owner.ForgetFolderCommand;
+}
+
+/// <summary>A linked-account choice (slice 7, CP 6): the label is the value the combo writes; <see cref="Shown"/> is what it shows and
+/// says, the codename while streamer mode hides it. Updated in place, so a reload never clears a live selection (WF2).</summary>
+public sealed partial class AccountChoice : ObservableObject
+{
+    public AccountChoice(string label, string shown)
+    {
+        Label = label;
+        _shown = shown;
+    }
+
+    public string Label { get; }
+
+    [ObservableProperty] private string _shown;
+
+    public override string ToString() => Shown;
 }
 
 /// <summary>The three pieces a folder card installs (the meters are Mods &amp; Widgets' since slice 4).</summary>
@@ -202,7 +225,11 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     private readonly ClaudeCodeHost _host;
 
     public ObservableCollection<CcFolderRowViewModel> Folders { get; } = new();
-    public ObservableCollection<string> AccountOptions { get; } = new();
+    public ObservableCollection<AccountChoice> AccountOptions { get; } = new();
+
+    /// <summary>A card's quick route (decision 16): the folder's real name shows on stream; every masked page reloads through the service.</summary>
+    internal void ShowRealName(CcFolderRowViewModel row) =>
+        _widget.Streamer.SetShown(CodenameCategory.Folder, StreamerMask.FolderKey(row.Path), true);
 
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private bool _hasFolders;
@@ -357,7 +384,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     private static string McpSourceDir => Path.Combine(AppContext.BaseDirectory, "mcp");
 
     /// <summary>Every known folder, found first and added second.</summary>
-    internal IReadOnlyList<CcFolder> KnownFolders() => _host.Folders();
+    internal IReadOnlyList<CcFolder> KnownFolders() => _host.Folders();   // streamer: key - the folder list handed on, never drawn
 
     /// <summary>A card's piece, its buttons acting on that card's folder.</summary>
     internal CcPieceViewModel NewPiece(CcPieceKind kind, CcFolderRowViewModel row) => kind switch
@@ -390,9 +417,9 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     {
         string? active = null;
         try { active = _host.ActiveAccountFolder(); } catch (Exception) { }
-        var pick = ModsFolderChoice.Pick([.. Folders.Select(f => f.Path)], s_holdsFolder, _host.ConfigDir, active,
+        var pick = ModsFolderChoice.Pick([.. Folders.Select(f => f.Path)], s_holdsFolder, _host.ConfigDir, active,   // streamer: key - picks a folder by path, never drawn
             ModInventory.EnabledPluginCount);
-        if (Folders.FirstOrDefault(f => pick is not null && ClaudeCodeFolders.Same(f.Path, pick)) is not { } row) return null;
+        if (Folders.FirstOrDefault(f => pick is not null && ClaudeCodeFolders.Same(f.Path, pick)) is not { } row) return null;   // streamer: key - compares folder paths, never drawn
         row.HoldsOpen = true;
         HoldsLanded?.Invoke(row);
         return row;
@@ -412,22 +439,29 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     private void SyncAccountOptions()
     {
         var wanted = new List<string> { NoAccount };
-        wanted.AddRange(_widget.ShownAccounts);
+        wanted.AddRange(_widget.ShownAccounts);   // streamer: key - account labels for the combo's options; the options draw Mask.Name
         for (int i = AccountOptions.Count - 1; i >= 0; i--)
-            if (!wanted.Contains(AccountOptions[i])) AccountOptions.RemoveAt(i);
+            if (!wanted.Contains(AccountOptions[i].Label)) AccountOptions.RemoveAt(i);
         for (int i = 0; i < wanted.Count; i++)
         {
-            if (i < AccountOptions.Count && AccountOptions[i] == wanted[i]) continue;
-            var at = AccountOptions.IndexOf(wanted[i]);
-            if (at >= 0) AccountOptions.Move(at, i);
-            else AccountOptions.Insert(i, wanted[i]);
+            // Streamer mode (slice 7, CP 6): the choice shows the codename; its value stays the label.
+            var shown = wanted[i] == NoAccount ? NoAccount : StreamerMode.Mask.Name(CodenameCategory.Account, wanted[i]);
+            int at = -1;
+            for (int j = 0; j < AccountOptions.Count; j++)
+                if (AccountOptions[j].Label == wanted[i]) { at = j; break; }
+            if (at < 0) AccountOptions.Insert(i, new AccountChoice(wanted[i], shown));
+            else
+            {
+                if (at != i) AccountOptions.Move(at, i);
+                AccountOptions[i].Shown = shown;
+            }
         }
     }
 
     /// <summary>Re-reads the folder list, the account choices and every card's status. A card whose report was open stays open.</summary>
     public void Reload()
     {
-        var open = Folders.Where(f => f.HoldsOpen).Select(f => f.Path).ToList();
+        var open = Folders.Where(f => f.HoldsOpen).Select(f => f.Path).ToList();   // streamer: key - paths of open cards kept to reopen them, never drawn
         _loading = true;
         SyncAccountOptions();
         LinkEnabled = !_widget.IsDemo;
@@ -437,11 +471,11 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         Folders.Clear();
         foreach (var f in KnownFolders())
         {
-            var linked = _widget.ShownAccounts.FirstOrDefault(l =>
+            var linked = _widget.ShownAccounts.FirstOrDefault(l =>   // streamer: key - finds the folder's linked account for the combo, never drawn
                 _widget.AccountFolder(l) is { } p && ClaudeCodeFolders.Same(p, f.Path)) ?? NoAccount;
             var row = new CcFolderRowViewModel(this, f, _host.Display(f.Path), linked,
                 f.Discovered && roots.GetValueOrDefault(f.Name), hasAccounts);
-            if (open.Any(p => ClaudeCodeFolders.Same(p, f.Path))) row.OpenHoldsQuietly();
+            if (open.Any(p => ClaudeCodeFolders.Same(p, f.Path))) row.OpenHoldsQuietly();   // streamer: key - compares folder paths, never drawn
             Folders.Add(row);
         }
         HasFolders = Folders.Count > 0;
@@ -461,7 +495,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 Multiselect = false,
             };
             if (dialog.ShowDialog(_owner) != true) return;
-            var path = ClaudeCodeFolders.Norm(dialog.FolderName);
+            var path = ClaudeCodeFolders.Norm(dialog.FolderName);   // streamer: key - compares folder paths, never drawn
             if (path.Length == 0) return;
             if (Folders.Any(f => ClaudeCodeFolders.Same(f.Path, path)))
             {
@@ -502,7 +536,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         try
         {
             // One folder per account, and one account per folder.
-            foreach (var label in _widget.ShownAccounts)
+            foreach (var label in _widget.ShownAccounts)   // streamer: key - unlinks the account from other folders, never drawn
                 if (_widget.AccountFolder(label) is { } p && ClaudeCodeFolders.Same(p, row.Path) && label != account)
                     _widget.SetAccountFolder(label, null);
             if (account != NoAccount)
@@ -537,7 +571,9 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     // ------------------------------------------------------------------ statuses
 
     private string Shorten(string text) =>
-        string.IsNullOrEmpty(text) ? text : text.Replace(Profile, "~", StringComparison.OrdinalIgnoreCase);
+        string.IsNullOrEmpty(text) ? text
+            : StreamerMode.On ? StreamerMode.FoldersIn(text, KnownFolders().Select(f => f.Path))   // slice 7, CP 8   // streamer: masked - CP 8: FoldersIn masks on the next line
+            : text.Replace(Profile, "~", StringComparison.OrdinalIgnoreCase);
 
     private static string StatusWords(IntegrationStatus s) => s switch
     {
@@ -615,7 +651,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             var states = new List<ConsumerState>();
             foreach (var f in KnownFolders())
             {
-                states.Add(SnapshotConsumers.Of(statusline.Status(f.Path)));
+                states.Add(SnapshotConsumers.Of(statusline.Status(f.Path)));   // streamer: key - folder paths handed to the status readers, never drawn
                 states.Add(SnapshotConsumers.Of(integ.Status(IntegrationKind.Meters, f.Path)));
             }
             var (receipts, unknown) = SnapshotConsumers.ReadReceipts(integ.ReceiptsPath);
@@ -657,7 +693,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 return;
             }
             string? theirs = status == StatuslineStatus.Other && installer.TheirCommand(row.Path) is { } cmd
-                ? ConfigMask.MaskString(cmd) : null;
+                ? StreamerMode.Mask.Paths(ConfigMask.MaskString(cmd)) : null;
             var choice = AskConsent(new ConsentSpec(
                 "Show usage under the Claude Code prompt?",
                 "Sanduhr adds a statusline with your live session and weekly meters, right where the tokens burn.",
@@ -665,8 +701,8 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 "What gets written: the render script at %USERPROFILE%\\.sanduhr\\bin, a statusLine entry in this folder's "
                 + "settings.json (a copy of the file is saved under %APPDATA%\\Sanduhr\\backups first), and a usage "
                 + "snapshot at %USERPROFILE%\\.sanduhr\\snapshot.json with percentages and reset times only, never your "
-                + "account name or keys. The line can start with this folder's name (or the SANDUHR_LABEL you set in its "
-                + "settings), worked out when it renders and never stored. Remove brings back the statusline that was here before.",
+                + "account name or keys. " + SettingsNames.StatuslineNameClause
+                + " Remove brings back the statusline that was here before.",
                 "Install", theirs, OfferSegments: true));
             if (choice is null) return;
             if (!installer.InstallScript())
@@ -711,8 +747,8 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 return;
             }
             var others = KnownFolders()
-                .Where(f => f.Discovered && !ClaudeCodeFolders.Same(f.Path, row.Path) && installer.IsRegistered(f.Name))
-                .Select(f => ClaudeCodeFolders.Display(f.Path, Profile));
+                .Where(f => f.Discovered && !ClaudeCodeFolders.Same(f.Path, row.Path) && installer.IsRegistered(f.Name))   // streamer: masked - CP 12: ShowFolder masks on the next line
+                .Select(f => StreamerMode.ShowFolder(f.Path, Profile));
             var consent = McpConsentDialog.ShowConsent(
                 _owner, [row.Name], null, installer.LauncherPath, installer.ConfigPathFor,
                 McpConsentCopy.WontChange(row.Display, others));
@@ -780,7 +816,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             if (choice is null) return;
             var res = MakeIntegrations().Install(IntegrationKind.Hooks, row.Path);
             Done(res.Ok ? "Glow hooks installed. Turn the glow on below."
-                        : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't install the hooks."), res.Ok);
+                        : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't install the hooks."), res.Ok);   // streamer: masked - via Shorten: the hook message passes FoldersIn (CP 8)
         }
         catch (Exception)
         {
@@ -793,7 +829,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         try
         {
             var res = MakeIntegrations().Remove(IntegrationKind.Hooks, row.Path);
-            Done(res.Ok ? "Glow hooks removed." : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't remove the hooks."), res.Ok);
+            Done(res.Ok ? "Glow hooks removed." : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't remove the hooks."), res.Ok);   // streamer: masked - via Shorten: the hook message passes FoldersIn (CP 8)
         }
         catch (Exception)
         {
@@ -830,9 +866,9 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     public static IReadOnlyList<string> UndoEverything(WidgetViewModel widget)
     {
         var failures = new List<string>();
-        var profile = ClaudeCodeProfile.Dir;
+        var profile = ClaudeCodeProfile.Dir;   // streamer: key - profile folder handed to the reset logic, never drawn
         var sanduhrDir = widget.SanduhrAppDataDir;
-        var folders = ClaudeCodeFolders.Build(profile, ClaudeCodeProfile.ConfigDir, widget.LoadCcFoldersAdded());
+        var folders = ClaudeCodeFolders.Build(profile, ClaudeCodeProfile.ConfigDir, widget.LoadCcFoldersAdded());   // streamer: key - folder list handed to the reset logic, never drawn
 
         try
         {
@@ -848,7 +884,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         var statusline = new StatuslineInstaller(profile, widget.StatuslineBinDir, null, sanduhrDir);
         // Known folders first, then any folder a receipt names that is no longer in the list, so Reset
         // never leaves an orphan statusLine. Each folder once.
-        var statuslineFolders = folders.Select(f => f.Path).ToList();
+        var statuslineFolders = folders.Select(f => f.Path).ToList();   // streamer: key - folder paths handed to the reset logic, never drawn
         try
         {
             var (receipts, _) = SnapshotConsumers.ReadReceipts(

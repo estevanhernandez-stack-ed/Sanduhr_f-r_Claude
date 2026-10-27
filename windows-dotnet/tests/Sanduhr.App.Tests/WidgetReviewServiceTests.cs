@@ -14,6 +14,7 @@ namespace Sanduhr.App.Tests;
 /// the companion; Dismiss writes nothing; the direct switch never skips Apply; and "Use my own art…" turns a Claude-made sprite into
 /// the user's own. Scratch folders and a fake host only; never the real Sanduhr folders.
 /// </summary>
+[Collection("SettingsWindow")]
 public sealed class WidgetReviewServiceTests : IDisposable
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 22, 18, 0, 0, TimeSpan.Zero);

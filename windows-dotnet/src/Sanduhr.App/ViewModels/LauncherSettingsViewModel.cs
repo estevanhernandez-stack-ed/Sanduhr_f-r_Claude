@@ -41,17 +41,33 @@ public sealed partial class LauncherButtonRow : ObservableObject
 
     /// <summary>The name this button goes by: its label, else the app's name, else the site.</summary>
     public string Title => string.IsNullOrWhiteSpace(Label)
-        ? (Kind == LauncherKind.Link ? LauncherTarget.LinkHost(Target) : AppName ?? Target)
+        ? (Kind == LauncherKind.Link ? LinkHostShown : AppName ?? StreamerMode.Mask.Paths(Target))   // streamer: masked - Mask.Paths masks a raw target (P3)
         : Label.Trim();
 
     /// <summary>The line under the title: what the button opens.</summary>
-    public string Detail => Kind == LauncherKind.Link ? Target : (AppName is null ? "App" : $"App, {AppName}");
+    /// <summary>A link's full URL can name a private repo, so while streamer mode is on it shows scheme://host/… with the host as its codename.</summary>
+    public string Detail => Kind == LauncherKind.Link ? LinkDetail() : (AppName is null ? "App" : $"App, {AppName}");
+
+    /// <summary>The link as typed while off. While on, scheme://{codename}/… where the codename is <see cref="LinkHostShown"/>: the host key the title, the Desk
+    /// piece and the allowlist use, so one link has one codename (final review I1).</summary>
+    private string LinkDetail()
+    {
+        if (!StreamerMode.On)
+            return StreamerMode.Mask.Endpoint(Target);
+        if (!Uri.TryCreate(Target?.Trim(), UriKind.Absolute, out var uri) || string.IsNullOrEmpty(uri.Host))
+            return LinkHostShown;
+        var rest = uri.PathAndQuery is "" or "/" ? "" : "/…";
+        return $"{uri.Scheme}://{LinkHostShown}{rest}";   // streamer: masked - LinkHostShown is Mask.Name(Host, LinkHost)
+    }
 
     /// <summary>"Use the app's icon" for an app; a link has no app, so it goes back to the link glyph.</summary>
     public string UseDefaultImageText => IsApp ? "Use the app's icon" : "Use the link icon";
 
     /// <summary>What a screen reader calls this button when a control belongs to it: the app's name or the site, never the label being typed.</summary>
-    public string Subject => Kind == LauncherKind.Link ? LauncherTarget.LinkHost(Target) : AppName ?? Target;
+    public string Subject => Kind == LauncherKind.Link ? LinkHostShown : AppName ?? StreamerMode.Mask.Paths(Target);
+
+    /// <summary>A link's site as the row shows and speaks it: its codename while streamer mode is on, the same one <see cref="Detail"/> shows.</summary>
+    private string LinkHostShown => StreamerMode.Mask.Name(CodenameCategory.Host, LauncherTarget.LinkHost(Target));
 
     public string UseDefaultImageName => $"{UseDefaultImageText} for {Subject}";
 
@@ -404,14 +420,14 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
             Multiselect = false,
         };
         if (dialog.ShowDialog(_owner) != true) return;
-        var imported = LauncherImages.Import(_paths, dialog.FileName);
+        var imported = LauncherImages.Import(_paths, dialog.FileName);   // streamer: key - the picked image path is copied into the store, never drawn
         if (!imported.Ok)
         {
             Problem = imported.Error ?? "Sanduhr couldn't read that image.";
             return;
         }
         var current = _model.Buttons[row.Index];
-        Commit(_model.Replace(row.Index, current with { Image = imported.FileName }), rebuild: true);
+        Commit(_model.Replace(row.Index, current with { Image = imported.FileName }), rebuild: true);   // streamer: notname - the stored image's hash-derived file name
         Select(row.Index);
     }
 

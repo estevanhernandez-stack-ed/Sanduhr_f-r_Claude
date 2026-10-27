@@ -42,7 +42,7 @@ public sealed class InactiveUsageReader
         try
         {
             if (_stopped) throw new OperationCanceledException();
-            client = new WebView2ApiClient(creds.SessionKey, creds.CfClearance, _paths.WebView2ProfileDir(accountRef));
+            client = new WebView2ApiClient(creds.SessionKey, creds.CfClearance, _paths.WebView2ProfileDir(accountRef));   // streamer: notname - a file location used for IO, never drawn
             var data = await client.GetUsageAsync(ct).ConfigureAwait(true);
             var account = client.Account;
             var plan = account is null ? null : PlanLabel.Resolve(account.RateLimitTier, account.BillingType, account.Capabilities)?.Name;
@@ -111,7 +111,7 @@ public sealed class InactiveUsageReader
     {
         var accountRef = SnapshotContract.AccountRef(label);
         if (accountRef is null) return;
-        var dir = _paths.WebView2ProfileDir(accountRef);
+        var dir = _paths.WebView2ProfileDir(accountRef);   // streamer: notname - a file location used for IO, never drawn
         await _gate.WaitAsync().ConfigureAwait(true);
         try
         {

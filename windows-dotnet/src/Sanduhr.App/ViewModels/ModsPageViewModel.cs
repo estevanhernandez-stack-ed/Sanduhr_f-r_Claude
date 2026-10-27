@@ -98,6 +98,16 @@ public sealed partial class InstalledRowViewModel : ObservableObject
     {
         _owner = owner;
         Item = item;
+        Name = item.Kind switch
+        {
+            InstalledKind.WidgetPack when item.MadeHere => StreamerMode.Mask.Name(CodenameCategory.AddOn, item.Name),
+            InstalledKind.ClaudeCodeMod or InstalledKind.ClaudeCodePlugin => StreamerMode.Mask.AddOn(item.Name),
+            _ => item.Name,
+        };
+        Source = item.Kind is InstalledKind.ClaudeCodeMod or InstalledKind.ClaudeCodePlugin
+                 && item.Source != SettingsNames.SourceSkillsFolder && item.Source != SettingsNames.SourcePluginFolder
+            ? StreamerMode.Mask.AddOn(item.Source)
+            : item.Source;
         _enabled = item.Enabled;
         Preview = item.Kind == InstalledKind.WidgetPack ? ModsPageViewModel.LoadPreview(previewPath) : null;
         var where = InstalledItems.Where(item.Kind == InstalledKind.WidgetPack ? item.PackKind : null);
@@ -108,9 +118,27 @@ public sealed partial class InstalledRowViewModel : ObservableObject
 
     public InstalledItem Item { get; }
     public string Id => Item.Id;
-    public string Source => Item.Source;
-    public string Name => Item.Name;
-    public string Description => Item.Description;
+    /// <summary>The row's name as shown (slice 7, CP 13): a Claude Code plugin's or mod's name and a pack made here are codenames while
+    /// streamer mode hides them; catalog packs are public and Sanduhr's own mod is allowlisted. Display only: every action keys off <see cref="Id"/>.</summary>
+    public string Name { get; }
+
+    /// <summary>Where it came from: a plugin's marketplace is masked like its name; the source words ("from the catalog") stay.</summary>
+    public string Source { get; }
+
+    /// <summary>The author's text, which names the plugin: hidden while its name is (slice 7, CP 14).</summary>
+    public string Description => HidesName ? "" : Item.Description;
+
+    private bool HidesName => Name != Item.Name;
+    private bool IsClaudeCodeItem => Item.Kind is InstalledKind.ClaudeCodeMod or InstalledKind.ClaudeCodePlugin;
+
+    /// <summary>Streamer mode hides this row's name: its menu offers "Show the real name on stream" (decision 16).</summary>
+    public bool CanShowRealName => HidesName || Source != Item.Source;
+
+    [RelayCommand]
+    private void ShowRealName() =>
+        _owner.ShowRealName?.Invoke([.. new[] { Item.Name, IsClaudeCodeItem && Source != Item.Source ? Item.Source : null }.OfType<string>()]);
+    internal static InstalledRowViewModel ForTests(InstalledItem item, Action<IReadOnlyList<string>>? showRealName = null) =>
+        new(new ModsPageViewModel { ShowRealName = showRealName }, item, null);
     public bool HasDescription => Description.Length > 0;
     public ImageSource? Preview { get; }
     public bool HasPreview => Preview is not null;
@@ -120,7 +148,7 @@ public sealed partial class InstalledRowViewModel : ObservableObject
     public bool IsReadOnly => !Item.CanSwitch;
 
     /// <summary>"palette · 1.0.0 · from the catalog"; "Claude Code mod · 0.1.0 · m".</summary>
-    public string Detail => string.Join(" · ", new[] { KindWord, Item.Version ?? "", Item.Source }.Where(s => s.Length > 0));
+    public string Detail => string.Join(" · ", new[] { KindWord, Item.Version ?? "", Source }.Where(s => s.Length > 0));
 
     private string KindWord => Item.Kind switch
     {
@@ -185,7 +213,7 @@ public sealed partial class InstalledRowViewModel : ObservableObject
     /// <summary>The row read as one line: a pack's name, kind, version, source and "on" or "off"; a Claude Code item's name, version, scope and
     /// mod tag, then "read-only" when Sanduhr can't switch it.</summary>
     public string RowName => IsPack
-        ? string.Join(", ", new[] { Name, Item.PackKind ?? "", "version " + Item.Version, Item.Source, Enabled ? SettingsNames.RowOn : SettingsNames.RowOff }
+        ? string.Join(", ", new[] { Name, Item.PackKind ?? "", "version " + Item.Version, Source, Enabled ? SettingsNames.RowOn : SettingsNames.RowOff }
             .Where(s => s.Length > 0))
         : ModsPageText.RowName(Name, Item.Version, ScopeText, Item.IsMod && !IsSanduhrMod,
               hasFiles: Item.Scope?.Any(s => s.State is FolderState.On or FolderState.Off) == true)
@@ -285,7 +313,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
         AskMetersConsent = folder => IntegrationConsentDialog.Ask(_window, new ConsentSpec(
             SettingsNames.MetersConsentTitle, SettingsNames.MetersConsentIntro, folder, SettingsNames.MetersConsentDetails,
             SettingsNames.MetersConsentInstall)) is not null;
-        Ask = q => ThemedDialog.Show(_window, q.Title, q.Message, MessageBoxButton.YesNo,
+        Ask = q => ThemedDialog.Show(_window, q.Title, q.Message, MessageBoxButton.YesNo,   // streamer: notname - q.Message is a confirmation question built from fixed copy and version stamps, no names
             q.Warning ? ThemedDialogKind.Warning : ThemedDialogKind.Info,
             primaryLabel: q.Primary, secondaryLabel: q.Secondary) == MessageBoxResult.Yes;
     }
@@ -350,7 +378,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
                 {
                     var res = integ.Install(IntegrationKind.Meters, row.Folder);
                     installed = changed = res.Ok;
-                    MetersStatus = res.Ok ? SettingsNames.MetersInstalled : Short(res.Message, SettingsNames.MetersInstallFailed);
+                    MetersStatus = res.Ok ? SettingsNames.MetersInstalled : Short(res.Message, SettingsNames.MetersInstallFailed);   // streamer: masked - via Short: the install message passes Mask.Paths or FoldersIn (CP 8)
                 }
             }
             else
@@ -358,7 +386,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
                 var res = integ.SwitchOwnMod(row.Folder, want);
                 changed = res.Ok;
                 MetersStatus = res.Ok ? (want ? SettingsNames.MetersTurnedOn : SettingsNames.MetersTurnedOff)
-                    : Short(res.Message, SettingsNames.MetersSwitchFailed);
+                    : Short(res.Message, SettingsNames.MetersSwitchFailed);   // streamer: masked - via Short: the install message passes Mask.Paths or FoldersIn (CP 8)
             }
         }
         catch (Exception) { MetersStatus = SettingsNames.MetersSwitchFailed; }
@@ -377,7 +405,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
                     SettingsNames.MetersUpdateConfirm, SettingsNames.MetersUpdateNotNow, Warning: false)))
                 return;
             var res = integ.UpdateOwnMod(row.Folder);
-            MetersStatus = !res.Ok ? Short(res.Message, SettingsNames.MetersUpdateFailed)
+            MetersStatus = !res.Ok ? Short(res.Message, SettingsNames.MetersUpdateFailed)   // streamer: masked - via Short: the install message passes Mask.Paths or FoldersIn (CP 8)
                 : res.Outcome == ModUpdateOutcome.Updated ? SettingsNames.MetersUpdated : SettingsNames.MetersAlreadyCurrent;
         }
         catch (Exception) { MetersStatus = SettingsNames.MetersUpdateFailed; }
@@ -394,16 +422,23 @@ public sealed partial class ModsPageViewModel : ObservableObject
                     SettingsNames.MetersRemoveConfirm, SettingsNames.MetersRemoveCancel, Warning: true)))
                 return;
             var res = _host.Integrations().Remove(IntegrationKind.Meters, row.Folder);
-            MetersStatus = res.Ok ? SettingsNames.MetersRemoved : Short(res.Message, SettingsNames.MetersRemoveFailed);
+            MetersStatus = res.Ok ? SettingsNames.MetersRemoved : Short(res.Message, SettingsNames.MetersRemoveFailed);   // streamer: masked - via Short: the install message passes Mask.Paths or FoldersIn (CP 8)
         }
         catch (Exception) { MetersStatus = SettingsNames.MetersRemoveFailed; }
         ReloadLocal();
         MetersChanged?.Invoke(false);
     }
 
+    internal string ShortForTests(string message, string fallback) => Short(message, fallback);
+
+    /// <summary>Set by Settings (slice 7): a row's "Show the real name on stream" shows these add-on names through the widget's service.</summary>
+    public Action<IReadOnlyList<string>>? ShowRealName { get; set; }
+
     private string Short(string message, string fallback) =>
         string.IsNullOrWhiteSpace(message) ? fallback
-            : _host is null ? message : message.Replace(_host.Profile, "~", StringComparison.OrdinalIgnoreCase);
+            : _host is null ? StreamerMode.Mask.Paths(message)
+            : StreamerMode.On ? StreamerMode.FoldersIn(message, _host.Folders().Select(f => f.Path))   // slice 7, CP 8   // streamer: masked - CP 8: FoldersIn masks on this line
+            : message.Replace(_host.Profile, "~", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Called after a pack is installed or removed (the Desk reloads).</summary>
     public Action? Changed { get; set; }
@@ -626,9 +661,16 @@ public sealed partial class ModsPageViewModel : ObservableObject
     private void ApplyFilter()
     {
         Installed.Clear();
-        foreach (var item in _items.Where(i => InstalledItems.Matches(i, Filter, FilterText)))
-            Installed.Add(new InstalledRowViewModel(this, item,
-                item.Kind == InstalledKind.WidgetPack ? Service.Store.ReadInfo(item.Id)?.PreviewPath : null));
+        var text = FilterText?.Trim();
+        foreach (var item in _items.Where(i => InstalledItems.Matches(i, Filter, null)))
+        {
+            var row = new InstalledRowViewModel(this, item,
+                item.Kind == InstalledKind.WidgetPack ? Service.Store.ReadInfo(item.Id)?.PreviewPath : null);
+            // The box also matches what the row shows: while streamer mode is on, that is its codename (final review M7).
+            if (InstalledItems.Matches(item, Filter, text)
+                || (!string.IsNullOrEmpty(text) && (row.Name.Contains(text, StringComparison.OrdinalIgnoreCase) || row.Source.Contains(text, StringComparison.OrdinalIgnoreCase))))
+                Installed.Add(row);
+        }
         NothingMatches = HasInstalled && Installed.Count == 0;
     }
 
@@ -736,7 +778,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
             CheckFileExists = true,
             Multiselect = false,
         };
-        return dialog.ShowDialog() == true ? dialog.FileName : null;
+        return dialog.ShowDialog() == true ? dialog.FileName : null;   // streamer: key - the picked sprite sheet path is imported, never drawn
     }
 
     /// <summary>A pack's preview, decoded from memory so the file is never held open (Uninstall deletes it).</summary>

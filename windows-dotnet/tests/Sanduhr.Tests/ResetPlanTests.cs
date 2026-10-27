@@ -172,4 +172,23 @@ public class ResetPlanTests : IDisposable
         Assert.All(inv.Values, v => Assert.Empty(v));
         Assert.False(Directory.Exists(paths.ExternalDirPath));
     }
+
+    /// <summary>Settings v2, slice 7 (spec, Reset): codenames.json goes with All settings, streamer.json by name from ~\.sanduhr. Review Focus 5.</summary>
+    [Fact]
+    public void Reset_lists_both_files_by_name_only()
+    {
+        var paths = Make();
+        Touch(paths.CodenamesFile);
+        Touch(Path.Combine(paths.ExternalDirPath, StreamerFile.FileName));
+        Touch(Path.Combine(paths.ExternalDirPath, "streamer.json.bak"));   // someone else's name in the shared folder
+        Touch(Path.Combine(paths.ExternalDirPath, "streamer.json.tmp"));   // a crashed write: Sanduhr's own name (preflight P19)
+        Touch(paths.CodenamesFile + ".tmp");   // Codenames.Save leaves it when the move fails; it holds the salt and every real name (final review M2)
+        var settings = ResetPlan.Inventory(paths)[ResetPart.Settings].Select(i => i.Path).ToList();
+        Assert.Contains(paths.CodenamesFile, settings);
+        Assert.Contains(paths.CodenamesFile + ".tmp", settings);
+        Assert.Contains(Path.Combine(paths.ExternalDirPath, StreamerFile.FileName), settings);
+        Assert.Contains(Path.Combine(paths.ExternalDirPath, "streamer.json.tmp"), settings);
+        Assert.DoesNotContain(Path.Combine(paths.ExternalDirPath, "streamer.json.bak"), settings);
+        Assert.DoesNotContain(paths.ExternalDirPath, settings);
+    }
 }

@@ -43,8 +43,8 @@ internal static class DeskLookResolver
             MeterStops = look.Bars,
             MeterTrackHex = look.BarTrack,
             PaceHex = look.PaceTick,
-            Message = frame.Message is { } m
-                ? m with { Settings = m.Settings with { Color = string.Join(",", look.Message), Glow = true }, GlowHex = look.Glow }
+            Message = frame.Message is { } m   // streamer: notname - frame.Message is the Desk message frame record
+                ? m with { Settings = m.Settings with { Color = string.Join(",", look.Message), Glow = true }, GlowHex = look.Glow }   // streamer: notname - look.Message is a colour list
                 : null,
         };
     }

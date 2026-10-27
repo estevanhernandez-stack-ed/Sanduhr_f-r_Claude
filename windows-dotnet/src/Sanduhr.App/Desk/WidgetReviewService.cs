@@ -92,7 +92,7 @@ internal sealed class WidgetReviewService : IDisposable
     internal string? ReviewingId => _review?.Pack.Id;
 
     /// <summary>Where a pack under review is staged.</summary>
-    internal string PreviewRoot => Path.Combine(_paths.WidgetsDir, PreviewFolder);
+    internal string PreviewRoot => Path.Combine(_paths.WidgetsDir, PreviewFolder);   // streamer: notname - a file location used for IO, never drawn
 
     public void Start()
     {
@@ -103,7 +103,7 @@ internal sealed class WidgetReviewService : IDisposable
         try
         {
             Directory.CreateDirectory(dir);
-            _watcher = new FileSystemWatcher(dir, WidgetProposal.RequestFile) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };
+            _watcher = new FileSystemWatcher(dir, WidgetProposal.RequestFile) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };   // streamer: notname - NotifyFilters.FileName is a watcher flag, not a name
             _watcher.Created += (_, _) => Check();
             _watcher.Changed += (_, _) => Check();
             _watcher.Renamed += (_, _) => Check();
@@ -221,7 +221,7 @@ internal sealed class WidgetReviewService : IDisposable
         // The pack is checked once more against the folder it goes into, then installed atomically.
         var check = WidgetProposal.Check(pack.Files, pack.Id);
         if (check.Pack is null) return WidgetAnswer.Refused(check.Reasons);
-        var store = new WidgetStore(_paths.WidgetsDir, EncodePng);
+        var store = new WidgetStore(_paths.WidgetsDir, EncodePng);   // streamer: notname - a file location used for IO, never drawn
         var result = store.Install(pack.Files, pack.Manifest, WidgetSource.Claude);
         if (!result.Ok)
             return new WidgetAnswer(WidgetAnswer.Rejected, "install_failed", [new DeskReason("widget", result.Error ?? "could not be installed")], pack.Id);
@@ -269,7 +269,7 @@ internal sealed class WidgetReviewService : IDisposable
     /// <summary>One line in the log: the operation and the exception type, never pack content (PRIVACY.md).</summary>
     private void Log(string operation, Exception e)
     {
-        try { File.AppendAllText(_paths.LogFile, $"{DateTime.UtcNow:o} widget review {operation} failed ({e.GetType().Name}){Environment.NewLine}"); }
+        try { File.AppendAllText(_paths.LogFile, $"{DateTime.UtcNow:o} widget review {operation} failed ({e.GetType().Name}){Environment.NewLine}"); }   // streamer: notname - written to the log file, never drawn
         catch (Exception) { /* the log is a courtesy */ }
     }
 

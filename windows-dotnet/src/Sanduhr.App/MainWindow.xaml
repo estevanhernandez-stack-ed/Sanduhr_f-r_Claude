@@ -342,7 +342,8 @@
                             Command="{Binding CycleAccountCommand}"
                             HorizontalAlignment="Left" Margin="2,2,2,6"
                             Visibility="{Binding AccountSwitcherText, Converter={StaticResource StrVis}}"
-                            ToolTip="Active Claude account. Click to switch when multiple are configured. Add or remove accounts in Settings, Accounts.">
+                            ToolTip="Active Claude account. Click to switch when multiple are configured. Add or remove accounts in Settings, Accounts."
+                            AutomationProperties.Name="{Binding AccountSwitcherName}">
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.TextDim}" />
@@ -357,8 +358,15 @@
                                             <Border x:Name="bg" CornerRadius="5"
                                                     Background="{TemplateBinding Background}"
                                                     Padding="{TemplateBinding Padding}">
-                                                <TextBlock Text="{Binding AccountSwitcherText}"
-                                                           Foreground="{TemplateBinding Foreground}" />
+                                                <StackPanel Orientation="Horizontal">
+                                                    <!-- Streamer mode (slice 7): the eye-slash glyph, spoken through the chip's name. -->
+                                                    <TextBlock Text="&#xED1A;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10"
+                                                               VerticalAlignment="Center" Margin="0,0,4,0"
+                                                               Visibility="{Binding StreamerOn, Converter={StaticResource BoolVis}}"
+                                                               Foreground="{TemplateBinding Foreground}" />
+                                                    <TextBlock Text="{Binding AccountSwitcherText}"
+                                                               Foreground="{TemplateBinding Foreground}" />
+                                                </StackPanel>
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <!-- Subtle hover only when a click actually cycles. -->

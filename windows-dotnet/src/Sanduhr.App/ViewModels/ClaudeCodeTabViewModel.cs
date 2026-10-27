@@ -24,6 +24,19 @@ public sealed partial class ClaudeCodeTabViewModel : ObservableObject
 
     public CcLedgerViewModel Ledger { get; }
 
+    /// <summary>Set by Settings (slice 7): "Show the real name on stream" from a table row (decision 16).</summary>
+    public Action<CodenameCategory, string>? ShowRealName { get; set; }
+
+    [RelayCommand]
+    private void ShowRealNameOf(object? row)
+    {
+        switch (row)
+        {
+            case BreakdownRow b when b.CanShowRealName: ShowRealName?.Invoke(b.Category, b.Real); break;
+            case LedgerRowViewModel l: ShowRealName?.Invoke(CodenameCategory.Project, l.ProjectKeyForStreamer); break;
+        }
+    }
+
     /// <summary>Set by the window on tab selection — ingest-completed refreshes
     /// only run while the user can see the tab.</summary>
     public bool IsTabActive { get; set; }

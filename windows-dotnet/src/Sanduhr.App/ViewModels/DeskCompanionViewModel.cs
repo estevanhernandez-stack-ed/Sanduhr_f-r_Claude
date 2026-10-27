@@ -87,6 +87,11 @@ public sealed partial class DeskCompanionViewModel : ObservableObject
 
     /// <summary>Lists the installed sprites and reads the companion's choices. A pick that is no longer installed falls back to the
     /// first sprite, as the Desk does.</summary>
+    /// <summary>A sprite's name in the picker (slice 7, CP 24): a sprite made here is a codename while streamer mode hides it; catalog
+    /// sprites are public.</summary>
+    internal static string ChoiceName(string name, bool madeHere) =>
+        madeHere ? StreamerMode.Mask.Name(CodenameCategory.AddOn, name) : name;
+
     public void Reload()
     {
         _loading = true;
@@ -102,7 +107,7 @@ public sealed partial class DeskCompanionViewModel : ObservableObject
                 if (store.ReadInfo(row.Id) is { Kind: "sprite" } info)
                 {
                     anySprite = true;
-                    if (row.Enabled) Companions.Add(new CompanionChoice(row.Id, info.Name));
+                    if (row.Enabled) Companions.Add(new CompanionChoice(row.Id, ChoiceName(info.Name, row.MadeHere)));
                 }
             HasCompanions = Companions.Count > 0;
             SpritesAreOff = !HasCompanions && anySprite;
@@ -135,7 +140,7 @@ public sealed partial class DeskCompanionViewModel : ObservableObject
         try
         {
             var store = _widgets();
-            var growth = CompanionGrowthState.Load(Path.Combine(store.Root, CompanionGrowthState.FileName));
+            var growth = CompanionGrowthState.Load(Path.Combine(store.Root, CompanionGrowthState.FileName));   // streamer: notname - a state file leaf, never drawn
             var file = Path.Combine(store.PackDir(packId), "sprite.json");
             if (File.Exists(file) && CompanionSprite.Parse(File.ReadAllBytes(file)) is { } sprite)
             {

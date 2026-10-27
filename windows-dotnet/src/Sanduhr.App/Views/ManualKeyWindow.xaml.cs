@@ -1,4 +1,5 @@
 using System.Windows;
+using Sanduhr.App.Services;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.Views;
@@ -40,8 +41,13 @@ internal partial class ManualKeyWindow : Window
         string label, Func<string, CapturedCookies, string> persist, bool embeddedAvailable)
     {
         var w = new ManualKeyWindow(label, persist, embeddedAvailable);
+        // Streamer mode (slice 7, CP 2): the window names the account by its codename. Save still targets the real label
+        // (see OnSaveClick), so a codename is never persisted.
+        var shown = StreamerMode.Mask.Name(CodenameCategory.Account, label);
+        w._hidden = shown == label ? null : (label, shown);
+        w.LabelBox.Text = shown;
         w.Title = "Update sessionKey";
-        w.HeadlineText.Text = $"Update sessionKey for '{label}'";
+        w.HeadlineText.Text = $"Update sessionKey for '{shown}'";
         w.IntroText.Text = "Paste a fresh claude.ai sessionKey for this account. Its history and settings stay put.";
         w.LabelBox.IsEnabled = false;
         w.LabelBox.Opacity = 0.6;
@@ -51,7 +57,8 @@ internal partial class ManualKeyWindow : Window
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
     {
-        var label = LabelBox.Text?.Trim() ?? "";
+        // Re-sign-in under streamer mode: the box shows the codename, the account is the real label.
+        var label = _hidden?.Real ?? LabelBox.Text?.Trim() ?? "";
         var sessionKey = SessionKeyBox.Text?.Trim() ?? "";
         var cf = CfClearanceBox.Text?.Trim();
 
@@ -76,7 +83,7 @@ internal partial class ManualKeyWindow : Window
         }
         catch (Exception ex)
         {
-            ShowError(ex.Message);
+            ShowError(ex.Message);   // streamer: masked - via ShowError: the text passes Mask.Paths and the codename swap (CP 18)
         }
     }
 
@@ -110,8 +117,16 @@ internal partial class ManualKeyWindow : Window
             ? Visibility.Collapsed
             : Visibility.Visible;
 
+    internal void ShowErrorForTests(string message) => ShowError(message);
+
+    /// <summary>Re-sign-in under streamer mode: the real label and its codename, so an error never names the account (slice 7, M6).</summary>
+    private (string Real, string Shown)? _hidden;
+
     private void ShowError(string message)
     {
+        if (_hidden is { } h)
+            message = message.Replace(h.Real, h.Shown, StringComparison.Ordinal);
+        message = StreamerMode.Mask.Paths(message);
         ErrorText.Text = message;
         ErrorText.Visibility = Visibility.Visible;
     }

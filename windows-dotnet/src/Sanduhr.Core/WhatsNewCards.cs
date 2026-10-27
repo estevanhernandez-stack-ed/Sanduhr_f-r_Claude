@@ -7,7 +7,20 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class WhatsNewCards
 {
-    public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
+    public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release400(), .. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
+
+    // 4.0.0 (Settings v2; spec, Outside Settings, same release): Settings rearranged, landing on What leaves this PC, and Streamer mode.
+    private static WhatsNewCard[] Release400() =>
+    [
+        WhatsNewCard.Of("4.0.0", "settings-rearranged", "Settings, rearranged",
+            "Every feature has one home now, and search lands on the exact section. Settings, Privacy shows what leaves this PC and what Claude can change.",
+            "", // Settings
+            WhatsNewPreview.None, SettingsPage.Privacy),
+        WhatsNewCard.Of("4.0.0", "streamer-mode", SettingsNames.StreamerSection,
+            "Before you share your screen, turn on Settings, Privacy, Streamer mode. Accounts, folders and projects become codenames; live numbers stay.",
+            "", // Hide
+            WhatsNewPreview.None, SettingsPage.Privacy),
+    ];
 
     // 3.9.0: the Store goes 3.8.0 to 3.9.0. One card; the cap of eight is not in play.
     private static WhatsNewCard[] Release390() =>
@@ -163,6 +176,8 @@ public static class WhatsNewCards
     /// </summary>
     private static string? AnchorFor(string id) => id switch
     {
+        "settings-rearranged" => SettingsIndex.Network,
+        "streamer-mode" => SettingsIndex.Streamer,
         "ci-runners" => SettingsIndex.CiRunners,
         "widgets" => SettingsIndex.WidgetsCatalog,
         "companion" => SettingsIndex.WidgetsCompanion,

@@ -4,6 +4,9 @@
              xmlns:views="clr-namespace:Sanduhr.App.Views"
              xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
              Focusable="False">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolVis" />
+    </UserControl.Resources>
     <!-- Settings, Privacy (spec, Privacy; WF6, WF10): what leaves this PC and what Claude can change. Hosted in SettingsWindow.
          DataContext: the PrivacyViewModel. Both lists are built from fixed Core lists, so neither is ever empty. -->
     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
@@ -18,7 +21,69 @@
                 <TextBlock Text="{x:Static core:SettingsNames.PrivacyLine}" FontSize="11" TextWrapping="Wrap"
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,-8,0,12" />
 
-                <!-- Slice 7: Streamer mode (streamer, streamer-allowlist) goes here, first on the page, with its divider below it. -->
+                <!-- The carry's order (slice 6 carry): the banner, the jump links, Streamer mode, then What leaves this PC. -->
+                <views:StreamerBanner />
+                <views:SectionJumpLinks Page="Privacy" />
+
+                <!-- Streamer mode (streamer; spec, Streamer mode): the switch, what it can't reach, demo mode, Shuffle. DataContext: Streamer. -->
+                <StackPanel views:SettingsAnchor.Id="streamer" DataContext="{Binding Streamer}">
+                    <TextBlock Text="{x:Static core:SettingsNames.StreamerSection}" FontSize="13" FontWeight="SemiBold"
+                               AutomationProperties.HeadingLevel="Level2"
+                               Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                    <CheckBox Style="{DynamicResource ThemedCheckBox}" Content="{x:Static core:SettingsNames.StreamerSwitch}"
+                              IsChecked="{Binding On, Mode=TwoWay}"
+                              AutomationProperties.Name="{x:Static core:SettingsNames.StreamerSwitch}" />
+                    <TextBlock Text="{x:Static core:SettingsNames.StreamerCaption}" FontSize="11" TextWrapping="Wrap" Margin="22,3,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                    <TextBlock Text="{x:Static core:SettingsNames.StreamerCantReach}" FontSize="11" TextWrapping="Wrap" Margin="22,6,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                    <TextBlock Text="{x:Static core:SettingsNames.StreamerCantReachMore}" FontSize="11" TextWrapping="Wrap" Margin="22,3,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                    <TextBlock Text="{x:Static core:SettingsNames.StreamerDemoLine}" FontSize="11" TextWrapping="Wrap" Margin="22,6,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                    <Button Style="{DynamicResource FlatButton}" HorizontalAlignment="Left" Margin="0,12,0,0" Padding="10,4"
+                            Content="{x:Static core:SettingsNames.ShuffleCodenames}" Command="{Binding ShuffleCommand}"
+                            AutomationProperties.Name="{x:Static core:SettingsNames.ShuffleCodenames}" />
+                    <TextBlock Text="{x:Static core:SettingsNames.ShuffleCaption}" FontSize="11" TextWrapping="Wrap" Margin="0,3,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                    <TextBlock Text="{x:Static core:SettingsNames.ShuffleDone}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                               Visibility="{Binding ShuffleShown, Converter={StaticResource BoolVis}}"
+                               views:LiveRegion.Shown="{Binding ShuffleShown}" />
+                </StackPanel>
+
+                <!-- Show the real name (streamer-allowlist; spec, the allowlist C): codenames only while on. -->
+                <StackPanel views:SettingsAnchor.Id="streamer-allowlist" DataContext="{Binding Streamer}" Margin="0,16,0,0">
+                    <TextBlock Text="{x:Static core:SettingsNames.ShowRealNameSection}" FontSize="13" FontWeight="SemiBold"
+                               AutomationProperties.HeadingLevel="Level2"
+                               Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                    <TextBlock Text="{Binding AllowlistCaption}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,6"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                    <TextBlock Text="{x:Static core:SettingsNames.AllowlistEmpty}" FontSize="11" TextWrapping="Wrap"
+                               Visibility="{Binding NoRows, Converter={StaticResource BoolVis}}"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                    <ItemsControl ItemsSource="{Binding Rows}" Focusable="False"
+                                  Visibility="{Binding HasRows, Converter={StaticResource BoolVis}}"
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.ShowRealNameSection}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding CategoryTitle, Mode=OneWay}" FontSize="11.5" FontWeight="SemiBold" Margin="0,8,0,4"
+                                               AutomationProperties.HeadingLevel="Level3"
+                                               Visibility="{Binding StartsCategory, Converter={StaticResource BoolVis}}"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                    <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,0,0,4"
+                                              IsChecked="{Binding Shown, Mode=TwoWay}"
+                                              AutomationProperties.Name="{Binding Name, Mode=OneWay}">
+                                        <TextBlock Text="{Binding Text, Mode=OneWay}" FontSize="11.5" TextWrapping="Wrap" />
+                                    </CheckBox>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
                 <!-- What leaves this PC (network): NetworkDisclosure.All, one card per row. -->
                 <StackPanel views:SettingsAnchor.Id="network">

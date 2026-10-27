@@ -16,6 +16,7 @@ namespace Sanduhr.App.Tests;
 /// the Desk's drift pauses while Arrange mode runs and while a design is under review and comes back after; the idle dim reaches
 /// the host and the widget; and the white cap reaches the Desk's ink. Core's rules are in OledCareTests there.
 /// </summary>
+[Collection("SettingsWindow")]
 public sealed class OledCareTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "sanduhr-oled-" + Guid.NewGuid().ToString("N")[..8]);

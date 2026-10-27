@@ -156,7 +156,7 @@ public sealed partial class ThemesViewModel : ObservableObject
         }
         var lint = ThemeLint.Lint(raw, _widget.FontAvailable);
         foreach (var f in lint.Findings.OrderBy(f => f.Level == ThemeFindingLevel.Error ? 0 : 1))
-            PasteFindings.Add(new ThemeFindingViewModel(f.Field, f.Message, f.Level == ThemeFindingLevel.Error));
+            PasteFindings.Add(new ThemeFindingViewModel(f.Field, f.Message, f.Level == ThemeFindingLevel.Error));   // streamer: notname - a theme lint finding about a field, no path or name
         HasPasteFindings = PasteFindings.Count > 0;
         int errors = lint.Errors.Count(), warnings = lint.Warnings.Count();
         PasteSummary = errors > 0 ? $"{errors} to fix before this theme can be applied"
@@ -181,7 +181,7 @@ public sealed partial class ThemesViewModel : ObservableObject
         }
         catch (JsonException e)
         {
-            Error($"Invalid JSON: {e.Message}");
+            Error($"Invalid JSON: {e.Message}");   // streamer: masked - via Error: every error line passes Mask.Paths (P1)
             return;
         }
         if (data is null)
@@ -205,13 +205,13 @@ public sealed partial class ThemesViewModel : ObservableObject
         try
         {
             Directory.CreateDirectory(dir);
-            File.WriteAllText(
+            WriteText(
                 Path.Combine(dir, filename),
                 data.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
         catch (IOException e)
         {
-            Error($"Could not write theme: {e.Message}");
+            Error($"Could not write theme: {e.Message}");   // streamer: masked - via Error: every error line passes Mask.Paths (P1)
             return;
         }
 
@@ -308,18 +308,34 @@ public sealed partial class ThemesViewModel : ObservableObject
         if (result != MessageBoxResult.Yes)
             return;
 
-        try
-        {
-            File.Delete(Path.Combine(_widget.ThemesDir, name));
-        }
-        catch (IOException e)
-        {
-            Error($"Could not delete: {e.Message}");
+        if (!TryDelete(name))
             return;
-        }
         _widget.ReloadUserThemes();
         RefreshList();
     }
+
+    /// <summary>Delete one installed theme file; a failure goes to <see cref="Error"/>. Split out of <see cref="Delete"/> so a test can reach it
+    /// without the confirmation dialog.</summary>
+    internal bool TryDelete(string name)
+    {
+        try
+        {
+            DeleteFile(Path.Combine(_widget.ThemesDir, name));
+            return true;
+        }
+        catch (IOException e)
+        {
+            Error($"Could not delete: {e.Message}");   // streamer: masked - via Error: every error line passes Mask.Paths (P1)
+            return false;
+        }
+    }
+
+    /// <summary>Tests: where a theme file is written and deleted (a seam to raise an IO failure).</summary>
+    internal Action<string, string> WriteText { get; set; } = File.WriteAllText;
+    internal Action<string> DeleteFile { get; set; } = File.Delete;
+
+    /// <summary>Tests read the error line here instead of opening the dialog.</summary>
+    internal Action<string>? ErrorHook { get; set; }
 
     private bool HasSelection() => SelectedTheme is not null;
 
@@ -335,7 +351,7 @@ public sealed partial class ThemesViewModel : ObservableObject
         var files = Directory.GetFiles(dir, "*.json");
         Array.Sort(files, StringComparer.Ordinal);
         foreach (var path in files)
-            InstalledThemes.Add(Path.GetFileName(path));
+            InstalledThemes.Add(Path.GetFileName(path));   // streamer: cant - an installed theme's file name is the theme name the person typed or saved: the caption's "what you type yourself"
         HasNoThemes = InstalledThemes.Count == 0;
     }
 
@@ -345,6 +361,14 @@ public sealed partial class ThemesViewModel : ObservableObject
 
     private void Error(string message)
     {
+        // Streamer mode (preflight P1): an exception's message can hold the Windows user folder. Every error line, the Theme Studio's
+        // included (it is handed this method), passes through here.
+        message = StreamerMode.Mask.Paths(message);
+        if (ErrorHook is { } hook)
+        {
+            hook(message);
+            return;
+        }
         Sounds.PlayError();
         Show(message, ThemedDialogKind.Warning);
     }

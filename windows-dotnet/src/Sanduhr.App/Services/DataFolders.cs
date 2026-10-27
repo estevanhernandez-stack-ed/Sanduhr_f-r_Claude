@@ -16,7 +16,7 @@ public static class DataFolders
     /// <summary>The folders for this process: the package's LocalCache copies when packaged and present.</summary>
     public static Folders Resolve(Paths paths)
         => Resolve(paths, Startup.IsPackaged(), PackageFamilyName(),
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));   // streamer: notname - a base folder for the About list, which draws each through Mask.Paths
 
     public static Folders Resolve(Paths paths, bool packaged, string? familyName, string localAppData)
     {

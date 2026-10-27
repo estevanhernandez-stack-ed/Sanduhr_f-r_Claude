@@ -41,7 +41,7 @@ public sealed class UsagePublishService
         _reader = reader;
         _paths = paths;
         _tokens = tokens;
-        _home = home ?? (() => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        _home = home ?? (() => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));   // streamer: notname - user folder handed to the reader, never drawn
     }
 
     /// <summary>Tests: the network the upload goes to. Null is the real one.</summary>
@@ -53,7 +53,7 @@ public sealed class UsagePublishService
 
     /// <summary>Basenames of the CC homes on this machine — the same list the
     /// vault consent offers, so both share maps speak the same vocabulary.</summary>
-    public IReadOnlyList<string> DetectedRootNames()
+    public IReadOnlyList<string> DetectedRootNames()   // streamer: key - root names for consent keys, never drawn here
         => _reader.SearchRoots().Select(Path.GetFileName).Where(n => !string.IsNullOrEmpty(n))
             .Select(n => n!).ToList();
 
@@ -61,7 +61,7 @@ public sealed class UsagePublishService
     public IReadOnlyList<string> SharedRootNames()
     {
         var map = _settings.LoadPublishSettings().Roots;
-        return DetectedRootNames().Where(r => map.GetValueOrDefault(r)).ToList();
+        return DetectedRootNames().Where(r => map.GetValueOrDefault(r)).ToList();   // streamer: key - root names for consent keys, never drawn here
     }
 
     public void SetEnabled(bool on) => _settings.SavePublishEnabled(on);
@@ -155,7 +155,7 @@ public sealed class UsagePublishService
     /// A request that arrives while an upload is in flight waits for the next tick.</summary>
     private async Task HandleHandoffAsync(DateTimeOffset nowLocal)
     {
-        string reqPath = Path.Combine(_paths.ExternalDir, PublishHandoff.RequestFileName);
+        string reqPath = Path.Combine(_paths.ExternalDir, PublishHandoff.RequestFileName);   // streamer: notname - a file location used for IO, never drawn
         string resPath = Path.Combine(_paths.ExternalDir, PublishHandoff.ResultFileName);
         if (PublishHandoff.TryReadRequest(reqPath, nowLocal) is not { } request)
             return;
@@ -188,7 +188,7 @@ public sealed class UsagePublishService
                 {
                     ["status"] = outcome.Result.Status,
                     ["reason"] = outcome.Result.Ok ? null : "http_" + outcome.Result.StatusCode,
-                    ["remedy"] = outcome.Result.Ok ? null : outcome.Result.Message,
+                    ["remedy"] = outcome.Result.Ok ? null : outcome.Result.Message,   // streamer: cant - the publish result goes to the MCP server through the handoff file; MCP answers are on the can't-reach list
                     ["http_status"] = outcome.Result.StatusCode,
                     ["message"] = outcome.Result.Message,
                     ["at"] = outcome.Result.At.ToUniversalTime().ToString("o"),
@@ -230,9 +230,9 @@ public sealed class UsagePublishService
             burn.Add(_reader.BurnForLocalDay(root, Path.Combine(home, root), date));
 
         var settings = _settings.LoadPublishSettings();
-        var quota = UsagePublisher.ReadQuota(_paths.SnapshotFile, DateTimeOffset.UtcNow);
+        var quota = UsagePublisher.ReadQuota(_paths.SnapshotFile, DateTimeOffset.UtcNow);   // streamer: notname - a file location used for IO, never drawn
         var payload = UsagePublisher.BuildPayload(
-            date, Environment.MachineName, burn,
+            date, Environment.MachineName, burn,   // streamer: export - the upload record the person turned on carries the PC name; the Publish page's sample masks it (CP 20)
             new HashSet<string>(shared, StringComparer.Ordinal), quota, settings.BodyFormat);
         return new PublishRecord(payload, shared, burn.Sum(b => b.Total), quota.Status);
     }
@@ -282,9 +282,9 @@ public sealed class UsagePublishService
     {
         try
         {
-            _settings.SavePublishAttempt(result.At, result.Message, result.Ok ? date : null);
+            _settings.SavePublishAttempt(result.At, result.Message, result.Ok ? date : null);   // streamer: key - stores the attempt text; the Publish page masks hosts when it draws it (CP 19)
             // PRIVACY.md contract for sanduhr.log: status codes only — never the payload, never the key.
-            File.AppendAllText(_paths.LogFile,
+            File.AppendAllText(_paths.LogFile,   // streamer: notname - written to the log file, never drawn
                 $"{DateTime.UtcNow:o} publish {date:yyyy-MM-dd} -> http {result.StatusCode} ({(result.Ok ? "ok" : "failed")}){Environment.NewLine}");
         }
         catch
@@ -299,7 +299,7 @@ public sealed class UsagePublishService
     {
         try
         {
-            File.AppendAllText(_paths.LogFile,
+            File.AppendAllText(_paths.LogFile,   // streamer: notname - written to the log file, never drawn
                 $"{DateTime.UtcNow:o} publish {operation} failed ({e.GetType().Name}){Environment.NewLine}");
         }
         catch

@@ -119,7 +119,7 @@ internal partial class SignInWindow : Window
         }
         catch (Exception ex)
         {
-            CompleteAndClose(new SignInResult.Failed($"Couldn't start the sign-in browser: {ex.Message}"));
+            CompleteAndClose(new SignInResult.Failed(StreamerMode.Mask.Paths($"Couldn't start the sign-in browser: {ex.Message}")));   // streamer: masked - Mask.Paths here; the coordinator's FailedText masks it again (CP 18)
         }
     }
 
@@ -288,6 +288,9 @@ internal partial class SignInWindow : Window
     /// <summary>Swap the loading overlay for an error panel with retry + manual-paste
     /// escape hatch. Marks the window load-failed so a subsequent user close reports
     /// <see cref="SignInResult.Failed"/> (offering manual paste) rather than a Cancel.</summary>
+    /// <summary>The window's own error line (P1, slice 7): a thrown message can name a path under the user folder.</summary>
+    internal static string LoadErrorText(string message) => StreamerMode.Mask.Paths(message);
+
     private void ShowLoadError(string message)
     {
         if (_captured)
@@ -298,7 +301,7 @@ internal partial class SignInWindow : Window
         Log($"load error surfaced: {message}");
         LoadingOverlay.Visibility = Visibility.Collapsed;
         WebView.Visibility = Visibility.Collapsed; // native control yields so the WPF panel shows (airspace)
-        ErrorMessage.Text = message;
+        ErrorMessage.Text = LoadErrorText(message);
         ErrorPanel.Visibility = Visibility.Visible;
     }
 
@@ -316,7 +319,7 @@ internal partial class SignInWindow : Window
         }
         catch (Exception ex)
         {
-            ShowLoadError($"Couldn't restart the sign-in browser: {ex.Message}");
+            ShowLoadError(StreamerMode.Mask.Paths($"Couldn't restart the sign-in browser: {ex.Message}"));   // streamer: masked - Mask.Paths here; LoadErrorText masks it again (P1)
         }
     }
 
@@ -442,14 +445,14 @@ internal partial class SignInWindow : Window
             }
             catch (Exception ex)
             {
-                CompleteAndClose(new SignInResult.Failed($"Sign-in succeeded but saving the account failed: {ex.Message}"));
+                CompleteAndClose(new SignInResult.Failed(StreamerMode.Mask.Paths($"Sign-in succeeded but saving the account failed: {ex.Message}")));   // streamer: masked - Mask.Paths here; the coordinator's FailedText masks it again (CP 18)
             }
         }
         catch (Exception ex)
         {
             // A transient cookie-read hiccup must NOT tear down the window — the
             // poll will retry. Only a genuine capture+persist failure closes it.
-            Log($"{trigger}: capture threw (non-fatal, will retry): {ex.GetType().Name}: {ex.Message}");
+            Log($"{trigger}: capture threw (non-fatal, will retry): {ex.GetType().Name}: {ex.Message}");   // streamer: notname - written to the log file, never drawn
         }
     }
 

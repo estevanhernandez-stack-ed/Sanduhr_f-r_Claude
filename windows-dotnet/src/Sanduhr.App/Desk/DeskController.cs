@@ -169,7 +169,17 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     internal bool WatchersPlaced => Placed("watchers");
 
     /// <summary>The cards to draw: the board's, when the piece is placed.</summary>
-    private IReadOnlyList<Watcher> WatchersNow() => _watchers is not null && Placed("watchers") ? _watchers.Shown : [];
+    private IReadOnlyList<Watcher> WatchersNow() =>
+        _watchers is not null && Placed("watchers") ? StreamerFrameParts(_watchers.Shown, null, "").Watchers : [];
+
+    /// <summary>
+    /// Streamer mode's part of a Desk frame (slice 7, M4 and M5): a CI runner's card names its runner by codename, a path in Claude's
+    /// own cards is masked, and the weather piece shows the "Show it as" nickname, else the city's codename (spec). Off, both pass
+    /// through. One seam, so both frame builds agree.
+    /// </summary>
+    internal static (IReadOnlyList<Watcher> Watchers, string Nickname) StreamerFrameParts(
+        IReadOnlyList<Watcher> watchers, WeatherPlace? place, string? nickname) =>
+        (StreamerMode.Mask.Watchers(watchers), StreamerMode.Mask.WeatherName(place, nickname));
 
     private bool _piecesTakeClicks = DeskPieceClicks.DefaultOn;
 
@@ -220,7 +230,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         if (_stopped || index < 0 || index >= _launcher.Buttons.Count) return;
         var button = _launcher.Buttons[index];
-        var name = button.DisplayName(_launcherApps?.NameOf(button.Target));
+        var name = StreamerMode.LauncherName(button, _launcherApps?.NameOf(button.Target));
         Func<string, bool>? exists = _launcherApps is null ? null : _launcherApps.ExistsNow;
         Task.Run(() => LauncherApps.Open(button, exists)).ContinueWith(t =>
         {
@@ -521,7 +531,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             WeatherOn = Placed("weather"),
             Place = _weatherSettings.Place,
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
-            WeatherNickname = _weatherSettings.Nickname,
+            WeatherNickname = StreamerFrameParts([], _weatherSettings.Place, _weatherSettings.Nickname).Nickname,
             Watchers = WatchersNow(),
             Launcher = LauncherNow(),
             Companion = CompanionNow(),
@@ -772,7 +782,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             WeatherOn = Placed("weather"),
             Place = _weatherSettings.Place,
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
-            WeatherNickname = _weatherSettings.Nickname,
+            WeatherNickname = StreamerFrameParts([], _weatherSettings.Place, _weatherSettings.Nickname).Nickname,
             Watchers = WatchersNow(),
             Launcher = LauncherNow(),
             Companion = CompanionNow(),
@@ -871,7 +881,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// <summary>A sampling pass draws nothing anyone sees: its message gets a scratch copy of the played set, so the drawn pass still
     /// writes a new line in.</summary>
     private static DeskFrame Scratch(DeskFrame frame) =>
-        frame.Message is { } m ? frame with { Message = m with { Played = new HashSet<string>(m.Played, StringComparer.Ordinal) } } : frame;
+        frame.Message is { } m ? frame with { Message = m with { Played = new HashSet<string>(m.Played, StringComparer.Ordinal) } } : frame;   // streamer: notname - frame.Message is the Desk message frame record
 
     /// <summary>A stack's rect in the view's DIPs as the screen's pixels.</summary>
     private static PxRect Px(DeskScreen screen, Rect r) => new(

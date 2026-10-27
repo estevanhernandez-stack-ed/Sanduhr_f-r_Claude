@@ -13,6 +13,7 @@ namespace Sanduhr.App.Tests;
 /// theme change; off, it draws its own settings untouched. The readability guard turns a plateless look's plate on where its ink would not
 /// read. Over a scratch AppData, with the wallpaper sample replaced.
 /// </summary>
+[Collection("SettingsWindow")]
 public sealed class DeskFollowThemeTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "sanduhr-follow-" + Guid.NewGuid().ToString("N")[..8]);

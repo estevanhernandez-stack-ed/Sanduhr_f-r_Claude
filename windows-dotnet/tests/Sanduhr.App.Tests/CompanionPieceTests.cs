@@ -16,6 +16,7 @@ namespace Sanduhr.App.Tests;
 /// rendered pixel says which frame is drawn. Installed through <see cref="WidgetStore"/> into a scratch folder (the
 /// rasterized pixel sheet lands in <c>.raster</c>); no binary assets, no real Sanduhr folder, no network.
 /// </summary>
+[Collection("SettingsWindow")]
 public sealed class CompanionPieceTests : IDisposable
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 22, 12, 0, 0, TimeSpan.Zero);

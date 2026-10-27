@@ -20,9 +20,9 @@ internal sealed record ClaudeCodeHost(
     Func<string, string, FolderReport>? ReadReport = null)
 {
     public static ClaudeCodeHost For(WidgetViewModel widget) => new(
-        ClaudeCodeProfile.Dir, ClaudeCodeProfile.ConfigDir, widget.LoadCcFoldersAdded,
+        ClaudeCodeProfile.Dir, ClaudeCodeProfile.ConfigDir, widget.LoadCcFoldersAdded,   // streamer: notname - profile folders handed to the folder discovery, never drawn
         widget.SanduhrAppDataDir, widget.SanduhrExternalDir, widget.SanduhrLegacyModsRoot,
-        () => widget.ShownActiveAccount is { } label ? widget.AccountFolder(label) : null,
+        () => widget.ShownActiveAccount is { } label ? widget.AccountFolder(label) : null,   // streamer: key - folder lookup for the active account, never drawn
         Path.Combine(AppContext.BaseDirectory, "mods", ClaudeCodeIntegrations.ModName));
 
     public ClaudeCodeIntegrations Integrations() =>
@@ -32,13 +32,15 @@ internal sealed record ClaudeCodeHost(
     public IReadOnlyList<CcFolder> Folders() => ClaudeCodeFolders.Build(Profile, ConfigDir, AddedFolders());
 
     /// <summary>The path with the profile folder written as ~.</summary>
-    public string Display(string path) => ClaudeCodeFolders.Display(path, Profile);
+    /// <remarks>Streamer mode (slice 7, CP 7): the folder's codename while hidden. Cards, consents, Mods &amp; Widgets' meters rows and
+    /// Privacy's folder-reads row all read their folder names here.</remarks>
+    public string Display(string path) => StreamerMode.ShowFolder(path, Profile);
 
     /// <summary>Every known folder read for the one list: its report, Sanduhr's mod state and the meters status. Files only; never throws.</summary>
     public IReadOnlyList<FolderMods> ReadFolders()
     {
         var integ = Integrations();
-        return [.. Folders().Select(f => ReadFolder(f.Path, integ))];
+        return [.. Folders().Select(f => ReadFolder(f.Path, integ))];   // streamer: key - reads each folder's report; the page draws folders through Display (CP 7)
     }
 
     /// <summary>One folder read the same way. A read that throws reads as a folder whose settings.json can't be read, so the others still list.</summary>

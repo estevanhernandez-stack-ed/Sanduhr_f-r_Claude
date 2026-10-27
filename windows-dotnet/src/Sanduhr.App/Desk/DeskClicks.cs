@@ -97,7 +97,7 @@ internal static class DeskClicks
             NowPlayingDrawn: Has(DeskElementKind.NowPlaying),
             WeatherCreditDrawn: Has(DeskElementKind.WeatherCredit),
             PiecesTakeClicks: piecesTakeClicks,
-            MessageDrawn: Has(DeskElementKind.Message),
+            MessageDrawn: Has(DeskElementKind.Message),   // streamer: notname - DeskElementKind.Message is an enum member
             ClaudeLineDrawn: Has(DeskElementKind.ClaudeLine));
         var kinds = new HashSet<DeskElementKind>(DeskElements.Build(input).Select(e => e.Kind));
         // The clock counts only when it is drawn in this island.
@@ -117,7 +117,7 @@ internal static class DeskClicks
                 DeskElementKind? kind = tag switch
                 {
                     "clock" => DeskElementKind.Clock,
-                    "message" => DeskElementKind.Message,
+                    "message" => DeskElementKind.Message,   // streamer: notname - DeskElementKind.Message is an enum member
                     "claude" => DeskElementKind.ClaudeLine,
                     "nowPlaying" => DeskElementKind.NowPlaying,
                     WeatherCreditTag => DeskElementKind.WeatherCredit,
@@ -277,11 +277,11 @@ internal static class DeskClicks
         void Add(string header, DeskMenuAction action)
         {
             var item = new MenuItem { Header = header };
-            AutomationProperties.SetName(item, header.TrimEnd('…'));
+            AutomationProperties.SetName(item, header.TrimEnd('…'));   // streamer: notname - context-menu item text, fixed copy
             item.Click += (_, _) => actions.Menu(action);
             menu.Items.Add(item);
         }
-        if (kind == DeskElementKind.Message) Add(MessageSettings, DeskMenuAction.EditMessages);
+        if (kind == DeskElementKind.Message) Add(MessageSettings, DeskMenuAction.EditMessages);   // streamer: notname - DeskElementKind.Message is an enum member
         if (kind == DeskElementKind.LauncherButton) Add(LauncherSettings, DeskMenuAction.LauncherSettings);
         Add(DeskSettings, DeskMenuAction.DeskSettings);
         Add(DeskArrangeCopy.MenuItem, DeskMenuAction.Arrange);

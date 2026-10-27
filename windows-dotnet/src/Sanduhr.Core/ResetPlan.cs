@@ -213,6 +213,12 @@ public static partial class ResetPlan
         AddFile(settings, Path.Combine(ext, DeskDesign.StateFile));
         // The wallpaper preview Claude Code can look at is a copy of the wallpaper: it goes with the state.
         AddFile(settings, Path.Combine(ext, WallpaperPreview.FileName));
+        // Streamer mode (Settings v2, slice 7; spec, Reset): the codename book and its crashed-write .tmp go with the settings. streamer.json (and its crashed-write
+        // .tmp) is taken from the shared folder by its own names only.
+        AddFile(settings, paths.CodenamesFile);
+        AddFile(settings, paths.CodenamesFile + ".tmp");   // Codenames.Save's crashed write: it holds the salt and every real name
+        AddFile(settings, Path.Combine(ext, StreamerFile.FileName));
+        AddFile(settings, Path.Combine(ext, StreamerFile.FileName + ".tmp"));
         map[ResetPart.Settings] = Finish(settings, backups);
 
         return map;

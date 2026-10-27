@@ -312,7 +312,7 @@ internal sealed partial class DeskView
         var ring = new StackPanel();
         ring.Children.Add(face);
         ring.Children.Add(label);
-        System.Windows.Automation.AutomationProperties.SetName(ring, $"{r.Label} {r.Percent}%");
+        System.Windows.Automation.AutomationProperties.SetName(ring, $"{r.Label} {r.Percent}%");   // streamer: notname - the ring label is a tier name (Five-hour, Weekly), not an account
         return (ring, next =>
         {
             var text = $"{next.Percent}";

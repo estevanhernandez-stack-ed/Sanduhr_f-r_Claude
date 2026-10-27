@@ -516,7 +516,7 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         }
         catch (Exception ex)
         {
-            Log($"init: cookie clear failed: {ex.Message}");
+            Log($"init: cookie clear failed: {ex.Message}");   // streamer: notname - written to the log file, never drawn
         }
 
         // Both domain variants: .claude.ai (host-wide) and claude.ai (exact). The

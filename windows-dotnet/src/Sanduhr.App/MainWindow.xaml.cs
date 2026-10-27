@@ -113,6 +113,12 @@ public partial class MainWindow : Window
         menu.Opened += (_, _) => compact.IsChecked = Vm?.IsCompact ?? false;
         menu.Items.Add(compact);
 
+        // Streamer mode (spec: a widget right-click item of the same name, writing the same key). Checkable: one name, the check says which.
+        var streamer = new MenuItem { Header = SettingsNames.StreamerMenuItemHeader, IsCheckable = true };
+        streamer.Click += (_, _) => Vm?.Streamer.SetOn(streamer.IsChecked);
+        menu.Opened += (_, _) => streamer.IsChecked = Vm?.Streamer.On ?? false;
+        menu.Items.Add(streamer);
+
         menu.Items.Add(new Separator());
 
         var focus = new MenuItem { Header = SettingsNames.DeepWork, Command = Vm.ToggleFocusCommand };

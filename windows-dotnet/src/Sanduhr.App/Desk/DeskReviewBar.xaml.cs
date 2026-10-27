@@ -68,21 +68,21 @@ public sealed partial class DeskReviewBar : UserControl
         Heading.Text = model.Heading ?? DefaultHeading;
         AutomationProperties.SetName(Heading, Heading.Text);
         string barName = model.BarName ?? DeskReviewCopy.BarName;
-        AutomationProperties.SetName(this, barName);
+        AutomationProperties.SetName(this, barName);   // streamer: notname - the bar's name is fixed copy or the proposal's own title
         AutomationProperties.SetName(Frame, barName);
         ChangesHeader.Text = model.ChangesTitle ?? DeskReviewCopy.ChangesName;
         AutomationProperties.SetName(ChangesHeader, ChangesHeader.Text);
         AutomationProperties.SetName(Changes, ChangesHeader.Text);
         // A widget's one choice with Apply ("Make it the companion"), on by default; kept as the user left it while the same bar updates.
         OptionBox.Content = model.Option ?? "";
-        AutomationProperties.SetName(OptionBox, model.Option ?? "");
+        AutomationProperties.SetName(OptionBox, model.Option ?? "");   // streamer: notname - the choice text is fixed copy (WidgetReviewCopy.MakeCompanion)
         OptionBox.Visibility = model.Option is null ? Visibility.Collapsed : Visibility.Visible;
         if (!sameOption) OptionBox.IsChecked = true;
         Title.Text = model.Title;
-        AutomationProperties.SetName(Title, model.Title);
+        AutomationProperties.SetName(Title, model.Title);   // streamer: notname - the proposal's own title as Claude wrote it; no account, folder or project is read
         Note.Text = model.Note ?? "";
         Note.Visibility = model.Note is null ? Visibility.Collapsed : Visibility.Visible;
-        AutomationProperties.SetName(Note, model.Note ?? "");
+        AutomationProperties.SetName(Note, model.Note ?? "");   // streamer: notname - the proposal's own note as Claude wrote it; no account, folder or project is read
         Changes.ItemsSource = model.Changes;
 
         Fonts.Children.Clear();
@@ -94,7 +94,7 @@ public sealed partial class DeskReviewBar : UserControl
         {
             var line = new TextBlock { Text = w, FontSize = 11.5, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 3) };
             line.SetResourceReference(TextBlock.ForegroundProperty, "Sanduhr.Brush.TextDim");
-            AutomationProperties.SetName(line, w);
+            AutomationProperties.SetName(line, w);   // streamer: notname - lint warning phrasing from DeskReviewCopy, no identifying name
             Warnings.Children.Add(line);
         }
         Warnings.Visibility = model.Warnings.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -104,16 +104,16 @@ public sealed partial class DeskReviewBar : UserControl
         AutomationProperties.SetName(DeskOff, DeskOff.Text);
 
         Keys.Text = model.Keys;
-        AutomationProperties.SetName(Keys, model.Keys);
+        AutomationProperties.SetName(Keys, model.Keys);   // streamer: notname - key hints, fixed copy
         ApplyButton.IsEnabled = model.CanApply;
-        AutomationProperties.SetHelpText(ApplyButton, DeskReviewCopy.ApplyHelp(model.CanApply));
+        AutomationProperties.SetHelpText(ApplyButton, DeskReviewCopy.ApplyHelp(model.CanApply));   // streamer: notname - help text from DeskReviewCopy.ApplyHelp, fixed copy
     }
 
     private UIElement FontLine(DeskReviewFont font)
     {
         var text = new TextBlock { FontSize = 12.5, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 4) };
         text.SetResourceReference(TextBlock.ForegroundProperty, "Sanduhr.Brush.Text");
-        AutomationProperties.SetName(text, font.Line);
+        AutomationProperties.SetName(text, font.Line);   // streamer: notname - names a font family, not an identifying name
         if (font.Link is null)
         {
             text.Inlines.Add(new Run(font.Line));
@@ -122,7 +122,7 @@ public sealed partial class DeskReviewBar : UserControl
         text.Inlines.Add(new Run($"{font.Family} is not installed. Get it from "));
         var link = new Hyperlink(new Run(font.Link)) { ToolTip = "Opens in your browser. Sanduhr downloads nothing." };
         link.SetResourceReference(TextElement.ForegroundProperty, "Sanduhr.Brush.Accent");
-        AutomationProperties.SetName(link, $"Open the download page for {font.Family}");
+        AutomationProperties.SetName(link, $"Open the download page for {font.Family}");   // streamer: notname - names a font family, not an identifying name
         string target = font.Link;
         link.Click += (_, _) => OpenLink(target);
         text.Inlines.Add(link);

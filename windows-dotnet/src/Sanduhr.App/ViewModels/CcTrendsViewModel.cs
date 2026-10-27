@@ -52,6 +52,29 @@ public sealed partial class CcTrendsViewModel : ObservableObject
         }
     }
 
+    private IReadOnlyList<(string Name, long Total)> _top = [];
+
+    /// <summary>Trends' top projects (slice 7, CP 16): the same codenames as Overview's (one key, the project's name).</summary>
+    internal static IReadOnlyList<BreakdownRow> Rows(IEnumerable<(string Name, long Total)> top) =>
+        LocalCcViewModel.Rows(top, CodenameCategory.Project);
+
+    private void FillTop()
+    {
+        TopProjects.Clear();
+        foreach (var row in Rows(_top))
+            TopProjects.Add(row);
+    }
+
+    /// <summary>Streamer mode moved (slice 7): the table reads its names again.</summary>
+    public void RefreshNames() => FillTop();
+
+    /// <summary>Tests fill the table as a refresh of the archive's top projects would.</summary>
+    internal void ShowTopForTests(IEnumerable<(string Name, long Total)> top)
+    {
+        _top = [.. top];
+        FillTop();
+    }
+
     private sealed record TrendsData(
         IReadOnlyList<VaultWeek> Weeks,
         IReadOnlyList<(string Name, long Total)> Top,
@@ -83,9 +106,8 @@ public sealed partial class CcTrendsViewModel : ObservableObject
         }
 
         _weeks = data.Weeks;
-        TopProjects.Clear();
-        foreach (var (name, total) in data.Top)
-            TopProjects.Add(new BreakdownRow(name, TokenFormat.Compact(total)));
+        _top = data.Top;   // streamer: masked - via FillTop: the top list draws codenames (CP 16)
+        FillTop();
 
         var todayLocal = DateOnly.FromDateTime(DateTime.Now);
         FooterText = data.Birth is { } birth

@@ -13,7 +13,7 @@ namespace Sanduhr.App.ViewModels;
 /// <see cref="Search"/>, the shortcut recorder, and the commands the About page and the sidebar's foot call: What's
 /// New, the tour, open a folder or link, Reset and Quit.
 /// </summary>
-public sealed class SettingsViewModel
+public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyChanged
 {
     public AccountsViewModel Accounts { get; }
 
@@ -51,6 +51,7 @@ public sealed class SettingsViewModel
 
     /// <summary>Settings, Mods &amp; Widgets (slice 4): the one list. Nothing is fetched until the catalog is opened.</summary>
     private ModsPageViewModel _modsPage = null!;
+    private readonly WidgetViewModel _widget;
 
     /// <summary>Settings, Mods &amp; Widgets (slice 4): the one list. Tests and the harness put in their own (a fake catalog); the setter wires
     /// it to this window's pickers.</summary>
@@ -62,6 +63,11 @@ public sealed class SettingsViewModel
             _modsPage = value;
             value.SettingsChanged = PacksChanged;
             value.MetersChanged = installed => ClaudeCodePage.AfterMetersChange(installed);
+            value.ShowRealName = names =>
+            {
+                foreach (var name in names)
+                    _widget.Streamer.SetShown(CodenameCategory.AddOn, name, true);
+            };
         }
     }
 
@@ -140,6 +146,12 @@ public sealed class SettingsViewModel
     /// install, the package's LocalCache copy when it exists (see <see cref="DataFolders"/>).</summary>
     public string SettingsFolder { get; }
 
+    /// <summary>About's folders as shown (slice 7, CP 23; spec, About): the user folder as %USERPROFILE% while streamer mode is on. The
+    /// Show in Explorer commands keep the real paths.</summary>
+    public string SettingsFolderShown => StreamerMode.Mask.Paths(SettingsFolder);
+    public string LocalFolderShown => StreamerMode.Mask.Paths(LocalFolder);
+    public string ClaudeCodeFilesFolderShown => StreamerMode.Mask.Paths(ClaudeCodeFilesFolder);
+
     /// <summary>About, Where settings live: the usage vault (PRIVACY.md: <c>%LOCALAPPDATA%\Sanduhr\vault\</c>,
     /// or the package's LocalCache copy on a Store install).</summary>
     public string LocalFolder { get; }
@@ -190,6 +202,7 @@ public sealed class SettingsViewModel
         GlobalHotKeyService? hotKeys = null, Action? showWhatsNew = null, Action? showTour = null,
         Func<Task<UpdateProbeResult>>? checkForUpdatesNow = null, bool? isStoreBuild = null)
     {
+        _widget = widget;
         ShowWhatsNewCommand = new RelayCommand(() => showWhatsNew?.Invoke());
         ShowTourCommand = new RelayCommand(() => showTour?.Invoke());
         AboutVersion = new AboutVersionViewModel(new SettingsStore(new Paths()));
@@ -203,6 +216,7 @@ public sealed class SettingsViewModel
             widget, widget.LoadLocalCcShowBreakdowns(), widget.SaveLocalCcShowBreakdowns),
             new CcTrendsViewModel(widget),
             new CcLedgerViewModel(widget, widget.LoadLedgerGroupByProject(), widget.SaveLedgerGroupByProject));
+        ClaudeCode.ShowRealName = (category, real) => widget.Streamer.SetShown(category, real, true);   // slice 7, decision 16
         ClaudeCodePage = new ClaudeCodeViewModel(widget);
         Desk = new DeskSettingsViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies(),
             inkPresets: () => PackInkPresets.Merged(new WidgetStore(new Paths().WidgetsDir, Sanduhr.App.Services.WidgetCatalogService.EncodePng)));
@@ -254,6 +268,8 @@ public sealed class SettingsViewModel
         var privacyStore = new SettingsStore(new Paths());
         Privacy = new PrivacyViewModel(privacyStore, ClaudeCodeHost.For(widget), widget.LoadMcpRoots,
             publishOn: () => privacyStore.LoadPublishSettings().Enabled);
+        // Streamer mode (slice 7): the widget's service; the window attaches it and detaches it on Closed (decision 15, preflight P15).
+        Privacy.Streamer = new StreamerSettingsViewModel(widget.Streamer) { NamesChanged = ReloadNames };
         var v = Assembly.GetExecutingAssembly().GetName().Version;
         Version = v is null ? "3.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
 
@@ -277,6 +293,42 @@ public sealed class SettingsViewModel
             catch (Exception) { /* the dialog reports its own failures */ }
         });
     }
+
+    /// <summary>
+    /// Streamer mode moved, the codenames were shuffled, or a name was shown or hidden (slice 7 decision 15): every page that masks a name
+    /// builds its text again, so nothing on an open page keeps a real name or an old codename. Tasks 9 to 12 add their pages here.
+    /// </summary>
+    public void ReloadNames()
+    {
+        Accounts.Reload();
+        ClaudeCodePage.Reload();
+        Privacy.Reload();
+        ModsPage.ReloadLocal();
+        // A status line is a sentence built when it was written, with the names as they were then: it is not rebuilt, so it goes (final review C1).
+        ModsPage.Status = "";
+        ModsPage.MetersStatus = "";
+        ClaudeCodePage.StatusText = "";
+        Desk.Companion.Reload();
+        Desk.Launcher.Reload();   // preflight P3: a link's URL and a raw target
+        History.RefreshNames();
+        ClaudeCode.Overview.RefreshNames();
+        ClaudeCode.Trends.RefreshNames();
+        ClaudeCode.Ledger.RefreshNames();
+        Publish.RefreshNames();
+        WeatherPage.RefreshNames();
+        OnPropertyChanged(nameof(SettingsFolderShown));
+        OnPropertyChanged(nameof(LocalFolderShown));
+        OnPropertyChanged(nameof(ClaudeCodeFilesFolderShown));
+        NamesReloaded++;
+    }
+
+    /// <summary>Only About's three folder lines change after the window opens (streamer mode, slice 7).</summary>
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+    private void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));
+
+    /// <summary>Tests count the reloads.</summary>
+    internal int NamesReloaded { get; private set; }
 
     private static void OpenFolder(string? folder)
     {

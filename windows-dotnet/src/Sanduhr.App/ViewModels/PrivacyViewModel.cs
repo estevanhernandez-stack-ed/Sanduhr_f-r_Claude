@@ -31,6 +31,9 @@ public sealed partial class PrivacyViewModel : ObservableObject
     private readonly Func<bool> _publishOn;
     private readonly Func<string, bool>? _isRegistered;
 
+    /// <summary>Streamer mode and Show the real name (slice 7), set by Settings; null in tests that build Privacy alone.</summary>
+    public StreamerSettingsViewModel? Streamer { get; internal set; }
+
     /// <summary>What leaves this PC, in the page's order.</summary>
     public IReadOnlyList<NetworkRow> Network => NetworkDisclosure.All;
 
@@ -63,7 +66,7 @@ public sealed partial class PrivacyViewModel : ObservableObject
     public void Reload()
     {
         ReadAgents();
-        var discovered = _host.Folders().Where(f => f.Discovered).ToList();
+        var discovered = _host.Folders().Where(f => f.Discovered).ToList();   // streamer: key - the discovered folders counted for the page, never drawn here
         var check = _isRegistered ?? DefaultCheck();
         McpStatus = SettingsNames.McpInstalledStatus(discovered.Count(f => Registered(check, f.Name)), discovered.Count);
     }
@@ -78,7 +81,7 @@ public sealed partial class PrivacyViewModel : ObservableObject
     {
         var roots = _mcpRoots();
         IReadOnlyList<(string Folder, bool On)> folders =
-            [.. _host.Folders().Where(f => f.Discovered).Select(f => (_host.Display(f.Path), roots.GetValueOrDefault(f.Name)))];
+            [.. _host.Folders().Where(f => f.Discovered).Select(f => (_host.Display(f.Path), roots.GetValueOrDefault(f.Name)))];   // streamer: masked - via Display: the folder shows through StreamerMode.ShowFolder (CP 7)
         Agents.Clear();
         foreach (var c in AgentConsents.All)
             Agents.Add(new AgentRow(c.Name, AgentConsents.State(c, SwitchOn(c), folders), c.Caption, c.LinkTitle, c.Link, c.LinkName));

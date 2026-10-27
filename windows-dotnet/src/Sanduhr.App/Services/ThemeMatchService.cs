@@ -158,7 +158,7 @@ internal sealed class ThemeMatchService
         _store.SaveDesk(own.Desk);
         _store.SaveDeskPlate(own.Desk.Plate);
         _store.SaveDeskInk(own.Ink);
-        _store.SaveDeskMessage(own.Message);
+        _store.SaveDeskMessage(own.Message);   // streamer: notname - own.Message is a theme's Desk message colours
         _store.SaveNowPlaying(own.NowPlaying);
     }
 
@@ -174,7 +174,7 @@ internal sealed class ThemeMatchService
     private ThemeMatchResult? Save(string key, JsonObject theme, string incomingName, bool overwrite, bool saveFirst)
     {
         var lint = ThemeLint.Lint(theme);
-        if (!lint.Ok) return new(false, lint.Errors.First().Message);
+        if (!lint.Ok) return new(false, lint.Errors.First().Message);   // streamer: notname - a theme lint finding about a field, no path or name
         string path = Path.Combine(_widget.ThemesDir, key + ".json");
         string tmp = path + ".tmp";
         try

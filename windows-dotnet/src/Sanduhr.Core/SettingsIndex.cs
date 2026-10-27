@@ -46,7 +46,9 @@ public static class SettingsIndex
     public const string TestAlert = "test";
     public const string EachLimit = "each-limit";
     public const string SignInReminders = "signin-reminders";
-    // Privacy (slice 6): Streamer mode's anchors come first on the page in slice 7
+    // Privacy: Streamer mode first (slice 7), then What leaves this PC and What Claude can change (slice 6)
+    public const string Streamer = "streamer";
+    public const string StreamerAllowlist = "streamer-allowlist";
     public const string Network = "network";
     public const string Agents = "agents";
     // History (retired in slice 5): kept for the aliases to Claude Usage, Meters
@@ -184,6 +186,13 @@ public static class SettingsIndex
              "until it resets", "promo", "special limit", SettingsNames.WarnForThisLimit, SettingsNames.ShowThisLimit, SettingsNames.HiddenUntilItResets]),
         E("Sound", SettingsPage.Alerts, Sound, ["chime", "sound", "snake", "model-scoped", "mute"]),
         E(SettingsNames.SendTestAlert, SettingsPage.Alerts, TestAlert, ["test", "try"]),
+
+        // Streamer mode (slice 7): the spec's words are Boosts (stream, streamer, screen share, hide names, obs, demo, codename). The entries
+        // take only words no other page owns: "recording" would take "record" from Shortcuts, "hide" from Alerts (decision 17).
+        E(SettingsNames.StreamerSection, SettingsPage.Privacy, Streamer,
+            ["streaming", "share my screen", "presenting", "codenames", "shuffle", "demo mode"]),
+        E(SettingsNames.ShowRealNameSection, SettingsPage.Privacy, StreamerAllowlist,
+            ["real name", "allowlist", "show on stream", "unmask"]),
 
         // P2: "endpoint", "upload", "GitHub", "telemetry", "Microsoft Store" and "propose" stay with the pages that own those controls.
         E(SettingsNames.WhatLeavesThisPc, SettingsPage.Privacy, Network,
@@ -350,6 +359,8 @@ public static class SettingsIndex
         [SettingsNames.LimitOrder] = WidgetOptions,
         [SettingsNames.ShowTheWidget] = JustTheDeskSection,
         [SettingsNames.TrayShows] = Tray,
+        [SettingsNames.StreamerSection] = Streamer,
+        [SettingsNames.ShuffleCodenames] = Streamer,
         [SettingsNames.ShortcutToOpenSettings] = Shortcuts,
         [SettingsNames.AddAccount] = SignInSection,
         [SettingsNames.ClearAccountHistory] = AccountData,
@@ -806,6 +817,14 @@ public static class SettingsIndex
         _ => null,
     };
 
+    /// <summary>The pages that mask something while streamer mode is on, each with a <c>StreamerBanner</c> under its first line (slice 7
+    /// decision 14; the reach inventory). A test holds the XAML to this list.</summary>
+    public static IReadOnlyList<SettingsPage> StreamerPages { get; } =
+    [
+        SettingsPage.Accounts, SettingsPage.Privacy, SettingsPage.ClaudeUsage, SettingsPage.Publish, SettingsPage.Desk, SettingsPage.Weather,
+        SettingsPage.Watchers, SettingsPage.ClaudeCode, SettingsPage.Mods, SettingsPage.About, SettingsPage.Launcher,
+    ];
+
     /// <summary>Where an opening Settings lands: the place asked for; else where it was left this session; else General.</summary>
     public static SettingsLink Landing(SettingsPage? page, string? anchor, SettingsLink? last) =>
         page is { } p ? new(p, anchor) : last ?? new(SettingsPage.General, null);
@@ -818,6 +837,8 @@ public static class SettingsIndex
     {
         SettingsPage.Alerts => Links(page, Thresholds, EachLimit, Sound, TestAlert),
         SettingsPage.Publish => Links(page, Destination, Token, Homes, Schedule, Sample),
+        // Privacy (slice 7): four sections once Streamer mode joins (slice 6 carry); the labels are the index titles.
+        SettingsPage.Privacy => Links(page, Streamer, StreamerAllowlist, Network, Agents),
         // About (slice 6): six sections once Updates joins (slice 5 carry P5). The labels are the index titles (owner taste 9), but
         // Reset's is the section's name: the entry's own title is the command (preflight P15).
         SettingsPage.About => [.. Links(page, Version, Updates, Trademark, Where), (SettingsNames.ResetJump, Reset), .. Links(page, Notices)],

@@ -25,6 +25,7 @@ using Sanduhr.Core;
 //                        settings-pass is not part of all: it is the slow evidence run for the Settings persona pass
 //                        (see SettingsPassScenario.cs); run it once without and once with --light
 //                        manual-key is not part of all either: the manual sign-in key window, closed and fully open
+//                        streamer-smoke is not part of all and runs alone: the Settings v2 slice 7 owner checks, automated (see StreamerSmokeScenario.cs)
 //   --pages <list>       settings-pass only: comma-separated page names to run (default every page)
 //   --parts <list>       settings-pass only: pages, tab, focus, search, links, contrast (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)
@@ -107,7 +108,7 @@ public static partial class Program
             }
         }
         string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange", "launcher", "review", "companion", "ridealongs", "propose-widget", "meterstyles", "theme-match" };
-        string[] opt = { "settings-pass", "manual-key" };
+        string[] opt = { "settings-pass", "manual-key", "streamer-smoke" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
         var bad = scenarios.Where(s => !known.Contains(s) && !opt.Contains(s)).ToList();
@@ -273,6 +274,16 @@ public static partial class Program
         Log.Add($"light: {(light ? "yes" : "no")}");
         Log.Add($"windows app mode: {WindowsAppMode()}");
         Log.Add($"scenarios: {string.Join(",", scenarios)}");
+
+        if (scenarios.Contains("streamer-smoke"))
+        {
+            // Runs alone and before the invented Claude Code profile and the real-account widget below: it builds its own rigs.
+            if (scenarios.Count != 1)
+                throw new InvalidOperationException("streamer-smoke runs alone: pass --scenario streamer-smoke only.");
+            try { await RenderStreamerSmoke(); }
+            finally { File.WriteAllLines(Path.Combine(Out, "log.txt"), Log); }
+            return;
+        }
 
         // Claude Code folders come from an invented profile, never the real one, so no real path, project or
         // account label reaches a picture. Set before the view model is built (its log reader discovers folders).
