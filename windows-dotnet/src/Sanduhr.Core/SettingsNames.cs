@@ -1058,6 +1058,8 @@ public static class SettingsNames
     [
         (TrayShows, SettingsPage.General),
         (ShortcutToOpenSettings, SettingsPage.General),
+        (StreamerSection, SettingsPage.Privacy),
+        (ShuffleCodenames, SettingsPage.Privacy),
         (AddAccount, SettingsPage.Accounts),
         (SendTestAlert, SettingsPage.Alerts),
         (WarnForThisLimit, SettingsPage.Alerts),

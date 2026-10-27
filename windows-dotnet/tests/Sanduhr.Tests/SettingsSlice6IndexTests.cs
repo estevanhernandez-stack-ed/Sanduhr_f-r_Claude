@@ -43,12 +43,13 @@ public class SettingsSlice6IndexTests
     }
 
     [Fact]
-    public void Privacy_holds_two_sections_and_no_jump_links()
+    public void Privacy_keeps_its_two_slice_6_sections_after_streamer_mode()
     {
-        Assert.Equal([SettingsIndex.Network, SettingsIndex.Agents], SettingsIndex.EntriesOn(SettingsPage.Privacy).Select(e => e.Anchor));
+        // Slice 7 put Streamer mode and Show the real name first; slice 6's two follow, in order (SettingsSlice7IndexTests pins the four).
+        Assert.Equal([SettingsIndex.Network, SettingsIndex.Agents],
+            SettingsIndex.EntriesOn(SettingsPage.Privacy).Select(e => e.Anchor).Distinct().Skip(2));
         Assert.Equal([SettingsNames.WhatLeavesThisPc, SettingsNames.WhatClaudeCanChange],
-            SettingsIndex.EntriesOn(SettingsPage.Privacy).Select(e => e.Title));
-        Assert.Empty(SettingsIndex.JumpLinks(SettingsPage.Privacy));   // two sections (decision 12); slice 7 adds the third
+            SettingsIndex.EntriesOn(SettingsPage.Privacy).Select(e => e.Title).Skip(2));
     }
 
     [Theory]

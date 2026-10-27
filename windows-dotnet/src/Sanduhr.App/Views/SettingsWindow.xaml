@@ -1033,6 +1033,7 @@
                                 <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                             </ScrollViewer.Resources>
                         <StackPanel Margin="16" DataContext="{Binding Accounts}">
+                            <views:StreamerBanner />
                             <StackPanel views:SettingsAnchor.Id="accounts">
                                 <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,8"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
@@ -1372,8 +1373,10 @@
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
 
-                            <!-- Sub-nav -->
-                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                            <!-- Sub-nav, under the streamer banner (slice 7) -->
+                            <StackPanel Grid.Row="0">
+                            <views:StreamerBanner />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                 <Button Content="{x:Static core:SettingsNames.MetersView}" Style="{StaticResource CcNavMeters}"
                                         Command="{Binding SetMetersCommand}" />
                                 <Button Content="Overview" Style="{StaticResource CcNavOverview}"
@@ -1382,6 +1385,7 @@
                                         Command="{Binding SetTrendsCommand}" />
                                 <Button Content="Sessions" Style="{StaticResource CcNavSessions}"
                                         Command="{Binding SetSessionsCommand}" />
+                            </StackPanel>
                             </StackPanel>
 
                             <!-- Meters (Settings v2, slice 5): the 30-day meter history, the History page until now (WF14). Its DataContext is
@@ -1861,6 +1865,7 @@
                             <TextBlock Text="Publish usage" FontSize="14" FontWeight="SemiBold"
                                        AutomationProperties.HeadingLevel="Level1"
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            <views:StreamerBanner />
                             <views:SectionJumpLinks Page="Publish" />
                             <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,12"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
@@ -2336,6 +2341,7 @@
                                 <StackPanel Margin="20">
                                     <TextBlock Text="Desk" FontSize="14" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level1"
                                                Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,4" />
+                                    <views:StreamerBanner />
                                     <TextBlock Text="{x:Static core:SettingsNames.DeskLine}" FontSize="11" TextWrapping="Wrap"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12" />
                                     <views:SectionJumpLinks Page="Desk" />
@@ -2605,6 +2611,7 @@
                         <StackPanel Margin="20">
                             <TextBlock Text="Weather" FontSize="14" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level1"
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                            <views:StreamerBanner />
                             <views:DeskPieceStatusPanel DataContext="{Binding Piece}" Margin="0,0,0,12" />
                             <StackPanel views:SettingsAnchor.Id="weather-place">
                                 <TextBlock Text="City" FontSize="13" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level2"
@@ -2691,6 +2698,7 @@
                             <TextBlock Text="About" FontSize="14" FontWeight="SemiBold"
                                        AutomationProperties.HeadingLevel="Level1"
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+                            <views:StreamerBanner />
                             <!-- Six sections: jump links (spec, Keyboard and screen reader; slice 5 carry P5). -->
                             <views:SectionJumpLinks Page="About" />
 

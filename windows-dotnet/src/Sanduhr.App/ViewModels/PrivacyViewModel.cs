@@ -31,6 +31,9 @@ public sealed partial class PrivacyViewModel : ObservableObject
     private readonly Func<bool> _publishOn;
     private readonly Func<string, bool>? _isRegistered;
 
+    /// <summary>Streamer mode and Show the real name (slice 7), set by Settings; null in tests that build Privacy alone.</summary>
+    public StreamerSettingsViewModel? Streamer { get; internal set; }
+
     /// <summary>What leaves this PC, in the page's order.</summary>
     public IReadOnlyList<NetworkRow> Network => NetworkDisclosure.All;
 

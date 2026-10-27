@@ -109,8 +109,11 @@ internal partial class SettingsWindow : Window
         Deactivated += (_, _) => ViewModel.Shortcuts.CancelRecording();
         // The What's New window is non-modal and writes the same key: read it again when Settings is brought back (P14).
         Activated += (_, _) => ViewModel.AboutVersion.Reload();
+        ViewModel.Privacy.Streamer?.AttachOwner(this);
         Closed += (_, _) =>
         {
+            // The one subscription to the widget's long-lived streamer service (slice 7 decision 15).
+            ViewModel.Privacy.Streamer?.Detach();
             ViewModel.Desk.Flush();
             ViewModel.Desk.Launcher.Detach();
             ViewModel.MessagePage.Dispose();

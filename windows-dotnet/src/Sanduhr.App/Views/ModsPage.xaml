@@ -240,6 +240,7 @@
                 <TextBlock Text="{x:Static core:SettingsNames.ModsAndWidgetsTitle}" FontSize="14" FontWeight="SemiBold"
                            AutomationProperties.HeadingLevel="Level1" Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,4" />
                 <TextBlock Text="{x:Static core:SettingsNames.ModsPageLine}" Style="{StaticResource Dim}" Margin="0,0,0,4" />
+                <views:StreamerBanner />
                 <TextBlock Text="{x:Static core:SettingsNames.ModsIntro}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,14"
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
 

@@ -254,6 +254,8 @@ public sealed class SettingsViewModel
         var privacyStore = new SettingsStore(new Paths());
         Privacy = new PrivacyViewModel(privacyStore, ClaudeCodeHost.For(widget), widget.LoadMcpRoots,
             publishOn: () => privacyStore.LoadPublishSettings().Enabled);
+        // Streamer mode (slice 7): the widget's service; the window attaches it and detaches it on Closed (decision 15, preflight P15).
+        Privacy.Streamer = new StreamerSettingsViewModel(widget.Streamer) { NamesChanged = ReloadNames };
         var v = Assembly.GetExecutingAssembly().GetName().Version;
         Version = v is null ? "3.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
 
@@ -277,6 +279,21 @@ public sealed class SettingsViewModel
             catch (Exception) { /* the dialog reports its own failures */ }
         });
     }
+
+    /// <summary>
+    /// Streamer mode moved, the codenames were shuffled, or a name was shown or hidden (slice 7 decision 15): every page that masks a name
+    /// builds its text again, so nothing on an open page keeps a real name or an old codename. Tasks 9 to 12 add their pages here.
+    /// </summary>
+    public void ReloadNames()
+    {
+        Accounts.Reload();
+        ClaudeCodePage.Reload();
+        Privacy.Reload();
+        NamesReloaded++;
+    }
+
+    /// <summary>Tests count the reloads.</summary>
+    internal int NamesReloaded { get; private set; }
 
     private static void OpenFolder(string? folder)
     {

@@ -52,6 +52,7 @@
             <StackPanel x:Name="PageBody" Margin="20">
                 <TextBlock Text="Claude Code" FontSize="14" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level1"
                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,4" />
+                <views:StreamerBanner />
                 <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,14" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                            Text="The folders Sanduhr found, and what Sanduhr adds to each. Nothing is written to a folder until you install a piece and confirm." />
 

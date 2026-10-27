@@ -102,7 +102,19 @@ public sealed class StreamerService : IDisposable
     public IReadOnlyList<CodenameEntry> Entries()
     {
         var book = EnsureBook();
-        lock (book) return book.Entries();
+        lock (book)
+        {
+            // While on, the list shows codenames only (spec): a shown name that never needed one gets one now.
+            if (On)
+            {
+                foreach (var e in book.Entries().Where(e => e.Codename is null))
+                {
+                    book.Assign(e.Category, e.Real);
+                    _dirty = true;
+                }
+            }
+            return book.Entries();
+        }
     }
 
     /// <summary>Saves the book (when it changed) and streamer.json (when a folder's line changed). Nothing after Reset.</summary>
