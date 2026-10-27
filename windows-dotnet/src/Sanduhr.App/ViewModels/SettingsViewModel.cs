@@ -51,6 +51,7 @@ public sealed class SettingsViewModel
 
     /// <summary>Settings, Mods &amp; Widgets (slice 4): the one list. Nothing is fetched until the catalog is opened.</summary>
     private ModsPageViewModel _modsPage = null!;
+    private readonly WidgetViewModel _widget;
 
     /// <summary>Settings, Mods &amp; Widgets (slice 4): the one list. Tests and the harness put in their own (a fake catalog); the setter wires
     /// it to this window's pickers.</summary>
@@ -62,6 +63,11 @@ public sealed class SettingsViewModel
             _modsPage = value;
             value.SettingsChanged = PacksChanged;
             value.MetersChanged = installed => ClaudeCodePage.AfterMetersChange(installed);
+            value.ShowRealName = names =>
+            {
+                foreach (var name in names)
+                    _widget.Streamer.SetShown(CodenameCategory.AddOn, name, true);
+            };
         }
     }
 
@@ -190,6 +196,7 @@ public sealed class SettingsViewModel
         GlobalHotKeyService? hotKeys = null, Action? showWhatsNew = null, Action? showTour = null,
         Func<Task<UpdateProbeResult>>? checkForUpdatesNow = null, bool? isStoreBuild = null)
     {
+        _widget = widget;
         ShowWhatsNewCommand = new RelayCommand(() => showWhatsNew?.Invoke());
         ShowTourCommand = new RelayCommand(() => showTour?.Invoke());
         AboutVersion = new AboutVersionViewModel(new SettingsStore(new Paths()));
@@ -289,6 +296,8 @@ public sealed class SettingsViewModel
         Accounts.Reload();
         ClaudeCodePage.Reload();
         Privacy.Reload();
+        ModsPage.ReloadLocal();
+        Desk.Companion.Reload();
         Desk.Launcher.Reload();   // preflight P3: a link's URL and a raw target
         NamesReloaded++;
     }

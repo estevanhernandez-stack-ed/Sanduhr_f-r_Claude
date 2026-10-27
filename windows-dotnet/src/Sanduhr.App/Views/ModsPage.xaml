@@ -65,6 +65,15 @@
             <Setter Property="FocusVisualStyle" Value="{StaticResource RowFocus}" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="AutomationProperties.Name" Value="{Binding RowName}" />
+            <!-- Streamer mode's quick route (decision 16): only while the row's name is hidden. -->
+            <Setter Property="ContextMenuService.IsEnabled" Value="{Binding CanShowRealName}" />
+            <Setter Property="ContextMenu">
+                <Setter.Value>
+                    <ContextMenu>
+                        <MenuItem Header="{x:Static core:SettingsNames.ShowRealNameOnStream}" Command="{Binding ShowRealNameCommand}" />
+                    </ContextMenu>
+                </Setter.Value>
+            </Setter>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
