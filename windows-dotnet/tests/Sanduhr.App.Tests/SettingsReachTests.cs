@@ -548,7 +548,11 @@ public sealed class SettingsReachTests : AppWindowFixture
             Assert.Equal(2, grid.Children.OfType<TextBlock>().Count(x => x.Text == "%"));
             // The boxes are already named "..., percent": the sign is drawn, not read (a plain TextBlock is a UIA control element).
             foreach (var percent in grid.Children.OfType<TextBlock>().Where(x => x.Text == "%"))
-                Assert.False(System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(percent).IsControlElement());
+            {
+                var peer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(percent);
+                Assert.False(peer.IsControlElement());
+                Assert.False(peer.IsContentElement());
+            }
         }
         finally { window.Close(); }
     });

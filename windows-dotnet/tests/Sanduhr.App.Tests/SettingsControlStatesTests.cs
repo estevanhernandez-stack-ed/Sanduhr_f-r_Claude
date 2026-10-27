@@ -1,11 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Data;
-using System.Windows.Automation;
 using System.Windows.Media;
 using Sanduhr.App.Views;
-using Sanduhr.Core;
 
 namespace Sanduhr.App.Tests;
 
@@ -22,8 +19,8 @@ public sealed class SettingsControlStatesTests : AppWindowFixture
         _ => null,
     };
 
-    // A loaded template reads a DynamicResource setter back as the extension; if it ever reads back as an expression, the key is
-    // reached through its ToString-free path below, so fail loudly instead of passing on nothing.
+    // A loaded template reads a DynamicResource setter back as the extension; if that ever changes, KeyOf returns null and the
+    // assertions fail, so the tests cannot pass on nothing.
     private static bool SetsBrush(Trigger t, DependencyProperty property, string key) =>
         t.Setters.OfType<Setter>().Any(s => s.Property == property && KeyOf(s.Value) == key);
 
@@ -94,7 +91,26 @@ public sealed class SettingsControlStatesTests : AppWindowFixture
     });
 
     [Fact]
-    public void A_section_with_no_help_text_draws_no_summary_line() => AppHost.Run(() =>
+    public void A_section_with_no_help_text_set_has_an_empty_tag_and_no_summary_line() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        var window = new SettingsWindow(new Sanduhr.App.ViewModels.SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask));
+        try
+        {
+            var (_, host, toggle) = BuildExpander(window, false);   // HelpText never set: its default is the empty string
+            try
+            {
+                Assert.Equal("", toggle.Tag);
+                var summary = Below<TextBlock>(toggle).Single(t => t.Style?.Triggers.OfType<DataTrigger>().Any() == true);
+                Assert.Equal(Visibility.Collapsed, summary.Visibility);
+            }
+            finally { host.Close(); }
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void A_section_whose_tag_is_null_draws_no_summary_line() => AppHost.Run(() =>
     {
         var (widget, _) = ScratchWidget("Personal");
         var window = new SettingsWindow(new Sanduhr.App.ViewModels.SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask));
