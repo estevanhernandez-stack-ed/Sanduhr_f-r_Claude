@@ -136,7 +136,7 @@
                                                 views:SettingsLinkTo.Link="{Binding MetersLink}" AutomationProperties.Name="{Binding MetersLinkName}" />
                                     </WrapPanel>
 
-                                    <!-- What this folder holds: the read-only report Mods & Config had, collapsed, read when opened. -->
+                                    <!-- What this folder holds: the folder's read-only report, collapsed, read when opened. -->
                                     <Expander Style="{DynamicResource SectionExpander}" Margin="0,8,0,0" Header="{x:Static core:SettingsNames.FolderHolds}"
                                               IsExpanded="{Binding HoldsOpen, Mode=TwoWay}"
                                               AutomationProperties.Name="{Binding HoldsName}"

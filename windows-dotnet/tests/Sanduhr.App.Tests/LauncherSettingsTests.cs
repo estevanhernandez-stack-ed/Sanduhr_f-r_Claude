@@ -10,7 +10,7 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Tests;
 
 /// <summary>
-/// Settings, Desk, Launcher (spec, Desk Launcher) over a scratch AppData: the key in settings.json, the rows and what editing
+/// Settings, Launcher (spec, Desk Launcher) over a scratch AppData: the key in settings.json, the rows and what editing
 /// them saves, the picture files that leave with their button, and the PNG import's checks. The two pickers and the file
 /// dialog are the only parts a person has to drive by hand.
 /// </summary>

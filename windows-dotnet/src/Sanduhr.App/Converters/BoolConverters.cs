@@ -4,7 +4,7 @@ using System.Windows.Data;
 
 namespace Sanduhr.App.Converters;
 
-/// <summary>Two bool converters the Settings pages and panels share (they lived on the Widgets page until slice 4).</summary>
+/// <summary>Two bool converters the Settings pages and panels share.</summary>
 public static class Bools
 {
     /// <summary>true to false: IsEnabled while a page is busy.</summary>

@@ -86,7 +86,7 @@ public static class ModsPageText
         return string.Join(", ", parts);
     }
 
-    /// <summary>What a mod or plugin touches, as the old Mods &amp; Config page said it: "Draws a band; can run programs." Empty when the scan
+    /// <summary>What a mod or plugin touches, as Settings, Mods &amp; Widgets says it: "Draws a band; can run programs." Empty when the scan
     /// found no surface and no capability.</summary>
     public static string DescribeTouches(ModTouches t)
     {

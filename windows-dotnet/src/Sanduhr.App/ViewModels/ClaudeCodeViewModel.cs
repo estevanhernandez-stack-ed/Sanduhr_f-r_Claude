@@ -338,7 +338,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         if (!_loading && value.Kind == GlowTargetKind.Desk) PlaceGlowSpot();
     }
 
-    /// <summary>Choosing the Desk places the glow's spot at its default anchor when it is not placed yet,
+    /// <summary>Choosing the Desk places the glow's spot at its default place (DeskArrangement.DefaultPlaceFor) when it is not placed yet,
     /// then asks the Desk to draw it (spec 7.3). A spot already placed stays where it is.</summary>
     private void PlaceGlowSpot()
     {

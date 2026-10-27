@@ -525,7 +525,7 @@ public class SettingsNamesTests
     [Fact]
     public void Copy_moved_out_of_Mods_and_Config_is_pinned()
     {
-        // P13: Mods & Config is gone (slice 4, Task 12); what FolderHoldsViewModel and the meters rows copied from it lives here now, word for word.
+        // P13: the Claude Code folder cards (FolderHoldsViewModel) and the meters rows on Mods & Widgets take their words from here, word for word.
         Assert.Equal(("Couldn't read this folder.", "Readable", "settings.json parses as JSON."),
             (SettingsNames.HoldsCantRead, SettingsNames.SettingsReadable, SettingsNames.SettingsReadableDetail));
         Assert.Equal("Unreadable: line 3, column 7", SettingsNames.SettingsUnreadableAt(3, 7));

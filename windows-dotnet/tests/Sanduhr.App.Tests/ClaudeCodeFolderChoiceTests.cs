@@ -4,7 +4,7 @@ using Sanduhr.App.ViewModels;
 
 namespace Sanduhr.App.Tests;
 
-/// <summary>Which folder card a link to Claude Code, folder-config opens (slice 4, decision 5; the same order Mods &amp; Config's combo used).</summary>
+/// <summary>Which folder card a link to Claude Code, folder-config opens (slice 4, decision 5).</summary>
 [Collection("SettingsWindow")]
 public sealed class ClaudeCodeFolderChoiceTests : AppWindowFixture
 {

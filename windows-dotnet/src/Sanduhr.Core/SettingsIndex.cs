@@ -691,7 +691,8 @@ public static class SettingsIndex
 
     /// <summary>
     /// Where (<paramref name="page"/>, <paramref name="anchor"/>) lives now: itself while it is still in the index; else
-    /// its alias's target once that target is in the index; else itself, unchanged. Cards, tests and agent text written
+    /// its alias's target once that target is in the index; or, once the page has left the sidebar, its page-level alias row;
+    /// else itself, unchanged. Cards, tests and agent text written
     /// before 4.0 land through this.
     /// </summary>
     public static SettingsLink Resolve(SettingsPage page, string? anchor) =>

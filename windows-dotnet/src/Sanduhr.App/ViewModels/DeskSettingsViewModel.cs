@@ -241,7 +241,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     /// <summary>The monitors connected when the page was loaded (read again by <see cref="Reload"/>).</summary>
     public IReadOnlyList<DeskMonitorInfo> Monitors { get; private set; }
 
-    /// <summary>Settings, Desk, Launcher: the buttons, their pictures and the pickers (spec, Desk Launcher).</summary>
+    /// <summary>Settings, Launcher: the buttons, their pictures and the pickers (spec, Desk Launcher).</summary>
     public LauncherSettingsViewModel Launcher { get; }
 
     /// <summary>Called after every saved change (App re-applies the Desk).</summary>

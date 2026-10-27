@@ -211,22 +211,22 @@ public static class SettingsNames
     public const string SaveThemeAs = "Save the theme as";
     /// <summary>Alerts, Sound (settings.json "alert_snake_full"), said plainly (WF43, WF38).</summary>
     public const string SnakeSoundAtFull = "Play the cooldown snake's sound at 100%";
-    /// <summary>Desk, Where each piece sits: the pieces, named as on the Mac.</summary>
+    /// <summary>Desk, Pieces: the pieces, named as on the Mac.</summary>
     public const string DeskClock = "Clock and date";
     public const string DeskClaudeLine = "Claude meters (line)";
     public const string DeskClaudeBars = "Claude meters (bars)";
-    /// <summary>Desk, Where each piece sits: the S6 pieces (spec 6.10).</summary>
+    /// <summary>Desk, Pieces: the S6 pieces (spec 6.10).</summary>
     public const string DeskMessage = "Message";
     public const string DeskNowPlaying = "Now playing";
     public const string DeskTelemetry = "System (CPU, RAM, disk)";
     public const string DeskWeather = "Weather";
-    /// <summary>Desk, Where each piece sits: the glow's spot (spec 7.3), named as Arrange mode labels it.</summary>
+    /// <summary>Desk, Pieces: the glow's spot (spec 7.3), named as Arrange mode labels it.</summary>
     public const string DeskGlow = "Claude Code glow";
-    /// <summary>Desk, Where each piece sits: the watchers (spec 6.9), live cards for work an agent is watching.</summary>
+    /// <summary>Desk, Pieces: the watchers (spec 6.9), live cards for work an agent is watching.</summary>
     public const string DeskWatchers = "Watchers";
-    /// <summary>Desk, Where each piece sits: the Launcher, buttons that open apps and links from the desktop.</summary>
+    /// <summary>Desk, Pieces: the Launcher, buttons that open apps and links from the desktop.</summary>
     public const string DeskLauncher = "Launcher";
-    /// <summary>Desk, Where each piece sits: the companion, whose sprite is chosen in its own row.</summary>
+    /// <summary>Desk, Pieces: the companion, whose sprite is chosen in its own row.</summary>
     public const string DeskCompanion = "Companion";
     /// <summary>Launcher, Buttons: opens the app picker.</summary>
     public const string LauncherAddApp = "Add app…";
@@ -280,6 +280,7 @@ public static class SettingsNames
         "glow" => SettingsPage.ClaudeCode,
         _ => null,
     };
+
     /// <summary>Desk Look, Ink and color: the ink picker's label and spoken name (it was spoken "Ink", WF34).</summary>
     public const string DeskInkPicker = "Clock, date, Claude";
     /// <summary>Desk Look, Fonts: the Desk's font, one of the two "Font"s (WF12).</summary>
@@ -512,7 +513,7 @@ public static class SettingsNames
     public static string OwnArtChangeFailed(string pack) => $"{pack} couldn't be changed.";
     public const string OwnArtFileFilter = "PNG sprite sheet (*.png)|*.png";
 
-    // ---- Copy moved out of Mods & Config when it retired (Task 12, P13): a card's "What this folder holds" and the meters rows ----
+    // ---- Copy for the Claude Code folder cards and Mods & Widgets (Task 12, P13): a card's "What this folder holds" and the meters rows ----
 
     public const string HoldsCantRead = "Couldn't read this folder.";
     public const string SettingsReadable = "Readable";
@@ -1007,7 +1008,7 @@ public static class SettingsNames
     /// <summary>Desk, Pieces: Order (WF5), live when another piece shares the place.</summary>
     public const string MoveUp = "Move up";
     public const string MoveDown = "Move down";
-    /// <summary>An Order button spoken: "Move Weather up in bottom left".</summary>
+    /// <summary>An Order button spoken: "Move Weather up in bottom left". <paramref name="place"/> is a title-case name; the sentence lower-cases it.</summary>
     public static string MoveUpIn(string piece, string place) => $"Move {piece} up in {place.ToLowerInvariant()}";
     public static string MoveDownIn(string piece, string place) => $"Move {piece} down in {place.ToLowerInvariant()}";
     /// <summary>A row's Show box spoken: its visible label is the piece's name.</summary>
@@ -1017,7 +1018,7 @@ public static class SettingsNames
     public const string NotOnDesk = "Not on the Desk.";
     /// <summary>Added to a placed piece's line while the Desk itself is off.</summary>
     public const string DeskIsOff = "The Desk is off: turn it on in Settings, Desk.";
-    /// <summary>A feature page's line about its piece: "On the Desk: bottom right." or "Not on the Desk."</summary>
+    /// <summary>A feature page's line about its piece: "On the Desk: bottom right." or "Not on the Desk." <paramref name="place"/> is a title-case name; the sentence lower-cases it.</summary>
     public static string PieceStatus(string? place, bool deskOn) =>
         place is null ? NotOnDesk : $"On the Desk: {place.ToLowerInvariant()}." + (deskOn ? "" : " " + DeskIsOff);
     /// <summary>Desk Look's sections (spec, Desk Look).</summary>

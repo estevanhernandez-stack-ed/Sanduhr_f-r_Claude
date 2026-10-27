@@ -4,7 +4,7 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.Tests;
 
-/// <summary>A folder card's "What this folder holds" (slice 4): Mods &amp; Config's read-only report for one folder, read when opened.</summary>
+/// <summary>A folder card's "What this folder holds" on Settings, Claude Code (slice 4): the read-only report for one folder, read when opened.</summary>
 [Collection("SettingsWindow")]
 public sealed class FolderHoldsTests : ModsPageFixture
 {

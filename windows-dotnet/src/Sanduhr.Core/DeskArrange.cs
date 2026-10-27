@@ -154,6 +154,7 @@ public static class DeskArrange
     public static DeskAnchor? Step(DeskAnchor from, int dx, int dy)
     {
         int col = (int)DeskAnchors.Column(from) + dx, row = (int)DeskAnchors.Row(from) + dy;
+        // (dx, dy) = (0, 0) would never leave the start: the guard stops an endless loop.
         while (col is >= 0 and <= 2 && row is >= 0 and <= 2 && (dx != 0 || dy != 0))
         {
             if (DeskAnchors.At((DeskColumn)col, (DeskRow)row) is { } at) return at;
