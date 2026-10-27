@@ -62,6 +62,10 @@ public static class ClaudeCodeReset
         string receiptsPath = Path.Combine(scope.SanduhrDir, ResetPlan.IntegrationsName, ResetPlan.ReceiptsFileName);
         // Read before any write: unreadable receipts mean Reset can't tell which entries are Sanduhr's to restore.
         bool receiptsUnreadable = ResetPlan.ReceiptsUnreadable(receiptsPath);
+        // A missing file is not a damaged one, but for a statusline it tells as little: with no receipt Remove drops the key and a
+        // chained line of the person's own goes with it. So a statusline with no receipt is left alone whenever installs.json is
+        // missing, and reported as left.
+        bool receiptsMissing = !File.Exists(receiptsPath);
         var (receipts, _) = SnapshotConsumers.ReadReceipts(receiptsPath);
         // Unreadable receipts hide which meters, hooks and statusline entries exist, so those kinds stay "left" for the switches.
         if (receiptsUnreadable)
@@ -103,8 +107,8 @@ public static class ClaudeCodeReset
 
         // The statusline: known folders first, then any folder a receipt names that is no longer listed, so Reset never leaves an
         // orphan statusLine. Each folder once. A kept folder is skipped. A folder that can't be read right now is a failure, and
-        // with unreadable receipts only a folder with a readable statusline receipt is touched: Remove without one would drop the
-        // key and lose a chained line of the person's own.
+        // with unreadable receipts, or none at all, only a folder with a readable statusline receipt is touched: Remove without one would
+        // drop the key and lose a chained line of the person's own.
         var statusline = new StatuslineInstaller(scope.ProfileDir, scope.StatuslineBinDir, null, scope.SanduhrDir);
         var statuslineFolders = scope.Folders.Select(f => f.Path).ToList();
         var receiptFolders = SnapshotConsumers.StatuslineReceiptFolders(receipts);
@@ -112,6 +116,7 @@ public static class ClaudeCodeReset
             if (!statuslineFolders.Any(p => ClaudeCodeFolders.Same(p, folder)))
                 statuslineFolders.Add(folder);
         bool statuslineFailed = false;
+        bool statuslineSkipped = false;
         foreach (var folder in statuslineFolders.Where(f => !Kept(f, IntegrationKind.Statusline)))
         {
             try
@@ -122,6 +127,11 @@ public static class ClaudeCodeReset
                 {
                     statuslineFailed = true;
                     failed.Add(new ClaudeCodeUndone(IntegrationKind.Statusline, folder));
+                }
+                else if (status is StatuslineStatus.Installed or StatuslineStatus.Outdated
+                         && receiptsMissing && !receiptFolders.Any(r => ClaudeCodeFolders.Same(r, folder)))
+                {
+                    statuslineSkipped = true;   // installed, and no receipt to say what was the person's own
                 }
                 else if (status is StatuslineStatus.Installed or StatuslineStatus.Outdated
                          && (!receiptsUnreadable || receiptFolders.Any(r => ClaudeCodeFolders.Same(r, folder))))
@@ -141,12 +151,12 @@ public static class ClaudeCodeReset
                 failed.Add(new ClaudeCodeUndone(IntegrationKind.Statusline, folder));
             }
         }
-        if (statuslineFailed)
+        if (statuslineFailed || statuslineSkipped)
         {
             failures.Add("a statusline entry");
             left.Add(IntegrationKind.Statusline);
         }
-        if (!KeptAny(IntegrationKind.Statusline) && !receiptsUnreadable && !statuslineFailed)
+        if (!KeptAny(IntegrationKind.Statusline) && !receiptsUnreadable && !statuslineFailed && !statuslineSkipped)
         {
             try { statusline.RemoveScript(); }
             catch (Exception)

@@ -342,4 +342,27 @@ public sealed class ClaudeCodeResetTests : IDisposable
         Assert.Contains(result.Removed, r => r.Kind == IntegrationKind.Mcp);
         Assert.DoesNotContain(result.Removed, r => r.Kind == IntegrationKind.Statusline);
     }
+
+    [Fact]
+    public void A_missing_installs_json_leaves_a_chained_statusline_alone_instead_of_dropping_the_persons_command()
+    {
+        string home = Home(".claude-chain");
+        const string theirs = "my-own-line.cmd --fancy";
+        File.WriteAllText(Path.Combine(home, "settings.json"),
+            "{\n  \"theme\": \"dark\",\n  \"statusLine\": { \"type\": \"command\", \"command\": \"" + theirs + "\" }\n}\n");
+        var statusline = new StatuslineInstaller(Profile, BinDir, null, SanduhrDir);
+        Assert.True(statusline.InstallScript());
+        Assert.True(statusline.Install(home, StatuslineMode.Combine, StatuslineInstaller.DefaultSegments, StatuslineInstaller.JoinLine));
+        Assert.Contains("-Chain", File.ReadAllText(Path.Combine(home, "settings.json")));
+        File.Delete(Receipts);   // missing, not damaged
+        var before = Snapshot(home);
+
+        var result = ClaudeCodeReset.UndoKeeping(Scope(), []);
+
+        Same(before, Snapshot(home), "the chained folder");   // the key, and their command inside it, are still there
+        Assert.Contains("a statusline entry", result.Failures);
+        Assert.Contains(IntegrationKind.Statusline, result.Left);
+        Assert.False(result.StatuslineOut);
+        Assert.True(File.Exists(statusline.ScriptPath), "the script went with a statusline still installed");
+    }
 }
