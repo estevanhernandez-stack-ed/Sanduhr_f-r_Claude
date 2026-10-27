@@ -41,7 +41,7 @@ public sealed partial class LauncherButtonRow : ObservableObject
 
     /// <summary>The name this button goes by: its label, else the app's name, else the site.</summary>
     public string Title => string.IsNullOrWhiteSpace(Label)
-        ? (Kind == LauncherKind.Link ? LauncherTarget.LinkHost(Target) : AppName ?? StreamerMode.Mask.Paths(Target))   // streamer: a raw target can be a path
+        ? (Kind == LauncherKind.Link ? LinkHostShown : AppName ?? StreamerMode.Mask.Paths(Target))   // streamer: a raw target can be a path
         : Label.Trim();
 
     /// <summary>The line under the title: what the button opens.</summary>
@@ -52,7 +52,10 @@ public sealed partial class LauncherButtonRow : ObservableObject
     public string UseDefaultImageText => IsApp ? "Use the app's icon" : "Use the link icon";
 
     /// <summary>What a screen reader calls this button when a control belongs to it: the app's name or the site, never the label being typed.</summary>
-    public string Subject => Kind == LauncherKind.Link ? LauncherTarget.LinkHost(Target) : AppName ?? Target;
+    public string Subject => Kind == LauncherKind.Link ? LinkHostShown : AppName ?? StreamerMode.Mask.Paths(Target);
+
+    /// <summary>A link's site as the row shows and speaks it: its codename while streamer mode is on, the same one <see cref="Detail"/> shows.</summary>
+    private string LinkHostShown => StreamerMode.Mask.Name(CodenameCategory.Host, LauncherTarget.LinkHost(Target));
 
     public string UseDefaultImageName => $"{UseDefaultImageText} for {Subject}";
 
