@@ -101,7 +101,7 @@ public class StreamerMaskTests
     public void Paths_show_the_profile_folder_as_USERPROFILE()
     {
         var mask = new StreamerMask(true, Book(), Profile, [Profile, @"D:\Home\qxother"]);
-        Assert.Equal(@"%USERPROFILE%\AppData\Roaming\Sanduhr", mask.Paths(@"c:\users\qxuser\AppData\Roaming\Sanduhr"));
+        Assert.Equal(@"%USERPROFILE%\…\Sanduhr", mask.Paths(@"c:\users\qxuser\AppData\Roaming\Sanduhr"));
         Assert.Equal(@"copy failed: %USERPROFILE%\x.json", mask.Paths(@"copy failed: D:\Home\qxother\x.json"));
         Assert.Equal("no path here", mask.Paths("no path here"));
     }
@@ -170,21 +170,26 @@ public class StreamerMaskTests
     private static StreamerMask PathMask() => new(true, Book(), Profile, [Profile, @"D:\Home\qxother"]);
 
     [Theory]
-    [InlineData(@"Access to the path 'C:\Users\qxuser\AppData\Roaming\Sanduhr\themes\x.json' is denied.", @"Access to the path '%USERPROFILE%\AppData\Roaming\Sanduhr\themes\x.json' is denied.")]
-    [InlineData(@"Could not find a part of the path ""c:\USERS\QXUSER\AppData\x.json"".", @"Could not find a part of the path ""%USERPROFILE%\AppData\x.json"".")]
+    [InlineData(@"Access to the path 'C:\Users\qxuser\AppData\Roaming\Sanduhr\themes\x.json' is denied.", @"Access to the path '%USERPROFILE%\…\x.json' is denied.")]
+    [InlineData(@"Could not find a part of the path ""c:\USERS\QXUSER\AppData\x.json"".", @"Could not find a part of the path ""%USERPROFILE%\…\x.json"".")]
     [InlineData(@"failed: C:\Users\qxuser\x.json, then more", @"failed: %USERPROFILE%\x.json, then more")]
     [InlineData(@"failed (C:\Users\qxuser\x.json).", @"failed (%USERPROFILE%\x.json).")]
-    [InlineData("failed C:/Users/qxuser/AppData/x.json now", @"failed %USERPROFILE%\AppData\x.json now")]
+    [InlineData("failed C:/Users/qxuser/AppData/x.json now", @"failed %USERPROFILE%\…\x.json now")]
     [InlineData(@"json path C:\\Users\\qxuser\\x.json bad", @"json path %USERPROFILE%\x.json bad")]
     [InlineData(@"\\?\C:\Users\qxuser\x.json", @"%USERPROFILE%\x.json")]
     [InlineData(@"C:\Users\qxuser", @"%USERPROFILE%")]
-    [InlineData(@"path ~\.claude\x.json gone", @"path %USERPROFILE%\.claude\x.json gone")]
+    [InlineData(@"path ~\.claude\x.json gone", @"path %USERPROFILE%\…\x.json gone")]
+    [InlineData(@"opened ~\notes", @"opened %USERPROFILE%\notes")]
+    [InlineData(@"C:\Users\qxuser\a\b\c\d.json", @"%USERPROFILE%\…\d.json")]
+    [InlineData(@"C:\Users\qxuser\onlyone", @"%USERPROFILE%\onlyone")]
+    [InlineData(@"D:\Home\qxother\deep\er\file.txt", @"%USERPROFILE%\…\file.txt")]
     [InlineData(@"E:\Backups\qxuser\notes.txt", @"E:\…\notes.txt")]
     [InlineData(@"'D:\Clients\Acme Corp\plan.json' is locked", @"'D:\…\plan.json' is locked")]
     [InlineData(@"read D:\My Clients\Acme\plan.json to E:\out", @"read D:\…\plan.json to E:\…")]
     [InlineData(@"\\fileserver\finance$\q3\plan.json missing", @"\\…\plan.json missing")]
     [InlineData(@"""\\fileserver\finance$\q3 reports\plan.json"" missing", @"""\\…\plan.json"" missing")]
-    [InlineData(@"C:\Users\Someone Else\Docs\x.json: denied", @"%USERPROFILE%\Docs\x.json: denied")]
+    [InlineData(@"C:\Users\Someone Else\Docs\x.json: denied", @"%USERPROFILE%\…\x.json: denied")]
+    [InlineData(@"C:\Users\Someone Else\Docs\More\x.json: denied", @"%USERPROFILE%\…\x.json: denied")]
     [InlineData("C:\\Users\\qxuser\\a.json\r\nD:\\Home\\qxother\\b.json", "%USERPROFILE%\\a.json\r\n%USERPROFILE%\\b.json")]
     public void Paths_masks_every_windows_path_shape_in_free_text(string text, string expected)
     {
@@ -300,7 +305,7 @@ public class StreamerMaskTests
         var agent = new Watcher { Id = "a:1", Source = WatcherSource.Agent, Title = @"npm test in C:\Users\qxuser\repo", Note = @"C:\Users\qxuser\repo\log.txt", State = WatcherState.Running, Started = DateTimeOffset.UnixEpoch, Touched = DateTimeOffset.UnixEpoch };
         var shown = mask.Watchers([agent])[0];
         Assert.Equal(@"npm test in %USERPROFILE%\repo", shown.Title);
-        Assert.Equal(@"%USERPROFILE%\repo\log.txt", shown.Note);
+        Assert.Equal(@"%USERPROFILE%\…\log.txt", shown.Note);
     }
     [Fact]
     public void The_mask_and_the_service_share_one_lock_the_book_itself()

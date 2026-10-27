@@ -50,7 +50,7 @@ public class SettingsSlice7NamesTests
         Assert.Contains("sign-in window", more);
         Assert.Contains("MCP server", more);
         Assert.Contains("full paths and folder names", more);
-        Assert.Contains("watcher cards", more);
+        Assert.Contains("watcher cards (the folders in an absolute Windows path in it are hidden)", more);
     }
 
     /// <summary>The demo line: the search word "demo" lands on it (spec), and it says how demo mode starts, as DemoMode does.</summary>

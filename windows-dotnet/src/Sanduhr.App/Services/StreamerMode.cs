@@ -22,7 +22,7 @@ public static class StreamerMode
         Mask.HidesFolder(path) ? Mask.Folder(path) : ClaudeCodeFolders.Display(path, profileDir);   // streamer: masked - CP 7: ShowFolder masks on this line
 
     /// <summary>Status and error text that may name folders by full path (CP 8): each of <paramref name="folderPaths"/> shows as it does on
-    /// its card, and any other path under the user folder shows as <c>%USERPROFILE%</c>. Off, the text is unchanged.</summary>
+    /// its card, and any other path under the user folder shows as <c>%USERPROFILE%</c> with the folders between hidden (<c>%USERPROFILE%\…\leaf</c>). Off, the text is unchanged.</summary>
     public static string FoldersIn(string text, IEnumerable<string> folderPaths)
     {
         if (!Mask.On || string.IsNullOrEmpty(text))

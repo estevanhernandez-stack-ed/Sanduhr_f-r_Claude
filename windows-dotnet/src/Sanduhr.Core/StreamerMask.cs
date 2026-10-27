@@ -133,7 +133,8 @@ public sealed class StreamerMask
     /// Text that may hold a path (an exception message, a status line). While on, every Windows path in it is masked:
     /// <list type="bullet">
     /// <item>a user folder (the profile folder, the Windows profile folder, <c>C:\Users\&lt;anyone&gt;</c>) and <c>~\</c> become
-    /// <c>%USERPROFILE%</c>, the rest of the path kept: <c>%USERPROFILE%\AppData\Roaming\Sanduhr\x.json</c>;</item>
+    /// <c>%USERPROFILE%</c>, the folders between it and the file or folder hidden as on any other drive: <c>%USERPROFILE%\x.json</c> for one
+    /// segment below it, <c>%USERPROFILE%\…\x.json</c> for more;</item>
     /// <item>any other drive path becomes <c>D:\…\leaf</c> and a UNC path <c>\\…\leaf</c>: where it lives is hidden, the file or folder it names stays;</item>
     /// <item>the bare Windows user name, standing as a path segment, becomes <c>%USERNAME%</c>.</item>
     /// </list>
@@ -149,7 +150,7 @@ public sealed class StreamerMask
             text = pattern.Replace(text, m =>
             {
                 var (core, trail) = SplitTrailing(m.Groups["tail"].Value);
-                return "%USERPROFILE%" + Separators(core).TrimEnd('\\') + trail;
+                return "%USERPROFILE%" + UnderProfile(Separators(core).Split('\\', StringSplitOptions.RemoveEmptyEntries)) + trail;
             });
         if (_userNames is not null)
             text = _userNames.Replace(text, "%USERNAME%");
@@ -172,6 +173,15 @@ public sealed class StreamerMask
 
     private static string Separators(string s) => Regex.Replace(s, @"[\\/]+", "\\");
 
+    /// <summary>What follows <c>%USERPROFILE%</c>: nothing for the folder itself, <c>\leaf</c> for one segment below it, <c>\…\leaf</c> for more.
+    /// The folders in between name projects and people, so they are hidden, as they are on any other drive.</summary>
+    private static string UnderProfile(string[] segments) => segments.Length switch
+    {
+        0 => "",
+        1 => "\\" + segments[0],
+        _ => "\\…\\" + segments[^1],
+    };
+
     /// <summary>One path, already cut from its sentence: see <see cref="Paths"/>.</summary>
     private static string MaskPath(string path)
     {
@@ -179,7 +189,7 @@ public sealed class StreamerMask
             path = path[4..];
         const string hidden = "…";
         if (path.StartsWith('~'))
-            return "%USERPROFILE%" + Separators(path[1..]).TrimEnd('\\');
+            return "%USERPROFILE%" + UnderProfile(Separators(path[1..]).Split('\\', StringSplitOptions.RemoveEmptyEntries));
         bool unc = path.StartsWith(@"\\", StringComparison.Ordinal);
         string root = unc ? "" : path[..2];   // "D:"
         var segments = path[2..].Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
@@ -192,7 +202,7 @@ public sealed class StreamerMask
         if (segments.Length == 0)
             return root + "\\";
         if (segments.Length >= 2 && string.Equals(segments[0], "Users", StringComparison.OrdinalIgnoreCase) && segments[1] != hidden)
-            return "%USERPROFILE%" + (segments.Length > 2 ? "\\" + string.Join('\\', segments[2..]) : "");
+            return "%USERPROFILE%" + UnderProfile(segments[2..]);
         return segments.Length == 1 ? root + "\\" + hidden : root + "\\" + hidden + "\\" + segments[^1];
     }
 

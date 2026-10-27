@@ -157,7 +157,7 @@ public sealed class StreamerAccountsAndFoldersTests : AppWindowFixture
             var text = StreamerMode.FoldersIn($@"Couldn't write {work}\settings.json; see {Profile}\AppData\x.log", [work]);
             NoSentinel("status", text);
             Assert.Contains(StreamerMode.Mask.Folder(work), text);
-            Assert.Contains(@"%USERPROFILE%\AppData\x.log", text);
+            Assert.Contains(@"%USERPROFILE%\…\x.log", text);
             NoSentinel("mcp consent details", McpConsentDialog.DetailsFor(Path.Combine(Profile, ".sanduhr", "bin", "sanduhr-mcp.cmd"),
                 Path.Combine(work, ".claude.json"), [work]));
         }
