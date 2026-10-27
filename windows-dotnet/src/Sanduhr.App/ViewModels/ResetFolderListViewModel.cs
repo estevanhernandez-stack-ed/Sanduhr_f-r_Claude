@@ -82,10 +82,11 @@ internal readonly record struct ResetFolderLines(
 /// </summary>
 internal sealed class ResetFolderListViewModel
 {
-    private ResetFolderListViewModel(IReadOnlyList<ResetFolderRow> rows, bool unreadable)
+    private ResetFolderListViewModel(IReadOnlyList<ResetFolderRow> rows, bool unreadable, bool readFailed = false)
     {
         Rows = rows;
         ReceiptsUnreadable = unreadable;
+        ReadFailed = readFailed;
         foreach (var row in rows)
             row.UndoChanged += () => Changed?.Invoke();
     }
@@ -95,11 +96,16 @@ internal sealed class ResetFolderListViewModel
     /// <summary>installs.json, or a copy set aside beside it, can't be read in full: Reset keeps every copy (decision 4).</summary>
     public bool ReceiptsUnreadable { get; }
 
+    /// <summary>Reading the folders threw (a locked or unreachable record), as opposed to a damaged one: there is no row to keep, so the
+    /// Claude Code part does not run at all and the dialog says why. A lock released before the run must not turn into an undo of
+    /// every folder.</summary>
+    public bool ReadFailed { get; }
+
     /// <summary>The folders the person unticked, with their kinds: what the service keeps per kind.</summary>
     public IReadOnlyList<ResetFolder> Kept => [.. Rows.Where(r => !r.Undo).Select(r => r.Folder)];
 
     /// <summary>The Claude Code part would change something: a ticked row, or no rows at all (Sanduhr's leftover copies still go).</summary>
-    public bool UndoesAny => Rows.Count == 0 || Rows.Any(r => r.Undo);
+    public bool UndoesAny => !ReadFailed && (Rows.Count == 0 || Rows.Any(r => r.Undo));
 
     /// <summary>A row was ticked or unticked.</summary>
     public event Action? Changed;
@@ -131,7 +137,7 @@ internal sealed class ResetFolderListViewModel
     internal static ResetFolderListViewModel For(IReadOnlyList<ResetFolderRow> rows, bool unreadable) => new(rows, unreadable);
 
     /// <summary>The folders as Reset finds them now: the receipts, plus Sanduhr's MCP entry and statusline in each discovered folder
-    /// (decision 1). A read that throws reads as unreadable, so Reset keeps everything rather than guess.</summary>
+    /// (decision 1). A read that throws leaves the Claude Code part off, so Reset keeps everything rather than guess.</summary>
     public static ResetFolderListViewModel Read(WidgetViewModel widget)
     {
         try
@@ -154,7 +160,7 @@ internal sealed class ResetFolderListViewModel
         }
         catch (Exception)
         {
-            return new ResetFolderListViewModel([], true);
+            return new ResetFolderListViewModel([], true, readFailed: true);
         }
     }
 }

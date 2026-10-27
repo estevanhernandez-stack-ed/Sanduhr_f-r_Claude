@@ -487,4 +487,48 @@ public sealed class ResetWindowFoldersTests : AppWindowFixture
         }
         finally { widget.Dispose(); }
     });
+
+    [Fact]
+    public void When_reading_the_folder_list_throws_the_claude_code_part_is_off_and_says_why_and_never_undoes_a_folder() => AppHost.Run(() =>
+    {
+        var (widget, _, _, _) = Make();
+        try
+        {
+            var receipts = Path.Combine(widget.SanduhrAppDataDir, ResetPlan.IntegrationsName, ResetPlan.ReceiptsFileName);
+            IReadOnlyCollection<ResetFolder>? asked = null;
+            var service = new ResetService(ScratchPaths(), new Sanduhr.Core.AccountStore(new MemoryCredentials()),
+                new PublishTokenStore(new MemoryCredentials()),
+                k => { asked = k; return Task.FromResult(ClaudeCodeUndoResult.Clean); }, () => { });
+            ResetFolderListViewModel list;
+            using (new FileStream(receipts, FileMode.Open, FileAccess.ReadWrite, FileShare.None))   // a lock the read can't get past
+                list = ResetFolderListViewModel.Read(widget);
+
+            Assert.True(list.ReadFailed);
+            Assert.Empty(list.Rows);
+            Assert.False(list.UndoesAny);   // not "no rows, so the leftover copies go"
+            var window = new ResetWindow(service, list);
+            OffScreen(window);
+            window.Show();
+            try
+            {
+                var part = (CheckBox)window.FindName("ClaudeCodeBox");
+                Assert.False(part.IsEnabled);
+                Assert.False(part.IsChecked);
+                var line = (TextBlock)window.FindName("UnreadableText");
+                Assert.Equal(Visibility.Visible, line.Visibility);
+                Assert.Equal(SettingsNames.ResetFoldersUnread, line.Text);
+                part.IsChecked = true;   // even forced on, the part does not run
+                Assert.False(window.EffectiveChoices.ClaudeCodeEntries);
+                foreach (var name in new[] { "AccountsBox", "ThemesBox", "SettingsBox" })
+                    ((CheckBox)window.FindName(name)).IsChecked = false;
+                var reset = (Button)window.FindName("ResetButton");
+                Assert.True(reset.IsEnabled);   // the meter history still resets
+                ((IInvokeProvider)new ButtonAutomationPeer(reset).GetPattern(PatternInterface.Invoke)).Invoke();
+                for (int i = 0; i < 50; i++) { Pump(); Thread.Sleep(20); }
+                Assert.Null(asked);   // the lock is gone by now: still no undo of any folder
+            }
+            finally { window.Close(); }
+        }
+        finally { widget.Dispose(); }
+    });
 }

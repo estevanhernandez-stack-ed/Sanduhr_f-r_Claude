@@ -928,6 +928,9 @@ public static class SettingsNames
         "With the settings reset, its MCP server stays but answers without your usage until you add it again in Settings, Claude Code.";
     /// <summary>Also shown while a kept folder was added by hand and Settings is ticked: cc_folders_added goes with settings.json.</summary>
     public const string ResetKeptAdded = "A folder you added yourself leaves that page with the settings: add it there again to remove its entries.";
+    /// <summary>Reading the folder list failed (a record locked or out of reach): the Claude Code part is skipped.</summary>
+    public const string ResetFoldersUnread =
+        "Sanduhr couldn't read its list of Claude Code folders, so this part is skipped and every folder keeps its entries and the files they need. Close what holds Sanduhr's record and open Reset again, or remove the entries in Settings, Claude Code.";
     /// <summary>installs.json (or a copy set aside) can't be read: everything of Sanduhr's in Claude Code stays.</summary>
     public const string ResetReceiptsUnreadable =
         "Sanduhr's record of what it installed can't be read, so some entries can't be listed or removed here. Sanduhr keeps its files for them; remove the entries in Settings, Claude Code, or by hand.";

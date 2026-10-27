@@ -35,6 +35,11 @@ internal partial class ResetWindow : Window
         _service = service;
         _folders = folders;
         FolderList.ItemsSource = folders?.Rows;
+        if (folders is { ReadFailed: true })
+        {
+            ClaudeCodeBox.IsChecked = false;   // nothing to keep or undo: the part is skipped and the line says why
+            ClaudeCodeBox.IsEnabled = false;
+        }
         if (folders is not null)
             folders.Changed += UpdateChoiceState;   // the list lives as long as this window; detached on Closed
         _ready = true;
@@ -172,6 +177,7 @@ internal partial class ResetWindow : Window
         FolderList.IsEnabled = part;   // owner taste 7: dim, keep the ticks
         FolderScroller.Visibility = Vis(_folders is { Rows.Count: > 0 });
         NoFoldersText.Visibility = Vis(lines.NoFolders);
+        UnreadableText.Text = _folders is { ReadFailed: true } ? SettingsNames.ResetFoldersUnread : SettingsNames.ResetReceiptsUnreadable;
         UnreadableText.Visibility = Vis(lines.Unreadable);
         // The lines that come and go are live regions: a screen reader hears one appear (LiveRegion.Shown flips with it).
         Line(ClaudeCodeWarning, lines.Kept);
