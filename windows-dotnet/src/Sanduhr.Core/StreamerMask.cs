@@ -12,7 +12,8 @@ namespace Sanduhr.Core;
 /// </summary>
 public sealed class StreamerMask
 {
-    private readonly object _gate = new();
+    // One lock for the book: StreamerService locks the book object itself when it saves, lists or changes the allowlist (preflight P10).
+    private readonly object _gate;
     private readonly CodenameBook? _book;
     private readonly Regex[] _folderPatterns = [];
     private readonly Regex? _userNames;
@@ -24,6 +25,7 @@ public sealed class StreamerMask
     {
         On = on && book is not null;
         _book = book;
+        _gate = (object?)book ?? new object();
         ProfileDir = profileDir;
         if (!On)
             return;

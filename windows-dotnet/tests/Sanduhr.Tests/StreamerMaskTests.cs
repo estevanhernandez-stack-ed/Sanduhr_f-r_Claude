@@ -302,4 +302,15 @@ public class StreamerMaskTests
         Assert.Equal(@"npm test in %USERPROFILE%\repo", shown.Title);
         Assert.Equal(@"%USERPROFILE%\repo\log.txt", shown.Note);
     }
+    [Fact]
+    public void The_mask_and_the_service_share_one_lock_the_book_itself()
+    {
+        // StreamerService locks the book object when it saves, lists or changes the allowlist; the mask must take the same lock (P10),
+        // or a background Assign could change the book while it is being written.
+        var book = Book();
+        var mask = new StreamerMask(true, book, Profile);
+        var gate = typeof(StreamerMask).GetField("_gate", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        Assert.Same(book, gate.GetValue(mask));
+    }
+
 }
