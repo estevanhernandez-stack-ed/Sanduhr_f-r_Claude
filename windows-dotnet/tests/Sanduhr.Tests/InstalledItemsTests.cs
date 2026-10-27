@@ -374,4 +374,28 @@ public sealed class InstalledItemsTests
         var alpha = Assert.Single(items, i => i.Id == "alpha@m");
         Assert.Equal([FolderState.On, FolderState.Unreadable], alpha.Scope!.Select(s => s.State));
     }
+
+    [Fact]
+    public void A_plugin_in_a_folder_whose_settings_cant_be_read_reads_Unreadable_not_On()
+    {
+        // Slice 4 row 13: with settings.json unreadable, "no entry" means "unknown", not "on".
+        var alpha = Plugin("a", ModState.On);
+        var unreadable = new FolderMods(@"C:\home\.claude-work", @"~\.claude-work",
+            Report(@"C:\home\.claude-work", alpha) with { Settings = new SettingsState(SettingsKind.Unreadable, 3, 7, "bad") },
+            NoOwn(".claude-work"), IntegrationStatus.NotInstalled);
+        var item = InstalledItems.Build([unreadable], WidgetRegistry.Empty, Info, null).Single(i => i.Id == "a@m");
+        Assert.Equal(FolderState.Unreadable, item.Scope!.Single().State);
+    }
+
+    [Theory]
+    [InlineData("mod", "alpha", true, true)]          // a mod is found by the word "mod"
+    [InlineData("mo", "alpha", true, false)]          // but not by a piece of it
+    [InlineData("mod", "model-tools", false, true)]   // a plugin is found by its own name
+    [InlineData("mod", "beta", false, false)]
+    public void Mod_is_a_word_not_a_substring(string filter, string name, bool isMod, bool matches)
+    {
+        var item = InstalledItems.Build([Folder(".claude", mods: Plugin(name, ModState.On, isMod: isMod))], WidgetRegistry.Empty, Info, null)
+            .Single(i => i.Id == name + "@m");
+        Assert.Equal(matches, InstalledItems.Matches(item, InstalledFilter.All, filter));
+    }
 }
