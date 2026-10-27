@@ -40,9 +40,9 @@ public sealed partial class LedgerRowViewModel : ObservableObject
     /// absent for them too.</summary>
     public string? CwdTooltip => StreamerMode.On ? null : Info.Cwd;   // slice 7, CP 17: a full path names the user folder and the project   // streamer: masked - CP 17: the tooltip is null while StreamerMode.On
 
-    /// <summary>The project's name as the codename book keys it (slice 7): the name, or the disambiguated form for twins. The quick route
-    /// shows this one.</summary>
+    /// <summary>The project's name as the codename book keys it (slice 7): the bare name, twins included. The quick route shows this one.</summary>
     internal string ProjectKeyForStreamer { get; private set; } = "";
+    private string _twinSuffix = "";
 
     /// <summary>The row's menu offers "Show the real name on stream" only while its name is hidden.</summary>
     public bool CanShowRealName => StreamerMode.Mask.Hides(CodenameCategory.Project, ProjectKeyForStreamer);
@@ -56,8 +56,8 @@ public sealed partial class LedgerRowViewModel : ObservableObject
         DetailText = IsExpanded ? BuildDetail() : "";
     }
 
-    // One codename per name; two projects that share a name are told apart by their disambiguated key, and only the codename shows.
-    private string ProjectShown() => StreamerMode.Mask.Name(CodenameCategory.Project, ProjectKeyForStreamer);
+    // One codename per name; two projects that share a name show the same codename and are told apart by the hash suffix.
+    private string ProjectShown() => StreamerMode.Mask.Name(CodenameCategory.Project, ProjectKeyForStreamer) + _twinSuffix;   // streamer: masked - the codename, then the hash suffix of a twin
 
     [ObservableProperty] private string _projectText = "";
     [ObservableProperty] private string _lastActiveText = "";
@@ -84,10 +84,10 @@ public sealed partial class LedgerRowViewModel : ObservableObject
         Info = info;
         if (IsGroup)
             Members = members ?? Array.Empty<VaultSessionInfo>();
-        var project = disambiguate
-            ? $"{info.ProjectName} ~{info.ProjectKey[^Math.Min(8, info.ProjectKey.Length)..]}"   // streamer: masked - via ProjectShown: the row draws the project's codename (CP 15)
-            : info.ProjectName;
-        ProjectKeyForStreamer = project;
+        // The codename book keys a project on its bare name, as Overview, Trends and the publish sample do, so one project has one codename
+        // everywhere. Twins are told apart by a hash suffix after it: the suffix is a hash of the folder key, not a name.
+        _twinSuffix = disambiguate ? $" ~{info.ProjectKey[^Math.Min(8, info.ProjectKey.Length)..]}" : "";   // streamer: key - the last eight characters of the folder key, shown after the codename to tell twins apart; a hash, not a name
+        ProjectKeyForStreamer = info.ProjectName;   // streamer: key - the codename book's key; ProjectShown masks it before it is drawn
         ProjectText = ProjectShown();
         LastActiveText = Relative(info.LastTs);
         ModelBadge = BuildBadge(info.ByModel);

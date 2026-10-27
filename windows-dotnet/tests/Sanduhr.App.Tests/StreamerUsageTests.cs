@@ -228,6 +228,31 @@ public sealed class StreamerUsageTests : AppWindowFixture
     });
 
     [Fact]
+    public void A_twin_project_has_one_codename_on_Sessions_and_Overview_and_Sessions_adds_only_the_hash_suffix() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            widget.Streamer.SetOn(true);
+            var twin = new LedgerRowViewModel("k", Session(project: "qxtwin", projectKey: "C--a-qxtwin~1111aaaa"), DateOnly.MinValue, DateOnly.MaxValue, disambiguate: true);
+            // Overview, Trends and the publish sample key a project on its bare name.
+            var codename = StreamerMode.Mask.Name(CodenameCategory.Project, "qxtwin");
+            NoSentinel("codename", codename);
+            Assert.Equal("qxtwin", twin.ProjectKeyForStreamer);
+            Assert.Equal(codename + " ~1111aaaa", twin.ProjectText);
+            Assert.True(twin.CanShowRealName);
+
+            // "Show the real name on stream" from the Sessions row unmasks the project on Overview too.
+            widget.Streamer.SetShown(CodenameCategory.Project, twin.ProjectKeyForStreamer, true);
+            Assert.Equal("qxtwin", StreamerMode.Mask.Name(CodenameCategory.Project, "qxtwin"));
+            twin.RefreshNames();
+            Assert.Equal("qxtwin ~1111aaaa", twin.ProjectText);
+            Assert.False(twin.CanShowRealName);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
     public void A_session_row_off_streamer_mode_reads_as_before() => AppHost.Run(() =>
     {
         var info = Session(cwd: $@"{Profile}\qxproject", skills: ["qxskill"]);
