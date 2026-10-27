@@ -1732,13 +1732,13 @@ state.yaml's `menu_submenus` and `scenarios/settings-names.yaml`.
 
 ## Settings pages
 
-Settings v2, slice 2 (item 72): seventeen pages in five groups (Lock Screen joined Desktop for #137), each feature with one home and every
+Settings v2, slice 2 (item 72): eighteen pages in five groups (Lock Screen joined Desktop for #137, Widgets after it for 2.35), each feature with one home and every
 other mention a status line and a "<Page> Settings…" link.
 
 | Group | Pages (raw value) |
 | --- | --- |
 | (none) | General (`general`), Accounts (`credentials`), Usage (`usage`), Alerts (`alerts`) |
-| Desktop | Desk (`deskLayout`), Desk Look (`deskLook`), Message (`message`), Notch (`notch`), Lock Screen (`lockScreen`), Now Playing (`nowPlaying`), Watchers (`watchers`) |
+| Desktop | Desk (`deskLayout`), Desk Look (`deskLook`), Message (`message`), Notch (`notch`), Lock Screen (`lockScreen`), Widgets (`widgets`), Now Playing (`nowPlaying`), Watchers (`watchers`) |
 | Claude Code | Claude Code (`integrations`), Mods & Config (`mods`) |
 | Widget | Widget (`widgetLook`), Themes (`themes`) |
 | Help | Updates (`updates`), About (`about`) |
@@ -1815,6 +1815,28 @@ from frames the marked views report; null with no anchor) and `settings_preview_
 `SettingsReachTests` covers the index (every names-table entry indexed at its anchor, the synonyms),
 anchor and link parsing, Advanced, folding, Add Line's place and the chin height.
 
+## Settings, Widgets
+
+Settings, Widgets (`widgets`, Desktop group after Lock Screen; docs/mac-widgets-spec.md section 2 and 3)
+lists the signed widget catalog with Install, Update or Installed, the installed packs (kind, version,
+"from the catalog" or "made here") with Uninstall, the Companion picker and Let it roam. Nothing polls:
+`WidgetsModel.refreshCatalog` runs when the page appears and on Check the catalog again, and a failure is
+one quiet line. Install is `WidgetCatalogClient.download` (rules 3 to 5), then `WidgetStore.install`
+(rule 6): files go to `widgets/.staging/<id>-<token>/`, pixel sheets are rasterized to
+`.raster/<sheet>.png`, and the folder is renamed into `widgets/<id>/` before the `widgets.json` row is
+written; a failure at any step puts the old install back. `widgets.json` is Windows' shape
+(`schema_version`, `catalog_generated_at`, `packs[{id, version, source, installed_at, enabled}]`), and
+`catalog_generated_at` is the rollback marker (`WidgetStore` is the `WidgetCatalogMarker`). An id keeps
+its source: a catalog pack never replaces a made-here one, nor the other way round. Every write honors
+`ResetGate`.
+
+The Companion is one installed sprite at a time (`CompanionSettings`): the Desk suite keys
+`deskCompanionPack` (absent: the first installed sprite by id) and `deskCompanionRoams` (absent: on).
+Installed theme packs join the Theme menu and the gallery as `<packId>:<stem>` (`PackThemes`, registered by
+`UserThemes.load`), and palette packs join `MessagePalette.all` as `<palette> · <pack name>`
+(`PackInkPresets`); seeded now-playing looks keep drawing from `MessagePalette.builtIn`, so a pack never
+changes a song's look. Effects packs are listed as installed only: "Effects packs don't draw yet."
+
 ## Reset Sanduhr…
 
 Settings v2, slice 5 (item 72): About's last section opens a sheet (`Views/ResetSheet.swift`) that
@@ -1835,11 +1857,13 @@ lists what it removes, each part a checkbox, all checked, and runs the checked s
    the sheet's accounts caption and each accounts result row say. A Keychain key that can't be
    deleted is named by slot kind in its row, pointing at Keychain Access.
 3. **History and records.** Every top-level item of `~/Library/Application Support/Sanduhr/` except
-   `themes/` (its own part) and, while any receipt is left or `installs.json` can't be decoded,
+   `themes/` and `widgets/` (their own parts) and, while any receipt is left or `installs.json` can't be decoded,
    `integrations/`; then the folder if empty. Unreadable receipts list no folder, and the sheet warns.
 4. **Desk messages.** `messages.txt` renamed to `messages.txt.previous`, replacing an older one.
 5. **Your themes.** `themes/`, then Sanduhr's folder if that left it empty.
-6. **All settings.** `removePersistentDomain` for `com.626labs.sanduhr` and
+6. **Your widgets.** `widgets/` (the installed packs, `widgets.json` and `.staging/`), then Sanduhr's
+   folder if that left it empty. Its own checkbox next to Themes.
+7. **All settings.** `removePersistentDomain` for `com.626labs.sanduhr` and
    `com.626labs.sanduhr.desk`, last: step 2 reads the account list from the first.
 
 Each step is tried on its own (`Reset.perform`) and reported; a failure (a folder whose file changed
