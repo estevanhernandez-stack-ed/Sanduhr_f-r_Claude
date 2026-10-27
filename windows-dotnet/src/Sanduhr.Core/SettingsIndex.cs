@@ -822,7 +822,7 @@ public static class SettingsIndex
     public static IReadOnlyList<SettingsPage> StreamerPages { get; } =
     [
         SettingsPage.Accounts, SettingsPage.Privacy, SettingsPage.ClaudeUsage, SettingsPage.Publish, SettingsPage.Desk, SettingsPage.Weather,
-        SettingsPage.Watchers, SettingsPage.ClaudeCode, SettingsPage.Mods, SettingsPage.About,
+        SettingsPage.Watchers, SettingsPage.ClaudeCode, SettingsPage.Mods, SettingsPage.About, SettingsPage.Launcher,
     ];
 
     /// <summary>Where an opening Settings lands: the place asked for; else where it was left this session; else General.</summary>

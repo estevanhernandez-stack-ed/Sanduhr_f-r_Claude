@@ -41,11 +41,12 @@ public sealed partial class LauncherButtonRow : ObservableObject
 
     /// <summary>The name this button goes by: its label, else the app's name, else the site.</summary>
     public string Title => string.IsNullOrWhiteSpace(Label)
-        ? (Kind == LauncherKind.Link ? LauncherTarget.LinkHost(Target) : AppName ?? Target)
+        ? (Kind == LauncherKind.Link ? LauncherTarget.LinkHost(Target) : AppName ?? StreamerMode.Mask.Paths(Target))   // streamer: a raw target can be a path
         : Label.Trim();
 
     /// <summary>The line under the title: what the button opens.</summary>
-    public string Detail => Kind == LauncherKind.Link ? Target : (AppName is null ? "App" : $"App, {AppName}");
+    /// <summary>A link's full URL can name a private repo, so while streamer mode is on it shows scheme://host/… with the host as its codename.</summary>
+    public string Detail => Kind == LauncherKind.Link ? StreamerMode.Mask.Endpoint(Target) : (AppName is null ? "App" : $"App, {AppName}");
 
     /// <summary>"Use the app's icon" for an app; a link has no app, so it goes back to the link glyph.</summary>
     public string UseDefaultImageText => IsApp ? "Use the app's icon" : "Use the link icon";

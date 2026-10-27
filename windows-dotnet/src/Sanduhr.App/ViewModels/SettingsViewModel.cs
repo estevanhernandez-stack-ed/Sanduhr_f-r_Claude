@@ -289,6 +289,7 @@ public sealed class SettingsViewModel
         Accounts.Reload();
         ClaudeCodePage.Reload();
         Privacy.Reload();
+        Desk.Launcher.Reload();   // preflight P3: a link's URL and a raw target
         NamesReloaded++;
     }
 

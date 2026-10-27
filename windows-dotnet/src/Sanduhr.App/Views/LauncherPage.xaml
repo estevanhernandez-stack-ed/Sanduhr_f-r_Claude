@@ -18,6 +18,7 @@
                 <TextBlock Text="{x:Static core:SettingsNames.LauncherTitle}" FontSize="14" FontWeight="SemiBold"
                            AutomationProperties.HeadingLevel="Level1"
                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+                <views:StreamerBanner />
 
                 <!-- Where it shows: the Launcher piece's line (Principle 1). -->
                 <StackPanel views:SettingsAnchor.Id="launcher">

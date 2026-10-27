@@ -1838,8 +1838,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         get
         {
             bool signIn = !IsDemo && Reason != SignInReason.None;
-            string? account = IsDemo ? DemoMode.ChipText(_demoAccount)
-                : _accounts.ListAccounts().Count > 1 ? _accounts.GetActive() : null;
+            // Streamer mode (slice 7, decision 3): the Claude line names the account by its codename, in every style and in its reminder.
+            string? account = IsDemo ? DemoMode.ChipText(_demoAccount)   // streamer: demo
+                : _accounts.ListAccounts().Count > 1 && _accounts.GetActive() is { } active
+                    ? StreamerMode.Mask.Name(CodenameCategory.Account, active) : null;
             return new DeskUsage(signIn ? [] : _deskTiers,
                 IsDemo ? DateTimeOffset.Now : _lastFetchAt,
                 signIn, Reason == SignInReason.FirstRun, account, signIn ? [] : _deskLineTiers,
