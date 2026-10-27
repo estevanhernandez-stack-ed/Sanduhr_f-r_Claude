@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "palettes": [
+    {
+      "name": "synthwave",
+      "colors": [
+        "#ff2a6d",
+        "#d16ba5",
+        "#05d9e8"
+      ],
+      "mood": "neon night"
+    },
+    {
+      "name": "sunset",
+      "colors": [
+        "#ff7e5f",
+        "#feb47b",
+        "#ffd86f"
+      ],
+      "mood": "warm dusk"
+    },
+    {
+      "name": "ocean",
+      "colors": [
+        "#00c6ff",
+        "#4f8bff",
+        "#a18cff"
+      ],
+      "mood": "deep current"
+    },
+    {
+      "name": "aurora",
+      "colors": [
+        "#00f5a0",
+        "#00d9f5",
+        "#a06bff"
+      ],
+      "mood": "northern lights"
+    },
+    {
+      "name": "ember",
+      "colors": [
+        "#f12711",
+        "#f5af19",
+        "#ffe259"
+      ],
+      "mood": "glowing coals"
+    },
+    {
+      "name": "bubblegum",
+      "colors": [
+        "#ff9a9e",
+        "#f6a6d8",
+        "#a18cd1"
+      ],
+      "mood": "soft pop"
+    },
+    {
+      "name": "toxic",
+      "colors": [
+        "#b6ff00",
+        "#00ff9c",
+        "#00c3ff"
+      ],
+      "mood": "radioactive"
+    },
+    {
+      "name": "gold",
+      "colors": [
+        "#f7971e",
+        "#ffd200",
+        "#fff6b7"
+      ],
+      "mood": "liquid gold"
+    }
+  ]
+}

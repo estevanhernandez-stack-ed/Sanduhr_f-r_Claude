@@ -1,0 +1,30 @@
+{
+  "name": "Void Ember",
+  "bg": "#000000",
+  "glass": "#000000",
+  "glass_on_mica": "#000000",
+  "title_bg": "#000000",
+  "border": "#3b1d0c",
+  "text": "#e6e6e6",
+  "text_secondary": "#b8aca4",
+  "text_dim": "#82756d",
+  "text_muted": "#564b45",
+  "accent": "#ff6a1a",
+  "bar_bg": "#1a0d06",
+  "footer_bg": "#000000",
+  "pace_marker": "#fbbf24",
+  "sparkline": "#ff6a1a",
+  "glass_alpha": 1.0,
+  "border_alpha": 0.6,
+  "border_tint": "#ff6a1a",
+  "accent_bloom": {
+    "blur": 6,
+    "alpha": 0.55
+  },
+  "inner_highlight": {
+    "color": "#ff6a1a",
+    "alpha": 0.2
+  },
+  "opts_out_of_mica": true,
+  "card_corner_radius": 12
+}

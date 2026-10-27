@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "effects": [
+    {
+      "name": "breathe",
+      "type": "pulse",
+      "intensity": 0.3,
+      "period_ms": 4000,
+      "color": "ink"
+    }
+  ]
+}

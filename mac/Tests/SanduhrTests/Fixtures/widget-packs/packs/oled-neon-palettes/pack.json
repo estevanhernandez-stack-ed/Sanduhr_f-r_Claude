@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "oled-neon-palettes",
+  "name": "OLED Neon Palettes",
+  "version": "1.0.0",
+  "author": "626 Labs LLC",
+  "license": "CC-BY-4.0",
+  "kind": "palette",
+  "sanduhr_min": "3.8.0",
+  "description": "Eight three-stop gradient palettes tuned for dark panels: synthwave, sunset, ocean, aurora, ember, bubblegum, toxic and gold.",
+  "files": [
+    "palettes.json"
+  ]
+}
