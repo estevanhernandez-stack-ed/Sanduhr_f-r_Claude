@@ -66,6 +66,10 @@ enum SettingsAnchor {
     static let textColor = "text-color"
     // Lock Screen
     static let lockLine = "lock-line"
+    // Widgets
+    static let catalog = "catalog"
+    static let installedWidgets = "installed"
+    static let companion = "companion"
     // Now Playing
     static let source = "source"
     static let show = "show"
@@ -108,7 +112,7 @@ enum SettingsAnchor {
     static let advanced = "advanced"
 
     /// Every anchor in sidebar order, page by page, with its title and synonyms.
-    static let all: [SettingsEntry] = general + accountsAndAlerts + deskPages + notchPages + lockScreenPages + claudeCodePages + widgetAndHelp
+    static let all: [SettingsEntry] = general + accountsAndAlerts + deskPages + notchPages + lockScreenPages + widgetsPages + claudeCodePages + widgetAndHelp
 
     private static let general: [SettingsEntry] = [
         SettingsEntry(title: "Surfaces", page: .general, anchor: surfaces, synonyms: ["status", "desk on", "notch on"]),
@@ -167,6 +171,16 @@ enum SettingsAnchor {
         SettingsEntry(title: "Show a line on the lock screen", page: .lockScreen, anchor: lockLine,
                       synonyms: ["lock screen", "login window", "loginwindow", "locked", "prefix", "Claude usage",
                                  "Reset time", "Watchers waiting for you"]),
+    ]
+
+    private static let widgetsPages: [SettingsEntry] = [
+        SettingsEntry(title: "Widget catalog", page: .widgets, anchor: catalog,
+                      synonyms: ["install", "update", "download", "sprites", "palettes", "fonts", "packs",
+                                 "Check the catalog again"]),
+        SettingsEntry(title: "Installed widgets", page: .widgets, anchor: installedWidgets,
+                      synonyms: ["uninstall", "remove", "made here", "from the catalog", "effects"]),
+        SettingsEntry(title: "Companion", page: .widgets, anchor: companion,
+                      synonyms: ["Let it roam", "roam", "sprite", "pet", "hourglass"]),
     ]
 
     private static let notchPages: [SettingsEntry] = [

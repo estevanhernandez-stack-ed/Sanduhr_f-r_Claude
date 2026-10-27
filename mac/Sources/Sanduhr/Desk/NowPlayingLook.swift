@@ -56,7 +56,7 @@ enum NowPlayingLooks {
     /// The default look for a song: a named palette and a seed style, both from its hash.
     static func seeded(_ key: String) -> SongLook {
         let h = hash(key)
-        let palettes = MessagePalette.all
+        let palettes = MessagePalette.builtIn
         let palette = palettes[Int(h % UInt64(palettes.count))]
         let style = seedStyles[Int((h / UInt64(palettes.count)) % UInt64(seedStyles.count))]
         return SongLook(colors: palette.colors, font: style)

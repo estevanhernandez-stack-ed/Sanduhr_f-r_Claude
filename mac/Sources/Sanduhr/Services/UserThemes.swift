@@ -13,6 +13,8 @@ import SwiftUI
 /// warning logged.
 enum UserThemes {
     static func load() {
+        // Installed theme packs join the list after the user's own (their ids carry the pack's).
+        defer { PackThemes.register() }
         let dir = appSupportThemesDir()
         // Reset Sanduhr… ran: read what is there, create nothing.
         if !ResetGate.isOn {

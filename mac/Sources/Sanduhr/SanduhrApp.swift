@@ -11,6 +11,7 @@ enum Sanduhr {
         // anything reads it (UsageViewModel.init resolves the saved theme
         // id on construction).
         UserThemes.load()
+        PackInkPresets.register()
         let delegate = AppDelegate()
         app.delegate = delegate
         app.mainMenu = editMenu()
