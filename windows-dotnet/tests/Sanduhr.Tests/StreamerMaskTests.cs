@@ -107,6 +107,14 @@ public class StreamerMaskTests
     }
 
     [Fact]
+    public void Omit_gives_nothing_while_on_and_the_value_as_it_is_while_off()
+    {
+        Assert.Null(new StreamerMask(true, Book(), Profile).Omit(@"C:\Users\qxuser\qxproject"));
+        Assert.Equal(@"C:\Users\qxuser\qxproject", StreamerMask.Off.Omit(@"C:\Users\qxuser\qxproject"));
+        Assert.Null(StreamerMask.Off.Omit(null));
+    }
+
+    [Fact]
     public void An_endpoint_shows_its_host_as_a_codename_and_hides_its_path()
     {
         var mask = OnMask();

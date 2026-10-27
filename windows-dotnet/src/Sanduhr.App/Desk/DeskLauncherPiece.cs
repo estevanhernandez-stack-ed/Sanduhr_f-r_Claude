@@ -82,7 +82,7 @@ internal sealed class LauncherButtonVisual : Border
         Cursor = System.Windows.Input.Cursors.Hand;
         Focusable = false;
 
-        AutomationProperties.SetName(this, missing ? $"{name}, not installed" : name);   // streamer: masked - via LauncherName (an unlabelled link's host and a raw target are masked; a label or Start menu app name shows)
+        AutomationProperties.SetName(this, missing ? $"{name}, not installed" : name);   // streamer: notname - already the shown name: Build gets it from StreamerMode.LauncherName (below) before this constructor draws it
         AutomationProperties.SetHelpText(this, missing
             ? "This app is no longer installed. Choose it to open Launcher settings."
             : button.Kind == LauncherKind.Link ? "Opens a link in your browser." : "Opens this app.");

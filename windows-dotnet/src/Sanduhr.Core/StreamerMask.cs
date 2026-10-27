@@ -58,6 +58,9 @@ public sealed class StreamerMask
         return Code(category, real.Trim()) ?? real;
     }
 
+    /// <summary>A value with no masked form (a project's full working path): nothing while on, as it is while off.</summary>
+    public string? Omit(string? real) => On ? null : real;
+
     /// <summary>Whether <see cref="Name"/> hides this name now (on, not blank, not allowlisted). Assigns nothing.</summary>
     public bool Hides(CodenameCategory category, string? real)
     {

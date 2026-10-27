@@ -38,7 +38,7 @@ public sealed partial class LedgerRowViewModel : ObservableObject
     /// (spec: Ledger). A null ToolTip renders nothing in WPF. Group rows carry
     /// no single cwd (Info.Cwd is synthesized null), so this is naturally
     /// absent for them too.</summary>
-    public string? CwdTooltip => StreamerMode.On ? null : Info.Cwd;   // slice 7, CP 17: a full path names the user folder and the project   // streamer: masked - CP 17: the tooltip is null while StreamerMode.On
+    public string? CwdTooltip => StreamerMode.Mask.Omit(Info.Cwd);   // slice 7, CP 17: a full path names the user folder and the project   // streamer: masked - CP 17: Mask.Omit gives nothing while on
 
     /// <summary>The project's name as the codename book keys it (slice 7): the bare name, twins included. The quick route shows this one.</summary>
     internal string ProjectKeyForStreamer { get; private set; } = "";
@@ -180,7 +180,7 @@ public sealed partial class LedgerRowViewModel : ObservableObject
         if (ordered.Count > shown)
             sb.Append('\n').Append("… and ").Append(ordered.Count - shown).Append(" more");
         var roots = ordered.Select(m => m.Root).Distinct(StringComparer.Ordinal)   // streamer: masked - CP 15: roots pass Mask.FolderName on the next line
-            .OrderBy(r => r, StringComparer.Ordinal).Select(StreamerMode.Mask.FolderName);
+            .OrderBy(r => r, StringComparer.Ordinal).Select(r => StreamerMode.Mask.FolderName(r));
         if (sb.Length > 0) sb.Append('\n');
         sb.Append("Sessions: ").Append(ordered.Count);
         if (Info.AgentCount > 0)
@@ -435,7 +435,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
             .Select(g => g.Key)
             .ToHashSet(StringComparer.Ordinal);
 
-        string ProjectTextFor(VaultSessionInfo info) => nameGroups.Contains(info.ProjectName)   // streamer: masked - via ProjectShown: the row draws the project's codename (CP 15)
+        string ProjectTextFor(VaultSessionInfo info) => nameGroups.Contains(info.ProjectName)   // streamer: export - the Sessions CSV the person asked for keeps real names; twins are told apart by the hash suffix
             ? $"{info.ProjectName} ~{info.ProjectKey[^Math.Min(8, info.ProjectKey.Length)..]}"
             : info.ProjectName;
 

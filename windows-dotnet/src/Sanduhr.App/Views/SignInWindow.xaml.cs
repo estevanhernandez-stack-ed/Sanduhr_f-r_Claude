@@ -119,7 +119,7 @@ internal partial class SignInWindow : Window
         }
         catch (Exception ex)
         {
-            CompleteAndClose(new SignInResult.Failed($"Couldn't start the sign-in browser: {ex.Message}"));   // streamer: masked - via FailedText: the coordinator masks a Failed result's text (CP 18)
+            CompleteAndClose(new SignInResult.Failed(StreamerMode.Mask.Paths($"Couldn't start the sign-in browser: {ex.Message}")));   // streamer: masked - Mask.Paths here; the coordinator's FailedText masks it again (CP 18)
         }
     }
 
@@ -319,7 +319,7 @@ internal partial class SignInWindow : Window
         }
         catch (Exception ex)
         {
-            ShowLoadError($"Couldn't restart the sign-in browser: {ex.Message}");   // streamer: masked - via LoadErrorText: the error line passes Mask.Paths (P1)
+            ShowLoadError(StreamerMode.Mask.Paths($"Couldn't restart the sign-in browser: {ex.Message}"));   // streamer: masked - Mask.Paths here; LoadErrorText masks it again (P1)
         }
     }
 
@@ -445,7 +445,7 @@ internal partial class SignInWindow : Window
             }
             catch (Exception ex)
             {
-                CompleteAndClose(new SignInResult.Failed($"Sign-in succeeded but saving the account failed: {ex.Message}"));   // streamer: masked - via FailedText: the coordinator masks a Failed result's text (CP 18)
+                CompleteAndClose(new SignInResult.Failed(StreamerMode.Mask.Paths($"Sign-in succeeded but saving the account failed: {ex.Message}")));   // streamer: masked - Mask.Paths here; the coordinator's FailedText masks it again (CP 18)
             }
         }
         catch (Exception ex)

@@ -126,7 +126,7 @@ public class StreamerReachTests
         ("Sanduhr.App/Desk/DeskController.cs", "notname", 1),
         ("Sanduhr.App/Desk/DeskDesignService.cs", "notname", 8),
         ("Sanduhr.App/Desk/DeskHandoffSeams.cs", "notname", 4),
-        ("Sanduhr.App/Desk/DeskLauncherPiece.cs", "masked", 2),   // controller, after Task 13: the Desk names an unlabelled link by codename
+        ("Sanduhr.App/Desk/DeskLauncherPiece.cs", "notname", 2),   // controller, after Task 13: the Desk names an unlabelled link by codename
         ("Sanduhr.App/Desk/DeskLookResolver.cs", "notname", 2),
         ("Sanduhr.App/Desk/DeskMessagePiece.cs", "notname", 3),
         ("Sanduhr.App/Desk/DeskReviewBar.xaml.cs", "notname", 10),
@@ -169,9 +169,9 @@ public class StreamerReachTests
         ("Sanduhr.App/Services/WebView2ApiClient.cs", "notname", 1),
         ("Sanduhr.App/Updates/UpdateChecker.cs", "notname", 3),
         ("Sanduhr.App/ViewModels/AccountsViewModel.cs", "masked", 4),
-        ("Sanduhr.App/ViewModels/CcLedgerViewModel.cs", "export", 2),
+        ("Sanduhr.App/ViewModels/CcLedgerViewModel.cs", "export", 5),
         ("Sanduhr.App/ViewModels/CcLedgerViewModel.cs", "key", 16),
-        ("Sanduhr.App/ViewModels/CcLedgerViewModel.cs", "masked", 9),
+        ("Sanduhr.App/ViewModels/CcLedgerViewModel.cs", "masked", 6),
         ("Sanduhr.App/ViewModels/CcTrendsViewModel.cs", "masked", 1),
         ("Sanduhr.App/ViewModels/ClaudeCodeHost.cs", "key", 2),
         ("Sanduhr.App/ViewModels/ClaudeCodeHost.cs", "notname", 1),
@@ -246,10 +246,17 @@ public class StreamerReachTests
         Assert.True(bad.Count == 0, string.Join("\n", bad));
     }
 
-    /// <summary>The mask calls that count: StreamerMode, the mask's own members, the folder helpers.</summary>
+    /// <summary>The mask calls that count: a call of one of the mask's own methods or a folder helper. A mention of StreamerMode (On, Mask.Hides)
+    /// masks nothing, so it doesn't count (final review M4).</summary>
     private static readonly Regex MaskCall = new(
-        @"StreamerMode\.|StreamerMask|Mask\.(?:Name|Folder|FolderName|AddOn|Paths|Endpoint|HostsIn|Watchers|WeatherName|PublishSample)|ShowFolder\(|FoldersIn\(",
+        @"Mask\.(?:Name|Folder|FolderName|AddOn|Paths|Endpoint|HostsIn|Watchers|WeatherName|PublishSample|Omit)\(|StreamerMode\.FoldersIn\(|ShowFolder\(|LauncherName\(",
         RegexOptions.Compiled);
+
+    /// <summary>How far a mask call may stand from a marked line: the line and the twelve below it (a local read is masked before it is drawn).</summary>
+    private const int MaskWindow = 13;
+
+    /// <summary>A "via X" hand-off may call X a loop away (a menu's rows are built after its labels are read): twenty lines.</summary>
+    private const int ViaWindow = 20;
 
     /// <summary>Choke points that mask inside, for a site that hands its value on ("via Symbol" in the marker): the file that defines each
     /// and the mask call it must make. A site can name only a symbol listed here, and the listing is checked against the source.</summary>
@@ -276,8 +283,26 @@ public class StreamerReachTests
         ("LauncherName", "Sanduhr.App/Services/StreamerMode.cs", @"Mask\.Name\(CodenameCategory\.Host"),
     ];
 
-    /// <summary>A line marked masked must call the mask: on the line or within the twelve below it (a local read here is masked before
-    /// it is drawn), or hand the value to a listed choke point that masks ("via Symbol").</summary>
+    /// <summary>Whether a line marked masked really masks: a mask call on the line or within the twelve below it, or, for "via Symbol", a listed
+    /// choke point that the line or the nineteen below call.</summary>
+    private static bool MaskedReallyMasks(IReadOnlyList<string> lines, int lineNumber, string? reason, out string why)
+    {
+        why = "";
+        var via = Regex.Match(reason ?? "", @"via (\w+)");
+        var window = string.Join("\n", lines.Skip(lineNumber - 1).Take(via.Success ? ViaWindow : MaskWindow));
+        if (via.Success)
+        {
+            // A site that hands its value to a choke point must call it in its window, and the choke point must be a listed one.
+            var symbol = via.Groups[1].Value;
+            if (Callees.Any(c => c.Symbol == symbol) && Regex.IsMatch(window, @"\b" + Regex.Escape(symbol) + @"\s*\(")) return true;
+            why = $"via {symbol}, but the line and the {ViaWindow - 1} below don't call it (or it isn't listed)";
+            return false;
+        }
+        if (MaskCall.IsMatch(window)) return true;
+        why = "no mask call on the line or the twelve below";
+        return false;
+    }
+
     [Fact]
     public void A_masked_line_really_calls_the_mask()
     {
@@ -286,14 +311,23 @@ public class StreamerReachTests
         foreach (var site in Scan().Where(s => s.Id == "masked"))
         {
             var lines = File.ReadAllLines(Path.Combine(src, site.File));
-            var window = string.Join("\n", lines.Skip(site.Line - 1).Take(13));
-            if (MaskCall.IsMatch(window)) continue;
-            var via = Regex.Match(site.Reason ?? "", @"via (\w+)");
-            if (via.Success && Callees.Any(c => c.Symbol == via.Groups[1].Value)) continue;
-            bad.Add($"{site.File}:{site.Line}  {site.Text}");
+            if (!MaskedReallyMasks(lines, site.Line, site.Reason, out var why))
+                bad.Add($"{site.File}:{site.Line}  {why}: {site.Text}");
         }
-        Assert.True(bad.Count == 0, "Marked masked, but no mask call on the line or the twelve below, and no listed via choke point:\n" + string.Join("\n", bad));
+        Assert.True(bad.Count == 0, "Marked masked, but it doesn't call the mask (Mask.<Method>(, StreamerMode.FoldersIn(, ShowFolder(, LauncherName():\n" + string.Join("\n", bad));
     }
+
+    /// <summary>The check can't pass on a mention (final review M4): StreamerMode.On and Mask.Hides mask nothing, and a via site must call its symbol.</summary>
+    [Theory]
+    [InlineData("CP 1: StreamerMode.On is checked", "if (StreamerMode.On) return;", false)]
+    [InlineData("CP 1: Mask.Hides is asked", "var hidden = StreamerMode.Mask.Hides(CodenameCategory.Project, x);", false)]
+    [InlineData("CP 1: the name passes Mask.Name", "Text = StreamerMode.Mask.Name(CodenameCategory.Project, x);", true)]
+    [InlineData("CP 1: the folder passes ShowFolder", "Text = StreamerMode.ShowFolder(path, profile);", true)]
+    [InlineData("via Shorten: the text", "var y = 1;", false)]
+    [InlineData("via Shorten: the text", "Status = Shorten(x);", true)]
+    [InlineData("via NotListed: the text", "Status = NotListed(x);", false)]
+    public void The_masked_check_needs_a_real_mask_call(string reason, string next, bool expected) =>
+        Assert.Equal(expected, MaskedReallyMasks(["var x = info.ProjectName;", next], 1, reason, out _));
 
     [Fact]
     public void Every_listed_choke_point_exists_and_masks()
