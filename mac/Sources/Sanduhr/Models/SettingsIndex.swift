@@ -44,6 +44,7 @@ enum SettingsAnchor {
     static let pieces = "pieces"
     static let order = "order"
     static let clicks = "clicks"
+    static let oled = "oled"
     static let margins = "margins"
     // Desk Look
     static let fonts = "fonts"
@@ -153,6 +154,9 @@ enum SettingsAnchor {
                       synonyms: ["corner", "position", "place", "hidden", "clock", "meetings", "Read today's meetings"]),
         SettingsEntry(title: "Order", page: .deskLayout, anchor: order, synonyms: ["stack", "reorder"]),
         SettingsEntry(title: "Clicks", page: .deskLayout, anchor: clicks, synonyms: [DeskPieceClicks.title, "click", DeskLayer.title, "under desktop icons", "bottom", "behind files"]),
+        SettingsEntry(title: SettingsNames.oledCareSwitch, page: .deskLayout, anchor: oled,
+                      synonyms: ["oled", "burn-in", "burn in", "burnin", "drift", "dim", "idle", "away", "screen", "pixels",
+                                 "white", "image retention", "off by default"]),
         SettingsEntry(title: "Margins", page: .deskLayout, anchor: margins, synonyms: ["padding", "edge", "inset"], advanced: true),
         SettingsEntry(title: "Fonts", page: .deskLook, anchor: fonts, synonyms: ["Desk font", "Message font", "typeface"]),
         SettingsEntry(title: "Sizes", page: .deskLook, anchor: sizes, synonyms: ["clock size", "message size"]),
@@ -271,7 +275,7 @@ extension SettingsNames {
         SanduhrHotKeys.Shortcut.settings.name: SettingsAnchor.shortcuts,
         SanduhrHotKeys.Shortcut.join.name: SettingsAnchor.shortcuts,
         checkAppMenus: SettingsAnchor.shortcuts,
-        deskSwitch: SettingsAnchor.desk, notchSwitch: SettingsAnchor.notch, notchGlow: SettingsAnchor.glow,
+        deskSwitch: SettingsAnchor.desk, oledCareSwitch: SettingsAnchor.oled, notchSwitch: SettingsAnchor.notch, notchGlow: SettingsAnchor.glow,
         cameraMicPlace: SettingsAnchor.cameraMic,
         claudeCodeGlowHook: SettingsAnchor.folders, metersAbovePrompt: SettingsAnchor.metersMod,
         byFolder: SettingsAnchor.inventory,

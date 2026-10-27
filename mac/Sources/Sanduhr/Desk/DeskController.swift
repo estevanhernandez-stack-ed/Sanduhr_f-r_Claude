@@ -96,6 +96,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         dock.apply = { [weak self] insets, animation in self?.applyDock(insets, animation: animation) }
         dock.start()
         buildWindow()
+        applyOled()
         // The clock menu is off by default: Sanduhr owns the menu bar, meetings join from the
         // desktop or the join shortcut. `defaults write com.626labs.sanduhr.desk menuIcon -bool true` brings it back.
         if UserDefaults.desk.bool(forKey: "menuIcon") { buildMenu() }
@@ -134,6 +135,12 @@ final class DeskController: NSObject, NSMenuDelegate {
         } else {
             model.dockInsets = insets
         }
+    }
+
+    /// OLED care follows the switch and the Desk: the drift timer and the idle subscription exist only
+    /// while both are on (OledCareController).
+    func applyOled() {
+        MainActor.assumeIsolated { OledCareController.shared.apply(deskRunning: running) }
     }
 
     // MARK: Out of sight (item 54: the message's {shimmer} rests)
@@ -217,6 +224,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         // Arrange mode ends with Desk; nothing was saved, so the layout stays as it was.
         endArrange(keep: false)
         running = false
+        applyOled()
         window?.close(); window = nil
         wingsWindow?.close(); wingsWindow = nil
         pillWindow?.close(); pillWindow = nil
@@ -360,6 +368,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         dock.screenChanged(screen)
         buildWingsWindow(on: screen)
         buildPillWindow(on: screen)
+        model.deskSize = screen.frame.size
+        MainActor.assumeIsolated { OledCareController.shared.deskWindowRebuilt(w) }
         w.contentView = FirstClickHostingView(rootView: DeskView(model: model))
         w.setFrame(screen.frame, display: true)
         w.orderFront(nil)

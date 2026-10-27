@@ -27,6 +27,8 @@ struct DeskMessageLine: View {
     var sweepFirst = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// OLED care: the message's ink, a line's own {ink:} included, never holds pure white.
+    @AppStorage(OledCare.key, store: .desk) private var oled = OledCare.defaultOn
     @State private var reveal: CGFloat = 0
     @State private var sweep: CGFloat = 0
     /// While a `{sweep}` light runs: when it started. nil between sweeps (no frames).
@@ -38,7 +40,8 @@ struct DeskMessageLine: View {
         let parsed = MessageMarkup.parse(raw)
         let effects = parsed.effects
         let size = MessageMotion.size(effects, base: baseSize)
-        let colors = Color.inkStops(MessageMotion.inkSpec(effects, global: inkSpec), fallback: "9ad7ff")
+        let spec = MessageMotion.inkSpec(effects, global: inkSpec)
+        let colors = Color.inkStops(oled ? OledInk.capWhite(spec) : spec, fallback: "9ad7ff")
         let glow = colors[colors.count / 2]
         let glows = MessageMotion.glows(effects, global: globalGlow)
         let writes = MessageMotion.animatesWrite(effects, reduceMotion: reduceMotion)

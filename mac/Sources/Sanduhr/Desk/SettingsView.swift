@@ -49,6 +49,7 @@ struct DeskLayoutSection: View {
                     .font(.caption)
             }
             DeskClicksSection()
+            DeskOledSection()
             // The margins move every piece, so they wait while arranging as the places and the order do.
             AdvancedSection(page: .deskLayout) { DeskMarginsRows().disabled(arranging) }
         }
@@ -84,6 +85,22 @@ private struct DeskClicksSection: View {
                 .settingsAnchor(SettingsAnchor.clicks)
                 .disabled(underIcons)
             Text(DeskPieceClicks.caption)
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Desk, OLED care: one switch (desk key `deskOledCare`, off when absent). The Desk starts or stops the
+/// drift, the dim and the white cap as it flips (OledCareController).
+private struct DeskOledSection: View {
+    @AppStorage(OledCare.key, store: .desk) private var oled = OledCare.defaultOn
+
+    var body: some View {
+        Section {
+            Toggle(OledCare.title, isOn: $oled)
+                .settingsAnchor(SettingsAnchor.oled)
+                .onChange(of: oled) { _, _ in DeskController.shared.applyOled() }
+            Text(OledCare.caption)
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
