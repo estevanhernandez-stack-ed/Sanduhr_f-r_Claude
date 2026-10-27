@@ -126,7 +126,7 @@
     </Window.Resources>
 
     <Border x:Name="Frame" CornerRadius="10"
-            Background="{DynamicResource Sanduhr.Brush.GlassChrome}"
+            Background="{DynamicResource Sanduhr.Brush.Glass}"
             BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
             BorderThickness="1"
             MouseLeftButtonDown="Frame_MouseLeftButtonDown">
