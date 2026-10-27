@@ -199,7 +199,9 @@ public partial class App : Application
             try { ExternalDirMigrationRunner.Run(startupSettings, new Sanduhr.Core.Paths()); }
             catch { }
 
-            if (statuslineEnabled)
+            if (SnapshotConsumers.ScriptWanted(statuslineEnabled,
+                    System.IO.Path.Combine(appDataDir, ResetPlan.IntegrationsName, ResetPlan.ReceiptsFileName),
+                    System.IO.Path.Combine(statuslineBinDir, StatuslineInstaller.ScriptName)))
             {
                 try
                 {
