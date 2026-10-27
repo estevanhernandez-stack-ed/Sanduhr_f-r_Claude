@@ -668,4 +668,41 @@ public class SettingsNamesTests
         Assert.NotEmpty(SettingsNames.RetiredNames("Account name"));
         Assert.Empty(SettingsNames.RetiredNames("account name"));   // prose that says "the account name" stays
     }
+
+    [Fact]
+    public void The_3_8_widget_lines_keep_their_exact_words()
+    {
+        var pinned = new (string Actual, string Expected)[]
+        {
+            (SettingsNames.UseOwnArtName("Fox"), "Use my own art for Fox"),
+            (SettingsNames.CatalogChecking, "Checking the widget catalog…"),
+            (SettingsNames.CatalogVerified(1, "5 May 2026"), "The catalog is verified: 1 widget, published 5 May 2026."),
+            (SettingsNames.CatalogVerified(3, "5 May 2026"), "The catalog is verified: 3 widgets, published 5 May 2026."),
+            (SettingsNames.WidgetsFolderUnreadable, "The widgets folder couldn't be read."),
+            (SettingsNames.WidgetUpdating("Fox"), "Updating Fox…"),
+            (SettingsNames.WidgetInstalling("Fox"), "Installing Fox…"),
+            (SettingsNames.WidgetUpdated("Fox", "1.2.0"), "Fox is updated to 1.2.0."),
+            (SettingsNames.WidgetInstalled("Fox"), "Fox is installed."),
+            (SettingsNames.WidgetInstallFailed, "The widget couldn't be installed."),
+            (SettingsNames.WidgetUninstalled("Fox"), "Fox is uninstalled."),
+            (SettingsNames.WidgetRemoveFailed, "The widget couldn't be removed."),
+            (SettingsNames.OwnArtUnreadable("Fox"), "Fox couldn't be read, so it is unchanged."),
+            (SettingsNames.OwnArtPickTitle("Fox", 32, 24), "Your own art for Fox (32x24 pixel cells)"),
+            (SettingsNames.OwnArtPickStageTitle("Fox", 2, 3, "Run", 32, 24), "Your own art for Fox: stage 2 of 3, Run (32x24 pixel cells)"),
+            (SettingsNames.OwnArtTooLarge("Run", "Fox"), "Run: that image is larger than 2 MB. A sprite sheet is at most 2 MB, so Fox is unchanged."),
+            (SettingsNames.OwnArtImageUnreadable("Fox"), "That image couldn't be read, so Fox is unchanged."),
+            (SettingsNames.OwnArtRejected("Run", "It is too wide.", "Fox"), "Run: It is too wide. Fox is unchanged."),
+            (SettingsNames.OwnArtNoneChosen("Fox"), "No image was chosen, so Fox is unchanged."),
+            (SettingsNames.OwnArtChecksFailed, "the pack didn't pass its checks."),
+            (SettingsNames.OwnArtUnchanged("Fox", "bad."), "Fox is unchanged: bad."),
+            (SettingsNames.OwnArtApplied("Fox"), "Fox now uses your own art. It stays on this PC."),
+            (SettingsNames.OwnArtChangeFailed("Fox"), "Fox couldn't be changed."),
+            (SettingsNames.OwnArtFileFilter, "PNG sprite sheet (*.png)|*.png"),
+        };
+        foreach (var (actual, expected) in pinned)
+        {
+            Assert.Equal(expected, actual);
+            Assert.Empty(SettingsNames.PathProblems(actual));
+        }
+    }
 }

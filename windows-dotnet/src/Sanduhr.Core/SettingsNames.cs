@@ -481,6 +481,37 @@ public static class SettingsNames
     /// <summary>Use my own art…'s help text (spec 3.8 section 6).</summary>
     public const string UseOwnArtHelp = "Choose a PNG sprite sheet for each stage. It is copied into the widget and never sent anywhere.";
 
+    // ---- Mods & Widgets, the 3.8 widget lines (moved from ModsPageViewModel, slice 4 row 31) ----
+
+    /// <summary>The accessible name of a row's Use my own art… button.</summary>
+    public static string UseOwnArtName(string pack) => $"Use my own art for {pack}";
+    public const string CatalogChecking = "Checking the widget catalog…";
+    /// <summary>The verified-catalog line; <paramref name="date"/> is already formatted.</summary>
+    public static string CatalogVerified(int count, string date) =>
+        count == 1 ? $"The catalog is verified: 1 widget, published {date}." : $"The catalog is verified: {count} widgets, published {date}.";
+    public const string WidgetsFolderUnreadable = "The widgets folder couldn't be read.";
+    public static string WidgetUpdating(string pack) => $"Updating {pack}…";
+    public static string WidgetInstalling(string pack) => $"Installing {pack}…";
+    public static string WidgetUpdated(string pack, string version) => $"{pack} is updated to {version}.";
+    public static string WidgetInstalled(string pack) => $"{pack} is installed.";
+    public const string WidgetInstallFailed = "The widget couldn't be installed.";
+    public static string WidgetUninstalled(string pack) => $"{pack} is uninstalled.";
+    public const string WidgetRemoveFailed = "The widget couldn't be removed.";
+    public static string OwnArtUnreadable(string pack) => $"{pack} couldn't be read, so it is unchanged.";
+    public static string OwnArtPickTitle(string pack, int width, int height) => $"Your own art for {pack} ({width}x{height} pixel cells)";
+    public static string OwnArtPickStageTitle(string pack, int stage, int stages, string stageName, int width, int height) =>
+        $"Your own art for {pack}: stage {stage} of {stages}, {stageName} ({width}x{height} pixel cells)";
+    public static string OwnArtTooLarge(string stageName, string pack) =>
+        $"{stageName}: that image is larger than 2 MB. A sprite sheet is at most 2 MB, so {pack} is unchanged.";
+    public static string OwnArtImageUnreadable(string pack) => $"That image couldn't be read, so {pack} is unchanged.";
+    public static string OwnArtRejected(string stageName, string why, string pack) => $"{stageName}: {why} {pack} is unchanged.";
+    public static string OwnArtNoneChosen(string pack) => $"No image was chosen, so {pack} is unchanged.";
+    public const string OwnArtChecksFailed = "the pack didn't pass its checks.";
+    public static string OwnArtUnchanged(string pack, string reason) => $"{pack} is unchanged: {reason}";
+    public static string OwnArtApplied(string pack) => $"{pack} now uses your own art. It stays on this PC.";
+    public static string OwnArtChangeFailed(string pack) => $"{pack} couldn't be changed.";
+    public const string OwnArtFileFilter = "PNG sprite sheet (*.png)|*.png";
+
     // ---- Copy moved out of Mods & Config when it retired (Task 12, P13): a card's "What this folder holds" and the meters rows ----
 
     public const string HoldsCantRead = "Couldn't read this folder.";
