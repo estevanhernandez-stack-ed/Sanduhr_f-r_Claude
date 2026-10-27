@@ -132,6 +132,27 @@ public sealed class StreamerServiceTests : AppWindowFixture
         Assert.Equal(StreamerMode.Mask.Folder(folder), (string?)json["folders"]![StreamerFile.FolderRef(folder)]);
     }
 
+    /// <summary>The one-lock contract (final review M1): the mask assigns under the book's lock, so Shuffle must clear the book under it too.</summary>
+    [Fact]
+    public void Shuffle_waits_for_the_books_lock()
+    {
+        var (service, _, _) = Make();
+        service.Load();
+        service.SetOn(true);
+        var gate = typeof(StreamerMask).GetField("_gate", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var book = (CodenameBook)gate.GetValue(StreamerMode.Mask)!;
+        var before = StreamerMode.Mask.Name(CodenameCategory.Account, "Qxalpha");
+        Task shuffle;
+        lock (book)
+        {
+            shuffle = Task.Run(service.Shuffle);
+            Thread.Sleep(400);
+            Assert.True(book.TryGet(CodenameCategory.Account, "Qxalpha", out var during) && during == before,
+                "Shuffle changed the book while another thread held its lock");
+        }
+        Assert.True(shuffle.Wait(10_000), "Shuffle never finished once the lock was free");
+    }
+
     [Fact]
     public void Showing_a_folders_real_name_moves_it_to_shown_in_streamer_json()
     {

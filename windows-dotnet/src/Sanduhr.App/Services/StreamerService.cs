@@ -82,7 +82,7 @@ public sealed class StreamerService : IDisposable
     public void Shuffle()
     {
         var book = EnsureBook();
-        book.Shuffle(RandomNumberGenerator.GetBytes(Codenames.SaltBytes));
+        lock (book) book.Shuffle(RandomNumberGenerator.GetBytes(Codenames.SaltBytes));   // the mask assigns under this lock
         _dirty = true;
         Apply(On, announce: true);
     }
