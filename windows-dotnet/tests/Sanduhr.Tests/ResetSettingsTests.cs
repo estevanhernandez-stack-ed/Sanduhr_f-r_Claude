@@ -7,12 +7,15 @@ public class ResetSettingsTests
 {
     private static JsonObject Parse(string json) => (JsonObject)JsonNode.Parse(json)!;
 
+    /// <summary>Both kinds' switches, through the per-kind methods Reset calls.</summary>
+    private static bool Both(JsonObject root) => ResetSettings.ClearMcpSwitches(root) | ResetSettings.ClearStatuslineSwitches(root);
+
     [Fact]
     public void Both_switches_go_false_and_both_homes_go_and_everything_else_stays()
     {
         var root = Parse("""{"mcp_enabled":true,"statusline_enabled":true,"mcp_cc_home":".claude","statusline_cc_home":".claude-work","theme":"dark","mcp_roots":{".claude":true}}""");
 
-        Assert.True(ResetSettings.ClearClaudeCodeSwitches(root));
+        Assert.True(Both(root));
 
         Assert.False((bool)root["mcp_enabled"]!);
         Assert.False((bool)root["statusline_enabled"]!);
@@ -26,7 +29,7 @@ public class ResetSettingsTests
     public void A_missing_key_is_not_created()
     {
         var root = Parse("""{"mcp_enabled":true}""");
-        Assert.True(ResetSettings.ClearClaudeCodeSwitches(root));
+        Assert.True(Both(root));
         Assert.False((bool)root["mcp_enabled"]!);
         Assert.False(root.ContainsKey("statusline_enabled"));
     }
@@ -38,7 +41,7 @@ public class ResetSettingsTests
     {
         var root = Parse(json);
         var before = root.ToJsonString();
-        Assert.False(ResetSettings.ClearClaudeCodeSwitches(root));
+        Assert.False(Both(root));
         Assert.Equal(before, root.ToJsonString());
     }
 
@@ -66,7 +69,7 @@ public class ResetSettingsTests
     public void A_switch_of_the_wrong_type_is_replaced_by_false()
     {
         var root = Parse("""{"mcp_enabled":"yes"}""");
-        Assert.True(ResetSettings.ClearClaudeCodeSwitches(root));
+        Assert.True(Both(root));
         Assert.False((bool)root["mcp_enabled"]!);
     }
 }

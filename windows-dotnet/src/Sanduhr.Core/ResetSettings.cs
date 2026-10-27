@@ -10,9 +10,6 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class ResetSettings
 {
-    /// <summary>Sets the two switches false and removes the two home names. Returns whether anything changed.</summary>
-    public static bool ClearClaudeCodeSwitches(JsonObject root) => ClearMcpSwitches(root) | ClearStatuslineSwitches(root);
-
     /// <summary>The MCP pair: <c>mcp_enabled</c> false and <c>mcp_cc_home</c> removed. Returns whether anything changed.</summary>
     public static bool ClearMcpSwitches(JsonObject root) => Clear(root, "mcp_enabled", "mcp_cc_home");
 

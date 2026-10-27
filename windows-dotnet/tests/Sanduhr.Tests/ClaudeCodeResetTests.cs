@@ -68,6 +68,10 @@ public sealed class ClaudeCodeResetTests : IDisposable
         File.WriteAllText(mcp.LauncherPath, "@echo off");
     }
 
+    /// <summary>Keeps every kind in each folder given.</summary>
+    private static ResetFolder[] Everything(params string[] folders)
+        => [.. folders.Select(f => new ResetFolder(f, SettingsNames.ResetKindOrder))];
+
     private ClaudeCodeResetScope Scope() =>
         new(Profile, SanduhrDir, ExternalDir, BinDir, ClaudeCodeFolders.Build(Profile, null, []), null, []);
 
@@ -97,7 +101,7 @@ public sealed class ClaudeCodeResetTests : IDisposable
         InstallAll(keep);
         var before = Snapshot(keep);
 
-        var failures = ClaudeCodeReset.Undo(Scope(), [keep]);
+        var failures = ClaudeCodeReset.UndoKeeping(Scope(), Everything(keep)).Failures;
 
         Assert.Empty(failures);
         Same(before, Snapshot(keep), "the kept folder");
@@ -114,7 +118,7 @@ public sealed class ClaudeCodeResetTests : IDisposable
         InstallAll(undo);
         InstallAll(keep);
 
-        ClaudeCodeReset.Undo(Scope(), [keep]);
+        ClaudeCodeReset.UndoKeeping(Scope(), Everything(keep));
 
         Assert.True(File.Exists(Mcp().LauncherPath), "the MCP launcher went");
         Assert.True(File.Exists(new StatuslineInstaller(Profile, BinDir).ScriptPath), "the statusline script went");
@@ -129,7 +133,7 @@ public sealed class ClaudeCodeResetTests : IDisposable
         InstallAll(keep);
         var before = Snapshot(keep);
 
-        ClaudeCodeReset.Undo(Scope(), [keep.ToUpperInvariant() + "\\"]);
+        ClaudeCodeReset.UndoKeeping(Scope(), Everything(keep.ToUpperInvariant() + "\\"));
 
         Same(before, Snapshot(keep), "the kept folder, written in capitals with a trailing slash");
         Clean(undo);
@@ -146,7 +150,7 @@ public sealed class ClaudeCodeResetTests : IDisposable
         var before = Snapshot(dotClaude);
         var besideBytes = File.ReadAllBytes(beside);
 
-        ClaudeCodeReset.Undo(Scope(), [dotClaude]);
+        ClaudeCodeReset.UndoKeeping(Scope(), Everything(dotClaude));
 
         Same(before, Snapshot(dotClaude), ".claude");
         Assert.Equal(besideBytes, File.ReadAllBytes(beside));
@@ -162,7 +166,7 @@ public sealed class ClaudeCodeResetTests : IDisposable
         InstallAll(a);
         InstallAll(b);
 
-        Assert.Empty(ClaudeCodeReset.Undo(Scope(), []));
+        Assert.Empty(ClaudeCodeReset.UndoKeeping(Scope(), Everything()).Failures);
 
         Clean(a);
         Clean(b);
@@ -184,7 +188,7 @@ public sealed class ClaudeCodeResetTests : IDisposable
             + ClaudeCodeIntegrations.PluginDirsSeparator + theirs;
         File.WriteAllText(file, root.ToJsonString());
 
-        ClaudeCodeReset.Undo(Scope(), []);
+        ClaudeCodeReset.UndoKeeping(Scope(), Everything());
 
         var after = JsonNode.Parse(File.ReadAllText(file))!;
         Assert.Equal(theirs, after["env"]?[ClaudeCodeIntegrations.PluginDirsKey]?.GetValue<string>());
@@ -211,7 +215,7 @@ public sealed class ClaudeCodeResetTests : IDisposable
 
         IReadOnlyList<string> failures;
         using (new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None))
-            failures = ClaudeCodeReset.Undo(Scope(), []);
+            failures = ClaudeCodeReset.UndoKeeping(Scope(), Everything()).Failures;
 
         Assert.Contains("a statusline entry", failures);
         Assert.True(File.Exists(script), "the script went while a folder still runs it");
@@ -233,7 +237,7 @@ public sealed class ClaudeCodeResetTests : IDisposable
         File.WriteAllText(Receipts, "{ not a list");
         string before = Hash(file);
 
-        ClaudeCodeReset.Undo(Scope(), []);
+        ClaudeCodeReset.UndoKeeping(Scope(), Everything());
 
         Assert.Equal(before, Hash(file));
         Assert.Equal("my-own-line.sh", Chain(file));
@@ -288,7 +292,7 @@ public sealed class ClaudeCodeResetTests : IDisposable
         root["statusLine"] = JsonNode.Parse("{ \"type\": \"command\", \"command\": \"their-line.sh\" }");
         File.WriteAllText(file, root.ToJsonString());
 
-        ClaudeCodeReset.Undo(Scope(), []);
+        ClaudeCodeReset.UndoKeeping(Scope(), Everything());
 
         Assert.Equal("their-line.sh", JsonNode.Parse(File.ReadAllText(file))!["statusLine"]!["command"]!.GetValue<string>());
     }
@@ -303,7 +307,7 @@ public sealed class ClaudeCodeResetTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(theirs)!);
         File.WriteAllText(theirs, "{}");
 
-        Assert.Empty(ClaudeCodeReset.Undo(Scope(), []));
+        Assert.Empty(ClaudeCodeReset.UndoKeeping(Scope(), Everything()).Failures);
 
         Assert.True(File.Exists(theirs));
     }

@@ -48,10 +48,6 @@ public sealed record ClaudeCodeUndoResult(
 /// </summary>
 public static class ClaudeCodeReset
 {
-    /// <summary>Keeps every kind in each folder given.</summary>
-    public static IReadOnlyList<string> Undo(ClaudeCodeResetScope scope, IReadOnlyCollection<string> keep)
-        => UndoKeeping(scope, [.. keep.Select(k => new ResetFolder(k, SettingsNames.ResetKindOrder))]).Failures;
-
     /// <summary>Keeps the kinds each <see cref="ResetFolder"/> lists and undoes the rest.</summary>
     public static ClaudeCodeUndoResult UndoKeeping(ClaudeCodeResetScope scope, IReadOnlyCollection<ResetFolder> keep)
     {

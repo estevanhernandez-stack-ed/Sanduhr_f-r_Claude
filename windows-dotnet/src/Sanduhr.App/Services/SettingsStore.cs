@@ -61,23 +61,15 @@ public sealed class SettingsStore
         McpSettingsExport.Sync(Read(), _mcpSettingsPath, LogLine);
     }
 
-    /// <summary>
-    /// Reset Sanduhr…, "Claude Code entries" part: turns <c>mcp_enabled</c> and <c>statusline_enabled</c> off and drops
-    /// <c>mcp_cc_home</c> and <c>statusline_cc_home</c>, so a Reset that leaves "Settings" unchecked doesn't bring the
-    /// projection, the launcher or the script back at the next launch.
-    ///
-    /// This is the ONE write allowed while <see cref="ResetGuard.Done"/> is set (Reset marks it before its steps run),
-    /// and it is narrow on purpose: it only edits an existing settings.json, changes only those four keys, and does NOT
-    /// re-sync <c>mcp-settings.json</c> (the same step deletes that file). Never throws; false when nothing was written.
-    /// </summary>
-    public bool ClearClaudeCodeSwitchesForReset() => ClearForReset(ResetSettings.ClearClaudeCodeSwitches);
-
     /// <summary>Reset's per-kind variant: only <c>mcp_enabled</c> and <c>mcp_cc_home</c>, for a reset that keeps a statusline or meters folder.</summary>
     public bool ClearMcpSwitchesForReset() => ClearForReset(ResetSettings.ClearMcpSwitches);
 
     /// <summary>Reset's per-kind variant: only <c>statusline_enabled</c> and <c>statusline_cc_home</c>, for a reset that keeps an MCP folder.</summary>
     public bool ClearStatuslineSwitchesForReset() => ClearForReset(ResetSettings.ClearStatuslineSwitches);
 
+    /// <summary>The ONE write allowed while <see cref="ResetGuard.Done"/> is set (Reset marks it before its steps run), and narrow on
+    /// purpose: it only edits an existing settings.json, changes only one kind's two keys, and does NOT re-sync <c>mcp-settings.json</c>
+    /// (Reset deletes that file). Never throws; false when nothing was written.</summary>
     private bool ClearForReset(Func<JsonObject, bool> clear)
     {
         try
