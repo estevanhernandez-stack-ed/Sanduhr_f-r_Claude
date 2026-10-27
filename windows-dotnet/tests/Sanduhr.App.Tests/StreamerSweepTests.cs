@@ -494,6 +494,33 @@ public sealed class StreamerSweepTests : AppWindowFixture
         finally { r.Window.Close(); r.Widget.Dispose(); }
     });
 
+    /// <summary>The pre-stream flow: tidy up with the switch off, then turn it on. A status line written while off names the real thing, and
+    /// the flip must not leave it on screen (final review C1).</summary>
+    [Fact]
+    public void A_status_line_written_while_off_is_gone_when_the_switch_goes_on() => AppHost.Run(() =>
+    {
+        Home(".claude-qxwork");
+        var (widget, _) = ScratchWidget("Qxalpha");
+        try
+        {
+            var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask,
+                checkForUpdatesNow: () => Task.FromResult(new UpdateProbeResult(UpdateProbeStatus.UpToDate)), isStoreBuild: false);
+            // Off: what the pages write after an uninstall, a switch or a failed install names the real pack or folder.
+            Assert.False(widget.Streamer.On);
+            svm.ModsPage.Status = "qxpack is uninstalled.";
+            svm.ModsPage.MetersStatus = svm.ModsPage.ShortForTests($@"Couldn't update {Profile}\.claude-qxwork\settings.json", "fallback");
+            svm.ClaudeCodePage.StatusText = $@"Couldn't remove the hook in {Profile}\.claude-qxwork\settings.json.";
+            Assert.Contains("qx", svm.ModsPage.Status + svm.ModsPage.MetersStatus + svm.ClaudeCodePage.StatusText);
+
+            widget.Streamer.SetOn(true);
+            svm.ReloadNames();
+
+            foreach (var (what, text) in new[] { ("Mods status", svm.ModsPage.Status), ("meters status", svm.ModsPage.MetersStatus), ("Claude Code status", svm.ClaudeCodePage.StatusText) })
+                Assert.False(text.Contains("qx", StringComparison.OrdinalIgnoreCase), $"{what}: \"{text}\"");
+        }
+        finally { widget.Dispose(); }
+    });
+
     /// <summary>Allowlisted names are the exception, and the switch off shows everything as it was.</summary>
     [Fact]
     public void Off_every_page_shows_the_real_names_again() => AppHost.Run(() =>

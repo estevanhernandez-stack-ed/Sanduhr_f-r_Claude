@@ -304,6 +304,10 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
         ClaudeCodePage.Reload();
         Privacy.Reload();
         ModsPage.ReloadLocal();
+        // A status line is a sentence built when it was written, with the names as they were then: it is not rebuilt, so it goes (final review C1).
+        ModsPage.Status = "";
+        ModsPage.MetersStatus = "";
+        ClaudeCodePage.StatusText = "";
         Desk.Companion.Reload();
         Desk.Launcher.Reload();   // preflight P3: a link's URL and a raw target
         History.RefreshNames();
