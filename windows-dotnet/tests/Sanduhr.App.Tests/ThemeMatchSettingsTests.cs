@@ -250,12 +250,15 @@ public sealed class ThemeMatchSettingsTests : AppWindowFixture
             Assert.Equal(Visibility.Collapsed, overlay.Visibility);
             bars.Text = "";
 
-            svm.ThemeMatch.Service.AskWhere = (_, _) => ThemeEditChoice.Cancel;
+            int asked = 0;
+            svm.ThemeMatch.Service.AskWhere = (_, _) => { asked++; return ThemeEditChoice.Cancel; };
             var ink = boxes[0];
-            ink.Focus();
             ink.Text = "#ffffff";
-            boxes[2].Focus();   // the row is left: it commits, and Cancel puts it back
+            // Leaving the row commits it (UpdateSourceTrigger=LostFocus). Commit the binding directly, so no focus move can be lost
+            // to whatever window holds the foreground (slice 8 final review M7).
+            System.Windows.Data.BindingOperations.GetBindingExpression(ink, TextBox.TextProperty)!.UpdateSource();
             Settle(window, guard);
+            Assert.Equal(1, asked);
             Assert.Equal("#e8e4dc, #6c63ff", ink.Text);
         }
         finally { window.Close(); }

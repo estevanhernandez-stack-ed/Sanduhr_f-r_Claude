@@ -493,7 +493,8 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
             var on = Below<CheckBox>(window).Single(c => c.IsVisible && NameOf(c) == SettingsNames.PackOnFor("Fixture palette"));
             Assert.True(on.IsChecked);
 
-            on.Command.Execute(on.CommandParameter);   // what a click runs: the bound command
+            // A click: OnClick toggles IsChecked, then runs the Command, as a mouse press does.
+            typeof(System.Windows.Controls.Primitives.ButtonBase).GetMethod("OnClick", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(on, null);
             Settle(window, guard);
 
             Assert.False(on.IsChecked);
@@ -509,45 +510,6 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
-
-    /// <summary>Why a visible, enabled control cannot act, or null when it can: a command that can run, a link that resolves, or a binding
-    /// to the model. A toggle in an Expander's header acts through the template.</summary>
-    private static string? CantAct(Control c)
-    {
-        bool Bound(DependencyProperty p) => System.Windows.Data.BindingOperations.GetBindingExpressionBase(c, p) is { HasError: false };
-        switch (c)
-        {
-            case System.Windows.Controls.Primitives.ToggleButton { TemplatedParent: Expander }:
-                return null;
-            case System.Windows.Controls.Primitives.ButtonBase b when b.Command is { } cmd:
-                return cmd.CanExecute(b.CommandParameter) ? null : "its command can't run";
-            case System.Windows.Controls.Primitives.ButtonBase b when SettingsLinkTo.GetLink(b) is { Length: > 0 } link:
-                return SettingsIndex.ParseLink(link) is null ? $"its link \"{link}\" doesn't resolve" : null;
-            case System.Windows.Controls.Primitives.ToggleButton:
-                return Bound(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty) ? null : "it has no command and no binding";
-            case System.Windows.Controls.Primitives.ButtonBase:
-                return "it has no command and no link";
-            case ComboBox cb:
-                // The linked-account combo binds SelectedValue (slice 7: its items are AccountChoices with a codename to show).
-                return !Bound(System.Windows.Controls.Primitives.Selector.SelectedItemProperty)
-                    && !Bound(System.Windows.Controls.Primitives.Selector.SelectedValueProperty) ? "its selection is not bound"
-                    : cb.Items.Count == 0 ? "it has nothing to choose" : null;
-            case TextBox t:
-                return t.IsReadOnly ? "it is read-only" : Bound(TextBox.TextProperty) ? null : "its text is not bound";
-            default:
-                return null;
-        }
-    }
-
-    private static bool IsActor(Control c) => c is System.Windows.Controls.Primitives.ButtonBase or ComboBox or TextBox;
-
-    private static IEnumerable<string> ControlsThatCantAct(DependencyObject root) =>
-        Below<Control>(root).Where(c => IsActor(c) && c.IsVisible && c.IsEnabled)
-            .Select(c => (Control: c, Why: CantAct(c))).Where(x => x.Why is not null)
-            .Select(x => $"{x.Control.GetType().Name} \"{NameOf(x.Control)}\": {x.Why}");
-
-    private static List<string> ShownNames(DependencyObject root) =>
-        [.. Below<Control>(root).Where(c => IsActor(c) && c.IsVisible).Select(NameOf)];
 
     private string MissingEntry() =>
         Path.Combine(Root, "dev", "external", "mods", "v0.1.0-20200101000000", "sanduhr-meters").Replace("\\", "\\\\");
@@ -588,7 +550,7 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
             foreach (var presenter in meterRows)
             {
                 var vm = (MetersFolderRowViewModel)presenter.Content;
-                var shown = ShownNames(presenter);
+                var shown = DoneWalk.ShownNames(presenter);
                 if (vm.State == FolderState.Unreadable) Assert.Empty(shown);
                 Assert.Equal(vm.CanSwitch, shown.Contains(vm.SwitchName));
                 Assert.Equal(vm.CanUpdate, shown.Contains(vm.UpdateName));
@@ -601,7 +563,7 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
             foreach (var item in items)
             {
                 var vm = (InstalledRowViewModel)item.Content;
-                var shown = ShownNames(item);
+                var shown = DoneWalk.ShownNames(item);
                 if (vm.IsPack)
                 {
                     Assert.Contains(vm.SwitchName, shown);
@@ -618,7 +580,7 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
             var effects = items.Single(i => ((InstalledRowViewModel)i.Content).Id == "good-effects");
             Assert.DoesNotContain(Below<Button>(effects), b => b.IsVisible && SettingsLinkTo.GetLink(b) is { Length: > 0 });   // no link: nothing draws effects
 
-            Assert.Empty(ControlsThatCantAct(page));
+            Assert.Empty(DoneWalk.ControlsThatCantAct(page));
 
             // The Claude Code cards: every report open, every piece, then the page's own controls.
             window.SelectPage(SettingsPage.ClaudeCode);
@@ -626,11 +588,11 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
             Settle(window, guard);
             Settle(window, guard);
             var cards = Below<ClaudeCodePage>(window).Single();
-            Assert.Empty(ControlsThatCantAct(cards));
+            Assert.Empty(DoneWalk.ControlsThatCantAct(cards));
             foreach (var row in svm.ClaudeCodePage.Folders)
             {
                 var card = CardOf(Below<Expander>(cards).Single(e => e.DataContext == row))!;
-                var shown = ShownNames(card);
+                var shown = DoneWalk.ShownNames(card);
                 if (row.Holds.SettingsUnreadable)
                     Assert.DoesNotContain(shown, n => n.Contains("Statusline", StringComparison.Ordinal) || n.Contains("hook", StringComparison.OrdinalIgnoreCase));
                 Assert.Equal(row.IsAdded, shown.Contains(row.ForgetName));
@@ -720,4 +682,61 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+}
+
+/// <summary>The Done walk's measures (Principle 5), shared with the other classes that open a page and ask what can act.</summary>
+internal static class DoneWalk
+{
+    internal static IEnumerable<T> Below<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T t) yield return t;
+            foreach (var deeper in Below<T>(child)) yield return deeper;
+        }
+    }
+
+    internal static string NameOf(DependencyObject d) => System.Windows.Automation.AutomationProperties.GetName(d) ?? "";
+
+    /// <summary>Why a visible, enabled control cannot act, or null when it can: a command that can run, a link that resolves, or a binding
+    /// to the model. A toggle in an Expander's header acts through the template.</summary>
+    internal static string? CantAct(Control c)
+    {
+        bool Bound(DependencyProperty p) => System.Windows.Data.BindingOperations.GetBindingExpressionBase(c, p) is { HasError: false };
+        switch (c)
+        {
+            case System.Windows.Controls.Primitives.ToggleButton { TemplatedParent: Expander e }:
+                // The header toggle acts through the template, by the Expander's IsExpanded: that must be bound to something.
+                return System.Windows.Data.BindingOperations.GetBindingExpressionBase(e, Expander.IsExpandedProperty) is not null
+                    ? null : "its Expander's IsExpanded is not bound";
+            case System.Windows.Controls.Primitives.ButtonBase b when b.Command is { } cmd:
+                return cmd.CanExecute(b.CommandParameter) ? null : "its command can't run";
+            case System.Windows.Controls.Primitives.ButtonBase b when SettingsLinkTo.GetLink(b) is { Length: > 0 } link:
+                return SettingsIndex.ParseLink(link) is null ? $"its link \"{link}\" doesn't resolve" : null;
+            case System.Windows.Controls.Primitives.ToggleButton:
+                return Bound(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty) ? null : "it has no command and no binding";
+            case System.Windows.Controls.Primitives.ButtonBase:
+                return "it has no command and no link";
+            case ComboBox cb:
+                // The linked-account combo binds SelectedValue (slice 7: its items are AccountChoices with a codename to show).
+                return !Bound(System.Windows.Controls.Primitives.Selector.SelectedItemProperty)
+                    && !Bound(System.Windows.Controls.Primitives.Selector.SelectedValueProperty) ? "its selection is not bound"
+                    : cb.Items.Count == 0 ? "it has nothing to choose" : null;
+            case TextBox t:
+                return t.IsReadOnly ? "it is read-only" : Bound(TextBox.TextProperty) ? null : "its text is not bound";
+            default:
+                return null;
+        }
+    }
+
+    internal static bool IsActor(Control c) => c is System.Windows.Controls.Primitives.ButtonBase or ComboBox or TextBox;
+
+    internal static IEnumerable<string> ControlsThatCantAct(DependencyObject root) =>
+        Below<Control>(root).Where(c => IsActor(c) && c.IsVisible && c.IsEnabled)
+            .Select(c => (Control: c, Why: CantAct(c))).Where(x => x.Why is not null)
+            .Select(x => $"{x.Control.GetType().Name} \"{NameOf(x.Control)}\": {x.Why}");
+
+    internal static List<string> ShownNames(DependencyObject root) =>
+        [.. Below<Control>(root).Where(c => IsActor(c) && c.IsVisible).Select(NameOf)];
 }
