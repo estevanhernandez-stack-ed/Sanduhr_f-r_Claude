@@ -104,4 +104,28 @@ public sealed class StreamerModsTests : AppWindowFixture
         Assert.DoesNotContain("Fixture", page.Status);
         Assert.DoesNotContain("Fixture", row.RowName + row.SwitchName + row.UninstallName + row.UseOwnArtName);
     });
+    /// <summary>The filter box matches what the row shows (final review M7): while on, typing the codename finds the row, and typing the
+    /// real name still does (the person's own typing, on their own list).</summary>
+    [Fact]
+    public void The_filter_also_matches_the_codename_the_row_shows() => AppHost.Run(() =>
+    {
+        var paths = new Paths(Path.Combine(Root, "appdata"), Path.Combine(Root, "home"), Path.Combine(Root, "local"));
+        var svc = new WidgetCatalogService(paths, new OfflineHandler(), WidgetKit.V380);
+        var files = WidgetKit.Pack("good-palette");
+        Assert.True(svc.Store.Install(files, PackValidator.Validate(files, "good-palette", strict: true).Manifest!, WidgetSource.Local).Ok);
+        var page = new ModsPageViewModel(() => svc);
+        StreamerMode.Use(new StreamerMask(true, CodenameBook.New(), Profile));
+        page.ReloadLocal();
+        var shown = Assert.Single(page.Installed).Name;
+        Assert.DoesNotContain("Fixture", shown);
+
+        page.FilterText = shown;
+        Assert.Single(page.Installed);
+        page.FilterText = shown.ToUpperInvariant();
+        Assert.Single(page.Installed);
+        page.FilterText = "good-palette";
+        Assert.Single(page.Installed);
+        page.FilterText = "nothing is called this";
+        Assert.Empty(page.Installed);
+    });
 }

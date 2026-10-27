@@ -661,9 +661,16 @@ public sealed partial class ModsPageViewModel : ObservableObject
     private void ApplyFilter()
     {
         Installed.Clear();
-        foreach (var item in _items.Where(i => InstalledItems.Matches(i, Filter, FilterText)))
-            Installed.Add(new InstalledRowViewModel(this, item,
-                item.Kind == InstalledKind.WidgetPack ? Service.Store.ReadInfo(item.Id)?.PreviewPath : null));
+        var text = FilterText?.Trim();
+        foreach (var item in _items.Where(i => InstalledItems.Matches(i, Filter, null)))
+        {
+            var row = new InstalledRowViewModel(this, item,
+                item.Kind == InstalledKind.WidgetPack ? Service.Store.ReadInfo(item.Id)?.PreviewPath : null);
+            // The box also matches what the row shows: while streamer mode is on, that is its codename (final review M7).
+            if (InstalledItems.Matches(item, Filter, text)
+                || (!string.IsNullOrEmpty(text) && (row.Name.Contains(text, StringComparison.OrdinalIgnoreCase) || row.Source.Contains(text, StringComparison.OrdinalIgnoreCase))))
+                Installed.Add(row);
+        }
         NothingMatches = HasInstalled && Installed.Count == 0;
     }
 
