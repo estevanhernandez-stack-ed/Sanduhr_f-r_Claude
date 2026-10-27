@@ -313,7 +313,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
         AskMetersConsent = folder => IntegrationConsentDialog.Ask(_window, new ConsentSpec(
             SettingsNames.MetersConsentTitle, SettingsNames.MetersConsentIntro, folder, SettingsNames.MetersConsentDetails,
             SettingsNames.MetersConsentInstall)) is not null;
-        Ask = q => ThemedDialog.Show(_window, q.Title, q.Message, MessageBoxButton.YesNo,
+        Ask = q => ThemedDialog.Show(_window, q.Title, q.Message, MessageBoxButton.YesNo,   // streamer: notname - q.Message is a confirmation question built from fixed copy and version stamps, no names
             q.Warning ? ThemedDialogKind.Warning : ThemedDialogKind.Info,
             primaryLabel: q.Primary, secondaryLabel: q.Secondary) == MessageBoxResult.Yes;
     }
@@ -378,7 +378,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
                 {
                     var res = integ.Install(IntegrationKind.Meters, row.Folder);
                     installed = changed = res.Ok;
-                    MetersStatus = res.Ok ? SettingsNames.MetersInstalled : Short(res.Message, SettingsNames.MetersInstallFailed);
+                    MetersStatus = res.Ok ? SettingsNames.MetersInstalled : Short(res.Message, SettingsNames.MetersInstallFailed);   // streamer: masked - via Short: the install message passes Mask.Paths or FoldersIn (CP 8)
                 }
             }
             else
@@ -386,7 +386,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
                 var res = integ.SwitchOwnMod(row.Folder, want);
                 changed = res.Ok;
                 MetersStatus = res.Ok ? (want ? SettingsNames.MetersTurnedOn : SettingsNames.MetersTurnedOff)
-                    : Short(res.Message, SettingsNames.MetersSwitchFailed);
+                    : Short(res.Message, SettingsNames.MetersSwitchFailed);   // streamer: masked - via Short: the install message passes Mask.Paths or FoldersIn (CP 8)
             }
         }
         catch (Exception) { MetersStatus = SettingsNames.MetersSwitchFailed; }
@@ -405,7 +405,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
                     SettingsNames.MetersUpdateConfirm, SettingsNames.MetersUpdateNotNow, Warning: false)))
                 return;
             var res = integ.UpdateOwnMod(row.Folder);
-            MetersStatus = !res.Ok ? Short(res.Message, SettingsNames.MetersUpdateFailed)
+            MetersStatus = !res.Ok ? Short(res.Message, SettingsNames.MetersUpdateFailed)   // streamer: masked - via Short: the install message passes Mask.Paths or FoldersIn (CP 8)
                 : res.Outcome == ModUpdateOutcome.Updated ? SettingsNames.MetersUpdated : SettingsNames.MetersAlreadyCurrent;
         }
         catch (Exception) { MetersStatus = SettingsNames.MetersUpdateFailed; }
@@ -422,7 +422,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
                     SettingsNames.MetersRemoveConfirm, SettingsNames.MetersRemoveCancel, Warning: true)))
                 return;
             var res = _host.Integrations().Remove(IntegrationKind.Meters, row.Folder);
-            MetersStatus = res.Ok ? SettingsNames.MetersRemoved : Short(res.Message, SettingsNames.MetersRemoveFailed);
+            MetersStatus = res.Ok ? SettingsNames.MetersRemoved : Short(res.Message, SettingsNames.MetersRemoveFailed);   // streamer: masked - via Short: the install message passes Mask.Paths or FoldersIn (CP 8)
         }
         catch (Exception) { MetersStatus = SettingsNames.MetersRemoveFailed; }
         ReloadLocal();
@@ -437,7 +437,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
     private string Short(string message, string fallback) =>
         string.IsNullOrWhiteSpace(message) ? fallback
             : _host is null ? StreamerMode.Mask.Paths(message)
-            : StreamerMode.On ? StreamerMode.FoldersIn(message, _host.Folders().Select(f => f.Path))   // slice 7, CP 8
+            : StreamerMode.On ? StreamerMode.FoldersIn(message, _host.Folders().Select(f => f.Path))   // slice 7, CP 8   // streamer: masked - CP 8: FoldersIn masks on this line
             : message.Replace(_host.Profile, "~", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Called after a pack is installed or removed (the Desk reloads).</summary>
@@ -771,7 +771,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
             CheckFileExists = true,
             Multiselect = false,
         };
-        return dialog.ShowDialog() == true ? dialog.FileName : null;
+        return dialog.ShowDialog() == true ? dialog.FileName : null;   // streamer: key - the picked sprite sheet path is imported, never drawn
     }
 
     /// <summary>A pack's preview, decoded from memory so the file is never held open (Uninstall deletes it).</summary>

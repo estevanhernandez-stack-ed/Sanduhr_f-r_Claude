@@ -41,7 +41,7 @@ public sealed partial class LauncherButtonRow : ObservableObject
 
     /// <summary>The name this button goes by: its label, else the app's name, else the site.</summary>
     public string Title => string.IsNullOrWhiteSpace(Label)
-        ? (Kind == LauncherKind.Link ? LinkHostShown : AppName ?? StreamerMode.Mask.Paths(Target))   // streamer: a raw target can be a path
+        ? (Kind == LauncherKind.Link ? LinkHostShown : AppName ?? StreamerMode.Mask.Paths(Target))   // streamer: masked - Mask.Paths masks a raw target (P3)
         : Label.Trim();
 
     /// <summary>The line under the title: what the button opens.</summary>
@@ -408,14 +408,14 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
             Multiselect = false,
         };
         if (dialog.ShowDialog(_owner) != true) return;
-        var imported = LauncherImages.Import(_paths, dialog.FileName);
+        var imported = LauncherImages.Import(_paths, dialog.FileName);   // streamer: key - the picked image path is copied into the store, never drawn
         if (!imported.Ok)
         {
             Problem = imported.Error ?? "Sanduhr couldn't read that image.";
             return;
         }
         var current = _model.Buttons[row.Index];
-        Commit(_model.Replace(row.Index, current with { Image = imported.FileName }), rebuild: true);
+        Commit(_model.Replace(row.Index, current with { Image = imported.FileName }), rebuild: true);   // streamer: notname - the stored image's hash-derived file name
         Select(row.Index);
     }
 

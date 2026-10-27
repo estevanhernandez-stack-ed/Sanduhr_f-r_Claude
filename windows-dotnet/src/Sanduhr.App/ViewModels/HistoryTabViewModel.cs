@@ -97,7 +97,7 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         var prev = SelectedOption?.Account;
         AccountOptions.Clear();
         AccountOptions.Add(new AccountOption("All accounts", null));
-        foreach (var label in _widget.ShownAccounts)
+        foreach (var label in _widget.ShownAccounts)   // streamer: masked - CP 3: Mask.Name masks the option text on the next line
             AccountOptions.Add(new AccountOption(StreamerMode.Mask.Name(CodenameCategory.Account, label), label));   // slice 7, CP 3
         SelectedOption = AccountOptions.FirstOrDefault(o => o.Account == prev) ?? AccountOptions[0];
         ExportCsvCommand.NotifyCanExecuteChanged();
@@ -146,7 +146,7 @@ public sealed partial class HistoryTabViewModel : ObservableObject
             ShowLegend = false;
             return;
         }
-        var accounts = _widget.ShownAccounts;
+        var accounts = _widget.ShownAccounts;   // streamer: masked - CP 3: the legend text passes Mask.Name below
         if (accounts.Count == 0)
         {
             ShowLegend = false;
@@ -176,7 +176,7 @@ public sealed partial class HistoryTabViewModel : ObservableObject
     public IReadOnlyList<ChartRow> BuildRows()
     {
         var rows = Rows();
-        EmptyText = EmptyLine(_widget.ActiveAccount is not null || _widget.IsDemo, rows.Count > 0);
+        EmptyText = EmptyLine(_widget.ActiveAccount is not null || _widget.IsDemo, rows.Count > 0);   // streamer: key - a null check, never drawn
         return rows;
     }
 
@@ -192,7 +192,7 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         if (_widget.IsDemo)
             return [];
         int days = WeekMode ? 7 : 30;
-        var accounts = _widget.ShownAccounts;
+        var accounts = _widget.ShownAccounts;   // streamer: key - label list keyed to the chart series; the legend draws codenames (CP 3)
         string? selected = SelectedOption?.Account;
         var rows = new List<ChartRow>();
 
@@ -254,14 +254,14 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         try
         {
             var result = CsvExport.Build(_widget.History, _widget.AccountStore, account);
-            File.WriteAllText(dlg.FileName, result.Text);
+            File.WriteAllText(dlg.FileName, result.Text);   // streamer: export - the CSV the person asked for keeps real names
             Sounds.PlaySaveConfirmation();
-            Info(ExportedMessage(result.RowCount, dlg.FileName));
+            Info(ExportedMessage(result.RowCount, dlg.FileName));   // streamer: masked - via ExportedMessage: the saved path passes Mask.Paths (CP 4)
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             Sounds.PlayError();
-            Info(ExportFailedMessage(dlg.FileName, e.Message));
+            Info(ExportFailedMessage(dlg.FileName, e.Message));   // streamer: masked - via ExportFailedMessage: path and error text pass Mask.Paths (CP 4)
         }
     }
 

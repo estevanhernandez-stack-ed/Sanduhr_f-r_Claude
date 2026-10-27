@@ -100,7 +100,7 @@ public sealed partial class DesignsSettingsViewModel : ObservableObject
 
     private void Done(DesignActionResult result)
     {
-        Status = result.Message;
+        Status = result.Message;   // streamer: cant - the status names the design the person typed or picked: the caption's "what you type yourself"
         Reload();
     }
 

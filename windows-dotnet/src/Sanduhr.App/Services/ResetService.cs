@@ -77,7 +77,7 @@ internal sealed class ResetService
     {
         try
         {
-            string dir = _paths.ExternalDirPath;
+            string dir = _paths.ExternalDirPath;   // streamer: notname - a file location used for IO, never drawn
             if (Directory.Exists(dir))
                 Directory.Delete(dir, recursive: false);
         }
@@ -115,7 +115,7 @@ internal sealed class ResetService
         var failures = new List<string>();
 
         IReadOnlyList<string> labels;
-        try { labels = _accounts.ListAccounts().ToList(); }
+        try { labels = _accounts.ListAccounts().ToList(); }   // streamer: key - labels removed from the registry, never drawn
         catch (Exception)
         {
             labels = [];
@@ -224,9 +224,9 @@ internal sealed class ResetService
     /// <summary>A phrase for the kind of thing that stayed. Never a path or a name.</summary>
     private string KindOf(ResetPart part, ResetItem item)
     {
-        string name = Path.GetFileName(item.Path.TrimEnd('\\', '/'));
+        string name = Path.GetFileName(item.Path.TrimEnd('\\', '/'));   // streamer: notname - leaf classified into a phrase; the result is a kind, never a path or name
         if (name.StartsWith("webview2", StringComparison.OrdinalIgnoreCase)) return "a sign-in profile folder";
-        if (string.Equals(item.Path, _paths.VaultDir, StringComparison.OrdinalIgnoreCase)) return "the session archive";
+        if (string.Equals(item.Path, _paths.VaultDir, StringComparison.OrdinalIgnoreCase)) return "the session archive";   // streamer: notname - compared to classify the kind, never drawn
         if (string.Equals(item.Path, _paths.WidgetsDir, StringComparison.OrdinalIgnoreCase)) return "the widgets folder";
         return part switch
         {

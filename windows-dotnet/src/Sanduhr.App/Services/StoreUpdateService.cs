@@ -105,7 +105,7 @@ public sealed class StoreUpdateService
         }
     }
 
-    private void Log(string stage, Exception e) => _log?.Invoke($"store update {stage} ({e.GetType().Name}: {e.Message})");
+    private void Log(string stage, Exception e) => _log?.Invoke($"store update {stage} ({e.GetType().Name}: {e.Message})");   // streamer: notname - written to the log file, never drawn
 }
 
 /// <summary>

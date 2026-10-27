@@ -182,7 +182,7 @@ internal sealed class CompanionService : IDisposable
 
     /// <summary>The store the companion draws from: a pack under review's staged copy, else the installed widgets.</summary>
     private WidgetStore StoreNow() =>
-        _previewPack?.Store ?? new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng);
+        _previewPack?.Store ?? new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng);   // streamer: notname - a file location used for IO, never drawn
 
     /// <summary>True while a pack under review is drawn in place of the chosen companion.</summary>
     public bool PreviewingPack => _previewPack is not null;
@@ -311,7 +311,7 @@ internal sealed class CompanionService : IDisposable
         _growthRunning = true;
         var dispatcher = Dispatcher.CurrentDispatcher;
         var was = _growth;
-        string daysDir = _paths.TimeDaysDir, file = _paths.CompanionStateFile;
+        string daysDir = _paths.TimeDaysDir, file = _paths.CompanionStateFile;   // streamer: notname - a file location used for IO, never drawn
         var fallback = _claudeCodeDays;
         Task.Run(() =>
         {
@@ -343,7 +343,7 @@ internal sealed class CompanionService : IDisposable
     {
         try
         {
-            var reader = new CcLogReader(null, () => ClaudeCodeHomes.Discover(ClaudeCodeProfile.Dir, ClaudeCodeProfile.ConfigDir));
+            var reader = new CcLogReader(null, () => ClaudeCodeHomes.Discover(ClaudeCodeProfile.Dir, ClaudeCodeProfile.ConfigDir));   // streamer: key - folders handed to the log reader for token counts, never drawn
             return [.. reader.TokensByDay(daysBack: 60).Keys.Select(d => new CodingDay(d, TimeSpan.Zero))];
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)

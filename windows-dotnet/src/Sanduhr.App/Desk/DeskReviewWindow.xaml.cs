@@ -62,7 +62,7 @@ public sealed partial class DeskReviewWindow : Window
         bool wasApplyEnabled = Bar.Apply.IsEnabled;
         Bar.SetModel(model);
         Title = model.BarName ?? DeskReviewCopy.BarName;
-        AutomationProperties.SetName(this, Title);
+        AutomationProperties.SetName(this, Title);   // streamer: notname - the window's fixed title
         if (IsLoaded && Bar.Apply.IsEnabled != wasApplyEnabled) FocusDefault();
     }
 

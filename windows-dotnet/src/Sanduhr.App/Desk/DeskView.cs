@@ -495,7 +495,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         double ts = TimeSize * p.Scale;
         FrameworkElement? piece = p.Widget switch
         {
-            "message" => _frame.Message is { } msg ? DeskMessagePiece.Create(msg, p.Scale, _ink, _fonts, _settings.Font, align, width, _live, _gate) : null,
+            "message" => _frame.Message is { } msg ? DeskMessagePiece.Create(msg, p.Scale, _ink, _fonts, _settings.Font, align, width, _live, _gate) : null,   // streamer: notname - frame.Message is the Desk message frame record
             "clock" => Clock(ts, align),
             "claude" => p.Style == DeskMeterStyle.Bar ? ClaudeLine(ts) : StyledClaude(ts, align, p.Style),
             "meters" => p.Style == DeskMeterStyle.Bar ? Meters(ts, align) : StyledMeters(ts, align, p.Style),
@@ -953,7 +953,7 @@ internal sealed partial class DeskView : Grid, IDisposable
             TextTrimming = TextTrimming.CharacterEllipsis,
             MaxWidth = Math.Max(10, width - used),
         };
-        System.Windows.Automation.AutomationProperties.SetName(styled, rest);
+        System.Windows.Automation.AutomationProperties.SetName(styled, rest);   // streamer: cant - the Desk message text the person typed, spoken as written
         row.Children.Add(styled);
         // The row is as wide as its words (so the gradient spans them) inside a frame of the line's width.
         var frame = new Grid { Width = width };

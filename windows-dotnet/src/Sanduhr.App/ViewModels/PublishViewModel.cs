@@ -20,7 +20,7 @@ public sealed partial class PublishRootToggleViewModel : ObservableObject
     public string Name { get; }
 
     /// <summary>The folder as shown: its codename while streamer mode hides it (slice 7, CP 11). <see cref="Name"/> stays the key.</summary>
-    public string Shown => StreamerMode.Mask.FolderName(Name);
+    public string Shown => StreamerMode.Mask.FolderName(Name);   // streamer: masked - CP 11: Mask.FolderName masks on this line
 
     [ObservableProperty] private bool _isShared;
 
@@ -99,7 +99,7 @@ public sealed partial class PublishViewModel : ObservableObject
     public bool StreamerOff => !StreamerMode.On;
 
     /// <summary>The endpoint as the read-only line shows it: the host as a codename, the path hidden.</summary>
-    public string EndpointShown => StreamerMode.Mask.Endpoint(EndpointUrl);
+    public string EndpointShown => StreamerMode.Mask.Endpoint(EndpointUrl);   // streamer: masked - CP 19: Mask.Endpoint masks on this line
 
     /// <summary>Streamer mode moved (slice 7): the folder rows, the endpoint line and the status read their names again.</summary>
     public void RefreshNames()
@@ -154,7 +154,7 @@ public sealed partial class PublishViewModel : ObservableObject
             Enabled = s.Enabled;
             PublishTimeText = PublishScheduler.FormatPublishTime(s.PublishTime);
             Roots.Clear();
-            foreach (var root in _service.DetectedRootNames())
+            foreach (var root in _service.DetectedRootNames())   // streamer: masked - via PublishRootToggleViewModel: its Shown is Mask.FolderName (CP 11)
                 Roots.Add(new PublishRootToggleViewModel(this, root, s.Roots.GetValueOrDefault(root)));
             LoadDestination(s);
             RefreshToken();
@@ -172,8 +172,8 @@ public sealed partial class PublishViewModel : ObservableObject
     {
         SelectedPreset = PresetOptions.First(p => p.Value == s.Preset);
         PresetHint = s.Preset == PublishPreset.Labs626 ? PublishPresets.Labs626Hint : "";
-        EndpointUrl = s.EndpointUrl;
-        EndpointError = EndpointErrorFor(s.EndpointUrl);
+        EndpointUrl = s.EndpointUrl;   // streamer: key - loads the saved endpoint into the box; EndpointShown masks it while on (CP 19)
+        EndpointError = EndpointErrorFor(s.EndpointUrl);   // streamer: key - validates the endpoint, never drawn as is
         SelectedAuth = AuthOptions.First(a => a.Value == s.AuthScheme);
         ShowHeaderName = s.AuthScheme == PublishAuthScheme.Header;
         NeedsToken = s.AuthScheme != PublishAuthScheme.None;
@@ -225,7 +225,7 @@ public sealed partial class PublishViewModel : ObservableObject
             if (normalized != value)
             {
                 _loading = true;
-                try { EndpointUrl = normalized; }
+                try { EndpointUrl = normalized; }   // streamer: key - saves the normalised endpoint
                 finally { _loading = false; }
             }
             RefreshStatus();
@@ -362,7 +362,7 @@ public sealed partial class PublishViewModel : ObservableObject
                 StatusText = "Set an endpoint URL first.";
                 return;
             }
-            if (!UsagePublisher.IsUsableEndpoint(s.EndpointUrl))
+            if (!UsagePublisher.IsUsableEndpoint(s.EndpointUrl))   // streamer: key - validates the endpoint
             {
                 StatusText = "The endpoint URL must be an absolute http(s) URL.";
                 return;
@@ -421,7 +421,7 @@ public sealed partial class PublishViewModel : ObservableObject
             var record = await _service.SampleAsync(DateTimeOffset.Now);
             var date = record.Payload["date"]?.GetValue<string>() ?? "";
             var s = _service.Load();
-            var endpoint = s.Target.EndpointUrl;
+            var endpoint = s.Target.EndpointUrl;   // streamer: key - the endpoint used to build the sample; the header masks the host
             // The senders' own gates: a usable endpoint, and a stored token when the scheme needs one (HasToken is loaded already:
             // the sample reads no token).
             bool usable = UsagePublisher.IsUsableEndpoint(endpoint);
@@ -499,6 +499,6 @@ public sealed partial class PublishViewModel : ObservableObject
             };
         }
         // Streamer mode (slice 7, CP 19; preflight P2): every host in the result is a codename, a server's rejection body is cut.
-        StatusText = StreamerMode.Mask.HostsIn(string.Create(CultureInfo.InvariantCulture, $"{last}{ok}{next}"), s.Target.EndpointUrl);
+        StatusText = StreamerMode.Mask.HostsIn(string.Create(CultureInfo.InvariantCulture, $"{last}{ok}{next}"), s.Target.EndpointUrl);   // streamer: masked - CP 19: HostsIn masks on this line
     }
 }

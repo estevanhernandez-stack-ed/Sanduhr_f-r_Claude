@@ -33,7 +33,7 @@ public sealed partial class ThemeMatchViewModel : ObservableObject
     {
         var result = _service.Edit(next);
         Reload();   // Update or a new theme: the theme now; Cancel: the theme as it was
-        if (!string.IsNullOrEmpty(result.Message))
+        if (!string.IsNullOrEmpty(result.Message))   // streamer: cant - the status names the theme the person typed or picked: the caption's "what you type yourself"
         {
             Status = result.Message;
             _followLine = false;
@@ -84,7 +84,7 @@ public sealed partial class ThemeMatchViewModel : ObservableObject
         if (_loading) return;
         var result = value ? _service.FollowOn() : _service.FollowOff();
         Reload();   // a Cancel, or a theme that could not be written, puts the switch back
-        Status = result.Message;
+        Status = result.Message;   // streamer: cant - the status names the theme the person typed or picked: the caption's "what you type yourself"
         _followLine = false;
         if (result.Ok) Changed?.Invoke();
     }
@@ -93,7 +93,7 @@ public sealed partial class ThemeMatchViewModel : ObservableObject
     private void MatchNow()
     {
         var result = _service.MatchNow();
-        Status = result.Message;
+        Status = result.Message;   // streamer: cant - the status names the theme the person typed or picked: the caption's "what you type yourself"
         if (result.Ok) Changed?.Invoke();
     }
 }

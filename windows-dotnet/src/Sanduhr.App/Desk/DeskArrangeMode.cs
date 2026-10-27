@@ -198,7 +198,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         Ref(button, Control.ForegroundProperty, "Sanduhr.Brush.Text");
         Ref(button, Control.BackgroundProperty, "Sanduhr.Brush.Bg");
         Ref(button, Control.BorderBrushProperty, "Sanduhr.Brush.Border");
-        AutomationProperties.SetName(button, accessibleName);
+        AutomationProperties.SetName(button, accessibleName);   // streamer: notname - accessible name of an arrange-bar button, fixed copy
         ToolTipService.SetToolTip(button, accessibleName);
         return button;
     }
@@ -343,7 +343,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
             outline.StrokeDashArray = [4, 3];
             outline.Fill = Brushes.Transparent;
             Ref(outline, Shape.StrokeProperty, "Sanduhr.Brush.Accent");
-            AutomationProperties.SetName(outline, name + ", piece");
+            AutomationProperties.SetName(outline, name + ", piece");   // streamer: notname - piece type name from SettingsNames.DeskPieceName, not an identifying name
             Canvas.SetLeft(outline, r.X - OutlinePad);
             Canvas.SetTop(outline, r.Y - OutlinePad);
             _adorn.Children.Add(outline);
@@ -358,7 +358,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
                 Opacity = 0.92,
             };
             Ref(label, Border.BackgroundProperty, "Sanduhr.Brush.Bg");
-            AutomationProperties.SetName(label, name);
+            AutomationProperties.SetName(label, name);   // streamer: notname - piece type name from SettingsNames.DeskPieceName, not an identifying name
             label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             double y = TagTop(widget, r) - OutlinePad - label.DesiredSize.Height - 3;
             if (y < 2) y = r.Bottom + OutlinePad + 3;

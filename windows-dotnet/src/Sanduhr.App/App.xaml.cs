@@ -115,7 +115,7 @@ public partial class App : Application
         _window = new MainWindow { DataContext = _vm };
         // Just the Desk with no account (spec 7.5): the widget starts hidden and the tray is the way back.
         // The handle is created without showing, so the glow, alerts and tray have a window to point at.
-        if (JustTheDesk.WidgetStartsHidden(_vm.JustTheDesk, _vm.AccountStore.ListAccounts().Count > 0,
+        if (JustTheDesk.WidgetStartsHidden(_vm.JustTheDesk, _vm.AccountStore.ListAccounts().Count > 0,   // streamer: key - a count, never drawn
                 new SettingsStore(new Sanduhr.Core.Paths()).LoadDesk().Enabled))
             new System.Windows.Interop.WindowInteropHelper(_window).EnsureHandle();
         else
@@ -137,7 +137,7 @@ public partial class App : Application
         // kicks the initial backfill through the attached service.
         var vaultService = new VaultService(new SettingsStore(new Sanduhr.Core.Paths()), _vm.CcReader);
         if (vaultService.NeedsConsentPrompt)
-            vaultService.SaveConsent(VaultConsentDialog.ShowConsent(_window, vaultService.DetectedRootNames()));
+            vaultService.SaveConsent(VaultConsentDialog.ShowConsent(_window, vaultService.DetectedRootNames()));   // streamer: masked - via ShowConsent: the consent dialog draws each folder as Mask.FolderName
         _vm.AttachVaultService(vaultService);
 
         // Publish usage: everything defaults off (toggle + every home, no endpoint),
@@ -204,7 +204,7 @@ public partial class App : Application
                 try
                 {
                     new StatuslineInstaller(
-                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),   // streamer: notname - user folder handed to the statusline installer to write files, never drawn
                         statuslineBinDir).InstallScript();
                 }
                 catch { }
@@ -218,7 +218,7 @@ public partial class App : Application
                     if (System.IO.Directory.Exists(mcpSource))
                     {
                         new McpIntegrationInstaller(
-                            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),   // streamer: notname - user folder handed to the MCP installer to write files, never drawn
                             appDataDir, externalDir: externalDir).RefreshInstall(mcpSource);
                     }
                 }
@@ -272,12 +272,12 @@ public partial class App : Application
             var lastSeen = store.LoadWhatsNewLastSeen();
             // After Start(): it migrates legacy credentials, so the account list is settled.
             var fresh = WhatsNew.IsFresh(lastSeen, store.LoadWhatsNewInstalledVersion(),
-                _vm.AccountStore.ListAccounts().Count);
-            var onboarding = JustTheDesk.Onboarding(_vm.ActiveAccount is not null, store.LoadJustTheDesk().On);
+                _vm.AccountStore.ListAccounts().Count);   // streamer: key - a count, never drawn
+            var onboarding = JustTheDesk.Onboarding(_vm.ActiveAccount is not null, store.LoadJustTheDesk().On);   // streamer: key - a null check, never drawn
 
             // The tour is decided before What's New records anything: pending only on a fresh
             // install (no account, nothing seen). While it is pending, What's New waits for it.
-            var accounts = _vm.AccountStore.ListAccounts().Count;
+            var accounts = _vm.AccountStore.ListAccounts().Count;   // streamer: key - a count, never drawn
             var existingTour = WelcomeTour.Parse(store.LoadTourState());
             _tourState = WelcomeTour.Decide(existingTour, fresh, accounts, lastSeen);
             if (existingTour != _tourState)
@@ -346,7 +346,7 @@ public partial class App : Application
             return;
         try
         {
-            var signedIn = _vm.ActiveAccount is not null || _vm.IsDemo;
+            var signedIn = _vm.ActiveAccount is not null || _vm.IsDemo;   // streamer: key - a null check, never drawn
             var steps = WelcomeTour.StepsFor(_vm.JustTheDesk, new HashSet<TourFeature>(), signedIn);
             WhatsNewWindow.ShowTour(new WelcomeTourViewModel(steps, _vm), ShowMe, EndTour);
         }
@@ -818,7 +818,7 @@ public partial class App : Application
             try
             {
                 System.IO.File.AppendAllText(new Sanduhr.Core.Paths().LogFile,
-                    $"{DateTime.UtcNow:o} settings window failed to open ({e.GetType().Name}: {e.Message}){Environment.NewLine}{e}{Environment.NewLine}");
+                    $"{DateTime.UtcNow:o} settings window failed to open ({e.GetType().Name}: {e.Message}){Environment.NewLine}{e}{Environment.NewLine}");   // streamer: notname - written to the log file, never drawn
             }
             catch { }
             RunnerStatusShown -= showRunnerStatus; // no window to show it in
@@ -894,7 +894,7 @@ public partial class App : Application
         var outcome = _vm.AccountStore.GetOrigin(label) == AccountOrigin.Manual
             ? await coordinator.ReauthenticateManualAsync(owner, label)
             : await coordinator.ReauthenticateEmbeddedAsync(owner, label);
-        if (outcome.Added && _vm.ActiveAccount == label)
+        if (outcome.Added && _vm.ActiveAccount == label)   // streamer: key - compares the active label with the one just added
             await ReloadAfterSignInAsync();
     }
 
@@ -918,7 +918,7 @@ public partial class App : Application
     {
         try
         {
-            if (vm.AccountStore.ListAccounts().Count == 0 || !vm.EndJustTheDesk())
+            if (vm.AccountStore.ListAccounts().Count == 0 || !vm.EndJustTheDesk())   // streamer: key - a count, never drawn
                 return;
             if (_settingsWindow?.ViewModel.Alerts is { } alerts) alerts.DeskSignInReminder = vm.LoadDeskSignInReminder();
             ShowWindow();
@@ -989,7 +989,7 @@ public partial class App : Application
     /// <summary>Watchers' CI runners line (slice 7, CP 22): each runner by codename while streamer mode is on. Raised again when the switch
     /// moves (<see cref="OnStreamerChanged"/>).</summary>
     internal static string RunnerStatusText(RunnerStatus? status) =>
-        status is null ? "" : (status with { Runners = [.. status.Runners.Select(r => StreamerMode.Mask.Name(CodenameCategory.Runner, r))] }).Text;
+        status is null ? "" : (status with { Runners = [.. status.Runners.Select(r => StreamerMode.Mask.Name(CodenameCategory.Runner, r))] }).Text;   // streamer: masked - CP 19: runner names pass Mask.Name on this line
 
     private void OnStreamerChanged()
     {
@@ -1170,7 +1170,7 @@ public partial class App : Application
             try
             {
                 // network: local (the relaunch)
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target.FileName, target.Arguments) { UseShellExecute = false })?.Dispose();
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target.FileName, target.Arguments) { UseShellExecute = false })?.Dispose();   // streamer: notname - launcher target handed to Process.Start, never drawn
             }
             catch (Exception e)
             {

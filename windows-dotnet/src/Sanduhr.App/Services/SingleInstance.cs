@@ -177,7 +177,7 @@ public sealed class SingleInstance : IDisposable
     // view all throw different things, and none of them may stop Sanduhr from starting or answering.
     private static MemoryMappedFile? OpenMailbox(string name)
     {
-        try { return MemoryMappedFile.CreateOrOpen(name + ".Message", MailboxBytes); }
+        try { return MemoryMappedFile.CreateOrOpen(name + ".Message", MailboxBytes); }   // streamer: notname - ".Message" is a shared-memory mailbox suffix
         catch { return null; }
     }
 
@@ -186,7 +186,7 @@ public sealed class SingleInstance : IDisposable
     {
         try
         {
-            using var mailbox = MemoryMappedFile.OpenExisting(name + ".Message", MemoryMappedFileRights.ReadWrite);
+            using var mailbox = MemoryMappedFile.OpenExisting(name + ".Message", MemoryMappedFileRights.ReadWrite);   // streamer: notname - ".Message" is a shared-memory mailbox suffix
             Write(mailbox, message);
         }
         catch { /* best effort; never stops a launch */ }

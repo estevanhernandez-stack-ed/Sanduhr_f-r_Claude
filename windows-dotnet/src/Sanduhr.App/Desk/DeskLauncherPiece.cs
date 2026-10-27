@@ -81,7 +81,7 @@ internal sealed class LauncherButtonVisual : Border
         Cursor = System.Windows.Input.Cursors.Hand;
         Focusable = false;
 
-        AutomationProperties.SetName(this, missing ? $"{name}, not installed" : name);
+        AutomationProperties.SetName(this, missing ? $"{name}, not installed" : name);   // streamer: cant - a Launcher button's own label or app name, shown as the person set it (P3 ruling keeps the Desk piece)
         AutomationProperties.SetHelpText(this, missing
             ? "This app is no longer installed. Choose it to open Launcher settings."
             : button.Kind == LauncherKind.Link ? "Opens a link in your browser." : "Opens this app.");

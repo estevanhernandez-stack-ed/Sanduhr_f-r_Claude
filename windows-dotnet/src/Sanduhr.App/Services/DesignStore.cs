@@ -20,7 +20,7 @@ internal sealed class DesignStore
     public DesignStore(Paths paths) => _paths = paths;
 
     /// <summary>The folder (not created until the first save).</summary>
-    public string Dir => _paths.DesignsDir;
+    public string Dir => _paths.DesignsDir;   // streamer: notname - a file location used for IO, never drawn
 
     /// <summary>Every readable design, newest applied first.</summary>
     public IReadOnlyList<SavedDesign> List()
@@ -102,7 +102,7 @@ internal sealed class DesignStore
 
     /// <summary>Whether a Launcher image is on disk.</summary>
     public bool ImageExists(string name) =>
-        LauncherButton.IsImageName(name) && File.Exists(Path.Combine(_paths.LauncherDir, name));
+        LauncherButton.IsImageName(name) && File.Exists(Path.Combine(_paths.LauncherDir, name));   // streamer: notname - a file location used for IO, never drawn
 
     private void RemoveFiles(IReadOnlyList<SavedDesign> removed, IReadOnlyList<SavedDesign> remaining, LauncherModel currentLauncher)
     {

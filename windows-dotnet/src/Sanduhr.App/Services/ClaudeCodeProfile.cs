@@ -15,7 +15,7 @@ public static class ClaudeCodeProfile
     public static string? ConfigDirOverride { get; set; }
 
     public static string Dir =>
-        ProfileOverride ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        ProfileOverride ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);   // streamer: notname - the profile root the masks are built from, never drawn as is
 
     public static string? ConfigDir =>
         ProfileOverride is not null ? ConfigDirOverride : Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR");

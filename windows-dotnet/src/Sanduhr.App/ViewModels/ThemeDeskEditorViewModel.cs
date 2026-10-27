@@ -70,7 +70,7 @@ public sealed partial class ThemeDeskEditorViewModel : ObservableObject
         Font = _desk.Font ?? SettingsNames.ThemeDeskFromTheme;
         Ink = Join(_desk.Ink);
         Bars = Join(_desk.Bars);
-        Message = Join(_desk.Message);
+        Message = Join(_desk.Message);   // streamer: notname - the theme's Desk message colour list
         Glow = _desk.Glow ?? "";
         PlateColor = _desk.PlateColor ?? "";
         Shadow = _desk.Shadow ?? "";
@@ -86,7 +86,7 @@ public sealed partial class ThemeDeskEditorViewModel : ObservableObject
         FontDefault = rules.Font ?? SettingsNames.DesksOwnFont;
         InkDefault = Join(rules.Ink);
         BarsDefault = Join(rules.Bars);
-        MessageDefault = Join(rules.Message);
+        MessageDefault = Join(rules.Message);   // streamer: notname - the theme's Desk message colour list
         GlowDefault = "#" + rules.Glow;
         PlateColorDefault = "#" + rules.PlateColor;
         ShadowDefault = "#" + rules.Shadow;
@@ -145,7 +145,7 @@ public sealed partial class ThemeDeskEditorViewModel : ObservableObject
         && string.Equals(a.Glow?.TrimStart('#'), b.Glow?.TrimStart('#'), StringComparison.OrdinalIgnoreCase)
         && string.Equals(a.PlateColor?.TrimStart('#'), b.PlateColor?.TrimStart('#'), StringComparison.OrdinalIgnoreCase)
         && string.Equals(a.Shadow?.TrimStart('#'), b.Shadow?.TrimStart('#'), StringComparison.OrdinalIgnoreCase)
-        && Join(a.Ink) == Join(b.Ink) && Join(a.Bars) == Join(b.Bars) && Join(a.Message) == Join(b.Message);
+        && Join(a.Ink) == Join(b.Ink) && Join(a.Bars) == Join(b.Bars) && Join(a.Message) == Join(b.Message);   // streamer: notname - compares Desk message colour lists
 
     /// <summary>"#e8e4dc, 6C63FF" is ["#e8e4dc", "#6c63ff"]; empty is []; a bad color or more than four is null.</summary>
     internal static IReadOnlyList<string>? ParseStops(string text)

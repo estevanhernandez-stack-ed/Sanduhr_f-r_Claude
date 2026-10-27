@@ -74,7 +74,7 @@ public sealed partial class StreamerSettingsViewModel : ObservableObject
     public StreamerSettingsViewModel(StreamerService service, Func<string, string>? showFolder = null)
     {
         _service = service;
-        _showFolder = showFolder ?? (key => ClaudeCodeFolders.Display(key, ClaudeCodeProfile.Dir));
+        _showFolder = showFolder ?? (key => ClaudeCodeFolders.Display(key, ClaudeCodeProfile.Dir));   // streamer: key - default viewer of a folder key while the mode is off; the row shows the codename while on
         Read();
     }
 

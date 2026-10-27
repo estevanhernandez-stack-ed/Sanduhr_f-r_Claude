@@ -88,7 +88,7 @@ public sealed partial class FolderHoldsViewModel : ObservableObject
         if (report.Statusline is { } sl)
         {
             StatuslineSummary = sl.IsSanduhr ? SettingsNames.StatuslineSanduhrs : SettingsNames.StatuslineSomeoneElses;
-            StatuslineCommand = StreamerMode.FoldersIn(sl.Command, [Folder, .. _host.Folders().Select(f => f.Path)]);   // slice 7, CP 9: the folder's own name too
+            StatuslineCommand = StreamerMode.FoldersIn(sl.Command, [Folder, .. _host.Folders().Select(f => f.Path)]);   // slice 7, CP 9: the folder's own name too   // streamer: masked - CP 9: FoldersIn masks on this line
         }
         else
         {
@@ -101,13 +101,13 @@ public sealed partial class FolderHoldsViewModel : ObservableObject
         int groups = report.Hooks.Sum(h => h.Groups);
         HooksSummary = report.Hooks.Count == 0 ? SettingsNames.HoldsNone : SettingsNames.HooksOnEvents(groups, report.Hooks.Count);
 
-        foreach (var (name, on) in report.EnabledPlugins.OrderBy(p => p.Key, StringComparer.Ordinal))
+        foreach (var (name, on) in report.EnabledPlugins.OrderBy(p => p.Key, StringComparer.Ordinal))   // streamer: masked - CP 10: the add-on name passes Mask.AddOn on the next line
             PluginLines.Add(new ModsLine(StreamerMode.Mask.AddOn(name), on ? SettingsNames.FolderOn : SettingsNames.FolderOff));   // CP 10
-        int pluginsOn = report.EnabledPlugins.Count(p => p.Value);
+        int pluginsOn = report.EnabledPlugins.Count(p => p.Value);   // streamer: key - a count, never drawn
         PluginsSummary = ModsPageText.SwitchSummary(pluginsOn, report.EnabledPlugins.Count - pluginsOn);
 
-        foreach (var n in report.Mcp.UserServers) McpNames.Add(StreamerMode.Mask.AddOn(n));   // slice 7, CP 10
-        McpSummary = report.Mcp.UserServers.Count == 0 ? SettingsNames.HoldsNone : SettingsNames.McpServerCount(report.Mcp.UserServers.Count);
+        foreach (var n in report.Mcp.UserServers) McpNames.Add(StreamerMode.Mask.AddOn(n));   // slice 7, CP 10   // streamer: masked - CP 10: Mask.AddOn masks on this line
+        McpSummary = report.Mcp.UserServers.Count == 0 ? SettingsNames.HoldsNone : SettingsNames.McpServerCount(report.Mcp.UserServers.Count);   // streamer: key - a count, never drawn
         McpProjects = report.Mcp.LocalProjectCount > 0 ? SettingsNames.McpProjectsOwn(report.Mcp.LocalProjectCount) : "";
 
         ClaudeMdSummary = report.ClaudeMd.Exists

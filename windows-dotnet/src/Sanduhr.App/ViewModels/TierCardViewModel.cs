@@ -171,7 +171,7 @@ public sealed partial class TierCardViewModel : ObservableObject
         PaceBrush = pace is { } p ? FromHex(p.Color) : new SolidColorBrush(_palette.TextDim);
 
         var burn = Pacing.BurnProjection(_util, _resetsAt, TierKey, now);
-        BurnText = burn?.Message ?? "";
+        BurnText = burn?.Message ?? "";   // streamer: notname - the burn projection sentence, no names
         HasBurn = burn is not null;
         BurnBrush = burn is { } b ? FromHex(b.Color) : new SolidColorBrush(_palette.TextMuted);
     }

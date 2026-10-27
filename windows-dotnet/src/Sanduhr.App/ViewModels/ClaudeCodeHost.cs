@@ -20,9 +20,9 @@ internal sealed record ClaudeCodeHost(
     Func<string, string, FolderReport>? ReadReport = null)
 {
     public static ClaudeCodeHost For(WidgetViewModel widget) => new(
-        ClaudeCodeProfile.Dir, ClaudeCodeProfile.ConfigDir, widget.LoadCcFoldersAdded,
+        ClaudeCodeProfile.Dir, ClaudeCodeProfile.ConfigDir, widget.LoadCcFoldersAdded,   // streamer: notname - profile folders handed to the folder discovery, never drawn
         widget.SanduhrAppDataDir, widget.SanduhrExternalDir, widget.SanduhrLegacyModsRoot,
-        () => widget.ShownActiveAccount is { } label ? widget.AccountFolder(label) : null,
+        () => widget.ShownActiveAccount is { } label ? widget.AccountFolder(label) : null,   // streamer: key - folder lookup for the active account, never drawn
         Path.Combine(AppContext.BaseDirectory, "mods", ClaudeCodeIntegrations.ModName));
 
     public ClaudeCodeIntegrations Integrations() =>
@@ -40,7 +40,7 @@ internal sealed record ClaudeCodeHost(
     public IReadOnlyList<FolderMods> ReadFolders()
     {
         var integ = Integrations();
-        return [.. Folders().Select(f => ReadFolder(f.Path, integ))];
+        return [.. Folders().Select(f => ReadFolder(f.Path, integ))];   // streamer: key - reads each folder's report; the page draws folders through Display (CP 7)
     }
 
     /// <summary>One folder read the same way. A read that throws reads as a folder whose settings.json can't be read, so the others still list.</summary>

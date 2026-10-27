@@ -309,7 +309,7 @@ internal static class DeskSensorsNative
             o = type is null ? null : Activator.CreateInstance(type);
             if (o is not IDesktopWallpaper w) return null;
             var list = new List<WallpaperMonitor>();
-            string themes = WallpaperFallback.ThemesDir(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+            string themes = WallpaperFallback.ThemesDir(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));   // streamer: notname - a file location used for IO, never drawn
             bool plainColor = NoPictureChosen();
             return DeskNative.PerMonitor(() =>
             {

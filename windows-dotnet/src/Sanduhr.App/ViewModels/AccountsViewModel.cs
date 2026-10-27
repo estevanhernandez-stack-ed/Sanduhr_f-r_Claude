@@ -86,7 +86,7 @@ public sealed partial class AccountsViewModel : ObservableObject
         _widget = widget;
         _addAccountAsync = addAccountAsync;
         _updateSignInAsync = updateSignInAsync;
-        _displayFolder = displayFolder ?? (path => StreamerMode.ShowFolder(path, ClaudeCodeProfile.Dir));   // slice 7: CP 7's bypass
+        _displayFolder = displayFolder ?? (path => StreamerMode.ShowFolder(path, ClaudeCodeProfile.Dir));   // slice 7: CP 7's bypass   // streamer: masked - CP 7: ShowFolder masks on this line
         Reload();
     }
 
@@ -113,7 +113,7 @@ public sealed partial class AccountsViewModel : ObservableObject
         var prev = SelectedAccount?.Label;
         Accounts.Clear();
         IsDemo = _widget.IsDemo;
-        var active = _widget.ShownActiveAccount;
+        var active = _widget.ShownActiveAccount;   // streamer: masked - via AccountItemViewModel: each row's Shown is Mask.Name (CP 1)
         foreach (var label in _widget.ShownAccounts)
             Accounts.Add(new AccountItemViewModel(label, label == active));
         HasNoAccounts = Accounts.Count == 0;
@@ -180,7 +180,7 @@ public sealed partial class AccountsViewModel : ObservableObject
 
     /// <summary>The rename error, naming the account as the page does (CP 25). The new name is the person's own typing and stays.</summary>
     internal static string RenameError(string label, Exception ex) =>
-        $"Couldn't rename: {StreamerMode.Mask.Paths(ex.Message.Replace(label, StreamerMode.Mask.Name(CodenameCategory.Account, label), StringComparison.Ordinal))}";
+        $"Couldn't rename: {StreamerMode.Mask.Paths(ex.Message.Replace(label, StreamerMode.Mask.Name(CodenameCategory.Account, label), StringComparison.Ordinal))}";   // streamer: masked - CP 18: the rename error passes Mask.Paths and Mask.Name on this line
 
     /// <summary>Refresh the selected account's credentials IN PLACE — works for
     /// non-active accounts too (pre-WS-A, only the active account could reauth,

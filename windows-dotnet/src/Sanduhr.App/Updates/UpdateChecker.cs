@@ -65,7 +65,7 @@ public sealed class VelopackUpdateProbe : IUpdateProbe
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Sanduhr] Update check threw (treating as failed): {ex.Message}");
+            Debug.WriteLine($"[Sanduhr] Update check threw (treating as failed): {ex.Message}");   // streamer: notname - written to the log file, never drawn
             return new UpdateProbeResult(UpdateProbeStatus.Failed);
         }
     }
@@ -86,7 +86,7 @@ public sealed class UpdateChecker
 {
     /// <summary>The stamp the 3.x builds wrote, kept so an upgrade doesn't ask again at once.</summary>
     public static readonly string DefaultStampPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Sanduhr", "last-update-check.txt");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Sanduhr", "last-update-check.txt");   // streamer: notname - a file location used for IO, never drawn
 
     private readonly Func<bool> _enabled;
     private readonly IUpdateProbe _probe;
@@ -197,7 +197,7 @@ public sealed class UpdateChecker
         _lastRead = true;
         try
         {
-            var dir = Path.GetDirectoryName(_stampPath);
+            var dir = Path.GetDirectoryName(_stampPath);   // streamer: notname - a file location used for IO, never drawn
             if (!string.IsNullOrEmpty(dir))
                 Directory.CreateDirectory(dir);
             File.WriteAllText(_stampPath, UpdateCheck.FormatStamp(at));

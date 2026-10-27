@@ -119,7 +119,7 @@ internal partial class SignInWindow : Window
         }
         catch (Exception ex)
         {
-            CompleteAndClose(new SignInResult.Failed($"Couldn't start the sign-in browser: {ex.Message}"));
+            CompleteAndClose(new SignInResult.Failed($"Couldn't start the sign-in browser: {ex.Message}"));   // streamer: masked - via FailedText: the coordinator masks a Failed result's text (CP 18)
         }
     }
 
@@ -319,7 +319,7 @@ internal partial class SignInWindow : Window
         }
         catch (Exception ex)
         {
-            ShowLoadError($"Couldn't restart the sign-in browser: {ex.Message}");
+            ShowLoadError($"Couldn't restart the sign-in browser: {ex.Message}");   // streamer: masked - via LoadErrorText: the error line passes Mask.Paths (P1)
         }
     }
 
@@ -445,14 +445,14 @@ internal partial class SignInWindow : Window
             }
             catch (Exception ex)
             {
-                CompleteAndClose(new SignInResult.Failed($"Sign-in succeeded but saving the account failed: {ex.Message}"));
+                CompleteAndClose(new SignInResult.Failed($"Sign-in succeeded but saving the account failed: {ex.Message}"));   // streamer: masked - via FailedText: the coordinator masks a Failed result's text (CP 18)
             }
         }
         catch (Exception ex)
         {
             // A transient cookie-read hiccup must NOT tear down the window — the
             // poll will retry. Only a genuine capture+persist failure closes it.
-            Log($"{trigger}: capture threw (non-fatal, will retry): {ex.GetType().Name}: {ex.Message}");
+            Log($"{trigger}: capture threw (non-fatal, will retry): {ex.GetType().Name}: {ex.Message}");   // streamer: notname - written to the log file, never drawn
         }
     }
 

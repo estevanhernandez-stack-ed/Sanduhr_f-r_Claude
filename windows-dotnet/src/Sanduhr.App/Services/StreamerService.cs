@@ -68,7 +68,7 @@ public sealed class StreamerService : IDisposable
     {
         try
         {
-            var file = _paths.StatuslineScriptFile;
+            var file = _paths.StatuslineScriptFile;   // streamer: notname - a file location used for IO, never drawn
             if (!File.Exists(file) || File.ReadAllText(file) == StatuslineScript.Content)
                 return;
             new StatuslineInstaller(_profileDir(), _paths.StatuslineBinDir).InstallScript();
@@ -125,7 +125,7 @@ public sealed class StreamerService : IDisposable
         if (_dirty && _book is not null)
         {
             lock (_book)
-                if (Codenames.Save(_book, _paths.CodenamesFile))
+                if (Codenames.Save(_book, _paths.CodenamesFile))   // streamer: notname - a file location used for IO, never drawn
                     _dirty = false;
         }
         if (_foldersDirty)
@@ -145,7 +145,7 @@ public sealed class StreamerService : IDisposable
     {
         var book = on ? EnsureBook() : _book;
         var mask = new StreamerMask(on, book, _profileDir(),
-            [_profileDir(), Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)]);
+            [_profileDir(), Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)]);   // streamer: key - folders the mask replaces, never drawn
         Mask.Assigned -= OnAssigned;
         mask.Assigned += OnAssigned;
         Mask = mask;
@@ -156,9 +156,9 @@ public sealed class StreamerService : IDisposable
         {
             // Every known folder gets its codename now, so streamer.json maps it before Claude Code renders a line (decision 8).
             foreach (var f in SafeFolders())
-                mask.Folder(f.Path);
+                mask.Folder(f.Path);   // streamer: key - registers the folder with the mask
         }
-        _foldersDirty = on || File.Exists(_paths.StreamerStateFile);
+        _foldersDirty = on || File.Exists(_paths.StreamerStateFile);   // streamer: notname - a file location used for IO, never drawn
         Flush();
         if (announce)
             Changed?.Invoke();
@@ -168,7 +168,7 @@ public sealed class StreamerService : IDisposable
     {
         if (_book is null)
         {
-            _book = Codenames.Load(_paths.CodenamesFile) ?? CodenameBook.New();
+            _book = Codenames.Load(_paths.CodenamesFile) ?? CodenameBook.New();   // streamer: notname - a file location used for IO, never drawn
         }
         return _book;
     }
@@ -196,16 +196,16 @@ public sealed class StreamerService : IDisposable
             {
                 foreach (var f in SafeFolders())
                 {
-                    var key = StreamerMask.FolderKey(f.Path);
+                    var key = StreamerMask.FolderKey(f.Path);   // streamer: key - folder key for streamer.json, which holds hashes and codenames only
                     if (key.Length == 0)
                         continue;
-                    folders.Add(new StreamerFolder(StreamerFile.FolderRef(f.Path),
+                    folders.Add(new StreamerFolder(StreamerFile.FolderRef(f.Path),   // streamer: key - folder ref for streamer.json, which holds hashes and codenames only
                         _book.TryGet(CodenameCategory.Folder, key, out var code) ? code : null,
                         _book.IsShown(CodenameCategory.Folder, key)));
                 }
             }
         }
-        StreamerFile.Write(_paths.StreamerStateFile, StreamerFile.Build(On, folders));
+        StreamerFile.Write(_paths.StreamerStateFile, StreamerFile.Build(On, folders));   // streamer: notname - a file location used for IO, never drawn
     }
 
     private IReadOnlyList<CcFolder> SafeFolders()

@@ -140,7 +140,7 @@ public sealed partial class DeskCompanionViewModel : ObservableObject
         try
         {
             var store = _widgets();
-            var growth = CompanionGrowthState.Load(Path.Combine(store.Root, CompanionGrowthState.FileName));
+            var growth = CompanionGrowthState.Load(Path.Combine(store.Root, CompanionGrowthState.FileName));   // streamer: notname - a state file leaf, never drawn
             var file = Path.Combine(store.PackDir(packId), "sprite.json");
             if (File.Exists(file) && CompanionSprite.Parse(File.ReadAllBytes(file)) is { } sprite)
             {

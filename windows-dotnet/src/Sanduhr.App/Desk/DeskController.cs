@@ -881,7 +881,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// <summary>A sampling pass draws nothing anyone sees: its message gets a scratch copy of the played set, so the drawn pass still
     /// writes a new line in.</summary>
     private static DeskFrame Scratch(DeskFrame frame) =>
-        frame.Message is { } m ? frame with { Message = m with { Played = new HashSet<string>(m.Played, StringComparer.Ordinal) } } : frame;
+        frame.Message is { } m ? frame with { Message = m with { Played = new HashSet<string>(m.Played, StringComparer.Ordinal) } } : frame;   // streamer: notname - frame.Message is the Desk message frame record
 
     /// <summary>A stack's rect in the view's DIPs as the screen's pixels.</summary>
     private static PxRect Px(DeskScreen screen, Rect r) => new(

@@ -253,7 +253,7 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
         var lint = _draft.Lint(_widget.FontAvailable);
         Findings.Clear();
         foreach (var f in lint.Findings.OrderBy(f => f.Level == ThemeFindingLevel.Error ? 0 : 1))
-            Findings.Add(new ThemeFindingViewModel(f.Field, f.Message, f.Level == ThemeFindingLevel.Error));
+            Findings.Add(new ThemeFindingViewModel(f.Field, f.Message, f.Level == ThemeFindingLevel.Error));   // streamer: notname - a theme lint finding about a field, no path or name
         IsValid = lint.Ok;
         HasFindings = Findings.Count > 0;
         int errors = lint.Errors.Count(), warnings = lint.Warnings.Count();
@@ -313,7 +313,7 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            _error($"Could not write the theme: {StreamerMode.Mask.Paths(e.Message)}");
+            _error($"Could not write the theme: {StreamerMode.Mask.Paths(e.Message)}");   // streamer: masked - P1: the write error passes Mask.Paths on this line
             return;
         }
 

@@ -142,7 +142,7 @@ public sealed class AlertService
     {
         try
         {
-            File.AppendAllText(_paths.LogFile,
+            File.AppendAllText(_paths.LogFile,   // streamer: notname - written to the log file, never drawn
                 $"{DateTime.UtcNow:o} alert {operation} failed ({e.GetType().Name}){Environment.NewLine}");
         }
         catch

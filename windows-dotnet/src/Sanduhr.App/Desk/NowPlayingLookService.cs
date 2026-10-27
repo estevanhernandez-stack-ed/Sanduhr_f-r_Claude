@@ -86,7 +86,7 @@ internal sealed partial class NowPlayingLookService : IDisposable
     /// <summary>Watches one file in the external folder; a change takes whatever waits there.</summary>
     private FileSystemWatcher Watch(string dir, string file)
     {
-        var w = new FileSystemWatcher(dir, file) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };
+        var w = new FileSystemWatcher(dir, file) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };   // streamer: notname - NotifyFilters.FileName is a watcher flag, not a name
         w.Created += (_, _) => Check();
         w.Changed += (_, _) => Check();
         w.Renamed += (_, _) => Check();

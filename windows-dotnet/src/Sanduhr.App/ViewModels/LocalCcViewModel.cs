@@ -37,7 +37,7 @@ public sealed partial class VaultRootToggleViewModel : ObservableObject
     {
         _owner = owner;
         Name = name;
-        Shown = StreamerMode.Mask.FolderName(name);
+        Shown = StreamerMode.Mask.FolderName(name);   // streamer: masked - CP 11: Mask.FolderName masks on this line
         IsEnabled = enabled;
         _loading = false;
     }
@@ -127,7 +127,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
         if (_widget.Vault is not { } vault)
             return;
         var consented = new HashSet<string>(vault.ConsentedRootNames(), StringComparer.Ordinal);
-        foreach (var root in vault.DetectedRootNames())
+        foreach (var root in vault.DetectedRootNames())   // streamer: masked - via VaultRootToggleViewModel: its Shown is Mask.FolderName (CP 11)
             Roots.Add(new VaultRootToggleViewModel(this, root, consented.Contains(root)));
     }
 
@@ -316,7 +316,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
             calendarByDay[d] = v;
 
         var projects = new Dictionary<string, long>(win.ByProjectName);
-        var skills = new Dictionary<string, long>(win.BySkill);
+        var skills = new Dictionary<string, long>(win.BySkill);   // streamer: key - skill tokens copied into a dictionary; Rows masks when listed (CP 15)
 
         long sentWindow = win.ByDayInput.Values.Sum();
         long recvWindow = win.ByDayOutput.Values.Sum();
@@ -337,7 +337,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
             var byName = new Dictionary<string, long>();
             foreach (var (cwd, v) in agg.ByProject)
             {
-                var name = CcLogReader.ProjectDisplayName(cwd);
+                var name = CcLogReader.ProjectDisplayName(cwd);   // streamer: key - project display name used as a dictionary key; Rows masks when listed (CP 15)
                 byName[name] = byName.GetValueOrDefault(name) + v;
             }
             long sentW = agg.ByDayInput.Values.Sum();
@@ -347,7 +347,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
             long liveTotal = agg.ByDay.Values.Sum();
             return new OverviewData(
                 new Dictionary<DateOnly, long>(agg.ByDay), byName,
-                new Dictionary<string, long>(agg.BySkill),
+                new Dictionary<string, long>(agg.BySkill),   // streamer: key - skill tokens copied into a dictionary; Rows masks when listed (CP 15)
                 !vaultOn ? "session archive off, these numbers are the live logs, not an archive"
                          : "session archive paused, showing live logs only",
                 sentT, recvT, sentW, recvW,
@@ -386,10 +386,10 @@ public sealed partial class LocalCcViewModel : ObservableObject
         var projects = new Dictionary<string, long>(win.ByProjectName);
         foreach (var (cwd, v) in todayAgg.ByProject)
         {
-            var name = CcLogReader.ProjectDisplayName(cwd);
+            var name = CcLogReader.ProjectDisplayName(cwd);   // streamer: key - project display name used as a dictionary key; Rows masks when listed (CP 15)
             projects[name] = projects.GetValueOrDefault(name) + v;
         }
-        var skills = new Dictionary<string, long>(win.BySkill);
+        var skills = new Dictionary<string, long>(win.BySkill);   // streamer: key - skill tokens summed into a dictionary; Rows masks when listed (CP 15)
         foreach (var (skill, v) in todayAgg.BySkill)
             skills[skill] = skills.GetValueOrDefault(skill) + v;
 
@@ -411,7 +411,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
     }
 
     /// <summary>"Stop archiving …?" naming the folder as its checkbox does (slice 7, CP 11).</summary>
-    internal static string StopArchivingQuestion(string root) => $"Stop archiving {StreamerMode.Mask.FolderName(root)}?";
+    internal static string StopArchivingQuestion(string root) => $"Stop archiving {StreamerMode.Mask.FolderName(root)}?";   // streamer: masked - CP 11: Mask.FolderName masks on this line
 
     /// <summary>A top-ten table's rows (slice 7, CP 15): each name as shown, with its real name kept for the quick route.</summary>
     internal static IReadOnlyList<BreakdownRow> Rows(IEnumerable<(string Name, long Tokens)> rows, CodenameCategory category) =>
@@ -471,7 +471,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
         StatusLine = data.StatusLine;
         _byDay = data.ByDay;
 
-        _topProjects = [.. data.Projects.OrderByDescending(kv => kv.Value).Take(10).Select(kv => (kv.Key, kv.Value))];
+        _topProjects = [.. data.Projects.OrderByDescending(kv => kv.Value).Take(10).Select(kv => (kv.Key, kv.Value))];   // streamer: masked - via FillBreakdowns: Rows masks each name (CP 15)
         _topSkills = [.. data.Skills.OrderByDescending(kv => kv.Value).Take(10).Select(kv => (kv.Key, kv.Value))];
         FillBreakdowns();
 

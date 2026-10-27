@@ -38,7 +38,7 @@ public sealed partial class LedgerRowViewModel : ObservableObject
     /// (spec: Ledger). A null ToolTip renders nothing in WPF. Group rows carry
     /// no single cwd (Info.Cwd is synthesized null), so this is naturally
     /// absent for them too.</summary>
-    public string? CwdTooltip => StreamerMode.On ? null : Info.Cwd;   // slice 7, CP 17: a full path names the user folder and the project
+    public string? CwdTooltip => StreamerMode.On ? null : Info.Cwd;   // slice 7, CP 17: a full path names the user folder and the project   // streamer: masked - CP 17: the tooltip is null while StreamerMode.On
 
     /// <summary>The project's name as the codename book keys it (slice 7): the name, or the disambiguated form for twins. The quick route
     /// shows this one.</summary>
@@ -85,7 +85,7 @@ public sealed partial class LedgerRowViewModel : ObservableObject
         if (IsGroup)
             Members = members ?? Array.Empty<VaultSessionInfo>();
         var project = disambiguate
-            ? $"{info.ProjectName} ~{info.ProjectKey[^Math.Min(8, info.ProjectKey.Length)..]}"
+            ? $"{info.ProjectName} ~{info.ProjectKey[^Math.Min(8, info.ProjectKey.Length)..]}"   // streamer: masked - via ProjectShown: the row draws the project's codename (CP 15)
             : info.ProjectName;
         ProjectKeyForStreamer = project;
         ProjectText = ProjectShown();
@@ -146,13 +146,13 @@ public sealed partial class LedgerRowViewModel : ObservableObject
             if (models.Length > 0)
                 sb.Append("  (").Append(models).Append(')');
         }
-        if (Info.BySkill is { Count: > 0 })
+        if (Info.BySkill is { Count: > 0 })   // streamer: masked - CP 15: skills pass Mask.Name below
         {
             sb.Append("\nSkills: ").Append(string.Join(", ",
                 Info.BySkill.OrderByDescending(kv => kv.Value)
                     .Select(kv => $"{StreamerMode.Mask.Name(CodenameCategory.Skill, kv.Key)} {TokenFormat.Compact(kv.Value)}")));
         }
-        sb.Append("\nFolder: ").Append(StreamerMode.Mask.FolderName(Info.Root)).Append("  ·  Session: ").Append(Info.Uuid);
+        sb.Append("\nFolder: ").Append(StreamerMode.Mask.FolderName(Info.Root)).Append("  ·  Session: ").Append(Info.Uuid);   // streamer: masked - CP 15: the folder passes Mask.FolderName on this line
         return sb.ToString();
     }
 
@@ -179,7 +179,7 @@ public sealed partial class LedgerRowViewModel : ObservableObject
         }
         if (ordered.Count > shown)
             sb.Append('\n').Append("… and ").Append(ordered.Count - shown).Append(" more");
-        var roots = ordered.Select(m => m.Root).Distinct(StringComparer.Ordinal)
+        var roots = ordered.Select(m => m.Root).Distinct(StringComparer.Ordinal)   // streamer: masked - CP 15: roots pass Mask.FolderName on the next line
             .OrderBy(r => r, StringComparer.Ordinal).Select(StreamerMode.Mask.FolderName);
         if (sb.Length > 0) sb.Append('\n');
         sb.Append("Sessions: ").Append(ordered.Count);
@@ -406,7 +406,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         var built = VaultLedgerCsv.Build(rows);
         try
         {
-            File.WriteAllText(dialog.FileName, built.Text);
+            File.WriteAllText(dialog.FileName, built.Text);   // streamer: export - the Sessions CSV the person asked for keeps real names
             ThemedDialog.Show(_owner, "Export complete", $"Wrote {built.RowCount} session rows.");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -430,12 +430,12 @@ public sealed partial class CcLedgerViewModel : ObservableObject
     {
         var (from, to) = ScopeRange();
 
-        var nameGroups = _lastSessions.GroupBy(s => s.ProjectName, StringComparer.Ordinal)
+        var nameGroups = _lastSessions.GroupBy(s => s.ProjectName, StringComparer.Ordinal)   // streamer: key - groups twins by name; the row draws the codename
             .Where(g => g.Select(s => s.ProjectKey).Distinct(StringComparer.Ordinal).Count() > 1)
             .Select(g => g.Key)
             .ToHashSet(StringComparer.Ordinal);
 
-        string ProjectTextFor(VaultSessionInfo info) => nameGroups.Contains(info.ProjectName)
+        string ProjectTextFor(VaultSessionInfo info) => nameGroups.Contains(info.ProjectName)   // streamer: masked - via ProjectShown: the row draws the project's codename (CP 15)
             ? $"{info.ProjectName} ~{info.ProjectKey[^Math.Min(8, info.ProjectKey.Length)..]}"
             : info.ProjectName;
 
@@ -457,7 +457,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         });
 
         return scoped.Select(x => new VaultLedgerCsv.Row(
-                x.Info.Uuid, x.Info.Root, x.ProjectText,
+                x.Info.Uuid, x.Info.Root, x.ProjectText,   // streamer: export - the Sessions CSV the person asked for keeps real names
                 x.Info.FirstTs.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
                 x.Info.LastTs.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
                 x.ScopedTokens, x.Info.Total,
@@ -509,7 +509,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
                 .ToList();
 
         var result = new List<RowSource>();
-        foreach (var group in _lastSessions.GroupBy(s => s.ProjectKey, StringComparer.Ordinal))
+        foreach (var group in _lastSessions.GroupBy(s => s.ProjectKey, StringComparer.Ordinal))   // streamer: key - groups sessions by key, never drawn
         {
             var members = group.ToList();
             result.Add(new RowSource("grp|" + group.Key, MergeGroup(group.Key, members), true, members));
@@ -524,7 +524,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
     private static VaultSessionInfo MergeGroup(string projectKey, IReadOnlyList<VaultSessionInfo> members)
     {
         var first = members[0];
-        string root = members.Select(m => m.Root).Distinct(StringComparer.Ordinal).Count() == 1
+        string root = members.Select(m => m.Root).Distinct(StringComparer.Ordinal).Count() == 1   // streamer: key - picks the group's root for the row; the row masks it
             ? first.Root
             : "both";
 
@@ -538,7 +538,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
             total += m.Total;
             foreach (var (model, v) in m.ByModel)
                 byModel[model] = byModel.GetValueOrDefault(model) + v;
-            if (m.BySkill is { Count: > 0 })
+            if (m.BySkill is { Count: > 0 })   // streamer: key - sums tokens per skill into a dictionary; Rows masks when listed
             {
                 bySkill ??= new Dictionary<string, long>(StringComparer.Ordinal);
                 foreach (var (skill, v) in m.BySkill)
@@ -551,17 +551,17 @@ public sealed partial class CcLedgerViewModel : ObservableObject
                 merged.Total += bucket.Total;
                 foreach (var (model, v) in bucket.ByModel)
                     merged.ByModel[model] = merged.ByModel.GetValueOrDefault(model) + v;
-                if (bucket.BySkill is { Count: > 0 })
+                if (bucket.BySkill is { Count: > 0 })   // streamer: key - sums tokens per skill into a dictionary; Rows masks when listed
                 {
                     merged.BySkill ??= new Dictionary<string, long>(StringComparer.Ordinal);
                     foreach (var (skill, v) in bucket.BySkill)
-                        merged.BySkill[skill] = merged.BySkill.GetValueOrDefault(skill) + v;
+                        merged.BySkill[skill] = merged.BySkill.GetValueOrDefault(skill) + v;   // streamer: key - sums tokens per skill into a dictionary; Rows masks when listed
                 }
             }
         }
 
         return new VaultSessionInfo(
-            projectKey, root, projectKey, first.ProjectName, null,
+            projectKey, root, projectKey, first.ProjectName, null,   // streamer: key - builds the merged row's info; the row masks its name
             members.Min(m => m.FirstTs), members.Max(m => m.LastTs),
             total, byModel, bySkill, byDay, null,
             members.Sum(m => m.AgentCount), members.Sum(m => m.AgentTokens));
@@ -589,7 +589,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         var sources = BuildRowSources();
 
         // Disambiguate only when two DIFFERENT project keys share a name.
-        var nameGroups = sources.GroupBy(s => s.Info.ProjectName, StringComparer.Ordinal)
+        var nameGroups = sources.GroupBy(s => s.Info.ProjectName, StringComparer.Ordinal)   // streamer: key - groups twins by name; the row draws the codename
             .Where(g => g.Select(s => s.Info.ProjectKey).Distinct(StringComparer.Ordinal).Count() > 1)
             .Select(g => g.Key)
             .ToHashSet(StringComparer.Ordinal);
@@ -604,7 +604,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         var existing = Rows.ToDictionary(r => r.Key, StringComparer.Ordinal);
         foreach (var src in sources)
         {
-            bool disambiguate = nameGroups.Contains(src.Info.ProjectName);
+            bool disambiguate = nameGroups.Contains(src.Info.ProjectName);   // streamer: key - decides whether to disambiguate; the row draws the codename
             if (existing.TryGetValue(src.Key, out var row))
                 row.Update(src.Info, from, to, disambiguate, src.Members);
             else

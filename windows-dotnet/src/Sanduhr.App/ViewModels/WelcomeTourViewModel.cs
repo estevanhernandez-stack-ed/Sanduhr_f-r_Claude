@@ -168,6 +168,6 @@ public sealed class WelcomeTourViewModel : ObservableObject
     /// <summary>The chip's text: the demo sample, the active account, or a plain placeholder.</summary>
     private string ChipText() =>
         _widget.DemoAccount is { } demo ? DemoMode.ChipText(demo)
-        : _widget.ActiveAccount is { } active ? StreamerMode.Mask.Name(CodenameCategory.Account, active)   // slice 7, CP 5
+        : _widget.ActiveAccount is { } active ? StreamerMode.Mask.Name(CodenameCategory.Account, active)   // slice 7, CP 5   // streamer: masked - CP 5: Mask.Name masks on this line
         : "No account yet";
 }

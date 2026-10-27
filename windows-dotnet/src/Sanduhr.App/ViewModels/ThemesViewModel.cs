@@ -156,7 +156,7 @@ public sealed partial class ThemesViewModel : ObservableObject
         }
         var lint = ThemeLint.Lint(raw, _widget.FontAvailable);
         foreach (var f in lint.Findings.OrderBy(f => f.Level == ThemeFindingLevel.Error ? 0 : 1))
-            PasteFindings.Add(new ThemeFindingViewModel(f.Field, f.Message, f.Level == ThemeFindingLevel.Error));
+            PasteFindings.Add(new ThemeFindingViewModel(f.Field, f.Message, f.Level == ThemeFindingLevel.Error));   // streamer: notname - a theme lint finding about a field, no path or name
         HasPasteFindings = PasteFindings.Count > 0;
         int errors = lint.Errors.Count(), warnings = lint.Warnings.Count();
         PasteSummary = errors > 0 ? $"{errors} to fix before this theme can be applied"
@@ -181,7 +181,7 @@ public sealed partial class ThemesViewModel : ObservableObject
         }
         catch (JsonException e)
         {
-            Error($"Invalid JSON: {e.Message}");
+            Error($"Invalid JSON: {e.Message}");   // streamer: masked - via Error: every error line passes Mask.Paths (P1)
             return;
         }
         if (data is null)
@@ -211,7 +211,7 @@ public sealed partial class ThemesViewModel : ObservableObject
         }
         catch (IOException e)
         {
-            Error($"Could not write theme: {e.Message}");
+            Error($"Could not write theme: {e.Message}");   // streamer: masked - via Error: every error line passes Mask.Paths (P1)
             return;
         }
 
@@ -325,7 +325,7 @@ public sealed partial class ThemesViewModel : ObservableObject
         }
         catch (IOException e)
         {
-            Error($"Could not delete: {e.Message}");
+            Error($"Could not delete: {e.Message}");   // streamer: masked - via Error: every error line passes Mask.Paths (P1)
             return false;
         }
     }
@@ -351,7 +351,7 @@ public sealed partial class ThemesViewModel : ObservableObject
         var files = Directory.GetFiles(dir, "*.json");
         Array.Sort(files, StringComparer.Ordinal);
         foreach (var path in files)
-            InstalledThemes.Add(Path.GetFileName(path));
+            InstalledThemes.Add(Path.GetFileName(path));   // streamer: cant - an installed theme's file name is the theme name the person typed or saved: the caption's "what you type yourself"
         HasNoThemes = InstalledThemes.Count == 0;
     }
 

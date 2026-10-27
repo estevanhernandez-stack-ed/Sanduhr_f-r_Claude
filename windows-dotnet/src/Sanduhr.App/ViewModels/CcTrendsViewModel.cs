@@ -106,7 +106,7 @@ public sealed partial class CcTrendsViewModel : ObservableObject
         }
 
         _weeks = data.Weeks;
-        _top = data.Top;
+        _top = data.Top;   // streamer: masked - via FillTop: the top list draws codenames (CP 16)
         FillTop();
 
         var todayLocal = DateOnly.FromDateTime(DateTime.Now);

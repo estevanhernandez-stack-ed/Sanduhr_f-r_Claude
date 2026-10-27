@@ -24,7 +24,7 @@ internal static class AccountMenuBuilder
 
         // Demo mode lists the sample accounts, so a screenshot of the menu names no real one;
         // picking one shows that sample.
-        var active = vm.ShownActiveAccount;
+        var active = vm.ShownActiveAccount;   // streamer: masked - via Header: each menu row masks its label (CP 2)
         var accounts = vm.ShownAccounts;
         var inUse = vm.OthersInUse;
         var switchCommand = vm.IsDemo ? vm.ShowSampleAccountCommand : (System.Windows.Input.ICommand)vm.SwitchAccountCommand;
@@ -66,7 +66,7 @@ internal static class AccountMenuBuilder
     /// and stay out of the codename book (preflight P17).</summary>
     internal static string Header(string label, bool isActive, bool inUse, bool demo = false)
     {
-        var shown = demo ? label : StreamerMode.Mask.Name(CodenameCategory.Account, label);   // streamer: demo
+        var shown = demo ? label : StreamerMode.Mask.Name(CodenameCategory.Account, label);   // streamer: demo - the sample labels of demo mode are not real names and stay out of the book (P17)
         return (isActive ? $"●  {shown}" : $"     {shown}") + (inUse ? " · in use" : "");
     }
 }

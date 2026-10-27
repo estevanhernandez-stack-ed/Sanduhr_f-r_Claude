@@ -82,7 +82,7 @@ public sealed partial class DeskPieceRow : ObservableObject
 
     /// <summary>The Show box spoken; its visible label is <see cref="Name"/>.</summary>
     public string ShownName => SettingsNames.PieceShownSpoken(Name);
-    public string MoveUpName => SettingsNames.MoveUpIn(Name, Place.Name);
+    public string MoveUpName => SettingsNames.MoveUpIn(Name, Place.Name);   // streamer: notname - Place.Name is a Desk position (Top left), not a weather place
     public string MoveDownName => SettingsNames.MoveDownIn(Name, Place.Name);
 
     /// <summary>The page with this piece's own settings; null for a piece that has none.</summary>

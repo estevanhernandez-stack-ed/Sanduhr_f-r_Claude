@@ -121,7 +121,7 @@ internal sealed class DeskDesignService : IDisposable
 
     /// <summary>The system's families and the installed font packs' (3.9.1): what a design may name as installed.</summary>
     private IReadOnlyList<string> InstalledWithPacks() => PackFontCatalog.Union(InstalledFamilies(),
-        PackFontCatalog.Families(new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng)));
+        PackFontCatalog.Families(new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng)));   // streamer: notname - a file location used for IO, never drawn
 
     /// <summary>The clock (tests set it).</summary>
     internal Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.UtcNow;
@@ -146,7 +146,7 @@ internal sealed class DeskDesignService : IDisposable
         try
         {
             Directory.CreateDirectory(dir);
-            _watcher = new FileSystemWatcher(dir, DeskDesign.RequestFile) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };
+            _watcher = new FileSystemWatcher(dir, DeskDesign.RequestFile) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };   // streamer: notname - NotifyFilters.FileName is a watcher flag, not a name
             _watcher.Created += (_, _) => Check();
             _watcher.Changed += (_, _) => Check();
             _watcher.Renamed += (_, _) => Check();
@@ -222,7 +222,7 @@ internal sealed class DeskDesignService : IDisposable
     }
 
     /// <summary>Where the downscaled wallpaper copy for Claude Code lives.</summary>
-    private string PreviewPath => Path.Combine(Handoff.Paths.Support, WallpaperPreview.FileName);
+    private string PreviewPath => Path.Combine(Handoff.Paths.Support, WallpaperPreview.FileName);   // streamer: notname - preview file leaf, never drawn
 
     private Inputs Gather()
     {
@@ -274,7 +274,7 @@ internal sealed class DeskDesignService : IDisposable
 
     /// <summary>The built-in themes, the user's and the installed theme packs'.</summary>
     private Dictionary<string, ThemeDefinition> ThemeMap() =>
-        PackThemes.Merged(_paths.ThemesDir, new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng));
+        PackThemes.Merged(_paths.ThemesDir, new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng));   // streamer: notname - a file location used for IO, never drawn
 
     private bool FontInstalled(string family)
     {
@@ -529,7 +529,7 @@ internal sealed class DeskDesignService : IDisposable
         if (plan is null) return null;
         if (plan.Write)
         {
-            Directory.CreateDirectory(_paths.ThemesDir);
+            Directory.CreateDirectory(_paths.ThemesDir);   // streamer: notname - a file location used for IO, never drawn
             string path = Path.Combine(_paths.ThemesDir, plan.Key + ".json");
             string temp = path + ".tmp";
             File.WriteAllText(temp, theme.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
@@ -555,7 +555,7 @@ internal sealed class DeskDesignService : IDisposable
     /// <summary>The design's message lines go into messages.txt the way Add or Replace does it, keeping the old file as messages.txt.previous.</summary>
     private bool WriteMessages(DeskMessagesChange change)
     {
-        string path = Path.Combine(_paths.AppDataDir, "messages.txt");
+        string path = Path.Combine(_paths.AppDataDir, "messages.txt");   // streamer: notname - a file location used for IO, never drawn
         bool had = File.Exists(path);
         string existing = "";
         if (had)
@@ -596,7 +596,7 @@ internal sealed class DeskDesignService : IDisposable
     /// <summary>One line in the log: the operation and the exception type, never design content (PRIVACY.md).</summary>
     private void Log(string operation, Exception e)
     {
-        try { File.AppendAllText(_paths.LogFile, $"{DateTime.UtcNow:o} desk design {operation} failed ({e.GetType().Name}){Environment.NewLine}"); }
+        try { File.AppendAllText(_paths.LogFile, $"{DateTime.UtcNow:o} desk design {operation} failed ({e.GetType().Name}){Environment.NewLine}"); }   // streamer: notname - written to the log file, never drawn
         catch (Exception) { /* the log is a courtesy */ }
     }
 

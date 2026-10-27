@@ -39,7 +39,7 @@ internal partial class McpConsentDialog : Window
         {
             var rb = new RadioButton
             {
-                Content = StreamerMode.Mask.FolderName(home),   // slice 7, CP 11: Tag keeps the real folder
+                Content = StreamerMode.Mask.FolderName(home),   // slice 7, CP 11: Tag keeps the real folder   // streamer: masked - CP 11: Mask.FolderName masks on this line
                 GroupName = "mcpHome",
                 IsChecked = defaultHome is not null ? home == defaultHome : _radios.Count == 0,
                 Style = (Style)FindResource("ConsentRadio"),
@@ -51,7 +51,7 @@ internal partial class McpConsentDialog : Window
 
             var cb = new CheckBox
             {
-                Content = StreamerMode.Mask.FolderName(home),   // slice 7, CP 11: _rootChecks keeps the real folder
+                Content = StreamerMode.Mask.FolderName(home),   // slice 7, CP 11: _rootChecks keeps the real folder   // streamer: masked - CP 11: Mask.FolderName masks on this line
                 IsChecked = false,   // burn-attribution consent is NEVER pre-answered
                 Style = (Style)FindResource("ConsentCheckBox"),
             };
@@ -69,7 +69,7 @@ internal partial class McpConsentDialog : Window
         var home = SelectedHome;
         if (home is null || DetailsText is null)
             return;
-        DetailsText.Text = DetailsFor(launcherPath, configPathFor(home), [Path.Combine(ClaudeCodeProfile.Dir, home)]);
+        DetailsText.Text = DetailsFor(launcherPath, configPathFor(home), [Path.Combine(ClaudeCodeProfile.Dir, home)]);   // streamer: masked - via DetailsFor: the paths pass Mask.Paths and FoldersIn (CP 12)
     }
 
     /// <summary>The consent's details (slice 7, CP 12): the launcher's and the config's full paths, with the chosen folder as its codename

@@ -27,7 +27,7 @@ internal partial class VaultConsentDialog : Window
         {
             var cb = new CheckBox
             {
-                Content = StreamerMode.Mask.FolderName(root),   // slice 7, M7: the key below stays the real folder
+                Content = StreamerMode.Mask.FolderName(root),   // slice 7, M7: the key below stays the real folder   // streamer: masked - CP 11: Mask.FolderName masks on this line
                 IsChecked = true,   // pre-checked; the prompt itself is the consent gate
                 Style = (Style)FindResource("ConsentCheckBox"),
             };

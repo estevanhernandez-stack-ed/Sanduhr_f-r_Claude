@@ -46,7 +46,7 @@ public sealed class SectionJumpLinks : WrapPanel
             var link = new Button { Content = links[i].Title };
             link.SetResourceReference(StyleProperty, "SettingsLinkButton");
             SettingsLinkTo.SetLink(link, SettingsIndex.PageId(Page) + "#" + links[i].Anchor);
-            AutomationProperties.SetName(link, links[i].Title);
+            AutomationProperties.SetName(link, links[i].Title);   // streamer: notname - a link title is a page name, fixed copy
             Children.Add(link);
         }
     }

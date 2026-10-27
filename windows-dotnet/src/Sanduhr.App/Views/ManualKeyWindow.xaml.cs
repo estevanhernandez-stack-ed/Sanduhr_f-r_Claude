@@ -83,7 +83,7 @@ internal partial class ManualKeyWindow : Window
         }
         catch (Exception ex)
         {
-            ShowError(ex.Message);
+            ShowError(ex.Message);   // streamer: masked - via ShowError: the text passes Mask.Paths and the codename swap (CP 18)
         }
     }
 
