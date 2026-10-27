@@ -46,7 +46,9 @@ public static class SettingsIndex
     public const string TestAlert = "test";
     public const string EachLimit = "each-limit";
     public const string SignInReminders = "signin-reminders";
-    // Privacy (slice 6): Streamer mode's anchors come first on the page in slice 7
+    // Privacy: Streamer mode first (slice 7), then What leaves this PC and What Claude can change (slice 6)
+    public const string Streamer = "streamer";
+    public const string StreamerAllowlist = "streamer-allowlist";
     public const string Network = "network";
     public const string Agents = "agents";
     // History (retired in slice 5): kept for the aliases to Claude Usage, Meters

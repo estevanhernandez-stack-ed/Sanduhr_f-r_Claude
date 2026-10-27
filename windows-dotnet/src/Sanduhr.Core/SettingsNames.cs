@@ -838,6 +838,63 @@ public static class SettingsNames
     public const string ResetJump = "Reset";
     public const string StoreKeepsUpToDate = "The Microsoft Store keeps Sanduhr up to date.";
 
+    // Streamer mode (Settings v2, slice 7; spec, Streamer mode; WF7). The switch, its caption, Shuffle's words and the banner are the spec's.
+    public const string StreamerSection = "Streamer mode";
+    public const string StreamerSwitch = "Streamer mode: hide accounts, folders and projects";
+    public const string StreamerCaption = "Live numbers stay. Names become codenames until you choose to show one.";
+    public const string StreamerCantReach = "Claude Code's own screen isn't covered. Check what it shows before you share it.";
+    /// <summary>The rest of what it can't reach, exactly (slice 7 decision 11; preflight P4; owner P6 = A, 2026-10-26: MCP answers keep full paths).</summary>
+    public const string StreamerCantReachMore =
+        "Also not covered: what you type yourself (Desk messages, a place's Show it as name, a new account's name); windows Windows opens "
+        + "for Sanduhr (Explorer, the Save dialog), which show your user folder; the task text on Claude Code's watcher cards; claude.ai's "
+        + "own pages in the sign-in window; and what Sanduhr's MCP server answers Claude, which keeps full paths and folder names and "
+        + "becomes part of your conversation.";
+    /// <summary>Under the switch: the search word "demo" lands here (spec, Search). True to DemoMode: it starts only from the command line or SANDUHR_DEMO.</summary>
+    public const string StreamerDemoLine =
+        "Demo mode is separate: it swaps in sample numbers and accounts, and starts only when Sanduhr is started with --demo or SANDUHR_DEMO=1.";
+    public const string ShuffleCodenames = "Shuffle codenames…";
+    public const string ShuffleCaption = "Draws new codenames for everything. Names you chose to show stay shown.";
+    public const string ShuffleQuestion = "Shuffle codenames?";
+    public const string ShuffleDetail = "Every codename changes. Viewers following a name will lose it.";
+    public const string ShuffleConfirm = "Shuffle";
+    public const string ShuffleCancel = "Cancel";
+    /// <summary>The status line after a confirmed Shuffle, shown through a live region (preflight P14).</summary>
+    public const string ShuffleDone = "New codenames drawn.";
+    public const string ShowRealNameSection = "Show the real name";
+    public const string ShowRealNameOnStream = "Show the real name on stream";
+    public const string AllowlistCaptionOn = "While streamer mode is on, this list shows codenames only.";
+    public const string AllowlistCaptionOff = "Each name with its codename. A ticked name shows as it is while streamer mode is on.";
+    public const string AllowlistEmpty = "Nothing has a codename yet. A name gets one the first time streamer mode hides it.";
+    public static string AllowlistRowName(string shown) => $"{ShowRealNameOnStream}, {shown}";
+    public static string AllowlistRowOff(string codename, string real) => $"{codename} · {real}";
+    public static string CodenameCategoryTitle(CodenameCategory category) => category switch
+    {
+        CodenameCategory.Account => "Accounts",
+        CodenameCategory.Email => "Emails",
+        CodenameCategory.Folder => "Claude Code folders",
+        CodenameCategory.Project => "Projects",
+        CodenameCategory.Skill => "Skills",
+        CodenameCategory.Repo => "Repos",
+        CodenameCategory.Runner => "CI runners",
+        CodenameCategory.Host => "Publish endpoints",
+        CodenameCategory.City => "Places",
+        CodenameCategory.AddOn => "Plugins, marketplaces and packs",
+        _ => category.ToString(),
+    };
+    public const string StreamerBanner = "Streamer mode is on: names are codenames.";
+    public static string StreamerBannerLinkName => $"{LinkTitle(SettingsPage.Privacy)}, {StreamerSection}";
+    public const string StreamerIndicatorName = "Streamer mode on";
+    public const string StreamerTooltipPrefix = "Streamer mode · ";
+    /// <summary>The tray tooltip (spec: it starts with "Streamer mode · " while on). It names no account at HEAD (slice 7 decision 2).</summary>
+    public static string TrayTooltip(bool streamer, string text) => streamer ? StreamerTooltipPrefix + text : text;
+    /// <summary>The widget's account chip as spoken: the shown name, then the indicator while on (owner taste 4).</summary>
+    public static string StreamerChipName(string shown, bool streamer) => streamer ? $"{shown}, {StreamerIndicatorName}" : shown;
+    public const string ExportsKeepRealNames = "Exports keep real names.";
+    /// <summary>Shown in place of a sample's machine name while streamer mode is on (owner taste 13).</summary>
+    public const string StreamerThisPc = "this PC";
+    public const string PlacesHiddenNote = "Streamer mode shows places as codenames. Turn it off to see their names.";
+    public const string EndpointHiddenNote = "Streamer mode hides the address. Turn it off to edit it.";
+
     // ---- Settings v2, slice 3: the Desk split ----
 
     /// <summary>A page's row of jump links, spoken (spec, Keyboard and screen reader).</summary>
