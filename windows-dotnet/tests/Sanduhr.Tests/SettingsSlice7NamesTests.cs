@@ -23,6 +23,22 @@ public class SettingsSlice7NamesTests
         Assert.Equal("Exports keep real names.", SettingsNames.ExportsKeepRealNames);
     }
 
+    /// <summary>P18: the statusline consent says the folder name on the line is the codename while streamer mode is on.</summary>
+    [Fact]
+    public void The_statusline_consent_names_the_codename_clause()
+    {
+        Assert.Contains("(its codename while streamer mode is on)", SettingsNames.StatuslineNameClause);
+        Assert.Contains("SANDUHR_LABEL", SettingsNames.StatuslineNameClause);
+    }
+
+    [Fact]
+    public void The_remove_detail_drops_the_history_file_while_the_name_is_hidden()
+    {
+        Assert.Contains("(history.Work.json)", SettingsNames.RemoveAccountDetail("Work"));
+        Assert.DoesNotContain("history.", SettingsNames.RemoveAccountDetail("Dune Fox", nameHidden: true));
+        Assert.Contains("its meter history, its Claude Code folder link", SettingsNames.RemoveAccountDetail("Dune Fox", nameHidden: true));
+    }
+
     /// <summary>Exactly true (decision 11, P4; P6 option A): what streamer mode can't reach is named, and MCP answers are among it, paths included.</summary>
     [Fact]
     public void What_it_cant_reach_names_typed_text_Explorer_the_sign_in_window_the_MCP_answers_and_the_watcher_cards()

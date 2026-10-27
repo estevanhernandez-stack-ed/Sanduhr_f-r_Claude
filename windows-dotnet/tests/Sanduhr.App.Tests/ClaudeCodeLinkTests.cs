@@ -64,7 +64,7 @@ public sealed class ClaudeCodeLinkTests : AppWindowFixture
             Assert.Equal(before, Saved());
             Assert.NotEqual(SaveFailed, svm.ClaudeCodePage.StatusText);
             var combo = LinkCombos(window).First(c => System.Windows.Automation.AutomationProperties.GetName(c) == @"Linked account for ~\.claude");
-            Assert.Equal("Work", combo.SelectedItem);
+            Assert.Equal("Work", combo.SelectedValue);
         }
         finally { window.Close(); }
     });
@@ -101,7 +101,7 @@ public sealed class ClaudeCodeLinkTests : AppWindowFixture
             Assert.Equal(work, widget.AccountFolder("Work"));
             Assert.Equal(other, widget.AccountFolder("Personal"));
             Assert.NotEqual(SaveFailed, page.StatusText);
-            Assert.Equal(["None", "Work", "Personal", "Spare"], page.AccountOptions);
+            Assert.Equal(["None", "Work", "Personal", "Spare"], page.AccountOptions.Select(o => o.Label));
             Assert.Equal("Work", page.Folders.Single(f => f.Path == work).LinkedAccount);
             Assert.Equal("Personal", page.Folders.Single(f => f.Path == other).LinkedAccount);
         }

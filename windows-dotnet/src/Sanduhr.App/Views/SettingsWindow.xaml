@@ -1097,7 +1097,7 @@
                                                         <TextBlock Grid.Column="0" Text="{Binding Marker}"
                                                                    Foreground="{DynamicResource Sanduhr.Brush.Accent}" FontSize="12"
                                                                    VerticalAlignment="Center" />
-                                                        <TextBlock Grid.Column="1" Text="{Binding Label}"
+                                                        <TextBlock Grid.Column="1" Text="{Binding Shown}"
                                                                    Foreground="{DynamicResource Sanduhr.Brush.Text}" FontSize="13"
                                                                    VerticalAlignment="Center" />
                                                         <TextBlock Grid.Column="2" Text="active" FontSize="10"

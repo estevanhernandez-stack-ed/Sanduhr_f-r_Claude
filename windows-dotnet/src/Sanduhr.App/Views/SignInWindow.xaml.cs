@@ -288,6 +288,9 @@ internal partial class SignInWindow : Window
     /// <summary>Swap the loading overlay for an error panel with retry + manual-paste
     /// escape hatch. Marks the window load-failed so a subsequent user close reports
     /// <see cref="SignInResult.Failed"/> (offering manual paste) rather than a Cancel.</summary>
+    /// <summary>The window's own error line (P1, slice 7): a thrown message can name a path under the user folder.</summary>
+    internal static string LoadErrorText(string message) => StreamerMode.Mask.Paths(message);
+
     private void ShowLoadError(string message)
     {
         if (_captured)
@@ -298,7 +301,7 @@ internal partial class SignInWindow : Window
         Log($"load error surfaced: {message}");
         LoadingOverlay.Visibility = Visibility.Collapsed;
         WebView.Visibility = Visibility.Collapsed; // native control yields so the WPF panel shows (airspace)
-        ErrorMessage.Text = message;
+        ErrorMessage.Text = LoadErrorText(message);
         ErrorPanel.Visibility = Visibility.Visible;
     }
 

@@ -528,7 +528,9 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
             case System.Windows.Controls.Primitives.ButtonBase:
                 return "it has no command and no link";
             case ComboBox cb:
-                return !Bound(System.Windows.Controls.Primitives.Selector.SelectedItemProperty) ? "its selection is not bound"
+                // The linked-account combo binds SelectedValue (slice 7: its items are AccountChoices with a codename to show).
+                return !Bound(System.Windows.Controls.Primitives.Selector.SelectedItemProperty)
+                    && !Bound(System.Windows.Controls.Primitives.Selector.SelectedValueProperty) ? "its selection is not bound"
                     : cb.Items.Count == 0 ? "it has nothing to choose" : null;
             case TextBox t:
                 return t.IsReadOnly ? "it is read-only" : Bound(TextBox.TextProperty) ? null : "its text is not bound";

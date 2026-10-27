@@ -159,9 +159,7 @@ public sealed class SignInCoordinator
         }
         catch (Exception ex)
         {
-            ShowMessage(owner,
-                $"Couldn't prepare the sign-in browser profile: {ex.Message}",
-                MessageBoxButton.OK);
+            ShowMessage(owner, ProfileFailureText(ex), MessageBoxButton.OK);
             return await manual(owner);
         }
 
@@ -179,9 +177,7 @@ public sealed class SignInCoordinator
                 return await ShowRuntimeMissingThenMaybeManual(owner, o => RunEmbeddedAsync(o, persist, manualFallback), manual);
 
             case SignInResult.Failed f:
-                var retry = ShowMessage(owner,
-                    $"{f.Message}\n\nPaste a sessionKey by hand instead?",
-                    MessageBoxButton.YesNo);
+                var retry = ShowMessage(owner, FailedText(f.Message), MessageBoxButton.YesNo);
                 return retry == MessageBoxResult.Yes
                     ? await manual(owner)
                     : SignInOutcome.NotAdded;
@@ -314,6 +310,12 @@ public sealed class SignInCoordinator
         if (owner is not null && owner.IsLoaded)
             window.Owner = owner;
     }
+
+    // P1 (slice 7): an exception's message can carry a full path under the Windows user folder; both dialogs read their text here.
+    internal static string ProfileFailureText(Exception ex) =>
+        StreamerMode.Mask.Paths($"Couldn't prepare the sign-in browser profile: {ex.Message}");
+
+    internal static string FailedText(string message) => $"{StreamerMode.Mask.Paths(message)}\n\nPaste a sessionKey by hand instead?";
 
     private static MessageBoxResult ShowMessage(Window? owner, string text, MessageBoxButton buttons)
         => ThemedDialog.Show(owner, "Sign in to Claude", text, buttons, ThemedDialogKind.Warning);

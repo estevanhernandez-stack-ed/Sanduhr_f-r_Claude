@@ -560,8 +560,9 @@ public static class SettingsNames
     public const string RemoveAccount = "Remove account…";
     public static string RemoveAccountNamed(string account) => $"Remove account, {account}";
     public static string RemoveAccountQuestion(string account) => $"Remove {account} from Sanduhr?";
-    public static string RemoveAccountDetail(string account) =>
-        $"Removes {account}'s sign-in from Windows Credential Manager, its meter history (history.{account}.json), its Claude Code folder link, "
+    /// <param name="nameHidden">Streamer mode hides the name: the codename isn't the file's name, so the parenthesis is dropped (P18).</param>
+    public static string RemoveAccountDetail(string account, bool nameHidden = false) =>
+        $"Removes {account}'s sign-in from Windows Credential Manager, its meter history{(nameHidden ? "" : $" (history.{account}.json)")}, its Claude Code folder link, "
         + "the meter files Claude Code reads for it and its browser profile. It can't be undone.";
     public const string RemoveAccountConfirm = "Remove";
     public const string RemoveAccountCancel = "Cancel";
@@ -864,6 +865,10 @@ public static class SettingsNames
     public const string ShuffleDone = "New codenames drawn.";
     public const string ShowRealNameSection = "Show the real name";
     public const string ShowRealNameOnStream = "Show the real name on stream";
+    /// <summary>The statusline consent's sentence on the folder name (P18): under streamer mode the line shows the folder's codename.</summary>
+    public const string StatuslineNameClause =
+        "The line can start with this folder's name (its codename while streamer mode is on) or the SANDUHR_LABEL you set in its "
+        + "settings, worked out when it renders and never stored.";
     public const string AllowlistCaptionOn = "While streamer mode is on, this list shows codenames only.";
     public const string AllowlistCaptionOff = "Each name with its codename. A ticked name shows as it is while streamer mode is on.";
     public const string AllowlistEmpty = "Nothing has a codename yet. A name gets one the first time streamer mode hides it.";

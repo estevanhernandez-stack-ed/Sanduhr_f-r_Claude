@@ -32,7 +32,9 @@ internal sealed record ClaudeCodeHost(
     public IReadOnlyList<CcFolder> Folders() => ClaudeCodeFolders.Build(Profile, ConfigDir, AddedFolders());
 
     /// <summary>The path with the profile folder written as ~.</summary>
-    public string Display(string path) => ClaudeCodeFolders.Display(path, Profile);
+    /// <remarks>Streamer mode (slice 7, CP 7): the folder's codename while hidden. Cards, consents, Mods &amp; Widgets' meters rows and
+    /// Privacy's folder-reads row all read their folder names here.</remarks>
+    public string Display(string path) => StreamerMode.ShowFolder(path, Profile);
 
     /// <summary>Every known folder read for the one list: its report, Sanduhr's mod state and the meters status. Files only; never throws.</summary>
     public IReadOnlyList<FolderMods> ReadFolders()
