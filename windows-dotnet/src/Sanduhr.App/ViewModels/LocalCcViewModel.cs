@@ -11,10 +11,13 @@ using Sanduhr.Core;
 namespace Sanduhr.App.ViewModels;
 
 /// <summary>One row in the breakdown tables — display name + compact tokens.</summary>
-public sealed record BreakdownRow(string Name, string Tokens)
+public sealed record BreakdownRow(string Name, string Tokens, string Real = "", CodenameCategory Category = CodenameCategory.Project)
 {
-    /// <summary>What a screen reader reads for the row: "my-project, 1.2M".</summary>
+    /// <summary>What a screen reader reads for the row: "my-project, 1.2M" (the codename while streamer mode hides it).</summary>
     public override string ToString() => $"{Name}, {Tokens}";
+
+    /// <summary>The row's menu offers "Show the real name on stream" (decision 16).</summary>
+    public bool CanShowRealName => Real.Length > 0 && Name != Real;
 }
 
 /// <summary>A per-root vault consent toggle in the stewardship strip.</summary>
@@ -25,12 +28,16 @@ public sealed partial class VaultRootToggleViewModel : ObservableObject
 
     public string Name { get; }
 
+    /// <summary>The folder as shown: its codename while streamer mode hides it (slice 7, CP 11). <see cref="Name"/> stays the key.</summary>
+    public string Shown { get; }
+
     [ObservableProperty] private bool _isEnabled;
 
     public VaultRootToggleViewModel(LocalCcViewModel owner, string name, bool enabled)
     {
         _owner = owner;
         Name = name;
+        Shown = StreamerMode.Mask.FolderName(name);
         IsEnabled = enabled;
         _loading = false;
     }
@@ -41,7 +48,7 @@ public sealed partial class VaultRootToggleViewModel : ObservableObject
             _owner.OnRootToggled(Name, value);
     }
 
-    public override string ToString() => Name;
+    public override string ToString() => Shown;
 }
 
 /// <summary>
@@ -141,7 +148,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
             else
             {
                 vault.SetRootConsent(root, false);
-                var res = ThemedDialog.Show(_owner, $"Stop archiving {root}?",
+                var res = ThemedDialog.Show(_owner, StopArchivingQuestion(root),
                     "Archiving is off for this folder either way. Erase the history already stored for it?",
                     MessageBoxButton.YesNo, ThemedDialogKind.Warning,
                     primaryLabel: "Erase it", secondaryLabel: "Keep data");
@@ -403,6 +410,39 @@ public sealed partial class LocalCcViewModel : ObservableObject
             calendarByDay, calFrom);
     }
 
+    /// <summary>"Stop archiving …?" naming the folder as its checkbox does (slice 7, CP 11).</summary>
+    internal static string StopArchivingQuestion(string root) => $"Stop archiving {StreamerMode.Mask.FolderName(root)}?";
+
+    /// <summary>A top-ten table's rows (slice 7, CP 15): each name as shown, with its real name kept for the quick route.</summary>
+    internal static IReadOnlyList<BreakdownRow> Rows(IEnumerable<(string Name, long Tokens)> rows, CodenameCategory category) =>
+        [.. rows.Select(r => new BreakdownRow(StreamerMode.Mask.Name(category, r.Name), TokenFormat.Compact(r.Tokens), r.Name, category))];
+
+    private IReadOnlyList<(string Name, long Tokens)> _topProjects = [];
+    private IReadOnlyList<(string Name, long Tokens)> _topSkills = [];
+
+    /// <summary>Rebuild the two tables from the last data applied. Rows are made on display, so a codename is assigned for the ten shown
+    /// and never for the whole archive.</summary>
+    private void FillBreakdowns()
+    {
+        Projects.Clear();
+        foreach (var row in Rows(_topProjects, CodenameCategory.Project))
+            Projects.Add(row);
+        Skills.Clear();
+        foreach (var row in Rows(_topSkills, CodenameCategory.Skill))
+            Skills.Add(row);
+    }
+
+    /// <summary>Streamer mode moved (slice 7): the tables read their names again.</summary>
+    public void RefreshNames() => FillBreakdowns();
+
+    /// <summary>Tests fill the two tables as an apply of the archive's top ten would.</summary>
+    internal void ShowTopForTests(IEnumerable<(string Name, long Tokens)> projects, IEnumerable<(string Name, long Tokens)> skills)
+    {
+        _topProjects = [.. projects];
+        _topSkills = [.. skills];
+        FillBreakdowns();
+    }
+
     private void Apply(OverviewData data, bool previewToday = false)
     {
         var today = DateOnly.FromDateTime(DateTime.Now);
@@ -431,13 +471,9 @@ public sealed partial class LocalCcViewModel : ObservableObject
         StatusLine = data.StatusLine;
         _byDay = data.ByDay;
 
-        Projects.Clear();
-        foreach (var (name, tokens) in data.Projects.OrderByDescending(kv => kv.Value).Take(10))
-            Projects.Add(new BreakdownRow(name, TokenFormat.Compact(tokens)));
-
-        Skills.Clear();
-        foreach (var (name, tokens) in data.Skills.OrderByDescending(kv => kv.Value).Take(10))
-            Skills.Add(new BreakdownRow(name, TokenFormat.Compact(tokens)));
+        _topProjects = [.. data.Projects.OrderByDescending(kv => kv.Value).Take(10).Select(kv => (kv.Key, kv.Value))];
+        _topSkills = [.. data.Skills.OrderByDescending(kv => kv.Value).Take(10).Select(kv => (kv.Key, kv.Value))];
+        FillBreakdowns();
 
         _uncovered = data.Uncovered;
         _calendarByDay = data.CalendarByDay;

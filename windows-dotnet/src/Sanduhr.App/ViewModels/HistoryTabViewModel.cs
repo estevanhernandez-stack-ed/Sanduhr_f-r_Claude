@@ -13,7 +13,11 @@ namespace Sanduhr.App.ViewModels;
 
 /// <summary>An account choice in the Meters view's selector. <c>Account == null</c>
 /// is the "All accounts" overlay.</summary>
-public sealed record AccountOption(string Display, string? Account);
+public sealed record AccountOption(string Display, string? Account)
+{
+    /// <summary>What a screen reader reads: the shown name, never the record's text, which would carry the real label (slice 7, CP 3).</summary>
+    public override string ToString() => Display;
+}
 
 /// <summary>A legend entry — an account's label and its overlay swatch brush.</summary>
 public sealed record LegendItem(string Label, Brush Swatch)
@@ -94,7 +98,7 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         AccountOptions.Clear();
         AccountOptions.Add(new AccountOption("All accounts", null));
         foreach (var label in _widget.ShownAccounts)
-            AccountOptions.Add(new AccountOption(label, label));
+            AccountOptions.Add(new AccountOption(StreamerMode.Mask.Name(CodenameCategory.Account, label), label));   // slice 7, CP 3
         SelectedOption = AccountOptions.FirstOrDefault(o => o.Account == prev) ?? AccountOptions[0];
         ExportCsvCommand.NotifyCanExecuteChanged();
     }
@@ -106,6 +110,33 @@ public sealed partial class HistoryTabViewModel : ObservableObject
     }
 
     partial void OnWeekModeChanged(bool value) => Changed?.Invoke();
+
+    /// <summary>Streamer mode moved (slice 7): the picker, the legend and the export caption read their names again.</summary>
+    public void RefreshNames()
+    {
+        RefreshAccountOptions();
+        RefreshLegend();
+        OnPropertyChanged(nameof(ExportsKeepRealNamesShown));
+    }
+
+    /// <summary>"Exports keep real names." beside the export button, while streamer mode is on (spec).</summary>
+    public bool ExportsKeepRealNamesShown => StreamerMode.On;
+
+    /// <summary>The Save dialog's default name (slice 7, CP 4): the account's codename while hidden, never its label. The file itself keeps
+    /// real names (spec).</summary>
+    internal static string ExportFileName(string? account, DateTime day)
+    {
+        string scopeTag = account is null
+            ? "all-accounts"
+            : StreamerMode.Mask.Name(CodenameCategory.Account, account).ToLowerInvariant().Replace(" ", "-");
+        return $"Sanduhr-usage-{scopeTag}-{day:yyyy-MM-dd}.csv";
+    }
+
+    /// <summary>"Wrote N rows to:" with the path's user folder as %USERPROFILE% while streamer mode is on (slice 7, CP 4).</summary>
+    internal static string ExportedMessage(int rows, string path) => $"Wrote {rows} rows to:\n{StreamerMode.Mask.Paths(path)}";
+
+    /// <summary>The write failure, with its path and the exception's own text scrubbed while streamer mode is on (slice 7, CP 4).</summary>
+    internal static string ExportFailedMessage(string path, string error) => StreamerMode.Mask.Paths($"Could not write {path}:\n{error}");
 
     private void RefreshLegend()
     {
@@ -121,8 +152,9 @@ public sealed partial class HistoryTabViewModel : ObservableObject
             ShowLegend = false;
             return;
         }
+        // The swatch keeps its colour by the real label; the text is the codename while streamer mode hides it (slice 7, CP 3).
         foreach (var label in accounts)
-            Legend.Add(new LegendItem(label, AccountColors.BrushFor(label, accounts)));
+            Legend.Add(new LegendItem(StreamerMode.Mask.Name(CodenameCategory.Account, label), AccountColors.BrushFor(label, accounts)));
         ShowLegend = true;
     }
 
@@ -206,10 +238,7 @@ public sealed partial class HistoryTabViewModel : ObservableObject
     private void ExportCsv()
     {
         string? account = SelectedOption?.Account;
-        string scopeTag = account is null
-            ? "all-accounts"
-            : account.ToLowerInvariant().Replace(" ", "-");
-        string defaultName = $"Sanduhr-usage-{scopeTag}-{DateTime.Today:yyyy-MM-dd}.csv";
+        string defaultName = ExportFileName(account, DateTime.Today);
 
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
@@ -227,12 +256,12 @@ public sealed partial class HistoryTabViewModel : ObservableObject
             var result = CsvExport.Build(_widget.History, _widget.AccountStore, account);
             File.WriteAllText(dlg.FileName, result.Text);
             Sounds.PlaySaveConfirmation();
-            Info($"Wrote {result.RowCount} rows to:\n{dlg.FileName}");
+            Info(ExportedMessage(result.RowCount, dlg.FileName));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             Sounds.PlayError();
-            Info($"Could not write {dlg.FileName}:\n{e.Message}");
+            Info(ExportFailedMessage(dlg.FileName, e.Message));
         }
     }
 

@@ -210,6 +210,7 @@ public sealed class SettingsViewModel
             widget, widget.LoadLocalCcShowBreakdowns(), widget.SaveLocalCcShowBreakdowns),
             new CcTrendsViewModel(widget),
             new CcLedgerViewModel(widget, widget.LoadLedgerGroupByProject(), widget.SaveLedgerGroupByProject));
+        ClaudeCode.ShowRealName = (category, real) => widget.Streamer.SetShown(category, real, true);   // slice 7, decision 16
         ClaudeCodePage = new ClaudeCodeViewModel(widget);
         Desk = new DeskSettingsViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies(),
             inkPresets: () => PackInkPresets.Merged(new WidgetStore(new Paths().WidgetsDir, Sanduhr.App.Services.WidgetCatalogService.EncodePng)));
@@ -299,6 +300,10 @@ public sealed class SettingsViewModel
         ModsPage.ReloadLocal();
         Desk.Companion.Reload();
         Desk.Launcher.Reload();   // preflight P3: a link's URL and a raw target
+        History.RefreshNames();
+        ClaudeCode.Overview.RefreshNames();
+        ClaudeCode.Trends.RefreshNames();
+        ClaudeCode.Ledger.RefreshNames();
         NamesReloaded++;
     }
 

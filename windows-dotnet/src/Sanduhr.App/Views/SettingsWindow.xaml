@@ -1467,7 +1467,9 @@
                                 <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,12,0,0" views:SettingsAnchor.Id="meters-export">
                                     <Button Style="{StaticResource AccentButton}" Content="{x:Static core:SettingsNames.ExportMeterHistory}"
                                             Command="{Binding ExportCsvCommand}" Margin="0" />
-                                </StackPanel>
+                                    <TextBlock Text="{x:Static core:SettingsNames.ExportsKeepRealNames}" FontSize="10.5" VerticalAlignment="Center" Margin="8,0,0,0"
+                                               Visibility="{Binding ExportsKeepRealNamesShown, Converter={StaticResource BoolVis}}"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />                                </StackPanel>
                             </Grid>
 
                             <!-- Overview -->
@@ -1557,7 +1559,15 @@
                                             <ItemsControl x:Name="OverviewProjectsList" ItemsSource="{Binding Projects}" Margin="4" AutomationProperties.Name="Top projects (last 30 days)" Focusable="False">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Grid Margin="4,3">
+                                                        <Grid Margin="4,3" Background="Transparent" ContextMenuService.IsEnabled="{Binding CanShowRealName}"
+                                                              Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=TabItem}}">
+                                                            <Grid.ContextMenu>
+                                                                <ContextMenu>
+                                                                    <MenuItem Header="{x:Static core:SettingsNames.ShowRealNameOnStream}"
+                                                                              Command="{Binding PlacementTarget.Tag.ShowRealNameOfCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                                              CommandParameter="{Binding}" />
+                                                                </ContextMenu>
+                                                            </Grid.ContextMenu>
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="*" />
                                                                 <ColumnDefinition Width="Auto" />
@@ -1591,7 +1601,15 @@
                                             <ItemsControl x:Name="OverviewSkillsList" ItemsSource="{Binding Skills}" Margin="4" AutomationProperties.Name="Top skills (last 30 days)" Focusable="False">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Grid Margin="4,3">
+                                                        <Grid Margin="4,3" Background="Transparent" ContextMenuService.IsEnabled="{Binding CanShowRealName}"
+                                                              Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=TabItem}}">
+                                                            <Grid.ContextMenu>
+                                                                <ContextMenu>
+                                                                    <MenuItem Header="{x:Static core:SettingsNames.ShowRealNameOnStream}"
+                                                                              Command="{Binding PlacementTarget.Tag.ShowRealNameOfCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                                              CommandParameter="{Binding}" />
+                                                                </ContextMenu>
+                                                            </Grid.ContextMenu>
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="*" />
                                                                 <ColumnDefinition Width="Auto" />
@@ -1631,7 +1649,7 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
-                                                          Content="{Binding Name}"
+                                                          Content="{Binding Shown}"
                                                           IsChecked="{Binding IsEnabled, Mode=TwoWay}" />
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -1688,7 +1706,15 @@
                                     <ItemsControl x:Name="TrendsProjectsList" ItemsSource="{Binding TopProjects}" AutomationProperties.Name="Top projects (window)" Focusable="False">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Grid Margin="0,1">
+                                                <Grid Margin="0,1" Background="Transparent" ContextMenuService.IsEnabled="{Binding CanShowRealName}"
+                                                      Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=TabItem}}">
+                                                    <Grid.ContextMenu>
+                                                        <ContextMenu>
+                                                            <MenuItem Header="{x:Static core:SettingsNames.ShowRealNameOnStream}"
+                                                                      Command="{Binding PlacementTarget.Tag.ShowRealNameOfCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                                      CommandParameter="{Binding}" />
+                                                        </ContextMenu>
+                                                    </Grid.ContextMenu>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
@@ -1724,6 +1750,10 @@
                                 <DockPanel Grid.Row="0" Margin="0,0,0,8">
                                     <Button DockPanel.Dock="Right" Style="{StaticResource AccentButton}"
                                             Content="{x:Static core:SettingsNames.ExportSessions}" Command="{Binding ExportCsvCommand}" />
+                                    <TextBlock DockPanel.Dock="Right" Text="{x:Static core:SettingsNames.ExportsKeepRealNames}" FontSize="10.5"
+                                               VerticalAlignment="Center" Margin="0,0,8,0"
+                                               Visibility="{Binding ExportsKeepRealNamesShown, Converter={StaticResource BoolVis}}"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                                     <CheckBox DockPanel.Dock="Right" Style="{StaticResource ThemedCheckBox}"
                                               Margin="0,0,12,0" VerticalAlignment="Center"
                                               Content="Stack by project"
@@ -1784,6 +1814,17 @@
                                                     <Setter Property="Padding" Value="0" />
                                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                                     <Setter Property="Focusable" Value="False" />
+                                                    <Setter Property="ContextMenuService.IsEnabled" Value="{Binding CanShowRealName}" />
+                                                    <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=TabItem}}" />
+                                                    <Setter Property="ContextMenu">
+                                                        <Setter.Value>
+                                                            <ContextMenu>
+                                                                <MenuItem Header="{x:Static core:SettingsNames.ShowRealNameOnStream}"
+                                                                          Command="{Binding PlacementTarget.Tag.ShowRealNameOfCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                            </ContextMenu>
+                                                        </Setter.Value>
+                                                    </Setter>
                                                     <Setter Property="Template">
                                                         <Setter.Value>
                                                             <ControlTemplate TargetType="ListBoxItem">

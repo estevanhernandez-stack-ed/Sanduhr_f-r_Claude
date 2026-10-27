@@ -8,6 +8,7 @@ using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Sanduhr.App.Services;
 using Sanduhr.App.Theming;
 using Sanduhr.App.Views;
 using Sanduhr.Core;
@@ -37,7 +38,26 @@ public sealed partial class LedgerRowViewModel : ObservableObject
     /// (spec: Ledger). A null ToolTip renders nothing in WPF. Group rows carry
     /// no single cwd (Info.Cwd is synthesized null), so this is naturally
     /// absent for them too.</summary>
-    public string? CwdTooltip => Info.Cwd;
+    public string? CwdTooltip => StreamerMode.On ? null : Info.Cwd;   // slice 7, CP 17: a full path names the user folder and the project
+
+    /// <summary>The project's name as the codename book keys it (slice 7): the name, or the disambiguated form for twins. The quick route
+    /// shows this one.</summary>
+    internal string ProjectKeyForStreamer { get; private set; } = "";
+
+    /// <summary>The row's menu offers "Show the real name on stream" only while its name is hidden.</summary>
+    public bool CanShowRealName => StreamerMode.Mask.Hides(CodenameCategory.Project, ProjectKeyForStreamer);
+
+    /// <summary>Streamer mode moved (slice 7): the name, the tooltip and any built detail read again.</summary>
+    internal void RefreshNames()
+    {
+        ProjectText = ProjectShown();
+        OnPropertyChanged(nameof(CwdTooltip));
+        OnPropertyChanged(nameof(CanShowRealName));
+        DetailText = IsExpanded ? BuildDetail() : "";
+    }
+
+    // One codename per name; two projects that share a name are told apart by their disambiguated key, and only the codename shows.
+    private string ProjectShown() => StreamerMode.Mask.Name(CodenameCategory.Project, ProjectKeyForStreamer);
 
     [ObservableProperty] private string _projectText = "";
     [ObservableProperty] private string _lastActiveText = "";
@@ -64,9 +84,11 @@ public sealed partial class LedgerRowViewModel : ObservableObject
         Info = info;
         if (IsGroup)
             Members = members ?? Array.Empty<VaultSessionInfo>();
-        ProjectText = disambiguate
+        var project = disambiguate
             ? $"{info.ProjectName} ~{info.ProjectKey[^Math.Min(8, info.ProjectKey.Length)..]}"
             : info.ProjectName;
+        ProjectKeyForStreamer = project;
+        ProjectText = ProjectShown();
         LastActiveText = Relative(info.LastTs);
         ModelBadge = BuildBadge(info.ByModel);
         RescopeCore(from, to);
@@ -128,9 +150,9 @@ public sealed partial class LedgerRowViewModel : ObservableObject
         {
             sb.Append("\nSkills: ").Append(string.Join(", ",
                 Info.BySkill.OrderByDescending(kv => kv.Value)
-                    .Select(kv => $"{kv.Key} {TokenFormat.Compact(kv.Value)}")));
+                    .Select(kv => $"{StreamerMode.Mask.Name(CodenameCategory.Skill, kv.Key)} {TokenFormat.Compact(kv.Value)}")));
         }
-        sb.Append("\nFolder: ").Append(Info.Root).Append("  ·  Session: ").Append(Info.Uuid);
+        sb.Append("\nFolder: ").Append(StreamerMode.Mask.FolderName(Info.Root)).Append("  ·  Session: ").Append(Info.Uuid);
         return sb.ToString();
     }
 
@@ -158,7 +180,7 @@ public sealed partial class LedgerRowViewModel : ObservableObject
         if (ordered.Count > shown)
             sb.Append('\n').Append("… and ").Append(ordered.Count - shown).Append(" more");
         var roots = ordered.Select(m => m.Root).Distinct(StringComparer.Ordinal)
-            .OrderBy(r => r, StringComparer.Ordinal);
+            .OrderBy(r => r, StringComparer.Ordinal).Select(StreamerMode.Mask.FolderName);
         if (sb.Length > 0) sb.Append('\n');
         sb.Append("Sessions: ").Append(ordered.Count);
         if (Info.AgentCount > 0)
@@ -444,6 +466,13 @@ public sealed partial class CcLedgerViewModel : ObservableObject
             .ToList();
     }
 
+    /// <summary>Tests present these sessions as a read of the archive would, with no vault.</summary>
+    internal void PresentForTests(IReadOnlyList<VaultSessionInfo> sessions)
+    {
+        _lastSessions = sessions;
+        Present();
+    }
+
     public async Task RefreshAsync()
     {
         var vault = _widget.Vault;
@@ -542,6 +571,18 @@ public sealed partial class CcLedgerViewModel : ObservableObject
     /// current mode/scope — no vault read. Called after every RefreshAsync AND
     /// on a GroupByProject toggle. Diffs by row key (never Clear()+re-add), so
     /// the 5-minute refresh preserves scroll + expansion exactly as before.</summary>
+    /// <summary>"Exports keep real names." beside the Sessions export, while streamer mode is on (spec).</summary>
+    public bool ExportsKeepRealNamesShown => StreamerMode.On;
+
+    /// <summary>Streamer mode moved (slice 7): every row reads its names again, and the caption follows the switch.</summary>
+    public void RefreshNames()
+    {
+        foreach (var row in Rows)
+            row.RefreshNames();
+        View.Refresh();
+        OnPropertyChanged(nameof(ExportsKeepRealNamesShown));
+    }
+
     private void Present()
     {
         var (from, to) = ScopeRange();
