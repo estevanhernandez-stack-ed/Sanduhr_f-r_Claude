@@ -902,6 +902,54 @@ public static class SettingsNames
     public const string PlacesHiddenNote = "Streamer mode shows places as codenames. Turn it off to see their names.";
     public const string EndpointHiddenNote = "Streamer mode hides the address. Turn it off to edit it.";
 
+    // ---- Settings v2, slice 8: Reset's folders (WF20, R12) and About's caption ----
+
+    /// <summary>About, under Reset Sanduhr...: what it removes, so nobody has to open the dialog to learn it (spec, Reset). The spec's
+    /// sentence left out themes and widgets (slice 8 decision 5).</summary>
+    public const string ResetSanduhrCaption =
+        "Removes your accounts, history, session archive, themes, widgets, settings, Desk messages and Sanduhr's Claude Code entries. You choose which.";
+    /// <summary>Reset Sanduhr...: the folder list under the Claude Code part, spoken.</summary>
+    public const string ResetFoldersName = "Claude Code folders to reset";
+    /// <summary>Under the part when no folder holds a receipt or Sanduhr's MCP entry.</summary>
+    public const string ResetNoFolders = "No Claude Code folder holds anything of Sanduhr's.";
+    /// <summary>Shown while a folder is kept (the part or a row is unticked). Keeping is per kind: the entries and the files they run stay.</summary>
+    public const string ResetFoldersKept = "Unticked folders keep Sanduhr's entries and the files they need. Remove them later in Settings, Claude Code.";
+    /// <summary>Also shown while a kept folder has meters and Accounts and sign-in keys is ticked.</summary>
+    public const string ResetKeptSignIn = "Their meters stay empty until you sign in to Sanduhr again.";
+    /// <summary>Also shown while a kept folder has meters and Settings is ticked: statusline_enabled goes with settings.json and comes back
+    /// when the Claude Code page reads the folders.</summary>
+    public const string ResetKeptSettings = "With the settings reset, their meters come back once you open Settings, Claude Code.";
+    /// <summary>Also shown while a kept folder has an MCP server and Settings is ticked: mcp-settings.json and mcp_enabled go with the
+    /// settings, and only Install sets them again (preflight P2).</summary>
+    public const string ResetKeptMcpSettings =
+        "With the settings reset, its MCP server stays but answers without your usage until you add it again in Settings, Claude Code.";
+    /// <summary>Also shown while a kept folder was added by hand and Settings is ticked: cc_folders_added goes with settings.json.</summary>
+    public const string ResetKeptAdded = "A folder you added yourself leaves that page with the settings: add it there again to remove its entries.";
+    /// <summary>installs.json (or a copy set aside) can't be read: everything of Sanduhr's in Claude Code stays.</summary>
+    public const string ResetReceiptsUnreadable =
+        "Sanduhr's record of what it installed can't be read, so some entries can't be listed or removed here. Sanduhr keeps its files for them; remove the entries in Settings, Claude Code, or by hand.";
+
+    /// <summary>The order the part's label names the kinds in, and each row's kinds line.</summary>
+    public static readonly IReadOnlyList<IntegrationKind> ResetKindOrder =
+        [IntegrationKind.Statusline, IntegrationKind.Mcp, IntegrationKind.Meters, IntegrationKind.Hooks];
+
+    /// <summary>One kind of entry as the part's label names it.</summary>
+    public static string ResetKindWord(IntegrationKind kind) => kind switch
+    {
+        IntegrationKind.Statusline => "statusline",
+        IntegrationKind.Mcp => "MCP server",
+        IntegrationKind.Meters => "meters mod",
+        IntegrationKind.Hooks => "glow hook",
+        _ => "",
+    };
+
+    /// <summary>A row's kinds line: "statusline, meters mod", in <see cref="ResetKindOrder"/>.</summary>
+    public static string ResetFolderKinds(IEnumerable<IntegrationKind> kinds)
+    {
+        var set = kinds.ToHashSet();
+        return string.Join(", ", ResetKindOrder.Where(set.Contains).Select(ResetKindWord));
+    }
+
     // ---- Settings v2, slice 3: the Desk split ----
 
     /// <summary>A page's row of jump links, spoken (spec, Keyboard and screen reader).</summary>
