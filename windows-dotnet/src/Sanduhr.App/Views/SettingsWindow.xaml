@@ -2092,6 +2092,12 @@
 
                 <!-- Themes tab (item 8) — swatch grid + agent-assisted theme creation. -->
                 <TabItem Header="Themes" Tag="Themes" AutomationProperties.Name="Themes">
+                    <!-- Settings v2, slice 8 (WF49): one scrolling page, so both lists show everything they hold. -->
+                    <ScrollViewer x:Name="ThemesPageScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                  Focusable="False">
+                    <ScrollViewer.Resources>
+                        <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                    </ScrollViewer.Resources>
                     <Border x:Name="ThemesRoot" Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="16"
                             DataContext="{Binding Themes}">
                         <Grid>
@@ -2100,7 +2106,7 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -2127,14 +2133,8 @@
                             <Border Grid.Row="1" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
                                     BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
                                     Padding="5,4">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                              HorizontalScrollBarVisibility="Disabled" MaxHeight="112">
-                                    <ScrollViewer.Resources>
-                                        <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
-                                    </ScrollViewer.Resources>
-                                    <ListBox x:Name="ThemeGallery" Style="{StaticResource ThemeSwatchList}"
-                                             ItemsSource="{Binding Themes}" AutomationProperties.Name="Choose a theme" />
-                                </ScrollViewer>
+                                <ListBox x:Name="ThemeGallery" Style="{StaticResource ThemeSwatchList}"
+                                         ItemsSource="{Binding Themes}" AutomationProperties.Name="Choose a theme" />
                             </Border>
 
                             <Border Grid.Row="2" Height="1" Background="{DynamicResource Sanduhr.Brush.Border}"
@@ -2142,14 +2142,9 @@
 
                             <!-- Editor: Paste (a theme JSON, lint findings before Save) or Studio
                                  (token rows; the widget itself is the live preview). -->
-                            <!-- The editor scrolls inside the flexible row: at a short window the token
-                                 list would otherwise push "Save & apply" below the frame, and the grid
-                                 itself does not scroll. Installed themes and their buttons stay pinned. -->
-                            <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled">
-                                <ScrollViewer.Resources>
-                                    <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
-                                </ScrollViewer.Resources>
+                            <!-- The editor sits on the page, which scrolls as one (slice 8, WF49): an inner scroller would
+                                 swallow the wheel over the editor. -->
+                            <Border Grid.Row="4">
                                 <StackPanel>
                                 <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,0,8" views:SettingsAnchor.Id="studio"
                                           Content="Studio: edit the tokens, watch the widget re-tint live"
@@ -2344,21 +2339,27 @@
                                     </StackPanel>
                                 </StackPanel>
                                 </StackPanel>
-                            </ScrollViewer>
+                            </Border>
                             <!-- Installed user themes -->
                             <TextBlock Grid.Row="7" Text="Installed user themes" FontSize="11" views:SettingsAnchor.Id="installed"
                                        FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                        Margin="0,16,0,6" />
 
-                            <Border Grid.Row="8" Height="72" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                            <Border Grid.Row="8" MinHeight="72" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
                                     BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
                                 <Grid>
+                                    <!-- No scroll host of its own (slice 8, WF49): the page scrolls, and the wheel reaches it. -->
                                     <ListBox x:Name="ThemesList" AutomationProperties.Name="Installed user themes"
                                              ItemsSource="{Binding InstalledThemes}"
                                              SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
                                              Background="Transparent" BorderThickness="0"
-                                             Foreground="{DynamicResource Sanduhr.Brush.Text}"
-                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                                             Foreground="{DynamicResource Sanduhr.Brush.Text}">
+                                        <ListBox.Template>
+                                            <ControlTemplate TargetType="ListBox">
+                                                <ItemsPresenter Margin="2" />
+                                            </ControlTemplate>
+                                        </ListBox.Template>
+                                    </ListBox>
                                     <TextBlock Text="No user themes yet. Paste one above or drop a JSON in the themes folder."
                                                Foreground="{DynamicResource Sanduhr.Brush.TextDim}" FontSize="11"
                                                TextWrapping="Wrap" TextAlignment="Center" MaxWidth="280"
@@ -2378,6 +2379,7 @@
                             </StackPanel>
                         </Grid>
                     </Border>
+                    </ScrollViewer>
                 </TabItem>
 
                 <!-- Desk (Settings v2, slice 3: the split, WF22, WF8): the switch, Arrange, the map on top, every piece (Show, place, order),
