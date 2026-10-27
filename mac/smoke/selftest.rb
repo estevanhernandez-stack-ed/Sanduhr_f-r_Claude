@@ -294,6 +294,8 @@ eq('piece clicks on in the fixture', state['desk_piece_clicks'], true)
 eq('plate off in the fixture', state['desk_plate'], false)
 # "Keep the Desk under desktop icons": off in the fixture, what an absent key reads as.
 eq('under icons off in the fixture', state['desk_under_icons'], false)
+# "OLED care": off in the fixture, what an absent key reads as.
+eq('oled care off in the fixture', state['oled_care'], false)
 # Issue #119: the top-center pill is off, not forced and not up in the fixture; its frame is null
 # until it is. The `on` key is quoted in the fixture, so it reads as a key and not as true.
 eq('pill off in the fixture', state['notch_pill'], { 'on' => false, 'forced' => false, 'shown' => false, 'frame' => nil })

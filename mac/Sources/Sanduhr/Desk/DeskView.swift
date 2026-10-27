@@ -173,6 +173,7 @@ struct DeskView: View {
             if let widget = Widget(rawValue: p.widget) {
                 DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale)
                     .deskArrangeable(p, mode: model.arrange)
+                    .oledDrift(model)
             }
         }
     }
@@ -229,7 +230,10 @@ struct DeskPiece: View {
     private var messageSize: Double { savedMessageSize * scale }
     @AppStorage("messageColor", store: .desk) private var messageColor = "9ad7ff"
     @AppStorage(DeskMessageLook.glowKey, store: .desk) private var messageGlow = true
-    @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
+    @AppStorage("inkColor", store: .desk) private var savedInk = "ffffff"
+    @AppStorage(OledCare.key, store: .desk) private var oled = OledCare.defaultOn
+    /// The ink as drawn: with OLED care on, never pure white (OledInk).
+    private var ink: String { oled ? OledInk.capWhite(savedInk) : savedInk }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Every piece, the message included, over its plate (DeskPlate) when the plate is on.
@@ -560,11 +564,12 @@ enum DeskInkShadow {
 }
 
 private struct DeskInk: ViewModifier {
-    @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
+    @AppStorage("inkColor", store: .desk) private var savedInk = "ffffff"
     @AppStorage("inkShadow", store: .desk) private var shadow = true
+    @AppStorage(OledCare.key, store: .desk) private var oled = OledCare.defaultOn
     func body(content: Content) -> some View {
         content
-            .foregroundStyle(LinearGradient.ink(ink))
+            .foregroundStyle(LinearGradient.ink(oled ? OledInk.capWhite(savedInk) : savedInk))
             .opacity(0.92)
             .shadow(color: .black.opacity(shadow ? 0.45 : 0), radius: 10, x: 0, y: 2)
     }

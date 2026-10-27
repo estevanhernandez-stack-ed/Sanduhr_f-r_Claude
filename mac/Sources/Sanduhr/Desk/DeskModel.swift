@@ -146,6 +146,11 @@ final class DeskModel {
     /// corners on that side sit this much further in. Changes with an animation while an
     /// auto-hiding Dock comes and goes.
     var dockInsets = DockInsets()
+    /// OLED care's drift step (OledDrift), nil while OLED care is off: each piece sits at the orbit's
+    /// offset for it. Set by OledCareController inside one animation per step.
+    var oledStep: Int?
+    /// The Desk window's size in points, the area the drift is clamped to (0 until the window is built).
+    var deskSize: CGSize = .zero
     /// The camera notch in window coordinates (top-left origin), or nil on screens without one.
     var notchRect: CGRect?
     /// The Claude meters, short enough for the notch: "5h 7%  wk 63%".

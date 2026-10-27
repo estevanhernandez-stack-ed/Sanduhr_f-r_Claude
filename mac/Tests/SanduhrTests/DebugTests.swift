@@ -340,7 +340,7 @@ struct DebugStateTests {
         #expect(keys == ["desk_enabled", "desk_running", "layout", "desk_pieces", "desk_arrange", "notch", "has_notch",
                          "notch_pill", "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "now_playing", "now_playing_idle", "notch_shows", "widget_visible", "widget_visibility",
                          "menu_bar", "menu_bar_item", "settings_open", "settings_section", "settings_anchor", "settings_anchor_visible", "usage_page", "meters", "widget_warnings", "hidden_limits",
-                         "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "desk_piece_clicks", "desk_plate", "desk_under_icons", "dock", "alerts",
+                         "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "desk_piece_clicks", "desk_plate", "desk_under_icons", "oled_care", "dock", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "glow_claude_waiting", "glow_claude_done", "theme", "menu", "menu_submenus", "credentials_store", "account_ref", "accounts_count", "plan", "history_days", "data",
                          "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "snapshots", "seats", "version", "build", "whats_new", "tour", "watchers", "av_indicators", "settings_preview", "settings_preview_folded", "mods_page", "mods_config", "message_editor", "hot_keys", "meter_history", "lock_line", "just_the_desk", "demo", "reset_dry_run"])
@@ -468,7 +468,7 @@ struct DebugStateTests {
         var s = DebugStateInput()
         s.dock = DockDebug(side: .left, autohide: true, inset: 73)
         let yaml = YAMLEmitter.emit(DebugState.yaml(s))
-        #expect(yaml.contains("desk_frames_problem: null\ndesk_piece_clicks: true\ndesk_plate: false\ndesk_under_icons: false\ndock:\n  side: left\n  autohide: true\n  inset: 73\nalerts:\n"))
+        #expect(yaml.contains("desk_frames_problem: null\ndesk_piece_clicks: true\ndesk_plate: false\ndesk_under_icons: false\noled_care: false\ndock:\n  side: left\n  autohide: true\n  inset: 73\nalerts:\n"))
         let rest = YAMLEmitter.emit(DebugState.yaml(DebugStateInput()))
         #expect(rest.contains("dock:\n  side: bottom\n  autohide: false\n  inset: 0\n"))
     }

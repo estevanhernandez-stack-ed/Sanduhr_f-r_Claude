@@ -101,6 +101,7 @@ desk_frames_problem: null
 desk_piece_clicks: true
 desk_plate: false
 desk_under_icons: false
+oled_care: false
 dock:
   side: bottom
   autohide: false

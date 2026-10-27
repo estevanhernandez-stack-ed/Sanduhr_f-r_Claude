@@ -1397,6 +1397,10 @@ pointer. A drag that starts on a piece itself is Desk's until the button comes u
 the window server is not documented to honour for a drag already under way; it has not been
 checked against a live Finder drag in a test (see the smoke test).
 
+## OLED care
+
+Settings, Desk, **OLED care** (desk suite key `deskOledCare`, off when absent; the rules are in `OledCare.swift`, ported from Windows' `OledCare`). With it on and the Desk showing: every 3 minutes each Desk piece's offset moves to the next point of a 16-point figure-eight (6 points wide, a 48-minute loop), as one animation, clamped clear of the menu bar, the notch and the Dock; after 5 minutes without input the Desk window eases to 0.40 opacity and the widget window to 0.70 (the first input wakes them in 0.3 s; Reduce Motion snaps); and the Desk ink, the message and now playing never draw pure white (capped to #e6e6e6, hue kept). The notch island and the lock screen line do not drift. Off, none of it exists: no timer, no subscription, no offset. `IdleClock` is the one shared reader of seconds since any input (`CGEventSource`, no permission); it polls only while someone subscribes. `state.yaml` carries `oled_care: on|off` as a bool.
+
 ## Desk and the Dock
 
 Desk's pieces stay clear of the Dock on the Desk's screen (item 56, `DockFollower`, the pure

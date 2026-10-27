@@ -17,6 +17,8 @@ enum SettingsNames {
     static let checkAppMenus = "Also check other apps' menus"
     /// The Desk's switch, at the top of the Desk page (desk key `deskEnabled`).
     static let deskSwitch = "Desk: clock, meters, meetings and the message on the desktop"
+    /// Desk, OLED care: drift, dim while away, no pure white (desk key `deskOledCare`, off by default).
+    static let oledCareSwitch = OledCare.title
     /// The notch island's switch, at the top of the Notch page (desk key `notch`).
     static let notchSwitch = "Notch: the island around the camera"
     /// Widget: when the widget shows on its own (key `widgetVisibility`), moved from General.
@@ -57,7 +59,7 @@ enum SettingsNames {
         (menuBarShows, .general), (showMenuBarItem, .general), (meetingsMenu, .general),
         (SanduhrHotKeys.Shortcut.settings.name, .general), (SanduhrHotKeys.Shortcut.join.name, .general),
         (checkAppMenus, .general),
-        (deskSwitch, .deskLayout),
+        (deskSwitch, .deskLayout), (oledCareSwitch, .deskLayout),
         (notchSwitch, .notch), (notchGlow, .notch), (cameraMicPlace, .notch),
         (claudeCodeGlowHook, .integrations), (metersAbovePrompt, .mods), (byFolder, .mods),
         (claudeMetersLine, .deskLayout), (claudeMetersBars, .deskLayout),
