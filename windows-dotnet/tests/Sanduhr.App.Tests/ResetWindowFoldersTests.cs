@@ -1,4 +1,5 @@
 using System.IO;
+using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
@@ -444,4 +445,46 @@ public sealed class ResetWindowFoldersTests : AppWindowFixture
         }
         return null;
     }
+
+    [Fact]
+    public void An_added_folders_statusline_without_a_receipt_is_listed_and_an_unticked_row_comes_out_byte_for_byte() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Qxalpha");
+        try
+        {
+            string added = Path.Combine(Root, "elsewhere", "qxadded");
+            Directory.CreateDirectory(added);
+            File.WriteAllText(Path.Combine(added, "settings.json"), "{\n  \"theme\": \"dark\"\n}\n");
+            new SettingsStore(ScratchPaths()).SaveCcFoldersAdded([added]);
+            string source = Path.Combine(Root, "app", "mods", "sanduhr-meters");
+            Directory.CreateDirectory(Path.Combine(source, ".claude-plugin"));
+            Directory.CreateDirectory(Path.Combine(source, "hooks"));
+            File.WriteAllText(Path.Combine(source, ".claude-plugin", "plugin.json"), "{ \"name\": \"sanduhr-meters\", \"version\": \"0.3.0\" }");
+            File.WriteAllText(Path.Combine(source, "hooks", "hooks.json"), "{ \"modules\": [\"./register.tsx\"] }");
+            File.WriteAllText(Path.Combine(source, "hooks", "register.tsx"), "export {};");
+            var integ = new ClaudeCodeIntegrations(Profile, widget.SanduhrAppDataDir, source, externalDir: widget.SanduhrExternalDir);
+            var statusline = new StatuslineInstaller(Profile, widget.StatuslineBinDir, null, widget.SanduhrAppDataDir);
+            Assert.True(integ.Install(IntegrationKind.Meters, added).Ok);
+            Assert.True(statusline.InstallScript());
+            Assert.True(statusline.Install(added, StatuslineMode.Replace, StatuslineInstaller.DefaultSegments, StatuslineInstaller.JoinLine));
+            // The statusline's receipt is lost (a failed receipt save, a legacy install): the meters receipt stays.
+            var store = new ReceiptStore(Path.Combine(widget.SanduhrAppDataDir, ResetPlan.IntegrationsName, ResetPlan.ReceiptsFileName));
+            store.Save([.. store.Load().Records.Where(r => r.Kind != IntegrationKind.Statusline)]);
+            Assert.True(statusline.IsRegistered(added));
+            Dictionary<string, string> Hashes() => Directory.EnumerateFiles(added, "*", SearchOption.AllDirectories)
+                .ToDictionary(p => p, p => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(p))), StringComparer.OrdinalIgnoreCase);
+            var before = Hashes();
+
+            var list = ResetFolderListViewModel.Read(widget);
+            var row = Assert.Single(list.Rows);
+            Assert.False(row.Discovered);
+            Assert.Contains(IntegrationKind.Statusline, row.Folder.Kinds);   // the row says so, so unticking it can keep it
+            row.Undo = false;
+            var failures = ClaudeCodeViewModel.UndoEverything(widget, list.Kept).Failures;
+
+            Assert.Empty(failures);
+            Assert.Equal(before, Hashes());
+        }
+        finally { widget.Dispose(); }
+    });
 }

@@ -143,7 +143,7 @@ internal sealed class ResetFolderListViewModel
             var ledger = new ReceiptStore(receipts).Load();
             var mcp = new McpIntegrationInstaller(profile, widget.SanduhrAppDataDir, externalDir: widget.SanduhrExternalDir);
             var statusline = new StatuslineInstaller(profile, widget.StatuslineBinDir, null, widget.SanduhrAppDataDir);
-            var folders = ResetPlan.FoldersWithEntries(ledger.Records, known, k => k.Discovered && mcp.IsRegistered(k.Name), k => k.Discovered && statusline.IsRegistered(k.Name));
+            var folders = ResetPlan.FoldersWithEntries(ledger.Records, known, k => k.Discovered && mcp.IsRegistered(k.Name), k => statusline.IsRegistered(k.Path));   // by real path, so an added folder's receipt-less statusline is listed too and can be kept
             var rows = folders.Select(f => new ResetFolderRow(
                 f,
                 known.Any(k => k.Discovered && ClaudeCodeFolders.Same(k.Path, f.Path)),   // streamer: key - the real folder each row keys on; the row draws it through ShowFolder
