@@ -108,4 +108,25 @@ public class ThemeContrastTests
         Assert.True(ThemeContrast.Ratio(ThemeContrast.PrimaryButtonText, accent) >= ThemeContrast.TextMin, $"{key}: dialog primary text");
         Assert.True(ThemeContrast.Ratio(def.Accent, bg) >= ThemeContrast.NonTextMin, $"{key}: banner border");
     }
+
+    /// <summary>Spec: Obsidian's selected label uses Text with an accent bar. The rule is computed, so it holds for any theme (decision 11).</summary>
+    [Theory]
+    [MemberData(nameof(BuiltIns))]
+    public void The_selected_label_reads_and_its_bar_shows(string key)
+    {
+        var def = ThemeCatalog.BuiltIns[key];
+        ThemeLint.TryParseHex(def.Glass, out var row);
+        string label = ThemeContrast.SelectedLabel(def);
+        Assert.Equal(key == "obsidian" ? def.Text : def.Accent, label);
+        Assert.True(ThemeContrast.Ratio(label, row) >= ThemeContrast.TextMin, $"{key}: label {label}");
+        Assert.True(ThemeContrast.Ratio(def.Accent, row) >= ThemeContrast.NonTextMin, $"{key}: the bar");
+    }
+
+    /// <summary>Review Focus 4: a custom theme whose accent can't carry text on its row gets Text too.</summary>
+    [Fact]
+    public void A_custom_theme_with_a_dark_accent_gets_Text()
+    {
+        var custom = ThemeCatalog.BuiltIns["aurora"] with { Accent = "#1e3a8a" };
+        Assert.Equal(custom.Text, ThemeContrast.SelectedLabel(custom));
+    }
 }

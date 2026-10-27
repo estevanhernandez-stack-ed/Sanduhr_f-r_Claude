@@ -58,3 +58,43 @@ public sealed class SettingsContrastTests
         Assert.Contains("<Border x:Name=\"ThemesRoot\" Background=\"{DynamicResource Sanduhr.Brush.Glass}\"", xaml);
     }
 }
+
+/// <summary>Settings v2, slice 8: the sidebar's selected row draws its label in Sanduhr.Brush.SelectedLabel beside an accent bar.</summary>
+[Collection("SettingsWindow")]
+public sealed class SidebarSelectedLabelTests : AppWindowFixture
+{
+    [Theory]
+    [InlineData("obsidian")]
+    [InlineData("aurora")]
+    public void The_selected_row_draws_the_themes_selected_label_and_only_it_shows_the_bar(string key) => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Qxalpha");
+        Sanduhr.App.Views.SettingsWindow? window = null;
+        try
+        {
+            var svm = new Sanduhr.App.ViewModels.SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask,
+                checkForUpdatesNow: () => Task.FromResult(new Sanduhr.App.Updates.UpdateProbeResult(Sanduhr.App.Updates.UpdateProbeStatus.UpToDate)),
+                isStoreBuild: false);
+            window = new Sanduhr.App.Views.SettingsWindow(svm);
+            var def = ThemeCatalog.BuiltIns[key];
+            new ThemePalette(key, def).Apply(window.Resources);
+            var guard = NoActivate.Show(window);
+            window.SelectPage(SettingsPage.Themes);
+            window.UpdateLayout();
+            guard.Check();
+            var tabs = (System.Windows.Controls.TabControl)window.FindName("Tabs");
+            var selected = (System.Windows.Controls.TabItem)tabs.SelectedItem;
+            var expected = (Color)ColorConverter.ConvertFromString(ThemeContrast.SelectedLabel(def));
+            Assert.Equal(expected, ((SolidColorBrush)selected.Foreground).Color);
+            Assert.Equal(Visibility.Visible, ((FrameworkElement)selected.Template.FindName("bar", selected)).Visibility);
+            var other = tabs.Items.Cast<System.Windows.Controls.TabItem>().First(t => !ReferenceEquals(t, selected));
+            other.ApplyTemplate();
+            Assert.NotEqual(Visibility.Visible, ((FrameworkElement)other.Template.FindName("bar", other)).Visibility);
+        }
+        finally
+        {
+            window?.Close();
+            widget.Dispose();
+        }
+    });
+}

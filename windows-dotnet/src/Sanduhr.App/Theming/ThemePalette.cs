@@ -169,6 +169,8 @@ public sealed class ThemePalette
         SetBrush(res, "Sanduhr.Brush.TextDim", TextDim);
         SetBrush(res, "Sanduhr.Brush.TextMuted", TextMuted);
         SetBrush(res, "Sanduhr.Brush.Accent", Accent);
+        // The selected sidebar row's label (Settings v2, slice 8; WF37): Accent where it reads 4.5:1 on the row, else Text.
+        SetBrush(res, "Sanduhr.Brush.SelectedLabel", Hex(ThemeContrast.SelectedLabel(Definition)));
         SetBrush(res, "Sanduhr.Brush.Success", Success);
         SetBrush(res, "Sanduhr.Brush.PaceMarker", PaceMarker);
 

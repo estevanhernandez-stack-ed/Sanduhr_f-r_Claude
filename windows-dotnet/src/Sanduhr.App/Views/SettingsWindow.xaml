@@ -241,7 +241,14 @@
                                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                             <Border x:Name="bd" Padding="10,7" Margin="0,1" CornerRadius="6"
                                     Background="Transparent" BorderBrush="Transparent" BorderThickness="1">
-                                <ContentPresenter ContentSource="Header" />
+                                <Grid>
+                                    <!-- Settings v2, slice 8 (WF37): the selected row's accent bar, 3 x 16 DIP, 2 DIP in from the row's edge
+                                         (1 border + 10 padding - 9). -->
+                                    <Border x:Name="bar" Width="3" Height="16" CornerRadius="1.5" Margin="-9,0,0,0"
+                                            HorizontalAlignment="Left" VerticalAlignment="Center" Visibility="Hidden"
+                                            Background="{DynamicResource Sanduhr.Brush.Accent}" />
+                                    <ContentPresenter ContentSource="Header" />
+                                </Grid>
                             </Border>
                         </StackPanel>
                         <ControlTemplate.Triggers>
@@ -253,7 +260,8 @@
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="bd" Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
-                                <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                <Setter TargetName="bar" Property="Visibility" Value="Visible" />
+                                <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.SelectedLabel}" />
                                 <Setter Property="FontWeight" Value="SemiBold" />
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
