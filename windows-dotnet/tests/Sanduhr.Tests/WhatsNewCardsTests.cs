@@ -12,13 +12,41 @@ public class WhatsNewCardsTests
     public void Table_HasEveryReleaseNewestFirst()
     {
         Assert.Equal(
-            ["ci-runners",
+            ["settings-rearranged", "streamer-mode",
+             "ci-runners",
              "widgets", "companion", "claude-widgets", "restart-to-update", "desk-fold", "weather-nickname", "livelier-bars", "meter-styles",
              "desk-design", "launcher", "per-monitor", "song-looks", "oled-care", "saved-designs",
              "now-playing-steps-aside", "watchers", "suggested-messages", "desk-plate", "arrange-hide", "statusline-label",
              "desk", "settings-redesigned", "claude-code-page",
              "shortcut-keys", "tray-shows", "limits-come-and-go", "every-folder", "steady-sparklines", "whats-new"],
             Table.Select(c => c.Id));
+    }
+
+    /// <summary>4.0.0 (spec, Outside Settings, same release): "Settings, rearranged" lands on What leaves this PC, Streamer mode on its own section.</summary>
+    [Fact]
+    public void Release400_ShowsItsTwoCardsAfterTheUpdate()
+    {
+        var shown = WhatsNew.Cards("3.9.0", "4.0.0");
+        Assert.Equal(["settings-rearranged", "streamer-mode"], shown.Select(c => c.Id));
+        Assert.All(shown, c => Assert.Equal("4.0.0", c.Version));
+        Assert.All(shown, c => Assert.Equal(SettingsPage.Privacy, c.Destination));
+        Assert.Equal(SettingsIndex.Network, shown[0].Anchor);
+        Assert.Equal(SettingsIndex.Streamer, shown[1].Anchor);
+    }
+
+    [Fact]
+    public void Release400_CardsNameThePlaceInTheSettingsForm()
+    {
+        Assert.Equal("Settings, rearranged", Table.Single(c => c.Id == "settings-rearranged").Title);
+        Assert.Equal(SettingsNames.StreamerSection, Table.Single(c => c.Id == "streamer-mode").Title);
+        Assert.Contains("Settings, Privacy, Streamer mode", Table.Single(c => c.Id == "streamer-mode").Body);
+        Assert.Contains("Settings, Privacy", Table.Single(c => c.Id == "settings-rearranged").Body);
+    }
+
+    [Fact]
+    public void Release390_StillShowsOnlyItsOwnCardOnThe390Build()
+    {
+        Assert.Equal(["ci-runners"], WhatsNew.Cards("3.8.0", "3.9.0").Select(c => c.Id));
     }
 
     /// <summary>The Store goes 3.8.0 to 3.9.0: the one CI watchers card, and nothing from 3.8.0 again.</summary>
