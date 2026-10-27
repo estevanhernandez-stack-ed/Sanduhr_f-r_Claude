@@ -13,7 +13,7 @@ namespace Sanduhr.App.ViewModels;
 /// <see cref="Search"/>, the shortcut recorder, and the commands the About page and the sidebar's foot call: What's
 /// New, the tour, open a folder or link, Reset and Quit.
 /// </summary>
-public sealed class SettingsViewModel
+public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyChanged
 {
     public AccountsViewModel Accounts { get; }
 
@@ -145,6 +145,12 @@ public sealed class SettingsViewModel
     /// <summary>About, Where settings live: the folder holding settings, history, themes and logs. On a Store
     /// install, the package's LocalCache copy when it exists (see <see cref="DataFolders"/>).</summary>
     public string SettingsFolder { get; }
+
+    /// <summary>About's folders as shown (slice 7, CP 23; spec, About): the user folder as %USERPROFILE% while streamer mode is on. The
+    /// Show in Explorer commands keep the real paths.</summary>
+    public string SettingsFolderShown => StreamerMode.Mask.Paths(SettingsFolder);
+    public string LocalFolderShown => StreamerMode.Mask.Paths(LocalFolder);
+    public string ClaudeCodeFilesFolderShown => StreamerMode.Mask.Paths(ClaudeCodeFilesFolder);
 
     /// <summary>About, Where settings live: the usage vault (PRIVACY.md: <c>%LOCALAPPDATA%\Sanduhr\vault\</c>,
     /// or the package's LocalCache copy on a Store install).</summary>
@@ -304,8 +310,18 @@ public sealed class SettingsViewModel
         ClaudeCode.Overview.RefreshNames();
         ClaudeCode.Trends.RefreshNames();
         ClaudeCode.Ledger.RefreshNames();
+        Publish.RefreshNames();
+        WeatherPage.RefreshNames();
+        OnPropertyChanged(nameof(SettingsFolderShown));
+        OnPropertyChanged(nameof(LocalFolderShown));
+        OnPropertyChanged(nameof(ClaudeCodeFilesFolderShown));
         NamesReloaded++;
     }
+
+    /// <summary>Only About's three folder lines change after the window opens (streamer mode, slice 7).</summary>
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+    private void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));
 
     /// <summary>Tests count the reloads.</summary>
     internal int NamesReloaded { get; private set; }

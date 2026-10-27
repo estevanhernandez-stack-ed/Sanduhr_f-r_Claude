@@ -205,7 +205,7 @@ public sealed partial class ThemesViewModel : ObservableObject
         try
         {
             Directory.CreateDirectory(dir);
-            File.WriteAllText(
+            WriteText(
                 Path.Combine(dir, filename),
                 data.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
@@ -308,18 +308,34 @@ public sealed partial class ThemesViewModel : ObservableObject
         if (result != MessageBoxResult.Yes)
             return;
 
+        if (!TryDelete(name))
+            return;
+        _widget.ReloadUserThemes();
+        RefreshList();
+    }
+
+    /// <summary>Delete one installed theme file; a failure goes to <see cref="Error"/>. Split out of <see cref="Delete"/> so a test can reach it
+    /// without the confirmation dialog.</summary>
+    internal bool TryDelete(string name)
+    {
         try
         {
-            File.Delete(Path.Combine(_widget.ThemesDir, name));
+            DeleteFile(Path.Combine(_widget.ThemesDir, name));
+            return true;
         }
         catch (IOException e)
         {
             Error($"Could not delete: {e.Message}");
-            return;
+            return false;
         }
-        _widget.ReloadUserThemes();
-        RefreshList();
     }
+
+    /// <summary>Tests: where a theme file is written and deleted (a seam to raise an IO failure).</summary>
+    internal Action<string, string> WriteText { get; set; } = File.WriteAllText;
+    internal Action<string> DeleteFile { get; set; } = File.Delete;
+
+    /// <summary>Tests read the error line here instead of opening the dialog.</summary>
+    internal Action<string>? ErrorHook { get; set; }
 
     private bool HasSelection() => SelectedTheme is not null;
 
@@ -345,6 +361,14 @@ public sealed partial class ThemesViewModel : ObservableObject
 
     private void Error(string message)
     {
+        // Streamer mode (preflight P1): an exception's message can hold the Windows user folder. Every error line, the Theme Studio's
+        // included (it is handed this method), passes through here.
+        message = StreamerMode.Mask.Paths(message);
+        if (ErrorHook is { } hook)
+        {
+            hook(message);
+            return;
+        }
         Sounds.PlayError();
         Show(message, ThemedDialogKind.Warning);
     }

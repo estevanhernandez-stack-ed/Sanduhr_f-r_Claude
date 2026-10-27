@@ -1932,7 +1932,15 @@
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                                 <TextBlock Text="Endpoint URL" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <!-- Streamer mode (slice 7, decision 12): a read-only line in place of the box, so the address never shows. -->
+                                <StackPanel Visibility="{Binding StreamerOn, Converter={StaticResource BoolVis}}">
+                                    <TextBlock Text="{Binding EndpointShown}" FontFamily="Cascadia Code, Consolas" FontSize="12"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                    <TextBlock Text="{x:Static core:SettingsNames.EndpointHiddenNote}" FontSize="10.5"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                </StackPanel>
                                 <TextBox Style="{StaticResource Input}" Width="360"
+                                         Visibility="{Binding StreamerOff, Converter={StaticResource BoolVis}}"
                                          Text="{Binding EndpointUrl, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                                          AutomationProperties.Name="Endpoint URL"
                                          ToolTip="Where the daily POST goes. An absolute http(s) URL you control." />
@@ -2002,7 +2010,7 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
-                                                  Content="{Binding Name}"
+                                                  Content="{Binding Shown}"
                                                   IsChecked="{Binding IsShared, Mode=TwoWay}"
                                                   ToolTip="Include this Claude Code folder's per-project token counts in the daily publish." />
                                     </DataTemplate>
@@ -2671,10 +2679,13 @@
                                 </StackPanel>
                                 <TextBlock Text="{Binding Note}" FontSize="11" Margin="0,6,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
-                                <ListBox ItemsSource="{Binding Results}" SelectedItem="{Binding Picked, Mode=TwoWay}"
-                                         DisplayMemberPath="Label" MaxHeight="140" Margin="0,4,0,0" Width="400" HorizontalAlignment="Left"
+                                <ListBox ItemsSource="{Binding Results}" SelectedValuePath="Place" SelectedValue="{Binding Picked, Mode=TwoWay}"
+                                         DisplayMemberPath="Shown" MaxHeight="140" Margin="0,4,0,0" Width="400" HorizontalAlignment="Left"
                                          Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Sanduhr.Brush.Text}"
                                          AutomationProperties.Name="Places found" />
+                                <TextBlock Text="{x:Static core:SettingsNames.PlacesHiddenNote}" FontSize="10.5" Margin="0,2,0,0"
+                                           Visibility="{Binding PlacesHidden, Converter={StaticResource BoolVis}}"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                                 <Grid Margin="0,10,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="90" />
@@ -2818,9 +2829,9 @@
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Settings, history, themes" FontSize="12"
                                                VerticalAlignment="Center" Margin="0,0,12,6"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SettingsFolder}" FontSize="11"
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SettingsFolderShown}" FontSize="11"
                                                FontFamily="Cascadia Code, Consolas" TextWrapping="Wrap"
-                                               ToolTip="{Binding SettingsFolder}" VerticalAlignment="Center" Margin="0,0,8,6"
+                                               ToolTip="{Binding SettingsFolderShown}" VerticalAlignment="Center" Margin="0,0,8,6"
                                                Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                     <Button Grid.Row="0" Grid.Column="2" Style="{StaticResource FlatButton}" Padding="10,4"
                                             Margin="0,0,0,6" Content="Show in Explorer"
@@ -2831,9 +2842,9 @@
                                                VerticalAlignment="Center" Margin="0,0,12,6"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                     <StackPanel Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,6">
-                                        <TextBlock Text="{Binding LocalFolder}" FontSize="11"
+                                        <TextBlock Text="{Binding LocalFolderShown}" FontSize="11"
                                                    FontFamily="Cascadia Code, Consolas" TextWrapping="Wrap"
-                                                   ToolTip="{Binding LocalFolder}"
+                                                   ToolTip="{Binding LocalFolderShown}"
                                                    Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                         <TextBlock Text="{x:Static core:SettingsNames.NothingArchivedYet}" FontSize="10.5" Margin="0,2,0,0"
                                                    Foreground="{DynamicResource Sanduhr.Brush.TextDim}">
@@ -2857,9 +2868,9 @@
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="Claude Code files" FontSize="12"
                                                VerticalAlignment="Center" Margin="0,0,12,6"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ClaudeCodeFilesFolder}" FontSize="11"
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ClaudeCodeFilesFolderShown}" FontSize="11"
                                                FontFamily="Cascadia Code, Consolas" TextWrapping="Wrap"
-                                               ToolTip="{Binding ClaudeCodeFilesFolder}" VerticalAlignment="Center" Margin="0,0,8,6"
+                                               ToolTip="{Binding ClaudeCodeFilesFolderShown}" VerticalAlignment="Center" Margin="0,0,8,6"
                                                Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                     <Button Grid.Row="2" Grid.Column="2" Style="{StaticResource FlatButton}" Padding="10,4"
                                             Margin="0,0,0,6" Content="Show in Explorer"

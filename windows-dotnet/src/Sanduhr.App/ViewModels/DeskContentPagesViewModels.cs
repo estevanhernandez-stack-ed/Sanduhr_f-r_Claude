@@ -254,6 +254,11 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
 /// rounded to about 1 km. Clear forgets the place. "Show it as" (#315) is a nickname the Desk shows instead of the place's
 /// name: kept on this PC only, never sent, and the forecast still uses the picked place. Picking a place shows a hidden Weather piece (Principle 4); where it sits is Settings, Desk, Pieces.
 /// </summary>
+public sealed record PlaceChoice(WeatherPlace Place, string Shown)
+{
+    public override string ToString() => Shown;
+}
+
 public sealed partial class WeatherPageViewModel : ObservableObject
 {
     private readonly SettingsStore _store;
@@ -303,10 +308,37 @@ public sealed partial class WeatherPageViewModel : ObservableObject
     [ObservableProperty] private WeatherPlace? _picked;
     [ObservableProperty] private string _nickname = "";
 
-    public ObservableCollection<WeatherPlace> Results { get; } = [];
+    public ObservableCollection<PlaceChoice> Results { get; } = [];
 
-    /// <summary>"Fort Worth, Texas, United States", or "No city set".</summary>
-    public string PlaceText => _saved.Place?.Label ?? "No city set";
+    /// <summary>Places found are codenames: the note under the list says so (owner taste 11).</summary>
+    public bool PlacesHidden => StreamerMode.On && Results.Count > 0;
+
+    /// <summary>Streamer mode moved (slice 7).</summary>
+    public void RefreshNames()
+    {
+        var places = Results.Select(r => r.Place).ToList();
+        Results.Clear();
+        foreach (var p in places) Results.Add(Choice(p));
+        OnPropertyChanged(nameof(PlaceText));
+        OnPropertyChanged(nameof(PlacesHidden));
+    }
+
+    private static PlaceChoice Choice(WeatherPlace p) =>
+        new(p, StreamerMode.On ? StreamerMode.Mask.Name(CodenameCategory.City, p.Label) : p.Label);
+
+    /// <summary>Tests fill the list as Look up does.</summary>
+    internal void ShowResultsForTests(IEnumerable<WeatherPlace> places)
+    {
+        Results.Clear();
+        foreach (var p in places) Results.Add(Choice(p));
+        OnPropertyChanged(nameof(PlacesHidden));
+    }
+
+    /// <summary>"Fort Worth, Texas, United States", or "No city set". While streamer mode is on: the "Show it as" name, else the city's
+    /// codename (spec, Weather; slice 7, CP 21).</summary>
+    public string PlaceText => _saved.Place is not { } place ? "No city set"
+        : StreamerMode.On ? StreamerMode.Mask.WeatherName(place, _saved.Nickname)
+        : place.Label;
 
     public bool HasPlace => _saved.Place is not null;
 
@@ -322,7 +354,8 @@ public sealed partial class WeatherPageViewModel : ObservableObject
         {
             var places = await WeatherService.LookUp(City, cts.Token);
             if (cts.IsCancellationRequested) return;
-            foreach (var p in places) Results.Add(p);
+            foreach (var p in places) Results.Add(Choice(p));
+            OnPropertyChanged(nameof(PlacesHidden));
             Note = places.Count == 0 ? "No place by that name. Try the city with its country." : "Pick your place:";
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or OperationCanceledException)
@@ -336,6 +369,7 @@ public sealed partial class WeatherPageViewModel : ObservableObject
         if (value is null) return;
         Save(_saved with { Place = WeatherPlace.Create(value.Name, value.Admin, value.Country, value.Lat, value.Lon) });
         Results.Clear();
+        OnPropertyChanged(nameof(PlacesHidden));
         Note = "";
         City = "";
         Piece?.PlaceIfHidden();

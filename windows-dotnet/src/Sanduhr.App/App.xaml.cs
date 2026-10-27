@@ -786,8 +786,8 @@ public partial class App : Application
         svm.MessageChanged = () => { _desk?.Reload(); _handoff?.PublishState(); };
         svm.Desk.WatchersChanged = () => _watchers?.SwitchChanged();
         svm.Desk.CiRunnersChanged = () => _runners?.Refresh();
-        svm.Desk.CiRunnersStatus = _runners?.Status.Text ?? "";
-        Action showRunnerStatus = () => svm.Desk.CiRunnersStatus = _runners?.Status.Text ?? "";
+        svm.Desk.CiRunnersStatus = RunnerStatusText(_runners?.Status);
+        Action showRunnerStatus = () => svm.Desk.CiRunnersStatus = RunnerStatusText(_runners?.Status);
         RunnerStatusShown += showRunnerStatus;
         svm.QuitRequested = QuitApp;
         // Settings, Widget, Just the Desk's "Show the widget" (WF32): the widget view model has ended it and redrawn the Desk; the window is App's.
@@ -986,6 +986,11 @@ public partial class App : Application
 
     /// <summary>Streamer mode moved (slice 7): the tooltip's prefix, the Desk and the Watchers runner line follow. App lives as long as the
     /// widget, so this subscription is never detached.</summary>
+    /// <summary>Watchers' CI runners line (slice 7, CP 22): each runner by codename while streamer mode is on. Raised again when the switch
+    /// moves (<see cref="OnStreamerChanged"/>).</summary>
+    internal static string RunnerStatusText(RunnerStatus? status) =>
+        status is null ? "" : (status with { Runners = [.. status.Runners.Select(r => StreamerMode.Mask.Name(CodenameCategory.Runner, r))] }).Text;
+
     private void OnStreamerChanged()
     {
         if (_tray is not null)

@@ -81,6 +81,9 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
 {
     private readonly WidgetViewModel _widget;
     private readonly Action<string> _error;
+
+    /// <summary>Tests: where the theme file is written (a seam to raise an IO failure).</summary>
+    internal Action<string, string> WriteText { get; set; } = File.WriteAllText;
     private readonly Action<string> _info;
     private readonly Action _saved;
     private ThemeDraft _draft = new();
@@ -305,12 +308,12 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
         {
             Directory.CreateDirectory(dir);
             string tmp = path + ".tmp";
-            File.WriteAllText(tmp, _draft.ToJsonText());
+            WriteText(tmp, _draft.ToJsonText());
             File.Move(tmp, path, overwrite: true);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            _error($"Could not write the theme: {e.Message}");
+            _error($"Could not write the theme: {StreamerMode.Mask.Paths(e.Message)}");
             return;
         }
 
