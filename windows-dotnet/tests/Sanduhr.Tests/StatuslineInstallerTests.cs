@@ -253,7 +253,7 @@ public class StatuslineInstallerSpliceTests
     [InlineData("\r\n")]
     public void Remove_without_a_receipt_puts_a_chained_command_back(string eol)
     {
-        // Carry (after slice 8): a readable record that no longer names this folder. The person's command rides inside Sanduhr's,
+        // Carry (after slice 8): no record at all (Save([]) deletes the ledger), so there is no receipt for this folder. The person's command rides inside Sanduhr's,
         // so Remove decodes it and puts it back as their statusLine instead of dropping the key.
         using var rig = new Rig();
         rig.Write(Settings(eol, TheirsLf.Replace("\n", eol)));
@@ -264,6 +264,7 @@ public class StatuslineInstallerSpliceTests
 
         Assert.Equal(StatuslineStatus.Other, rig.Installer.Status(".claude"));
         Assert.Equal("~/bin/mine.sh \u00e9", rig.Installer.TheirCommand(".claude"));
+        Assert.Contains("\"type\": \"command\"", rig.Text());
         Assert.Contains("mine.sh \u00e9", rig.Text());   // raw UTF-8, not the escaped form: written the way Install writes, through JsonEdit.Quoted
         Assert.Contains("\"model\": \"opus\"", rig.Text());
         Assert.Contains("\"A\": \"1\"", rig.Text());
@@ -285,6 +286,7 @@ public class StatuslineInstallerSpliceTests
 
         Assert.Equal(StatuslineStatus.Other, rig.Installer.Status(".claude"));
         Assert.Equal("~/bin/mine.sh \u00e9", rig.Installer.TheirCommand(".claude"));
+        Assert.Contains("\"type\": \"command\"", rig.Text());
     }
 
     [Fact]
