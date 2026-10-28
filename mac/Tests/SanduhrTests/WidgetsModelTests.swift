@@ -210,17 +210,17 @@ struct WidgetsModelTests {
         #expect(m.justInstalledSprite == nil)
     }
 
-    @Test func turnOnPlacesTheCompanionAndTheDeskDecidesTheSentence() {
+    @Test func theLinkSaysWhatIsMissingAndLandsWhereItIsSet() {
         let standard = DeskLayout.standard
         #expect(CompanionOnDesk.state(deskOn: true, layout: standard) == .notPlaced)
-        let placed = CompanionOnDesk.placed(in: standard)
-        #expect(DeskArrangement(placed).placement("companion")?.anchor == .bc)
+        let placed = standard + " companion:bc"
         #expect(CompanionOnDesk.state(deskOn: false, layout: placed) == .deskOff)
         #expect(CompanionOnDesk.state(deskOn: true, layout: placed) == .on)
-        #expect(CompanionOnDesk.placed(in: placed) == placed)
+        #expect(CompanionOnDesk.anchor(.notPlaced) == SettingsAnchor.companionPlace)
+        #expect(CompanionOnDesk.anchor(.deskOff) == SettingsAnchor.desk)
         #expect(CompanionOnDesk.prompt(.on, name: "Hourglass") == nil)
-        #expect(CompanionOnDesk.prompt(.notPlaced, name: "Hourglass") == "Hourglass is installed. Turn it on to put your companion on the Desk.")
-        #expect(CompanionOnDesk.prompt(.deskOff, name: nil) == "Turn it on to show the Desk, where your companion lives.")
+        #expect(CompanionOnDesk.prompt(.notPlaced, name: "Hourglass") == "Hourglass is installed. Place the Companion piece on the Desk to see it.")
+        #expect(CompanionOnDesk.prompt(.deskOff, name: nil) == "Turn on the Desk to see your companion.")
     }
 
     @Test func installUpdateAndUninstallWalkThroughTheOffers() async {

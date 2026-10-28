@@ -42,6 +42,8 @@ enum SettingsAnchor {
     static let desk = "desk"
     static let arrange = "arrange"
     static let pieces = "pieces"
+    /// The Companion's row under Where each piece sits (not searchable: Settings, Widgets links to it).
+    static let companionPlace = "companion-place"
     static let order = "order"
     static let clicks = "clicks"
     static let oled = "oled"

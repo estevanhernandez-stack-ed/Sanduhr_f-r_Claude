@@ -1,8 +1,8 @@
 import Foundation
 
 /// Whether the companion can show: the Desk is on and the `companion` piece is placed. A sprite
-/// installed from Settings ▸ Widgets shows nothing until both hold, so the page asks for Turn On,
-/// which makes both writes.
+/// installed from Settings, Widgets shows nothing until both hold, so the page says which is missing
+/// and links to the row on Settings, Desk where it is set.
 enum CompanionOnDesk {
     enum State: Equatable { case on, deskOff, notPlaced }
 
@@ -11,20 +11,18 @@ enum CompanionOnDesk {
         return deskOn ? .on : .deskOff
     }
 
-    /// `layout` with the companion at its standard place; a placed companion stays where it is.
-    static func placed(in layout: String) -> String {
-        var a = DeskArrangement(layout)
-        a.show("companion")
-        return a.string
-    }
-
-    /// The sentence over Turn On.
+    /// The sentence over the link, nil when the companion shows.
     static func prompt(_ state: State, name: String?) -> String? {
         let it = name.map { "\($0) is installed. " } ?? ""
         switch state {
         case .on: return nil
-        case .notPlaced: return it + "Turn it on to put your companion on the Desk."
-        case .deskOff: return it + "Turn it on to show the Desk, where your companion lives."
+        case .notPlaced: return it + "Place the Companion piece on the Desk to see it."
+        case .deskOff: return it + "Turn on the Desk to see your companion."
         }
+    }
+
+    /// Where the link lands on Settings, Desk: the Companion's place, or the Desk's switch.
+    static func anchor(_ state: State) -> String {
+        state == .deskOff ? SettingsAnchor.desk : SettingsAnchor.companionPlace
     }
 }

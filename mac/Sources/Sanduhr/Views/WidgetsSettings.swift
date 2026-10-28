@@ -168,29 +168,22 @@ private struct WidgetsCompanionSection: View {
     }
 }
 
-/// Turn On for the companion: shown while a sprite is installed but the Desk is off or the piece
-/// isn't placed. Places the piece at its standard spot and turns the Desk on.
+/// A link to where the companion is set, shown while a sprite is installed but the Desk is off or
+/// the piece isn't placed: Desk Settings…, landing on the Companion's place or the Desk's switch.
 private struct CompanionTurnOnRow: View {
     let name: String?
     @AppStorage(DeskArrangeMode.layoutKey, store: .desk) private var layout = DeskLayout.standard
     @AppStorage(DeskController.enabledKey, store: .desk) private var deskOn = false
 
     var body: some View {
-        if let text = CompanionOnDesk.prompt(CompanionOnDesk.state(deskOn: deskOn, layout: layout), name: name) {
+        let state = CompanionOnDesk.state(deskOn: deskOn, layout: layout)
+        if let text = CompanionOnDesk.prompt(state, name: name) {
             HStack {
                 Text(text)
                 Spacer()
-                Button("Turn On") { turnOn() }
+                SettingsLinkButton(.deskLayout, anchor: CompanionOnDesk.anchor(state))
                     .buttonStyle(.borderedProminent)
             }
-        }
-    }
-
-    private func turnOn() {
-        layout = CompanionOnDesk.placed(in: layout)
-        if !deskOn {
-            deskOn = true
-            DeskController.shared.apply()
         }
     }
 }

@@ -57,13 +57,16 @@ struct DeskLayoutSection: View {
     }
 }
 
-/// Where each piece sits: its first row carries the section's anchor.
+/// Where each piece sits: its first row carries the section's anchor, and the Companion's row its
+/// own, for Settings, Widgets' link after a sprite install.
 private struct FirstPieceAnchor: ViewModifier {
     let widget: String
 
     func body(content: Content) -> some View {
         if widget == DeskLayout.widgets.first?.key {
             content.settingsAnchor(SettingsAnchor.pieces)
+        } else if widget == "companion" {
+            content.settingsAnchor(SettingsAnchor.companionPlace)
         } else {
             content
         }
