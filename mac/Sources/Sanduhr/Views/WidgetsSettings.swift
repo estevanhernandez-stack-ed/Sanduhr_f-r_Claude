@@ -9,9 +9,6 @@ struct WidgetsSettings: View {
 
     var body: some View {
         Form {
-            if model.justInstalledSprite != nil {
-                Section { CompanionTurnOnRow(name: model.justInstalledSprite) }
-            }
             WidgetsCatalogSection(model: model)
             WidgetsInstalledSection(model: model)
             WidgetsCompanionSection(model: model)
@@ -158,29 +155,10 @@ private struct WidgetsCompanionSection: View {
                 }
                 Text("One companion at a time. With no pick, the first installed sprite is used.")
                     .font(.caption).foregroundStyle(.secondary)
-                if model.justInstalledSprite == nil { CompanionTurnOnRow(name: nil) }
             }
+            // Where the companion is placed and moved: its row under Where each piece sits.
+            SettingsLinkButton(.deskLayout, anchor: SettingsAnchor.companionPlace)
         }
         .settingsAnchor(SettingsAnchor.companion)
-    }
-}
-
-/// A link to where the companion is set, shown while a sprite is installed but the Desk is off or
-/// the piece isn't placed: Desk Settings…, landing on the Companion's place or the Desk's switch.
-private struct CompanionTurnOnRow: View {
-    let name: String?
-    @AppStorage(DeskArrangeMode.layoutKey, store: .desk) private var layout = DeskLayout.standard
-    @AppStorage(DeskController.enabledKey, store: .desk) private var deskOn = false
-
-    var body: some View {
-        let state = CompanionOnDesk.state(deskOn: deskOn, layout: layout)
-        if let text = CompanionOnDesk.prompt(state, name: name) {
-            HStack {
-                Text(text)
-                Spacer()
-                SettingsLinkButton(.deskLayout, anchor: CompanionOnDesk.anchor(state))
-                    .buttonStyle(.borderedProminent)
-            }
-        }
     }
 }

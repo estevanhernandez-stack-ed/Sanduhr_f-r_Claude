@@ -191,38 +191,15 @@ struct WidgetsModelTests {
         #expect(!m.checking)
     }
 
-    @Test func aSpriteInstalledFromTheCatalogAsksToBeTurnedOnUntilItIsRemoved() async {
+    @Test func theCatalogRowFollowsAnUninstallAtOnce() async {
         let box = Box(publish(kind: "sprite", pack: "good-sprite"))
         let m = model(box, WidgetTestRoot(), WidgetScratchDefaults())
         await m.refreshCatalog()
         await m.install(box.net.entry)
-        #expect(m.notice == nil && m.justInstalledSprite == "Fixture")
         #expect(m.offer(for: box.net.entry) == .installed)
         m.uninstall("good-sprite")
-        #expect(m.justInstalledSprite == nil)
-        // The catalog row reads the observed list, so it offers Install again at once.
+        // The row reads the observed list, so it offers Install again without a reload.
         #expect(m.offer(for: box.net.entry) == .install)
-    }
-
-    @Test func aPaletteNeverAsksForTheCompanion() async {
-        let box = Box(publish())
-        let m = model(box, WidgetTestRoot(), WidgetScratchDefaults())
-        await m.refreshCatalog()
-        await m.install(box.net.entry)
-        #expect(m.justInstalledSprite == nil)
-    }
-
-    @Test func theLinkSaysWhatIsMissingAndLandsWhereItIsSet() {
-        let standard = DeskLayout.standard
-        #expect(CompanionOnDesk.state(deskOn: true, layout: standard) == .notPlaced)
-        let placed = standard + " companion:bc"
-        #expect(CompanionOnDesk.state(deskOn: false, layout: placed) == .deskOff)
-        #expect(CompanionOnDesk.state(deskOn: true, layout: placed) == .on)
-        #expect(CompanionOnDesk.anchor(.notPlaced) == SettingsAnchor.companionPlace)
-        #expect(CompanionOnDesk.anchor(.deskOff) == SettingsAnchor.desk)
-        #expect(CompanionOnDesk.prompt(.on, name: "Hourglass") == nil)
-        #expect(CompanionOnDesk.prompt(.notPlaced, name: "Hourglass") == "Hourglass is installed. Place the Companion piece on the Desk to see it.")
-        #expect(CompanionOnDesk.prompt(.deskOff, name: nil) == "Turn on the Desk to see your companion.")
     }
 
     @Test func installUpdateAndUninstallWalkThroughTheOffers() async {

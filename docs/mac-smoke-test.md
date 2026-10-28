@@ -2212,12 +2212,9 @@ The piece needs an installed sprite pack (the hourglass is in the catalog) and t
 `smoke/smoke state` shows `companion: null` until it draws.
 
 1. Desk on, no sprite installed: `companion: null`, and `ps`/Activity Monitor show nothing extra for
-   it. Install the hourglass: Settings, Widgets leads with "Hourglass is installed. Place the
-   Companion piece on the Desk to see it." and **Desk Settings…**. Press it: Settings, Desk opens at
-   the Companion's row under Where each piece sits (with the Desk off, the sentence asks to turn on
-   the Desk and the link lands on its switch). Pick a place: the row on Widgets goes away, and the
-   companion appears on the Desk within a second. While a sprite is installed and the companion isn't
-   showing, the Companion section keeps the same row;
+   it. Install the hourglass, then press **Desk Settings…** in Settings, Widgets, Companion: Settings,
+   Desk opens at the Companion's row under Where each piece sits. Pick a place: the companion appears on
+   the Desk within a second;
    `smoke/smoke state` shows `companion: {pack: hourglass, stage, mood, roaming}`.
 2. Settings, Widgets, Companion: with two sprite packs installed, picking one swaps the art at once
    and `companion.pack` follows. Uninstalling the picked pack falls back to the first sprite by id;
