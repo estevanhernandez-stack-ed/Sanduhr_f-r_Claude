@@ -9,13 +9,18 @@ public static class WhatsNewCards
 {
     public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release400(), .. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
 
-    // 4.0.0 (Settings v2; spec, Outside Settings, same release): Settings rearranged, landing on What leaves this PC, and Streamer mode.
+    // 4.0.0 (Settings v2; spec, Outside Settings, same release): Settings rearranged, landing on What leaves this PC; one theme for the
+    // widget and the Desk (theme match, with the message's own switch); and Streamer mode.
     private static WhatsNewCard[] Release400() =>
     [
         WhatsNewCard.Of("4.0.0", "settings-rearranged", "Settings, rearranged",
             "Every feature has one home now, and search lands on the exact section. Settings, Privacy shows what leaves this PC and what Claude can change.",
             "", // Settings
             WhatsNewPreview.None, SettingsPage.Privacy),
+        WhatsNewCard.Of("4.0.0", "one-theme", "One theme for the widget and the Desk",
+            "The Desk can take your widget's colors, font and plate, the message included. Turn it on in Settings, Desk Look, Match the widget theme.",
+            "", // Color
+            WhatsNewPreview.None, SettingsPage.DeskLook),
         WhatsNewCard.Of("4.0.0", "streamer-mode", SettingsNames.StreamerSection,
             "Before you share your screen, turn on Settings, Privacy, Streamer mode. Accounts, folders and projects become codenames; live numbers stay.",
             "", // Hide
@@ -177,6 +182,7 @@ public static class WhatsNewCards
     private static string? AnchorFor(string id) => id switch
     {
         "settings-rearranged" => SettingsIndex.Network,
+        "one-theme" => SettingsIndex.DeskThemeMatch,
         "streamer-mode" => SettingsIndex.Streamer,
         "ci-runners" => SettingsIndex.CiRunners,
         "widgets" => SettingsIndex.WidgetsCatalog,

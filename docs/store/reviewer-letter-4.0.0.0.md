@@ -1,20 +1,20 @@
 # Notes for certification — reviewer letter (v4.0.0.0)
 
 > Paste the block between the `---` markers into Partner Center → Submission options → Notes
-> for certification (~2000-char cap; this block measures 1,614 characters, the fallback 695; 1,648 and 710 if the field counts a line break as two). This field never goes
+> for certification (~2000-char cap; this block measures 1,632 characters, the fallback 679; 1,667 and 694 if the field counts a line break as two). This field never goes
 > through the Store Listing Console API, so it is confirmed in Partner Center or not at all.
 >
-> Framing: 4.0 rebuilds Settings (Settings v2) and adds **no capability**: the manifest changes only
-> its version and still declares `runFullTrust` only. It adds **two outbound items**, both disclosed in
-> `docs/PRIVACY.md` and the hosted policy (hub PR #280, which must be live before commit):
-> - Google's sign-in page, loaded in Sanduhr's WebView2 sign-in window only when the user chooses
->   Continue with Google on claude.ai's sign-in page. Nothing new is kept; the session cookie is
->   captured as before.
-> - claude.ai's routines budget (`claude.ai/v1/code/routines/run-budget`), read with the same session
->   and on the same host as the usage call.
+> Framing: 4.0 rebuilds Settings (Settings v2) and adds **no capability and no new destination**: the
+> manifest changes only its version and still declares `runFullTrust` only. Settings ▸ Privacy now lists
+> every destination, built from one table a test keeps complete (`NetworkDisclosureTests`), and that
+> made three existing items disclosed for the first time, in `docs/PRIVACY.md` and the hosted policy
+> (hub PR #280, which must be live before commit):
 >
-> SmartScreen in WebView2 is not new, but 4.0 discloses it. Settings ▸ Privacy now lists every
-> destination, built from one table a test keeps complete (`NetworkDisclosureTests`).
+> - Google's sign-in page. It was reachable in 3.9 (Continue with Google on claude.ai's sign-in page)
+>   but dead-ended; 4.0 finishes it in a small window of Sanduhr's. Nothing new is kept.
+> - claude.ai's routines budget (`claude.ai/v1/code/routines/run-budget`), read since June 2026 with
+>   the same session and on the same host as the usage call.
+> - SmartScreen, which WebView2 runs as Edge does.
 > Confirm which version is live before pasting: the first line below names 3.9.1.0.
 
 ---
@@ -30,11 +30,12 @@ New in 4.0.0.0: Settings is rebuilt, with pages grouped by task and a
 search box. Settings > Privacy lists every network destination, when it
 is used, what it carries and the switch that turns it off.
 
-Two outbound items are new, both on that page and in the hosted privacy
-policy: (1) Google's sign-in page, only if the user chooses Continue
-with Google on claude.ai's sign-in page, inside Sanduhr's sign-in
-window; (2) the Claude Code routines budget, read from claude.ai with
-the same session as the usage it already reads. Nothing else is sent.
+No new destination. Two existing ones are now disclosed there and in
+the hosted privacy policy: (1) Google's sign-in page, only if the user
+chooses Continue with Google on claude.ai's sign-in page; it now
+finishes in a small Sanduhr window instead of dead-ending; (2) the
+Claude Code routines budget, read from claude.ai with the session it
+already uses for usage.
 
 Also new, off by default: streamer mode (Settings > Privacy), which
 shows codenames in place of account, folder and project names. Its two
@@ -65,10 +66,10 @@ Updates v3.9.1.0, same Identity and Publisher CN. Only runFullTrust is
 declared; no telemetry.
 
 New: Settings is rebuilt; Settings > Privacy lists every destination.
-Two outbound items are new, both disclosed there and in the hosted
-policy: Google's sign-in page (only if the user picks Continue with
-Google, in Sanduhr's sign-in window) and the Claude Code routines budget
-from claude.ai, with the same session. Streamer mode, off by default,
+No new destination; two existing ones are now disclosed there and in
+the hosted policy: Google's sign-in page (only if the user picks
+Continue with Google) and the Claude Code routines budget from
+claude.ai, with the same session. Streamer mode, off by default,
 shows codenames in place of names; its files stay on the PC.
 
 "Claude"/"claude.ai" are Anthropic PBC trademarks, used nominatively.
