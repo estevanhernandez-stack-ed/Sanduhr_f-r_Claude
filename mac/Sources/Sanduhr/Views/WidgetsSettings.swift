@@ -32,8 +32,8 @@ private struct WidgetsSuggestionSection: View {
     let handoff: WidgetProposalHandoff
 
     var body: some View {
-        if let review = handoff.model {
-            Section {
+        Section {
+            if let review = handoff.model {
                 WidgetSuggestionBanner(
                     model: review, previewNote: handoff.previewNote,
                     preview: { handoff.previewOnDesk() },
@@ -41,9 +41,13 @@ private struct WidgetsSuggestionSection: View {
                     makeCompanion: { handoff.apply(makeCompanion: true) },
                     apply: { handoff.apply() },
                     dismiss: { handoff.dismiss() })
+            } else {
+                // The anchor stays on the page with nothing waiting, so the search entry still lands at the top.
+                Text("No widget suggestion from Claude is waiting.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
-            .settingsAnchor(SettingsAnchor.widgetSuggestion)
         }
+        .settingsAnchor(SettingsAnchor.widgetSuggestion)
     }
 }
 
@@ -165,12 +169,21 @@ private struct WidgetsInstalledRow: View {
             }
             Spacer()
             if model.canUseOwnArt(row) {
-                Button("Use my own art\u{2026}") { OwnArtPicker.run(model: model, id: row.id) }
-                    .accessibilityLabel("Use my own art for \(row.name)")
-                    .settingsAnchor(SettingsAnchor.ownArt)
+                if model.firstOwnArtRow?.id == row.id {
+                    ownArtButton.settingsAnchor(SettingsAnchor.ownArt)
+                } else {
+                    ownArtButton
+                }
             }
             Button("Uninstall") { model.uninstall(row.id) }
         }
+    }
+}
+
+private extension WidgetsInstalledRow {
+    var ownArtButton: some View {
+        Button("Use my own art\u{2026}") { OwnArtPicker.run(model: model, id: row.id) }
+            .accessibilityLabel("Use my own art for \(row.name)")
     }
 }
 

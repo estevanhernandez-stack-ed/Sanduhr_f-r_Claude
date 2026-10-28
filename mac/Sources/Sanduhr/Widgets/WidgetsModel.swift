@@ -194,6 +194,9 @@ final class WidgetsModel {
         return entry.source != .catalog
     }
 
+    /// The first installed row that offers own art: it carries the search anchor, so one anchor names one place.
+    var firstOwnArtRow: InstalledRow? { installed.first { canUseOwnArt($0) } }
+
     /// The dialogs to show, one per stage, in the sprite's order (Windows' titles). Nil, with the status set, when the
     /// pack can't be read or isn't a made-here sprite.
     func ownArtPrompts(for id: String) -> [OwnArtPrompt]? {

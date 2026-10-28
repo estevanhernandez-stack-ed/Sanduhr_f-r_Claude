@@ -68,6 +68,18 @@ struct WidgetsOwnArtModelTests {
         #expect(root.store().load().find(row.id)?.version == row.version)
     }
 
+    @Test func theOwnArtAnchorGoesToTheFirstEligibleRowOnly() throws {
+        let root = WidgetTestRoot()
+        let (files, manifest) = StoreFixtures.valid("good", "good-sprite")
+        #expect(root.store().install(files, manifest, source: .catalog).ok)
+        let m = model(root, WidgetScratchDefaults())
+        #expect(m.firstOwnArtRow == nil)
+        let pack = installClaudeSprite(root)
+        m.reloadInstalled()
+        #expect(m.firstOwnArtRow?.id == pack.id)
+        #expect(SettingsAnchor.exists(SettingsAnchor.ownArt, on: .widgets) && SettingsAnchor.exists(SettingsAnchor.widgetSuggestion, on: .widgets))
+    }
+
     @Test func aLocalSpriteOffersOwnArtToo() throws {
         let root = WidgetTestRoot()
         _ = installClaudeSprite(root, source: .local)
