@@ -93,9 +93,10 @@ final class WidgetsModel {
         if let doc = result.catalog { catalog = doc.packs }
     }
 
-    /// What the catalog row for `entry` offers, given what is installed.
+    /// What the catalog row for `entry` offers, given what is installed. Reads `installed`, which the
+    /// page observes, so the row changes the moment a pack is installed or removed.
     func offer(for entry: WidgetCatalogEntry) -> Offer {
-        guard let row = store.load().find(entry.id) else { return .install }
+        guard let row = installed.first(where: { $0.id == entry.id }) else { return .install }
         if row.madeHere { return .madeHere }
         return WidgetCatalog.compareVersions(entry.version, row.version) > 0 ? .update : .installed
     }
@@ -157,11 +158,6 @@ final class WidgetsModel {
     /// Picks the companion (nil: the first installed sprite).
     func pickCompanion(_ id: String?) {
         companion.pack = id
-        companion.save(defaults)
-    }
-
-    func setRoams(_ on: Bool) {
-        companion.roams = on
         companion.save(defaults)
     }
 

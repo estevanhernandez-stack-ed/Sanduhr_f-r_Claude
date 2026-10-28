@@ -328,11 +328,10 @@ struct CompanionBehaviourTests {
     }
 
     @Test func reduceMotionTheSwitchSleepAndATriggerAllStopTheWalk() {
-        #expect(CompanionRoamer.allowed(roams: true, reduceMotion: false, mood: .content, triggerPlaying: false))
-        #expect(!CompanionRoamer.allowed(roams: true, reduceMotion: true, mood: .content, triggerPlaying: false))
-        #expect(!CompanionRoamer.allowed(roams: false, reduceMotion: false, mood: .content, triggerPlaying: false))
-        #expect(!CompanionRoamer.allowed(roams: true, reduceMotion: false, mood: .exhausted, triggerPlaying: false))
-        #expect(!CompanionRoamer.allowed(roams: true, reduceMotion: false, mood: .content, triggerPlaying: true))
-        #expect(CompanionRoamer.allowed(roams: true, reduceMotion: false, mood: .celebrate, triggerPlaying: false))
+        #expect(CompanionRoamer.allowed(reduceMotion: false, mood: .content, triggerPlaying: false))
+        #expect(!CompanionRoamer.allowed(reduceMotion: true, mood: .content, triggerPlaying: false))
+        #expect(!CompanionRoamer.allowed(reduceMotion: false, mood: .exhausted, triggerPlaying: false))
+        #expect(!CompanionRoamer.allowed(reduceMotion: false, mood: .content, triggerPlaying: true))
+        #expect(CompanionRoamer.allowed(reduceMotion: false, mood: .celebrate, triggerPlaying: false))
     }
 }

@@ -141,7 +141,7 @@ private struct WidgetsInstalledRow: View {
     }
 }
 
-/// The companion: one installed sprite at a time, and whether it roams.
+/// The companion: one installed sprite at a time.
 private struct WidgetsCompanionSection: View {
     let model: WidgetsModel
 
@@ -160,9 +160,6 @@ private struct WidgetsCompanionSection: View {
                     .font(.caption).foregroundStyle(.secondary)
                 if model.justInstalledSprite == nil { CompanionTurnOnRow(name: nil) }
             }
-            Toggle("Let it roam", isOn: Binding(
-                get: { model.companion.roams },
-                set: { model.setRoams($0) }))
         }
         .settingsAnchor(SettingsAnchor.companion)
     }

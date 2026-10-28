@@ -2235,11 +2235,11 @@ The piece needs an installed sprite pack (the hourglass is in the catalog) and t
 5. Triggers: a watcher that goes to waiting plays needs_you once; to passed, job_passed; a limit
    crossing its Alerts line (or 100 percent) upward plays near_limit; 20 minutes without input plays
    idle once and rearms on input. After each, the mood resumes.
-6. Roam: with **Let it roam** on, it walks the pack's edges for about 12 seconds, rests for about 8,
+6. Roam: it walks the pack's edges for about 12 seconds, rests for about 8,
    and turns (the art mirrors) at corners. Watch the whole route, including the screen's right and
    bottom edges and next to the Dock and the notch: **the sprite is never cut off while it walks**
-   (it extends outside its piece's view, which relies on views not clipping). With **Let it roam**
-   off it stays put.
+   (it extends outside its piece's view, which relies on views not clipping). There is no roam
+   switch: with Reduce Motion on it stays put.
 7. Pause and Reduce Motion: cover the Desk with a full-screen app, sleep the display or start the
    screen saver: the walk and the frames hold, and pick up where they were. System Settings,
    Accessibility, Display, **Reduce motion** on: it stops walking and animates at a slow rate; off

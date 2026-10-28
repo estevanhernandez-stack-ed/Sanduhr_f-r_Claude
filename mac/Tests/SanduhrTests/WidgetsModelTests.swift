@@ -106,14 +106,13 @@ struct CompanionSettingsTests {
         #expect(CompanionSettings().activePack(registry([])) { _ in nil } == nil)
     }
 
-    @Test func absentReadsAsNoPickAndRoamingOnAndTheKeysAreTheDesksOwn() {
+    @Test func absentReadsAsNoPickAndTheKeyIsTheDesksOwn() {
         let scratch = WidgetScratchDefaults()
-        #expect(CompanionSettings.load(scratch.defaults) == CompanionSettings(pack: nil, roams: true))
-        CompanionSettings(pack: "alpha-sprite", roams: false).save(scratch.defaults)
+        #expect(CompanionSettings.load(scratch.defaults) == CompanionSettings(pack: nil))
+        CompanionSettings(pack: "alpha-sprite").save(scratch.defaults)
         #expect(scratch.defaults.string(forKey: "deskCompanionPack") == "alpha-sprite")
-        #expect(scratch.defaults.object(forKey: "deskCompanionRoams") as? Bool == false)
-        #expect(CompanionSettings.load(scratch.defaults) == CompanionSettings(pack: "alpha-sprite", roams: false))
-        CompanionSettings(pack: nil, roams: true).save(scratch.defaults)
+        #expect(CompanionSettings.load(scratch.defaults) == CompanionSettings(pack: "alpha-sprite"))
+        CompanionSettings(pack: nil).save(scratch.defaults)
         #expect(scratch.defaults.object(forKey: "deskCompanionPack") == nil)
     }
 
@@ -126,9 +125,9 @@ struct CompanionSettingsTests {
     @Test func nothingIsWrittenAfterReset() {
         let scratch = WidgetScratchDefaults()
         ResetGate.$testOverride.withValue(true) {
-            CompanionSettings(pack: "alpha-sprite", roams: false).save(scratch.defaults)
+            CompanionSettings(pack: "alpha-sprite").save(scratch.defaults)
         }
-        #expect(scratch.defaults.object(forKey: "deskCompanionRoams") == nil)
+        #expect(scratch.defaults.object(forKey: "deskCompanionPack") == nil)
     }
 }
 
@@ -198,8 +197,11 @@ struct WidgetsModelTests {
         await m.refreshCatalog()
         await m.install(box.net.entry)
         #expect(m.notice == nil && m.justInstalledSprite == "Fixture")
+        #expect(m.offer(for: box.net.entry) == .installed)
         m.uninstall("good-sprite")
         #expect(m.justInstalledSprite == nil)
+        // The catalog row reads the observed list, so it offers Install again at once.
+        #expect(m.offer(for: box.net.entry) == .install)
     }
 
     @Test func aPaletteNeverAsksForTheCompanion() async {
@@ -312,11 +314,11 @@ struct WidgetsModelTests {
         #expect(PackThemes.installed(in: m.store).isEmpty)
     }
 
-    @Test func theCompanionIsOneAtATimeDefaultsToTheFirstSpriteAndRoamsByDefault() {
+    @Test func theCompanionIsOneAtATimeAndDefaultsToTheFirstSprite() {
         let root = WidgetTestRoot()
         let scratch = WidgetScratchDefaults()
         let m = model(Box(publish()), root, scratch)
-        #expect(m.sprites.isEmpty && m.activeCompanion == nil && m.companion.roams)
+        #expect(m.sprites.isEmpty && m.activeCompanion == nil)
 
         for name in ["good-sprite", "good-sprite-pixel", "good-theme"] {
             let (files, manifest) = StoreFixtures.valid("good", name)
@@ -329,12 +331,10 @@ struct WidgetsModelTests {
         m.pickCompanion("good-sprite-pixel")
         #expect(m.activeCompanion == "good-sprite-pixel")
         #expect(scratch.defaults.string(forKey: "deskCompanionPack") == "good-sprite-pixel")
-        m.setRoams(false)
-        #expect(scratch.defaults.object(forKey: "deskCompanionRoams") as? Bool == false)
 
-        // A fresh model reads both back; removing the pick falls back to the first sprite.
+        // A fresh model reads the pick back; removing it falls back to the first sprite.
         let again = model(Box(publish()), root, scratch)
-        #expect(again.companion == CompanionSettings(pack: "good-sprite-pixel", roams: false))
+        #expect(again.companion == CompanionSettings(pack: "good-sprite-pixel"))
         again.uninstall("good-sprite-pixel")
         #expect(again.activeCompanion == "good-sprite")
     }

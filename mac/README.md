@@ -1823,7 +1823,7 @@ anchor and link parsing, Advanced, folding, Add Line's place and the chin height
 
 Settings, Widgets (`widgets`, Desktop group after Lock Screen; docs/mac-widgets-spec.md section 2 and 3)
 lists the signed widget catalog with Install, Update or Installed, the installed packs (kind, version,
-"from the catalog" or "made here") with Uninstall, the Companion picker and Let it roam. Nothing polls:
+"from the catalog" or "made here") with Uninstall, and the Companion picker. Nothing polls:
 `WidgetsModel.refreshCatalog` runs when the page appears and on Check the catalog again, and a failure is
 one quiet line. Install is `WidgetCatalogClient.download` (rules 3 to 5), then `WidgetStore.install`
 (rule 6): files go to `widgets/.staging/<id>-<token>/`, pixel sheets are rasterized to
@@ -1834,8 +1834,8 @@ written; a failure at any step puts the old install back. `widgets.json` is Wind
 its source: a catalog pack never replaces a made-here one, nor the other way round. Every write honors
 `ResetGate`.
 
-The Companion is one installed sprite at a time (`CompanionSettings`): the Desk suite keys
-`deskCompanionPack` (absent: the first installed sprite by id) and `deskCompanionRoams` (absent: on).
+The Companion is one installed sprite at a time (`CompanionSettings`): the Desk suite key
+`deskCompanionPack` (absent: the first installed sprite by id). It always roams, unless Reduce Motion is on.
 Installed theme packs join the Theme menu and the gallery as `<packId>:<stem>` (`PackThemes`, registered by
 `UserThemes.load`), and palette packs join `MessagePalette.all` as `<palette> · <pack name>`
 (`PackInkPresets`); seeded now-playing looks keep drawing from `MessagePalette.builtIn`, so a pack never
@@ -1875,10 +1875,10 @@ timer, observer, subscription or image. Rules are pure and tested apart from the
   passed), `near_limit` (a limit crossed its Alerts line, `sessionLine` for the session and `weeklyLine` for the
   rest, or 100 percent, upward; the first reading is only a baseline) and `idle` (20 minutes without input,
   once until input returns).
-- **Roam** (`CompanionRoamer`, `CompanionPath`). On by default (desk key `deskCompanionRoams`): it walks the
+- **Roam** (`CompanionRoamer`, `CompanionPath`). Always on, with no switch: it walks the
   pack's named edges of the Desk area less the menu bar and the Dock, 12 s walking then 8 s resting, one
   `CAKeyframeAnimation` on position with a stepped mirror, so the render server does the work. Reduce Motion,
-  Roam off, exhausted and a playing trigger each stop it. The sprite layer extends outside its piece's view
+  exhausted and a playing trigger each stop it. The sprite layer extends outside its piece's view
   (views do not clip on macOS 14 and later), which keeps OLED drift applying to it unchanged.
 - **Pause.** Out of sight (Desk covered, screens asleep, screen saver, session switched away) the layers and the timers hold.
   Reduce Motion drops the frame rate to 1 and cancels the walk.
@@ -1970,7 +1970,7 @@ refusal. `ResetShutdownTests` covers the gate (each writer a no-op inside
 - EsteFont Pro and EsteFont 26 → `Sanduhr.app/Contents/Resources/Fonts/`, from `mac/Resources/Fonts/` (see Fonts); the Desk's choice in the desk preference `font`
 - Third-party notices (Sparkle, mediaremote-adapter, EsteFont Pro, EsteFont 26) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
 
-- Widgets (2.35.0) → `~/Library/Application Support/Sanduhr/widgets/`: one folder per installed pack (with `.raster/` for pixel-sheet PNGs drawn at install), `widgets.json` (Windows' shape: the installed packs and the rollback marker `catalog_generated_at`), `.staging/` (installs and removals in flight) and `companion.json` (`schema_version`, `growth`, `active_ms`, `days`); the companion's choices in the desk preferences `deskCompanionPack` and `deskCompanionRoams`; Reset Sanduhr… has a **Your widgets** part
+- Widgets (2.35.0) → `~/Library/Application Support/Sanduhr/widgets/`: one folder per installed pack (with `.raster/` for pixel-sheet PNGs drawn at install), `widgets.json` (Windows' shape: the installed packs and the rollback marker `catalog_generated_at`), `.staging/` (installs and removals in flight) and `companion.json` (`schema_version`, `growth`, `active_ms`, `days`); the companion's choice in the desk preference `deskCompanionPack`; Reset Sanduhr… has a **Your widgets** part
 - OLED care (2.35.0) → the desk preference `deskOledCare` (off when absent); nothing on disk
 
 ## Controls

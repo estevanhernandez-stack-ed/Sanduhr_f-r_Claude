@@ -123,10 +123,10 @@ struct CompanionRoamer {
         walking ? Self.walkFor - phase : Self.walkFor + Self.restFor - phase
     }
 
-    /// Whether the companion may roam at all right now. Reduce Motion means no roaming; so does the
-    /// Settings switch, sleeping (exhausted) and a trigger playing.
-    static func allowed(roams: Bool, reduceMotion: Bool, mood: CompanionMood, triggerPlaying: Bool) -> Bool {
-        roams && !reduceMotion && mood != .exhausted && !triggerPlaying
+    /// Whether the companion may roam right now. Reduce Motion means no roaming; so do sleeping
+    /// (exhausted) and a trigger playing.
+    static func allowed(reduceMotion: Bool, mood: CompanionMood, triggerPlaying: Bool) -> Bool {
+        !reduceMotion && mood != .exhausted && !triggerPlaying
     }
 
     /// Moves the clock on by `step` seconds when `allowed`; holds it otherwise.

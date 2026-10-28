@@ -186,7 +186,7 @@ enum SettingsAnchor {
         SettingsEntry(title: "Installed widgets", page: .widgets, anchor: installedWidgets,
                       synonyms: ["uninstall", "remove", "made here", "from the catalog", "effects"]),
         SettingsEntry(title: "Companion", page: .widgets, anchor: companion,
-                      synonyms: ["Let it roam", "roam", "sprite", "pet", "hourglass"]),
+                      synonyms: ["roam", "sprite", "pet", "hourglass"]),
     ]
 
     private static let notchPages: [SettingsEntry] = [

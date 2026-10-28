@@ -304,11 +304,11 @@ final class CompanionDriver {
     /// Starts, keeps or stops the walk to match what is allowed now.
     private func updateRoam(mood: CompanionMood, reduce: Bool, now: Date) {
         guard let animator else { return }
-        let allowed = CompanionRoamer.allowed(roams: settings.roams, reduceMotion: reduce, mood: mood,
+        let allowed = CompanionRoamer.allowed(reduceMotion: reduce, mood: mood,
                                               triggerPlaying: animator.playing(at: now, reduceMotion: reduce))
         guard allowed else {
             stopSegment(commit: true)
-            if !settings.roams || reduce { view?.goHome() }
+            if reduce { view?.goHome() }
             return
         }
         if segment == nil, !paused { startSegment(now: now) }
