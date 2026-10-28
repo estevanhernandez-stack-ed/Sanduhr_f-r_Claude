@@ -9,6 +9,8 @@ struct DebugStateInput {
     var layout: String?
     /// The pieces the Desk draws from it (item 59), in order: each anchor's stack top to bottom.
     var deskPieces: [DeskPlacement] = []
+    /// The companion piece while it shows (CompanionDriver.debug), nil otherwise.
+    var companion: CompanionDebug?
     /// Arrange mode (item 60): on or off, an unsaved change, the layout being edited, and whether
     /// the Desk window takes clicks over its whole frame or only where it draws.
     var deskArrange = DeskArrangeDebug()
@@ -556,6 +558,7 @@ enum DebugState {
         pairs.append(("desk_running", .bool(s.deskRunning)))
         pairs.append(("layout", s.layout.map(YAMLNode.string) ?? .null))
         pairs.append(("desk_pieces", deskPiecesYAML(s.deskPieces)))
+        pairs.append(("companion", CompanionDebug.yaml(s.companion)))
         pairs.append(("desk_arrange", deskArrangeYAML(s.deskArrange)))
         pairs.append(("notch", .bool(s.notch)))
         pairs.append(("has_notch", .bool(s.hasNotch)))

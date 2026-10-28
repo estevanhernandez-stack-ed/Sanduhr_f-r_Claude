@@ -18,6 +18,7 @@ desk_pieces:
     anchor: bl
     order: 2
     scale: 1
+companion: null
 desk_arrange:
   active: false
   changed: false

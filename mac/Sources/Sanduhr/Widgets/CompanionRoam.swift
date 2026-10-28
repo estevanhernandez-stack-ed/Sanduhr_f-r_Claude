@@ -117,6 +117,12 @@ struct CompanionRoamer {
     /// True in the walking part of the cycle.
     var walking: Bool { phase < Self.walkFor }
 
+    /// Seconds left in the current part of the cycle (the walk's or the rest's): the length of the
+    /// segment the Desk hands the render server.
+    var secondsLeftInPhase: TimeInterval {
+        walking ? Self.walkFor - phase : Self.walkFor + Self.restFor - phase
+    }
+
     /// Whether the companion may roam at all right now. Reduce Motion means no roaming; so does the
     /// Settings switch, sleeping (exhausted) and a trigger playing.
     static func allowed(roams: Bool, reduceMotion: Bool, mood: CompanionMood, triggerPlaying: Bool) -> Bool {

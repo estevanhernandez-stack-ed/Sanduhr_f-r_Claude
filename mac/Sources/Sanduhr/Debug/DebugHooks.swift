@@ -343,6 +343,7 @@ enum DebugHooks {
         s.deskEnabled = desk.enabled
         s.deskRunning = desk.running
         s.layout = UserDefaults.desk.string(forKey: "layout")
+        s.companion = desk.model.companion.debug
         s.deskPieces = DeskArrangement(s.layout ?? DeskLayout.standard).shown(
             showMeetings: UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true)
         let arrange = desk.model.arrange

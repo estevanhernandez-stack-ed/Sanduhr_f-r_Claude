@@ -285,6 +285,7 @@ eq('desk pieces follow the layout', state['desk_pieces'].map { |p| [p['piece'], 
    [['message', 'tl', 0], ['clock', 'bl', 0], ['meters', 'bl', 1], ['meetings', 'bl', 2]])
 eq('desk pieces at size 1 in the fixture', state['desk_pieces'].map { |p| p['scale'] }.uniq, [1])
 eq('select a piece by name', State.dig(state, 'desk_pieces[piece=meters].order'), [true, 1])
+eq('no companion in the fixture', state['companion'], nil)
 eq('desk frames ok in the fixture', [state['desk_frames_ok'], state['desk_frames_problem']], [true, nil])
 eq('desk frame kinds', state['desk_frames'].map { |f| f['kind'] }, %w[meters meter_row meter_row meetings clock message])
 # "Clock and message take clicks": on in the fixture; desk-layout.yaml's check that, off, neither
