@@ -37,7 +37,8 @@ it, never edit it). BACKLOG #8 is the direction.
 
 ## Scope
 
-Four releases, each shippable on its own. Nothing from Windows 3.8 or 3.9 is left out.
+Five releases, each shippable on its own. Nothing from Windows 3.8 or 3.9 is left out; 2.39.0
+is the Mac's own addition (sections 18 and 19).
 
 | Release | What | Windows ref |
 |---|---|---|
@@ -45,6 +46,7 @@ Four releases, each shippable on its own. Nothing from Windows 3.8 or 3.9 is lef
 | **2.36.0: Claude-made widgets and your own art** | `propose_widget` in the Mac MCP, the review banner with a live Desk preview, made-here packs, and "Use my own art…". | 3.8 spec B and C |
 | **2.37.0: the Desk, shaped by hand or by Claude** | `get_desk` and `propose_desk` in the Mac MCP, the fold (a per-stack slant), meter styles (bar, slim, ring, ticks), and font packs. | 3.8 E to G, #314, #336 |
 | **2.38.0: new pieces** | The system piece (CPU, RAM, disk), the weather piece with its nickname, livelier now-playing bars (owner call below), and CI watchers from local runners. | 3.6 system and weather, 3.8 G, 3.9 |
+| **2.39.0: sprites from your own art** | "New sprite from an image…": a PNG sheet, a cell size, cells tagged to actions, a pack made here. Claude can propose the motion for it (which cells walk, the frame rate, moods to actions) from the sheet's size alone, never its pixels. | Mac first; Windows parity handed over |
 
 Out of scope: pushing anything to the catalog from the app, and the Rainmeter spike (a report on
 Windows skins, not a feature).
@@ -366,6 +368,44 @@ GitHub Actions runner container on this Mac runs.
 
 ---
 
+## Release 2.39.0
+
+Added 2026-10-28 by the owner after the 2.36.0 own-art check.
+
+## 18. A new sprite from your own art
+
+Today **Use my own art…** only swaps the sheets of a sprite that already exists. 2.39.0 makes one
+from nothing.
+- Settings ▸ Widgets ▸ **New sprite from an image…**: an `NSOpenPanel` for one PNG, checked with
+  the pack image rules of section 7 (PNG signature and chunks, at most 2 MB and 4096 px).
+- The user sets the cell size (8 to 64 px on a side; the sheet must be a whole number of cells),
+  sees the cells as a grid, and tags cells to actions: `walk` (two or more, in order), `sit`, `nap`,
+  `cheer` and `worry`. An untagged action falls back to `sit`. A name, and optionally a scale.
+- Sanduhr writes `pack.json` (id `my-<slug>`, license CC0-1.0, version 1.0.0, `sanduhr_min`
+  3.8.0), `sprite.json` (the animations, moods and triggers mapped from the tags the way the
+  hourglass maps them) and `art/sprite.png`, validates the whole pack (strict), and installs it as
+  `local`. It is the same install path as own art; nothing new is written outside the pack's folder.
+- One stage only in 2.39.0. Art per growth stage stays on the backlog (#9).
+- **Making the sheet is the user's business.** A user may draw it by hand or agree with Claude, in
+  any tool, to turn their own art into a sheet. That happens outside Sanduhr; Sanduhr only reads the
+  finished PNG the user picks. Sanduhr itself never sends the image anywhere and never shows it to
+  Claude.
+
+## 19. Claude maps the motion, never sees the art
+
+`propose_sprite_motion` in the Mac MCP, beside `propose_widget`:
+- Input: the id of an installed made-here sprite, and `sprite.json` fields only: `animations`
+  (cell indices), `fps`, `scale`, `moods`, `triggers`, `roam`. No image, no pixels.
+- What Claude may know about the art: `get_widgets` (or a field on an existing read tool) reports
+  for each made-here sprite its frame size and cell count, never the image.
+- The server checks the fields with the validator against that cell count and hands them over in a
+  request file like `widget-request.json`. The app shows the review banner with **Preview on the
+  Desk** (the sprite with the proposed motion, in memory) and **Apply**, which rewrites
+  `sprite.json`, bumps the patch version and reinstalls. Same statuses and limits as section 6.
+- The image boundary holds: Claude never supplies or reads an image (BACKLOG #8 gap 3).
+
+---
+
 ## 16. Privacy, docs and release (every release)
 
 - **`docs/PRIVACY.md`, Mac section, in the same release as the thing it describes:**
@@ -376,6 +416,8 @@ GitHub Actions runner container on this Mac runs.
     preference.
   - **2.36.0:** the widget handoff files; a user's own art stays on the Mac.
   - **2.37.0:** the Desk handoff files; font packs registered for this app only.
+  - **2.39.0:** the new-sprite panel and `art/sprite.png`; the motion handoff files and that Claude
+    sees only a sprite's frame size and cell count.
   - **2.38.0:** the system readings (local only); the two Open-Meteo hosts and exactly what each
     sees; the bars' audio tap if it ships; the Docker socket and its two requests.
   - The hub's privacy page gets the same rows (hub issue) before each release.
@@ -410,3 +452,7 @@ drawing and 5 need live checks on the Desk.
    System Audio Recording permission and how its prompt reads. The tap ships behind its own
    off-by-default switch only if that prompt is acceptable; otherwise the Mac keeps its position bar.
 7. **CI watchers (2.38.0): built for parity, last in the release.**
+8. **Own sprite art (2026-10-28).** A new sprite from the user's own sheet and Claude-proposed motion
+   go in as 2.39.0 (sections 18 and 19). GIF and Aseprite import, art per growth stage and pack export
+   are on the backlog (#9). A user agreeing with Claude to make a sheet from their own art is fine:
+   that is separate from Sanduhr, which only uses the finished sheet.
