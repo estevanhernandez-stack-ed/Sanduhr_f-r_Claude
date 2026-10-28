@@ -45,6 +45,7 @@ enum SettingsAnchor {
     /// The Companion's row under Where each piece sits (not searchable: Settings, Widgets links to it).
     static let companionPlace = "companion-place"
     static let slant = "slant"
+    static let meterStyle = "meter-style"
     static let order = "order"
     static let clicks = "clicks"
     static let oled = "oled"
@@ -158,6 +159,8 @@ enum SettingsAnchor {
                       synonyms: ["corner", "position", "place", "hidden", "clock", "meetings", "Read today's meetings"]),
         SettingsEntry(title: DeskSlant.title, page: .deskLayout, anchor: slant,
                       synonyms: ["tilt", "fold", "lean", "angle", "skew", "degrees", "straight"]),
+        SettingsEntry(title: "Meter style", page: .deskLayout, anchor: meterStyle,
+                      synonyms: ["style", "slim", "ring", "rings", "gauge", "ticks", "bars", "bar", "meters", "claude line", "compact", "oled"]),
         SettingsEntry(title: "Order", page: .deskLayout, anchor: order, synonyms: ["stack", "reorder"]),
         SettingsEntry(title: "Clicks", page: .deskLayout, anchor: clicks, synonyms: [DeskPieceClicks.title, "click", DeskLayer.title, "under desktop icons", "bottom", "behind files"]),
         SettingsEntry(title: SettingsNames.oledCareSwitch, page: .deskLayout, anchor: oled,

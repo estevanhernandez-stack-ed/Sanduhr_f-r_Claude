@@ -170,6 +170,12 @@ final class DeskModel {
     var notchRect: CGRect?
     /// The Claude meters, short enough for the notch: "5h 7%  wk 63%".
     var claudeCompact: String?
+    /// The `claude` piece's compact two-row form (slim style), nil when there is nothing to say.
+    var claudeTwoRows: DeskClaudeCompact?
+    /// The session and week limits as the `claude` piece's ring and ticks styles draw them, hidden
+    /// limits included (the line reads session and week whatever the cards show); empty while a
+    /// sign-in is needed.
+    var claudeGauges: [DeskMeterStyleModel.Gauge] = []
     /// What plays, after Now Playing's hide rules (NowPlayingController), nil for nothing to show.
     /// In memory only.
     var nowPlaying: NowPlayingInfo?
@@ -530,6 +536,10 @@ final class DeskModel {
         let parts = DeskClaudeText.parts(usage)
         if parts != claudeParts { claudeParts = parts }
         claudeCompact = DeskClaudeText.compact(usage, now: now)
+        let two = DeskClaudeCompact.make(usage)
+        if two != claudeTwoRows { claudeTwoRows = two }
+        let gauges = DeskMeterStyleModel.claudeGauges(Self.claudeRows(usage.usage, now: now), signInNeeded: usage.signInNeeded)
+        if gauges != claudeGauges { claudeGauges = gauges }
         claudeLineIsStale = usage.isStale(now: now)
     }
 
@@ -545,6 +555,12 @@ final class DeskModel {
         }
     }
 
+    /// The session and week rows for the claude piece's gauges: every reported limit, with the saved warning settings.
+    private static func claudeRows(_ usage: UsageResponse?, now: Date) -> [DeskMeterRow] {
+        let desk = UserDefaults.desk
+        return DeskMeterRow.rows(from: usage, now: now) { MeterWarningSettings.saved($0, in: desk) }
+    }
+
     /// The meter rows for the limits that show, with the saved warning settings (Settings, Alerts, Each limit).
     private static func meterRows(_ usage: UsageResponse?, now: Date) -> [DeskMeterRow] {
         let desk = UserDefaults.desk
@@ -557,6 +573,8 @@ final class DeskModel {
     func refreshMeterWarnings(now: Date = Date()) {
         let rows = Self.meterRows(usage.usage, now: now)
         if rows != meters { meters = rows }
+        let gauges = DeskMeterStyleModel.claudeGauges(Self.claudeRows(usage.usage, now: now), signInNeeded: usage.signInNeeded)
+        if gauges != claudeGauges { claudeGauges = gauges }
     }
 
     /// An alert chose the Desk: pulse these limits' meters once. `pulseCount` counts every pulse;
