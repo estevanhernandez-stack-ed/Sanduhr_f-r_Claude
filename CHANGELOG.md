@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.35.0-mac — 2026-10-28
 
 - **Widgets.** Settings, Widgets lists the signed widget catalog and installs the packs you pick: color themes, message palettes, sprites and effects. Sanduhr reaches GitHub only when the page opens, on **Check the catalog again** and on **Install** or **Update**, checks the catalog's signature and each download's size and SHA-256, and checks every file again on this Mac before the pack is put in place. Installed themes join Settings, Widget, Themes; palettes join the Message editor's Palette menu. Effects packs are listed and don't draw yet. **Reset Sanduhr…** has a **Your widgets** part.
 
