@@ -349,3 +349,22 @@ says which one it is on.
 **Done when** a new user, starting from a blank Desk, finishes a single Claude Code session with
 a Desk they designed and at least one widget or mod that Claude made for them, without editing a
 file by hand.
+
+## #9 — Sprite sheets, later (Mac first)
+
+**Raised 2026-10-28 by Este**, after the 2.36.0 own-art check. A new sprite from your own art and
+Claude-proposed motion are planned as 2.39.0 (`docs/mac-widgets-spec.md` sections 18 and 19). These
+three wait:
+
+1. **Import an animated GIF or an Aseprite file.** Sanduhr unpacks the frames into a sheet on the Mac
+   (ImageIO reads a GIF's frames; Aseprite's exported sheet and its JSON tags map almost straight onto
+   `sprite.json`). Local only.
+2. **Art per growth stage.** Own art already works per stage; what's missing is a page that shows
+   one column per stage, so the companion's growth is visible while you pick.
+3. **Export a pack.** "Export…" on a pack made here writes a zip the user can carry to Windows or
+   submit to the catalog by hand. The app never pushes to the catalog (spec, Scope).
+
+Not planned: turning a user's PNG into a pixel sheet Claude can read or edit inside Sanduhr (that
+would send the art to Claude), and any upload host. A user who wants Claude's help making a sheet
+from their own art does that with Claude outside Sanduhr; Sanduhr just uses the finished sheet.
+
