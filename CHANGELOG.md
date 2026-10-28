@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.36.0-mac — 2026-10-28
 
 - **Claude can make you a widget.** With the MCP server installed, `propose_widget` hands Sanduhr a pixel-art sprite, a palette or effects presets that Claude wrote as text. It is data only: no PNG, no font, no code, and a theme still goes through `propose_theme`. The server names the pack `my-<id>` and checks it with the catalog's own rules, trademark rule included, before anything is written; a refusal writes nothing. A good one waits in Settings, Widgets as **Review Claude's widget**, with Claude's note, what the widget is and its files. **Preview on the Desk** shows a sprite as the companion, or a palette across the Desk's text, notch and message included, from memory, with your saved choices untouched. **Apply** installs it as a widget made here, **Make it the companion** also picks it, and **Dismiss** drops it. No setting lets Claude skip Apply, and the proposal is held in memory only.
 
