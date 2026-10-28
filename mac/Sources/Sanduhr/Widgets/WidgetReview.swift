@@ -12,6 +12,10 @@ enum WidgetReviewCopy {
     /// Effects packs have nothing to draw on the Desk (the companion and the ink are all a preview shows).
     static let noPreview = "Effects packs don't draw yet, so there is nothing to preview."
 
+    static let endPreview = "End preview"
+    static let apply = "Apply"
+    static let dismiss = "Dismiss"
+
     static func heading(_ name: String) -> String { "Claude suggests a widget · \(name)" }
 }
 
@@ -40,6 +44,13 @@ struct WidgetReviewModel: Equatable {
     let canPreview: Bool
     /// The pending proposal's state: shown on the Desk now.
     let previewing: Bool
+
+    /// Why Preview on the Desk can't be pressed, or nil when it can (or is showing, and End preview takes its place).
+    var previewHint: String? {
+        if !canPreview { return WidgetReviewCopy.noPreview }
+        if deskOff && !previewing { return WidgetReviewCopy.deskOff }
+        return nil
+    }
 }
 
 /// What the review says about a Claude-made pack (spec 3.8 section 5: "What this widget is" and the file list), and what

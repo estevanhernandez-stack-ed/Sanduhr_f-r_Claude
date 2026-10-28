@@ -1,4 +1,6 @@
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
 /// Settings, Widgets (spec 3): the widget catalog with Install, Update or Installed, what is
 /// installed with Uninstall, and the Desk companion's two choices. The catalog is fetched when the
@@ -6,9 +8,12 @@ import SwiftUI
 struct WidgetsSettings: View {
     let vm: UsageViewModel
     let model: WidgetsModel
+    /// The proposal waiting for review (Claude's `propose_widget`); observed, so the banner comes and goes with it.
+    var handoff = WidgetProposalHandoff.shared
 
     var body: some View {
         Form {
+            WidgetsSuggestionSection(handoff: handoff)
             WidgetsCatalogSection(model: model)
             WidgetsInstalledSection(model: model)
             WidgetsCompanionSection(model: model)
@@ -17,6 +22,28 @@ struct WidgetsSettings: View {
         .task { await model.refreshCatalog() }
         // Installed theme packs join the Theme menu and the gallery: they re-read the registry.
         .onChange(of: model.installed) { _, _ in vm.userThemesTick &+= 1 }
+        // A proposal arrived or was decided: the installed list and the companion pick are read again (Apply installs).
+        .onChange(of: handoff.pending?.id) { _, _ in model.reloadInstalled() }
+    }
+}
+
+/// The review banner, while a proposal waits.
+private struct WidgetsSuggestionSection: View {
+    let handoff: WidgetProposalHandoff
+
+    var body: some View {
+        if let review = handoff.model {
+            Section {
+                WidgetSuggestionBanner(
+                    model: review, previewNote: handoff.previewNote,
+                    preview: { handoff.previewOnDesk() },
+                    endPreview: { handoff.endPreview() },
+                    makeCompanion: { handoff.apply(makeCompanion: true) },
+                    apply: { handoff.apply() },
+                    dismiss: { handoff.dismiss() })
+            }
+            .settingsAnchor(SettingsAnchor.widgetSuggestion)
+        }
     }
 }
 
@@ -112,6 +139,10 @@ private struct WidgetsInstalledSection: View {
             ForEach(model.installed) { row in
                 WidgetsInstalledRow(model: model, row: row)
             }
+            if let status = model.ownArtStatus {
+                Text(status).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .settingsAnchor(SettingsAnchor.installedWidgets)
     }
@@ -133,8 +164,49 @@ private struct WidgetsInstalledRow: View {
                 }
             }
             Spacer()
+            if model.canUseOwnArt(row) {
+                Button("Use my own art\u{2026}") { OwnArtPicker.run(model: model, id: row.id) }
+                    .accessibilityLabel("Use my own art for \(row.name)")
+                    .settingsAnchor(SettingsAnchor.ownArt)
+            }
             Button("Uninstall") { model.uninstall(row.id) }
         }
+    }
+}
+
+/// "Use my own art..." (spec 3.8 section 6): one PNG per stage from an open panel, each checked before the next
+/// panel; a stage whose panel is cancelled keeps its sheet. The panel is only the source of bytes: the checks and
+/// the reinstall are `WidgetsModel`'s. The files are read here and copied into the pack folder; nothing is sent.
+@MainActor
+private enum OwnArtPicker {
+    static func run(model: WidgetsModel, id: String) {
+        guard let prompts = model.ownArtPrompts(for: id) else { return }
+        var art: [String: Data] = [:]
+        for prompt in prompts {
+            guard let url = pick(prompt.title) else { continue }
+            let data = read(url)
+            if model.checkOwnArt(id: id, stageId: prompt.stageId, data: data) != nil { return }
+            art[prompt.stageId] = data
+        }
+        model.useOwnArt(id: id, art: art)
+    }
+
+    private static func pick(_ title: String) -> URL? {
+        let panel = NSOpenPanel()
+        panel.title = title
+        panel.message = title
+        panel.allowedContentTypes = [.png]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    /// At most one byte past the 2 MB limit, so an oversized file is refused by the rule without being read whole.
+    private static func read(_ url: URL) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        return try? handle.read(upToCount: PackValidator.maxImageBytes + 1)
     }
 }
 
