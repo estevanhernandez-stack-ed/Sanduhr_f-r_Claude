@@ -37,6 +37,8 @@ final class CompanionDriver {
     @ObservationIgnored private var triggerTimer: Timer?
     @ObservationIgnored private var paused = false
     @ObservationIgnored private var lastMood = CompanionMood.content
+    /// A proposed sprite drawn from memory in place of the saved choice (WidgetProposalHandoff). Never saved.
+    @ObservationIgnored private var previewed: CompanionPreview?
 
     /// What the render server is playing, so a refresh that changes nothing changes nothing.
     private struct PlayKey: Equatable {
@@ -102,6 +104,18 @@ final class CompanionDriver {
 
     // MARK: Choice
 
+    /// A proposed sprite becomes the companion for now, or (nil) the saved choice comes back. The saved
+    /// `CompanionSettings` are neither read into nor written from the preview.
+    func setPreview(_ preview: CompanionPreview?) {
+        previewed = preview
+        guard shown else { return }
+        // Same pack id, other art: drop what is drawn so the next pick loads fresh.
+        stopEverything()
+        pick = nil
+        lastKey = nil
+        reload(force: true)
+    }
+
     /// Reads the settings and, when they (or the demo switch) changed, the pack. Cheap otherwise.
     func reload(force: Bool) {
         guard shown else { return }
@@ -112,7 +126,8 @@ final class CompanionDriver {
         settings = now
         demo = nowDemo
         guard changed else { return }
-        let next = CompanionPicker.pick(store: .shared, settings: settings, demo: demo)
+        let next = previewed.map { CompanionPick(packId: $0.packId, sprite: $0.sprite) }
+            ?? CompanionPicker.pick(store: .shared, settings: settings, demo: demo)
         if next == pick, next != nil {
             refresh()
             return
@@ -202,6 +217,7 @@ final class CompanionDriver {
 
     private func loadSheet(_ stage: CompanionStage) -> (image: CGImage, width: Int, height: Int)? {
         guard let id = pick?.packId else { return nil }
+        if let previewed, previewed.packId == id { return previewed.sheet(for: stage) }
         let url = CompanionSheet.drawnFile(store: .shared, packId: id, stage: stage)
         guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return nil }

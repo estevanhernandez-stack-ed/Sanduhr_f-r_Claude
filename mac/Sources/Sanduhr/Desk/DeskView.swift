@@ -62,7 +62,12 @@ struct DeskView: View {
     /// the widget's default.
     /// While arranging (item 60), the layout being edited; nothing is saved until Done.
     private var stacks: [DeskAnchor: [DeskPlacement]] {
-        (model.arrange.working ?? DeskArrangement(layout)).stacks(showMeetings: showMeetings)
+        var arrangement = model.arrange.working ?? DeskArrangement(layout)
+        // A proposed sprite is previewed even while the piece is Hidden (WidgetProposalHandoff); never saved.
+        if model.widgetPreviewsCompanion, arrangement.placement("companion") == nil {
+            arrangement.pieces.append(DeskPlacement(widget: "companion", anchor: DeskArrangement.defaultAnchor("companion")))
+        }
+        return arrangement.stacks(showMeetings: showMeetings)
     }
 
     var body: some View {
@@ -233,7 +238,9 @@ struct DeskPiece: View {
     @AppStorage("inkColor", store: .desk) private var savedInk = "ffffff"
     @AppStorage(OledCare.key, store: .desk) private var oled = OledCare.defaultOn
     /// The ink as drawn: with OLED care on, never pure white (OledInk).
-    private var ink: String { oled ? OledInk.capWhite(savedInk) : savedInk }
+    private var ink: String { oled ? OledInk.capWhite(inkSpec) : inkSpec }
+    /// The saved ink, or the palette a widget proposal is previewing with (DeskInkPreview).
+    private var inkSpec: String { DeskInkPreview.shared.resolved(saved: savedInk) }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Every piece, the message included, over its plate (DeskPlate) when the plate is on.
@@ -568,9 +575,11 @@ private struct DeskInk: ViewModifier {
     @AppStorage("inkColor", store: .desk) private var savedInk = "ffffff"
     @AppStorage("inkShadow", store: .desk) private var shadow = true
     @AppStorage(OledCare.key, store: .desk) private var oled = OledCare.defaultOn
+    /// The saved ink, or the palette a widget proposal is previewing with (DeskInkPreview).
+    private var inkSpec: String { DeskInkPreview.shared.resolved(saved: savedInk) }
     func body(content: Content) -> some View {
         content
-            .foregroundStyle(LinearGradient.ink(oled ? OledInk.capWhite(savedInk) : savedInk))
+            .foregroundStyle(LinearGradient.ink(oled ? OledInk.capWhite(inkSpec) : inkSpec))
             .opacity(0.92)
             .shadow(color: .black.opacity(shadow ? 0.45 : 0), radius: 10, x: 0, y: 2)
     }

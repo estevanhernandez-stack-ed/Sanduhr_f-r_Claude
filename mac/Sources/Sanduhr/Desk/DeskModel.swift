@@ -144,6 +144,17 @@ final class DeskModel {
     }
     /// The companion piece's runtime (CompanionDriver): idle unless the piece shows.
     @ObservationIgnored let companion = CompanionDriver()
+    /// A widget proposal under review shows its sprite as the companion (WidgetProposalHandoff): the piece is drawn
+    /// for the preview even while Hidden. Observed, so DeskView adds or drops it. Nothing is saved.
+    private(set) var widgetPreviewsCompanion = false
+
+    /// Puts a proposed sprite on the Desk as the companion, or (nil) takes it off and gives the Desk back what it
+    /// had: the saved companion pack, and the piece only if the layout places it.
+    func setWidgetPreview(companion preview: CompanionPreview?) {
+        let on = preview != nil
+        if widgetPreviewsCompanion != on { widgetPreviewsCompanion = on }
+        companion.setPreview(preview)
+    }
     /// Height of the menu bar strip at the top of the screen, so top slots sit below it.
     var topInset: CGFloat = 0
     /// How far the Dock reaches into the screen on each side (item 56, DockFollower): the Desk's

@@ -169,12 +169,34 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     static let themeSuggestionPrefix = "theme-suggestion-"
 
+    // MARK: - Claude's widget suggestions (2.36.0)
+
+    /// The same gentle banner for a proposed widget. Clicking it opens Settings, Widgets.
+    func suggestWidget(_ m: WidgetReviewModel) {
+        guard MessageSuggestionNotice.banner(AlertSettings(defaults), deskRunning: DeskController.shared.running,
+                                             now: Date()) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Claude suggested a widget: \(m.name)"
+        content.body = m.note ?? "Preview, apply or dismiss it in Sanduhr Settings, Widgets."
+        content.sound = nil
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: Self.widgetSuggestionPrefix + m.id, content: content, trigger: nil))
+    }
+
+    /// The suggestion was decided: its banner leaves Notification Center.
+    func clearWidgetSuggestion(id: String) {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [Self.widgetSuggestionPrefix + id])
+    }
+
+    static let widgetSuggestionPrefix = "widget-suggestion-"
+
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         let id = response.notification.request.identifier
         let section: SettingsSection? = id.hasPrefix(Self.deskSuggestionPrefix) ? .message
-            : id.hasPrefix(Self.themeSuggestionPrefix) ? .themes : nil
+            : id.hasPrefix(Self.themeSuggestionPrefix) ? .themes
+            : id.hasPrefix(Self.widgetSuggestionPrefix) ? .widgets : nil
         if let section {
             DispatchQueue.main.async { MainActor.assumeIsolated { SettingsWindowController.shared.show(section) } }
         }

@@ -152,6 +152,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DeskMessageHandoff.shared.startForApp()
         // Claude's suggested themes (item 55): propose_theme's requests, on the same folder watch.
         ThemeProposalHandoff.shared.startForApp(vm: viewModel)
+        // Claude-made widgets (2.36.0): propose_widget's requests, on the same folder watch. Held in memory,
+        // previewed on the Desk on request, installed only on the user's Apply.
+        WidgetProposalHandoff.shared.startForApp()
         // Watchers (item 66): the MCP server's watch_* requests and the Stop hook's background
         // work, on the same folder watch; watchers.json follows the two switches.
         WatcherStore.shared.startForApp()
