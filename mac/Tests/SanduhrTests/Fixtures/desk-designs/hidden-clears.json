@@ -1,0 +1,14 @@
+{
+  "layout": {
+    "clock": {
+      "anchor": "tl",
+      "size": 1.2,
+      "tilt": 5,
+      "hidden": true
+    },
+    "claude": {
+      "hidden": true,
+      "style": "ring"
+    }
+  }
+}

@@ -157,6 +157,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Claude-made widgets (2.36.0): propose_widget's requests, on the same folder watch. Held in memory,
         // previewed on the Desk on request, installed only on the user's Apply.
         WidgetProposalHandoff.shared.startForApp()
+        // The Desk for Claude (2.37.0): desk-state.json follows the Desk settings, for get_desk.
+        DeskStateExporter.shared.startForApp()
         // Watchers (item 66): the MCP server's watch_* requests and the Stop hook's background
         // work, on the same folder watch; watchers.json follows the two switches.
         WatcherStore.shared.startForApp()

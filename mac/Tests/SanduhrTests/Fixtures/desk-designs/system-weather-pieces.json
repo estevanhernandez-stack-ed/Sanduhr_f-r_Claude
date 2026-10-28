@@ -1,0 +1,17 @@
+{
+  "layout": {
+    "system": {
+      "anchor": "tr"
+    },
+    "weather": {
+      "anchor": "tl"
+    },
+    "telemetry": {
+      "anchor": "tr"
+    },
+    "launcher": {
+      "anchor": "bl"
+    },
+    "glow": {}
+  }
+}

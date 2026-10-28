@@ -1,0 +1,14 @@
+{
+  "layout": {
+    "clock": {
+      "anchor": "bl",
+      "style": "ring"
+    },
+    "meters": {
+      "style": "gauge"
+    },
+    "claude": {
+      "style": true
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "launcher": {
+    "buttons": []
+  },
+  "weather": {
+    "nickname": "Funky Town"
+  },
+  "messages": {
+    "lines": [
+      "Hello."
+    ]
+  },
+  "looks": [],
+  "theme": {
+    "name": "x"
+  }
+}

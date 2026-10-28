@@ -1,0 +1,16 @@
+{
+  "layout": {
+    "clock": {
+      "anchor": "ml",
+      "tilt": -10
+    },
+    "claude": {
+      "anchor": "ml",
+      "tilt": 12
+    },
+    "meters": {
+      "anchor": "ml",
+      "tilt": -10
+    }
+  }
+}
