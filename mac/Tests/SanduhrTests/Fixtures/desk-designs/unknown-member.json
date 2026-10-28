@@ -1,0 +1,9 @@
+{
+  "layout": {
+    "clock": {
+      "anchor": "bl",
+      "color": "red",
+      "zindex": 3
+    }
+  }
+}

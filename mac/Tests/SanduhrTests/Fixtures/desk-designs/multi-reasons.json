@@ -1,0 +1,9 @@
+{
+  "plate": "yes",
+  "ink": "red",
+  "layout": {
+    "clock": {
+      "size": 9
+    }
+  }
+}

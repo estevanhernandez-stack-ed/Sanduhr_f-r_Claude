@@ -1,0 +1,11 @@
+{
+  "layout": {
+    "clock": {
+      "anchor": "tl",
+      "tilt": 25
+    },
+    "claude": {
+      "tilt": "steep"
+    }
+  }
+}
