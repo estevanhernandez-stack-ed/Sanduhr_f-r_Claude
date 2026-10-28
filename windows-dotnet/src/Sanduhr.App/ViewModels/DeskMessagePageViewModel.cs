@@ -800,6 +800,17 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
             ? "Use hex colors like 9ad7ff, or a few with commas for a gradient."
             : null;
 
+    /// <summary>"Use the theme's colors": the message draws in the widget theme's message colors and glow. The own color, glow and any
+    /// colored lines are kept as they are, for when it is turned off.</summary>
+    public bool ThemeColors
+    {
+        get => _settings.ThemeColors;
+        set => Apply(_settings with { ThemeColors = value });
+    }
+
+    /// <summary>The own color and glow controls take input only while the theme's colors are off.</summary>
+    public bool OwnColorsEnabled => !_settings.ThemeColors;
+
     public bool Glow
     {
         get => _settings.Glow;
@@ -857,6 +868,7 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
         {
             nameof(IsDaily), nameof(IsHourly), nameof(Mix), nameof(Pin), nameof(IsStack), nameof(IsTurns), nameof(IsScroll),
             nameof(SecondsApply), nameof(Seconds), nameof(Size), nameof(Glow), nameof(Font),
+            nameof(ThemeColors), nameof(OwnColorsEnabled),
         })
             OnPropertyChanged(name);
         RaiseColor();
@@ -946,6 +958,7 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
     /// <summary>messages.txt was changed here (Claude's lines went in): reload, or offer to under unsaved edits.</summary>
     private void OnApplied() => OnUi(() =>
     {
+        RefreshSettings();   // colored lines may have turned "Use the theme's colors" off
         if (_active) CheckDisk();
         RaiseSuggestion();
     });

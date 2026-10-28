@@ -105,6 +105,27 @@ public class ThemeMatchTests
         Assert.Equal("e2e8f0,38bdf8", own.Ink.Color);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Match_now_copies_the_look_into_the_own_color_and_leaves_Use_the_themes_colors_as_it_was(bool themeColors)
+    {
+        var own = ThemeMatch.OwnSettings(ThemeDeskLook.From(ThemeCatalog.BuiltIns["obsidian"]), DeskSettings.Default, DeskInkSettings.Default,
+            DeskMessageSettings.Default with { ThemeColors = themeColors, Color = "ff00ff" }, NowPlayingSettings.Default);
+        Assert.Equal("6c63ff,e8e4dc", own.Message.Color);
+        Assert.Equal(themeColors, own.Message.ThemeColors);
+    }
+
+    [Fact]
+    public void Use_the_themes_colors_is_on_for_a_new_install_and_off_for_a_key_without_the_field_and_round_trips()
+    {
+        Assert.True(DeskMessageSettings.Decode(null).ThemeColors);
+        Assert.False(DeskMessageSettings.Decode(System.Text.Json.Nodes.JsonNode.Parse("""{"color":"ff00ff"}""")).ThemeColors);
+        Assert.False(DeskMessageSettings.Decode(System.Text.Json.Nodes.JsonNode.Parse("""{"theme_colors":false}""")).ThemeColors);
+        foreach (bool on in new[] { true, false })
+            Assert.Equal(on, DeskMessageSettings.Decode((DeskMessageSettings.Default with { ThemeColors = on }).Encode()).ThemeColors);
+    }
+
     [Fact]
     public void A_font_this_PC_lacks_leaves_the_desks_own_font()
     {

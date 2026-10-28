@@ -25,11 +25,21 @@ internal sealed class DeskMessageHandoffService : IDisposable
     private readonly SettingsStore? _store;
     private FileSystemWatcher? _watcher;
 
-    public DeskMessageHandoffService(Paths paths, string messagesPath, SettingsStore? store = null)
+    public DeskMessageHandoffService(Paths paths, string messagesPath, SettingsStore? store = null, Action? settingsChanged = null)
     {
         _store = store;
         Handoff = new DeskMessageHandoff(new DeskMessagePaths(paths.ExternalDir, messagesPath),
             direct: () => false, canWrite: () => !ResetGuard.Done);
+        // Colored lines in an accepted suggestion would be hidden by "Use the theme's colors": that switch goes off so they show.
+        if (store is not null)
+            Handoff.LinesApplied += lines =>
+            {
+                var own = store.LoadDeskMessage();
+                var next = own.AfterLinesAdded(lines);
+                if (next == own || ResetGuard.Done) return;
+                store.SaveDeskMessage(next);
+                settingsChanged?.Invoke();
+            };
     }
 
     /// <summary>The suggestion state Settings, Message shows.</summary>

@@ -180,9 +180,18 @@
                                    Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                    Text="{x:Static core:SettingsNames.DeskInkCaption}" />
                     </StackPanel>
+                    <StackPanel Margin="0,14,0,0" DataContext="{Binding MessagePage}">
+                        <CheckBox Style="{DynamicResource ThemedCheckBox}"
+                                  Content="{x:Static core:SettingsNames.UseThemeColors}" IsChecked="{Binding ThemeColors, Mode=TwoWay}"
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.UseThemeColors}"
+                                  AutomationProperties.HelpText="{x:Static core:SettingsNames.UseThemeColorsCaption}" />
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                   Text="{x:Static core:SettingsNames.UseThemeColorsCaption}" />
+                    </StackPanel>
                     <StackPanel Margin="0,14,0,0" DataContext="{Binding MessagePage}"
                                 IsEnabled="{Binding DataContext.ThemeMatch.NotFollowing, ElementName=PageBody}">
-                        <Grid>
+                        <Grid IsEnabled="{Binding OwnColorsEnabled}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="110" />
                                 <ColumnDefinition Width="230" />
@@ -204,7 +213,7 @@
                                    Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
                                    Text="{Binding CustomColorProblem}"
                                    Visibility="{Binding CustomColorProblem, Converter={StaticResource StrVis}}" />
-                        <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,10,0,0"
+                        <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,10,0,0" IsEnabled="{Binding OwnColorsEnabled}"
                                   Content="{x:Static core:SettingsNames.GlowAroundMessage}" IsChecked="{Binding Glow, Mode=TwoWay}"
                                   AutomationProperties.Name="{x:Static core:SettingsNames.GlowAroundMessage}" />
                     </StackPanel>

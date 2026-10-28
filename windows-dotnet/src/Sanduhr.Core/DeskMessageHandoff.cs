@@ -60,6 +60,9 @@ public sealed class DeskMessageHandoff
     /// <summary>messages.txt changed here (the Desk picks today's line again).</summary>
     public event Action? Applied;
 
+    /// <summary>The lines that went into messages.txt, raised just before <see cref="Applied"/> (the app keeps the lines' own colors visible).</summary>
+    public event Action<IReadOnlyList<string>>? LinesApplied;
+
     /// <summary>A suggestion was added, dismissed or replaced by a newer one (its notice can go).</summary>
     public event Action<MessageProposal>? Decided;
 
@@ -148,6 +151,7 @@ public sealed class DeskMessageHandoff
             return;
         }
         Revision++;
+        LinesApplied?.Invoke(p.MessageLines);
         Applied?.Invoke();
         WriteResult(p.Id, MessageProposalStatus.Applied, p.Mode, applied: applied);
     }

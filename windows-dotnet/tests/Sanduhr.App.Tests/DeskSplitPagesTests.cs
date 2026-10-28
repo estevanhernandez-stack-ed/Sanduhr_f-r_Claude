@@ -272,6 +272,39 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
     });
 
     [Fact]
+    public void Desk_Look_offers_the_themes_colors_to_the_message_and_locks_its_own_while_on() => AppHost.Run(() =>
+    {
+        var (window, _, guard) = Open("Personal");
+        try
+        {
+            var store = Store();
+            store.SaveDeskMessage(store.LoadDeskMessage() with { ThemeColors = false, Color = "ff00ff" });
+            window.SelectPage(SettingsPage.DeskLook, SettingsIndex.DeskInk);
+            Settle(window, guard);
+            var ink = Marked(window, SettingsPage.DeskLook, SettingsIndex.DeskInk);
+            string NameOf(DependencyObject d) => System.Windows.Automation.AutomationProperties.GetName(d);
+            var box = Below<CheckBox>(ink).Single(c => NameOf(c) == SettingsNames.UseThemeColors);
+            var color = Below<ComboBox>(ink).Single(c => NameOf(c) == SettingsNames.MessageColor);
+            var glow = Below<CheckBox>(ink).Single(c => NameOf(c) == SettingsNames.GlowAroundMessage);
+            Assert.Equal(SettingsNames.UseThemeColorsCaption, System.Windows.Automation.AutomationProperties.GetHelpText(box));
+            Assert.True(box.IsEnabled);
+            Assert.False(box.IsChecked);
+            Assert.True(color.IsEnabled);
+            box.IsChecked = true;
+            Settle(window, guard);
+            Assert.True(store.LoadDeskMessage().ThemeColors);
+            Assert.False(color.IsEnabled);
+            Assert.False(glow.IsEnabled);
+            Assert.Equal("ff00ff", store.LoadDeskMessage().Color);   // the own color keeps its value
+            box.IsChecked = false;
+            Settle(window, guard);
+            Assert.False(store.LoadDeskMessage().ThemeColors);
+            Assert.True(color.IsEnabled);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public void The_Watchers_page_holds_both_switches_and_the_pieces_line() => AppHost.Run(() =>
     {
         var (window, svm, guard) = Open("Personal");

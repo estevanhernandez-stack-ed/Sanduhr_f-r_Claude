@@ -144,6 +144,24 @@ public sealed class DeskFollowThemeTests : IDisposable
     });
 
     [Fact]
+    public void A_desk_that_does_not_follow_still_draws_a_message_in_the_themes_colors_when_it_uses_them() => Sta.Run(() =>
+    {
+        _store.SaveDeskMessage(DeskMessageSettings.Default with { ThemeColors = true, Color = "ff00ff", Pin = "{ink:#ff0000}keep building." });
+        var (desk, host) = Start(follows: false, layout: "message:tl");
+        try
+        {
+            TextBlock Line() => host.Shown.SelectMany(s => s.Islands).SelectMany(i => All<TextBlock>(i.Content)).First(t => t.Text == "keep building.");
+            Assert.Equal([C("6c63ff"), C("e8e4dc")], Stops(Line().Foreground));   // Obsidian's message stops, not the line's red or the own magenta
+            desk.ThemeChanged(ThemeCatalog.BuiltIns["aurora"]);                   // the Desk is not following; the message still redraws
+            Assert.Equal([C("38bdf8"), C("e2e8f0")], Stops(Line().Foreground));
+            _store.SaveDeskMessage(DeskMessageSettings.Default with { ThemeColors = false, Color = "ff00ff", Pin = "{ink:#ff0000}keep building." });
+            desk.Reload();
+            Assert.Equal([C("ff0000")], Stops(Line().Foreground));                // off: the line's own ink wins, as before
+        }
+        finally { desk.Dispose(); }
+    });
+
+    [Fact]
     public void The_guard_turns_a_plateless_looks_plate_on_where_the_ink_would_not_read() => Sta.Run(() =>
     {
         var plateless = ThemeCatalog.BuiltIns["obsidian"] with { Desk = new ThemeDesk { Plate = false } };

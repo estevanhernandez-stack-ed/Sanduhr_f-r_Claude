@@ -590,7 +590,7 @@ public partial class App : Application
         _nowPlaying = new Desk.NowPlayingHub();
         Desk.NowPlayingHub.Current = _nowPlaying;
         _messages = new Desk.DeskMessageSource(store, paths);
-        _handoff = new Desk.DeskMessageHandoffService(paths, _messages.FilePath, store);
+        _handoff = new Desk.DeskMessageHandoffService(paths, _messages.FilePath, store, _messages.Reload);
         Desk.DeskMessageHandoffService.Current = _handoff;
         _handoff.Start(); // Claude's suggested Desk messages (spec 6.9)
         // Watchers (spec 6.9): agents' cards, only while "Let Claude show watchers" is on; in memory only.

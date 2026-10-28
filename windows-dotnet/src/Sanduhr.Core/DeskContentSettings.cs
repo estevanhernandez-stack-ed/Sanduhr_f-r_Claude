@@ -7,11 +7,13 @@ namespace Sanduhr.Core;
 /// The Desk message's settings (spec 6.2), settings.json <c>desk_message</c>: the pinned line, the
 /// rotation, the mix switch, how special days show and for how long each line, and the message's own
 /// look (size, color, glow, font). Absent or odd members are their defaults, so an install without
-/// the key reads as the Mac's defaults.
+/// the key reads as the Mac's defaults. <c>theme_colors</c> is "Use the theme's colors": the message draws in the
+/// active widget theme's message colors and glow, and a line's own <c>{ink:}</c> is ignored. It is on for an install
+/// without the key and off for one that has the key but not the field, so an update changes nobody's Desk.
 /// </summary>
 public sealed record DeskMessageSettings(
     string Pin, bool Hourly, bool Mix, MessageSpecialMode Special, double Seconds,
-    double Size, string Color, bool Glow, string Font)
+    double Size, string Color, bool Glow, string Font, bool ThemeColors)
 {
     public const string Key = "desk_message";
     public const double DefaultSize = 84;
@@ -19,10 +21,21 @@ public sealed record DeskMessageSettings(
     public const double MaxSize = 180;
 
     public static DeskMessageSettings Default { get; } =
-        new("", false, false, MessageSpecialMode.Stack, MessageSpecialModes.DefaultSeconds, DefaultSize, "", true, "");
+        new("", false, false, MessageSpecialMode.Stack, MessageSpecialModes.DefaultSeconds, DefaultSize, "", true, "", true);
 
     /// <summary>The pin as the engine takes it: null when empty.</summary>
     public string? PinnedLine => string.IsNullOrWhiteSpace(Pin) ? null : Pin.Trim();
+
+    /// <summary>
+    /// The settings once these lines are in messages.txt (a Desk design's, or Claude's accepted suggestion): off "Use the theme's colors" when a
+    /// line carries its own <c>{ink:}</c>, since that switch would hide the colors it was just given. Comments, blank lines and the other
+    /// tags change nothing.
+    /// </summary>
+    public DeskMessageSettings AfterLinesAdded(IEnumerable<string> lines) =>
+        ThemeColors && lines.Any(l => MessageProposal.IsMessageLine(l)
+            && MessageMarkup.Parse(DeskMessages.SplitPrefix(MessageText.Trim(l)).Body).Effects.Ink is { Count: > 0 })
+            ? this with { ThemeColors = false }
+            : this;
 
     public static DeskMessageSettings Decode(JsonNode? node)
     {
@@ -39,7 +52,8 @@ public sealed record DeskMessageSettings(
             double.IsFinite(size) ? Math.Clamp(Math.Round(size), MinSize, MaxSize) : DefaultSize,
             SettingsJson.String(o, "color", d.Color),
             SettingsJson.Bool(o, "glow", d.Glow),
-            SettingsJson.String(o, "font", d.Font));
+            SettingsJson.String(o, "font", d.Font),
+            SettingsJson.Bool(o, "theme_colors", false));
     }
 
     public JsonObject Encode() => new()
@@ -53,6 +67,7 @@ public sealed record DeskMessageSettings(
         ["color"] = Color,
         ["glow"] = Glow,
         ["font"] = Font,
+        ["theme_colors"] = ThemeColors,
     };
 }
 
