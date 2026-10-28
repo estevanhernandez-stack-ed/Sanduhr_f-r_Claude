@@ -111,7 +111,7 @@ public class SettingsSlice8NamesTests
             + "The MCP server has no such record, so Sanduhr takes it out of every folder except the ones you unticked, and when each of those worked and no MCP entry is kept "
             + "it removes the MCP launcher and server copies (all but a copy a running Claude Code session holds), whatever the state of the record and whatever else failed. "
             + "It removes the statusline script only when no statusline entry is kept, that record can be read and no statusline entry failed to come out or had to be left. "
-            + "When that record can't be read or is missing, Sanduhr removes only the statusline entries it lists, because without a record it can't tell a command of yours chained into the statusline from its own.", privacy);
+            + "When that record can't be read or is missing, Sanduhr removes only the statusline entries it lists and leaves any other statusline entry as it is.", privacy);
         Assert.Contains("The Settings part removes `mcp-settings.json` and the MCP switch whatever is kept, so a kept MCP server stays registered "
             + "but answers without your usage until you add it again in Settings, Claude Code.", privacy);
     }
