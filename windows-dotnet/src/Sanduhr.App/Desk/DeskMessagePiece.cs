@@ -261,7 +261,8 @@ internal static class DeskMessagePiece
     {
         var parsed = MessageMarkup.Parse(raw);
         var e = parsed.Effects;
-        var stops = e.Ink is { Count: > 0 } own
+        // "Use the theme's colors" ignores a line's own ink: the resolver already put the theme's stops in s.Color.
+        var stops = e.Ink is { Count: > 0 } own && !s.ThemeColors
             ? InkHex.Stops(string.Join(",", own))
             : InkHex.Stops(DeskInk.MessageColor(s.Color, ink.DarkInk));
         var text = parsed.Text;

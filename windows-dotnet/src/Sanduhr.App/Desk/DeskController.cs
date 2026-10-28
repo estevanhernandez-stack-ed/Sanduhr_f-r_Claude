@@ -437,11 +437,11 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     }
 
     /// <summary>The widget's theme changed (a switch, a Claude proposal, Put my Desk back, a Studio preview): Theme ink and a Desk that
-    /// follows the theme redraw from <paramref name="theme"/>.</summary>
+    /// follows the theme, and the message when it uses the theme's colors, redraw from <paramref name="theme"/>.</summary>
     public void ThemeChanged(ThemeDefinition theme)
     {
         _theme = theme;
-        if (_follows || _ink.Mode == DeskInkMode.Theme) Render();
+        Render();   // the message may use the theme's colors whether or not the Desk follows it
     }
 
     /// <summary>The widget has new numbers (after each render and sign-in change). Read only while the
@@ -570,7 +570,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         _fonts ??= _paths is null ? new DeskFonts() : DeskFonts.ForThisPc(_paths);
         var draw = DeskLookResolver.For(_follows, _theme);
-        return (DeskLookResolver.Settings(_settings, draw, _fonts.Has), DeskLookResolver.Frame(frame, draw));
+        return (DeskLookResolver.Settings(_settings, draw, _fonts.Has), DeskLookResolver.Frame(frame, draw, _theme));
     }
 
     /// <summary>
@@ -791,7 +791,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         };
         // Following the widget theme (theme match): the theme's look in place of the Desk's own.
         var draw = DeskLookResolver.For(_follows, _theme);
-        frame = DeskLookResolver.Frame(frame, draw);
+        frame = DeskLookResolver.Frame(frame, draw, _theme);
         LastFrame = frame;
         _fullAt = now;
         foreach (var old in _views) old.Dispose();

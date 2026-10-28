@@ -31,10 +31,13 @@ internal static class DeskLookResolver
     };
 
     /// <summary>The frame with the look's plate tint, Now playing gradient, meter colors, track and tick, and the message in the look's
-    /// colors with its glow on in the look's glow color (a line's own <c>{ink:}</c> still wins).</summary>
-    public static DeskFrame Frame(DeskFrame frame, DeskThemeDraw? draw)
+    /// colors with its glow on in the look's glow color (a line's own <c>{ink:}</c> still wins). With the message's own "Use the theme's
+    /// colors" on, the message takes the active <paramref name="theme"/>'s colors and glow whether or not the Desk follows it, and the
+    /// piece ignores a line's <c>{ink:}</c> (the settings carry the switch); the rest of the frame is the look's only while following.</summary>
+    public static DeskFrame Frame(DeskFrame frame, DeskThemeDraw? draw, ThemeDefinition? theme = null)
     {
-        if (draw is null) return frame;
+        var message = Message(frame.Message, draw?.Look, theme);   // streamer: notname - the Desk message frame record
+        if (draw is null) return frame with { Message = message };
         var look = draw.Look;
         return frame with
         {
@@ -43,9 +46,17 @@ internal static class DeskLookResolver
             MeterStops = look.Bars,
             MeterTrackHex = look.BarTrack,
             PaceHex = look.PaceTick,
-            Message = frame.Message is { } m   // streamer: notname - frame.Message is the Desk message frame record
-                ? m with { Settings = m.Settings with { Color = string.Join(",", look.Message), Glow = true }, GlowHex = look.Glow }   // streamer: notname - look.Message is a colour list
-                : null,
+            Message = message,
         };
+    }
+
+    /// <summary>The message in a look's colors: the followed look, else the active theme's while the message's own switch is on; else as it is.</summary>
+    private static DeskMessageFrame? Message(DeskMessageFrame? m, ThemeDeskLook? followed, ThemeDefinition? theme)
+    {
+        if (m is null) return null;
+        var look = followed ?? (m.Settings.ThemeColors && theme is not null ? ThemeDeskLook.From(theme) : null);
+        return look is null
+            ? m
+            : m with { Settings = m.Settings with { Color = string.Join(",", look.Message), Glow = true }, GlowHex = look.Glow };   // streamer: notname - look.Message is a colour list
     }
 }
