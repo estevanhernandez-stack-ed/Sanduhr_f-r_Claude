@@ -157,6 +157,122 @@ public static partial class Program
         Frame(name, (settings, x, y), (widget, x + settings.PixelWidth + gap, (FrameH - widget.PixelHeight) / 2 - 60));
     }
 
+    /// <summary>The Desk as the Store shows it: every piece in the active theme's look (follow on, the message in the theme's
+    /// colors), an invented song on Now playing (never a real artist), over a dark wallpaper stand-in, with the widget on top.</summary>
+    static async Task RenderStoreDesk(BitmapSource? widget, string themeKey, string layout, string name, double widgetLeft, double widgetTop,
+        Sanduhr.App.Desk.CompanionService? companion = null, FrameworkElement? overlay = null)
+    {
+        // The widget's demo resets count from the real clock, so the Desk uses it too and the two agree.
+        var now = DateTimeOffset.Now;
+        now = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, now.Offset);
+        string Iso(TimeSpan span) => now.Add(span).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fffK", System.Globalization.CultureInfo.InvariantCulture);
+        var usage = new DeskUsage(
+            [new DeskTier(TierModel.FiveHour, 42, Iso(TimeSpan.FromHours(2))),
+             new DeskTier(TierModel.SevenDay, 63, Iso(TimeSpan.FromDays(4)))],
+            now.AddMinutes(-1), false, false, null);
+        var message = new Sanduhr.App.Desk.DeskMessageFrame(new MessageToday(usual: "keep building."), DeskMessageSettings.Default);
+        var track = new NowPlayingInfo
+        {
+            Title = "Glass Hours", Artist = "The Pace Markers", Duration = 236, Elapsed = 94, ElapsedAt = now, Playing = true,
+        };
+        var audio = new Sanduhr.App.Desk.AudioLevelSource();
+        float[] levels = [0.1f, 0.35f, 0.6f, 0.45f, 0.85f, 0.55f, 0.95f, 0.7f, 0.4f, 0.8f, 0.6f, 0.3f, 0.7f, 0.5f, 0.75f, 0.35f];
+        foreach (var l in levels) audio.Bars.Push(l * l, now);
+        var telemetry = new Sanduhr.App.Desk.TelemetrySource();
+        telemetry.Preview(new TelemetrySample(23, 61, 48, now));
+        var place = WeatherPlace.Create("Lakeside", "Texas", "United States", 32.7555, -97.3308);
+        var reading = new WeatherReading(68, 0, 79, 56, 1, 81, 60, now.AddMinutes(-5));
+
+        var theme = ThemeCatalog.BuiltIns[themeKey];
+        var draw = Sanduhr.App.Desk.DeskLookResolver.For(true, theme)!;
+        var wallTop = Color.FromRgb(0x14, 0x12, 0x24);
+        var wallBottom = Color.FromRgb(0x05, 0x06, 0x0a);
+        var guarded = draw with { Look = draw.Look.Guarded(0.01) };
+        var screen = new Sanduhr.App.Desk.DeskScreen("DISPLAY1", new PxRect(0, 0, 1920, 1080), new PxRect(0, 0, 1920, 1032), 1.0, true,
+            TaskbarClearance.Insets(new PxRect(0, 0, 1920, 1080), new PxRect(0, 0, 1920, 1032), [], 1.0));
+        var settings = Sanduhr.App.Desk.DeskLookResolver.Settings(DeskSettings.Default with { Enabled = true, Layout = layout }, guarded).Normalized();
+        var view = new Sanduhr.App.Desk.DeskView(screen, settings, new Sanduhr.App.Desk.DeskFonts());
+        var frame = Sanduhr.App.Desk.DeskLookResolver.Frame(new Sanduhr.App.Desk.DeskFrame
+        {
+            Usage = usage, Now = now, Message = message, Track = track, Bars = true, Audio = audio,
+            Telemetry = telemetry, WeatherOn = true, Place = place, Weather = reading, Companion = companion,
+        }, guarded);
+        view.Update(frame, new Sanduhr.App.Desk.DeskInkMap(guarded.Ink));
+
+        var accent = Res("Sanduhr.Brush.Accent", Color.FromRgb(0x6c, 0x63, 0xff));
+        var root = new Grid { Width = 1920, Height = 1080, Background = new LinearGradientBrush(wallTop, wallBottom, 90) };
+        root.Children.Add(new Border
+        {
+            Background = new RadialGradientBrush(Color.FromArgb(0x40, accent.R, accent.G, accent.B), Colors.Transparent)
+            { Center = new Point(0.25, 0.35), GradientOrigin = new Point(0.25, 0.35), RadiusX = 0.6, RadiusY = 0.7 },
+        });
+        root.Children.Add(new System.Windows.Shapes.Rectangle
+        {
+            Height = 48, VerticalAlignment = VerticalAlignment.Bottom, Fill = new SolidColorBrush(Color.FromArgb(0xB0, 0x0a, 0x0b, 0x10)),
+        });
+        root.Children.Add(view);
+        if (overlay is not null)
+        {
+            overlay.HorizontalAlignment = HorizontalAlignment.Center;
+            overlay.VerticalAlignment = VerticalAlignment.Top;
+            overlay.Margin = new Thickness(0, 8, 0, 0);
+            root.Children.Add(overlay);
+        }
+        if (widget is not null)
+        {
+        var w = new Image
+        {
+            Source = widget, Stretch = Stretch.Fill, Width = widget.PixelWidth / ShotScale, Height = widget.PixelHeight / ShotScale,
+            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(widgetLeft, widgetTop, 0, 0),
+            Effect = new DropShadowEffect { BlurRadius = 50, ShadowDepth = 12, Direction = 270, Opacity = 0.6, Color = Colors.Black },
+        };
+        RenderOptions.SetBitmapScalingMode(w, BitmapScalingMode.HighQuality);
+        root.Children.Add(w);
+        }
+        root.Measure(new Size(1920, 1080));
+        root.Arrange(new Rect(0, 0, 1920, 1080));
+        await Settle2();
+        AssertNoUserName(root);
+        double s = FrameW / 1920.0;
+        var rtb = new RenderTargetBitmap(FrameW, FrameH, 96 * s, 96 * s, PixelFormats.Pbgra32);
+        rtb.Render(root);
+        string path = Path.Combine(Out, "store-shots", name + ".png");
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(rtb));
+        using (var f = File.Create(path)) enc.Save(f);
+        Log.Add($"png store-shots/{name}.png {FrameW}x{FrameH}");
+        view.Dispose();
+        audio.Dispose();
+        telemetry.Dispose();
+    }
+
+    /// <summary>The propose_widget path as the review scenario runs it (the pack built as the MCP server builds it, handed to a real
+    /// WidgetReviewService over the dev profile), drawn on the Store Desk instead of the bare one.</summary>
+    static async Task RenderStoreReview()
+    {
+        var paths = new Paths();
+        var store = new Sanduhr.App.Services.SettingsStore(paths);
+        // The Desk on, so the bar does not say it shows for this preview only.
+        store.SaveDesk(DeskSettings.Default with { Enabled = true });
+        var now = DateTimeOffset.Now;
+        var build = WidgetProposal.Build(BlobArgs(), now);
+        if (build.Pack is not { } pack) throw new InvalidOperationException("store-shots: the sample widget did not build: " + string.Join("; ", build.Reasons));
+        var host = new HarnessWidgetHost();
+        using var service = new Sanduhr.App.Desk.WidgetReviewService(paths, store, clock: () => now) { Host = host };
+        service.Handoff.Receive(Encoding.UTF8.GetBytes(WidgetProposal.RequestJson("store-1", pack, "A tiny friend in your Desk's colors, drawn as pixels.", now).ToJsonString()));
+        if (host.Preview?.Staged is not { } staged || host.Model is not { } model) throw new InvalidOperationException("store-shots: the sample widget was not staged.");
+        using var companion = new Sanduhr.App.Desk.CompanionService(paths, store, claudeCodeDays: () => [], lastInput: () => now, clock: () => now, reduceMotion: () => false);
+        companion.PreviewPack(staged, pack.Id);
+        companion.Reload();
+        companion.Step(now);
+        var bar = new Sanduhr.App.Desk.DeskReviewBar();
+        bar.SetModel(model);
+        await RenderStoreDesk(null, "obsidian",
+            "message:tr clock:tr claude:tr telemetry:tr:1:0:ring weather:mr meters:br nowPlaying:bl companion:bc:1.6", "11-desk-review", 0, 0,
+            companion, bar);
+        companion.EndPreviewPack();
+    }
+
     static async Task RenderStoreShots(WidgetViewModel vm, Assembly asm)
     {
         Sanduhr.App.Services.WidgetCatalogService.HandlerOverride = () => new OfflineHandler();
@@ -250,6 +366,24 @@ public static partial class Program
             // 8. Themes.
             await Open(SettingsPage.Themes);
             Pair("08-themes", Settings(), Widget());
+
+            // 9. The Desk following the widget theme, with a song up, and the widget over it.
+            await RenderStoreDesk(Widget(), "obsidian",
+                "message:tr clock:tr claude:tr telemetry:tr:1:0:ring weather:mr meters:br nowPlaying:bc", "09-desk", 160, 150);
+
+            // 10. The fold, in Aurora: the widget re-tinted with it, the Desk following.
+            vm.ApplyThemeByKey("aurora");
+            vm.ApplyThemeResources();
+            await Settle2();
+            await RenderStoreDesk(Widget(), "aurora",
+                "clock:ml:1:-18 message:ml:1:-18 weather:ml:1:-18 claude:mr:1:18:slim telemetry:mr:1:18:ring meters:mr:1:18:ticks nowPlaying:bc",
+                "10-desk-fold", 760, 70);
+            vm.ApplyThemeByKey("obsidian");
+            vm.ApplyThemeResources();
+            await Settle2();
+
+            // 11. A widget Claude designed: its sprite staged as the companion, the review bar over the Desk.
+            await RenderStoreReview();
         }
         finally
         {
