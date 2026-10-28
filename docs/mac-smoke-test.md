@@ -2173,3 +2173,96 @@ The subscription plan on the widget footer and in Settings, Accounts. Back up
 4. Sign Out that account in Settings, Accounts: the capsule leaves the footer, its row shows no plan,
    and `snapshot.json` reads `"plan": null`. Sign in again: the plan comes back after the first fetch.
 5. An account on an API or prepaid org shows no capsule, no plan text in Accounts and `"plan": null`.
+
+## 54. Widgets: the catalog (2.35.0)
+
+Settings, Widgets. Back up `~/Library/Application Support/Sanduhr` first (section 45) and quit the
+release app. Needs a network for steps 1 to 6; the signature is checked against the key built into
+the app, so a live catalog must be published and signed.
+
+1. Open Settings, Widgets (Desktop group, after Lock Screen). The Catalog section shows the packs
+   with **Install**, and a quiet line instead of a list only when GitHub could not be reached. In
+   Little Snitch or `nettop`, the only requests are to `github.com` (then its redirect host) for
+   `catalog.json`, `catalog.json.sig` and `catalog.json.sig2` (a 404 outside a key change), and
+   they happen when the page opens. Leave the page open for five minutes: no further request.
+2. **Check the catalog again** makes one more round of the same requests, and no others.
+3. Turn the network off and press Check the catalog again: the list stays, with one line that says
+   Sanduhr couldn't reach the widget catalog. Nothing else changes.
+4. **Install** a palette pack: only then is the zip requested. The row turns to **Installed**, the
+   pack is under Installed with its kind, version and "from the catalog", and
+   `widgets/<id>/pack.json` exists beside `widgets.json`. Its palette names appear, as
+   `<palette> · <pack name>`, in the Message editor's Palette menu; a theme pack's themes appear as
+   `<packId>:<stem>` in Settings, Widget, Themes. `widgets/.staging/` is empty afterwards.
+5. Install a sprite pack: `widgets/<id>/.raster/` holds a PNG per pixel sheet.
+6. When the catalog lists a newer version of an installed pack, its row offers **Update**; after
+   it, the Installed row shows the new version. **Uninstall** removes the folder and the row at
+   once, and the catalog row goes back to **Install**.
+7. An effects pack installs and shows "Effects packs don't draw yet." Nothing draws it.
+8. A pack whose `sanduhr_min` is above the pack-format level the app supports (3.8.0) fails with a
+   sentence that says it needs a newer Sanduhr, and nothing is installed.
+9. Reset's widgets part: `smoke/smoke run scenarios/reset-dry-run.yaml` lists a `widgets` step with
+   a count while `widgets/` exists. On the scratch user, Settings, About, Reset Sanduhr… has a
+   **Your widgets** checkbox, checked, after Your themes; with only that part checked, Reset removes
+   `widgets/` (packs, `widgets.json` and `companion.json`) and leaves your settings, accounts and
+   themes. Nothing is put back after the app quits.
+
+## 55. The companion (2.35.0)
+
+The piece needs an installed sprite pack (the hourglass is in the catalog) and the Desk on.
+`smoke/smoke state` shows `companion: null` until it draws.
+
+1. Desk on, no sprite installed: `companion: null`, and `ps`/Activity Monitor show nothing extra for
+   it. Install the hourglass, then in Settings, Desk, Layout place **Companion** (it defaults to
+   bottom center). It appears on the Desk within a second of the install, without leaving the app;
+   `smoke/smoke state` shows `companion: {pack: hourglass, stage, mood, roaming}`.
+2. Settings, Widgets, Companion: with two sprite packs installed, picking one swaps the art at once
+   and `companion.pack` follows. Uninstalling the picked pack falls back to the first sprite by id;
+   uninstalling the last one removes the companion and `companion` goes back to null.
+3. Stages: with `~/.sanduhr/time/days/` holding 3, 10 and 30 day files (made-up dates and
+   `{"v":2,"date":"yyyy-mm-dd","totals":{"totalMs":3600000}}`), quit and reopen. The stage steps up at
+   day 3, 10 and 30 and `widgets/companion.json` lists the days. Remove the day files: the stage and
+   growth stay (growth never goes down). With no Sanduhr Time folder, the days come from Claude Code
+   activity dates instead.
+4. Moods: demo mode (`smoke/smoke do demo on`) shows the hourglass at the third stage cycling content,
+   focused, worried, celebrate, exhausted every 20 seconds (`companion.mood` follows); exhausted
+   sleeps and does not walk. Real data: usage under pace reads content, near pace in use focused,
+   weekly 85 percent or any limit well ahead of pace worried, 100 percent exhausted, and a weekly reset
+   celebrate for about ten minutes.
+5. Triggers: a watcher that goes to waiting plays needs_you once; to passed, job_passed; a limit
+   crossing its Alerts line (or 100 percent) upward plays near_limit; 20 minutes without input plays
+   idle once and rearms on input. After each, the mood resumes.
+6. Roam: with **Let it roam** on, it walks the pack's edges for about 12 seconds, rests for about 8,
+   and turns (the art mirrors) at corners. Watch the whole route, including the screen's right and
+   bottom edges and next to the Dock and the notch: **the sprite is never cut off while it walks**
+   (it extends outside its piece's view, which relies on views not clipping). With **Let it roam**
+   off it stays put.
+7. Pause and Reduce Motion: cover the Desk with a full-screen app, sleep the display or start the
+   screen saver: the walk and the frames hold, and pick up where they were. System Settings,
+   Accessibility, Display, **Reduce motion** on: it stops walking and animates at a slow rate; off
+   again, it resumes.
+8. Quiet: turn the Companion piece off in the layout (or hide the Desk). `smoke/smoke state` shows
+   `companion: null`, and Activity Monitor's idle wakeups for Sanduhr drop back to their usual
+   level (no companion timers).
+9. Privacy checks: `widgets/companion.json` holds only `schema_version`, `growth`, `active_ms` and
+   `days`; `~/.sanduhr/time/days/` is unchanged.
+
+## 56. OLED care (2.35.0)
+
+Settings, Desk, **OLED care**. Needs a screen you can watch for several minutes.
+
+1. Off by default (`defaults read com.626labs.sanduhr.desk deskOledCare` is absent or 0;
+   `smoke/smoke state` has `oled_care: false`). With it off, nothing moves or dims, however long
+   you wait, and Sanduhr has no input-idle timer (Activity Monitor, Sample Process: no `IdleClock`
+   work).
+2. Turn it on with the Desk showing (`oled_care: true`). Every three minutes each Desk piece
+   (clock, meters, message, meetings, the companion) moves a few points along a small figure-eight, as
+   one eased step, never past the menu bar, the Dock or the notch. The notch island, the top-center
+   pill and the lock screen line do not move. Clicks still land on the pieces after a step.
+3. Stop touching the Mac for five minutes: the Desk eases to about 40 percent opacity and the
+   widget window to about 70 percent. The first key press, click or scroll wakes both in a
+   fraction of a second. With Reduce motion on, both snap with no ease.
+4. White cap: set the Desk ink or the message colour to pure white (`ffffff`). With OLED care on it
+   draws as `#e6e6e6` (hue kept for coloured ink); turn OLED care off and it is white again. The
+   saved colour in Settings, Desk Look never changes.
+5. Turn it off mid-dim: both windows return to full opacity at once and the pieces return to their
+   places.
