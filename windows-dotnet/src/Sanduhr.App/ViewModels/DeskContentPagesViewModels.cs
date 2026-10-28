@@ -116,6 +116,9 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
     /// <summary>Called after every saved change (the widget line and the Desk follow).</summary>
     public Action? Changed { get; set; }
 
+    /// <summary>The Now playing piece's line at the page top (set by <see cref="SettingsViewModel"/>).</summary>
+    public DeskPieceStatusViewModel? Piece { get; internal set; }
+
     [ObservableProperty] private bool _widget;
     [ObservableProperty] private bool _keepPaused;
     [ObservableProperty] private bool _bars;
@@ -157,6 +160,13 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
         Status = NowPlayingStatus.Text(on, _hub?.Shown, LauncherAppCache.Current is { } apps ? apps.StartMenuName : null);
     }
 
+    /// <summary>The settings changed behind the page (theme match's Follow off or Match now turned Gradient bars on): read them again.</summary>
+    public void ReloadSettings()
+    {
+        _saved = _store.LoadNowPlaying();
+        Load();
+    }
+
     internal void SetExcluded(string appId, bool excluded)
     {
         var list = _saved.Excluded.Where(e => !string.Equals(e, appId, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -166,9 +176,20 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
 
     partial void OnWidgetChanged(bool value) { if (!_loading) Save(_saved with { Widget = value }); }
     partial void OnKeepPausedChanged(bool value) { if (!_loading) Save(_saved with { KeepPaused = value }); }
-    partial void OnBarsChanged(bool value) { if (!_loading) Save(_saved with { Bars = value }); }
+    // The bars and the song's look draw on the Desk: turning either on shows a hidden piece (Principle 4).
+    partial void OnBarsChanged(bool value)
+    {
+        if (_loading) return;
+        Save(_saved with { Bars = value });
+        if (value) Piece?.PlaceIfHidden();
+    }
     partial void OnBarsGradientChanged(bool value) { if (!_loading) Save(_saved with { BarsGradient = value }); }
-    partial void OnStyleChanged(bool value) { if (!_loading) Save(_saved with { Style = value }); }
+    partial void OnStyleChanged(bool value)
+    {
+        if (_loading) return;
+        Save(_saved with { Style = value });
+        if (value) Piece?.PlaceIfHidden();
+    }
     partial void OnLooksDirectChanged(bool value) { if (!_loading) Save(_saved with { LooksDirect = value }); }
 
     // ---- Looks (spec, a look per song) ----
@@ -231,8 +252,13 @@ public sealed partial class NowPlayingPageViewModel : ObservableObject
 /// Settings, Weather (spec 6.5): type a city, Look up sends that name (and only that) to Open-Meteo's
 /// place search, pick one of the places found, choose the unit. The place's coordinates are saved
 /// rounded to about 1 km. Clear forgets the place. "Show it as" (#315) is a nickname the Desk shows instead of the place's
-/// name: kept on this PC only, never sent, and the forecast still uses the picked place. The piece itself is placed on the Desk page.
+/// name: kept on this PC only, never sent, and the forecast still uses the picked place. Picking a place shows a hidden Weather piece (Principle 4); where it sits is Settings, Desk, Pieces.
 /// </summary>
+public sealed record PlaceChoice(WeatherPlace Place, string Shown)
+{
+    public override string ToString() => Shown;
+}
+
 public sealed partial class WeatherPageViewModel : ObservableObject
 {
     private readonly SettingsStore _store;
@@ -273,16 +299,46 @@ public sealed partial class WeatherPageViewModel : ObservableObject
     /// <summary>Called after every saved change (the Desk follows).</summary>
     public Action? Changed { get; set; }
 
+    /// <summary>The Weather piece's line at the page top (set by <see cref="SettingsViewModel"/>).</summary>
+    public DeskPieceStatusViewModel? Piece { get; internal set; }
+
     [ObservableProperty] private string _city = "";
     [ObservableProperty] private string _note = "";
     [ObservableProperty] private UnitChoice _unit = Units[0];
     [ObservableProperty] private WeatherPlace? _picked;
     [ObservableProperty] private string _nickname = "";
 
-    public ObservableCollection<WeatherPlace> Results { get; } = [];
+    public ObservableCollection<PlaceChoice> Results { get; } = [];
 
-    /// <summary>"Fort Worth, Texas, United States", or "No city set".</summary>
-    public string PlaceText => _saved.Place?.Label ?? "No city set";
+    /// <summary>Places found are codenames: the note under the list says so (owner taste 11).</summary>
+    public bool PlacesHidden => StreamerMode.On && Results.Count > 0;
+
+    /// <summary>Streamer mode moved (slice 7).</summary>
+    public void RefreshNames()
+    {
+        var places = Results.Select(r => r.Place).ToList();
+        Results.Clear();
+        foreach (var p in places) Results.Add(Choice(p));
+        OnPropertyChanged(nameof(PlaceText));
+        OnPropertyChanged(nameof(PlacesHidden));
+    }
+
+    private static PlaceChoice Choice(WeatherPlace p) =>
+        new(p, StreamerMode.On ? StreamerMode.Mask.Name(CodenameCategory.City, p.Label) : p.Label);
+
+    /// <summary>Tests fill the list as Look up does.</summary>
+    internal void ShowResultsForTests(IEnumerable<WeatherPlace> places)
+    {
+        Results.Clear();
+        foreach (var p in places) Results.Add(Choice(p));
+        OnPropertyChanged(nameof(PlacesHidden));
+    }
+
+    /// <summary>"Fort Worth, Texas, United States", or "No city set". While streamer mode is on: the "Show it as" name, else the city's
+    /// codename (spec, Weather; slice 7, CP 21).</summary>
+    public string PlaceText => _saved.Place is not { } place ? "No city set"
+        : StreamerMode.On ? StreamerMode.Mask.WeatherName(place, _saved.Nickname)
+        : place.Label;
 
     public bool HasPlace => _saved.Place is not null;
 
@@ -298,7 +354,8 @@ public sealed partial class WeatherPageViewModel : ObservableObject
         {
             var places = await WeatherService.LookUp(City, cts.Token);
             if (cts.IsCancellationRequested) return;
-            foreach (var p in places) Results.Add(p);
+            foreach (var p in places) Results.Add(Choice(p));
+            OnPropertyChanged(nameof(PlacesHidden));
             Note = places.Count == 0 ? "No place by that name. Try the city with its country." : "Pick your place:";
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or OperationCanceledException)
@@ -312,8 +369,10 @@ public sealed partial class WeatherPageViewModel : ObservableObject
         if (value is null) return;
         Save(_saved with { Place = WeatherPlace.Create(value.Name, value.Admin, value.Country, value.Lat, value.Lon) });
         Results.Clear();
+        OnPropertyChanged(nameof(PlacesHidden));
         Note = "";
         City = "";
+        Piece?.PlaceIfHidden();
     }
 
     [RelayCommand]

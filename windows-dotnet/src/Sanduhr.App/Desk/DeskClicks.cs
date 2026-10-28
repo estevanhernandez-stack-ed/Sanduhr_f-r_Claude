@@ -47,9 +47,11 @@ internal static class DeskClicks
     /// <summary>Open-Meteo's site, the link its CC BY 4.0 licence asks for beside its data.</summary>
     public const string WeatherCreditUrl = "https://open-meteo.com/";
 
-    public const string EditMessages = "Edit messages…";
-    public const string DeskSettings = "Desk settings…";
-    public const string LauncherSettings = "Edit buttons…";
+    /// <summary>The message's menu item: "Message settings…", a page name like every Settings entry point.</summary>
+    public static readonly string MessageSettings = SettingsNames.LinkTitle(SettingsPage.DeskMessage);
+    public static readonly string DeskSettings = SettingsNames.LinkTitle(SettingsPage.Desk);
+    /// <summary>A Launcher button's menu item: "Launcher settings…" (WF17, WF19), the page's own name like every entry point.</summary>
+    public static readonly string LauncherSettings = SettingsNames.LinkTitle(SettingsPage.Launcher);
     public const string TurnOffDesk = "Turn off the Desk";
 
     private static readonly Brush Plate = Frozen(Color.FromArgb(1, 0, 0, 0));
@@ -95,7 +97,7 @@ internal static class DeskClicks
             NowPlayingDrawn: Has(DeskElementKind.NowPlaying),
             WeatherCreditDrawn: Has(DeskElementKind.WeatherCredit),
             PiecesTakeClicks: piecesTakeClicks,
-            MessageDrawn: Has(DeskElementKind.Message),
+            MessageDrawn: Has(DeskElementKind.Message),   // streamer: notname - DeskElementKind.Message is an enum member
             ClaudeLineDrawn: Has(DeskElementKind.ClaudeLine));
         var kinds = new HashSet<DeskElementKind>(DeskElements.Build(input).Select(e => e.Kind));
         // The clock counts only when it is drawn in this island.
@@ -115,7 +117,7 @@ internal static class DeskClicks
                 DeskElementKind? kind = tag switch
                 {
                     "clock" => DeskElementKind.Clock,
-                    "message" => DeskElementKind.Message,
+                    "message" => DeskElementKind.Message,   // streamer: notname - DeskElementKind.Message is an enum member
                     "claude" => DeskElementKind.ClaudeLine,
                     "nowPlaying" => DeskElementKind.NowPlaying,
                     WeatherCreditTag => DeskElementKind.WeatherCredit,
@@ -267,7 +269,7 @@ internal static class DeskClicks
         };
     }
 
-    /// <summary>The Desk menu: the piece's own item (Edit messages… on the message), then the shared ones.</summary>
+    /// <summary>The Desk menu: the piece's own item (Message settings… on the message), then the shared ones.</summary>
     private static void OpenMenu(FrameworkElement target, DeskElementKind kind, IDeskClickActions actions)
     {
         var menu = new ContextMenu { PlacementTarget = target, Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint };
@@ -275,11 +277,11 @@ internal static class DeskClicks
         void Add(string header, DeskMenuAction action)
         {
             var item = new MenuItem { Header = header };
-            AutomationProperties.SetName(item, header.TrimEnd('…'));
+            AutomationProperties.SetName(item, header.TrimEnd('…'));   // streamer: notname - context-menu item text, fixed copy
             item.Click += (_, _) => actions.Menu(action);
             menu.Items.Add(item);
         }
-        if (kind == DeskElementKind.Message) Add(EditMessages, DeskMenuAction.EditMessages);
+        if (kind == DeskElementKind.Message) Add(MessageSettings, DeskMenuAction.EditMessages);   // streamer: notname - DeskElementKind.Message is an enum member
         if (kind == DeskElementKind.LauncherButton) Add(LauncherSettings, DeskMenuAction.LauncherSettings);
         Add(DeskSettings, DeskMenuAction.DeskSettings);
         Add(DeskArrangeCopy.MenuItem, DeskMenuAction.Arrange);

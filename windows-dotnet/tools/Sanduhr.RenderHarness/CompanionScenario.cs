@@ -13,7 +13,7 @@ using Sanduhr.Core;
 // The Desk companion scenario (spec 3.8 section 4): the first-party hourglass installed into the dev profile's widgets folder
 // through WidgetStore (validated as the catalog client would), then drawn on a composited Desk the way the host places each
 // island: every stage sitting beside the clock, a mood and a trigger, and one roaming frame part way along the bottom. Then
-// Settings, Widgets with the companion section. No network (the catalog fetch gets a 503), no Desk windows, no real
+// Settings, Desk, Pieces with the Companion row. No network (the catalog fetch gets a 503), no Desk windows, no real
 // widgets folder, no session logs read (growth is set by hand).
 public static partial class Program
 {
@@ -147,12 +147,12 @@ public static partial class Program
             await Settle();
         }
 
-        // ---- Settings, Widgets ----
+        // ---- Settings, Desk, Pieces ----
         var desk = store.LoadDesk();
         store.SaveDesk(desk with { Enabled = true, Layout = "clock:bl claude:bl companion:br" });
         var svm = new SettingsViewModel(vm, () => Task.CompletedTask, _ => Task.CompletedTask)
         {
-            WidgetsPage = new WidgetsPageViewModel(() => new WidgetCatalogService(paths, new NoNetwork()), store),
+            ModsPage = new ModsPageViewModel(() => new WidgetCatalogService(paths, new NoNetwork()), store),
         };
         var swType = asm.GetType("Sanduhr.App.Views.SettingsWindow")!;
         var sw = (Window)Activator.CreateInstance(swType, svm)!;
@@ -162,11 +162,11 @@ public static partial class Program
         sw.Top = -20000;
         sw.Height = 1100;
         await Settle();
-        swType.GetMethod("SelectPage")!.Invoke(sw, [SettingsPage.Widgets, SettingsIndex.WidgetsCompanion]);
+        swType.GetMethod("SelectPage")!.Invoke(sw, [SettingsPage.Desk, SettingsIndex.DeskPieces]);
         await Settle();
         await Settle();
-        Log.Add($"companion: settings companions={svm.WidgetsPage.Companions.Count} shown={svm.WidgetsPage.CompanionShown} roams={svm.WidgetsPage.CompanionRoams} status={svm.WidgetsPage.CompanionStatus}");
-        Save((FrameworkElement)sw.Content, "companion-settings-widgets");
+        Log.Add($"companion: settings companions={svm.Desk.Companion.Companions.Count} shown={svm.Desk.Pieces.Single(p => p.Widget == CompanionSettings.Widget).Shown} roams={svm.Desk.Companion.Roams} status={svm.Desk.Companion.Status}");
+        Save((FrameworkElement)sw.Content, "companion-settings-desk");
         sw.Close();
         await Settle();
     }

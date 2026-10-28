@@ -97,26 +97,34 @@ public partial class MainWindow : Window
         accounts.SubmenuOpened += (_, _) =>
         {
             if (Vm is not null)
-                AccountMenuBuilder.PopulateSwitchList(accounts.Items, Vm, includeAdd: true, includeManage: false);
+                AccountMenuBuilder.PopulateSwitchList(accounts.Items, Vm, includeAdd: true, includeManage: true);
         };
         menu.Items.Add(accounts);
 
         var settings = new MenuItem { Header = Sanduhr.Core.SettingsNames.OpenSettings, Command = Vm.OpenSettingsCommand };
         menu.Items.Add(settings);
 
-        var refresh = new MenuItem { Header = "Refresh", Command = Vm.RefreshCommand };
+        var refresh = new MenuItem { Header = SettingsNames.RefreshUsageNow, Command = Vm.RefreshCommand };
         menu.Items.Add(refresh);
 
-        var compact = new MenuItem { Command = Vm.ToggleCompactCommand };
-        menu.Opened += (_, _) => compact.Header = (Vm?.IsCompact ?? false) ? "Expand" : "Compact Mode";
+        // One name in both states; the check mark says which (WF19). IsCheckable also gives the item a
+        // Toggle state for screen readers; the menu's Opened handler re-syncs it from IsCompact.
+        var compact = new MenuItem { Header = SettingsNames.CompactMode, Command = Vm.ToggleCompactCommand, IsCheckable = true };
+        menu.Opened += (_, _) => compact.IsChecked = Vm?.IsCompact ?? false;
         menu.Items.Add(compact);
+
+        // Streamer mode (spec: a widget right-click item of the same name, writing the same key). Checkable: one name, the check says which.
+        var streamer = new MenuItem { Header = SettingsNames.StreamerMenuItemHeader, IsCheckable = true };
+        streamer.Click += (_, _) => Vm?.Streamer.SetOn(streamer.IsChecked);
+        menu.Opened += (_, _) => streamer.IsChecked = Vm?.Streamer.On ?? false;
+        menu.Items.Add(streamer);
 
         menu.Items.Add(new Separator());
 
-        var focus = new MenuItem { Header = "Deep Work (Focus)", Command = Vm.ToggleFocusCommand };
+        var focus = new MenuItem { Header = SettingsNames.DeepWork, Command = Vm.ToggleFocusCommand };
         menu.Items.Add(focus);
 
-        var game = new MenuItem { Header = "Cooldown Snake", Command = Vm.StartGameCommand };
+        var game = new MenuItem { Header = SettingsNames.CooldownSnake, Command = Vm.StartGameCommand };
         menu.Items.Add(game);
 
         menu.Items.Add(new Separator());

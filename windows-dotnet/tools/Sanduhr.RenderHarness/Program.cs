@@ -21,7 +21,15 @@ using Sanduhr.Core;
 //
 // Options:
 //   --out <dir>          where PNGs and log.txt go (default ./harness-out)
-//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | desk | arrange | launcher | review | companion | ridealongs | propose-widget | meterstyles | all; repeatable (default all)
+//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | desk | arrange | launcher | review | companion | ridealongs | propose-widget | meterstyles | theme-match | all; repeatable (default all)
+//                        settings-pass is not part of all: it is the slow evidence run for the Settings persona pass
+//                        (see SettingsPassScenario.cs); run it once without and once with --light
+//                        manual-key is not part of all either: the manual sign-in key window, closed and fully open
+//                        streamer-smoke is not part of all and runs alone: the Settings v2 slice 7 owner checks, automated (see StreamerSmokeScenario.cs)
+//                        polish-smoke is not part of all and runs alone: the 4.0 polish live checks, SANDUHR_DEV_PROFILE under %TEMP% (see PolishSmokeScenario.cs)
+//                        store-shots is not part of all: Store screenshots, 2560x1440 frames of Settings and the widget (see StoreShotsScenario.cs)
+//   --pages <list>       settings-pass only: comma-separated page names to run (default every page)
+//   --parts <list>       settings-pass only: pages, tab, focus, search, links, contrast (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)
 //   --light              write a LIGHT user theme into the dev profile's themes folder and apply
 //                        it, to check dialogs for legibility on a light surface
@@ -94,15 +102,18 @@ public static partial class Program
                 case "--theme": theme = Next(args, ref i); break;
                 case "--app-xaml": appXamlArg = Next(args, ref i); break;
                 case "--light": light = true; break;
+                case "--parts": PassParts = Next(args, ref i).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries); break;
+                case "--pages": PassPages = Next(args, ref i).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries); break;
                 default:
                     Console.Error.WriteLine($"Unknown argument: {args[i]}");
                     return 2;
             }
         }
-        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange", "launcher", "review", "companion", "ridealongs", "propose-widget", "meterstyles" };
+        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange", "launcher", "review", "companion", "ridealongs", "propose-widget", "meterstyles", "theme-match" };
+        string[] opt = { "settings-pass", "manual-key", "streamer-smoke", "polish-smoke", "store-shots" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
-        var bad = scenarios.Where(s => !known.Contains(s)).ToList();
+        var bad = scenarios.Where(s => !known.Contains(s) && !opt.Contains(s)).ToList();
         if (bad.Count > 0)
         {
             Console.Error.WriteLine($"Unknown scenario: {string.Join(", ", bad)}. Known: {string.Join(", ", known)}, all.");
@@ -266,9 +277,31 @@ public static partial class Program
         Log.Add($"windows app mode: {WindowsAppMode()}");
         Log.Add($"scenarios: {string.Join(",", scenarios)}");
 
+        if (scenarios.Contains("streamer-smoke"))
+        {
+            // Runs alone and before the invented Claude Code profile and the real-account widget below: it builds its own rigs.
+            if (scenarios.Count != 1)
+                throw new InvalidOperationException("streamer-smoke runs alone: pass --scenario streamer-smoke only.");
+            try { await RenderStreamerSmoke(); }
+            finally { File.WriteAllLines(Path.Combine(Out, "log.txt"), Log); }
+            return;
+        }
+
+        if (scenarios.Contains("polish-smoke"))
+        {
+            // Runs alone, like streamer-smoke: it builds its own scratch rig and never reaches the real-account widget below.
+            if (scenarios.Count != 1)
+                throw new InvalidOperationException("polish-smoke runs alone: pass --scenario polish-smoke only.");
+            try { await RenderPolishSmoke(); }
+            finally { File.WriteAllLines(Path.Combine(Out, "log.txt"), Log); }
+            return;
+        }
+
         // Claude Code folders come from an invented profile, never the real one, so no real path, project or
         // account label reaches a picture. Set before the view model is built (its log reader discovers folders).
         string fakeProfile = BuildFakeProfile();
+        if (scenarios.Contains("store-shots"))
+            SeedStoreLogs(fakeProfile);
         Sanduhr.App.Services.ClaudeCodeProfile.ProfileOverride = fakeProfile;
         Sanduhr.App.Services.ClaudeCodeProfile.ConfigDirOverride = "";
         Log.Add("claude code profile: invented (temp folder)");
@@ -351,6 +384,10 @@ public static partial class Program
                 await RenderArrange();
             if (scenarios.Contains("settings"))
                 await RenderSettings(vm, asm);
+            if (scenarios.Contains("settings-pass"))
+                await RenderSettingsPass(vm, asm, light);
+            if (scenarios.Contains("manual-key"))
+                await RenderManualKey(asm);
             if (scenarios.Contains("launcher"))
                 await RenderLauncher(vm, asm, light);
             if (scenarios.Contains("review"))
@@ -359,10 +396,14 @@ public static partial class Program
                 await RenderCompanion(vm, asm);
             if (scenarios.Contains("meterstyles"))
                 await RenderMeterStyles(vm, asm);
+            if (scenarios.Contains("theme-match"))
+                await RenderThemeMatch(vm, asm);
             if (scenarios.Contains("ridealongs"))
                 await RenderRideAlongs(vm, asm);
             if (scenarios.Contains("propose-widget"))
                 await RenderProposeWidget(vm, asm);
+            if (scenarios.Contains("store-shots"))
+                await RenderStoreShots(vm, asm);
         }
         finally
         {
@@ -841,7 +882,7 @@ public static partial class Program
         await Settle();
     }
 
-    /// <summary>The harness never touches the network: Settings ▸ Widgets fetches the catalog when it opens, so it gets a
+    /// <summary>The harness never touches the network: Settings, Mods & Widgets fetches the catalog when it opens, so it gets a
     /// network that is never there and draws its offline line.</summary>
     sealed class OfflineHandler : System.Net.Http.HttpMessageHandler
     {

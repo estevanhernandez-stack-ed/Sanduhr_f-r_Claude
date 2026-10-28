@@ -143,6 +143,7 @@ internal static class WidgetKit
 /// caps), WPF's PNG encoding of pixel sheets, and install, update and uninstall through the Settings page's view model.
 /// All over <see cref="FakeGitHub"/> and a scratch LocalAppData: no real network, no real Sanduhr folder.
 /// </summary>
+[Collection("SettingsWindow")]
 public sealed class WidgetCatalogServiceTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "sanduhr-widget-svc-" + Guid.NewGuid().ToString("N")[..10]);
@@ -248,9 +249,9 @@ public sealed class WidgetCatalogServiceTests : IDisposable
         var palette = Packed("good-palette", "Fixture palette", "palette");
         using var stranger = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         WidgetKit.Publish(_net, stranger, "2026-10-22T02:23:13Z", palette);
-        var page = new WidgetsPageViewModel(() => Service());
-        await page.Activate();
-        Assert.Equal("The widget catalog couldn't be verified.", page.Status);
+        var page = new ModsPageViewModel(() => Service());
+        await page.OpenCatalog();
+        Assert.Equal("The widget catalog couldn't be verified.", page.CatalogStatus);
         Assert.Empty(page.Catalog);
         Assert.DoesNotContain(_net.Seen, r => r.RequestUri!.AbsoluteUri == palette.Item1.Url);
     }
@@ -262,9 +263,9 @@ public sealed class WidgetCatalogServiceTests : IDisposable
         var files = WidgetKit.Pack("good-palette");
         var v = PackValidator.Validate(files, "good-palette", strict: true);
         Assert.True(svc.Store.Install(files, v.Manifest!, WidgetSource.Claude).Ok);
-        var page = new WidgetsPageViewModel(() => svc);
-        await page.Activate();
-        Assert.Equal(WidgetCatalogClient.Offline, page.Status);
+        var page = new ModsPageViewModel(() => svc);
+        await page.OpenCatalog();
+        Assert.Equal(WidgetCatalogClient.Offline, page.CatalogStatus);
         var row = Assert.Single(page.Installed);
         Assert.Equal(("Fixture palette", SettingsNames.WidgetMadeHere), (row.Name, row.Source));
     }
@@ -276,16 +277,17 @@ public sealed class WidgetCatalogServiceTests : IDisposable
         var effects = Packed("good-effects", "Fixture effects", "effects");
         WidgetKit.Publish(_net, _key, "2026-10-22T02:23:13Z", v1, effects);
         var svc = Service();
-        var page = new WidgetsPageViewModel(() => svc);
-        await page.Activate();
-        Assert.StartsWith("The catalog is verified: 2 widgets", page.Status);
+        var page = new ModsPageViewModel(() => svc);
+        page.Confirm = (_, _) => true;
+        await page.OpenCatalog();
+        Assert.StartsWith("The catalog is verified: 2 widgets", page.CatalogStatus);
 
         var paletteRow = page.Catalog.Single(r => r.Entry.Id == "good-palette");
-        Assert.Equal((WidgetRowAction.Install, "Install Fixture palette"), (paletteRow.Action, paletteRow.ActionName));
+        Assert.Equal((CatalogAction.Install, "Install Fixture palette"), (paletteRow.Action, paletteRow.ActionName));
         await paletteRow.ActCommand.ExecuteAsync(null);
         Assert.Equal("Fixture palette is installed.", page.Status);
         Assert.Equal("Installed.", page.Catalog.Single(r => r.Entry.Id == "good-palette").State);
-        Assert.Equal(WidgetRowAction.None, page.Catalog.Single(r => r.Entry.Id == "good-palette").Action);
+        Assert.Equal(CatalogAction.Switch, page.Catalog.Single(r => r.Entry.Id == "good-palette").Action);
         Assert.Equal("Uninstall Fixture palette", Assert.Single(page.Installed).UninstallName);
 
         // 1.1.0 is published, but its zip on the server is not the one the catalog hashed.
@@ -296,7 +298,7 @@ public sealed class WidgetCatalogServiceTests : IDisposable
         _net.Redirected(v2.Item1.Url, "objects.githubusercontent.com", tampered);
         await page.CheckAgainCommand.ExecuteAsync(null);
         var update = page.Catalog.Single(r => r.Entry.Id == "good-palette");
-        Assert.Equal((WidgetRowAction.Update, "Update Fixture palette to 1.1.0"), (update.Action, update.ActionName));
+        Assert.Equal((CatalogAction.Update, "Update Fixture palette to 1.1.0"), (update.Action, update.ActionName));
         await update.ActCommand.ExecuteAsync(null);
         Assert.Equal(WidgetCatalogClient.DownloadMismatch, page.Status);
         Assert.Equal("1.0.0", svc.Store.Load().Find("good-palette")!.Version);
@@ -312,7 +314,7 @@ public sealed class WidgetCatalogServiceTests : IDisposable
         Assert.Equal("Fixture palette is uninstalled.", page.Status);
         Assert.Empty(page.Installed);
         Assert.False(Directory.Exists(svc.Store.PackDir("good-palette")));
-        Assert.Equal(WidgetRowAction.Install, page.Catalog.Single(r => r.Entry.Id == "good-palette").Action);
+        Assert.Equal(CatalogAction.Install, page.Catalog.Single(r => r.Entry.Id == "good-palette").Action);
     }
 
     [Fact]
@@ -320,9 +322,9 @@ public sealed class WidgetCatalogServiceTests : IDisposable
     {
         var palette = Packed("good-palette", "Fixture palette", "palette");
         WidgetKit.Publish(_net, _key, "2026-10-22T02:23:13Z", palette);
-        var page = new WidgetsPageViewModel(() => Service(new Version(3, 7, 2, 0)));
-        await page.Activate();
+        var page = new ModsPageViewModel(() => Service(new Version(3, 7, 2, 0)));
+        await page.OpenCatalog();
         var row = Assert.Single(page.Catalog);
-        Assert.Equal((WidgetRowAction.None, "Needs Sanduhr 3.8.0 or later."), (row.Action, row.State));
+        Assert.Equal((CatalogAction.None, "Needs Sanduhr 3.8.0 or later."), (row.Action, row.State));
     }
 }

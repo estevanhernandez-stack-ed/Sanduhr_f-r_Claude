@@ -312,10 +312,10 @@
                 <DockPanel Margin="0,12,0,0" LastChildFill="False"
                            Visibility="{Binding IsWhatsNew, Converter={StaticResource BoolVis}}">
                     <CheckBox DockPanel.Dock="Left" Style="{StaticResource ThemedCheckBox}"
-                              Content="Don't show after updates"
+                              Content="{x:Static core:SettingsNames.HideWhatsNewAfterUpdates}"
                               IsChecked="{Binding HideAfterUpdates, Mode=TwoWay}"
                               ToolTip="What's New stays in the tray menu and Settings either way."
-                              AutomationProperties.Name="Don't show after updates" />
+                              AutomationProperties.Name="{x:Static core:SettingsNames.HideWhatsNewAfterUpdates}" />
                     <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Done"
                             IsDefault="{Binding IsWhatsNew}" IsCancel="{Binding IsWhatsNew}" Padding="22,7"
                             AutomationProperties.Name="Done" Click="Done_Click" />

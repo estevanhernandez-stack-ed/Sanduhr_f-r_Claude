@@ -33,9 +33,11 @@ public static class Program
             })
             .Run();
 
-        // One Sanduhr per data folder: a second launch shows the running widget and exits. A launch that
-        // meets an instance mid-quit waits for it (up to the handoff) and then starts as usual.
-        using var instance = Services.SingleInstance.Claim(new Sanduhr.Core.Paths().AppDataDir, TimeSpan.FromSeconds(15));
+        // One Sanduhr per data folder: a second launch shows the running widget, or opens its Settings where
+        // `--settings <page>[#<anchor>]` says, and exits. A launch that meets an instance mid-quit waits for it
+        // (up to the handoff) and then starts as usual.
+        using var instance = Services.SingleInstance.Claim(new Sanduhr.Core.Paths().AppDataDir,
+            Services.SingleInstance.HandoffDeadline, Sanduhr.Core.SettingsIndex.LinkArgument(args));
         if (!instance.IsPrimary)
             return 0;
 

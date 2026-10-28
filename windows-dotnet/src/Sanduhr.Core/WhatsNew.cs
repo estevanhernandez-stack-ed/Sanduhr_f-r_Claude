@@ -4,7 +4,7 @@ namespace Sanduhr.Core;
 /// The Settings pages a What's New card's "Show me" can open (Widget shows the widget). Their
 /// sidebar titles and groups are in <see cref="SettingsNames"/>. New pages go at the end.
 /// </summary>
-public enum SettingsPage { Accounts, Themes, Alerts, History, ClaudeUsage, Publish, General, Widget, About, ClaudeCode, Mods, Desk, DeskMessage, NowPlaying, Weather, Widgets }
+public enum SettingsPage { Accounts, Themes, Alerts, History, ClaudeUsage, Publish, General, Widget, About, ClaudeCode, Mods, Desk, DeskMessage, NowPlaying, Weather, Widgets, DeskLook, Watchers, Launcher, Privacy }
 
 /// <summary>The small live previews a card can ask for in place of a glyph.</summary>
 public enum WhatsNewPreview
@@ -34,6 +34,13 @@ public sealed record WhatsNewCard
     public string Glyph { get; }
     public WhatsNewPreview Preview { get; }
     public SettingsPage Destination { get; }
+
+    /// <summary>
+    /// The section Show me lands on: an anchor of <see cref="SettingsIndex"/> on <see cref="Destination"/> (Settings v2,
+    /// WF17). Null when the card shows the widget. Set from the id maps in <see cref="WhatsNewCards"/> and
+    /// <see cref="WelcomeTour"/>, apart from the card's words.
+    /// </summary>
+    public string? Anchor { get; init; }
 
     public WhatsNewCard(IReadOnlyList<string> versions, string id, string title, string body,
         string glyph, WhatsNewPreview preview, SettingsPage destination)

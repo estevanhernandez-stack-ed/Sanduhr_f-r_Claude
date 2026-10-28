@@ -277,4 +277,27 @@ public class ThemeModelTests
         };
         return obj.ToJsonString();
     }
+
+    [Fact]
+    public void A_user_theme_file_with_font_and_desk_loads_them()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "sanduhr-theme-" + Guid.NewGuid().ToString("N")[..8]);
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var o = ThemeDraft.FromDefinition("obsidian", ThemeCatalog.BuiltIns["obsidian"]).ToJson();
+            o["name"] = "Dusk";
+            o["font"] = "Consolas";
+            o["desk"] = JsonNode.Parse("""{"bars": ["#6c63ff", "#e8e4dc"]}""");
+            File.WriteAllText(Path.Combine(dir, "dusk.json"), o.ToJsonString());
+            var dusk = ThemeCatalog.LoadUserThemes(dir)["dusk"];
+            Assert.Equal("Consolas", dusk.Font);
+            Assert.Equal(["#6c63ff", "#e8e4dc"], dusk.Desk!.Bars);
+            Assert.Null(ThemeCatalog.BuiltIns["obsidian"].Desk);   // no built-in sets one
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
 }

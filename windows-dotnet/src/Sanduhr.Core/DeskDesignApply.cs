@@ -4,7 +4,9 @@ namespace Sanduhr.Core;
 
 /// <summary>What a design changes in the Desk's settings: the layout (with each stack's tilt), font and plate (<see cref="Desk"/>), the
 /// ink, the Launcher and the weather nickname (null: the design leaves it alone). The preview draws these from memory; Apply saves them.</summary>
-public sealed record DeskDesignSettings(DeskSettings Desk, DeskInkSettings Ink, LauncherModel Launcher, string? WeatherNickname = null);
+/// <param name="FollowsTheme">"Follow the widget theme" as the design sets it (theme match); null leaves it alone.</param>
+public sealed record DeskDesignSettings(DeskSettings Desk, DeskInkSettings Ink, LauncherModel Launcher, string? WeatherNickname = null,
+    bool? FollowsTheme = null);
 
 /// <summary>
 /// Turns a full design (<see cref="DeskDesign.Merge"/>) into the settings the Desk reads (spec, the agent-designed Desk, the live
@@ -22,7 +24,8 @@ public static class DeskDesignApply
             Font = design.Font is null ? desk.Font : FontSetting(design.Font),
             Plate = design.Plate ?? desk.Plate,
         };
-        return new DeskDesignSettings(nextDesk.Normalized(), Ink(ink, design), design.Launcher ?? launcher, design.Weather?.Nickname);
+        return new DeskDesignSettings(nextDesk.Normalized(), Ink(ink, design), design.Launcher ?? launcher, design.Weather?.Nickname,
+            design.FollowsTheme);
     }
 
     /// <summary>The layout string for a design's pieces: the placed ones, in the design's order, with their sizes, tilts and meter styles.</summary>

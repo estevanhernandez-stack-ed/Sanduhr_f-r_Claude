@@ -56,6 +56,21 @@ internal sealed record DeskFrame
     public DeskLauncherFrame? Launcher { get; init; }
     /// <summary>The companion piece's sprite (spec 3.8 section 4); null when no sprite is installed or the piece is not placed.</summary>
     public CompanionService? Companion { get; init; }
+    /// <summary>The alert thresholds the meters' signal uses (theme match): Alerts' Warn at and Urgent at.</summary>
+    public int WarnAt { get; init; } = MeterSignal.DefaultWarnAt;
+    public int UrgentAt { get; init; } = MeterSignal.DefaultUrgentAt;
+
+    // -- theme match: what a followed theme draws. Null is the Desk's own look, exactly as before. --
+    /// <summary>The plate's tint (six hex digits); null is black behind light ink, white behind dark ink.</summary>
+    public string? PlateHex { get; init; }
+    /// <summary>The plate's strength when the readability guard raises it over a bright wallpaper; null is <see cref="DeskPlate.Opacity"/>.</summary>
+    public double? PlateOpacity { get; init; }
+    /// <summary>Now playing's bars and position bar when no song look shows: the theme gradient. Null: the ink (and Gradient bars).</summary>
+    public IReadOnlyList<string>? NowPlayingStops { get; init; }
+    /// <summary>The meters' colors (desk.bars, else the theme gradient), their track (bar_bg) and pace tick (pace_marker). Null: the ink.</summary>
+    public IReadOnlyList<string>? MeterStops { get; init; }
+    public string? MeterTrackHex { get; init; }
+    public string? PaceHex { get; init; }
 }
 
 /// <summary>
@@ -70,7 +85,8 @@ internal sealed record DeskFrame
 /// </summary>
 internal sealed partial class DeskView : Grid, IDisposable
 {
-    /// <summary>The widget's over-limit red (<c>ThemeCatalog.UsageColor</c> at 90% and up).</summary>
+    /// <summary>The widget's over-limit red (<c>ThemeCatalog.UsageColor</c> at 90% and up): a failed watcher's title. Meters take
+    /// <see cref="MeterSignal"/> instead.</summary>
     private static readonly Color WarningRed = Color.FromRgb(0xF8, 0x71, 0x71);
 
     /// <summary>The pieces this build draws (watchers: only from the harness until their tools ship).</summary>
@@ -479,7 +495,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         double ts = TimeSize * p.Scale;
         FrameworkElement? piece = p.Widget switch
         {
-            "message" => _frame.Message is { } msg ? DeskMessagePiece.Create(msg, p.Scale, _ink, _fonts, _settings.Font, align, width, _live, _gate) : null,
+            "message" => _frame.Message is { } msg ? DeskMessagePiece.Create(msg, p.Scale, _ink, _fonts, _settings.Font, align, width, _live, _gate) : null,   // streamer: notname - frame.Message is the Desk message frame record
             "clock" => Clock(ts, align),
             "claude" => p.Style == DeskMeterStyle.Bar ? ClaudeLine(ts) : StyledClaude(ts, align, p.Style),
             "meters" => p.Style == DeskMeterStyle.Bar ? Meters(ts, align) : StyledMeters(ts, align, p.Style),
@@ -519,8 +535,8 @@ internal sealed partial class DeskView : Grid, IDisposable
         double gap = TimeSize * 0.12, topTrim = 0, bottomTrim = 0;
         for (int i = 0; i < span.First; i++) topTrim += kinds[i].Height + gap;
         for (int i = span.Last + 1; i < kinds.Count; i++) bottomTrim += kinds[i].Height + gap;
-        var fill = new SolidColorBrush(Color.FromArgb((byte)Math.Round(DeskPlate.Opacity * 255), 0, 0, 0));
-        var c = Rgb(DeskPlate.ColorHex(_ink.DarkInk));
+        var fill = new SolidColorBrush(Color.FromArgb((byte)Math.Round((_frame.PlateOpacity ?? DeskPlate.Opacity) * 255), 0, 0, 0));
+        var c = Rgb(_frame.PlateHex ?? DeskPlate.ColorHex(_ink.DarkInk));
         fill.Color = Color.FromArgb(fill.Color.A, c.R, c.G, c.B);
         fill.Freeze();
         var plate = new Border
@@ -624,6 +640,29 @@ internal sealed partial class DeskView : Grid, IDisposable
 
     private Brush Ink => InkBrush(_ink.Stops);
 
+    /// <summary>A meter's colors: the frame's (a followed theme's bars) or the ink.</summary>
+    private IReadOnlyList<string> MeterStops => _frame.MeterStops ?? _ink.Stops;
+
+    /// <summary>A meter's fill (theme match, the usage signal): its colors, and past Warn at or Urgent at with a yellow or red stop in
+    /// their middle. Calm in the Desk's own look, it is <see cref="Ink"/> itself, so such a meter draws exactly as it always has.</summary>
+    private Brush MeterFill(MeterLevel level) =>
+        level == MeterLevel.Calm && _frame.MeterStops is null ? Ink : InkBrush(MeterSignal.Stops(MeterStops, level));
+
+    /// <summary>A meter's track: a followed theme's bar_bg, else the ink (at <see cref="MeterTrackOpacity"/>).</summary>
+    private Brush MeterTrack => _frame.MeterTrackHex is { } hex ? SolidInk(hex) : Ink;
+
+    /// <summary>The ink's track is the ink at 22%; a theme's bar_bg is its own color, nearly solid.</summary>
+    private double MeterTrackOpacity => _frame.MeterTrackHex is null ? 0.22 : 0.9;
+
+    /// <summary>A meter's pace tick: a followed theme's pace_marker, else the ink.</summary>
+    private Brush PaceInk => _frame.PaceHex is { } hex ? SolidInk(hex) : Ink;
+
+    /// <summary>A meter's value past Warn at or Urgent at takes the signal's color; under it, the ink as before.</summary>
+    private static void Signal(TextBlock value, MeterLevel level)
+    {
+        if (MeterSignal.Hex(level) is { } hex) value.Foreground = SolidInk(hex);
+    }
+
     private TextBlock Text(string text, double size, double opacity, bool bold = false, TextAlignment alignment = TextAlignment.Left) => new()
     {
         Text = text,
@@ -674,12 +713,12 @@ internal sealed partial class DeskView : Grid, IDisposable
     /// <summary>A row in the meters' shape: a label and a percent over a bar in the ink. Returns the
     /// pieces a live row updates.</summary>
     private (StackPanel Block, TextBlock Percent, Rectangle Fill) BarRow(string label, int percent, double fill, double size, double width,
-        bool warning, bool first, double? pace = null)
+        MeterLevel level, bool first, double? pace = null)
     {
         var block = new StackPanel { Width = width, Margin = new Thickness(0, first ? 0 : size * 0.6, 0, 0) };
         var head = new DockPanel { LastChildFill = true };
         var pct = Text($"{percent}%", size, 1);
-        if (warning) pct.Foreground = new SolidColorBrush(WarningRed);
+        Signal(pct, level);
         DockPanel.SetDock(pct, Dock.Right);
         head.Children.Add(pct);
         var name = Text(label, size, 0.85);
@@ -692,19 +731,19 @@ internal sealed partial class DeskView : Grid, IDisposable
         bar.Children.Add(new Rectangle
         {
             Height = barHeight, RadiusX = barHeight / 2, RadiusY = barHeight / 2,
-            Fill = Ink, Opacity = 0.22, VerticalAlignment = VerticalAlignment.Center,
+            Fill = MeterTrack, Opacity = MeterTrackOpacity, VerticalAlignment = VerticalAlignment.Center,
         });
         var rect = new Rectangle
         {
             Width = width * Math.Clamp(fill, 0, 1), Height = barHeight, RadiusX = barHeight / 2, RadiusY = barHeight / 2,
-            Fill = warning ? new SolidColorBrush(WarningRed) : Ink, Opacity = _ink.TextOpacity,
+            Fill = MeterFill(level), Opacity = _ink.TextOpacity,
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
         };
         bar.Children.Add(rect);
         if (pace is { } p)
             bar.Children.Add(new Rectangle
             {
-                Width = 2, Height = barHeight * 2, Fill = Ink, Opacity = _ink.TextOpacity,
+                Width = 2, Height = barHeight * 2, Fill = PaceInk, Opacity = _ink.TextOpacity,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = new Thickness(Math.Max(0, Math.Min(width - 2, p * width)), 0, 0, 0),
             });
@@ -714,7 +753,7 @@ internal sealed partial class DeskView : Grid, IDisposable
 
     private FrameworkElement? Meters(double ts, HorizontalAlignment align)
     {
-        var rows = DeskMeters.Rows(_frame.Usage, _frame.Now);
+        var rows = DeskMeters.Rows(_frame.Usage, _frame.Now, warnAt: _frame.WarnAt, urgentAt: _frame.UrgentAt);
         double size = ts * 0.17;
         double width = ts * 3.2;
         if (rows.Count == 0)
@@ -725,7 +764,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         var panel = new StackPanel { HorizontalAlignment = align, Opacity = _frame.Usage.IsStale(_frame.Now) ? 0.5 : 1 };
         foreach (var row in rows)
         {
-            var (block, _, _) = BarRow(row.Label, row.Percent, row.Fill, size, width, row.Warning, panel.Children.Count == 0, row.Pace);
+            var (block, _, _) = BarRow(row.Label, row.Percent, row.Fill, size, width, row.Level, panel.Children.Count == 0, row.Pace);
             if (row.Reset.Length > 0)
                 block.Children.Add(Text($"resets {row.Reset}", size * 0.8, 0.7));
             panel.Children.Add(block);
@@ -746,7 +785,8 @@ internal sealed partial class DeskView : Grid, IDisposable
         var cells = new List<(TextBlock Pct, Rectangle Fill)>();
         foreach (var row in Telemetry.Rows(sample))
         {
-            var (block, pct, fill) = BarRow(row.Label, row.Percent, row.Fill, size, width, false, panel.Children.Count == 0);
+            // Telemetry is no usage: it never carries the signal.
+            var (block, pct, fill) = BarRow(row.Label, row.Percent, row.Fill, size, width, MeterLevel.Calm, panel.Children.Count == 0);
             panel.Children.Add(block);
             cells.Add((pct, fill));
         }
@@ -827,7 +867,9 @@ internal sealed partial class DeskView : Grid, IDisposable
             column.Children.Add(StyledLine(line, size, width, align, look));
         }
         // With a look the position bar takes its gradient across the whole bar, however much of it is filled.
-        Brush barInk = look is null ? Ink : AbsoluteGradient(look.Stops, width);
+        // A followed theme's gradient (theme match) when no song look shows.
+        Brush barInk = look is not null ? AbsoluteGradient(look.Stops, width)
+            : _frame.NowPlayingStops is { } themed ? AbsoluteGradient(themed, width) : Ink;
         double barHeight = Math.Max(2, size * 0.14);
         var bar = new Grid { Width = width, Height = barHeight, Margin = new Thickness(0, size * 0.3, 0, 0) };
         bar.Children.Add(new Rectangle { Fill = barInk, Opacity = 0.22, RadiusX = barHeight / 2, RadiusY = barHeight / 2 });
@@ -867,7 +909,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         if (_frame.Bars && _frame.Audio is { } audio)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal };
-            var bars = BarsPiece(size, audio, look, _frame.BarsGradient);
+            var bars = BarsPiece(size, audio, look, _frame.BarsGradient || (look is null && _frame.NowPlayingStops is not null));
             bars.Margin = new Thickness(align == HorizontalAlignment.Right ? 0 : 0, 0, size * 0.6, 0);
             if (align == HorizontalAlignment.Right) { row.Children.Add(column); bars.Margin = new Thickness(size * 0.6, 0, 0, 0); row.Children.Add(bars); }
             else { row.Children.Add(bars); row.Children.Add(column); }
@@ -911,7 +953,7 @@ internal sealed partial class DeskView : Grid, IDisposable
             TextTrimming = TextTrimming.CharacterEllipsis,
             MaxWidth = Math.Max(10, width - used),
         };
-        System.Windows.Automation.AutomationProperties.SetName(styled, rest);
+        System.Windows.Automation.AutomationProperties.SetName(styled, rest);   // streamer: cant - the Desk message text the person typed, spoken as written
         row.Children.Add(styled);
         // The row is as wide as its words (so the gradient spans them) inside a frame of the line's width.
         var frame = new Grid { Width = width };
@@ -960,7 +1002,7 @@ internal sealed partial class DeskView : Grid, IDisposable
         var caps = new Border[count];
         var motion = new AudioBarMotion(count) { Calm = audio.Calm };
         // The colors along the row: a song's look, or with gradient bars the ink's own stops; null draws every bar in the ink.
-        IReadOnlyList<string>? stops = look?.Stops ?? (gradient ? _ink.Stops : null);
+        IReadOnlyList<string>? stops = look?.Stops ?? _frame.NowPlayingStops ?? (gradient ? _ink.Stops : null);
         var ink = Ink;
         for (int i = 0; i < count; i++)
         {

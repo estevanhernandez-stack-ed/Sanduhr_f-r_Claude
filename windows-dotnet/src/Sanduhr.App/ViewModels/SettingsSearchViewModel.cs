@@ -4,11 +4,22 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
-/// <summary>One row of the sidebar's search results: a page, or a section or control under it.</summary>
-public sealed record SettingsSearchRow(string Title, SettingsPage Page, string? Anchor, bool IsPage)
+/// <summary>
+/// One row of the sidebar's search results: a page, or a section or control under it. <paramref name="CollapsedIn"/>
+/// names the collapsed section it sits in, so the row says "(in Advanced)" and opening it unfolds the section.
+/// </summary>
+public sealed record SettingsSearchRow(string Title, SettingsPage Page, string? Anchor, bool IsPage, string? CollapsedIn = null)
 {
-    /// <summary>What a screen reader says: the page alone, or "Tray shows, on General".</summary>
-    public string AutomationName => IsPage ? $"{Title} page" : $"{Title}, on {SettingsNames.PageTitle(Page)}";
+    /// <summary>The row's words: the title, with "(in Advanced)" when it sits in a collapsed section.</summary>
+    public string DisplayTitle => CollapsedIn is null ? Title : SettingsNames.InSection(Title, CollapsedIn);
+
+    /// <summary>
+    /// What a screen reader says: the page alone, "Tray shows, on General", or "Margins, in Advanced, on Desk"
+    /// (no parentheses when spoken).
+    /// </summary>
+    public string AutomationName => IsPage
+        ? $"{Title} page"
+        : $"{(CollapsedIn is null ? Title : SettingsNames.InSectionSpoken(Title, CollapsedIn))}, on {SettingsNames.PageTitle(Page)}";
 }
 
 /// <summary>
@@ -41,7 +52,7 @@ public sealed partial class SettingsSearchViewModel : ObservableObject
                 _first ??= pageRow;
             foreach (var e in entries)
             {
-                var row = new SettingsSearchRow(e.Title, page, e.Anchor, IsPage: false);
+                var row = new SettingsSearchRow(e.Title, page, e.Anchor, IsPage: false, e.CollapsedIn);
                 Results.Add(row);
                 if (best is not null && best.Page == page && best.Anchor is not null && best.Title == e.Title)
                     _first ??= row;
@@ -54,7 +65,7 @@ public sealed partial class SettingsSearchViewModel : ObservableObject
     private SettingsSearchRow? _first;
 
     /// <summary>The row Enter opens from the search box: the best hit, a page or a section
-    /// ("publish" opens Publish usage, "vault" opens History vault).</summary>
+    /// ("publish" opens Publish usage, "vault" opens Session archive).</summary>
     public SettingsSearchRow? First => _first ?? Results.FirstOrDefault();
 
     public void Clear() => Query = "";

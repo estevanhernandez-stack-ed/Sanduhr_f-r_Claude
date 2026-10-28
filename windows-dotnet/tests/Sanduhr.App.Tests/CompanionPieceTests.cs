@@ -1,6 +1,10 @@
 using System.IO;
 using System.Text;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Automation.Peers;
+using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Sanduhr.App.Desk;
@@ -16,6 +20,7 @@ namespace Sanduhr.App.Tests;
 /// rendered pixel says which frame is drawn. Installed through <see cref="WidgetStore"/> into a scratch folder (the
 /// rasterized pixel sheet lands in <c>.raster</c>); no binary assets, no real Sanduhr folder, no network.
 /// </summary>
+[Collection("SettingsWindow")]
 public sealed class CompanionPieceTests : IDisposable
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 22, 12, 0, 0, TimeSpan.Zero);
@@ -297,55 +302,150 @@ public sealed class CompanionPieceTests : IDisposable
     });
 
     [Fact]
-    public async Task Settings_widgets_picks_the_sprite_shows_or_hides_the_piece_and_lets_it_roam()
+    public void Desk_pieces_companion_row_picks_the_sprite_shows_or_hides_it_and_lets_it_roam()
     {
         Install("clock:bl companion:bl", roam: false);
         var svc = new WidgetCatalogService(_paths, new FakeGitHub(), WidgetKit.V380, []);
-        var page = new WidgetsPageViewModel(() => svc, _store);
+        var desk = new DeskSettingsViewModel(_store, [], () => [], widgets: () => svc.Store);
         int changed = 0;
-        page.Changed = () => changed++;
-        await page.Activate();
+        desk.Changed = () => changed++;
+        var row = desk.Pieces.Single(p => p.Widget == CompanionSettings.Widget);
+        Assert.True(row.IsCompanion);
+        var companion = Assert.IsType<DeskCompanionViewModel>(row.Companion);
+        Assert.Null(desk.Pieces.Single(p => p.Widget == "clock").Companion);
 
-        var choice = Assert.Single(page.Companions);
+        var choice = Assert.Single(companion.Companions);
         Assert.Equal((PackId, "Tiny sprite"), (choice.Id, choice.Name));
-        Assert.True(page.HasCompanions);
-        Assert.Equal(choice, page.SelectedCompanion);
-        Assert.True(page.CompanionShown);
-        Assert.False(page.CompanionRoams);
-        Assert.Equal("Stage 1 of 2, Small. 0 coding days so far.", page.CompanionStatus);
+        Assert.True(companion.HasCompanions);
+        Assert.Equal(choice, companion.SelectedCompanion);
+        Assert.True(row.Shown);
+        Assert.False(companion.Roams);
+        Assert.Equal("Stage 1 of 2, Small. 0 coding days so far.", companion.Status);
         Assert.Equal(0, changed);
 
-        page.CompanionRoams = true;
+        companion.Roams = true;
         Assert.True(_store.LoadCompanion().Roam);
-        page.CompanionShown = false;
+        row.Shown = false;
         Assert.Equal("clock:bl", _store.LoadDesk().Layout);
-        Assert.Contains("hidden", page.CompanionStatus);
-        page.CompanionShown = true;
-        Assert.Equal("clock:bl companion:br", _store.LoadDesk().Layout);
+        Assert.Contains("hidden", companion.Status);
+        row.Shown = true;
+        Assert.Equal("clock:bl companion:bl", _store.LoadDesk().Layout);   // back where it was in this window
         Assert.Equal(3, changed);
 
-        // Gone from disk: the page lists no sprite and the companion section says how to get one.
+        // Gone from disk: the row lists no sprite and says how to get one.
         Assert.True(svc.Store.Uninstall(PackId).Ok);
-        page.ReloadCompanions();
-        Assert.False(page.HasCompanions);
-        Assert.Null(page.SelectedCompanion);
+        desk.Reload();
+        Assert.False(companion.HasCompanions);
+        Assert.Null(companion.SelectedCompanion);
+        Assert.Equal("mods#catalog", companion.GetOneLink);
     }
 
     [Fact]
-    public void The_companion_controls_carry_their_names_for_a_screen_reader() => Sta.Run(() =>
+    public void The_companion_status_line_speaks_its_text_not_a_label() => Sta.Run(() =>
     {
-        Install();
+        // Item 12 (S3 T7): a TextBlock with no Name speaks its Text, so the live status is read, not "Companion status".
+        Install("clock:bl companion:bl", roam: false);
         var svc = new WidgetCatalogService(_paths, new FakeGitHub(), WidgetKit.V380, []);
-        var model = new WidgetsPageViewModel(() => svc, _store);
-        model.ReloadCompanions();
-        var page = new Sanduhr.App.Views.WidgetsPage { DataContext = model };
-        Assert.Equal(SettingsNames.WidgetCompanionPick, System.Windows.Automation.AutomationProperties.GetName((DependencyObject)page.FindName("CompanionPicker")));
-        Assert.Equal(SettingsNames.WidgetCompanionShow, System.Windows.Automation.AutomationProperties.GetName((DependencyObject)page.FindName("CompanionShowSwitch")));
-        Assert.Equal(SettingsNames.WidgetCompanionRoam, System.Windows.Automation.AutomationProperties.GetName((DependencyObject)page.FindName("CompanionRoamSwitch")));
-        Assert.Equal("Companion status", System.Windows.Automation.AutomationProperties.GetName((DependencyObject)page.FindName("CompanionStatusLine")));
-        Assert.Contains((SettingsNames.WidgetCompanionShow, SettingsPage.Widgets), SettingsNames.Table);
-        Assert.Contains((SettingsNames.WidgetCompanionRoam, SettingsPage.Widgets), SettingsNames.Table);
+        var desk = new DeskSettingsViewModel(_store, [], () => [], widgets: () => svc.Store);
+        var page = new Sanduhr.App.Views.DeskPiecesPanel { DataContext = desk };
+        page.Measure(new Size(760, 2000));
+        page.Arrange(new Rect(0, 0, 760, 2000));
+        page.UpdateLayout();
+        var line = Below<TextBlock>(page).Single(t => BindingOperations.GetBinding(t, TextBlock.TextProperty)?.Path.Path == "Status");
+        Assert.Equal("", AutomationProperties.GetName(line));
+        Assert.Equal(line.Text, new TextBlockAutomationPeer(line).GetName());
+        Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(line));
     });
+
+    private static IEnumerable<T> Below<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T t) yield return t;
+            foreach (var deeper in Below<T>(child)) yield return deeper;
+        }
+    }
+
+    [Fact]
+    public void Sprites_installed_but_all_switched_off_say_so_and_link_to_the_installed_list_not_no_companion_yet()
+    {
+        Install("companion:bl", roam: false);
+        var svc = new WidgetCatalogService(_paths, new FakeGitHub(), WidgetKit.V380, []);
+        var desk = new DeskSettingsViewModel(_store, [], () => [], widgets: () => svc.Store);
+        var companion = Assert.IsType<DeskCompanionViewModel>(desk.Pieces.Single(p => p.Widget == CompanionSettings.Widget).Companion);
+        int turnedOn = 0;
+        companion.TurnOneOn = () => turnedOn++;
+
+        Assert.True(svc.Store.SetEnabled(PackId, false).Ok);
+        desk.Reload();
+
+        Assert.False(companion.HasCompanions);
+        Assert.True(companion.SpritesAreOff);
+        Assert.False(companion.NoSprites);
+        Assert.Equal("Your sprites are switched off.", companion.SpritesOffLine);
+        Assert.Equal(SettingsNames.SpritesSwitchedOff, companion.SpritesOffLine);
+        Assert.Equal("mods#mods", companion.TurnOneOnLink);
+        Assert.Equal(SettingsNames.TurnASpriteOn, companion.TurnOneOnTitle);
+        Assert.Empty(SettingsNames.PathProblems(SettingsNames.SpritesSwitchedOff + " " + SettingsNames.TurnASpriteOn));
+        companion.TurnOneOnClickedCommand.Execute(null);
+        Assert.Equal(1, turnedOn);
+
+        // Switched back on: the row lists the sprite and neither line shows.
+        Assert.True(svc.Store.SetEnabled(PackId, true).Ok);
+        desk.Reload();
+        Assert.True(companion.HasCompanions);
+        Assert.False(companion.SpritesAreOff);
+        Assert.False(companion.NoSprites);
+    }
+
+    [Fact]
+    public void With_no_sprite_installed_the_row_still_says_no_companion_yet_and_gets_one_from_the_catalog()
+    {
+        Install("companion:bl", roam: false);
+        var svc = new WidgetCatalogService(_paths, new FakeGitHub(), WidgetKit.V380, []);
+        var desk = new DeskSettingsViewModel(_store, [], () => [], widgets: () => svc.Store);
+        var companion = Assert.IsType<DeskCompanionViewModel>(desk.Pieces.Single(p => p.Widget == CompanionSettings.Widget).Companion);
+        Assert.True(svc.Store.Uninstall(PackId).Ok);
+        desk.Reload();
+
+        Assert.False(companion.HasCompanions);
+        Assert.False(companion.SpritesAreOff);
+        Assert.True(companion.NoSprites);
+        Assert.Equal("No companion yet.", companion.NoneYet);
+        Assert.Equal("mods#catalog", companion.GetOneLink);
+    }
+
+    [Fact]
+    public void A_fresh_companion_is_shown_at_its_default_place()
+    {
+        Install("clock:bl", roam: false);
+        var svc = new WidgetCatalogService(_paths, new FakeGitHub(), WidgetKit.V380, []);
+        var desk = new DeskSettingsViewModel(_store, [], () => [], widgets: () => svc.Store);
+        desk.Pieces.Single(p => p.Widget == CompanionSettings.Widget).Shown = true;
+        Assert.Equal("clock:bl companion:bc", _store.LoadDesk().Layout);   // DeskArrangement.DefaultPlaceFor("companion")
+    }
+
+    [Fact]
+    public void The_companion_controls_carry_their_names_and_live_on_the_Desk_page()
+    {
+        var panel = File.ReadAllText(Path.Combine(AppDir(), "Views", "DeskPiecesPanel.xaml"));
+        Assert.Contains("AutomationProperties.Name=\"{x:Static core:SettingsNames.WidgetCompanionPick}\"", panel);
+        Assert.Contains("AutomationProperties.Name=\"{x:Static core:SettingsNames.WidgetCompanionRoam}\"", panel);
+        Assert.Contains("views:SettingsLinkTo.Link=\"{Binding GetOneLink}\"", panel);
+        Assert.DoesNotContain("widgets-companion", File.ReadAllText(Path.Combine(AppDir(), "Views", "ModsPage.xaml")));
+        Assert.Contains((SettingsNames.WidgetCompanionPick, SettingsPage.Desk), SettingsNames.Table);
+        Assert.Contains((SettingsNames.WidgetCompanionRoam, SettingsPage.Desk), SettingsNames.Table);
+    }
+
+    private static string AppDir()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "src", "Sanduhr.App", "Package.appxmanifest")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        return Path.Combine(dir!.FullName, "src", "Sanduhr.App");
+    }
 
     private static List<string> Texts(DependencyObject root)
     {

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sanduhr.Core;
@@ -46,7 +47,48 @@ public sealed partial class AlertsViewModel : ObservableObject
         SnakeAtFull = widget.LoadAlertSnakeFull();
         DeskSignInReminder = widget.LoadDeskSignInReminder();
         _loading = false;
+        _widget.LimitsChanged += ReloadLimits;
+        ReloadLimits();
     }
+
+    /// <summary>Alerts, Each limit (WF13): one row per limit the account has or a setting still names.</summary>
+    public ObservableCollection<LimitRowViewModel> Limits { get; } = new();
+
+    /// <summary>What Each limit says while it has no row: signed out, or signed in with nothing fetched yet.</summary>
+    [ObservableProperty] private string _limitsEmptyText = "";
+
+    /// <summary>True while Each limit has no row; drives the empty line's live region.</summary>
+    [ObservableProperty] private bool _hasNoLimits = true;
+
+    /// <summary>Syncs the rows in place: a row keeps its object (and its box keeps focus) while its state changes; new limits
+    /// slot in at their place; gone ones leave.</summary>
+    private void ReloadLimits()
+    {
+        var rows = _widget.LimitRows();
+        for (int i = 0; i < rows.Count; i++)
+        {
+            int at = -1;
+            for (int j = i; j < Limits.Count; j++)
+            {
+                if (Limits[j].Key == rows[i].Key) { at = j; break; }
+            }
+            if (at < 0)
+            {
+                Limits.Insert(i, new LimitRowViewModel(_widget, rows[i]));
+                continue;
+            }
+            if (at != i)
+                Limits.Move(at, i);
+            Limits[i].Sync(rows[i]);
+        }
+        while (Limits.Count > rows.Count)
+            Limits.RemoveAt(Limits.Count - 1);
+        LimitsEmptyText = rows.Count > 0 ? "" : _widget.LimitsEmptyLine();
+        HasNoLimits = rows.Count == 0;
+    }
+
+    /// <summary>Stop following the widget (Settings closed): it outlives every Settings window.</summary>
+    public void Detach() => _widget.LimitsChanged -= ReloadLimits;
 
     partial void OnAlertsEnabledChanged(bool value) => PersistConfig();
     partial void OnWarnPctChanged(int value) => PersistConfig();

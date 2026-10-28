@@ -12,6 +12,45 @@
         WindowStartupLocation="CenterOwner"
         FontFamily="Segoe UI Variable Display, Segoe UI"
         UseLayoutRounding="True">
+    <Window.Resources>
+        <!-- The dialog's secondary and tertiary buttons: the look they had inline at rest, plus hover and press in GlassHover (press also
+             rings 1 px in Accent), a keyboard ring, and a disabled look. The primary keeps its own look. -->
+        <Style x:Key="DialogFlatButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="18,7" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                                <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bg" Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Border CornerRadius="10"
             Background="{DynamicResource Sanduhr.Brush.GlassChrome}"
             BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
@@ -49,12 +88,12 @@
 
             <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right"
                         Margin="20,18,20,18">
+                <Button x:Name="TertiaryButton" Content="Cancel" Click="OnTertiaryClick"
+                        Visibility="Collapsed" Cursor="Hand"
+                        Style="{StaticResource DialogFlatButton}" Margin="0,0,8,0" />
                 <Button x:Name="SecondaryButton" Content="No" Click="OnSecondaryClick"
                         IsCancel="True" Visibility="Collapsed" Cursor="Hand"
-                        Padding="18,7" Margin="0,0,8,0" BorderThickness="1"
-                        Background="#1c1c1c"
-                        Foreground="{DynamicResource Sanduhr.Brush.Text}"
-                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}" />
+                        Style="{StaticResource DialogFlatButton}" Margin="0,0,8,0" />
                 <Button x:Name="PrimaryButton" Content="OK" Click="OnPrimaryClick"
                         IsDefault="True" Cursor="Hand" Padding="22,7" BorderThickness="0"
                         FontWeight="SemiBold" Foreground="#0d0d0d"

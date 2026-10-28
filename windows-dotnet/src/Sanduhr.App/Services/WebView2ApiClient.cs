@@ -388,6 +388,7 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         core.NavigationCompleted += OnNav;
         try
         {
+            // network: claude-usage
             core.Navigate(StartPage);
             var done = await Task.WhenAny(navTcs.Task, Task.Delay(NavTimeout, ct)).ConfigureAwait(true);
             bool navOk = done == navTcs.Task && navTcs.Task.Result;
@@ -515,7 +516,7 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         }
         catch (Exception ex)
         {
-            Log($"init: cookie clear failed: {ex.Message}");
+            Log($"init: cookie clear failed: {ex.Message}");   // streamer: notname - written to the log file, never drawn
         }
 
         // Both domain variants: .claude.ai (host-wide) and claude.ai (exact). The
@@ -572,6 +573,7 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
         try
         {
+            // network: claude-usage
             await core.ExecuteScriptAsync(BuildFetchScript(id, url, headers)).ConfigureAwait(true);
             var reply = await tcs.Task.ConfigureAwait(true);
             if (reply.Error == BrowserGoneError)

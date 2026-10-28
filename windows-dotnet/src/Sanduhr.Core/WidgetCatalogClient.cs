@@ -21,7 +21,7 @@ public sealed record WidgetCatalogRefresh(WidgetCatalogDocument? Catalog, string
 /// </summary>
 public sealed class WidgetCatalogClient
 {
-    public const string Offline = "Sanduhr couldn't reach the widget catalog. Check your connection and try again.";
+    public const string Offline = "Couldn't reach the widget catalog. Widget packs add themes, colors, fonts and a Desk companion. Check your connection and try again.";
     public const string Unverified = "The widget catalog couldn't be verified.";
     public const string Unreadable = "The widget catalog couldn't be read.";
     public const string RolledBack = "The widget catalog is older than one Sanduhr has already seen, so it wasn't used.";

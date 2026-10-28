@@ -23,7 +23,7 @@ internal interface IWidgetReviewHost
     /// <summary>Puts the Desk back as it was and takes the bar down.</summary>
     void EndPreview();
 
-    /// <summary>A pack was installed: the bar goes, the Desk and Settings ▸ Widgets follow.</summary>
+    /// <summary>A pack was installed: the bar goes, the Desk and Settings, Mods & Widgets follow.</summary>
     void Installed(string packId);
 
     /// <summary>A Desk design is on the desktop for review; a widget waits until it is applied or dismissed.</summary>
@@ -82,7 +82,7 @@ internal sealed class WidgetReviewService : IDisposable
     /// <summary>Encodes a rasterized pixel sheet as PNG (tests pass their own; the app uses WPF's encoder).</summary>
     internal Func<PixelSheetImage, byte[]> EncodePng { get; set; } = WidgetCatalogService.EncodePng;
 
-    /// <summary>A pack was installed (Settings ▸ Widgets and the companion follow).</summary>
+    /// <summary>A pack was installed (Settings, Mods & Widgets and the companion follow).</summary>
     public event Action? Installed;
 
     /// <summary>A pack is on the desktop waiting for Apply or Dismiss.</summary>
@@ -92,7 +92,7 @@ internal sealed class WidgetReviewService : IDisposable
     internal string? ReviewingId => _review?.Pack.Id;
 
     /// <summary>Where a pack under review is staged.</summary>
-    internal string PreviewRoot => Path.Combine(_paths.WidgetsDir, PreviewFolder);
+    internal string PreviewRoot => Path.Combine(_paths.WidgetsDir, PreviewFolder);   // streamer: notname - a file location used for IO, never drawn
 
     public void Start()
     {
@@ -103,7 +103,7 @@ internal sealed class WidgetReviewService : IDisposable
         try
         {
             Directory.CreateDirectory(dir);
-            _watcher = new FileSystemWatcher(dir, WidgetProposal.RequestFile) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };
+            _watcher = new FileSystemWatcher(dir, WidgetProposal.RequestFile) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };   // streamer: notname - NotifyFilters.FileName is a watcher flag, not a name
             _watcher.Created += (_, _) => Check();
             _watcher.Changed += (_, _) => Check();
             _watcher.Renamed += (_, _) => Check();
@@ -221,7 +221,7 @@ internal sealed class WidgetReviewService : IDisposable
         // The pack is checked once more against the folder it goes into, then installed atomically.
         var check = WidgetProposal.Check(pack.Files, pack.Id);
         if (check.Pack is null) return WidgetAnswer.Refused(check.Reasons);
-        var store = new WidgetStore(_paths.WidgetsDir, EncodePng);
+        var store = new WidgetStore(_paths.WidgetsDir, EncodePng);   // streamer: notname - a file location used for IO, never drawn
         var result = store.Install(pack.Files, pack.Manifest, WidgetSource.Claude);
         if (!result.Ok)
             return new WidgetAnswer(WidgetAnswer.Rejected, "install_failed", [new DeskReason("widget", result.Error ?? "could not be installed")], pack.Id);
@@ -232,11 +232,8 @@ internal sealed class WidgetReviewService : IDisposable
             _store.SaveCompanion(_store.LoadCompanion() with { Pack = pack.Id });
             var desk = _store.LoadDesk();
             var layout = new DeskArrangement(desk.Layout);
-            if (layout.Placement(CompanionSettings.Widget) is null)
-            {
-                layout.Place(CompanionSettings.Widget, DeskArrangement.DefaultAnchor(CompanionSettings.Widget));
+            if (layout.PlaceAtDefault(CompanionSettings.Widget) is not null)
                 _store.SaveDesk(desk with { Layout = layout.Layout });
-            }
             companion = true;
         }
         return new WidgetAnswer(WidgetAnswer.Applied, PackId: pack.Id, Companion: pack.Kind == "sprite" ? companion : null);
@@ -272,7 +269,7 @@ internal sealed class WidgetReviewService : IDisposable
     /// <summary>One line in the log: the operation and the exception type, never pack content (PRIVACY.md).</summary>
     private void Log(string operation, Exception e)
     {
-        try { File.AppendAllText(_paths.LogFile, $"{DateTime.UtcNow:o} widget review {operation} failed ({e.GetType().Name}){Environment.NewLine}"); }
+        try { File.AppendAllText(_paths.LogFile, $"{DateTime.UtcNow:o} widget review {operation} failed ({e.GetType().Name}){Environment.NewLine}"); }   // streamer: notname - written to the log file, never drawn
         catch (Exception) { /* the log is a courtesy */ }
     }
 
@@ -355,11 +352,8 @@ internal sealed class WidgetReviewHost : IWidgetReviewHost, IDisposable
         if (preview.Pack.Kind == "sprite")
         {
             var layout = new DeskArrangement(desk.Layout);
-            if (layout.Placement(CompanionSettings.Widget) is null)
-            {
-                layout.Place(CompanionSettings.Widget, DeskArrangement.DefaultAnchor(CompanionSettings.Widget));
+            if (layout.PlaceAtDefault(CompanionSettings.Widget) is not null)
                 desk = desk with { Layout = layout.Layout };
-            }
         }
         if (preview.Ink is { } stops) ink = ink with { Mode = DeskInkMode.Custom, Color = stops };
         return new DeskDesignSettings(desk, ink, _store.LoadLauncher());

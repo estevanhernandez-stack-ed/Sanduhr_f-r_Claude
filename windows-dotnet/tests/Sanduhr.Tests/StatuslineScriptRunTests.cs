@@ -284,6 +284,107 @@ public class StatuslineScriptRunTests : IDisposable
         Assert.Equal("snapshot.json", Assert.Single(Directory.GetFileSystemEntries(_sanduhr).Select(p => Path.GetFileName(p))));
     }
 
+    // -- streamer mode (Settings v2, slice 7) ----------------------------------
+
+    private void Streamer(bool on, params StreamerFolder[] folders) =>
+        WriteSanduhr(StreamerFile.FileName, StreamerFile.Build(on, folders).ToJsonString());
+
+    [PowerShellFact]
+    public void Streamer_mode_on_prints_the_folders_codename_in_place_of_its_label()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        var folder = Path.Combine(_profile, ".claude-qxwork");
+        Streamer(true, new StreamerFolder(StreamerFile.FolderRef(folder), "Dune Fox", false));
+        Assert.StartsWith("Dune Fox | 5h 42% | wk 17% |", RunScript([], env: Config(folder)).Text);
+        // SANDUHR_LABEL is the person's own label, and it is masked too.
+        Assert.StartsWith("Dune Fox | 5h 42% |", RunScript([], env: new() { ["CLAUDE_CONFIG_DIR"] = folder, ["SANDUHR_LABEL"] = "Qxlabel" }).Text);
+    }
+
+    /// <summary>The script's ref and Core's agree however the folder is written (spaces, mixed case, trailing slash).</summary>
+    [PowerShellFact]
+    public void A_config_dir_written_another_way_still_finds_its_codename()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        var folder = Path.Combine(_profile, ".claude-qxwork");
+        Streamer(true, new StreamerFolder(StreamerFile.FolderRef(folder), "Dune Fox", false));
+        Assert.StartsWith("Dune Fox | 5h 42% |", RunScript([], env: Config(folder.ToUpperInvariant() + "\\")).Text);
+    }
+
+    [PowerShellFact]
+    public void A_folder_with_spaces_and_mixed_case_hashes_the_same_in_the_script_and_in_core()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        var folder = Path.Combine(_profile, "My Work Folder", ".Claude-Qx Work");
+        Streamer(true, new StreamerFolder(StreamerFile.FolderRef(folder), "Mesa Owl", false));
+        Assert.StartsWith("Mesa Owl | 5h 42% |", RunScript([], env: Config(folder)).Text);
+        Assert.StartsWith("Mesa Owl | 5h 42% |", RunScript([], env: Config(folder.ToLowerInvariant())).Text);
+    }
+
+    [PowerShellFact]
+    public void Streamer_mode_on_with_the_folder_unmapped_prints_no_label()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        Streamer(true);
+        var run = RunScript([], env: Config(Path.Combine(_profile, ".claude-qxwork")));
+        Assert.StartsWith("5h 42% | wk 17% |", run.Text);
+        Assert.DoesNotContain("qxwork", run.Text);
+    }
+
+    [PowerShellFact]
+    public void A_shown_folder_keeps_its_real_label()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        var folder = Path.Combine(_profile, ".claude-qxwork");
+        Streamer(true, new StreamerFolder(StreamerFile.FolderRef(folder), null, true));
+        Assert.StartsWith("qxwork | 5h 42% |", RunScript([], env: Config(folder)).Text);
+    }
+
+    /// <summary>Streamer mode replaces a label, it never adds one. Plain .claude stays bare.</summary>
+    [PowerShellFact]
+    public void Streamer_mode_never_adds_a_label_where_none_would_print()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        var plain = Path.Combine(_profile, ".claude");
+        Streamer(true, new StreamerFolder(StreamerFile.FolderRef(plain), "Mesa Owl", false));
+        Assert.StartsWith("5h 42% | wk 17% |", RunScript([], env: Config(plain)).Text);
+        Assert.StartsWith("5h 42% | wk 17% |", RunScript([]).Text);
+    }
+
+    /// <summary>A missing file fails open (it only exists once streamer mode has been on); off prints as before.</summary>
+    [PowerShellFact]
+    public void Streamer_mode_off_or_no_file_prints_the_label_as_before()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        var folder = Path.Combine(_profile, ".claude-qxwork");
+        Assert.StartsWith("qxwork | 5h 42% |", RunScript([], env: Config(folder)).Text);
+        Streamer(false, new StreamerFolder(StreamerFile.FolderRef(folder), "Dune Fox", false));
+        Assert.StartsWith("qxwork | 5h 42% |", RunScript([], env: Config(folder)).Text);
+    }
+
+    /// <summary>Fail closed: a file that is there but can't be trusted prints no label, never the real one.</summary>
+    [PowerShellFact]
+    public void An_unreadable_streamer_file_prints_no_label()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        var folder = Path.Combine(_profile, ".claude-qxwork");
+        foreach (var bad in new[] { "{ not json", """{"schema_version":2,"on":true}""", """{"schema_version":1,"on":"true"}""", new string(' ', StreamerFile.MaxBytes + 1) })
+        {
+            WriteSanduhr(StreamerFile.FileName, bad);
+            var run = RunScript([], env: Config(folder));
+            Assert.StartsWith("5h 42% | wk 17% |", run.Text);
+        }
+    }
+
+    [PowerShellFact]
+    public void Reading_streamer_mode_writes_nothing_to_the_sanduhr_folder()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        Streamer(true);
+        RunScript([], env: Config(Path.Combine(_profile, ".claude-qxwork")));
+        Assert.Equal(["snapshot.json", StreamerFile.FileName],
+            Directory.GetFileSystemEntries(_sanduhr).Select(p => Path.GetFileName(p)).Order(StringComparer.Ordinal));
+    }
+
     // -- seats ----------------------------------------------------------------
 
     private string Seat(string folder, string accountRef)

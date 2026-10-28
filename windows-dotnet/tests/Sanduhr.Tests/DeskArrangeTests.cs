@@ -299,8 +299,10 @@ public class DeskArrangeTests
     {
         Assert.Equal("Arrange Desk…", DeskArrangeCopy.MenuItem);
         Assert.Equal("Arrange Desk…", DeskArrangeCopy.SettingsButton);
-        Assert.Equal("Return or Done keeps the new layout. Escape or Cancel puts it back.", DeskArrangeCopy.BarKeys);
+        Assert.Equal("Tab picks a piece; the arrow keys move it to the next place, and Shift+Up or Shift+Down moves it in its stack. "
+            + "Return or Done keeps the new layout. Escape or Cancel puts it back.", DeskArrangeCopy.BarKeys);
         Assert.Contains("Return or Done keeps the new layout; Escape or Cancel puts it back", DeskArrangeCopy.SettingsNote);
+        Assert.EndsWith("Or use the Order buttons below.", DeskArrangeCopy.SettingsNote);
         Assert.DoesNotContain("Escape or Done", DeskArrangeCopy.BarKeys);
         Assert.DoesNotContain("handle", DeskArrangeCopy.BarHint);
         Assert.Equal("Drag a piece to any of the eight places, or up and down its stack, or onto another monitor.", DeskArrangeCopy.BarHint);
@@ -379,9 +381,9 @@ public class DeskArrangeTests
         Assert.Equal(1, a.Placement("clock")!.Scale);
         a.Hide("message");
         a.Show("message");
-        Assert.Equal(DeskAnchor.TL, a.Placement("message")!.Anchor);
+        Assert.Equal(DeskAnchor.BL, a.Placement("message")!.Anchor);   // DefaultPlaceFor (slice 3)
         a.Show("weather");
-        Assert.Equal(DeskAnchor.MR, a.Placement("weather")!.Anchor);
+        Assert.Equal(DeskAnchor.TR, a.Placement("weather")!.Anchor);
     }
 
     [Fact]
@@ -467,4 +469,42 @@ public class DeskArrangeTests
         s.Working.Put("clock", DeskAnchor.TR, null);
         Assert.Equal("clock:tr claude:bl", s.ToWrite);
     }
+
+    // ---- Settings v2, slice 3: the arrow keys (spec, Keyboard and screen reader) ----
+
+    [Theory]
+    [InlineData("Left", false, DeskArrangeArrowKind.Place, -1, 0)]
+    [InlineData("Right", false, DeskArrangeArrowKind.Place, 1, 0)]
+    [InlineData("Up", false, DeskArrangeArrowKind.Place, 0, -1)]
+    [InlineData("Down", false, DeskArrangeArrowKind.Place, 0, 1)]
+    [InlineData("Up", true, DeskArrangeArrowKind.Order, 0, -1)]
+    [InlineData("Down", true, DeskArrangeArrowKind.Order, 0, 1)]
+    public void Arrows_move_a_piece_and_Shift_arrows_reorder_it(string key, bool shift, DeskArrangeArrowKind kind, int dx, int dy) =>
+        Assert.Equal(new DeskArrangeArrow(kind, dx, dy), DeskArrange.ArrowKey(key, shift));
+
+    [Theory]
+    [InlineData("Left", true)]
+    [InlineData("Right", true)]
+    [InlineData("Tab", false)]
+    [InlineData("Return", false)]
+    [InlineData(null, false)]
+    public void Other_keys_are_not_arrows(string? key, bool shift) => Assert.Null(DeskArrange.ArrowKey(key, shift));
+
+    [Theory]
+    [InlineData(DeskAnchor.TL, 1, 0, DeskAnchor.TC)]
+    [InlineData(DeskAnchor.TC, 1, 0, DeskAnchor.TR)]
+    [InlineData(DeskAnchor.TC, 0, 1, DeskAnchor.BC)]   // the open middle of the screen is stepped over
+    [InlineData(DeskAnchor.BC, 0, -1, DeskAnchor.TC)]
+    [InlineData(DeskAnchor.ML, 1, 0, DeskAnchor.MR)]
+    [InlineData(DeskAnchor.TL, 0, 1, DeskAnchor.ML)]
+    [InlineData(DeskAnchor.BR, -1, 0, DeskAnchor.BC)]
+    public void Step_goes_to_the_next_place_that_way(DeskAnchor from, int dx, int dy, DeskAnchor to) =>
+        Assert.Equal(to, DeskArrange.Step(from, dx, dy));
+
+    [Theory]
+    [InlineData(DeskAnchor.TL, -1, 0)]
+    [InlineData(DeskAnchor.TL, 0, -1)]
+    [InlineData(DeskAnchor.BR, 1, 0)]
+    [InlineData(DeskAnchor.BR, 0, 1)]
+    public void Step_stops_at_the_edge(DeskAnchor from, int dx, int dy) => Assert.Null(DeskArrange.Step(from, dx, dy));
 }

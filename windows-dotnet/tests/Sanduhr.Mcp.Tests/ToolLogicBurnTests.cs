@@ -26,6 +26,8 @@ public class ToolLogicBurnTests
         Assert.Equal("no_data", (string?)r["status"]);
         Assert.Equal("disabled", (string?)r["reason"]);
         Assert.Contains("consent", (string?)r["remedy"], StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("(Settings, Claude Code, Folders)", (string?)r["remedy"]);
+        Assert.DoesNotContain("mcp_roots", (string?)r["remedy"]);
     }
 
     [Fact]

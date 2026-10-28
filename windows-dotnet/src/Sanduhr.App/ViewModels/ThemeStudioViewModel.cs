@@ -81,6 +81,9 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
 {
     private readonly WidgetViewModel _widget;
     private readonly Action<string> _error;
+
+    /// <summary>Tests: where the theme file is written (a seam to raise an IO failure).</summary>
+    internal Action<string, string> WriteText { get; set; } = File.WriteAllText;
     private readonly Action<string> _info;
     private readonly Action _saved;
     private ThemeDraft _draft = new();
@@ -102,17 +105,41 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
     [ObservableProperty] private string _summary = "";
     [ObservableProperty] private bool _isPreviewing;
 
+    /// <summary>The theme's font (theme match): the widget's text, and the Desk's while it follows.</summary>
+    [ObservableProperty] private string _font = SettingsNames.ThemeDefaultFont;
+
+    /// <summary>The Font picker's choices: no font (Segoe UI), then this PC's families, then a font a loaded theme names that this PC lacks.</summary>
+    private readonly ObservableCollection<string> _fontChoices;
+    public IReadOnlyList<string> FontChoices => _fontChoices;
+
+    /// <summary>The theme's Desk look (theme match); each committed row updates the draft and the preview.</summary>
+    public ThemeDeskEditorViewModel DeskEditor { get; }
+
     public string GlassAlphaText => GlassAlpha.ToString("0.00");
     public string BorderAlphaText => BorderAlpha.ToString("0.00");
 
-    public ThemeStudioViewModel(WidgetViewModel widget, Action<string> error, Action<string> info, Action saved)
+    /// <param name="fontFamilies">This PC's families for the Font picker and the Desk font row; null offers none beyond the default.</param>
+    public ThemeStudioViewModel(WidgetViewModel widget, Action<string> error, Action<string> info, Action saved,
+        IReadOnlyList<string>? fontFamilies = null)
     {
         _widget = widget;
         _error = error;
         _info = info;
         _saved = saved;
+        _fontChoices = new ObservableCollection<string>([SettingsNames.ThemeDefaultFont, .. fontFamilies ?? []]);
+        DeskEditor = new ThemeDeskEditorViewModel(fontFamilies ?? []) { Committed = OnDeskEdited };
         foreach (var (field, label, job) in ThemeDraft.ColorTokens)
             Rows.Add(new ThemeTokenRowViewModel(this, field, label, job));
+    }
+
+    /// <summary>The font packs changed: the Font picker and the Desk font row follow; the draft's font stays listed.</summary>
+    public void ReloadFonts(IReadOnlyList<string> families)
+    {
+        var wanted = new List<string> { SettingsNames.ThemeDefaultFont };
+        wanted.AddRange(families);
+        if (_draft.Font is { Length: > 0 } f && !wanted.Contains(f)) wanted.Add(f);
+        FontListSync.Sync(_fontChoices, wanted);
+        DeskEditor.ReloadFonts(families);
     }
 
     /// <summary>Called when the studio becomes visible: start from the active
@@ -144,6 +171,10 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
         Name = _draft.Name;
         GlassAlpha = _draft.GlassAlpha;
         BorderAlpha = _draft.BorderAlpha;
+        // A font this PC lacks stays in the list so the picker is not blank.
+        if (_draft.Font is { Length: > 0 } f && !_fontChoices.Contains(f)) _fontChoices.Add(f);
+        Font = _draft.Font is { Length: > 0 } ? _draft.Font : SettingsNames.ThemeDefaultFont;
+        DeskEditor.Load(def);
         FileName = SuggestedFileName(key);
         foreach (var row in Rows)
             row.Load(_draft.GetColor(row.Field), _draft.TryGetColor(row.Field));
@@ -201,26 +232,42 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
         Refresh(preview: true);
     }
 
+    partial void OnFontChanged(string value)
+    {
+        if (_loading) return;
+        _draft.Font = value == SettingsNames.ThemeDefaultFont || string.IsNullOrEmpty(value) ? null : value;
+        Refresh(preview: true);
+    }
+
+    private void OnDeskEdited(ThemeDesk desk)
+    {
+        if (_loading) return;
+        _draft.Desk = desk.IsEmpty ? null : desk;
+        Refresh(preview: true);
+    }
+
     /// <summary>Re-lint, refresh the findings list, and (for user edits) push the
     /// draft into the widget as the live preview.</summary>
     private void Refresh(bool preview)
     {
-        var lint = _draft.Lint();
+        var lint = _draft.Lint(_widget.FontAvailable);
         Findings.Clear();
         foreach (var f in lint.Findings.OrderBy(f => f.Level == ThemeFindingLevel.Error ? 0 : 1))
-            Findings.Add(new ThemeFindingViewModel(f.Field, f.Message, f.Level == ThemeFindingLevel.Error));
+            Findings.Add(new ThemeFindingViewModel(f.Field, f.Message, f.Level == ThemeFindingLevel.Error));   // streamer: notname - a theme lint finding about a field, no path or name
         IsValid = lint.Ok;
         HasFindings = Findings.Count > 0;
         int errors = lint.Errors.Count(), warnings = lint.Warnings.Count();
         Summary = errors > 0 ? $"{errors} to fix before saving"
             : warnings > 0 ? $"Saveable, {warnings} design {(warnings == 1 ? "note" : "notes")}"
-            : "Looks good";
+            : SettingsNames.ThemeJsonValid;
 
         if (!preview)
             return;
         if (_draft.PreviewDefinition() is { } def)
         {
-            _widget.PreviewTheme(def);
+            // The greyed Desk defaults follow the colors being edited.
+            DeskEditor.ShowRules(def);
+            _widget.PreviewTheme(def);   // ThemeChanged: a Desk that follows the theme redraws from the draft too
             IsPreviewing = true;
         }
     }
@@ -228,7 +275,7 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
     [RelayCommand]
     private void Save()
     {
-        var lint = _draft.Lint();
+        var lint = _draft.Lint(_widget.FontAvailable);
         if (!lint.Ok)
         {
             _error("Fix the errors listed under the rows first: " + string.Join("; ", lint.Errors.Select(e => e.Field)));
@@ -261,12 +308,12 @@ public sealed partial class ThemeStudioViewModel : ObservableObject
         {
             Directory.CreateDirectory(dir);
             string tmp = path + ".tmp";
-            File.WriteAllText(tmp, _draft.ToJsonText());
+            WriteText(tmp, _draft.ToJsonText());
             File.Move(tmp, path, overwrite: true);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            _error($"Could not write the theme: {e.Message}");
+            _error($"Could not write the theme: {StreamerMode.Mask.Paths(e.Message)}");   // streamer: masked - P1: the write error passes Mask.Paths on this line
             return;
         }
 

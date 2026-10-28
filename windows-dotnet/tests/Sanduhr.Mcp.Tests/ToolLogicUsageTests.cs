@@ -23,6 +23,9 @@ public class ToolLogicUsageTests
         Assert.Equal("no_data", (string?)r["status"]);
         Assert.Equal("missing", (string?)r["reason"]);
         Assert.Contains("Sanduhr widget", (string?)r["remedy"]);
+        // The integration toggles live on the Claude Code page, not on Claude Usage.
+        Assert.Contains("(Settings, Claude Code)", (string?)r["remedy"]);
+        Assert.DoesNotContain("Claude Usage", (string?)r["remedy"]);
     }
 
     [Fact]

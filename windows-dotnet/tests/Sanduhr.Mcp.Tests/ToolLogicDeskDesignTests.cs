@@ -761,4 +761,52 @@ public class ToolLogicDeskDesignTests
         Assert.Equal(@"C:\h\.sanduhr\desk-design-request.json", cfg.DesignRequestPath);
         Assert.Equal(@"C:\h\.sanduhr\desk-design-result.json", cfg.DesignResultPath);
     }
+
+    // ---- theme match ----
+
+    private static JsonNode Obsidian() => JsonNode.Parse("""
+        {"name": "Obsidian", "bg": "#0d0d0d", "glass": "#1c1c1c", "glass_on_mica": "#1a1a1c", "title_bg": "#161616",
+         "border": "#333333", "footer_bg": "#111111", "bar_bg": "#2a2a2a", "text": "#e8e4dc", "text_secondary": "#b8b4ac",
+         "text_dim": "#777777", "text_muted": "#555555", "accent": "#6c63ff", "pace_marker": "#ff6b6b", "sparkline": "#6c63ff"}
+        """)!;
+
+    [Fact]
+    public void Get_reports_the_theme_look_the_widget_would_draw_and_whether_the_desk_follows()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg, s =>
+        {
+            s["design"]!["theme"] = Obsidian();
+            s["design"]!["follows_theme"] = true;
+        });
+
+        var r = new ToolLogic(cfg, () => Now).BuildGetDesk();
+
+        Assert.True((bool)r["design"]!["follows_theme"]!);
+        Assert.Equal("#e8e4dc", (string?)r["theme_look"]!["ink"]![0]);
+        Assert.Equal("#0a0a0a", (string?)r["theme_look"]!["plate_color"]);
+        Assert.Equal("#070707", (string?)r["theme_look"]!["shadow"]);
+    }
+
+    [Fact]
+    public void Get_reports_no_theme_look_without_a_theme()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg);
+        Assert.Null(new ToolLogic(cfg, () => Now).BuildGetDesk()["theme_look"]);
+    }
+
+    [Fact]
+    public void Get_reports_no_theme_look_for_a_theme_that_fails_the_lint_or_a_design_that_is_no_object()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg, s => s["design"]!["theme"] = JsonNode.Parse("""{"name":"X"}"""));
+        Assert.Null(new ToolLogic(cfg, () => Now).BuildGetDesk()["theme_look"]);
+
+        WriteState(cfg, s => s["design"] = "nope");
+        Assert.Null(new ToolLogic(cfg, () => Now).BuildGetDesk()["theme_look"]);
+    }
 }

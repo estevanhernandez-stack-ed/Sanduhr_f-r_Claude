@@ -323,6 +323,18 @@ public class CompanionSettingsTests
     }
 
     [Fact]
+    public void The_active_pack_is_never_a_sprite_that_is_off()
+    {
+        var reg = new WidgetRegistry(null,
+        [
+            new InstalledWidget("hourglass", "1.0.0", WidgetSource.Catalog, DateTimeOffset.UnixEpoch, false),
+            new InstalledWidget("my-sprite", "1.0.0", WidgetSource.Claude, DateTimeOffset.UnixEpoch, true),
+        ]);
+        Assert.Equal("my-sprite", new CompanionSettings("hourglass", true).ActivePack(reg, Kind));
+        Assert.Equal("my-sprite", new CompanionSettings(null, true).ActivePack(reg, Kind));
+    }
+
+    [Fact]
     public void The_growth_memory_lives_in_the_widgets_folder_and_time_is_only_read_from_the_shared_folder()
     {
         var p = new Paths(@"C:\r", @"C:\h", @"C:\l", @"C:\h\.sanduhr");

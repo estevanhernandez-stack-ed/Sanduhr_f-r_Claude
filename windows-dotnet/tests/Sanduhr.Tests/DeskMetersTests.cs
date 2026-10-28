@@ -52,11 +52,15 @@ public class DeskMetersTests
     }
 
     [Fact]
-    public void Warning_StartsAtNinety()
+    public void Each_row_carries_its_level_at_the_alert_thresholds()
     {
-        var rows = DeskMeters.Rows(Usage(new DeskTier(TierModel.FiveHour, 89.9, null), new DeskTier(TierModel.SevenDay, 90, null)), Now);
-        Assert.False(rows[0].Warning);
-        Assert.True(rows[1].Warning);
+        var rows = DeskMeters.Rows(Usage(new DeskTier(TierModel.FiveHour, 79.9, null), new DeskTier(TierModel.SevenDay, 80, null)), Now);
+        Assert.Equal([MeterLevel.Calm, MeterLevel.Warn], rows.Select(r => r.Level));
+        rows = DeskMeters.Rows(Usage(new DeskTier(TierModel.FiveHour, 94.9, null), new DeskTier(TierModel.SevenDay, 95, null)), Now);
+        Assert.Equal([MeterLevel.Warn, MeterLevel.Urgent], rows.Select(r => r.Level));
+        rows = DeskMeters.Rows(Usage(new DeskTier(TierModel.FiveHour, 65, null), new DeskTier(TierModel.SevenDay, 70, null)), Now,
+            warnAt: 60, urgentAt: 70);
+        Assert.Equal([MeterLevel.Warn, MeterLevel.Urgent], rows.Select(r => r.Level));
     }
 
     [Fact]

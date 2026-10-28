@@ -1,0 +1,124 @@
+using System.IO;
+using Sanduhr.App.Services;
+using Sanduhr.App.ViewModels;
+using Sanduhr.Core;
+
+namespace Sanduhr.App.Tests;
+
+/// <summary>Settings v2, slice 7, preflight P3: a Launcher row shows a repo URL and a raw path, so it masks them while streamer mode is on.</summary>
+[Collection("SettingsWindow")]
+public sealed class StreamerLauncherTests : AppWindowFixture
+{
+    private const string Repo = "https://github.com/qxowner/qxsecretrepo";
+    private const string RawPath = @"C:\Users\qxuser\tools\qxtool.exe";
+
+    private (LauncherSettingsViewModel Vm, string Root) Open()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "sanduhr-sl-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(root);
+        var paths = new Paths(appDataBase: root, localAppDataBase: Path.Combine(root, "local"));
+        var store = new SettingsStore(paths);
+        store.SaveLauncher(new LauncherModel(LauncherOrientation.Column,
+            [LauncherButton.Create(LauncherKind.Link, Repo)!, LauncherButton.Create(LauncherKind.App, RawPath, null, null, null)!]));
+        return (new LauncherSettingsViewModel(store, paths, () => true), root);
+    }
+
+    [Fact]
+    public void A_repo_link_shows_scheme_host_and_an_ellipsis_while_on()
+    {
+        var (vm, root) = Open();
+        try
+        {
+            Assert.Equal(Repo, vm.Rows[0].Detail);
+            StreamerMode.Use(new StreamerMask(true, CodenameBook.New(), Profile));
+            vm.Reload();
+            var detail = vm.Rows[0].Detail;
+            Assert.StartsWith("https://", detail);
+            Assert.EndsWith("/…", detail);
+            Assert.DoesNotContain("qx", detail, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("github", detail, StringComparison.OrdinalIgnoreCase);
+        }
+        finally { try { Directory.Delete(root, true); } catch (IOException) { } }
+    }
+
+    [Fact]
+    public void An_unlabelled_links_title_and_spoken_subject_name_its_host_by_codename_while_on()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "sanduhr-sl-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(root);
+        try
+        {
+            var paths = new Paths(appDataBase: root, localAppDataBase: Path.Combine(root, "local"));
+            var store = new SettingsStore(paths);
+            store.SaveLauncher(new LauncherModel(LauncherOrientation.Column, [LauncherButton.Create(LauncherKind.Link, "https://qxowner.dev/notes")!]));
+            var vm = new LauncherSettingsViewModel(store, paths, () => true);
+            Assert.Equal("qxowner.dev", vm.Rows[0].Title);
+
+            StreamerMode.Use(new StreamerMask(true, CodenameBook.New(), Profile));
+            vm.Reload();
+            Assert.DoesNotContain("qx", vm.Rows[0].Title, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("qx", vm.Rows[0].Subject, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("qx", vm.Rows[0].UseDefaultImageName, StringComparison.OrdinalIgnoreCase);
+            // The title's codename is the same one the detail line shows.
+            Assert.Contains(vm.Rows[0].Title, vm.Rows[0].Detail);
+        }
+        finally { try { Directory.Delete(root, true); } catch (IOException) { } }
+    }
+
+    [Fact]
+    public void One_link_has_one_codename_in_the_title_the_detail_the_Desk_piece_and_the_allowlist()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "sanduhr-sl-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(root);
+        try
+        {
+            var paths = new Paths(appDataBase: root, localAppDataBase: Path.Combine(root, "local"));
+            var store = new SettingsStore(paths);
+            var link = LauncherButton.Create(LauncherKind.Link, "https://www.qxhost.dev/x")!;
+            store.SaveLauncher(new LauncherModel(LauncherOrientation.Column, [link]));
+            var vm = new LauncherSettingsViewModel(store, paths, () => true);
+            var book = CodenameBook.New();
+            StreamerMode.Use(new StreamerMask(true, book, Profile));
+            vm.Reload();
+            var row = vm.Rows[0];
+            var code = row.Title;
+            Assert.DoesNotContain("qx", code, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal($"https://{code}/…", row.Detail);
+            Assert.Equal(code, StreamerMode.LauncherName(link, null));
+            Assert.Equal(code, row.Subject);
+            var hosts = book.Entries().Where(e => e.Category == CodenameCategory.Host && e.Real.Contains("qxhost", StringComparison.Ordinal)).ToList();
+            Assert.Single(hosts);
+        }
+        finally { try { Directory.Delete(root, true); } catch (IOException) { } }
+    }
+
+    [Fact]
+    public void A_raw_target_title_goes_through_the_path_mask_while_on()
+    {
+        var (vm, root) = Open();
+        try
+        {
+            Assert.Equal(RawPath, vm.Rows[1].Title);
+            StreamerMode.Use(new StreamerMask(true, CodenameBook.New(), Profile));
+            vm.Reload();
+            Assert.DoesNotContain("qxuser", vm.Rows[1].Title);
+            Assert.StartsWith("%USERPROFILE%", vm.Rows[1].Title);
+        }
+        finally { try { Directory.Delete(root, true); } catch (IOException) { } }
+    }
+    [Fact]
+    public void The_Desk_names_an_unlabelled_link_by_its_hosts_codename_and_a_raw_target_through_the_path_mask_while_on()
+    {
+        var link = LauncherButton.Create(LauncherKind.Link, "https://qxowner.dev/notes")!;
+        var raw = LauncherButton.Create(LauncherKind.App, RawPath, null, null, null)!;
+        var labelled = LauncherButton.Create(LauncherKind.Link, "https://qxowner.dev/notes", null, "Notes", null)!;
+        Assert.Equal("qxowner.dev", StreamerMode.LauncherName(link, null));
+
+        StreamerMode.Use(new StreamerMask(true, CodenameBook.New(), Profile));
+        Assert.DoesNotContain("qx", StreamerMode.LauncherName(link, null), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("qxuser", StreamerMode.LauncherName(raw, null));
+        Assert.Equal("Visual Studio Code", StreamerMode.LauncherName(raw, "Visual Studio Code"));   // an app's Start menu name identifies no one
+        Assert.Equal("Notes", StreamerMode.LauncherName(labelled, null));                           // what the person typed (the caption says so)
+    }
+
+}

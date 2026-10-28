@@ -36,13 +36,13 @@ public static class WelcomeTour
     /// Every card, in step order: five steps numbered 1 to 5. The Desk is on every Windows build,
     /// so its card needs no feature.
     /// </summary>
-    public static IReadOnlyList<TourCard> Table { get; } =
+    public static IReadOnlyList<TourCard> Table { get; } = Anchored(
     [
         new(1, new WhatsNewCard([], "paced", "Your limits, paced",
-            "Each bar is one of your limits, filling as you use it. The tick marks where an even pace would put you right now.",
+            "The widget is the small floating window with your meters, one bar per limit. The tick on each bar marks where an even pace would put you right now.",
             "\uE9D2", WhatsNewPreview.Meters, SettingsPage.Widget)),
         new(2, new WhatsNewCard([], "desk", "On your desktop",
-            "The Desk puts a clock, your meters, a message and more on the desktop, under every window. Arrange each piece from Settings, Desk.",
+            "The Desk is the clock, meters and pieces Sanduhr draws on your desktop, under every window. A piece is one thing on the Desk, and you arrange each in Settings, Desk, Pieces.",
             "\uE7F4", WhatsNewPreview.None, SettingsPage.Desk)),
         new(3, new WhatsNewCard([], "tray", "At a glance",
             "The hourglass in the tray shows a percent: your session, your weekly limit, whichever is higher, both in turn, or the highest of any.",
@@ -51,9 +51,9 @@ public static class WelcomeTour
             "Add each Claude account with its own sign-in and history, then switch from the name chip or the tray's Accounts menu.",
             "\uE716", WhatsNewPreview.AccountChip, SettingsPage.Accounts)),
         new(5, new WhatsNewCard([], "claude-code", "Claude Code, connected",
-            "The Claude Usage page shows your Claude Code tokens by day and project. The Claude Code page adds the MCP tools and the statusline, each after you say yes.",
+            "The Claude Usage page shows your Claude Code tokens by day and project. The Claude Code page adds the MCP tools, the statusline and a mod, an add-on that Claude Code loads, each after you say yes.",
             "\uEA86", WhatsNewPreview.None, SettingsPage.ClaudeCode)),
-    ];
+    ]);
 
     /// <summary>
     /// The tour for someone who chose Just the Desk: three steps with no meters, accounts or Claude
@@ -61,7 +61,7 @@ public static class WelcomeTour
     /// rewritten for a tray with no numbers); a last card says the Desk stands alone and where
     /// sign-in lives.
     /// </summary>
-    public static IReadOnlyList<TourCard> DeskOnly { get; } =
+    public static IReadOnlyList<TourCard> DeskOnly { get; } = Anchored(
     [
         Moved(ById("desk"), 1),
         Moved(ById("tray"), 2,
@@ -69,7 +69,7 @@ public static class WelcomeTour
         new(3, new WhatsNewCard([], "sign-in", "Sign in any time",
             "The Desk works without a Claude account. Sign in from Settings, Accounts whenever you have one, and the meters fill in on the desktop.",
             "", WhatsNewPreview.None, SettingsPage.Accounts), ShowMeTitle: "Accounts"),
-    ];
+    ]);
 
     private static TourCard ById(string id) => Table.Single(c => c.Id == id);
 
@@ -128,7 +128,7 @@ public static class WelcomeTour
     }
 
     /// <summary>Step 1 with no account: it sends to Sign in instead of showing meters. Other cards are unchanged.</summary>
-    public static TourCard SignedOut(TourCard card) =>
+    public static TourCard SignedOut(TourCard card) => WithAnchor(
         card.Step != 1
             ? card
             : card with
@@ -137,7 +137,7 @@ public static class WelcomeTour
                     "Sign in to see your meters here. Each bar is one of your limits, with a tick where an even pace would put you.",
                     card.Card.Glyph, card.Card.Preview, SettingsPage.Accounts),
                 ShowMeTitle = SettingsNames.SignIn,
-            };
+            });
 
     /// <summary>"1 of 4" for the 0-based index 0 of 4.</summary>
     public static string StepText(int index, int count) => $"{index + 1} of {count}";
@@ -181,4 +181,24 @@ public static class WelcomeTour
     /// </summary>
     public static TourState? End(TourState? state, bool finished) =>
         state == TourState.Pending ? (finished ? TourState.Finished : TourState.Skipped) : null;
+
+    /// <summary>The cards with the section each Show me lands on (Settings v2, WF17).</summary>
+    private static TourCard[] Anchored(TourCard[] cards) => [.. cards.Select(WithAnchor)];
+
+    /// <summary><paramref name="card"/> with the anchor its destination calls for; the same card when it has it already.</summary>
+    private static TourCard WithAnchor(TourCard card)
+    {
+        var anchor = AnchorFor(card.Card.Destination);
+        return card.Card.Anchor == anchor ? card : card with { Card = card.Card with { Anchor = anchor } };
+    }
+
+    /// <summary>Where a tour card lands, by its destination. Kept apart from the cards' words. The widget has none.</summary>
+    private static string? AnchorFor(SettingsPage destination) => destination switch
+    {
+        SettingsPage.Accounts => SettingsIndex.AccountList,
+        SettingsPage.Desk => SettingsIndex.DeskOn,
+        SettingsPage.General => SettingsIndex.Tray,
+        SettingsPage.ClaudeCode => SettingsIndex.Folders,
+        _ => null,
+    };
 }

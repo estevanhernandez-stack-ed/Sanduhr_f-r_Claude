@@ -32,12 +32,12 @@ public sealed class VaultService
         _paths = new Paths();
         _settings = settings;
         _reader = reader;
-        _store = new VaultStore(_paths.VaultDir, _paths.LogFile);
+        _store = new VaultStore(_paths.VaultDir, _paths.LogFile);   // streamer: notname - a file location used for IO, never drawn
         Reader = new VaultReader(_store);
         var v = Assembly.GetExecutingAssembly().GetName().Version;
         var version = v is null ? "3.2.0" : $"{v.Major}.{v.Minor}.{v.Build}";
         _ingester = new VaultIngester(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),   // streamer: notname - user folder handed to the ingester, never drawn
             _store, version, _paths.LogFile);
     }
 
@@ -45,11 +45,11 @@ public sealed class VaultService
 
     public VaultStore Store => _store;
 
-    public string VaultDir => _paths.VaultDir;
+    public string VaultDir => _paths.VaultDir;   // streamer: notname - a file location used for IO, never drawn
 
     /// <summary>Basenames (".claude", ".claude-personal") of CC homes that
     /// exist on this machine right now.</summary>
-    public IReadOnlyList<string> DetectedRootNames()
+    public IReadOnlyList<string> DetectedRootNames()   // streamer: key - root names for consent keys, never drawn here
         => _reader.SearchRoots().Select(Path.GetFileName).Where(n => !string.IsNullOrEmpty(n))
             .Select(n => n!).ToList();
 
@@ -57,11 +57,11 @@ public sealed class VaultService
     public IReadOnlyList<string> ConsentedRootNames()
     {
         var consent = _settings.LoadVaultRoots();
-        return DetectedRootNames().Where(r => consent.GetValueOrDefault(r)).ToList();
+        return DetectedRootNames().Where(r => consent.GetValueOrDefault(r)).ToList();   // streamer: key - root names for consent keys, never drawn here
     }
 
     public bool NeedsConsentPrompt
-        => !_settings.LoadVaultPrompted() && DetectedRootNames().Count > 0;
+        => !_settings.LoadVaultPrompted() && DetectedRootNames().Count > 0;   // streamer: key - a count, never drawn
 
     public void SaveConsent(IReadOnlyDictionary<string, bool> roots)
     {
@@ -141,7 +141,7 @@ public sealed class VaultService
     public void EraseArchive()
     {
         var map = new Dictionary<string, bool>(StringComparer.Ordinal);
-        foreach (var root in DetectedRootNames())
+        foreach (var root in DetectedRootNames())   // streamer: key - root names written as consent keys, never drawn
             map[root] = false;
         _settings.SaveVaultRoots(map);
         RunUnderWriterMutex(() => _store.PurgeAll());
@@ -181,8 +181,9 @@ public sealed class VaultService
     {
         try
         {
-            Directory.CreateDirectory(_paths.VaultDir);
-            Process.Start(new ProcessStartInfo("explorer.exe", _paths.VaultDir) { UseShellExecute = true });
+            Directory.CreateDirectory(_paths.VaultDir);   // streamer: notname - a file location used for IO, never drawn
+            // network: local
+            Process.Start(new ProcessStartInfo("explorer.exe", _paths.VaultDir) { UseShellExecute = true });   // streamer: cant - Explorer is a window Windows opens for Sanduhr (the caption's list)
         }
         catch (Exception e)
         {
@@ -195,7 +196,7 @@ public sealed class VaultService
     {
         try
         {
-            File.AppendAllText(_paths.LogFile,
+            File.AppendAllText(_paths.LogFile,   // streamer: notname - written to the log file, never drawn
                 $"{DateTime.UtcNow:o} vault {operation} failed ({e.GetType().Name}){Environment.NewLine}");
         }
         catch

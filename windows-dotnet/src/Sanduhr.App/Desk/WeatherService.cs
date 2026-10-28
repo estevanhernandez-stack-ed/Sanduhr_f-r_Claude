@@ -17,6 +17,7 @@ internal sealed class WeatherService : IDisposable
     private static readonly Lazy<HttpClient> Http = new(() =>
     {
         var handler = new HttpClientHandler { UseCookies = false, AllowAutoRedirect = false };
+        // network: open-meteo
         var c = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
         c.DefaultRequestHeaders.UserAgent.ParseAdd(Weather.UserAgent);
         return c;
@@ -69,6 +70,7 @@ internal sealed class WeatherService : IDisposable
         try
         {
             var url = Weather.ForecastUrl(place, unit);
+            // network: open-meteo (the forecast)
             var json = await Http.Value.GetStringAsync(url);
             var reading = Weather.ParseForecast(json, DateTimeOffset.Now);
             if (reading is not null && place == _place && unit == _unit)
@@ -95,6 +97,7 @@ internal sealed class WeatherService : IDisposable
     {
         var url = Weather.GeocodeUrl(city);
         if (url is null) return [];
+        // network: open-meteo (Look up)
         var json = await Http.Value.GetStringAsync(url, ct);
         return Weather.ParsePlaces(json);
     }

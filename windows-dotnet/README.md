@@ -106,11 +106,15 @@ a cookie value.
 - The login runs on Anthropic's **real** `claude.ai/login` page inside WebView2.
   Sanduhr never sees the password; it only reads back the resulting session cookie
   from its own jar.
-- **Google OAuth is unreliable inside an embedded WebView2** — Google routinely
-  refuses embedded user-agents (the `disallowed_useragent` block). The reliable
-  path is **email + login-code** (or passkey). Use that when the Google button
-  dead-ends. The sign-in window already presents a clean desktop-Chrome UA as a
-  mitigation, but Google may still block.
+- **Continue with Google works in the sign-in window (since 4.0).** Google's
+  sign-in runs in a popup and hands its result back through `window.opener`, so
+  `SignInWindow` gives each `window.open` a real owned window on the same WebView2
+  environment, with the same desktop-Chrome UA (Google refuses the embedded one,
+  `disallowed_useragent`). Google may add its own device check (g.co/sc). Folding
+  the popup into the main view, as before 4.0, left a blank Google page. If a popup
+  can't start, the URL falls back into the main view, and a one-shot timer sends it
+  back to `claude.ai/login` 6 s after Google's `accounts.youtube.com` step, where
+  the live Google session completes the sign-in. Email + login code still works.
 - Cookies are read **only from the `claude.ai` origin** (`https://claude.ai`); the
   capture never fires on OAuth-provider, analytics, or captcha hosts.
 
@@ -150,7 +154,7 @@ no snapshot, history, alert or limit state. New `settings.json` key: `tour_state
 ### Since 3.4.3: Mac parity, Stage 3
 
 Settings v2 (`docs/settings-v2-spec.md`): Settings is a sidebar in four groups (General,
-Accounts, Alerts; Usage: History, Claude Usage, Publish usage; Widget: Themes; Help: About) with
+Accounts, Alerts; Usage: Claude Usage (its first view, Meters, is the 30-day meter history), Publish usage; Widget: Themes; Help: About) with
 a search box that finds pages, sections and controls by name and synonyms and opens them in view.
 General shows a live tray preview. About holds the version, What's New… and Take the tour…, the
 trademark notice, where settings live (with Show in Explorer) and the third-party notices.
@@ -179,7 +183,7 @@ The Claude Code side (`docs/spec.md` Stage 4, `../docs/mods-and-config-spec.md`)
   `seats.json` for per-folder meters.
 - **Meters mod**: the Mac's `sanduhr-meters` mod ships in the app output (`mods\`), installs to
   `%USERPROFILE%\.sanduhr\mods\<stamp>` and joins `env.CLAUDE_CODE_PLUGIN_DIRS`; On, Off, Update and
-  Remove live on **Mods & Config**, which otherwise reads a folder without changing it (settings,
+  Remove live on **Settings, Mods & Widgets**, which otherwise reads a folder without changing it (settings,
   statusline, hooks, plugins, mods, MCP names, `CLAUDE.md`, retention). Secrets are masked.
 - **Glow when Claude needs you**: `Notification` and `Stop` hooks touch a signal file; the widget
   lights the top edge of the window you are working in, in the theme's accent (waiting) or
@@ -237,7 +241,7 @@ The Desk (`docs/spec.md` Stages 5 and 6), off until **Settings, Desk** turns it 
 
 ### 3.8 (in progress): the widget catalog
 
-`docs/widgets-3.8-spec.md` sections 2 and 3. **Settings, Widgets** (Desk group) lists the signed
+`docs/widgets-3.8-spec.md` sections 2 and 3. **Settings, Mods & Widgets** (Extend group) lists the signed
 `sanduhr-widgets` catalog and the installed packs, and installs, updates and uninstalls them.
 
 - **Fetch** (`Services/WidgetCatalogService.cs`, the app only, never `Sanduhr.Mcp`): `catalog.json`,
@@ -256,7 +260,7 @@ The Desk (`docs/spec.md` Stages 5 and 6), off until **Settings, Desk** turns it 
 
 **The companion** (spec section 4, FORMAT 5.5 and 6): a Desk piece, `companion`, placed like any
 other and listed in `get_desk` pieces (last in `DeskArrangement.Known`, default anchor bottom right).
-It draws the sprite chosen in Settings, Widgets (`desk_companion` {pack, roam}; no pick is the first
+It draws the sprite chosen in Settings, Desk (Pieces, the Companion row) (`desk_companion` {pack, roam}; no pick is the first
 installed sprite). Showing it there places or hides the piece.
 
 - **Core, pure**: `CompanionSprite` reads sprite.json (stages with their own cell sizes, the
@@ -277,7 +281,7 @@ installed sprite). Showing it there places or hides the piece.
   Roaming, it is its own island with a `DeskIslandMotion` the host follows by moving the window
   (OLED care's drift and dim still apply); with Windows' animations off it sits in its stack.
 - **Harness**: `--scenario companion` installs the hourglass into the dev profile and draws each stage,
-  a trigger, a mood, a roaming frame and Settings, Widgets.
+  a trigger, a mood, a roaming frame and Settings, Desk, Pieces.
 
 **The ride-alongs** (spec section 7, E to G):
 
@@ -333,10 +337,10 @@ font is ever accepted) and installs nothing.
   (`WidgetHandoff`), stages a sprite in `widgets\.preview\` (rasterized there) and draws it through the
   companion's own loader (`CompanionService.PreviewPack`); a palette previews as Custom ink. The review
   bar wears the widget's words and one choice, Make it the companion. Apply installs as source `claude`;
-  Dismiss removes the staged copy and writes nothing; the direct switch is never read. Settings, Widgets
+  Dismiss removes the staged copy and writes nothing; the direct switch is never read. Settings, Mods & Widgets
   offers Use my own art… on a sprite made here, which reinstalls it as source `local`.
 - **Harness**: `--scenario propose-widget` builds a 16 px pixel blob as the server would, previews it on a
-  composited Desk with the bar, applies it, and shows Settings, Widgets with the row made here.
+  composited Desk with the bar, applies it, and shows Settings, Mods & Widgets with the row made here.
 
 ### Since 3.8.0: CI watchers from local runners
 

@@ -115,4 +115,58 @@ public class SnapshotConsumersTests
         var (_, unknown) = SnapshotConsumers.ReadReceipts(path);
         Assert.True(unknown);
     }
+
+    // Slice 8 final review M2: the switch also means "the meters mod reads the snapshot", and the meters mod never runs the script.
+    // So the widget writes the script at start only for a statusline: one is on record, the record can't be read, or the script
+    // is already there (an update for a statusline Sanduhr has no receipt for).
+    private static (string Root, string Receipts, string Script) ScriptRig()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "sanduhr-scriptwanted-" + Guid.NewGuid().ToString("N"));
+        var receipts = Path.Combine(root, "appdata", "integrations", "installs.json");
+        var script = Path.Combine(root, "bin", StatuslineInstaller.ScriptName);
+        Directory.CreateDirectory(Path.GetDirectoryName(receipts)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(script)!);
+        return (root, receipts, script);
+    }
+
+    [Fact]
+    public void A_meters_mod_alone_does_not_bring_the_script_back()
+    {
+        var (root, receipts, script) = ScriptRig();
+        try
+        {
+            new ReceiptStore(receipts).Save([new IntegrationReceipt { Kind = IntegrationKind.Meters, Folder = Path.Combine(root, ".claude"), File = Path.Combine(root, ".claude", "settings.json") }]);
+            Assert.False(SnapshotConsumers.ScriptWanted(statuslineEnabled: true, receipts, script));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void A_statusline_on_record_an_unreadable_record_or_a_script_already_there_keeps_it_updated()
+    {
+        var (root, receipts, script) = ScriptRig();
+        try
+        {
+            new ReceiptStore(receipts).Save([new IntegrationReceipt { Kind = IntegrationKind.Statusline, Folder = Path.Combine(root, ".claude"), File = Path.Combine(root, ".claude", "settings.json") }]);
+            Assert.True(SnapshotConsumers.ScriptWanted(true, receipts, script));
+
+            File.WriteAllText(receipts, "{ not a list");
+            Assert.True(SnapshotConsumers.ScriptWanted(true, receipts, script));
+
+            new ReceiptStore(receipts).Save([]);
+            File.WriteAllText(script, "# an older copy");
+            Assert.True(SnapshotConsumers.ScriptWanted(true, receipts, script));
+
+            Assert.False(SnapshotConsumers.ScriptWanted(statuslineEnabled: false, receipts, script));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void No_record_and_no_script_writes_nothing()
+    {
+        var (root, receipts, script) = ScriptRig();
+        try { Assert.False(SnapshotConsumers.ScriptWanted(true, receipts, script)); }
+        finally { Directory.Delete(root, true); }
+    }
 }

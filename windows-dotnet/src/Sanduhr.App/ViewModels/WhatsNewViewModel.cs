@@ -67,9 +67,9 @@ public sealed class WhatsNewCardItem
     public override string ToString() => Card.Title;
     public string ShowMeName => $"{ShowMeTitle}: {Card.Title}";
 
-    public string ShowMeToolTip => Card.Destination == SettingsPage.Widget
+    public string ShowMeToolTip => SettingsIndex.ShowsTheWidget(new SettingsLink(Card.Destination, Card.Anchor))
         ? "Shows the widget"
-        : $"Opens Settings, {SettingsNames.PageTitle(Card.Destination)}";
+        : $"Opens Settings, {SettingsNames.PageTitle(SettingsIndex.Resolve(Card.Destination, Card.Anchor).Page)}";
 }
 
 /// <summary>What the What's New window binds to: the header, the cards, and the persisted "don't show after updates" flag.</summary>
@@ -77,12 +77,13 @@ public sealed class WhatsNewViewModel : ObservableObject
 {
     private readonly SettingsStore _store;
     private bool _hideAfterUpdates;
+    private bool _loading;
 
     public string Header { get; }
     public IReadOnlyList<WhatsNewCardItem> Items { get; }
     public bool IsEmpty => Items.Count == 0;
 
-    // The window's mode: What's New (cards, Don't show after updates, Done).
+    // The window's mode: What's New (cards, Don't show What's New after updates, Done).
     public string WindowTitle => "What's New in Sanduhr";
     public string HeaderName => Header;
     public bool IsTour => false;
@@ -104,8 +105,17 @@ public sealed class WhatsNewViewModel : ObservableObject
         set
         {
             if (!SetProperty(ref _hideAfterUpdates, value)) return;
+            if (_loading) return;
             _store.SaveWhatsNewHideAfterUpdates(value);
         }
+    }
+
+    /// <summary>Read the key again (About may have changed it while this window was open; slice 6). Raises the change, writes nothing.</summary>
+    public void Reload()
+    {
+        _loading = true;
+        try { HideAfterUpdates = _store.LoadWhatsNewHideAfterUpdates(); }
+        finally { _loading = false; }
     }
 
     /// <summary>The tray glyph at 12% as a WPF image, for the Tray preview.</summary>

@@ -20,7 +20,7 @@ public static class StatuslineScript
 {
     /// <summary>Bumped when the script body changes; the installer re-writes the
     /// script whenever the installed copy differs from this source.</summary>
-    public const int Version = 5;
+    public const int Version = 6;
 
     /// <summary>PowerShell 5.1-compatible script body. Reads the snapshot per the
     /// reader contract (one-shot read, any parse failure = missing), renders per
@@ -43,6 +43,9 @@ public static class StatuslineScript
 # here, when the line renders, and written nowhere: SANDUHR_LABEL from the session's
 # environment (the folder's own settings.json env block), else the CLAUDE_CONFIG_DIR folder's
 # name (.claude-personal reads personal; plain .claude has none), else no label.
+# Streamer mode (Settings, Privacy) puts the folder's codename in its place, from
+# %USERPROFILE%\.sanduhr\streamer.json (folder ref -> codename, never a real name). It never adds
+# a label where none would print, and a file it can't trust prints no label at all.
 param(
   [string]$Chain = '',
   [string]$Join = 'line',
@@ -121,6 +124,36 @@ function Get-FolderLabel {
   if ($leaf.StartsWith('.claude-', [System.StringComparison]::OrdinalIgnoreCase)) { return (Clean-Label $leaf.Substring(8)) }
   if ($leaf -ieq '.claude') { return $null }
   return (Clean-Label $leaf.TrimStart('.'))
+}
+
+# ---- streamer mode: the folder's codename in place of its label -----------------
+# streamer.json is written by the widget once streamer mode has been on. Missing: as before.
+# On: the codename for this folder's ref, the label itself for a shown ref, else nothing.
+# The ref is the first 4 bytes of SHA-256 over the folder's full path, lower-cased (StreamerFile.FolderRef).
+function Get-StreamerLabel([string]$label) {
+  $path = Join-Path $env:USERPROFILE '.sanduhr\streamer.json'
+  $info = New-Object System.IO.FileInfo($path)
+  if (-not $info.Exists) { return $label }
+  if ($info.Length -gt 65536) { return $null }
+  try { $s = [System.IO.File]::ReadAllText($path) | ConvertFrom-Json -ErrorAction Stop } catch { return $null }
+  if ($null -eq $s -or $null -eq $s.schema_version) { return $null }
+  if (-not ($s.schema_version -is [int] -or $s.schema_version -is [long] -or $s.schema_version -is [double])) { return $null }
+  if ([double]$s.schema_version -ne 1) { return $null }
+  if (-not ($s.on -is [bool])) { return $null }
+  if (-not $s.on) { return $label }
+  $profileDir = $env:USERPROFILE
+  $config = $env:CLAUDE_CONFIG_DIR
+  if ([string]::IsNullOrEmpty($config)) { $config = Join-Path $profileDir '.claude' }
+  $folder = Get-FolderKey $config $profileDir
+  if ($null -eq $folder) { return $null }
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  try { $hash = $sha.ComputeHash($utf8.GetBytes($folder.ToLowerInvariant())) } finally { $sha.Dispose() }
+  $ref = (($hash[0..3] | ForEach-Object { $_.ToString('x2') }) -join '')
+  if (@($s.shown) -contains $ref) { return $label }
+  if ($null -eq $s.folders) { return $null }
+  $code = $s.folders.$ref
+  if ($code -is [string]) { return (Clean-Label $code) }
+  return $null
 }
 
 # ---- Sanduhr's own line (null = nothing of Sanduhr's to print) -----------------
@@ -205,6 +238,7 @@ function Get-OurLine {
   if (-not $line) { return $null }   # no numbers: the label never prints on its own
   if ($showAccount) {
     $folderLabel = Get-FolderLabel
+    if ($folderLabel) { $folderLabel = Get-StreamerLabel $folderLabel }   # streamer mode: the codename, or nothing
     if ($folderLabel) { $line = $folderLabel + ' | ' + $line }   # the label may be non-ASCII; Emit writes UTF-8
   }
   if ($age -ge 450) { $line = $line + (' ({0}m ago)' -f [int][Math]::Floor($age / 60)) }

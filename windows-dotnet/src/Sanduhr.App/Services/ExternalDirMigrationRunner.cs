@@ -34,11 +34,11 @@ public static class ExternalDirMigrationRunner
 
     internal static ExternalDirMigrationInputs BuildInputs(SettingsStore settings, Paths paths)
     {
-        string profile = ClaudeCodeProfile.Dir;
+        string profile = ClaudeCodeProfile.Dir;   // streamer: key - profile folder compared with install receipts, never drawn
         string appData = paths.AppDataDir;
         string external = paths.ExternalDir;
 
-        var discovered = ClaudeCodeFolders.Build(profile, ClaudeCodeProfile.ConfigDir, settings.LoadCcFoldersAdded());
+        var discovered = ClaudeCodeFolders.Build(profile, ClaudeCodeProfile.ConfigDir, settings.LoadCcFoldersAdded());   // streamer: key - folder list compared with install receipts, never drawn
         var folders = discovered.Select(f => f.Path).ToList();
         try
         {

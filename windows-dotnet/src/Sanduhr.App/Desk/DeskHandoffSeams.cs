@@ -25,11 +25,21 @@ internal sealed class DeskMessageHandoffService : IDisposable
     private readonly SettingsStore? _store;
     private FileSystemWatcher? _watcher;
 
-    public DeskMessageHandoffService(Paths paths, string messagesPath, SettingsStore? store = null)
+    public DeskMessageHandoffService(Paths paths, string messagesPath, SettingsStore? store = null, Action? settingsChanged = null)
     {
         _store = store;
         Handoff = new DeskMessageHandoff(new DeskMessagePaths(paths.ExternalDir, messagesPath),
             direct: () => false, canWrite: () => !ResetGuard.Done);
+        // Colored lines in an accepted suggestion would be hidden by "Use the theme's colors": that switch goes off so they show.
+        if (store is not null)
+            Handoff.LinesApplied += lines =>
+            {
+                var own = store.LoadDeskMessage();
+                var next = own.AfterLinesAdded(lines);
+                if (next == own || ResetGuard.Done) return;
+                store.SaveDeskMessage(next);
+                settingsChanged?.Invoke();
+            };
     }
 
     /// <summary>The suggestion state Settings, Message shows.</summary>
@@ -38,11 +48,11 @@ internal sealed class DeskMessageHandoffService : IDisposable
     public void Start()
     {
         if (!Enabled || _watcher is not null) return;
-        var dir = Path.GetDirectoryName(Handoff.Paths.Request)!;
+        var dir = Path.GetDirectoryName(Handoff.Paths.Request)!;   // streamer: notname - folder of the handoff request file, never drawn
         try
         {
             Directory.CreateDirectory(dir);
-            _watcher = new FileSystemWatcher(dir, MessageProposal.RequestFile) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };
+            _watcher = new FileSystemWatcher(dir, MessageProposal.RequestFile) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };   // streamer: notname - NotifyFilters.FileName is a watcher flag, not a name
             _watcher.Created += (_, _) => Check();
             _watcher.Changed += (_, _) => Check();
             _watcher.Renamed += (_, _) => Check();
@@ -81,7 +91,7 @@ internal sealed class DeskMessageHandoffService : IDisposable
 /// Watchers, the app side (spec 6.9): reads <c>watch-request-*.json</c> from <c>%USERPROFILE%\.sanduhr</c>,
 /// deletes each as it reads it, keeps the board in memory and ticks it for fades and lost touch. The MCP
 /// tools that write the requests (<c>watch_start</c>, <c>watch_update</c>, <c>watch_end</c>) shipped in
-/// 3.6.0, gated by one switch: Settings, Desk, "Let agents show watchers" (off by default). The store
+/// 3.6.0, gated by one switch: Settings, Desk, "Let Claude show watchers" (off by default). The store
 /// writes that switch to <c>watchers.json</c> for the server to read (the server writes nothing and
 /// refuses with <c>watchers_off</c> unless it says on), applies a request only while the switch is on,
 /// and clears its cards when it goes off. Claude Code's background work (the Stop hook) is not read at all.
@@ -98,7 +108,7 @@ internal sealed class WatcherStore : IDisposable, IRunnerSink
     private FileSystemWatcher? _watcher;
     private bool _disposed;
 
-    /// <param name="allowed">The user's switch: Settings, Desk, "Let agents show watchers".</param>
+    /// <param name="allowed">The user's switch: Settings, Desk, "Let Claude show watchers".</param>
     /// <param name="demo">Demo mode is on: work watchers hide.</param>
     public WatcherStore(Paths paths, Func<bool> allowed, Func<bool>? demo = null)
     {
@@ -153,7 +163,7 @@ internal sealed class WatcherStore : IDisposable, IRunnerSink
     internal void ClearRunners()
     {
         if (_disposed) return;
-        Board.Clear(WatcherSource.Runner);
+        Board.Clear(WatcherSource.Runner);   // streamer: notname - WatcherSource.Runner is an enum member
         Changed?.Invoke();
     }
 
@@ -165,7 +175,7 @@ internal sealed class WatcherStore : IDisposable, IRunnerSink
         try
         {
             Directory.CreateDirectory(_dir);
-            _watcher = new FileSystemWatcher(_dir, WatcherRequest.RequestPattern) { NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite };
+            _watcher = new FileSystemWatcher(_dir, WatcherRequest.RequestPattern) { NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite };   // streamer: notname - NotifyFilters.FileName is a watcher flag, not a name
             // A request lands by rename from a temp name, so Created alone would miss it.
             _watcher.Created += (_, _) => Application.Current?.Dispatcher.BeginInvoke(ReadAll);
             _watcher.Renamed += (_, _) => Application.Current?.Dispatcher.BeginInvoke(ReadAll);

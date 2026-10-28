@@ -409,12 +409,12 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
             _handoff.Decided += OnDecided;
             _handoff.Applied += OnApplied;
         }
-        FontOptions = BuildFontOptions();
+        FontOptions = new(BuildFontOptions());
         ColorOptions = [FollowsInk, .. DeskInkPresets.All.Select(p => new MessageChoice<string>(p.Name, p.Value)), CustomInkChoice];
         SecondsOptions = [.. MessageSpecialModes.Presets.Select(s => new MessageChoice<double>(MessageSpecialModes.Label(s), s))];
     }
 
-    private readonly IReadOnlyList<string> _fontFamilies;
+    private IReadOnlyList<string> _fontFamilies;
 
     /// <summary>Today, for a new date row's starting month and day.</summary>
     internal DateTime Today => DateTime.Today;
@@ -433,6 +433,7 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
     public void Activate()
     {
         _active = true;
+        Flush();   // a size drag still inside its settle window would be overwritten by the old value
         _settings = _store.LoadDeskMessage();
         _customColorText = null;
         RaiseSettings();
@@ -446,6 +447,18 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
             CheckDisk();
         }
         RaiseSuggestion();
+    }
+
+    /// <summary>
+    /// Desk Look shows the message's size, color, glow and font without the rest of the page: it reads the saved settings
+    /// again (a design switch or a proposal may have changed them) so its controls are fresh and an edit keeps the other fields.
+    /// </summary>
+    public void RefreshSettings()
+    {
+        Flush();   // a size drag still inside its settle window would be overwritten by the old value
+        _settings = _store.LoadDeskMessage();
+        _customColorText = null;
+        RaiseSettings();
     }
 
     private void CheckDisk()
@@ -536,6 +549,9 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
 
     // The bar: Add line, view switch, Save, Revert
 
+    /// <summary>The Message piece's line at the page top (set by <see cref="SettingsViewModel"/>).</summary>
+    public DeskPieceStatusViewModel? Piece { get; internal set; }
+
     [RelayCommand]
     private void AddLine()
     {
@@ -543,6 +559,8 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
         _focusNext = _editor.JustAdded;
         Rebuild();
         OnPropertyChanged(nameof(EditorText));
+        // Writing a line is turning the message on: a hidden piece is shown (Principle 4).
+        Piece?.PlaceIfHidden();
     }
 
     [RelayCommand]
@@ -585,12 +603,20 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
 
     [ObservableProperty] private string _saveMessage = "";
 
-    public bool IsListMode => _editor.Mode == MessageEditorMode.List;
-    public bool IsTextMode => !IsListMode;
-    public bool HasNoRows => Rows.Count == 0;
+    /// <summary>The List radio. Checking it shows the list; the false WPF writes when Text takes the check does nothing.</summary>
+    public bool IsListMode
+    {
+        get => _editor.Mode == MessageEditorMode.List;
+        set { if (value && !IsListMode) ToggleMode(); }
+    }
 
-    /// <summary>"Edit as text…" in the list, "Back to the list" in the text.</summary>
-    public string ModeButtonText => IsListMode ? "Edit as text…" : "Back to the list";
+    /// <summary>The Text radio, the other half of the segment.</summary>
+    public bool IsTextMode
+    {
+        get => !IsListMode;
+        set { if (value && IsListMode) ToggleMode(); }
+    }
+    public bool HasNoRows => Rows.Count == 0;
 
     /// <summary>Unsaved edits: the text this view would write differs from the file as read.</summary>
     public bool Unsaved => _editor.Unsaved;
@@ -621,7 +647,6 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
         OnPropertyChanged(nameof(IsListMode));
         OnPropertyChanged(nameof(IsTextMode));
         OnPropertyChanged(nameof(HasNoRows));
-        OnPropertyChanged(nameof(ModeButtonText));
         OnPropertyChanged(nameof(Unsaved));
         OnPropertyChanged(nameof(FileChanged));
         OnPropertyChanged(nameof(StatusText));
@@ -775,13 +800,24 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
             ? "Use hex colors like 9ad7ff, or a few with commas for a gradient."
             : null;
 
+    /// <summary>"Use the theme's colors": the message draws in the widget theme's message colors and glow. The own color, glow and any
+    /// colored lines are kept as they are, for when it is turned off.</summary>
+    public bool ThemeColors
+    {
+        get => _settings.ThemeColors;
+        set => Apply(_settings with { ThemeColors = value });
+    }
+
+    /// <summary>The own color and glow controls take input only while the theme's colors are off.</summary>
+    public bool OwnColorsEnabled => !_settings.ThemeColors;
+
     public bool Glow
     {
         get => _settings.Glow;
         set => Apply(_settings with { Glow = value });
     }
 
-    public IReadOnlyList<MessageChoice<string>> FontOptions { get; }
+    public ObservableCollection<MessageChoice<string>> FontOptions { get; }
 
     private IReadOnlyList<MessageChoice<string>> BuildFontOptions()
     {
@@ -790,6 +826,13 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
         if (_settings.Font.Length > 0 && list.All(c => c.Value != _settings.Font))
             list.Add(new MessageChoice<string>(_settings.Font, _settings.Font));
         return list;
+    }
+
+    /// <summary>The font packs changed: the Message font list follows, keeping the saved family listed (BuildFontOptions already does).</summary>
+    public void ReloadFonts(IReadOnlyList<string> families)
+    {
+        _fontFamilies = families;
+        FontListSync.Sync(FontOptions, BuildFontOptions());
     }
 
     public MessageChoice<string> Font
@@ -825,6 +868,7 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
         {
             nameof(IsDaily), nameof(IsHourly), nameof(Mix), nameof(Pin), nameof(IsStack), nameof(IsTurns), nameof(IsScroll),
             nameof(SecondsApply), nameof(Seconds), nameof(Size), nameof(Glow), nameof(Font),
+            nameof(ThemeColors), nameof(OwnColorsEnabled),
         })
             OnPropertyChanged(name);
         RaiseColor();
@@ -914,6 +958,7 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
     /// <summary>messages.txt was changed here (Claude's lines went in): reload, or offer to under unsaved edits.</summary>
     private void OnApplied() => OnUi(() =>
     {
+        RefreshSettings();   // colored lines may have turned "Use the theme's colors" off
         if (_active) CheckDisk();
         RaiseSuggestion();
     });

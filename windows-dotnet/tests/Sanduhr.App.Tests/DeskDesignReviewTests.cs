@@ -393,6 +393,23 @@ public sealed class DeskDesignReviewTests : IDisposable
     }
 
     [Fact]
+    public void ADesignWithColoredLinesTurnsTheThemesColorsOffSoTheyShowAndPlainLinesLeaveItOn()
+    {
+        _store.SaveDeskDirect(true);
+        Assert.True(_store.LoadDeskMessage().ThemeColors);   // a new install
+        WithService((s, _) =>
+        {
+            Send(s, "p1", """{"name":"Plain","messages":{"lines":["Ship it today","{glow}{size:1.2}Bigger"],"mode":"add"}}""");
+            Assert.Equal("applied", ResultStatus);
+            Assert.True(_store.LoadDeskMessage().ThemeColors);
+            _now = _now.AddMinutes(5);
+            Send(s, "p2", """{"name":"Colored","messages":{"lines":["{ink:#ff2a6d,#05d9e8}Ship it tonight"],"mode":"add"}}""");
+            Assert.Equal("applied", ResultStatus);
+            Assert.False(_store.LoadDeskMessage().ThemeColors);
+        }, host: false);
+    }
+
+    [Fact]
     public void ALauncherImageThatIsNotOnThisPcIsRefusedBeforeAnyPreview()
     {
         string image = new string('a', 64) + ".png";

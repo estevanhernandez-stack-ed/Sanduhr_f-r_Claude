@@ -30,7 +30,7 @@ internal sealed class WallpaperPreviewFile
 
             var png = Render(source);
             if (png is null) return null;
-            string? dir = Path.GetDirectoryName(destination);
+            string? dir = Path.GetDirectoryName(destination);   // streamer: notname - a file location used for IO, never drawn
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
             string temp = destination + "." + Guid.NewGuid().ToString("N")[..8] + ".tmp";
             try

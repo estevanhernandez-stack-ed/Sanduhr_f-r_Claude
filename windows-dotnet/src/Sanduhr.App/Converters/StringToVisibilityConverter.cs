@@ -10,8 +10,14 @@ namespace Sanduhr.App.Converters;
 /// the Python build hid these labels the same way.</summary>
 public sealed class StringToVisibilityConverter : IValueConverter
 {
+    /// <remarks><c>ConverterParameter=empty</c> turns it around: visible only while the string is empty (theme match's greyed
+    /// defaults show under an empty row).</remarks>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => string.IsNullOrWhiteSpace(value as string) ? Visibility.Collapsed : Visibility.Visible;
+    {
+        bool empty = string.IsNullOrWhiteSpace(value as string);
+        bool whenEmpty = string.Equals(parameter as string, "empty", StringComparison.Ordinal);
+        return empty == whenEmpty ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
