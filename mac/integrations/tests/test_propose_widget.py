@@ -255,6 +255,48 @@ class ProposeWidget(Base):
         self.assertEqual(mcp.WIDGET_GUIDE, windows)
 
 
+class ValidatorLayout(Base):
+    """propose_widget finds widgets/validate.py beside the script's real path, in every layout the app
+    and install.sh make: the folder itself, and a link to it (the flat copy and `current`)."""
+
+    def test_the_validator_is_found_beside_the_script_and_through_a_link(self):
+        src = os.path.dirname(SERVER)
+        for layout in ("copy", "link"):
+            with self.subTest(layout=layout):
+                dest = os.path.join(self.tmp, layout)
+                os.makedirs(os.path.join(dest, "widgets"))
+                shutil.copy(SERVER, os.path.join(dest, "stamp_mcp.py"))
+                shutil.copy(os.path.join(src, "widgets", "validate.py"), os.path.join(dest, "widgets", "validate.py"))
+                script = os.path.join(dest, "stamp_mcp.py")
+                if layout == "link":
+                    flat = os.path.join(self.tmp, "flat")
+                    os.makedirs(flat)
+                    os.symlink(script, os.path.join(flat, "sanduhr_mcp.py"))
+                    script = os.path.join(flat, "sanduhr_mcp.py")
+                spec2 = importlib.util.spec_from_file_location("sanduhr_mcp_layout_" + layout, script)
+                module = importlib.util.module_from_spec(spec2)
+                spec2.loader.exec_module(module)
+                self.assertTrue(hasattr(module.widget_validator(), "validate_pack"))
+
+    def test_a_copy_without_widgets_answers_validator_missing(self):
+        dest = os.path.join(self.tmp, "bare")
+        os.makedirs(dest)
+        shutil.copy(SERVER, os.path.join(dest, "sanduhr_mcp.py"))
+        spec2 = importlib.util.spec_from_file_location("sanduhr_mcp_bare", os.path.join(dest, "sanduhr_mcp.py"))
+        module = importlib.util.module_from_spec(spec2)
+        spec2.loader.exec_module(module)
+        r = module.build_propose_widget(sprite_args(), now=NOW, paths=module.Paths(support_dir=self.support))
+        self.assertEqual((r["status"], r["reason"]), ("error", "validator_missing"))
+        self.assertFalse(os.path.exists(self.support))
+
+    def test_install_sh_and_build_sh_ship_it(self):
+        root = os.path.dirname(os.path.dirname(HERE))
+        with open(os.path.join(root, "integrations", "install.sh"), encoding="utf-8") as f:
+            self.assertIn('"$DEST/widgets/validate.py"', f.read())
+        with open(os.path.join(root, "build.sh"), encoding="utf-8") as f:
+            self.assertIn("integrations/widgets/validate.py", f.read())
+
+
 class BuildRules(Base):
     """WidgetProposal.Build, rule for rule (the Swift WidgetProposalTests are the other half)."""
 
