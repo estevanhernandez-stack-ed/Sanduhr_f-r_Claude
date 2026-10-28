@@ -17,7 +17,9 @@ public static class DeskState
     /// <summary>The Desk's current look as a full design, built from the settings and the active widget theme.</summary>
     /// <param name="theme">The active theme as its JSON document (<see cref="ThemeDraft.ToJson"/>); null leaves it out.</param>
     /// <param name="weatherNickname">The weather piece's nickname (#315), "" or null for none; reported as <c>weather.nickname</c>.</param>
-    public static DeskDesign Current(DeskSettings desk, DeskInkSettings ink, LauncherModel launcher, JsonObject? theme, string? weatherNickname = null)
+    /// <param name="followsTheme">"Follow the widget theme" (theme match), reported as <c>follows_theme</c>.</param>
+    public static DeskDesign Current(DeskSettings desk, DeskInkSettings ink, LauncherModel launcher, JsonObject? theme, string? weatherNickname = null,
+        bool followsTheme = false)
     {
         var arrangement = new DeskArrangement(desk.Layout);
         return new DeskDesign
@@ -31,6 +33,7 @@ public static class DeskState
             Launcher = launcher,
             Theme = theme,
             Weather = new DeskWeatherChange(weatherNickname ?? ""),
+            FollowsTheme = followsTheme,
         };
     }
 

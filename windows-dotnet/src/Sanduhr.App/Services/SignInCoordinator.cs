@@ -22,8 +22,8 @@ public readonly record struct SignInOutcome(bool Added, string? Label)
 /// App-side counterpart to ROROROblox's <c>CookieCapture</c>. Owns the WebView2
 /// runtime pre-check, the per-capture user-data folder lifecycle
 /// (<see cref="WebView2UserDataDirectory"/> rooted at <c>%APPDATA%\Sanduhr\webview2\</c>),
-/// the account-persistence semantics (first-run → "Personal"; subsequent →
-/// named slot + make active), and the graceful WebView2-missing → manual-paste
+/// the account-persistence semantics (every new account is named through the
+/// Label prompt, "Personal" offered first; it becomes active), and the graceful WebView2-missing → manual-paste
 /// degradation.
 ///
 /// Stateless over the OS credential store: it constructs its own
@@ -36,13 +36,21 @@ public sealed class SignInCoordinator
     private readonly AccountStore _accounts;
     private readonly CredentialStore _credentials;
     private readonly WebView2UserDataDirectory _userData;
+    private readonly Func<string, string?> _askLabel;
 
     public SignInCoordinator()
+        : this(new AccountStore(new WindowsCredentialManager(AccountStore.Service)), new Paths(), AskLabel)
     {
-        var paths = new Paths();
-        _accounts = new AccountStore(new WindowsCredentialManager(AccountStore.Service));
+    }
+
+    /// <summary>Tests: an in-memory registry, scratch folders, and the answer to the label prompt (the typed text, or null when
+    /// cancelled). The prompt is given the label it offers.</summary>
+    internal SignInCoordinator(AccountStore accounts, Paths paths, Func<string, string?> askLabel)
+    {
+        _accounts = accounts;
         _credentials = new CredentialStore(_accounts, paths);
         _userData = new WebView2UserDataDirectory(Path.Combine(paths.AppDataDir, "webview2"));
+        _askLabel = askLabel;
     }
 
     /// <summary>
@@ -60,7 +68,7 @@ public sealed class SignInCoordinator
     /// </summary>
     public Task<SignInOutcome> ReauthenticateActiveAsync(Window? owner)
     {
-        var active = _accounts.GetActive();
+        var active = _accounts.GetActive();   // streamer: key - active label handed to a re-sign-in; the window draws its codename
         // No active account (theoretical): keep the historic create-"Personal" fallback.
         return active is null
             ? RunEmbeddedAsync(owner, PersistReauth)
@@ -80,7 +88,7 @@ public sealed class SignInCoordinator
     /// recovery). Falls back to add semantics only when no account exists.</summary>
     public Task<SignInOutcome> ReauthenticateManualActiveAsync(Window? owner)
     {
-        var active = _accounts.GetActive();
+        var active = _accounts.GetActive();   // streamer: key - active label handed to a re-sign-in; the window draws its codename
         return active is null ? SignInManual(owner) : ReauthenticateManualAsync(owner, active);
     }
 
@@ -151,9 +159,7 @@ public sealed class SignInCoordinator
         }
         catch (Exception ex)
         {
-            ShowMessage(owner,
-                $"Couldn't prepare the sign-in browser profile: {ex.Message}",
-                MessageBoxButton.OK);
+            ShowMessage(owner, ProfileFailureText(ex), MessageBoxButton.OK);
             return await manual(owner);
         }
 
@@ -171,9 +177,7 @@ public sealed class SignInCoordinator
                 return await ShowRuntimeMissingThenMaybeManual(owner, o => RunEmbeddedAsync(o, persist, manualFallback), manual);
 
             case SignInResult.Failed f:
-                var retry = ShowMessage(owner,
-                    $"{f.Message}\n\nPaste a sessionKey by hand instead?",
-                    MessageBoxButton.YesNo);
+                var retry = ShowMessage(owner, FailedText(f.Message), MessageBoxButton.YesNo);   // streamer: masked - via FailedText: the message passes Mask.Paths (CP 18)
                 return retry == MessageBoxResult.Yes
                     ? await manual(owner)
                     : SignInOutcome.NotAdded;
@@ -191,11 +195,11 @@ public sealed class SignInCoordinator
     /// no active account exists, fall back to first-run create-"Personal" semantics.</summary>
     private string PersistReauth(CapturedCookies cookies)
     {
-        var active = _accounts.GetActive();
+        var active = _accounts.GetActive();   // streamer: key - active label looked up to overwrite its slots
         if (active is null)
         {
             _credentials.Save(cookies.SessionKey, cookies.CfClearance);
-            var label = _accounts.GetActive() ?? "Personal";
+            var label = _accounts.GetActive() ?? AccountLabels.First;   // streamer: key - label returned to the caller, never drawn
             SetOriginSafe(label, AccountOrigin.Embedded);
             return label;
         }
@@ -211,7 +215,7 @@ public sealed class SignInCoordinator
     /// re-auth.</summary>
     public async Task<SignInOutcome> SignInManual(Window? owner, Func<Window?, Task<SignInOutcome>>? bounceTo = null)
     {
-        var suggested = _accounts.GetActive() is null ? "Personal" : NextFreeLabel();
+        var suggested = AccountLabels.Suggested(_accounts.ListAccounts());   // streamer: key - existing labels used to suggest the next free default
         var window = new ManualKeyWindow(suggested, PersistManual, IsRuntimeAvailable());
         SetOwner(window, owner);
         window.ShowDialog();
@@ -226,46 +230,27 @@ public sealed class SignInCoordinator
 
     // -- persistence semantics ------------------------------------------------
 
-    /// <summary>Embedded-flow save: the first account auto-creates "Personal";
-    /// subsequent ones prompt for a name (defaulting to the next free slot) and
-    /// become active.</summary>
-    private string PersistEmbedded(CapturedCookies cookies)
+    /// <summary>Embedded-flow save (Settings v2, WF30): every new account, the first included, is named through the label prompt,
+    /// "Personal" offered first and "Account N" after; it becomes active. A cancelled, invalid or taken label keeps the offer, so a
+    /// captured sign-in is never thrown away.</summary>
+    internal string PersistEmbedded(CapturedCookies cookies)
     {
-        if (_accounts.GetActive() is null)
-        {
-            _credentials.Save(cookies.SessionKey, cookies.CfClearance);
-            var label = _accounts.GetActive() ?? "Personal";
-            SetOriginSafe(label, AccountOrigin.Embedded);
-            return label;
-        }
-        var name = PromptForAccountName(NextFreeLabel());
+        var existing = _accounts.ListAccounts();   // streamer: key - existing labels used to accept or refuse a name
+        var suggested = AccountLabels.Suggested(existing);
+        var name = AccountLabels.Accept(_askLabel(suggested), suggested, existing);
         _accounts.AddAccount(name, cookies.SessionKey!, cookies.CfClearance);
         _accounts.SetActive(name);
         SetOriginSafe(name, AccountOrigin.Embedded);
         return name;
     }
 
-    /// <summary>Ask the user to name a newly-added account during embedded sign-in,
-    /// defaulting to (and falling back to) <paramref name="suggested"/> — the next free
-    /// "Account N" slot. Validated like <c>ManualKeyWindow</c> (1-32 of [A-Za-z0-9 _-],
-    /// unique); an empty, invalid, or cancelled entry keeps the suggested label.</summary>
-    private string PromptForAccountName(string suggested)
+    /// <summary>The label prompt: "Name this account", field "Label", with <paramref name="suggested"/> filled in. Null when cancelled.</summary>
+    private static string? AskLabel(string suggested)
     {
-        var prompt = new TextPromptWindow("Name this account", "Account name", suggested);
+        var prompt = new TextPromptWindow(SettingsNames.NameThisAccount, SettingsNames.AccountLabelField, suggested);
         if (Application.Current?.MainWindow is { IsLoaded: true } main)
             prompt.Owner = main;
-        if (prompt.ShowDialog() != true)
-            return suggested;
-
-        var name = prompt.Value.Trim();
-        var existing = new HashSet<string>(_accounts.ListAccounts(), StringComparer.OrdinalIgnoreCase);
-        if (name.Length == 0
-            || !System.Text.RegularExpressions.Regex.IsMatch(name, "^[A-Za-z0-9 _-]{1,32}$")
-            || existing.Contains(name))
-        {
-            return suggested;
-        }
-        return name;
+        return prompt.ShowDialog() == true ? prompt.Value : null;
     }
 
     /// <summary>Manual-flow save: explicit user-named slot, then make it active.</summary>
@@ -277,23 +262,12 @@ public sealed class SignInCoordinator
         return label;
     }
 
-    private string NextFreeLabel()
-    {
-        var existing = new HashSet<string>(_accounts.ListAccounts(), StringComparer.OrdinalIgnoreCase);
-        for (int n = 2; ; n++)
-        {
-            var candidate = string.Format(CultureInfo.InvariantCulture, "Account {0}", n);
-            if (!existing.Contains(candidate))
-                return candidate;
-        }
-    }
-
     /// <summary>Best-effort origin stamp — the label is absent from the registry
     /// only in the theoretical first-run PersistReauth fallback, where Embedded
     /// is the default reading anyway.</summary>
     private void SetOriginSafe(string label, AccountOrigin origin)
     {
-        if (_accounts.ListAccounts().Contains(label))
+        if (_accounts.ListAccounts().Contains(label))   // streamer: key - membership test, never drawn
             _accounts.SetOrigin(label, origin);
     }
 
@@ -336,6 +310,12 @@ public sealed class SignInCoordinator
         if (owner is not null && owner.IsLoaded)
             window.Owner = owner;
     }
+
+    // P1 (slice 7): an exception's message can carry a full path under the Windows user folder; both dialogs read their text here.
+    internal static string ProfileFailureText(Exception ex) =>
+        StreamerMode.Mask.Paths($"Couldn't prepare the sign-in browser profile: {ex.Message}");   // streamer: masked - CP 18: the dialog text passes Mask.Paths on this line
+
+    internal static string FailedText(string message) => $"{StreamerMode.Mask.Paths(message)}\n\nPaste a sessionKey by hand instead?";
 
     private static MessageBoxResult ShowMessage(Window? owner, string text, MessageBoxButton buttons)
         => ThemedDialog.Show(owner, "Sign in to Claude", text, buttons, ThemedDialogKind.Warning);

@@ -100,7 +100,7 @@ internal sealed class RunnerWatchService(IDockerApi docker, Func<bool> enabled, 
         IReadOnlyList<DockerContainer> runners;
         try
         {
-            runners = DockerContainers.Runners(DockerContainers.Parse(await docker.ListContainersAsync(ct).ConfigureAwait(false)));
+            runners = DockerContainers.Runners(DockerContainers.Parse(await docker.ListContainersAsync(ct).ConfigureAwait(false)));   // streamer: key - container list parsed into runner names; the Watchers page and Desk draw them through Mask.Name (CP 19)
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

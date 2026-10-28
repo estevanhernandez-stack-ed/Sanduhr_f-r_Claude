@@ -13,23 +13,22 @@ public class LauncherSettingsTests
     [InlineData("app")]
     [InlineData("Add app")]
     [InlineData("Add link")]
-    public void SearchFindsTheLauncherSection(string query) =>
+    public void SearchFindsTheLauncherButtons(string query) =>
         Assert.Contains(SettingsIndex.Search(query),
-            h => h.Entry.Page == SettingsPage.Desk && h.Entry.Anchor == SettingsIndex.DeskLauncher);
+            h => h.Entry.Page == SettingsPage.Launcher && h.Entry.Anchor == SettingsIndex.LauncherButtons);
 
     [Fact]
     public void LauncherIsTheTopHitForItsOwnName()
     {
         var top = SettingsIndex.Search("launcher")[0];
-        Assert.Equal(SettingsPage.Desk, top.Entry.Page);
-        Assert.Equal(SettingsIndex.DeskLauncher, top.Entry.Anchor);
+        Assert.Equal((SettingsPage.Launcher, (string?)null), (top.Entry.Page, top.Entry.Anchor));   // the page itself
     }
 
     [Fact]
-    public void TheAddButtonsAreInTheNamesTableOnTheDeskPage()
+    public void TheAddButtonsAreInTheNamesTableOnTheLauncherPage()
     {
-        Assert.Contains((SettingsNames.LauncherAddApp, SettingsPage.Desk), SettingsNames.Table);
-        Assert.Contains((SettingsNames.LauncherAddLink, SettingsPage.Desk), SettingsNames.Table);
+        Assert.Contains((SettingsNames.LauncherAddApp, SettingsPage.Launcher), SettingsNames.Table);
+        Assert.Contains((SettingsNames.LauncherAddLink, SettingsPage.Launcher), SettingsNames.Table);
         Assert.Equal("Add app…", SettingsNames.LauncherAddApp);
         Assert.Equal("Add link…", SettingsNames.LauncherAddLink);
     }

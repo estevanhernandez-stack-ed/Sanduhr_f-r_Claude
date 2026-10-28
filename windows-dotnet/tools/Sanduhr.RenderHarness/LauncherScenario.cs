@@ -155,7 +155,7 @@ public static partial class Program
         sw.Height = 1900;
         await Settle();
         var select = swType.GetMethod("SelectPage")!;
-        select.Invoke(sw, [SettingsPage.Desk, SettingsIndex.DeskLauncher]);
+        select.Invoke(sw, [SettingsPage.Launcher, SettingsIndex.LauncherButtons]);
         svm.Desk.Launcher.Select(4);
         await Settle();
         Save((FrameworkElement)sw.Content, "launcher-settings-hidden");

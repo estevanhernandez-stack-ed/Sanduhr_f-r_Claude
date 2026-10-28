@@ -53,7 +53,7 @@ internal sealed class NowPlayingService : IDisposable
     public NowPlayingInfo Current => _tracker.Latest;
 
     /// <summary>Apps seen playing this session, first seen first (Settings' app list). Memory only.</summary>
-    public IReadOnlyList<string> SeenApps { get; private set; } = [];
+    public IReadOnlyList<string> SeenApps { get; internal set; } = [];
 
     /// <summary>The shown track changed (title, state or position anchor).</summary>
     public event Action? Changed;

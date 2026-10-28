@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
+using Sanduhr.App.Services;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.Desk;
@@ -81,7 +82,7 @@ internal sealed class LauncherButtonVisual : Border
         Cursor = System.Windows.Input.Cursors.Hand;
         Focusable = false;
 
-        AutomationProperties.SetName(this, missing ? $"{name}, not installed" : name);
+        AutomationProperties.SetName(this, missing ? $"{name}, not installed" : name);   // streamer: notname - already the shown name: Build gets it from StreamerMode.LauncherName (below) before this constructor draws it
         AutomationProperties.SetHelpText(this, missing
             ? "This app is no longer installed. Choose it to open Launcher settings."
             : button.Kind == LauncherKind.Link ? "Opens a link in your browser." : "Opens this app.");
@@ -223,7 +224,7 @@ internal static class DeskLauncherPiece
             var b = model.Buttons[i];
             var slot = geometry.Slots[i];
             frame.AppNames.TryGetValue(b.Target, out var appName);
-            string name = b.DisplayName(b.Kind == LauncherKind.App ? appName : null);
+            string name = StreamerMode.LauncherName(b, b.Kind == LauncherKind.App ? appName : null);
             bool missing = b.Kind == LauncherKind.App && frame.Missing.Contains(b.Target);
             var image = Picture(frame, b, slot.Image.Width, name, family, ink, textOpacity);
             UIElement? label = null;

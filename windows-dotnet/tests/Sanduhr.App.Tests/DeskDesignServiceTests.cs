@@ -281,4 +281,62 @@ public sealed class DeskDesignServiceTests : IDisposable
         });
         Assert.Equal("s1", (string?)ReadResult()["id"]);
     }
+
+    // ---- theme match: undo ----
+
+    [Fact]
+    public void The_current_design_says_whether_the_desk_follows()
+    {
+        _store.SaveDeskFollowsTheme(true);
+        WithService(s => Assert.True(s.CurrentDesign().FollowsTheme));
+    }
+
+    [Fact]
+    public void Put_my_Desk_back_after_Follow_returns_the_desk_and_the_widget_theme_together()
+    {
+        _store.SaveTheme("obsidian");
+        WithService(s =>
+        {
+            Assert.True(s.SaveBeforeChange("Obsidian + Desk"));
+            Assert.True(s.CanPutBack);
+            // What Follow does next: a new user theme, made active, and the switch on.
+            var obsidian = ThemeCatalog.BuiltIns["obsidian"];
+            Directory.CreateDirectory(_paths.ThemesDir);
+            File.WriteAllText(Path.Combine(_paths.ThemesDir, "obsidian-desk.json"),
+                ThemeMatch.WithDesk(obsidian, ThemeMatch.SpelledOut(obsidian), "Obsidian + Desk").ToJsonString());
+            _store.SaveTheme("obsidian-desk");
+            _store.SaveDeskFollowsTheme(true);
+
+            Assert.True(s.PutBack().Ok);
+            Assert.Equal("obsidian", _store.LoadTheme());
+            Assert.False(_store.LoadDeskFollowsTheme());
+        });
+    }
+
+    [Fact]
+    public void Saving_before_a_change_twice_keeps_one_design()
+    {
+        WithService(s =>
+        {
+            Assert.True(s.SaveBeforeChange("matching Obsidian"));
+            Assert.True(s.SaveBeforeChange("matching Obsidian"));   // the same look: not saved twice
+            Assert.Single(s.Designs());
+            Assert.Equal("Before matching Obsidian", s.Designs()[0].Name);
+        });
+    }
+
+    [Fact]
+    public void Put_my_Desk_back_to_a_design_saved_before_theme_match_turns_following_off()
+    {
+        WithService(s =>
+        {
+            // A saved design of the current look with no follows_theme: one from before this feature.
+            var old = new SavedDesign(SavedDesign.NewId(), "Old look", false, DateTimeOffset.UtcNow.AddDays(-3), s.CurrentDesign() with { FollowsTheme = null, Name = "Old look" });
+            new DesignStore(_paths).Add(old, _store.LoadLauncher());
+            Assert.True(s.SaveBeforeChange("x"));
+            _store.SaveDeskFollowsTheme(true);
+            Assert.True(s.PutBack().Ok);
+            Assert.False(_store.LoadDeskFollowsTheme());
+        });
+    }
 }

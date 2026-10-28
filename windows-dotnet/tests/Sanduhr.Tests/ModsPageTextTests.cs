@@ -16,7 +16,6 @@ public class ModsPageTextTests
         var t = ModsPageText.Tally(items, Switches(("a@market", true), ("b@market", false), ("c@market", true)));
         Assert.Equal(new PluginTally(3, 3, 2, 0, 0), t);
         Assert.Equal("Plugins (3 installed, 2 on)", ModsPageText.ListTitle(t));
-        Assert.Equal("", ModsPageText.Reconcile(t, 2, 1));
     }
 
     [Fact]
@@ -35,8 +34,6 @@ public class ModsPageTextTests
         Assert.Equal(43, t.On);
         Assert.Equal(3, t.NoSwitch);
         Assert.Equal("Plugins (46 installed, 43 on)", ModsPageText.ListTitle(t));
-        var why = ModsPageText.Reconcile(t, 41, 2);
-        Assert.StartsWith("settings.json has 43 plugin switches (41 on, 2 off). The list differs because 3 have no switch in settings.json", why);
     }
 
     [Fact]
@@ -46,7 +43,67 @@ public class ModsPageTextTests
         var t = ModsPageText.Tally(items, Switches(("a@market", true), ("ghost@market", true), ("gone@market", true)));
         Assert.Equal(new PluginTally(3, 1, 1, 2, 0), t);
         Assert.Equal("Plugins (1 installed, 1 on)", ModsPageText.ListTitle(t));
-        Assert.Contains("2 are switched in settings.json or listed as installed, but the files are not in this folder", ModsPageText.Reconcile(t, 3, 0));
+    }
+
+    private static ModItem NoteItem(string name, ModState state, string? path, string? key) =>
+        new(name, null, "", path, ModOriginKind.Installed, "m", key, false, state, ModTouches.None, false);
+
+    private static FolderMods NoteFolder(string name, IReadOnlyDictionary<string, bool> switches, params ModItem[] mods) =>
+        new(name, name, new FolderReport(name, true, SettingsState.Readable, null, [], switches, mods,
+            new McpSummary([], 0), new ClaudeMdInfo(false, 0, 0), new RetentionInfo(30, false, null)), null, IntegrationStatus.NotInstalled);
+
+    [Fact]
+    public void The_note_counts_plugins_without_a_switch_and_without_files_over_every_folder_in_plain_words()
+    {
+        var a = NoteFolder("a", new Dictionary<string, bool> { ["x@m"] = true, ["ghost@m"] = true },
+            NoteItem("x", ModState.On, @"C:\x", "x@m"), NoteItem("inline", ModState.On, @"C:\i", null), NoteItem("ghost", ModState.On, null, "ghost@m"));
+        var b = NoteFolder("b", new Dictionary<string, bool>(), NoteItem("skills", ModState.On, @"C:\s", "skills@skills-dir"));
+
+        Assert.Equal(SettingsNames.NoSwitchNote(2) + " " + SettingsNames.NoFilesNote(1), ModsPageText.PlainNote([a, b]));
+        Assert.Equal("", ModsPageText.PlainNote([NoteFolder("c", new Dictionary<string, bool> { ["x@m"] = true }, NoteItem("x", ModState.On, @"C:\x", "x@m"))]));
+    }
+
+    [Fact]
+    public void A_plugin_in_two_folders_counts_once_in_the_note()
+    {
+        var noSwitch = new Dictionary<string, bool>();
+        var ghostOn = new Dictionary<string, bool> { ["ghost@m"] = true };
+        var one = NoteFolder("a", ghostOn, NoteItem("alpha", ModState.On, @"C:\a", "alpha@skills-dir"), NoteItem("ghost", ModState.On, null, "ghost@m"));
+        var two = NoteFolder("b", ghostOn, NoteItem("alpha", ModState.On, @"C:\a", "alpha@skills-dir"), NoteItem("ghost", ModState.On, null, "ghost@m"));
+        var three = NoteFolder("c", noSwitch, NoteItem("alpha", ModState.On, @"C:\a", "alpha@skills-dir"));
+
+        Assert.Equal(SettingsNames.NoSwitchNote(1) + " " + SettingsNames.NoFilesNote(1), ModsPageText.PlainNote([one, two, three]));
+    }
+
+    [Fact]
+    public void An_unreadable_folder_adds_nothing_to_the_no_switch_note()
+    {
+        var f = NoteFolder("a", new Dictionary<string, bool>(), NoteItem("x", ModState.On, @"C:\x", "x@m"));
+        f = f with { Report = f.Report with { Settings = new SettingsState(SettingsKind.Unreadable, 3, 7, "bad") } };
+        Assert.Equal("", ModsPageText.PlainNote([f]));
+    }
+
+    [Fact]
+    public void A_plugin_counts_in_one_sentence_only_and_no_files_wins()
+    {
+        // Slice 4 row 20 (owner taste 4): files and no entry in folder A, switched on with no files in folder B.
+        var a = NoteFolder("a", new Dictionary<string, bool>(), NoteItem("x", ModState.On, @"C:\x", "x@m"));
+        var b = NoteFolder("b", new Dictionary<string, bool> { ["x@m"] = true }, NoteItem("x", ModState.On, null, "x@m"));
+        var note = ModsPageText.PlainNote([a, b]);
+        Assert.Contains(SettingsNames.NoFilesNote(1), note);
+        Assert.DoesNotContain(SettingsNames.NoSwitchNote(1), note);
+    }
+
+    [Fact]
+    public void The_files_missing_count_is_of_plugins_switched_on_not_off_or_only_listed()
+    {
+        // "switched on in settings.json, but its files aren't there" must be true of every plugin it counts.
+        var f = NoteFolder("a", new Dictionary<string, bool> { ["off@m"] = false, ["on@m"] = true },
+            NoteItem("off", ModState.Off, null, "off@m"), NoteItem("listed", ModState.On, null, "listed@m"), NoteItem("on", ModState.On, null, "on@m"));
+
+        Assert.Equal(SettingsNames.NoFilesNote(1), ModsPageText.PlainNote([f]));
+        var onlyOff = NoteFolder("b", new Dictionary<string, bool> { ["off@m"] = false }, NoteItem("off", ModState.Off, null, "off@m"));
+        Assert.Equal("", ModsPageText.PlainNote([onlyOff]));
     }
 
     [Fact]

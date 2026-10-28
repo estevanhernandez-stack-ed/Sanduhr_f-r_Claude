@@ -10,8 +10,9 @@ namespace Sanduhr.App.Tests;
 /// <summary>
 /// A fact that is skipped, with a message, on GitHub's hosted runner. There the items of a list get no automation
 /// names at all, though every one is named on a desktop session; until that is understood these run locally only.
+/// Skippable too: a focus test that meets an outside app taking the foreground ends as a skip (see <see cref="AppHost.Run"/>).
 /// </summary>
-public sealed class DesktopFactAttribute : FactAttribute
+public sealed class DesktopFactAttribute : SkippableFactAttribute
 {
     public DesktopFactAttribute()
     {
@@ -30,7 +31,27 @@ public abstract class AppWindowFixture : IDisposable
     protected readonly string Root = Path.Combine(Path.GetTempPath(), "sanduhr-names-" + Guid.NewGuid().ToString("N")[..10]);
     private readonly string? _oldDev = Environment.GetEnvironmentVariable("SANDUHR_DEV_PROFILE");
 
+    private readonly Sanduhr.App.Desk.NowPlayingHub? _oldHub = Sanduhr.App.Desk.NowPlayingHub.Current;
+    private readonly Sanduhr.App.Desk.NowPlayingLookService? _oldLooks = Sanduhr.App.Desk.NowPlayingLookService.Current;
+
+    /// <summary>Settings reads the app's one Now playing hub and look service, which follow the PC's live media session.
+    /// A test never has them: this clears both, so a hub left by another test (or a player on the PC) cannot reach a window.</summary>
+    protected static void NoLiveMedia()
+    {
+        Sanduhr.App.Desk.NowPlayingHub.Current = null;
+        Sanduhr.App.Desk.NowPlayingLookService.Current = null;
+    }
+
     protected string Profile => Path.Combine(Root, "profile");
+
+    /// <summary>A Claude Code home (it has a projects folder) under the scratch profile, with the given settings.json text.</summary>
+    protected string Home(string name, string settings = "{}")
+    {
+        var dir = Path.Combine(Profile, name);
+        Directory.CreateDirectory(Path.Combine(dir, "projects"));
+        File.WriteAllText(Path.Combine(dir, "settings.json"), settings);
+        return dir;
+    }
 
     protected AppWindowFixture()
     {
@@ -39,9 +60,11 @@ public abstract class AppWindowFixture : IDisposable
         ClaudeCodeProfile.ProfileOverride = Profile;
         ClaudeCodeProfile.ConfigDirOverride = "";
         ClaudeCodeViewModel.ForgetSessionChoice();
-        ModsConfigViewModel.ForgetSessionChoice();
-        // Settings ▸ Widgets fetches the catalog when it opens: never the real network from a test.
+        // Mods & Widgets fetches the catalog when it opens: never the real network from a test.
         WidgetCatalogService.HandlerOverride = () => new OfflineHandler();
+        NoLiveMedia();
+        // Streamer mode is process-wide (slice 7): every test starts with it off, whatever the last one left.
+        StreamerMode.Reset();
     }
 
     /// <summary>A network that is never there: every request fails as if the PC were offline.</summary>
@@ -57,17 +80,47 @@ public abstract class AppWindowFixture : IDisposable
         ClaudeCodeProfile.ProfileOverride = null;
         ClaudeCodeProfile.ConfigDirOverride = null;
         WidgetCatalogService.HandlerOverride = null;
+        Sanduhr.App.Desk.NowPlayingHub.Current = _oldHub;
+        Sanduhr.App.Desk.NowPlayingLookService.Current = _oldLooks;
         ClaudeCodeViewModel.ForgetSessionChoice();
-        ModsConfigViewModel.ForgetSessionChoice();
+        StreamerMode.Reset();
         try { Directory.Delete(Root, true); } catch (IOException) { }
     }
 
     /// <summary>A widget in demo mode: sample accounts and sample meters.</summary>
     protected static WidgetViewModel DemoWidget()
     {
+        NoLiveMedia();
         var widget = new WidgetViewModel();
         widget.StartDemo();
         return widget;
+    }
+
+    /// <summary>An account registry in memory: nothing reaches Credential Manager.</summary>
+    internal sealed class MemoryCredentials : Sanduhr.Core.ICredentialManager
+    {
+        private readonly Dictionary<string, string> _store = new();
+        public string Service => Sanduhr.Core.AccountStore.Service;
+        public string? GetPassword(string slot) => _store.GetValueOrDefault(slot);
+        public void SetPassword(string slot, string value) => _store[slot] = value;
+        public bool DeletePassword(string slot) => _store.Remove(slot);
+    }
+
+    /// <summary>Folders under this test's scratch root, so no test reaches the real AppData.</summary>
+    protected Sanduhr.Core.Paths ScratchPaths() =>
+        new(Path.Combine(Root, "appdata"), Path.Combine(Root, "home"), Path.Combine(Root, "local"));
+
+    /// <summary>A real (not demo) widget over scratch folders and an in-memory registry holding
+    /// <paramref name="labels"/>, the first of them active.</summary>
+    protected (WidgetViewModel Widget, Sanduhr.Core.AccountStore Accounts) ScratchWidget(params string[] labels)
+    {
+        NoLiveMedia();
+        var accounts = new Sanduhr.Core.AccountStore(new MemoryCredentials());
+        foreach (var label in labels)
+            accounts.AddAccount(label, "placeholder-" + label);
+        if (labels.Length > 0)
+            accounts.SetActive(labels[0]);
+        return (new WidgetViewModel(ScratchPaths(), accounts), accounts);
     }
 
     /// <summary>A name that is a type or a record's text rather than words for a person.</summary>
@@ -84,6 +137,9 @@ public abstract class AppWindowFixture : IDisposable
     {
         yield return peer;
         IList<AutomationPeer>? children = null;
+        // A peer keeps the children it first listed, and a page selected since then is not among them unless a UI
+        // Automation client is listening. Drop the cache so each walk reads the tree as it is now.
+        try { peer.ResetChildrenCache(); } catch (NullReferenceException) { /* a stale item peer */ }
         try { children = peer.GetChildren(); }
         catch (NullReferenceException) { /* a stale item peer */ }
         foreach (var child in children ?? [])
@@ -99,6 +155,13 @@ public abstract class AppWindowFixture : IDisposable
             RealizeEveryItem(System.Windows.Media.VisualTreeHelper.GetChild(root, i));
     }
 
+    /// <summary>
+    /// Isolation hazard: <c>Invoke(..., ApplicationIdle)</c> pushes a nested dispatcher frame on the one app thread. Any work another test
+    /// collection has queued for <c>AppHost.Run</c> (Send priority) can run inside that frame, in the middle of this test, with this test's
+    /// process-wide state live (<c>StreamerMode</c>, <c>ClaudeCodeProfile</c> overrides, open windows). Collections stay apart by inventory
+    /// (a class that touches a process-wide static joins the SettingsWindow collection), not by a mechanism, so a new class that reaches
+    /// one without joining it can surface here as a flake in somebody else's test (final review M5).
+    /// </summary>
     protected static void Pump() =>
         System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
 

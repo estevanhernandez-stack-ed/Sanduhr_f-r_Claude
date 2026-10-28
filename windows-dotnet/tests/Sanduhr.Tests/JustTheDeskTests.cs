@@ -135,4 +135,38 @@ public class JustTheDeskTests
         Assert.Contains("“sign in to Sanduhr”", SignInReminder.Caption);
         Assert.EndsWith("The widget always says when you're not signed in.", SignInReminder.Caption);
     }
+
+    // ---- Settings v2, slice 5: Settings, Widget's "Show the widget" (WF32) ----
+
+    [Fact]
+    public void ShowingTheWidgetEndsItTheWaySigningInDoes()
+    {
+        foreach (bool reminderWasOn in new[] { true, false })
+        {
+            var chosen = JustTheDesk.Choose(JustTheDeskState.Off, reminderWasOn);
+            var shown = JustTheDesk.EndByShowWidget(chosen.State, chosen.ReminderOn);
+            Assert.Equal(JustTheDesk.EndBySignIn(chosen.State, chosen.ReminderOn), shown);
+            Assert.True(shown.Ended);
+            Assert.Equal(JustTheDeskState.Off, shown.State);
+            Assert.Equal(reminderWasOn, shown.ReminderOn);
+        }
+    }
+
+    [Fact]
+    public void ShowingTheWidgetWhenItIsNotOnChangesNothing()
+    {
+        var r = JustTheDesk.EndByShowWidget(JustTheDeskState.Off, reminderOn: false);
+        Assert.False(r.Ended);
+        Assert.Equal(JustTheDeskState.Off, r.State);
+        Assert.False(r.ReminderOn);
+    }
+
+    [Fact]
+    public void AfterShowingTheWidgetTheNextLaunchShowsIt()
+    {
+        var chosen = JustTheDesk.Choose(JustTheDeskState.Off, reminderOn: true);
+        var shown = JustTheDesk.EndByShowWidget(chosen.State, chosen.ReminderOn);
+        Assert.False(JustTheDesk.WidgetStartsHidden(shown.State.On, hasAccount: false, deskOn: true));
+        Assert.True(JustTheDesk.ShowsFirstRunCard(hasAccount: false, shown.State.On));
+    }
 }

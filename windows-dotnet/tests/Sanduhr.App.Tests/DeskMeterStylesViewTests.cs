@@ -81,9 +81,9 @@ public sealed class DeskMeterStylesViewTests : IDisposable
         Assert.Equal(2, PaceMarks(meters));
         var texts = All<TextBlock>(meters).Select(t => t.Text).ToList();
         Assert.Contains(style == DeskMeterStyle.Ring ? "93" : "93%", texts);
-        // The week is over the warning line: its value is red in every style.
-        var red = All<TextBlock>(meters).Single(t => t.Text.StartsWith("93", StringComparison.Ordinal));
-        Assert.Equal(Color.FromRgb(0xF8, 0x71, 0x71), ((SolidColorBrush)red.Foreground).Color);
+        // The week (93) is past Warn at (80) and under Urgent at (95): its value is yellow in every style.
+        var warn = All<TextBlock>(meters).Single(t => t.Text.StartsWith("93", StringComparison.Ordinal));
+        Assert.Equal(Color.FromRgb(0xFA, 0xCC, 0x15), ((SolidColorBrush)warn.Foreground).Color);
         view.Dispose();
     });
 
@@ -289,4 +289,35 @@ public sealed class DeskMeterStylesViewTests : IDisposable
         foreach (var child in peer.GetChildren() ?? [])
             foreach (var p in Walk(child)) yield return p;
     }
+
+    // ---- theme match: the usage signal on the Desk's meters ----
+
+    /// <summary>The bar row's fill rectangles, in tier order (pace marks are 2 px wide; tracks stretch).</summary>
+    private static List<Rectangle> Fills(FrameworkElement meters) =>
+        All<Rectangle>(meters).Where(r => r.HorizontalAlignment == HorizontalAlignment.Left && r.Width > 2).ToList();
+
+    [Fact]
+    public void A_meter_past_Warn_at_wears_a_yellow_middle_stop_and_under_it_draws_as_before() => Sta.Run(() =>
+    {
+        var view = View("meters:tr", new DeskFrame { Usage = Usage(), Now = Now });   // session 42, week 93
+        var fills = Fills(Piece(view, "meters"));
+        Assert.IsType<SolidColorBrush>(fills[0].Fill);   // calm: the ink itself (Light ink is one white)
+        var week = Assert.IsType<LinearGradientBrush>(fills[1].Fill);
+        Assert.Equal([Colors.White, Color.FromRgb(0xFA, 0xCC, 0x15), Colors.White], week.GradientStops.Select(s => s.Color));
+        var calm = All<TextBlock>(Piece(view, "meters")).Single(t => t.Text == "42%");
+        Assert.Equal(Colors.White, ((SolidColorBrush)calm.Foreground).Color);
+        view.Dispose();
+    });
+
+    [Fact]
+    public void The_alert_thresholds_in_the_frame_move_the_signal() => Sta.Run(() =>
+    {
+        var view = View("meters:tr", new DeskFrame { Usage = Usage(), Now = Now, WarnAt = 40, UrgentAt = 90 });
+        var fills = Fills(Piece(view, "meters"));
+        Assert.Equal(Color.FromRgb(0xFA, 0xCC, 0x15), Assert.IsType<LinearGradientBrush>(fills[0].Fill).GradientStops[1].Color);
+        Assert.Equal(Color.FromRgb(0xF8, 0x71, 0x71), Assert.IsType<LinearGradientBrush>(fills[1].Fill).GradientStops[1].Color);
+        var urgent = All<TextBlock>(Piece(view, "meters")).Single(t => t.Text == "93%");
+        Assert.Equal(Color.FromRgb(0xF8, 0x71, 0x71), ((SolidColorBrush)urgent.Foreground).Color);
+        view.Dispose();
+    });
 }

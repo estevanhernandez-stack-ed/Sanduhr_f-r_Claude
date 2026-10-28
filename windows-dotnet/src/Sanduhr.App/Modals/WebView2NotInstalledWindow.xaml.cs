@@ -65,6 +65,7 @@ internal partial class WebView2NotInstalledWindow : Window
     {
         try
         {
+            // network: your-browser
             Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
         }
         catch

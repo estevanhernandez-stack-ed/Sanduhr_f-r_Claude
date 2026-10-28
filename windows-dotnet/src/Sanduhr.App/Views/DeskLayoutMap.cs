@@ -36,7 +36,7 @@ internal sealed class DeskLayoutMap : Canvas
     {
         SnapsToDevicePixels = true;
         Focusable = false;
-        AutomationProperties.SetName(this, AccessibleName);
+        AutomationProperties.SetName(this, AccessibleName);   // streamer: notname - the map's fixed accessible name
         DataContextChanged += (_, _) => Attach(DataContext as DeskSettingsViewModel);
         // A tab switch unloads the page and Unloaded detaches; coming back re-attaches (PR #209 review, 7).
         Loaded += (_, _) => { Attach(DataContext as DeskSettingsViewModel); Redraw(); };

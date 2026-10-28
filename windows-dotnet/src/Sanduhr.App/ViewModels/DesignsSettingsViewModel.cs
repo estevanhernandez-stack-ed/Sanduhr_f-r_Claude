@@ -82,6 +82,9 @@ public sealed partial class DesignsSettingsViewModel : ObservableObject
         var n => $"{n} designs kept. ",
     };
 
+    /// <summary>Desk, Designs' one line while the section is collapsed: "3 saved. Put my Desk back is ready."</summary>
+    public string Summary => SettingsNames.DesignsSummary(Rows.Count, CanPutBack);
+
     /// <summary>Reads the list again (after any change, and when the service says it changed).</summary>
     public void Reload()
     {
@@ -91,12 +94,13 @@ public sealed partial class DesignsSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(HasNoDesigns));
         OnPropertyChanged(nameof(CountText));
         OnPropertyChanged(nameof(CanPutBack));
+        OnPropertyChanged(nameof(Summary));
         PutBackCommand.NotifyCanExecuteChanged();
     }
 
     private void Done(DesignActionResult result)
     {
-        Status = result.Message;
+        Status = result.Message;   // streamer: cant - the status names the design the person typed or picked: the caption's "what you type yourself"
         Reload();
     }
 

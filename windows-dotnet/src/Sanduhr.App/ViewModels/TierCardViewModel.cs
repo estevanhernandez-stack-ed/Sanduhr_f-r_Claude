@@ -27,6 +27,13 @@ public sealed partial class TierCardViewModel : ObservableObject
     [ObservableProperty] private string _valueText = "";
     [ObservableProperty] private double _utilization;
     [ObservableProperty] private Color _barColor = Colors.LimeGreen;
+    /// <summary>The bar's fill when the theme sets <c>desk.bars</c> (theme match): its gradient with the usage signal. Null: the ramp
+    /// (<see cref="BarColor"/>), unchanged for every theme without it.</summary>
+    [ObservableProperty] private Brush? _barBrush;
+    /// <summary>The percent's color: the ramp's without <c>desk.bars</c>; with it, the theme's text, yellow past Warn at, red past Urgent at.</summary>
+    [ObservableProperty] private Brush _valueBrush = Brushes.LimeGreen;
+    private int _warnAt = MeterSignal.DefaultWarnAt;
+    private int _urgentAt = MeterSignal.DefaultUrgentAt;
     [ObservableProperty] private double _paceFraction = double.NaN;
     [ObservableProperty] private Color _paceTickColor = Color.FromRgb(0xff, 0x6b, 0x6b);
     [ObservableProperty] private string _resetCountdown = "";
@@ -74,6 +81,7 @@ public sealed partial class TierCardViewModel : ObservableObject
         Utilization = util;
         ValueText = TierModel.ValueLabel(TierKey, util, used, limit);
         BarColor = ThemePalette.UsageColor(util);
+        Recolor();
         PaceTickColor = palette.PaceMarker;
         Sparkline = history;
         SparklineColor = palette.Sparkline;
@@ -106,13 +114,46 @@ public sealed partial class TierCardViewModel : ObservableObject
 
     /// <summary>Recolor against a newly applied theme without a refetch — the
     /// theme-strip live switch path. The bar/value color stays usage-derived
-    /// (theme-independent); the pace tick + sparkline pick up the new accent
+    /// (theme-independent) unless the theme sets desk.bars; the pace tick + sparkline pick up the new accent
     /// hues, and the next 30 s tick refreshes the pace/burn label brushes.</summary>
     public void ApplyPalette(ThemePalette palette)
     {
         _palette = palette;
         PaceTickColor = palette.PaceMarker;
         SparklineColor = palette.Sparkline;
+        Recolor();
+    }
+
+    /// <summary>The alert thresholds the bar's signal uses (theme match); the widget passes Alerts' Warn at and Urgent at.</summary>
+    public void SetThresholds(int warnAt, int urgentAt)
+    {
+        _warnAt = warnAt;
+        _urgentAt = urgentAt;
+        Recolor();
+    }
+
+    /// <summary>The bar and the percent for the theme now (theme match, "Meters"): a theme with <c>desk.bars</c> fills the bar with that
+    /// gradient and works the usage signal into it; any other keeps the ramp exactly.</summary>
+    private void Recolor()
+    {
+        if (_palette.Definition.Desk?.Bars is { Count: > 0 } bars)
+        {
+            var level = MeterSignal.Level(_util, _warnAt, _urgentAt);
+            BarBrush = Sanduhr.App.Desk.DeskView.InkBrush(MeterSignal.Stops(bars, level));
+            ValueBrush = Frozen(MeterSignal.Hex(level) is { } hex ? Sanduhr.App.Desk.DeskView.Rgb(hex) : _palette.Text);
+        }
+        else
+        {
+            BarBrush = null;
+            ValueBrush = Frozen(BarColor);
+        }
+    }
+
+    private static SolidColorBrush Frozen(Color c)
+    {
+        var b = new SolidColorBrush(c);
+        b.Freeze();
+        return b;
     }
 
     /// <summary>Apply a newly-cycled sparkline style without a refetch — the Graph
@@ -130,7 +171,7 @@ public sealed partial class TierCardViewModel : ObservableObject
         PaceBrush = pace is { } p ? FromHex(p.Color) : new SolidColorBrush(_palette.TextDim);
 
         var burn = Pacing.BurnProjection(_util, _resetsAt, TierKey, now);
-        BurnText = burn?.Message ?? "";
+        BurnText = burn?.Message ?? "";   // streamer: notname - the burn projection sentence, no names
         HasBurn = burn is not null;
         BurnBrush = burn is { } b ? FromHex(b.Color) : new SolidColorBrush(_palette.TextMuted);
     }

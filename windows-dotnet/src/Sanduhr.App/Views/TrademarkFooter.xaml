@@ -1,0 +1,11 @@
+<UserControl x:Class="Sanduhr.App.Views.TrademarkFooter"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
+             Focusable="False">
+    <!-- The trademark disclaimer (Store test 10.1.4.4) at the foot of every Settings page that names Claude.
+         One control, so the six pages can't drift. The separator above it stays with each page's layout. -->
+    <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"
+               TextWrapping="Wrap" FontSize="11"
+               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+</UserControl>

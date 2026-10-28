@@ -1,7 +1,7 @@
 namespace Sanduhr.Core;
 
 /// <summary>
-/// What the plugin list on Mods &amp; Config counts, and the words it uses for them. In Claude Code these are
+/// What the Claude Code plugin rows on Mods &amp; Widgets and the folder cards count, and the words it uses for them. In Claude Code these are
 /// all plugins; a mod is a plugin that also carries mod hooks (<see cref="ModItem.IsMod"/>) and gets a small
 /// "mod" tag. Kept in Core so the counts and wording are tested without a window.
 /// </summary>
@@ -44,20 +44,31 @@ public static class ModsPageText
         t.Listed == 0 ? "Plugins (none)" : $"Plugins ({t.Installed} installed, {t.On} on)";
 
     /// <summary>
-    /// Why the list and the settings.json switches do not add up to the same number, or "" when they do.
+    /// The note under the Installed list, over every folder, in the spec's plain words: how many plugins have no on/off entry in
+    /// settings.json (Claude Code treats them as on), then how many are switched on (true in settings.json) with no files; a plugin that is off, or only listed, is not counted. Each count is of distinct plugin ids,
+    /// so one plugin in three folders counts once, as the list shows one row. "" when both are 0.
     /// </summary>
-    public static string Reconcile(PluginTally t, int switchesOn, int switchesOff)
+    public static string PlainNote(IReadOnlyList<FolderMods> folders)
     {
+        var noSwitch = new HashSet<string>(StringComparer.Ordinal);
+        var noFiles = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var f in folders)
+        {
+            // Slice 4 row 13: an unreadable settings.json says nothing about switches, so it adds nothing.
+            if (f.Report.Settings.Kind == SettingsKind.Unreadable) continue;
+            foreach (var m in f.Report.Mods.Where(m => !m.IsSanduhr))
+            {
+                var id = m.Key ?? m.Name;
+                if (!HasFiles(m)) { if (m.Key is not null && f.Report.EnabledPlugins.TryGetValue(m.Key, out var on) && on) noFiles.Add(id); }
+                else if (m.Key is null || !f.Report.EnabledPlugins.ContainsKey(m.Key)) noSwitch.Add(id);
+            }
+        }
+        // Slice 4 row 20: a plugin counts in one sentence only, and the more serious one (no files) wins.
+        noSwitch.ExceptWith(noFiles);
         var parts = new List<string>();
-        if (t.NoSwitch > 0)
-            parts.Add($"{t.NoSwitch} {(t.NoSwitch == 1 ? "has" : "have")} no switch in settings.json " +
-                      "(loaded from a plugin folder, or installed here and never switched)");
-        if (t.NoFiles > 0)
-            parts.Add($"{t.NoFiles} {(t.NoFiles == 1 ? "is" : "are")} switched in settings.json or listed as installed, " +
-                      "but the files are not in this folder");
-        if (parts.Count == 0) return "";
-        return $"settings.json has {switchesOn + switchesOff} plugin switches ({switchesOn} on, {switchesOff} off). " +
-               "The list differs because " + string.Join("; ", parts) + ".";
+        if (noSwitch.Count > 0) parts.Add(SettingsNames.NoSwitchNote(noSwitch.Count));
+        if (noFiles.Count > 0) parts.Add(SettingsNames.NoFilesNote(noFiles.Count));
+        return string.Join(" ", parts);
     }
 
     /// <summary>
@@ -73,6 +84,32 @@ public static class ModsPageText
         parts.Add(state.ToLowerInvariant());
         if (isMod) parts.Add("mod");
         return string.Join(", ", parts);
+    }
+
+    /// <summary>What a mod or plugin touches, as Settings, Mods &amp; Widgets says it: "Draws a band; can run programs." Empty when the scan
+    /// found no surface and no capability.</summary>
+    public static string DescribeTouches(ModTouches t)
+    {
+        var parts = new List<string>();
+        if (t.Surfaces.Count > 0)
+            parts.Add("Draws " + string.Join(", ", t.Surfaces.Select(s => s switch
+            {
+                ModSurface.Band => "a band",
+                ModSurface.Pane => "a pane",
+                ModSurface.Status => "the status line",
+                ModSurface.Toast => "toasts",
+                _ => "slash commands",
+            })));
+        if (t.Capabilities.Count > 0)
+            parts.Add("can " + string.Join(", ", t.Capabilities.Select(c => c switch
+            {
+                ModCapability.Process => "run programs",
+                ModCapability.Http => "use the network",
+                _ => "read and write files",
+            })));
+        if (parts.Count == 0) return "";
+        var line = string.Join("; ", parts);
+        return char.ToUpperInvariant(line[0]) + line[1..] + ".";
     }
 
     /// <summary>The version as the row shows it: "v0.1.0", or nothing when it is unknown.</summary>

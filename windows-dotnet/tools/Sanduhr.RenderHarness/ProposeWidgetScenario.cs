@@ -13,7 +13,7 @@ using Sanduhr.Core;
 // Widgets made with Claude (spec 3.8 section 5): a 16 px pixel sprite built the way propose_widget builds it (pack.json, the
 // LICENSE, sprite.json and a pixel sheet, validated strict), handed to a real WidgetReviewService over the dev profile as the
 // request file would bring it, staged and drawn by the companion's own loader beside the clock with the review bar over the
-// Desk; then the bar alone, Apply, and Settings, Widgets with the pack listed "made here" and Use my own art… on its row.
+// Desk; then the bar alone, Apply, and Settings, Mods & Widgets with the pack listed "made here" and Use my own art… on its row.
 // Off screen only: no Desk windows, no network (the catalog fetch gets a 503), no real widgets folder.
 public static partial class Program
 {
@@ -151,12 +151,12 @@ public static partial class Program
         window.Close();
         companion.EndPreviewPack();
 
-        // ---- Apply, then Settings, Widgets ----
+        // ---- Apply, then Settings, Mods & Widgets ----
         host.Apply!(true);
         Log.Add($"propose-widget: after Apply {File.ReadAllText(Path.Combine(paths.ExternalDir, WidgetProposal.ResultFile))}");
         var svm = new SettingsViewModel(vm, () => Task.CompletedTask, _ => Task.CompletedTask)
         {
-            WidgetsPage = new WidgetsPageViewModel(() => new WidgetCatalogService(paths, new NoNetwork()), store),
+            ModsPage = new ModsPageViewModel(() => new WidgetCatalogService(paths, new NoNetwork()), store),
         };
         var swType = asm.GetType("Sanduhr.App.Views.SettingsWindow")!;
         var sw = (Window)Activator.CreateInstance(swType, svm)!;
@@ -166,10 +166,10 @@ public static partial class Program
         sw.Top = -20000;
         sw.Height = 1300;
         await Settle();
-        swType.GetMethod("SelectPage")!.Invoke(sw, [SettingsPage.Widgets, SettingsIndex.WidgetsInstalled]);
+        swType.GetMethod("SelectPage")!.Invoke(sw, [SettingsPage.Mods, SettingsIndex.ModList]);
         await Settle();
         await Settle();
-        Log.Add($"propose-widget: installed={string.Join("|", svm.WidgetsPage.Installed.Select(r => r.RowName + (r.CanUseOwnArt ? " [own art]" : "")))}");
+        Log.Add($"propose-widget: installed={string.Join("|", svm.ModsPage.Installed.Select(r => r.RowName + (r.CanUseOwnArt ? " [own art]" : "")))}");
         Save((FrameworkElement)sw.Content, "propose-widget-settings-installed");
         sw.Close();
         await Settle();

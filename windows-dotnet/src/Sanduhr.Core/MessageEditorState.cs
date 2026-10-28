@@ -203,7 +203,7 @@ public sealed class MessageEditorState
         Mode = MessageEditorMode.Text;
     }
 
-    /// <summary>Back to the list: the text read into rows, unsaved edits included.</summary>
+    /// <summary>List: the text read into rows, unsaved edits included.</summary>
     public void ShowList()
     {
         if (Mode != MessageEditorMode.Text) return;

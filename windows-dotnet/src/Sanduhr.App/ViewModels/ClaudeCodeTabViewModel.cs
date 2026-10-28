@@ -1,18 +1,22 @@
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
 /// <summary>
-/// Parent of the Settings → Claude Usage tab: owns the Overview / Trends /
-/// Sessions sub-nav state and fans refreshes to the active section. Sections
-/// are added as they land (Task 6: Overview; Task 7: Trends; Task 8: Sessions).
+/// Parent of Settings, Claude Usage: owns the Meters / Overview / Trends / Sessions views and fans refreshes to the one shown.
+/// Meters is the 30-day meter history (Settings v2, slice 5: it was the History page) and the first view; the other three read the
+/// session archive and the live session logs.
 /// </summary>
 public sealed partial class ClaudeCodeTabViewModel : ObservableObject
 {
     private readonly WidgetViewModel _widget;
     private readonly Action _ingestHandler;
+
+    /// <summary>The meter history (WF14). The same object as <see cref="SettingsViewModel.History"/>.</summary>
+    public HistoryTabViewModel Meters { get; }
 
     public LocalCcViewModel Overview { get; }
 
@@ -20,15 +24,31 @@ public sealed partial class ClaudeCodeTabViewModel : ObservableObject
 
     public CcLedgerViewModel Ledger { get; }
 
+    /// <summary>Set by Settings (slice 7): "Show the real name on stream" from a table row (decision 16).</summary>
+    public Action<CodenameCategory, string>? ShowRealName { get; set; }
+
+    [RelayCommand]
+    private void ShowRealNameOf(object? row)
+    {
+        switch (row)
+        {
+            case BreakdownRow b when b.CanShowRealName: ShowRealName?.Invoke(b.Category, b.Real); break;
+            case LedgerRowViewModel l: ShowRealName?.Invoke(CodenameCategory.Project, l.ProjectKeyForStreamer); break;
+        }
+    }
+
     /// <summary>Set by the window on tab selection — ingest-completed refreshes
     /// only run while the user can see the tab.</summary>
     public bool IsTabActive { get; set; }
 
-    [ObservableProperty] private string _section = "Overview";
+    /// <summary>The view shown: Meters first (owner taste 1), then wherever the person or a link left it this window.</summary>
+    [ObservableProperty] private string _section = SettingsIndex.MetersView;
 
-    public ClaudeCodeTabViewModel(WidgetViewModel widget, LocalCcViewModel overview, CcTrendsViewModel trends, CcLedgerViewModel ledger)
+    public ClaudeCodeTabViewModel(WidgetViewModel widget, HistoryTabViewModel meters, LocalCcViewModel overview, CcTrendsViewModel trends,
+        CcLedgerViewModel ledger)
     {
         _widget = widget;
+        Meters = meters;
         Overview = overview;
         Trends = trends;
         Ledger = ledger;
@@ -68,6 +88,9 @@ public sealed partial class ClaudeCodeTabViewModel : ObservableObject
     {
         switch (Section)
         {
+            case SettingsIndex.MetersView:
+                Meters.Refresh();   // the chart is drawn by the window; a view switch must redraw it at its new size
+                break;
             case "Overview":
                 await Overview.RefreshAsync();
                 break;
@@ -78,6 +101,13 @@ public sealed partial class ClaudeCodeTabViewModel : ObservableObject
                 await Ledger.RefreshAsync();
                 break;
         }
+    }
+
+    [RelayCommand]
+    private async Task SetMeters()
+    {
+        Section = SettingsIndex.MetersView;
+        await RefreshActiveAsync();
     }
 
     [RelayCommand]

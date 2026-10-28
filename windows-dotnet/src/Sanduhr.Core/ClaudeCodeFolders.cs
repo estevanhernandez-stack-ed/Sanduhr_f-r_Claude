@@ -1,6 +1,6 @@
 namespace Sanduhr.Core;
 
-/// <summary>One Claude Code folder the Claude Code and Mods &amp; Config pages know: its full path, its
+/// <summary>One Claude Code folder the Claude Code and Mods &amp; Widgets pages know: its full path, its
 /// folder name, and whether Sanduhr found it (<see cref="ClaudeCodeHomes.Discover"/>) or the user added it.</summary>
 public sealed record CcFolder(string Path, string Name, bool Discovered);
 

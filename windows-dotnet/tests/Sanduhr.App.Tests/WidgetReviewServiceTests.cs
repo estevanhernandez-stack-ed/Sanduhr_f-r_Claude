@@ -14,6 +14,7 @@ namespace Sanduhr.App.Tests;
 /// the companion; Dismiss writes nothing; the direct switch never skips Apply; and "Use my own art…" turns a Claude-made sprite into
 /// the user's own. Scratch folders and a fake host only; never the real Sanduhr folders.
 /// </summary>
+[Collection("SettingsWindow")]
 public sealed class WidgetReviewServiceTests : IDisposable
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 22, 18, 0, 0, TimeSpan.Zero);
@@ -149,7 +150,10 @@ public sealed class WidgetReviewServiceTests : IDisposable
             Assert.True(row.MadeHere);
             Assert.True(File.Exists(Installed.RasterPath("my-blob", "sheet.json")));
             Assert.Equal("my-blob", _store.LoadCompanion().Pack);
-            Assert.NotNull(new DeskArrangement(_store.LoadDesk().Layout).Placement(CompanionSettings.Widget));
+            var placed = new DeskArrangement(_store.LoadDesk().Layout).Placement(CompanionSettings.Widget);
+            Assert.NotNull(placed);
+            Assert.Equal(DeskAnchor.BC, placed!.Anchor);   // the companion's default place: bottom center
+            Assert.EndsWith("companion:bc", _store.LoadDesk().Layout);
             Assert.Equal(["show", "end", "installed my-blob"], host.Calls);
             Assert.Equal(1, installed);
             Assert.False(service.Reviewing);
@@ -312,7 +316,7 @@ public sealed class WidgetReviewServiceTests : IDisposable
             }
             string art = Path.Combine(_root, "my-art.png");
             File.WriteAllBytes(art, Png(32, 8));
-            var page = new WidgetsPageViewModel(() => new WidgetCatalogService(_paths), _store);
+            var page = new ModsPageViewModel(() => new WidgetCatalogService(_paths), _store);
             page.ReloadLocal();
             var row = Assert.Single(page.Installed);
             Assert.True(row.CanUseOwnArt);
@@ -344,7 +348,7 @@ public sealed class WidgetReviewServiceTests : IDisposable
             }
             string art = Path.Combine(_root, "odd.png");
             File.WriteAllBytes(art, Png(30, 8));
-            var page = new WidgetsPageViewModel(() => new WidgetCatalogService(_paths), _store);
+            var page = new ModsPageViewModel(() => new WidgetCatalogService(_paths), _store);
             page.ReloadLocal();
             page.PickImage = _ => art;
             page.Installed[0].UseOwnArtCommand.Execute(null);
@@ -373,7 +377,7 @@ public sealed class WidgetReviewServiceTests : IDisposable
             var palette = Palette();
             Assert.True(Installed.Install(palette.Files, palette.Manifest, WidgetSource.Claude).Ok);
 
-            var page = new WidgetsPageViewModel(() => new WidgetCatalogService(_paths), _store);
+            var page = new ModsPageViewModel(() => new WidgetCatalogService(_paths), _store);
             page.ReloadLocal();
             Assert.Equal(2, page.Installed.Count);
             Assert.All(page.Installed, r => Assert.False(r.CanUseOwnArt));

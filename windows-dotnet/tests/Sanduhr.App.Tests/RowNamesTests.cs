@@ -38,9 +38,7 @@ public class RowNamesTests
         Reads("Fort Worth, Texas, United States", WeatherPlace.Create("Fort Worth", "Texas", "United States", 32.75, -97.33));
 
     [Fact]
-    public void ModsLinesAndFolderOptionsReadAsWords()
-    {
+    public void ModsLinesReadAsWords() =>
+        // The old Mods folder picker (ModsFolderOption) retired in slice 4; the Claude Code cards' report lines remain.
         Reads("Notification, 2 groups", new ModsLine("Notification", "2 groups"));
-        Reads(@"~\.claude-personal", new ModsFolderOption(@"C:\u\.claude-personal", @"~\.claude-personal"));
-    }
 }

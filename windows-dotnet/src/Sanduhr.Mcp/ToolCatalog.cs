@@ -46,10 +46,10 @@ public static class ToolCatalog
         Tool(
             "get_local_burn_by_project",
             "Attribute recent local Claude Code token burn to projects: which project ate the " +
-            "tokens, keyed per Claude Code home. Attribution only - token counts are a proxy " +
+            "tokens, keyed per Claude Code folder. Attribution only - token counts are a proxy " +
             "(input+output, cache excluded) and are NOT convertible to quota percentages; use " +
-            "get_usage for headroom. Scoped to the Claude Code homes the user consented to in " +
-            "Sanduhr's settings; every response names the roots it covered.",
+            "get_usage for headroom. Scoped to the Claude Code folders the user consented to in " +
+            "Sanduhr (Settings, Claude Code, Folders); every response names the roots it covered.",
             new JsonObject
             {
                 ["type"] = "object",
@@ -75,7 +75,7 @@ public static class ToolCatalog
             "a window, joined with each model's weekly meter utilization from the live snapshot. " +
             "Use when choosing between models for a big job - a model whose per-model weekly " +
             "meter is hot is the one to avoid. Token counts are a proxy (input+output, cache " +
-            "excluded), never convertible to quota %. Scoped to consented Claude Code homes.",
+            "excluded), never convertible to quota %. Scoped to consented Claude Code folders.",
             new JsonObject
             {
                 ["type"] = "object",
@@ -92,11 +92,11 @@ public static class ToolCatalog
             }),
         Tool(
             "get_usage_history",
-            "Daily local Claude Code usage history from Sanduhr's durable vault (survives Claude " +
+            "Daily local Claude Code usage history from Sanduhr's durable session archive (the vault; survives Claude " +
             "Code's ~30-day log cleanup): tokens per day with sent/received split, window totals, " +
             "top projects. Trend and attribution data, not quota - use get_usage for headroom. " +
             "Days without a record are omitted, never fabricated as zero. Scoped to consented " +
-            "Claude Code homes.",
+            "Claude Code folders.",
             new JsonObject
             {
                 ["type"] = "object",
@@ -163,7 +163,11 @@ public static class ToolCatalog
             "base (bg/glass luminance under 0.25); text at 4.5:1 or better on the card; text_secondary, " +
             "text_dim, text_muted the same hue as text at decreasing luminance; one accent hue shared " +
             "by accent, sparkline and border_tint; pace_marker visible on every bar fill (a " +
-            "complementary hue works). The server lints first: status rejected with findings means " +
+            "complementary hue works). Optional: font (a font family the widget's text, and the Desk while it follows the " +
+            "theme, is drawn in) and desk {ink, bars, message: 1 to 4 #rrggbb each; glow, plate_color, shadow: #rrggbb; " +
+            "plate: true or false; font}: the Desk's look for this theme, every field optional with a default worked out from " +
+            "the colors; bars also fills the widget's bars, with a yellow or red middle stop at the user's alert levels. " +
+            "The server lints first: status rejected with findings means " +
             "fix the named fields and call again, nothing was written. Otherwise the widget saves the " +
             "theme under its themes folder and applies it (apply: false saves without switching); the " +
             "result names the previous theme's key so the user can go back, and carries any warnings.",
@@ -175,7 +179,7 @@ public static class ToolCatalog
                     ["theme"] = new JsonObject
                     {
                         ["type"] = "object",
-                        ["description"] = "The palette JSON: name, the fourteen #rrggbb colors, optional dials.",
+                        ["description"] = "The palette JSON: name, the fourteen #rrggbb colors, optional dials, optional font and desk.",
                     },
                     ["save_as"] = new JsonObject
                     {
@@ -303,7 +307,12 @@ public static class ToolCatalog
                             ["theme"] = new JsonObject
                             {
                                 ["type"] = "object",
-                                ["description"] = "A widget palette as propose_theme takes it: name and the fourteen #rrggbb colors.",
+                                ["description"] = "A widget palette as propose_theme takes it: name and the fourteen #rrggbb colors, optional font and desk.",
+                            },
+                            ["follows_theme"] = new JsonObject
+                            {
+                                ["type"] = "boolean",
+                                ["description"] = "True draws the Desk in the widget theme's own look (get_desk theme_look) instead of its font, ink and plate.",
                             },
                         },
                         ["additionalProperties"] = false,
@@ -604,7 +613,9 @@ public static class ToolCatalog
         "color theme. Returns design (the current look as a full design: layout with every piece's anchor, size, " +
         "hidden, monitor and tilt (the slant of its stack in degrees, 0 upright), and for claude, meters and telemetry its style (bar, slim, ring or ticks; " +
         "limits.piece_style lists the pieces and the words), weather.nickname (the name the weather piece shows " +
-        "instead of the place's, \"\" for none), font, ink, plate, shadow, launcher, theme), pieces and anchors (the allowed words), fonts (installed " +
+        "instead of the place's, \"\" for none), font, ink, plate, shadow, launcher, theme, follows_theme: true while the Desk draws the " +
+        "theme's look instead of its own), theme_look (that look worked out from the theme: gradient, ink, bars, message, glow, plate, " +
+        "plate_color, shadow, font, bar_track, pace_tick), pieces and anchors (the allowed words), fonts (installed " +
         "families, and the bundled handwriting fonts EsteFont Pro and EsteFont 26), wallpaper (path of a copy of the wallpaper " +
         "image scaled to at most 1600 pixels on its longest side, which you can open only if the user allows Claude Code to read that file; " +
         "source file, or cache when Windows' cached copy stands in for a wallpaper file that was deleted; kind image, or color when the shell " +
@@ -621,7 +632,7 @@ public static class ToolCatalog
         "the fields to change; everything absent stays as it is. Fields, all optional: name (up to 40 characters); " +
         "note (one sentence for the user, up to 200); layout {piece: {anchor, size, hidden}}, where piece is a key from " +
         "get_desk pieces, anchor is tl tc tr ml mr bl bc br, size is 0.6 to 1.6, hidden removes the piece and monitor puts it on \"all\" monitors (the default), the \"main\" monitor or one monitor by the id in get_desk monitors (a piece on a monitor that is unplugged shows on the main one meanwhile; " +
-        "the companion piece draws the sprite the user chose in Settings, Widgets, sits at its anchor or roams the monitor's edges from it, and draws nothing until a sprite is installed); " +
+        "the companion piece draws the sprite the user chose in Settings, Desk, Pieces, sits at its anchor or roams the monitor's edges from it, and draws nothing until a sprite is installed); " +
         "tilt in a layout piece slants the piece's whole stack from -20 to 20 degrees (negative rises to the right, positive falls; 0 upright), " +
         "so a left stack at -18 and a right stack at 18 read as two faces of a fold; pieces at one anchor share one slant, so give them the same tilt; " +
         "style in a layout piece, only on claude, meters and telemetry, is how its numbers draw so a stack fits its column: bar (the default, " +
@@ -641,7 +652,9 @@ public static class ToolCatalog
         "per-song looks for the now playing line, {title, artist, ink, style, mood} as propose_now_playing_looks takes " +
         "them, saved with the design when it is applied; each color must keep 3:1 against what is behind the now " +
         "playing piece, and they show while the user's Style what's playing is on); theme (a widget " +
-        "palette: name and the fourteen #rrggbb colors, per docs/themes/AGENT_PROMPT.md, as propose_theme takes it). " +
+        "palette: name and the fourteen #rrggbb colors, per docs/themes/AGENT_PROMPT.md, as propose_theme takes it, with its optional " +
+        "font and desk look); follows_theme (true draws the Desk in the theme's look; its ink is judged by its first stop, and the " +
+        "Desk turns its plate on where that would not read). " +
         "The server checks before anything is sent: every field's shape and range; ink against the wallpaper (each " +
         "placed piece's ink must keep a WCAG contrast of at least 3:1 against the wallpaper brightness under its anchor " +
         "on every monitor, or against the plate when the plate is on; auto ink picks its own and is not judged), so read " +
@@ -683,8 +696,8 @@ public static class ToolCatalog
         "failed). Without an update for 10 minutes it greys as lost touch, so update long jobs. Limits: " +
         "title 1 to 80 characters on one line, short up to 12, link https only, total 1 to 1000000. Pass work: true for " +
         "anything from the user's employer, so it hides in demo mode. Refused with reason " +
-        "watchers_off when the user has not turned on Let agents show watchers in Sanduhr (Settings, " +
-        "Desk); then do not retry. It shows where the user has placed the Watchers piece on the Desk.";
+        "watchers_off when the user has not turned on 'Let Claude show watchers' in Sanduhr " +
+        "(Settings, Watchers); then do not retry. It shows where the user has placed the Watchers piece on the Desk.";
 
     private const string WatchGuideUpdate =
         "Move a watcher from watch_start: done (how many of its total are done), note (one line, up to " +
@@ -736,7 +749,7 @@ public static class ToolCatalog
         "period_ms integer 400-10000, color '#rrggbb' or 'ink'}. " +
         "Sanduhr checks the pack again and previews it on the Desk (a sprite as the companion, a palette as the Desk ink) with a " +
         "review bar: previewing means the user is looking at it; it installs only when they press Apply (applied, as a local " +
-        "widget made here, listed in Settings, Widgets; companion true when they made a sprite the companion), and Dismiss " +
+        "widget made here, listed in Settings, Mods & Widgets, Installed; companion true when they made a sprite the companion), and Dismiss " +
         "answers rejected with reason dismissed and writes nothing. 'Let Claude change the Desk directly' does not cover " +
         "widgets: a new pack always waits for Apply. queued means Sanduhr did not answer: it is not running. Nothing is uploaded; " +
         "sharing a pack is a pull request to the sanduhr-widgets catalog.";

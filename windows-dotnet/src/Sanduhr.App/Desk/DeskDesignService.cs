@@ -121,7 +121,7 @@ internal sealed class DeskDesignService : IDisposable
 
     /// <summary>The system's families and the installed font packs' (3.9.1): what a design may name as installed.</summary>
     private IReadOnlyList<string> InstalledWithPacks() => PackFontCatalog.Union(InstalledFamilies(),
-        PackFontCatalog.Families(new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng)));
+        PackFontCatalog.Families(new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng)));   // streamer: notname - a file location used for IO, never drawn
 
     /// <summary>The clock (tests set it).</summary>
     internal Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.UtcNow;
@@ -146,7 +146,7 @@ internal sealed class DeskDesignService : IDisposable
         try
         {
             Directory.CreateDirectory(dir);
-            _watcher = new FileSystemWatcher(dir, DeskDesign.RequestFile) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };
+            _watcher = new FileSystemWatcher(dir, DeskDesign.RequestFile) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };   // streamer: notname - NotifyFilters.FileName is a watcher flag, not a name
             _watcher.Created += (_, _) => Check();
             _watcher.Changed += (_, _) => Check();
             _watcher.Renamed += (_, _) => Check();
@@ -222,7 +222,7 @@ internal sealed class DeskDesignService : IDisposable
     }
 
     /// <summary>Where the downscaled wallpaper copy for Claude Code lives.</summary>
-    private string PreviewPath => Path.Combine(Handoff.Paths.Support, WallpaperPreview.FileName);
+    private string PreviewPath => Path.Combine(Handoff.Paths.Support, WallpaperPreview.FileName);   // streamer: notname - preview file leaf, never drawn
 
     private Inputs Gather()
     {
@@ -241,7 +241,8 @@ internal sealed class DeskDesignService : IDisposable
 
     /// <summary>The Desk as it is now, as a full design (the settings and the active theme).</summary>
     internal DeskDesign CurrentDesign() =>
-        DeskState.Current(_store.LoadDesk(), _store.LoadDeskInk(), _store.LoadLauncher(), ActiveTheme(), _store.LoadDeskWeather().Nickname);
+        DeskState.Current(_store.LoadDesk(), _store.LoadDeskInk(), _store.LoadLauncher(), ActiveTheme(), _store.LoadDeskWeather().Nickname,
+            _store.LoadDeskFollowsTheme());
 
     /// <summary>What the widget's own check of a request knows about this PC.</summary>
     private DeskDesignContext Context()
@@ -273,7 +274,7 @@ internal sealed class DeskDesignService : IDisposable
 
     /// <summary>The built-in themes, the user's and the installed theme packs'.</summary>
     private Dictionary<string, ThemeDefinition> ThemeMap() =>
-        PackThemes.Merged(_paths.ThemesDir, new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng));
+        PackThemes.Merged(_paths.ThemesDir, new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng));   // streamer: notname - a file location used for IO, never drawn
 
     private bool FontInstalled(string family)
     {
@@ -466,6 +467,27 @@ internal sealed class DeskDesignService : IDisposable
         return _designs.Load(design.Id);
     }
 
+    /// <summary>
+    /// Saves the Desk as it is before a change Settings makes to it (theme match: Follow on, Match now), unless a saved design already is
+    /// that look, and points "Put my Desk back" at it, as applying a design does. False when it could not be saved.
+    /// </summary>
+    public bool SaveBeforeChange(string incomingName)
+    {
+        if (_disposed || ResetGuard.Done) return false;   // a late call after Reset must not write into a cleared store
+        try
+        {
+            if (SaveCurrentFirst(CurrentDesign(), incomingName) is not { } saved) return false;
+            _store.SaveDeskPutBack(saved.Id);
+            AfterChange();
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Log("save before", e);
+            return false;
+        }
+    }
+
     /// <summary>Keeps the look that was just written as a saved design: the one that is already that look (now the newest), or a new one.</summary>
     private void KeepApplied(DeskDesign after, string? name)
     {
@@ -491,6 +513,8 @@ internal sealed class DeskDesignService : IDisposable
         if (next.Desk.Plate != desk.Plate) _store.SaveDeskPlate(next.Desk.Plate);
         if (next.Ink != ink) _store.SaveDeskInk(next.Ink);
         if (next.Launcher.ToJson().ToJsonString() != launcher.ToJson().ToJsonString()) _store.SaveLauncher(next.Launcher);
+        // Theme match: a design that says whether the Desk follows the theme sets it (Put my Desk back restores both sides).
+        if (next.FollowsTheme is { } follows && follows != _store.LoadDeskFollowsTheme()) _store.SaveDeskFollowsTheme(follows);
         // The weather nickname (#315) is the one part of desk_weather a design may set; the place and the unit stay the user's.
         if (next.WeatherNickname is { } nickname)
         {
@@ -505,7 +529,7 @@ internal sealed class DeskDesignService : IDisposable
         if (plan is null) return null;
         if (plan.Write)
         {
-            Directory.CreateDirectory(_paths.ThemesDir);
+            Directory.CreateDirectory(_paths.ThemesDir);   // streamer: notname - a file location used for IO, never drawn
             string path = Path.Combine(_paths.ThemesDir, plan.Key + ".json");
             string temp = path + ".tmp";
             File.WriteAllText(temp, theme.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
@@ -531,7 +555,7 @@ internal sealed class DeskDesignService : IDisposable
     /// <summary>The design's message lines go into messages.txt the way Add or Replace does it, keeping the old file as messages.txt.previous.</summary>
     private bool WriteMessages(DeskMessagesChange change)
     {
-        string path = Path.Combine(_paths.AppDataDir, "messages.txt");
+        string path = Path.Combine(_paths.AppDataDir, "messages.txt");   // streamer: notname - a file location used for IO, never drawn
         bool had = File.Exists(path);
         string existing = "";
         if (had)
@@ -545,6 +569,10 @@ internal sealed class DeskDesignService : IDisposable
         {
             if (had) MessageFileIo.WriteAtomic(path + ".previous", MessageFileIo.Encode(existing));
             MessageFileIo.WriteAtomic(path, MessageFileIo.Encode(applied.Text));
+            // Colored lines would be hidden by "Use the theme's colors": that switch goes off so the design shows.
+            var own = _store.LoadDeskMessage();
+            var next = own.AfterLinesAdded(change.Lines);
+            if (next != own) _store.SaveDeskMessage(next);
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -572,7 +600,7 @@ internal sealed class DeskDesignService : IDisposable
     /// <summary>One line in the log: the operation and the exception type, never design content (PRIVACY.md).</summary>
     private void Log(string operation, Exception e)
     {
-        try { File.AppendAllText(_paths.LogFile, $"{DateTime.UtcNow:o} desk design {operation} failed ({e.GetType().Name}){Environment.NewLine}"); }
+        try { File.AppendAllText(_paths.LogFile, $"{DateTime.UtcNow:o} desk design {operation} failed ({e.GetType().Name}){Environment.NewLine}"); }   // streamer: notname - written to the log file, never drawn
         catch (Exception) { /* the log is a courtesy */ }
     }
 
@@ -608,6 +636,8 @@ internal sealed class DeskDesignService : IDisposable
         if (_review is not null) DismissReview();
 
         var design = DeskDesigns.WithoutMissingImages(target.Design, _designs.ImageExists);
+        // A saved design is a whole Desk: no follows_theme is one that does not follow (theme match).
+        design = design with { FollowsTheme = design.FollowsTheme ?? false };
         var before = CurrentDesign();
         if (DeskDesigns.FindSame([target], before) is not null) return new(true, $"{target.Name} is your Desk already.");
 

@@ -185,7 +185,7 @@ public class DeskHitTestTests
     [Fact]
     public void MenuItems()
     {
-        Assert.Equal("Edit messages…", DeskPieceClicks.MenuItem(DeskElementKind.Message)?.Title);
+        Assert.Equal("Message settings…", DeskPieceClicks.MenuItem(DeskElementKind.Message)?.Title);
         Assert.Equal(DeskElementKind.Message, DeskPieceClicks.MenuItem(DeskElementKind.Message)?.Page);
         Assert.Equal("Desk settings…", DeskPieceClicks.MenuItem(DeskElementKind.Clock)?.Title);
         Assert.Null(DeskPieceClicks.MenuItem(DeskElementKind.ClaudeLine));

@@ -24,7 +24,7 @@ internal static class AccountMenuBuilder
 
         // Demo mode lists the sample accounts, so a screenshot of the menu names no real one;
         // picking one shows that sample.
-        var active = vm.ShownActiveAccount;
+        var active = vm.ShownActiveAccount;   // streamer: masked - via Header: each menu row masks its label (CP 2)
         var accounts = vm.ShownAccounts;
         var inUse = vm.OthersInUse;
         var switchCommand = vm.IsDemo ? vm.ShowSampleAccountCommand : (System.Windows.Input.ICommand)vm.SwitchAccountCommand;
@@ -40,10 +40,9 @@ internal static class AccountMenuBuilder
                 bool isActive = label == active;
                 // Follow saw this account in use in its latest check: the menu is rebuilt on every
                 // open, so the mark is as fresh as the follower's last reading.
-                var mark = !isActive && inUse.Contains(label) ? " · in use" : "";
                 items.Add(new MenuItem
                 {
-                    Header = (isActive ? $"●  {label}" : $"     {label}") + mark,
+                    Header = Header(label, isActive, !isActive && inUse.Contains(label), vm.IsDemo),
                     Command = switchCommand,
                     CommandParameter = label,
                     // The active account is the no-op target; dim it so the live one reads clearly.
@@ -60,5 +59,14 @@ internal static class AccountMenuBuilder
 
         if (includeManage)
             items.Add(new MenuItem { Header = SettingsNames.LinkTitle(SettingsPage.Accounts), Command = vm.OpenSettingsPageCommand, CommandParameter = SettingsPage.Accounts });
+    }
+
+    /// <summary>A row's text: the bullet for the active account, the label (its codename while streamer mode is on, slice 7 M2), and
+    /// " · in use" when Follow saw it in use. The row's command still takes the real label. Demo's sample labels are not real names
+    /// and stay out of the codename book (preflight P17).</summary>
+    internal static string Header(string label, bool isActive, bool inUse, bool demo = false)
+    {
+        var shown = demo ? label : StreamerMode.Mask.Name(CodenameCategory.Account, label);   // streamer: demo - the sample labels of demo mode are not real names and stay out of the book (P17)
+        return (isActive ? $"●  {shown}" : $"     {shown}") + (inUse ? " · in use" : "");
     }
 }

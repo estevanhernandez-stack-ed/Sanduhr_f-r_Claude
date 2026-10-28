@@ -31,8 +31,12 @@ public sealed class SettingsStore
     private readonly string _path;
     private readonly string _mcpSettingsPath;
 
+    /// <summary>The folders this store reads and writes under (a scratch profile in tests).</summary>
+    public Paths Paths { get; }
+
     public SettingsStore(Paths paths)
     {
+        Paths = paths;
         _path = paths.SettingsFile;
         // The projection sanduhr-mcp reads, in %USERPROFILE%\.sanduhr (spec Plan B, B.2).
         _mcpSettingsPath = paths.McpSettingsFile;
@@ -57,16 +61,16 @@ public sealed class SettingsStore
         McpSettingsExport.Sync(Read(), _mcpSettingsPath, LogLine);
     }
 
-    /// <summary>
-    /// Reset Sanduhr…, "Claude Code entries" part: turns <c>mcp_enabled</c> and <c>statusline_enabled</c> off and drops
-    /// <c>mcp_cc_home</c> and <c>statusline_cc_home</c>, so a Reset that leaves "Settings" unchecked doesn't bring the
-    /// projection, the launcher or the script back at the next launch.
-    ///
-    /// This is the ONE write allowed while <see cref="ResetGuard.Done"/> is set (Reset marks it before its steps run),
-    /// and it is narrow on purpose: it only edits an existing settings.json, changes only those four keys, and does NOT
-    /// re-sync <c>mcp-settings.json</c> (the same step deletes that file). Never throws; false when nothing was written.
-    /// </summary>
-    public bool ClearClaudeCodeSwitchesForReset()
+    /// <summary>Reset's per-kind variant: only <c>mcp_enabled</c> and <c>mcp_cc_home</c>, for a reset that keeps a statusline or meters folder.</summary>
+    public bool ClearMcpSwitchesForReset() => ClearForReset(ResetSettings.ClearMcpSwitches);
+
+    /// <summary>Reset's per-kind variant: only <c>statusline_enabled</c> and <c>statusline_cc_home</c>, for a reset that keeps an MCP folder.</summary>
+    public bool ClearStatuslineSwitchesForReset() => ClearForReset(ResetSettings.ClearStatuslineSwitches);
+
+    /// <summary>The ONE write allowed while <see cref="ResetGuard.Done"/> is set (Reset marks it before its steps run), and narrow on
+    /// purpose: it only edits an existing settings.json, changes only one kind's two keys, and does NOT re-sync <c>mcp-settings.json</c>
+    /// (Reset deletes that file). Never throws; false when nothing was written.</summary>
+    private bool ClearForReset(Func<JsonObject, bool> clear)
     {
         try
         {
@@ -74,7 +78,7 @@ public sealed class SettingsStore
                 return false;
             if (JsonNode.Parse(File.ReadAllText(_path)) is not JsonObject root)
                 return false;
-            if (!ResetSettings.ClearClaudeCodeSwitches(root))
+            if (!clear(root))
                 return false;
             File.WriteAllText(_path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
             return true;
@@ -789,6 +793,18 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>"Follow the widget theme" (theme match): <c>desk_follows_theme</c>, absent = off. While on, the Desk draws the active
+    /// theme's look and leaves its own look settings untouched for when it goes off. Written only while on.</summary>
+    public bool LoadDeskFollowsTheme() => ReadBool(Read(), "desk_follows_theme", false);
+
+    public void SaveDeskFollowsTheme(bool on)
+    {
+        var root = Read();
+        if (on) root["desk_follows_theme"] = true;
+        else root.Remove("desk_follows_theme");
+        Write(root);
+    }
+
     /// <summary>A fresh install's first launch writes the plate on; an existing install keeps what it has.</summary>
     public void SeedDeskPlate(bool freshInstall)
     {
@@ -827,7 +843,7 @@ public sealed class SettingsStore
         Write(root);
     }
 
-    /// <summary>"Let agents show watchers" (spec 6.9): <c>watchers_agents</c>, absent = off. The MCP tools
+    /// <summary>"Let Claude show watchers" (spec 6.9): <c>watchers_agents</c>, absent = off. The MCP tools
     /// <c>watch_start</c>, <c>watch_update</c> and <c>watch_end</c> write nothing while it is off.</summary>
     public bool LoadWatchersAgents() => ReadBool(Read(), "watchers_agents", false);
 
@@ -1028,7 +1044,7 @@ public sealed class SettingsStore
 
     public void SaveWhatsNewInstalledVersion(string version) => WriteString("whats_new_installed_version", version);
 
-    /// <summary>"Don't show after updates" (default false).</summary>
+    /// <summary>"Don't show What's New after updates" (default false).</summary>
     public bool LoadWhatsNewHideAfterUpdates()
     {
         try { return Read()["whats_new_hide_after_updates"]?.GetValue<bool>() ?? false; }
@@ -1039,6 +1055,28 @@ public sealed class SettingsStore
     {
         var root = Read();
         root["whats_new_hide_after_updates"] = hide;
+        Write(root);
+    }
+
+    /// <summary>Settings, About, Updates' "Check for updates once a day" (settings.json "update_check", Settings v2 slice 6): on when absent.
+    /// Off, no update probe runs on its own (<c>UpdateChecker</c>, <c>StoreUpdateService</c>); "Check now" still asks once.</summary>
+    public bool LoadUpdateCheck() => ReadBool(Read(), "update_check", true);
+
+    public void SaveUpdateCheck(bool on)
+    {
+        var root = Read();
+        root["update_check"] = on;
+        Write(root);
+    }
+
+    /// <summary>Settings, Privacy, Streamer mode (settings.json "streamer_mode", Settings v2 slice 7): off when absent. The tray's and the
+    /// widget's "Streamer mode" items write the same key.</summary>
+    public bool LoadStreamerMode() => ReadBool(Read(), "streamer_mode", false);
+
+    public void SaveStreamerMode(bool on)
+    {
+        var root = Read();
+        root["streamer_mode"] = on;
         Write(root);
     }
 

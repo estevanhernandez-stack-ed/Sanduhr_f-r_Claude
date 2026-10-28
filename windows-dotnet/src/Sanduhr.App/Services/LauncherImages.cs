@@ -39,7 +39,7 @@ internal static class LauncherImages
             byte[] encoded = Encode(sourcePath, out var sizeRefusal);
             if (sizeRefusal is not null) return new(null, sizeRefusal);
 
-            var name = LauncherImagePolicy.FileName(encoded);
+            var name = LauncherImagePolicy.FileName(encoded);   // streamer: notname - a hash-derived image file name, not an identifying name
             var dir = paths.LauncherDir;
             Directory.CreateDirectory(dir);
             var target = Path.Combine(dir, name);

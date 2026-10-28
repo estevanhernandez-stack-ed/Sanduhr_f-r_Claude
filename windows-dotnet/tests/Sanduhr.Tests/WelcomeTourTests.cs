@@ -273,4 +273,13 @@ public class WelcomeTourTests
         Assert.Empty(fresh.Show);
         Assert.True(fresh.Record);
     }
+
+    [Fact]
+    public void The_tour_defines_the_Desk_a_piece_the_widget_and_a_mod()
+    {
+        Assert.Contains(SettingsNames.DefineDesk, ById("desk").Card.Body);
+        Assert.Contains(SettingsNames.DefinePiece, ById("desk").Card.Body);
+        Assert.Contains(SettingsNames.DefineWidget, ById("paced").Card.Body);
+        Assert.Contains(SettingsNames.DefineMod, ById("claude-code").Card.Body);
+    }
 }

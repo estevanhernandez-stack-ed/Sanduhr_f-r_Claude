@@ -51,6 +51,20 @@ public static class SnapshotConsumers
     /// <c>get_usage</c> reads it and has nothing else on the Store build.</summary>
     public static bool SnapshotWanted(bool statuslineEnabled, bool mcpEnabled) => statuslineEnabled || mcpEnabled;
 
+    /// <summary>
+    /// Whether the widget writes the statusline script at start (slice 8 final review M2). <c>statusline_enabled</c> also stands for
+    /// the meters mod, which reads the snapshot and never runs the script, so the switch alone isn't enough: the script is written
+    /// when a statusline receipt exists, when the receipts can't be read (unknown is not "none"), or when the script is already
+    /// there (an update for a statusline installed before receipts, or one whose receipt is gone).
+    /// </summary>
+    public static bool ScriptWanted(bool statuslineEnabled, string receiptsPath, string scriptPath)
+    {
+        if (!statuslineEnabled) return false;
+        if (File.Exists(scriptPath)) return true;
+        var (receipts, unknown) = ReadReceipts(receiptsPath);
+        return unknown || StatuslineReceiptFolders(receipts).Count > 0;
+    }
+
     public static ConsumerState Of(StatuslineStatus status) => status switch
     {
         StatuslineStatus.Installed or StatuslineStatus.Outdated => ConsumerState.Installed,

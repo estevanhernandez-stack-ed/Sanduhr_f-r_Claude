@@ -212,10 +212,12 @@ internal sealed class LauncherApps : ILauncherAppCatalog, IDisposable
                 var explorer = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
                 var start = new ProcessStartInfo(explorer) { UseShellExecute = false, CreateNoWindow = true };
                 start.ArgumentList.Add(shellPath);   // one argument, quoted for us when the path has spaces; never the exe itself
+                // network: local (an app, through explorer.exe)
                 using var p = Process.Start(start);
                 return OpenResult.Opened;
             }
             if (LauncherTarget.LinkUrl(button.Target) is not { } url) return OpenResult.Refused;
+            // network: your-browser
             using var q = Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
             return OpenResult.Opened;
         }

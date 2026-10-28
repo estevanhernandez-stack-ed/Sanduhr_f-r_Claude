@@ -10,7 +10,7 @@ namespace Sanduhr.App.Views;
 /// One tier card. Adds two affordances over the pure binding surface: a
 /// drag-to-reorder gesture (starts a <see cref="DragDrop"/> carrying this card's
 /// <see cref="TierCardViewModel"/>; the host ItemsControl handles the drop) and
-/// a "Hide this tier" context action. Both persist through
+/// a "Hide this limit" context action. Both persist through
 /// <see cref="WidgetViewModel"/> (parity with the Python Settings → Cards
 /// hide/reorder, which wrote tier_order / hidden_tiers to settings.json).
 /// </summary>
@@ -69,7 +69,7 @@ public partial class TierCard : UserControl
 
         if (host.CanHideUntilReset(key))
             menu.Items.Add(Item(SettingsNames.HideUntilItResets, () => host.HideUntilReset(key)));
-        menu.Items.Add(Item("Hide this tier", () => host.HideTier(key)));
+        menu.Items.Add(Item(SettingsNames.HideThisLimit, () => host.HideTier(key)));
         menu.Items.Add(host.WarningsOn(key)
             ? Item(SettingsNames.StopWarnings, () => host.SetWarnings(key, false))
             : Item(SettingsNames.WarnAgain, () => host.SetWarnings(key, true)));

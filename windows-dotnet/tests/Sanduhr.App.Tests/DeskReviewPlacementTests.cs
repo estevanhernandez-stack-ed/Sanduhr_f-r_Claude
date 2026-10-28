@@ -9,6 +9,7 @@ namespace Sanduhr.App.Tests;
 /// #319, the app side: the Desk names the screen the review bar opens on from the design under review and the screens it has, and
 /// the bar centers itself on that screen's work area in physical pixels (a 3440 x 1440 primary beside a 1920 x 1080 secondary).
 /// </summary>
+[Collection("SettingsWindow")]
 public sealed class DeskReviewPlacementTests : IDisposable
 {
     private const string MainId = @"\\?\DISPLAY#GSM5B09#5&2c9d3a1&0&UID4352#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}";

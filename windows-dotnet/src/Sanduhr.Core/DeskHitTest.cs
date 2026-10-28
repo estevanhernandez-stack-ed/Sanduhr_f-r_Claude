@@ -142,8 +142,8 @@ public static class DeskPieceClicks
     /// <summary>The item a piece's menu has above the shared items, and the Settings page it opens ("message" or "clock"); null for the rest.</summary>
     public static (string Title, DeskElementKind Page)? MenuItem(DeskElementKind kind) => kind switch
     {
-        DeskElementKind.Message => ("Edit messages…", DeskElementKind.Message),
-        DeskElementKind.Clock => ("Desk settings…", DeskElementKind.Clock),
+        DeskElementKind.Message => (SettingsNames.LinkTitle(SettingsPage.DeskMessage), DeskElementKind.Message),
+        DeskElementKind.Clock => (SettingsNames.LinkTitle(SettingsPage.Desk), DeskElementKind.Clock),
         _ => null,
     };
 }

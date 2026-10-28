@@ -343,4 +343,69 @@ public class DeskArrangementTests
         full.Place("launcher", full.FirstFreeAnchor());
         Assert.Equal(["clock", "launcher"], full.Stack(DeskAnchor.BL).Select(p => p.Widget));
     }
+
+    // ---- Settings v2, slice 3: default places (spec, Desk: the split). Owner-confirmable: one line each in DefaultPlaceFor. ----
+
+    [Theory]
+    [InlineData("message", DeskAnchor.BL)]
+    [InlineData("nowPlaying", DeskAnchor.BR)]
+    [InlineData("weather", DeskAnchor.TR)]
+    [InlineData("watchers", DeskAnchor.MR)]
+    [InlineData("launcher", DeskAnchor.TL)]
+    [InlineData("companion", DeskAnchor.BC)]
+    [InlineData("telemetry", DeskAnchor.TR)]
+    [InlineData("clock", DeskAnchor.BL)]
+    [InlineData("claude", DeskAnchor.BL)]
+    [InlineData("meters", DeskAnchor.BL)]
+    [InlineData("meetings", DeskAnchor.BL)]
+    [InlineData("glow", DeskAnchor.TC)]
+    public void DefaultPlaceFor_is_the_specs_table(string widget, DeskAnchor expected) =>
+        Assert.Equal(expected, DeskArrangement.DefaultPlaceFor(widget));
+
+    [Fact]
+    public void The_layout_formats_fallback_is_unchanged()
+    {
+        // DefaultAnchor is what a layout or a design falls back to for an anchor it can't read; the MCP server reports it.
+        Assert.Equal(DeskAnchor.TL, DeskArrangement.DefaultAnchor("message"));
+        Assert.Equal(DeskAnchor.MR, DeskArrangement.DefaultAnchor("weather"));
+        Assert.Equal(DeskAnchor.BR, DeskArrangement.DefaultAnchor("companion"));
+        Assert.Equal(DeskAnchor.TL, new DeskArrangement("message:zz").Placement("message")!.Anchor);
+    }
+
+    [Fact]
+    public void PlaceAtDefault_places_a_hidden_piece_and_says_where()
+    {
+        var a = new DeskArrangement(DeskArrangement.Standard);
+        Assert.Equal(DeskAnchor.TR, a.PlaceAtDefault("weather"));
+        Assert.Equal("clock:bl claude:bl weather:tr", a.Layout);
+        Assert.Equal(DeskAnchor.BC, a.PlaceAtDefault("companion", DeskAnchor.BC));
+        Assert.Equal(DeskAnchor.TL, a.PlaceAtDefault("launcher", remembered: DeskAnchor.TL));
+    }
+
+    [Fact]
+    public void PlaceAtDefault_uses_a_remembered_place_first()
+    {
+        var a = new DeskArrangement(DeskArrangement.Standard);
+        Assert.Equal(DeskAnchor.BL, a.PlaceAtDefault("weather", DeskAnchor.BL));
+        Assert.Equal(DeskAnchor.BL, a.Placement("weather")!.Anchor);
+    }
+
+    [Fact]
+    public void PlaceAtDefault_leaves_a_placed_piece_and_an_unknown_word_alone()
+    {
+        var a = new DeskArrangement("clock:bl weather:bl:1.2");
+        Assert.Null(a.PlaceAtDefault("weather"));
+        Assert.Null(a.PlaceAtDefault("nope"));
+        Assert.Equal("clock:bl weather:bl:1.2", a.Layout);
+    }
+
+    [Fact]
+    public void StackPosition_counts_the_pieces_that_share_a_place()
+    {
+        var a = new DeskArrangement("clock:bl claude:bl weather:tr");
+        Assert.Equal((0, 2), a.StackPosition("clock"));
+        Assert.Equal((1, 2), a.StackPosition("claude"));
+        Assert.Equal((0, 1), a.StackPosition("weather"));
+        Assert.Equal((-1, 0), a.StackPosition("message"));
+    }
 }

@@ -185,11 +185,22 @@
                     </Grid.ColumnDefinitions>
                     <ContentPresenter Grid.Column="0" ContentSource="Header" RecognizesAccessKey="True"
                                       Margin="12,6,12,6" VerticalAlignment="Center" />
+                    <!-- A drawn mark, not text: it has no automation peer, so a screen reader hears the
+                         item's Toggle state once and not a stray "check mark" besides. It sits over the
+                         header's left padding, so it adds no column. -->
+                    <Path x:Name="CheckMark" Grid.Column="0" Data="M0.8,4.4 L3.4,7 L8.2,0.8" Width="9" Height="8"
+                          Margin="1,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"
+                          Stroke="{TemplateBinding Foreground}" StrokeThickness="1.6"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                          Visibility="Collapsed" IsHitTestVisible="False" />
                     <TextBlock Grid.Column="1" Text="{TemplateBinding InputGestureText}"
                                Margin="0,6,12,6" VerticalAlignment="Center" Opacity="0.7" />
                 </Grid>
             </Border>
             <ControlTemplate.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                </Trigger>
                 <Trigger Property="IsHighlighted" Value="True">
                     <Setter TargetName="Bd" Property="Background"
                             Value="{DynamicResource Sanduhr.Brush.GlassHover}" />

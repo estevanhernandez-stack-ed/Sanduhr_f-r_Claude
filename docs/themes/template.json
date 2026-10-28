@@ -12,8 +12,8 @@
 
   "text": "#e8e4dc",
   "text_secondary": "#b8b4ac",
-  "text_dim": "#777777",
-  "text_muted": "#555555",
+  "text_dim": "#8b8b8b",
+  "text_muted": "#848484",
 
   "accent": "#6c63ff",
   "pace_marker": "#ff6b6b",

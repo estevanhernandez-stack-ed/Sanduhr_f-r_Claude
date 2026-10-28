@@ -61,10 +61,10 @@ public sealed class CiRunnersSwitchTests : IDisposable
     }
 
     [Fact]
-    public void TheSwitchIsSearchableAndSitsOnTheDeskPage()
+    public void TheSwitchIsSearchableAndSitsOnTheWatchersPage()
     {
         foreach (var query in new[] { "show my CI runners' jobs", "runner", "GitHub Actions", "Docker" })
-            Assert.Contains(SettingsIndex.Search(query), h => h.Entry.Page == SettingsPage.Desk && h.Entry.Anchor == SettingsIndex.DeskWatchers);
-        Assert.Equal(SettingsPage.Desk, SettingsNames.Table.Single(t => t.Name == SettingsNames.CiRunnersSwitch).Page);
+            Assert.Contains(SettingsIndex.Search(query), h => h.Entry.Page == SettingsPage.Watchers && h.Entry.Anchor == SettingsIndex.CiRunners);
+        Assert.Equal(SettingsPage.Watchers, SettingsNames.Table.Single(t => t.Name == SettingsNames.CiRunnersSwitch).Page);
     }
 }
