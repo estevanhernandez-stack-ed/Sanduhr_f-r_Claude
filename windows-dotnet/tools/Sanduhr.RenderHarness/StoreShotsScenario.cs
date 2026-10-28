@@ -158,7 +158,7 @@ public static partial class Program
     }
 
     /// <summary>The Desk as the Store shows it: every piece in the active theme's look (follow on, the message in the theme's
-    /// colors), an invented song on Now playing (never a real artist), over a dark wallpaper stand-in, with the widget on top.</summary>
+    /// colors), the owner's Easter egg on Now playing (never a real artist's song), over a dark wallpaper stand-in, with the widget on top.</summary>
     static async Task RenderStoreDesk(BitmapSource? widget, string themeKey, string layout, string name, double widgetLeft, double widgetTop,
         Sanduhr.App.Desk.CompanionService? companion = null, FrameworkElement? overlay = null)
     {
@@ -173,7 +173,7 @@ public static partial class Program
         var message = new Sanduhr.App.Desk.DeskMessageFrame(new MessageToday(usual: "keep building."), DeskMessageSettings.Default);
         var track = new NowPlayingInfo
         {
-            Title = "Glass Hours", Artist = "The Pace Markers", Duration = 236, Elapsed = 94, ElapsedAt = now, Playing = true,
+            Title = "Thank God for Esteban", Artist = "Este", Duration = 236, Elapsed = 94, ElapsedAt = now, Playing = true,
         };
         var audio = new Sanduhr.App.Desk.AudioLevelSource();
         float[] levels = [0.1f, 0.35f, 0.6f, 0.45f, 0.85f, 0.55f, 0.95f, 0.7f, 0.4f, 0.8f, 0.6f, 0.3f, 0.7f, 0.5f, 0.75f, 0.35f];
