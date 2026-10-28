@@ -293,7 +293,9 @@ struct NotchHaloView: View {
     let radius: CGFloat
     /// Horizontal offset of the outline from the window's center (wings of unequal width).
     var offsetX: CGFloat = 0
-    @AppStorage("notchTextColor", store: .desk) private var textColor = "ffffff"
+    @AppStorage("notchTextColor", store: .desk) private var savedTextColor = "ffffff"
+    /// The saved notch color, or the palette a widget proposal is previewing with (DeskInkPreview).
+    private var textColor: String { DeskInkPreview.shared.resolved(saved: savedTextColor) }
 
     var body: some View {
         let reach = NotchGlowLayout.reach

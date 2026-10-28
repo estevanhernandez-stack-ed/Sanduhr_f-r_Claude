@@ -2313,8 +2313,8 @@ ink (Settings, Desk Look) and the companion pick (Settings, Widgets, Companion).
    Companion still names your own pack, `defaults read com.626labs.sanduhr.desk deskCompanionPack` is
    unchanged and `widgets/` has no new folder.
 3. **Dismiss**: your own companion is back at once. Propose a palette and press **Preview on the Desk**: the
-   Desk ink shows the palette's first color; Dismiss restores your ink, and Desk Look still shows the saved
-   color.
+   clock, date, meters, the notch island's text and the message all take the palette's gradient; Dismiss
+   restores each, and Desk Look still shows the saved colors.
 4. Start a preview, then propose something else: the preview comes down and the newer proposal waits
    unpreviewed. Start a preview and quit Sanduhr: after relaunch nothing is previewed and nothing is
    waiting (the proposal lived in memory).

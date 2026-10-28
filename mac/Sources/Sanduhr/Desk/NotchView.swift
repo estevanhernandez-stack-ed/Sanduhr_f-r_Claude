@@ -35,7 +35,9 @@ struct NotchView: View {
     /// The Desk font as drawn: EsteFont Pro unless a font was picked (DeskFont, item 58).
     private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage("notchChinText", store: .desk) private var showChinText = false
-    @AppStorage("notchTextColor", store: .desk) private var textColor = "ffffff"
+    @AppStorage("notchTextColor", store: .desk) private var savedTextColor = "ffffff"
+    /// The saved notch color, or the palette a widget proposal is previewing with (DeskInkPreview).
+    private var textColor: String { DeskInkPreview.shared.resolved(saved: savedTextColor) }
     @AppStorage("notchText", store: .desk) private var wingText = true
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
@@ -218,7 +220,9 @@ struct NotchWingsView: View {
     @AppStorage(DeskController.notchKey, store: .desk) private var enabled = false
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
     @AppStorage("notchText", store: .desk) private var showText = true
-    @AppStorage("notchTextColor", store: .desk) private var textColor = "ffffff"
+    @AppStorage("notchTextColor", store: .desk) private var savedTextColor = "ffffff"
+    /// The saved notch color, or the palette a widget proposal is previewing with (DeskInkPreview).
+    private var textColor: String { DeskInkPreview.shared.resolved(saved: savedTextColor) }
     @AppStorage("font", store: .desk) private var savedFont: String?
     /// The Desk font as drawn: EsteFont Pro unless a font was picked (DeskFont, item 58).
     private var font: String { DeskFont.resolve(saved: savedFont) }

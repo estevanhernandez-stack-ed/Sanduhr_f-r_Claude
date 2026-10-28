@@ -433,7 +433,8 @@ struct DeskPiece: View {
     private func line(_ text: String, size: Double, paused: Bool? = nil) -> some View {
         DeskMessageLine(raw: text, font: messageFont.isEmpty ? font : messageFont, baseSize: size,
                         inkSpec: messageColor, globalGlow: messageGlow, alignment: alignment,
-                        paused: paused ?? model.motionPaused, sweepFirst: sweepFirst)
+                        paused: paused ?? model.motionPaused, sweepFirst: sweepFirst,
+                        previewInk: DeskInkPreview.shared.spec)
     }
 
     private static func format(_ date: Date, _ pattern: String) -> String {

@@ -1874,8 +1874,9 @@ the older `replaced`; `busy` means the Desk is being arranged; `not_ready` means
   notification opens that page): the name, Claude's note, "What this widget is", the files and their
   license, and "Installs on Apply as a widget made here, on this Mac only." Buttons: **Preview on the
   Desk**, **Make it the companion** (sprites), **Apply**, **Dismiss**.
-- **Preview on the Desk** starts only on that click. A sprite is shown as the companion and a palette as the
-  Desk ink, from memory: the saved companion, the Desk ink and the widgets folder are untouched. Dismiss,
+- **Preview on the Desk** starts only on that click. A sprite is shown as the companion; a palette's first gradient
+  colors all the Desk's text (the Desk ink, the notch island and the message, over a line's own `{ink:}`),
+  from memory: the saved companion, the three saved colors and the widgets folder are untouched. Dismiss,
   Apply and a newer request take it down. Effects packs have nothing to draw. The answer to Claude is
   `previewing` as soon as the proposal is held, before any click.
 - **Apply** installs through `WidgetStore.install(source: .claude)` (a widget made here) and answers
