@@ -324,7 +324,7 @@ public class ToolLogicDeskDesignTests
     public async Task A_good_design_is_queued_normalized_and_the_widgets_answer_comes_back()
     {
         using var tmp = new TempDir();
-        var cfg = DesignConfig(tmp, TimeSpan.FromSeconds(5));
+        var cfg = DesignConfig(tmp, Waits.AnswerWait);
         WriteState(cfg);
         var logic = new ToolLogic(cfg, () => Now);
 
@@ -366,7 +366,7 @@ public class ToolLogicDeskDesignTests
     public async Task The_calls_name_and_note_win_over_the_designs()
     {
         using var tmp = new TempDir();
-        var cfg = DesignConfig(tmp, TimeSpan.FromSeconds(5));
+        var cfg = DesignConfig(tmp, Waits.AnswerWait);
         var widget = Task.Run(async () =>
         {
             var design = (JsonObject)((JsonObject)JsonNode.Parse(await ReadWhenReady(cfg.DesignRequestPath!))!)["design"]!;
@@ -385,7 +385,7 @@ public class ToolLogicDeskDesignTests
     public async Task Each_status_the_widget_may_give_is_passed_on_with_its_details(string status)
     {
         using var tmp = new TempDir();
-        var cfg = DesignConfig(tmp, TimeSpan.FromSeconds(5));
+        var cfg = DesignConfig(tmp, Waits.AnswerWait);
         var widget = Task.Run(async () =>
         {
             var id = (string?)((JsonObject)JsonNode.Parse(await ReadWhenReady(cfg.DesignRequestPath!))!)["id"];
@@ -414,7 +414,7 @@ public class ToolLogicDeskDesignTests
     public async Task A_status_the_server_does_not_know_is_not_passed_on_as_success()
     {
         using var tmp = new TempDir();
-        var cfg = DesignConfig(tmp, TimeSpan.FromSeconds(5));
+        var cfg = DesignConfig(tmp, Waits.AnswerWait);
         var widget = Task.Run(async () =>
         {
             var id = (string?)((JsonObject)JsonNode.Parse(await ReadWhenReady(cfg.DesignRequestPath!))!)["id"];
@@ -430,7 +430,7 @@ public class ToolLogicDeskDesignTests
     public async Task The_phase_one_widget_answers_not_ready_and_the_reason_arrives()
     {
         using var tmp = new TempDir();
-        var cfg = DesignConfig(tmp, TimeSpan.FromSeconds(5));
+        var cfg = DesignConfig(tmp, Waits.AnswerWait);
         var widget = Task.Run(async () =>
         {
             var id = (string?)((JsonObject)JsonNode.Parse(await ReadWhenReady(cfg.DesignRequestPath!))!)["id"];

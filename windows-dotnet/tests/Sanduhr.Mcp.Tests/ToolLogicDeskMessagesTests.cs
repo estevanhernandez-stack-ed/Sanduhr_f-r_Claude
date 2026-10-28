@@ -231,7 +231,7 @@ public class ToolLogicDeskMessagesTests
     public async Task A_good_proposal_is_queued_for_the_widget_and_its_answer_comes_back()
     {
         using var tmp = new TempDir();
-        var cfg = DeskConfig(tmp, TimeSpan.FromSeconds(5));
+        var cfg = DeskConfig(tmp, Waits.AnswerWait);
         var logic = new ToolLogic(cfg, () => Now);
 
         // Play the widget: take the request, check it with the widget's own decoder, answer pending.
@@ -262,7 +262,7 @@ public class ToolLogicDeskMessagesTests
     public async Task An_applied_or_rejected_answer_carries_its_counts_and_reasons()
     {
         using var tmp = new TempDir();
-        var cfg = DeskConfig(tmp, TimeSpan.FromSeconds(5));
+        var cfg = DeskConfig(tmp, Waits.AnswerWait);
         var logic = new ToolLogic(cfg, () => Now);
         var widget = Task.Run(async () =>
         {

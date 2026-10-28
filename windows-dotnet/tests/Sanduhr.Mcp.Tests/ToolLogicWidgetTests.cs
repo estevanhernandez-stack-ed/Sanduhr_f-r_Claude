@@ -85,7 +85,7 @@ public class ToolLogicWidgetTests
     public async Task A_good_pack_is_queued_namespaced_and_the_widgets_answer_comes_back()
     {
         using var tmp = new TempDir();
-        var cfg = WidgetConfig(tmp, TimeSpan.FromSeconds(5));
+        var cfg = WidgetConfig(tmp, Waits.AnswerWait);
         var logic = new ToolLogic(cfg, () => Now);
 
         var widget = Task.Run(async () =>
@@ -117,7 +117,7 @@ public class ToolLogicWidgetTests
     public async Task An_answer_outside_the_widgets_statuses_is_passed_on_as_rejected()
     {
         using var tmp = new TempDir();
-        var cfg = WidgetConfig(tmp, TimeSpan.FromSeconds(5));
+        var cfg = WidgetConfig(tmp, Waits.AnswerWait);
         var logic = new ToolLogic(cfg, () => Now);
         var widget = Task.Run(async () =>
         {

@@ -67,7 +67,7 @@ public class ToolLogicThemeTests
     public async Task Clean_theme_writes_the_request_the_widget_expects_and_returns_its_result()
     {
         using var tmp = new TempDir();
-        var cfg = ThemeConfig(tmp, TimeSpan.FromSeconds(5));
+        var cfg = ThemeConfig(tmp, Waits.AnswerWait);
         var logic = new ToolLogic(cfg, () => Now);
 
         // Play the widget: answer as soon as the request lands.
