@@ -53,7 +53,7 @@ struct DeskView: View {
     @AppStorage(DeskController.notchKey, store: .desk) private var island = false
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
 
-    enum Widget: String, CaseIterable { case clock, claude, meters, nowPlaying, watchers, meetings, message }
+    enum Widget: String, CaseIterable { case clock, claude, meters, nowPlaying, watchers, meetings, message, companion }
 
     private var inset: CGFloat { timeSize * 0.18 }
 
@@ -251,6 +251,7 @@ struct DeskPiece: View {
         case .watchers: DeskWatchers(model: model, font: font, size: timeSize * 0.17, alignment: alignment).deskInk()
         case .meetings: meetings.deskInk()
         case .message: message.deskPieceClickArea(.message) { model.messageFrame = $0 }
+        case .companion: CompanionPiece(model: model, scale: scale)
         }
     }
 

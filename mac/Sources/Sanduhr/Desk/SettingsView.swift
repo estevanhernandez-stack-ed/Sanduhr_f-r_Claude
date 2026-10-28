@@ -340,7 +340,7 @@ enum DeskLayout {
     static let widgets: [(key: String, name: String)] = [
         ("message", "Message"), ("clock", "Clock and date"), ("claude", SettingsNames.claudeMetersLine),
         ("meters", SettingsNames.claudeMetersBars), ("nowPlaying", "Now playing"), ("watchers", "Watchers"),
-        ("meetings", "Meetings"),
+        ("meetings", "Meetings"), ("companion", "Companion"),
     ]
 
     /// Widget to anchor word, for the widgets this build knows. A repeated widget keeps its last
