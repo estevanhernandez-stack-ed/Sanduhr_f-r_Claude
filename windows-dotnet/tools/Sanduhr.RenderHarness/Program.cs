@@ -27,6 +27,7 @@ using Sanduhr.Core;
 //                        manual-key is not part of all either: the manual sign-in key window, closed and fully open
 //                        streamer-smoke is not part of all and runs alone: the Settings v2 slice 7 owner checks, automated (see StreamerSmokeScenario.cs)
 //                        polish-smoke is not part of all and runs alone: the 4.0 polish live checks, SANDUHR_DEV_PROFILE under %TEMP% (see PolishSmokeScenario.cs)
+//                        store-shots is not part of all: Store screenshots, 2560x1440 frames of Settings and the widget (see StoreShotsScenario.cs)
 //   --pages <list>       settings-pass only: comma-separated page names to run (default every page)
 //   --parts <list>       settings-pass only: pages, tab, focus, search, links, contrast (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)
@@ -109,7 +110,7 @@ public static partial class Program
             }
         }
         string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange", "launcher", "review", "companion", "ridealongs", "propose-widget", "meterstyles", "theme-match" };
-        string[] opt = { "settings-pass", "manual-key", "streamer-smoke", "polish-smoke" };
+        string[] opt = { "settings-pass", "manual-key", "streamer-smoke", "polish-smoke", "store-shots" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
         var bad = scenarios.Where(s => !known.Contains(s) && !opt.Contains(s)).ToList();
@@ -299,6 +300,8 @@ public static partial class Program
         // Claude Code folders come from an invented profile, never the real one, so no real path, project or
         // account label reaches a picture. Set before the view model is built (its log reader discovers folders).
         string fakeProfile = BuildFakeProfile();
+        if (scenarios.Contains("store-shots"))
+            SeedStoreLogs(fakeProfile);
         Sanduhr.App.Services.ClaudeCodeProfile.ProfileOverride = fakeProfile;
         Sanduhr.App.Services.ClaudeCodeProfile.ConfigDirOverride = "";
         Log.Add("claude code profile: invented (temp folder)");
@@ -399,6 +402,8 @@ public static partial class Program
                 await RenderRideAlongs(vm, asm);
             if (scenarios.Contains("propose-widget"))
                 await RenderProposeWidget(vm, asm);
+            if (scenarios.Contains("store-shots"))
+                await RenderStoreShots(vm, asm);
         }
         finally
         {
