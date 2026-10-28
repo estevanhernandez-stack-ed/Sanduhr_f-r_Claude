@@ -1880,7 +1880,7 @@ timer, observer, subscription or image. Rules are pure and tested apart from the
   `CAKeyframeAnimation` on position with a stepped mirror, so the render server does the work. Reduce Motion,
   Roam off, exhausted and a playing trigger each stop it. The sprite layer extends outside its piece's view
   (views do not clip on macOS 14 and later), which keeps OLED drift applying to it unchanged.
-- **Pause.** Out of sight (Desk covered, screens asleep, session switched away) the layers and the timers hold.
+- **Pause.** Out of sight (Desk covered, screens asleep, screen saver, session switched away) the layers and the timers hold.
   Reduce Motion drops the frame rate to 1 and cancels the walk.
 - **Demo mode.** Only the pack with id `hourglass`, at growth 0.5, cycling the five moods every 20 seconds; it
   reads no real growth, usage or watchers.
