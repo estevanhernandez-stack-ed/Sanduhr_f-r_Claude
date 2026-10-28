@@ -2,6 +2,16 @@
 
 ## Unreleased (mac)
 
+- **Widgets.** Settings, Widgets lists the signed widget catalog and installs the packs you pick: color themes, message palettes, sprites and effects. Sanduhr reaches GitHub only when the page opens, on **Check the catalog again** and on **Install** or **Update**, checks the catalog's signature and each download's size and SHA-256, and checks every file again on this Mac before the pack is put in place. Installed themes join Settings, Widget, Themes; palettes join the Message editor's Palette menu. Effects packs are listed and don't draw yet. **Reset Sanduhr…** has a **Your widgets** part.
+
+- **A companion on the Desk.** Install a sprite pack in Settings, Widgets; its **Desk Settings…** link opens the **Companion** piece's place on Settings, Desk, where you put it on the Desk and move it. It grows with the days you code (read from Sanduhr Time's day files, or Claude Code activity dates, never tokens), shows your pacing as a mood, reacts when a watcher needs you or passes and when a limit nears, naps when you're away, and roams the Desk edges unless Reduce Motion is on. Demo mode shows the hourglass.
+
+- **OLED care.** A switch in Settings, Desk, off by default. On, the Desk's pieces drift a few points every three minutes, the Desk and the widget dim after five minutes without input, and the Desk's ink never draws pure white. Off, none of it runs. Nothing leaves the Mac.
+
+- **For the smoke harness.** `smoke/smoke state` has a `companion` field (`pack`, `stage`, `mood`, `roaming`) while the piece shows, and `null` otherwise.
+
+## v2.34.0-mac — 2026-10-27
+
 - **Your plan on the widget.** The footer shows your plan as a small label, Max ×20, Max, Team or Pro, and on the Max plans its tooltip rotates through a few jokes every few seconds (Reduce Motion keeps the first). Settings, Accounts shows each account's plan beside its name. Claude Code sessions get it too, through the MCP's `get_usage`. No new request: the plan comes from the organization answer Sanduhr already fetches, and only its name is kept. API and prepaid accounts show none.
 
 ## v2.33.1-mac — 2026-10-26

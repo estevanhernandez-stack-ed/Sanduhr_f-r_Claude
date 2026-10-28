@@ -42,8 +42,11 @@ enum SettingsAnchor {
     static let desk = "desk"
     static let arrange = "arrange"
     static let pieces = "pieces"
+    /// The Companion's row under Where each piece sits (not searchable: Settings, Widgets links to it).
+    static let companionPlace = "companion-place"
     static let order = "order"
     static let clicks = "clicks"
+    static let oled = "oled"
     static let margins = "margins"
     // Desk Look
     static let fonts = "fonts"
@@ -66,6 +69,10 @@ enum SettingsAnchor {
     static let textColor = "text-color"
     // Lock Screen
     static let lockLine = "lock-line"
+    // Widgets
+    static let catalog = "catalog"
+    static let installedWidgets = "installed"
+    static let companion = "companion"
     // Now Playing
     static let source = "source"
     static let show = "show"
@@ -108,7 +115,7 @@ enum SettingsAnchor {
     static let advanced = "advanced"
 
     /// Every anchor in sidebar order, page by page, with its title and synonyms.
-    static let all: [SettingsEntry] = general + accountsAndAlerts + deskPages + notchPages + lockScreenPages + claudeCodePages + widgetAndHelp
+    static let all: [SettingsEntry] = general + accountsAndAlerts + deskPages + notchPages + lockScreenPages + widgetsPages + claudeCodePages + widgetAndHelp
 
     private static let general: [SettingsEntry] = [
         SettingsEntry(title: "Surfaces", page: .general, anchor: surfaces, synonyms: ["status", "desk on", "notch on"]),
@@ -149,6 +156,9 @@ enum SettingsAnchor {
                       synonyms: ["corner", "position", "place", "hidden", "clock", "meetings", "Read today's meetings"]),
         SettingsEntry(title: "Order", page: .deskLayout, anchor: order, synonyms: ["stack", "reorder"]),
         SettingsEntry(title: "Clicks", page: .deskLayout, anchor: clicks, synonyms: [DeskPieceClicks.title, "click", DeskLayer.title, "under desktop icons", "bottom", "behind files"]),
+        SettingsEntry(title: SettingsNames.oledCareSwitch, page: .deskLayout, anchor: oled,
+                      synonyms: ["oled", "burn-in", "burn in", "burnin", "drift", "dim", "idle", "away", "screen", "pixels",
+                                 "white", "image retention", "off by default"]),
         SettingsEntry(title: "Margins", page: .deskLayout, anchor: margins, synonyms: ["padding", "edge", "inset"], advanced: true),
         SettingsEntry(title: "Fonts", page: .deskLook, anchor: fonts, synonyms: ["Desk font", "Message font", "typeface"]),
         SettingsEntry(title: "Sizes", page: .deskLook, anchor: sizes, synonyms: ["clock size", "message size"]),
@@ -167,6 +177,16 @@ enum SettingsAnchor {
         SettingsEntry(title: "Show a line on the lock screen", page: .lockScreen, anchor: lockLine,
                       synonyms: ["lock screen", "login window", "loginwindow", "locked", "prefix", "Claude usage",
                                  "Reset time", "Watchers waiting for you"]),
+    ]
+
+    private static let widgetsPages: [SettingsEntry] = [
+        SettingsEntry(title: "Widget catalog", page: .widgets, anchor: catalog,
+                      synonyms: ["install", "update", "download", "sprites", "palettes", "fonts", "packs",
+                                 "Check the catalog again"]),
+        SettingsEntry(title: "Installed widgets", page: .widgets, anchor: installedWidgets,
+                      synonyms: ["uninstall", "remove", "made here", "from the catalog", "effects"]),
+        SettingsEntry(title: "Companion", page: .widgets, anchor: companion,
+                      synonyms: ["roam", "sprite", "pet", "hourglass"]),
     ]
 
     private static let notchPages: [SettingsEntry] = [
@@ -257,7 +277,7 @@ extension SettingsNames {
         SanduhrHotKeys.Shortcut.settings.name: SettingsAnchor.shortcuts,
         SanduhrHotKeys.Shortcut.join.name: SettingsAnchor.shortcuts,
         checkAppMenus: SettingsAnchor.shortcuts,
-        deskSwitch: SettingsAnchor.desk, notchSwitch: SettingsAnchor.notch, notchGlow: SettingsAnchor.glow,
+        deskSwitch: SettingsAnchor.desk, oledCareSwitch: SettingsAnchor.oled, notchSwitch: SettingsAnchor.notch, notchGlow: SettingsAnchor.glow,
         cameraMicPlace: SettingsAnchor.cameraMic,
         claudeCodeGlowHook: SettingsAnchor.folders, metersAbovePrompt: SettingsAnchor.metersMod,
         byFolder: SettingsAnchor.inventory,

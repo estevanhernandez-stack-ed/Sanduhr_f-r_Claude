@@ -285,6 +285,7 @@ eq('desk pieces follow the layout', state['desk_pieces'].map { |p| [p['piece'], 
    [['message', 'tl', 0], ['clock', 'bl', 0], ['meters', 'bl', 1], ['meetings', 'bl', 2]])
 eq('desk pieces at size 1 in the fixture', state['desk_pieces'].map { |p| p['scale'] }.uniq, [1])
 eq('select a piece by name', State.dig(state, 'desk_pieces[piece=meters].order'), [true, 1])
+eq('no companion in the fixture', state['companion'], nil)
 eq('desk frames ok in the fixture', [state['desk_frames_ok'], state['desk_frames_problem']], [true, nil])
 eq('desk frame kinds', state['desk_frames'].map { |f| f['kind'] }, %w[meters meter_row meter_row meetings clock message])
 # "Clock and message take clicks": on in the fixture; desk-layout.yaml's check that, off, neither
@@ -294,6 +295,8 @@ eq('piece clicks on in the fixture', state['desk_piece_clicks'], true)
 eq('plate off in the fixture', state['desk_plate'], false)
 # "Keep the Desk under desktop icons": off in the fixture, what an absent key reads as.
 eq('under icons off in the fixture', state['desk_under_icons'], false)
+# "OLED care": off in the fixture, what an absent key reads as.
+eq('oled care off in the fixture', state['oled_care'], false)
 # Issue #119: the top-center pill is off, not forced and not up in the fixture; its frame is null
 # until it is. The `on` key is quoted in the fixture, so it reads as a key and not as true.
 eq('pill off in the fixture', state['notch_pill'], { 'on' => false, 'forced' => false, 'shown' => false, 'frame' => nil })

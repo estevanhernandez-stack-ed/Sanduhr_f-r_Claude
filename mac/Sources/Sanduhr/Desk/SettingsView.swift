@@ -49,6 +49,7 @@ struct DeskLayoutSection: View {
                     .font(.caption)
             }
             DeskClicksSection()
+            DeskOledSection()
             // The margins move every piece, so they wait while arranging as the places and the order do.
             AdvancedSection(page: .deskLayout) { DeskMarginsRows().disabled(arranging) }
         }
@@ -56,13 +57,16 @@ struct DeskLayoutSection: View {
     }
 }
 
-/// Where each piece sits: its first row carries the section's anchor.
+/// Where each piece sits: its first row carries the section's anchor, and the Companion's row its
+/// own, for Settings, Widgets' link after a sprite install.
 private struct FirstPieceAnchor: ViewModifier {
     let widget: String
 
     func body(content: Content) -> some View {
         if widget == DeskLayout.widgets.first?.key {
             content.settingsAnchor(SettingsAnchor.pieces)
+        } else if widget == "companion" {
+            content.settingsAnchor(SettingsAnchor.companionPlace)
         } else {
             content
         }
@@ -84,6 +88,22 @@ private struct DeskClicksSection: View {
                 .settingsAnchor(SettingsAnchor.clicks)
                 .disabled(underIcons)
             Text(DeskPieceClicks.caption)
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Desk, OLED care: one switch (desk key `deskOledCare`, off when absent). The Desk starts or stops the
+/// drift, the dim and the white cap as it flips (OledCareController).
+private struct DeskOledSection: View {
+    @AppStorage(OledCare.key, store: .desk) private var oled = OledCare.defaultOn
+
+    var body: some View {
+        Section {
+            Toggle(OledCare.title, isOn: $oled)
+                .settingsAnchor(SettingsAnchor.oled)
+                .onChange(of: oled) { _, _ in DeskController.shared.applyOled() }
+            Text(OledCare.caption)
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -323,7 +343,7 @@ enum DeskLayout {
     static let widgets: [(key: String, name: String)] = [
         ("message", "Message"), ("clock", "Clock and date"), ("claude", SettingsNames.claudeMetersLine),
         ("meters", SettingsNames.claudeMetersBars), ("nowPlaying", "Now playing"), ("watchers", "Watchers"),
-        ("meetings", "Meetings"),
+        ("meetings", "Meetings"), ("companion", "Companion"),
     ]
 
     /// Widget to anchor word, for the widgets this build knows. A repeated widget keeps its last

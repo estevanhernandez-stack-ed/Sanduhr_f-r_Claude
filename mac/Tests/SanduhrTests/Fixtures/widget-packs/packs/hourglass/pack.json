@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "hourglass",
+  "name": "Hourglass",
+  "version": "1.0.0",
+  "author": "626 Labs LLC",
+  "license": "CC-BY-4.0",
+  "kind": "sprite",
+  "sanduhr_min": "3.8.0",
+  "description": "A little hourglass companion that grows through four stages as you code. Sand level is growth: egg, sprout, runner, keeper. Original pixel art.",
+  "files": [
+    "sprite.json",
+    "sprites/egg.png",
+    "sprites/sprout.png",
+    "sprites/runner.png",
+    "sprites/keeper.png"
+  ],
+  "preview": "preview.png"
+}

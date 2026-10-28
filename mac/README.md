@@ -1397,6 +1397,10 @@ pointer. A drag that starts on a piece itself is Desk's until the button comes u
 the window server is not documented to honour for a drag already under way; it has not been
 checked against a live Finder drag in a test (see the smoke test).
 
+## OLED care
+
+Settings, Desk, **OLED care** (desk suite key `deskOledCare`, off when absent; the rules are in `OledCare.swift`, ported from Windows' `OledCare`). With it on and the Desk showing: every 3 minutes each Desk piece's offset moves to the next point of a 16-point figure-eight (6 points wide, a 48-minute loop), as one animation, clamped clear of the menu bar, the notch and the Dock; after 5 minutes without input the Desk window eases to 0.40 opacity and the widget window to 0.70 (the first input wakes them in 0.3 s; Reduce Motion snaps); and the Desk ink, the message and now playing never draw pure white (capped to #e6e6e6, hue kept). The notch island and the lock screen line do not drift. Off, none of it exists: no timer, no subscription, no offset. `IdleClock` is the one shared reader of seconds since any input (`CGEventSource`, no permission); it polls only while someone subscribes. `state.yaml` carries `oled_care: on|off` as a bool.
+
 ## Desk and the Dock
 
 Desk's pieces stay clear of the Dock on the Desk's screen (item 56, `DockFollower`, the pure
@@ -1732,13 +1736,13 @@ state.yaml's `menu_submenus` and `scenarios/settings-names.yaml`.
 
 ## Settings pages
 
-Settings v2, slice 2 (item 72): seventeen pages in five groups (Lock Screen joined Desktop for #137), each feature with one home and every
+Settings v2, slice 2 (item 72): eighteen pages in five groups (Lock Screen joined Desktop for #137, Widgets after it for 2.35), each feature with one home and every
 other mention a status line and a "<Page> Settings…" link.
 
 | Group | Pages (raw value) |
 | --- | --- |
 | (none) | General (`general`), Accounts (`credentials`), Usage (`usage`), Alerts (`alerts`) |
-| Desktop | Desk (`deskLayout`), Desk Look (`deskLook`), Message (`message`), Notch (`notch`), Lock Screen (`lockScreen`), Now Playing (`nowPlaying`), Watchers (`watchers`) |
+| Desktop | Desk (`deskLayout`), Desk Look (`deskLook`), Message (`message`), Notch (`notch`), Lock Screen (`lockScreen`), Widgets (`widgets`), Now Playing (`nowPlaying`), Watchers (`watchers`) |
 | Claude Code | Claude Code (`integrations`), Mods & Config (`mods`) |
 | Widget | Widget (`widgetLook`), Themes (`themes`) |
 | Help | Updates (`updates`), About (`about`) |
@@ -1815,6 +1819,80 @@ from frames the marked views report; null with no anchor) and `settings_preview_
 `SettingsReachTests` covers the index (every names-table entry indexed at its anchor, the synonyms),
 anchor and link parsing, Advanced, folding, Add Line's place and the chin height.
 
+## Settings, Widgets
+
+Settings, Widgets (`widgets`, Desktop group after Lock Screen; docs/mac-widgets-spec.md section 2 and 3)
+lists the signed widget catalog with Install, Update or Installed, the installed packs (kind, version,
+"from the catalog" or "made here") with Uninstall, and the Companion picker. Nothing polls:
+`WidgetsModel.refreshCatalog` runs when the page appears and on Check the catalog again, and a failure is
+one quiet line. Install is `WidgetCatalogClient.download` (rules 3 to 5), then `WidgetStore.install`
+(rule 6): files go to `widgets/.staging/<id>-<token>/`, pixel sheets are rasterized to
+`.raster/<sheet>.png`, and the folder is renamed into `widgets/<id>/` before the `widgets.json` row is
+written; a failure at any step puts the old install back. `widgets.json` is Windows' shape
+(`schema_version`, `catalog_generated_at`, `packs[{id, version, source, installed_at, enabled}]`), and
+`catalog_generated_at` is the rollback marker (`WidgetStore` is the `WidgetCatalogMarker`). An id keeps
+its source: a catalog pack never replaces a made-here one, nor the other way round. Every write honors
+`ResetGate`.
+
+The Companion is one installed sprite at a time (`CompanionSettings`): the Desk suite key
+`deskCompanionPack` (absent: the first installed sprite by id). It always roams, unless Reduce Motion is on.
+Installed theme packs join the Theme menu and the gallery as `<packId>:<stem>` (`PackThemes`, registered by
+`UserThemes.load`), and palette packs join `MessagePalette.all` as `<palette> · <pack name>`
+(`PackInkPresets`); seeded now-playing looks keep drawing from `MessagePalette.builtIn`, so a pack never
+changes a song's look. Effects packs are listed as installed only: "Effects packs don't draw yet."
+
+**The pack validator.** `PackValidator` (with `PackValidator+Kinds`, `PackThemes`, `PixelSheet`) is a Swift
+port of the catalog's `validate.py`, run on every download and again on the installed folder, with the
+shared fixture corpus in `Tests/SanduhrTests/Fixtures/widget-packs/` pinned to the Python messages. The PNG
+data check uses `PackInflate`, a small zlib reader written for it, because the Compression framework
+decodes a truncated stream to a different length than Python and gives no reason for a corrupt one; bad
+streams are worded as stock zlib words them (the wording Python and the Windows app give), not as macOS's
+libz does, so one message set serves every platform. `PackFormat.supported` (`3.8.0`) is the pack-format
+level this app can install: a pack's `sanduhr_min` is compared with it, never with the app's own version,
+because `sanduhr_min` is the shared level numbered by the Windows app's releases. It moves only when the Mac
+gains a newer format's features, and a test pins it. The catalog client and the catalog's own checks
+(`WidgetCatalog`, `WidgetCatalogClient`, `WidgetDownloader`) are described in docs/PRIVACY.md, On the Mac.
+
+## The companion
+
+The Desk's `companion` piece (default place bottom center; a sprite pack from Settings, Widgets picks the
+art, `CompanionSettings`) is a small animal that lives on the Desk. It exists only while the piece is
+placed, a sprite pack is installed and the Desk shows: with none of those, `CompanionDriver` holds no
+timer, observer, subscription or image. Rules are pure and tested apart from the layers:
+
+- **Stage.** Growth, 0 to 1, is a function of distinct coding days (`CompanionGrowth`: 3 days 0.10,
+  10 days 0.35, 30 days 0.75, 60 days 1), never of tokens, so a user well under pace grows as fast as one at
+  the cap. The stage is the pack's stage with the highest `min_growth` that growth has reached. Days come
+  from Sanduhr Time's day files (`~/.sanduhr/time/days/*.json`) when the folder holds any, otherwise from the
+  dates of Claude Code activity in the linked folders. `widgets/companion.json` remembers the highest growth,
+  the days seen (a log gets pruned; growth never goes down) and the active time; the read runs hourly off the
+  main thread.
+- **Mood** (`CompanionMoods`, `CompanionBrain`). Under pace is content; near pace (within 5 points) and in use
+  is focused; weekly at 85 percent or more, or any limit 5 or more points ahead of its pace line, is worried;
+  a windowed limit at 100 percent is exhausted (it sleeps, and does not roam); a weekly limit or one that was
+  at 100 rolling into a new window is celebrate for 10 minutes. Signed out or no numbers is content.
+- **Triggers** play once and the mood resumes: `needs_you` (a watcher went to waiting), `job_passed` (to
+  passed), `near_limit` (a limit crossed its Alerts line, `sessionLine` for the session and `weeklyLine` for the
+  rest, or 100 percent, upward; the first reading is only a baseline) and `idle` (20 minutes without input,
+  once until input returns).
+- **Roam** (`CompanionRoamer`, `CompanionPath`). Always on, with no switch: it walks the
+  pack's named edges of the Desk area less the menu bar and the Dock, 12 s walking then 8 s resting, one
+  `CAKeyframeAnimation` on position with a stepped mirror, so the render server does the work. Reduce Motion,
+  exhausted and a playing trigger each stop it. The sprite layer extends outside its piece's view
+  (views do not clip on macOS 14 and later), which keeps OLED drift applying to it unchanged.
+- **Pause.** Out of sight (Desk covered, screens asleep, screen saver, session switched away) the layers and the timers hold.
+  Reduce Motion drops the frame rate to 1 and cancels the walk.
+- **Demo mode.** Only the pack with id `hourglass`, at growth 0.5, cycling the five moods every 20 seconds; it
+  reads no real growth, usage or watchers.
+- **Idle.** `IdleClock` is one shared reader of the seconds since any input (`CGEventSource`, no permission,
+  never what was pressed). The companion subscribes at 5 s while it shows; OLED care subscribes at 15 s while
+  it is on. With no subscriber there is no timer.
+- **`state.yaml`** has `companion: {pack, stage, mood, roaming}` while the piece shows and `companion: null`
+  otherwise.
+- **Reload.** The driver re-reads its pack when the Desk preferences change, when the app activates, and on
+  `Notification.Name.widgetPacksDidChange`, which `WidgetsModel` posts after an install, update or
+  uninstall succeeds.
+
 ## Reset Sanduhr…
 
 Settings v2, slice 5 (item 72): About's last section opens a sheet (`Views/ResetSheet.swift`) that
@@ -1835,11 +1913,13 @@ lists what it removes, each part a checkbox, all checked, and runs the checked s
    the sheet's accounts caption and each accounts result row say. A Keychain key that can't be
    deleted is named by slot kind in its row, pointing at Keychain Access.
 3. **History and records.** Every top-level item of `~/Library/Application Support/Sanduhr/` except
-   `themes/` (its own part) and, while any receipt is left or `installs.json` can't be decoded,
+   `themes/` and `widgets/` (their own parts) and, while any receipt is left or `installs.json` can't be decoded,
    `integrations/`; then the folder if empty. Unreadable receipts list no folder, and the sheet warns.
 4. **Desk messages.** `messages.txt` renamed to `messages.txt.previous`, replacing an older one.
 5. **Your themes.** `themes/`, then Sanduhr's folder if that left it empty.
-6. **All settings.** `removePersistentDomain` for `com.626labs.sanduhr` and
+6. **Your widgets.** `widgets/` (the installed packs, `widgets.json` and `.staging/`), then Sanduhr's
+   folder if that left it empty. Its own checkbox next to Themes.
+7. **All settings.** `removePersistentDomain` for `com.626labs.sanduhr` and
    `com.626labs.sanduhr.desk`, last: step 2 reads the account list from the first.
 
 Each step is tried on its own (`Reset.perform`) and reported; a failure (a folder whose file changed
@@ -1889,6 +1969,9 @@ refusal. `ResetShutdownTests` covers the gate (each writer a no-op inside
 - Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps`, `nowPlayingExcluded` (bundle ids switched off) and `nowPlayingIdle` (When nothing is playing: `automatic` when unset, or a notch content's raw value). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory
 - EsteFont Pro and EsteFont 26 → `Sanduhr.app/Contents/Resources/Fonts/`, from `mac/Resources/Fonts/` (see Fonts); the Desk's choice in the desk preference `font`
 - Third-party notices (Sparkle, mediaremote-adapter, EsteFont Pro, EsteFont 26) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
+
+- Widgets (2.35.0) → `~/Library/Application Support/Sanduhr/widgets/`: one folder per installed pack (with `.raster/` for pixel-sheet PNGs drawn at install), `widgets.json` (Windows' shape: the installed packs and the rollback marker `catalog_generated_at`), `.staging/` (installs and removals in flight) and `companion.json` (`schema_version`, `growth`, `active_ms`, `days`); the companion's choice in the desk preference `deskCompanionPack`; Reset Sanduhr… has a **Your widgets** part
+- OLED care (2.35.0) → the desk preference `deskOledCare` (off when absent); nothing on disk
 
 ## Controls
 

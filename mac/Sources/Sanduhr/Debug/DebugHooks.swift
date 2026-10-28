@@ -343,6 +343,7 @@ enum DebugHooks {
         s.deskEnabled = desk.enabled
         s.deskRunning = desk.running
         s.layout = UserDefaults.desk.string(forKey: "layout")
+        s.companion = desk.model.companion.debug
         s.deskPieces = DeskArrangement(s.layout ?? DeskLayout.standard).shown(
             showMeetings: UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true)
         let arrange = desk.model.arrange
@@ -444,6 +445,7 @@ enum DebugHooks {
         s.deskPieceClicks = DeskPieceClicks.isOn(in: UserDefaults.desk)
         s.deskPlate = DeskPlate.isOn(in: UserDefaults.desk)
         s.deskUnderIcons = DeskLayer.isOn(in: UserDefaults.desk)
+        s.oledCare = OledCare.isOn(in: UserDefaults.desk)
         if desk.running, let size = desk.windowSize {
             s.deskFrames = desk.model.elements()
             s.deskFramesProblem = DeskFrameCheck.problem(s.deskFrames, window: size)

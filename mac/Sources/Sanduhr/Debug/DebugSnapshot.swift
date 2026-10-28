@@ -9,6 +9,8 @@ struct DebugStateInput {
     var layout: String?
     /// The pieces the Desk draws from it (item 59), in order: each anchor's stack top to bottom.
     var deskPieces: [DeskPlacement] = []
+    /// The companion piece while it shows (CompanionDriver.debug), nil otherwise.
+    var companion: CompanionDebug?
     /// Arrange mode (item 60): on or off, an unsaved change, the layout being edited, and whether
     /// the Desk window takes clicks over its whole frame or only where it draws.
     var deskArrange = DeskArrangeDebug()
@@ -89,6 +91,8 @@ struct DebugStateInput {
     /// "Keep the Desk under desktop icons" (DeskLayer, desk suite key "underIcons"), Settings,
     /// Desk, Clicks: off when the key is absent.
     var deskUnderIcons = DeskLayer.defaultOn
+    /// "OLED care" (OledCare, desk suite key "deskOledCare"), Settings, Desk: off when the key is absent.
+    var oledCare = OledCare.defaultOn
     /// The Dock as the Desk sees it (item 56): its side, auto-hide, and the inset applied now.
     var dock = DockDebug()
     var alerts = AlertSettings()
@@ -554,6 +558,7 @@ enum DebugState {
         pairs.append(("desk_running", .bool(s.deskRunning)))
         pairs.append(("layout", s.layout.map(YAMLNode.string) ?? .null))
         pairs.append(("desk_pieces", deskPiecesYAML(s.deskPieces)))
+        pairs.append(("companion", CompanionDebug.yaml(s.companion)))
         pairs.append(("desk_arrange", deskArrangeYAML(s.deskArrange)))
         pairs.append(("notch", .bool(s.notch)))
         pairs.append(("has_notch", .bool(s.hasNotch)))
@@ -593,6 +598,7 @@ enum DebugState {
         pairs.append(("desk_piece_clicks", .bool(s.deskPieceClicks)))
         pairs.append(("desk_plate", .bool(s.deskPlate)))
         pairs.append(("desk_under_icons", .bool(s.deskUnderIcons)))
+        pairs.append(("oled_care", .bool(s.oledCare)))
         pairs.append(("dock", dockYAML(s.dock)))
         pairs.append(("alerts", alerts(s.alerts)))
         let fetched: YAMLNode = s.lastFetch.map { .string(ISO8601.stamp($0, fractional: false)) } ?? .null

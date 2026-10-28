@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "palettes": [
+    {
+      "name": "plain",
+      "colors": [
+        "#ff2a6d"
+      ],
+      "mood": "<script>x</script>"
+    }
+  ]
+}

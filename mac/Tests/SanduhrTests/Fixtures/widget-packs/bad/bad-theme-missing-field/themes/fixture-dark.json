@@ -1,0 +1,18 @@
+{
+  "name": "Fixture Dark",
+  "bg": "#000000",
+  "glass": "#000000",
+  "glass_on_mica": "#000000",
+  "title_bg": "#000000",
+  "border": "#222222",
+  "text": "#e6e6e6",
+  "text_secondary": "#a8a8a8",
+  "text_dim": "#707070",
+  "text_muted": "#484848",
+  "bar_bg": "#141414",
+  "footer_bg": "#000000",
+  "pace_marker": "#ffd23f",
+  "sparkline": "#ff2a6d",
+  "glass_alpha": 1.0,
+  "opts_out_of_mica": true
+}

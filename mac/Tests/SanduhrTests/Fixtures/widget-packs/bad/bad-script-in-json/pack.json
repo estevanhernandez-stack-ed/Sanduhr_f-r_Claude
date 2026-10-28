@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "bad-script-in-json",
+  "name": "Fixture palette",
+  "version": "1.0.0",
+  "author": "Fixture Author",
+  "license": "MIT",
+  "kind": "palette",
+  "sanduhr_min": "3.8.0",
+  "description": "A fixture pack for the validator tests.",
+  "files": [
+    "palettes.json"
+  ]
+}

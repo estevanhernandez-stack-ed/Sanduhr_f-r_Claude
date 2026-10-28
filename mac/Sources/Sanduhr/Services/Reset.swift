@@ -26,6 +26,7 @@ enum ResetPart: String, CaseIterable, Identifiable, Sendable {
     case records
     case deskMessages
     case themes
+    case widgets
     case settings
 
     var id: String { rawValue }
@@ -37,6 +38,7 @@ enum ResetPart: String, CaseIterable, Identifiable, Sendable {
         case .records: "History and records"
         case .deskMessages: "Desk messages"
         case .themes: "Your themes"
+        case .widgets: "Your widgets"
         case .settings: "All settings"
         }
     }
@@ -48,6 +50,7 @@ enum ResetPart: String, CaseIterable, Identifiable, Sendable {
         case .records: "The vault, usage history, snapshots, seats.json and the rest of Sanduhr's folder in Application Support."
         case .deskMessages: "messages.txt, kept as messages.txt.previous beside it (an older messages.txt.previous is replaced)."
         case .themes: "The themes you added or Claude made for you."
+        case .widgets: "The widgets you installed from the catalog, and the folder they live in."
         case .settings: "Both preferences domains, com.626labs.sanduhr and com.626labs.sanduhr.desk."
         }
     }
@@ -60,6 +63,7 @@ enum ResetPart: String, CaseIterable, Identifiable, Sendable {
         case .records: "records"
         case .deskMessages: "desk_messages"
         case .themes: "themes"
+        case .widgets: "widgets"
         case .settings: "settings"
         }
     }
@@ -90,10 +94,12 @@ struct ResetEnvironment {
     static let devBuildKeysNote = "This dev build clears its own key file; the release build's Keychain items stay."
 
     static let themesName = "themes"
+    static let widgetsName = "widgets"
     static let integrationsName = "integrations"
     static let previousSuffix = ".previous"
 
     var themesDir: URL { supportDir.appendingPathComponent(Self.themesName, isDirectory: true) }
+    var widgetsDir: URL { supportDir.appendingPathComponent(Self.widgetsName, isDirectory: true) }
 
     /// The real places. Built only by the sheet's confirmed button and the dry-run hook.
     static var standard: ResetEnvironment {
@@ -120,6 +126,7 @@ struct ResetStep: Equatable, Identifiable {
         case supportFiles = "support_files"
         case deskMessages = "desk_messages"
         case themes
+        case widgets
         /// One preferences domain.
         case preferences
     }
@@ -205,6 +212,10 @@ enum Reset {
             let n = (try? fm.contentsOfDirectory(atPath: env.themesDir.path))?.count ?? 0
             steps.append(ResetStep(part: .themes, kind: .themes, target: ResetEnvironment.themesName, count: n))
         }
+        if parts.contains(.widgets), fm.fileExists(atPath: env.widgetsDir.path) {
+            let n = (try? fm.contentsOfDirectory(atPath: env.widgetsDir.path))?.count ?? 0
+            steps.append(ResetStep(part: .widgets, kind: .widgets, target: ResetEnvironment.widgetsName, count: n))
+        }
         if parts.contains(.settings) {
             for d in env.domains {
                 steps.append(ResetStep(part: .settings, kind: .preferences, target: d.name))
@@ -228,13 +239,13 @@ enum Reset {
     }
 
     /// The top-level items of Sanduhr's folder the records step deletes: everything but the
-    /// themes (their own part) and, while a receipt is left, `integrations/` (the scripts those
+    /// themes and widgets (their own parts) and, while a receipt is left, `integrations/` (the scripts those
     /// entries run and the receipts that remove them).
     static func supportEntries(_ env: ResetEnvironment, keepThemes: Bool, keepIntegrations: Bool) -> [URL] {
         let fm = FileManager.default
         guard let names = try? fm.contentsOfDirectory(atPath: env.supportDir.path) else { return [] }
         return names.sorted().compactMap { name in
-            if keepThemes && name == ResetEnvironment.themesName { return nil }
+            if keepThemes && (name == ResetEnvironment.themesName || name == ResetEnvironment.widgetsName) { return nil }
             if keepIntegrations && name == ResetEnvironment.integrationsName { return nil }
             return env.supportDir.appendingPathComponent(name)
         }
@@ -303,6 +314,7 @@ enum Reset {
             }
         }
         if parts.contains(.themes) { try? fm.removeItem(at: env.themesDir) }
+        if parts.contains(.widgets) { try? fm.removeItem(at: env.widgetsDir) }
         removeIfEmpty(env.supportDir)
         if parts.contains(.settings) {
             for d in env.domains { d.defaults.removePersistentDomain(forName: d.name) }
@@ -348,6 +360,9 @@ enum Reset {
             try fm.moveItem(at: env.messagesFile, to: previous)
         case .themes:
             try fm.removeItem(at: env.themesDir)
+            removeIfEmpty(env.supportDir)
+        case .widgets:
+            try fm.removeItem(at: env.widgetsDir)
             removeIfEmpty(env.supportDir)
         case .preferences:
             guard let d = env.domains.first(where: { $0.name == step.target }) else { return }

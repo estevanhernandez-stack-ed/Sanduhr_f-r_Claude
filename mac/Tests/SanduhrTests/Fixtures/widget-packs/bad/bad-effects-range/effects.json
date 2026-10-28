@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "effects": [
+    {
+      "name": "too-fast",
+      "type": "pulse",
+      "intensity": 0.3,
+      "period_ms": 50,
+      "color": "ink"
+    }
+  ]
+}

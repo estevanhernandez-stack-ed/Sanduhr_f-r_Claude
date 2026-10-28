@@ -1,0 +1,157 @@
+{
+  "run": "widgets-2-35",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "8fce24db3163378cac96a83345eea8a3cf0d04ed",
+  "integration_branch": "cart/widgets-2-35",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-widgets-2-35/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-widgets-2-35",
+  "builder_branch": "main",
+  "uncommitted_at_start": [],
+  "started_at": "2026-10-27T19:11:31.255Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "pack-validator",
+      "title": "pack-validator",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widgets-2-35--01-pack-validator",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "./test.sh (2009 tests) && ./test.sh --filter PackValidator && pytest integrations/tests",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "zip-and-pixel-sheets",
+      "title": "zip-and-pixel-sheets",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widgets-2-35--02-zip-and-pixel-sheets",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "./test.sh (2039) && --filter WidgetZip|PixelSheet|PackValidator",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "widget-catalog",
+      "title": "widget-catalog",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widgets-2-35--03-widget-catalog",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "./test.sh full + fuzz seeds 1-6 (only Apple-wording diffs)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "widget-store-and-settings",
+      "title": "widget-store-and-settings",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widgets-2-35--04-widget-store-and-settings",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "./test.sh (2131) && ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "oled-care",
+      "title": "oled-care",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widgets-2-35--05-oled-care",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "./test.sh (2159) && smoke/selftest.rb && build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "companion-rules",
+      "title": "companion-rules",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widgets-2-35--06-companion-rules",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "./test.sh (2211)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 7,
+      "slug": "companion-piece",
+      "title": "companion-piece",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widgets-2-35--07-companion-piece",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "./test.sh (2224) && smoke/selftest.rb (1033) && build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 8,
+      "slug": "docs-and-whats-new",
+      "title": "docs-and-whats-new",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widgets-2-35--08-docs-and-whats-new",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "./test.sh (2226) && smoke/selftest.rb (1033)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}

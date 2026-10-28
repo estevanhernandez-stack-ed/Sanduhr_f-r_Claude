@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "frame_w": 8,
+  "frame_h": 8,
+  "scale": 2,
+  "fps": 8,
+  "sheet": "sprite.png",
+  "animations": {
+    "walk": [
+      0,
+      1
+    ],
+    "sit": [
+      0
+    ],
+    "nap": [
+      1
+    ],
+    "pop": [
+      2
+    ],
+    "cheer": [
+      3
+    ],
+    "worry": [
+      0
+    ],
+    "focus": [
+      1
+    ],
+    "sleep": [
+      2
+    ]
+  },
+  "moods": {
+    "content": "sit",
+    "focused": "focus",
+    "worried": "worry",
+    "exhausted": "sleep",
+    "celebrate": "cheer"
+  },
+  "triggers": {
+    "needs_you": "pop",
+    "job_passed": "cheer",
+    "near_limit": "worry",
+    "idle": "nap"
+  },
+  "roam": {
+    "edges": [
+      "bottom"
+    ],
+    "speed_px_s": 20
+  }
+}

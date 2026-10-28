@@ -139,13 +139,22 @@ final class DeskModel {
     }
     /// Nobody can see the Desk (covered, screens asleep, screen saver, session switched away):
     /// the message's {shimmer} rests (MessageMotion). Set by DeskController.
-    var motionPaused = false
+    var motionPaused = false {
+        didSet { if motionPaused != oldValue { companion.setPaused(motionPaused) } }
+    }
+    /// The companion piece's runtime (CompanionDriver): idle unless the piece shows.
+    @ObservationIgnored let companion = CompanionDriver()
     /// Height of the menu bar strip at the top of the screen, so top slots sit below it.
     var topInset: CGFloat = 0
     /// How far the Dock reaches into the screen on each side (item 56, DockFollower): the Desk's
     /// corners on that side sit this much further in. Changes with an animation while an
     /// auto-hiding Dock comes and goes.
     var dockInsets = DockInsets()
+    /// OLED care's drift step (OledDrift), nil while OLED care is off: each piece sits at the orbit's
+    /// offset for it. Set by OledCareController inside one animation per step.
+    var oledStep: Int?
+    /// The Desk window's size in points, the area the drift is clamped to (0 until the window is built).
+    var deskSize: CGSize = .zero
     /// The camera notch in window coordinates (top-left origin), or nil on screens without one.
     var notchRect: CGRect?
     /// The Claude meters, short enough for the notch: "5h 7%  wk 63%".
@@ -318,6 +327,7 @@ final class DeskModel {
     }
 
     func stop() {
+        companion.hide()
         timer?.invalidate(); timer = nil
         claudeTimer?.invalidate(); claudeTimer = nil
         // A block observer is removed by its token; removeObserver(self) would leave it behind
@@ -335,6 +345,7 @@ final class DeskModel {
         allWatchers = all
         let shown = WatcherBoard.shown(all, demo: demo)
         if shown != watchers { watchers = shown }
+        companion.watchersChanged(shown)
         updateWatcherIntro(now: Date())
         onHitAreasChange?()
     }
@@ -375,6 +386,7 @@ final class DeskModel {
     func setDemo(_ on: Bool, now: Date = Date()) {
         demo = on
         setWatchers(allWatchers)
+        companion.reload(force: true)
         if on {
             meetings = Self.demoMeetings(now: now)
             message = Self.demoMessage
@@ -465,6 +477,7 @@ final class DeskModel {
     func update(_ input: DeskUsage, now: Date = Date()) {
         let settled = input.settled
         usage = settled
+        companion.usageChanged(settled)
         if !settled.signInNeeded, settled.fetchedAt == nil, settled.keyPresent != false {
             if waitingSince == nil { waitingSince = now }
         } else {

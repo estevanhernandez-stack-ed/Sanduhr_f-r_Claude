@@ -36,6 +36,13 @@ struct DeskNowPlayingLine: View {
     let alignment: HorizontalAlignment
     /// Settings, Now Playing's "Style what's playing" (item 65c): the song's gradient and letters.
     @AppStorage(NowPlayingLooks.styleKey, store: .desk) private var styleSongs = false
+    /// OLED care: the song's gradient, like the Desk ink, never holds pure white.
+    @AppStorage(OledCare.key, store: .desk) private var oled = OledCare.defaultOn
+
+    private func drawnInk(_ look: SongLook?) -> String {
+        let spec = NowPlayingStyled.ink(look, fallback: ink)
+        return oled ? OledInk.capWhite(spec) : spec
+    }
 
     var body: some View {
         let line = NowPlayingText.desk(info) ?? ""
@@ -43,7 +50,7 @@ struct DeskNowPlayingLine: View {
         VStack(alignment: alignment, spacing: size * 0.35) {
             StyledLineText(text: line, plan: NowPlayingStyled.plan(line, look: look, family: font), size: size,
                            font: .custom(font, size: size))
-                .foregroundStyle(LinearGradient.ink(NowPlayingStyled.ink(look, fallback: ink)))
+                .foregroundStyle(LinearGradient.ink(drawnInk(look)))
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .opacity(0.85)
@@ -51,10 +58,10 @@ struct DeskNowPlayingLine: View {
             if (info.duration ?? 0) > 0 {
                 if info.state == .playing {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
-                        bar(info.progress(at: context.date) ?? 0, ink: NowPlayingStyled.ink(look, fallback: ink))
+                        bar(info.progress(at: context.date) ?? 0, ink: drawnInk(look))
                     }
                 } else {
-                    bar(info.progress(at: Date()) ?? 0, ink: NowPlayingStyled.ink(look, fallback: ink))
+                    bar(info.progress(at: Date()) ?? 0, ink: drawnInk(look))
                 }
             }
         }

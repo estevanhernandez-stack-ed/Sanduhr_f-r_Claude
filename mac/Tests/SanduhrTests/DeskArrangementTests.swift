@@ -114,7 +114,7 @@ struct DeskArrangementHideShowTests {
         a.hide("clock")
         #expect(a.string == "message:tl meters:bl:0.8 meetings:bl")
         #expect(a.string == DeskLayout.placing("clock", in: "", layout: "message:tl clock:tr:1.2 meters:bl:0.8 meetings:bl"))
-        #expect(a.hidden == ["clock", "claude", "nowPlaying", "watchers"])
+        #expect(a.hidden == ["clock", "claude", "nowPlaying", "watchers", "companion"])
         // Hiding a hidden piece changes nothing.
         a.hide("watchers")
         #expect(a.string == "message:tl meters:bl:0.8 meetings:bl")
@@ -156,7 +156,7 @@ struct DeskArrangementHideShowTests {
         #expect(DeskArrangement("weather:tr").placesNothing)
         #expect(!DeskArrangement("clock:bl").placesNothing)
         #expect(DeskArrangement("").hidden == DeskArrangement.known)
-        #expect(DeskArrangement(DeskLayout.standard).hidden == ["meters", "nowPlaying", "watchers"])
+        #expect(DeskArrangement(DeskLayout.standard).hidden == ["meters", "nowPlaying", "watchers", "companion"])
     }
 }
 
@@ -401,6 +401,7 @@ struct DeskArrangementFrameTests {
             anchor: mr
             order: 0
             scale: 1
+        companion: null
         desk_arrange:
         """))
         #expect(YAMLEmitter.emit(DebugState.yaml(DebugStateInput())).contains("desk_pieces: []\n"))
