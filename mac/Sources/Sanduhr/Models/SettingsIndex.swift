@@ -73,6 +73,7 @@ enum SettingsAnchor {
     static let catalog = "catalog"
     static let installedWidgets = "installed"
     static let companion = "companion"
+    static let ownArt = "own-art"
     // Now Playing
     static let source = "source"
     static let show = "show"
@@ -185,6 +186,8 @@ enum SettingsAnchor {
                                  "Check the catalog again"]),
         SettingsEntry(title: "Installed widgets", page: .widgets, anchor: installedWidgets,
                       synonyms: ["uninstall", "remove", "made here", "from the catalog", "effects"]),
+        SettingsEntry(title: "Use my own art\u{2026}", page: .widgets, anchor: ownArt,
+                      synonyms: ["own art", "my art", "png", "sprite sheet", "image", "replace the art", "made here"]),
         SettingsEntry(title: "Companion", page: .widgets, anchor: companion,
                       synonyms: ["roam", "sprite", "pet", "hourglass"]),
     ]
