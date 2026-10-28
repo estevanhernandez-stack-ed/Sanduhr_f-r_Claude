@@ -157,6 +157,10 @@ private struct WidgetsInstalledRow: View {
                 Text(row.name)
                 Text("\(row.kind) \u{00B7} \(row.version) \u{00B7} \(row.sourceText)")
                     .font(.caption).foregroundStyle(.secondary)
+                if let note = model.fontNote(row) {
+                    Text(note)
+                        .font(.caption).foregroundStyle(.orange)
+                }
                 if model.drawsNothing(row) {
                     Text(WidgetsModel.effectsNote)
                         .font(.caption).foregroundStyle(.secondary)

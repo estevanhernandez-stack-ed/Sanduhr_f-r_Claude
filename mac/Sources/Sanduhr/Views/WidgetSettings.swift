@@ -307,6 +307,9 @@ struct WidgetSettings: View {
             }
         }
         .onAppear { fontFamilies = FontSettings.installedFamilies() }
+        .onReceive(NotificationCenter.default.publisher(for: .widgetPacksDidChange)) { _ in
+            fontFamilies = FontSettings.installedFamilies()
+        }
     }
 
     // MARK: - Alerts

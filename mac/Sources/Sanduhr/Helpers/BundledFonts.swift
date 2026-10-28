@@ -147,11 +147,15 @@ enum DeskFont {
     }
 
     /// The font families for the Desk and widget pickers: the bundled families first (EsteFont
-    /// Pro, then EsteFont 26), then everything installed, sorted, without a second copy of either.
-    static func pickerFamilies(installed: [String]) -> [String] {
+    /// Pro, then EsteFont 26), then everything installed and the installed font packs' families,
+    /// sorted, without a second copy of any name.
+    static func pickerFamilies(installed: [String], packs: [String] = PackFonts.shared.families) -> [String] {
         let bundled = BundledFonts.families.map(\.name)
-        return bundled + installed.filter { !bundled.contains($0) }.sorted {
-            $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+        var rest: [String] = []
+        for name in installed + packs where !bundled.contains(name)
+            && !rest.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
+            rest.append(name)
         }
+        return bundled + rest.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 }

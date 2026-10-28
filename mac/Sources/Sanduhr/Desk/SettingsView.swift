@@ -570,6 +570,10 @@ struct DeskLookSection: View {
             // EsteFont Pro, then EsteFont 26, first: they ship inside Sanduhr.
             families = DeskFont.pickerFamilies(installed: NSFontManager.shared.availableFontFamilies)
         }
+        // A font pack installed or removed changes the lists at once.
+        .onReceive(NotificationCenter.default.publisher(for: .widgetPacksDidChange)) { _ in
+            families = DeskFont.pickerFamilies(installed: NSFontManager.shared.availableFontFamilies)
+        }
     }
 }
 
