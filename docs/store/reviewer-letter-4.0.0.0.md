@@ -1,7 +1,7 @@
 # Notes for certification — reviewer letter (v4.0.0.0)
 
 > Paste the block between the `---` markers into Partner Center → Submission options → Notes
-> for certification (~2000-char cap; this block measures 1,632 characters, the fallback 679; 1,667 and 694 if the field counts a line break as two). This field never goes
+> for certification (~2000-char cap; this block measures 1,530 characters, the fallback 679; 1,564 and 694 if the field counts a line break as two). This field never goes
 > through the Store Listing Console API, so it is confirmed in Partner Center or not at all.
 >
 > Framing: 4.0 rebuilds Settings (Settings v2) and adds **no capability and no new destination**: the
@@ -39,8 +39,7 @@ already uses for usage.
 
 Also new, off by default: streamer mode (Settings > Privacy), which
 shows codenames in place of account, folder and project names. Its two
-files stay on the PC. Testing without a claude.ai account: Settings,
-Privacy and streamer mode all open without signing in.
+files stay on the PC.
 
 Preserved (10.1.4.4): (a) trademark disclaimer on every surface naming
 Claude, specific copyright entity, no model names in keywords; (b)
@@ -89,7 +88,7 @@ Estevan Hernandez, 626 Labs LLC
 - [ ] `dist/Sanduhr-Store-v4.0.0.0.msix` built off the `v4.0.0` tag, unsigned; `mcp\sanduhr-mcp.exe` trimmed; `scripts/smoke-mcp.ps1` passes
 - [ ] **Privacy page complete:** `NetworkDisclosureTests` green; Settings ▸ Privacy lists claude.ai usage (with the routines budget), the sign-in window (with Google), Open-Meteo, the widget catalog, updates, Publish usage and Through Claude Code
 - [ ] **Hosted policy live before commit:** hub PR #280 merged, then the combined curl check against 626labs.dev/privacy.html prints **22**
-- [ ] **Streamer mode off on a fresh install**, and Settings, Privacy and streamer mode open signed out
+- [ ] **Streamer mode off on a fresh install**
 - [ ] Store keywords: no model names (Fable, Opus, Sonnet, Haiku), the 3.5.0 failure. The screenshots carry none either (store-shots folds the demo Sonnet meter away)
 - [ ] Trademark disclaimer on all six surfaces plus What's New, the tour and the Desk pages
 - [ ] Store "What's new" keeps the 0x80073D02 line: the restart-to-update check (runbook Phase 7 step 9) has not passed (dashboard a36UEAoiqo1OKKBCDyCy). Run it on the 3.9.1 to 4.0 update; drop the line in the next release if it passes
