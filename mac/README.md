@@ -617,7 +617,8 @@ Outdated, and Update moves it to the app's copy.
 The server (`sanduhr_mcp.py`) speaks the Windows `sanduhr-mcp` protocol with the same tool names
 and result shapes: `get_usage`, `get_local_burn_by_project`, `get_model_usage`,
 `get_usage_history`, `ping`, `propose_theme` (below), plus two Mac tools for Desk messages (below),
-the watcher tools, `propose_now_playing_looks` (Now playing, below), and `propose_mod`,
+the watcher tools, `propose_now_playing_looks` (Now playing, below), `propose_widget` (Claude-made
+widgets, below; no switch needed, because nothing installs until you press Apply), and `propose_mod`,
 `list_catalog`, `propose_install` with `get_mod_status` (Mod Studio: a mod's files for you to
 review, your kept mods, a request to turn one on in a folder; only while **Let agents propose
 mods** is on), and `propose_config` under the same switch (agents, skills, commands, output
@@ -1852,6 +1853,45 @@ level this app can install: a pack's `sanduhr_min` is compared with it, never wi
 because `sanduhr_min` is the shared level numbered by the Windows app's releases. It moves only when the Mac
 gains a newer format's features, and a test pins it. The catalog client and the catalog's own checks
 (`WidgetCatalog`, `WidgetCatalogClient`, `WidgetDownloader`) are described in docs/PRIVACY.md, On the Mac.
+
+## Claude-made widgets and your own art
+
+With the MCP server installed, Claude can make a sprite, a palette or effects presets for you
+(`propose_widget`; a theme goes through `propose_theme`). It is data only: no PNG, no font, no code.
+`build_widget` in `sanduhr_mcp.py` builds the pack from Claude's fields (`pack.json` generated, the id
+namespaced `my-`, a LICENSE text, the kind's JSON files, pixel sheets as text) and checks it with the
+catalog's `widgets/validate.py` (strict, plus the trademark rule) in a transient temp folder it removes
+afterwards; `widgets/validate.py` ships beside the script (`build.sh`, `install.sh` and the stamped
+`integrations/<stamp>/` folder). A refusal returns `rejected` with reasons and writes nothing. Otherwise it
+writes `widget-request.json` (owner-only, atomic) and waits about ten seconds for `widget-result.json`;
+no answer is `queued`, `widget_not_responding`, and the request stays for ten minutes.
+`WidgetProposalHandoff` takes the request through `HandoffWatch`, re-checks it with `WidgetProposal.decode`
+(the app never trusts the server; the Swift build and the Python build are held to the same fixtures in
+`Tests/SanduhrTests/Fixtures/widget-proposals/`) and holds the pack in memory only. A newer request answers
+the older `replaced`; `busy` means the Desk is being arranged; `not_ready` means no Desk is wired.
+
+- **The banner.** Settings, Widgets shows **Review Claude's widget** only while a proposal waits (and the
+  notification opens that page): the name, Claude's note, "What this widget is", the files and their
+  license, and "Installs on Apply as a widget made here, on this Mac only." Buttons: **Preview on the
+  Desk**, **Make it the companion** (sprites), **Apply**, **Dismiss**.
+- **Preview on the Desk** starts only on that click. A sprite is shown as the companion and a palette as the
+  Desk ink, from memory: the saved companion, the Desk ink and the widgets folder are untouched. Dismiss,
+  Apply and a newer request take it down. Effects packs have nothing to draw. The answer to Claude is
+  `previewing` as soon as the proposal is held, before any click.
+- **Apply** installs through `WidgetStore.install(source: .claude)` (a widget made here) and answers
+  `applied`; a store failure answers `rejected`, `install_failed`. **Make it the companion** also saves
+  `CompanionSettings.pack` and places the Companion piece. Dismiss answers `rejected`, `dismissed`.
+- **No direct switch.** Unlike messages and themes, no setting lets Claude install a widget without Apply.
+- **`state.yaml`** `pending_suggestions.widget` is a flag only: a proposal's id, kind and content stay out.
+
+**Use my own art.** On an installed sprite made here (Claude's or a local one, never a catalog pack), the
+row has **Use my own art…**: an open panel per stage, PNG only. `WidgetOwnArt.checkImage` words each failure
+inline (not a PNG, over 2 MB or 4096 pixels, not a whole number of the stage's cells, too few cells for the
+frames the animations use). `WidgetOwnArt.apply` copies each chosen image into the pack as
+`art/<stage>.png` (`art/sprite.png` for a single-sheet sprite), drops the sheet it replaces, lists the new
+files in `pack.json`, adds one to its patch version and validates the whole pack again; the model
+(`WidgetsModel.useOwnArt`) reinstalls it as `.local` with `replaceMadeHere`. Nothing leaves the Mac. Only the
+first eligible row carries the search anchor, and the banner has no search entry.
 
 ## The companion
 
