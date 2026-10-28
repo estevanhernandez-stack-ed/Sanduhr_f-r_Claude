@@ -83,6 +83,10 @@ mkdir -p "$APP/Contents/Resources/integrations"
 for script in sanduhr_mcp.py sanduhr_statusline.py; do
     install -m 0644 "integrations/$script" "$APP/Contents/Resources/integrations/$script"
 done
+# The pack validator propose_widget loads from beside the MCP script (widgets/validate.py); it travels with
+# the scripts into the same stamped folder.
+install -d "$APP/Contents/Resources/integrations/widgets"
+install -m 0644 integrations/widgets/validate.py "$APP/Contents/Resources/integrations/widgets/validate.py"
 # The meters mod for Claude Code (item 50), copied beside the scripts into the same stamped
 # folder. Its tests and the types Claude Code writes into a mod folder it loads stay behind.
 rm -rf "$APP/Contents/Resources/integrations/mods"

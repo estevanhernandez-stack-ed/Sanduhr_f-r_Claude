@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **Claude can make you a widget.** With the MCP server installed, `propose_widget` hands Sanduhr a pixel-art sprite, a palette or effects presets that Claude wrote as text. It is data only: no PNG, no font, no code, and a theme still goes through `propose_theme`. The server names the pack `my-<id>` and checks it with the catalog's own rules, trademark rule included, before anything is written; a refusal writes nothing. A good one waits in Settings, Widgets as **Review Claude's widget**, with Claude's note, what the widget is and its files. **Preview on the Desk** shows a sprite as the companion, or a palette across the Desk's text, notch and message included, from memory, with your saved choices untouched. **Apply** installs it as a widget made here, **Make it the companion** also picks it, and **Dismiss** drops it. No setting lets Claude skip Apply, and the proposal is held in memory only.
+
+- **Use my own art.** On a sprite made here, **Use my own art…** takes one PNG per stage, checks each one (size, cells, frames) with a sentence when it fails, copies it into the widget's folder and reinstalls the widget as your own, with its patch version up by one. Nothing is sent anywhere.
+
+- **The validator ships with the MCP server.** `widgets/validate.py` now installs beside `sanduhr_mcp.py`, in the app's copy and in `mac/integrations/install.sh`, so `propose_widget` works from an installed build.
+
+- **For the smoke harness.** `smoke/smoke state` has `pending_suggestions.widget`, a flag that is true while a Claude-made widget waits. Never its id or content.
+
 ## v2.35.0-mac — 2026-10-28
 
 - **Widgets.** Settings, Widgets lists the signed widget catalog and installs the packs you pick: color themes, message palettes, sprites and effects. Sanduhr reaches GitHub only when the page opens, on **Check the catalog again** and on **Install** or **Update**, checks the catalog's signature and each download's size and SHA-256, and checks every file again on this Mac before the pack is put in place. Installed themes join Settings, Widget, Themes; palettes join the Message editor's Palette menu. Effects packs are listed and don't draw yet. **Reset Sanduhr…** has a **Your widgets** part.

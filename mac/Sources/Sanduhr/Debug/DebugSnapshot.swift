@@ -144,6 +144,7 @@ struct DebugStateInput {
     /// Claude's suggestions waiting for the user (items 54, 55): flags only, never their content.
     var pendingMessages = false
     var pendingTheme = false
+    var pendingWidget = false
     var menu: [MenuGroup] = []
     /// The submenus every Sanduhr menu shows after Show or Hide Widget, by title (Accounts, Menu Bar
     /// Shows; Settings v2, slice 1). Titles only: the Accounts submenu's labels never appear.
@@ -429,9 +430,9 @@ enum DebugState {
               YAMLPair("meters_installed", .int(meters)), YAMLPair("hooks_installed", .int(hooks))])
     }
 
-    /// `pending_suggestions:` (items 54, 55): whether a suggestion from Claude waits, no content.
-    static func pendingSuggestionsYAML(messages: Bool, theme: Bool) -> YAMLNode {
-        .map([YAMLPair("messages", .bool(messages)), YAMLPair("theme", .bool(theme))])
+    /// `pending_suggestions:` (items 54, 55, 2.36.0): whether a suggestion from Claude waits, no content.
+    static func pendingSuggestionsYAML(messages: Bool, theme: Bool, widget: Bool = false) -> YAMLNode {
+        .map([YAMLPair("messages", .bool(messages)), YAMLPair("theme", .bool(theme)), YAMLPair("widget", .bool(widget))])
     }
 
     /// `whats_new:` (item 57): versions, a count and two flags.
@@ -627,7 +628,7 @@ enum DebugState {
         pairs.append(("vault", vaultYAML(s.vault)))
         pairs.append(("integrations", integrationsYAML(mcp: s.mcpInstalled, statusline: s.statuslineInstalled,
                                                                 meters: s.metersInstalled, hooks: s.hooksInstalled)))
-        pairs.append(("pending_suggestions", pendingSuggestionsYAML(messages: s.pendingMessages, theme: s.pendingTheme)))
+        pairs.append(("pending_suggestions", pendingSuggestionsYAML(messages: s.pendingMessages, theme: s.pendingTheme, widget: s.pendingWidget)))
         pairs.append(("follow", .bool(s.follow)))
         pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("snapshots", .int(s.seatSnapshots)))

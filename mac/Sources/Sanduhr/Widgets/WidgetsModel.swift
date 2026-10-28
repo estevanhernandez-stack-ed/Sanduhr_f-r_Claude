@@ -42,12 +42,15 @@ final class WidgetsModel {
     private(set) var notice: String?
     private(set) var installed: [InstalledRow] = []
     private(set) var companion: CompanionSettings
+    /// The last "Use my own art..." outcome in a sentence (a check that failed, or the success line), nil before one.
+    private(set) var ownArtStatus: String?
 
     let store: WidgetStore
     private let defaults: UserDefaults
     private let makeClient: (WidgetStore) -> WidgetCatalogClient
     private let changed: () -> Void
     private var client: WidgetCatalogClient?
+    @ObservationIgnored private nonisolated(unsafe) var packsObserver: NSObjectProtocol?
 
     /// - Parameters:
     ///   - store: The installed packs.
@@ -62,6 +65,28 @@ final class WidgetsModel {
         self.makeClient = makeClient
         self.changed = changed
         self.companion = CompanionSettings.load(defaults)
+        reloadInstalled()
+        // A pack installed somewhere else (a Claude-made widget applied from the review banner) shows at once: the lists
+        // are read again from the widgets folder. The catalog is not fetched. Delivered on the posting thread; the
+        // app posts from the main thread, and anything else hops there.
+        packsObserver = NotificationCenter.default.addObserver(forName: .widgetPacksDidChange, object: nil, queue: nil) { [weak self] note in
+            let from = note.object as AnyObject?
+            if Thread.isMainThread {
+                MainActor.assumeIsolated { self?.packsChangedElsewhere(from) }
+            } else {
+                Task { @MainActor in self?.packsChangedElsewhere(from) }
+            }
+        }
+    }
+
+    deinit {
+        if let packsObserver { NotificationCenter.default.removeObserver(packsObserver) }
+    }
+
+    /// `.widgetPacksDidChange` arrived: re-read the installed packs and the companion's pick (Make it the companion
+    /// saves one). Nothing is posted back, and `changed` is the poster's to run.
+    private func packsChangedElsewhere(_ from: AnyObject?) {
+        guard from !== self else { return }
         reloadInstalled()
     }
 
@@ -136,6 +161,7 @@ final class WidgetsModel {
             guard let info = store.readInfo(row.id) else { return nil }
             return InstalledRow(id: row.id, name: info.name, kind: info.kind, version: row.version, madeHere: row.madeHere)
         }
+        companion = CompanionSettings.load(defaults)
     }
 
     // MARK: The companion
@@ -152,6 +178,99 @@ final class WidgetsModel {
     func pickCompanion(_ id: String?) {
         companion.pack = id
         companion.save(defaults)
+    }
+
+    // MARK: Use my own art
+
+    /// One stage's file dialog: the stage id and the sentence the dialog is titled with.
+    struct OwnArtPrompt: Equatable {
+        let stageId: String
+        let title: String
+    }
+
+    /// "Use my own art..." is offered on a sprite made here (Claude's or a local one), never on a catalog pack.
+    func canUseOwnArt(_ row: InstalledRow) -> Bool {
+        guard row.madeHere, row.kind == "sprite", let entry = store.load().find(row.id) else { return false }
+        return entry.source != .catalog
+    }
+
+    /// The first installed row that offers own art: it carries the search anchor, so one anchor names one place.
+    var firstOwnArtRow: InstalledRow? { installed.first { canUseOwnArt($0) } }
+
+    /// The dialogs to show, one per stage, in the sprite's order (Windows' titles). Nil, with the status set, when the
+    /// pack can't be read or isn't a made-here sprite.
+    func ownArtPrompts(for id: String) -> [OwnArtPrompt]? {
+        ownArtStatus = nil
+        let name = installed.first { $0.id == id }?.name ?? id
+        guard let row = installed.first(where: { $0.id == id }), canUseOwnArt(row),
+              let files = store.readFiles(id), let sprite = WidgetOwnArt.sprite(files) else {
+            ownArtStatus = "\(name) couldn't be read, so it is unchanged."
+            return nil
+        }
+        let count = sprite.stages.count
+        return sprite.stages.enumerated().map { i, stage in
+            let cells = "\(stage.frameWidth)x\(stage.frameHeight) pixel cells"
+            let title = count == 1
+                ? "Your own art for \(name) (\(cells))"
+                : "Your own art for \(name): stage \(i + 1) of \(count), \(stage.name) (\(cells))"
+            return OwnArtPrompt(stageId: stage.id, title: title)
+        }
+    }
+
+    /// One picked file against the pack image rules, before it is kept: nil when it may be used, else the sentence
+    /// (also left in `ownArtStatus`). `data` nil: the file couldn't be read.
+    func checkOwnArt(id: String, stageId: String, data: Data?) -> String? {
+        let name = installed.first { $0.id == id }?.name ?? id
+        var why: String?
+        if let data {
+            if let files = store.readFiles(id), let sprite = WidgetOwnArt.sprite(files),
+               let stage = sprite.stages.first(where: { $0.id == stageId }) {
+                why = WidgetOwnArt.checkImage(data, stage: stage, maxFrame: sprite.maxFrame)
+                    .map { "\(stage.name): \($0) \(name) is unchanged." }
+            } else {
+                why = "\(name) couldn't be read, so it is unchanged."
+            }
+        } else {
+            why = "That image couldn't be read, so \(name) is unchanged."
+        }
+        ownArtStatus = why
+        return why
+    }
+
+    /// The chosen files' bytes (stage id to PNG) put into the pack, the whole pack checked again, and the result
+    /// installed as the user's own (`.local`, `replaceMadeHere`) with the patch version bumped. A stage with no file
+    /// keeps its sheet. True when it was installed. Nothing leaves this Mac.
+    @discardableResult
+    func useOwnArt(id: String, art: [String: Data]) -> Bool {
+        guard !busy.contains(id) else { return false }
+        let name = installed.first { $0.id == id }?.name ?? id
+        ownArtStatus = nil
+        guard let row = installed.first(where: { $0.id == id }), canUseOwnArt(row), let files = store.readFiles(id),
+              let sprite = WidgetOwnArt.sprite(files) else {
+            ownArtStatus = "\(name) couldn't be read, so it is unchanged."
+            return false
+        }
+        if art.isEmpty {
+            ownArtStatus = "No image was chosen, so \(name) is unchanged."
+            return false
+        }
+        for stage in sprite.stages {
+            if let data = art[stage.id], let why = WidgetOwnArt.checkImage(data, stage: stage, maxFrame: sprite.maxFrame) {
+                ownArtStatus = "\(stage.name): \(why) \(name) is unchanged."
+                return false
+            }
+        }
+        busy.insert(id)
+        defer { busy.remove(id) }
+        let made = WidgetOwnArt.apply(files, packId: id, art: art)
+        guard let newFiles = made.files, let manifest = made.manifest else {
+            ownArtStatus = "\(name) is unchanged: \(made.errors.first ?? "the pack didn't pass its checks.")"
+            return false
+        }
+        let r = store.install(newFiles, manifest, source: .local, replaceMadeHere: true)
+        ownArtStatus = r.ok ? "\(name) now uses your own art. It stays on this Mac." : (r.error ?? "\(name) couldn't be changed.")
+        packsChanged(posting: r.ok)
+        return r.ok
     }
 
     /// Effects packs are listed as installed only.

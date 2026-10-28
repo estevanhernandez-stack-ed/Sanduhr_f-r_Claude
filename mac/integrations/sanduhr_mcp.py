@@ -30,6 +30,10 @@ tools the same way on either machine:
   propose_config             hands agents, skills, commands, output styles, settings keys and MCP
                              servers for one Claude Code folder to Sanduhr, which opens them for the
                              user to import or dismiss, under the same switch
+  propose_widget             builds a sprite, palette or effects pack from data (no PNG, no font),
+                             checks it with the catalog's own rules (widgets/validate.py, strict), and
+                             hands it to Sanduhr, which previews it on the Desk; it installs only when
+                             the user presses Apply (no switch lets Claude skip that)
 
 What each tool may read is decided per account in Sanduhr (Settings, Accounts, Data, Share
 with Claude) and handed over in ~/Library/Application Support/Sanduhr/mcp-access.json. No
@@ -49,7 +53,8 @@ logs. The files it writes are desk-messages-request.json (propose_desk_messages)
 theme-request.json (propose_theme), now-playing-looks-request.json (propose_now_playing_looks) and
 watch-request-<ms>-<seq>-<id>.json (the watch tools, only while watchers.json, written by Sanduhr,
 says agents may show watchers) and mod-request.json, mod-install-request.json and config-request.json (propose_mod,
-propose_install and propose_config, only while mods-agents.json says agents may propose mods), atomically and owner-only; it never writes messages.txt, a theme or
+propose_install and propose_config, only while mods-agents.json says agents may propose mods) and
+widget-request.json (propose_widget, always: a new pack waits for the user's Apply), atomically and owner-only; it never writes messages.txt, a theme or
 the saved looks. No tool takes a path. Failures are typed results (status/reason/remedy), never protocol
 errors. Python 3.9 standard library only.
 
@@ -334,6 +339,42 @@ CONFIG_GUIDE = (
     "Mac: a line that looks like a secret refuses the proposal. Works only while the user lets agents "
     "propose mods. pending_review means the user has it; get_mod_status with request_id gives the "
     "decision (approved when they imported any of it, dismissed). queued means Sanduhr did not answer.")
+
+WIDGET_GUIDE = (
+    "Make a widget for the user's Sanduhr Desk with them: a pixel-art companion sprite, a palette "
+    "pack for the Desk ink, or an effects pack. Call when the user asks for a desk pet, a "
+    "companion, a sprite, a palette or an effect preset. The pack is data only: never a PNG, "
+    "never a font, never code. A widget theme goes through propose_theme instead. Pass kind, pack "
+    "{id, name (1-40), description (1-200), version?, author?, license?} and the kind's files. "
+    "Sanduhr namespaces the id my-<id>, writes pack.json and a LICENSE (CC0-1.0 by default), "
+    "validates the whole pack with the catalog's own rules (strict), and refuses with status "
+    "rejected and reasons before anything is sent. Trademark rule: no 'claude' or 'anthropic' "
+    "anywhere and no 'opus', 'sonnet', 'haiku' or 'fable' as words, in any name, description, "
+    "author, file name or JSON string; original art only, no studio or game characters. SPRITE: "
+    "sprite = sprite.json, schema_version 2: frame_w and frame_h (8 to 32 for pixel sheets), "
+    "scale 1-4 (nearest neighbour), fps 1-24, either sheet (one .json path) or stages (1-6 of {id "
+    "kebab 2-20, name 1-24, min_growth 0 for the first then strictly increasing up to 1, sheet, "
+    "frame_w, frame_h}; stage 0's size equals the top-level size; stages grow with the user's "
+    "coding days, never tokens), animations (name to 1-64 frame indexes; required: walk, sit, "
+    "nap, pop, cheer, worry, focus, sleep, celebrate), moods {content, focused, worried, "
+    "exhausted, celebrate} and triggers {needs_you, job_passed, near_limit, idle} each naming an "
+    "animation, roam {edges: subset of bottom, left, right; speed_px_s 5-120}. sheets = path to a "
+    "pixel sheet: {palette: 1-16 '#rrggbb' colors, never #ffffff (use #f0f0f0), frame_w, frame_h "
+    "(equal to the stage's), frames: 1-256 frames, each exactly frame_h strings of exactly "
+    "frame_w characters, top row first; '.' is transparent and 0-9, a-f (lowercase) index the "
+    "palette}. Frame i is frames[i]; every sheet needs a frame for the highest index any "
+    "animation uses. Keep the character on transparency, readable at scale 2, and give walk two "
+    "or more frames. PALETTE: palettes = 1-64 of {name: lowercase-kebab 2-24, unique; colors: 1-4 "
+    "'#rrggbb' stops left to right; mood? up to 24 characters}. EFFECTS: effects = 1-64 of {name "
+    "as for palettes, type glow|sweep|shimmer|pulse, intensity 0-1, period_ms integer 400-10000, "
+    "color '#rrggbb' or 'ink'}. Sanduhr checks the pack again and previews it on the Desk (a "
+    "sprite as the companion, a palette as the Desk ink) with a review bar: previewing means the "
+    "user is looking at it; it installs only when they press Apply (applied, as a local widget "
+    "made here, listed in Settings, Widgets; companion true when they made a sprite the "
+    "companion), and Dismiss answers rejected with reason dismissed and writes nothing. 'Let "
+    "Claude change the Desk directly' does not cover widgets: a new pack always waits for Apply. "
+    "queued means Sanduhr did not answer: it is not running. Nothing is uploaded; sharing a pack "
+    "is a pull request to the sanduhr-widgets catalog.")
 
 READ_ONLY = {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}
 NO_ARGS = {"type": "object", "properties": {}, "additionalProperties": False}
@@ -639,6 +680,47 @@ TOOLS += [
                         "openWorldHint": False},
     },
 ]
+TOOLS += [
+    {
+        "name": "propose_widget",
+        "description": WIDGET_GUIDE,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "kind": {"type": "string", "enum": ["sprite", "palette", "effects"],
+                         "description": "What the pack is. A widget theme goes through propose_theme instead; fonts are never proposed."},
+                "pack": {
+                    "type": "object",
+                    "description": "pack.json's own fields. Sanduhr writes files, kind, schema_version and sanduhr_min, and the LICENSE text.",
+                    "properties": {
+                        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+                               "description": "Lowercase kebab-case; Sanduhr prefixes my- (3 to 40 characters with it)."},
+                        "name": {"type": "string", "minLength": 1, "maxLength": 40},
+                        "description": {"type": "string", "minLength": 1, "maxLength": 200},
+                        "version": {"type": "string", "description": "MAJOR.MINOR.PATCH, default 1.0.0."},
+                        "author": {"type": "string", "maxLength": 80, "description": "Default: Made here. Never a brand or model name."},
+                        "license": {"type": "string", "enum": ["CC0-1.0", "CC-BY-4.0", "MIT", "Apache-2.0", "BSD-3-Clause", "ISC"],
+                                    "description": "Default CC0-1.0. Sanduhr writes the matching LICENSE."},
+                    },
+                    "required": ["id", "name", "description"],
+                    "additionalProperties": False,
+                },
+                "sprite": {"type": "object",
+                           "description": "kind sprite: sprite.json (schema_version 2): frame_w, frame_h, scale, fps, sheet or stages, animations, moods, triggers, roam. Every sheet path ends .json and is a key of sheets."},
+                "sheets": {"type": "object",
+                           "description": "kind sprite: pixel sheets, path (such as sheet.json or sprites/egg.json) to {palette, frame_w, frame_h, frames}."},
+                "palettes": {"description": "kind palette: palettes.json, {schema_version: 1, palettes: [...]} or the list alone."},
+                "effects": {"description": "kind effects: effects.json, {schema_version: 1, effects: [...]} or the list alone."},
+                "note": {"type": "string", "maxLength": 200,
+                         "description": "One short sentence for the user on what you made and why (shown on the review bar)."},
+            },
+            "required": ["kind", "pack"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False,
+                        "openWorldHint": False},
+    },
+]
 TOOL_NAMES = [t["name"] for t in TOOLS]
 # The Desk messages handoff (item 54). The app mirrors these names (DeskMessageHandoff); a test on
 # each side pins them.
@@ -675,6 +757,12 @@ LOOKS_MAX_MOOD_CHARS = 40
 LOOKS_MIN_CONTRAST_ON_BLACK = 3.0
 LOOKS_FIELDS = ("artist", "title", "colors", "font", "mood")
 LOOKS_WAIT_SECONDS = 10.0
+# The widget handoff (2.36.0, propose_widget): Windows' WidgetProposal file names and cap, mirrored by the
+# app (WidgetProposal); a test on each side pins them.
+WIDGET_REQUEST_FILE = "widget-request.json"
+WIDGET_RESULT_FILE = "widget-result.json"
+WIDGET_MAX_BYTES = 4 * 1024 * 1024
+WIDGET_WAIT_SECONDS = 10.0
 # The watchers handoff (item 66). The app mirrors these names (WatcherStore); a test on each side
 # pins them.
 WATCH_SWITCH_FILE = "watchers.json"
@@ -754,6 +842,8 @@ class Paths:
         self.mod_install_result = os.path.join(self.support_dir, MOD_INSTALL_RESULT_FILE)
         self.config_request = os.path.join(self.support_dir, CONFIG_REQUEST_FILE)
         self.config_result = os.path.join(self.support_dir, CONFIG_RESULT_FILE)
+        self.widget_request = os.path.join(self.support_dir, WIDGET_REQUEST_FILE)
+        self.widget_result = os.path.join(self.support_dir, WIDGET_RESULT_FILE)
 
     def history_file(self, name):
         return os.path.join(self.support_dir, name)
@@ -2992,6 +3082,484 @@ def build_propose_config(args, now=None, paths=None, wait=MOD_WAIT_SECONDS, poll
                       "ten minutes of when it was made." % int(wait)}
 
 
+# -- propose_widget (2.36.0): widgets made with Claude ---------------------------------------
+#
+# A port of Windows' WidgetProposal.Build (and its Check) and ToolLogic.BuildProposeWidget; the app's
+# Swift WidgetProposal is the third copy, and Tests/SanduhrTests/Fixtures/widget-proposals/ holds the
+# arguments both this file and the Swift build are held to. The pack is built in memory from the tool's
+# arguments (pack.json from the given fields, the id namespaced my-, a LICENSE text, the kind's JSON
+# files), checked with the vendored widgets/validate.py in strict mode (its trademark rule included),
+# and only then handed over in widget-request.json. This server never installs anything and never
+# touches the network.
+
+WIDGET_ARGS = ("kind", "pack", "sprite", "sheets", "palettes", "effects", "note")
+WIDGET_PACK_ARGS = ("id", "name", "description", "version", "author", "license")
+WIDGET_KINDS = ("sprite", "palette", "effects")
+WIDGET_LICENSES = ("CC0-1.0", "CC-BY-4.0", "MIT", "Apache-2.0", "BSD-3-Clause", "ISC")
+WIDGET_STATUSES = ("previewing", "applied", "rejected")
+WIDGET_SANDUHR_MIN = "3.8.0"
+WIDGET_PACK_ID_RE = re.compile(r"[a-z][a-z0-9]*(-[a-z0-9]+)*")
+
+
+class WidgetValidatorMissing(Exception):
+    """widgets/validate.py is not beside this script (a copy made without it)."""
+
+
+_widget_validator = []
+
+
+def widget_validator():
+    """The vendored validate.py, loaded once from widgets/validate.py beside this script (the folder
+    this file really lives in, so a link to it finds it too). Raises WidgetValidatorMissing."""
+    if _widget_validator:
+        return _widget_validator[0]
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "widgets", "validate.py")
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("sanduhr_widget_validate", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    except (OSError, ImportError, AttributeError, SyntaxError) as e:
+        raise WidgetValidatorMissing(type(e).__name__)
+    _widget_validator.append(module)
+    return module
+
+
+def u16(s):
+    """UTF-16 code units of s, as bytes (C#'s string order and length)."""
+    return s.encode("utf-16-be", "surrogatepass")
+
+
+def u16len(s):
+    return len(u16(s)) // 2
+
+
+def ordinal(items):
+    """Sorted as C#'s StringComparer.Ordinal does: by UTF-16 code units."""
+    return sorted(items, key=u16)
+
+
+def clip16(s, cap):
+    """s cut to cap UTF-16 units with '...' after, as the C# prints it."""
+    if u16len(s) <= cap:
+        return s
+    return u16(s)[:2 * cap].decode("utf-16-be", "replace") + "..."
+
+
+def widget_utf8(text):
+    """UTF-8 bytes of text; a lone surrogate becomes U+FFFD, as .NET's encoder does."""
+    try:
+        return text.encode("utf-8")
+    except UnicodeEncodeError:
+        return u16(text).decode("utf-16-be", "replace").encode("utf-8")
+
+
+def widget_quote(s):
+    """A JSON string as System.Text.Json's default encoder writes it: every non-ASCII character as
+    \\uXXXX (UTF-16 units), and < > & ' + " and the backtick escaped too."""
+    out = ['"']
+    shorts = {0x08: "\\b", 0x09: "\\t", 0x0A: "\\n", 0x0C: "\\f", 0x0D: "\\r", 0x5C: "\\\\"}
+    b = u16(s)
+    for i in range(0, len(b), 2):
+        unit = (b[i] << 8) | b[i + 1]
+        if unit in shorts:
+            out.append(shorts[unit])
+        elif 0x20 <= unit <= 0x7E and chr(unit) not in "\"&'+<>`":
+            out.append(chr(unit))
+        else:
+            out.append("\\u%04X" % unit)
+    out.append('"')
+    return "".join(out)
+
+
+def widget_json(value, indent=None, depth=0):
+    """JSON as .NET's JsonObject.ToJsonString writes it: keys in order; compact, or (indent) two
+    spaces, ': ' and \\n line ends. A number is written as Python read it (the source text is gone
+    after json.loads, so 0.50 comes out 0.5); a number JSON cannot hold raises ValueError."""
+    def nl(d):
+        return "" if indent is None else "\n" + indent * d
+    if value is None:
+        return "null"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("number out of range")
+        return repr(value)
+    if isinstance(value, str):
+        return widget_quote(value)
+    if isinstance(value, list):
+        if not value:
+            return "[]"
+        items = [nl(depth + 1) + widget_json(v, indent, depth + 1) for v in value]
+        return "[" + ",".join(items) + nl(depth) + "]"
+    if isinstance(value, dict):
+        if not value:
+            return "{}"
+        sep = ":" if indent is None else ": "
+        items = [nl(depth + 1) + widget_quote(k) + sep + widget_json(v, indent, depth + 1) for k, v in value.items()]
+        return "{" + ",".join(items) + nl(depth) + "}"
+    raise ValueError("not JSON")
+
+
+def widget_reason(field, message):
+    return {"field": field, "message": message}
+
+
+def widget_str(v):
+    return v if isinstance(v, str) else None
+
+
+def widget_namespaced(pack_id):
+    return pack_id if pack_id.startswith("my-") else "my-" + pack_id
+
+
+def widget_license_text(spdx, author, year):
+    """The LICENSE a Claude-made pack carries for spdx; each text holds the phrase the validator looks for."""
+    holder = "Copyright (c) %d %s" % (year, author)
+    if spdx == "MIT":
+        return ("MIT License\n\n" + holder + "\n\n"
+                "Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated "
+                "documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation "
+                "the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to "
+                "permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\n"
+                "The above copyright notice and this permission notice shall be included in all copies or substantial portions of the "
+                "Software.\n\n"
+                "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE "
+                "WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR "
+                "COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR "
+                "OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n")
+    if spdx == "ISC":
+        return ("ISC License\n\n" + holder + "\n\n"
+                "Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby "
+                "granted, provided that the above copyright notice and this permission notice appear in all copies.\n\n"
+                "THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL "
+                "IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, "
+                "INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN "
+                "AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR "
+                "PERFORMANCE OF THIS SOFTWARE.\n")
+    if spdx == "BSD-3-Clause":
+        return ("BSD 3-Clause License\n\n" + holder + "\n\n"
+                "Redistribution and use in source and binary forms, with or without modification, are permitted provided that the "
+                "following conditions are met:\n\n"
+                "1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following "
+                "disclaimer.\n\n"
+                "2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following "
+                "disclaimer in the documentation and/or other materials provided with the distribution.\n\n"
+                "3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote "
+                "products derived from this software without specific prior written permission.\n\n"
+                "THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, "
+                "INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE "
+                "DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, "
+                "SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF "
+                "THE POSSIBILITY OF SUCH DAMAGE.\n")
+    if spdx == "Apache-2.0":
+        return (holder + "\n\n"
+                "Licensed under the Apache License, Version 2.0 (the \"License\"); you may not use this file except in compliance "
+                "with the License. You may obtain a copy of the License at\n\n    http://www.apache.org/licenses/LICENSE-2.0\n\n"
+                "Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on "
+                "an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the "
+                "specific language governing permissions and limitations under the License.\n")
+    if spdx == "CC-BY-4.0":
+        return (holder + "\n\n"
+                "This work is licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0). You are free "
+                "to share and adapt it for any purpose, provided you give appropriate credit, link to the license and indicate if "
+                "changes were made.\n\nThe full license text: https://creativecommons.org/licenses/by/4.0/legalcode\n")
+    return ("CC0 1.0 Universal\n\n" + holder + "\n\n"
+            "To the extent possible under law, the author has waived all copyright and related or neighboring rights to this "
+            "work, dedicating it to the public domain worldwide. This work is distributed without any warranty.\n\n"
+            "The full legal code: https://creativecommons.org/publicdomain/zero/1.0/legalcode\n")
+
+
+def widget_sheet_paths(sprite):
+    """Every sheet path sprite.json names (the top-level sheet and each stage's)."""
+    out = []
+    if widget_str(sprite.get("sheet")) is not None:
+        out.append(sprite["sheet"])
+    if isinstance(sprite.get("stages"), list):
+        for st in sprite["stages"]:
+            if isinstance(st, dict) and widget_str(st.get("sheet")) is not None:
+                out.append(st["sheet"])
+    return out
+
+
+def widget_build_sprite(args, files, reasons):
+    sprite = args.get("sprite")
+    if not isinstance(sprite, dict):
+        reasons.append(widget_reason("sprite", "must be an object: sprite.json (schema_version 2) with its stages or sheet, animations, moods, triggers and roam"))
+        return
+    copy = dict(sprite)
+    if copy.get("schema_version") is None:
+        copy["schema_version"] = 2
+    for path in widget_sheet_paths(copy):
+        if path.lower().endswith(".png"):
+            reasons.append(widget_reason("sprite", "names the PNG sheet %s; Claude never supplies an image. Draw it as a .json pixel sheet in sheets" % clip16(path, 40)))
+    files["sprite.json"] = widget_utf8(widget_json(copy, "  ") + "\n")
+
+    sheets = args.get("sheets")
+    if not isinstance(sheets, dict) or len(sheets) == 0:
+        reasons.append(widget_reason("sheets", "must be an object of pixel sheets: path (ending .json) to {palette, frame_w, frame_h, frames}"))
+        return
+    if len(sheets) > 6:
+        reasons.append(widget_reason("sheets", "at most 6 pixel sheets (one per stage)"))
+    validate = widget_validator()
+    for path, sheet in sheets.items():
+        if not path.endswith(".json") or not validate.safe_rel_path(path) or path == "sprite.json":
+            reasons.append(widget_reason("sheets", "%s: a sheet is a .json pixel sheet with a safe relative path (no PNG, no font)" % clip16(path, 40)))
+            continue
+        if not isinstance(sheet, dict):
+            reasons.append(widget_reason("sheets", "%s: must be an object {palette, frame_w, frame_h, frames}" % clip16(path, 40)))
+            continue
+        files[path] = widget_utf8(widget_json(sheet, "  ") + "\n")
+
+
+def widget_build_list(given, key, file, files, reasons):
+    """palettes.json or effects.json: the object as given, or a bare list wrapped as {schema_version: 1, key: list}."""
+    if isinstance(given, list):
+        doc = {"schema_version": 1, key: given}
+    elif isinstance(given, dict):
+        doc = dict(given)
+        if doc.get("schema_version") is None:
+            doc["schema_version"] = 1
+    else:
+        reasons.append(widget_reason(key, "must be %s's object {schema_version: 1, %s: [...]} or the list alone" % (file, key)))
+        return
+    files[file] = widget_utf8(widget_json(doc, "  ") + "\n")
+
+
+def widget_check(files, expected_id):
+    """The rules a Claude-made pack meets, on its files (path to bytes): JSON and the LICENSE only (no PNG,
+    no font, nothing else), the id namespaced my- and equal to expected_id, and the vendored validator in
+    strict mode (warnings count as errors; the trademark rule is in it). Returns (manifest, reasons).
+
+    The validator reads a folder, so the files go to a temporary one named for the id for the length of
+    the check and nothing else is kept. Raises WidgetValidatorMissing."""
+    reasons = []
+    for rel in ordinal(files):
+        if rel in ("pack.json", "LICENSE"):
+            continue
+        if not rel.endswith(".json"):
+            reasons.append(widget_reason("files", "%s: a Claude-made pack holds JSON only; no PNG, no font, nothing else" % clip16(rel, 40)))
+    if expected_id is None or not expected_id.startswith("my-"):
+        reasons.append(widget_reason("pack.id", "a Claude-made pack's id starts with my-"))
+    if reasons:
+        return None, reasons
+
+    validate = widget_validator()
+    import tempfile
+    # The folder is named for the id (the validator compares them); an id that is not a folder-safe
+    # kebab string fails the validator's own id rule whatever the folder is called.
+    folder = expected_id if len(expected_id) <= 40 and WIDGET_PACK_ID_RE.fullmatch(expected_id) else "pack"
+    with tempfile.TemporaryDirectory(prefix="sanduhr-widget-") as tmp:
+        root = os.path.join(tmp, folder)
+        try:
+            for rel in ordinal(files):
+                dest = os.path.join(root, *rel.split("/"))
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                with open(dest, "wb") as f:
+                    f.write(files[rel])
+        except (OSError, ValueError):
+            return None, [widget_reason("files", "the pack's file paths clash (a file is also a folder of another)")]
+        report = validate.validate_pack(root, label="pack")
+    errors = list(report.errors) + list(report.warnings)
+    if errors:
+        return None, [widget_reason("pack", e) for e in errors[:24]]
+    try:
+        manifest = json.loads(files["pack.json"].decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, KeyError):
+        return None, [widget_reason("pack", "pack.json is not readable")]
+    if manifest.get("kind") not in WIDGET_KINDS:
+        return None, [widget_reason("kind", "a Claude-made pack is a sprite, a palette or effects")]
+    return manifest, []
+
+
+def build_widget(args, now):
+    """Builds and validates the pack the tool's arguments describe. Returns {"pack": ..., "reasons": []}
+    where pack is {"id", "kind", "name", "files": {path: bytes}, "manifest": {...}}, or pack None and the
+    reasons ({field, message}) it was refused with. now stamps the LICENSE year (UTC)."""
+    args = args if isinstance(args, dict) else {}
+    reasons = []
+    unknown = ordinal(k for k in args if k not in WIDGET_ARGS)
+    if unknown:
+        reasons.append(widget_reason("arguments", "unknown argument(s): " + ", ".join(clip16(k, 24) for k in unknown[:5])
+                                     + ". The arguments are kind, pack, sprite, sheets, palettes, effects and note. Claude never supplies a PNG or a font."))
+
+    kind = widget_str(args.get("kind"))
+    if kind is None:
+        reasons.append(widget_reason("kind", "must be one of sprite, palette, effects"))
+    elif kind == "theme":
+        reasons.append(widget_reason("kind", "a theme goes through propose_theme (it previews and saves the widget theme the same way); "
+                                             "propose_widget makes sprite, palette and effects packs"))
+    elif kind == "font":
+        reasons.append(widget_reason("kind", "fonts are binaries and are never proposed; the user installs a font pack from the catalog"))
+    elif kind not in WIDGET_KINDS:
+        reasons.append(widget_reason("kind", "must be one of sprite, palette, effects"))
+
+    if args.get("note") is not None:
+        note = widget_str(args["note"])
+        if note is None or u16len(note) > 200 or any(unicodedata.category(c) == "Cc" for c in note):
+            reasons.append(widget_reason("note", "must be one line of at most 200 characters"))
+
+    # pack.json fields
+    pid = name = description = None
+    version, author, lic = "1.0.0", "Made here", "CC0-1.0"
+    pack = args.get("pack")
+    if not isinstance(pack, dict):
+        reasons.append(widget_reason("pack", "must be an object: {id, name, description, version?, author?, license?}"))
+    else:
+        extra = ordinal(k for k in pack if k not in WIDGET_PACK_ARGS)
+        if extra:
+            reasons.append(widget_reason("pack", "unknown key(s): " + ", ".join(clip16(k, 24) for k in extra[:5])
+                                         + ". pack.json's files, kind, schema_version and sanduhr_min are written by Sanduhr."))
+        pid = widget_str(pack.get("id"))
+        if pid is None:
+            reasons.append(widget_reason("pack.id", "must be a lowercase kebab-case string; Sanduhr adds the my- prefix"))
+        else:
+            pid = widget_namespaced(pid)
+        name = widget_str(pack.get("name"))
+        if name is None:
+            reasons.append(widget_reason("pack.name", "must be a string of 1 to 40 characters"))
+        description = widget_str(pack.get("description"))
+        if description is None:
+            reasons.append(widget_reason("pack.description", "must be a string of 1 to 200 characters"))
+        if pack.get("version") is not None:
+            version = widget_str(pack["version"])
+            if version is None:
+                reasons.append(widget_reason("pack.version", "must be MAJOR.MINOR.PATCH"))
+        if pack.get("author") is not None:
+            author = widget_str(pack["author"])
+            if author is None:
+                reasons.append(widget_reason("pack.author", "must be a string of 1 to 80 characters"))
+        if pack.get("license") is not None:
+            lic = widget_str(pack["license"])
+            if lic is None or lic not in WIDGET_LICENSES:
+                reasons.append(widget_reason("pack.license", "must be one of " + ", ".join(WIDGET_LICENSES) + " (default CC0-1.0)"))
+
+    # the kind's files
+    files = {}
+    if kind in WIDGET_KINDS:
+        for other in ("sprite", "sheets", "palettes", "effects"):
+            belongs = ((kind == "sprite" and other in ("sprite", "sheets")) or (kind == "palette" and other == "palettes")
+                       or (kind == "effects" and other == "effects"))
+            if not belongs and args.get(other) is not None:
+                reasons.append(widget_reason(other, "does not belong to a %s pack" % kind))
+        try:
+            if kind == "sprite":
+                widget_build_sprite(args, files, reasons)
+            elif kind == "palette":
+                widget_build_list(args.get("palettes"), "palettes", "palettes.json", files, reasons)
+            else:
+                widget_build_list(args.get("effects"), "effects", "effects.json", files, reasons)
+        except ValueError:
+            reasons.append(widget_reason("arguments", "a number is out of range for JSON"))
+    if reasons:
+        return {"pack": None, "reasons": reasons}
+
+    manifest = {
+        "schema_version": 1, "id": pid, "name": name, "version": version, "author": author, "license": lic,
+        "kind": kind, "sanduhr_min": WIDGET_SANDUHR_MIN, "description": description,
+        "files": ordinal(files),
+    }
+    files["pack.json"] = widget_utf8(widget_json(manifest, "  ") + "\n")
+    files["LICENSE"] = widget_utf8(widget_license_text(lic, author, now.astimezone(timezone.utc).year))
+
+    checked, why = widget_check(files, pid)
+    if checked is None:
+        return {"pack": None, "reasons": why}
+    return {"pack": {"id": checked["id"], "kind": checked["kind"], "name": checked["name"], "files": files,
+                     "manifest": checked}, "reasons": []}
+
+
+def widget_stamp(t):
+    """Windows' Stamp: yyyy-MM-ddTHH:mm:ss.fffZ in UTC."""
+    t = t.astimezone(timezone.utc)
+    return t.strftime("%Y-%m-%dT%H:%M:%S.") + "%03dZ" % (t.microsecond // 1000)
+
+
+def widget_request_json(request_id, pack, note, now):
+    """The request file: {schema_version, id, requested_at, pack_id, note?, files: {path: text}}. Every
+    file is text (JSON, or the LICENSE), so the request is data only."""
+    files = {rel: pack["files"][rel].decode("utf-8") for rel in ordinal(pack["files"])}
+    request = {"schema_version": 1, "id": request_id, "requested_at": widget_stamp(now), "pack_id": pack["id"]}
+    if note is not None and note.strip():
+        request["note"] = note
+    request["files"] = files
+    return widget_json(request)
+
+
+def widget_answer(result, pack_id, request_id):
+    """The widget's answer, passed on: its status (one of the three it may give), reasons, the pack id
+    and whether the user made a sprite the companion."""
+    word = result.get("status")
+    status = word if isinstance(word, str) and word in WIDGET_STATUSES else "rejected"
+    answer = {"status": status}
+    for key in ("reason", "reasons", "companion"):
+        if result.get(key) is not None:
+            answer[key] = result[key]
+    if status == "rejected" and "reasons" not in answer and "reason" not in answer:
+        answer["reason"] = "unexpected_answer"
+    answer["pack_id"] = pack_id
+    answer["request_id"] = request_id
+    return answer
+
+
+def build_propose_widget(args, now=None, paths=None, wait=WIDGET_WAIT_SECONDS, poll=DESK_POLL_SECONDS,
+                         sleep=time.sleep, clock=time.monotonic):
+    """Builds and checks the pack here (a refusal returns status rejected with reasons and writes
+    nothing), hands it to the app through widget-request.json and waits briefly for widget-result.json.
+    Never installs anything: a new pack always waits for the user's Apply."""
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    args = args if isinstance(args, dict) else {}
+    try:
+        built = build_widget(args, now)
+    except WidgetValidatorMissing:
+        return {"status": "error", "reason": "validator_missing",
+                "remedy": "This copy of the Sanduhr server has no widgets/validate.py beside it. Update the Sanduhr "
+                          "integrations (Settings, Integrations, or bash mac/integrations/install.sh)."}
+    pack = built["pack"]
+    if pack is None:
+        return {"status": "rejected", "reasons": built["reasons"]}
+
+    note = args["note"] if isinstance(args.get("note"), str) else None
+    request_id = uuid.uuid4().hex
+    try:
+        text = widget_request_json(request_id, pack, note, now)
+    except ValueError:
+        return {"status": "rejected", "reasons": [widget_reason("pack", "is not readable as JSON text")]}
+    if len(text) > WIDGET_MAX_BYTES:
+        return {"status": "rejected", "reasons": [widget_reason(
+            "pack", "is too large for the widget to read (a Claude-made pack is at most 4 MB of JSON)")]}
+    try:
+        os.makedirs(paths.support_dir, mode=0o700, exist_ok=True)
+        tmp = paths.widget_request + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, paths.widget_request)   # atomic: the app never reads half a file
+    except OSError as e:
+        return {"status": "error", "reason": "request_write_failed",
+                "remedy": "Could not queue the request (%s)." % type(e).__name__}
+
+    deadline = clock() + wait
+    while True:
+        res = read_desk_result(paths.widget_result, request_id)
+        if res is not None:
+            return widget_answer(res, pack["id"], request_id)
+        if clock() >= deadline:
+            break
+        sleep(poll)
+    # The request stays for the app's next look within its ten-minute window.
+    return {"status": "queued", "reason": "widget_not_responding", "pack_id": pack["id"], "request_id": request_id,
+            "remedy": "Sanduhr did not answer within %d seconds. Start Sanduhr: it picks the request up within ten "
+                      "minutes of when it was made and previews the widget on the Desk for the user to Apply or Dismiss."
+                      % int(wait)}
+
+
 def call_tool(name, args):
     """The payload for a tools/call, or None for an unknown tool."""
     args = args if isinstance(args, dict) else {}
@@ -3024,6 +3592,8 @@ def call_tool(name, args):
         return build_propose_mod(args)
     if name == "propose_config":
         return build_propose_config(args)
+    if name == "propose_widget":
+        return build_propose_widget(args)
     if name == "get_mod_status":
         return build_get_mod_status(args)
     if name == "list_catalog":

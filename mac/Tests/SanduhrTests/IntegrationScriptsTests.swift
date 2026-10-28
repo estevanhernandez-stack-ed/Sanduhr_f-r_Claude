@@ -23,6 +23,9 @@ struct IntegrationRig {
             FileManager.default.createFile(atPath: app.appendingPathComponent(name).path,
                                            contents: Data("# \(name) v\(version)\n".utf8))
         }
+        let validator = app.appendingPathComponent(IntegrationScripts.validatorPath)
+        try? FileManager.default.createDirectory(at: validator.deletingLastPathComponent(), withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: validator.path, contents: Data("# validate v\(version)\n".utf8))
         let mod = app.appendingPathComponent(IntegrationScripts.modPath)
         for (rel, text) in [(".claude-plugin/plugin.json", "{ \"name\": \"sanduhr-meters\", \"version\": \"\(version)\" }\n"),
                             ("hooks/hooks.json", "{ \"modules\": [\"./register.tsx\"] }\n"),
@@ -157,7 +160,7 @@ struct IntegrationScriptsTests {
         FileManager.default.createFile(atPath: r.app.appendingPathComponent("\(IntegrationScripts.modPath)/hooks/x.test.ts").path,
                                        contents: Data("test".utf8))
         #expect(IntegrationScripts.files(in: r.app) == [
-            "sanduhr_mcp.py", "sanduhr_statusline.py",
+            "sanduhr_mcp.py", "sanduhr_statusline.py", "widgets/validate.py",
             "mods/sanduhr-meters/.claude-plugin/plugin.json", "mods/sanduhr-meters/hooks/hooks.json",
             "mods/sanduhr-meters/hooks/register.tsx",
         ])
@@ -179,6 +182,8 @@ struct IntegrationScriptsTests {
         r.ship(version: "2")
         #expect(try s.refresh() != one)
         #expect(try String(contentsOf: mod.appendingPathComponent("hooks/register.tsx"), encoding: .utf8) == "// v2\n")
+        // The validator is installed beside the script, through the same stable link.
+        #expect(try String(contentsOf: s.current.appendingPathComponent("widgets/validate.py"), encoding: .utf8) == "# validate v2\n")
     }
 
     @Test func theRealScriptsHaveAStamp() {
@@ -189,6 +194,8 @@ struct IntegrationScriptsTests {
         let files = IntegrationScripts.files(in: repo)
         #expect(files.contains("mods/sanduhr-meters/hooks/register.tsx"))
         #expect(files.contains("mods/sanduhr-meters/.claude-plugin/plugin.json"))
+        // The pack validator rides beside the MCP script, where propose_widget looks for it.
+        #expect(files.contains("widgets/validate.py"))
         #expect(!files.contains { $0.contains(".test.") || $0.contains("/.claude-plugin/types/") })
     }
 }

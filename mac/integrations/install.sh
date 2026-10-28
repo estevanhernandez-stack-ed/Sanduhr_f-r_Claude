@@ -20,7 +20,8 @@ PY="$(command -v python3 || true)"
 
 if [ "${1:-}" = "--remove" ]; then
   command -v claude >/dev/null && claude mcp remove sanduhr --scope user >/dev/null 2>&1 && echo "Removed the sanduhr MCP server" || true
-  rm -f "$DEST/sanduhr_statusline.py" "$DEST/sanduhr_mcp.py"
+  rm -f "$DEST/sanduhr_statusline.py" "$DEST/sanduhr_mcp.py" "$DEST/widgets/validate.py"
+  rmdir "$DEST/widgets" 2>/dev/null || true
   echo "Removed the scripts. If a statusLine in your Claude settings calls sanduhr_statusline.py, it now prints nothing."
   exit 0
 fi
@@ -32,6 +33,9 @@ mkdir -p "$DEST"
 rm -f "$DEST/sanduhr_statusline.py" "$DEST/sanduhr_mcp.py"
 cp "$HERE/sanduhr_statusline.py" "$HERE/sanduhr_mcp.py" "$DEST/"
 chmod +x "$DEST"/*.py
+# propose_widget loads the pack validator from widgets/ beside the script (the script's real path).
+mkdir -p "$DEST/widgets"
+cp "$HERE/widgets/validate.py" "$DEST/widgets/validate.py"
 echo "Installed to $DEST"
 
 if command -v claude >/dev/null; then

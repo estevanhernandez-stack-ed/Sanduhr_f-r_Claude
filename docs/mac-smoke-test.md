@@ -2267,3 +2267,99 @@ Settings, Desk, **OLED care**. Needs a screen you can watch for several minutes.
    saved colour in Settings, Desk Look never changes.
 5. Turn it off mid-dim: both windows return to full opacity at once and the pieces return to their
    places.
+
+## 57. Widgets from Claude: propose_widget (2.36.0)
+
+Needs the MCP server installed (Settings, Integrations) and Claude Code open on that folder. Back up
+`~/Library/Application Support/Sanduhr` first (section 45) and quit the release app. The arguments of a
+good sprite, palette and effects proposal are the files in `mac/Tests/SanduhrTests/Fixtures/widget-proposals/`
+(`good-sprite.json`, `good-palette.json`, `good-effects.json`); a tools/call over stdio to
+`mac/integrations/sanduhr_mcp.py` works as well as Claude Code does.
+
+1. Refusals write nothing: propose `theme-kind.json`, `font-kind.json`, `png-sheet.json` and
+   `trademark-name.json`. Each answers `rejected` with reasons in the tool result (the theme one points at
+   `propose_theme`), and there is no `widget-request.json` in the Sanduhr folder, no banner and no
+   notification. `ls /tmp` and `$TMPDIR` show no `sanduhr-widget-*` folder left behind.
+2. A sprite: propose `good-sprite.json` with Sanduhr running. The tool answers `previewing` with a
+   `pack_id` of `my-neon-blob`. The request file is gone at once (read and deleted), `widget-result.json`
+   exists with mode `0600`, and a notification offers the suggestion. Settings, Widgets shows **Review
+   Claude's widget** with the name, Claude's note, "What this widget is", the files and their license, and
+   "Installs on Apply as a widget made here, on this Mac only." Nothing is installed: `widgets/` has no
+   `my-neon-blob` folder and `smoke/smoke state` shows `pending_suggestions.widget: true` and nothing else
+   about it.
+3. A palette: dismiss the sprite, then propose `good-palette.json`. The banner appears with **Apply** and
+   **Dismiss** and no **Make it the companion**.
+4. Replaced: with one proposal waiting, propose another. The first call's `widget-result.json` answer was
+   `previewing` and the waiting one is replaced: the older request id is answered `rejected` with reason
+   `replaced`, and the banner shows only the newer one.
+5. Dismissed: press **Dismiss**. The banner goes, the notification clears, nothing is installed, and the
+   answer for that request is `rejected`, `dismissed`. With nothing waiting the banner is not on the page
+   at all, and Settings search finds no entry for it.
+6. Not running: quit Sanduhr and propose again. The tool answers `queued` with reason
+   `widget_not_responding` after about ten seconds, and `widget-request.json` stays (mode `0600`). Start
+   Sanduhr within ten minutes: the banner appears and the file is gone. Leave one for over ten minutes
+   before starting: it is dropped, with no banner and no answer.
+7. An effects pack (`good-effects.json`) shows the banner with "Effects packs don't draw yet, so there is
+   nothing to preview." and Apply installs it.
+
+## 58. Preview on the Desk and its undo (2.36.0)
+
+Desk on, a sprite pack installed and picked as the companion, the Companion piece placed. Note the Desk
+ink (Settings, Desk Look) and the companion pick (Settings, Widgets, Companion).
+
+1. A proposal arrives (section 57, step 2): the Desk does not change. The preview starts only when you press
+   **Preview on the Desk**.
+2. Press it for a sprite: the proposed sprite shows as the companion. Quit nothing; Settings, Widgets,
+   Companion still names your own pack, `defaults read com.626labs.sanduhr.desk deskCompanionPack` is
+   unchanged and `widgets/` has no new folder.
+3. **Dismiss**: your own companion is back at once. Propose a palette and press **Preview on the Desk**: the
+   clock, date, meters, the notch island's text and the message all take the palette's gradient; Dismiss
+   restores each, and Desk Look still shows the saved colors.
+4. Start a preview, then propose something else: the preview comes down and the newer proposal waits
+   unpreviewed. Start a preview and quit Sanduhr: after relaunch nothing is previewed and nothing is
+   waiting (the proposal lived in memory).
+5. Desk off: **Preview on the Desk** shows "Turn the Desk on to preview it." and changes nothing.
+6. While the Desk's arrange mode is on, propose a widget: the tool answers `rejected`, reason `busy`.
+
+## 59. Apply and the companion (2.36.0)
+
+1. Preview a sprite, then press **Apply**: the preview comes down, `widgets/my-neon-blob/` exists with
+   `pack.json`, `LICENSE` and the sheets, its `.raster/` folder holds a PNG per pixel sheet, and the
+   Installed list shows the pack as "made here". The tool's answer for that
+   request is `applied` with `companion: false`. Your saved companion did not change.
+2. Propose another sprite and press **Make it the companion**: it installs, Settings, Widgets, Companion
+   names it, the Companion piece is on the Desk (placed if it was not) and the answer is `applied`,
+   `companion: true`.
+3. Make Apply fail (set `widgets/` read-only for the step): the answer is `rejected`, `install_failed`, and
+   nothing is half-installed (`widgets/.staging/` is empty).
+4. No direct switch: Settings, Integrations, and every Let Claude… switch on, propose a widget: it still
+   waits for Apply.
+5. Uninstall the pack in Settings, Widgets: the folder and its line go, and the companion falls back to the
+   first installed sprite.
+
+## 60. Use my own art (2.36.0)
+
+On an installed sprite made here (section 59, step 1). Catalog packs show no such button.
+
+1. **Use my own art…** on the row opens a panel for the first stage; PNG only. Choose a text file renamed
+   `.png`, or any non-PNG: a line under the row says it isn't a PNG image, and the pack is unchanged.
+2. Choose a PNG over 2 MB, one whose size is not a whole number of the stage's cells, and one with fewer
+   cells than the animations use: each gives its own sentence ("is larger than 2 MB", "isn't a whole number
+   of 8x8 cells", "needs at least N"), and the pack is unchanged. A bad file stops the whole run with no change. Cancelling one
+   stage's panel keeps that stage's sheet and still applies the stages you did choose.
+3. Choose a good PNG for each stage: the line reads "<name> now uses your own art. It stays on this Mac."
+   `widgets/<id>/art/<stage>.png` exists, `pack.json` lists it and its patch version went up by one
+   (1.0.0 to 1.0.1), the replaced sheet's JSON is gone, and the row still reads "made here" (now a local
+   widget, not a Claude one). The companion redraws from the new art.
+4. Run it again: the version goes to 1.0.2. Stages with no new image keep their sheets.
+5. A network monitor shows no request during any of this. The picked image is read only after you choose it.
+
+## 61. The validator in an installed copy (2.36.0)
+
+1. After **Install** or **Update** in Settings, Integrations, `~/Library/Application Support/Sanduhr/integrations/current/widgets/validate.py`
+   exists beside `sanduhr_mcp.py`. In a Claude Code folder with the server installed, propose a sprite: it
+   answers `previewing`, not `validator_missing`.
+2. `bash mac/integrations/install.sh` from the repo puts `widgets/validate.py` in its destination too, and
+   its remove path takes it out (and the `widgets` folder, when empty).
+3. Move `widgets/validate.py` aside in a scratch copy and propose: the answer is `error` with reason
+   `validator_missing` and a remedy that says to update the integrations; nothing is written. Put it back.

@@ -25,6 +25,9 @@ struct DeskMessageLine: View {
     var lineLimit = 2
     /// Settings, Message's preview Replay (item 68): the first `{shimmer}` and `{sweep}` come at once.
     var sweepFirst = false
+    /// A widget proposal's palette while it previews (DeskInkPreview): it outranks the saved color and a
+    /// line's own {ink:}, so the whole message shows the palette. Nil at rest.
+    var previewInk: String? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// OLED care: the message's ink, a line's own {ink:} included, never holds pure white.
@@ -40,7 +43,7 @@ struct DeskMessageLine: View {
         let parsed = MessageMarkup.parse(raw)
         let effects = parsed.effects
         let size = MessageMotion.size(effects, base: baseSize)
-        let spec = MessageMotion.inkSpec(effects, global: inkSpec)
+        let spec = previewInk ?? MessageMotion.inkSpec(effects, global: inkSpec)
         let colors = Color.inkStops(oled ? OledInk.capWhite(spec) : spec, fallback: "9ad7ff")
         let glow = colors[colors.count / 2]
         let glows = MessageMotion.glows(effects, global: globalGlow)

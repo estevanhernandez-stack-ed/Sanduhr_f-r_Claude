@@ -485,6 +485,7 @@ enum DebugHooks {
             = IntegrationInstaller.standard.installedCounts(folders: folders)
         s.pendingMessages = DeskMessageHandoff.shared.pending != nil
         s.pendingTheme = ThemeProposalHandoff.shared.pending != nil
+        s.pendingWidget = WidgetProposalHandoff.shared.pending != nil
         s.follow = vm.followEnabled
         s.followPaused = vm.followPaused
         (s.seatSnapshots, s.seats) = SeatSnapshots.counts(in: .standard)
