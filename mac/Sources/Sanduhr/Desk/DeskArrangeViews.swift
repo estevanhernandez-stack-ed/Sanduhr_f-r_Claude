@@ -139,7 +139,7 @@ private struct DeskArrangeable: ViewModifier {
         DragGesture(minimumDistance: 3, coordinateSpace: .named(DeskArrange.space))
             .onChanged { v in
                 mode.drag = DeskArrangeDrag(widget: widget, location: v.location, translation: v.translation,
-                                            frame: mode.drag?.frame ?? mode.frames[widget] ?? .zero)
+                                            frame: mode.drag?.frame ?? mode.layoutFrame(of: widget) ?? .zero)
             }
             .onEnded { v in drop(at: v.location) }
     }
@@ -155,8 +155,11 @@ private struct DeskArrangeable: ViewModifier {
         let anchor = mode.target(of: widget, at: location, geometry: geometry)
         let stack = working.stack(anchor)
             .filter { $0.widget != widget }
-            .map { (widget: $0.widget, frame: mode.frames[$0.widget] ?? .zero) }
-        let before = DeskArrange.pieceAfter(y: location.y, in: stack)
+            .map { (widget: $0.widget, frame: mode.layoutFrame(of: $0.widget) ?? .zero) }
+        // The stack's frames are taken back to the unslanted layout: a drop on a slanted stack is judged where the
+        // pointer is on the stack's own face, not on the screen (the fold).
+        let face = mode.folds[anchor].map { $0.unapply(location) } ?? location
+        let before = DeskArrange.pieceAfter(y: face.y, in: stack)
         withAnimation(DeskArrange.snapAnimation(reduceMotion: reduceMotion)) {
             mode.edit { $0.put(widget, at: anchor, before: before) }
             mode.drag = nil
@@ -166,7 +169,7 @@ private struct DeskArrangeable: ViewModifier {
     private var resize: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named(DeskArrange.space))
             .onChanged { v in
-                let start = resizeStart ?? ResizeStart(scale: placement.scale, size: mode.frames[widget]?.size ?? .zero)
+                let start = resizeStart ?? ResizeStart(scale: placement.scale, size: mode.layoutFrame(of: widget)?.size ?? .zero)
                 if resizeStart == nil { resizeStart = start }
                 let scale = DeskArrange.scale(from: start.scale, size: start.size, drag: v.translation, anchor: placement.anchor)
                 if scale != placement.scale { mode.edit { $0.setScale(widget, scale) } }

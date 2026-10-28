@@ -231,6 +231,18 @@ final class DeskModel {
     @ObservationIgnored var clockFrame: CGRect = .zero { didSet { if clockFrame != oldValue { onHitAreasChange?() } } }
     @ObservationIgnored var messageFrame: CGRect = .zero { didSet { if messageFrame != oldValue { onHitAreasChange?() } } }
     @ObservationIgnored var claudeLineFrame: CGRect = .zero { didSet { if claudeLineFrame != oldValue { onHitAreasChange?() } } }
+    /// Each slanted stack's tilt and top left in the global space the frames above are in (the
+    /// fold), by anchor; reported by DeskFoldStack. A stack that stands upright has none. The
+    /// frames above are the boxes around what is drawn (SwiftUI reports a slanted view's bounds);
+    /// `elements()` recovers each one's layout frame and attaches the slant.
+    @ObservationIgnored private(set) var folds: [DeskAnchor: DeskFold] = [:]
+
+    func setFold(_ fold: DeskFold?, at anchor: DeskAnchor) {
+        guard folds[anchor] != fold else { return }
+        folds[anchor] = fold
+        onHitAreasChange?()
+    }
+
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
     @ObservationIgnored var onHitAreasChange: (() -> Void)?
     /// Arrange mode (item 60): the layout being edited on the desktop, nil-session outside it.
@@ -603,7 +615,9 @@ final class DeskModel {
         input.messageFrame = messageFrame
         input.claudeLineDrawn = claudeLine != nil || claudeParts?.account != nil || switchNote
         input.claudeLineFrame = claudeLineFrame
-        return DeskElements.build(input)
+        return DeskElements.folded(DeskElements.build(input),
+                                   arrangement: DeskArrangement(desk.string(forKey: "layout") ?? DeskLayout.standard),
+                                   folds: folds)
     }
 
     /// The first meeting still to come (or in progress) that has a join link.

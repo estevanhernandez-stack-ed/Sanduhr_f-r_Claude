@@ -31,7 +31,12 @@ enum DeskClickLayer {
     /// The plates: one click area (DeskHitTest.area) per element the layer serves that has a
     /// frame. An element without a frame yet takes no click in the Desk window either.
     static func areas(in all: [DeskElement]) -> [CGRect] {
-        elements(in: all).map(DeskHitTest.area).filter { !$0.isNull && !$0.isEmpty }
+        elements(in: all).filter { $0.fold == nil }.map(DeskHitTest.area).filter { !$0.isNull && !$0.isEmpty }
+    }
+
+    /// The plates of elements in a slanted stack (the fold): the same areas, sheared with the stack.
+    static func slantedAreas(in all: [DeskElement]) -> [DeskQuad] {
+        elements(in: all).filter { $0.fold != nil }.compactMap(DeskHitTest.quad)
     }
 
     /// True when the layer stands in for the Desk window: under the icons, and not arranging.
@@ -48,6 +53,11 @@ final class DeskClickLayerView: NSView {
         didSet { if areas != oldValue { needsDisplay = true } }
     }
 
+    /// The plates of pieces in a slanted stack (the fold), drawn as the slanted quads they click as.
+    var slanted: [DeskQuad] = [] {
+        didSet { if slanted != oldValue { needsDisplay = true } }
+    }
+
     override var isFlipped: Bool { true }
 
     /// Takes the first click instead of spending it on activating Sanduhr, so one click joins
@@ -58,6 +68,11 @@ final class DeskClickLayerView: NSView {
         NSColor.black.withAlphaComponent(DeskPointerMenu.hitPlateOpacity).setFill()
         for area in areas where area.intersects(dirtyRect) {
             area.fill()
+        }
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        for quad in slanted where quad.bounds.intersects(dirtyRect) {
+            ctx.addPath(quad.path)
+            ctx.fillPath()
         }
     }
 }
