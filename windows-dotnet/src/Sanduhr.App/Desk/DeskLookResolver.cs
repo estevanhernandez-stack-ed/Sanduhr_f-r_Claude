@@ -37,7 +37,7 @@ internal static class DeskLookResolver
     public static DeskFrame Frame(DeskFrame frame, DeskThemeDraw? draw, ThemeDefinition? theme = null)
     {
         var message = Message(frame.Message, draw?.Look, theme);   // streamer: notname - the Desk message frame record
-        if (draw is null) return frame with { Message = message };
+        if (draw is null) return ReferenceEquals(message, frame.Message) ? frame : frame with { Message = message };
         var look = draw.Look;
         return frame with
         {

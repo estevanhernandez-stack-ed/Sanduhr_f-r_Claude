@@ -569,6 +569,10 @@ internal sealed class DeskDesignService : IDisposable
         {
             if (had) MessageFileIo.WriteAtomic(path + ".previous", MessageFileIo.Encode(existing));
             MessageFileIo.WriteAtomic(path, MessageFileIo.Encode(applied.Text));
+            // Colored lines would be hidden by "Use the theme's colors": that switch goes off so the design shows.
+            var own = _store.LoadDeskMessage();
+            var next = own.AfterLinesAdded(change.Lines);
+            if (next != own) _store.SaveDeskMessage(next);
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)

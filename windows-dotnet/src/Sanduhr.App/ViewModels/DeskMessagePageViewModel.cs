@@ -958,6 +958,7 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
     /// <summary>messages.txt was changed here (Claude's lines went in): reload, or offer to under unsaved edits.</summary>
     private void OnApplied() => OnUi(() =>
     {
+        RefreshSettings();   // colored lines may have turned "Use the theme's colors" off
         if (_active) CheckDisk();
         RaiseSuggestion();
     });

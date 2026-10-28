@@ -205,6 +205,34 @@ public sealed class DeskMessageThemeColorsTests : IDisposable
     // ---- designs and proposals ----
 
     [Fact]
+    public void An_accepted_suggestion_with_colored_lines_turns_theme_colors_off_so_it_shows() => Sta.Run(() =>
+    {
+        var paths = ScratchPaths();
+        Directory.CreateDirectory(paths.AppDataDir);
+        var store = new SettingsStore(paths);
+        string messages = Path.Combine(paths.AppDataDir, "messages.txt");
+        File.WriteAllText(messages, "keep building.\n");
+        int reloaded = 0;
+        using var service = new DeskMessageHandoffService(paths, messages, store, () => reloaded++);
+        Assert.True(store.LoadDeskMessage().ThemeColors);
+        string Request(string id, string line) => new JsonObject
+        {
+            ["schema_version"] = 1,
+            ["id"] = id,
+            ["requested_at"] = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'"),
+            ["lines"] = new JsonArray(line),
+            ["mode"] = "add",
+        }.ToJsonString();
+        service.Handoff.Receive(System.Text.Encoding.UTF8.GetBytes(Request("s1", "{glow}plain glow.")));
+        service.Handoff.Approve();
+        Assert.True(store.LoadDeskMessage().ThemeColors);
+        service.Handoff.Receive(System.Text.Encoding.UTF8.GetBytes(Request("s2", "{ink:#ff2a6d}pink.")));
+        service.Handoff.Approve();
+        Assert.False(store.LoadDeskMessage().ThemeColors);
+        Assert.Equal(1, reloaded);   // the Desk reads the settings again
+    });
+
+    [Fact]
     public void Lines_with_their_own_ink_turn_theme_colors_off_so_they_show()
     {
         var on = DeskMessageSettings.Default with { ThemeColors = true };

@@ -72,6 +72,7 @@ public sealed class ThemeMatchSettingsTests : AppWindowFixture
         var (window, svm, guard, widget) = Open();
         try
         {
+            svm.MessagePage.ThemeColors = false;   // a new install uses the theme's colors, which locks the message color on its own
             window.SelectPage(SettingsPage.DeskLook);
             Settle(window, guard);
             svm.ThemeMatch.Follow = true;   // Obsidian is a built-in: a new theme is made, nothing asked
@@ -130,6 +131,7 @@ public sealed class ThemeMatchSettingsTests : AppWindowFixture
         var (window, svm, guard, _) = Open();
         try
         {
+            svm.MessagePage.ThemeColors = false;   // a new install uses the theme's colors, which locks the message color on its own
             window.SelectPage(SettingsPage.DeskLook);
             svm.ThemeMatch.Follow = true;
             Settle(window, guard);

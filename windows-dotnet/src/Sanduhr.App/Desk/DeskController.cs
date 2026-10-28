@@ -441,7 +441,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     public void ThemeChanged(ThemeDefinition theme)
     {
         _theme = theme;
-        Render();   // the message may use the theme's colors whether or not the Desk follows it
+        // The message uses the theme's colors whether or not the Desk follows it.
+        if (_follows || _ink.Mode == DeskInkMode.Theme || (_messages.ThemeColors && Placed("message"))) Render();
     }
 
     /// <summary>The widget has new numbers (after each render and sign-in change). Read only while the
