@@ -4,7 +4,7 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.Tests;
 
-/// <summary>A folder card's "What this folder holds" (slice 4): Mods &amp; Config's read-only report for one folder, read when opened.</summary>
+/// <summary>A folder card's "What this folder holds" on Settings, Claude Code (slice 4): the read-only report for one folder, read when opened.</summary>
 [Collection("SettingsWindow")]
 public sealed class FolderHoldsTests : ModsPageFixture
 {
@@ -90,6 +90,67 @@ public sealed class FolderHoldsTests : ModsPageFixture
         Assert.Equal("2 servers", holds.McpSummary);
         Assert.Equal(@"Refresh, read ~\.claude again", holds.RefreshName);
         Assert.Equal(SettingsNames.RefreshFolderNamed(@"~\.claude"), holds.RefreshName);
+    }
+
+    [Fact]
+    public void A_refresh_that_fails_leaves_no_line_from_the_last_read()
+    {
+        // Slice 4 row 25: load once with a full report, then the read throws. Every summary goes empty; nothing from the last read stays.
+        bool fail = false;
+        var host = Host() with { ReadReport = (folder, profile) => fail ? throw new IOException("held") : ModInventory.Read(folder, profile) };
+        var holds = new FolderHoldsViewModel(host, Seeded());
+        holds.Refresh();
+        Assert.NotEqual("", holds.StatuslineSummary);
+        Assert.NotEqual("", holds.HooksSummary);
+        Assert.NotEqual("", holds.PluginsSummary);
+        Assert.NotEqual("", holds.McpSummary);
+
+        fail = true;
+        holds.Refresh();
+
+        Assert.Equal(SettingsNames.HoldsCantRead, holds.SettingsSummary);
+        Assert.True(holds.Loaded);
+        Assert.Equal("", holds.SettingsDetail);
+        Assert.Equal("", holds.StatuslineSummary);
+        Assert.Equal("", holds.StatuslineCommand);
+        Assert.Equal("", holds.HooksSummary);
+        Assert.Equal("", holds.PluginsSummary);
+        Assert.Equal("", holds.McpSummary);
+        Assert.Equal("", holds.McpProjects);
+        Assert.Equal("", holds.ClaudeMdSummary);
+        Assert.Equal("", holds.RetentionSummary);
+        Assert.False(holds.RetentionWarning);
+        Assert.False(holds.SettingsUnreadable);
+    }
+
+    [Fact]
+    public void A_failed_refresh_after_an_unreadable_read_clears_the_unreadable_flag()
+    {
+        bool fail = false;
+        var host = Host() with { ReadReport = (folder, profile) => fail ? throw new IOException("held") : ModInventory.Read(folder, profile) };
+        var holds = new FolderHoldsViewModel(host, Home(".claude", "{ \"a\": 1, }"));
+        holds.Refresh();
+        Assert.True(holds.SettingsUnreadable);
+
+        fail = true;
+        holds.Refresh();
+
+        Assert.False(holds.SettingsUnreadable);
+        Assert.Equal("", holds.SettingsDetail);
+    }
+
+    [Fact]
+    public void A_missing_folder_and_Sanduhrs_own_statusline_have_their_lines()
+    {
+        // Slice 4 row 26: the two lines the earlier pins left out.
+        var missing = new FolderHoldsViewModel(Host(), Home(".claude-nothing"));
+        missing.Refresh();
+        var ours = new FolderHoldsViewModel(Host(), Home(".claude-ours",
+            "{\"statusLine\":{\"type\":\"command\",\"command\":\"powershell -File sanduhr-statusline.ps1\"}}"));
+        ours.Refresh();
+
+        Assert.Equal(SettingsNames.SettingsMissing, missing.SettingsSummary);
+        Assert.Equal(SettingsNames.StatuslineSanduhrs, ours.StatuslineSummary);
     }
 
     [Fact]

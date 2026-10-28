@@ -200,7 +200,7 @@ public sealed partial class InstalledRowViewModel : ObservableObject
 
     /// <summary>A sprite made here (Claude's or the user's own) takes the user's own PNG sheets (spec 3.8 section 6); a catalog pack never does.</summary>
     public bool CanUseOwnArt => Item.MadeHere && Item.PackKind == "sprite";
-    public string UseOwnArtName => $"Use my own art for {Name}";
+    public string UseOwnArtName => SettingsNames.UseOwnArtName(Name);
 
     [RelayCommand]
     private Task UseOwnArt() => _owner.UseOwnArtAsync(Id, Name);
@@ -254,8 +254,8 @@ public sealed partial class MetersFolderRowViewModel : ObservableObject
     public bool HasReason => Reason.Length > 0;
 
     public string SwitchName => SettingsNames.MetersOnFor(Display);
-    /// <summary>The row read as one line: "~\.claude, On".</summary>
-    public string RowName => $"{Display}, {StateText}";
+    /// <summary>The row read as one line: "~\.claude, On", with the reason when there is one.</summary>
+    public string RowName => HasReason ? $"{Display}, {StateText}. {Reason}" : $"{Display}, {StateText}";
     public string UpdateName => SettingsNames.UpdateMetersIn(Display);
     public string RemoveName => SettingsNames.RemoveMetersFrom(Display);
 
@@ -361,6 +361,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
 
     internal void SwitchMeters(MetersFolderRowViewModel row)
     {
+        MetersStatus = "";   // an outcome that repeats is still news: the line announces a change of text
         if (_host is null || !row.CanSwitch)
         {
             ReloadLocal();
@@ -396,6 +397,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
 
     internal void UpdateMeters(MetersFolderRowViewModel row)
     {
+        MetersStatus = "";   // an outcome that repeats is still news: the line announces a change of text
         if (_host is null || !row.CanUpdate) return;
         try
         {
@@ -415,6 +417,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
 
     internal void RemoveMeters(MetersFolderRowViewModel row)
     {
+        MetersStatus = "";   // an outcome that repeats is still news: the line announces a change of text
         if (_host is null || !row.CanRemove) return;
         try
         {
@@ -570,16 +573,14 @@ public sealed partial class ModsPageViewModel : ObservableObject
     {
         _asked = true;
         Busy = true;
-        CatalogStatus = "Checking the widget catalog…";
+        CatalogStatus = SettingsNames.CatalogChecking;
         try
         {
             var result = await Service.Client.RefreshAsync();
             if (result.Catalog is { } doc)
             {
                 var date = doc.GeneratedAt.ToLocalTime().ToString("d MMMM yyyy", CultureInfo.CurrentCulture);
-                CatalogStatus = doc.Packs.Count == 1
-                    ? $"The catalog is verified: 1 widget, published {date}."
-                    : $"The catalog is verified: {doc.Packs.Count} widgets, published {date}.";
+                CatalogStatus = SettingsNames.CatalogVerified(doc.Packs.Count, date);
             }
             else
             {
@@ -588,7 +589,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            CatalogStatus = "The widgets folder couldn't be read.";
+            CatalogStatus = SettingsNames.WidgetsFolderUnreadable;
         }
         finally
         {
@@ -602,13 +603,13 @@ public sealed partial class ModsPageViewModel : ObservableObject
         if (Busy) return;
         if (row.Action is not (CatalogAction.Install or CatalogAction.Update)) return;
         Busy = true;
-        Status = row.Action == CatalogAction.Update ? $"Updating {row.Name}…" : $"Installing {row.Name}…";
+        Status = row.Action == CatalogAction.Update ? SettingsNames.WidgetUpdating(row.Name) : SettingsNames.WidgetInstalling(row.Name);
         try
         {
             var result = await Service.Client.InstallAsync(row.Entry);
             Status = result.Ok
-                ? (row.Action == CatalogAction.Update ? $"{row.Name} is updated to {row.Version}." : $"{row.Name} is installed.")
-                : result.Error ?? "The widget couldn't be installed.";
+                ? (row.Action == CatalogAction.Update ? SettingsNames.WidgetUpdated(row.Name, row.Version) : SettingsNames.WidgetInstalled(row.Name))
+                : result.Error ?? SettingsNames.WidgetInstallFailed;
             if (result.Ok) Notify();
         }
         finally
@@ -622,8 +623,9 @@ public sealed partial class ModsPageViewModel : ObservableObject
     {
         if (Busy) return Task.CompletedTask;
         if (!Confirm(SettingsNames.UninstallQuestion(name), SettingsNames.UninstallDetail)) return Task.CompletedTask;
+        Status = "";   // a repeated outcome is still announced
         var result = Service.Store.Uninstall(id);
-        Status = result.Ok ? $"{name} is uninstalled." : result.Error ?? "The widget couldn't be removed.";
+        Status = result.Ok ? SettingsNames.WidgetUninstalled(name) : result.Error ?? SettingsNames.WidgetRemoveFailed;
         Rebuild();
         if (result.Ok) Notify();
         return Task.CompletedTask;
@@ -686,6 +688,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
             foreach (var row in Catalog.Where(r => r.Id == id)) row.ShowEnabled(row.Enabled);
             return;
         }
+        Status = "";   // a repeated outcome is still announced
         var result = Service.Store.SetEnabled(id, on);
         // What is on disk now; a pack gone behind the page's back keeps the row's last state (nothing was written).
         bool now = Service.Store.Load().Find(id)?.Enabled ?? Installed.FirstOrDefault(r => r.Id == id)?.Enabled ?? !on;
@@ -712,10 +715,11 @@ public sealed partial class ModsPageViewModel : ObservableObject
     internal Task UseOwnArtAsync(string id, string name)
     {
         if (Busy) return Task.CompletedTask;
+        Status = "";   // a repeated outcome is still announced
         var files = Service.Store.ReadFiles(id);
         if (files is null || WidgetOwnArt.Sprite(files) is not { } sprite)
         {
-            Status = $"{name} couldn't be read, so it is unchanged.";
+            Status = SettingsNames.OwnArtUnreadable(name);
             return Task.CompletedTask;
         }
         var art = new Dictionary<string, byte[]>(StringComparer.Ordinal);
@@ -723,8 +727,8 @@ public sealed partial class ModsPageViewModel : ObservableObject
         {
             var stage = sprite.Stages[i];
             string title = sprite.Stages.Count == 1
-                ? $"Your own art for {name} ({stage.FrameWidth}x{stage.FrameHeight} pixel cells)"
-                : $"Your own art for {name}: stage {i + 1} of {sprite.Stages.Count}, {stage.Name} ({stage.FrameWidth}x{stage.FrameHeight} pixel cells)";
+                ? SettingsNames.OwnArtPickTitle(name, stage.FrameWidth, stage.FrameHeight)
+                : SettingsNames.OwnArtPickStageTitle(name, i + 1, sprite.Stages.Count, stage.Name, stage.FrameWidth, stage.FrameHeight);
             if (PickImage(title) is not { } path) continue;
             byte[] png;
             try
@@ -732,38 +736,38 @@ public sealed partial class ModsPageViewModel : ObservableObject
                 var info = new FileInfo(path);
                 if (info.Length > PackValidator.MaxImageBytes)
                 {
-                    Status = $"{stage.Name}: that image is larger than 2 MB. A sprite sheet is at most 2 MB, so {name} is unchanged.";
+                    Status = SettingsNames.OwnArtTooLarge(stage.Name, name);
                     return Task.CompletedTask;
                 }
                 png = File.ReadAllBytes(path);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
             {
-                Status = $"That image couldn't be read, so {name} is unchanged.";
+                Status = SettingsNames.OwnArtImageUnreadable(name);
                 return Task.CompletedTask;
             }
             if (WidgetOwnArt.CheckImage(png, stage, sprite.MaxFrame) is { } why)
             {
-                Status = $"{stage.Name}: {why} {name} is unchanged.";
+                Status = SettingsNames.OwnArtRejected(stage.Name, why, name);
                 return Task.CompletedTask;
             }
             art[stage.Id] = png;
         }
         if (art.Count == 0)
         {
-            Status = $"No image was chosen, so {name} is unchanged.";
+            Status = SettingsNames.OwnArtNoneChosen(name);
             return Task.CompletedTask;
         }
         var result = WidgetOwnArt.Apply(files, id, art);
         if (!result.Ok)
         {
-            Status = $"{name} is unchanged: {result.Errors.FirstOrDefault() ?? "the pack didn't pass its checks."}";
+            Status = SettingsNames.OwnArtUnchanged(name, result.Errors.FirstOrDefault() ?? SettingsNames.OwnArtChecksFailed);
             return Task.CompletedTask;
         }
         var installed = Service.Store.Install(result.Files!, result.Manifest!, WidgetSource.Local, replaceMadeHere: true);
         Status = installed.Ok
-            ? $"{name} now uses your own art. It stays on this PC."
-            : installed.Error ?? $"{name} couldn't be changed.";
+            ? SettingsNames.OwnArtApplied(name)
+            : installed.Error ?? SettingsNames.OwnArtChangeFailed(name);
         Rebuild();
         if (installed.Ok) Notify();
         return Task.CompletedTask;
@@ -774,7 +778,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
             Title = title,
-            Filter = "PNG sprite sheet (*.png)|*.png",
+            Filter = SettingsNames.OwnArtFileFilter,
             CheckFileExists = true,
             Multiselect = false,
         };

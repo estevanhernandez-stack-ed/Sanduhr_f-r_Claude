@@ -132,7 +132,7 @@ internal partial class ResetWindow : Window
         ProgressText.Text = allOk
             ? "Reset is done."
             : "Reset finished, and some things are still there.";
-        var done = (Brush)FindResource("Sanduhr.Brush.Accent");
+        var done = (Brush)FindResource("Sanduhr.Brush.AccentText");
         var failed = (Brush)FindResource("Sanduhr.Brush.PaceMarker");
         ResultsList.ItemsSource = results.Select(r => new ResultRow(
             PartLabel(r.Part),

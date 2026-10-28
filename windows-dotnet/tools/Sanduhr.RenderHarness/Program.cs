@@ -26,6 +26,7 @@ using Sanduhr.Core;
 //                        (see SettingsPassScenario.cs); run it once without and once with --light
 //                        manual-key is not part of all either: the manual sign-in key window, closed and fully open
 //                        streamer-smoke is not part of all and runs alone: the Settings v2 slice 7 owner checks, automated (see StreamerSmokeScenario.cs)
+//                        polish-smoke is not part of all and runs alone: the 4.0 polish live checks, SANDUHR_DEV_PROFILE under %TEMP% (see PolishSmokeScenario.cs)
 //   --pages <list>       settings-pass only: comma-separated page names to run (default every page)
 //   --parts <list>       settings-pass only: pages, tab, focus, search, links, contrast (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)
@@ -108,7 +109,7 @@ public static partial class Program
             }
         }
         string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange", "launcher", "review", "companion", "ridealongs", "propose-widget", "meterstyles", "theme-match" };
-        string[] opt = { "settings-pass", "manual-key", "streamer-smoke" };
+        string[] opt = { "settings-pass", "manual-key", "streamer-smoke", "polish-smoke" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
         var bad = scenarios.Where(s => !known.Contains(s) && !opt.Contains(s)).ToList();
@@ -281,6 +282,16 @@ public static partial class Program
             if (scenarios.Count != 1)
                 throw new InvalidOperationException("streamer-smoke runs alone: pass --scenario streamer-smoke only.");
             try { await RenderStreamerSmoke(); }
+            finally { File.WriteAllLines(Path.Combine(Out, "log.txt"), Log); }
+            return;
+        }
+
+        if (scenarios.Contains("polish-smoke"))
+        {
+            // Runs alone, like streamer-smoke: it builds its own scratch rig and never reaches the real-account widget below.
+            if (scenarios.Count != 1)
+                throw new InvalidOperationException("polish-smoke runs alone: pass --scenario polish-smoke only.");
+            try { await RenderPolishSmoke(); }
             finally { File.WriteAllLines(Path.Combine(Out, "log.txt"), Log); }
             return;
         }

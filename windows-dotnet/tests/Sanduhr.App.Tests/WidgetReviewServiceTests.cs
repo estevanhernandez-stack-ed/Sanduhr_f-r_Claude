@@ -150,7 +150,10 @@ public sealed class WidgetReviewServiceTests : IDisposable
             Assert.True(row.MadeHere);
             Assert.True(File.Exists(Installed.RasterPath("my-blob", "sheet.json")));
             Assert.Equal("my-blob", _store.LoadCompanion().Pack);
-            Assert.NotNull(new DeskArrangement(_store.LoadDesk().Layout).Placement(CompanionSettings.Widget));
+            var placed = new DeskArrangement(_store.LoadDesk().Layout).Placement(CompanionSettings.Widget);
+            Assert.NotNull(placed);
+            Assert.Equal(DeskAnchor.BC, placed!.Anchor);   // the companion's default place: bottom center
+            Assert.EndsWith("companion:bc", _store.LoadDesk().Layout);
             Assert.Equal(["show", "end", "installed my-blob"], host.Calls);
             Assert.Equal(1, installed);
             Assert.False(service.Reviewing);

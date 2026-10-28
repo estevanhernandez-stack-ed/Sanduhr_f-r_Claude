@@ -210,6 +210,20 @@ public sealed class DeskPiecesSettingsTests : IDisposable
         Assert.True(status.PlaceCommand.CanExecute(null));
     }
 
+    [Fact]
+    public void Hiding_a_placed_piece_raises_CanPlace_once()
+    {
+        // Item 10a (S3 T7): one change, one notification.
+        var desk = Desk("clock:bl claude:bl weather:bl");
+        var status = desk.PieceStatus("weather");
+        Assert.True(status.IsPlaced);
+        int raised = 0;
+        status.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(DeskPieceStatusViewModel.CanPlace)) raised++; };
+        Row(desk, "weather").Shown = false;
+        Assert.False(status.IsPlaced);
+        Assert.Equal(1, raised);
+    }
+
     private static System.Windows.Controls.WrapPanel? FirstRow(System.Windows.DependencyObject root)
     {
         for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)

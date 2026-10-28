@@ -39,7 +39,7 @@
                 </WrapPanel>
                 <TextBlock Text="{Binding Status}" FontSize="11" TextWrapping="Wrap"
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                           AutomationProperties.Name="Companion status" AutomationProperties.LiveSetting="Polite"
+                           AutomationProperties.LiveSetting="Polite"
                            Visibility="{Binding HasCompanions, Converter={StaticResource BoolVis}}" />
                 <WrapPanel Visibility="{Binding SpritesAreOff, Converter={StaticResource BoolVis}}">
                     <TextBlock Text="{Binding SpritesOffLine}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"
@@ -68,74 +68,74 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <WrapPanel Tag="PieceRow" Margin="0,0,0,8">
-                        <Grid Width="490">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" MinWidth="118" />
-                                <ColumnDefinition Width="138" />
-                                <ColumnDefinition Width="8" />
-                                <ColumnDefinition Width="72" />
-                                <ColumnDefinition Width="8" />
-                                <ColumnDefinition Width="146" />
-                            </Grid.ColumnDefinitions>
-                            <CheckBox Grid.Column="0" Style="{DynamicResource ThemedCheckBox}" VerticalAlignment="Center" Margin="0,0,6,0"
-                                      Content="{Binding Name}" IsChecked="{Binding Shown, Mode=TwoWay}"
-                                      AutomationProperties.Name="{Binding ShownName}" />
-                            <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
-                                      ItemsSource="{x:Static vm:DeskSettingsViewModel.PlaceOptions}"
-                                      SelectedItem="{Binding Place, Mode=TwoWay}"
-                                      AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, place'}" />
-                            <ComboBox Grid.Column="3" Style="{DynamicResource ThemedComboBox}"
-                                      ItemsSource="{x:Static vm:DeskSettingsViewModel.SizeSteps}"
-                                      SelectedItem="{Binding Size, Mode=TwoWay}"
-                                      IsEnabled="{Binding IsPlaced}"
-                                      AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, size'}">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding StringFormat='{}{0:0%}'}" />
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            <ComboBox Grid.Column="5" Style="{DynamicResource ThemedComboBox}"
-                                      ItemsSource="{Binding MonitorChoices}"
-                                      SelectedItem="{Binding Monitor, Mode=TwoWay}"
-                                      IsEnabled="{Binding IsPlaced}"
-                                      AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, monitor'}" />
-                            <!-- The second line: the meter style (#336) on the Claude line, the Claude limits and telemetry, or the link to the
-                                 piece's own page. Made only for those rows (not merely hidden), so a screen reader never meets it elsewhere. -->
-                            <ContentControl Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="5" Focusable="False" IsTabStop="False">
-                                <ContentControl.Style>
-                                    <Style TargetType="ContentControl">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding HasStyle}" Value="True">
-                                                <Setter Property="Content" Value="{Binding}" />
-                                                <Setter Property="ContentTemplate" Value="{StaticResource StylePicker}" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding HasSettingsPage}" Value="True">
-                                                <Setter Property="Content" Value="{Binding}" />
-                                                <Setter Property="ContentTemplate" Value="{StaticResource PageLink}" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding IsCompanion}" Value="True">
-                                                <Setter Property="Content" Value="{Binding}" />
-                                                <Setter Property="ContentTemplate" Value="{StaticResource CompanionExtras}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </ContentControl.Style>
-                            </ContentControl>
-                        </Grid>
-                        <!-- Order (WF5): live when another piece shares the place. Spoken "Move <piece> up in <place>". -->
-                        <StackPanel Width="230" Orientation="Horizontal" VerticalAlignment="Top">
-                            <Button Style="{DynamicResource FlatButton}" Padding="8,4" Margin="8,0,4,0"
-                                    Content="{x:Static core:SettingsNames.MoveUp}" Command="{Binding MoveUpCommand}"
-                                    AutomationProperties.Name="{Binding MoveUpName}" />
-                            <Button Style="{DynamicResource FlatButton}" Padding="8,4" Margin="0"
-                                    Content="{x:Static core:SettingsNames.MoveDown}" Command="{Binding MoveDownCommand}"
-                                    AutomationProperties.Name="{Binding MoveDownName}" />
-                        </StackPanel>
+                            <Grid Width="490">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" MinWidth="118" />
+                                    <ColumnDefinition Width="138" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="146" />
+                                </Grid.ColumnDefinitions>
+                                <CheckBox Grid.Column="0" Style="{DynamicResource ThemedCheckBox}" VerticalAlignment="Center" Margin="0,0,6,0"
+                                          Content="{Binding Name}" IsChecked="{Binding Shown, Mode=TwoWay}"
+                                          AutomationProperties.Name="{Binding ShownName}" />
+                                <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
+                                          ItemsSource="{x:Static vm:DeskSettingsViewModel.PlaceOptions}"
+                                          SelectedItem="{Binding Place, Mode=TwoWay}"
+                                          AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, place'}" />
+                                <ComboBox Grid.Column="3" Style="{DynamicResource ThemedComboBox}"
+                                          ItemsSource="{x:Static vm:DeskSettingsViewModel.SizeSteps}"
+                                          SelectedItem="{Binding Size, Mode=TwoWay}"
+                                          IsEnabled="{Binding IsPlaced}"
+                                          AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, size'}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding StringFormat='{}{0:0%}'}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <ComboBox Grid.Column="5" Style="{DynamicResource ThemedComboBox}"
+                                          ItemsSource="{Binding MonitorChoices}"
+                                          SelectedItem="{Binding Monitor, Mode=TwoWay}"
+                                          IsEnabled="{Binding IsPlaced}"
+                                          AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, monitor'}" />
+                                <!-- The second line: the meter style (#336) on the Claude line, the Claude limits and telemetry, or the link to the
+                                     piece's own page. Made only for those rows (not merely hidden), so a screen reader never meets it elsewhere. -->
+                                <ContentControl Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="5" Focusable="False" IsTabStop="False">
+                                    <ContentControl.Style>
+                                        <Style TargetType="ContentControl">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasStyle}" Value="True">
+                                                    <Setter Property="Content" Value="{Binding}" />
+                                                    <Setter Property="ContentTemplate" Value="{StaticResource StylePicker}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding HasSettingsPage}" Value="True">
+                                                    <Setter Property="Content" Value="{Binding}" />
+                                                    <Setter Property="ContentTemplate" Value="{StaticResource PageLink}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsCompanion}" Value="True">
+                                                    <Setter Property="Content" Value="{Binding}" />
+                                                    <Setter Property="ContentTemplate" Value="{StaticResource CompanionExtras}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ContentControl.Style>
+                                </ContentControl>
+                            </Grid>
+                            <!-- Order (WF5): live when another piece shares the place. Spoken "Move <piece> up in <place>". -->
+                            <StackPanel Width="230" Orientation="Horizontal" VerticalAlignment="Top">
+                                <Button Style="{DynamicResource FlatButton}" Padding="8,4" Margin="8,0,4,0"
+                                        Content="{x:Static core:SettingsNames.MoveUp}" Command="{Binding MoveUpCommand}"
+                                        AutomationProperties.Name="{Binding MoveUpName}" />
+                                <Button Style="{DynamicResource FlatButton}" Padding="8,4" Margin="0"
+                                        Content="{x:Static core:SettingsNames.MoveDown}" Command="{Binding MoveDownCommand}"
+                                        AutomationProperties.Name="{Binding MoveDownName}" />
+                            </StackPanel>
                         </WrapPanel>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

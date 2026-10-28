@@ -45,6 +45,10 @@
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
                             </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                                <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="bg" Property="Opacity" Value="0.4" />
                             </Trigger>
@@ -126,7 +130,7 @@
     </Window.Resources>
 
     <Border x:Name="Frame" CornerRadius="10"
-            Background="{DynamicResource Sanduhr.Brush.GlassChrome}"
+            Background="{DynamicResource Sanduhr.Brush.Glass}"
             BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
             BorderThickness="1"
             MouseLeftButtonDown="Frame_MouseLeftButtonDown">

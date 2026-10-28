@@ -711,6 +711,9 @@
                                                                     <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Value="">
                                                                         <Setter Property="Visibility" Value="Collapsed" />
                                                                     </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Value="{x:Null}">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </TextBlock.Style>
@@ -722,8 +725,14 @@
                                             <Trigger Property="IsChecked" Value="True">
                                                 <Setter TargetName="arrow" Property="Text" Value="&#xE70D;" />
                                             </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ring" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                                            </Trigger>
+                                            <Trigger Property="IsPressed" Value="True">
+                                                <Setter TargetName="ring" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                                            </Trigger>
                                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                                <Setter TargetName="ring" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Text}" />
+                                                <Setter TargetName="ring" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -1260,9 +1269,9 @@
                                     <ColumnDefinition Width="70" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="2" Text="%" VerticalAlignment="Center" FontSize="12" Margin="4,0,0,0"
+                                <controls:DecorativeText Grid.Column="2" Text="%" VerticalAlignment="Center" FontSize="12" Margin="4,0,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                <TextBlock Grid.Column="6" Text="%" VerticalAlignment="Center" FontSize="12" Margin="4,0,0,0"
+                                <controls:DecorativeText Grid.Column="6" Text="%" VerticalAlignment="Center" FontSize="12" Margin="4,0,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                 <TextBlock Grid.Column="0" Text="Warn at" VerticalAlignment="Center" FontSize="12"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,8,0" />

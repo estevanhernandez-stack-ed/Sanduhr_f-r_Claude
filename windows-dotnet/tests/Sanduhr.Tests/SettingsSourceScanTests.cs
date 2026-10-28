@@ -713,15 +713,43 @@ public class SettingsSourceScanTests
         Assert.Contains("x:Name=\"UseEmbeddedLink\"", key);
     }
 
+    /// <summary>Every hard-coded hex brush on a button in the dialog's XAML: a hex on any brush attribute of a &lt;Button&gt;, or a hex
+    /// Value in a Setter of any Button style. The primary's literal <c>Foreground="#0d0d0d"</c> is the one allowed exception.</summary>
+    internal static List<string> DialogButtonHexes(string xamlWithComments)
+    {
+        var xaml = XmlComment.Replace(xamlWithComments, "");
+        var found = new List<string>();
+        foreach (Match button in Regex.Matches(xaml, @"<Button\b[^>]*>", RegexOptions.Singleline))
+            foreach (Match attr in Regex.Matches(button.Value, @"\b(\w*Brush|Background|Foreground)=""(#[^""]*)"""))
+            {
+                var primaryText = attr.Groups[1].Value == "Foreground" && attr.Groups[2].Value == "#0d0d0d"
+                    && button.Value.Contains("x:Name=\"PrimaryButton\"");
+                if (!primaryText) found.Add(attr.Value);
+            }
+        foreach (Match style in Regex.Matches(xaml, @"<Style\b[^>]*TargetType=""Button""[^>]*>.*?</Style>", RegexOptions.Singleline))
+            foreach (Match setter in Regex.Matches(style.Value, @"<Setter\b[^>]*\bValue=""(#[^""]*)"""))
+                found.Add(setter.Value);
+        return found;
+    }
+
     [Fact]
     public void The_shared_dialog_paints_no_button_with_a_hard_coded_color()
     {
-        // A literal hex Background pairs a themed Foreground with a fixed fill: dark text on near-black in a light theme (Store 10.1.4.4).
-        var xaml = XmlComment.Replace(File.ReadAllText(Path.Combine(AppDir(), "Views", "ThemedDialog.xaml")), "");
-        var buttons = Regex.Matches(xaml, "<Button\\b[^>]*>", RegexOptions.Singleline);
-        Assert.Equal(3, buttons.Count);   // Primary, Secondary and the Cancel of ShowChoice
-        foreach (Match button in buttons)
-            Assert.DoesNotMatch("\\bBackground=\"#", button.Value);
+        // A literal hex pairs a themed brush with a fixed one: dark text on near-black in a light theme (Store 10.1.4.4).
+        var raw = File.ReadAllText(Path.Combine(AppDir(), "Views", "ThemedDialog.xaml"));
+        Assert.Equal(3, Regex.Matches(XmlComment.Replace(raw, ""), @"<Button\b[^>]*>", RegexOptions.Singleline).Count);   // Primary, Secondary and the Cancel of ShowChoice
+        Assert.Empty(DialogButtonHexes(raw));
+    }
+
+    [Fact]
+    public void The_dialog_hex_scan_catches_a_planted_hex_in_a_button_style_or_a_brush_attribute()
+    {
+        var real = File.ReadAllText(Path.Combine(AppDir(), "Views", "ThemedDialog.xaml"));
+        const string styleBorder = "<Setter Property=\"BorderBrush\" Value=\"{DynamicResource Sanduhr.Brush.Border}\" />";
+        Assert.Contains(styleBorder, real);
+        Assert.Single(DialogButtonHexes(real.Replace(styleBorder, "<Setter Property=\"BorderBrush\" Value=\"#ff0000\" />")));
+        Assert.Single(DialogButtonHexes(real.Replace("x:Name=\"SecondaryButton\"", "x:Name=\"SecondaryButton\" BorderBrush=\"#ff0000\"")));
+        Assert.Single(DialogButtonHexes(real.Replace("x:Name=\"TertiaryButton\"", "x:Name=\"TertiaryButton\" Foreground=\"#0d0d0d\"")));   // the exception is the primary's alone
     }
 
     [Fact]
@@ -737,8 +765,10 @@ public class SettingsSourceScanTests
     {
         // "(Settings, " + "Desk);" escapes PathProblems: the page is in the next literal (slice 1 review, split literals). Keep a
         // place in one literal; wrap the prose around it instead.
+        // "Settings," alone, or "Settings, <Page title>," (the sentence's own path cut after a page).
+        var openers = SettingsNames.Pages.Select(p => "Settings, " + SettingsNames.PageTitle(p) + ",").Append("Settings,").ToList();
         var split = CsStrings().Concat(CoreAndMcpStrings())
-            .Where(x => x.Text.TrimEnd().EndsWith("Settings,", StringComparison.Ordinal))
+            .Where(x => openers.Any(o => x.Text.TrimEnd().EndsWith(o, StringComparison.Ordinal)))
             .Select(x => $"{x.Where}: \"{x.Text}\"")
             .ToList();
         Assert.True(split.Count == 0, "A Settings path split across literals: " + string.Join(", ", split));
@@ -800,7 +830,7 @@ public class SettingsSourceScanTests
         // Slice 3 final review T9: the companion row used views:WidgetsPage.NotVisible, which breaks the Desk page when that page goes.
         // Shared converters live in Converters/; a view references its own statics or those.
         var bad = Directory.EnumerateFiles(AppDir(), "*.xaml", SearchOption.AllDirectories)
-            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"\{x:Static views:(\w+Page)\.\w+\}").Select(m => (File: f, Page: m.Groups[1].Value)))
+            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"\{x:Static views:(\w+)\.\w+\}").Select(m => (File: f, Page: m.Groups[1].Value)))
             .Where(x => !Path.GetFileNameWithoutExtension(x.File).Equals(x.Page, StringComparison.Ordinal))
             .Select(x => $"{Path.GetFileName(x.File)} uses {x.Page}'s statics")
             .ToList();

@@ -76,6 +76,25 @@ public class ModsPageTextTests
     }
 
     [Fact]
+    public void An_unreadable_folder_adds_nothing_to_the_no_switch_note()
+    {
+        var f = NoteFolder("a", new Dictionary<string, bool>(), NoteItem("x", ModState.On, @"C:\x", "x@m"));
+        f = f with { Report = f.Report with { Settings = new SettingsState(SettingsKind.Unreadable, 3, 7, "bad") } };
+        Assert.Equal("", ModsPageText.PlainNote([f]));
+    }
+
+    [Fact]
+    public void A_plugin_counts_in_one_sentence_only_and_no_files_wins()
+    {
+        // Slice 4 row 20 (owner taste 4): files and no entry in folder A, switched on with no files in folder B.
+        var a = NoteFolder("a", new Dictionary<string, bool>(), NoteItem("x", ModState.On, @"C:\x", "x@m"));
+        var b = NoteFolder("b", new Dictionary<string, bool> { ["x@m"] = true }, NoteItem("x", ModState.On, null, "x@m"));
+        var note = ModsPageText.PlainNote([a, b]);
+        Assert.Contains(SettingsNames.NoFilesNote(1), note);
+        Assert.DoesNotContain(SettingsNames.NoSwitchNote(1), note);
+    }
+
+    [Fact]
     public void The_files_missing_count_is_of_plugins_switched_on_not_off_or_only_listed()
     {
         // "switched on in settings.json, but its files aren't there" must be true of every plugin it counts.

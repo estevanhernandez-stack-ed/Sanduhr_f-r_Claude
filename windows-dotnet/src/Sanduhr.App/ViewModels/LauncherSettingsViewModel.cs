@@ -10,7 +10,7 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
-/// <summary>One Launcher button in Settings, Desk, Launcher: what it opens, its label and glow, and its picture.</summary>
+/// <summary>One Launcher button in Settings, Launcher: what it opens, its label and glow, and its picture.</summary>
 public sealed partial class LauncherButtonRow : ObservableObject
 {
     private readonly LauncherSettingsViewModel _owner;
@@ -135,7 +135,7 @@ public sealed partial class LauncherButtonRow : ObservableObject
 }
 
 /// <summary>
-/// Settings, Desk, Launcher (spec, Desk Launcher): the buttons as a list you can add to, remove from and reorder, each
+/// Settings, Launcher (spec, Desk Launcher): the buttons as a list you can add to, remove from and reorder, each
 /// with its label, glow color and picture; row or column; and the way into the app picker and the link prompt. Every
 /// change saves at once, removes the picture files nothing uses any more, and tells the running Desk. The piece
 /// itself is placed in Settings, Desk, Pieces, like any other.

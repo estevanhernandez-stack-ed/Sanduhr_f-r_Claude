@@ -1,6 +1,11 @@
 using System.IO;
+using System.Net.Http;
 using System.Security.Cryptography;
+using System.Windows;
+using System.Windows.Controls;
+using Sanduhr.App.Services;
 using Sanduhr.App.ViewModels;
+using Sanduhr.App.Views;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.Tests;
@@ -14,14 +19,26 @@ public sealed class ModsPageCatalogTests : ModsPageFixture
     private readonly ECDsa _key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
     private readonly FakeGitHub _net = new();
 
-    private ModsPageViewModel Published(Version? running = null)
+    /// <summary>Holds every request until <see cref="Release"/>, so two callers can both be in flight when the second one asks.</summary>
+    private sealed class GateHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
+    {
+        private readonly TaskCompletionSource _open = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void Release() => _open.TrySetResult();
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            await _open.Task;
+            return await base.SendAsync(request, ct);
+        }
+    }
+
+    private ModsPageViewModel Published(Version? running = null, HttpMessageHandler? handler = null)
     {
         var palette = WidgetKit.Zip(WidgetKit.Pack("good-palette"));
         var sprite = WidgetKit.Zip(WidgetKit.Pack("good-sprite"));
         WidgetKit.Publish(_net, _key, "2026-10-25T02:00:00Z",
             (WidgetKit.Entry("good-palette", "Fixture palette", "palette", "1.0.0", palette), palette),
             (WidgetKit.Entry("good-sprite", "Fixture sprite", "sprite", "1.0.0", sprite), sprite));
-        return new ModsPageViewModel(() => new Sanduhr.App.Services.WidgetCatalogService(Paths, _net, running ?? WidgetKit.V380, [WidgetKit.Spki(_key)]),
+        return new ModsPageViewModel(() => new Sanduhr.App.Services.WidgetCatalogService(Paths, handler ?? _net, running ?? WidgetKit.V380, [WidgetKit.Spki(_key)]),
             null, Host())
         {
             Confirm = (_, _) => true,
@@ -61,6 +78,25 @@ public sealed class ModsPageCatalogTests : ModsPageFixture
 
         await page.CheckAgainCommand.ExecuteAsync(null);
         Assert.True(_net.Seen.Count > first);
+    }
+
+    [Fact]
+    public async Task Opening_the_catalog_and_checking_again_together_fetch_once()
+    {
+        var single = Published();
+        await single.OpenCatalog();
+        int oneFetch = _net.Seen.Count;
+        Assert.True(oneFetch > 0);
+        _net.Seen.Clear();
+
+        var gate = new GateHandler(_net);
+        var page = Published(handler: gate);
+        var open = page.OpenCatalog();
+        var again = page.CheckAgainCommand.ExecuteAsync(null);   // while the first is still in flight: the guard hands back the running fetch
+        gate.Release();
+        await Task.WhenAll(open, again);
+
+        Assert.Equal(oneFetch, _net.Seen.Count);
     }
 
     [Fact]
@@ -144,4 +180,57 @@ public sealed class ModsPageCatalogTests : ModsPageFixture
         Assert.True(disclosure >= 0 && list >= 0);
         Assert.True(disclosure < list);
     }
+}
+
+/// <summary>The catalog opened in a real Settings window over a fake GitHub: each row shows exactly the one control that acts on it.</summary>
+[Collection("SettingsWindow")]
+public sealed class ModsPageCatalogWalkTests : AppWindowFixture
+{
+    private readonly ECDsa _key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+    private readonly FakeGitHub _net = new();
+
+    [Fact]
+    public void An_open_catalog_shows_no_control_that_cant_act_and_each_row_its_one_action() => AppHost.Run(() =>
+    {
+        InstalledPackKit.Install(new Paths(), "good-palette");   // its catalog row is the switch; the sprite's is Install
+        var palette = WidgetKit.Zip(WidgetKit.Pack("good-palette"));
+        var sprite = WidgetKit.Zip(WidgetKit.Pack("good-sprite"));
+        WidgetKit.Publish(_net, _key, "2026-10-25T02:00:00Z",
+            (WidgetKit.Entry("good-palette", "Fixture palette", "palette", "1.0.0", palette), palette),
+            (WidgetKit.Entry("good-sprite", "Fixture sprite", "sprite", "1.0.0", sprite), sprite));
+        var (widget, _) = ScratchWidget("Personal");
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+        svm.ModsPage = new ModsPageViewModel(() => new WidgetCatalogService(new Paths(), _net, WidgetKit.V380, [WidgetKit.Spki(_key)]),
+            null, ClaudeCodeHost.For(widget));
+        var window = new SettingsWindow(svm);
+        var guard = NoActivate.Show(window);
+        try
+        {
+            window.SelectPage(SettingsPage.Mods, SettingsIndex.Catalog);
+            var until = DateTime.UtcNow.AddSeconds(10);
+            while ((svm.ModsPage.Busy || svm.ModsPage.Catalog.Count == 0) && DateTime.UtcNow < until) { Pump(); Thread.Sleep(15); }
+            window.UpdateLayout();
+            Pump();
+            guard.Check();
+            Assert.True(svm.ModsPage.CatalogOpen);
+            Assert.Equal(2, svm.ModsPage.Catalog.Count);
+
+            var catalog = DoneWalk.Below<Expander>(window).Single(e => e.Name == "CatalogSection");
+            Assert.True(catalog.IsExpanded);
+            Assert.Empty(DoneWalk.ControlsThatCantAct(catalog));
+
+            var rows = DoneWalk.Below<ContentPresenter>(catalog).Where(p => p.Content is CatalogRowViewModel).ToList();
+            Assert.Equal(2, rows.Count);
+            foreach (var presenter in rows)
+            {
+                var vm = (CatalogRowViewModel)presenter.Content;
+                var shown = DoneWalk.ShownNames(presenter);
+                // A catalog row has no Uninstall: that lives on the Installed row. Install, Update or the switch, one of them.
+                Assert.Equal([vm.HasButton ? vm.ActionName : vm.SwitchName], shown);
+            }
+            Assert.Contains(rows, p => ((CatalogRowViewModel)p.Content).IsSwitch);
+            Assert.Contains(rows, p => ((CatalogRowViewModel)p.Content).Action == CatalogAction.Install);
+        }
+        finally { window.Close(); }
+    });
 }

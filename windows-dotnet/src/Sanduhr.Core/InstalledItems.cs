@@ -104,7 +104,9 @@ public static partial class InstalledItems
                 // A row with no files to load (ModsPageText.HasFiles, the note's own check) is Files missing whatever settings.json says:
                 // switched on with its folder gone, it is not on (Task 12 review I1).
                 var state = here is null ? (f.Report.Settings.Kind == SettingsKind.Unreadable ? FolderState.Unreadable : FolderState.NotInstalled)
-                    : !ModsPageText.HasFiles(here) ? FolderState.Missing : here.State switch
+                    : !ModsPageText.HasFiles(here) ? FolderState.Missing
+                    // Slice 4 row 13: with settings.json unreadable, "no entry" is unknown, not on.
+                    : f.Report.Settings.Kind == SettingsKind.Unreadable ? FolderState.Unreadable : here.State switch
                 {
                     ModState.On => FolderState.On,
                     ModState.Off => FolderState.Off,
@@ -234,7 +236,9 @@ public static partial class InstalledItems
         if (!kind) return false;
         if (string.IsNullOrWhiteSpace(text)) return true;
         var t = text.Trim();
-        return new[] { item.Name, item.Id, item.PackKind ?? "", item.Source, item.IsMod ? "mod" : "" }
-            .Any(s => s.Contains(t, StringComparison.OrdinalIgnoreCase));
+        return new[] { item.Name, item.Id, item.PackKind ?? "", item.Source }
+            .Any(s => s.Contains(t, StringComparison.OrdinalIgnoreCase))
+            // Slice 4 row 21: "mod" is the tag as a whole word, not a substring ("mo" no longer matches every mod).
+            || (item.IsMod && t.Equals("mod", StringComparison.OrdinalIgnoreCase));
     }
 }

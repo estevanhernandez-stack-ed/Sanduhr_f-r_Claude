@@ -53,12 +53,18 @@ public static class ModsPageText
         var noSwitch = new HashSet<string>(StringComparer.Ordinal);
         var noFiles = new HashSet<string>(StringComparer.Ordinal);
         foreach (var f in folders)
+        {
+            // Slice 4 row 13: an unreadable settings.json says nothing about switches, so it adds nothing.
+            if (f.Report.Settings.Kind == SettingsKind.Unreadable) continue;
             foreach (var m in f.Report.Mods.Where(m => !m.IsSanduhr))
             {
                 var id = m.Key ?? m.Name;
                 if (!HasFiles(m)) { if (m.Key is not null && f.Report.EnabledPlugins.TryGetValue(m.Key, out var on) && on) noFiles.Add(id); }
                 else if (m.Key is null || !f.Report.EnabledPlugins.ContainsKey(m.Key)) noSwitch.Add(id);
             }
+        }
+        // Slice 4 row 20: a plugin counts in one sentence only, and the more serious one (no files) wins.
+        noSwitch.ExceptWith(noFiles);
         var parts = new List<string>();
         if (noSwitch.Count > 0) parts.Add(SettingsNames.NoSwitchNote(noSwitch.Count));
         if (noFiles.Count > 0) parts.Add(SettingsNames.NoFilesNote(noFiles.Count));
@@ -80,7 +86,7 @@ public static class ModsPageText
         return string.Join(", ", parts);
     }
 
-    /// <summary>What a mod or plugin touches, as the old Mods &amp; Config page said it: "Draws a band; can run programs." Empty when the scan
+    /// <summary>What a mod or plugin touches, as Settings, Mods &amp; Widgets says it: "Draws a band; can run programs." Empty when the scan
     /// found no surface and no capability.</summary>
     public static string DescribeTouches(ModTouches t)
     {

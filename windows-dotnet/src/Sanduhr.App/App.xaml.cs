@@ -199,7 +199,9 @@ public partial class App : Application
             try { ExternalDirMigrationRunner.Run(startupSettings, new Sanduhr.Core.Paths()); }
             catch { }
 
-            if (statuslineEnabled)
+            if (SnapshotConsumers.ScriptWanted(statuslineEnabled,
+                    System.IO.Path.Combine(appDataDir, ResetPlan.IntegrationsName, ResetPlan.ReceiptsFileName),
+                    System.IO.Path.Combine(statuslineBinDir, StatuslineInstaller.ScriptName)))
             {
                 try
                 {
@@ -636,10 +638,8 @@ public partial class App : Application
         _widgetReview.Host = new Desk.WidgetReviewHost(_desk, store, () =>
         {
             _settingsWindow?.ViewModel.ModsPage.ReloadLocal();
-            // A pack Claude made joins the pickers and the Themes pack line.
+            // A pack Claude made joins the pickers, the Themes pack line and the Ink presets (PacksChanged reloads the Desk page).
             _settingsWindow?.ViewModel.PacksChanged();
-            // A palette Claude made joins the Ink presets (3.9.1).
-            _settingsWindow?.ViewModel.Desk.Reload();
         });
         _widgetReview.Start();
         _desk.LauncherMissingClicked += OnLauncherMissing;
@@ -735,7 +735,11 @@ public partial class App : Application
 
         // Landing only ever sees a checked place (SettingsIndex.Check, the rule ParseLink uses), so nothing raw reaches it.
         if (page is { } asked)
-            (page, anchor) = SettingsIndex.Check(asked, anchor);
+        {
+            var checkedLink = SettingsIndex.Check(asked, anchor);
+            page = checkedLink.Page;
+            anchor = checkedLink.Anchor;
+        }
 
         if (_settingsWindow is not null)
         {
@@ -781,7 +785,6 @@ public partial class App : Application
             _desk?.ResetFonts();
             _deskDesign?.FontsChanged();
             _desk?.Reload();
-            svm.Desk.Reload();
         };
         svm.MessageChanged = () => { _desk?.Reload(); _handoff?.PublishState(); };
         svm.Desk.WatchersChanged = () => _watchers?.SwitchChanged();

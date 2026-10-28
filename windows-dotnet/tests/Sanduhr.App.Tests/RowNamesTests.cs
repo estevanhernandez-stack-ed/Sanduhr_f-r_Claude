@@ -39,6 +39,6 @@ public class RowNamesTests
 
     [Fact]
     public void ModsLinesReadAsWords() =>
-        // Mods & Config's folder picker (ModsFolderOption) retired with the page in slice 4; the cards' report lines remain.
+        // The old Mods folder picker (ModsFolderOption) retired in slice 4; the Claude Code cards' report lines remain.
         Reads("Notification, 2 groups", new ModsLine("Notification", "2 groups"));
 }

@@ -61,7 +61,6 @@ public class ThemeContrastTests
         double L(string hex) { ThemeLint.TryParseHex(hex, out var c); return ThemeLint.Luminance(c); }
         Assert.True(L(def.Text) > L(def.TextSecondary) && L(def.TextSecondary) > L(def.TextDim) && L(def.TextDim) > L(def.TextMuted),
             $"{key}'s ramp no longer steps down: {def.Text} {def.TextSecondary} {def.TextDim} {def.TextMuted}");
-        Assert.True(L(def.Text) > L(def.TextDim) && L(def.TextDim) > L(def.TextMuted), $"{key}: Text > TextDim > TextMuted");
     }
 
     /// <summary>The twelve values, pinned: a later change to a built-in's dim text is a reviewed change (the owner's before/after table).

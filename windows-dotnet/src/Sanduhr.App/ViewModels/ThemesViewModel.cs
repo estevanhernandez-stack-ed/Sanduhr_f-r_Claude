@@ -87,6 +87,7 @@ public sealed partial class ThemesViewModel : ObservableObject
         RefreshThemePacks();
     }
 
+    // Defaults to the real widgets folder: a test that opens Themes sets this seam or runs under AppWindowFixture's scratch profile.
     /// <summary>The installed widget packs (Settings' own folder). A seam for tests.</summary>
     internal Func<WidgetStore> Widgets { get; set; } =
         () => new WidgetStore(new Sanduhr.Core.Paths().WidgetsDir, Sanduhr.App.Services.WidgetCatalogService.EncodePng);

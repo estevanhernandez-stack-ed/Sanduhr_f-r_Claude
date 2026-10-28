@@ -338,7 +338,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         if (!_loading && value.Kind == GlowTargetKind.Desk) PlaceGlowSpot();
     }
 
-    /// <summary>Choosing the Desk places the glow's spot at its default anchor when it is not placed yet,
+    /// <summary>Choosing the Desk places the glow's spot at its default place (DeskArrangement.DefaultPlaceFor) when it is not placed yet,
     /// then asks the Desk to draw it (spec 7.3). A spot already placed stays where it is.</summary>
     private void PlaceGlowSpot()
     {
@@ -499,19 +499,19 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             if (path.Length == 0) return;
             if (Folders.Any(f => ClaudeCodeFolders.Same(f.Path, path)))
             {
-                StatusText = "That folder is already in the list.";
+                Say("That folder is already in the list.");
                 return;
             }
             var added = _widget.LoadCcFoldersAdded().ToList();
             added.Add(path);
             _widget.SaveCcFoldersAdded(added);
             Reload();
-            StatusText = "Folder added. Sanduhr changes nothing in it until you install a piece.";
+            Say("Folder added. Sanduhr changes nothing in it until you install a piece.");
             FoldersChanged?.Invoke();
         }
         catch (Exception)
         {
-            StatusText = "Couldn't add that folder.";
+            Say("Couldn't add that folder.");
             Sounds.PlayError();
         }
     }
@@ -525,7 +525,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         var left = _widget.LoadCcFoldersAdded().Where(p => !ClaudeCodeFolders.Same(p, row.Path)).ToList();
         _widget.SaveCcFoldersAdded(left);
         Reload();
-        StatusText = "Folder forgotten. Anything Sanduhr installed in it stays until you remove it.";
+        Say("Folder forgotten. Anything Sanduhr installed in it stays until you remove it.");
         FoldersChanged?.Invoke();
     }
 
@@ -548,7 +548,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         }
         catch (Exception)
         {
-            StatusText = "Couldn't save that link.";
+            Say("Couldn't save that link.");
         }
     }
 
@@ -631,7 +631,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         }
         catch (Exception)
         {
-            StatusText = "Couldn't read this folder.";
+            Say("Couldn't read this folder.");
         }
     }
 
@@ -670,9 +670,16 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         }
     }
 
+    /// <summary>Sets the page's outcome line. It clears first, so the same outcome twice in a row is still a change the line announces.</summary>
+    private void Say(string message)
+    {
+        StatusText = "";
+        StatusText = message;
+    }
+
     private void Done(string message, bool ok = true)
     {
-        StatusText = message;
+        Say(message);
         RefreshStatuses();
         SyncSnapshotConsumers(forceWrite: ok);
         PiecesChanged?.Invoke();

@@ -95,6 +95,53 @@ public sealed class ClaudeCodeCardsTests : AppWindowFixture
     });
 
     [Fact]
+    public void A_card_removes_only_its_own_folders_statusline() => AppHost.Run(() =>
+    {
+        // Slice 4 row 27: the statusline closure acts on its card's folder only.
+        var personal = Home(".claude-personal");
+        var work = Home(".claude-work");
+        var (page, _) = Page(answer: _ => Yes);
+        Card(page, ".claude-personal").Statusline.InstallCommand.Execute(null);
+        Card(page, ".claude-work").Statusline.InstallCommand.Execute(null);
+        Assert.True(Card(page, ".claude-personal").Statusline.IsInstalled);
+        Assert.True(Card(page, ".claude-work").Statusline.IsInstalled);
+        var workBefore = File.ReadAllBytes(Path.Combine(work, "settings.json"));
+
+        Card(page, ".claude-personal").Statusline.RemoveCommand.Execute(null);
+
+        Assert.DoesNotContain("statusLine", File.ReadAllText(Path.Combine(personal, "settings.json")));
+        Assert.Equal(workBefore, File.ReadAllBytes(Path.Combine(work, "settings.json")));
+        Assert.False(Card(page, ".claude-personal").Statusline.IsInstalled);
+        Assert.True(Card(page, ".claude-work").Statusline.IsInstalled);
+    });
+
+    [Fact]
+    public void A_card_removes_only_its_own_folders_mcp_entry() => AppHost.Run(() =>
+    {
+        // Slice 4 row 27: the MCP closure deregisters its card's folder only. Registered through the installer (the install path
+        // opens a consent window and copies server files, neither of which this pin needs).
+        var personal = Home(".claude-personal");
+        var work = Home(".claude-work");
+        var (widget, _) = ScratchWidget("Personal");
+        var installer = new McpIntegrationInstaller(Profile, widget.SanduhrAppDataDir, externalDir: widget.SanduhrExternalDir);
+        Assert.True(installer.Register(".claude-personal").Ok);
+        Assert.True(installer.Register(".claude-work").Ok);
+        var page = new ClaudeCodeViewModel(widget);
+        Assert.True(Card(page, ".claude-personal").Mcp.IsInstalled);
+        Assert.True(Card(page, ".claude-work").Mcp.IsInstalled);
+        var workConfig = installer.ConfigPathFor(".claude-work");
+        var workBefore = File.ReadAllBytes(workConfig);
+
+        Card(page, ".claude-personal").Mcp.RemoveCommand.Execute(null);
+
+        Assert.False(installer.IsRegistered(".claude-personal"));
+        Assert.True(installer.IsRegistered(".claude-work"));
+        Assert.Equal(workBefore, File.ReadAllBytes(workConfig));
+        Assert.False(Card(page, ".claude-personal").Mcp.IsInstalled);
+        Assert.True(Card(page, ".claude-work").Mcp.IsInstalled);
+    });
+
+    [Fact]
     public void A_card_for_a_folder_added_by_hand_offers_no_MCP_server() => AppHost.Run(() =>
     {
         var elsewhere = Path.Combine(Root, "elsewhere", "cc");

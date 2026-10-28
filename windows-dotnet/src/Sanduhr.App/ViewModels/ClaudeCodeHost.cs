@@ -6,7 +6,7 @@ namespace Sanduhr.App.ViewModels;
 
 /// <summary>
 /// What the Claude Code cards and Mods &amp; Widgets need from the app: the profile, the folders, Sanduhr's own folders and the meters mod's
-/// files. A record, so tests build the views over a scratch profile (it replaces Mods &amp; Config's host, and adds the mod source).
+/// files. A record, so tests build the views over a scratch profile (it also carries the mod source).
 /// </summary>
 internal sealed record ClaudeCodeHost(
     string Profile,

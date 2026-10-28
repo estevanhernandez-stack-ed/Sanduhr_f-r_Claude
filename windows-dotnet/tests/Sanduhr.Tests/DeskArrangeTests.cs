@@ -494,6 +494,7 @@ public class DeskArrangeTests
     [InlineData(DeskAnchor.TL, 1, 0, DeskAnchor.TC)]
     [InlineData(DeskAnchor.TC, 1, 0, DeskAnchor.TR)]
     [InlineData(DeskAnchor.TC, 0, 1, DeskAnchor.BC)]   // the open middle of the screen is stepped over
+    [InlineData(DeskAnchor.BC, 0, -1, DeskAnchor.TC)]
     [InlineData(DeskAnchor.ML, 1, 0, DeskAnchor.MR)]
     [InlineData(DeskAnchor.TL, 0, 1, DeskAnchor.ML)]
     [InlineData(DeskAnchor.BR, -1, 0, DeskAnchor.BC)]
