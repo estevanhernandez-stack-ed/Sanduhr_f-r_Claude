@@ -79,6 +79,8 @@ final class CompanionDriver {
                                              queue: .main) { [weak self] _ in self?.reload(force: false) }))
         observers.append((nc, nc.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil,
                                              queue: .main) { [weak self] _ in self?.reload(force: true) }))
+        observers.append((nc, nc.addObserver(forName: .widgetPacksDidChange, object: nil,
+                                             queue: .main) { [weak self] _ in self?.reload(force: true) }))
     }
 
     /// The piece went away (Hidden, or the Desk stopped): nothing runs.
