@@ -43,6 +43,8 @@ struct IntegrationScripts {
     static let modName = "sanduhr-meters"
     /// The mod's folder inside a stamped folder.
     static let modPath = "\(modsName)/\(modName)"
+    /// The pack validator `propose_widget` loads from beside the MCP script (vendored from sanduhr-widgets).
+    static let validatorPath = "widgets/validate.py"
 
     /// The scripts as the app ships them; nil where they are missing (a `swift run` build).
     let source: URL?
@@ -117,10 +119,12 @@ struct IntegrationScripts {
 
     // MARK: Stamps
 
-    /// The files a stamped folder holds, relative to it: the two scripts, then every file of the
-    /// mods folder in path order, without what Claude Code writes there or the mod's tests.
+    /// The files a stamped folder holds, relative to it: the two scripts, the pack validator the MCP
+    /// script loads (when the folder has it), then every file of the mods folder in path order,
+    /// without what Claude Code writes there or the mod's tests.
     static func files(in folder: URL) -> [String] {
         var out = names
+        if FileManager.default.fileExists(atPath: folder.appendingPathComponent(validatorPath).path) { out.append(validatorPath) }
         let mods = folder.appendingPathComponent(modsName, isDirectory: true)
         guard let walk = FileManager.default.enumerator(atPath: mods.path) else { return out }
         var found: [String] = []

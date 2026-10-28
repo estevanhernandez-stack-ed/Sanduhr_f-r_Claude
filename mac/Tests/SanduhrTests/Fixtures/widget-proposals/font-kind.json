@@ -1,0 +1,119 @@
+{
+  "kind": "font",
+  "pack": {
+    "id": "neon-blob",
+    "name": "Neon blob",
+    "description": "A small neon blob that walks the taskbar."
+  },
+  "sprite": {
+    "schema_version": 2,
+    "frame_w": 8,
+    "frame_h": 8,
+    "scale": 2,
+    "fps": 8,
+    "sheet": "sheet.json",
+    "animations": {
+      "walk": [
+        0,
+        1
+      ],
+      "sit": [
+        0
+      ],
+      "nap": [
+        1
+      ],
+      "pop": [
+        2
+      ],
+      "cheer": [
+        3
+      ],
+      "worry": [
+        0
+      ],
+      "focus": [
+        1
+      ],
+      "sleep": [
+        2
+      ],
+      "celebrate": [
+        3
+      ]
+    },
+    "moods": {
+      "content": "sit",
+      "focused": "focus",
+      "worried": "worry",
+      "exhausted": "sleep",
+      "celebrate": "celebrate"
+    },
+    "triggers": {
+      "needs_you": "pop",
+      "job_passed": "cheer",
+      "near_limit": "worry",
+      "idle": "nap"
+    },
+    "roam": {
+      "edges": [
+        "bottom"
+      ],
+      "speed_px_s": 20
+    }
+  },
+  "sheets": {
+    "sheet.json": {
+      "palette": [
+        "#22d3ee",
+        "#a855f7",
+        "#ec4899"
+      ],
+      "frame_w": 8,
+      "frame_h": 8,
+      "frames": [
+        [
+          "..0000..",
+          ".011110.",
+          "01122110",
+          "01122110",
+          "01111110",
+          ".011110.",
+          "..0..0..",
+          ".00..00."
+        ],
+        [
+          ".011110.",
+          "01122110",
+          "01122110",
+          "01111110",
+          ".011110.",
+          "..0..0..",
+          ".00..00.",
+          "..0000.."
+        ],
+        [
+          ".00..00.",
+          "..0..0..",
+          ".011110.",
+          "01111110",
+          "01122110",
+          "01122110",
+          ".011110.",
+          "..0000.."
+        ],
+        [
+          "..0000..",
+          ".011110.",
+          "01122110",
+          "01122110",
+          "01111110",
+          ".011110.",
+          "..0..0..",
+          ".00..00."
+        ]
+      ]
+    }
+  },
+  "note": "A tiny friend in your Desk's colors."
+}

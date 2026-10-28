@@ -1,0 +1,29 @@
+{
+  "kind": "palette",
+  "pack": {
+    "id": "dusk",
+    "name": "Dusk",
+    "description": "Two evening gradients.",
+    "license": "MIT",
+    "author": "Sam Lee",
+    "version": "1.2.0"
+  },
+  "palettes": [
+    {
+      "name": "dusk",
+      "colors": [
+        "#ff2a6d",
+        "#d16ba5",
+        "#05d9e8"
+      ],
+      "mood": "late drive"
+    },
+    {
+      "name": "ember",
+      "colors": [
+        "#ff8a3d",
+        "#c2410c"
+      ]
+    }
+  ]
+}

@@ -547,7 +547,8 @@ class ActivityLevel(Base):
                          ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
                           "get_desk_messages", "propose_desk_messages", "propose_theme",
                           "watch_start", "watch_update", "watch_end", "propose_now_playing_looks",
-                          "propose_mod", "list_catalog", "propose_install", "get_mod_status", "propose_config"])
+                          "propose_mod", "list_catalog", "propose_install", "get_mod_status", "propose_config",
+                          "propose_widget"])
         self.assertFalse(p["watchers_allowed"])
         self.assertEqual(sorted(p["tools_not_on_mac"]), ["publish_usage"])
         text = json.dumps(p)
@@ -610,7 +611,8 @@ class Protocol(Base):
         self.assertEqual(names, ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
                                  "get_desk_messages", "propose_desk_messages", "propose_theme",
                                  "watch_start", "watch_update", "watch_end", "propose_now_playing_looks",
-                                 "propose_mod", "list_catalog", "propose_install", "get_mod_status", "propose_config"])
+                                 "propose_mod", "list_catalog", "propose_install", "get_mod_status", "propose_config",
+                                 "propose_widget"])
         for t in frames[1]["result"]["tools"]:
             if t["name"] == "propose_desk_messages":
                 # The one tool that asks for a change: not read-only, never destructive, no path.
@@ -660,6 +662,15 @@ class Protocol(Base):
                 self.assertFalse(t["annotations"]["destructiveHint"])
                 self.assertEqual(sorted(t["inputSchema"]["properties"]), ["files", "folder", "mcp_servers", "settings", "summary"])
                 self.assertEqual(t["inputSchema"]["required"], ["folder", "summary"])
+                self.assertFalse(t["inputSchema"]["additionalProperties"])
+                continue
+            if t["name"] == "propose_widget":
+                # Asks, never installs; data only, no path and no binary argument.
+                self.assertFalse(t["annotations"]["readOnlyHint"])
+                self.assertFalse(t["annotations"]["destructiveHint"])
+                self.assertEqual(sorted(t["inputSchema"]["properties"]),
+                                 ["effects", "kind", "note", "pack", "palettes", "sheets", "sprite"])
+                self.assertEqual(t["inputSchema"]["required"], ["kind", "pack"])
                 self.assertFalse(t["inputSchema"]["additionalProperties"])
                 continue
             if t["name"] == "get_mod_status":

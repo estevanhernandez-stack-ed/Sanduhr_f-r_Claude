@@ -1,0 +1,20 @@
+{
+  "kind": "effects",
+  "pack": {
+    "id": "calm",
+    "name": "Calm",
+    "description": "A slow breath.",
+    "license": "BSD-3-Clause"
+  },
+  "effects": {
+    "effects": [
+      {
+        "name": "breathe",
+        "type": "pulse",
+        "intensity": 0.35,
+        "period_ms": 4000,
+        "color": "ink"
+      }
+    ]
+  }
+}

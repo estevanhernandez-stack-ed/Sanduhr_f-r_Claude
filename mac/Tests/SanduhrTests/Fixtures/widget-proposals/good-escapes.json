@@ -1,0 +1,19 @@
+{
+  "kind": "palette",
+  "pack": {
+    "id": "cafe",
+    "name": "Café <dusk> & \"co\"",
+    "description": "Warm tones + a snowman ☃ and a quote 'x' `y`.",
+    "author": "Zoë 😀"
+  },
+  "palettes": [
+    {
+      "name": "cafe",
+      "colors": [
+        "#ff2a6d",
+        "#05d9e8"
+      ],
+      "mood": "café"
+    }
+  ]
+}

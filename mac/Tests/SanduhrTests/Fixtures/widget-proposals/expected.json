@@ -1,0 +1,116 @@
+{
+  "bad-license.json": {
+    "ok": false,
+    "id": null,
+    "reasons": [
+      "pack.license"
+    ]
+  },
+  "bad-pixel-sheet.json": {
+    "ok": false,
+    "id": null,
+    "reasons": [
+      "pack"
+    ]
+  },
+  "font-kind.json": {
+    "ok": false,
+    "id": null,
+    "reasons": [
+      "kind"
+    ]
+  },
+  "good-effects.json": {
+    "ok": true,
+    "id": "my-calm",
+    "reasons": [],
+    "sha256": {
+      "LICENSE": "bf35dcb86f5a81fc4df8600847ecc0a67637f01619cda4b4c4a24aef152c9a92",
+      "effects.json": "fa11e85ffd66e422da03f9df6c42955db7d7fa715d5cb56ab5c341300edb88c5",
+      "pack.json": "1199d2061fc27a5b0ab94f12d21a538984f3895d20dc666474239d4f2b04a50b"
+    }
+  },
+  "good-escapes.json": {
+    "ok": true,
+    "id": "my-cafe",
+    "reasons": [],
+    "sha256": {
+      "LICENSE": "5abf9e2fc8a6ec72b31def16cf11a18386d4bbccd0f666371b32f83682e7629e",
+      "pack.json": "e19acfbe6f87fa33b4a7d1c11de7f44da71d4e33ef3e9947ce9df0c65bdf537b",
+      "palettes.json": "e1a0b489525f36cfd949c138514da22053d4e5aa69faf8ade7534b9329fcc014"
+    }
+  },
+  "good-palette.json": {
+    "ok": true,
+    "id": "my-dusk",
+    "reasons": [],
+    "sha256": {
+      "LICENSE": "61aacb425d47a7bfe68114d8c3d1ef415c3a7ecd8d98dfdf49526cf5bae792c3",
+      "pack.json": "d0790ca511e5cc7f560084205e90ac959e8e6a66ce950f3fbffd985034206259",
+      "palettes.json": "17d2891270392fdaf0ef605fa2b5957e15ed29b3a606815192b26188978cbd87"
+    }
+  },
+  "good-sprite.json": {
+    "ok": true,
+    "id": "my-neon-blob",
+    "reasons": [],
+    "sha256": {
+      "LICENSE": "b99993068722d217454f9cce458024d0d30c67c9ffdfc0130dfcc1d64ab2fe30",
+      "pack.json": "96437d6017c418571b5bf381a7e8a2c3097c1cfb3b59a6331e32eabbf0f9f2b1",
+      "sheet.json": "c73e60869b84c9eef19a8cfe5be4f0307032ebdfa70391981b40e8bb98d39491",
+      "sprite.json": "b02756c7194c5a3d2cd2d731ae2f86a8e94647499267208c74602021dff62b60"
+    }
+  },
+  "id-already-prefixed.json": {
+    "ok": true,
+    "id": "my-dusk",
+    "reasons": [],
+    "sha256": {
+      "LICENSE": "b99993068722d217454f9cce458024d0d30c67c9ffdfc0130dfcc1d64ab2fe30",
+      "pack.json": "31809e60ba51e697f0291d9c8f947ff03a6acffb6d784d8800ef6fc5a3326d4b",
+      "palettes.json": "da06c4408d649ec16a5ff308b0d479daac7c9082fa72026b3c7ba6e1129873f8"
+    }
+  },
+  "long-note.json": {
+    "ok": false,
+    "id": null,
+    "reasons": [
+      "note"
+    ]
+  },
+  "png-sheet.json": {
+    "ok": false,
+    "id": null,
+    "reasons": [
+      "sprite"
+    ]
+  },
+  "theme-kind.json": {
+    "ok": false,
+    "id": null,
+    "reasons": [
+      "kind"
+    ]
+  },
+  "trademark-name.json": {
+    "ok": false,
+    "id": null,
+    "reasons": [
+      "pack"
+    ]
+  },
+  "unknown-arg.json": {
+    "ok": false,
+    "id": null,
+    "reasons": [
+      "arguments"
+    ]
+  },
+  "white-in-palette.json": {
+    "ok": false,
+    "id": null,
+    "reasons": [
+      "pack"
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "kind": "palette",
+  "pack": {
+    "id": "my-dusk",
+    "name": "Dusk",
+    "description": "Already namespaced."
+  },
+  "palettes": [
+    {
+      "name": "dusk",
+      "colors": [
+        "#ff2a6d",
+        "#05d9e8"
+      ]
+    }
+  ]
+}
