@@ -220,6 +220,23 @@ struct WidgetsModelTests {
         #expect(m.offer(for: newer.entry) == .install)
     }
 
+    @Test func theCompanionIsToldWhenPacksChangeAndOnlyThen() async {
+        var posts = 0
+        let box = Box(publish("1.0.0"))
+        let m = model(box, WidgetTestRoot(), WidgetScratchDefaults())
+        // Scoped to this model: other suites install packs in parallel.
+        let token = NotificationCenter.default.addObserver(forName: .widgetPacksDidChange, object: m, queue: nil) { _ in posts += 1 }
+        defer { NotificationCenter.default.removeObserver(token) }
+        await m.refreshCatalog()
+        #expect(posts == 0)
+        await m.install(box.net.entry)
+        #expect(posts == 1)
+        m.uninstall("good-palette")
+        #expect(posts == 2)
+        m.uninstall("not-installed")
+        #expect(posts == 2)
+    }
+
     @Test func aPackMadeHereIsNeverOfferedAsAnInstallOver() async {
         let root = WidgetTestRoot()
         let box = Box(publish())

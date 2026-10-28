@@ -112,7 +112,7 @@ final class WidgetsModel {
         case .success(let pack):
             let r = store.install(pack.files, pack.manifest, source: .catalog)
             notice = r.error
-            packsChanged()
+            packsChanged(posting: r.error == nil)
         }
     }
 
@@ -120,12 +120,14 @@ final class WidgetsModel {
         guard !busy.contains(id) else { return }
         let r = store.uninstall(id)
         notice = r.error
-        packsChanged()
+        packsChanged(posting: r.error == nil)
     }
 
-    private func packsChanged() {
+    /// `posting`: the installed packs really changed, so the Desk's companion reloads its pack now.
+    private func packsChanged(posting: Bool) {
         reloadInstalled()
         changed()
+        if posting { NotificationCenter.default.post(name: .widgetPacksDidChange, object: self) }
     }
 
     func reloadInstalled() {
@@ -158,4 +160,9 @@ final class WidgetsModel {
 
     /// Effects packs are listed as installed only.
     func drawsNothing(_ row: InstalledRow) -> Bool { row.kind == "effects" }
+}
+
+extension Notification.Name {
+    /// A pack was installed, updated or uninstalled; the companion re-reads which pack it draws.
+    static let widgetPacksDidChange = Notification.Name("sanduhrWidgetPacksDidChange")
 }
