@@ -1030,6 +1030,10 @@ public static class SettingsNames
     public const string ClockSize = "Clock size";
     public const string MessageSize = "Message size";
     public const string GlowAroundMessage = "Glow around the message";
+    /// <summary>Desk Look, Ink and color: the message draws in the widget theme's message colors and glow (settings.json "desk_message.theme_colors").</summary>
+    public const string UseThemeColors = "Use the theme's colors";
+    public const string UseThemeColorsCaption =
+        "The message draws in your widget theme's message colors and glow, the same as the rest of the Desk. Your own colors and any colored lines are kept for when you turn this off.";
     public const string DropShadow = "Drop shadow under the text";
 
     // ---- One theme for the widget and the Desk (theme match) ----
@@ -1192,6 +1196,7 @@ public static class SettingsNames
         (DeskFont, SettingsPage.DeskLook),
         (MessageFont, SettingsPage.DeskLook),
         (MessageColor, SettingsPage.DeskLook),
+        (UseThemeColors, SettingsPage.DeskLook),
         (FollowThemeSwitch, SettingsPage.DeskLook),
         (MatchNowButton, SettingsPage.DeskLook),
         (LauncherAddApp, SettingsPage.Launcher),

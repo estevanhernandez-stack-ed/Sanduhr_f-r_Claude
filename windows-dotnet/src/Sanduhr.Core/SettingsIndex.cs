@@ -290,7 +290,7 @@ public static class SettingsIndex
             [SettingsNames.ClockSize, SettingsNames.MessageSize, "time size", "size", "bigger", "smaller"]),
         E(SettingsNames.InkAndColor, SettingsPage.DeskLook, DeskInk,
             ["ink", SettingsNames.DeskInkPicker, "text color", "automatic", "light", "dark", "wallpaper", "readable", SettingsNames.DropShadow,
-             "shadow", "gradient", "hex", "palette", "presets", SettingsNames.MessageColor, SettingsNames.GlowAroundMessage]),
+             "shadow", "gradient", "hex", "palette", "presets", SettingsNames.MessageColor, SettingsNames.GlowAroundMessage, SettingsNames.UseThemeColors, "theme colors", "same look", "colored lines"]),
         E(SettingsNames.BackPlate, SettingsPage.DeskLook, DeskPlate,
             [SettingsNames.DeskPlateSwitch, "plate", "backdrop", "background", "contrast", "readable", "desktop icons", "files", "dark plate", "behind the text"]),
 
@@ -402,6 +402,7 @@ public static class SettingsIndex
         [SettingsNames.DeskFont] = DeskLook,
         [SettingsNames.MessageFont] = DeskLook,
         [SettingsNames.MessageColor] = DeskInk,
+        [SettingsNames.UseThemeColors] = DeskInk,
         [SettingsNames.FollowThemeSwitch] = DeskThemeMatch,
         [SettingsNames.MatchNowButton] = DeskThemeMatch,
         [SettingsNames.LauncherAddApp] = LauncherButtons,
