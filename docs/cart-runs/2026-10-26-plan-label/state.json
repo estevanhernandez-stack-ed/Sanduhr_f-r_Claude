@@ -1,10 +1,10 @@
 {
   "run": "plan-label",
-  "repo": "/Users/102702/Projects/Sanduhr_f-r_Claude",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
   "base_commit": "23b5701c6176dcb09cdab4439f557c42fc3c1d80",
   "integration_branch": "cart/plan-label",
-  "integration_worktree": "/Users/102702/.cwt/sanduhr-f-r-clau-plan-label/int",
-  "worktree_root": "/Users/102702/.cwt/sanduhr-f-r-clau-plan-label",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-plan-label/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-plan-label",
   "builder_branch": "main",
   "uncommitted_at_start": [],
   "started_at": "2026-10-26T23:05:29.658Z",
