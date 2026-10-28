@@ -58,4 +58,48 @@ public sealed class ResetWindowSurfaceTests : AppWindowFixture
         }
         finally { window.Close(); }
     });
+
+    /// <summary>Polish smoke defect A: the results view drew "Done" in raw Accent (3.95:1 in Obsidian). Accent drawn as text is AccentText.</summary>
+    [Theory]
+    [MemberData(nameof(BuiltIns))]
+    public void The_results_view_draws_Done_in_AccentText_and_it_reads_on_the_frame(string key) => AppHost.Run(() =>
+    {
+        var window = new ResetWindow(null, ResetFolderListViewModel.For([], unreadable: false));
+        new ThemePalette(key, ThemeCatalog.BuiltIns[key]).Apply(window.Resources);
+        OffScreen(window);
+        window.Show();
+        try
+        {
+            window.ShowResults([ResetStepResult.Done(ResetPart.ClaudeCodeEntries), ResetStepResult.Done(ResetPart.ClaudeCodeEntries)]);
+            window.UpdateLayout();
+            var frame = (Border)window.FindName("Frame");
+            var surface = ((SolidColorBrush)frame.Background).Color;
+            var accentText = (SolidColorBrush)window.FindResource("Sanduhr.Brush.AccentText");
+            var statuses = Below<TextBlock>((ItemsControl)window.FindName("ResultsList")).Where(t => t.Text == "Done").ToList();
+            Assert.NotEmpty(statuses);
+            foreach (var t in statuses)
+            {
+                var c = ((SolidColorBrush)t.Foreground).Color;
+                Assert.Equal(accentText.Color, c);
+                double ratio = ThemeContrast.Ratio(ThemeContrast.Hex((c.R / 255.0, c.G / 255.0, c.B / 255.0)), (surface.R / 255.0, surface.G / 255.0, surface.B / 255.0));
+                Assert.True(ratio >= ThemeContrast.TextMin, $"{key}: \"Done\" reads {ratio:0.00} on the frame");
+            }
+        }
+        finally { window.Close(); }
+    });
+
+    private static bool SetsBrush(Trigger t, DependencyProperty property, string key) =>
+        t.Setters.OfType<Setter>().Any(s => s.Property == property && s.Value is DynamicResourceExtension d && d.ResourceKey as string == key);
+
+    /// <summary>Polish smoke defect B: Cancel pressed drew no Accent border. Same press look as the dialog's DialogFlatButton.</summary>
+    [Fact]
+    public void The_flat_button_presses_in_GlassHover_with_an_Accent_border() => AppHost.Run(() =>
+    {
+        var window = new ResetWindow(null, ResetFolderListViewModel.For([], unreadable: false));
+        var style = (Style)window.FindResource("FlatButton");
+        var template = (ControlTemplate)style.Setters.OfType<Setter>().Single(s => s.Property == Control.TemplateProperty).Value;
+        var pressed = template.Triggers.OfType<Trigger>().Single(t => t.Property == System.Windows.Controls.Primitives.ButtonBase.IsPressedProperty);
+        Assert.True(SetsBrush(pressed, Border.BackgroundProperty, "Sanduhr.Brush.GlassHover"));
+        Assert.True(SetsBrush(pressed, Border.BorderBrushProperty, "Sanduhr.Brush.Accent"));
+    });
 }

@@ -45,6 +45,10 @@
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
                             </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                                <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="bg" Property="Opacity" Value="0.4" />
                             </Trigger>
