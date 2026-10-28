@@ -47,6 +47,15 @@ struct DeskElement: Equatable {
     /// Takes a click. A meeting row without a join link is drawn but takes none, and the
     /// meetings block never does.
     var clickable = true
+    /// The slant of the stack the element sits in (the fold), nil when the stack stands upright.
+    /// `frame` stays the unslanted layout frame; the click area is its slanted quad (`DeskHitTest.quad`).
+    var fold: DeskFold?
+
+    /// The element's frame as drawn: the box around its slanted quad, or `frame` when upright.
+    var drawnFrame: CGRect {
+        guard let fold, !frame.isEmpty else { return frame }
+        return fold.quad(of: frame).bounds
+    }
 }
 
 /// Which Desk element is under a point (item 41). One pure answer for the mouse-through switch,
@@ -79,10 +88,27 @@ enum DeskHitTest {
         return element.frame.insetBy(dx: -s.width, dy: -s.height)
     }
 
+    /// The element's click area as drawn: `area` sheared with its stack (the fold), so a click
+    /// follows the slant. An upright element's quad is `area`. nil for an empty frame.
+    static func quad(_ element: DeskElement) -> DeskQuad? {
+        let a = area(element)
+        guard !a.isNull, !a.isEmpty else { return nil }
+        guard let fold = element.fold else { return DeskQuad.of(a) }
+        return fold.quad(of: a)
+    }
+
+    /// True when `point` is inside the element's click area, slanted with its stack.
+    static func contains(_ element: DeskElement, _ point: CGPoint) -> Bool {
+        guard let fold = element.fold else { return area(element).contains(point) }
+        let a = area(element)
+        guard !a.isNull, !a.isEmpty else { return false }
+        return DeskFold.contains(fold.quad(of: a), point)
+    }
+
     /// The clickable element under `point`, by `priority`; nil where Desk lets the mouse through.
     static func element(at point: CGPoint, in elements: [DeskElement]) -> DeskElement? {
         for kind in priority {
-            if let hit = elements.first(where: { $0.kind == kind && $0.clickable && area($0).contains(point) }) {
+            if let hit = elements.first(where: { $0.kind == kind && $0.clickable && contains($0, point) }) {
                 return hit
             }
         }
@@ -263,7 +289,7 @@ enum DeskFrameCheck {
         let bounds = CGRect(origin: .zero, size: window).insetBy(dx: -tolerance, dy: -tolerance)
         for e in elements {
             if e.frame.isEmpty { return "\(name(e)) frame empty" }
-            if !bounds.contains(e.frame) { return "\(name(e)) off the Desk window" }
+            if !bounds.contains(e.drawnFrame) { return "\(name(e)) off the Desk window" }
         }
         for e in elements {
             guard let p = parent(e.kind), let block = elements.first(where: { $0.kind == p }) else { continue }
@@ -274,7 +300,7 @@ enum DeskFrameCheck {
         let clickable = elements.filter(\.clickable)
         for (i, a) in clickable.enumerated() {
             for b in clickable[(i + 1)...] where a.kind != b.kind && !nested(a.kind, b.kind) {
-                if overlaps(DeskHitTest.area(a), DeskHitTest.area(b)) {
+                if overlapping(a, b) {
                     return "\(name(a)) overlaps \(name(b))"
                 }
             }
@@ -285,6 +311,16 @@ enum DeskFrameCheck {
     /// A row and its own block share their area by design.
     private static func nested(_ a: DeskElement.Kind, _ b: DeskElement.Kind) -> Bool {
         parent(a) == b || parent(b) == a
+    }
+
+    /// Click areas of two elements overlap. Within one stack the slant moves both alike, so the
+    /// unslanted areas decide; across stacks, the boxes around the slanted areas do.
+    static func overlapping(_ a: DeskElement, _ b: DeskElement) -> Bool {
+        if a.fold == b.fold { return overlaps(DeskHitTest.area(a), DeskHitTest.area(b)) }
+        func box(_ e: DeskElement) -> CGRect {
+            DeskHitTest.quad(e)?.bounds ?? .null
+        }
+        return overlaps(box(a), box(b))
     }
 
     /// More than the tolerance in both directions: click areas that only touch do not overlap.

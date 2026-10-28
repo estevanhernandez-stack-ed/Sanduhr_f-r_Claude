@@ -37,6 +37,7 @@ struct DeskLayoutSection: View {
                 Link("Learn more", destination: AboutLinks.deskGuide)
                     .font(.caption)
             }
+            DeskSlantSection(layout: $layout, arranging: arranging)
             Section("Order") {
                 // One row, so the section's anchor marks the whole list.
                 VStack(alignment: .leading, spacing: 10) { DeskOrderList(layout: $layout) }
@@ -264,6 +265,45 @@ private struct DeskPlaceRow: View {
     }
 }
 
+/// Desk, Slant (the fold): one stepper per place that has pieces, whole degrees from -20 to 20,
+/// 0 straight. It writes the layout word's fourth field (`DeskArrangement.setTilt`), so every piece
+/// at the place slants together, plate and all. A negative number rises to the right.
+private struct DeskSlantSection: View {
+    @Binding var layout: String
+    let arranging: Bool
+
+    var body: some View {
+        let a = DeskArrangement(layout)
+        let anchors = DeskAnchor.allCases.filter { !a.stack($0).isEmpty }
+        Section(DeskSlant.title) {
+            if anchors.isEmpty {
+                Text(DeskSlant.nothingPlaced).foregroundStyle(.secondary)
+            }
+            ForEach(anchors, id: \.self) { anchor in
+                Stepper(value: tilt(anchor), in: DeskArrangement.tiltRange, step: 1) {
+                    LabeledContent(DeskSlant.rowTitle(anchor)) { Text(DeskSlant.label(a.stackTilt(anchor) ?? 0)).monospacedDigit() }
+                }
+                .accessibilityValue(DeskSlant.label(a.stackTilt(anchor) ?? 0))
+            }
+            Text(DeskSlant.caption)
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .disabled(arranging)
+        .settingsAnchor(SettingsAnchor.slant)
+    }
+
+    private func tilt(_ anchor: DeskAnchor) -> Binding<Double> {
+        Binding(
+            get: { DeskArrangement(layout).stackTilt(anchor) ?? 0 },
+            set: { value in
+                var a = DeskArrangement(layout)
+                guard let first = a.stack(anchor).first else { return }
+                a.setTilt(first.widget, value)
+                layout = a.string
+            })
+    }
+}
+
 /// Desk's Order list: each place that has pieces, its pieces top to bottom. A piece drags
 /// onto another to take its place (DeskArrangement.move); VoiceOver gets Move Up and Move Down.
 private struct DeskOrderList: View {
@@ -326,6 +366,19 @@ private struct DeskOrderRow: View {
         edit(&a)
         layout = a.string
     }
+}
+
+/// Settings, Desk, Slant (the fold): the words, kept apart from the view so they test without AppKit.
+enum DeskSlant {
+    static let title = "Slant"
+    static let nothingPlaced = "Place a piece first."
+    static let caption = "Tilts a whole place, plate and all, from -20 to 20 degrees. Negative rises to the right; 0° is straight."
+
+    /// "Top left slant".
+    static func rowTitle(_ anchor: DeskAnchor) -> String { "\(anchor.name) slant" }
+
+    /// "0°" for straight, "-12°" rising to the right, "8°" falling.
+    static func label(_ tilt: Double) -> String { "\(Int(DeskArrangement.clampTilt(tilt)))°" }
 }
 
 /// The layout string the Layout section edits ("message:tl clock:bl claude:bl meetings:bl"), kept

@@ -173,7 +173,24 @@ struct DeskView: View {
         }
     }
 
+    /// A stack's pieces. A stack with a slant (the fold: its first piece's tilt, the pieces of one
+    /// anchor share it) is drawn in a DeskFoldStack, sheared as one face with its plates and
+    /// Arrange outlines; a stack at 0 is built exactly as before, with no container and no transform.
+    @ViewBuilder
     private func pieces(_ stack: [DeskPlacement], alignment: HorizontalAlignment, lineInLayout: Bool) -> some View {
+        let tilt = DeskArrangement.clampTilt(stack.first?.tilt ?? 0)
+        if tilt != 0, let anchor = stack.first?.anchor {
+            DeskFoldStack(anchor: anchor, tilt: tilt, model: model) {
+                VStack(alignment: alignment, spacing: DeskNowPlaying.columnSpacing) {
+                    stackPieces(stack, alignment: alignment, lineInLayout: lineInLayout)
+                }
+            }
+        } else {
+            stackPieces(stack, alignment: alignment, lineInLayout: lineInLayout)
+        }
+    }
+
+    private func stackPieces(_ stack: [DeskPlacement], alignment: HorizontalAlignment, lineInLayout: Bool) -> some View {
         ForEach(stack, id: \.widget) { p in
             if let widget = Widget(rawValue: p.widget) {
                 DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale)
