@@ -32,8 +32,8 @@ private struct WidgetsSuggestionSection: View {
     let handoff: WidgetProposalHandoff
 
     var body: some View {
-        Section {
-            if let review = handoff.model {
+        if let review = handoff.model {
+            Section {
                 WidgetSuggestionBanner(
                     model: review, previewNote: handoff.previewNote,
                     preview: { handoff.previewOnDesk() },
@@ -41,13 +41,8 @@ private struct WidgetsSuggestionSection: View {
                     makeCompanion: { handoff.apply(makeCompanion: true) },
                     apply: { handoff.apply() },
                     dismiss: { handoff.dismiss() })
-            } else {
-                // The anchor stays on the page with nothing waiting, so the search entry still lands at the top.
-                Text("No widget suggestion from Claude is waiting.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
         }
-        .settingsAnchor(SettingsAnchor.widgetSuggestion)
     }
 }
 

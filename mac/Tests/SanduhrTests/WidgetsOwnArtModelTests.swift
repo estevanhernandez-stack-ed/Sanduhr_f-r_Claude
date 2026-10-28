@@ -77,7 +77,7 @@ struct WidgetsOwnArtModelTests {
         let pack = installClaudeSprite(root)
         m.reloadInstalled()
         #expect(m.firstOwnArtRow?.id == pack.id)
-        #expect(SettingsAnchor.exists(SettingsAnchor.ownArt, on: .widgets) && SettingsAnchor.exists(SettingsAnchor.widgetSuggestion, on: .widgets))
+        #expect(SettingsAnchor.exists(SettingsAnchor.ownArt, on: .widgets))
     }
 
     @Test func aLocalSpriteOffersOwnArtToo() throws {
