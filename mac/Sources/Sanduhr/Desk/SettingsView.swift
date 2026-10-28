@@ -30,7 +30,7 @@ struct DeskLayoutSection: View {
                     DeskPlaceRow(widget: w.key, name: w.name, layout: $layout)
                         .disabled(arranging)
                         .modifier(FirstPieceAnchor(widget: w.key))
-                    DeskPieceExtra(widget: w.key, arranging: arranging)
+                    DeskPieceExtra(widget: w.key, arranging: arranging, layout: $layout)
                 }
                 Text(DeskLayout.placesCaption)
                     .font(.caption).foregroundStyle(.secondary)
@@ -133,10 +133,15 @@ private struct DeskMarginsRows: View {
 private struct DeskPieceExtra: View {
     let widget: String
     var arranging = false
+    @Binding var layout: String
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
 
     var body: some View {
         switch widget {
+        case _ where DeskMeterStyleSettings.shows(widget, in: layout):
+            DeskMeterStylePicker(widget: widget, layout: $layout)
+                .disabled(arranging)
+                .padding(.leading, 16)
         case "meetings":
             Toggle("Read today's meetings", isOn: $showMeetings)
                 .onChange(of: showMeetings) { _, on in
@@ -162,6 +167,72 @@ private struct DeskPieceExtra: View {
             SettingsLinkButton(page, anchor: anchor)
         }
         .padding(.leading, 16)
+    }
+}
+
+/// Desk, Where each piece sits, under the `claude` and `meters` pieces: how the piece draws its
+/// numbers. Writes the layout word's fifth field (`DeskArrangement.setStyle`), so the Desk redraws
+/// as the choice is made; bars are the default and are never written.
+private struct DeskMeterStylePicker: View {
+    let widget: String
+    @Binding var layout: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Picker(DeskMeterStyleSettings.title, selection: style) {
+                ForEach(DeskMeterStyle.allCases, id: \.self) { Text(DeskMeterStyles.name($0)).tag($0) }
+            }
+            .pickerStyle(.menu)
+            Text(DeskMeterStyleSettings.caption(widget))
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .modifier(MeterStyleAnchor(widget: widget, layout: layout))
+    }
+
+    private var style: Binding<DeskMeterStyle> {
+        Binding(
+            get: { DeskArrangement(layout).style(of: widget) },
+            set: { value in
+                var a = DeskArrangement(layout)
+                a.setStyle(widget, value)
+                layout = a.string
+            })
+    }
+}
+
+/// The Style picker's search anchor goes on the first piece that shows one.
+private struct MeterStyleAnchor: ViewModifier {
+    let widget: String
+    let layout: String
+
+    func body(content: Content) -> some View {
+        if DeskMeterStyleSettings.anchorWidget(in: layout) == widget {
+            content.settingsAnchor(SettingsAnchor.meterStyle)
+        } else {
+            content
+        }
+    }
+}
+
+/// Settings, Desk, Style: the words and the rule for when the picker shows, apart from the view
+/// so they test without AppKit.
+enum DeskMeterStyleSettings {
+    static let title = "Style"
+
+    /// The picker shows under a piece that has a style and is placed on the Desk (a hidden piece has none).
+    static func shows(_ widget: String, in layout: String) -> Bool {
+        DeskMeterStyles.supports(widget) && DeskArrangement(layout).placement(widget) != nil
+    }
+
+    /// The piece that carries the search anchor: the first with a picker, in the pieces' order.
+    static func anchorWidget(in layout: String) -> String? {
+        DeskLayout.widgets.map(\.key).first { shows($0, in: layout) }
+    }
+
+    static func caption(_ widget: String) -> String {
+        widget == "claude"
+            ? "Bars keep the one line. Slim makes it two short rows; Rings and Ticks show the session and week limits as small gauges."
+            : "Bars show a reset time; Slim, Rings and Ticks leave it out and take less room. Every style keeps the pace mark and the nearly-full warning."
     }
 }
 
