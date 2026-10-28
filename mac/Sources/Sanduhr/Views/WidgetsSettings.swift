@@ -9,6 +9,9 @@ struct WidgetsSettings: View {
 
     var body: some View {
         Form {
+            if model.justInstalledSprite != nil {
+                Section { CompanionTurnOnRow(name: model.justInstalledSprite) }
+            }
             WidgetsCatalogSection(model: model)
             WidgetsInstalledSection(model: model)
             WidgetsCompanionSection(model: model)
@@ -155,11 +158,39 @@ private struct WidgetsCompanionSection: View {
                 }
                 Text("One companion at a time. With no pick, the first installed sprite is used.")
                     .font(.caption).foregroundStyle(.secondary)
+                if model.justInstalledSprite == nil { CompanionTurnOnRow(name: nil) }
             }
             Toggle("Let it roam", isOn: Binding(
                 get: { model.companion.roams },
                 set: { model.setRoams($0) }))
         }
         .settingsAnchor(SettingsAnchor.companion)
+    }
+}
+
+/// Turn On for the companion: shown while a sprite is installed but the Desk is off or the piece
+/// isn't placed. Places the piece at its standard spot and turns the Desk on.
+private struct CompanionTurnOnRow: View {
+    let name: String?
+    @AppStorage(DeskArrangeMode.layoutKey, store: .desk) private var layout = DeskLayout.standard
+    @AppStorage(DeskController.enabledKey, store: .desk) private var deskOn = false
+
+    var body: some View {
+        if let text = CompanionOnDesk.prompt(CompanionOnDesk.state(deskOn: deskOn, layout: layout), name: name) {
+            HStack {
+                Text(text)
+                Spacer()
+                Button("Turn On") { turnOn() }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    private func turnOn() {
+        layout = CompanionOnDesk.placed(in: layout)
+        if !deskOn {
+            deskOn = true
+            DeskController.shared.apply()
+        }
     }
 }

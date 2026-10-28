@@ -192,6 +192,37 @@ struct WidgetsModelTests {
         #expect(!m.checking)
     }
 
+    @Test func aSpriteInstalledFromTheCatalogAsksToBeTurnedOnUntilItIsRemoved() async {
+        let box = Box(publish(kind: "sprite", pack: "good-sprite"))
+        let m = model(box, WidgetTestRoot(), WidgetScratchDefaults())
+        await m.refreshCatalog()
+        await m.install(box.net.entry)
+        #expect(m.notice == nil && m.justInstalledSprite == "Fixture")
+        m.uninstall("good-sprite")
+        #expect(m.justInstalledSprite == nil)
+    }
+
+    @Test func aPaletteNeverAsksForTheCompanion() async {
+        let box = Box(publish())
+        let m = model(box, WidgetTestRoot(), WidgetScratchDefaults())
+        await m.refreshCatalog()
+        await m.install(box.net.entry)
+        #expect(m.justInstalledSprite == nil)
+    }
+
+    @Test func turnOnPlacesTheCompanionAndTheDeskDecidesTheSentence() {
+        let standard = DeskLayout.standard
+        #expect(CompanionOnDesk.state(deskOn: true, layout: standard) == .notPlaced)
+        let placed = CompanionOnDesk.placed(in: standard)
+        #expect(DeskArrangement(placed).placement("companion")?.anchor == .bc)
+        #expect(CompanionOnDesk.state(deskOn: false, layout: placed) == .deskOff)
+        #expect(CompanionOnDesk.state(deskOn: true, layout: placed) == .on)
+        #expect(CompanionOnDesk.placed(in: placed) == placed)
+        #expect(CompanionOnDesk.prompt(.on, name: "Hourglass") == nil)
+        #expect(CompanionOnDesk.prompt(.notPlaced, name: "Hourglass") == "Hourglass is installed. Turn it on to put your companion on the Desk.")
+        #expect(CompanionOnDesk.prompt(.deskOff, name: nil) == "Turn it on to show the Desk, where your companion lives.")
+    }
+
     @Test func installUpdateAndUninstallWalkThroughTheOffers() async {
         let root = WidgetTestRoot()
         var changes = 0

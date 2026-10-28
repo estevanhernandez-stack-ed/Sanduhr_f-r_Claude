@@ -40,6 +40,9 @@ final class WidgetsModel {
     private(set) var busy: Set<String> = []
     /// The last install or uninstall that did not go through, in a sentence.
     private(set) var notice: String?
+    /// The sprite just installed from the catalog, by name: the page leads with Turn On until the
+    /// companion is on the Desk or the pack is removed.
+    private(set) var justInstalledSprite: String?
     private(set) var installed: [InstalledRow] = []
     private(set) var companion: CompanionSettings
 
@@ -112,6 +115,7 @@ final class WidgetsModel {
         case .success(let pack):
             let r = store.install(pack.files, pack.manifest, source: .catalog)
             notice = r.error
+            if r.error == nil, entry.kind == "sprite" { justInstalledSprite = entry.name }
             packsChanged(posting: r.error == nil)
         }
     }
@@ -120,6 +124,9 @@ final class WidgetsModel {
         guard !busy.contains(id) else { return }
         let r = store.uninstall(id)
         notice = r.error
+        if r.error == nil, sprites.isEmpty || installed.contains(where: { $0.id == id && $0.kind == "sprite" }) {
+            justInstalledSprite = nil
+        }
         packsChanged(posting: r.error == nil)
     }
 
