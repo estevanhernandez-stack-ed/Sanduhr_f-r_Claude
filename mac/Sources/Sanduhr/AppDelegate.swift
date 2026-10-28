@@ -40,6 +40,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // EsteFont Pro and EsteFont 26, from Contents/Resources/Fonts, for this process only: before any
         // view draws, so the Desk and the widget find it on a Mac that never had it installed.
         BundledFonts.register()
+        // Installed font packs' faces, the same way: this process only, before any view draws.
+        PackFonts.shared.sync()
         NSApp.setActivationPolicy(.accessory)
         // A quit Apple Event (a script, logging out) ends any sheet first, or AppKit answers it
         // "user canceled" while the Welcome sheet is up (AppQuit).

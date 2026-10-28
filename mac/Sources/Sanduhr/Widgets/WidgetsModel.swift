@@ -49,6 +49,7 @@ final class WidgetsModel {
     private let defaults: UserDefaults
     private let makeClient: (WidgetStore) -> WidgetCatalogClient
     private let changed: () -> Void
+    let fonts: PackFonts
     private var client: WidgetCatalogClient?
     @ObservationIgnored private nonisolated(unsafe) var packsObserver: NSObjectProtocol?
 
@@ -56,10 +57,13 @@ final class WidgetsModel {
     ///   - store: The installed packs.
     ///   - defaults: Where the companion's choices live (the Desk's suite).
     ///   - makeClient: The catalog client over the network; tests pass one over a dictionary.
+    ///   - fonts: The registered font packs; a pack's faces are unregistered before its folder is replaced or removed.
     ///   - changed: Runs after the installed packs changed, so theme and palette lists re-read.
     init(store: WidgetStore = .shared, defaults: UserDefaults = .desk,
          makeClient: @escaping (WidgetStore) -> WidgetCatalogClient = WidgetsModel.networkClient,
+         fonts: PackFonts = .shared,
          changed: @escaping () -> Void = WidgetsModel.refreshPackLists) {
+        self.fonts = fonts
         self.store = store
         self.defaults = defaults
         self.makeClient = makeClient
@@ -99,6 +103,7 @@ final class WidgetsModel {
     static func refreshPackLists() {
         UserThemes.reload()
         PackInkPresets.register()
+        PackFonts.shared.sync()
     }
 
     // MARK: The catalog
@@ -136,6 +141,7 @@ final class WidgetsModel {
         case .failure(let e):
             notice = e.message
         case .success(let pack):
+            fonts.release(entry.id)
             let r = store.install(pack.files, pack.manifest, source: .catalog)
             notice = r.error
             packsChanged(posting: r.error == nil)
@@ -144,6 +150,7 @@ final class WidgetsModel {
 
     func uninstall(_ id: String) {
         guard !busy.contains(id) else { return }
+        fonts.release(id)
         let r = store.uninstall(id)
         notice = r.error
         packsChanged(posting: r.error == nil)
@@ -271,6 +278,11 @@ final class WidgetsModel {
         ownArtStatus = r.ok ? "\(name) now uses your own art. It stays on this Mac." : (r.error ?? "\(name) couldn't be changed.")
         packsChanged(posting: r.ok)
         return r.ok
+    }
+
+    /// The sentence under a font pack's row when CoreText refused one of its faces, nil otherwise.
+    func fontNote(_ row: InstalledRow) -> String? {
+        row.kind == "font" ? fonts.note(for: row.id) : nil
     }
 
     /// Effects packs are listed as installed only.
