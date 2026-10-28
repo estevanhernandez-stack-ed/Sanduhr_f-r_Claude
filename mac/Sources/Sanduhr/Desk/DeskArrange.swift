@@ -135,11 +135,13 @@ enum DeskArrange {
 extension DeskArrangement {
     /// Puts a placed piece at `anchor`, in front of `before` in that anchor's stack (nil: at its
     /// bottom). Into an empty anchor it keeps its place in the string, as `place` does. The piece
-    /// keeps its size. Nothing changes for a piece that is not placed, or when `before` is the
+    /// keeps its size and style, and joins the stack's slant. Nothing changes for a piece that is not placed, or when `before` is the
     /// piece itself.
     mutating func put(_ widget: String, at anchor: DeskAnchor, before: String?) {
         guard widget != before, let from = pieces.firstIndex(where: { $0.widget == widget }) else { return }
         var piece = pieces[from]
+        // Into another anchor's stack the piece takes its slant; into an empty one it keeps its own.
+        if piece.anchor != anchor, let joined = stackTilt(anchor) { piece.tilt = joined }
         piece.anchor = anchor
         pieces.remove(at: from)
         if let before, let i = pieces.firstIndex(where: { $0.widget == before && $0.anchor == anchor }) {

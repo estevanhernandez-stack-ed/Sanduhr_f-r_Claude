@@ -46,15 +46,82 @@ enum DeskAnchor: String, CaseIterable, Hashable {
     }
 }
 
+/// How a meter-like piece draws its numbers (the layout word's fifth field): `bar` is today's
+/// full-width bar and the default, `slim` a one-line label over a thin bar, `ring` a small arc
+/// gauge, `ticks` ten segmented cells. The raw values are the layout and design words.
+enum DeskMeterStyle: String, CaseIterable, Hashable {
+    case bar, slim, ring, ticks
+}
+
+/// Words, names and the pieces that take a `DeskMeterStyle`.
+enum DeskMeterStyles {
+    /// The pieces that have a style: the Claude line and the Claude limits. 2.38.0 adds `system`
+    /// here (Windows also lists `telemetry`); everything below reads this one list.
+    static let pieces = ["claude", "meters"]
+
+    static func supports(_ widget: String) -> Bool { pieces.contains(widget) }
+
+    /// The layout and design word: "bar", "slim", "ring", "ticks".
+    static func word(_ s: DeskMeterStyle) -> String { s.rawValue }
+
+    /// The style for an exact lowercase word, nil for anything else.
+    static func parse(_ word: String?) -> DeskMeterStyle? { word.flatMap(DeskMeterStyle.init(rawValue:)) }
+
+    /// As Settings, Desk names it.
+    static func name(_ s: DeskMeterStyle) -> String {
+        switch s {
+        case .bar: return "Bars"
+        case .slim: return "Slim"
+        case .ring: return "Rings"
+        case .ticks: return "Ticks"
+        }
+    }
+
+    /// The style a piece can carry: `style` for a piece that has one, `.bar` for any other.
+    static func `for`(_ widget: String, _ style: DeskMeterStyle) -> DeskMeterStyle {
+        supports(widget) ? style : .bar
+    }
+
+    /// Why a design or layout may not give `widget` the style word `word`, nil when it may. Windows'
+    /// messages, with this build's pieces: a style only on a piece that draws one, and only a known word.
+    static func refusal(widget: String, word: String?) -> String? {
+        guard supports(widget) else { return "only " + pieces.joined(separator: ", ") + " have a style" }
+        guard parse(word?.trimmingCharacters(in: .whitespaces).lowercased()) != nil else {
+            return "must be one of " + DeskMeterStyle.allCases.map(\.rawValue).joined(separator: ", ")
+        }
+        return nil
+    }
+}
+
 /// One placed piece: its widget word, its anchor and its size (1 is the piece's own size).
+/// `tilt` is the slant, in whole degrees, of the stack the piece sits in (the fold): the pieces of
+/// one anchor share it (`DeskArrangement.setTilt`), and a stack whose words disagree slants by its
+/// first piece's. `style` is how a meter-like piece draws (`.bar` for every other piece).
 struct DeskPlacement: Equatable, Hashable {
     var widget: String
     var anchor: DeskAnchor
     var scale: Double = 1
+    var tilt: Double = 0
+    var style: DeskMeterStyle = .bar
 }
 
-/// The Desk layout string read and written (item 59). Each word is `widget:anchor` or
-/// `widget:anchor:scale`; within an anchor, pieces stack top to bottom in the string's order.
+/// Two pieces of one stack given different slants: the refusal a design or layout check reports.
+/// `field` and `message` are Windows' (`layout.<first piece>.tilt`).
+struct DeskTiltConflict: Equatable {
+    var anchor: DeskAnchor
+    var pieces: [String]
+    var field: String { "layout.\(pieces[0]).tilt" }
+    var message: String {
+        "the pieces at \(anchor.rawValue) share one slant; give \(pieces.joined(separator: " and ")) the same tilt"
+    }
+}
+
+/// The Desk layout string read and written (item 59). Each word is `widget:anchor`,
+/// `widget:anchor:scale`, `widget:anchor:scale:tilt` (the fold: whole degrees -20 to 20, written
+/// only when not 0, with the size written as 1 to hold its place) or `widget:anchor:scale:tilt:style`
+/// (`meters:tr:1:0:ring`: only on the pieces `DeskMeterStyles.pieces` names, written only when not
+/// `bar`, the size and tilt holding their places; an older build reads the size and ignores the rest);
+/// within an anchor, pieces stack top to bottom in the string's order.
 /// An older string (corners only, no sizes) reads exactly as before. A word for a widget this
 /// build does not know is dropped; an anchor it does not know puts the piece at its default
 /// anchor instead of hiding it; a size it cannot read is 1. A widget named twice keeps its last
@@ -69,6 +136,17 @@ struct DeskArrangement: Equatable {
     static let scaleStep = 0.1
     static var scaleSteps: [Double] {
         stride(from: 0.0, through: 10.0, by: 1.0).map { clampScale(scaleRange.lowerBound + $0 * scaleStep) }
+    }
+
+    /// The fold's range: a stack slants at most this many degrees either way. Negative rises to
+    /// the right, positive falls.
+    static let tiltRange: ClosedRange<Double> = -20...20
+
+    /// Whole degrees within `tiltRange`; anything unreadable is 0 (no slant), and never -0.
+    static func clampTilt(_ t: Double) -> Double {
+        guard t.isFinite else { return 0 }
+        let whole = min(tiltRange.upperBound, max(tiltRange.lowerBound, t)).rounded()
+        return whole == 0 ? 0 : whole
     }
 
     /// Snaps to the step and keeps within the range; anything unreadable is 1.
@@ -102,8 +180,12 @@ struct DeskArrangement: Equatable {
             guard bits.count >= 2, known.contains(bits[0]) else { continue }
             let anchor = DeskAnchor(rawValue: bits[1]) ?? Self.defaultAnchor(bits[0])
             let scale = bits.count >= 3 ? Double(bits[2]).map(Self.clampScale) ?? 1 : 1
+            let tilt = bits.count >= 4 ? Double(bits[3]).map(Self.clampTilt) ?? 0 : 0
+            // The meter style is the fifth field; a word this build does not know, or a style on a
+            // piece that has none, is a bar.
+            let style = bits.count >= 5 ? DeskMeterStyles.parse(bits[4]).map { DeskMeterStyles.for(bits[0], $0) } ?? .bar : .bar
             pieces.removeAll { $0.widget == bits[0] }
-            pieces.append(DeskPlacement(widget: bits[0], anchor: anchor, scale: scale))
+            pieces.append(DeskPlacement(widget: bits[0], anchor: anchor, scale: scale, tilt: tilt, style: style))
         }
     }
 
@@ -113,8 +195,15 @@ struct DeskArrangement: Equatable {
     }
 
     static func word(_ p: DeskPlacement) -> String {
-        guard p.scale != 1 else { return "\(p.widget):\(p.anchor.rawValue)" }
-        return "\(p.widget):\(p.anchor.rawValue):\(String(format: "%g", p.scale))"
+        let head = "\(p.widget):\(p.anchor.rawValue)"
+        let tilt = clampTilt(p.tilt)
+        let style = DeskMeterStyles.for(p.widget, p.style)
+        guard p.scale != 1 || tilt != 0 || style != .bar else { return head }
+        var word = head + ":" + String(format: "%g", p.scale)
+        // The fold rides after the size and the style after the fold, each only when not default.
+        if tilt != 0 || style != .bar { word += ":" + String(format: "%.0f", tilt) }
+        if style != .bar { word += ":" + DeskMeterStyles.word(style) }
+        return word
     }
 
     func placement(_ widget: String) -> DeskPlacement? {
@@ -159,7 +248,9 @@ struct DeskArrangement: Equatable {
             return
         }
         if old?.anchor == anchor { return }
-        let moved = DeskPlacement(widget: widget, anchor: anchor, scale: old?.scale ?? 1)
+        // Into a stack a piece takes its slant (one per stack); into an empty anchor it keeps its own.
+        let moved = DeskPlacement(widget: widget, anchor: anchor, scale: old?.scale ?? 1,
+                                  tilt: stackTilt(anchor) ?? old?.tilt ?? 0, style: old?.style ?? .bar)
         let rank = Self.rank(widget)
         if stack(anchor).isEmpty {
             if let i = pieces.firstIndex(where: { $0.widget == widget }) {
@@ -204,6 +295,57 @@ struct DeskArrangement: Equatable {
         pieces[i].scale = Self.clampScale(scale)
     }
 
+    /// Sets a placed piece's meter style; a piece that has none stays a bar, a hidden piece has none.
+    mutating func setStyle(_ widget: String, _ style: DeskMeterStyle) {
+        guard let i = pieces.firstIndex(where: { $0.widget == widget }) else { return }
+        pieces[i].style = DeskMeterStyles.for(widget, style)
+    }
+
+    /// The slant of the stack at `anchor`: its first piece's; nil when the anchor has none.
+    func stackTilt(_ anchor: DeskAnchor) -> Double? {
+        pieces.first { $0.anchor == anchor }?.tilt
+    }
+
+    /// The slant of the stack `widget` sits in; nil when it is not placed. What the Desk draws by.
+    func tilt(of widget: String) -> Double? {
+        placement(widget).map { stackTilt($0.anchor) ?? $0.tilt }
+    }
+
+    /// The style `widget` draws in: its own, `.bar` for a piece without one or one not placed.
+    func style(of widget: String) -> DeskMeterStyle {
+        placement(widget).map { DeskMeterStyles.for(widget, $0.style) } ?? .bar
+    }
+
+    /// Slants the stack `widget` sits in: every piece at its anchor takes the tilt (whole degrees,
+    /// kept within range), so a stack reads as one slanted face. A hidden piece changes nothing.
+    mutating func setTilt(_ widget: String, _ tilt: Double) {
+        guard let p = placement(widget) else { return }
+        let t = Self.clampTilt(tilt)
+        for i in pieces.indices where pieces[i].anchor == p.anchor { pieces[i].tilt = t }
+    }
+
+    /// Stacks whose pieces carry different tilts, in anchor order (what a layout string can say and
+    /// the Desk resolves by the first piece's). A design or layout check refuses these.
+    var tiltConflicts: [DeskTiltConflict] {
+        Self.tiltConflicts(pieces.map { ($0.widget, $0.anchor, Optional($0.tilt)) })
+    }
+
+    /// The same check over words a design gives: pieces sent to one anchor with different tilts
+    /// (a nil tilt says nothing and never conflicts), at most three, in the pieces' order.
+    static func tiltConflicts(_ words: [(widget: String, anchor: DeskAnchor, tilt: Double?)]) -> [DeskTiltConflict] {
+        var order: [DeskAnchor] = []
+        var by: [DeskAnchor: [(String, Double)]] = [:]
+        for w in words {
+            guard let t = w.tilt else { continue }
+            if by[w.anchor] == nil { order.append(w.anchor) }
+            by[w.anchor, default: []].append((w.widget, t))
+        }
+        return order.compactMap { a -> DeskTiltConflict? in
+            guard let g = by[a], Set(g.map(\.1)).count > 1 else { return nil }
+            return DeskTiltConflict(anchor: a, pieces: g.map(\.0))
+        }.prefix(3).map { $0 }
+    }
+
     /// Drops `widget` onto `target`, Settings' drag: in the same anchor it takes the target's
     /// place in the stack (coming from above it lands after it, from below before it); from
     /// another anchor it joins the target's anchor just before it. Nothing changes when either
@@ -214,6 +356,7 @@ struct DeskArrangement: Equatable {
         var piece = pieces[from]
         let sameAnchor = piece.anchor == pieces[to].anchor
         piece.anchor = pieces[to].anchor
+        if !sameAnchor { piece.tilt = pieces[to].tilt }
         pieces.remove(at: from)
         let target = pieces.firstIndex { $0.widget == target } ?? pieces.endIndex
         pieces.insert(piece, at: sameAnchor && from <= to ? target + 1 : target)
