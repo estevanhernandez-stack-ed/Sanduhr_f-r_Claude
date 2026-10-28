@@ -1,0 +1,103 @@
+{
+  "run": "widgets-2-36",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "adf96201903b1b4712779b1c1c880079716426e6",
+  "integration_branch": "cart/widgets-2-36",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-widgets-2-36/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-widgets-2-36",
+  "builder_branch": "main",
+  "uncommitted_at_start": [],
+  "started_at": "2026-10-28T13:36:55.651Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "proposal-rules",
+      "title": "WidgetProposal and WidgetOwnArt in Swift",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widgets-2-36--01-proposal-rules",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh --filter \"WidgetProposal|WidgetOwnArt\" (30 pass); full ./test.sh 2257 pass",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "mcp-propose-widget",
+      "title": "propose_widget in the Mac MCP",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widgets-2-36--02-mcp-propose-widget",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "pytest 261 pass; ./test.sh 2259 pass; smoke selftest 1033; build.sh --debug bundle has widgets/validate.py",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "review-flow",
+      "title": "The app's review flow",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widgets-2-36--03-review-flow",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "worker: ./test.sh 2284 pass, smoke 1033; session: filtered 92 pass, selftest 1033",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "banner-own-art",
+      "title": "WidgetSuggestionBanner and Use my own art",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widgets-2-36--04-banner-own-art",
+      "worktree": "",
+      "on": 3,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "worker: ./test.sh 2291 pass, smoke 1033; session: filtered 54 pass",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "docs-2-36",
+      "title": "Docs, What's New, CHANGELOG",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widgets-2-36--05-docs-2-36",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "worker: ./test.sh 2292, smoke 1033, pytest 261",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}
