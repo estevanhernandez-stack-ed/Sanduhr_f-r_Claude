@@ -182,7 +182,7 @@ public class ToolLogicPublishTests
     {
         using var tmp = new TempDir();
         WriteSettings(tmp, enabled: true, credentialReady: true);
-        var cfg = PublishConfig(tmp, wait: TimeSpan.FromSeconds(5));
+        var cfg = PublishConfig(tmp, wait: Waits.AnswerWait);
         string reqPath = cfg.PublishRequestPath!;
         string resPath = cfg.PublishResultPath!;
 
