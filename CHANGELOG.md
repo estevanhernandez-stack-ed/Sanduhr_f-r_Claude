@@ -1,5 +1,13 @@
 # Changelog
 
+## v4.0.1 — 2026-10-29
+
+**Platform:** Windows (.NET 10 / WPF). A fix release. `Sanduhr.Mcp` to 4.0.1. No new outbound destination and no new capability: the manifest changes only its version.
+
+### Fixes
+
+- **The layout map shows every monitor.** Settings ▸ Desk ▸ Layout map drew the main monitor only, so a Desk placed on another monitor showed an empty map. It now draws each connected monitor where Windows arranges it, each with its own taskbar and the pieces the Desk draws there, captioned with the monitor's name. One monitor looks as before.
+
 ## v4.0.0 — 2026-10-28
 
 **Platform:** Windows (.NET 10 / WPF). Settings v2 is the release: Settings rebuilt around what you came to do, with search, a Privacy page that lists every destination, streamer mode, and one theme for the widget and the Desk. `Sanduhr.Mcp` to 4.0.0. **No new outbound destination and no new capability:** the manifest still declares `runFullTrust` only and changes only its version. Settings ▸ Privacy is built from one list a test keeps complete, and three existing items are disclosed for the first time there and in PRIVACY: Google's sign-in page (reached in 3.9 too, where it dead-ended), claude.ai's routines budget and WebView2's SmartScreen.
