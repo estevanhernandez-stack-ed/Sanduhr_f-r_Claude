@@ -172,6 +172,41 @@ struct PackFontsTests {
         fonts.release("real-font")
     }
 
+    /// The live check: Settings ▸ Widgets' Uninstall left the font drawing until quit, because the
+    /// folder was gone before PackFonts unregistered it. The store releases the faces first.
+    @Test func uninstallingAFontPackUnregistersItsFacesThroughTheStore() throws {
+        let root = WidgetTestRoot()
+        let store = root.store()
+        let fonts = PackFonts()
+        store.releaseFonts = { fonts.release($0) }
+        try Self.install("real-font", in: store)
+        fonts.sync(store)
+        #expect(Self.processKnows(Self.family))
+
+        #expect(store.uninstall("real-font").ok)
+        fonts.sync(store)
+        #expect(!Self.processKnows(Self.family))
+        #expect(!DeskFont.isAvailable(Self.family))
+        #expect(fonts.families.isEmpty)
+    }
+
+    @Test func updatingAFontPackThroughTheStoreLeavesOneRegistration() throws {
+        let root = WidgetTestRoot()
+        let store = root.store()
+        var unregistered = 0
+        let fonts = PackFonts(unregister: { unregistered += 1; PackFonts.coreTextUnregister($0) })
+        store.releaseFonts = { fonts.release($0) }
+        try Self.install("real-font", in: store)
+        fonts.sync(store)
+        try Self.install("real-font", in: store, version: "1.0.1")
+        #expect(unregistered == 1)
+        #expect(fonts.sync(store))
+        #expect(Self.processKnows(Self.family))
+        #expect(fonts.families == [Self.family])
+        fonts.release("real-font")
+        #expect(!Self.processKnows(Self.family))
+    }
+
     @Test func pickerListsPutPackFamiliesAfterTheBuiltInsOnceEach() {
         let list = DeskFont.pickerFamilies(installed: ["Zapfino", "Menlo", "fixture pack sans"],
                                            packs: [Self.family, "Menlo", "Aardvark Sans"])
