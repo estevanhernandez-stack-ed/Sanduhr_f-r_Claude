@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.37.0-mac — 2026-10-29
 
 - **Claude can shape your Desk.** With the MCP server installed, `get_desk` tells Claude how your Desk is set up and `propose_desk` hands Sanduhr a whole look: pieces (place, size, slant, style), font, ink, plate and shadow. The server checks it with the app's own rules and refuses what the Mac Desk can't do with a reason: messages, song looks and themes (they keep their tools), the Windows-only fields, and the system and weather pieces until 2.38.0. A good one waits at the top of Settings, Desk as **Claude suggests a Desk design**, with what it changes. **Preview on the Desk** shows it from memory with your saved settings untouched, **Apply** writes only the settings it changes, and **Dismiss** drops it. A font you lack is named with Claude's link as text, and Apply waits until you install it. No setting lets Claude skip Apply, and the design is held in memory only.
 
