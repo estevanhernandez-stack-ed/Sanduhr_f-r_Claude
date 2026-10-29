@@ -589,8 +589,12 @@ final class DeskModel {
     /// layout settings as DeskView.
     func elements() -> [DeskElement] {
         let desk = UserDefaults.desk
+        // The layout the Desk draws: a Desk design's preview, else the saved one (Settings, Desk banner).
+        let layoutWords = MainActor.assumeIsolated {
+            DeskDesignPreview.shared.layoutString(saved: desk.string(forKey: "layout") ?? DeskLayout.standard)
+        }
         var input = DeskElements.Input()
-        input.placed = DeskLayout.placed(desk.string(forKey: "layout") ?? DeskLayout.standard,
+        input.placed = DeskLayout.placed(layoutWords,
                                          showMeetings: desk.object(forKey: "showMeetings") as? Bool ?? true)
         input.meterTiers = meters.map(\.tier)
         input.signInNeeded = signInNeeded && signInReminder
@@ -634,7 +638,7 @@ final class DeskModel {
         input.claudeLineDrawn = claudeLine != nil || claudeParts?.account != nil || switchNote
         input.claudeLineFrame = claudeLineFrame
         return DeskElements.folded(DeskElements.build(input),
-                                   arrangement: DeskArrangement(desk.string(forKey: "layout") ?? DeskLayout.standard),
+                                   arrangement: DeskArrangement(layoutWords),
                                    folds: folds)
     }
 

@@ -101,7 +101,7 @@ struct NowPlayingLookSuggestionCard: View {
     let dismiss: () -> Void
 
     @AppStorage("font", store: .desk) private var savedFont: String?
-    private var font: String { DeskFont.resolve(saved: savedFont) }
+    private var font: String { DeskFont.resolve(saved: DeskDesignPreview.shared.font ?? savedFont) }
 
     static let shown = 6
 

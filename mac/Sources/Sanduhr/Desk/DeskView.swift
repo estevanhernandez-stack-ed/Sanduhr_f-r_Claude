@@ -62,7 +62,7 @@ struct DeskView: View {
     /// the widget's default.
     /// While arranging (item 60), the layout being edited; nothing is saved until Done.
     private var stacks: [DeskAnchor: [DeskPlacement]] {
-        var arrangement = model.arrange.working ?? DeskArrangement(layout)
+        var arrangement = model.arrange.working ?? DeskDesignPreview.shared.layout ?? DeskArrangement(layout)
         // A proposed sprite is previewed even while the piece is Hidden (WidgetProposalHandoff); never saved.
         if model.widgetPreviewsCompanion, arrangement.placement("companion") == nil {
             arrangement.pieces.append(DeskPlacement(widget: "companion", anchor: DeskArrangement.defaultAnchor("companion")))
@@ -245,7 +245,7 @@ struct DeskPiece: View {
 
     @AppStorage("font", store: .desk) private var savedFont: String?
     /// The Desk font as drawn: EsteFont Pro unless a font was picked (DeskFont, item 58).
-    private var font: String { DeskFont.resolve(saved: savedFont) }
+    private var font: String { DeskFont.resolve(saved: DeskDesignPreview.shared.font ?? savedFont) }
     @AppStorage("messageFont", store: .desk) private var messageFont = ""
     @AppStorage("timeSize", store: .desk) private var savedTimeSize = 112.0
     @AppStorage("messageSize", store: .desk) private var savedMessageSize = 84.0
@@ -625,7 +625,9 @@ enum DeskPlate {
 /// outside the ink's own, so the fill is what the style says. Never a click area: the window
 /// takes the pointer over reported frames only (DeskController), and the plate reports none.
 private struct DeskPlateModifier: ViewModifier {
-    @AppStorage(DeskPlate.key, store: .desk) private var on = DeskPlate.defaultOn
+    @AppStorage(DeskPlate.key, store: .desk) private var savedOn = DeskPlate.defaultOn
+    /// The saved plate, or the one a Desk design is previewing (DeskDesignPreview).
+    private var on: Bool { DeskDesignPreview.shared.plate ?? savedOn }
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
@@ -652,7 +654,9 @@ enum DeskInkShadow {
 
 private struct DeskInk: ViewModifier {
     @AppStorage("inkColor", store: .desk) private var savedInk = "ffffff"
-    @AppStorage("inkShadow", store: .desk) private var shadow = true
+    @AppStorage("inkShadow", store: .desk) private var savedShadow = true
+    /// The saved shadow, or the one a Desk design is previewing (DeskDesignPreview).
+    private var shadow: Bool { DeskDesignPreview.shared.shadow ?? savedShadow }
     @AppStorage(OledCare.key, store: .desk) private var oled = OledCare.defaultOn
     /// The saved ink, or the palette a widget proposal is previewing with (DeskInkPreview).
     private var inkSpec: String { DeskInkPreview.shared.resolved(saved: savedInk) }
