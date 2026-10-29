@@ -190,13 +190,35 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     static let widgetSuggestionPrefix = "widget-suggestion-"
 
+    // MARK: - Claude's Desk design suggestions (2.37.0)
+
+    /// The same gentle banner for a proposed Desk design. Clicking it opens Settings, Desk.
+    func suggestDeskDesign(_ m: DeskDesignReviewModel) {
+        guard MessageSuggestionNotice.banner(AlertSettings(defaults), deskRunning: DeskController.shared.running,
+                                             now: Date()) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Claude suggested a Desk design: \(m.name)"
+        content.body = m.note ?? "Preview, apply or dismiss it in Sanduhr Settings, Desk."
+        content.sound = nil
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: Self.deskDesignSuggestionPrefix + m.id, content: content, trigger: nil))
+    }
+
+    /// The suggestion was decided: its banner leaves Notification Center.
+    func clearDeskDesignSuggestion(id: String) {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [Self.deskDesignSuggestionPrefix + id])
+    }
+
+    static let deskDesignSuggestionPrefix = "desk-design-suggestion-"
+
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         let id = response.notification.request.identifier
         let section: SettingsSection? = id.hasPrefix(Self.deskSuggestionPrefix) ? .message
             : id.hasPrefix(Self.themeSuggestionPrefix) ? .themes
-            : id.hasPrefix(Self.widgetSuggestionPrefix) ? .widgets : nil
+            : id.hasPrefix(Self.widgetSuggestionPrefix) ? .widgets
+            : id.hasPrefix(Self.deskDesignSuggestionPrefix) ? .deskLayout : nil
         if let section {
             DispatchQueue.main.async { MainActor.assumeIsolated { SettingsWindowController.shared.show(section) } }
         }

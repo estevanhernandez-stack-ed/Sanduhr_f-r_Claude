@@ -338,7 +338,7 @@ struct NotchGlowView: View {
     @AppStorage("notchText", store: .desk) private var showText = true
     @AppStorage("font", store: .desk) private var savedFont: String?
     /// The Desk font as drawn: EsteFont Pro unless a font was picked (DeskFont, item 58).
-    private var font: String { DeskFont.resolve(saved: savedFont) }
+    private var font: String { DeskFont.resolve(saved: DeskDesignPreview.shared.font ?? savedFont) }
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
     @AppStorage(NowPlayingIdle.key, store: .desk) private var idle = NowPlayingIdle.automatic

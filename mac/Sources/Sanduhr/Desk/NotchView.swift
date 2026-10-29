@@ -33,7 +33,7 @@ struct NotchView: View {
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
     @AppStorage("font", store: .desk) private var savedFont: String?
     /// The Desk font as drawn: EsteFont Pro unless a font was picked (DeskFont, item 58).
-    private var font: String { DeskFont.resolve(saved: savedFont) }
+    private var font: String { DeskFont.resolve(saved: DeskDesignPreview.shared.font ?? savedFont) }
     @AppStorage("notchChinText", store: .desk) private var showChinText = false
     @AppStorage("notchTextColor", store: .desk) private var savedTextColor = "ffffff"
     /// The saved notch color, or the palette a widget proposal is previewing with (DeskInkPreview).
@@ -225,7 +225,7 @@ struct NotchWingsView: View {
     private var textColor: String { DeskInkPreview.shared.resolved(saved: savedTextColor) }
     @AppStorage("font", store: .desk) private var savedFont: String?
     /// The Desk font as drawn: EsteFont Pro unless a font was picked (DeskFont, item 58).
-    private var font: String { DeskFont.resolve(saved: savedFont) }
+    private var font: String { DeskFont.resolve(saved: DeskDesignPreview.shared.font ?? savedFont) }
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
     @AppStorage(NowPlayingIdle.key, store: .desk) private var idle = NowPlayingIdle.automatic

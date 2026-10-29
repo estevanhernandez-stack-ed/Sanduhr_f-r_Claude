@@ -75,9 +75,12 @@ final class DeskWidgetPreviewHost: WidgetPreviewHost {
     init(controller: DeskController = .shared) { self.controller = controller }
 
     var deskRunning: Bool { controller.running }
-    var deskBusy: Bool { controller.model.arrange.active }
+    /// Arranging, or a Desk design waits for the user's review (it previews with the same ink).
+    var deskBusy: Bool { controller.model.arrange.active || DeskDesignProposalHandoff.shared.pending != nil }
 
     func show(_ preview: WidgetDeskPreview) {
+        // One preview at a time: a Desk design's ink is the same ink.
+        DeskDesignProposalHandoff.shared.endPreview()
         let model = controller.model
         model.setWidgetPreview(companion: preview.companion)
         DeskInkPreview.shared.spec = preview.ink
