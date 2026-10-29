@@ -7,8 +7,26 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2360 + release2350 + release2340 + release2330 + release2320 + release2310 + release2300 + release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2370 + release2360 + release2350 + release2340 + release2330 + release2320 + release2310 + release2300 + release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2370: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.37.0", id: "claude-desk",
+            title: "Claude shapes your Desk",
+            body: "With the Sanduhr MCP server installed, Claude can read your Desk and suggest a whole look. Preview it, then Apply or Dismiss; Put my Desk back undoes an Apply.",
+            art: .symbol("sparkles"), destination: .deskLayout),
+        WhatsNewCard(
+            version: "2.37.0", id: "slant-and-styles",
+            title: "Slant and meter styles",
+            body: "In Settings, Desk, slant a whole place from -20 to 20 degrees and give the Claude meters a Slim, Ring or Ticks look.",
+            art: .symbol("gauge.with.dots.needle.33percent"), destination: .deskLayout),
+        WhatsNewCard(
+            version: "2.37.0", id: "font-packs",
+            title: "Font packs",
+            body: "Font packs from the catalog join the Desk and widget font lists. They load for Sanduhr only and never install on your Mac.",
+            art: .symbol("textformat"), destination: .widgets),
+    ]
 
     static let release2360: [WhatsNewCard] = [
         WhatsNewCard(
