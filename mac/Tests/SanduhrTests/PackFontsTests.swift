@@ -252,7 +252,7 @@ struct PackFontsTests {
         let store = root.store()
         let fonts = PackFonts()
         try Self.install("real-font", in: store)
-        let model = WidgetsModel(store: store, defaults: UserDefaults(suiteName: "sanduhr-packfonts-" + UUID().uuidString)!,
+        let model = WidgetsModel(store: store, defaults: UserDefaults(suiteName: "sanduhr.tests.packfonts." + UUID().uuidString)!,
                                  fonts: fonts, changed: { fonts.sync(store) })
         fonts.sync(store)
         #expect(DeskFont.pickerFamilies(installed: [], packs: fonts.families).contains(Self.family))
@@ -275,7 +275,7 @@ struct PackFontsTests {
         let store = root.store()
         let fonts = PackFonts()
         try Self.install("refused-font", in: store)
-        let model = WidgetsModel(store: store, defaults: UserDefaults(suiteName: "sanduhr-packfonts-" + UUID().uuidString)!,
+        let model = WidgetsModel(store: store, defaults: UserDefaults(suiteName: "sanduhr.tests.packfonts." + UUID().uuidString)!,
                                  fonts: fonts, changed: { fonts.sync(store) })
         fonts.sync(store)
         let row = try #require(model.installed.first)

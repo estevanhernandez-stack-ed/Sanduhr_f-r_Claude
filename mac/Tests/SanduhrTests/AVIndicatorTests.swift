@@ -22,7 +22,7 @@ struct AVIndicatorStateTests {
     @Test func switchesAreOffByDefaultKeys() {
         #expect(AVCameraDotMode.key == "avCameraDotMode")
         #expect(AVIndicators.micKey == "avMicGlyph")
-        let defaults = UserDefaults(suiteName: "av-test-\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: "sanduhr.tests.av.\(UUID().uuidString)")!
         #expect(AVCameraDotMode.saved(in: defaults) == .never)
         #expect(defaults.bool(forKey: AVIndicators.micKey) == false)
         #expect(AVIndicatorSide.saved(in: defaults) == .right)
@@ -42,7 +42,7 @@ struct AVCameraDotModeTests {
         #expect(AVCameraDotMode.resolve(raw: "always", legacy: true) == .always)
         #expect(AVCameraDotMode.resolve(raw: "bogus", legacy: nil) == .never)
 
-        let d = UserDefaults(suiteName: "av-migrate-\(UUID().uuidString)")!
+        let d = UserDefaults(suiteName: "sanduhr.tests.av-migrate.\(UUID().uuidString)")!
         d.set(true, forKey: AVCameraDotMode.legacyKey)
         AVCameraDotMode.migrate(d)
         #expect(d.string(forKey: AVCameraDotMode.key) == "hiddenLight")
@@ -53,7 +53,7 @@ struct AVCameraDotModeTests {
         AVCameraDotMode.migrate(d)
         #expect(AVCameraDotMode.saved(in: d) == .always)
         // Off migrates to nothing picked: never.
-        let e = UserDefaults(suiteName: "av-migrate-\(UUID().uuidString)")!
+        let e = UserDefaults(suiteName: "sanduhr.tests.av-migrate.\(UUID().uuidString)")!
         e.set(false, forKey: AVCameraDotMode.legacyKey)
         AVCameraDotMode.migrate(e)
         #expect(AVCameraDotMode.saved(in: e) == .never)

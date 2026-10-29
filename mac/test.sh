@@ -18,4 +18,16 @@ if [[ ! -x "$XCODE_PATH/../SharedFrameworks/XCBuild.framework/Versions/A/Support
     [[ -d "$PLUGINS" ]] && EXTRA=(-Xswiftc -plugin-path -Xswiftc "$PLUGINS")
 fi
 
+# Tests make scratch defaults suites named sanduhr.tests.<area>.<id>, and macOS keeps each one as a
+# plist in ~/Library/Preferences (removePersistentDomain leaves the file), so they piled up by the
+# thousand. cfprefsd writes the last of them several seconds after the tests exit (about seven
+# here), so the sweep after a run, pass or fail, waits in the background and this script returns at
+# once; the sweep before a run takes anything later still. Only that prefix: the app's own domains
+# are com.626labs.sanduhr*.
+sweep_test_defaults() {
+    find "$HOME/Library/Preferences" -maxdepth 1 -name 'sanduhr.tests.*.plist' -delete 2>/dev/null || true
+}
+sweep_test_defaults
+trap '( sleep 15; sweep_test_defaults ) >/dev/null 2>&1 &' EXIT
+
 swift test ${EXTRA[@]+"${EXTRA[@]}"} "$@"

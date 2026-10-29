@@ -24,7 +24,7 @@ struct ConfigProposalTests {
 
     private func rig(allowed: Bool = true) -> (TempHome, ModProposalStore, String) {
         let h = TempHome()
-        let defaults = UserDefaults(suiteName: "config-proposals-\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: "sanduhr.tests.config-proposals.\(UUID().uuidString)")!
         defaults.set(allowed, forKey: ModProposalStore.switchKey)
         let personal = h.at(".claude-personal")
         h.dir(".claude-personal")

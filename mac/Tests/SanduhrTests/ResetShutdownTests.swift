@@ -56,7 +56,7 @@ struct ResetShutdownTests {
     @MainActor
     @Test func bandWriterStopsAndWritesNothingAfter() throws {
         let dir = scratch()
-        let suite = "sanduhr-reset-band-\(UUID().uuidString)"
+        let suite = "sanduhr.tests.reset-band.\(UUID().uuidString)"
         let d = try #require(UserDefaults(suiteName: suite))
         defer {
             try? FileManager.default.removeItem(at: dir)

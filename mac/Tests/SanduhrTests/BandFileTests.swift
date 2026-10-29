@@ -29,7 +29,7 @@ struct BandFileTests {
     private func scratch() throws -> (URL, UserDefaults, String) {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("sanduhr-band-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let suite = "sanduhr-band-tests-\(UUID().uuidString)"
+        let suite = "sanduhr.tests.band.\(UUID().uuidString)"
         return (dir, try #require(UserDefaults(suiteName: suite)), suite)
     }
 

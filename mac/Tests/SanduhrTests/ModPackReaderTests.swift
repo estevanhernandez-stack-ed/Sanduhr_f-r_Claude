@@ -47,7 +47,7 @@ struct ModPackReaderTests {
     }
 
     private func proposalStore(_ h: TempHome, allowed: Bool) -> ModProposalStore {
-        let defaults = UserDefaults(suiteName: "packs-\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: "sanduhr.tests.packs.\(UUID().uuidString)")!
         defaults.set(allowed, forKey: ModProposalStore.switchKey)
         let paths = ModProposalStore.Paths(support: URL(fileURLWithPath: h.at("Support")),
                                            kept: KeptMods(dir: URL(fileURLWithPath: h.at("Support/mods"))))
