@@ -92,6 +92,7 @@
     <Compile Include="..\Sanduhr.Core\DeskDesignValidator.cs" Link="Core\DeskDesignValidator.cs" />
     <Compile Include="..\Sanduhr.Core\WallpaperSummary.cs" Link="Core\WallpaperSummary.cs" />
     <Compile Include="..\Sanduhr.Core\DeskArrangement.cs" Link="Core\DeskArrangement.cs" />
+    <Compile Include="..\Sanduhr.Core\DrawerPieces.cs" Link="Core\DrawerPieces.cs" />
     <Compile Include="..\Sanduhr.Core\DeskInk.cs" Link="Core\DeskInk.cs" />
     <Compile Include="..\Sanduhr.Core\DeskPlate.cs" Link="Core\DeskPlate.cs" />
     <Compile Include="..\Sanduhr.Core\DeskFont.cs" Link="Core\DeskFont.cs" />

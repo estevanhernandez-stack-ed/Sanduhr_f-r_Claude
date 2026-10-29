@@ -315,7 +315,8 @@ public sealed class DeskArrangement
             string head = at < 0 ? word : word[..at];
             string? monitor = at < 0 ? null : DeskMonitors.FromWord(DeskMonitors.Unescape(word[(at + 1)..]));
             var bits = head.Split(':', StringSplitOptions.RemoveEmptyEntries);
-            if (bits.Length < 2 || !Known.Contains(bits[0], StringComparer.Ordinal)) continue;
+            // A drawer piece (5.0) is drawer.<id>, any number of them; every other word must be one this build knows.
+            if (bits.Length < 2 || !(Known.Contains(bits[0], StringComparer.Ordinal) || DrawerPieces.IsWord(bits[0]))) continue;
             var anchor = DeskAnchors.Parse(bits[1]) ?? DefaultAnchor(bits[0]);
             var scale = 1.0;
             if (bits.Length >= 3 &&
@@ -358,6 +359,7 @@ public sealed class DeskArrangement
         "weather" => DeskAnchor.MR,
         "glow" => DeskAnchor.TC,
         "companion" => DeskAnchor.BR,
+        _ when DrawerPieces.IsWord(widget) => DeskAnchor.TL,
         _ => DeskAnchor.BL,
     };
 

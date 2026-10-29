@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace Sanduhr.Core;
 
 /// <summary>Who made a move plan (5.0 drawers spec, section 1): the built-in rules, an agent through the MCP, or the user's own hand.</summary>
@@ -17,38 +15,6 @@ public sealed record DrawerPlan(DrawerPlanSource Source, string? Agent, IReadOnl
 
 /// <summary>One entry in a desktop or drawer listing, as the App reads it from disk.</summary>
 public sealed record DesktopItem(string Path, bool IsFolder, DateTime WrittenUtc);
-
-/// <summary>Drawer ids: lowercase letters, digits and hyphens, a letter or digit first, at most 40. No colon, at-sign, dot or space,
-/// so <c>drawer.&lt;id&gt;</c> is always one safe layout word.</summary>
-public static class DrawerIds
-{
-    public const int MaxLength = 40;
-
-    public static bool IsValid(string? id)
-    {
-        if (string.IsNullOrEmpty(id) || id.Length > MaxLength || !IsSlugChar(id[0]) || id[0] == '-') return false;
-        foreach (var c in id)
-            if (!IsSlugChar(c)) return false;
-        return true;
-    }
-
-    /// <summary>The id a name gets: lowercased, every run of other characters one hyphen, trimmed of hyphens, cut to 40.
-    /// A name with no ASCII letter or digit gets "drawer".</summary>
-    public static string From(string name)
-    {
-        var sb = new StringBuilder();
-        foreach (var raw in name.ToLowerInvariant())
-        {
-            if (raw is >= 'a' and <= 'z' or >= '0' and <= '9') sb.Append(raw);
-            else if (sb.Length > 0 && sb[^1] != '-') sb.Append('-');
-        }
-        var id = sb.ToString().Trim('-');
-        if (id.Length > MaxLength) id = id[..MaxLength].TrimEnd('-');
-        return id.Length == 0 ? "drawer" : id;
-    }
-
-    private static bool IsSlugChar(char c) => c is >= 'a' and <= 'z' or >= '0' and <= '9' or '-';
-}
 
 /// <summary>Drawer names, which are also their folder names, and the Explorer-style name a clash gets.</summary>
 public static class DrawerNames

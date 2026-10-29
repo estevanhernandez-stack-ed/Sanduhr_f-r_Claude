@@ -99,8 +99,9 @@ Undo never overwrites.
 
 ## 2. The drawer on the Desk
 
-**A Desk piece.** A drawer uses the existing layout grammar: `drawer:<name>:<place>:<scale>[:tilt]`, for
-example `drawer:Screenshots:tl:1`. Drawers stack and sit side by side as other pieces do. Each drawer is
+**A Desk piece.** A drawer uses the existing layout grammar with its id in the widget slot:
+`drawer.<id>:<place>:<scale>[:tilt]`, for example `drawer.screenshots:tl:1`. (`drawer:<name>` would have put
+the name where the grammar reads the anchor.) Drawers stack and sit side by side as other pieces do. Each drawer is
 its own island with `TakesClicks` set; the rest of the Desk stays click-through.
 
 **Themed in full.** A drawer draws from the Desk look in force: `ThemeDeskLook.From(theme)` when Match the
