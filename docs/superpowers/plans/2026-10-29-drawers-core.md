@@ -21,7 +21,7 @@ after the spike's verdict.
 - Every type lives in `namespace Sanduhr.Core;` (file-scoped), with `/// <summary>` docs in the house style (say what and why, one or two sentences).
 - Moves are the only plan action: no delete, no overwrite, no rename of a user's file except the Explorer-style clash name `name (2).ext`.
 - Allowed sources: the user's Desktop, the Public Desktop (listed, never moved: "shared, needs an administrator") and drawer homes. Allowed targets: drawer homes only.
-- Plan drawers made by rules or agents live under the Drawers root (`%USERPROFILE%\Drawers` by default). Drawers pointed at existing folders are made only by the user in Settings (plan 2).
+- Plan drawers made by rules or agents live directly in the Drawers root, which by default is a folder on the Desktop itself (`<Desktop>\Drawers`, decision `KNT1mDtN3kQ0rlz2sePq`), so after any uninstall the files sit in one visible folder. The root folder itself is never a plan source. Drawers pointed at existing folders are made only by the user in Settings (plan 2).
 - User-facing strings: no em dash, end sentences with a period.
 - The working tree is CRLF with an LF index: edit with the Edit tool, never `sed -i`.
 - Build and test from `windows-dotnet/` with `--disable-build-servers -nodeReuse:false` (an MSBuild node holding `obj` otherwise fails the next build with MSB3061).
@@ -35,7 +35,7 @@ after the spike's verdict.
 2. **Two files with one name heading to one place:** two drawers each holding `a.txt` returning to a Desktop that already has `a.txt`. Expected: `a (2).txt` and `a (3).txt`, nothing overwritten. Pinned in Tasks 1 and 6.
 3. **Damaged JSON:** a truncated settings object, a journal file that is not JSON, a rule with an unknown kind. Expected: defaults or the readable part, never an exception. Pinned in Tasks 5 and 7.
 4. **Names an agent can send that Windows rejects:** `CON`, `nul.txt` style device names, `a/b`, `..`, trailing dots or spaces, 41+ characters. Expected: the plan is refused with the name in the error. Pinned in Tasks 1 and 2.
-5. **A move that is already done or would swallow a drawer:** a source already inside its target drawer (a no-op, dropped) and a source that is itself a drawer home (refused). Pinned in Task 2.
+5. **A move that is already done or would swallow a drawer:** a source already inside its target drawer (a no-op, dropped), a source that is itself a drawer home (refused), and the Drawers root, which sits on the Desktop by default and so looks like any desktop folder (refused). Pinned in Task 2.
 
 ---
 
@@ -725,6 +725,25 @@ public class DrawerPlanValidatorTests
     }
 
     [Fact]
+    public void With_the_root_on_the_Desktop_the_root_is_refused_and_its_drawers_are_sources()
+    {
+        var onDesk = new DrawerRoots(@"C:\Users\pat\Desktop", @"C:\Users\Public\Desktop", @"C:\Users\pat\Desktop\Drawers");
+        var shots = new DrawerDef("screenshots", "Screenshots", @"C:\Users\pat\Desktop\Drawers\Screenshots", true);
+        var docs = new DrawerDef("documents", "Documents", @"C:\Users\pat\Desktop\Drawers\Documents", true);
+
+        var root = DrawerPlanValidator.Check(Agent([], new DrawerMove(@"C:\Users\pat\Desktop\Drawers", "screenshots")), onDesk, [shots]);
+        Assert.False(root.Ok);
+        Assert.Contains("Drawers folder", root.Error);
+
+        var between = DrawerPlanValidator.Check(Agent([], new DrawerMove(@"C:\Users\pat\Desktop\Drawers\Screenshots\a.pdf", "documents")), onDesk, [shots, docs]);
+        Assert.True(between.Ok, between.Error);
+        Assert.Single(between.Moves);
+
+        var fresh = DrawerPlanValidator.Check(Agent([docs], new DrawerMove(@"C:\Users\pat\Desktop\a.pdf", "documents")), onDesk, []);
+        Assert.True(fresh.Ok, fresh.Error);
+    }
+
+    [Fact]
     public void A_view_drawer_on_the_Desktop_makes_a_desktop_source_a_no_op()
     {
         var desk = new DrawerDef("desk", "Desk", @"C:\Users\pat\Desktop", false);
@@ -902,6 +921,9 @@ public static class DrawerPlanValidator
             if (source is null) return Refuse($"\"{m.Source}\" is outside the Desktop and the drawers.");
             if (!seen.Add(source)) return Refuse($"\"{m.Source}\" is in the plan twice.");
             if (DrawerPaths.IsChildOf(source, shared)) { sharedItems.Add(source); continue; }
+            // The root sits on the Desktop by default, so it would otherwise pass as a desktop folder.
+            if (string.Equals(source, root, StringComparison.OrdinalIgnoreCase))
+                return Refuse("The Drawers folder itself can't go into a drawer.");
             if (homes.Any(h => string.Equals(h, source, StringComparison.OrdinalIgnoreCase)))
                 return Refuse($"\"{m.Source}\" is a drawer's own folder.");
             bool fromDesktop = DrawerPaths.IsChildOf(source, desktop);
@@ -1525,8 +1547,12 @@ public class DrawerReturnTests
         Assert.Equal(
             [new UndoStep($@"{Root}\Screenshots\a.txt", $@"{Desktop}\a.txt"), new UndoStep($@"{Root}\Screenshots\Trip", $@"{Desktop}\Trip")],
             plan.Moves);
-        Assert.Equal([$@"{Root}\Screenshots"], plan.HomesToRemove);
+        Assert.Equal([$@"{Root}\Screenshots", Root], plan.HomesToRemove);
     }
+
+    [Fact]
+    public void The_root_goes_last_so_it_is_removed_only_after_its_homes() =>
+        Assert.Equal(Root, DrawerReturn.Plan([Shots, Docs], Root, Desktop, Children, _ => false).HomesToRemove[^1]);
 
     [Fact]
     public void A_view_drawer_keeps_its_contents_where_they_are()
@@ -1574,7 +1600,7 @@ Expected: build FAIL, `The name 'DrawerReturn' does not exist in the current con
 ```csharp
 namespace Sanduhr.Core;
 
-/// <summary>What turning drawers off does: the moves back to the Desktop, and the owned homes to remove once they are empty.</summary>
+/// <summary>What turning drawers off does: the moves back to the Desktop, and the owned homes (then the root) to remove once each is empty.</summary>
 public sealed record ReturnPlan(IReadOnlyList<UndoStep> Moves, IReadOnlyList<string> HomesToRemove);
 
 /// <summary>
@@ -1606,6 +1632,8 @@ public static class DrawerReturn
             }
             homes.Add(home);
         }
+        // The root last: the App removes each folder only once it is empty, so a root holding anything else stays.
+        if (homes.Count > 0) homes.Add(root);
         return new ReturnPlan(moves, homes);
     }
 
@@ -1640,8 +1668,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: Task 1's `DrawerDef`, `DrawerIds`, `DrawerNames`; Task 3's `DrawerRule`, `DrawerRuleKind`, `DrawerRules.Defaults`; `SettingsJson` (in `DeskContentSettings.cs`).
 - Produces:
-  - `record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<DrawerDef> Drawers, IReadOnlyList<DrawerRule> Rules, bool AutoTidy, bool AutoTidyUnlocked)` with `const string Key = "drawers"`, `static DrawerSettings Default`, `static DrawerSettings Decode(JsonNode?)`, `JsonObject Encode()`, `string RootOr(string defaultRoot)`.
-  - `Paths.DrawersRoot` (`<home>\Drawers`), `Paths.DrawerJournalFile` (`<AppDataDir>\drawers-journal.json`).
+  - `record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<DrawerDef> Drawers, IReadOnlyList<DrawerRule> Rules, bool AutoTidy, bool AutoTidyUnlocked)` with `const string Key = "drawers"`, `static DrawerSettings Default`, `static DrawerSettings Decode(JsonNode?)`, `JsonObject Encode()`, `static string DefaultRoot(string desktop)` (`<desktop>\Drawers`), `string RootOr(string desktop)`.
+  - `Paths.DrawerJournalFile` (`<AppDataDir>\drawers-journal.json`). The root is not on `Paths`: it hangs off the Desktop, which the App reads from `Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)` (it may be redirected, for example into OneDrive), so plan 2 passes that path in.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1731,17 +1759,20 @@ public class DrawerSettingsTests
     }
 
     [Fact]
-    public void RootOr_falls_back_to_the_default_root()
+    public void The_default_root_is_a_folder_on_the_Desktop() =>
+        Assert.Equal(@"C:\Users\pat\OneDrive\Desktop\Drawers", DrawerSettings.DefaultRoot(@"C:\Users\pat\OneDrive\Desktop"));
+
+    [Fact]
+    public void RootOr_falls_back_to_the_Desktop_default()
     {
-        Assert.Equal(@"C:\Users\pat\Drawers", DrawerSettings.Default.RootOr(@"C:\Users\pat\Drawers"));
-        Assert.Equal(@"D:\Sorted", (DrawerSettings.Default with { Root = @"D:\Sorted" }).RootOr(@"C:\Users\pat\Drawers"));
+        Assert.Equal(@"C:\Users\pat\Desktop\Drawers", DrawerSettings.Default.RootOr(@"C:\Users\pat\Desktop"));
+        Assert.Equal(@"D:\Sorted", (DrawerSettings.Default with { Root = @"D:\Sorted" }).RootOr(@"C:\Users\pat\Desktop"));
     }
 
     [Fact]
-    public void Paths_puts_the_root_in_the_profile_and_the_journal_with_the_settings()
+    public void Paths_keeps_the_journal_with_the_settings()
     {
         var p = new Paths(appDataBase: @"C:\t\appdata", homeDir: @"C:\t\home", localAppDataBase: @"C:\t\local");
-        Assert.Equal(@"C:\t\home\Drawers", p.DrawersRoot);
         Assert.Equal(Path.Combine(p.AppDataDir, "drawers-journal.json"), p.DrawerJournalFile);
     }
 }
@@ -1773,8 +1804,12 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
 
     public static DrawerSettings Default { get; } = new(false, null, [], DrawerRules.Defaults, false, false);
 
-    /// <summary>The Drawers root in force: the user's, or <paramref name="defaultRoot"/> (<see cref="Paths.DrawersRoot"/>).</summary>
-    public string RootOr(string defaultRoot) => string.IsNullOrWhiteSpace(Root) ? defaultRoot : Root;
+    /// <summary>The default root (decision KNT1mDtN3kQ0rlz2sePq): a Drawers folder on the Desktop itself, so after any uninstall,
+    /// the Store's included, the files sit in one visible folder; and a synced Desktop keeps them synced.</summary>
+    public static string DefaultRoot(string desktop) => Path.Combine(desktop, "Drawers");
+
+    /// <summary>The Drawers root in force: the user's, or the Desktop default.</summary>
+    public string RootOr(string desktop) => string.IsNullOrWhiteSpace(Root) ? DefaultRoot(desktop) : Root;
 
     public static DrawerSettings Decode(JsonNode? node)
     {
@@ -1840,15 +1875,11 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
 }
 ```
 
-- [ ] **Step 4: Add the two paths**
+- [ ] **Step 4: Add the journal path**
 
 In `windows-dotnet/src/Sanduhr.Core/Paths.cs`, after the `CodenamesFile` property:
 
 ```csharp
-    /// <summary>The default Drawers root (5.0 drawers spec, section 4): <c>%USERPROFILE%\Drawers</c>, a normal folder the user can see in
-    /// Explorer. Not under AppData, so the Store package's write virtualization never hides it.</summary>
-    public string DrawersRoot => Path.Combine(_homeDir, "Drawers");
-
     /// <summary>The move journal: paths only, beside settings.json, apart from the Velopack install tree.</summary>
     public string DrawerJournalFile => Path.Combine(AppDataDir, "drawers-journal.json");
 ```
@@ -2030,7 +2061,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 The drawer island and its theming from the Desk look; moves through `IFileOperation` with the per-move root and reparse
 check; the journal on disk; review on the Desk with `DeskReviewBar` and `DeskBusy`; undo, turning off and Reset's Drawers
-part; the three front doors on top of `JustTheDesk`; the What's New card; Settings pages, index and Privacy switch;
+part; the same return from Velopack's `OnBeforeUninstallFastCallback` in `Sanduhr.App/Program.cs` (Setup.exe only, best-effort);
+the first-on line "Drawer files live in the Drawers folder on your Desktop."; the three front doors on top of `JustTheDesk`; the What's New card; Settings pages, index and Privacy switch;
 `propose_drawers` and `get_drawers` with the one new `TrustBoundaryTests` entry (the MCP links `DrawerModel.cs`,
 `DrawerPlanValidator.cs` and `DrawerJournal.cs`' summary, which are IO-free by this plan's constraint); streamer-mode
 codenames; and the RenderHarness `drawers` scenario.

@@ -184,13 +184,18 @@ move as it lands. A failure skips that file and the plan carries on. The result 
 **Name clashes.** A clash is renamed the way Explorer renames, "report (2).docx". The journal keeps the new
 name so that undo restores the old one. Nothing is overwritten.
 
-**Cloud files.** OneDrive placeholders move as placeholders, and the Shell handles that with OneDrive. When
-the Desktop is synced and a drawer's home is not, the first plan says so in one line naming the folders,
-before Apply.
+**Cloud files.** OneDrive placeholders move as placeholders, and the Shell handles that with OneDrive. With
+the default root the drawer homes sit inside the Desktop, so a synced Desktop stays synced. When the user
+moves the root out of a synced Desktop, the first plan after says so in one line naming the folders, before
+Apply.
 
-**Homes.** Each drawer has its own home. The default is under `%USERPROFILE%\Drawers\<name>`, and the root
-can be changed in Settings. A drawer can instead point at the Desktop or at an existing folder (Downloads, a
-project folder), and then shows that folder in place, as a view.
+**Homes.** Each drawer has its own home. The default root is a folder on the Desktop itself,
+`Desktop\Drawers`, so homes are `Desktop\Drawers\<name>`. This costs one folder icon on the desktop and buys
+the uninstall case below: whatever happens to Sanduhr, the files sit in one visible folder on the Desktop.
+The root can be changed in Settings. A drawer can instead point at the Desktop or at an existing folder
+(Downloads, a project folder), and then shows that folder in place, as a view. The root folder itself is
+never a plan source, so no plan can move it into a drawer. The first time drawers are turned on, one line
+says where drawer files live: "Drawer files live in the Drawers folder on your Desktop."
 
 **The journal.** It lives in Sanduhr's data folder, kept apart from the Velopack install tree. It holds
 paths only, never contents: the last 50 plans, and the user's own moves for 30 days. The MCP sees a summary
@@ -201,15 +206,17 @@ back on the Desktop?" Then:
 
 - Every Sanduhr-owned home (under the Drawers root) empties back onto the Desktop, files and folders alike,
   whether the journal moved them or the user dragged them in through Explorer. Clashes are renamed.
-- An emptied home is removed. A home that still holds a file that could not move (open or locked) is kept,
-  and the result says why.
+- An emptied home is removed, and then the Drawers root when it is empty too. A home that still holds a file
+  that could not move (open or locked) is kept, and the result says why.
 - Drawers pointed at existing folders are views, so their contents stay where they are.
 
 Reset's Drawers part runs the same return first, then clears the rules, the journal and the drawer
 settings. Reset never deletes a user's file.
 
-**Uninstall.** A Store package cannot run code on removal, so files still in the Drawers root stay there as
-a normal folder. Settings (Drawers page) and the listing say so.
+**Uninstall.** A Setup.exe install runs the same return from Velopack's `OnBeforeUninstallFastCallback`
+(`Sanduhr.App/Program.cs`), best-effort: that callback must be quick, so a locked file keeps its home. A
+Store package cannot run code on removal, so its files stay in the Drawers folder on the Desktop, in plain
+sight. Settings (Drawers page) and the listing say so.
 
 **Privacy.**
 
