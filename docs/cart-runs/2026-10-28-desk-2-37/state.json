@@ -1,0 +1,139 @@
+{
+  "run": "desk-2-37",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "e66f051c037c0186903d00f263118f01907bcff2",
+  "integration_branch": "cart/desk-2-37",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-desk-2-37/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-desk-2-37",
+  "builder_branch": "main",
+  "uncommitted_at_start": [],
+  "started_at": "2026-10-28T20:45:21.518Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "layout-tilt-style",
+      "title": "Layout words gain tilt and style",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-37--01-layout-tilt-style",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "worker: ./test.sh 2312, smoke 1033; session: filtered Desk arrangement suites",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "the-fold",
+      "title": "The fold",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-37--02-the-fold",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "worker: ./test.sh 2333, smoke 1033; session: fold/hit-test/index suites",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "meter-styles",
+      "title": "Meter styles",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-37--03-meter-styles",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "worker: ./test.sh 2342, smoke 1033; session: Desk meter styles suite (9 tests)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "font-packs",
+      "title": "Font packs",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-37--04-font-packs",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "worker: ./test.sh 2352, smoke 1033; session: PackFonts + PackValidator suites",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "desk-design-mcp",
+      "title": "get_desk and propose_desk",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-37--05-desk-design-mcp",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "worker: pytest 293, ./test.sh 2370, smoke 1033; session: pytest + DeskDesign/DeskState suites",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "desk-design-review",
+      "title": "The app's Desk design review",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-37--06-desk-design-review",
+      "worktree": "",
+      "on": 5,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "worker: ./test.sh 2402, smoke 1033, pytest 293; session: DeskDesign/WidgetReview/Debug suites",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 7,
+      "slug": "docs-2-37",
+      "title": "Docs, What's New, CHANGELOG",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-37--07-docs-2-37",
+      "worktree": "",
+      "on": 6,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "worker: ./test.sh 2403, smoke 1033, pytest 293",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}
