@@ -86,7 +86,7 @@ public class ToolLogicNowPlayingLooksTests
     public async Task A_good_request_is_queued_for_the_widget_and_its_answer_comes_back()
     {
         using var tmp = new TempDir();
-        var cfg = LooksConfig(tmp, TimeSpan.FromSeconds(5));
+        var cfg = LooksConfig(tmp, Waits.AnswerWait);
         var logic = new ToolLogic(cfg, () => Now);
 
         // Play the widget: take the request, check it with the widget's own decoder, answer pending.
@@ -120,7 +120,7 @@ public class ToolLogicNowPlayingLooksTests
         foreach (bool applied in new[] { true, false })
         {
             using var tmp = new TempDir();
-            var cfg = LooksConfig(tmp, TimeSpan.FromSeconds(5));
+            var cfg = LooksConfig(tmp, Waits.AnswerWait);
             var widget = Task.Run(async () =>
             {
                 var p = NowPlayingLookProposal.Decode(await ReadWhenReady(cfg.LooksRequestPath!), Now).Proposal!;

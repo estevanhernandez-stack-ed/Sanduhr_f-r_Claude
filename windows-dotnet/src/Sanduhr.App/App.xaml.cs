@@ -30,6 +30,9 @@ public partial class App : Application
     private GlobalHotKeyService? _hotKeys;
     private ClaudeCodeGlowService? _glow;
     private Desk.DeskController? _desk;
+    /// <summary>This PC's font families for the theme's font (theme match): drawn when present, warned about when not. Read again when a
+    /// font pack comes or goes.</summary>
+    private Desk.DeskFonts _themeFonts = new([]);
     private Desk.NowPlayingHub? _nowPlaying;
     private Desk.DeskMessageSource? _messages;
     private Desk.DeskMessageHandoffService? _handoff;
@@ -47,9 +50,14 @@ public partial class App : Application
     private MenuItem? _restartToUpdateItem;
     private MenuItem? _restartItem;
     private RestartToUpdateService? _restartToUpdate;
+    /// <summary>The GitHub update check (Settings v2, slice 6): launch, the widget's tick and About's Check now share it.</summary>
+    private UpdateChecker? _updateChecker;
     private bool _quitting;
 
-    /// <summary>The claim on this data folder (Program.Main). A second launch asks it to show the widget.</summary>
+    /// <summary>Where Settings was when it last closed, for the app's life (spec, Reopen where it was left). Never saved.</summary>
+    private SettingsLink? _lastSettings;
+
+    /// <summary>The claim on this data folder (Program.Main). A second launch asks it to show the widget, or Settings at its `--settings` link.</summary>
     internal SingleInstance? Instance { get; init; }
 
     /// <summary>How long a quit waits for WebView2's browser processes to close by themselves before ending them.</summary>
@@ -72,6 +80,11 @@ public partial class App : Application
         startupSettings.SyncMcpExport();
 
         _vm = new WidgetViewModel();
+        // A theme's font (theme match): drawn when this PC has the family, bundled, installed or from a font pack; the theme lint warns
+        // about one it lacks. Set before the first ApplyThemeResources so the first paint is in the theme's font.
+        _themeFonts = Desk.DeskFonts.ForThisPc(new Sanduhr.Core.Paths());
+        _vm.FontAvailable = f => _themeFonts.Has(f);
+        Sanduhr.App.Theming.ThemePalette.ResolveFont = f => _themeFonts.Has(f) ? _themeFonts.Families(f).Regular : null;
         // Apply the saved theme's palette to the Application resources before the
         // window is shown so the first paint is correct (no obsidian→saved flash).
         _vm.ApplyThemeResources();
@@ -92,7 +105,8 @@ public partial class App : Application
         _vm.ManualReauthRequested += RunManualReauthAsync;
         _vm.PasteKeyRequested += () => RunSignInAsync(embedded: false);
         _vm.SettingsRequested += () => ShowSettingsAsync();
-        _vm.SettingsPageRequested += page => ShowSettingsAsync(page);
+        // "<Page> settings…" from the tier card and the account menus lands on its section (spec, Menus table).
+        _vm.SettingsPageRequested += page => ShowSettingsAsync(page, SettingsIndex.MenuAnchor(page));
         _vm.JustTheDeskRequested += ChooseJustTheDesk;
         // Keep an open Settings window's account list in sync with quick-switches
         // made elsewhere (tray / widget chip / right-click).
@@ -101,7 +115,7 @@ public partial class App : Application
         _window = new MainWindow { DataContext = _vm };
         // Just the Desk with no account (spec 7.5): the widget starts hidden and the tray is the way back.
         // The handle is created without showing, so the glow, alerts and tray have a window to point at.
-        if (JustTheDesk.WidgetStartsHidden(_vm.JustTheDesk, _vm.AccountStore.ListAccounts().Count > 0,
+        if (JustTheDesk.WidgetStartsHidden(_vm.JustTheDesk, _vm.AccountStore.ListAccounts().Count > 0,   // streamer: key - a count, never drawn
                 new SettingsStore(new Sanduhr.Core.Paths()).LoadDesk().Enabled))
             new System.Windows.Interop.WindowInteropHelper(_window).EnsureHandle();
         else
@@ -111,21 +125,23 @@ public partial class App : Application
 
         SetupTray();
         SyncTrayRotation();
-        Instance?.Listen(() => Dispatcher.BeginInvoke(() => { if (!_quitting) ShowWindow(); }));
+        // Streamer mode (slice 7): App lives as long as the widget, so this is never detached.
+        _vm.Streamer.Changed += OnStreamerChanged;
+        Instance?.Listen(message => Dispatcher.BeginInvoke(() => { if (!_quitting) OnSecondLaunch(message); }));
         SetupHotKeys();
         StartGlow();
         StartDesk();
 
-        // Usage vault (WS-C): consent resolves BEFORE the service attaches —
+        // Session archive (WS-C): consent resolves BEFORE the service attaches —
         // attach order is the consent gate; Start()'s first fetch cycle then
         // kicks the initial backfill through the attached service.
         var vaultService = new VaultService(new SettingsStore(new Sanduhr.Core.Paths()), _vm.CcReader);
         if (vaultService.NeedsConsentPrompt)
-            vaultService.SaveConsent(VaultConsentDialog.ShowConsent(_window, vaultService.DetectedRootNames()));
+            vaultService.SaveConsent(VaultConsentDialog.ShowConsent(_window, vaultService.DetectedRootNames()));   // streamer: masked - via ShowConsent: the consent dialog draws each folder as Mask.FolderName
         _vm.AttachVaultService(vaultService);
 
         // Publish usage: everything defaults off (toggle + every home, no endpoint),
-        // so attaching is inert until the user opts in under Settings > Publish usage.
+        // so attaching is inert until the user opts in under Settings, Publish usage.
         // The publish token rides the same Credential Manager seam as the accounts.
         _vm.AttachPublishService(new UsagePublishService(
             new SettingsStore(new Sanduhr.Core.Paths()),
@@ -159,7 +175,13 @@ public partial class App : Application
         _restartToUpdate.OfferChanged += UpdateRestartItems;
         _vm.RestartToUpdateRequested += () => _restartToUpdate?.Accept();
         _vm.RestartRequested += RestartApp;
+        // Settings, About, Updates' "Check for updates once a day" (settings.json "update_check") gates the GitHub probe only: off, it asks
+        // nothing on its own, and About's Check now asks through the same checker. The Store build has no switch, so its check ignores it.
+        var updateSwitch = new SettingsStore(new Sanduhr.Core.Paths());
         _vm.AttachStoreUpdateService(new StoreUpdateService(_restartToUpdate, OwnerWindowHandle, log: LogUpdate));
+        _updateChecker = new UpdateChecker(updateSwitch.LoadUpdateCheck, new VelopackUpdateProbe(), UpdateChecker.DefaultStampPath,
+            (version, installer) => Dispatcher.BeginInvoke(() => _restartToUpdate?.Offer(version, installer)));
+        _vm.AttachUpdateChecker(_updateChecker);
 
         // Background, in order, each step on its own: the one-time re-point of pre-3.5.0 registrations to
         // %USERPROFILE%\.sanduhr, then the statusline bridge (WS-E) and the MCP integration refresh. The
@@ -177,12 +199,14 @@ public partial class App : Application
             try { ExternalDirMigrationRunner.Run(startupSettings, new Sanduhr.Core.Paths()); }
             catch { }
 
-            if (statuslineEnabled)
+            if (SnapshotConsumers.ScriptWanted(statuslineEnabled,
+                    System.IO.Path.Combine(appDataDir, ResetPlan.IntegrationsName, ResetPlan.ReceiptsFileName),
+                    System.IO.Path.Combine(statuslineBinDir, StatuslineInstaller.ScriptName)))
             {
                 try
                 {
                     new StatuslineInstaller(
-                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),   // streamer: notname - user folder handed to the statusline installer to write files, never drawn
                         statuslineBinDir).InstallScript();
                 }
                 catch { }
@@ -196,7 +220,7 @@ public partial class App : Application
                     if (System.IO.Directory.Exists(mcpSource))
                     {
                         new McpIntegrationInstaller(
-                            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),   // streamer: notname - user folder handed to the MCP installer to write files, never drawn
                             appDataDir, externalDir: externalDir).RefreshInstall(mcpSource);
                     }
                 }
@@ -213,13 +237,16 @@ public partial class App : Application
                 Environment.GetEnvironmentVariable(DemoMode.EnvironmentVariable)))
             _vm.StartDemo();
 
-        // Best-effort GitHub/Velopack update probe — fire-and-forget so a slow or offline
-        // network never delays the first paint. No-ops on the Store/MSIX install and in dev.
-        // A downloaded release joins the same Restart to update offer as the Store's.
-        _ = new UpdateChecker().CheckForUpdatesAsync((version, installer) =>
-            Dispatcher.BeginInvoke(() => _restartToUpdate?.Offer(version, installer)));
+        // The GitHub update probe at launch, fire-and-forget so a slow or offline network never delays the first paint. It asks only while
+        // "Check for updates once a day" is on and a day has passed; it no-ops on the Store/MSIX install and in dev. A downloaded release
+        // joins the same Restart to update offer as the Store's.
+        _ = _updateChecker?.RunIfDueAsync();
 
         ScheduleWhatsNewAtLaunch();
+
+        // `Sanduhr.exe --settings <page>[#<anchor>]` as the first launch: Settings opens there once the widget is up.
+        if (SettingsIndex.LinkFromArgs(Environment.GetCommandLineArgs().Skip(1)) is { } startLink)
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => OpenSettingsLink(startLink)));
     }
 
     /// <summary>The app version as Major.Minor.Build, the same shape Settings shows.</summary>
@@ -247,12 +274,12 @@ public partial class App : Application
             var lastSeen = store.LoadWhatsNewLastSeen();
             // After Start(): it migrates legacy credentials, so the account list is settled.
             var fresh = WhatsNew.IsFresh(lastSeen, store.LoadWhatsNewInstalledVersion(),
-                _vm.AccountStore.ListAccounts().Count);
-            var onboarding = JustTheDesk.Onboarding(_vm.ActiveAccount is not null, store.LoadJustTheDesk().On);
+                _vm.AccountStore.ListAccounts().Count);   // streamer: key - a count, never drawn
+            var onboarding = JustTheDesk.Onboarding(_vm.ActiveAccount is not null, store.LoadJustTheDesk().On);   // streamer: key - a null check, never drawn
 
             // The tour is decided before What's New records anything: pending only on a fresh
             // install (no account, nothing seen). While it is pending, What's New waits for it.
-            var accounts = _vm.AccountStore.ListAccounts().Count;
+            var accounts = _vm.AccountStore.ListAccounts().Count;   // streamer: key - a count, never drawn
             var existingTour = WelcomeTour.Parse(store.LoadTourState());
             _tourState = WelcomeTour.Decide(existingTour, fresh, accounts, lastSeen);
             if (existingTour != _tourState)
@@ -288,13 +315,16 @@ public partial class App : Application
     }
 
     private void OpenWhatsNew(IReadOnlyList<WhatsNewCard> cards, string header) =>
-        WhatsNewWindow.Show(cards, header, new SettingsStore(new Sanduhr.Core.Paths()), page =>
-        {
-            if (page == SettingsPage.Widget)
-                ShowWindow();
-            else
-                _ = ShowSettingsAsync(page);
-        });
+        WhatsNewWindow.Show(cards, header, new SettingsStore(new Sanduhr.Core.Paths()), ShowMe);
+
+    /// <summary>A card's Show me: the widget, or Settings at the card's page and section (WF17).</summary>
+    private void ShowMe(SettingsPage page, string? anchor)
+    {
+        if (SettingsIndex.ShowsTheWidget(new SettingsLink(page, anchor)))
+            ShowWindow();
+        else
+            _ = ShowSettingsAsync(page, anchor);
+    }
 
     /// <summary>
     /// The first successful fetch on a fresh install opens the tour, once a launch, so its first
@@ -318,15 +348,9 @@ public partial class App : Application
             return;
         try
         {
-            var signedIn = _vm.ActiveAccount is not null || _vm.IsDemo;
+            var signedIn = _vm.ActiveAccount is not null || _vm.IsDemo;   // streamer: key - a null check, never drawn
             var steps = WelcomeTour.StepsFor(_vm.JustTheDesk, new HashSet<TourFeature>(), signedIn);
-            WhatsNewWindow.ShowTour(new WelcomeTourViewModel(steps, _vm), page =>
-            {
-                if (page == SettingsPage.Widget)
-                    ShowWindow();
-                else
-                    _ = ShowSettingsAsync(page);
-            }, EndTour);
+            WhatsNewWindow.ShowTour(new WelcomeTourViewModel(steps, _vm), ShowMe, EndTour);
         }
         catch (Exception e)
         {
@@ -360,6 +384,10 @@ public partial class App : Application
     }
 
     /// <summary>"What's New…" from the tray and Settings: the installed version's highlights, or every card.</summary>
+    /// <summary>About, Updates' Check now: the launch checker, asked once whatever the switch says (slice 6, decision 7).</summary>
+    private Task<UpdateProbeResult> CheckForUpdatesNowAsync() =>
+        _updateChecker?.CheckNowAsync() ?? Task.FromResult(new UpdateProbeResult(UpdateProbeStatus.Failed));
+
     private void ShowWhatsNewFromMenu()
     {
         var installed = new SettingsStore(new Sanduhr.Core.Paths()).LoadWhatsNewInstalledVersion();
@@ -417,8 +445,13 @@ public partial class App : Application
         _putBackItem.Click += (_, _) => _deskDesign?.PutBack();
         menu.Opened += (_, _) => _putBackItem.Visibility = _deskDesign?.CanPutBack == true ? Visibility.Visible : Visibility.Collapsed;
 
-        var refresh = new MenuItem { Header = "Refresh" };
+        var refresh = new MenuItem { Header = SettingsNames.RefreshUsageNow };
         refresh.Click += (_, _) => _vm?.RefreshCommand.Execute(null);
+
+        // Streamer mode (spec: a tray item with a checked state, writing the same key as Privacy's switch).
+        var streamer = new MenuItem { Header = SettingsNames.StreamerMenuItemHeader, IsCheckable = true };
+        streamer.Click += (_, _) => _vm?.Streamer.SetOn(streamer.IsChecked);
+        menu.Opened += (_, _) => streamer.IsChecked = _vm?.Streamer.On ?? false;
 
         // Accounts ▸ quick-switch submenu — repopulated on open so the live registry
         // and active marker stay current.
@@ -427,24 +460,24 @@ public partial class App : Application
         accounts.SubmenuOpened += (_, _) =>
         {
             if (_vm is not null)
-                AccountMenuBuilder.PopulateSwitchList(accounts.Items, _vm, includeAdd: false, includeManage: false);
+                AccountMenuBuilder.PopulateSwitchList(accounts.Items, _vm, includeAdd: false, includeManage: true);
         };
 
         var addAccount = new MenuItem { Header = SettingsNames.AddAccount };
         addAccount.Click += async (_, _) => await RunSignInAsync(embedded: true);
 
         // Focus + Game affordances (parity with widget.py's tray entries).
-        var focus = new MenuItem { Header = "Deep Work (Focus)" };
+        var focus = new MenuItem { Header = SettingsNames.DeepWork };
         focus.Click += (_, _) => _vm?.ToggleFocusCommand.Execute(null);
 
-        var game = new MenuItem { Header = "Cooldown Snake" };
+        var game = new MenuItem { Header = SettingsNames.CooldownSnake };
         game.Click += (_, _) =>
         {
             ShowWindow();
             _vm?.StartGameCommand.Execute(null);
         };
 
-        var quit = new MenuItem { Header = "Quit Sanduhr" };
+        var quit = new MenuItem { Header = SettingsNames.QuitSanduhr };
         quit.Click += (_, _) => QuitApp();
 
         // Only while an update waits (3.8 spec 8b): the same Restart to update as the toast and the widget.
@@ -466,6 +499,7 @@ public partial class App : Application
         menu.Items.Add(_putBackItem);
         menu.Items.Add(refresh);
         menu.Items.Add(BuildTrayShowsMenu());
+        menu.Items.Add(streamer);
         menu.Items.Add(new Separator());
         menu.Items.Add(accounts);
         menu.Items.Add(addAccount);
@@ -482,9 +516,9 @@ public partial class App : Application
     {
         switch (action)
         {
-            case Desk.DeskMenuAction.EditMessages: _ = ShowSettingsAsync(SettingsPage.DeskMessage); break;
-            case Desk.DeskMenuAction.DeskSettings: _ = ShowSettingsAsync(SettingsPage.Desk); break;
-            case Desk.DeskMenuAction.LauncherSettings: _ = ShowSettingsAsync(SettingsPage.Desk, Sanduhr.Core.SettingsIndex.DeskLauncher); break;
+            case Desk.DeskMenuAction.EditMessages: _ = ShowSettingsAsync(SettingsPage.DeskMessage, SettingsIndex.MenuAnchor(SettingsPage.DeskMessage)); break;
+            case Desk.DeskMenuAction.DeskSettings: _ = ShowSettingsAsync(SettingsPage.Desk, SettingsIndex.MenuAnchor(SettingsPage.Desk)); break;
+            case Desk.DeskMenuAction.LauncherSettings: _ = ShowSettingsAsync(SettingsPage.Launcher, SettingsIndex.MenuAnchor(SettingsPage.Launcher)); break;
             case Desk.DeskMenuAction.Arrange: _desk?.BeginArrange(); break;
             case Desk.DeskMenuAction.TurnOffDesk:
                 try
@@ -502,10 +536,10 @@ public partial class App : Application
         }
     }
 
-    /// <summary>A Launcher button for an app that is no longer installed was chosen: Settings, Desk, Launcher opens at that button.</summary>
+    /// <summary>A Launcher button for an app that is no longer installed was chosen: Settings, Launcher opens at its buttons, that one selected.</summary>
     private void OnLauncherMissing(int index)
     {
-        _ = ShowSettingsAsync(SettingsPage.Desk, Sanduhr.Core.SettingsIndex.DeskLauncher);
+        _ = ShowSettingsAsync(SettingsPage.Launcher, SettingsIndex.MenuAnchor(SettingsPage.Launcher));
         if (_settingsWindow?.ViewModel.Desk.Launcher is { } launcher)
         {
             launcher.Reload();
@@ -528,8 +562,10 @@ public partial class App : Application
     /// <summary>A design was applied: an open Settings window re-reads the Desk page, the Launcher and the designs.</summary>
     private void FollowDesignChange()
     {
-        if (_settingsWindow?.ViewModel.Desk is not { } page) return;
-        page.RefreshFromStore();
+        if (_settingsWindow?.ViewModel is not { } svm) return;
+        svm.Desk.RefreshFromStore();
+        // Put my Desk back, a design switch or an MCP design can turn Follow on or off behind the section.
+        svm.ThemeMatch.Reload();
     }
 
     /// <summary>Arrange mode began, dropped a piece or ended: the tray entry and an open Settings window follow
@@ -554,10 +590,10 @@ public partial class App : Application
         _nowPlaying = new Desk.NowPlayingHub();
         Desk.NowPlayingHub.Current = _nowPlaying;
         _messages = new Desk.DeskMessageSource(store, paths);
-        _handoff = new Desk.DeskMessageHandoffService(paths, _messages.FilePath, store);
+        _handoff = new Desk.DeskMessageHandoffService(paths, _messages.FilePath, store, _messages.Reload);
         Desk.DeskMessageHandoffService.Current = _handoff;
         _handoff.Start(); // Claude's suggested Desk messages (spec 6.9)
-        // Watchers (spec 6.9): agents' cards, only while "Let agents show watchers" is on; in memory only.
+        // Watchers (spec 6.9): agents' cards, only while "Let Claude show watchers" is on; in memory only.
         _watchers = new Desk.WatcherStore(paths, store.LoadWatchersAgents, () => vm.IsDemo);
         _watchers.WaitingStarted += () =>
         {
@@ -601,9 +637,9 @@ public partial class App : Application
         Desk.WidgetReviewService.Current = _widgetReview;
         _widgetReview.Host = new Desk.WidgetReviewHost(_desk, store, () =>
         {
-            _settingsWindow?.ViewModel.WidgetsPage.ReloadLocal();
-            // A palette Claude made joins the Ink presets (3.9.1).
-            _settingsWindow?.ViewModel.Desk.Reload();
+            _settingsWindow?.ViewModel.ModsPage.ReloadLocal();
+            // A pack Claude made joins the pickers, the Themes pack line and the Ink presets (PacksChanged reloads the Desk page).
+            _settingsWindow?.ViewModel.PacksChanged();
         });
         _widgetReview.Start();
         _desk.LauncherMissingClicked += OnLauncherMissing;
@@ -613,9 +649,13 @@ public partial class App : Application
         _desk.ArrangeChanged += OnArrangeChanged;
         _desk.WidgetDimRequested += (dimmed, ease) => _window?.SetCareDim(dimmed, ease);
         _desk.MenuRequested += OnDeskMenu;
-        _vm.ThemeChanged += _ => _desk?.ThemeChanged();
+        _vm.ThemeChanged += p => _desk?.ThemeChanged(p.Definition);
+        // The meters' usage signal follows Alerts' thresholds.
+        _vm.AlertSettingsChanged += () => _desk?.Reload();
         // The widget's now-playing line (spec 6.3, W8) shares the Desk's media-session listener.
         _vm.NowPlaying = new NowPlayingLineViewModel(_nowPlaying, store);
+        // The theme a following Desk draws from (theme match), before the first redraw.
+        _desk.ThemeChanged(_vm.Palette.Definition);
         _desk.Reload();
         _looks.Start();
     }
@@ -663,14 +703,43 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Open the Settings window (on General, or on <paramref name="page"/>) — single-instance and
-    /// non-modal so a live account switch from here reflects in the widget at once.
-    /// Re-invoking focuses the existing window and refreshes its account list.
+    /// A second launch asked: <c>--settings desk#pieces</c> opens Settings there; a plain launch shows the widget.
+    /// </summary>
+    private void OnSecondLaunch(string? message)
+    {
+        if (SettingsIndex.ParseLink(message) is { } link)
+            OpenSettingsLink(link);
+        else
+            ShowWindow();
+    }
+
+    /// <summary>A link from outside the app: the widget, or Settings at that page and section.</summary>
+    private void OpenSettingsLink(SettingsLink link)
+    {
+        if (SettingsIndex.ShowsTheWidget(link))
+            ShowWindow();
+        else
+            _ = ShowSettingsAsync(link.Page, link.Anchor);
+    }
+
+    /// <summary>
+    /// Open the Settings window at <paramref name="page"/> and <paramref name="anchor"/>, or, with no page, where it was
+    /// left this session (General the first time); single-instance and non-modal so a live account switch from here
+    /// reflects in the widget at once. Re-invoking focuses the existing window, refreshes its account list and, with a
+    /// page, moves it there.
     /// </summary>
     private Task ShowSettingsAsync(SettingsPage? page = null, string? anchor = null)
     {
         if (_vm is null)
             return Task.CompletedTask;
+
+        // Landing only ever sees a checked place (SettingsIndex.Check, the rule ParseLink uses), so nothing raw reaches it.
+        if (page is { } asked)
+        {
+            var checkedLink = SettingsIndex.Check(asked, anchor);
+            page = checkedLink.Page;
+            anchor = checkedLink.Anchor;
+        }
 
         if (_settingsWindow is not null)
         {
@@ -681,37 +750,55 @@ public partial class App : Application
             return Task.CompletedTask;
         }
 
+        var landing = SettingsIndex.Landing(page, anchor, _lastSettings);
         var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync, _hotKeys,
-            ShowWhatsNewFromMenu, ShowTour);
+            ShowWhatsNewFromMenu, ShowTour, checkForUpdatesNow: CheckForUpdatesNowAsync);
         // The Claude Code page re-reads the glow switches and plays "Try it" through the running glow service.
         svm.ClaudeCodePage.GlowReload = () => _glow?.Reload();
         svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
         svm.Desk.Changed = () => _desk?.Reload();
+        // Desk Look, Match the widget theme: the plate note follows the running Desk's readability guard.
+        svm.ThemeMatch.PlateForced = () => _desk?.PlateForced == true;
+        Action plateShown = () => svm.ThemeMatch.Reload();
+        if (_desk is not null) _desk.PlateForcedChanged += plateShown;
+        // The widget theme changing while Settings is open (the strip, Themes, an MCP theme): the followed line names the new one.
+        Action<Sanduhr.App.Theming.ThemePalette> themeShown = _ => svm.ThemeMatch.Reload();
+        if (_vm is not null) _vm.ThemeChanged += themeShown;
+        // Match now's guard asks the Desk what is behind the clock, and whether the guard already holds the plate on.
+        svm.ThemeMatch.Service.WallpaperLuminance = () => _desk?.ClockLuminance() ?? [];
+        svm.ThemeMatch.Service.PlateForced = () => _desk?.PlateForced == true;
         svm.Desk.ArrangeRequested = () => _desk?.BeginArrange();
         svm.Desk.Arranging = _desk?.Arranging == true;
         svm.Desk.ArrangingLayout = _desk?.Session?.Working.Layout;
         svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); _looks?.SettingsChanged(); };
         // get_desk reports the weather nickname (#315), so a change rewrites desk-state.json too.
         svm.WeatherPage.Changed = () => { _desk?.Reload(); _deskDesign?.Refresh(); };
-        // The companion (spec 3.8 section 4): a new pick, roaming, an install or uninstall, or the piece shown or hidden.
+        // A pack installed, uninstalled or switched on or off (a companion sprite included), theme, font or palette pack.
         // 3.9.1: it also reloads the theme list, since an installed theme pack joins it and an uninstalled one leaves it.
         // A font pack changes what the Desk and a design may draw in: drop their font lists before the Desk redraws.
-        svm.WidgetsPage.Changed = () =>
+        svm.ModsPage.Changed = () =>
         {
+            _themeFonts = Desk.DeskFonts.ForThisPc(new Sanduhr.Core.Paths());
             _vm?.ReloadUserThemes();
+            _vm?.ApplyThemeResources();
             _desk?.ResetFonts();
             _deskDesign?.FontsChanged();
             _desk?.Reload();
-            svm.Desk.Reload();
         };
         svm.MessageChanged = () => { _desk?.Reload(); _handoff?.PublishState(); };
         svm.Desk.WatchersChanged = () => _watchers?.SwitchChanged();
         svm.Desk.CiRunnersChanged = () => _runners?.Refresh();
-        svm.Desk.CiRunnersStatus = _runners?.Status.Text ?? "";
-        Action showRunnerStatus = () => svm.Desk.CiRunnersStatus = _runners?.Status.Text ?? "";
+        svm.Desk.CiRunnersStatus = RunnerStatusText(_runners?.Status);
+        Action showRunnerStatus = () => svm.Desk.CiRunnersStatus = RunnerStatusText(_runners?.Status);
         RunnerStatusShown += showRunnerStatus;
         svm.QuitRequested = QuitApp;
+        // Settings, Widget, Just the Desk's "Show the widget" (WF32): the widget view model has ended it and redrawn the Desk; the window is App's.
+        svm.WidgetPage.ShowWidgetRequested = () =>
+        {
+            if (_vm is { } widgetVm) svm.Alerts.DeskSignInReminder = widgetVm.LoadDeskSignInReminder();
+            ShowWindow();
+        };
         svm.ResetRequested = () =>
         {
             ShowReset();
@@ -720,7 +807,12 @@ public partial class App : Application
         try
         {
             _settingsWindow = new SettingsWindow(svm);
-            _settingsWindow.Closed += (_, _) => RunnerStatusShown -= showRunnerStatus;
+            _settingsWindow.Closed += (_, _) =>
+            {
+                RunnerStatusShown -= showRunnerStatus;
+                if (_desk is not null) _desk.PlateForcedChanged -= plateShown;
+                if (_vm is not null) _vm.ThemeChanged -= themeShown;
+            };
         }
         catch (Exception e)
         {
@@ -729,18 +821,27 @@ public partial class App : Application
             try
             {
                 System.IO.File.AppendAllText(new Sanduhr.Core.Paths().LogFile,
-                    $"{DateTime.UtcNow:o} settings window failed to open ({e.GetType().Name}: {e.Message}){Environment.NewLine}{e}{Environment.NewLine}");
+                    $"{DateTime.UtcNow:o} settings window failed to open ({e.GetType().Name}: {e.Message}){Environment.NewLine}{e}{Environment.NewLine}");   // streamer: notname - written to the log file, never drawn
             }
             catch { }
             RunnerStatusShown -= showRunnerStatus; // no window to show it in
+            if (_vm is not null) _vm.ThemeChanged -= themeShown;
+            if (_desk is not null) _desk.PlateForcedChanged -= plateShown;
             throw;
         }
         if (_window is { IsLoaded: true })
             _settingsWindow.Owner = _window;
-        _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+        // On the widget's monitor, inside its work area, so the foot and Quit never sit off screen (WF41). Once, before the
+        // first Show of a new window; a reopen of the window already up never comes through here.
+        _settingsWindow.FitToWorkArea(_window);
+        var opened = _settingsWindow;
+        _settingsWindow.Closed += (_, _) =>
+        {
+            _lastSettings = opened.Place; // reopen here this session (spec, Reopen where it was left)
+            _settingsWindow = null;
+        };
         _settingsWindow.Show();
-        if (page is { } first)
-            _settingsWindow.SelectPage(first, anchor);
+        _settingsWindow.SelectPage(landing.Page, landing.Anchor);
         _settingsWindow.Activate();
         return Task.CompletedTask;
     }
@@ -796,7 +897,7 @@ public partial class App : Application
         var outcome = _vm.AccountStore.GetOrigin(label) == AccountOrigin.Manual
             ? await coordinator.ReauthenticateManualAsync(owner, label)
             : await coordinator.ReauthenticateEmbeddedAsync(owner, label);
-        if (outcome.Added && _vm.ActiveAccount == label)
+        if (outcome.Added && _vm.ActiveAccount == label)   // streamer: key - compares the active label with the one just added
             await ReloadAfterSignInAsync();
     }
 
@@ -820,17 +921,9 @@ public partial class App : Application
     {
         try
         {
-            if (vm.AccountStore.ListAccounts().Count == 0)
+            if (vm.AccountStore.ListAccounts().Count == 0 || !vm.EndJustTheDesk())   // streamer: key - a count, never drawn
                 return;
-            var store = new SettingsStore(new Sanduhr.Core.Paths());
-            var (state, reminderOn, ended) = JustTheDesk.EndBySignIn(store.LoadJustTheDesk(), store.LoadDeskSignInReminder());
-            if (!ended)
-                return;
-            store.SaveJustTheDesk(state);
-            store.SaveDeskSignInReminder(reminderOn);
-            vm.JustTheDesk = false;
-            if (_settingsWindow?.ViewModel.Alerts is { } alerts) alerts.DeskSignInReminder = reminderOn;
-            vm.RefreshDesk();
+            if (_settingsWindow?.ViewModel.Alerts is { } alerts) alerts.DeskSignInReminder = vm.LoadDeskSignInReminder();
             ShowWindow();
         }
         catch
@@ -887,11 +980,26 @@ public partial class App : Application
         _tray.Icon = icon;
         _trayIcon?.Dispose();
         _trayIcon = icon;
-        _tray.ToolTipText = reading is null
+        _tray.ToolTipText = SettingsNames.TrayTooltip(_vm?.Streamer.On == true, reading is null
             ? "Sanduhr für Claude — no data yet"
             : _vm?.IsDemo == true
                 ? $"Sanduhr für Claude — {DemoMode.TrayLabel(reading.Label, reading.Percent)}"
-                : $"Sanduhr für Claude — {reading.Label} {reading.Percent}%";
+                : $"Sanduhr für Claude — {reading.Label} {reading.Percent}%");
+    }
+
+    /// <summary>Streamer mode moved (slice 7): the tooltip's prefix, the Desk and the Watchers runner line follow. App lives as long as the
+    /// widget, so this subscription is never detached.</summary>
+    /// <summary>Watchers' CI runners line (slice 7, CP 22): each runner by codename while streamer mode is on. Raised again when the switch
+    /// moves (<see cref="OnStreamerChanged"/>).</summary>
+    internal static string RunnerStatusText(RunnerStatus? status) =>
+        status is null ? "" : (status with { Runners = [.. status.Runners.Select(r => StreamerMode.Mask.Name(CodenameCategory.Runner, r))] }).Text;   // streamer: masked - CP 19: runner names pass Mask.Name on this line
+
+    private void OnStreamerChanged()
+    {
+        if (_tray is not null)
+            OnTrayReadingChanged(_vm?.CurrentTrayReading);
+        _desk?.Reload();
+        RunnerStatusShown?.Invoke();
     }
 
     /// <summary>"Tray shows" submenu: one checkable item per mode, checks refreshed on open.</summary>
@@ -980,7 +1088,7 @@ public partial class App : Application
             paths,
             vm.AccountStore,
             new PublishTokenStore(new WindowsCredentialManager(AccountStore.Service)),
-            () => Task.Run<IReadOnlyList<string>>(() => ClaudeCodeViewModel.UndoEverything(vm)),
+            keep => Task.Run(() => ClaudeCodeViewModel.UndoEverything(vm, keep)),
             () =>
             {
                 ResetGuard.MarkDone();
@@ -993,8 +1101,13 @@ public partial class App : Application
                 _vm?.NowPlaying?.Dispose();
             },
             vm.InactiveReader.DeleteAllProfilesAsync,
-            () => new SettingsStore(paths).ClearClaudeCodeSwitchesForReset());
-        ResetWindow.ShowFor(_settingsWindow, service, QuitApp);
+            () => new SettingsStore(paths).ClearMcpSwitchesForReset(),
+            () => new SettingsStore(paths).ClearStatuslineSwitchesForReset());
+        var folders = ResetFolderListViewModel.Read(vm);
+        var svm = _settingsWindow?.ViewModel;
+        if (svm is not null) svm.ResetFolders = folders;   // a streamer flip renames the rows (decision 13)
+        try { ResetWindow.ShowFor(_settingsWindow, service, folders, QuitApp); }
+        finally { if (svm is not null) svm.ResetFolders = null; }
     }
 
     /// <summary>The tray's restart items follow the update offer and the transport's state.</summary>
@@ -1064,7 +1177,8 @@ public partial class App : Application
         {
             try
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target.FileName, target.Arguments) { UseShellExecute = false })?.Dispose();
+                // network: local (the relaunch)
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target.FileName, target.Arguments) { UseShellExecute = false })?.Dispose();   // streamer: notname - launcher target handed to Process.Start, never drawn
             }
             catch (Exception e)
             {

@@ -83,9 +83,9 @@
          requires a 4-part version with the 4th component .0 (Partner Center rejects
          non-zero revisions). Keep these three in lockstep with <Identity Version> in
          Package.appxmanifest. -->
-    <Version>3.9.1.0</Version>
-    <AssemblyVersion>3.9.1.0</AssemblyVersion>
-    <FileVersion>3.9.1.0</FileVersion>
+    <Version>4.0.1.0</Version>
+    <AssemblyVersion>4.0.1.0</AssemblyVersion>
+    <FileVersion>4.0.1.0</FileVersion>
   </PropertyGroup>
 
   <!-- MCP integration: the widget carries the sanduhr-mcp server build in its own

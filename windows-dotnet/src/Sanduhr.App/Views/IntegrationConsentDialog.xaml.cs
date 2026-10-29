@@ -38,7 +38,7 @@ internal partial class IntegrationConsentDialog : Window
         FolderText.Text = spec.Folder;
         DetailsText.Text = spec.Details;
         ConfirmButton.Content = spec.ConfirmLabel;
-        System.Windows.Automation.AutomationProperties.SetName(ConfirmButton, spec.ConfirmLabel);
+        System.Windows.Automation.AutomationProperties.SetName(ConfirmButton, spec.ConfirmLabel);   // streamer: notname - a fixed confirm label from the consent spec
         if (spec.TheirCommand is { Length: > 0 } theirs)
         {
             ExistingText.Text = "This folder already has a statusline: " + theirs;

@@ -46,6 +46,13 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private DeskWeatherSettings _weatherSettings = DeskWeatherSettings.Default;
     private DeskUsage _usage = DeskUsage.Empty;
     private LauncherModel _launcher = LauncherModel.Empty;
+    /// <summary>"Follow the widget theme" (theme match): the Desk draws <see cref="_theme"/>'s look instead of its own settings.</summary>
+    private bool _follows;
+    /// <summary>The widget's theme as last handed over (a switch, a proposal, a Studio preview); the look a following Desk draws.</summary>
+    private ThemeDefinition? _theme;
+    /// <summary>Alerts' thresholds, for the meters' usage signal.</summary>
+    private int _warnAt = MeterSignal.DefaultWarnAt, _urgentAt = MeterSignal.DefaultUrgentAt;
+    private bool _plateForced;
     private readonly List<DeskView> _views = [];
     /// <summary>Message lines whose once-only motion has run (spec 6.2), kept across redraws.</summary>
     private readonly HashSet<string> _played = new(StringComparer.Ordinal);
@@ -162,7 +169,17 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     internal bool WatchersPlaced => Placed("watchers");
 
     /// <summary>The cards to draw: the board's, when the piece is placed.</summary>
-    private IReadOnlyList<Watcher> WatchersNow() => _watchers is not null && Placed("watchers") ? _watchers.Shown : [];
+    private IReadOnlyList<Watcher> WatchersNow() =>
+        _watchers is not null && Placed("watchers") ? StreamerFrameParts(_watchers.Shown, null, "").Watchers : [];
+
+    /// <summary>
+    /// Streamer mode's part of a Desk frame (slice 7, M4 and M5): a CI runner's card names its runner by codename, a path in Claude's
+    /// own cards is masked, and the weather piece shows the "Show it as" nickname, else the city's codename (spec). Off, both pass
+    /// through. One seam, so both frame builds agree.
+    /// </summary>
+    internal static (IReadOnlyList<Watcher> Watchers, string Nickname) StreamerFrameParts(
+        IReadOnlyList<Watcher> watchers, WeatherPlace? place, string? nickname) =>
+        (StreamerMode.Mask.Watchers(watchers), StreamerMode.Mask.WeatherName(place, nickname));
 
     private bool _piecesTakeClicks = DeskPieceClicks.DefaultOn;
 
@@ -213,7 +230,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         if (_stopped || index < 0 || index >= _launcher.Buttons.Count) return;
         var button = _launcher.Buttons[index];
-        var name = button.DisplayName(_launcherApps?.NameOf(button.Target));
+        var name = StreamerMode.LauncherName(button, _launcherApps?.NameOf(button.Target));
         Func<string, bool>? exists = _launcherApps is null ? null : _launcherApps.ExistsNow;
         Task.Run(() => LauncherApps.Open(button, exists)).ContinueWith(t =>
         {
@@ -261,6 +278,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         try
         {
+            // network: your-browser
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(DeskClicks.WeatherCreditUrl) { UseShellExecute = true });
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
@@ -295,6 +313,46 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// <summary>Supplies the live widget theme's text color, for Theme ink. Null: Light ink.</summary>
     public Func<string?> ThemeText { get; set; } = () => null;
 
+    /// <summary>True while a followed look's plate is on only because its ink would not read over this wallpaper (the readability guard);
+    /// Settings, Desk Look says so.</summary>
+    public bool PlateForced => _plateForced;
+
+    /// <summary>Raised when <see cref="PlateForced"/> changes.</summary>
+    public event Action? PlateForcedChanged;
+
+    /// <summary>The wallpaper's luminance behind a region (tests replace it); null reads the wallpaper file.</summary>
+    internal Func<DeskScreen, PxRect, double?>? WallpaperLuminance { get; set; }
+
+    /// <summary>The frame the last full redraw drew (a test seam).</summary>
+    internal DeskFrame? LastFrame { get; private set; }
+
+    private double? Luminance(DeskScreen screen, PxRect px) => WallpaperLuminance is { } f ? f(screen, px) : _wallpaper.Luminance(screen, px);
+
+    /// <summary>The wallpaper's luminance behind the clock stack on every screen that draws the clock, sampled the way the inks are
+    /// (theme match's Match now guard). Empty when the Desk is not running, the clock is placed on no screen, or nothing sampled.</summary>
+    internal IReadOnlyList<double> ClockLuminance()
+    {
+        if (_host is null || _stopped || _screens.Count == 0 || _fonts is null || LastFrame is not { } frame) return [];
+        var draw = DeskLookResolver.For(_follows, _theme);
+        var samples = new List<double>();
+        foreach (var screen in _screens)
+        {
+            var layout = LayoutFor(screen);
+            if (new DeskArrangement(layout).Placement("clock") is not { } clock) continue;
+            var settings = DeskLookResolver.Settings(_settings, draw, _fonts.Has) with { Layout = layout };
+            var view = new DeskView(screen, settings, _fonts);
+            try
+            {
+                view.Update(Scratch(frame), DeskInkMap.Light);
+                if (view.StackRects().TryGetValue(clock.Anchor, out var rect)
+                    && Luminance(screen, Px(screen, rect)) is { } l && !double.IsNaN(l))
+                    samples.Add(l);
+            }
+            finally { view.Dispose(); }
+        }
+        return samples;
+    }
+
     /// <summary>Read the settings again and start, rebuild or stop to match.</summary>
     /// <summary>A font pack was installed or removed: the font list is read again at the next redraw (the cache is dropped here, then
     /// <see cref="Reload"/> redraws), so a new font draws, and a removed one falls back to EsteFont Pro, without a restart.</summary>
@@ -310,6 +368,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _weatherSettings = _store.LoadDeskWeather();
         _piecesTakeClicks = _store.LoadDeskPiecesTakeClicks();
         _launcher = _store.LoadLauncher();
+        _follows = _store.LoadDeskFollowsTheme();
+        var alertCfg = _store.LoadAlertConfig();
+        (_warnAt, _urgentAt) = (alertCfg.WarnPct, alertCfg.UrgentPct);
         _oledOn = _store.LoadOledCare();
         _oled.On = _oledOn; // off wakes anything it had dimmed
         if (_preview is { } preview)
@@ -318,6 +379,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             _settings = preview.Desk with { Enabled = true };
             _ink = preview.Ink;
             _launcher = preview.Launcher;
+            if (preview.FollowsTheme is { } follows) _follows = follows;   // a design under review follows, or not, as it says
             if (preview.WeatherNickname is { } nickname) _weatherSettings = _weatherSettings with { Nickname = DeskWeatherSettings.NormalizeNickname(nickname) };
         }
         _messages.Reload();
@@ -374,10 +436,13 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         Reload();
     }
 
-    /// <summary>The widget's theme changed: Theme ink follows it.</summary>
-    public void ThemeChanged()
+    /// <summary>The widget's theme changed (a switch, a Claude proposal, Put my Desk back, a Studio preview): Theme ink and a Desk that
+    /// follows the theme, and the message when it uses the theme's colors, redraw from <paramref name="theme"/>.</summary>
+    public void ThemeChanged(ThemeDefinition theme)
     {
-        if (_ink.Mode == DeskInkMode.Theme) Render();
+        _theme = theme;
+        // The message uses the theme's colors whether or not the Desk follows it.
+        if (_follows || _ink.Mode == DeskInkMode.Theme || (_messages.ThemeColors && Placed("message"))) Render();
     }
 
     /// <summary>The widget has new numbers (after each render and sign-in change). Read only while the
@@ -467,15 +532,19 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             WeatherOn = Placed("weather"),
             Place = _weatherSettings.Place,
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
-            WeatherNickname = _weatherSettings.Nickname,
+            WeatherNickname = StreamerFrameParts([], _weatherSettings.Place, _weatherSettings.Nickname).Nickname,
             Watchers = WatchersNow(),
             Launcher = LauncherNow(),
             Companion = CompanionNow(),
+            WarnAt = _warnAt,
+            UrgentAt = _urgentAt,
         };
+        // Arrange draws what the Desk shows: while it follows the widget theme, the theme's font, plate and colors.
+        var (arrangeSettings, arrangeFrame) = ArrangeLook(frame);
         DeskArrangeMode mode;
         try
         {
-            mode = new DeskArrangeMode(_screens, _settings, _fonts, frame, session.Working, ConnectedIds,
+            mode = new DeskArrangeMode(_screens, arrangeSettings, _fonts, arrangeFrame, session.Working, ConnectedIds,
                 how => EndArrange(how), () => ArrangeChanged?.Invoke());
         }
         catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception)
@@ -495,6 +564,14 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         SyncSources(track);
         mode.Activate();
         ArrangeChanged?.Invoke();
+    }
+
+    /// <summary>The settings and frame Arrange mode draws: the resolved look, as the Desk itself draws it (theme match).</summary>
+    internal (DeskSettings Settings, DeskFrame Frame) ArrangeLook(DeskFrame frame)
+    {
+        _fonts ??= _paths is null ? new DeskFonts() : DeskFonts.ForThisPc(_paths);
+        var draw = DeskLookResolver.For(_follows, _theme);
+        return (DeskLookResolver.Settings(_settings, draw, _fonts.Has), DeskLookResolver.Frame(frame, draw, _theme));
     }
 
     /// <summary>
@@ -706,21 +783,52 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             WeatherOn = Placed("weather"),
             Place = _weatherSettings.Place,
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
-            WeatherNickname = _weatherSettings.Nickname,
+            WeatherNickname = StreamerFrameParts([], _weatherSettings.Place, _weatherSettings.Nickname).Nickname,
             Watchers = WatchersNow(),
             Launcher = LauncherNow(),
             Companion = CompanionNow(),
+            WarnAt = _warnAt,
+            UrgentAt = _urgentAt,
         };
+        // Following the widget theme (theme match): the theme's look in place of the Desk's own.
+        var draw = DeskLookResolver.For(_follows, _theme);
+        frame = DeskLookResolver.Frame(frame, draw, _theme);
+        LastFrame = frame;
         _fullAt = now;
         foreach (var old in _views) old.Dispose();
         _views.Clear();
         var surfaces = new List<DeskSurface>();
+        bool forced = false;
         foreach (var screen in _screens)
         {
-            var view = new DeskView(screen, _settings with { Layout = LayoutFor(screen) }, _fonts);
-            view.Update(frame, InkFor(view, screen, frame));
+            var settings = DeskLookResolver.Settings(_settings, draw, _fonts.Has) with { Layout = LayoutFor(screen) };
+            var view = new DeskView(screen, settings, _fonts);
+            var inks = InkFor(view, screen, frame, draw);
+            // The readability guard: a followed look gets its plate where its ink would not read over this wallpaper, and a plate that
+            // is on is drawn stronger (0.05 steps up to ThemeDeskLook.MaxPlateOpacity) until the ink reads. The theme's colors never change.
+            var shown = frame;
+            if (draw is not null)
+            {
+                var samples = StackLuminances(view, screen, frame, inks);
+                bool turnOn = !settings.Plate && !samples.All(draw.Look.ReadsOver);
+                double opacity = samples.Select(l => draw.Look.PlateOpacityOver(l)).DefaultIfEmpty(DeskPlate.Opacity).Max();
+                bool stronger = (settings.Plate || turnOn) && opacity > DeskPlate.Opacity;
+                if (turnOn)
+                {
+                    view.Dispose();
+                    view = new DeskView(screen, settings with { Plate = true }, _fonts);
+                }
+                if (stronger) shown = frame with { PlateOpacity = opacity };
+                forced |= turnOn || stronger;
+            }
+            view.Update(shown, inks);
             _views.Add(view);
             surfaces.Add(new DeskSurface(screen, DeskClicks.Prepare(view.TakeIslands(), _piecesTakeClicks, this)));
+        }
+        if (forced != _plateForced)
+        {
+            _plateForced = forced;
+            PlateForcedChanged?.Invoke();
         }
         _surfaces = surfaces;
         if (_host is not { } host) return;
@@ -744,28 +852,42 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     }
 
     /// <summary>
-    /// The inks for one screen (spec 6.7). Every mode but Automatic is one ink for the screen. Automatic
-    /// lays the screen out once in Light ink, reads the wallpaper's brightness behind each stack (from the
+    /// The inks for one screen (spec 6.7). A followed theme's look is one ink for the screen. Every mode but Automatic is one ink too.
+    /// Automatic lays the screen out once in Light ink, reads the wallpaper's brightness behind each stack (from the
     /// wallpaper file, never the screen), and the view draws each stack in the ink that reading picks.
     /// </summary>
-    private DeskInkMap InkFor(DeskView view, DeskScreen screen, DeskFrame frame)
+    private DeskInkMap InkFor(DeskView view, DeskScreen screen, DeskFrame frame, DeskThemeDraw? draw)
     {
+        if (draw is not null)
+            return new DeskInkMap(Care(draw.Ink));
         if (_ink.Mode != DeskInkMode.Auto)
             return new DeskInkMap(Care(DeskInk.Resolve(_ink, ThemeText(), null)));
-        // The sampling pass draws nothing anyone sees: give its message a scratch copy of the played set
-        // so the drawn pass still writes a new line in.
-        var scratch = frame.Message is { } m ? frame with { Message = m with { Played = new HashSet<string>(m.Played, StringComparer.Ordinal) } } : frame;
-        view.Update(scratch, DeskInkMap.Light);
+        view.Update(Scratch(frame), DeskInkMap.Light);
         var by = new Dictionary<DeskAnchor, ResolvedInk>();
         foreach (var (anchor, r) in view.StackRects())
-        {
-            var px = new PxRect(
-                screen.Bounds.X + (int)Math.Round(r.X * screen.Scale), screen.Bounds.Y + (int)Math.Round(r.Y * screen.Scale),
-                Math.Max(1, (int)Math.Round(r.Width * screen.Scale)), Math.Max(1, (int)Math.Round(r.Height * screen.Scale)));
-            by[anchor] = Care(DeskInk.Resolve(_ink, ThemeText(), _wallpaper.Luminance(screen, px)));
-        }
+            by[anchor] = Care(DeskInk.Resolve(_ink, ThemeText(), Luminance(screen, Px(screen, r))));
         return new DeskInkMap(Care(DeskInk.Resolve(_ink, ThemeText(), null)), by);
     }
+
+    /// <summary>The wallpaper's luminance behind every stack on this screen that has a sample (a stack with none does not count).</summary>
+    private List<double> StackLuminances(DeskView view, DeskScreen screen, DeskFrame frame, DeskInkMap inks)
+    {
+        view.Update(Scratch(frame), inks);
+        var samples = new List<double>();
+        foreach (var (_, r) in view.StackRects())
+            if (Luminance(screen, Px(screen, r)) is { } l && !double.IsNaN(l)) samples.Add(l);
+        return samples;
+    }
+
+    /// <summary>A sampling pass draws nothing anyone sees: its message gets a scratch copy of the played set, so the drawn pass still
+    /// writes a new line in.</summary>
+    private static DeskFrame Scratch(DeskFrame frame) =>
+        frame.Message is { } m ? frame with { Message = m with { Played = new HashSet<string>(m.Played, StringComparer.Ordinal) } } : frame;   // streamer: notname - frame.Message is the Desk message frame record
+
+    /// <summary>A stack's rect in the view's DIPs as the screen's pixels.</summary>
+    private static PxRect Px(DeskScreen screen, Rect r) => new(
+        screen.Bounds.X + (int)Math.Round(r.X * screen.Scale), screen.Bounds.Y + (int)Math.Round(r.Y * screen.Scale),
+        Math.Max(1, (int)Math.Round(r.Width * screen.Scale)), Math.Max(1, (int)Math.Round(r.Height * screen.Scale)));
 
     /// <summary>Hands the message its played set, forgetting lines no longer showing (one that comes back
     /// later writes itself in again, as on the Mac when a line appears).</summary>
@@ -822,6 +944,12 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         foreach (var v in _views) v.Dispose();
         _views.Clear();
         _surfaces = [];
+        // A Desk that is off holds no plate: the plate note in Settings must not outlive it.
+        if (_plateForced)
+        {
+            _plateForced = false;
+            PlateForcedChanged?.Invoke();
+        }
         _telemetry.Stop();
         if (_audio.Running) _audio.Stop();
         _weather.Stop();

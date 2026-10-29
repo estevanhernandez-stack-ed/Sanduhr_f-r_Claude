@@ -9,12 +9,13 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
-/// <summary>One Claude Code folder on the Claude Code page: its path, the account it is linked to and the
-/// MCP read switch.</summary>
+/// <summary>One Claude Code folder card (Settings v2 slice 4): its path, the linked account, the MCP read switch, Sanduhr's pieces in this
+/// folder, the meters' state here and the collapsed "What this folder holds". Every action on the card acts on this folder.</summary>
 public sealed partial class CcFolderRowViewModel : ObservableObject
 {
     private readonly ClaudeCodeViewModel _owner;
     private bool _loading = true;
+    private FolderHoldsViewModel? _holds;
 
     internal CcFolder Folder { get; }
     public string Path => Folder.Path;
@@ -27,25 +28,56 @@ public sealed partial class CcFolderRowViewModel : ObservableObject
 
     [ObservableProperty] private string _linkedAccount = ClaudeCodeViewModel.NoAccount;
     [ObservableProperty] private bool _mcpReadable;
+    /// <summary>The meters above the prompt in this folder: On, Off, Files missing, Not installed or Can't be read. A status line, never a control (WF9).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MetersSpoken))]
+    private string _metersText = "";
+    /// <summary>"What this folder holds" is open: the folder is read then.</summary>
+    [ObservableProperty] private bool _holdsOpen;
 
-    internal CcFolderRowViewModel(ClaudeCodeViewModel owner, CcFolder folder, string display, string linked, bool mcpReadable)
+    internal CcFolderRowViewModel(ClaudeCodeViewModel owner, CcFolder folder, string display, string linked, bool mcpReadable, bool hasAccounts)
     {
         _owner = owner;
         Folder = folder;
         Display = display;
         _linkedAccount = linked;
         _mcpReadable = mcpReadable;
+        HasAccounts = hasAccounts;
+        Statusline = owner.NewPiece(CcPieceKind.Statusline, this);
+        Mcp = owner.NewPiece(CcPieceKind.Mcp, this);
+        Hooks = owner.NewPiece(CcPieceKind.Hooks, this);
         _loading = false;
     }
 
+    public CcPieceViewModel Statusline { get; }
+    public CcPieceViewModel Mcp { get; }
+    public CcPieceViewModel Hooks { get; }
+
+    /// <summary>The folder's report, made the first time it is asked for.</summary>
+    public FolderHoldsViewModel Holds => _holds ??= _owner.NewHolds(Path);
+
+    /// <summary>An account is signed in to link; otherwise the card says how to get one (WF32).</summary>
+    public bool HasAccounts { get; }
+    public bool NoAccounts => !HasAccounts;
+
     partial void OnLinkedAccountChanged(string value)
     {
+        // A combo whose selected item leaves its list writes null back. That is not a choice: "None" is the
+        // choice that unlinks.
+        if (string.IsNullOrWhiteSpace(value)) return;
         if (!_loading) _owner.OnLinkChanged(this, value);
     }
 
     partial void OnMcpReadableChanged(bool value)
     {
         if (!_loading) _owner.OnMcpReadableChanged(this, value);
+    }
+
+    partial void OnHoldsOpenChanged(bool value)
+    {
+        if (!value) return;
+        Holds.EnsureLoaded();
+        if (!_loading) _owner.RememberHolds(this);
     }
 
     internal void SetLinkedQuietly(string value)
@@ -55,24 +87,61 @@ public sealed partial class CcFolderRowViewModel : ObservableObject
         _loading = false;
     }
 
+    internal void OpenHoldsQuietly()
+    {
+        _loading = true;
+        HoldsOpen = true;
+        _loading = false;
+    }
+
     public string AutomationName => $"Folder {Display}";
 
-    // Each row's controls are named for its folder: every row's combo read "Linked account for this folder",
-    // so a screen reader could not tell one folder's from another's.
+    // Each card's controls are named for its folder, so a screen reader tells one card's from another's.
     public string LinkedAccountName => $"Linked account for {Display}";
-    public string ForgetName => $"Forget {Display}";
-    public string McpReadableName => $"Claude can read the project totals of {Display} through the MCP server";
+    public string ForgetName => SettingsNames.ForgetFolderFor(Display);
+    public string McpReadableName => SettingsNames.LetClaudeReadTotalsFor(Display);
+    public string HoldsName => $"{SettingsNames.FolderHolds} {Display}";
+    public string MetersLine => SettingsNames.MetersSection + ":";
+    public string MetersLink => SettingsIndex.PageId(SettingsPage.Mods) + "#" + SettingsIndex.Meters;
+    public string MetersLinkTitle => SettingsNames.LinkTitle(SettingsPage.Mods);
+    public string MetersSpoken => SettingsNames.MetersSpoken(Display, MetersText);
+    public string MetersLinkName => $"{SettingsNames.LinkTitle(SettingsPage.Mods)} {SettingsNames.MetersIn(Display)}";
 
     public override string ToString() => AutomationName;
 
-    /// <summary>The account choices (the page's list), bound directly so the combo never depends on
-    /// a RelativeSource walk to the page.</summary>
-    public System.Collections.ObjectModel.ObservableCollection<string> AccountOptions => _owner.AccountOptions;
+    /// <summary>The account choices (the page's list), bound directly so the combo never depends on a RelativeSource walk to the page.</summary>
+    public ObservableCollection<AccountChoice> AccountOptions => _owner.AccountOptions;
+
+    /// <summary>Streamer mode hides this folder's name: the card's menu offers "Show the real name on stream" (decision 16).</summary>
+    public bool CanShowRealName => StreamerMode.Mask.HidesFolder(Path);
+
+    [RelayCommand]
+    private void ShowRealName() => _owner.ShowRealName(this);
     public bool LinkEnabled => _owner.LinkEnabled;
     public System.Windows.Input.ICommand ForgetCommand => _owner.ForgetFolderCommand;
 }
 
-/// <summary>One Sanduhr piece for the selected folder: what it is, where it stands, and its buttons.</summary>
+/// <summary>A linked-account choice (slice 7, CP 6): the label is the value the combo writes; <see cref="Shown"/> is what it shows and
+/// says, the codename while streamer mode hides it. Updated in place, so a reload never clears a live selection (WF2).</summary>
+public sealed partial class AccountChoice : ObservableObject
+{
+    public AccountChoice(string label, string shown)
+    {
+        Label = label;
+        _shown = shown;
+    }
+
+    public string Label { get; }
+
+    [ObservableProperty] private string _shown;
+
+    public override string ToString() => Shown;
+}
+
+/// <summary>The three pieces a folder card installs (the meters are Mods &amp; Widgets' since slice 4).</summary>
+internal enum CcPieceKind { Statusline, Mcp, Hooks }
+
+/// <summary>One Sanduhr piece in one folder card: what it is, where it stands, and its buttons.</summary>
 public sealed partial class CcPieceViewModel : ObservableObject
 {
     public string Title { get; }
@@ -81,7 +150,7 @@ public sealed partial class CcPieceViewModel : ObservableObject
     [ObservableProperty] private string _statusText = "";
     /// <summary>Sanduhr's entry is in the folder (current or not): Remove shows.</summary>
     [ObservableProperty] private bool _isInstalled;
-    /// <summary>The piece can be installed in the selected folder.</summary>
+    /// <summary>The piece can be installed in this card's folder.</summary>
     [ObservableProperty] private bool _canInstall = true;
 
     private readonly string _installedVerb;
@@ -114,7 +183,7 @@ public sealed partial class CcPieceViewModel : ObservableObject
     public string InstallName => $"{InstallLabel.TrimEnd('…')} {Title}";
 
     /// <summary>What the install button does right now, for screen readers.</summary>
-    public string InstallHelp => IsInstalled ? _installedHelp : $"Asks first, then adds {Title} to the selected folder.";
+    public string InstallHelp => IsInstalled ? _installedHelp : SettingsNames.PieceInstallHelp(Title);
 
     public bool NotInstalled => !IsInstalled;
     partial void OnIsInstalledChanged(bool value)
@@ -127,10 +196,10 @@ public sealed partial class CcPieceViewModel : ObservableObject
 }
 
 /// <summary>
-/// The Claude Code page: the folders Sanduhr knows (found, then added by hand), the accounts linked to them,
-/// and Sanduhr's four pieces in a chosen folder (statusline, MCP server, meters above the prompt, glow hooks)
-/// with the glow switches. Every write to a folder waits for a consent dialog's confirm button and goes only
-/// to the folder the person picked. The installers are the Core ones; this class chooses nothing silently.
+/// The Claude Code page (Settings v2 slice 4): one card per folder Sanduhr knows (found, then added by hand), each holding the account
+/// linked to it, the MCP read switch, Sanduhr's pieces in that folder (statusline, MCP server, Claude Code glow hook), the meters' state
+/// there and "What this folder holds", plus the Claude Code glow switches. Every write to a folder waits for a consent dialog's confirm
+/// button and goes only to the folder of the card it was pressed on. The installers are the Core ones; this class chooses nothing silently.
 ///
 /// <para><c>statusline_enabled</c> keeps its key and now means "a Claude Code piece that reads
 /// <c>snapshot.json</c> is installed": true when the statusline or the meters mod is installed in any known
@@ -147,22 +216,21 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     private Window? _owner;
     private bool _loading;
 
-    /// <summary>The folder picked in the install combo earlier in the session. The Settings window is rebuilt each time
-    /// it opens; this is what keeps the choice.</summary>
-    private static string? s_sessionFolder;
+    /// <summary>The folder whose "What this folder holds" was opened last this session: a link to folder-config opens it first (decision 5).
+    /// The Settings window is rebuilt each time it opens; this is what keeps it.</summary>
+    private static string? s_holdsFolder;
 
-    internal static void ForgetSessionChoice() => s_sessionFolder = null;
+    internal static void ForgetSessionChoice() => s_holdsFolder = null;
+
+    private readonly ClaudeCodeHost _host;
 
     public ObservableCollection<CcFolderRowViewModel> Folders { get; } = new();
-    public ObservableCollection<string> AccountOptions { get; } = new();
-    public ObservableCollection<CcFolderRowViewModel> FolderChoices => Folders;
+    public ObservableCollection<AccountChoice> AccountOptions { get; } = new();
 
-    public CcPieceViewModel Statusline { get; }
-    public CcPieceViewModel Mcp { get; }
-    public CcPieceViewModel Meters { get; }
-    public CcPieceViewModel Hooks { get; }
+    /// <summary>A card's quick route (decision 16): the folder's real name shows on stream; every masked page reloads through the service.</summary>
+    internal void ShowRealName(CcFolderRowViewModel row) =>
+        _widget.Streamer.SetShown(CodenameCategory.Folder, StreamerMask.FolderKey(row.Path), true);
 
-    [ObservableProperty] private CcFolderRowViewModel? _selectedFolder;
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private bool _hasFolders;
     public bool HasNoFolders => !HasFolders;
@@ -173,9 +241,18 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     [ObservableProperty] private bool _glowDone;
     [ObservableProperty] private bool _glowSkipTerminal = true;
 
-    /// <summary>Raised after folders were added or forgotten, so Mods &amp; Config follows.</summary>
+    /// <summary>The Claude Code glow section's line: which folders have the hook (WF11).</summary>
+    [ObservableProperty] private string _glowHookStatus = "";
+
+    /// <summary>Asks before a write to a folder (the consent dialog). A seam for tests.</summary>
+    internal Func<ConsentSpec, ConsentChoice?> AskConsent { get; set; }
+
+    /// <summary>A link landed on folder-config and opened this card's report: the page brings the card into view.</summary>
+    public event Action<CcFolderRowViewModel>? HoldsLanded;
+
+    /// <summary>Raised after folders were added or forgotten, so Mods &amp; Widgets follows.</summary>
     public event Action? FoldersChanged;
-    /// <summary>Raised after an install or remove, so Mods &amp; Config re-reads the folder.</summary>
+    /// <summary>Raised after an install or remove, so Mods &amp; Widgets reads the folders again.</summary>
     public event Action? PiecesChanged;
 
     /// <summary>Set by App: tells the glow service to re-read the switches.</summary>
@@ -186,22 +263,8 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     public ClaudeCodeViewModel(WidgetViewModel widget)
     {
         _widget = widget;
-        Statusline = new CcPieceViewModel("Statusline",
-            "Shows your session and weekly meters under the Claude Code prompt.",
-            InstallStatusline, RemoveStatusline, "Change…",
-            "Asks first, then lets you replace or adjust the statusline in this folder.");
-        Mcp = new CcPieceViewModel("MCP server",
-            "Lets Claude Code ask for your live headroom before it spawns agents. Read-only.",
-            InstallMcp, RemoveMcp, "Update…",
-            "Asks first, then copies the current server files again and refreshes Sanduhr's entry in this folder's .claude.json.");
-        Meters = new CcPieceViewModel("Meters above the prompt",
-            "A mod that draws your meters in a band above the prompt.",
-            InstallMeters, RemoveMeters, "Update…",
-            "Asks first, then copies the current mod files again and points this folder's entry at them.");
-        Hooks = new CcPieceViewModel("Glow when Claude needs you",
-            "Two hooks that light the edge of your window when Claude Code waits on you or finishes.",
-            InstallHooks, RemoveHooks, "Update…",
-            "Asks first, then writes Sanduhr's two hooks into this folder's settings.json again.");
+        _host = ClaudeCodeHost.For(widget);
+        AskConsent = spec => IntegrationConsentDialog.Ask(_owner, spec);
         Reload();
         _loading = true;
         var glow = _widget.LoadClaudeCodeGlow();
@@ -275,7 +338,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         if (!_loading && value.Kind == GlowTargetKind.Desk) PlaceGlowSpot();
     }
 
-    /// <summary>Choosing the Desk places the glow's spot at its default anchor when it is not placed yet,
+    /// <summary>Choosing the Desk places the glow's spot at its default place (DeskArrangement.DefaultPlaceFor) when it is not placed yet,
     /// then asks the Desk to draw it (spec 7.3). A spot already placed stays where it is.</summary>
     private void PlaceGlowSpot()
     {
@@ -283,8 +346,8 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         {
             var desk = _glowStore.LoadDesk();
             var layout = new DeskArrangement(desk.Layout);
-            if (layout.Placement("glow") is not null) return;
-            layout.Place("glow", DeskArrangement.DefaultAnchor("glow"));
+            // DeskArrangement.DefaultPlaceFor: the one table of default places (Settings v2, Principle 4).
+            if (layout.PlaceAtDefault("glow") is null) return;
             _glowStore.SaveDesk((desk with { Layout = layout.Layout }).Normalized());
             DeskReload?.Invoke();
             GlowReload?.Invoke();
@@ -310,14 +373,9 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
 
     // ------------------------------------------------------------------ folders
 
-    private string Profile => ClaudeCodeProfile.Dir;
+    private string Profile => _host.Profile;
 
-    private ClaudeCodeIntegrations MakeIntegrations() => new(
-        Profile, _widget.SanduhrAppDataDir, Path.Combine(AppContext.BaseDirectory, "mods", ClaudeCodeIntegrations.ModName),
-        externalDir: _widget.SanduhrExternalDir)
-    {
-        LegacyModsRoots = [_widget.SanduhrLegacyModsRoot],
-    };
+    private ClaudeCodeIntegrations MakeIntegrations() => _host.Integrations();
 
     private StatuslineInstaller MakeStatusline() => new(Profile, _widget.StatuslineBinDir, null, _widget.SanduhrAppDataDir);
 
@@ -326,46 +384,104 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     private static string McpSourceDir => Path.Combine(AppContext.BaseDirectory, "mcp");
 
     /// <summary>Every known folder, found first and added second.</summary>
-    internal IReadOnlyList<CcFolder> KnownFolders() =>
-        ClaudeCodeFolders.Build(Profile, ClaudeCodeProfile.ConfigDir, _widget.LoadCcFoldersAdded());
+    internal IReadOnlyList<CcFolder> KnownFolders() => _host.Folders();   // streamer: key - the folder list handed on, never drawn
 
-    /// <summary>Re-reads the folder list, the account choices and every status.</summary>
+    /// <summary>A card's piece, its buttons acting on that card's folder.</summary>
+    internal CcPieceViewModel NewPiece(CcPieceKind kind, CcFolderRowViewModel row) => kind switch
+    {
+        CcPieceKind.Statusline => new CcPieceViewModel("Statusline",
+            "Shows your session and weekly meters under the Claude Code prompt.",
+            () => InstallStatusline(row), () => RemoveStatusline(row), "Change…",
+            "Asks first, then lets you replace or adjust the statusline in this folder."),
+        CcPieceKind.Mcp => new CcPieceViewModel("MCP server",
+            "Lets Claude Code ask for your live headroom before it spawns agents. Read-only.",
+            () => InstallMcp(row), () => RemoveMcp(row), "Update…",
+            "Asks first, then copies the current server files again and refreshes Sanduhr's entry in this folder's .claude.json."),
+        _ => new CcPieceViewModel(SettingsNames.ClaudeCodeGlowHook,
+            "Two hooks that light the edge of your window when Claude Code waits on you or finishes.",
+            () => InstallHooks(row), () => RemoveHooks(row), "Update…",
+            "Asks first, then writes Sanduhr's two hooks into this folder's settings.json again."),
+    };
+
+    /// <summary>A card's "What this folder holds".</summary>
+    internal FolderHoldsViewModel NewHolds(string folder) => new(_host, folder);
+
+    /// <summary>The person opened a card's report: a later link to folder-config opens that folder first.</summary>
+    internal void RememberHolds(CcFolderRowViewModel row) => s_holdsFolder = row.Path;
+
+    /// <summary>
+    /// A link landed on folder-config: opens the report of the card <see cref="ModsFolderChoice.Pick"/> chooses (the one opened last this
+    /// session, then CLAUDE_CONFIG_DIR, the active account's, the most plugins on, the first) and returns it; null with no folders.
+    /// </summary>
+    internal CcFolderRowViewModel? OpenHoldsForLanding()
+    {
+        string? active = null;
+        try { active = _host.ActiveAccountFolder(); } catch (Exception) { }
+        var pick = ModsFolderChoice.Pick([.. Folders.Select(f => f.Path)], s_holdsFolder, _host.ConfigDir, active,   // streamer: key - picks a folder by path, never drawn
+            ModInventory.EnabledPluginCount);
+        if (Folders.FirstOrDefault(f => pick is not null && ClaudeCodeFolders.Same(f.Path, pick)) is not { } row) return null;   // streamer: key - compares folder paths, never drawn
+        row.HoldsOpen = true;
+        HoldsLanded?.Invoke(row);
+        return row;
+    }
+
+    /// <summary>The meters were switched, installed, updated or removed on Mods &amp; Widgets: the cards' lines follow, and the snapshot switch
+    /// is recomputed (with a fresh snapshot after an install, as this page's installs do).</summary>
+    public void AfterMetersChange(bool installed)
+    {
+        RefreshStatuses();
+        SyncSnapshotConsumers(forceWrite: installed);
+    }
+
+    /// <summary>Brings the account choices to "None" plus the shown accounts without ever emptying the list: the
+    /// folder rows' combos are still bound to it, and a combo whose items are cleared writes a null selection back.
+    /// Only labels that are gone are removed.</summary>
+    private void SyncAccountOptions()
+    {
+        var wanted = new List<string> { NoAccount };
+        wanted.AddRange(_widget.ShownAccounts);   // streamer: key - account labels for the combo's options; the options draw Mask.Name
+        for (int i = AccountOptions.Count - 1; i >= 0; i--)
+            if (!wanted.Contains(AccountOptions[i].Label)) AccountOptions.RemoveAt(i);
+        for (int i = 0; i < wanted.Count; i++)
+        {
+            // Streamer mode (slice 7, CP 6): the choice shows the codename; its value stays the label.
+            var shown = wanted[i] == NoAccount ? NoAccount : StreamerMode.Mask.Name(CodenameCategory.Account, wanted[i]);
+            int at = -1;
+            for (int j = 0; j < AccountOptions.Count; j++)
+                if (AccountOptions[j].Label == wanted[i]) { at = j; break; }
+            if (at < 0) AccountOptions.Insert(i, new AccountChoice(wanted[i], shown));
+            else
+            {
+                if (at != i) AccountOptions.Move(at, i);
+                AccountOptions[i].Shown = shown;
+            }
+        }
+    }
+
+    /// <summary>Re-reads the folder list, the account choices and every card's status. A card whose report was open stays open.</summary>
     public void Reload()
     {
-        var keep = SelectedFolder?.Path ?? s_sessionFolder;
+        var open = Folders.Where(f => f.HoldsOpen).Select(f => f.Path).ToList();   // streamer: key - paths of open cards kept to reopen them, never drawn
         _loading = true;
-        AccountOptions.Clear();
-        AccountOptions.Add(NoAccount);
-        foreach (var label in _widget.ShownAccounts)
-            AccountOptions.Add(label);
+        SyncAccountOptions();
         LinkEnabled = !_widget.IsDemo;
 
         var roots = _widget.LoadMcpRoots();
+        bool hasAccounts = AccountOptions.Count > 1;
         Folders.Clear();
         foreach (var f in KnownFolders())
         {
-            var linked = _widget.ShownAccounts.FirstOrDefault(l =>
+            var linked = _widget.ShownAccounts.FirstOrDefault(l =>   // streamer: key - finds the folder's linked account for the combo, never drawn
                 _widget.AccountFolder(l) is { } p && ClaudeCodeFolders.Same(p, f.Path)) ?? NoAccount;
-            Folders.Add(new CcFolderRowViewModel(this, f, ClaudeCodeFolders.Display(f.Path, Profile), linked,
-                f.Discovered && roots.GetValueOrDefault(f.Name)));
+            var row = new CcFolderRowViewModel(this, f, _host.Display(f.Path), linked,
+                f.Discovered && roots.GetValueOrDefault(f.Name), hasAccounts);
+            if (open.Any(p => ClaudeCodeFolders.Same(p, f.Path))) row.OpenHoldsQuietly();   // streamer: key - compares folder paths, never drawn
+            Folders.Add(row);
         }
         HasFolders = Folders.Count > 0;
-        // Your last pick, then the folder Claude Code runs from, then the active account's, then the one with the
-        // most plugins on, then the first (the same order as Mods & Config).
-        string? active = null;
-        try { active = _widget.ShownActiveAccount is { } label ? _widget.AccountFolder(label) : null; } catch (Exception) { }
-        var pick = ModsFolderChoice.Pick([.. Folders.Select(f => f.Path)], keep, ClaudeCodeProfile.ConfigDir, active, ModInventory.EnabledPluginCount);
-        SelectedFolder = Folders.FirstOrDefault(r => pick is not null && ClaudeCodeFolders.Same(r.Path, pick));
         _loading = false;
         RefreshStatuses();
         SyncSnapshotConsumers(forceWrite: false);
-    }
-
-    partial void OnSelectedFolderChanged(CcFolderRowViewModel? value)
-    {
-        if (_loading) return;
-        if (value is not null) s_sessionFolder = value.Path;
-        RefreshStatuses();
     }
 
     [RelayCommand]
@@ -379,24 +495,23 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 Multiselect = false,
             };
             if (dialog.ShowDialog(_owner) != true) return;
-            var path = ClaudeCodeFolders.Norm(dialog.FolderName);
+            var path = ClaudeCodeFolders.Norm(dialog.FolderName);   // streamer: key - compares folder paths, never drawn
             if (path.Length == 0) return;
             if (Folders.Any(f => ClaudeCodeFolders.Same(f.Path, path)))
             {
-                StatusText = "That folder is already in the list.";
+                Say("That folder is already in the list.");
                 return;
             }
             var added = _widget.LoadCcFoldersAdded().ToList();
             added.Add(path);
             _widget.SaveCcFoldersAdded(added);
             Reload();
-            SelectedFolder = Folders.FirstOrDefault(f => ClaudeCodeFolders.Same(f.Path, path)) ?? SelectedFolder;
-            StatusText = "Folder added. Sanduhr changes nothing in it until you install a piece.";
+            Say("Folder added. Sanduhr changes nothing in it until you install a piece.");
             FoldersChanged?.Invoke();
         }
         catch (Exception)
         {
-            StatusText = "Couldn't add that folder.";
+            Say("Couldn't add that folder.");
             Sounds.PlayError();
         }
     }
@@ -410,16 +525,18 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         var left = _widget.LoadCcFoldersAdded().Where(p => !ClaudeCodeFolders.Same(p, row.Path)).ToList();
         _widget.SaveCcFoldersAdded(left);
         Reload();
-        StatusText = "Folder forgotten. Anything Sanduhr installed in it stays until you remove it.";
+        Say("Folder forgotten. Anything Sanduhr installed in it stays until you remove it.");
         FoldersChanged?.Invoke();
     }
 
     internal void OnLinkChanged(CcFolderRowViewModel row, string account)
     {
+        // No account is not "unlink everything": only NoAccount unlinks.
+        if (string.IsNullOrWhiteSpace(account)) return;
         try
         {
             // One folder per account, and one account per folder.
-            foreach (var label in _widget.ShownAccounts)
+            foreach (var label in _widget.ShownAccounts)   // streamer: key - unlinks the account from other folders, never drawn
                 if (_widget.AccountFolder(label) is { } p && ClaudeCodeFolders.Same(p, row.Path) && label != account)
                     _widget.SetAccountFolder(label, null);
             if (account != NoAccount)
@@ -431,7 +548,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         }
         catch (Exception)
         {
-            StatusText = "Couldn't save that link.";
+            Say("Couldn't save that link.");
         }
     }
 
@@ -454,37 +571,33 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     // ------------------------------------------------------------------ statuses
 
     private string Shorten(string text) =>
-        string.IsNullOrEmpty(text) ? text : text.Replace(Profile, "~", StringComparison.OrdinalIgnoreCase);
+        string.IsNullOrEmpty(text) ? text
+            : StreamerMode.On ? StreamerMode.FoldersIn(text, KnownFolders().Select(f => f.Path))   // slice 7, CP 8   // streamer: masked - CP 8: FoldersIn masks on the next line
+            : text.Replace(Profile, "~", StringComparison.OrdinalIgnoreCase);
 
     private static string StatusWords(IntegrationStatus s) => s switch
     {
         IntegrationStatus.Installed => "Installed.",
-        IntegrationStatus.Outdated => "Installed, but not the current version. Install again to update it.",
+        IntegrationStatus.Outdated => SettingsNames.PieceOutdated,
         IntegrationStatus.Unreadable => "This folder's settings.json can't be read, so nothing is changed.",
         _ => "Not installed.",
     };
 
-    /// <summary>Recomputes the four statuses for the selected folder.</summary>
+    /// <summary>Recomputes every card's pieces and meters line, and the glow section's line.</summary>
     public void RefreshStatuses()
     {
-        var row = SelectedFolder;
-        if (row is null)
-        {
-            foreach (var p in new[] { Statusline, Mcp, Meters, Hooks })
-            {
-                p.StatusText = "Add a folder to install here.";
-                p.IsInstalled = false;
-                p.CanInstall = false;
-            }
-            return;
-        }
+        foreach (var row in Folders) RefreshRow(row);
+        GlowHookStatus = SettingsNames.GlowHookIn([.. Folders.Where(f => f.Hooks.IsInstalled).Select(f => f.Display)]);
+    }
+
+    private void RefreshRow(CcFolderRowViewModel row)
+    {
         try
         {
-            var statusline = MakeStatusline();
-            var sl = statusline.Status(row.Path);
-            Statusline.CanInstall = sl != StatuslineStatus.Unreadable;
-            Statusline.IsInstalled = sl is StatuslineStatus.Installed or StatuslineStatus.Outdated;
-            Statusline.StatusText = sl switch
+            var sl = MakeStatusline().Status(row.Path);
+            row.Statusline.CanInstall = sl != StatuslineStatus.Unreadable;
+            row.Statusline.IsInstalled = sl is StatuslineStatus.Installed or StatuslineStatus.Outdated;
+            row.Statusline.StatusText = sl switch
             {
                 StatuslineStatus.Installed => "Installed.",
                 StatuslineStatus.Outdated => "Installed, but not the current version. Change it to update.",
@@ -496,30 +609,29 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             if (row.Discovered)
             {
                 bool registered = MakeMcp().IsRegistered(row.Name);
-                Mcp.CanInstall = true;
-                Mcp.IsInstalled = registered;
-                Mcp.StatusText = registered ? "Installed." : "Not installed.";
+                row.Mcp.CanInstall = true;
+                row.Mcp.IsInstalled = registered;
+                row.Mcp.StatusText = registered ? "Installed." : "Not installed.";
             }
             else
             {
-                Mcp.CanInstall = false;
-                Mcp.IsInstalled = false;
-                Mcp.StatusText = "Not available for folders added by hand.";
+                row.Mcp.CanInstall = false;
+                row.Mcp.IsInstalled = false;
+                row.Mcp.StatusText = "Not available for folders added by hand.";
             }
 
             var integ = MakeIntegrations();
-            var meters = integ.Status(IntegrationKind.Meters, row.Path);
-            Meters.IsInstalled = meters is IntegrationStatus.Installed or IntegrationStatus.Outdated;
-            Meters.CanInstall = meters != IntegrationStatus.Unreadable;
-            Meters.StatusText = StatusWords(meters);
             var hooks = integ.Status(IntegrationKind.Hooks, row.Path);
-            Hooks.IsInstalled = hooks is IntegrationStatus.Installed or IntegrationStatus.Outdated;
-            Hooks.CanInstall = hooks != IntegrationStatus.Unreadable;
-            Hooks.StatusText = StatusWords(hooks);
+            row.Hooks.IsInstalled = hooks is IntegrationStatus.Installed or IntegrationStatus.Outdated;
+            row.Hooks.CanInstall = hooks != IntegrationStatus.Unreadable;
+            row.Hooks.StatusText = StatusWords(hooks);
+
+            // One rule with Mods & Widgets' meters row (P12): Files missing is read from the same state, not guessed from the switch.
+            row.MetersText = InstalledItems.StateWord(InstalledItems.MetersState(_host.ReadFolder(row.Path, integ)));
         }
         catch (Exception)
         {
-            StatusText = "Couldn't read this folder.";
+            Say("Couldn't read this folder.");
         }
     }
 
@@ -539,7 +651,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             var states = new List<ConsumerState>();
             foreach (var f in KnownFolders())
             {
-                states.Add(SnapshotConsumers.Of(statusline.Status(f.Path)));
+                states.Add(SnapshotConsumers.Of(statusline.Status(f.Path)));   // streamer: key - folder paths handed to the status readers, never drawn
                 states.Add(SnapshotConsumers.Of(integ.Status(IntegrationKind.Meters, f.Path)));
             }
             var (receipts, unknown) = SnapshotConsumers.ReadReceipts(integ.ReceiptsPath);
@@ -558,9 +670,16 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         }
     }
 
+    /// <summary>Sets the page's outcome line. It clears first, so the same outcome twice in a row is still a change the line announces.</summary>
+    private void Say(string message)
+    {
+        StatusText = "";
+        StatusText = message;
+    }
+
     private void Done(string message, bool ok = true)
     {
-        StatusText = message;
+        Say(message);
         RefreshStatuses();
         SyncSnapshotConsumers(forceWrite: ok);
         PiecesChanged?.Invoke();
@@ -569,9 +688,8 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
 
     // ------------------------------------------------------------------ statusline
 
-    private void InstallStatusline()
+    private void InstallStatusline(CcFolderRowViewModel row)
     {
-        if (SelectedFolder is not { } row) return;
         try
         {
             var installer = MakeStatusline();
@@ -582,16 +700,16 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 return;
             }
             string? theirs = status == StatuslineStatus.Other && installer.TheirCommand(row.Path) is { } cmd
-                ? ConfigMask.MaskString(cmd) : null;
-            var choice = IntegrationConsentDialog.Ask(_owner, new ConsentSpec(
+                ? StreamerMode.Mask.Paths(ConfigMask.MaskString(cmd)) : null;
+            var choice = AskConsent(new ConsentSpec(
                 "Show usage under the Claude Code prompt?",
                 "Sanduhr adds a statusline with your live session and weekly meters, right where the tokens burn.",
                 row.Display,
                 "What gets written: the render script at %USERPROFILE%\\.sanduhr\\bin, a statusLine entry in this folder's "
                 + "settings.json (a copy of the file is saved under %APPDATA%\\Sanduhr\\backups first), and a usage "
                 + "snapshot at %USERPROFILE%\\.sanduhr\\snapshot.json with percentages and reset times only, never your "
-                + "account name or keys. The line can start with this folder's name (or the SANDUHR_LABEL you set in its "
-                + "settings), worked out when it renders and never stored. Remove brings back the statusline that was here before.",
+                + "account name or keys. " + SettingsNames.StatuslineNameClause
+                + " Remove brings back the statusline that was here before.",
                 "Install", theirs, OfferSegments: true));
             if (choice is null) return;
             if (!installer.InstallScript())
@@ -609,9 +727,8 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         }
     }
 
-    private void RemoveStatusline()
+    private void RemoveStatusline(CcFolderRowViewModel row)
     {
-        if (SelectedFolder is not { } row) return;
         try
         {
             bool ok = MakeStatusline().Remove(row.Path);
@@ -625,9 +742,9 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
 
     // ------------------------------------------------------------------ MCP server
 
-    private void InstallMcp()
+    private void InstallMcp(CcFolderRowViewModel row)
     {
-        if (SelectedFolder is not { Discovered: true } row) return;
+        if (!row.Discovered) return;
         try
         {
             var installer = MakeMcp();
@@ -637,8 +754,8 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 return;
             }
             var others = KnownFolders()
-                .Where(f => f.Discovered && !ClaudeCodeFolders.Same(f.Path, row.Path) && installer.IsRegistered(f.Name))
-                .Select(f => ClaudeCodeFolders.Display(f.Path, Profile));
+                .Where(f => f.Discovered && !ClaudeCodeFolders.Same(f.Path, row.Path) && installer.IsRegistered(f.Name))   // streamer: masked - CP 12: ShowFolder masks on the next line
+                .Select(f => StreamerMode.ShowFolder(f.Path, Profile));
             var consent = McpConsentDialog.ShowConsent(
                 _owner, [row.Name], null, installer.LauncherPath, installer.ConfigPathFor,
                 McpConsentCopy.WontChange(row.Display, others));
@@ -669,9 +786,9 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         }
     }
 
-    private void RemoveMcp()
+    private void RemoveMcp(CcFolderRowViewModel row)
     {
-        if (SelectedFolder is not { Discovered: true } row) return;
+        if (!row.Discovered) return;
         try
         {
             var installer = MakeMcp();
@@ -689,54 +806,13 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         }
     }
 
-    // ------------------------------------------------------------------ meters mod
-
-    private void InstallMeters()
-    {
-        if (SelectedFolder is not { } row) return;
-        try
-        {
-            var choice = IntegrationConsentDialog.Ask(_owner, new ConsentSpec(
-                "Draw your meters above the Claude Code prompt?",
-                "Sanduhr adds a mod that draws your session and weekly meters in a band above the prompt.",
-                row.Display,
-                "What gets written: the mod's folder, copied under %USERPROFILE%\\.sanduhr\\mods, and one entry in this "
-                + "folder's settings.json under env, CLAUDE_CODE_PLUGIN_DIRS. The mod reads only Sanduhr's snapshot "
-                + "file. Remove takes out only Sanduhr's entry and leaves any other folder in that list alone.",
-                "Install"));
-            if (choice is null) return;
-            var res = MakeIntegrations().Install(IntegrationKind.Meters, row.Path);
-            Done(res.Ok ? "Meters installed. New Claude Code sessions show them."
-                        : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't install the meters."), res.Ok);
-        }
-        catch (Exception)
-        {
-            Done("Install failed.", ok: false);
-        }
-    }
-
-    private void RemoveMeters()
-    {
-        if (SelectedFolder is not { } row) return;
-        try
-        {
-            var res = MakeIntegrations().Remove(IntegrationKind.Meters, row.Path);
-            Done(res.Ok ? "Meters removed." : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't remove the meters."), res.Ok);
-        }
-        catch (Exception)
-        {
-            Done("Remove failed.", ok: false);
-        }
-    }
-
     // ------------------------------------------------------------------ glow hooks
 
-    private void InstallHooks()
+    private void InstallHooks(CcFolderRowViewModel row)
     {
-        if (SelectedFolder is not { } row) return;
         try
         {
-            var choice = IntegrationConsentDialog.Ask(_owner, new ConsentSpec(
+            var choice = AskConsent(new ConsentSpec(
                 "Glow when Claude Code needs you?",
                 "Sanduhr lights the top edge of your window when Claude Code waits on you or finishes.",
                 row.Display,
@@ -747,7 +823,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             if (choice is null) return;
             var res = MakeIntegrations().Install(IntegrationKind.Hooks, row.Path);
             Done(res.Ok ? "Glow hooks installed. Turn the glow on below."
-                        : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't install the hooks."), res.Ok);
+                        : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't install the hooks."), res.Ok);   // streamer: masked - via Shorten: the hook message passes FoldersIn (CP 8)
         }
         catch (Exception)
         {
@@ -755,13 +831,12 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         }
     }
 
-    private void RemoveHooks()
+    private void RemoveHooks(CcFolderRowViewModel row)
     {
-        if (SelectedFolder is not { } row) return;
         try
         {
             var res = MakeIntegrations().Remove(IntegrationKind.Hooks, row.Path);
-            Done(res.Ok ? "Glow hooks removed." : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't remove the hooks."), res.Ok);
+            Done(res.Ok ? "Glow hooks removed." : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't remove the hooks."), res.Ok);   // streamer: masked - via Shorten: the hook message passes FoldersIn (CP 8)
         }
         catch (Exception)
         {
@@ -791,65 +866,21 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     // ------------------------------------------------------------------ reset
 
     /// <summary>
-    /// Reset Sanduhr…: undoes every receipt (meters mod, glow hooks), takes Sanduhr's statusline out of each
-    /// folder where it is still Sanduhr's, and deregisters the MCP server. Returns the kinds of failures,
-    /// never a path. Safe to call off the UI thread.
+    /// Reset Sanduhr…: undoes Sanduhr's entries in every Claude Code folder but the kinds kept in <paramref name="keep"/> (real folders,
+    /// never what a row shows), through <see cref="ClaudeCodeReset.UndoKeeping"/>. Returns what each kind did (failures as kinds, never a path). Safe to
+    /// call off the UI thread.
     /// </summary>
-    public static IReadOnlyList<string> UndoEverything(WidgetViewModel widget)
+    public static ClaudeCodeUndoResult UndoEverything(WidgetViewModel widget, IReadOnlyCollection<ResetFolder>? keep = null)
     {
-        var failures = new List<string>();
-        var profile = ClaudeCodeProfile.Dir;
-        var sanduhrDir = widget.SanduhrAppDataDir;
-        var folders = ClaudeCodeFolders.Build(profile, ClaudeCodeProfile.ConfigDir, widget.LoadCcFoldersAdded());
-
-        try
-        {
-            var integ = new ClaudeCodeIntegrations(profile, sanduhrDir, externalDir: widget.SanduhrExternalDir)
-            {
-                LegacyModsRoots = [widget.SanduhrLegacyModsRoot],
-            };
-            if (integ.UndoAll().Any(r => !r.Ok))
-                failures.Add("a Claude Code entry");
-        }
-        catch (Exception) { failures.Add("a Claude Code entry"); }
-
-        var statusline = new StatuslineInstaller(profile, widget.StatuslineBinDir, null, sanduhrDir);
-        // Known folders first, then any folder a receipt names that is no longer in the list, so Reset
-        // never leaves an orphan statusLine. Each folder once.
-        var statuslineFolders = folders.Select(f => f.Path).ToList();
-        try
-        {
-            var (receipts, _) = SnapshotConsumers.ReadReceipts(
-                Path.Combine(sanduhrDir, "integrations", "installs.json"));
-            foreach (var folder in SnapshotConsumers.StatuslineReceiptFolders(receipts))
-                if (!statuslineFolders.Any(p => ClaudeCodeFolders.Same(p, folder)))
-                    statuslineFolders.Add(folder);
-        }
-        catch (Exception) { failures.Add("a statusline entry"); }
-        foreach (var folder in statuslineFolders)
-        {
-            try
-            {
-                // A rooted second argument to Path.Combine returns it, so a full folder path works as the home name.
-                if (statusline.IsRegistered(folder) && !statusline.Remove(folder))
-                    failures.Add("a statusline entry");
-            }
-            catch (Exception) { failures.Add("a statusline entry"); }
-        }
-        try { statusline.RemoveScript(); } catch (Exception) { failures.Add("the statusline script"); }
-
-        try
-        {
-            var mcp = new McpIntegrationInstaller(profile, sanduhrDir, externalDir: widget.SanduhrExternalDir);
-            var homes = folders.Where(f => f.Discovered).Select(f => f.Name)
-                .Concat(widget.LoadMcpCcHome() is { Length: > 0 } saved ? [saved] : [])
-                .Distinct(StringComparer.OrdinalIgnoreCase);
-            // A failed deregister keeps the launcher and server files, as the reset promises.
-            if (!mcp.UndoAll(homes))
-                failures.Add("an MCP server entry");
-        }
-        catch (Exception) { failures.Add("an MCP server entry"); }
-
-        return failures.Distinct().ToList();
+        var profile = ClaudeCodeProfile.Dir;   // streamer: key - profile folder handed to the reset logic, never drawn
+        var scope = new ClaudeCodeResetScope(
+            profile,
+            widget.SanduhrAppDataDir,
+            widget.SanduhrExternalDir,
+            widget.StatuslineBinDir,
+            ClaudeCodeFolders.Build(profile, ClaudeCodeProfile.ConfigDir, widget.LoadCcFoldersAdded()),   // streamer: key - folder list handed to the reset logic, never drawn
+            widget.LoadMcpCcHome(),
+            [widget.SanduhrLegacyModsRoot]);
+        return ClaudeCodeReset.UndoKeeping(scope, keep ?? []);
     }
 }

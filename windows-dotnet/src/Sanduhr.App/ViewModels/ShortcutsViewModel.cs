@@ -31,9 +31,6 @@ public sealed partial class ShortcutsViewModel : ObservableObject
             _service.FailureChanged += OnFailureChanged;
     }
 
-    /// <summary>"Ctrl+Alt+S opens Settings".</summary>
-    public string Label => HotKeys.Label(Action, _setting.Combo);
-
     /// <summary>The combo, or "Type keys…" while recording.</summary>
     public string KeysText => IsRecording ? "Type keys…" : _setting.Combo.Display;
 
@@ -145,7 +142,6 @@ public sealed partial class ShortcutsViewModel : ObservableObject
         _store.SaveHotKeySetting(Action, next);
         _service?.Apply(new Dictionary<HotKeyAction, HotKeySetting> { [Action] = next });
         OnPropertyChanged(nameof(IsOn));
-        OnPropertyChanged(nameof(Label));
         OnPropertyChanged(nameof(KeysText));
         OnPropertyChanged(nameof(ShowReset));
         OnPropertyChanged(nameof(Caption));

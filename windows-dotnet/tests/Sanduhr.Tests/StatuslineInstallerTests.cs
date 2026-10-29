@@ -248,6 +248,62 @@ public class StatuslineInstallerSpliceTests
         Assert.Equal("~/bin/mine.sh \u00e9", rig.Installer.TheirCommand(".claude"));
     }
 
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Remove_without_a_receipt_puts_a_chained_command_back(string eol)
+    {
+        // Carry (after slice 8): no record at all (Save([]) deletes the ledger), so there is no receipt for this folder. The person's command rides inside Sanduhr's,
+        // so Remove decodes it and puts it back as their statusLine instead of dropping the key.
+        using var rig = new Rig();
+        rig.Write(Settings(eol, TheirsLf.Replace("\n", eol)));
+        Assert.True(rig.Installer.Install(".claude", StatuslineMode.Combine, StatuslineInstaller.DefaultSegments, "line"), string.Join("; ", rig.Log));
+        Assert.True(new ReceiptStore(rig.Receipts).Save([]));
+
+        Assert.True(rig.Installer.Remove(".claude"));
+
+        Assert.Equal(StatuslineStatus.Other, rig.Installer.Status(".claude"));
+        Assert.Equal("~/bin/mine.sh \u00e9", rig.Installer.TheirCommand(".claude"));
+        Assert.Contains("\"type\": \"command\"", rig.Text());
+        Assert.Contains("mine.sh \u00e9", rig.Text());   // raw UTF-8, not the escaped form: written the way Install writes, through JsonEdit.Quoted
+        Assert.Contains("\"model\": \"opus\"", rig.Text());
+        Assert.Contains("\"A\": \"1\"", rig.Text());
+    }
+
+    [Fact]
+    public void Remove_with_a_receipt_that_has_no_copy_still_puts_a_chained_command_back()
+    {
+        // Preflight P7: a Combine line whose receipt was lost, then installed again, gets a fresh receipt with no Previous while the
+        // chain rides along. Remove puts the chained command back here too.
+        using var rig = new Rig();
+        rig.Write(Settings("\n", TheirsLf));
+        Assert.True(rig.Installer.Install(".claude", StatuslineMode.Combine, StatuslineInstaller.DefaultSegments, "line"), string.Join("; ", rig.Log));
+        Assert.True(new ReceiptStore(rig.Receipts).Save([]));
+        Assert.True(rig.Installer.Install(".claude", StatuslineMode.Combine, StatuslineInstaller.DefaultSegments, "line"), string.Join("; ", rig.Log));
+        Assert.Null(Assert.Single(new ReceiptStore(rig.Receipts).Load().Records).Previous);
+
+        Assert.True(rig.Installer.Remove(".claude"));
+
+        Assert.Equal(StatuslineStatus.Other, rig.Installer.Status(".claude"));
+        Assert.Equal("~/bin/mine.sh \u00e9", rig.Installer.TheirCommand(".claude"));
+        Assert.Contains("\"type\": \"command\"", rig.Text());
+    }
+
+    [Fact]
+    public void Remove_without_a_receipt_still_drops_a_line_with_nothing_chained()
+    {
+        using var rig = new Rig();
+        rig.Write(Settings("\n", TheirsLf));
+        Assert.True(rig.Installer.Install(".claude", StatuslineMode.Replace, StatuslineInstaller.DefaultSegments, "line"), string.Join("; ", rig.Log));
+        Assert.True(new ReceiptStore(rig.Receipts).Save([]));
+
+        Assert.True(rig.Installer.Remove(".claude"));
+
+        Assert.Equal(StatuslineStatus.NotInstalled, rig.Installer.Status(".claude"));
+        Assert.DoesNotContain("statusLine", rig.Text());
+        Assert.Contains("\"model\": \"opus\"", rig.Text());
+    }
+
     [Fact]
     public void Combine_chains_their_command_as_base64_and_keeps_it_through_a_reinstall()
     {

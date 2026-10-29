@@ -18,9 +18,11 @@ public static class ThemeProposals
     /// said not to or the theme was refused.</summary>
     public sealed record Outcome(JsonObject Payload, string? ApplyKey, string? SavedPath);
 
-    public static Outcome Process(ThemeHandoff.Request request, string themesDir, string activeKey, Func<string, bool> isReservedKey)
+    /// <param name="fontAvailable">This PC's font check (theme match: a <c>font</c> it lacks is a warning in the result); null skips it.</param>
+    public static Outcome Process(ThemeHandoff.Request request, string themesDir, string activeKey, Func<string, bool> isReservedKey,
+        Func<string, bool>? fontAvailable = null)
     {
-        var lint = ThemeLint.Lint(request.Theme);
+        var lint = ThemeLint.Lint(request.Theme, fontAvailable);
         if (!lint.Ok)
         {
             var rejected = Typed("rejected", "invalid_theme", "Fix the fields named in findings and call again.");

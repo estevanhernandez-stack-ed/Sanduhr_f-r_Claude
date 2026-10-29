@@ -28,7 +28,7 @@ public class SettingsIndexTests
     [Fact]
     public void Subsection_is_set_only_on_Claude_Usage_and_always_there()
     {
-        string?[] views = [SettingsIndex.OverviewView, SettingsIndex.TrendsView, SettingsIndex.SessionsView];
+        string?[] views = [SettingsIndex.MetersView, SettingsIndex.OverviewView, SettingsIndex.TrendsView, SettingsIndex.SessionsView];
         foreach (var e in SettingsIndex.Anchors)
         {
             if (e.Page == SettingsPage.ClaudeUsage)
@@ -61,7 +61,15 @@ public class SettingsIndexTests
         {
             Assert.True(SettingsIndex.NameAnchors.TryGetValue(name, out var anchor), $"no anchor for {name}");
             Assert.NotNull(SettingsIndex.Find(page, anchor));
-            Assert.Contains(SettingsIndex.Search(name), h => h.Entry.Page == page && h.Entry.Anchor == anchor);
+            // A control inside a section whose opening asks the network is not offered by search at all (it could not land inside it).
+            if (SettingsIndex.FetchingSections.ContainsKey((page, anchor!)) && SettingsIndex.CollapsedSections.ContainsKey((page, anchor!))
+                && !SettingsIndex.Anchors.Any(e => e.Title == name))
+            {
+                Assert.DoesNotContain(SettingsIndex.Search(name), h => h.Entry.Title == name);
+                continue;
+            }
+            var lands = SettingsIndex.FetchingSections.TryGetValue((page, anchor!), out var safe) ? safe : anchor;
+            Assert.Contains(SettingsIndex.Search(name), h => h.Entry.Page == page && h.Entry.Anchor == lands);
         }
     }
 
@@ -69,10 +77,10 @@ public class SettingsIndexTests
     [InlineData("percent", SettingsPage.General, SettingsIndex.Tray)]
     [InlineData("hotkey", SettingsPage.General, SettingsIndex.Shortcuts)]
     [InlineData("vault", SettingsPage.ClaudeUsage, SettingsIndex.Vault)]
-    [InlineData("statusline", SettingsPage.ClaudeCode, SettingsIndex.Statusline)]
-    [InlineData("MCP", SettingsPage.ClaudeCode, SettingsIndex.Mcp)]
+    [InlineData("statusline", SettingsPage.ClaudeCode, SettingsIndex.Folders)]
+    [InlineData("MCP", SettingsPage.ClaudeCode, SettingsIndex.Folders)]
     [InlineData("glow", SettingsPage.ClaudeCode, SettingsIndex.Glow)]
-    [InlineData("cleanupPeriodDays", SettingsPage.Mods, SettingsIndex.Retention)]
+    [InlineData("cleanupPeriodDays", SettingsPage.ClaudeCode, SettingsIndex.FolderConfig)]
     [InlineData("follow", SettingsPage.Accounts, SettingsIndex.Follow)]
     [InlineData("license", SettingsPage.About, SettingsIndex.Notices)]
     [InlineData("trademark", SettingsPage.About, SettingsIndex.Trademark)]
@@ -88,24 +96,33 @@ public class SettingsIndexTests
     {
         Assert.Null(SettingsIndex.Find(SettingsPage.ClaudeUsage, SettingsIndex.Statusline));
         Assert.Null(SettingsIndex.Find(SettingsPage.ClaudeUsage, SettingsIndex.Mcp));
-        Assert.NotNull(SettingsIndex.Find(SettingsPage.ClaudeCode, SettingsIndex.Statusline));
-        Assert.NotNull(SettingsIndex.Find(SettingsPage.ClaudeCode, SettingsIndex.Mcp));
+        Assert.Equal(new SettingsLink(SettingsPage.ClaudeCode, SettingsIndex.Folders), SettingsIndex.Resolve(SettingsPage.ClaudeCode, SettingsIndex.Statusline));
+        Assert.Equal(new SettingsLink(SettingsPage.ClaudeCode, SettingsIndex.Folders), SettingsIndex.Resolve(SettingsPage.ClaudeCode, SettingsIndex.Mcp));
         Assert.Null(Top("statusline").Entry.Subsection);
     }
 
     [Fact]
-    public void Csv_first_hit_is_History_export_because_its_title_matches()
+    public void Csv_first_hit_is_the_meter_history_export()
     {
-        // "Export CSV..." has the word csv in its TITLE (rank 0), so it outranks the Sessions
-        // ledger, whose only link to csv is a synonym (rank 1). Rank sorts first, so this is not
-        // even a tie broken by sidebar order; History would also win a tie (History before Claude Usage).
+        // "Export meter history…" has no "csv" in its title any more; both exports match "csv" through a
+        // synonym (rank 1); both sit on Claude Usage, and the tie goes to index order: Meters before Sessions.
         var top = Top("csv");
-        Assert.Equal(0, top.Rank);
-        Assert.Equal(SettingsPage.History, top.Entry.Page);
-        Assert.Equal(SettingsIndex.HistoryExport, top.Entry.Anchor);
+        Assert.Equal(1, top.Rank);
+        Assert.Equal(SettingsPage.ClaudeUsage, top.Entry.Page);
+        Assert.Equal(SettingsIndex.MeterHistoryExport, top.Entry.Anchor);
+        Assert.Equal(SettingsNames.ExportMeterHistory, top.Entry.Title);
         Assert.Contains(SettingsIndex.Search("csv"),
             h => h.Entry.Page == SettingsPage.ClaudeUsage && h.Entry.Anchor == SettingsIndex.Sessions && h.Rank == 1);
     }
+
+    [Theory]
+    [InlineData("vault", SettingsPage.ClaudeUsage, SettingsIndex.Vault)]
+    [InlineData("history vault", SettingsPage.ClaudeUsage, SettingsIndex.Vault)]
+    [InlineData("homes", SettingsPage.Publish, SettingsIndex.Homes)]
+    [InlineData("export", SettingsPage.ClaudeUsage, SettingsIndex.MeterHistoryExport)]
+    [InlineData("meter history", SettingsPage.ClaudeUsage, SettingsIndex.MeterHistoryExport)]
+    public void Old_words_still_find_the_renamed_controls(string query, SettingsPage page, string anchor) =>
+        Assert.Contains(SettingsIndex.Search(query), h => h.Entry.Page == page && h.Entry.Anchor == anchor);
 
     [Fact]
     public void Endpoint_leads_with_the_Publish_page_row_then_Destination()
@@ -180,18 +197,11 @@ public class SettingsIndexTests
     }
 
     [Fact]
-    public void Widgets_is_a_Desk_page_search_finds_by_its_words()
+    public void Widget_words_find_Mods_and_Widgets()
     {
-        Assert.Equal("Desk", SettingsNames.GroupTitle(SettingsPage.Widgets));
-        Assert.Equal("Widgets", SettingsNames.PageTitle(SettingsPage.Widgets));
-        Assert.Equal(SettingsPage.Widgets, SettingsIndex.Search("widgets")[0].Entry.Page);
-        foreach (var (query, anchor) in new[]
-        {
-            ("hourglass", SettingsIndex.WidgetsCatalog), ("install", SettingsIndex.WidgetsCatalog), ("companion", SettingsIndex.WidgetsCatalog),
-            ("uninstall", SettingsIndex.WidgetsInstalled), ("made here", SettingsIndex.WidgetsInstalled),
-            ("check the catalog", SettingsIndex.WidgetsCatalog),
-        })
-            Assert.Contains(SettingsIndex.Search(query), h => h.Entry.Page == SettingsPage.Widgets && h.Entry.Anchor == anchor);
-        Assert.Contains((SettingsNames.WidgetCatalogCheck, SettingsPage.Widgets), SettingsNames.Table);
+        Assert.Null(SettingsNames.GroupTitle(SettingsPage.Widgets));
+        Assert.Equal("Extend", SettingsNames.GroupTitle(SettingsPage.Mods));
+        Assert.Equal(SettingsPage.Mods, SettingsIndex.Search("widgets")[0].Entry.Page);
+        Assert.Contains((SettingsNames.WidgetCatalogCheck, SettingsPage.Mods), SettingsNames.Table);
     }
 }

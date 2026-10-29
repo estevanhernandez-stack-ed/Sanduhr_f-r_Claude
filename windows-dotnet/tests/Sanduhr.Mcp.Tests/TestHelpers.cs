@@ -4,6 +4,15 @@ using Sanduhr.Mcp;
 
 namespace Sanduhr.Mcp.Tests;
 
+/// <summary>How long a tool waits for the stand-in widget when a test expects it to answer. A passing test returns the
+/// moment the answer lands, so this only bounds a failure; it is wide because the release runner runs the three suites
+/// at once and the stand-in's task can start seconds late (v4.0.0's gate failed twice at 5 s, a different test each time).
+/// Tests that expect no answer keep their own short waits.</summary>
+internal static class Waits
+{
+    public static readonly TimeSpan AnswerWait = TimeSpan.FromSeconds(30);
+}
+
 /// <summary>Self-deleting temp dir (mirrors Sanduhr.Tests' TempDir — duplicated
 /// because this project deliberately references only Sanduhr.Mcp).</summary>
 internal sealed class TempDir : IDisposable

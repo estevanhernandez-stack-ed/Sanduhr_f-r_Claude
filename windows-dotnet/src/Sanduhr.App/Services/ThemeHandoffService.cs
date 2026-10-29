@@ -47,10 +47,10 @@ public sealed class ThemeHandoffService : IDisposable
     {
         try
         {
-            Directory.CreateDirectory(_paths.ExternalDir);
+            Directory.CreateDirectory(_paths.ExternalDir);   // streamer: notname - a file location used for IO, never drawn
             _watcher = new FileSystemWatcher(_paths.ExternalDir,ThemeHandoff.RequestFileName)
             {
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,   // streamer: notname - NotifyFilters.FileName is a watcher flag, not a name
                 IncludeSubdirectories = false,
             };
             _watcher.Created += OnRequestFileEvent;
@@ -88,12 +88,13 @@ public sealed class ThemeHandoffService : IDisposable
         _handling = true;
         try
         {
-            string reqPath = Path.Combine(_paths.ExternalDir, ThemeHandoff.RequestFileName);
+            string reqPath = Path.Combine(_paths.ExternalDir, ThemeHandoff.RequestFileName);   // streamer: notname - a file location used for IO, never drawn
             string resPath = Path.Combine(_paths.ExternalDir, ThemeHandoff.ResultFileName);
             if (ThemeHandoff.TryReadRequest(reqPath, DateTimeOffset.Now) is not { } request)
                 return;
 
-            var outcome = ThemeProposals.Process(request, _paths.ThemesDir, _widget.ActiveThemeKey, ThemeCatalog.BuiltIns.ContainsKey);
+            var outcome = ThemeProposals.Process(request, _paths.ThemesDir, _widget.ActiveThemeKey, ThemeCatalog.BuiltIns.ContainsKey,   // streamer: notname - a file location used for IO, never drawn
+                _widget.FontAvailable);
             if (outcome.SavedPath is not null)
                 _widget.ReloadUserThemes();
             if (outcome.ApplyKey is { } key)
@@ -107,7 +108,7 @@ public sealed class ThemeHandoffService : IDisposable
         }
         catch (Exception e)
         {
-            _log?.Invoke($"theme handoff failed ({e.GetType().Name}: {e.Message})");
+            _log?.Invoke($"theme handoff failed ({e.GetType().Name}: {e.Message})");   // streamer: notname - written to the log file, never drawn
         }
         finally
         {

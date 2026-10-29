@@ -10,7 +10,7 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
-/// <summary>One Launcher button in Settings, Desk, Launcher: what it opens, its label and glow, and its picture.</summary>
+/// <summary>One Launcher button in Settings, Launcher: what it opens, its label and glow, and its picture.</summary>
 public sealed partial class LauncherButtonRow : ObservableObject
 {
     private readonly LauncherSettingsViewModel _owner;
@@ -41,17 +41,33 @@ public sealed partial class LauncherButtonRow : ObservableObject
 
     /// <summary>The name this button goes by: its label, else the app's name, else the site.</summary>
     public string Title => string.IsNullOrWhiteSpace(Label)
-        ? (Kind == LauncherKind.Link ? LauncherTarget.LinkHost(Target) : AppName ?? Target)
+        ? (Kind == LauncherKind.Link ? LinkHostShown : AppName ?? StreamerMode.Mask.Paths(Target))   // streamer: masked - Mask.Paths masks a raw target (P3)
         : Label.Trim();
 
     /// <summary>The line under the title: what the button opens.</summary>
-    public string Detail => Kind == LauncherKind.Link ? Target : (AppName is null ? "App" : $"App, {AppName}");
+    /// <summary>A link's full URL can name a private repo, so while streamer mode is on it shows scheme://host/… with the host as its codename.</summary>
+    public string Detail => Kind == LauncherKind.Link ? LinkDetail() : (AppName is null ? "App" : $"App, {AppName}");
+
+    /// <summary>The link as typed while off. While on, scheme://{codename}/… where the codename is <see cref="LinkHostShown"/>: the host key the title, the Desk
+    /// piece and the allowlist use, so one link has one codename (final review I1).</summary>
+    private string LinkDetail()
+    {
+        if (!StreamerMode.On)
+            return StreamerMode.Mask.Endpoint(Target);
+        if (!Uri.TryCreate(Target?.Trim(), UriKind.Absolute, out var uri) || string.IsNullOrEmpty(uri.Host))
+            return LinkHostShown;
+        var rest = uri.PathAndQuery is "" or "/" ? "" : "/…";
+        return $"{uri.Scheme}://{LinkHostShown}{rest}";   // streamer: masked - LinkHostShown is Mask.Name(Host, LinkHost)
+    }
 
     /// <summary>"Use the app's icon" for an app; a link has no app, so it goes back to the link glyph.</summary>
     public string UseDefaultImageText => IsApp ? "Use the app's icon" : "Use the link icon";
 
     /// <summary>What a screen reader calls this button when a control belongs to it: the app's name or the site, never the label being typed.</summary>
-    public string Subject => Kind == LauncherKind.Link ? LauncherTarget.LinkHost(Target) : AppName ?? Target;
+    public string Subject => Kind == LauncherKind.Link ? LinkHostShown : AppName ?? StreamerMode.Mask.Paths(Target);
+
+    /// <summary>A link's site as the row shows and speaks it: its codename while streamer mode is on, the same one <see cref="Detail"/> shows.</summary>
+    private string LinkHostShown => StreamerMode.Mask.Name(CodenameCategory.Host, LauncherTarget.LinkHost(Target));
 
     public string UseDefaultImageName => $"{UseDefaultImageText} for {Subject}";
 
@@ -119,10 +135,10 @@ public sealed partial class LauncherButtonRow : ObservableObject
 }
 
 /// <summary>
-/// Settings, Desk, Launcher (spec, Desk Launcher): the buttons as a list you can add to, remove from and reorder, each
+/// Settings, Launcher (spec, Desk Launcher): the buttons as a list you can add to, remove from and reorder, each
 /// with its label, glow color and picture; row or column; and the way into the app picker and the link prompt. Every
 /// change saves at once, removes the picture files nothing uses any more, and tells the running Desk. The piece
-/// itself is placed under Where each piece sits, like any other.
+/// itself is placed in Settings, Desk, Pieces, like any other.
 /// </summary>
 public sealed partial class LauncherSettingsViewModel : ObservableObject
 {
@@ -164,10 +180,9 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
     /// <summary>"3 of 8 buttons".</summary>
     public string CountText => $"{Rows.Count} of {LauncherModel.MaxButtons} buttons";
 
-    /// <summary>Shown when there are buttons but the piece has no place on the Desk.</summary>
-    public string PlacementNote => !HasButtons ? ""
-        : !_isPlaced() ? "The Launcher is hidden. Pick a place for it under Where each piece sits."
-        : _autoNote;
+    /// <summary>Where the first button put the piece ("Placed at top left. …"). A hidden Launcher is said by the page's status line
+    /// at its top (Principle 1), not here.</summary>
+    public string PlacementNote => HasButtons && _isPlaced() ? _autoNote : "";
 
     public bool HasPlacementNote => PlacementNote.Length > 0;
 
@@ -364,7 +379,7 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
         Select(Rows.Count - 1);
         if (first && !_isPlaced() && _autoPlace?.Invoke() is { } where)
         {
-            _autoNote = $"Placed at {where}. Move it under Where each piece sits.";
+            _autoNote = $"Placed at {where}. Move it in Settings, Desk, Pieces.";
             RaiseNote();
         }
     }
@@ -405,14 +420,14 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
             Multiselect = false,
         };
         if (dialog.ShowDialog(_owner) != true) return;
-        var imported = LauncherImages.Import(_paths, dialog.FileName);
+        var imported = LauncherImages.Import(_paths, dialog.FileName);   // streamer: key - the picked image path is copied into the store, never drawn
         if (!imported.Ok)
         {
             Problem = imported.Error ?? "Sanduhr couldn't read that image.";
             return;
         }
         var current = _model.Buttons[row.Index];
-        Commit(_model.Replace(row.Index, current with { Image = imported.FileName }), rebuild: true);
+        Commit(_model.Replace(row.Index, current with { Image = imported.FileName }), rebuild: true);   // streamer: notname - the stored image's hash-derived file name
         Select(row.Index);
     }
 

@@ -133,6 +133,9 @@ public class ToolLogicHistoryFallbackTests
         Assert.Equal("widget_too_old", (string?)r["reason"]);
         Assert.Contains("re-enable", (string?)r["remedy"]);
         Assert.DoesNotContain("leftover", (string?)r["remedy"]);
+        // The integration toggles live on the Claude Code page, not on Claude Usage.
+        Assert.Contains("(Settings, Claude Code)", (string?)r["remedy"]);
+        Assert.DoesNotContain("Claude Usage", (string?)r["remedy"]);
     }
 
     [Fact]

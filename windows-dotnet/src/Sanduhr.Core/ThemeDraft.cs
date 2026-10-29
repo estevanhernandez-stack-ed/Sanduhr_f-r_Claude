@@ -43,6 +43,13 @@ public sealed class ThemeDraft
     public double GlassAlpha { get; set; } = 0.80;
     public double BorderAlpha { get; set; } = 0.40;
 
+    /// <summary>The theme's font (theme match); null or empty writes none.</summary>
+    public string? Font { get; set; }
+
+    /// <summary>The theme's Desk look (theme match); null or empty writes none. Designs, <c>get_desk</c> and undo serialize themes through
+    /// this class, so a field it did not carry would silently drop out of all of them.</summary>
+    public ThemeDesk? Desk { get; set; }
+
     /// <summary>The catalog key the draft was loaded from, for the studio's "Start
     /// from" selection and the default Save name; null for a blank draft.</summary>
     public string? SourceKey { get; private set; }
@@ -56,7 +63,10 @@ public sealed class ThemeDraft
     /// <summary>A draft with every value of an existing theme, extras included.</summary>
     public static ThemeDraft FromDefinition(string key, ThemeDefinition def)
     {
-        var d = new ThemeDraft { SourceKey = key, Name = def.Name, GlassAlpha = def.GlassAlpha, BorderAlpha = def.BorderAlpha };
+        var d = new ThemeDraft
+        {
+            SourceKey = key, Name = def.Name, GlassAlpha = def.GlassAlpha, BorderAlpha = def.BorderAlpha, Font = def.Font, Desk = def.Desk,
+        };
         d.SetColor("bg", def.Bg);
         d.SetColor("glass", def.Glass);
         d.SetColor("glass_on_mica", def.GlassOnMica);
@@ -110,7 +120,7 @@ public sealed class ThemeDraft
         => _lastGood.TryGetValue(field, out var rgb) ? rgb : null;
 
     /// <summary>The theme document: name, the fourteen colors as typed, the two
-    /// dials, then the carried extras.</summary>
+    /// dials, the font and Desk look when set, then the carried extras.</summary>
     public JsonObject ToJson()
     {
         var o = new JsonObject { ["name"] = Name };
@@ -118,6 +128,9 @@ public sealed class ThemeDraft
             o[field] = _colors[field];
         o["glass_alpha"] = Math.Round(GlassAlpha, 2);
         o["border_alpha"] = Math.Round(BorderAlpha, 2);
+        // Written only when set, so a theme from before theme match keeps its canonical string (designs compare by it).
+        if (!string.IsNullOrEmpty(Font)) o["font"] = Font;
+        if (Desk is { IsEmpty: false } desk) o["desk"] = desk.ToJson();
         foreach (var (k, v) in _extras)
             o[k] = v?.DeepClone();
         return o;
@@ -125,7 +138,8 @@ public sealed class ThemeDraft
 
     public string ToJsonText() => ToJson().ToJsonString(new JsonSerializerOptions { WriteIndented = true });
 
-    public ThemeLintResult Lint() => ThemeLint.Lint(ToJson());
+    /// <param name="fontAvailable">This PC's font check (the App's); null lints the font's shape only.</param>
+    public ThemeLintResult Lint(Func<string, bool>? fontAvailable = null) => ThemeLint.Lint(ToJson(), fontAvailable);
 
     /// <summary>The theme the widget can preview right now: the lint's definition
     /// when the draft is valid, otherwise the last good color per row over the

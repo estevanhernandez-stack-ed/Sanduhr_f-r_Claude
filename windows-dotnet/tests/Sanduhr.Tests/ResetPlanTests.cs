@@ -172,4 +172,105 @@ public class ResetPlanTests : IDisposable
         Assert.All(inv.Values, v => Assert.Empty(v));
         Assert.False(Directory.Exists(paths.ExternalDirPath));
     }
+
+    /// <summary>Settings v2, slice 7 (spec, Reset): codenames.json goes with All settings, streamer.json by name from ~\.sanduhr. Review Focus 5.</summary>
+    [Fact]
+    public void Reset_lists_both_files_by_name_only()
+    {
+        var paths = Make();
+        Touch(paths.CodenamesFile);
+        Touch(Path.Combine(paths.ExternalDirPath, StreamerFile.FileName));
+        Touch(Path.Combine(paths.ExternalDirPath, "streamer.json.bak"));   // someone else's name in the shared folder
+        Touch(Path.Combine(paths.ExternalDirPath, "streamer.json.tmp"));   // a crashed write: Sanduhr's own name (preflight P19)
+        Touch(paths.CodenamesFile + ".tmp");   // Codenames.Save leaves it when the move fails; it holds the salt and every real name (final review M2)
+        var settings = ResetPlan.Inventory(paths)[ResetPart.Settings].Select(i => i.Path).ToList();
+        Assert.Contains(paths.CodenamesFile, settings);
+        Assert.Contains(paths.CodenamesFile + ".tmp", settings);
+        Assert.Contains(Path.Combine(paths.ExternalDirPath, StreamerFile.FileName), settings);
+        Assert.Contains(Path.Combine(paths.ExternalDirPath, "streamer.json.tmp"), settings);
+        Assert.DoesNotContain(Path.Combine(paths.ExternalDirPath, "streamer.json.bak"), settings);
+        Assert.DoesNotContain(paths.ExternalDirPath, settings);
+    }
+
+    // ---- Settings v2, slice 8: the folders Reset lists (R12; decisions 1 and 4) ----
+
+    private static IntegrationReceipt R(IntegrationKind kind, string folder) =>
+        new() { Kind = kind, Folder = folder, File = Path.Combine(folder, "settings.json") };
+
+    [Fact]
+    public void Reset_lists_each_folder_with_entries_once_in_Settings_order_with_its_kinds()
+    {
+        string home = Path.Combine(_root, "home");
+        string a = Path.Combine(home, ".claude"), b = Path.Combine(home, ".claude-work"), empty = Path.Combine(home, ".claude-empty");
+        string gone = Path.Combine(_root, "elsewhere", ".claude-old");   // a receipt names it; Settings no longer lists it
+        var known = new[] { new CcFolder(a, ".claude", true), new CcFolder(b, ".claude-work", true), new CcFolder(empty, ".claude-empty", true) };
+        var receipts = new[]
+        {
+            R(IntegrationKind.Hooks, b),
+            R(IntegrationKind.Meters, b.ToUpperInvariant() + "\\"),   // the same folder written another way
+            R(IntegrationKind.Statusline, gone),
+            R(IntegrationKind.Statusline, a),
+        };
+
+        var list = ResetPlan.FoldersWithEntries(receipts, known, f => f.Name == ".claude", _ => false);
+
+        Assert.Equal(new[] { a, b, gone }, list.Select(f => f.Path));
+        Assert.Equal(new[] { IntegrationKind.Statusline, IntegrationKind.Mcp }, list[0].Kinds);
+        Assert.Equal(new[] { IntegrationKind.Meters, IntegrationKind.Hooks }, list[1].Kinds);
+        Assert.Equal(new[] { IntegrationKind.Statusline }, list[2].Kinds);
+    }
+
+    [Fact]
+    public void A_folder_with_only_the_MCP_entry_is_listed_and_one_with_nothing_is_not()
+    {
+        string home = Path.Combine(_root, "home");
+        var mcpOnly = new CcFolder(Path.Combine(home, ".claude-mcp"), ".claude-mcp", true);
+        var nothing = new CcFolder(Path.Combine(home, ".claude-none"), ".claude-none", true);
+
+        var list = ResetPlan.FoldersWithEntries([], [mcpOnly, nothing], f => f == mcpOnly, _ => false);
+
+        var only = Assert.Single(list);
+        Assert.Equal(mcpOnly.Path, only.Path);
+        Assert.Equal(new[] { IntegrationKind.Mcp }, only.Kinds);
+    }
+
+    [Fact]
+    public void A_folder_whose_statusline_has_no_receipt_is_still_listed_and_gains_the_kind()
+    {
+        string home = Path.Combine(_root, "home");
+        var early = new CcFolder(Path.Combine(home, ".claude-early"), ".claude-early", true);   // legacy install, receipt lost
+        var mixed = new CcFolder(Path.Combine(home, ".claude-mixed"), ".claude-mixed", true);   // a hooks receipt, statusline without one
+        var nothing = new CcFolder(Path.Combine(home, ".claude-none"), ".claude-none", true);
+
+        var list = ResetPlan.FoldersWithEntries(
+            [R(IntegrationKind.Hooks, mixed.Path)], [early, mixed, nothing], _ => false, f => f != nothing);
+
+        Assert.Equal(new[] { early.Path, mixed.Path }, list.Select(f => f.Path));
+        Assert.Equal(new[] { IntegrationKind.Statusline }, list[0].Kinds);
+        Assert.Equal(new[] { IntegrationKind.Statusline, IntegrationKind.Hooks }, list[1].Kinds);
+    }
+
+    [Fact]
+    public void Receipts_that_cant_be_read_say_so()
+    {
+        var paths = Make();
+        string file = ResetPlan.ReceiptsFile(paths);
+        Assert.Equal(Path.Combine(paths.AppDataDir, ResetPlan.IntegrationsName, ResetPlan.ReceiptsFileName), file);
+        Assert.False(ResetPlan.ReceiptsUnreadable(paths));   // no file: nothing to lose
+        Assert.False(ResetPlan.ReceiptsUnreadable(file));
+
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        File.WriteAllText(file, "[]");
+        Assert.False(ResetPlan.ReceiptsUnreadable(paths));
+        Assert.False(ResetPlan.ReceiptsUnreadable(file));
+
+        File.WriteAllText(file, "{ not a list");
+        Assert.True(ResetPlan.ReceiptsUnreadable(paths));
+        Assert.True(ResetPlan.ReceiptsUnreadable(file));
+
+        File.WriteAllText(file, "[]");
+        File.WriteAllText(file + ReceiptLog.AsideSuffix, "[{\"kind\":\"meters\"");   // a damaged copy set aside earlier
+        Assert.True(ResetPlan.ReceiptsUnreadable(paths));
+        Assert.True(ResetPlan.ReceiptsUnreadable(file));
+    }
 }

@@ -415,6 +415,19 @@ public class DeskDesignTests
     }
 
     [Fact]
+    public void MergeUnhidingAPieceWithoutAnAnchorUsesTheDefaultPlacesTable()
+    {
+        var shown = DeskDesign.Merge(Current(), Proposal("""{"layout":{"weather":{"hidden":false}}}"""));
+        var weather = shown.Layout!.Single(p => p.Piece == "weather");
+        Assert.False(weather.IsHidden);
+        Assert.Equal(DeskArrangement.DefaultPlaceFor("weather"), weather.Anchor);
+        Assert.Equal(DeskAnchor.TR, weather.Anchor);
+
+        var anchored = DeskDesign.Merge(Current(), Proposal("""{"layout":{"weather":{"hidden":false,"anchor":"ml"}}}"""));
+        Assert.Equal(DeskAnchor.ML, anchored.Layout!.Single(p => p.Piece == "weather").Anchor);
+    }
+
+    [Fact]
     public void MergeHidesAndShowsPieces()
     {
         var hidden = DeskDesign.Merge(Current(), Proposal("""{"layout":{"claude":{"hidden":true}}}"""));
@@ -525,5 +538,39 @@ public class DeskDesignTests
     {
         var lines = DeskDesign.Diff(Current(), Proposal("""{"messages":{"lines":["hi."]}}"""));
         Assert.Equal(["Messages: adds 1 line"], lines);
+    }
+
+    // ---- theme match: a design carries "follows the widget theme" ----
+
+    [Fact]
+    public void Follows_theme_is_read_written_merged_and_described()
+    {
+        var parsed = DeskDesign.Parse(JsonNode.Parse("""{"follows_theme": true}"""));
+        Assert.True(parsed.Design!.FollowsTheme);
+        Assert.True((bool)parsed.Design.ToJson()["follows_theme"]!);
+        Assert.Contains(DeskDesign.Parse(JsonNode.Parse("""{"follows_theme": "yes"}""")).Reasons, r => r.Field == "follows_theme");
+        Assert.True(DeskDesign.Merge(new DeskDesign { FollowsTheme = true }, new DeskDesign { Plate = true }).FollowsTheme);
+        Assert.False(DeskDesign.Merge(new DeskDesign { FollowsTheme = true }, new DeskDesign { FollowsTheme = false }).FollowsTheme);
+        Assert.Contains("Desk follows the widget theme: on", DeskDesign.Diff(new DeskDesign(), new DeskDesign { FollowsTheme = true }));
+        Assert.Empty(DeskDesign.Diff(new DeskDesign { FollowsTheme = false }, new DeskDesign { FollowsTheme = false }));
+    }
+
+    [Fact]
+    public void A_design_saved_before_theme_match_is_the_same_look_as_one_that_does_not_follow()
+    {
+        var before = new DeskDesign { Plate = true };
+        Assert.Equal(DeskDesigns.Canonical(before), DeskDesigns.Canonical(before with { FollowsTheme = false }));
+        Assert.NotEqual(DeskDesigns.Canonical(before), DeskDesigns.Canonical(before with { FollowsTheme = true }));
+    }
+
+    [Fact]
+    public void The_state_and_the_apply_carry_it()
+    {
+        var current = DeskState.Current(DeskSettings.Default, DeskInkSettings.Default, LauncherModel.Empty, null, followsTheme: true);
+        Assert.True(current.FollowsTheme);
+        Assert.True((bool)current.ToJson()["follows_theme"]!);
+        Assert.False(DeskState.Current(DeskSettings.Default, DeskInkSettings.Default, LauncherModel.Empty, null).FollowsTheme);
+        Assert.True(DeskDesignApply.Settings(DeskSettings.Default, DeskInkSettings.Default, LauncherModel.Empty, new DeskDesign { FollowsTheme = true }).FollowsTheme);
+        Assert.Null(DeskDesignApply.Settings(DeskSettings.Default, DeskInkSettings.Default, LauncherModel.Empty, new DeskDesign()).FollowsTheme);
     }
 }

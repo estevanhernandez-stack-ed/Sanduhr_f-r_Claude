@@ -45,11 +45,11 @@ internal sealed class ClaudeCodeGlowService : IDisposable
         Reload();
         try
         {
-            string dir = _paths.ExternalDir;
+            string dir = _paths.ExternalDir;   // streamer: notname - a file location used for IO, never drawn
             Directory.CreateDirectory(dir);
             _watcher = new FileSystemWatcher(dir, "glow-*.signal")
             {
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,   // streamer: notname - NotifyFilters.FileName is a watcher flag, not a name
                 IncludeSubdirectories = false,
             };
             _watcher.Created += OnSignal;

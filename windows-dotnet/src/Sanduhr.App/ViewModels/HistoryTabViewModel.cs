@@ -11,9 +11,13 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
-/// <summary>An account choice in the History tab's selector. <c>Account == null</c>
+/// <summary>An account choice in the Meters view's selector. <c>Account == null</c>
 /// is the "All accounts" overlay.</summary>
-public sealed record AccountOption(string Display, string? Account);
+public sealed record AccountOption(string Display, string? Account)
+{
+    /// <summary>What a screen reader reads: the shown name, never the record's text, which would carry the real label (slice 7, CP 3).</summary>
+    public override string ToString() => Display;
+}
 
 /// <summary>A legend entry — an account's label and its overlay swatch brush.</summary>
 public sealed record LegendItem(string Label, Brush Swatch)
@@ -23,9 +27,9 @@ public sealed record LegendItem(string Label, Brush Swatch)
 }
 
 /// <summary>
-/// Backs the Settings → History tab — the 30-day usage chart with the per-account
+/// Backs Settings, Claude Usage, Meters — the 30-day meter history with the per-account
 /// vs all-accounts overlay toggle, the Week/Month window selector, the legend, and
-/// the CSV export + Clear-history actions. Ported from
+/// the CSV export (Clear moved to Accounts, Data for this account, in Settings v2). Ported from
 /// <c>settings_dialog._build_history_tab</c> + the surrounding handlers.
 ///
 /// The chart itself is a custom-render control (<see cref="HistoryChart"/>); this
@@ -78,7 +82,10 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         _widget.AccountsChanged -= RefreshAccountOptions;
     }
 
-    /// <summary>Export and Clear act on real history files: never while demo mode shows sample
+    /// <summary>Redraw the chart (Accounts cleared a history, or the Meters view came into view).</summary>
+    public void Refresh() => Changed?.Invoke();
+
+    /// <summary>Export acts on real history files: never while demo mode shows sample
     /// accounts, whose labels can match a real account's ("Personal").</summary>
     private bool NotDemo => !_widget.IsDemo;
 
@@ -90,11 +97,10 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         var prev = SelectedOption?.Account;
         AccountOptions.Clear();
         AccountOptions.Add(new AccountOption("All accounts", null));
-        foreach (var label in _widget.ShownAccounts)
-            AccountOptions.Add(new AccountOption(label, label));
+        foreach (var label in _widget.ShownAccounts)   // streamer: masked - CP 3: Mask.Name masks the option text on the next line
+            AccountOptions.Add(new AccountOption(StreamerMode.Mask.Name(CodenameCategory.Account, label), label));   // slice 7, CP 3
         SelectedOption = AccountOptions.FirstOrDefault(o => o.Account == prev) ?? AccountOptions[0];
         ExportCsvCommand.NotifyCanExecuteChanged();
-        ClearHistoryCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnSelectedOptionChanged(AccountOption? value)
@@ -105,6 +111,33 @@ public sealed partial class HistoryTabViewModel : ObservableObject
 
     partial void OnWeekModeChanged(bool value) => Changed?.Invoke();
 
+    /// <summary>Streamer mode moved (slice 7): the picker, the legend and the export caption read their names again.</summary>
+    public void RefreshNames()
+    {
+        RefreshAccountOptions();
+        RefreshLegend();
+        OnPropertyChanged(nameof(ExportsKeepRealNamesShown));
+    }
+
+    /// <summary>"Exports keep real names." beside the export button, while streamer mode is on (spec).</summary>
+    public bool ExportsKeepRealNamesShown => StreamerMode.On;
+
+    /// <summary>The Save dialog's default name (slice 7, CP 4): the account's codename while hidden, never its label. The file itself keeps
+    /// real names (spec).</summary>
+    internal static string ExportFileName(string? account, DateTime day)
+    {
+        string scopeTag = account is null
+            ? "all-accounts"
+            : StreamerMode.Mask.Name(CodenameCategory.Account, account).ToLowerInvariant().Replace(" ", "-");
+        return $"Sanduhr-usage-{scopeTag}-{day:yyyy-MM-dd}.csv";
+    }
+
+    /// <summary>"Wrote N rows to:" with the path's user folder as %USERPROFILE% while streamer mode is on (slice 7, CP 4).</summary>
+    internal static string ExportedMessage(int rows, string path) => $"Wrote {rows} rows to:\n{StreamerMode.Mask.Paths(path)}";
+
+    /// <summary>The write failure, with its path and the exception's own text scrubbed while streamer mode is on (slice 7, CP 4).</summary>
+    internal static string ExportFailedMessage(string path, string error) => StreamerMode.Mask.Paths($"Could not write {path}:\n{error}");
+
     private void RefreshLegend()
     {
         Legend.Clear();
@@ -113,15 +146,38 @@ public sealed partial class HistoryTabViewModel : ObservableObject
             ShowLegend = false;
             return;
         }
-        var accounts = _widget.ShownAccounts;
+        var accounts = _widget.ShownAccounts;   // streamer: masked - CP 3: the legend text passes Mask.Name below
         if (accounts.Count == 0)
         {
             ShowLegend = false;
             return;
         }
+        // The swatch keeps its colour by the real label; the text is the codename while streamer mode hides it (slice 7, CP 3).
         foreach (var label in accounts)
-            Legend.Add(new LegendItem(label, AccountColors.BrushFor(label, accounts)));
+            Legend.Add(new LegendItem(StreamerMode.Mask.Name(CodenameCategory.Account, label), AccountColors.BrushFor(label, accounts)));
         ShowLegend = true;
+    }
+
+    /// <summary>
+    /// What the meter history says when it draws nothing (WF32, WF35): signed out, how to start it; signed in with nothing
+    /// recorded yet, that it fills in. Empty while the chart has rows. A screen reader reads it; the chart is a drawing.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasEmptyText))]
+    private string _emptyText = "";
+
+    /// <summary>The empty-state line shows in place of the chart.</summary>
+    public bool HasEmptyText => EmptyText.Length > 0;
+
+    /// <summary>The empty-state line for a chart with or without rows.</summary>
+    internal static string EmptyLine(bool signedIn, bool hasRows) => hasRows ? "" : signedIn ? SettingsNames.MeterHistoryEmpty : SettingsNames.MeterHistorySignedOut;
+
+    /// <summary>The chart rows (see <see cref="Rows"/>), and the empty-state line that goes with them.</summary>
+    public IReadOnlyList<ChartRow> BuildRows()
+    {
+        var rows = Rows();
+        EmptyText = EmptyLine(_widget.ActiveAccount is not null || _widget.IsDemo, rows.Count > 0);   // streamer: key - a null check, never drawn
+        return rows;
     }
 
     /// <summary>
@@ -130,13 +186,13 @@ public sealed partial class HistoryTabViewModel : ObservableObject
     /// per-account series per tier (registry order → stable colors). A tier with
     /// no data in the window is dropped (parity with the Python <c>if agg:</c>).
     /// </summary>
-    public IReadOnlyList<ChartRow> BuildRows()
+    private IReadOnlyList<ChartRow> Rows()
     {
         // Demo mode charts nothing: a sample label could match a real account's history file.
         if (_widget.IsDemo)
             return [];
         int days = WeekMode ? 7 : 30;
-        var accounts = _widget.ShownAccounts;
+        var accounts = _widget.ShownAccounts;   // streamer: key - label list keyed to the chart series; the legend draws codenames (CP 3)
         string? selected = SelectedOption?.Account;
         var rows = new List<ChartRow>();
 
@@ -182,14 +238,11 @@ public sealed partial class HistoryTabViewModel : ObservableObject
     private void ExportCsv()
     {
         string? account = SelectedOption?.Account;
-        string scopeTag = account is null
-            ? "all-accounts"
-            : account.ToLowerInvariant().Replace(" ", "-");
-        string defaultName = $"Sanduhr-usage-{scopeTag}-{DateTime.Today:yyyy-MM-dd}.csv";
+        string defaultName = ExportFileName(account, DateTime.Today);
 
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
-            Title = "Export usage history",
+            Title = SettingsNames.ExportMeterHistoryTitle,
             FileName = defaultName,
             Filter = "CSV files (*.csv)|*.csv",
             DefaultExt = ".csv",
@@ -201,45 +254,23 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         try
         {
             var result = CsvExport.Build(_widget.History, _widget.AccountStore, account);
-            File.WriteAllText(dlg.FileName, result.Text);
+            File.WriteAllText(dlg.FileName, result.Text);   // streamer: export - the CSV the person asked for keeps real names
             Sounds.PlaySaveConfirmation();
-            Info($"Wrote {result.RowCount} rows to:\n{dlg.FileName}");
+            Info(ExportedMessage(result.RowCount, dlg.FileName));   // streamer: masked - via ExportedMessage: the saved path passes Mask.Paths (CP 4)
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             Sounds.PlayError();
-            Info($"Could not write {dlg.FileName}:\n{e.Message}");
+            Info(ExportFailedMessage(dlg.FileName, e.Message));   // streamer: masked - via ExportFailedMessage: path and error text pass Mask.Paths (CP 4)
         }
     }
 
-    [RelayCommand(CanExecute = nameof(NotDemo))]
-    private void ClearHistory()
-    {
-        bool confirm = Confirm(
-            "This permanently removes the local 30-day usage history file. " +
-            "Sparkline and history chart will be empty until new data " +
-            "accumulates.\n\nCredentials are not affected.");
-        if (!confirm)
-            return;
-
-        try
-        {
-            _widget.History.ClearAll();
-        }
-        catch (IOException e)
-        {
-            Sounds.PlayError();
-            Info($"Could not clear history file:\n{e.Message}");
-            return;
-        }
-        Changed?.Invoke();
-        Info("Local usage history file removed.");
-    }
+    /// <summary>Tests read the notices here instead of showing them.</summary>
+    internal Action<string>? InfoHook { get; set; }
 
     private void Info(string message)
-        => ThemedDialog.Show(_owner, "History", message, MessageBoxButton.OK, ThemedDialogKind.Info);
-
-    private bool Confirm(string message)
-        => ThemedDialog.Show(_owner, "Clear history?", message, MessageBoxButton.YesNo, ThemedDialogKind.Warning)
-           == MessageBoxResult.Yes;
+    {
+        if (InfoHook is not null) { InfoHook(message); return; }
+        ThemedDialog.Show(_owner, SettingsNames.MeterHistoryDialogTitle, message, MessageBoxButton.OK, ThemedDialogKind.Info);
+    }
 }

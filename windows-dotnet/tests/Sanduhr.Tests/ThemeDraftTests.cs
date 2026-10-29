@@ -105,4 +105,75 @@ public class ThemeDraftTests
         Assert.Equal(required, fields);
         Assert.All(ThemeDraft.ColorTokens, t => Assert.False(string.IsNullOrWhiteSpace(t.Job)));
     }
+
+    // ---- theme match: the canonical serializer carries font and desk ----
+
+    private static ThemeDefinition Matched() => ThemeCatalog.BuiltIns["obsidian"] with
+    {
+        Name = "Obsidian + Desk",
+        Font = "Consolas",
+        Desk = new ThemeDesk { Ink = ["#e8e4dc", "#6c63ff"], Plate = false, Shadow = "#070707", Font = "EsteFont Pro" },
+    };
+
+    [Fact]
+    public void Font_and_desk_survive_the_draft_round_trip()
+    {
+        var back = ThemeLint.Lint(ThemeDraft.FromDefinition("x", Matched()).ToJson()).Theme;
+        Assert.Equal(Matched(), back);
+    }
+
+    [Fact]
+    public void A_theme_without_font_or_desk_writes_neither_and_keeps_its_canonical_string()
+    {
+        var json = ThemeDraft.FromDefinition("obsidian", ThemeCatalog.BuiltIns["obsidian"]).ToJson();
+        Assert.False(json.ContainsKey("font"));
+        Assert.False(json.ContainsKey("desk"));
+        // Saved designs compare themes by this string: a theme from before theme match is still the same theme.
+        Assert.DoesNotContain("desk", DesignTheme.Canonical(ThemeCatalog.BuiltIns["obsidian"]));
+    }
+
+    [Fact]
+    public void The_draft_edits_font_and_desk_and_an_empty_one_writes_nothing()
+    {
+        var d = ThemeDraft.FromDefinition("obsidian", ThemeCatalog.BuiltIns["obsidian"]);
+        d.Font = "Segoe UI";
+        d.Desk = new ThemeDesk { Bars = ["#6c63ff"] };
+        var json = d.ToJson();
+        Assert.Equal("Segoe UI", (string?)json["font"]);
+        Assert.Equal("#6c63ff", (string?)json["desk"]!["bars"]![0]);
+        d.Desk = new ThemeDesk();
+        d.Font = "";
+        Assert.False(d.ToJson().ContainsKey("desk"));
+        Assert.False(d.ToJson().ContainsKey("font"));
+    }
+
+    [Fact]
+    public void Designs_and_get_desk_keep_a_matched_theme_whole()
+    {
+        // DeskState.Current and DesignTheme.Canonical both go through the draft: a field it dropped would vanish from every design.
+        var canonical = DesignTheme.Canonical(ThemeDraft.FromDefinition("x", Matched()).ToJson());
+        Assert.Equal("Consolas", (string?)canonical["font"]);
+        Assert.False((bool)canonical["desk"]!["plate"]!);
+    }
+
+    [Fact]
+    public void A_design_plan_keeps_font_and_desk_through_the_apply_path()
+    {
+        // DesignTheme.Plan (DeskDesignApply) lints the theme and canonicalizes it through the draft.
+        var theme = ThemeDraft.FromDefinition("x", Matched()).ToJson();
+        var plan = DesignTheme.Plan(theme, _ => null);
+        Assert.NotNull(plan);
+        Assert.Equal("Consolas", plan!.Definition.Font);
+        Assert.Equal(Matched().Desk, plan.Definition.Desk);
+        Assert.Contains("\"desk\"", DesignTheme.Canonical(plan.Definition));
+    }
+
+    [Fact]
+    public void The_draft_lint_passes_the_font_check_through()
+    {
+        var d = ThemeDraft.FromDefinition("obsidian", ThemeCatalog.BuiltIns["obsidian"]);
+        d.Font = "Nope Sans";
+        Assert.Contains(d.Lint(_ => false).Warnings, f => f.Field == "font");
+        Assert.Empty(d.Lint().Findings);
+    }
 }

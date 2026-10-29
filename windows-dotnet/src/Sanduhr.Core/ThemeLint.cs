@@ -49,6 +49,11 @@ public static class ThemeLint
     /// a gray has no hue to agree or disagree about.</summary>
     public const double HueSaturationFloor = 0.15;
 
+    /// <summary>A Desk gradient (desk.ink, desk.bars, desk.message) is one to this many colors.</summary>
+    public const int MaxDeskStops = 4;
+    /// <summary>desk.ink and desk.message stops against the theme's bg: the Desk's readable-contrast rule.</summary>
+    public const double DeskContrastMin = DeskDesign.MinContrast;
+
     /// <summary>The neutral mid-gray desktop the card is assumed to sit on when
     /// measuring text contrast through a translucent card.</summary>
     private static readonly (double R, double G, double B) Desktop = (0x80 / 255.0, 0x80 / 255.0, 0x80 / 255.0);
@@ -64,7 +69,9 @@ public static class ThemeLint
 
     /// <summary>Lint raw JSON text. A parse failure or a non-object document is a
     /// single Error finding on the field <c>json</c>.</summary>
-    public static ThemeLintResult Lint(string json)
+    /// <param name="fontAvailable">Whether this PC can draw a family (bundled, installed or a font pack); null skips the check
+    /// (the MCP server, which cannot know the PC's fonts).</param>
+    public static ThemeLintResult Lint(string json, Func<string, bool>? fontAvailable = null)
     {
         JsonObject? data;
         try
@@ -77,10 +84,10 @@ public static class ThemeLint
         }
         if (data is null)
             return new ThemeLintResult(null, new[] { Error("json", "Theme JSON must be an object.") });
-        return Lint(data);
+        return Lint(data, fontAvailable);
     }
 
-    public static ThemeLintResult Lint(JsonObject data)
+    public static ThemeLintResult Lint(JsonObject data, Func<string, bool>? fontAvailable = null)
     {
         var findings = new List<ThemeFinding>();
 
@@ -143,6 +150,9 @@ public static class ThemeLint
         CheckRange(data, "card_corner_radius", 0, 24, 10, findings);
         CheckRange(data, "breath_period_ms", 500, 20000, 4000, findings);
         bool optsOut = data["opts_out_of_mica"] is JsonNode oom && BoolOr(oom, false);
+        CheckFont(data, "font", findings);
+        if (data["desk"] is JsonNode deskNode)
+            CheckDesk(deskNode, findings);
 
         if (findings.Any(f => f.Level == ThemeFindingLevel.Error))
             return new ThemeLintResult(null, findings);
@@ -195,6 +205,31 @@ public static class ThemeLint
 
         if (optsOut && glassAlpha < 1.0)
             findings.Add(Warning("glass_alpha", "opts_out_of_mica is true, so set glass_alpha to 1.0; cards render translucent on non-Mica fallbacks otherwise."));
+
+        // The Desk draws ink and message stops over a plate tinted from bg (theme match): each must read on bg.
+        if (data["desk"] is JsonObject desk)
+        {
+            double bgL = Luminance(colors["bg"]);
+            foreach (var key in new[] { "ink", "message" })
+            {
+                if (desk[key] is not JsonArray stops) continue;
+                foreach (var stop in stops)
+                {
+                    if (StringOrNull(stop) is not { } hex || !TryParseHex(hex, out var rgb)) continue;
+                    double ratio = Contrast(Luminance(rgb), bgL);
+                    if (ratio < DeskContrastMin)
+                        findings.Add(Warning("desk." + key, $"desk.{key} color {hex} reads at {ratio:0.0}:1 on bg (needs {DeskContrastMin:0.0}:1); the Desk draws it over a plate tinted from bg."));
+                }
+            }
+        }
+        if (fontAvailable is not null)
+        {
+            foreach (var (label, family) in new[] { ("font", StringOrNull(data["font"])), ("desk.font", StringOrNull((data["desk"] as JsonObject)?["font"])) })
+            {
+                if (family is { Length: > 0 } f && BundledFonts.Bundled(f) is null && !fontAvailable(f))
+                    findings.Add(Warning(label, $"{label} {f} is not installed on this PC or in a font pack; the widget shows Segoe UI and the Desk {DeskFont.DefaultFamily} until it is."));
+            }
+        }
 
         return new ThemeLintResult(ThemeCatalog.BuildDefinition(data), findings);
     }
@@ -361,5 +396,48 @@ public static class ThemeLint
         string? s = StringOrNull(n);
         if (s is null || !TryParseHex(s, out _))
             findings.Add(Error(label, $"{label} must be a #rrggbb color or null, got {Describe(n)}."));
+    }
+
+    /// <summary>A font family (theme match): a family name as the font pickers show it, never a path, a link or a list.</summary>
+    private static void CheckFont(JsonObject o, string key, List<ThemeFinding> findings, string? label = null)
+    {
+        label ??= key;
+        if (o[key] is not JsonNode n)
+            return;
+        string? family = StringOrNull(n);
+        if (family is null || family.Trim().Length == 0)
+            findings.Add(Error(label, $"{label} must be a font family name, got {Describe(n)}."));
+        else if (DeskDesign.FontFamilyProblem(family) is { } why)
+            findings.Add(Error(label, $"{label} {why}."));
+    }
+
+    /// <summary>The desk object (theme match): its known fields' shapes are errors; an unknown field is a warning and is ignored, so a
+    /// theme written by a newer Sanduhr still loads.</summary>
+    private static void CheckDesk(JsonNode node, List<ThemeFinding> findings)
+    {
+        if (node is not JsonObject desk)
+        {
+            findings.Add(Error("desk", $"desk must be an object: ink, bars and message (1 to {MaxDeskStops} #rrggbb colors each), glow, plate_color and shadow (#rrggbb), plate (true or false) and font, every one optional."));
+            return;
+        }
+        foreach (var key in new[] { "ink", "bars", "message" })
+        {
+            if (!desk.ContainsKey(key)) continue;
+            var n = desk[key];
+            if (n is not JsonArray arr || arr.Count is < 1 or > MaxDeskStops || arr.Any(s => StringOrNull(s) is not { } h || !TryParseHex(h, out _)))
+                findings.Add(Error("desk." + key, $"desk.{key} must be a list of 1 to {MaxDeskStops} #rrggbb colors, got {Describe(n)}."));
+        }
+        foreach (var key in new[] { "glow", "plate_color", "shadow" })
+        {
+            if (!desk.ContainsKey(key)) continue;
+            var n = desk[key];
+            if (StringOrNull(n) is not { } hex || !TryParseHex(hex, out _))
+                findings.Add(Error("desk." + key, $"desk.{key} must be a #rrggbb color, got {Describe(n)}."));
+        }
+        if (desk.ContainsKey("plate") && !(desk["plate"] is JsonValue pv && pv.TryGetValue<bool>(out _)))
+            findings.Add(Error("desk.plate", $"desk.plate must be true or false, got {Describe(desk["plate"])}."));
+        CheckFont(desk, "font", findings, "desk.font");
+        foreach (var unknown in desk.Select(kv => kv.Key).Where(k => !ThemeDesk.Fields.Contains(k)).Order(StringComparer.Ordinal).Take(5))
+            findings.Add(Warning("desk." + unknown, $"desk.{unknown} is not a Desk field; it is ignored. The fields are {string.Join(", ", ThemeDesk.Fields)}."));
     }
 }

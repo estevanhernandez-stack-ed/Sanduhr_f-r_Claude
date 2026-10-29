@@ -52,6 +52,10 @@ public sealed record ResetStepResult(ResetPart Part, bool Ok, IReadOnlyList<stri
 /// <summary>One file or folder a part deletes.</summary>
 public sealed record ResetItem(string Path, bool IsDirectory);
 
+/// <summary>One Claude Code folder that holds Sanduhr's entries, for Reset's list: the real folder and the kinds Sanduhr put there,
+/// in <see cref="SettingsNames.ResetKindOrder"/>. Each kind can be kept or removed on its own.</summary>
+public sealed record ResetFolder(string Path, IReadOnlyList<IntegrationKind> Kinds);
+
 /// <summary>
 /// Reset Sanduhr… (spec 4.7): the ordered steps, the keep-going run, and the inventory of what each
 /// part deletes. The run takes its actions as a delegate, so order and the keep-going rule are tested
@@ -213,6 +217,12 @@ public static partial class ResetPlan
         AddFile(settings, Path.Combine(ext, DeskDesign.StateFile));
         // The wallpaper preview Claude Code can look at is a copy of the wallpaper: it goes with the state.
         AddFile(settings, Path.Combine(ext, WallpaperPreview.FileName));
+        // Streamer mode (Settings v2, slice 7; spec, Reset): the codename book and its crashed-write .tmp go with the settings. streamer.json (and its crashed-write
+        // .tmp) is taken from the shared folder by its own names only.
+        AddFile(settings, paths.CodenamesFile);
+        AddFile(settings, paths.CodenamesFile + ".tmp");   // Codenames.Save's crashed write: it holds the salt and every real name
+        AddFile(settings, Path.Combine(ext, StreamerFile.FileName));
+        AddFile(settings, Path.Combine(ext, StreamerFile.FileName + ".tmp"));
         map[ResetPart.Settings] = Finish(settings, backups);
 
         return map;
@@ -255,5 +265,72 @@ public static partial class ResetPlan
         if (!Directory.Exists(dir)) return;
         foreach (var d in Directory.EnumerateDirectories(dir).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
             if (match(Path.GetFileName(d))) to.Add(new ResetItem(d, true));
+    }
+
+    public const string ReceiptsFileName = "installs.json";
+
+    /// <summary>The receipts file the installers share: <c>integrations\installs.json</c> under Sanduhr's AppData folder.</summary>
+    public static string ReceiptsFile(Paths paths) => Path.Combine(paths.AppDataDir, IntegrationsName, ReceiptsFileName);
+
+    /// <summary>
+    /// True when the receipts file is there and some of it can't be read, or a damaged copy was set aside beside it
+    /// (<c>installs.json*.unreadable</c>). The one rule Core, the service and the dialog all read: Reset then keeps every file
+    /// Sanduhr's Claude Code entries need, and the receipts, so nothing it can't list is left without a way to remove it (slice 8
+    /// decision 4). Read before the undo runs: a receipt save moves a damaged file aside.
+    /// </summary>
+    public static bool ReceiptsUnreadable(string receiptsFile)
+    {
+        try
+        {
+            string dir = Path.GetDirectoryName(receiptsFile)!;
+            if (Directory.Exists(dir)
+                && Directory.EnumerateFiles(dir, Path.GetFileName(receiptsFile) + "*" + ReceiptLog.AsideSuffix).Any())
+                return true;
+            return File.Exists(receiptsFile) && new ReceiptStore(receiptsFile).Load().Skipped > 0;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
+    public static bool ReceiptsUnreadable(Paths paths) => ReceiptsUnreadable(ReceiptsFile(paths));
+
+    /// <summary>
+    /// Every Claude Code folder that holds Sanduhr's entries, once each: the folders Settings lists, in its order, then any folder a
+    /// receipt names that the list no longer has. A folder's kinds are its receipts' kinds, plus <see cref="IntegrationKind.Mcp"/>
+    /// when <paramref name="mcpRegistered"/> finds the MCP entry (Windows keeps no receipt for it) and
+    /// <see cref="IntegrationKind.Statusline"/> when <paramref name="statuslineRegistered"/> finds one without a receipt (early
+    /// installs, lost receipts). A folder written two ways is one folder. Rows key on the real path.
+    /// </summary>
+    public static IReadOnlyList<ResetFolder> FoldersWithEntries(
+        IEnumerable<IntegrationReceipt> receipts, IEnumerable<CcFolder> known,
+        Func<CcFolder, bool> mcpRegistered, Func<CcFolder, bool> statuslineRegistered)
+    {
+        var order = new List<string>();
+        var kinds = new Dictionary<string, HashSet<IntegrationKind>>(StringComparer.OrdinalIgnoreCase);
+        void Add(string path, IntegrationKind kind)
+        {
+            string norm = ClaudeCodeFolders.Norm(path);
+            if (norm.Length == 0) return;
+            if (!kinds.TryGetValue(norm, out var set))
+            {
+                kinds[norm] = set = [];
+                order.Add(norm);
+            }
+            set.Add(kind);
+        }
+
+        var receiptList = receipts.ToList();
+        foreach (var folder in known)
+        {
+            foreach (var r in receiptList.Where(r => ClaudeCodeFolders.Same(r.Folder, folder.Path)))
+                Add(folder.Path, r.Kind);
+            if (mcpRegistered(folder)) Add(folder.Path, IntegrationKind.Mcp);
+            if (statuslineRegistered(folder)) Add(folder.Path, IntegrationKind.Statusline);
+        }
+        foreach (var r in receiptList)
+            Add(r.Folder, r.Kind);
+        return [.. order.Select(p => new ResetFolder(p, [.. SettingsNames.ResetKindOrder.Where(kinds[p].Contains)]))];
     }
 }

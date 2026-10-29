@@ -16,6 +16,10 @@ internal partial class VaultConsentDialog : Window
     private readonly Dictionary<string, CheckBox> _checkboxes = new(StringComparer.Ordinal);
     private bool _keep;
 
+    internal static VaultConsentDialog ForTests(IReadOnlyList<string> rootNames) => new(rootNames);
+
+    internal IReadOnlyDictionary<string, CheckBox> RootBoxesForTests => _checkboxes;
+
     private VaultConsentDialog(IReadOnlyList<string> rootNames)
     {
         InitializeComponent();
@@ -23,7 +27,7 @@ internal partial class VaultConsentDialog : Window
         {
             var cb = new CheckBox
             {
-                Content = root,
+                Content = StreamerMode.Mask.FolderName(root),   // slice 7, M7: the key below stays the real folder   // streamer: masked - CP 11: Mask.FolderName masks on this line
                 IsChecked = true,   // pre-checked; the prompt itself is the consent gate
                 Style = (Style)FindResource("ConsentCheckBox"),
             };

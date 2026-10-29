@@ -27,7 +27,7 @@ namespace Sanduhr.App.ViewModels;
 /// </summary>
 public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 {
-    private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan RefreshInterval = UsageSchedule.Refresh;
     private static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan RiffInterval = TimeSpan.FromSeconds(4);
 
@@ -131,6 +131,15 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// a single account the switcher is a flat, non-interactive label.</summary>
     [ObservableProperty] private bool _accountSwitcherClickable;
 
+    /// <summary>Streamer mode is on (slice 7): the chip draws its eye-slash glyph (owner taste 4).</summary>
+    [ObservableProperty] private bool _streamerOn;
+
+    /// <summary>The chip as spoken: its text, then "Streamer mode on" while on (SettingsNames.StreamerChipName).</summary>
+    [ObservableProperty] private string _accountSwitcherName = "";
+
+    /// <summary>Test seam: runs a message through the same Fail path the refresh error uses.</summary>
+    internal void FailForTests(string message) => Fail($"Error: {Truncate(StreamerMode.Mask.Paths(message), 200)}");
+
     [ObservableProperty] private string _footerText = "";
     [ObservableProperty] private string _planBadgeName = "";
     [ObservableProperty] private string _planTooltip = "";
@@ -205,7 +214,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <summary>The active account's credential origin — routes the recovery card.
     /// Embedded when signed out (FirstRun copy doesn't branch on origin anyway).</summary>
     private AccountOrigin ActiveOrigin
-        => _accounts.GetActive() is { } label ? _accounts.GetOrigin(label) : AccountOrigin.Embedded;
+        => _accounts.GetActive() is { } label ? _accounts.GetOrigin(label) : AccountOrigin.Embedded;   // streamer: key - looks up the active account's origin, never drawn
 
     /// <summary>Card headline for the current reason (empty when hidden).</summary>
     public string PromptHeadline => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason, ActiveOrigin).Headline;
@@ -310,7 +319,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     public event Func<Task>? PasteKeyRequested;
 
     /// <summary>Raised by the "Settings…" command (title-bar chip, widget right-click,
-    /// tray) — App opens the <c>SettingsWindow</c> on the Accounts tab.</summary>
+    /// tray). App opens the <c>SettingsWindow</c>; which page it lands on is App's rule.</summary>
     public event Func<Task>? SettingsRequested;
 
     /// <summary>Raised by <see cref="OpenSettingsAtAsync"/> — App opens (or focuses) Settings
@@ -359,21 +368,25 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>The user theme drop-in folder, for the Settings "Open themes folder"
     /// and save/reload flows.</summary>
-    public string ThemesDir => _paths.ThemesDir;
+    public string ThemesDir => _paths.ThemesDir;   // streamer: notname - path accessor for the theme store, never drawn as is
+
+    /// <summary>Whether this PC can draw a font family (bundled, installed or a font pack), for the theme lint's font warning. App sets
+    /// it; the default (tests, the harness) answers yes, so no warning appears there.</summary>
+    public Func<string, bool> FontAvailable { get; set; } = _ => true;
 
     /// <summary>True when <paramref name="key"/> resolves to a loaded theme
     /// (built-in or user). Lets the Settings tab guard Apply before switching.</summary>
     public bool HasTheme(string key) => _themes.ContainsKey(key);
 
     /// <summary>Account labels in registry order — drives the quick-switch menus.</summary>
-    public IReadOnlyList<string> ListAccounts() => _accounts.ListAccounts();
+    public IReadOnlyList<string> ListAccounts() => _accounts.ListAccounts();   // streamer: key - label source for the menus; every surface that draws it masks (CP 1, 2, 3, 5)
 
     /// <summary>The active account label, or null when signed out.</summary>
-    public string? ActiveAccount => _accounts.GetActive();
+    public string? ActiveAccount => _accounts.GetActive();   // streamer: key - label source; every surface that draws it masks (CP 1, 2, 3, 5)
 
     /// <summary>The accounts a surface shows: the sample accounts while demo mode runs, so no
     /// real label reaches Settings or a menu in a screenshot; the registry otherwise.</summary>
-    public IReadOnlyList<string> ShownAccounts => IsDemo ? DemoMode.Accounts : ListAccounts();
+    public IReadOnlyList<string> ShownAccounts => IsDemo ? DemoMode.Accounts : ListAccounts();   // streamer: key - label source; every surface that draws it masks (CP 1, 2, 3, 5)
 
     /// <summary>The account a surface marks as active: the sample one in demo mode.</summary>
     public string? ShownActiveAccount => IsDemo ? _demoAccount : ActiveAccount;
@@ -390,11 +403,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>The per-account usage history store — shared with the Settings
-    /// History tab (chart + CSV export) so it reads the same files the live
+    /// Claude Usage, Meters (chart + CSV export) so it reads the same files the live
     /// widget writes.</summary>
     public UsageHistory History => _history;
 
-    /// <summary>The multi-account registry — the Settings History tab's account
+    /// <summary>The multi-account registry — the Settings Meters view's account
     /// selector + CSV export read account labels from here.</summary>
     public AccountStore AccountStore => _accounts;
 
@@ -495,20 +508,23 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>Where the statusline helper script installs — OUTSIDE the package
     /// trees so it survives app updates (the widget re-writes it on start).</summary>
-    public string StatuslineBinDir => _paths.StatuslineBinDir;
+    public string StatuslineBinDir => _paths.StatuslineBinDir;   // streamer: notname - path accessor for the installers, never drawn as is
 
     /// <summary>The Sanduhr app-data dir — the MCP installer's root for the
     /// launcher (bin\) and versioned server dirs (mcp\).</summary>
-    public string SanduhrAppDataDir => _paths.AppDataDir;
+    public string SanduhrAppDataDir => _paths.AppDataDir;   // streamer: notname - path accessor for the installers; About draws the folder through Mask.Paths
 
     /// <summary><c>%USERPROFILE%\.sanduhr</c>: where the server copies, the launcher, the mod and every
     /// file a process outside the package reads live (spec Plan B). The installers take it as
     /// <c>externalDir</c>.</summary>
-    public string SanduhrExternalDir => _paths.ExternalDir;
+    public string SanduhrExternalDir => _paths.ExternalDir;   // streamer: notname - path accessor for the installers; About draws the folder through Mask.Paths
+
+    /// <summary>Streamer mode (Settings v2, slice 7): the switch, the codename book and streamer.json.</summary>
+    public StreamerService Streamer { get; }
 
     /// <summary>The pre-3.5.0 meters mod root (<c>%APPDATA%\Sanduhr\mods</c>): entries under it still read as
     /// Sanduhr's, so Install, Status and Reset handle them.</summary>
-    public string SanduhrLegacyModsRoot => _paths.LegacyModsRoot;
+    public string SanduhrLegacyModsRoot => _paths.LegacyModsRoot;   // streamer: notname - path accessor for the installers, never drawn as is
 
     // -- WS-E MCP integration facade -------------------------------------------
 
@@ -544,7 +560,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         try
         {
             _snapshotWriter?.WriteOk(data, HasPlanBadge ? PlanBadgeName : null,
-                _accounts.GetActive(), DateTimeOffset.UtcNow);
+                _accounts.GetActive(), DateTimeOffset.UtcNow);   // streamer: cant - snapshot.json feeds the MCP server and the statusline; MCP answers are on the can't-reach list
         }
         catch
         {
@@ -562,7 +578,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         try
         {
             _snapshotWriter?.WriteError(errorKind, HasPlanBadge ? PlanBadgeName : null,
-                _accounts.GetActive(), DateTimeOffset.UtcNow);
+                _accounts.GetActive(), DateTimeOffset.UtcNow);   // streamer: cant - snapshot.json feeds the MCP server and the statusline; MCP answers are on the can't-reach list
         }
         catch
         {
@@ -576,7 +592,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         try
         {
-            File.AppendAllText(_paths.LogFile, $"{DateTime.UtcNow:o} {line}{Environment.NewLine}");
+            File.AppendAllText(_paths.LogFile, $"{DateTime.UtcNow:o} {line}{Environment.NewLine}");   // streamer: notname - written to the log file, never drawn
         }
         catch
         {
@@ -630,6 +646,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// contexts and inert on the Velopack build.</summary>
     public void AttachStoreUpdateService(StoreUpdateService service) => _storeUpdate = service;
 
+    private Sanduhr.App.Updates.UpdateChecker? _updateChecker;
+
+    /// <summary>The GitHub update check (Settings, About, Updates). Attached by App; rides the 30-second tick, asks at most once a day and
+    /// never while "update_check" is off. Null in unit contexts.</summary>
+    public void AttachUpdateChecker(Sanduhr.App.Updates.UpdateChecker checker) => _updateChecker = checker;
+
     /// <summary>The catalog key of the live palette (what the strip marks active
     /// and settings.json remembers). The theme handoff reports it as
     /// previous_key so an agent can offer the way back.</summary>
@@ -666,21 +688,42 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         }
     }
 
-    public WidgetViewModel()
+    public WidgetViewModel() : this(new Paths(), new AccountStore(new WindowsCredentialManager(AccountStore.Service)))
     {
-        _paths = new Paths();
-        _accounts = new AccountStore(new WindowsCredentialManager(AccountStore.Service));
+    }
+
+    /// <summary>The same widget over the given folders and account registry. Tests hand it a scratch
+    /// <see cref="Paths"/> and an in-memory registry so nothing touches the real AppData or Credential Manager.</summary>
+    internal WidgetViewModel(Paths paths, AccountStore accounts)
+    {
+        _paths = paths;
+        _accounts = accounts;
         _credentials = new CredentialStore(_accounts, _paths);
         _history = new UsageHistory(_accounts, _paths);
         _settings = new SettingsStore(_paths);
-        _ccReader = new CcLogReader(null, () => ClaudeCodeHomes.Discover(
-            ClaudeCodeProfile.Dir,
+        // Streamer mode (Settings v2, slice 7): the widget owns the switch, the codename book and streamer.json; StreamerMode.Mask is set here.
+        // The dispatcher is read once, here, so a mask call from another thread still posts its save to the UI thread (preflight P10).
+        var ui = Dispatcher.CurrentDispatcher;
+        Streamer = new StreamerService(_paths, _settings,
+            () => ClaudeCodeFolders.Build(ClaudeCodeProfile.Dir, ClaudeCodeProfile.ConfigDir, _settings.LoadCcFoldersAdded()),   // streamer: notname - profile folder handed to the streamer service as its mask root
+            () => ClaudeCodeProfile.Dir,
+            post: a => ui.BeginInvoke(a, DispatcherPriority.Background));
+        Streamer.Load();
+        StreamerOn = Streamer.On;
+        Streamer.Changed += OnStreamerChanged;
+        _ccReader = new CcLogReader(ClaudeCodeProfile.Dir, () => ClaudeCodeHomes.Discover(   // streamer: notname - the profile folder the log reader joins its folder names to, never drawn
+            ClaudeCodeProfile.Dir,   // streamer: notname - profile folders handed to the log reader, never drawn
             ClaudeCodeProfile.ConfigDir));
 
         _alertConfig = _settings.LoadAlertConfig();
-        AlertSettingsChanged += () => _alertConfig = _settings.LoadAlertConfig();
+        AlertSettingsChanged += () =>
+        {
+            _alertConfig = _settings.LoadAlertConfig();
+            // The bars' usage signal (theme match) follows Alerts' thresholds.
+            foreach (var card in Tiers) card.SetThresholds(_alertConfig.WarnPct, _alertConfig.UrgentPct);
+        };
 
-        _snapshotWriter = new SnapshotWriter(_paths.SnapshotFile, LogSnapshotFailure, AppVersion);
+        _snapshotWriter = new SnapshotWriter(_paths.SnapshotFile, LogSnapshotFailure, AppVersion);   // streamer: notname - a file location used for IO, never drawn
         _statuslineEnabled = _settings.LoadStatuslineEnabled();
         _mcpEnabled = _settings.LoadMcpEnabled();
 
@@ -696,7 +739,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             OnReadings = () => InUseChanged?.Invoke(),
             OnResult = (label, reading) => _seatMeters!.FollowerAnswered(label, reading),
         };
-        _seatMeters = new SeatMeters(_paths.ExternalDir,RefreshInterval, _inactiveReader, AppVersion, LogSnapshotFailure)
+        _seatMeters = new SeatMeters(_paths.ExternalDir,RefreshInterval, _inactiveReader, AppVersion, LogSnapshotFailure)   // streamer: notname - a file location used for IO, never drawn
         {
             Context = SeatContextNow,
             CredentialsOf = _accounts.LoadCredentials,
@@ -748,7 +791,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // their own Json/IO faults; guard anyway so a migration fault never blocks
         // first paint.
         try { _credentials.MigrateFromV1(); }
-        catch (Exception ex) { Debug.WriteLine($"[Sanduhr.Migrate] skipped: {ex.Message}"); }
+        catch (Exception ex) { Debug.WriteLine($"[Sanduhr.Migrate] skipped: {ex.Message}"); }   // streamer: notname - written to the log file, never drawn
 
         RebuildFetcher();
         RefreshAccountLabel();
@@ -777,7 +820,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <c>themes.load_user_themes</c>.</summary>
     private void RebuildThemeMap()
     {
-        _themes = PackThemes.Merged(_paths.ThemesDir, new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng), Log);
+        _themes = PackThemes.Merged(_paths.ThemesDir, new WidgetStore(_paths.WidgetsDir, WidgetCatalogService.EncodePng), Log);   // streamer: notname - a file location used for IO, never drawn
     }
 
     /// <summary>Rebuild the swatch collection: built-ins in display order, then any
@@ -946,7 +989,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         else _accountFolders[label] = path.Trim();
         _settings.SaveAccountFolders(_accountFolders);
         SyncSeats();
-        if (!IsDemo && label == _accounts.GetActive() && _lastData is { } data)
+        if (!IsDemo && label == _accounts.GetActive() && _lastData is { } data)   // streamer: key - seeds the seat meters for the active label, never drawn
             _seatMeters.Seed(data, _lastFetchAt, label, HasPlanBadge ? PlanBadgeName : null);
     }
 
@@ -955,11 +998,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private AccountFollow.State FollowState()
     {
-        var labels = _accounts.ListAccounts();
+        var labels = _accounts.ListAccounts();   // streamer: key - account state for the follower, never drawn
         return new AccountFollow.State
         {
             Enabled = _followAccount && !IsDemo,
-            Active = _accounts.GetActive(),
+            Active = _accounts.GetActive(),   // streamer: key - account state for the follower, never drawn
             SignedIn = SignedInLabels(labels),
             ActiveSignedOut = Reason != SignInReason.None,
             Switching = _switchingAccount,
@@ -968,12 +1011,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private SeatMeters.SeatContext SeatContextNow()
     {
-        var labels = _accounts.ListAccounts();
+        var labels = _accounts.ListAccounts();   // streamer: key - account state for the seat writer, never drawn
         return new SeatMeters.SeatContext
         {
             Linked = SeatFiles.Linked(_accountFolders, labels),
             SignedIn = SignedInLabels(labels),
-            Active = _accounts.GetActive(),
+            Active = _accounts.GetActive(),   // streamer: key - account state for the seat writer, never drawn
             InUse = _follower.OthersInUse(),
         };
     }
@@ -994,7 +1037,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (IsDemo) return;
         try
         {
-            var label = _accounts.GetActive();
+            var label = _accounts.GetActive();   // streamer: cant - seat files are read by the MCP server; MCP answers are on the can't-reach list
             _follower.RecordActive(label, data);
             _seatMeters.ActiveAnswered(label, data, HasPlanBadge ? PlanBadgeName : null);
         }
@@ -1004,7 +1047,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void OnActiveFetchFailed(string errorKind)
     {
         if (IsDemo) return;
-        try { _seatMeters.ActiveFailed(_accounts.GetActive(), errorKind, HasPlanBadge ? PlanBadgeName : null); }
+        try { _seatMeters.ActiveFailed(_accounts.GetActive(), errorKind, HasPlanBadge ? PlanBadgeName : null); }   // streamer: cant - seat files are read by the MCP server; MCP answers are on the can't-reach list
         catch (Exception e) { LogSnapshotFailure($"seat write failed ({e.GetType().Name})"); }
     }
 
@@ -1078,6 +1121,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _demoData = null;
         _lastData = null;
         Tiers.Clear();
+        ResetShownOrder();
         ClearTray();   // the sample percent never lingers on the tray unlabelled
         FooterText = "";
         OnPropertyChanged(nameof(DemoAccount));
@@ -1194,7 +1238,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// one starts its 30-minute spacing instead. Follow never switches in demo mode.</summary>
     private async Task SwitchAccountCoreAsync(string? label, bool automatic)
     {
-        if (string.IsNullOrEmpty(label) || (label == _accounts.GetActive() && !IsDemo))
+        if (string.IsNullOrEmpty(label) || (label == _accounts.GetActive() && !IsDemo))   // streamer: key - compares labels to decide a switch, never drawn
             return;
         if (automatic && (IsDemo || _switchingAccount))
             return;
@@ -1221,6 +1265,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // numbers (WS-E). The next successful fetch rewrites it.
         _snapshotWriter?.Delete();
         Tiers.Clear();
+        ResetShownOrder();
         _alertEngine.Reset();
         _lastData = null;
         StatusText = "Switching account…";
@@ -1250,7 +1295,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             ShowDemoAccount();
             return;
         }
-        var labels = _accounts.ListAccounts().ToList();
+        var labels = _accounts.ListAccounts().ToList();   // streamer: key - picks the next account in order, never drawn
         if (labels.Count < 2)
             return;
         var active = _accounts.GetActive();
@@ -1300,13 +1345,13 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         bool leftDemo = IsDemo;
         if (leftDemo)
             LeaveDemo();
-        if (leftDemo && _accounts.GetActive() != label)
+        if (leftDemo && _accounts.GetActive() != label)   // streamer: key - compares labels on removal, never drawn
         {
             RebuildFetcher();
             RefreshAccountLabel();
             _ = RefreshAsync();
         }
-        bool wasActive = _accounts.GetActive() == label;
+        bool wasActive = _accounts.GetActive() == label;   // streamer: key - compares labels on removal, never drawn
         if (wasActive)
         {
             // Release the transport's hold on the shared profile BEFORE cleanup.
@@ -1326,11 +1371,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (wasActive)
         {
             Tiers.Clear();
+            ResetShownOrder();
             _lastData = null;
             // The snapshot belongs to the active account — removal revokes the
             // artifact, not just the writer (WS-E lifecycle-delete rule).
             _snapshotWriter?.Delete();
-            if (_accounts.ListAccounts().Count == 0)
+            if (_accounts.ListAccounts().Count == 0)   // streamer: key - a count, never drawn
                 await PurgeTransportProfileBestEffortAsync();
             RebuildFetcher();
             await RefreshAsync();
@@ -1345,7 +1391,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// init's cookie wipe (best-effort — the app must keep working regardless).</summary>
     private async Task PurgeTransportProfileBestEffortAsync()
     {
-        var profile = _paths.WebView2FetchDir;
+        var profile = _paths.WebView2FetchDir;   // streamer: notname - a file location used for IO, never drawn
         for (int attempt = 0; attempt < 3; attempt++)
         {
             try
@@ -1361,7 +1407,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         }
         try
         {
-            File.AppendAllText(_paths.LogFile,
+            File.AppendAllText(_paths.LogFile,   // streamer: notname - written to the log file, never drawn
                 $"{DateTime.UtcNow:o} webview2-fetch purge failed — cookies remain until the next transport init{Environment.NewLine}");
         }
         catch
@@ -1495,7 +1541,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             if (_transport.Lost)
                 Fail(TransportLostStatus);
             else
-                Fail($"Error: {Truncate(ex.Message, 60)}");
+                Fail($"Error: {Truncate(StreamerMode.Mask.Paths(ex.Message), 60)}");   // M8: an exception's text can carry a path   // streamer: masked - M8: the error text passes Mask.Paths on this line
             return RefreshOutcome.Other;
         }
         finally
@@ -1530,7 +1576,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // retry window; a failed retry falls back to the honest Fail() text.
         StatusText = "Reconnecting…";
         int generation = _fetcherGeneration;
-        await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(true);
+        await Task.Delay(UsageSchedule.RetryAfterFailure).ConfigureAwait(true);
         if (generation != _fetcherGeneration || _fetcher is null || _lastData is not null || Reason != SignInReason.None)
             return;
         await RefreshCoreAsync().ConfigureAwait(true);
@@ -1539,8 +1585,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void TogglePin()
     {
-        Pinned = !Pinned;
-        _settings.SavePinned(Pinned);
+        SetPinned(!Pinned);
     }
 
     /// <summary>Toggle compact mode — collapse the card list to the busiest tier and
@@ -1571,10 +1616,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         var styles = (SparklineStyle[])Enum.GetValues(typeof(SparklineStyle));
         int i = Array.IndexOf(styles, SparklineStyle);
-        SparklineStyle = styles[(i + 1) % styles.Length];
-        foreach (var card in Tiers)
-            card.ApplyStyle(SparklineStyle);
-        _settings.SaveSparklineStyle(SparklineStyle);
+        SetSparklineStyle(styles[(i + 1) % styles.Length]);
         Sounds.PlayToggle();
     }
 
@@ -1615,10 +1657,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void ClearSignedInChrome()
     {
         Tiers.Clear();
+        ResetShownOrder();
         _lastData = null;
         HasPlanBadge = false;
         PlanTooltip = "";
         AccountSwitcherText = "";
+        AccountSwitcherName = "";
         AccountSwitcherClickable = false;
         FooterText = "";
     }
@@ -1644,6 +1688,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // A waiting Store update cannot install while this process holds its
         // files, so the widget tells the person and offers Restart to update.
         _storeUpdate?.Tick(DateTimeOffset.Now);
+        // The GitHub build's daily check, so a widget left running for days still asks once a day (slice 6, decision 8).
+        _updateChecker?.Tick();
 
         if (ShownData is null)
             return;
@@ -1709,6 +1755,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         var hiddenKeys = new HashSet<string>(_hidden);
         hiddenKeys.UnionWith(_limitState.HiddenUntilReset.Keys);
         var active = TierModel.ActiveTiers(utilByKey, _savedOrder, hiddenKeys);
+        // Settings, Widget, Limit order lists these, in this order, whatever compact mode shows.
+        _shownOrder = [.. active];
         // The Desk draws the visible tiers in order whatever compact mode shows; its Claude line
         // reads session and week whether or not their cards are hidden (spec 5.1).
         _deskTiers = [.. active.Select(k => DeskTierFor(data, k, utilByKey[k]))];
@@ -1745,6 +1793,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             if (!existing.TryGetValue(key, out var vm))
             {
                 vm = new TierCardViewModel(key, _palette);
+                vm.SetThresholds(_alertConfig.WarnPct, _alertConfig.UrgentPct);
                 Tiers.Insert(Math.Min(i, Tiers.Count), vm);
                 existing[key] = vm;
             }
@@ -1773,6 +1822,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         RaiseTray();
 
         RaiseDesk();
+        LimitsChanged?.Invoke();
     }
 
     private static DeskTier DeskTierFor(JsonObject data, string key, double? util) =>
@@ -1788,8 +1838,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         get
         {
             bool signIn = !IsDemo && Reason != SignInReason.None;
-            string? account = IsDemo ? DemoMode.ChipText(_demoAccount)
-                : _accounts.ListAccounts().Count > 1 ? _accounts.GetActive() : null;
+            // Streamer mode (slice 7, decision 3): the Claude line names the account by its codename, in every style and in its reminder.
+            string? account = IsDemo ? DemoMode.ChipText(_demoAccount)   // streamer: demo - demo's sample name is not a real one
+                : _accounts.ListAccounts().Count > 1 && _accounts.GetActive() is { } active   // streamer: masked - CP 5: Mask.Name masks on the next line
+                    ? StreamerMode.Mask.Name(CodenameCategory.Account, active) : null;
             return new DeskUsage(signIn ? [] : _deskTiers,
                 IsDemo ? DateTimeOffset.Now : _lastFetchAt,
                 signIn, Reason == SignInReason.FirstRun, account, signIn ? [] : _deskLineTiers,
@@ -1857,7 +1909,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         {
             try
             {
-                File.AppendAllText(_paths.LogFile,
+                File.AppendAllText(_paths.LogFile,   // streamer: notname - written to the log file, never drawn
                     $"{DateTime.UtcNow:o} alert evaluate failed ({e.GetType().Name}){Environment.NewLine}");
             }
             catch { }
@@ -1894,24 +1946,38 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         PlanTooltip = _riffs[_riffIndex];
     }
 
-    private void RefreshAccountLabel()
+    internal void RefreshAccountLabel()   // internal: the chip tests read it without Start()
     {
         if (IsDemo)
         {
-            AccountSwitcherText = $"⇆ {DemoMode.ChipText(_demoAccount)}";
+            AccountSwitcherText = $"⇆ {DemoMode.ChipText(_demoAccount)}";   // streamer: demo - demo's sample name is not a real one
+            AccountSwitcherName = AccountSwitcherText;
             AccountSwitcherClickable = true;
             return;
         }
-        var active = _accounts.GetActive();
+        var active = _accounts.GetActive();   // streamer: masked - CP 1: the chip masks the label with Mask.Name below
         if (active is null)
         {
             AccountSwitcherText = "";
+            AccountSwitcherName = "";
             AccountSwitcherClickable = false;
             return;
         }
-        bool multiple = _accounts.ListAccounts().Count > 1;
-        AccountSwitcherText = multiple ? $"⇆ {active}" : active;
+        bool multiple = _accounts.ListAccounts().Count > 1;   // streamer: key - a count, never drawn
+        // Streamer mode (slice 7, M1): the chip names the account by its codename; the indicator says why.
+        var shown = StreamerMode.Mask.Name(CodenameCategory.Account, active);
+        AccountSwitcherText = multiple ? $"⇆ {shown}" : shown;
+        AccountSwitcherName = SettingsNames.StreamerChipName(AccountSwitcherText, StreamerMode.On);
         AccountSwitcherClickable = multiple;
+    }
+
+    /// <summary>The switch moved, the codenames were shuffled or a name was shown (slice 7): the chip and the Desk read their names again.
+    /// The widget listens to its own service, and detaches in Dispose.</summary>
+    private void OnStreamerChanged()
+    {
+        StreamerOn = Streamer.On;
+        RefreshAccountLabel();
+        DeskUsageChanged?.Invoke();
     }
 
     private void UpdateFooter()
@@ -1939,6 +2005,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (oldIndex == newIndex) return;
         Tiers.Move(oldIndex, newIndex);
         PersistOrder();
+        // No re-render mid-drop (it would flicker): the shown order follows the saved one directly.
+        var was = _shownOrder;
+        _shownOrder = [.. _savedOrder.Where(was.Contains)];
+        LimitsChanged?.Invoke();
     }
 
     /// <summary>Hide a tier card and persist the hidden set.</summary>
@@ -1948,7 +2018,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _settings.SaveHiddenTiers(_hidden);
         var vm = Tiers.FirstOrDefault(t => t.TierKey == tierKey);
         if (vm is not null) Tiers.Remove(vm);
+        _shownOrder = [.. _shownOrder.Where(k => k != tierKey)];
         RecomputeHighestForTray();
+        LimitsChanged?.Invoke();
     }
 
     // -- limits that come and go (W2) ----------------------------------------
@@ -2000,7 +2072,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _settings.SaveLimitState(_limitState);
         var vm = Tiers.FirstOrDefault(t => t.TierKey == tierKey);
         if (vm is not null) Tiers.Remove(vm);
+        _shownOrder = [.. _shownOrder.Where(k => k != tierKey)];
         RecomputeHighestForTray();
+        LimitsChanged?.Invoke();
     }
 
     /// <summary>Show a hidden limit again, whichever way it was hidden.</summary>
@@ -2014,7 +2088,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             _settings.SaveLimitState(_limitState);
         }
         if (ShownData is { } shown)
-            RenderCards(shown, DateTimeOffset.UtcNow);
+            RenderCards(shown, DateTimeOffset.UtcNow);   // raises LimitsChanged itself
+        else
+            LimitsChanged?.Invoke();
     }
 
     /// <summary>Hidden limits (manual and until-reset), in canonical tier order.</summary>
@@ -2028,8 +2104,101 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     public void SetWarnings(string tierKey, bool on)
     {
         bool changed = on ? _mutedTiers.Remove(tierKey) : _mutedTiers.Add(tierKey);
-        if (changed)
-            _settings.SaveAlertMutedTiers(_mutedTiers);
+        if (!changed)
+            return;
+        _settings.SaveAlertMutedTiers(_mutedTiers);
+        LimitsChanged?.Invoke();
+    }
+
+    // -- Settings, Alerts, Each limit and Settings, Widget (Settings v2, slice 5) --
+
+    /// <summary>Raised after a limit's warnings, hiding or order change, from the card menu or Settings, and at the end of every card
+    /// render (a fetch may bring a limit in or take one away). Settings Each limit and Limit order follow it.</summary>
+    public event Action? LimitsChanged;
+
+    private IReadOnlyList<string> _shownOrder = [];
+
+    /// <summary>Settings, Alerts, Each limit (WF13): a row per limit in the shown answer, and per limit a setting still names.</summary>
+    public IReadOnlyList<LimitRow> LimitRows() =>
+        LimitSettings.Rows(PresentLimitKeys(), _hidden, _mutedTiers, _limitState.HiddenUntilReset.Keys);
+
+    // The same test RenderCards uses: a limit the API sends with a null utilization never gets a card, so it gets no row.
+    private IEnumerable<string> PresentLimitKeys() =>
+        ShownData is { } data ? TierModel.EffectiveOrder.Where(k => Util(data, k) is not null).ToList() : [];
+
+    /// <summary>What an empty limits list says (Alerts, Each limit; Widget, Limit order): signed out, or signed in and not fetched yet.</summary>
+    public string LimitsEmptyLine() =>
+        ActiveAccount is null && !IsDemo ? SettingsNames.EachLimitSignedOut   // streamer: key - a null check, never drawn
+        : _shownOrder.Count == 0 && PresentLimitKeys().Any() ? SettingsNames.LimitOrderAllHidden
+        : SettingsNames.EachLimitNotYet;
+
+    /// <summary>Settings, Widget, Limit order: the limits the widget shows, in its order (compact mode aside).</summary>
+    public IReadOnlyList<string> ShownLimitOrder => _shownOrder;
+
+    /// <summary>Clears the shown order where the cards are cleared without a render (account removed, demo left), and says so.</summary>
+    private void ResetShownOrder()
+    {
+        _shownOrder = [];
+        LimitsChanged?.Invoke();
+    }
+
+    /// <summary>Settings, Alerts, Each limit, Show this limit: shown clears both kinds of hiding (as the card menu Hidden limits
+    /// item does); not shown hides it until shown again.</summary>
+    public void SetShown(string tierKey, bool shown)
+    {
+        if (shown) ShowTier(tierKey);
+        else HideTier(tierKey);
+    }
+
+    /// <summary>Settings, Widget, Limit order: <paramref name="shownOrder"/> first, then every other known limit once, saved to
+    /// "tier_order"; the cards follow at once.</summary>
+    public void SetLimitOrder(IReadOnlyList<string> shownOrder)
+    {
+        var order = LimitSettings.SavedOrder(shownOrder, _savedOrder);
+        _savedOrder.Clear();
+        _savedOrder.AddRange(order);
+        _settings.SaveTierOrder(order);
+        if (ShownData is { } shown)
+            RenderCards(shown, DateTimeOffset.UtcNow);
+        else
+            LimitsChanged?.Invoke();
+    }
+
+    /// <summary>Settings, Widget, Graph style: every card redraws, with no refetch; saved to "sparkline_style".</summary>
+    public void SetSparklineStyle(SparklineStyle style)
+    {
+        if (SparklineStyle == style)
+            return;
+        SparklineStyle = style;
+        foreach (var card in Tiers)
+            card.ApplyStyle(style);
+        _settings.SaveSparklineStyle(style);
+    }
+
+    /// <summary>Settings, Widget, Keep the widget on top: saved to "pinned".</summary>
+    public void SetPinned(bool on)
+    {
+        if (Pinned == on)
+            return;
+        Pinned = on;
+        _settings.SavePinned(on);
+    }
+
+    /// <summary>
+    /// Ends Just the Desk (Settings, Widget, Show the widget, and an added account; <see cref="Sanduhr.Core.JustTheDesk.End"/>): saves
+    /// it off, brings the sign-in reminder back only when Just the Desk silenced it, and redraws the Desk. False when it was not on.
+    /// Showing the widget is the App's.
+    /// </summary>
+    public bool EndJustTheDesk()
+    {
+        var (state, reminderOn, ended) = Sanduhr.Core.JustTheDesk.End(_settings.LoadJustTheDesk(), _settings.LoadDeskSignInReminder());
+        if (!ended)
+            return false;
+        _settings.SaveJustTheDesk(state);
+        _settings.SaveDeskSignInReminder(reminderOn);
+        JustTheDesk = false;
+        RefreshDesk();
+        return true;
     }
 
     private void PersistOrder()
@@ -2100,6 +2269,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _riffTimer.Stop();
         _statusNoticeTimer?.Stop();
         _themeHandoff?.Dispose();
+        Streamer.Changed -= OnStreamerChanged;
+        Streamer.Dispose();
         _follower.Stop();
         _seatMeters.Stop();
         StopTransportRecovery();

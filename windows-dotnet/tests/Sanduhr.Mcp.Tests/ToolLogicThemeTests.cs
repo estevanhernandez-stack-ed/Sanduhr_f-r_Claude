@@ -67,7 +67,7 @@ public class ToolLogicThemeTests
     public async Task Clean_theme_writes_the_request_the_widget_expects_and_returns_its_result()
     {
         using var tmp = new TempDir();
-        var cfg = ThemeConfig(tmp, TimeSpan.FromSeconds(5));
+        var cfg = ThemeConfig(tmp, Waits.AnswerWait);
         var logic = new ToolLogic(cfg, () => Now);
 
         // Play the widget: answer as soon as the request lands.
@@ -164,5 +164,30 @@ public class ToolLogicThemeTests
         Assert.False(ToolLogic.IsValidThemeKey("Nebula"));
         Assert.False(ToolLogic.IsValidThemeKey("-a"));
         Assert.False(ToolLogic.IsValidThemeKey(new string('a', 41)));
+    }
+
+    [Fact]
+    public void A_theme_with_font_and_desk_is_handed_over_and_a_bad_desk_is_refused()
+    {
+        using var tmp = new TempDir();
+        var cfg = ThemeConfig(tmp, TimeSpan.FromMilliseconds(50));
+        var bad = CleanTheme();
+        bad["desk"] = JsonNode.Parse("""{"ink": "white"}""");
+
+        var refused = new ToolLogic(cfg, () => Now).BuildProposeTheme(bad, null, true);
+
+        Assert.Equal("rejected", (string?)refused["status"]);
+        Assert.Contains(((JsonArray)refused["findings"]!).Select(f => (string?)f!["field"]), f => f == "desk.ink");
+        Assert.False(File.Exists(cfg.ThemeRequestPath));
+
+        var good = CleanTheme();
+        good["font"] = "Segoe UI";
+        good["desk"] = JsonNode.Parse("""{"bars": ["#6c63ff", "#e8e4dc"], "plate": false}""");
+        var queued = new ToolLogic(cfg, () => Now).BuildProposeTheme(good, null, true);
+
+        Assert.Equal("queued", (string?)queued["status"]);   // no widget answers here
+        var request = JsonNode.Parse(File.ReadAllText(cfg.ThemeRequestPath!))!;
+        Assert.Equal("Segoe UI", (string?)request["theme"]!["font"]);
+        Assert.False((bool)request["theme"]!["desk"]!["plate"]!);
     }
 }

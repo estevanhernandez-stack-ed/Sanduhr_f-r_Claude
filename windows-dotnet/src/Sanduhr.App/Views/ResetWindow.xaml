@@ -2,6 +2,8 @@
         x:ClassModifier="internal"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
+        xmlns:controls="clr-namespace:Sanduhr.App.Controls"
         Title="Reset Sanduhr"
         AutomationProperties.Name="Reset Sanduhr"
         WindowStyle="None"
@@ -41,6 +43,10 @@
                                 <Setter TargetName="bg" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
                                 <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
@@ -124,7 +130,7 @@
     </Window.Resources>
 
     <Border x:Name="Frame" CornerRadius="10"
-            Background="{DynamicResource Sanduhr.Brush.GlassChrome}"
+            Background="{DynamicResource Sanduhr.Brush.Glass}"
             BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
             BorderThickness="1"
             MouseLeftButtonDown="Frame_MouseLeftButtonDown">
@@ -158,20 +164,64 @@
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
 
                 <CheckBox x:Name="ClaudeCodeBox" Style="{StaticResource ThemedCheckBox}" IsChecked="True"
-                          Content="Sanduhr's entries in Claude Code (statusline, MCP server)"
-                          AutomationProperties.Name="Sanduhr's entries in Claude Code (statusline, MCP server)"
+                          Content="Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, glow hook)"
+                          AutomationProperties.Name="Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, glow hook)"
                           Margin="0,0,0,4" Checked="Choice_Changed" Unchecked="Choice_Changed" />
-                <TextBlock x:Name="ClaudeCodeWarning" Margin="24,0,0,10" TextWrapping="Wrap" FontSize="11"
-                           Text="An entry you leave unchecked can't be removed from Sanduhr later."
-                           AutomationProperties.Name="Warning about leaving the Claude Code entries unchecked"
+                <!-- Settings v2, slice 8 (R12): a checkbox per folder that holds Sanduhr's entries, then the lines that are true for
+                     what is ticked (decision 6). Rows show folders as every page does; the choice keys on the real folder. The list scrolls
+                     past 200 DIP so Reset and Cancel stay on screen with many folders (preflight P6). -->
+                <ScrollViewer x:Name="FolderScroller" Margin="24,2,0,4" MaxHeight="200" Focusable="False" Visibility="Collapsed"
+                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <ScrollViewer.Resources>
+                        <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                    </ScrollViewer.Resources>
+                    <ItemsControl x:Name="FolderList" Focusable="False"
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.ResetFoldersName}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,0,8,6">
+                                    <CheckBox Style="{StaticResource ThemedCheckBox}" Content="{Binding Shown}"
+                                              IsChecked="{Binding Undo, Mode=TwoWay}"
+                                              AutomationProperties.Name="{Binding Shown}"
+                                              AutomationProperties.HelpText="{Binding Kinds}" />
+                                    <controls:DecorativeText Text="{Binding Kinds}" Margin="24,1,0,0" FontSize="11" TextWrapping="Wrap"
+                                                             Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                <TextBlock x:Name="NoFoldersText" Margin="24,0,0,10" TextWrapping="Wrap" FontSize="11" Visibility="Collapsed"
+                           Text="{x:Static core:SettingsNames.ResetNoFolders}"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                <TextBlock x:Name="UnreadableText" Margin="24,0,0,10" TextWrapping="Wrap" FontSize="11" Visibility="Collapsed"
+                           Text="{x:Static core:SettingsNames.ResetReceiptsUnreadable}"
                            Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" />
+                <TextBlock x:Name="ClaudeCodeWarning" Margin="24,0,0,4" TextWrapping="Wrap" FontSize="11" Visibility="Collapsed"
+                           Text="{x:Static core:SettingsNames.ResetFoldersKept}"
+                           Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" />
+                <TextBlock x:Name="PartOffText" Margin="24,0,0,4" TextWrapping="Wrap" FontSize="11" Visibility="Collapsed"
+                           Text="{x:Static core:SettingsNames.ResetFoldersPartOff}"
+                           Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" />
+                <TextBlock x:Name="KeptSignInText" Margin="24,0,0,4" TextWrapping="Wrap" FontSize="11" Visibility="Collapsed"
+                           Text="{x:Static core:SettingsNames.ResetKeptSignIn}"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                <TextBlock x:Name="KeptSettingsText" Margin="24,0,0,4" TextWrapping="Wrap" FontSize="11" Visibility="Collapsed"
+                           Text="{x:Static core:SettingsNames.ResetKeptSettings}"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                <TextBlock x:Name="KeptMcpSettingsText" Margin="24,0,0,4" TextWrapping="Wrap" FontSize="11" Visibility="Collapsed"
+                           Text="{x:Static core:SettingsNames.ResetKeptMcpSettings}"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                <TextBlock x:Name="KeptAddedText" Margin="24,0,0,10" TextWrapping="Wrap" FontSize="11" Visibility="Collapsed"
+                           Text="{x:Static core:SettingsNames.ResetKeptAdded}"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                 <CheckBox x:Name="AccountsBox" Style="{StaticResource ThemedCheckBox}" IsChecked="True"
                           Content="Accounts and sign-in keys"
                           AutomationProperties.Name="Accounts and sign-in keys"
                           Margin="0,0,0,10" Checked="Choice_Changed" Unchecked="Choice_Changed" />
                 <CheckBox x:Name="HistoryBox" Style="{StaticResource ThemedCheckBox}" IsChecked="True"
-                          Content="Usage history and the vault"
-                          AutomationProperties.Name="Usage history and the vault"
+                          Content="Meter history and the session archive"
+                          AutomationProperties.Name="Meter history and the session archive"
                           Margin="0,0,0,10" Checked="Choice_Changed" Unchecked="Choice_Changed" />
                 <CheckBox x:Name="ThemesBox" Style="{StaticResource ThemedCheckBox}" IsChecked="True"
                           Content="Your themes and widgets"

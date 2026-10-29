@@ -765,4 +765,16 @@ public class PackValidatorTests
         SetText(p, "palettes.json", new string('[', 5000) + new string(']', 5000));
         AssertHas(Errors(p, "good-palette"), "palettes.json: invalid JSON");
     }
+
+    [Fact]
+    public void Theme_font_and_desk_are_documented_fields()
+    {
+        var p = Good("good-theme");
+        EditJson(p, "themes/fixture-dark.json", t =>
+        {
+            t["font"] = "EsteFont Pro";
+            t["desk"] = JsonNode.Parse("""{"ink": ["#ffffff"], "plate": true}""");
+        });
+        Assert.Empty(Errors(p, "good-theme"));
+    }
 }

@@ -10,7 +10,7 @@ public class CcPieceViewModelTests
 
     [Theory]
     [InlineData("MCP server")]
-    [InlineData("Glow when Claude needs you")]
+    [InlineData("Claude Code glow hook")]
     [InlineData("Meters above the prompt")]
     public void AnAbsentPieceOffersInstallAndAnInstalledOneOffersUpdate(string title)
     {

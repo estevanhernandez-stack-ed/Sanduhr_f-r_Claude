@@ -54,6 +54,7 @@ internal sealed class WidgetCatalogService
 
     private static HttpClient NewClient(HttpMessageHandler handler)
     {
+        // network: widget-catalog
         var c = new HttpClient(handler, disposeHandler: true) { Timeout = TimeSpan.FromMinutes(2) };
         c.DefaultRequestHeaders.UserAgent.ParseAdd(Weather.UserAgent);
         return c;
@@ -73,6 +74,7 @@ internal sealed class WidgetCatalogService
                 if (!WidgetCatalog.IsAllowedUrl(uri))
                     throw new WidgetFetchException("refused a URL outside GitHub's release hosts");
                 using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+                // network: widget-catalog
                 using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
                 int code = (int)response.StatusCode;
                 if (code is 301 or 302 or 303 or 307 or 308)

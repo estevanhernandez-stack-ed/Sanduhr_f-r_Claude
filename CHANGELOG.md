@@ -16,6 +16,49 @@
 
 - **For the smoke harness.** `smoke/smoke state` has `pending_suggestions.desk`, a flag that is true while a Claude-made Desk design waits. Never its content.
 
+## v4.0.1 — 2026-10-29
+
+**Platform:** Windows (.NET 10 / WPF). A fix release. `Sanduhr.Mcp` to 4.0.1. No new outbound destination and no new capability: the manifest changes only its version.
+
+### Fixes
+
+- **The layout map shows every monitor.** Settings ▸ Desk ▸ Layout map drew the main monitor only, so a Desk placed on another monitor showed an empty map. It now draws each connected monitor where Windows arranges it, each with its own taskbar and the pieces the Desk draws there, captioned with the monitor's name. One monitor looks as before.
+
+## v4.0.0 — 2026-10-28
+
+**Platform:** Windows (.NET 10 / WPF). Settings v2 is the release: Settings rebuilt around what you came to do, with search, a Privacy page that lists every destination, streamer mode, and one theme for the widget and the Desk. `Sanduhr.Mcp` to 4.0.0. **No new outbound destination and no new capability:** the manifest still declares `runFullTrust` only and changes only its version. Settings ▸ Privacy is built from one list a test keeps complete, and three existing items are disclosed for the first time there and in PRIVACY: Google's sign-in page (reached in 3.9 too, where it dead-ended), claude.ai's routines budget and WebView2's SmartScreen.
+
+### Settings v2
+
+- **Grouped by task.** The sidebar runs General, Accounts, Alerts and Privacy, then Usage (Claude Usage, Publish usage), Extend (Claude Code, Mods & Widgets), Widget (Widget, Themes), Desktop (Desk, Desk Look, Message, Now playing, Weather, Watchers, Launcher) and About. Every feature has one home, and every link into Settings (menus, What's New, the tour) lands on its section.
+- **Search** finds any setting by what it does and opens the page at the section, with Enter on the first result.
+- **Settings ▸ Privacy.** What leaves this PC: each destination, when Sanduhr contacts it, what it carries and the switch that turns it off. What Claude can change: each switch that lets Claude write to your Desk, themes or widgets, and where it lives.
+- **Claude Usage** has four views: Meters (the 30-day history, renamed from History, with its CSV export), Overview, Trends and Sessions.
+- **Claude Code** shows a card per folder: its linked account, the statusline, the MCP server, the glow hook, "Let Claude read this folder's project totals" and what the folder holds.
+- **Mods & Widgets** puts everything installed for Sanduhr and for Claude Code in one list. Sanduhr's own mod and packs switch there; other Claude Code mods show read-only.
+- **Updates** (Setup.exe build): Settings ▸ About ▸ Updates has **Check for updates once a day**, on by default; off, Sanduhr asks GitHub only when you press Check now. The Store build shows no switch: the Store keeps Sanduhr up to date.
+- **Publish usage** gets **Show a sample**: the next record, built on your PC with the code that sends it, shown and never sent. A redirected publish now fails and says where it was sent.
+- Visible focus rings, pressed and hover states on Settings' buttons and toggles, rows that Narrator names, and Settings text at AA contrast in all six built-in themes.
+
+### One theme for the widget and the Desk
+
+- **Desk Look ▸ Match the widget theme ▸ Follow the widget theme**: the Desk draws its colors, gradients, font, plate and shadow from the widget's theme and changes with it. **Match now** copies the theme's look into the Desk's own settings once. The Theme Studio edits a theme's Desk look.
+- **Use the theme's colors for the message** (Desk Look ▸ Ink and color): the message draws in the theme's message colors and glow, whether or not the Desk follows the theme. Colored lines draw in the theme's colors too and keep their own for when you turn it off. On for new installs, off after an update so no Desk changes color. A Desk design or an accepted suggestion with colored lines turns it off so its colors show.
+
+### Streamer mode
+
+- **Streamer mode** (Settings ▸ Privacy, also in the tray's and the widget's menus, off by default): accounts, emails, Claude Code folders, projects, skills, repos, CI runners, publish endpoints, the weather place and plugin and pack names show as codenames on the widget, the Desk, the tray and in Settings. Numbers stay. **Show the real name** per name, and **Shuffle codenames**. Claude Code's statusline shows the folder's codename too. What it can't hide is listed under the switch.
+
+### Accounts and Reset
+
+- **Reset Sanduhr…** lists each Claude Code folder that holds Sanduhr's entries with its own checkbox. A folder you untick keeps its entries and the files they run. Each part reports what it couldn't remove.
+
+### Fixes
+
+- **Continue with Google works in the sign-in window.** Google's sign-in opens in a small window of its own that closes itself when it's done, and Sanduhr finishes signing in. Before, Google's last page stayed blank. Continue with email still works.
+- Clearing meter history now clears one account: Settings ▸ Accounts ▸ Clear this account's history… acts on the selected account only, and its confirmation names what it removes. (Reset still clears every account's history.)
+- Reopening Settings, Claude Code no longer unlinks folders from their accounts or shows "Couldn't save that link." The account list is updated in place, and an empty selection is ignored instead of read as "unlink everything".
+
 ## v2.36.0-mac — 2026-10-28
 
 - **Claude can make you a widget.** With the MCP server installed, `propose_widget` hands Sanduhr a pixel-art sprite, a palette or effects presets that Claude wrote as text. It is data only: no PNG, no font, no code, and a theme still goes through `propose_theme`. The server names the pack `my-<id>` and checks it with the catalog's own rules, trademark rule included, before anything is written; a refusal writes nothing. A good one waits in Settings, Widgets as **Review Claude's widget**, with Claude's note, what the widget is and its files. **Preview on the Desk** shows a sprite as the companion, or a palette across the Desk's text, notch and message included, from memory, with your saved choices untouched. **Apply** installs it as a widget made here, **Make it the companion** also picks it, and **Dismiss** drops it. No setting lets Claude skip Apply, and the proposal is held in memory only.

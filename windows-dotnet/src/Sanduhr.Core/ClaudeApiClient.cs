@@ -111,6 +111,7 @@ public sealed class CloudflareAwareHandler : DelegatingHandler
         h.TryAddWithoutValidation("sec-ch-ua", "\"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\", \"Google Chrome\";v=\"131\"");
         h.TryAddWithoutValidation("sec-ch-ua-mobile", "?0");
         h.TryAddWithoutValidation("sec-ch-ua-platform", "\"Windows\"");
+        // network: claude-usage (the HttpClient transport; the app builds WebView2ApiClient, tests build this)
         return base.SendAsync(request, cancellationToken);
     }
 }
@@ -178,6 +179,7 @@ public sealed class ClaudeApiClient : IClaudeApiClient, IDisposable
             UseCookies = false, // we build the Cookie header by hand (parity with api.py)
             AutomaticDecompression = DecompressionMethods.All,
         };
+        // network: claude-usage
         _http = new HttpClient(new CloudflareAwareHandler(inner), disposeHandler: true)
         {
             Timeout = TimeSpan.FromSeconds(15), // api.py timeout=15
@@ -208,6 +210,7 @@ public sealed class ClaudeApiClient : IClaudeApiClient, IDisposable
         if (extraHeaders is not null)
             foreach (var kv in extraHeaders)
                 req.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
+        // network: claude-usage
         return await _http.SendAsync(req, ct).ConfigureAwait(false);
     }
 

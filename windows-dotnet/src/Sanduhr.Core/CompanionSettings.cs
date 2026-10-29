@@ -33,13 +33,13 @@ public sealed record CompanionSettings(string? Pack, bool Roam)
     }
 
     /// <summary>
-    /// The pack the companion draws: the chosen one while it is installed as a sprite, otherwise the first installed sprite
+    /// The pack the companion draws: the chosen one while it is installed as a sprite and switched on, otherwise the first installed sprite
     /// pack by id (so installing the hourglass and placing the piece is enough). Null when no sprite pack is installed.
     /// <paramref name="kindOf"/> reads an installed pack's kind from its own pack.json.
     /// </summary>
     public string? ActivePack(WidgetRegistry registry, Func<string, string?> kindOf)
     {
-        var sprites = registry.Packs.Where(p => kindOf(p.Id) == "sprite").Select(p => p.Id).OrderBy(id => id, StringComparer.Ordinal).ToList();
+        var sprites = registry.Packs.Where(p => p.Enabled && kindOf(p.Id) == "sprite").Select(p => p.Id).OrderBy(id => id, StringComparer.Ordinal).ToList();
         if (Pack is { } chosen && sprites.Contains(chosen)) return chosen;
         return sprites.FirstOrDefault();
     }

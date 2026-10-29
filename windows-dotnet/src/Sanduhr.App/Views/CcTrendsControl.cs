@@ -40,7 +40,7 @@ public sealed class CcTrendsControl : FrameworkElement
 
         if (_weeks.Count == 0)
         {
-            DrawCenteredText(dc, "No vault history yet.", w, h, dpi);
+            DrawCenteredText(dc, SettingsNames.NothingArchivedYet, w, h, dpi);
             return;
         }
 

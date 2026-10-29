@@ -283,4 +283,109 @@ public class ThemeLintTests
         Assert.Null(ThemeCatalog.TryValidate("bad", j, warnings.Add));
         Assert.Contains(warnings, w => w.Contains("malformed field") && w.Contains("accent"));
     }
+
+    // ---- theme match: font and desk (one theme for the widget and the Desk) ----
+
+    private static JsonObject WithDesk(string deskJson)
+    {
+        var t = Clean();
+        t["desk"] = JsonNode.Parse(deskJson);
+        return t;
+    }
+
+    [Fact]
+    public void Font_and_a_full_desk_block_lint_clean_and_build()
+    {
+        var t = WithDesk("""
+            {"ink": ["#e8e4dc", "#6c63ff"], "bars": ["#6c63ff", "#e8e4dc", "#ff6b6b"], "message": ["#6c63ff"],
+             "glow": "#6c63ff", "plate": false, "plate_color": "#0a0a0a", "shadow": "#070707", "font": "Consolas"}
+            """);
+        t["font"] = "Segoe UI";
+        var r = ThemeLint.Lint(t);
+        Assert.True(r.Ok);
+        Assert.Empty(r.Findings);
+        Assert.Equal("Segoe UI", r.Theme!.Font);
+        var d = r.Theme.Desk!;
+        Assert.Equal(["#e8e4dc", "#6c63ff"], d.Ink);
+        Assert.Equal(3, d.Bars!.Count);
+        Assert.Equal(["#6c63ff"], d.Message);
+        Assert.Equal("#6c63ff", d.Glow);
+        Assert.False(d.Plate);
+        Assert.Equal("#0a0a0a", d.PlateColor);
+        Assert.Equal("#070707", d.Shadow);
+        Assert.Equal("Consolas", d.Font);
+    }
+
+    [Fact]
+    public void A_theme_without_font_or_desk_builds_with_neither()
+    {
+        var r = ThemeLint.Lint(Clean());
+        Assert.Null(r.Theme!.Font);
+        Assert.Null(r.Theme.Desk);
+        Assert.Null(ThemeLint.Lint(WithDesk("{}")).Theme!.Desk);   // an empty block is no block
+    }
+
+    [Theory]
+    [InlineData("""{"ink": []}""", "desk.ink")]
+    [InlineData("""{"ink": ["#111111", "#222222", "#333333", "#444444", "#555555"]}""", "desk.ink")]
+    [InlineData("""{"bars": ["red"]}""", "desk.bars")]
+    [InlineData("""{"message": "#ffffff"}""", "desk.message")]
+    [InlineData("""{"glow": "#fff"}""", "desk.glow")]
+    [InlineData("""{"plate_color": 3}""", "desk.plate_color")]
+    [InlineData("""{"shadow": null}""", "desk.shadow")]
+    [InlineData("""{"plate": "yes"}""", "desk.plate")]
+    [InlineData("""{"font": "C:\\Windows\\Fonts\\x.ttf"}""", "desk.font")]
+    [InlineData("""[1]""", "desk")]
+    public void A_bad_desk_field_is_an_error_naming_it(string desk, string field)
+    {
+        var r = ThemeLint.Lint(WithDesk(desk));
+        Assert.False(r.Ok);
+        Assert.Contains(field, Fields(r, ThemeFindingLevel.Error));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Fira Code, Consolas")]
+    [InlineData("https://example.com/font")]
+    public void A_font_that_is_not_a_family_name_is_an_error(string font)
+    {
+        var t = Clean();
+        t["font"] = font;
+        Assert.Contains("font", Fields(ThemeLint.Lint(t), ThemeFindingLevel.Error));
+    }
+
+    [Fact]
+    public void An_unknown_desk_field_is_a_warning_and_the_theme_still_loads()
+    {
+        var r = ThemeLint.Lint(WithDesk("""{"ink": ["#e8e4dc"], "sparkle": true}"""));
+        Assert.True(r.Ok);
+        Assert.Contains("desk.sparkle", Fields(r, ThemeFindingLevel.Warning));
+        Assert.Equal(["#e8e4dc"], r.Theme!.Desk!.Ink);
+    }
+
+    [Fact]
+    public void Desk_ink_and_message_stops_that_do_not_read_on_the_background_are_warnings()
+    {
+        var r = ThemeLint.Lint(WithDesk("""{"ink": ["#e8e4dc", "#222222"], "message": ["#1a1a1a"], "bars": ["#111111"]}"""));
+        Assert.True(r.Ok);
+        var warned = Fields(r, ThemeFindingLevel.Warning).ToList();
+        Assert.Contains("desk.ink", warned);
+        Assert.Contains("desk.message", warned);
+        Assert.DoesNotContain("desk.bars", warned);   // bars sit on bar_bg, not on the wallpaper: no text contrast rule
+        Assert.Contains(r.Findings, f => f.Field == "desk.ink" && f.Message.Contains("#222222"));
+    }
+
+    [Fact]
+    public void A_font_this_pc_lacks_is_a_warning_only_when_the_caller_knows_the_fonts()
+    {
+        var t = Clean();
+        t["font"] = "Nope Sans";
+        t["desk"] = JsonNode.Parse("""{"font": "Also Missing"}""");
+        Assert.Empty(ThemeLint.Lint(t).Findings);   // the MCP server's lint: the name's shape only
+        var r = ThemeLint.Lint(t, f => f == "Consolas");
+        Assert.Contains("font", Fields(r, ThemeFindingLevel.Warning));
+        Assert.Contains("desk.font", Fields(r, ThemeFindingLevel.Warning));
+        t["font"] = "EsteFont Pro";   // bundled: always there
+        Assert.DoesNotContain("font", Fields(ThemeLint.Lint(t, _ => false), ThemeFindingLevel.Warning));
+    }
 }

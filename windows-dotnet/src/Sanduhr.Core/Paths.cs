@@ -168,11 +168,20 @@ public sealed class Paths
 
     public string LastErrorFile => Path.Combine(AppDataDir, "last_error.json");
 
+    /// <summary>Streamer mode's salt, codename maps and allowlist (Settings v2, slice 7). Only the app reads it, so it stays in AppData; it
+    /// holds real names and is never sent anywhere.</summary>
+    public string CodenamesFile => Path.Combine(AppDataDir, Codenames.FileName);
+
     /// <summary>Statusline/MCP rendezvous file (WS-E): the widget's active-account
     /// usage snapshot, written atomically each fetch when the Claude Code
     /// statusline integration is enabled. Read-only for every consumer.
     /// In <see cref="ExternalDir"/>: read from outside the package.</summary>
     public string SnapshotFile => Path.Combine(ExternalDir, "snapshot.json");
+
+    /// <summary>Streamer mode's half for the statusline (Settings v2, slice 7): on, and folder ref to codename, never a real name. In
+    /// <see cref="ExternalDir"/> because the statusline runs outside the package. Shared ground: only this name is Sanduhr's. Built on the
+    /// folder path, not <see cref="ExternalDir"/>, so asking for the path never creates the shared folder.</summary>
+    public string StreamerStateFile => Path.Combine(_externalDir, StreamerFile.FileName);
 
     /// <summary>Helper-script folder: <c>%USERPROFILE%\.sanduhr\bin</c>. OUTSIDE both
     /// package trees deliberately (WS-E) — the statusline script must survive an

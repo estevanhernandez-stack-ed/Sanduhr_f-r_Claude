@@ -64,16 +64,27 @@ public sealed class ThemePalette
 
     /// <summary>Chrome strip glass alpha — denser than cards so light text stays
     /// legible against Mica bleed (widget.apply_theme: 0.92, or 1.0 for opt-out).</summary>
-    public double ChromeAlpha => Definition.OptsOutOfMica ? 1.0 : 0.92;
+    public double ChromeAlpha => ThemeContrast.ChromeAlpha(Definition);
 
     /// <summary>Card corner radius (the theme's <c>card_corner_radius</c>);
     /// defaults to the obsidian 10 px, Matrix tightens to 2 px.</summary>
     public int CardCornerRadius => Definition.CardCornerRadius ?? 10;
 
-    public ThemePalette(string key, ThemeDefinition def)
+    /// <summary>The widget's text family before theme match, and for a theme without a <c>font</c> this PC has.</summary>
+    public const string DefaultUiFamily = "Segoe UI Variable Display, Segoe UI";
+
+    /// <summary>Turns a theme's <c>font</c> into the family to draw, or null when this PC lacks it. App sets it from <c>DeskFonts</c>
+    /// (bundled, installed and font-pack families); unset (tests, the harness) a theme's font is not drawn.</summary>
+    public static Func<string, FontFamily?>? ResolveFont { get; set; }
+
+    private readonly Func<string, FontFamily?>? _resolveFont;
+
+    /// <param name="resolveFont">This palette's font lookup; null uses <see cref="ResolveFont"/>.</param>
+    public ThemePalette(string key, ThemeDefinition def, Func<string, FontFamily?>? resolveFont = null)
     {
         Key = key;
         Definition = def;
+        _resolveFont = resolveFont;
         Bg = Hex(def.Bg);
         Glass = Hex(def.Glass);
         GlassOnMica = Hex(def.GlassOnMica);
@@ -158,6 +169,10 @@ public sealed class ThemePalette
         SetBrush(res, "Sanduhr.Brush.TextDim", TextDim);
         SetBrush(res, "Sanduhr.Brush.TextMuted", TextMuted);
         SetBrush(res, "Sanduhr.Brush.Accent", Accent);
+        // The selected sidebar row's label (Settings v2, slice 8; WF37): Accent where it reads 4.5:1 on the row, else Text.
+        SetBrush(res, "Sanduhr.Brush.SelectedLabel", Hex(ThemeContrast.SelectedLabel(Definition)));
+        // Accent drawn as text (Settings v2, slice 8, D2): Accent where it reads 4.5:1 on Glass, else raised in lightness. Fills and borders keep Accent.
+        SetBrush(res, "Sanduhr.Brush.AccentText", Hex(ThemeContrast.AccentText(Definition)));
         SetBrush(res, "Sanduhr.Brush.Success", Success);
         SetBrush(res, "Sanduhr.Brush.PaceMarker", PaceMarker);
 
@@ -173,6 +188,9 @@ public sealed class ThemePalette
         // falling back to Consolas via WPF's built-in comma fallback), else the
         // widget default. The numeric/tier text is the only surface that switches.
         res["Sanduhr.Font.Value"] = ResolveValueFont();
+
+        // The widget's text (theme match): the theme's font when this PC has it, else Segoe UI. MainWindow binds to it.
+        res["Sanduhr.Font.Ui"] = UiFont();
 
         // Accent-bloom glow on the value label — applied ONLY for monospace
         // terminal themes (widget._apply_monospace_if_needed gates the bloom drop
@@ -192,8 +210,12 @@ public sealed class ThemePalette
             // families automatically — no manual exactMatch probe needed.
             return new FontFamily($"{Definition.MonospaceFont}, {fallback}");
         }
-        return new FontFamily("Segoe UI Variable Display, Segoe UI");
+        return UiFont();
     }
+
+    /// <summary>The widget's text family: the theme's <c>font</c> when this PC has it, else <see cref="DefaultUiFamily"/>.</summary>
+    public FontFamily UiFont() =>
+        Definition.Font is { Length: > 0 } f && (_resolveFont ?? ResolveFont)?.Invoke(f) is { } family ? family : new FontFamily(DefaultUiFamily);
 
     private Effect BuildValueBloom()
     {

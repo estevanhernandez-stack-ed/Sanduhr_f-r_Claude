@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:views="clr-namespace:Sanduhr.App.Views"
              xmlns:conv="clr-namespace:Sanduhr.App.Converters"
+             xmlns:controls="clr-namespace:Sanduhr.App.Controls"
              xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
              xmlns:vm="clr-namespace:Sanduhr.App.ViewModels">
     <!-- Settings, Message (spec 6.2, 6.9). Hosted inside SettingsWindow: the themed styles (ThemedCheckBox,
@@ -63,6 +64,7 @@
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Margin" Value="0,0,0,8" />
             <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="AutomationProperties.HeadingLevel" Value="Level2" />
         </Style>
 
         <Style x:Key="Dim" TargetType="TextBlock">
@@ -198,7 +200,7 @@
                             </StackPanel>
                         </Grid>
                         <TextBlock Style="{StaticResource Dim}" Margin="0,4,0,0"
-                                   Text="Kept as written: the editor can't set everything on this line. Edit as text changes it." />
+                                   Text="Kept as written: the editor can't set everything on this line. Switch to Text to change it." />
                     </StackPanel>
 
                     <TextBlock Style="{StaticResource Dim}" Margin="0,2,0,0" Text="{Binding Note}" />
@@ -211,10 +213,11 @@
     </UserControl.Resources>
 
     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
             <StackPanel Margin="20">
-                <TextBlock Text="Message" FontSize="14" FontWeight="SemiBold"
-                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+                <TextBlock Text="Message" FontSize="14" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level1"
+                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                <views:DeskPieceStatusPanel DataContext="{Binding Piece}" Margin="0,0,0,12" />
 
                 <!-- Claude's suggestion (spec 6.9): only while one waits. -->
                 <StackPanel views:SettingsAnchor.Id="suggestion"
@@ -267,10 +270,18 @@
                         <Button Style="{DynamicResource AccentButton}" Content="Add line" Command="{Binding AddLineCommand}"
                                 AutomationProperties.Name="Add line"
                                 ToolTip="A new line, every day, at the top of the list." />
-                        <Button Style="{DynamicResource FlatButton}" Content="{Binding ModeButtonText}"
-                                Command="{Binding ToggleModeCommand}"
-                                AutomationProperties.Name="Switch between the list and the text of messages.txt"
-                                ToolTip="List: each line as controls. Text: the file itself, tags and all. Your edits carry over either way." />
+                        <controls:RadioGroupPanel Orientation="Horizontal" AutomationProperties.Name="Message view">
+                            <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageMode"
+                                         Content="{x:Static core:SettingsNames.MessageModeList}"
+                                         IsChecked="{Binding IsListMode, Mode=TwoWay}"
+                                         AutomationProperties.Name="List, each line as its own row"
+                                         ToolTip="Each line as controls. Your edits carry over to Text." />
+                            <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageMode"
+                                         Content="{x:Static core:SettingsNames.MessageModeText}"
+                                         IsChecked="{Binding IsTextMode, Mode=TwoWay}"
+                                         AutomationProperties.Name="Text, messages.txt as written, tags and all"
+                                         ToolTip="The file itself, tags and all. Your edits carry over to List." />
+                        </controls:RadioGroupPanel>
                         <Button Style="{DynamicResource FlatButton}" Content="Save" Command="{Binding SaveCommand}"
                                 IsEnabled="{Binding Unsaved}" AutomationProperties.Name="Save messages.txt" />
                         <Button Style="{DynamicResource FlatButton}" Content="Revert" Command="{Binding RevertCommand}"
@@ -313,12 +324,13 @@
                 <!-- Rotation -->
                 <StackPanel views:SettingsAnchor.Id="rotation">
                     <TextBlock Text="Rotation" Style="{StaticResource Heading}" />
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <controls:RadioGroupPanel Orientation="Horizontal" Margin="0,0,0,10"
+                                              AutomationProperties.Name="Rotation, how often the line changes">
                         <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageRotate" Content="Daily"
-                                     IsChecked="{Binding IsDaily, Mode=TwoWay}" AutomationProperties.Name="Change the line once a day" />
+                                     IsChecked="{Binding IsDaily, Mode=TwoWay}" AutomationProperties.Name="Daily, the line changes once a day" />
                         <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageRotate" Content="Hourly"
-                                     IsChecked="{Binding IsHourly, Mode=TwoWay}" AutomationProperties.Name="Change the line every hour" />
-                    </StackPanel>
+                                     IsChecked="{Binding IsHourly, Mode=TwoWay}" AutomationProperties.Name="Hourly, the line changes every hour" />
+                    </controls:RadioGroupPanel>
                     <CheckBox Style="{DynamicResource ThemedCheckBox}"
                               Content="Mix every-day lines in on days with their own line"
                               IsChecked="{Binding Mix, Mode=TwoWay}"
@@ -350,15 +362,17 @@
                     <TextBlock Text="On special days" Style="{StaticResource Heading}" />
                     <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8"
                                Text="How a date's own lines share the Desk with the day's line." />
-                    <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Stack"
-                                 IsChecked="{Binding IsStack, Mode=TwoWay}" AutomationProperties.Name="Stack special day lines" />
-                    <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,8" Text="{Binding StackHelp}" />
-                    <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Take turns"
-                                 IsChecked="{Binding IsTurns, Mode=TwoWay}" AutomationProperties.Name="Take turns showing special day lines" />
-                    <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,8" Text="{Binding TurnsHelp}" />
-                    <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Scroll"
-                                 IsChecked="{Binding IsScroll, Mode=TwoWay}" AutomationProperties.Name="Scroll special day lines" />
-                    <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,10" Text="{Binding ScrollHelp}" />
+                    <controls:RadioGroupPanel AutomationProperties.Name="On special days, how a date's own lines share the Desk">
+                        <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Stack"
+                                     IsChecked="{Binding IsStack, Mode=TwoWay}" AutomationProperties.Name="Stack special day lines" />
+                        <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,8" Text="{Binding StackHelp}" />
+                        <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Take turns"
+                                     IsChecked="{Binding IsTurns, Mode=TwoWay}" AutomationProperties.Name="Take turns showing special day lines" />
+                        <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,8" Text="{Binding TurnsHelp}" />
+                        <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Scroll"
+                                     IsChecked="{Binding IsScroll, Mode=TwoWay}" AutomationProperties.Name="Scroll special day lines" />
+                        <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,10" Text="{Binding ScrollHelp}" />
+                    </controls:RadioGroupPanel>
                     <Grid IsEnabled="{Binding SecondsApply}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="130" />
@@ -374,68 +388,7 @@
 
                 <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
-                <!-- Look -->
-                <StackPanel views:SettingsAnchor.Id="message-look">
-                    <TextBlock Text="Look" Style="{StaticResource Heading}" />
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="90" />
-                            <ColumnDefinition Width="230" />
-                            <ColumnDefinition Width="44" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Message size" FontSize="12" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                        <Slider Grid.Column="1" x:Name="MessageSizeSlider" Style="{DynamicResource ThemedSlider}"
-                                Minimum="24" Maximum="180"
-                                TickFrequency="1" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="10"
-                                Value="{Binding Size, Mode=TwoWay}" AutomationProperties.Name="Message size" />
-                        <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=MessageSizeSlider, StringFormat='{}{0:0}'}"
-                                   FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Right"
-                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}" FontFamily="Cascadia Code, Consolas" />
-                    </Grid>
-                    <Grid Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="90" />
-                            <ColumnDefinition Width="230" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Color" FontSize="12" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                        <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
-                                  ItemsSource="{Binding ColorOptions}" SelectedItem="{Binding Color, Mode=TwoWay}"
-                                  AutomationProperties.Name="Message color" />
-                        <TextBox Grid.Column="2" Style="{DynamicResource Input}" Width="170" Height="30" Margin="8,0,0,0"
-                                 VerticalContentAlignment="Center" FontFamily="Cascadia Code, Consolas"
-                                 Visibility="{Binding IsCustomColor, Converter={StaticResource BoolVis}}"
-                                 Text="{Binding CustomColorText, UpdateSourceTrigger=PropertyChanged}"
-                                 AutomationProperties.Name="Custom message color, hex"
-                                 ToolTip="Hex colors like 9ad7ff. Two or more, separated by commas, make a gradient." />
-                    </Grid>
-                    <TextBlock Style="{StaticResource Dim}" Margin="90,4,0,0"
-                               Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
-                               Text="{Binding CustomColorProblem}"
-                               Visibility="{Binding CustomColorProblem, Converter={StaticResource StrVis}}" />
-                    <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,10,0,0"
-                              Content="Glow around the message" IsChecked="{Binding Glow, Mode=TwoWay}"
-                              AutomationProperties.Name="Glow around the message" />
-                    <Grid Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="90" />
-                            <ColumnDefinition Width="230" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Font" FontSize="12" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                        <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
-                                  ItemsSource="{Binding FontOptions}" SelectedItem="{Binding Font, Mode=TwoWay}"
-                                  AutomationProperties.Name="Message font" />
-                    </Grid>
-                </StackPanel>
-
-                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
-
-                <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"
-                           TextWrapping="Wrap" FontSize="11"
-                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                <views:TrademarkFooter />
             </StackPanel>
         </ScrollViewer>
     </Border>

@@ -41,6 +41,17 @@ public sealed class StoreUpdateService
         _log = log;
     }
 
+    /// <summary>The Store's answer: the waiting update's version, or null. A seam for tests, which never ask the real Store.</summary>
+    internal Func<Task<string?>> Query { get; init; } = AskTheStoreAsync;
+
+    private static async Task<string?> AskTheStoreAsync()
+    {
+        var context = StoreContext.GetDefault();
+        // network: store-update
+        var updates = await context.GetAppAndOptionalStorePackageUpdatesAsync();
+        return updates.Count > 0 ? VersionOf(updates[0]) : null;
+    }
+
     /// <summary>Called from the widget's 30-second tick on the UI thread. The Store query itself is
     /// async and deliberately not awaited: the tick must not stall on a network call, and the answer
     /// is acted on when it lands (on the UI thread, which the await resumes on).</summary>
@@ -58,10 +69,7 @@ public sealed class StoreUpdateService
         string? version = null;
         try
         {
-            var context = StoreContext.GetDefault();
-            var updates = await context.GetAppAndOptionalStorePackageUpdatesAsync();
-            if (updates.Count > 0)
-                version = VersionOf(updates[0]);
+            version = await Query();
         }
         catch (Exception e)
         {
@@ -97,7 +105,7 @@ public sealed class StoreUpdateService
         }
     }
 
-    private void Log(string stage, Exception e) => _log?.Invoke($"store update {stage} ({e.GetType().Name}: {e.Message})");
+    private void Log(string stage, Exception e) => _log?.Invoke($"store update {stage} ({e.GetType().Name}: {e.Message})");   // streamer: notname - written to the log file, never drawn
 }
 
 /// <summary>
@@ -130,9 +138,11 @@ public sealed class StoreUpdateInstaller : IUpdateInstaller
             try { WinRT.Interop.InitializeWithWindow.Initialize(context, hwnd); }
             catch (Exception e) { _log?.Invoke($"store update owner ({e.GetType().Name})"); }
         }
+        // network: store-update
         var updates = await context.GetAppAndOptionalStorePackageUpdatesAsync();
         if (updates.Count == 0)
             return UpdateInstallResult.NotAvailable;
+        // network: store-update
         var result = await context.RequestDownloadAndInstallStorePackageUpdatesAsync(updates);
         return Map(result.OverallState);
     }

@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Runtime.InteropServices;
 using System.Windows.Threading;
 using Sanduhr.App.Interop;
 using Sanduhr.App.ViewModels;
@@ -10,10 +11,13 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Views;
 
 /// <summary>
-/// The Settings window (Settings v2): a grouped sidebar with search over General,
-/// Accounts, Alerts, History, Claude Usage, Publish usage, Claude Code, Mods &amp; Config, Themes and About. The
-/// sidebar is the TabControl re-templated; each TabItem's Tag is its
-/// <see cref="SettingsPage"/>, which <see cref="SelectPage"/> and the search use.
+/// The Settings window (Settings v2): a grouped sidebar with search. The sidebar is the TabControl
+/// re-templated; its groups and their order come from <see cref="SettingsNames.Sidebar"/>, and the constructor sets
+/// each group's heading on that group's first page. Each TabItem's Tag is its <see cref="SettingsPage"/>, which
+/// <see cref="SelectPage"/> and the search use. <see cref="SelectPage"/> resolves an old link through
+/// <see cref="SettingsIndex.Resolve"/> before it lands; <see cref="Place"/> is where the window was left, for the
+/// App to reopen there; <see cref="FitToWorkArea"/> is called before the first Show so a short screen never hides
+/// the foot; Quit asks before it quits.
 /// Opened non-modally and kept single-instance by the App so a live account switch
 /// from here reflects in the widget immediately.
 ///
@@ -22,7 +26,7 @@ namespace Sanduhr.App.Views;
 /// app-level <c>Sanduhr.Brush.*</c> DynamicResources, so the whole window —
 /// including the title bar — re-tints live when the active theme changes.
 ///
-/// The History chart and the Claude Usage Overview bar strip are custom
+/// The meter history chart (Claude Usage, Meters) and the Overview bar strip are custom
 /// <c>OnRender</c> controls that can't bind their data declaratively, so this
 /// code-behind bridges them: it re-pushes data on the VMs' <c>Changed</c>
 /// events, renders the chart on load, and drives the Claude Usage tab's show +
@@ -35,6 +39,12 @@ internal partial class SettingsWindow : Window
 
     private readonly DispatcherTimer _localCcTimer;
 
+    /// <summary>
+    /// Where the window is now: the page, and the anchor <see cref="SelectPage"/> last opened it at (null after a sidebar
+    /// click). App keeps it when the window closes, to reopen there this session (spec, Reopen where it was left).
+    /// </summary>
+    public SettingsLink? Place { get; private set; }
+
     /// <summary>Opens a page's https link (the Open-Meteo credit and licence) in the default browser.</summary>
     private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
     {
@@ -42,6 +52,7 @@ internal partial class SettingsWindow : Window
         if (e.Uri is not { Scheme: "https" } uri) return;
         try
         {
+            // network: your-browser
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true })?.Dispose();
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { }
@@ -62,7 +73,18 @@ internal partial class SettingsWindow : Window
         };
 
         InitializeComponent();
+        // A button carrying views:SettingsLinkTo.Link opens that place, wherever it sits (Desk, Pieces' rows, a page's status line).
+        AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, new RoutedEventHandler(OnSettingsLinkClick));
+        // The Desk's Layout map folds below 600 DIP. A window's first SizeChanged comes before Loaded, so Loaded folds a window that opens short.
+        SizeChanged += (_, _) => FoldMapForHeight();
+        Loaded += (_, _) => FoldMapForHeight();
+        // The sidebar's group headings have one source, the names table: each group's first page carries its title.
+        foreach (var group in SettingsNames.Sidebar)
+            if (group.Title is { } title
+                && Tabs.Items.OfType<TabItem>().FirstOrDefault(t => (string?)t.Tag == group.Pages[0].ToString()) is { } first)
+                SettingsSidebar.SetGroupHeader(first, title);
         // Modal dialogs spawned by the tabs (rename, confirm, export result) parent to us.
+        ViewModel.AttachOwner(this);
         ViewModel.Accounts.AttachOwner(this);
         ViewModel.Themes.AttachOwner(this);
         ViewModel.History.AttachOwner(this);
@@ -72,7 +94,7 @@ internal partial class SettingsWindow : Window
         ViewModel.Publish.AttachOwner(this);
         ViewModel.Publish.Attach();
         ViewModel.ClaudeCodePage.AttachOwner(this);
-        ViewModel.Mods.AttachOwner(this);
+        ViewModel.ModsPage.AttachOwner(this);
         ViewModel.Desk.Launcher.AttachOwner(this);
         ViewModel.NowPlayingPage.AttachOwner(this);
 
@@ -85,8 +107,13 @@ internal partial class SettingsWindow : Window
         Loaded += (_, _) => RenderHistory();
         PreviewKeyDown += OnRecorderPreviewKeyDown;
         Deactivated += (_, _) => ViewModel.Shortcuts.CancelRecording();
+        // The What's New window is non-modal and writes the same key: read it again when Settings is brought back (P14).
+        Activated += (_, _) => ViewModel.AboutVersion.Reload();
+        ViewModel.Privacy.Streamer?.AttachOwner(this);
         Closed += (_, _) =>
         {
+            // The one subscription to the widget's long-lived streamer service (slice 7 decision 15).
+            ViewModel.Privacy.Streamer?.Detach();
             ViewModel.Desk.Flush();
             ViewModel.Desk.Launcher.Detach();
             ViewModel.MessagePage.Dispose();
@@ -101,6 +128,8 @@ internal partial class SettingsWindow : Window
             ViewModel.ClaudeCode.Detach();
             ViewModel.Publish.Detach();
             ViewModel.Themes.Detach();
+            ViewModel.Alerts.Detach();
+            ViewModel.WidgetPage.Detach();
         };
     }
 
@@ -120,6 +149,55 @@ internal partial class SettingsWindow : Window
         base.OnSourceInitialized(e);
         MicaHelper.ApplyDarkRoundedChrome(this);
     }
+
+    /// <summary>
+    /// Before the first Show: sizes and places the window inside the work area of the monitor <paramref name="near"/> is
+    /// on (the primary monitor without one), at most its designed 780 x 800 and at least MinWidth x MinHeight, centred,
+    /// so its foot and Quit never sit off screen (spec, "Short windows"; WF41). A work area that cannot be read, or that
+    /// is empty or not a number, leaves the window as the XAML sizes it.
+    /// </summary>
+    internal void FitToWorkArea(Window? near)
+    {
+        if (WorkAreaNear(near) is not { } work)
+            return;
+        var fit = WindowFit.Fit(work, Width, Height, MinWidth, MinHeight);
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Width = fit.Width;
+        Height = fit.Height;
+        Left = fit.Left;
+        Top = fit.Top;
+    }
+
+    /// <summary>The work area, in DIPs, of the monitor <paramref name="near"/> is on; the primary's when it has no handle; null when unusable.</summary>
+    private static WindowFit.Area? WorkAreaNear(Window? near)
+    {
+        var primary = SystemParameters.WorkArea;
+        var fallback = Usable(new WindowFit.Area(primary.Left, primary.Top, primary.Width, primary.Height));
+        var hwnd = near is null ? IntPtr.Zero : new System.Windows.Interop.WindowInteropHelper(near).Handle;
+        if (hwnd == IntPtr.Zero)
+            return fallback;
+        const uint MONITOR_DEFAULTTONEAREST = 2;
+        var monitor = GlowNative.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        var info = new GlowNative.MONITORINFO { cbSize = Marshal.SizeOf<GlowNative.MONITORINFO>() };
+        if (monitor == IntPtr.Zero || !GlowNative.GetMonitorInfoW(monitor, ref info))
+            return fallback;
+        // rcWork is in the coordinates this process runs in (system-scaled pixels while the process is system-DPI aware;
+        // the owner's own scale if it ever goes per-monitor), and the owner, which sits on that monitor, draws at that scale.
+        var r = info.rcWork;
+        return WorkAreaDips(r.Left, r.Top, r.Right, r.Bottom, VisualTreeHelper.GetDpi(near!).DpiScaleX) ?? fallback;
+    }
+
+    /// <summary>A work-area rectangle in pixels as DIPs at <paramref name="scale"/>; null when it is empty, inverted or the scale is not a positive number.</summary>
+    internal static WindowFit.Area? WorkAreaDips(int left, int top, int right, int bottom, double scale) =>
+        double.IsFinite(scale) && scale > 0
+            ? Usable(new WindowFit.Area(left / scale, top / scale, (right - left) / scale, (bottom - top) / scale))
+            : null;
+
+    private static WindowFit.Area? Usable(WindowFit.Area a) =>
+        double.IsFinite(a.Left) && double.IsFinite(a.Top) && double.IsFinite(a.Width) && double.IsFinite(a.Height)
+        && a.Width > 0 && a.Height > 0
+            ? a
+            : null;
 
     private void RenderHistory()
         => Chart.SetData(
@@ -143,15 +221,15 @@ internal partial class SettingsWindow : Window
 
     /// <summary>Refresh + timer-arm the Claude Usage tab only while it's selected so
     /// we don't walk session logs on a tab the user can't see (parity with the
-    /// Python tab's showEvent/hideEvent). The History chart re-renders on
-    /// (re)selection too, since the control has no size until its tab is first
-    /// realized.</summary>
+    /// Python tab's showEvent/hideEvent). Meters re-renders through its refresh.</summary>
     private async void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(e.OriginalSource, Tabs))
             return; // ignore bubbled selection changes from inner controls (combo, lists)
 
         var page = PageOf(Tabs.SelectedItem as TabItem);
+        if (page is { } shown)
+            Place = new SettingsLink(shown, null);
         ViewModel.ClaudeCode.IsTabActive = page == SettingsPage.ClaudeUsage;
         if (page == SettingsPage.ClaudeUsage)
         {
@@ -161,15 +239,33 @@ internal partial class SettingsWindow : Window
         else
         {
             _localCcTimer.Stop();
-            if (page == SettingsPage.History)
-                RenderHistory();
         }
 
-        // The Claude Code pages read files other tools change: look again each time they are opened.
+        // Accounts shows the selected account's folder link, which the Claude Code page changes: read it again on each visit.
+        if (page == SettingsPage.Accounts)
+            ViewModel.Accounts.Reload();
+
+        // About: the What's New window shares its switch, and "Show in Explorer" for the session archive dims until there is one
+        // (slice 1 T4): read the one and ask the commands again on each visit.
+        if (page == SettingsPage.About)
+        {
+            ViewModel.AboutVersion.Reload();
+            ViewModel.AboutUpdates.Reload();
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        // Privacy reads every consent and the MCP install again on each visit; it holds no subscription, so Closed detaches nothing (slice 6).
+        if (page == SettingsPage.Privacy)
+            ViewModel.Privacy.Reload();
+
+        // Deep Work length is also written by the focus timer's own stepper: read it again on each visit.
+        if (page == SettingsPage.Widget)
+            ViewModel.WidgetPage.Reload();
+
+        // The Claude Code page reads files other tools change: look again each time it is opened. Mods & Widgets lists itself when it
+        // becomes visible (ModsPage.Activate).
         if (page == SettingsPage.ClaudeCode)
             ViewModel.ClaudeCodePage.Reload();
-        else if (page == SettingsPage.Mods)
-            ViewModel.Mods.ReloadFolders();
     }
 
     /// <summary>The page a sidebar entry stands for: its Tag names the <see cref="SettingsPage"/>.</summary>
@@ -216,11 +312,13 @@ internal partial class SettingsWindow : Window
     /// <summary>
     /// Open <paramref name="page"/> and, with an <paramref name="anchor"/> from
     /// <see cref="SettingsIndex"/>, scroll to that section and outline it for 1.5 s. On Claude Usage
-    /// the anchor's view (Overview, Trends, Sessions) is selected first. Widget is not a Settings
-    /// page and is ignored; an anchor the page doesn't have opens the page's top.
+    /// the anchor's view (Overview, Trends, Sessions) is selected first. An anchor the
+    /// page doesn't have opens the page's top.
     /// </summary>
     public void SelectPage(SettingsPage page, string? anchor = null)
     {
+        // An old page or anchor (a card, a menu or agent text from before 4.0) lands where it lives now.
+        (page, anchor) = SettingsIndex.Resolve(page, anchor);
         var tab = Tabs.Items.OfType<TabItem>().FirstOrDefault(t => PageOf(t) == page);
         if (tab is null)
             return;
@@ -236,6 +334,7 @@ internal partial class SettingsWindow : Window
             {
                 var command = view switch
                 {
+                    SettingsIndex.MetersView => ViewModel.ClaudeCode.SetMetersCommand,
                     SettingsIndex.TrendsView => ViewModel.ClaudeCode.SetTrendsCommand,
                     SettingsIndex.SessionsView => ViewModel.ClaudeCode.SetSessionsCommand,
                     _ => ViewModel.ClaudeCode.SetOverviewCommand,
@@ -252,21 +351,36 @@ internal partial class SettingsWindow : Window
             ViewModel.Themes.IsStudioMode = false;
 
         Tabs.SelectedItem = tab;
+        // Claude Code, What this folder holds is one anchor on the page: a link to it opens one card's report (slice 4, decision 5). After the
+        // selection, whose page reload rebuilds the cards.
+        bool cardOpened = false;
+        if (page == SettingsPage.ClaudeCode && entry?.Anchor == SettingsIndex.FolderConfig)
+            cardOpened = ViewModel.ClaudeCodePage.OpenHoldsForLanding() is not null;
+        Place = new SettingsLink(page, entry?.Anchor);
         if (entry is null)
             return;
 
         // After layout: the page may have just been realized for the first time.
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
-            if (tab.Content is not DependencyObject content || SettingsAnchor.Find(content, entry.Anchor!) is not { } target
-                || !target.IsVisible)
+            if (tab.Content is not DependencyObject content || SettingsAnchor.Find(content, entry.Anchor!) is not { } target)
             {
                 tab.Focus();   // never leave keyboard focus nowhere
                 return;
             }
-            target.BringIntoView();
-            if (TryFindResource("Sanduhr.Brush.Accent") is Brush accent)
-                AnchorHighlightAdorner.Flash(target, accent, TimeSpan.FromSeconds(1.5));
+            // A section inside a collapsed group (a search hit "(in Advanced)") opens its group first.
+            if (RevealInside(target, content))
+                target.UpdateLayout();
+            if (!target.IsVisible)
+            {
+                tab.Focus();
+                return;
+            }
+            ScrollToTop(target);
+            // Claude Code's folder-config lands on a card list; when a card opened, the page flashes that one card (slice 4 row 28).
+            bool cardFlashes = cardOpened && entry.Anchor == SettingsIndex.FolderConfig;
+            if (!cardFlashes && TryFindResource("Sanduhr.Brush.Accent") is Brush accent)
+                AnchorHighlightAdorner.Flash(target, accent, AnchorHighlightAdorner.Duration);
             // Keyboard users land on the section: its first control that takes focus, else the
             // next one after a heading, else the page's sidebar entry.
             if (FirstFocusable(target) is { } control)
@@ -279,6 +393,34 @@ internal partial class SettingsWindow : Window
         }));
     }
 
+    /// <summary>The breathing room above a landed section's top edge.</summary>
+    internal const double LandingTopMargin = 8;
+
+    /// <summary>
+    /// A landing (search, a link, a jump link) puts the section's top at the top of its page, or as high as the page scrolls near its end,
+    /// so most of the section shows. BringIntoView alone scrolls the least it can and leaves a section below the fold at the bottom edge.
+    /// </summary>
+    internal static void ScrollToTop(FrameworkElement target)
+    {
+        ScrollViewer? scroller = null;
+        for (DependencyObject? d = VisualTreeHelper.GetParent(target); d is not null; d = VisualTreeHelper.GetParent(d))
+        {
+            if (d is ScrollViewer sv && sv.ScrollableHeight >= 0 && sv.VerticalScrollBarVisibility != ScrollBarVisibility.Disabled)
+            {
+                scroller = sv;
+                break;
+            }
+        }
+        if (scroller is null)
+        {
+            target.BringIntoView();
+            return;
+        }
+        var top = target.TransformToAncestor(scroller).Transform(new Point(0, 0)).Y;
+        scroller.ScrollToVerticalOffset(Math.Max(0, scroller.VerticalOffset + top - LandingTopMargin));
+        scroller.UpdateLayout();
+    }
+
     private static bool IsInside(DependencyObject element, DependencyObject root)
     {
         for (var d = element; d is not null; d = VisualTreeHelper.GetParent(d) ?? LogicalTreeHelper.GetParent(d))
@@ -287,6 +429,25 @@ internal partial class SettingsWindow : Window
                 return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Opens every collapsed Expander between <paramref name="target"/> and the page's content root
+    /// <paramref name="root"/> (exclusive: the walk stops there and never opens anything above the page), so a section
+    /// inside one can be shown and focused. True when one was opened.
+    /// </summary>
+    internal static bool RevealInside(DependencyObject target, DependencyObject root)
+    {
+        bool opened = false;
+        for (var d = target; d is not null && !ReferenceEquals(d, root); d = LogicalTreeHelper.GetParent(d) ?? (d is Visual ? VisualTreeHelper.GetParent(d) : null))
+        {
+            if (d is Expander { IsExpanded: false } expander)
+            {
+                expander.IsExpanded = true;
+                opened = true;
+            }
+        }
+        return opened;
     }
 
     private static UIElement? FirstFocusable(DependencyObject root)
@@ -375,4 +536,46 @@ internal partial class SettingsWindow : Window
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>A link inside Settings (an empty list's "Claude Code settings…"): its Tag is a link, "claudecode#folders".</summary>
+    private void OpenSettingsLink_Click(object sender, RoutedEventArgs e) => OpenLink((sender as FrameworkElement)?.Tag as string);
+
+    /// <summary>Opens the place a clicked button's <see cref="SettingsLinkTo.Link"/> names.</summary>
+    private void OnSettingsLinkClick(object sender, RoutedEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject d && SettingsLinkTo.GetLink(d) is { Length: > 0 } text)
+        {
+            OpenLink(text);
+            e.Handled = true;
+        }
+    }
+
+    // The Desk's Layout map folds below 600 DIP of window height (spec, Short windows). A fold or unfold by the person, or a link that
+    // opens it, holds for this window's life, as on the Mac.
+    private bool? _mapChosenOpen;
+    private bool _foldingMap;
+
+    private void FoldMapForHeight()
+    {
+        if (!IsLoaded || ActualHeight <= 0) return;
+        bool open = !WindowFit.MapFolds(ActualHeight, _mapChosenOpen);
+        if (DeskMapFold.IsExpanded == open) return;
+        _foldingMap = true;
+        DeskMapFold.IsExpanded = open;
+        _foldingMap = false;
+    }
+
+    private void DeskMapFold_Toggled(object sender, RoutedEventArgs e)
+    {
+        // XAML's own IsExpanded="True" raises Expanded while loading: that is not a choice.
+        if (IsLoaded && !_foldingMap && ReferenceEquals(e.OriginalSource, sender))
+            _mapChosenOpen = DeskMapFold.IsExpanded;
+    }
+
+    /// <summary>Selects the page and anchor a link's text names ("claudecode#folders"); Widget with no anchor is the widget itself, not Settings.</summary>
+    private void OpenLink(string? text)
+    {
+        if (text is not null && SettingsIndex.ParseLink(text) is { } link && !SettingsIndex.ShowsTheWidget(link))
+            SelectPage(link.Page, link.Anchor);
+    }
 }

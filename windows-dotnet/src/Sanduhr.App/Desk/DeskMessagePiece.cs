@@ -16,6 +16,8 @@ namespace Sanduhr.App.Desk;
 internal sealed record DeskMessageFrame(MessageToday Today, DeskMessageSettings Settings)
 {
     public ISet<string> Played { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+    /// <summary>The glow's color (theme match: the followed theme's desk.glow, else its accent); null glows in the line's middle stop.</summary>
+    public string? GlowHex { get; init; }
 }
 
 /// <summary>
@@ -47,6 +49,9 @@ internal sealed class DeskMessageSource : IDisposable
     public event Action? Changed;
 
     public void Reload() => _settings = _store.LoadDeskMessage();
+
+    /// <summary>"Use the theme's colors" is on: a theme change redraws the message even when the Desk does not follow the theme.</summary>
+    public bool ThemeColors => _settings.ThemeColors;
 
     /// <summary>Creates the starter file when there is none (the piece or the editor needs it).</summary>
     public void EnsureFile() => MessageEditorState.EnsureFile(_path, () => !ResetGuard.Done);
@@ -87,10 +92,10 @@ internal sealed class DeskMessageSource : IDisposable
         if (_watcher is not null) return;
         try
         {
-            var dir = Path.GetDirectoryName(_path)!;
-            _watcher = new FileSystemWatcher(dir, Path.GetFileName(_path))
+            var dir = Path.GetDirectoryName(_path)!;   // streamer: notname - folder of the message file being watched, never drawn
+            _watcher = new FileSystemWatcher(dir, Path.GetFileName(_path))   // streamer: notname - watcher pattern, never drawn
             {
-                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,   // streamer: notname - NotifyFilters.FileName is a watcher flag, not a name
             };
             FileSystemEventHandler on = (_, _) => Application.Current?.Dispatcher.BeginInvoke(() => { _debounce.Stop(); _debounce.Start(); });
             _watcher.Changed += on;
@@ -146,7 +151,7 @@ internal static class DeskMessagePiece
             HorizontalAlignment.Center => TextAlignment.Center,
             _ => TextAlignment.Left,
         };
-        var built = lines.Select(l => Line(l, s, ink, regular, bold, baseSize, ta, align, width, live, frame.Played, gate)).ToList();
+        var built = lines.Select(l => Line(l, s, ink, regular, bold, baseSize, ta, align, width, live, frame.Played, gate, frame.GlowHex)).ToList();
 
         if (!MessageSpecialModes.Cycles(s.Special, frame.Today))
         {
@@ -254,11 +259,13 @@ internal static class DeskMessagePiece
 
     /// <summary>One line with its effects. A line that is nothing but tags draws as written.</summary>
     private static FrameworkElement Line(string raw, DeskMessageSettings s, ResolvedInk ink, FontFamily regular, FontFamily bold,
-        double baseSize, TextAlignment ta, HorizontalAlignment align, double width, List<IDisposable> live, ISet<string> played, DeskPause gate)
+        double baseSize, TextAlignment ta, HorizontalAlignment align, double width, List<IDisposable> live, ISet<string> played, DeskPause gate,
+        string? glowHex = null)
     {
         var parsed = MessageMarkup.Parse(raw);
         var e = parsed.Effects;
-        var stops = e.Ink is { Count: > 0 } own
+        // "Use the theme's colors" ignores a line's own ink: the resolver already put the theme's stops in s.Color.
+        var stops = e.Ink is { Count: > 0 } own && !s.ThemeColors
             ? InkHex.Stops(string.Join(",", own))
             : InkHex.Stops(DeskInk.MessageColor(s.Color, ink.DarkInk));
         var text = parsed.Text;
@@ -287,7 +294,7 @@ internal static class DeskMessagePiece
         if (MessageMotion.Glows(e, s.Glow))
             block.Effect = new DropShadowEffect
             {
-                Color = DeskView.Rgb(stops[stops.Count / 2]),
+                Color = DeskView.Rgb(glowHex ?? stops[stops.Count / 2]),
                 ShadowDepth = 0,
                 BlurRadius = DeskMessageLook.GlowBlur,
                 Opacity = DeskMessageLook.GlowOpacity,

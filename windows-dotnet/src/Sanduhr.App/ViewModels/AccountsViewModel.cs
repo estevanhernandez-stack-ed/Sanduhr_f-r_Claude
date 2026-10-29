@@ -1,8 +1,11 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Sanduhr.App.Services;
 using Sanduhr.App.Views;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
@@ -12,11 +15,15 @@ public sealed partial class AccountItemViewModel : ObservableObject
 {
     public string Label { get; }
 
+    /// <summary>What the row shows: the label, or its codename while streamer mode hides it (slice 7, CP 1). <see cref="Label"/> stays the key.</summary>
+    public string Shown { get; }
+
     [ObservableProperty] private bool _isActive;
 
     public AccountItemViewModel(string label, bool isActive)
     {
         Label = label;
+        Shown = StreamerMode.Mask.Name(CodenameCategory.Account, label);
         _isActive = isActive;
     }
 
@@ -26,7 +33,7 @@ public sealed partial class AccountItemViewModel : ObservableObject
     partial void OnIsActiveChanged(bool value) => OnPropertyChanged(nameof(Marker));
 
     /// <summary>What a screen reader reads for the row: "Work, active", never the type name.</summary>
-    public override string ToString() => IsActive ? Label + ", active" : Label;
+    public override string ToString() => IsActive ? Shown + ", active" : Shown;
 }
 
 /// <summary>
@@ -46,6 +53,7 @@ public sealed partial class AccountsViewModel : ObservableObject
     private readonly WidgetViewModel _widget;
     private readonly Func<Task> _addAccountAsync;
     private readonly Func<string, Task> _updateSignInAsync;
+    private readonly Func<string, string> _displayFolder;
     private Window? _owner;
 
     public ObservableCollection<AccountItemViewModel> Accounts { get; } = new();
@@ -61,6 +69,7 @@ public sealed partial class AccountsViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(RenameCommand))]
     [NotifyCanExecuteChangedFor(nameof(SignOutCommand))]
     [NotifyCanExecuteChangedFor(nameof(UpdateSignInCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClearHistoryCommand))]
     private bool _isDemo;
 
     [ObservableProperty]
@@ -68,13 +77,16 @@ public sealed partial class AccountsViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(RenameCommand))]
     [NotifyCanExecuteChangedFor(nameof(SignOutCommand))]
     [NotifyCanExecuteChangedFor(nameof(UpdateSignInCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClearHistoryCommand))]
     private AccountItemViewModel? _selectedAccount;
 
-    public AccountsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync)
+    public AccountsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync,
+        Func<string, string>? displayFolder = null)
     {
         _widget = widget;
         _addAccountAsync = addAccountAsync;
         _updateSignInAsync = updateSignInAsync;
+        _displayFolder = displayFolder ?? (path => StreamerMode.ShowFolder(path, ClaudeCodeProfile.Dir));   // slice 7: CP 7's bypass   // streamer: masked - CP 7: ShowFolder masks on this line
         Reload();
     }
 
@@ -101,7 +113,7 @@ public sealed partial class AccountsViewModel : ObservableObject
         var prev = SelectedAccount?.Label;
         Accounts.Clear();
         IsDemo = _widget.IsDemo;
-        var active = _widget.ShownActiveAccount;
+        var active = _widget.ShownActiveAccount;   // streamer: masked - via AccountItemViewModel: each row's Shown is Mask.Name (CP 1)
         foreach (var label in _widget.ShownAccounts)
             Accounts.Add(new AccountItemViewModel(label, label == active));
         HasNoAccounts = Accounts.Count == 0;
@@ -110,6 +122,7 @@ public sealed partial class AccountsViewModel : ObservableObject
         SelectedAccount = Accounts.FirstOrDefault(a => a.Label == prev)
                           ?? Accounts.FirstOrDefault(a => a.IsActive)
                           ?? Accounts.FirstOrDefault();
+        RefreshData();
     }
 
     // Demo mode's samples are not real accounts: nothing to switch, rename, update or remove.
@@ -131,12 +144,19 @@ public sealed partial class AccountsViewModel : ObservableObject
         var item = SelectedAccount;
         if (item is null)
             return;
-        var prompt = new TextPromptWindow("Rename account", "New name", item.Label);
-        if (_owner is not null && _owner.IsLoaded)
-            prompt.Owner = _owner;
-        if (prompt.ShowDialog() != true)
+        string? typed;
+        if (RenameHook is { } hook)
+            typed = hook(RenamePrefill(item.Label));
+        else
+        {
+            var prompt = new TextPromptWindow("Rename account", "New name", RenamePrefill(item.Label));
+            if (_owner is not null && _owner.IsLoaded)
+                prompt.Owner = _owner;
+            typed = prompt.ShowDialog() == true ? prompt.Value : null;
+        }
+        if (typed is null)
             return;
-        var newName = prompt.Value.Trim();
+        var newName = typed.Trim();
         if (string.IsNullOrEmpty(newName) || newName == item.Label)
             return;
         try
@@ -145,11 +165,22 @@ public sealed partial class AccountsViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ShowError($"Couldn't rename: {ex.Message}");
+            ShowError(RenameError(item.Label, ex));
             return;
         }
         Reload();
     }
+
+    /// <summary>Tests answer the Rename prompt here (given the prompt's prefill, returning the typed text or null for Cancel).</summary>
+    internal Func<string, string?>? RenameHook { get; set; }
+
+    /// <summary>The Rename prompt's text: empty while streamer mode hides the name, so a codename can never be saved as the name (decision 12).
+    /// The saved value is whatever the person types (or the model's real label), never the text a masked control shows.</summary>
+    internal static string RenamePrefill(string label) => StreamerMode.Mask.Hides(CodenameCategory.Account, label) ? "" : label;
+
+    /// <summary>The rename error, naming the account as the page does (CP 25). The new name is the person's own typing and stays.</summary>
+    internal static string RenameError(string label, Exception ex) =>
+        $"Couldn't rename: {StreamerMode.Mask.Paths(ex.Message.Replace(label, StreamerMode.Mask.Name(CodenameCategory.Account, label), StringComparison.Ordinal))}";   // streamer: masked - CP 18: the rename error passes Mask.Paths and Mask.Name on this line
 
     /// <summary>Refresh the selected account's credentials IN PLACE — works for
     /// non-active accounts too (pre-WS-A, only the active account could reauth,
@@ -169,14 +200,9 @@ public sealed partial class AccountsViewModel : ObservableObject
     private async Task SignOut()
     {
         var item = SelectedAccount;
-        if (item is null)
+        if (item is null || IsDemo || _widget.IsDemo)
             return;
-        var text =
-            $"Remove the '{item.Label}' account from Sanduhr?\n\n" +
-            "This deletes its saved sign-in from the Windows Credential Manager " +
-            $"and its usage-history file (history.{item.Label}.json). Cannot be undone.";
-        var result = ThemedDialog.Show(_owner, "Remove account", text, MessageBoxButton.YesNo, ThemedDialogKind.Warning);
-        if (result != MessageBoxResult.Yes)
+        if (!ConfirmRemove(item.Label))
             return;
         await _widget.SignOutAccountAsync(item.Label);
         Reload();
@@ -187,6 +213,93 @@ public sealed partial class AccountsViewModel : ObservableObject
     {
         await _addAccountAsync();
         Reload();
+    }
+
+    // ---- Data for this account (Settings v2, slice 5; WF1, WF27, WF29) ----
+
+    /// <summary>The Data section shows while an account is selected.</summary>
+    public bool HasData => SelectedAccount is not null;
+
+    /// <summary>"Linked to ~\.claude-work." or "No Claude Code folder is linked to this account." (an account links one folder).</summary>
+    [ObservableProperty] private string _linkedFolderText = "";
+
+    /// <summary>Under Remove account…: everything it removes, the same sentence its question shows.</summary>
+    [ObservableProperty] private string _removeCaption = "";
+
+    public string ClearHistoryName => SettingsNames.ClearAccountHistoryNamed(SelectedAccount?.Shown ?? "");
+    public string RemoveName => SettingsNames.RemoveAccountNamed(SelectedAccount?.Shown ?? "");
+
+    /// <summary>Connected by Settings: the meter history redraws after a clear.</summary>
+    public Action? HistoryCleared { get; set; }
+
+    partial void OnSelectedAccountChanged(AccountItemViewModel? value) => RefreshData();
+
+    private void RefreshData()
+    {
+        var label = SelectedAccount?.Label;
+        var folder = label is null || IsDemo ? null : _widget.AccountFolder(label);
+        LinkedFolderText = label is null ? "" : SettingsNames.LinkedFolderLine(folder is null ? null : _displayFolder(folder));
+        RemoveCaption = label is null ? "" : SettingsNames.RemoveAccountDetail(SelectedAccount!.Shown, StreamerMode.Mask.Hides(CodenameCategory.Account, label));
+        OnPropertyChanged(nameof(HasData));
+        OnPropertyChanged(nameof(ClearHistoryName));
+        OnPropertyChanged(nameof(RemoveName));
+    }
+
+    /// <summary>"Clear this account's history…" (WF1): the selected account's 30-day meter history, after a question with no default
+    /// button. Never in demo mode, whose sample labels can match a real account's.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void ClearHistory()
+    {
+        if (IsDemo || _widget.IsDemo || SelectedAccount is not { } item)
+            return;
+        if (!ConfirmClear(item.Label))
+            return;
+        try
+        {
+            _widget.History.ClearAll(item.Label);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Sounds.PlayError();
+            Info(SettingsNames.HistoryNotCleared);
+            return;
+        }
+        HistoryCleared?.Invoke();
+        Info(SettingsNames.HistoryCleared(item.Shown));
+    }
+
+    /// <summary>Tests answer the questions and read the notices here instead of showing them.</summary>
+    internal Func<string, bool>? ConfirmClearHook { get; set; }
+    internal Func<string, bool>? ConfirmRemoveHook { get; set; }
+    internal Action<string>? InfoHook { get; set; }
+
+    /// <summary>The question last asked (clear or remove), as shown; tests read it.</summary>
+    internal string? LastQuestion { get; private set; }
+
+    // The questions name the account as the row does (slice 7, CP 1); the hooks and the action keep the real label.
+    private bool ConfirmClear(string label)
+    {
+        LastQuestion = SettingsNames.ClearHistoryQuestion(StreamerMode.Mask.Name(CodenameCategory.Account, label));
+        return ConfirmClearHook is { } hook
+            ? hook(label)
+            : ThemedDialog.ShowConfirm(_owner, LastQuestion, SettingsNames.ClearHistoryDetail,
+                SettingsNames.ClearHistoryConfirm, SettingsNames.ClearHistoryCancel);
+    }
+
+    private bool ConfirmRemove(string label)
+    {
+        LastQuestion = SettingsNames.RemoveAccountQuestion(StreamerMode.Mask.Name(CodenameCategory.Account, label));
+        return ConfirmRemoveHook is { } hook
+            ? hook(label)
+            : ThemedDialog.ShowConfirm(_owner, LastQuestion,
+                SettingsNames.RemoveAccountDetail(StreamerMode.Mask.Name(CodenameCategory.Account, label), StreamerMode.Mask.Hides(CodenameCategory.Account, label)),
+                SettingsNames.RemoveAccountConfirm, SettingsNames.RemoveAccountCancel);
+    }
+
+    private void Info(string message)
+    {
+        if (InfoHook is { } hook) { hook(message); return; }
+        ThemedDialog.Show(_owner, SettingsNames.MeterHistoryDialogTitle, message, MessageBoxButton.OK, ThemedDialogKind.Info);
     }
 
     private void ShowError(string message)

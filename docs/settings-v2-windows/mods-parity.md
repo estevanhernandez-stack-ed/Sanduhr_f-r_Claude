@@ -1,0 +1,104 @@
+# Mods & Config parity: Mac against Windows
+
+Audit, 2026-10-24, read-only, on branch `docs/settings-v2-windows` at `1b263d8` (3.9.0). Input to the Windows Settings v2 spec for 4.0. Paths are repo-relative; `mac/…/Views/` means `mac/Sources/Sanduhr/Views/`, `win/` means `windows-dotnet/src/`.
+
+## Verdict: the Mac has more real control, but less than it looks
+
+The Mac really does more. It has a cross-folder Catalog, a By Folder view with eight sections, Compare, Mod Studio, kept mods you switch per folder, config packs, agent proposals, a validator risk card and a richer statusline. Windows has one page that reads one folder at a time, and the meters mod is its only write.
+
+Part of the "more control" is still presentation. On the Mac too, **no mod except Sanduhr's own and the user's kept mods can be switched**: the page says "Other mods are read-only" (`mac/…/Views/ModsSettings.swift:151`, `:223`) and that "switching other mods comes later" (`mac/…/Views/StatuslineSegmentPicker.swift:513`). The Mac's settings rows draw disabled switches (`mac/…/Views/ModsSeatSections.swift:68`), and every catalog line carries **Studio…** and **Folders…** buttons (`mac/…/Views/ModsCatalogRows.swift:111-114`). Both read as control without being control.
+
+The owner wants every mod switchable from one place in 4.0. **No platform does that today.** A generic plugin switch is the Mac spec's unbuilt slice 3 (CLI-routed writes, `docs/mods-and-config-spec.md:292-297`). Windows can't reach it by copying the Mac.
+
+Counts: **12 real gaps where Windows lacks it, 3 Windows-only** (the widget packs, which the Mac has none of), **8 looks-only**.
+
+## 1. Capability matrix
+
+| # | Capability | Mac (where, file:line) | Windows (where, file:line) | Verdict |
+|---|---|---|---|---|
+| 1 | List the mods and plugins one folder loads, with on/off/missing, version, description, mod tag, what it draws and can reach | By Folder, the "Mods and plugins" section: `ModsSettings.swift:161-185`, rows `ModsRows.swift:7-129`; origins include session `dev-mods/` (`Services/ModInventory.swift:43-51`) | Mods & Config list: `SettingsWindow.xaml:1942-1997`, `ModsConfigViewModel.cs:261-267`; origins are PluginDirs, Installed, SkillsDir only (`Sanduhr.Core/ModInventory.cs:24-32`) | Same, except session dev-mods aren't read on Windows (folded into gap R11) |
+| 2 | Browse a catalog across every folder (plugins, mods, skills, agents, commands, output styles, MCP, marketplace "Available"), with seat chips, groups, filters, search, Expand/Collapse All | `ModsCatalogView.swift:79-160`, filters `ModsCatalogRows.swift:194-220`, groups `Services/ConfigCatalog.swift:191-199`, chips `ModsCatalogCard.swift:167-189` | None. One folder at a time through a picker (`SettingsWindow.xaml:1858-1866`) | Real gap (Windows lacks it) |
+| 3 | What a new session loads, per folder (skill listing tokens against the budget) | `ModsCatalogView.swift:164-186` | None | Real gap (Windows lacks it), folded into R2 |
+| 4 | Sanduhr's meters mod: install per folder | Toggle On in a folder with no entry opens the consent sheet: `ModsOwnSettings.swift:205-209`, `:320-340` | Install… on the Claude Code page's Meters piece: `SettingsWindow.xaml:1779`, `ClaudeCodeViewModel.cs:197-200`, `:511-514` | Looks-only (different page) |
+| 5 | Meters mod: on/off, Update, Remove per folder | One header, every folder at once, a switch per row: `ModsOwnSettings.swift:167-297` | Turn on / Turn off / Update… / Remove… on the mod's row for the picked folder: `SettingsWindow.xaml:1978-1990`, `ModsConfigViewModel.cs:321-374`; Remove also on Claude Code (`CcPieceTemplate`, `SettingsWindow.xaml:281-284`) | Same capability; looks-only for the layout (see §3) |
+| 6 | Meters row notes: project override, what the last action said | `row.summary`, `ownNotes`: `ModsOwnSettings.swift:197-205` | `StatusText` for the last action only (`ModsConfigViewModel.cs:327-372`); `OwnModState` has no override field (`Sanduhr.Core/ClaudeCodeIntegrations.cs:63-75`) | Real gap (Windows lacks it), small, R11 |
+| 7 | Mod Studio for the meters mod: live band preview, Look (per-segment ink), Layout (bars, style, motion, label; this folder or every folder through `pluginConfigs`), Folders, About | `ModStudio.swift:180-391`, `ModStudioTabs.swift:25-208`; spec `docs/mod-studio-spec.md:27-70` | None. Windows has no `band.json` writer (no `BandFile` or `pluginConfigs` reference under `win/`) | Real gap (Windows lacks it) |
+| 8 | Watchers above the prompt (band rows) and the animated band in place of statusline meters (`--band`) | `ModsOwnSettings.swift:299-310`, `StatuslineSegmentPicker.swift:108-121` | None; Windows watchers go to the Desk only | Real gap (Windows lacks it), with R3 |
+| 9 | New Mod: Build with Claude prompt, From Claude, Open Pack | `ModNewSheet.swift:422-470`, `:640-667` | None | Real gap (Windows lacks it) |
+| 10 | Kept mods: Keep, Try in a Session, Check, Export, Publish to Marketplace, Forget | `ModNewSheet.swift:743-824` | None | Real gap (Windows lacks it) |
+| 11 | **Switch a non-Sanduhr mod per folder** (kept mods only: Turn On…, Turn Off, Use This Version…) | `ModNewSheet.swift:955-990` | None | Real gap (Windows lacks it). The only generic mod switch on either platform |
+| 12 | Switch any marketplace plugin or other mod | None. Read-only (`ModsSettings.swift:151`), planned as spec slice 3 | None. Read-only "Plugin switches" lines (`SettingsWindow.xaml:1920-1935`) | Same (neither) |
+| 13 | Check: Claude Code's validator, risk card per mod | `ModsRows.swift:148-211` | None (no `plugin validate` call under `win/`) | Real gap (Windows lacks it) |
+| 14 | By Folder: eight sections (Settings with source and honored badges, Instructions tree, Extensions with agents, skills, commands, hooks, parity, MCP across six sources, History, Housekeeping, Folder repo state, Drift) | `ModsBySeatView.swift:5-17`, `:309-360`, `ModsSeatSections.swift:35-309`, `ModsSeatRepoSections.swift:8-199` | Shallow versions of five: settings.json readable or not with line and column, statusline command, hook groups per event, `enabledPlugins` on/off, MCP user server names, CLAUDE.md lines and size, retention with the 30-day warning: `ModsConfigViewModel.cs:220-287`, `SettingsWindow.xaml:1869-2030` | Real gap (Windows lacks it): depth, not presence |
+| 15 | Compare two folders | `ModsCompareView.swift:7-190` | None | Real gap (Windows lacks it) |
+| 16 | Folder labels and a work or personal mark; work rows hidden in demo mode | `ModsCatalogView.swift:229-268`, `ModsPageModel.swift:221` | None. The linked account exists (`SettingsWindow.xaml:1734-1740`) but there is no mark and no wall | Real gap (Windows lacks it) |
+| 17 | Add Folder…, Forget Folder… | On Mods (`ModsSettings.swift:137`, `ModsBySeatView.swift:266-271`) and on Claude Code (`IntegrationsSettings.swift:286`) | Claude Code page only (`SettingsWindow.xaml:1726`, `:1759`); Mods says "Add one on the Claude Code page" (`ModsConfigViewModel.cs:204`) | Looks-only |
+| 18 | Re-read the folders | Read Again (`ModsSettings.swift:135`) | Refresh (`SettingsWindow.xaml:1864`) | Same (naming differs) |
+| 19 | Config export (a pack with secrets as "needs a value", watch words, for other agents) | `ConfigExportSheet.swift:79-210`, button `ModsBySeatView.swift:259` | None | Real gap (Windows lacks it) |
+| 20 | Config import into a folder, review per item, Undo Import | `ConfigImportSheet.swift:215-514`, `ModsBySeatView.swift:139-160` | None | Real gap (Windows lacks it), with R4 |
+| 21 | Agents propose mods and config (`propose_mod`, `list_catalog`, `propose_install`, `get_mod_status`, `propose_config`) and the "Let agents propose mods" switch | `ModsSettings.swift:190-205`, review rows `ModsBySeatView.swift:170-183`, `ModsCatalogView.swift:100-110`; tools `mac/README.md:619-623` | None. The MCP has propose_theme, desk_messages, desk, now_playing_looks and widget only (`Sanduhr.Mcp/ToolCatalog.cs:156-471`) | Real gap (Windows lacks it) |
+| 22 | Statusline: install, Replace or Combine, join line or same | Consent sheet `IntegrationsSettings.swift:577-653` | Consent dialog `IntegrationConsentDialog.xaml:92-110`, `ClaudeCodeViewModel.cs:595-602` | Same |
+| 23 | Statusline segments | Six: account label, session, weekly, resets, context, model (`StatuslineSegmentPicker.swift:230-235`), each with a style popover (ink, gradient, bold and so on, `:412-489`), join glyph, live test | Four: account, session, weekly, resets (`Sanduhr.Core/StatuslineInstaller.cs:54`, `IntegrationConsentDialog.xaml:101-110`); no styles | Real gap (Windows lacks it) |
+| 24 | The folder's mods that draw status entries, shown beside the statusline choice | `StatuslineSegmentPicker.swift:489-520` | None | Real gap (Windows lacks it), with R5 |
+| 25 | Edit an installed statusline in place | `SeatStatuslineBox` on Mods, By Folder (`StatuslineSegmentPicker.swift:706-760`) | **Change…** on the Claude Code page reopens the dialog (`ClaudeCodeViewModel.cs:189-192`) | Looks-only, for the shared segments |
+| 26 | MCP server and glow hooks install, update, remove per folder | Integrations rows `IntegrationsSettings.swift:518-560` | Claude Code pieces `ClaudeCodeViewModel.cs:193-203`, `SettingsWindow.xaml:1777-1782` | Same |
+| 27 | Per-folder MCP read consent (project totals) | Not checked in this audit | `SettingsWindow.xaml:1746-1750`, `ClaudeCodeViewModel.cs:438-446` | Unknown; not compared |
+| 28 | Secrets masked everywhere on the page | `Services/ConfigMask.swift` | `Sanduhr.Core/ConfigMask.cs:24-164` | Same |
+| 29 | Receipts, exact undo, backups | `Services/IntegrationInstaller.swift`, receipts skipped note `ModsSettings.swift:128-133` | `Sanduhr.Core/ConfigCommit.cs:33-124`, `ClaudeCodeIntegrations.cs:913-1017` | Same engine; Windows shows no "receipts skipped" note on the page (not checked further) |
+| 30 | Reset Sanduhr…: undo Claude Code entries first | Sheet with a checkbox per folder: `ResetSheet.swift:104-228`, parts `Services/Reset.swift:23-29` | Five parts, no per-folder choice: `ResetWindow.xaml:155-185`, `Sanduhr.Core/ResetPlan.cs:6-18`. The checkbox reads "statusline, MCP server" (`ResetWindow.xaml:161`) while the step undoes every receipt, meters and hooks included (`ClaudeCodeIntegrations.cs:1017`) | Real gap (Windows lacks it), small; plus a copy fix |
+| 31 | Widget catalog (signed, from GitHub): Install, Update | None | `WidgetsPage.xaml:150-170`, `WidgetsPageViewModel.cs:14-87`, `:281-372` | Windows-only |
+| 32 | Installed widget packs: Uninstall, Use my own art | None | `WidgetsPage.xaml:174-181`, `WidgetsPageViewModel.cs:93-134`, `:393-470` | Windows-only |
+| 33 | Desk companion (sprite pick, show, roam) and `propose_widget` | None | `WidgetsPage.xaml:113-141`, `WidgetsPageViewModel.cs:168-270`, `Sanduhr.Mcp/ToolCatalog.cs:471` | Windows-only |
+
+## 2. Real gaps, ranked by what a user loses
+
+1. **R1. Kept mods and the New Mod flow** (rows 9 to 11). This is the only place either platform switches a mod that isn't Sanduhr's, so its absence is the main reason Windows feels like it has no control. Port: `KeptMod` storage under `%USERPROFILE%\.sanduhr` (a Claude Code session loads it, so it can't live in AppData), a per-folder `CLAUDE_CODE_PLUGIN_DIRS` entry through the existing receipt engine (`SwitchOwnMod` generalized beyond one mod name), plus the sheet. Large: about one release slice. Try in a Session and Publish can follow.
+2. **R2. The cross-folder Catalog** (rows 2, 3). Without it a user with three folders opens each one to find where a plugin lives. Port: a Core `ConfigCatalog` that merges `ModInventory.Read` over every folder, adds marketplace `marketplace.json` listings and the skills, agents, commands and output-styles folders, and is keyed by name with per-folder state. Medium-large. It is also the data model §4 needs.
+3. **R3. Meters mod Studio and `band.json`** (rows 7, 8). Windows users get the mod's defaults with no styles, layout, watcher rows or animated-band option. Port: a `band.json` writer in `%USERPROFILE%\.sanduhr`, `pluginConfigs` edits with receipts, and the Studio's Look and Layout without the native preview first. Medium. The preview (a port of `band.ts`) is the expensive part and can wait.
+4. **R4. Config packs: export, import, Undo Import** (rows 19, 20). A user can't carry a folder's setup to a new PC. Port: needs R2 for the description, the existing receipts for undo, and a pack reader. Large. Behind R1 and R2.
+5. **R5. Statusline segments** (rows 23, 24). Context and model segments, per-segment looks, and the mod chips. Port: extend `StatuslineScript` (PowerShell) with two segments and style arguments, and add the chips list from `ModInventory` touches (Status surface already detected, `ModInventory.cs:8`). Small-medium.
+6. **R6. Agent proposals for mods and config** (row 21). Port: new MCP tools, but every MCP change is a trust-boundary decision (`TrustBoundaryTests` pins the link list), so this costs a design review on top of the code. Medium. Depends on R1.
+7. **R7. By Folder depth** (row 14). Settings precedence with sources, the instruction tree, agents, skills, commands, hook detail, MCP across sources, housekeeping, seat repo state and drift. Port: mostly Core readers. Large in total, but each section ships alone. Settings precedence and MCP sources pay first.
+8. **R8. Check, the validator risk card** (row 13). Port: a hardened runner for `claude plugin validate --json` (temp cwd, null stdin, timeout) in the App, never the MCP. Small-medium.
+9. **R9. Compare** (row 15). Port: a pure function over R2's catalog. Small once R2 exists.
+10. **R10. Folder labels and the work mark** (row 16). Port: a label and a mark per folder in `settings.json`; the account link already exists. Small. Needed before R4 can honor the wall.
+11. **R11. Meters row detail and session dev-mods** (rows 1, 6). The project override note and `dev-mods/<session>` discovery. Small.
+12. **R12. Reset per-folder choice** (row 30). Port: list the folders with receipts as checkboxes; `UndoAll(folders)` already takes a list (`ClaudeCodeIntegrations.cs:1017`). Small. Fix the "statusline, MCP server" label in the same change.
+
+**Windows-only (the Mac lacks these):** the signed widget catalog, installed packs with Uninstall and own art, and the Desk companion with `propose_widget` (rows 31 to 33). The 3.8 spec says the Mac follows with the same pack format (`docs/widgets-3.8-spec.md:7`).
+
+## 3. Looks-only gaps: why the Mac feels like more control
+
+1. **The meters mod has one home on the Mac and two on Windows.** On the Mac the header holds every control for every folder at once, a switch per row (`ModsOwnSettings.swift:251-297`), and switching on where it isn't installed installs it after consent (`:205-209`). Windows splits it: Install… on Claude Code (`SettingsWindow.xaml:1779`), switch, Update and Remove on Mods (`:1978-1990`), with Remove on both pages. Settings v2 for the Mac moved it on purpose (`docs/settings-v2-spec.md` "Why it moved (2026-10-08)").
+2. **Switches against buttons.** The Mac draws a toggle that shows state. Windows shows one button at a time, "Turn on" or "Turn off" (`SettingsWindow.xaml:1980-1985`), which reads as an action and hides the state in the row's text.
+3. **All folders against one folder.** The Mac header lists every folder; Windows needs the picker (`SettingsWindow.xaml:1858-1866`) even for the meters mod, so turning it on in three folders takes three picks.
+4. **Disabled switches that look live.** The Mac's settings rows draw switches, disabled (`ModsSeatSections.swift:68`). Windows prints "On" and "Off" as text (`SettingsWindow.xaml:1920-1935`). The data is the same; the Mac looks editable.
+5. **Studio… and Folders… on every catalog line** (`ModsCatalogRows.swift:111-114`, `ModsCatalogCard.swift:61-63`). For a mod that isn't Sanduhr's or kept, the Studio offers only Folders and About (`docs/mod-studio-spec.md:81`), so the buttons promise more than they do.
+6. **Framing.** The Windows page opens with "What one Claude Code folder holds, read from its files. Sanduhr runs nothing here" (`SettingsWindow.xaml:1856`) and the XAML comment "a read-only look at one folder" (`:1844`). The Mac opens on the meters switches, then "More: mods and config" with summary tiles counted across folders (`ModsSettings.swift:93-120`, `:209-237`). The Mac reads as a control panel, Windows as a report. Both write the same one thing outside R1.
+7. **Folder management lives elsewhere on Windows.** Add and Forget sit only on Claude Code (`SettingsWindow.xaml:1726`, `:1759`); the Mac has them on Mods too (`ModsSettings.swift:137`, `ModsBySeatView.swift:266`).
+8. **Statusline editing.** The Mac edits the installed line in place on Mods, By Folder (`StatuslineSegmentPicker.swift:706-760`). Windows does the same through Change… on Claude Code (`ClaudeCodeViewModel.cs:189-192`). Same capability for the four shared segments; the segment and style gaps are R5.
+
+Naming also differs: Read Again against Refresh, "By Folder" against no tab, "Meters above the prompt" on both (good), "Glow when Claude needs you" against the Mac's "Claude Code glow hook" (`docs/settings-v2-spec.md` F9).
+
+## 4. Where mods and widgets meet
+
+**Today on Windows** three pages each own a slice, with three separate sources:
+
+| What | Page | Source of truth | On/off |
+|---|---|---|---|
+| Claude Code plugins and mods, per folder | Mods & Config | `ModInventory.Read(folder)` → `FolderReport.Mods`, `ModItem.State` On/Off/Missing (`Sanduhr.Core/ModInventory.cs:35-49`) | Read-only, except Sanduhr's |
+| Sanduhr's meters mod, per folder | Claude Code (install) and Mods & Config (switch) | `ClaudeCodeIntegrations.OwnModStateOf` (`ClaudeCodeIntegrations.cs:480`) | `SwitchOwnMod` (`:823`) |
+| Widget packs (sprite, theme, palette, effects, font; `PackValidator.cs:47`) | Widgets | `WidgetStore.Load()` → `widgets.json` (`WidgetStore.cs:20-31`); the catalog from `WidgetCatalogService` | None in the UI |
+| Statusline, MCP, glow hooks | Claude Code | `StatuslineInstaller`, `McpIntegrationInstaller`, `ClaudeCodeIntegrations.Status` | Install or Remove only |
+
+**No single source answers "everything installed, with an on/off."** The nearest seed: `widgets.json` already stores `enabled` per pack (`WidgetStore.cs:20`, read at `:79`, written at `:110`, kept on reinstall at `:305`). Nothing reads it, and no control sets it. A pack is effectively always on.
+
+**What a "one list, collapsible catalog" model needs from the data side:**
+
+1. **One installed-item record across kinds**: id, display name, kind (Claude Code mod, Claude Code plugin, widget pack by pack kind, Sanduhr integration), source (signed catalog, made here, Claude, marketplace name, inline, Sanduhr), version and update available, and a **scope** that is either the app or one Claude Code folder.
+2. **State per scope, not one boolean.** A Claude Code mod is on or off per folder (`enabledPlugins` and `CLAUDE_CODE_PLUGIN_DIRS`), so its row needs a map of folder to On, Off, Missing or Not installed. A widget pack is app-wide. One switch per row only works for app-wide items; folder-scoped items need per-folder chips or a "on in 2 of 3 folders" summary that opens a picker. That is the Mac's Catalog chip model (`ModsCatalogCard.swift:167-189`).
+3. **A capability flag per row: can Sanduhr switch it, and through what.** Today only the meters mod (receipt), and kept mods once R1 lands. Marketplace plugins need the CLI route (spec slice 3), which neither platform has. Widget packs need `enabled` to be honored by every consumer: the Desk companion, theme and palette pickers, the effects and font loaders. Without this flag, a one-list page will show switches it can't move, which is looks-only gap 4 again.
+4. **A merge of catalog and installed by id**, so a catalog entry and its installed copy are one row (Install, Update, or the switch) and the collapsible catalog shows only what isn't installed. The widget catalog already does this per row (`WidgetsPageViewModel.cs:353-368`, row state at `:30`). Claude Code has no catalog on Windows until R2.
+5. **One aggregator in Core** (a pure `InstalledItems.Build(...)` over `ModInventory`, `ClaudeCodeIntegrations`, `WidgetStore` and the catalogs) so the page, search (`SettingsIndex`) and a future `list_catalog` read the same list. It must stay out of the MCP link list unless the trust-boundary review says otherwise.
+
+**What the code doesn't tell:** whether any widget consumer was meant to honor `enabled` (no comment says so); whether the owner's "every mod" includes marketplace plugins (that needs a CLI writer, a bigger decision than the page); and whether the Windows now-playing mod named in `windows-dotnet/README.md:211` is Sanduhr-installed. Nothing under `win/` installs it, so it is treated here as the user's own mod.

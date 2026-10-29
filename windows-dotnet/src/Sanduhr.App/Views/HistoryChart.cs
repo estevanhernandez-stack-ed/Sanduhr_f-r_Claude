@@ -77,15 +77,9 @@ public sealed class HistoryChart : FrameworkElement
         if (w < 180 || h < 40)
             return;
 
+        // Nothing to draw: the Meters view hides the chart and shows its empty-state line instead (WF32, WF35; slice 2 carry T15).
         if (_rows.Count == 0)
-        {
-            var ft = MakeText("No history yet.\nData accumulates as you use Sanduhr.",
-                typeface, FontSize, textDim, dpi);
-            ft.TextAlignment = TextAlignment.Center;
-            ft.MaxTextWidth = w;
-            dc.DrawText(ft, new Point(0, (h - ft.Height) / 2));
             return;
-        }
 
         const double axisH = 22;
         double rowsH = h - axisH;

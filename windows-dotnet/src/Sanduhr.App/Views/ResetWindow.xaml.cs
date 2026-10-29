@@ -1,7 +1,9 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Sanduhr.App.Services;
+using Sanduhr.App.ViewModels;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.Views;
@@ -25,25 +27,39 @@ internal partial class ResetWindow : Window
     /// <summary>Called once, when the user picks Quit (or closes the window) after the reset ran.</summary>
     public Action? QuitRequested { get; set; }
 
-    public ResetWindow(ResetService? service = null)
+    private readonly ResetFolderListViewModel? _folders;
+
+    public ResetWindow(ResetService? service = null, ResetFolderListViewModel? folders = null)
     {
         InitializeComponent();
-        _ready = true;
         _service = service;
+        _folders = folders;
+        FolderList.ItemsSource = folders?.Rows;
+        if (folders is { ReadFailed: true })
+        {
+            ClaudeCodeBox.IsChecked = false;   // nothing to keep or undo: the part is skipped and the line says why
+            ClaudeCodeBox.IsEnabled = false;
+        }
+        if (folders is not null)
+            folders.Changed += UpdateChoiceState;   // the list lives as long as this window; detached on Closed
+        _ready = true;
+        UpdateChoiceState();
         Closing += (_, e) =>
         {
             if (_running) e.Cancel = true;   // never close on a reset in flight
         };
         Closed += (_, _) =>
         {
+            if (_folders is not null)
+                _folders.Changed -= UpdateChoiceState;
             if (_finished) SendQuit();
         };
     }
 
     /// <summary>Opens the dialog over <paramref name="owner"/> (or the screen). Returns when it closes.</summary>
-    public static void ShowFor(Window? owner, ResetService service, Action quit)
+    public static void ShowFor(Window? owner, ResetService service, ResetFolderListViewModel folders, Action quit)
     {
-        var dlg = new ResetWindow(service) { QuitRequested = quit };
+        var dlg = new ResetWindow(service, folders) { QuitRequested = quit };
         if (owner is not null && owner.IsLoaded)
             dlg.Owner = owner;
         else
@@ -54,9 +70,9 @@ internal partial class ResetWindow : Window
     /// <summary>The five names, as the check boxes carry them.</summary>
     public static string PartLabel(ResetPart part) => part switch
     {
-        ResetPart.ClaudeCodeEntries => "Sanduhr's entries in Claude Code (statusline, MCP server)",
+        ResetPart.ClaudeCodeEntries => SettingsNames.ResetClaudeCodeEntries,
         ResetPart.Accounts => "Accounts and sign-in keys",
-        ResetPart.History => "Usage history and the vault",
+        ResetPart.History => SettingsNames.ResetMeterHistory,
         ResetPart.Themes => "Your themes and widgets",
         ResetPart.Settings => "Settings",
         _ => "",
@@ -68,6 +84,16 @@ internal partial class ResetWindow : Window
         History: HistoryBox.IsChecked == true,
         Themes: ThemesBox.IsChecked == true,
         Settings: SettingsBox.IsChecked == true);
+
+    /// <summary>The parts as the service runs them: the Claude Code part only while it would change something (a ticked folder, or
+    /// no list at all, when Sanduhr's leftover copies still go).</summary>
+    internal ResetChoices EffectiveChoices => Choices with
+    {
+        ClaudeCodeEntries = ClaudeCodeBox.IsChecked == true && (_folders?.UndoesAny ?? true),
+    };
+
+    /// <summary>The real paths of the folders left as they are: unticked rows, never what a row shows (decision 14).</summary>
+    internal IReadOnlyList<string> KeepFolders => ClaudeCodeBox.IsChecked == true ? [.. _folders?.Kept.Select(f => f.Path) ?? []] : [];   // streamer: key - the real paths Reset keeps, never drawn
 
     /// <summary>The choose state: five boxes, Cancel and Reset.</summary>
     public void ShowChoose()
@@ -106,7 +132,7 @@ internal partial class ResetWindow : Window
         ProgressText.Text = allOk
             ? "Reset is done."
             : "Reset finished, and some things are still there.";
-        var done = (Brush)FindResource("Sanduhr.Brush.Accent");
+        var done = (Brush)FindResource("Sanduhr.Brush.AccentText");
         var failed = (Brush)FindResource("Sanduhr.Brush.PaceMarker");
         ResultsList.ItemsSource = results.Select(r => new ResultRow(
             PartLabel(r.Part),
@@ -146,18 +172,41 @@ internal partial class ResetWindow : Window
 
     private void UpdateChoiceState()
     {
-        ResetButton.IsEnabled = Choices != new ResetChoices(false, false, false, false, false);
+        bool part = ClaudeCodeBox.IsChecked == true;
+        var lines = _folders?.LinesFor(part, AccountsBox.IsChecked == true, SettingsBox.IsChecked == true) ?? default;
+        FolderList.IsEnabled = part;   // owner taste 7: dim, keep the ticks
+        FolderScroller.Visibility = Vis(_folders is { Rows.Count: > 0 });
+        NoFoldersText.Visibility = Vis(lines.NoFolders);
+        UnreadableText.Text = _folders is { ReadFailed: true } ? SettingsNames.ResetFoldersUnread : SettingsNames.ResetReceiptsUnreadable;
+        UnreadableText.Visibility = Vis(lines.Unreadable);
+        // The lines that come and go are live regions: a screen reader hears one appear (LiveRegion.Shown flips with it).
+        Line(ClaudeCodeWarning, lines.Kept);
+        Line(PartOffText, lines.KeptPartOff);
+        Line(KeptSignInText, lines.KeptSignIn);
+        Line(KeptSettingsText, lines.KeptSettings);
+        Line(KeptMcpSettingsText, lines.KeptMcpSettings);
+        Line(KeptAddedText, lines.KeptAdded);
+        ResetButton.IsEnabled = ResetPlan.Steps(EffectiveChoices).Count > 0;
     }
+
+    private static void Line(TextBlock line, bool on)
+    {
+        line.Visibility = Vis(on);
+        LiveRegion.SetShown(line, on);
+    }
+
+    private static Visibility Vis(bool on) => on ? Visibility.Visible : Visibility.Collapsed;
 
     private async void Reset_Click(object sender, RoutedEventArgs e)
     {
         if (_service is null) return;
-        var choices = Choices;
+        var choices = EffectiveChoices;
+        IReadOnlyCollection<ResetFolder> keep = ClaudeCodeBox.IsChecked == true ? _folders?.Kept ?? [] : [];   // the real folders and their kinds
         ShowRunning("Resetting…");
         IReadOnlyList<ResetStepResult> results;
         try
         {
-            results = await _service.RunAsync(choices,
+            results = await _service.RunAsync(choices, keep,
                 part => ShowRunning($"Resetting: {PartLabel(part)}"));
         }
         catch (Exception)
