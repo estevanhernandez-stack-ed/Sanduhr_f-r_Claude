@@ -65,6 +65,36 @@ struct PackFontsTests {
         #expect(!Self.processKnows(Self.family))
     }
 
+    /// A pack font picked for the Desk and the message draws while installed and falls back the
+    /// moment it is uninstalled: availability comes from CoreText, which forgets an unregistered
+    /// family at once, where NSFontManager goes on listing it until the run loop turns (the live
+    /// check drew the message in LastResort's boxes).
+    @Test func aPickedPackFontFallsBackTheMomentItsPackIsReleased() throws {
+        let root = WidgetTestRoot()
+        let store = root.store()
+        let fonts = PackFonts()
+        try Self.install("real-font", in: store)
+        #expect(fonts.sync(store))
+        #expect(DeskFont.isAvailable(Self.family))
+        #expect(DeskFont.resolve(saved: Self.family) == Self.family)
+        #expect(DeskFont.resolveMessage(saved: Self.family, desk: "EsteFont Pro") == Self.family)
+
+        fonts.release("real-font")
+        #expect(!DeskFont.coreTextHas(Self.family))
+        #expect(!DeskFont.isAvailable(Self.family))
+        #expect(DeskFont.resolve(saved: Self.family) == DeskFont.defaultFamily)
+        #expect(DeskFont.resolveMessage(saved: Self.family, desk: "EsteFont Pro") == "EsteFont Pro")
+    }
+
+    @Test func messageFontIsItsOwnPickWhileAvailableElseTheDesks() {
+        let has: (String) -> Bool = { $0 == "Avenir" }
+        #expect(DeskFont.resolveMessage(saved: "", desk: "EsteFont Pro", available: has) == "EsteFont Pro")
+        #expect(DeskFont.resolveMessage(saved: "Avenir", desk: "EsteFont Pro", available: has) == "Avenir")
+        #expect(DeskFont.resolveMessage(saved: "Gone Sans", desk: "Menlo", available: has) == "Menlo")
+        #expect(DeskFont.resolveMessage(saved: "EsteFont 26", desk: "Menlo", available: { _ in false }) == "EsteFont 26")
+        #expect(DeskFont.resolveMessage(saved: "Gone Sans", desk: "", available: has) == "")
+    }
+
     @Test func aFaceCoreTextRefusesIsReportedAndLeftOutWhileThePackStaysInstalled() throws {
         let root = WidgetTestRoot()
         let store = root.store()

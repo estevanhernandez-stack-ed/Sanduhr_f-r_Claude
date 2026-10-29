@@ -509,7 +509,7 @@ struct DeskPiece: View {
     }
 
     private func line(_ text: String, size: Double, paused: Bool? = nil) -> some View {
-        DeskMessageLine(raw: text, font: messageFont.isEmpty ? font : messageFont, baseSize: size,
+        DeskMessageLine(raw: text, font: DeskFont.resolveMessage(saved: messageFont, desk: font), baseSize: size,
                         inkSpec: messageColor, globalGlow: messageGlow, alignment: alignment,
                         paused: paused ?? model.motionPaused, sweepFirst: sweepFirst,
                         previewInk: DeskInkPreview.shared.spec)

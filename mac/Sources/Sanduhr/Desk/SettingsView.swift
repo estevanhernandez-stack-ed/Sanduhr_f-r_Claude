@@ -554,6 +554,12 @@ struct DeskLookSection: View {
         Binding(get: { DeskFont.resolve(saved: savedFont) }, set: { savedFont = $0 })
     }
 
+    /// The message font as drawn: Same as Desk ("") until one is picked, or when the picked one
+    /// was uninstalled; picking writes it.
+    private var messageFamily: Binding<String> {
+        Binding(get: { DeskFont.resolveMessage(saved: messageFont, desk: "") }, set: { messageFont = $0 })
+    }
+
     static let presets: [(name: String, value: String)] = [
         ("Ice gradient", "8f5bd6,3a63e0,33fdff"),
         ("Ice gradient, exact", "531b93,012089,00fdff"),
@@ -572,7 +578,7 @@ struct DeskLookSection: View {
                     ForEach(families, id: \.self) { Text($0).tag($0) }
                 }
                 .settingsAnchor(SettingsAnchor.fonts)
-                Picker("Message font", selection: $messageFont) {
+                Picker("Message font", selection: messageFamily) {
                     Text("Same as Desk").tag("")
                     Divider()
                     ForEach(families, id: \.self) { Text($0).tag($0) }
@@ -965,7 +971,7 @@ struct MessageSuggestionReview: View {
                     Text(split.kind == .date ? "only on \(split.tag)" : "only on \(split.tag)days")
                         .font(.caption2).foregroundStyle(.white.opacity(0.55))
                 }
-                DeskMessageLine(raw: split.body, font: messageFont.isEmpty ? font : messageFont, baseSize: 30,
+                DeskMessageLine(raw: split.body, font: DeskFont.resolveMessage(saved: messageFont, desk: font), baseSize: 30,
                                 inkSpec: messageColor, globalGlow: messageGlow, alignment: .leading, paused: false)
             }
         } else if !line.trimmingCharacters(in: .whitespaces).isEmpty {

@@ -1,6 +1,7 @@
 import AppKit
 import CoreText
 import Foundation
+import Observation
 
 /// One handwriting family that ships inside Sanduhr: its family name and the PostScript names of
 /// its Regular and Bold faces (each file is `<face>.ttf`).
@@ -94,6 +95,15 @@ enum DeskFont {
         return defaultFamily
     }
 
+    /// The message's family: its own pick while that font is available, otherwise the Desk's
+    /// (`desk`, already resolved). "" (Same as Desk) is the Desk's; a pack font that was
+    /// uninstalled draws as the Desk's and comes back if the pack is installed again.
+    static func resolveMessage(saved: String, desk: String,
+                               available: (String) -> Bool = DeskFont.isAvailable) -> String {
+        if saved.isEmpty { return desk }
+        return BundledFonts.bundled(saved) != nil || available(saved) ? saved : desk
+    }
+
     /// The Desk's family from a defaults store.
     static func resolve(_ defaults: DefaultsStore, available: (String) -> Bool = DeskFont.isAvailable) -> String {
         resolve(saved: defaults.object(forKey: key) as? String, available: available)
@@ -120,14 +130,22 @@ enum DeskFont {
     }
 
     // Family -> installed, cached because the Desk resolves its font on every render (the clock
-    // ticks each second). Cleared when the Mac's font set changes and after registration.
+    // ticks each second). Cleared when the Mac's font set changes and after registration. A
+    // lookup that began before a clear never writes its answer after it (`generation`): the
+    // Desk state export asks off the main thread at launch, and its "not installed" from before a
+    // font pack registered stuck in the cache, so a picked pack font drew as EsteFont Pro.
     private static let lock = NSLock()
     nonisolated(unsafe) private static var cache: [String: Bool] = [:]
+    nonisolated(unsafe) private static var generation = 0
     nonisolated(unsafe) private static var watcher: NSObjectProtocol?
 
     /// Whether a font family is available to this process (installed, or registered from the
-    /// bundle).
+    /// bundle or a font pack). Asked of CoreText's family list: NSFontManager goes on listing a
+    /// family it has just unregistered until the run loop turns (a view that draws it then gets
+    /// LastResort's boxes), and stops listing a pack's family after the system's font set notice.
+    /// A view reading this on the main thread redraws when the font set changes (FontEpoch).
     static func isAvailable(_ family: String) -> Bool {
+        if Thread.isMainThread { _ = FontEpoch.shared.value }
         lock.lock()
         if watcher == nil {
             watcher = NotificationCenter.default.addObserver(
@@ -136,14 +154,27 @@ enum DeskFont {
             }
         }
         if let hit = cache[family] { lock.unlock(); return hit }
+        let asked = generation
         lock.unlock()
-        let found = NSFontManager.shared.availableMembers(ofFontFamily: family) != nil
-        lock.lock(); cache[family] = found; lock.unlock()
+        let found = coreTextHas(family)
+        lock.lock()
+        if generation == asked { cache[family] = found }
+        lock.unlock()
         return found
     }
 
+    /// Whether CoreText lists the family for this process now. The family list, not a descriptor
+    /// match: after the font set changed notice that follows a registration, matching a process-only
+    /// family by descriptor (and NSFontManager's members) can come back empty while the list has it.
+    static func coreTextHas(_ family: String) -> Bool {
+        (CTFontManagerCopyAvailableFontFamilyNames() as? [String] ?? []).contains(family)
+    }
+
+    /// The font set changed (a pack registered or released, Font Book, the bundled fonts): the
+    /// cache is dropped and every view that resolved a family redraws with the new answer.
     static func forgetAvailability() {
-        lock.lock(); cache.removeAll(); lock.unlock()
+        lock.lock(); cache.removeAll(); generation += 1; lock.unlock()
+        DispatchQueue.main.async { FontEpoch.shared.bump() }
     }
 
     /// The font families for the Desk and widget pickers: the bundled families first (EsteFont
@@ -158,4 +189,15 @@ enum DeskFont {
         }
         return bundled + rest.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
+}
+
+/// A count that goes up each time the font set changes. Views that resolve a font family read it
+/// (through `DeskFont.isAvailable`), so Observation redraws them when a pack is installed or
+/// uninstalled, including pieces with no clock of their own, such as the message.
+@Observable
+final class FontEpoch: @unchecked Sendable {
+    static let shared = FontEpoch()
+    /// Written on the main thread only.
+    private(set) var value = 0
+    func bump() { value += 1 }
 }
