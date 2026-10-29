@@ -75,7 +75,8 @@ public sealed class DrawerJournal
         JsonNode? root;
         try { root = JsonNode.Parse(json); }
         catch (JsonException) { return new DrawerJournal(); }
-        if (root?["entries"] is not JsonArray arr) return new DrawerJournal();
+        // JsonNode's string indexer throws on a non-object, so a "[]" or "42" file is checked before it is indexed.
+        if (root is not JsonObject ro || ro["entries"] is not JsonArray arr) return new DrawerJournal();
         var entries = new List<JournalEntry>();
         foreach (var n in arr)
         {

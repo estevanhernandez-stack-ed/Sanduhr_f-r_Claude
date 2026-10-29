@@ -13,8 +13,9 @@ public sealed record DrawerMove(string Source, string DrawerId);
 /// <summary>A move plan: the drawers it needs and the moves, with who made it. Moves are the only action a plan can hold.</summary>
 public sealed record DrawerPlan(DrawerPlanSource Source, string? Agent, IReadOnlyList<DrawerDef> Drawers, IReadOnlyList<DrawerMove> Moves);
 
-/// <summary>One entry in a desktop or drawer listing, as the App reads it from disk.</summary>
-public sealed record DesktopItem(string Path, bool IsFolder, DateTime WrittenUtc);
+/// <summary>One entry in a desktop or drawer listing, as the App reads it from disk. <see cref="Hidden"/> is true for a hidden or
+/// system item, which no rule moves.</summary>
+public sealed record DesktopItem(string Path, bool IsFolder, DateTime WrittenUtc, bool Hidden = false);
 
 /// <summary>Drawer names, which are also their folder names, and the Explorer-style name a clash gets.</summary>
 public static class DrawerNames

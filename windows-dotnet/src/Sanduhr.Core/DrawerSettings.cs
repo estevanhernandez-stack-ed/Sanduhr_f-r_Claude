@@ -29,7 +29,7 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
         return new DrawerSettings(
             SettingsJson.Bool(o, "enabled", false),
             root.Length == 0 ? null : root,
-            o["drawers"] is JsonArray ds ? ds.OfType<JsonObject>().Select(DecodeDrawer).OfType<DrawerDef>().ToArray() : [],
+            o["drawers"] is JsonArray ds ? ds.OfType<JsonObject>().Select(DecodeDrawer).OfType<DrawerDef>().DistinctBy(d => d.Id).ToArray() : [],
             o["rules"] is JsonArray rs ? rs.OfType<JsonObject>().Select(DecodeRule).OfType<DrawerRule>().ToArray() : DrawerRules.Defaults,
             unlocked && SettingsJson.Bool(o, "auto_tidy", false),
             unlocked);

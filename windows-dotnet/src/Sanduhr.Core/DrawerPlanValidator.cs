@@ -8,14 +8,28 @@ public sealed record DrawerRoots(string Desktop, string PublicDesktop, string Dr
 public static class DrawerPaths
 {
     /// <summary>The full, normalized form of a rooted local path with no trailing separator, or null for a relative, UNC or
-    /// device (<c>\\?\</c>) path, none of which a drawer plan may use.</summary>
+    /// device (<c>\\?\</c>) path, or one with a colon past the drive letter (an NTFS stream such as <c>name::$INDEX_ALLOCATION</c>,
+    /// which names a folder by another spelling), none of which a drawer plan may use.</summary>
     public static string? Normalize(string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return null;
         var p = path.Replace('/', '\\');
         if (p.StartsWith(@"\\", StringComparison.Ordinal) || !Path.IsPathFullyQualified(p)) return null;
+        if (p.IndexOf(':', 2) >= 0) return null;
         try { return Path.GetFullPath(p).TrimEnd('\\'); }
         catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException) { return null; }
+    }
+
+    /// <summary>A Drawers root turning drawers off can safely empty and remove: not the Desktop, not a folder that holds it (a
+    /// profile, a drive root), and not inside the Public Desktop.</summary>
+    public static bool IsSafeRoot(string root, string desktop, string publicDesktop)
+    {
+        var r = Normalize(root);
+        var d = Normalize(desktop);
+        var p = Normalize(publicDesktop);
+        if (r is null || d is null || p is null) return false;
+        if (Path.GetPathRoot(r + "\\")?.TrimEnd('\\') is { } drive && string.Equals(r, drive, StringComparison.OrdinalIgnoreCase)) return false;
+        return !IsInside(d, r) && !IsInside(r, p);
     }
 
     /// <summary>True when <paramref name="path"/> sits directly in <paramref name="dir"/>. Both must already be normalized.</summary>
@@ -55,8 +69,11 @@ public static class DrawerPlanValidator
         var shared = DrawerPaths.Normalize(roots.PublicDesktop);
         var root = DrawerPaths.Normalize(roots.DrawersRoot);
         if (desktop is null || shared is null || root is null) return Refuse("The drawer roots are not local folders.");
+        if (!DrawerPaths.IsSafeRoot(root, desktop, shared)) return Refuse("The Drawers folder can't be the Desktop or a folder that holds it.");
 
-        var known = existing.ToDictionary(d => d.Id, StringComparer.Ordinal);
+        // First wins on a duplicated id (a hand-edited settings.json), as the rule engine does.
+        var known = new Dictionary<string, DrawerDef>(StringComparer.Ordinal);
+        foreach (var d in existing) known.TryAdd(d.Id, d);
         var created = new List<DrawerDef>();
         foreach (var d in plan.Drawers)
         {
@@ -69,8 +86,11 @@ public static class DrawerPlanValidator
                     return Refuse($"The drawer \"{d.Name}\" already has a home.");
                 continue;
             }
-            if (!d.Owned || home is null || !DrawerPaths.IsChildOf(home, root))
-                return Refuse($"The drawer \"{d.Name}\" must live directly in the Drawers folder.");
+            // A new drawer's folder is its own name in the root, so the name an agent shows is the folder it gets.
+            if (!d.Owned || home is null || !string.Equals(home, Path.Combine(root, d.Name), StringComparison.OrdinalIgnoreCase))
+                return Refuse($"The drawer \"{d.Name}\" must live in the Drawers folder, in a folder of its own name.");
+            if (known.Values.Any(k => string.Equals(DrawerPaths.Normalize(k.Home), home, StringComparison.OrdinalIgnoreCase)))
+                return Refuse($"Another drawer already uses the folder \"{d.Name}\".");
             var made = d with { Home = home };
             known[d.Id] = made;
             created.Add(made);
@@ -87,11 +107,11 @@ public static class DrawerPlanValidator
             if (source is null) return Refuse($"\"{m.Source}\" is outside the Desktop and the drawers.");
             if (!seen.Add(source)) return Refuse($"\"{m.Source}\" is in the plan twice.");
             if (DrawerPaths.IsChildOf(source, shared)) { sharedItems.Add(source); continue; }
-            // The root sits on the Desktop by default, so it would otherwise pass as a desktop folder.
-            if (string.Equals(source, root, StringComparison.OrdinalIgnoreCase))
-                return Refuse("The Drawers folder itself can't go into a drawer.");
-            if (homes.Any(h => string.Equals(h, source, StringComparison.OrdinalIgnoreCase)))
-                return Refuse($"\"{m.Source}\" is a drawer's own folder.");
+            // The root sits on the Desktop by default, so it (or a folder holding it) would otherwise pass as a desktop folder.
+            if (DrawerPaths.IsInside(root, source))
+                return Refuse($"\"{m.Source}\" is or holds the Drawers folder, which can't go into a drawer.");
+            if (homes.Any(h => DrawerPaths.IsInside(h, source)))
+                return Refuse($"\"{m.Source}\" is or holds a drawer's own folder.");
             bool fromDesktop = DrawerPaths.IsChildOf(source, desktop);
             bool fromDrawer = homes.Any(h => DrawerPaths.IsChildOf(source, h));
             if (!fromDesktop && !fromDrawer) return Refuse($"\"{m.Source}\" is outside the Desktop and the drawers.");

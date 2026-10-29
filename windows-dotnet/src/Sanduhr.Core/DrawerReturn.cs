@@ -18,7 +18,8 @@ public static class DrawerReturn
         var desk = DrawerPaths.Normalize(desktop);
         var moves = new List<UndoStep>();
         var homes = new List<string>();
-        if (root is null || desk is null) return new ReturnPlan(moves, homes);
+        // A root that is the Desktop or holds it (a profile, a drive) would schedule the Desktop itself for removal: do nothing.
+        if (root is null || desk is null || DrawerPaths.IsInside(desk, root)) return new ReturnPlan(moves, homes);
         var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var d in drawers)
         {

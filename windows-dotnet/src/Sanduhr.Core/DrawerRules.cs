@@ -39,8 +39,9 @@ public static class DrawerRules
 
     public static bool Matches(DrawerRule rule, DesktopItem item, DateTime nowUtc)
     {
-        if (!rule.On || item.IsFolder) return false;
+        if (!rule.On || item.IsFolder || item.Hidden) return false;
         var name = Path.GetFileName(item.Path);
+        if (IsHousekeeping(name)) return false;
         var ext = Path.GetExtension(name);
         return rule.Kind switch
         {
@@ -76,4 +77,11 @@ public static class DrawerRules
     }
 
     private static HashSet<string> Set(params string[] exts) => new(exts, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Files Windows and Office keep on a Desktop for themselves (the folder's own desktop.ini, thumbnail caches, Office lock
+    /// files). A listing may not flag them hidden, so they are named here too; no rule ever moves them.</summary>
+    private static bool IsHousekeeping(string name) =>
+        name.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase)
+        || name.Equals("Thumbs.db", StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("~$", StringComparison.Ordinal);
 }
