@@ -113,7 +113,7 @@ final class DeskStateExporter {
 
     func schedule() {
         pending?.cancel()
-        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.writeNow() } }
+        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { _ = self?.writeNow() } }
         pending = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
