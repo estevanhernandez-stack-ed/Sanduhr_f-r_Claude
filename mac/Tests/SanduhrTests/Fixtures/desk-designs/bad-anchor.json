@@ -1,0 +1,10 @@
+{
+  "layout": {
+    "clock": {
+      "anchor": "middle"
+    },
+    "claude": {
+      "anchor": 3
+    }
+  }
+}

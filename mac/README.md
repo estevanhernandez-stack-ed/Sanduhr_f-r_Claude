@@ -618,7 +618,8 @@ The server (`sanduhr_mcp.py`) speaks the Windows `sanduhr-mcp` protocol with the
 and result shapes: `get_usage`, `get_local_burn_by_project`, `get_model_usage`,
 `get_usage_history`, `ping`, `propose_theme` (below), plus two Mac tools for Desk messages (below),
 the watcher tools, `propose_now_playing_looks` (Now playing, below), `propose_widget` (Claude-made
-widgets, below; no switch needed, because nothing installs until you press Apply), and `propose_mod`,
+widgets, below; no switch needed, because nothing installs until you press Apply), `get_desk` and
+`propose_desk` (the Desk for Claude, below; no switch needed either, because a design waits for Apply), and `propose_mod`,
 `list_catalog`, `propose_install` with `get_mod_status` (Mod Studio: a mod's files for you to
 review, your kept mods, a request to turn one on in a folder; only while **Let agents propose
 mods** is on), and `propose_config` under the same switch (agents, skills, commands, output
@@ -1398,6 +1399,35 @@ pointer. A drag that starts on a piece itself is Desk's until the button comes u
 the window server is not documented to honour for a drag already under way; it has not been
 checked against a live Finder drag in a test (see the smoke test).
 
+## The fold and meter styles
+
+Two Desk looks that ride in the layout word (2.37.0). The layout word is now
+`widget:anchor:size:slant:style` (`meters:tr:1:0:ring`); the slant is written only when not 0 and the style only
+when not `bar`, with the size and the slant holding their places, so every older layout reads and writes unchanged
+and a 2.36 build reads the size and ignores the rest. No new file and no new preference.
+
+- **The fold (a slant per stack).** Settings, Desk, Slant has a stepper per place that has pieces, whole degrees
+  from -20 to 20; negative rises to the right, 0 is straight. The slant is the stack's, so the pieces at one place
+  share it: a piece that joins a stack takes the stack's slant, one alone keeps its own (`DeskArrangement.setTilt`,
+  `stackTilt`). A layout string whose pieces at one place disagree still reads (the stack slants by its first piece);
+  the refusal lives in `DeskArrangement.tiltConflicts`, which a design from Claude goes through. Drawn as one
+  `transformEffect` shear on the stack's container, plate included, with a `DeskFoldLayout` that reserves the
+  slanted height, and only when the slant is not 0: at 0 nothing changes, which keeps idle CPU flat (`DeskFold.swift`,
+  `DeskView.swift`). A change from 0 to slanted rebuilds the stack once. Under the shear SwiftUI reports the bounding
+  box of what is drawn, so `DeskFold.layoutFrame(fromBounds:)` takes a frame back to the layout before Arrange Desk
+  and the click areas hit-test it (`DeskHitTest` has the quad math). Arrange Desk outlines and drags the slanted
+  quad; a drop is judged where the pointer is on the stack's own face. OLED care's drift sits inside the shear.
+  Plates stay per piece (not one shared plate per stack, as on Windows) and slant with the stack.
+- **Meter styles.** Settings, Desk, Style (a menu under the Claude line and the meters, shown while the piece is
+  placed): `bar` (today's look, the default), `slim` (a line of label and value over a thin bar; the Claude line
+  becomes two short rows), `ring` (small 270-degree arc gauges with the value inside and a short name in the open
+  bottom, side by side) and `ticks` (ten cells, unlit ones a faint outline, a reading above zero always lights
+  one). Rules in `DeskMeterStyleModel`, drawing in `DeskMeterStyleViews`. A Claude limit keeps its pace mark in
+  every style; slim, ring and ticks leave out the reset line. Two departures from Windows: a nearly-full ring shows
+  the warning triangle above its value (a colour-only cue fails the bar the other styles meet), and the alert pulse
+  is not applied to slim, ring or ticks. Nothing animates in the new styles. Settings previews still draw bars.
+- **An unknown style word reads as bar.** A style on any other piece is dropped on the next change.
+
 ## OLED care
 
 Settings, Desk, **OLED care** (desk suite key `deskOledCare`, off when absent; the rules are in `OledCare.swift`, ported from Windows' `OledCare`). With it on and the Desk showing: every 3 minutes each Desk piece's offset moves to the next point of a 16-point figure-eight (6 points wide, a 48-minute loop), as one animation, clamped clear of the menu bar, the notch and the Dock; after 5 minutes without input the Desk window eases to 0.40 opacity and the widget window to 0.70 (the first input wakes them in 0.3 s; Reduce Motion snaps); and the Desk ink, the message and now playing never draw pure white (capped to #e6e6e6, hue kept). The notch island and the lock screen line do not drift. Off, none of it exists: no timer, no subscription, no offset. `IdleClock` is the one shared reader of seconds since any input (`CGEventSource`, no permission); it polls only while someone subscribes. `state.yaml` carries `oled_care: on|off` as a bool.
@@ -1894,6 +1924,77 @@ files in `pack.json`, adds one to its patch version and validates the whole pack
 (`WidgetsModel.useOwnArt`) reinstalls it as `.local` with `replaceMadeHere`. Nothing leaves the Mac. Only the
 first eligible row carries the search anchor, and the banner has no search entry.
 
+## The Desk for Claude
+
+With the MCP server installed, Claude can read how your Desk is set up and suggest a whole look for it
+(`get_desk`, `propose_desk`; the same names and schemas as Windows, so one prompt works on both). Neither needs a
+switch: a design always waits for Apply.
+
+**`get_desk`** answers from `desk-state.json` in `~/Library/Application Support/Sanduhr/`, not from the preferences
+plist (reading it from Python races the preferences daemon and can be stale). `DeskStateExporter` writes it
+(owner-only, atomic, through `HandoffFiles.writeOwnerOnly`) at launch and 0.5 seconds after a Desk setting, an installed
+font or a font pack changes, and only when the bytes differ from its last write, so nothing writes per frame
+(`DeskStateExport.swift`). It holds the design (every piece's place, size, slant and style, or hidden; the Desk font,
+ink, plate and shadow), the pieces and places the Desk knows, the font names (the Desk's and the message's, the two
+bundled families, and the installed families, capped at 2000), the pieces shown, the message and notch colours and the
+limits a design must keep. It never holds usage, a message's text, a path or an account name. The server returns it
+with `state_age_seconds` and `writer_version`; with no file it answers `no_data` and says to start Sanduhr.
+
+**`propose_desk`** takes `{design, name?, note?}` where `design` has only the fields to change: `layout` (a piece to
+`{anchor, size, hidden, tilt, style}`), `font` (a family, or `{family, link}`), `ink` (`#rrggbb`, or two to four for a
+gradient), `plate` and `shadow`. `design_validate` in `sanduhr_mcp.py` checks it with the app's rules; a refusal returns
+`rejected` with reasons and writes nothing. Windows' rules govern the fields and the messages (the Windows C# is the
+guide), the spec governs the Mac surfaces. The Mac refuses, with a reason and never silently: `messages`, `looks` and
+`theme` (their own tools exist), Windows-only fields (`launcher`, `monitor`, the ink words `auto`, `light`, `dark` and
+`theme`, the telemetry and glow pieces) and the 2.38 pieces (`system`, `weather`). A tilt that differs inside one
+stack is refused, a style on a piece other than `claude` and `meters` or an unknown word is refused, and Windows'
+wallpaper contrast rule is skipped. A good design goes to `desk-request.json` (owner-only, atomic, at most 128 KB) and
+the tool waits about ten seconds for `desk-result.json`; no answer is `queued`, `widget_not_responding`, and the request
+stays for ten minutes.
+
+`DeskDesignProposalHandoff` takes the request through `HandoffWatch`, deletes the file as it reads it, checks it again
+with `DeskDesignHandoff.decode` (the app never trusts the server; the Swift and Python builds are held to the same
+fixtures in `Tests/SanduhrTests/Fixtures/desk-designs/`) and holds the design in memory only. A newer request answers
+the older `rejected`, `replaced`; `busy` means Arrange Desk is active; `not_ready` means no Desk is wired or Reset
+Sanduhr… ran.
+
+- **The review.** A banner, **Claude suggests a Desk design**, tops Settings, Desk only while a design waits (a
+  notification, which follows Alerts, opens that page): the name, Claude's note, **What changed** (a plain line per
+  difference, `DeskDesignApply.changes`) and **Fonts to install** for a family this Mac lacks, with Claude's link as
+  text. Buttons: **Preview on the Desk**, **Apply**, **Dismiss**.
+- **Preview on the Desk** starts only on that click. It draws the layout, font, plate, shadow and ink from memory
+  (`DeskDesignPreview`, `DeskInkPreview`); no saved setting is written. A font this Mac lacks previews in the nearest
+  look it has. Dismiss, Apply and a newer request take it down; with the Desk off the button says to turn it on.
+- **Apply** writes only the settings the design changes (`layout`, `font`, `inkColor`, `plate`, `inkShadow` in the
+  Desk preferences domain) through `DeskDesignApply.write`, the same `merged` look the preview drew, and answers
+  `applied` with the change lines. It waits while a font the design names is missing. **Dismiss** answers `rejected`,
+  `dismissed`. No setting lets Claude skip Apply for a design: the direct switches for messages and themes are not read.
+- **Put my Desk back.** Apply first saves the stored values of the keys it is about to change as `deskDesignBefore`
+  (`DeskDesignApply.recordBefore`; an absent key is recorded as absent). Settings, Desk shows one undo while it exists:
+  **Put my Desk back** restores those values and clears the snapshot, **Keep it** only clears it. One snapshot is kept
+  (the next applied design replaces it; a design that changes nothing leaves it). Windows' saved-designs library and
+  its "Before <name>" auto-save are not ported.
+- **`state.yaml`** `pending_suggestions.desk` is a flag only.
+
+## Font packs
+
+A pack of kind `font` in the widget catalog (Settings, Widgets) is loaded for Sanduhr only (2.37.0, spec 11).
+`PackFonts` (`Widgets/PackFonts.swift`) registers each enabled font pack's `.ttf` and `.otf` faces with
+`CTFontManagerRegisterFontsForURL` at `.process` scope, the way `BundledFonts` registers EsteFont: never the system, gone
+when the app quits. Windows copies the fonts into a cache first because WPF holds the file open; Core Text holds
+nothing open, so the faces are registered from the pack's own folder, and `release` unloads them before an install
+replaces or an uninstall removes the folder. `sync` runs at launch (before any view draws) and whenever the installed
+packs change (`WidgetsModel.refreshPackLists`), and unloads a pack that is gone, switched off or changed. Core Text
+can refuse that: after the system's font set notice that follows launch, `CTFontManagerUnregisterFontsForURL` answers
+201 (not registered) and the family stays listed. So a released pack's families go into `DeskFont`'s withdrawn set,
+which `isAvailable` and the pickers honour until the pack registers again; a pack updated in place may draw its old
+faces until relaunch, and one that duplicates an installed family hides it until relaunch. The families
+join `DeskFont.pickerFamilies`, so the Desk and widget font pickers and `desk-state.json` list them. A face Core Text
+refuses is counted per face and left out; the pack's row says "One font couldn't be loaded and is left out." (or the
+count). A font already available to the process (installed in Font Book) is harmless and draws. The test fixtures are a
+tiny generated font ("Fixture Pack Sans", three glyphs, OFL-1.1) and a truncated copy for the refused case, not a
+relabelled bundled font, because EsteFont is not OFL.
+
 ## The companion
 
 The Desk's `companion` piece (default place bottom center; a sprite pack from Settings, Widgets picks the
@@ -2013,6 +2114,8 @@ refusal. `ResetShutdownTests` covers the gate (each writer a no-op inside
 
 - Widgets (2.35.0) → `~/Library/Application Support/Sanduhr/widgets/`: one folder per installed pack (with `.raster/` for pixel-sheet PNGs drawn at install), `widgets.json` (Windows' shape: the installed packs and the rollback marker `catalog_generated_at`), `.staging/` (installs and removals in flight) and `companion.json` (`schema_version`, `growth`, `active_ms`, `days`); the companion's choice in the desk preference `deskCompanionPack`; Reset Sanduhr… has a **Your widgets** part
 - OLED care (2.35.0) → the desk preference `deskOledCare` (off when absent); nothing on disk
+- Desk for Claude (2.37.0) → `desk-state.json` (app; what `get_desk` reads), `desk-request.json` (server) and `desk-result.json` (app), all mode 0600 in `~/Library/Application Support/Sanduhr/`; the undo in the desk preference `deskDesignBefore`; the slant and style are fields of the desk preference `layout`; no new file for them
+- Font packs (2.37.0) → the faces stay in the pack's folder under `widgets/`; they are registered for the process only, nothing is installed on the Mac
 
 ## Controls
 

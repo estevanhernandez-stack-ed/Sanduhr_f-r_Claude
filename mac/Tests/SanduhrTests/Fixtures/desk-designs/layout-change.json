@@ -1,0 +1,14 @@
+{
+  "name": "  Dusk ",
+  "note": "Warm and low.",
+  "layout": {
+    "clock": {
+      "anchor": "tr",
+      "size": 1.23
+    },
+    "claude": {
+      "anchor": "tr",
+      "hidden": false
+    }
+  }
+}

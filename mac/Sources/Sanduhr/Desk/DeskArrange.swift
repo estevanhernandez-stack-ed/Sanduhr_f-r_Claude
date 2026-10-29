@@ -135,11 +135,13 @@ enum DeskArrange {
 extension DeskArrangement {
     /// Puts a placed piece at `anchor`, in front of `before` in that anchor's stack (nil: at its
     /// bottom). Into an empty anchor it keeps its place in the string, as `place` does. The piece
-    /// keeps its size. Nothing changes for a piece that is not placed, or when `before` is the
+    /// keeps its size and style, and joins the stack's slant. Nothing changes for a piece that is not placed, or when `before` is the
     /// piece itself.
     mutating func put(_ widget: String, at anchor: DeskAnchor, before: String?) {
         guard widget != before, let from = pieces.firstIndex(where: { $0.widget == widget }) else { return }
         var piece = pieces[from]
+        // Into another anchor's stack the piece takes its slant; into an empty one it keeps its own.
+        if piece.anchor != anchor, let joined = stackTilt(anchor) { piece.tilt = joined }
         piece.anchor = anchor
         pieces.remove(at: from)
         if let before, let i = pieces.firstIndex(where: { $0.widget == before && $0.anchor == anchor }) {
@@ -213,6 +215,35 @@ final class DeskArrangeMode {
     var drag: DeskArrangeDrag?
     /// Each drawn piece's frame in DeskArrange.space, reported while arranging (reorder drops).
     @ObservationIgnored var frames: [String: CGRect] = [:]
+    /// Each slanted stack's tilt and top left in DeskArrange.space (the fold), by anchor; the
+    /// frames above are the boxes around what is drawn. A stack that stands upright has none.
+    @ObservationIgnored private(set) var folds: [DeskAnchor: DeskFold] = [:]
+
+    func setFold(_ fold: DeskFold?, at anchor: DeskAnchor) {
+        if folds[anchor] != fold { folds[anchor] = fold }
+    }
+
+    /// The fold of the stack `widget` sits in, nil when it stands upright or is not placed.
+    func fold(of widget: String) -> DeskFold? {
+        guard let anchor = working?.placement(widget)?.anchor, let fold = folds[anchor],
+              DeskArrangement.clampTilt(fold.tilt) != 0 else { return nil }
+        return fold
+    }
+
+    /// `widget`'s frame in the unslanted layout: SwiftUI reports the box around what is drawn
+    /// (`frames`), so a slanted piece's is taken back along its stack's shear. nil with no frame.
+    func layoutFrame(of widget: String) -> CGRect? {
+        guard let f = frames[widget] else { return nil }
+        return fold(of: widget).map { $0.layoutFrame(fromBounds: f) } ?? f
+    }
+
+    /// `widget`'s outline as drawn: its layout frame sheared with its stack (the quad Arrange Desk
+    /// outlines and drags); the frame's rectangle when upright; nil with no frame.
+    func quad(of widget: String) -> DeskQuad? {
+        guard let f = layoutFrame(of: widget) else { return nil }
+        return fold(of: widget).map { $0.quad(of: f) } ?? DeskQuad.of(f)
+    }
+
     @ObservationIgnored private let store: DefaultsStore
 
     init(store: DefaultsStore = UserDefaults.desk) {

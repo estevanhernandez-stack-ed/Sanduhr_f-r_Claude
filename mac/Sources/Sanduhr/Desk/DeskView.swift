@@ -62,7 +62,7 @@ struct DeskView: View {
     /// the widget's default.
     /// While arranging (item 60), the layout being edited; nothing is saved until Done.
     private var stacks: [DeskAnchor: [DeskPlacement]] {
-        var arrangement = model.arrange.working ?? DeskArrangement(layout)
+        var arrangement = model.arrange.working ?? DeskDesignPreview.shared.layout ?? DeskArrangement(layout)
         // A proposed sprite is previewed even while the piece is Hidden (WidgetProposalHandoff); never saved.
         if model.widgetPreviewsCompanion, arrangement.placement("companion") == nil {
             arrangement.pieces.append(DeskPlacement(widget: "companion", anchor: DeskArrangement.defaultAnchor("companion")))
@@ -173,10 +173,28 @@ struct DeskView: View {
         }
     }
 
+    /// A stack's pieces. A stack with a slant (the fold: its first piece's tilt, the pieces of one
+    /// anchor share it) is drawn in a DeskFoldStack, sheared as one face with its plates and
+    /// Arrange outlines; a stack at 0 is built exactly as before, with no container and no transform.
+    @ViewBuilder
     private func pieces(_ stack: [DeskPlacement], alignment: HorizontalAlignment, lineInLayout: Bool) -> some View {
+        let tilt = DeskArrangement.clampTilt(stack.first?.tilt ?? 0)
+        if tilt != 0, let anchor = stack.first?.anchor {
+            DeskFoldStack(anchor: anchor, tilt: tilt, model: model) {
+                VStack(alignment: alignment, spacing: DeskNowPlaying.columnSpacing) {
+                    stackPieces(stack, alignment: alignment, lineInLayout: lineInLayout)
+                }
+            }
+        } else {
+            stackPieces(stack, alignment: alignment, lineInLayout: lineInLayout)
+        }
+    }
+
+    private func stackPieces(_ stack: [DeskPlacement], alignment: HorizontalAlignment, lineInLayout: Bool) -> some View {
         ForEach(stack, id: \.widget) { p in
             if let widget = Widget(rawValue: p.widget) {
-                DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale)
+                DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale,
+                          style: p.style)
                     .deskArrangeable(p, mode: model.arrange)
                     .oledDrift(model)
             }
@@ -222,10 +240,12 @@ struct DeskPiece: View {
     var sweepFirst = false
     /// The piece's size in the layout (item 59), 0.6 to 1.6: its sizes are the saved ones times this.
     var scale: Double = 1
+    /// How the claude line and the Claude limits draw (the layout word's style); other pieces ignore it.
+    var style: DeskMeterStyle = .bar
 
     @AppStorage("font", store: .desk) private var savedFont: String?
     /// The Desk font as drawn: EsteFont Pro unless a font was picked (DeskFont, item 58).
-    private var font: String { DeskFont.resolve(saved: savedFont) }
+    private var font: String { DeskFont.resolve(saved: DeskDesignPreview.shared.font ?? savedFont) }
     @AppStorage("messageFont", store: .desk) private var messageFont = ""
     @AppStorage("timeSize", store: .desk) private var savedTimeSize = 112.0
     @AppStorage("messageSize", store: .desk) private var savedMessageSize = 84.0
@@ -311,7 +331,9 @@ struct DeskPiece: View {
 
     @ViewBuilder
     private var claudeText: some View {
-        if let parts = model.claudeParts, let account = parts.account {
+        if style != .bar, let two = model.claudeTwoRows {
+            styledClaude(two)
+        } else if let parts = model.claudeParts, let account = parts.account {
             // Two or more accounts: the label is its own element, clickable like a meeting row
             // (DeskController cycles to the next account); the rest of the line lets clicks through.
             HStack(alignment: .firstTextBaseline, spacing: 0) {
@@ -339,10 +361,14 @@ struct DeskPiece: View {
         if !model.meters.isEmpty || signInLine || noteHere {
             let size = timeSize * 0.17
             VStack(alignment: alignment, spacing: size * 0.6) {
-                ForEach(model.meters) { row in
-                    MeterRow(row: row, ink: ink, font: font, size: size, width: timeSize * 3.2, alignment: alignment)
-                        .onGlobalFrame { model.meterRowFrames[row.tier] = $0 }
-                        .deskPulse(model.pulses[row.tier] ?? 0, ink: ink, size: size)
+                if style == .bar {
+                    ForEach(model.meters) { row in
+                        MeterRow(row: row, ink: ink, font: font, size: size, width: timeSize * 3.2, alignment: alignment)
+                            .onGlobalFrame { model.meterRowFrames[row.tier] = $0 }
+                            .deskPulse(model.pulses[row.tier] ?? 0, ink: ink, size: size)
+                    }
+                } else {
+                    styledMeters(size: size)
                 }
                 if signInLine {
                     Text(DeskClaudeText.signInLine(first: model.firstSignIn)).opacity(0.75)
@@ -363,6 +389,58 @@ struct DeskPiece: View {
             .contentShape(Rectangle())
             .onGlobalFrame { model.metersFrame = $0 }
         }
+    }
+
+    /// The Claude limits in slim, ring or ticks: no reset line, nothing animating (so no alert pulse
+    /// either), each reading still a limit-menu hit area.
+    private func styledMeters(size: CGFloat) -> some View {
+        DeskStyledGauges(gauges: DeskMeterStyleModel.gauges(model.meters), style: style, ink: ink, font: font,
+                         size: size, width: timeSize * 2.6, alignment: alignment,
+                         report: { model.meterRowFrames[$0] = $1 })
+    }
+
+    /// The claude line in slim (two short rows) or ring and ticks (the name over the session and
+    /// week limits as gauges, each with its pace mark). A sign-in, or no numbers, keeps the two rows.
+    @ViewBuilder
+    private func styledClaude(_ two: DeskClaudeCompact) -> some View {
+        let size = timeSize * 0.19
+        let stale = model.claudeLineIsStale
+        if DeskMeterStyleModel.claudeForm(style) == .gauges, !model.claudeGauges.isEmpty {
+            VStack(alignment: alignment, spacing: timeSize * 0.17 * 0.3) {
+                claudeName(two, size: timeSize * 0.17).opacity(0.75)
+                DeskStyledGauges(gauges: model.claudeGauges, style: style, ink: ink, font: font,
+                                 size: timeSize * 0.17, width: timeSize * 2.6, alignment: alignment)
+            }
+            .opacity(stale ? 0.6 : 1)
+        } else {
+            VStack(alignment: alignment, spacing: 0) {
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    claudeNameLead(two)
+                    if let rest = two.topRest { Text("   \(rest)") }
+                }
+                .font(.custom(font, size: size))
+                .opacity(stale ? 0.45 : 0.75)
+                if let bottom = two.bottom {
+                    Text(bottom)
+                        .font(.custom(font, size: size))
+                        .opacity(stale ? 0.45 * 0.85 : 0.75 * 0.85)
+                }
+            }
+        }
+    }
+
+    /// The claude name; with two or more accounts it is the clickable label that cycles accounts.
+    @ViewBuilder
+    private func claudeNameLead(_ two: DeskClaudeCompact) -> some View {
+        if let account = two.account {
+            AccountLead(label: account, model: model)
+        } else {
+            Text(two.name)
+        }
+    }
+
+    private func claudeName(_ two: DeskClaudeCompact, size: CGFloat) -> some View {
+        claudeNameLead(two).font(.custom(font, size: size))
     }
 
     private var meetings: some View {
@@ -431,7 +509,7 @@ struct DeskPiece: View {
     }
 
     private func line(_ text: String, size: Double, paused: Bool? = nil) -> some View {
-        DeskMessageLine(raw: text, font: messageFont.isEmpty ? font : messageFont, baseSize: size,
+        DeskMessageLine(raw: text, font: DeskFont.resolveMessage(saved: messageFont, desk: font), baseSize: size,
                         inkSpec: messageColor, globalGlow: messageGlow, alignment: alignment,
                         paused: paused ?? model.motionPaused, sweepFirst: sweepFirst,
                         previewInk: DeskInkPreview.shared.spec)
@@ -547,7 +625,9 @@ enum DeskPlate {
 /// outside the ink's own, so the fill is what the style says. Never a click area: the window
 /// takes the pointer over reported frames only (DeskController), and the plate reports none.
 private struct DeskPlateModifier: ViewModifier {
-    @AppStorage(DeskPlate.key, store: .desk) private var on = DeskPlate.defaultOn
+    @AppStorage(DeskPlate.key, store: .desk) private var savedOn = DeskPlate.defaultOn
+    /// The saved plate, or the one a Desk design is previewing (DeskDesignPreview).
+    private var on: Bool { DeskDesignPreview.shared.plate ?? savedOn }
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
@@ -574,7 +654,9 @@ enum DeskInkShadow {
 
 private struct DeskInk: ViewModifier {
     @AppStorage("inkColor", store: .desk) private var savedInk = "ffffff"
-    @AppStorage("inkShadow", store: .desk) private var shadow = true
+    @AppStorage("inkShadow", store: .desk) private var savedShadow = true
+    /// The saved shadow, or the one a Desk design is previewing (DeskDesignPreview).
+    private var shadow: Bool { DeskDesignPreview.shared.shadow ?? savedShadow }
     @AppStorage(OledCare.key, store: .desk) private var oled = OledCare.defaultOn
     /// The saved ink, or the palette a widget proposal is previewing with (DeskInkPreview).
     private var inkSpec: String { DeskInkPreview.shared.resolved(saved: savedInk) }

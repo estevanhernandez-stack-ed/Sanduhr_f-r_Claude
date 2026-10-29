@@ -30,6 +30,11 @@ tools the same way on either machine:
   propose_config             hands agents, skills, commands, output styles, settings keys and MCP
                              servers for one Claude Code folder to Sanduhr, which opens them for the
                              user to import or dismiss, under the same switch
+  get_desk                   the Desk as it is: layout words with tilt and style, ink, plate, shadow, font,
+                             the pieces shown, and the limits a design must keep (from desk-state.json)
+  propose_desk               suggests a whole Desk design (layout, tilt, style, font, ink, plate, shadow);
+                             checked here with the app's own rules, then previewed in Settings, Desk and
+                             applied only when the user presses Apply (no switch lets Claude skip that)
   propose_widget             builds a sprite, palette or effects pack from data (no PNG, no font),
                              checks it with the catalog's own rules (widgets/validate.py, strict), and
                              hands it to Sanduhr, which previews it on the Desk; it installs only when
@@ -54,7 +59,10 @@ theme-request.json (propose_theme), now-playing-looks-request.json (propose_now_
 watch-request-<ms>-<seq>-<id>.json (the watch tools, only while watchers.json, written by Sanduhr,
 says agents may show watchers) and mod-request.json, mod-install-request.json and config-request.json (propose_mod,
 propose_install and propose_config, only while mods-agents.json says agents may propose mods) and
-widget-request.json (propose_widget, always: a new pack waits for the user's Apply), atomically and owner-only; it never writes messages.txt, a theme or
+widget-request.json (propose_widget, always: a new pack waits for the user's Apply) and desk-request.json
+(propose_desk, always: a whole design waits for the user's Apply), atomically and owner-only; get_desk reads
+desk-state.json, which the app keeps current with the Desk settings (layout, ink, fonts, plate and shadow, no
+usage and no message text); it never writes messages.txt, a theme or
 the saved looks. No tool takes a path. Failures are typed results (status/reason/remedy), never protocol
 errors. Python 3.9 standard library only.
 
@@ -376,7 +384,53 @@ WIDGET_GUIDE = (
     "queued means Sanduhr did not answer: it is not running. Nothing is uploaded; sharing a pack "
     "is a pull request to the sanduhr-widgets catalog.")
 
-READ_ONLY = {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}
+# get_desk and propose_desk (2.37.0): Windows' tool names and schemas, with the guide text cut to what the
+# Mac Desk has (no monitors, wallpaper summary, Launcher, saved designs or direct-change switch).
+DESIGN_GUIDE_READ = (
+    "Read the user's Desk before designing it. The Desk is what Sanduhr draws on the Mac desktop: a clock, Claude "
+    "usage, a handwritten message and other pieces, each placed at one of eight anchors (tl tc tr ml mr bl bc br) "
+    "with a size, in a font and an ink, optionally on a soft plate. Returns design (the current look as a design: "
+    "layout with every piece's anchor, size, hidden and tilt (the slant of its stack in degrees, 0 upright), and "
+    "for claude and meters its style (bar, slim, ring or ticks; limits.piece_style lists the pieces and the "
+    "words), font, ink, plate, shadow), pieces and anchors (the allowed words), fonts (installed families, and the "
+    "bundled handwriting fonts EsteFont Pro and EsteFont 26), shown (the pieces the Desk draws now), "
+    "message_color and notch_text_color (hex colors, read-only: propose_desk does not change them) and limits. "
+    "The Mac Desk has no monitors, wallpaper summary, Launcher, saved designs or direct-change switch, so those "
+    "keys are never here, and propose_desk cannot judge ink against the wallpaper: choose an ink that reads on "
+    "what the user has. Call this before propose_desk and design from what it says. status no_data with reason "
+    "missing means Sanduhr is not running or has not written the Desk state yet.")
+
+DESIGN_GUIDE_PROPOSE = (
+    "Propose a look for the user's Desk. The design is PARTIAL: send only the fields to change; everything absent "
+    "stays as it is. Fields, all optional: name (up to 40 characters); note (one sentence for the user, up to 200); "
+    "layout {piece: {anchor, size, hidden}}, where piece is a key from get_desk pieces, anchor is tl tc tr ml mr bl "
+    "bc br, size is 0.6 to 1.6, and hidden removes the piece (the companion piece draws the sprite the user chose "
+    "in Settings, Widgets, and draws nothing until a sprite is installed); "
+    "tilt in a layout piece slants the piece's whole stack from -20 to 20 degrees (negative rises to the right, "
+    "positive falls; 0 upright), so a left stack at -18 and a right stack at 18 read as two faces of a fold; pieces "
+    "at one anchor share one slant, so give them the same tilt; "
+    "style in a layout piece, only on claude and meters, is how its numbers draw so a stack fits its column: bar "
+    "(the default, a full-width bar with its label above), slim (label and value on one line over a thin bar, about "
+    "half the height; claude becomes a compact two-row line), ring (small arc gauges with the value inside, side by "
+    "side in a row), ticks (ten segmented cells, the OLED-friendly one); a Claude limit keeps its pace mark in every "
+    "style; font (a family from get_desk fonts.installed or the bundled EsteFont Pro or EsteFont 26, or {family, "
+    "link} with an https link to get a font the user lacks: Sanduhr never downloads it, the review shows the link "
+    "and Apply waits for the font, status needs_font); ink (one #rrggbb, or a list of 2 to 4 #rrggbb for a "
+    "left-to-right gradient); plate and shadow (true or false; the plate is a soft panel behind each stack of "
+    "pieces). The Mac refuses, with a reason and nothing written, what only Windows has: monitor in a layout piece, "
+    "the launcher, telemetry and glow pieces, the launcher field, the weather piece and field (they arrive with "
+    "Sanduhr 2.38.0), the messages, looks and theme fields (send message lines with propose_desk_messages, song "
+    "looks with propose_now_playing_looks and a widget theme with propose_theme), and the Windows ink words auto, "
+    "light, dark and theme. The server checks before anything is sent: every field's shape and range, the tilt of "
+    "each stack and the style words. status rejected comes with reasons, each {field, message}: fix those fields "
+    "and call again; nothing was written. Otherwise Sanduhr draws the design live on the desktop with a bar on "
+    "Settings, Desk where the user chooses Apply or Dismiss: previewing means the user is reviewing it now (do not "
+    "send the same look again), applied means it is in place (their previous look is saved), needs_font lists the "
+    "fonts (family, link) the user must install first, queued means Sanduhr did not answer and will show it when "
+    "it starts. A whole design always waits for the user's Apply: the switch that lets Claude change Desk messages "
+    "directly does not cover it. This server never changes the Desk itself.")
+
+READ_ONLY ={"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}
 NO_ARGS = {"type": "object", "properties": {}, "additionalProperties": False}
 TOOLS = [
     {
@@ -721,6 +775,51 @@ TOOLS += [
                         "openWorldHint": False},
     },
 ]
+TOOLS += [
+    {
+        "name": "get_desk",
+        "description": DESIGN_GUIDE_READ,
+        "inputSchema": NO_ARGS,
+        "annotations": READ_ONLY,
+    },
+    {
+        "name": "propose_desk",
+        "description": DESIGN_GUIDE_PROPOSE,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "design": {
+                    "type": "object",
+                    "description": "A partial Desk design: only the fields to change. See the tool description for each field.",
+                    "properties": {
+                        "name": {"type": "string", "maxLength": 40},
+                        "note": {"type": "string", "maxLength": 200},
+                        "layout": {"type": "object",
+                                   "description": "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean, tilt: -20 to 20 degrees, the slant of the piece's whole stack, style: bar|slim|ring|ticks, only on claude and meters}. monitor is Windows only and refused here."},
+                        "weather": {"type": "object",
+                                    "description": "Windows only until Sanduhr 2.38.0: refused here with a reason."},
+                        "font": {"description": "A font family name, or {family, link} with an https link to get a font the user lacks."},
+                        "ink": {"description": "One #rrggbb color, or a list of 2 to 4 #rrggbb colors (gradient). The Windows words auto, light, dark and theme are refused here."},
+                        "plate": {"type": "boolean"},
+                        "shadow": {"type": "boolean"},
+                        "launcher": {"type": "object", "description": "Windows only: refused here with a reason."},
+                        "messages": {"type": "object", "description": "Not part of a Mac design: refused here with a reason (use propose_desk_messages)."},
+                        "looks": {"type": "array", "description": "Not part of a Mac design: refused here with a reason (use propose_now_playing_looks)."},
+                        "theme": {"type": "object", "description": "Not part of a Mac design: refused here with a reason (use propose_theme)."},
+                    },
+                    "additionalProperties": False,
+                },
+                "name": {"type": "string", "maxLength": 40, "description": "The design's name (overrides design.name)."},
+                "note": {"type": "string", "maxLength": 200,
+                         "description": "One short sentence for the user on why this look (shown in the review bar; overrides design.note)."},
+            },
+            "required": ["design"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False,
+                        "openWorldHint": False},
+    },
+]
 TOOL_NAMES = [t["name"] for t in TOOLS]
 # The Desk messages handoff (item 54). The app mirrors these names (DeskMessageHandoff); a test on
 # each side pins them.
@@ -763,6 +862,14 @@ WIDGET_REQUEST_FILE = "widget-request.json"
 WIDGET_RESULT_FILE = "widget-result.json"
 WIDGET_MAX_BYTES = 4 * 1024 * 1024
 WIDGET_WAIT_SECONDS = 10.0
+# The Desk design handoff (2.37.0, get_desk and propose_desk). The app mirrors these names and limits
+# (DeskDesign, DeskDesignHandoff, DeskStateExport); a test on each side pins them.
+DESIGN_REQUEST_FILE = "desk-request.json"
+DESIGN_RESULT_FILE = "desk-result.json"
+DESIGN_STATE_FILE = "desk-state.json"
+DESIGN_MAX_JSON_BYTES = 128 * 1024
+DESIGN_MAX_STATE_BYTES = 1024 * 1024
+DESIGN_WAIT_SECONDS = 10.0
 # The watchers handoff (item 66). The app mirrors these names (WatcherStore); a test on each side
 # pins them.
 WATCH_SWITCH_FILE = "watchers.json"
@@ -844,6 +951,9 @@ class Paths:
         self.config_result = os.path.join(self.support_dir, CONFIG_RESULT_FILE)
         self.widget_request = os.path.join(self.support_dir, WIDGET_REQUEST_FILE)
         self.widget_result = os.path.join(self.support_dir, WIDGET_RESULT_FILE)
+        self.design_request = os.path.join(self.support_dir, DESIGN_REQUEST_FILE)
+        self.design_result = os.path.join(self.support_dir, DESIGN_RESULT_FILE)
+        self.design_state = os.path.join(self.support_dir, DESIGN_STATE_FILE)
 
     def history_file(self, name):
         return os.path.join(self.support_dir, name)
@@ -3560,6 +3670,572 @@ def build_propose_widget(args, now=None, paths=None, wait=WIDGET_WAIT_SECONDS, p
                       % int(wait)}
 
 
+# -- get_desk and propose_desk (2.37.0): the Desk, read and designed with Claude -------------
+#
+# A port of the Mac subset of Windows' DeskDesign.Parse and Validate (Core), ToolLogic.Desk.cs and the two
+# tools' entries; the app's Swift DeskDesign and DeskDesignValidator are the third copy, and
+# Tests/SanduhrTests/Fixtures/desk-designs/ holds the designs both this file and the Swift build are held
+# to. Rules and messages are Windows' where the field exists on the Mac. What only Windows has (monitors,
+# the launcher, telemetry, glow and weather pieces, the launcher, weather, messages, looks and theme fields,
+# the auto, light, dark and theme ink words) is refused with a reason, never dropped. This server never
+# changes the Desk: it validates, queues desk-request.json and waits for desk-result.json.
+
+DESIGN_ARGS = ("design", "name", "note")
+DESIGN_FIELDS = ("name", "note", "layout", "font", "ink", "plate", "shadow")
+DESIGN_NAME_MAX = 40
+DESIGN_NOTE_MAX = 200
+DESIGN_FONT_FAMILY_MAX = 64
+DESIGN_MAX_PIECES = 16
+DESIGN_PIECES = ("message", "clock", "claude", "meters", "nowPlaying", "watchers", "meetings", "companion")
+DESIGN_ANCHORS = ("tl", "tc", "tr", "ml", "mr", "bl", "bc", "br")
+DESIGN_STYLE_PIECES = ("claude", "meters")
+DESIGN_STYLES = ("bar", "slim", "ring", "ticks")
+DESIGN_MIN_SCALE = 0.6
+DESIGN_MAX_SCALE = 1.6
+DESIGN_SCALE_STEP = 0.1
+DESIGN_MIN_TILT = -20
+DESIGN_MAX_TILT = 20
+DESIGN_BUNDLED_FONTS = ("EsteFont Pro", "EsteFont 26")
+DESIGN_LINK_MAX = 2048
+DESIGN_ANSWER_STATUSES = ("previewing", "applied", "rejected", "needs_font")
+DESIGN_STATE_KEYS = ("design", "pieces", "anchors", "fonts", "shown", "message_color", "notch_text_color", "limits")
+DESIGN_INK_WORDS = ("auto", "light", "dark", "theme")
+DESIGN_WINDOWS_ONLY_FIELDS = {
+    "weather": "arrives with the weather piece in Sanduhr 2.38.0; the Mac Desk has none yet, so nothing was applied",
+    "launcher": "is Windows only: the Mac Desk has no Launcher piece",
+    "messages": "is not part of a Mac Desk design; send message lines with propose_desk_messages",
+    "looks": "is not part of a Mac Desk design; send song looks with propose_now_playing_looks",
+    "theme": "is not part of a Mac Desk design; send a widget theme with propose_theme",
+}
+DESIGN_WINDOWS_ONLY_PIECES = {
+    "telemetry": "is the Windows system piece; the Mac gets a system piece in Sanduhr 2.38.0",
+    "system": "arrives in Sanduhr 2.38.0; the Mac Desk does not have it yet",
+    "weather": "arrives in Sanduhr 2.38.0; the Mac Desk does not have it yet",
+    "launcher": "is a Windows piece; the Mac Desk has no Launcher",
+    "glow": "is a Windows piece; the Mac Desk has no glow piece",
+}
+
+
+def design_reason(field, message):
+    return {"field": field, "message": message}
+
+
+def design_clip(s, n):
+    """s cut to n UTF-16 units (C#'s s[..n])."""
+    return s if len(u16(s)) <= 2 * n else u16(s)[:2 * n].decode("utf-16-be", "ignore")
+
+
+def design_str(v):
+    return v if isinstance(v, str) else None
+
+
+def design_number(v):
+    """A finite JSON number as a float, else None (a boolean is not a number)."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    try:
+        f = float(v)
+    except OverflowError:
+        return None
+    return f if math.isfinite(f) else None
+
+
+def design_round(x):
+    """Math.Round(x, MidpointRounding.AwayFromZero)."""
+    return math.copysign(math.floor(abs(x) + 0.5), x)
+
+
+def design_clamp_scale(s):
+    snapped = design_round(s / DESIGN_SCALE_STEP) * DESIGN_SCALE_STEP
+    clamped = min(DESIGN_MAX_SCALE, max(DESIGN_MIN_SCALE, snapped))
+    return design_round(clamped * 100) / 100
+
+
+def design_clamp_tilt(t):
+    whole = design_round(min(float(DESIGN_MAX_TILT), max(float(DESIGN_MIN_TILT), t)))
+    return 0.0 if whole == 0 else whole
+
+
+def design_out(x):
+    """A whole-number float as an int, so 1.0 is written 1."""
+    return int(x) if isinstance(x, float) and x == int(x) else x
+
+
+def design_has_control(s):
+    return any(is_control(c) for c in s)
+
+
+def design_text(o, key, limit, reasons):
+    if o.get(key) is None:
+        return None
+    raw = design_str(o[key])
+    if raw is None:
+        reasons.append(design_reason(key, "must be a string"))
+        return None
+    if len(u16(raw)) // 2 > limit * 4 or len(raw) > limit:
+        reasons.append(design_reason(key, "must be at most %d characters" % limit))
+        return None
+    if design_has_control(raw):
+        reasons.append(design_reason(key, "must be one line, with no control characters"))
+        return None
+    t = raw.strip()
+    return t if t else None
+
+
+def design_bool(o, key, reasons):
+    if o.get(key) is None:
+        return None
+    if isinstance(o[key], bool):
+        return o[key]
+    reasons.append(design_reason(key, "must be true or false"))
+    return None
+
+
+def design_parse_layout(node, reasons):
+    if node is None:
+        return None
+    if not isinstance(node, dict):
+        reasons.append(design_reason("layout", "must be an object of piece name to {anchor, size, hidden, tilt, style}"))
+        return None
+    if len(node) > DESIGN_MAX_PIECES:
+        reasons.append(design_reason("layout", "names %d pieces; the Desk has %d" % (len(node), len(DESIGN_PIECES))))
+        return None
+    pieces = []
+    before = len(reasons)
+    for key, value in node.items():
+        field = "layout." + design_clip(key, 24)
+        if key not in DESIGN_PIECES:
+            if key in DESIGN_WINDOWS_ONLY_PIECES:
+                reasons.append(design_reason(field, DESIGN_WINDOWS_ONLY_PIECES[key]))
+            else:
+                reasons.append(design_reason(field, "is not a Desk piece; the pieces are " + ", ".join(DESIGN_PIECES)))
+            continue
+        if not isinstance(value, dict):
+            reasons.append(design_reason(field, "must be an object with anchor, size, hidden, tilt and style"))
+            continue
+        for bad in sorted((k for k in value if k not in ("anchor", "size", "hidden", "tilt", "style")), key=u16)[:3]:
+            if bad == "monitor":
+                reasons.append(design_reason(field, "monitor is Windows only: the Mac Desk has no per-monitor placement; use anchor, size, hidden, tilt and style"))
+            else:
+                reasons.append(design_reason(field, "unknown member '%s'; use anchor, size, hidden, tilt and style" % design_clip(bad, 20)))
+        anchor = None
+        if value.get("anchor") is not None:
+            word = design_str(value["anchor"])
+            if word is not None and word.strip().lower() in DESIGN_ANCHORS:
+                anchor = word.strip().lower()
+            else:
+                reasons.append(design_reason(field + ".anchor", "must be one of " + ", ".join(DESIGN_ANCHORS)))
+        size = None
+        if value.get("size") is not None:
+            s = design_number(value["size"])
+            if s is not None and DESIGN_MIN_SCALE - 1e-9 <= s <= DESIGN_MAX_SCALE + 1e-9:
+                size = design_clamp_scale(s)
+            else:
+                reasons.append(design_reason(field + ".size", "must be a number from 0.6 to 1.6"))
+        hidden = None
+        if value.get("hidden") is not None:
+            if isinstance(value["hidden"], bool):
+                hidden = value["hidden"]
+            else:
+                reasons.append(design_reason(field + ".hidden", "must be true or false"))
+        tilt = None
+        if value.get("tilt") is not None:
+            t = design_number(value["tilt"])
+            if t is not None and DESIGN_MIN_TILT - 1e-9 <= t <= DESIGN_MAX_TILT + 1e-9:
+                tilt = design_clamp_tilt(t)
+            else:
+                reasons.append(design_reason(field + ".tilt", "must be a number of degrees from -20 to 20 (0 is upright)"))
+        style = None
+        if value.get("style") is not None:
+            # A style only on a piece that draws one: a clock with a style is a mistake, not a no-op.
+            if key not in DESIGN_STYLE_PIECES:
+                reasons.append(design_reason(field + ".style", "only " + ", ".join(DESIGN_STYLE_PIECES) + " have a style"))
+            else:
+                word = design_str(value["style"])
+                if word is not None and word.strip().lower() in DESIGN_STYLES:
+                    style = word.strip().lower()
+                else:
+                    reasons.append(design_reason(field + ".style", "must be one of " + ", ".join(DESIGN_STYLES)))
+        if hidden is True:
+            anchor = size = tilt = style = None
+        pieces.append({"piece": key, "anchor": anchor, "size": size, "hidden": hidden, "tilt": tilt, "style": style})
+    # One slant per stack: two pieces sent to the same anchor with different tilts cannot both be honored.
+    groups = {}
+    for p in pieces:
+        if p["anchor"] is not None and p["tilt"] is not None:
+            groups.setdefault(p["anchor"], []).append(p)
+    clashes = [(a, g) for a, g in groups.items() if len(set(p["tilt"] for p in g)) > 1]
+    for anchor, group in clashes[:3]:
+        reasons.append(design_reason("layout." + group[0]["piece"] + ".tilt",
+                                     "the pieces at %s share one slant; give %s the same tilt"
+                                     % (anchor, " and ".join(p["piece"] for p in group))))
+    return None if len(reasons) > before else pieces
+
+
+def design_font_problem(family):
+    """Why a font family name is refused, or None (FontFamilyProblem)."""
+    if not family:
+        return None   # the system font
+    if family != family.strip():
+        return "must not start or end with a space"
+    if len(family) > DESIGN_FONT_FAMILY_MAX:
+        return "must be at most %d characters" % DESIGN_FONT_FAMILY_MAX
+    for c in family:
+        o = ord(c)
+        if is_control(c):
+            return "must not contain control characters"
+        if o < 0x80 and not (c.isascii() and c.isalnum() or c in " .-_()+&!"):
+            return "must be a font family name, not a path, link or list"
+        if o >= 0x80:
+            cat = unicodedata.category(c)
+            if not (cat[0] in "LPS" or cat == "Nd" or c.isspace()):
+                return "must be a font family name"
+    return None
+
+
+def design_link_problem(link):
+    """Why an https link is refused, or None (LauncherTarget.Validate for a link)."""
+    if not link:
+        return "Enter a link."
+    if len(u16(link)) // 2 > DESIGN_LINK_MAX:
+        return "That link is too long."
+    if link != link.strip() or any(c.isspace() for c in link) or any(unicodedata.category(c) == "Cc" for c in link):
+        return "A link has no spaces."
+    if any(c in link for c in "\"'\\`"):
+        return "A link has no quotes or backslashes."
+    if not link.lower().startswith("https://"):
+        return "A link must start with https://."
+    authority = re.split(r"[/?#]", link[8:], maxsplit=1)[0]
+    userinfo, at, host = authority.rpartition("@")
+    port = ""
+    if host.startswith("["):
+        close = host.find("]")
+        if close < 0:
+            return "That is not a link."
+        rest = host[close + 1:]
+        host = host[:close + 1]
+        if rest and not rest.startswith(":"):
+            return "That is not a link."
+        port = rest[1:]
+    elif ":" in host:
+        host, _, port = host.rpartition(":")
+    if port and (not (port.isascii() and port.isdigit()) or int(port) > 65535):
+        return "That is not a link."
+    if not host:
+        return "That link has no site name."
+    if at:
+        return "A link has no sign-in part."
+    return None
+
+
+def design_parse_font(node, reasons):
+    if node is None:
+        return None
+    link = None
+    if isinstance(node, dict):
+        for bad in sorted((k for k in node if k not in ("family", "link")), key=u16)[:3]:
+            reasons.append(design_reason("font", "unknown member '%s'; use family and link" % design_clip(bad, 20)))
+        family = design_str(node.get("family"))
+        if family is None:
+            reasons.append(design_reason("font.family", "must be a font family name"))
+            return None
+        if node.get("link") is not None:
+            text = design_str(node["link"])
+            if text is None:
+                reasons.append(design_reason("font.link", "must be an https link"))
+            else:
+                why = design_link_problem(text)
+                if why is not None:
+                    reasons.append(design_reason("font.link", why))
+                else:
+                    link = text
+    else:
+        family = design_str(node)
+        if family is None:
+            reasons.append(design_reason("font", "must be a font family name (or {family, link})"))
+            return None
+    problem = design_font_problem(family)
+    if problem is not None:
+        reasons.append(design_reason("font.family" if isinstance(node, dict) else "font", problem))
+        return None
+    return {"family": family, "link": link}
+
+
+def design_hex(raw):
+    """"#9AD7FF" is "9ad7ff", "fff" is "ffffff"; None when it is not a 3 or 6 digit hex color (InkHex.Normalize)."""
+    if not isinstance(raw, str):
+        return None
+    h = raw.strip(" \t").lower()
+    if h.startswith("#"):
+        h = h[1:]
+    if len(h) not in (3, 6) or any(c not in "0123456789abcdef" for c in h):
+        return None
+    return "".join(c + c for c in h) if len(h) == 3 else h
+
+
+def design_parse_ink(node, reasons):
+    if node is None:
+        return None
+    help_text = "must be one #rrggbb color, or two to four colors for a gradient"
+    if isinstance(node, str):
+        word = node.strip().lower()
+        if word in DESIGN_INK_WORDS:
+            reasons.append(design_reason("ink", "%s is a Windows ink word; the Mac Desk's ink is one #rrggbb color, or two to four for a gradient" % word))
+            return None
+        if "," not in node and design_hex(node) is not None:
+            return ["#" + design_hex(node)]
+        reasons.append(design_reason("ink", help_text))
+        return None
+    if isinstance(node, list):
+        if not 1 <= len(node) <= 4:
+            reasons.append(design_reason("ink", "a gradient is two to four colors"))
+            return None
+        colors = []
+        for item in node:
+            h = design_hex(item)
+            if h is None:
+                reasons.append(design_reason("ink", "every color must be a #rrggbb hex color"))
+                return None
+            colors.append("#" + h)
+        return colors
+    reasons.append(design_reason("ink", help_text))
+    return None
+
+
+def design_parse(node):
+    """(design or None, reasons): shapes, ranges, words and the Mac's refusals. A field that is wrong is a reason
+    and the design is None; an unknown field is a reason too, so a typo never silently does nothing."""
+    if not isinstance(node, dict):
+        return None, [design_reason("design", "must be an object")]
+    r = []
+    unknown = sorted((k for k in node if k not in DESIGN_FIELDS and k not in DESIGN_WINDOWS_ONLY_FIELDS), key=u16)
+    if unknown:
+        r.append(design_reason("design", "unknown field(s): " + ", ".join(design_clip(k, 24) for k in unknown[:5])
+                               + ". The fields are " + ", ".join(DESIGN_FIELDS) + "."))
+    name = design_text(node, "name", DESIGN_NAME_MAX, r)
+    note = design_text(node, "note", DESIGN_NOTE_MAX, r)
+    layout = design_parse_layout(node.get("layout"), r)
+    if node.get("weather") is not None:
+        r.append(design_reason("weather", DESIGN_WINDOWS_ONLY_FIELDS["weather"]))
+    font = design_parse_font(node.get("font"), r)
+    ink = design_parse_ink(node.get("ink"), r)
+    plate = design_bool(node, "plate", r)
+    shadow = design_bool(node, "shadow", r)
+    for key in ("launcher", "messages", "looks", "theme"):
+        if node.get(key) is not None:
+            r.append(design_reason(key, DESIGN_WINDOWS_ONLY_FIELDS[key]))
+    if r:
+        return None, r[:40]
+    return {"name": name, "note": note, "layout": layout, "font": font, "ink": ink, "plate": plate, "shadow": shadow}, []
+
+
+def design_to_json(d):
+    """The design as JSON: only the fields that are set, in the contract's shape."""
+    o = {}
+    if d["name"] is not None:
+        o["name"] = d["name"]
+    if d["note"] is not None:
+        o["note"] = d["note"]
+    if d["layout"] is not None:
+        lo = {}
+        for p in d["layout"]:
+            po = {}
+            if p["anchor"] is not None:
+                po["anchor"] = p["anchor"]
+            if p["size"] is not None:
+                po["size"] = design_out(p["size"])
+            if p["hidden"] is not None:
+                po["hidden"] = p["hidden"]
+            if p["tilt"] is not None:
+                po["tilt"] = design_out(p["tilt"])
+            if p["style"] is not None:
+                po["style"] = p["style"]
+            lo[p["piece"]] = po
+        o["layout"] = lo
+    if d["font"] is not None:
+        o["font"] = d["font"]["family"] if d["font"]["link"] is None else {"family": d["font"]["family"], "link": d["font"]["link"]}
+    if d["ink"] is not None:
+        o["ink"] = d["ink"][0] if len(d["ink"]) == 1 else list(d["ink"])
+    if d["plate"] is not None:
+        o["plate"] = d["plate"]
+    if d["shadow"] is not None:
+        o["shadow"] = d["shadow"]
+    return o
+
+
+def design_validate(design, installed_fonts=None):
+    """The one gate for a design: {status: ok|needs_font|rejected, reasons, fonts, design}. installed_fonts is the
+    list get_desk reports (None: unknown, so the font rule is left to the app, which always knows)."""
+    if design is not None:
+        try:
+            size = len(widget_json(design).encode("utf-8"))
+        except ValueError:
+            size = DESIGN_MAX_JSON_BYTES + 1
+        if size > DESIGN_MAX_JSON_BYTES:
+            return {"status": "rejected", "reasons": [design_reason("design", "is larger than %d KB" % (DESIGN_MAX_JSON_BYTES // 1024))],
+                    "fonts": [], "design": None}
+    d, reasons = design_parse(design)
+    if d is None:
+        return {"status": "rejected", "reasons": reasons, "fonts": [], "design": None}
+    missing = []
+    font = d["font"]
+    if font is not None and font["family"] and installed_fonts is not None and font["family"] not in DESIGN_BUNDLED_FONTS:
+        if font["family"].lower() not in (f.lower() for f in installed_fonts):
+            missing.append({"family": font["family"], "link": font["link"]})
+    return {"status": "needs_font" if missing else "ok", "reasons": [], "fonts": missing, "design": d}
+
+
+def read_design_state(paths):
+    """(outcome, state): outcome is ok, missing, unreadable, too_large, malformed or schema_unsupported."""
+    path = paths.design_state
+    for attempt in range(4):
+        try:
+            if not os.path.exists(path):
+                return "missing", None
+            with open(path, "rb") as f:
+                raw = f.read(DESIGN_MAX_STATE_BYTES + 1)
+            if len(raw) > DESIGN_MAX_STATE_BYTES:
+                return "too_large", None
+            try:
+                doc = json.loads(raw.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                return "malformed", None
+            if not isinstance(doc, dict):
+                return "malformed", None
+            version = doc.get("schema_version")
+            if isinstance(version, bool) or not isinstance(version, int) or version != SCHEMA_VERSION:
+                return "schema_unsupported", None
+            return "ok", doc
+        except OSError:
+            if attempt < 3:
+                time.sleep(0.025)
+    return "unreadable", None
+
+
+def design_installed_fonts(state):
+    fonts = state.get("fonts") if isinstance(state, dict) else None
+    installed = fonts.get("installed") if isinstance(fonts, dict) else None
+    if not isinstance(installed, list):
+        return None
+    return [f for f in installed[:5000] if isinstance(f, str)]
+
+
+def build_get_desk(now=None, paths=None):
+    """The app's note of the Desk (desk-state.json), the keys it promises and nothing else. Writes nothing."""
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    outcome, state = read_design_state(paths)
+    if outcome == "missing":
+        return no_data("missing", "Sanduhr has not written the Desk state yet. Start Sanduhr; it writes the state at launch "
+                                  "and whenever a Desk setting changes, within a few seconds. Then call get_desk again.")
+    if outcome == "too_large":
+        return no_data("too_large", "The Desk state is larger than 1 MB; it is not read. Restart Sanduhr.")
+    if outcome == "schema_unsupported":
+        return no_data("schema_unsupported", "The Desk state is from a different Sanduhr version. Update or restart Sanduhr.")
+    if outcome == "unreadable":
+        return no_data("unreadable", "The Desk state could not be read right now. Try again in a moment.")
+    if outcome == "malformed":
+        return no_data("malformed", "The Desk state is not readable JSON. Restart Sanduhr to write it again.")
+    answer = {"status": "ok"}
+    for key in DESIGN_STATE_KEYS:
+        if state.get(key) is not None:
+            answer[key] = state[key]
+    if isinstance(state.get("writer_version"), str):
+        answer["writer_version"] = state["writer_version"]
+    try:
+        age = now.timestamp() - os.path.getmtime(paths.design_state)
+        answer["state_age_seconds"] = int(min(2 ** 31 - 1, max(0, round(age))))
+    except OSError:
+        pass   # the age is a courtesy
+    return answer
+
+
+def design_answer(result, verdict, request_id):
+    """The app's answer, passed on: its status (one of the four it may give), reasons, fonts, the what-changed
+    lines and warnings; the fonts this server found stand in when the app gave none."""
+    word = result.get("status")
+    status = word if isinstance(word, str) and word in DESIGN_ANSWER_STATUSES else "rejected"
+    answer = {"status": status}
+    for key in ("reason", "reasons", "fonts", "changes", "warnings"):
+        if result.get(key) is not None:
+            answer[key] = result[key]
+    if status == "rejected" and "reasons" not in answer and "reason" not in answer:
+        answer["reason"] = "unexpected_answer"
+    if "fonts" not in answer and verdict["fonts"]:
+        answer["fonts"] = verdict["fonts"]
+    answer["request_id"] = request_id
+    return answer
+
+
+def build_propose_desk(args, now=None, paths=None, wait=DESIGN_WAIT_SECONDS, poll=DESK_POLL_SECONDS,
+                       sleep=time.sleep, clock=time.monotonic):
+    """Checks the design here (a refusal returns status rejected with reasons and writes nothing), hands it to
+    the app through desk-request.json and waits briefly for desk-result.json. Never changes the Desk: a whole
+    design always waits for the user's Apply."""
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    args = args if isinstance(args, dict) else {}
+    reasons = []
+    unknown = sorted((k for k in args if k not in DESIGN_ARGS), key=u16)
+    if unknown:
+        reasons.append(design_reason("arguments", "unknown argument(s): " + ", ".join(design_clip(k, 20) for k in unknown[:5])
+                                     + ". The arguments are design, name and note."))
+    given = args.get("design")
+    if not isinstance(given, dict):
+        reasons.append(design_reason("design", "must be an object: a partial Desk design (see the tool description)"))
+    if reasons:
+        return {"status": "rejected", "reasons": reasons}
+
+    # name and note on the call are the design's own, and win over any inside it.
+    proposal = dict(given)
+    if args.get("name") is not None:
+        proposal["name"] = args["name"]
+    if args.get("note") is not None:
+        proposal["note"] = args["note"]
+
+    _outcome, state = read_design_state(paths)
+    verdict = design_validate(proposal, design_installed_fonts(state))
+    if verdict["status"] == "rejected":
+        return {"status": "rejected", "reasons": verdict["reasons"]}
+
+    request_id = uuid.uuid4().hex
+    request = {"schema_version": 1, "id": request_id, "requested_at": widget_stamp(now),
+               "design": design_to_json(verdict["design"])}
+    try:
+        text = widget_json(request)
+    except ValueError:
+        return {"status": "rejected", "reasons": [design_reason("design", "is not readable as JSON text")]}
+    if len(text.encode("utf-8")) > DESIGN_MAX_JSON_BYTES:
+        return {"status": "rejected", "reasons": [design_reason("design", "is too large for the app to read")]}
+    try:
+        os.makedirs(paths.support_dir, mode=0o700, exist_ok=True)
+        tmp = paths.design_request + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, paths.design_request)   # atomic: the app never reads half a file
+    except OSError as e:
+        return {"status": "error", "reason": "request_write_failed",
+                "remedy": "Could not queue the request (%s)." % type(e).__name__}
+
+    deadline = clock() + wait
+    while True:
+        res = read_desk_result(paths.design_result, request_id)
+        if res is not None:
+            return design_answer(res, verdict, request_id)
+        if clock() >= deadline:
+            break
+        sleep(poll)
+    # The request stays for the app's next look within its ten-minute window.
+    queued = {"status": "queued", "reason": "widget_not_responding", "request_id": request_id,
+              "remedy": "Sanduhr did not answer within %d seconds. Start Sanduhr: it picks the request up within ten "
+                        "minutes of when it was made and shows the design on Settings, Desk for the user to Apply or Dismiss."
+                        % int(wait)}
+    if verdict["fonts"]:
+        queued["fonts"] = verdict["fonts"]
+    return queued
+
+
 def call_tool(name, args):
     """The payload for a tools/call, or None for an unknown tool."""
     args = args if isinstance(args, dict) else {}
@@ -3594,6 +4270,10 @@ def call_tool(name, args):
         return build_propose_config(args)
     if name == "propose_widget":
         return build_propose_widget(args)
+    if name == "get_desk":
+        return build_get_desk()
+    if name == "propose_desk":
+        return build_propose_desk(args)
     if name == "get_mod_status":
         return build_get_mod_status(args)
     if name == "list_catalog":

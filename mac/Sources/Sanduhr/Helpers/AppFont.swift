@@ -40,17 +40,20 @@ final class FontSettings {
     }
 
     // Family name -> the PostScript name of its regular face. Cached because
-    // Font.app runs on every render of every card.
+    // Font.app runs on every render of every card; dropped when the font set changes.
     @ObservationIgnored private var faceCache: [String: String?] = [:]
+    @ObservationIgnored private var faceEpoch = -1
 
     /// The face to hand `Font.custom`, or nil when the family is the system
-    /// font or is no longer installed (a removed font falls back quietly).
+    /// font or is no longer installed (a removed font, an uninstalled font pack, falls back quietly).
     func faceName() -> String? {
         let fam = drawnFamily
         guard !fam.isEmpty else { return nil }
+        let epoch = FontEpoch.shared.value
+        if epoch != faceEpoch { faceCache.removeAll(); faceEpoch = epoch }
         if let hit = faceCache[fam] { return hit }
         var face: String?
-        if let members = NSFontManager.shared.availableMembers(ofFontFamily: fam) {
+        if DeskFont.isAvailable(fam), let members = NSFontManager.shared.availableMembers(ofFontFamily: fam) {
             // Each member is [postScriptName, styleName, weight, traits].
             let regular = members.first { ($0[1] as? String)?.lowercased() == "regular" }
             face = (regular ?? members.first)?.first as? String

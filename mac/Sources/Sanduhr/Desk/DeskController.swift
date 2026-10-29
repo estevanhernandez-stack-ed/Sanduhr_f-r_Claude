@@ -317,7 +317,9 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.hasShadow = false
         w.ignoresMouseEvents = true
         let view = DeskClickLayerView(frame: NSRect(origin: .zero, size: screen.frame.size))
-        view.areas = DeskClickLayer.areas(in: model.elements())
+        let elements = model.elements()
+        view.areas = DeskClickLayer.areas(in: elements)
+        view.slanted = DeskClickLayer.slantedAreas(in: elements)
         w.contentView = view
         w.setFrame(screen.frame, display: true)
         w.orderFront(nil)
@@ -327,7 +329,9 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// The plates follow the frames (onHitAreasChange, every mouse-through check).
     private func syncClickAreas() {
         guard let view = clickWindow?.contentView as? DeskClickLayerView else { return }
-        view.areas = DeskClickLayer.areas(in: model.elements())
+        let elements = model.elements()
+        view.areas = DeskClickLayer.areas(in: elements)
+        view.slanted = DeskClickLayer.slantedAreas(in: elements)
     }
 
     /// The window a Desk menu pops in and a click is judged against: the click layer while it

@@ -314,7 +314,7 @@ struct MessageRowPreview: View {
         ZStack(alignment: .leading) {
             PreviewWallpaper()
             if let line {
-                DeskMessageLine(raw: line, font: messageFont.isEmpty ? DeskFont.resolve(saved: savedFont) : messageFont,
+                DeskMessageLine(raw: line, font: DeskFont.resolveMessage(saved: messageFont, desk: DeskFont.resolve(saved: savedFont)),
                                 baseSize: Self.baseSize, inkSpec: messageColor, globalGlow: messageGlow,
                                 alignment: .leading, paused: false, lineLimit: 1)
                     .padding(.horizontal, 12)

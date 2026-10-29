@@ -1,0 +1,12 @@
+{
+  "layout": {
+    "meters": {
+      "anchor": "mr",
+      "tilt": 18,
+      "style": "slim"
+    },
+    "claude": {
+      "style": "ticks"
+    }
+  }
+}

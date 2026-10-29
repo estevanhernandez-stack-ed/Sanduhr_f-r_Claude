@@ -148,6 +148,10 @@ final class WidgetStore: WidgetCatalogMarker, @unchecked Sendable {
     /// rename and before the row is written. A throw there must leave the old install untouched.
     var beforeSwap: (() throws -> Void)?
     var beforeRegistryWrite: (() throws -> Void)?
+    /// Unregisters a pack's font faces before its folder is moved away (PackFonts.release): CoreText
+    /// can't unregister a file that is already gone, so a font pack uninstalled without this went on
+    /// drawing until Sanduhr quit. Tests hand in their own PackFonts.
+    var releaseFonts: (String) -> Void = { PackFonts.shared.release($0) }
 
     let root: URL
 
@@ -313,6 +317,7 @@ final class WidgetStore: WidgetCatalogMarker, @unchecked Sendable {
 
             try beforeSwap?()
             if fm.fileExists(atPath: target.path) {
+                releaseFonts(id)
                 let aside = stagingDir.appendingPathComponent(id + "-old-" + Self.token(), isDirectory: true)
                 try fm.moveItem(at: target, to: aside)
                 old = aside
@@ -351,6 +356,7 @@ final class WidgetStore: WidgetCatalogMarker, @unchecked Sendable {
         if reg.find(id) == nil, !fm.fileExists(atPath: target.path) { return .failed("That widget isn't installed.") }
         do {
             if fm.fileExists(atPath: target.path) {
+                releaseFonts(id)
                 try fm.createDirectory(at: stagingDir, withIntermediateDirectories: true)
                 let gone = stagingDir.appendingPathComponent(id + "-gone-" + Self.token(), isDirectory: true)
                 try fm.moveItem(at: target, to: gone)

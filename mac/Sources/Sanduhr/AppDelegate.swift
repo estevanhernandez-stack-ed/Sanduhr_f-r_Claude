@@ -40,6 +40,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // EsteFont Pro and EsteFont 26, from Contents/Resources/Fonts, for this process only: before any
         // view draws, so the Desk and the widget find it on a Mac that never had it installed.
         BundledFonts.register()
+        // Installed font packs' faces, the same way: this process only, before any view draws.
+        PackFonts.shared.sync()
         NSApp.setActivationPolicy(.accessory)
         // A quit Apple Event (a script, logging out) ends any sheet first, or AppKit answers it
         // "user canceled" while the Welcome sheet is up (AppQuit).
@@ -155,6 +157,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Claude-made widgets (2.36.0): propose_widget's requests, on the same folder watch. Held in memory,
         // previewed on the Desk on request, installed only on the user's Apply.
         WidgetProposalHandoff.shared.startForApp()
+        // Claude's Desk designs (2.37.0): propose_desk's requests, on the same folder watch. Held in memory,
+        // previewed on the Desk on request, written to the Desk settings only on the user's Apply.
+        DeskDesignProposalHandoff.shared.startForApp()
+        // The Desk for Claude (2.37.0): desk-state.json follows the Desk settings, for get_desk.
+        DeskStateExporter.shared.startForApp()
         // Watchers (item 66): the MCP server's watch_* requests and the Stop hook's background
         // work, on the same folder watch; watchers.json follows the two switches.
         WatcherStore.shared.startForApp()

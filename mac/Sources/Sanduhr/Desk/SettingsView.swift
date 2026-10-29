@@ -17,6 +17,8 @@ struct DeskLayoutSection: View {
     var body: some View {
         let arranging = DeskController.shared.model.arrange.active
         Form {
+            DeskDesignSuggestionSection()
+            DeskDesignUndoSection()
             Section {
                 Toggle(SettingsNames.deskSwitch, isOn: $deskOn)
                     .onChange(of: deskOn) { _, _ in DeskController.shared.apply() }
@@ -30,13 +32,14 @@ struct DeskLayoutSection: View {
                     DeskPlaceRow(widget: w.key, name: w.name, layout: $layout)
                         .disabled(arranging)
                         .modifier(FirstPieceAnchor(widget: w.key))
-                    DeskPieceExtra(widget: w.key, arranging: arranging)
+                    DeskPieceExtra(widget: w.key, arranging: arranging, layout: $layout)
                 }
                 Text(DeskLayout.placesCaption)
                     .font(.caption).foregroundStyle(.secondary)
                 Link("Learn more", destination: AboutLinks.deskGuide)
                     .font(.caption)
             }
+            DeskSlantSection(layout: $layout, arranging: arranging)
             Section("Order") {
                 // One row, so the section's anchor marks the whole list.
                 VStack(alignment: .leading, spacing: 10) { DeskOrderList(layout: $layout) }
@@ -54,6 +57,44 @@ struct DeskLayoutSection: View {
             AdvancedSection(page: .deskLayout) { DeskMarginsRows().disabled(arranging) }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// The review banner at the top of Settings, Desk, only while a Desk design from Claude waits (spec 8). No row, no
+/// empty state and no search entry otherwise.
+private struct DeskDesignSuggestionSection: View {
+    var handoff = DeskDesignProposalHandoff.shared
+
+    var body: some View {
+        if let review = handoff.model {
+            Section {
+                DeskDesignBanner(
+                    model: review, previewNote: handoff.previewNote,
+                    preview: { handoff.previewOnDesk() },
+                    endPreview: { handoff.endPreview() },
+                    apply: { handoff.apply() },
+                    dismiss: { handoff.dismiss() })
+            }
+        }
+    }
+}
+
+/// "Put my Desk back", only while the last applied Claude design's snapshot exists (`deskDesignBefore`). No search entry.
+private struct DeskDesignUndoSection: View {
+    @AppStorage(DeskDesignApply.beforeKey, store: .desk) private var before = ""
+
+    var body: some View {
+        if !before.isEmpty, let undo = DeskDesignApply.Undo.read(UserDefaults.desk) {
+            Section {
+                Text(undo.caption()).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button("Put my Desk back") { undo.putBack(in: UserDefaults.desk) }
+                    Button("Keep it") { DeskDesignApply.keepIt(in: UserDefaults.desk) }
+                    Spacer()
+                }
+            }
+        }
     }
 }
 
@@ -132,10 +173,15 @@ private struct DeskMarginsRows: View {
 private struct DeskPieceExtra: View {
     let widget: String
     var arranging = false
+    @Binding var layout: String
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
 
     var body: some View {
         switch widget {
+        case _ where DeskMeterStyleSettings.shows(widget, in: layout):
+            DeskMeterStylePicker(widget: widget, layout: $layout)
+                .disabled(arranging)
+                .padding(.leading, 16)
         case "meetings":
             Toggle("Read today's meetings", isOn: $showMeetings)
                 .onChange(of: showMeetings) { _, on in
@@ -161,6 +207,72 @@ private struct DeskPieceExtra: View {
             SettingsLinkButton(page, anchor: anchor)
         }
         .padding(.leading, 16)
+    }
+}
+
+/// Desk, Where each piece sits, under the `claude` and `meters` pieces: how the piece draws its
+/// numbers. Writes the layout word's fifth field (`DeskArrangement.setStyle`), so the Desk redraws
+/// as the choice is made; bars are the default and are never written.
+private struct DeskMeterStylePicker: View {
+    let widget: String
+    @Binding var layout: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Picker(DeskMeterStyleSettings.title, selection: style) {
+                ForEach(DeskMeterStyle.allCases, id: \.self) { Text(DeskMeterStyles.name($0)).tag($0) }
+            }
+            .pickerStyle(.menu)
+            Text(DeskMeterStyleSettings.caption(widget))
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .modifier(MeterStyleAnchor(widget: widget, layout: layout))
+    }
+
+    private var style: Binding<DeskMeterStyle> {
+        Binding(
+            get: { DeskArrangement(layout).style(of: widget) },
+            set: { value in
+                var a = DeskArrangement(layout)
+                a.setStyle(widget, value)
+                layout = a.string
+            })
+    }
+}
+
+/// The Style picker's search anchor goes on the first piece that shows one.
+private struct MeterStyleAnchor: ViewModifier {
+    let widget: String
+    let layout: String
+
+    func body(content: Content) -> some View {
+        if DeskMeterStyleSettings.anchorWidget(in: layout) == widget {
+            content.settingsAnchor(SettingsAnchor.meterStyle)
+        } else {
+            content
+        }
+    }
+}
+
+/// Settings, Desk, Style: the words and the rule for when the picker shows, apart from the view
+/// so they test without AppKit.
+enum DeskMeterStyleSettings {
+    static let title = "Style"
+
+    /// The picker shows under a piece that has a style and is placed on the Desk (a hidden piece has none).
+    static func shows(_ widget: String, in layout: String) -> Bool {
+        DeskMeterStyles.supports(widget) && DeskArrangement(layout).placement(widget) != nil
+    }
+
+    /// The piece that carries the search anchor: the first with a picker, in the pieces' order.
+    static func anchorWidget(in layout: String) -> String? {
+        DeskLayout.widgets.map(\.key).first { shows($0, in: layout) }
+    }
+
+    static func caption(_ widget: String) -> String {
+        widget == "claude"
+            ? "Bars keep the one line. Slim makes it two short rows; Rings and Ticks show the session and week limits as small gauges."
+            : "Bars show a reset time; Slim, Rings and Ticks leave it out and take less room. Every style keeps the pace mark and the nearly-full warning."
     }
 }
 
@@ -264,6 +376,45 @@ private struct DeskPlaceRow: View {
     }
 }
 
+/// Desk, Slant (the fold): one stepper per place that has pieces, whole degrees from -20 to 20,
+/// 0 straight. It writes the layout word's fourth field (`DeskArrangement.setTilt`), so every piece
+/// at the place slants together, plate and all. A negative number rises to the right.
+private struct DeskSlantSection: View {
+    @Binding var layout: String
+    let arranging: Bool
+
+    var body: some View {
+        let a = DeskArrangement(layout)
+        let anchors = DeskAnchor.allCases.filter { !a.stack($0).isEmpty }
+        Section(DeskSlant.title) {
+            if anchors.isEmpty {
+                Text(DeskSlant.nothingPlaced).foregroundStyle(.secondary)
+            }
+            ForEach(anchors, id: \.self) { anchor in
+                Stepper(value: tilt(anchor), in: DeskArrangement.tiltRange, step: 1) {
+                    LabeledContent(DeskSlant.rowTitle(anchor)) { Text(DeskSlant.label(a.stackTilt(anchor) ?? 0)).monospacedDigit() }
+                }
+                .accessibilityValue(DeskSlant.label(a.stackTilt(anchor) ?? 0))
+            }
+            Text(DeskSlant.caption)
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .disabled(arranging)
+        .settingsAnchor(SettingsAnchor.slant)
+    }
+
+    private func tilt(_ anchor: DeskAnchor) -> Binding<Double> {
+        Binding(
+            get: { DeskArrangement(layout).stackTilt(anchor) ?? 0 },
+            set: { value in
+                var a = DeskArrangement(layout)
+                guard let first = a.stack(anchor).first else { return }
+                a.setTilt(first.widget, value)
+                layout = a.string
+            })
+    }
+}
+
 /// Desk's Order list: each place that has pieces, its pieces top to bottom. A piece drags
 /// onto another to take its place (DeskArrangement.move); VoiceOver gets Move Up and Move Down.
 private struct DeskOrderList: View {
@@ -328,6 +479,19 @@ private struct DeskOrderRow: View {
     }
 }
 
+/// Settings, Desk, Slant (the fold): the words, kept apart from the view so they test without AppKit.
+enum DeskSlant {
+    static let title = "Slant"
+    static let nothingPlaced = "Place a piece first."
+    static let caption = "Tilts a whole place, plate and all, from -20 to 20 degrees. Negative rises to the right; 0° is straight."
+
+    /// "Top left slant".
+    static func rowTitle(_ anchor: DeskAnchor) -> String { "\(anchor.name) slant" }
+
+    /// "0°" for straight, "-12°" rising to the right, "8°" falling.
+    static func label(_ tilt: Double) -> String { "\(Int(DeskArrangement.clampTilt(tilt)))°" }
+}
+
 /// The layout string the Layout section edits ("message:tl clock:bl claude:bl meetings:bl"), kept
 /// apart from the view so it tests without AppKit. DeskView reads the same string. Now playing
 /// (item 53b) is an element like the others, off unless placed. The string itself (anchors,
@@ -390,6 +554,12 @@ struct DeskLookSection: View {
         Binding(get: { DeskFont.resolve(saved: savedFont) }, set: { savedFont = $0 })
     }
 
+    /// The message font as drawn: Same as Desk ("") until one is picked, or when the picked one
+    /// was uninstalled; picking writes it.
+    private var messageFamily: Binding<String> {
+        Binding(get: { DeskFont.resolveMessage(saved: messageFont, desk: "") }, set: { messageFont = $0 })
+    }
+
     static let presets: [(name: String, value: String)] = [
         ("Ice gradient", "8f5bd6,3a63e0,33fdff"),
         ("Ice gradient, exact", "531b93,012089,00fdff"),
@@ -408,7 +578,7 @@ struct DeskLookSection: View {
                     ForEach(families, id: \.self) { Text($0).tag($0) }
                 }
                 .settingsAnchor(SettingsAnchor.fonts)
-                Picker("Message font", selection: $messageFont) {
+                Picker("Message font", selection: messageFamily) {
                     Text("Same as Desk").tag("")
                     Divider()
                     ForEach(families, id: \.self) { Text($0).tag($0) }
@@ -444,6 +614,10 @@ struct DeskLookSection: View {
         .formStyle(.grouped)
         .onAppear {
             // EsteFont Pro, then EsteFont 26, first: they ship inside Sanduhr.
+            families = DeskFont.pickerFamilies(installed: NSFontManager.shared.availableFontFamilies)
+        }
+        // A font pack installed or removed changes the lists at once.
+        .onReceive(NotificationCenter.default.publisher(for: .widgetPacksDidChange)) { _ in
             families = DeskFont.pickerFamilies(installed: NSFontManager.shared.availableFontFamilies)
         }
     }
@@ -797,7 +971,7 @@ struct MessageSuggestionReview: View {
                     Text(split.kind == .date ? "only on \(split.tag)" : "only on \(split.tag)days")
                         .font(.caption2).foregroundStyle(.white.opacity(0.55))
                 }
-                DeskMessageLine(raw: split.body, font: messageFont.isEmpty ? font : messageFont, baseSize: 30,
+                DeskMessageLine(raw: split.body, font: DeskFont.resolveMessage(saved: messageFont, desk: font), baseSize: 30,
                                 inkSpec: messageColor, globalGlow: messageGlow, alignment: .leading, paused: false)
             }
         } else if !line.trimmingCharacters(in: .whitespaces).isEmpty {

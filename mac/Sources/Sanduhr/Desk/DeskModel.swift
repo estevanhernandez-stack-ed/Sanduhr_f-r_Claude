@@ -170,6 +170,12 @@ final class DeskModel {
     var notchRect: CGRect?
     /// The Claude meters, short enough for the notch: "5h 7%  wk 63%".
     var claudeCompact: String?
+    /// The `claude` piece's compact two-row form (slim style), nil when there is nothing to say.
+    var claudeTwoRows: DeskClaudeCompact?
+    /// The session and week limits as the `claude` piece's ring and ticks styles draw them, hidden
+    /// limits included (the line reads session and week whatever the cards show); empty while a
+    /// sign-in is needed.
+    var claudeGauges: [DeskMeterStyleModel.Gauge] = []
     /// What plays, after Now Playing's hide rules (NowPlayingController), nil for nothing to show.
     /// In memory only.
     var nowPlaying: NowPlayingInfo?
@@ -231,6 +237,18 @@ final class DeskModel {
     @ObservationIgnored var clockFrame: CGRect = .zero { didSet { if clockFrame != oldValue { onHitAreasChange?() } } }
     @ObservationIgnored var messageFrame: CGRect = .zero { didSet { if messageFrame != oldValue { onHitAreasChange?() } } }
     @ObservationIgnored var claudeLineFrame: CGRect = .zero { didSet { if claudeLineFrame != oldValue { onHitAreasChange?() } } }
+    /// Each slanted stack's tilt and top left in the global space the frames above are in (the
+    /// fold), by anchor; reported by DeskFoldStack. A stack that stands upright has none. The
+    /// frames above are the boxes around what is drawn (SwiftUI reports a slanted view's bounds);
+    /// `elements()` recovers each one's layout frame and attaches the slant.
+    @ObservationIgnored private(set) var folds: [DeskAnchor: DeskFold] = [:]
+
+    func setFold(_ fold: DeskFold?, at anchor: DeskAnchor) {
+        guard folds[anchor] != fold else { return }
+        folds[anchor] = fold
+        onHitAreasChange?()
+    }
+
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
     @ObservationIgnored var onHitAreasChange: (() -> Void)?
     /// Arrange mode (item 60): the layout being edited on the desktop, nil-session outside it.
@@ -518,6 +536,10 @@ final class DeskModel {
         let parts = DeskClaudeText.parts(usage)
         if parts != claudeParts { claudeParts = parts }
         claudeCompact = DeskClaudeText.compact(usage, now: now)
+        let two = DeskClaudeCompact.make(usage)
+        if two != claudeTwoRows { claudeTwoRows = two }
+        let gauges = DeskMeterStyleModel.claudeGauges(Self.claudeRows(usage.usage, now: now), signInNeeded: usage.signInNeeded)
+        if gauges != claudeGauges { claudeGauges = gauges }
         claudeLineIsStale = usage.isStale(now: now)
     }
 
@@ -533,6 +555,12 @@ final class DeskModel {
         }
     }
 
+    /// The session and week rows for the claude piece's gauges: every reported limit, with the saved warning settings.
+    private static func claudeRows(_ usage: UsageResponse?, now: Date) -> [DeskMeterRow] {
+        let desk = UserDefaults.desk
+        return DeskMeterRow.rows(from: usage, now: now) { MeterWarningSettings.saved($0, in: desk) }
+    }
+
     /// The meter rows for the limits that show, with the saved warning settings (Settings, Alerts, Each limit).
     private static func meterRows(_ usage: UsageResponse?, now: Date) -> [DeskMeterRow] {
         let desk = UserDefaults.desk
@@ -545,6 +573,8 @@ final class DeskModel {
     func refreshMeterWarnings(now: Date = Date()) {
         let rows = Self.meterRows(usage.usage, now: now)
         if rows != meters { meters = rows }
+        let gauges = DeskMeterStyleModel.claudeGauges(Self.claudeRows(usage.usage, now: now), signInNeeded: usage.signInNeeded)
+        if gauges != claudeGauges { claudeGauges = gauges }
     }
 
     /// An alert chose the Desk: pulse these limits' meters once. `pulseCount` counts every pulse;
@@ -559,8 +589,12 @@ final class DeskModel {
     /// layout settings as DeskView.
     func elements() -> [DeskElement] {
         let desk = UserDefaults.desk
+        // The layout the Desk draws: a Desk design's preview, else the saved one (Settings, Desk banner).
+        let layoutWords = MainActor.assumeIsolated {
+            DeskDesignPreview.shared.layoutString(saved: desk.string(forKey: "layout") ?? DeskLayout.standard)
+        }
         var input = DeskElements.Input()
-        input.placed = DeskLayout.placed(desk.string(forKey: "layout") ?? DeskLayout.standard,
+        input.placed = DeskLayout.placed(layoutWords,
                                          showMeetings: desk.object(forKey: "showMeetings") as? Bool ?? true)
         input.meterTiers = meters.map(\.tier)
         input.signInNeeded = signInNeeded && signInReminder
@@ -603,7 +637,9 @@ final class DeskModel {
         input.messageFrame = messageFrame
         input.claudeLineDrawn = claudeLine != nil || claudeParts?.account != nil || switchNote
         input.claudeLineFrame = claudeLineFrame
-        return DeskElements.build(input)
+        return DeskElements.folded(DeskElements.build(input),
+                                   arrangement: DeskArrangement(layoutWords),
+                                   folds: folds)
     }
 
     /// The first meeting still to come (or in progress) that has a join link.

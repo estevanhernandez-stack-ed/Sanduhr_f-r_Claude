@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **Claude can shape your Desk.** With the MCP server installed, `get_desk` tells Claude how your Desk is set up and `propose_desk` hands Sanduhr a whole look: pieces (place, size, slant, style), font, ink, plate and shadow. The server checks it with the app's own rules and refuses what the Mac Desk can't do with a reason: messages, song looks and themes (they keep their tools), the Windows-only fields, and the system and weather pieces until 2.38.0. A good one waits at the top of Settings, Desk as **Claude suggests a Desk design**, with what it changes. **Preview on the Desk** shows it from memory with your saved settings untouched, **Apply** writes only the settings it changes, and **Dismiss** drops it. A font you lack is named with Claude's link as text, and Apply waits until you install it. No setting lets Claude skip Apply, and the design is held in memory only.
+
+- **Put my Desk back.** Apply saves what it replaces, and Settings, Desk offers **Put my Desk back** or **Keep it** until the next design. One snapshot is kept.
+
+- **What Claude reads of your Desk.** Sanduhr keeps `desk-state.json` in its folder (owner-only, written at launch and when a Desk setting or font changes, only when different): the layout, font, ink, plate and shadow, the font names it can use, and the limits a design must keep. Never usage, message text, paths or account names. **Reset Sanduhr…** removes it.
+
+- **The fold.** Settings, Desk, Slant tilts a whole place, plate and all, from -20 to 20 degrees; negative rises to the right. The pieces at one place share the slant. Arrange Desk outlines and drags the slanted piece, and a straight Desk draws and costs exactly what it did.
+
+- **Meter styles.** The Claude line and the meters take a Style: Bar (as before), Slim, Ring or Ticks. Every style keeps the pace mark and the nearly-full warning, and nothing animates in the new ones. The slant and the style are two more fields of the existing layout setting, so an older build keeps reading the rest.
+
+- **Font packs.** Font packs from the widget catalog load for Sanduhr only, never installed on your Mac, and leave its font lists, the Desk and the message the moment you uninstall them. An updated pack shows its new letters after Sanduhr restarts. Their families join the Desk and widget font lists. A face the system refuses is left out, and the pack's row says so.
+
+- **For the smoke harness.** `smoke/smoke state` has `pending_suggestions.desk`, a flag that is true while a Claude-made Desk design waits. Never its content.
+
 ## v4.0.1 — 2026-10-29
 
 **Platform:** Windows (.NET 10 / WPF). A fix release. `Sanduhr.Mcp` to 4.0.1. No new outbound destination and no new capability: the manifest changes only its version.

@@ -2363,3 +2363,154 @@ On an installed sprite made here (section 59, step 1). Catalog packs show no suc
    its remove path takes it out (and the `widgets` folder, when empty).
 3. Move `widgets/validate.py` aside in a scratch copy and propose: the answer is `error` with reason
    `validator_missing` and a remedy that says to update the integrations; nothing is written. Put it back.
+
+## 62. The fold: a slant per stack (2.37.0)
+
+Settings, Desk, **Slant**. Dev build, signed out, against the file store (section 45). Desk on with the clock,
+the Claude line and the meters placed, two of them at one place.
+
+1. The Slant section has a stepper per place that has pieces, in whole degrees, with the caption "Tilts a whole
+   place, plate and all, from -20 to 20 degrees. Negative rises to the right; 0 is straight." With nothing
+   placed it reads "Place a piece first." Set Middle left to -12: every piece at that place leans together and
+   rises to the right, plate included, and the other places stay straight. 8 falls to the right. The stepper
+   stops at -20 and 20.
+2. `defaults read com.626labs.sanduhr.desk layout` shows the fourth field on those pieces only
+   (`clock:ml:1:-12`) and none on a straight piece. Set the place back to 0: the field is gone from the string.
+3. Move a piece into a slanted place in Arrange Desk: it takes the place's slant. Move one into an empty
+   place: it keeps its own. Move a slanted stack's only piece out: the old place stands straight.
+4. **Arrange on a slant.** Turn Arrange Desk on with a slanted stack. Each piece's outline is the slanted
+   parallelogram, not the rectangle around it. Click inside a corner of the rectangle that lies outside the
+   parallelogram: it does not pick the piece. Drag a piece onto another slanted stack and drop it above and then
+   below a piece there: the order follows where the pointer is on the stack's own face. Resize a slanted piece
+   with its handle: the size steps as on a straight one.
+5. Straight stack: nothing about a straight Desk changed. Compare it before and after against a 2.36.0 build:
+   same positions, no extra height.
+6. A layout written by hand with two different slants at one place (`clock:ml:1:-18 claude:ml:1:6`) loads, and the
+   stack slants by its first piece. A slant of 40 clamps to 20. With OLED care on, the drift still moves the
+   slanted stack as a whole.
+7. A 2.36 build handed `clock:ml:1:-12` reads the size and ignores the slant.
+
+## 63. Meter styles (2.37.0)
+
+Settings, Desk, **Style**, under the Claude line and the meters once they are placed (a hidden piece has none).
+Use demo mode (section 48) so the readings are known, and set one limit above 90 percent.
+
+1. The menu offers Bar, Slim, Ring and Ticks. Bar draws exactly as 2.36.0. `layout` carries the fifth field only
+   when not bar (`meters:tr:1:0:ring`), with the size and slant holding their places.
+2. **Slim:** the meters show one line of label and value over a thin bar, about half the height; the Claude line
+   becomes two short rows (the session over the reset and week).
+3. **Ring:** small arcs of three quarters of a circle, side by side, the value inside without a percent sign and a
+   short name in the open bottom (Session, Week, or the model for another weekly limit). The Claude line shows the
+   session and week as two gauges.
+4. **Ticks:** ten cells, unlit ones a faint outline. A reading of 3 percent lights one cell; 100 lights all ten.
+5. **Pace mark:** on a Claude limit with a pace mark, every style keeps it, in the right place along the bar, the
+   arc or the cells.
+6. **Warning:** the limit above 90 percent is red in every style. Bar, slim and ticks show the warning glyph beside
+   the percent where there is one; the ring shows the warning triangle above its value. Reduce Motion on or off:
+   slim, ring and ticks do not pulse.
+7. Slim, ring and ticks leave out the reset line. Settings previews (Desk Look) still draw bars.
+8. A slanted place with a ring or ticks stack draws the gauges slanted with the rest, and clicking the piece still
+   opens what it opened. Set `layout` by hand to `clock:bl:1:0:ring`: the clock stays as it was (a style on a
+   piece without one is dropped on the next change). An unknown word (`meters:tr:1:0:spiral`) draws as bar.
+
+## 64. Font packs (2.37.0)
+
+Needs a font pack. Install one from Settings, Widgets when the catalog lists one. Without one, copy the fixture
+`mac/Tests/SanduhrTests/Fixtures/font-packs/real-font` (a tiny generated font, "Fixture Pack Sans") into
+`~/Library/Application Support/Sanduhr/widgets/real-font/` with a row in `widgets.json` (copy a sprite
+pack's row and set `id`) and relaunch. Back up the Sanduhr folder first (section 45).
+
+1. After install, Fixture Pack Sans is in the Desk font picker (Settings, Desk Look) and the widget font picker,
+   once each, in the sorted list after EsteFont Pro and EsteFont 26. Pick it for the Desk: the Desk draws in it
+   (it has three glyphs, so most text shows the fallback shapes).
+2. Font Book and another app, such as TextEdit, do not list it: it is loaded for Sanduhr only. Quit Sanduhr: it
+   is gone.
+3. `get_desk` (section 66) lists the family under `fonts.installed`.
+4. Uninstall the pack in Settings, Widgets: the family leaves both pickers at once, a Desk set to it draws in
+   EsteFont Pro, and the folder is gone. Reinstalling the same pack puts it back without a relaunch.
+5. **A refused face.** Copy `.../font-packs/refused-font` (a font file cut short that still carries a valid
+   header) the same way. The pack's row in Settings, Widgets shows in orange "One font couldn't be loaded and is
+   left out." and the family is in no picker. Nothing else is affected.
+6. A font installed in Font Book and also in a pack: the pickers list the family once; installing the pack is
+   harmless.
+7. Reset Sanduhr… with Your widgets checked removes the folder. The faces already loaded stay until you quit.
+
+## 65. get_desk (2.37.0)
+
+Needs the MCP server installed (Settings, Integrations). A tools/call over stdio to
+`mac/integrations/sanduhr_mcp.py` works as well as Claude Code does.
+
+1. With Sanduhr running, `ls -l ~/Library/Application\ Support/Sanduhr/desk-state.json` shows mode `0600`.
+   Change a Desk setting (the ink): within a second `get_desk` shows the new ink and `state_age_seconds` is a
+   few seconds at most. Change nothing: the file's modification time does not move for minutes (it is written
+   only when different).
+2. The answer has `design` (each piece's `anchor`, `size`, `hidden`, `tilt`, and `style` on the Claude line and the
+   meters; the font, ink, plate and shadow), `pieces`, `anchors`, `fonts` (desk, message, bundled, installed),
+   `shown`, `message_color`, `notch_text_color` and `limits`. It holds no usage figure, no message text, no path and
+   no account name: `grep -i` the file for a label or a line of `messages.txt` finds nothing.
+3. Install a font pack or a font in Font Book: the family appears under `fonts.installed` within a few seconds.
+4. Quit Sanduhr, delete `desk-state.json` and call `get_desk`: `no_data` with a reason that says to start Sanduhr.
+   Start Sanduhr: the file is back at launch. Write `{}` into it: `schema_unsupported`; write garbage: `malformed`.
+5. A `defaults write com.626labs.sanduhr.desk inkColor ff0000` from Terminal reaches the file too (the folder
+   watch catches it).
+6. Reset Sanduhr… removes the file with the records part.
+
+## 66. propose_desk (2.37.0)
+
+Needs the MCP server. The arguments of each case are the files in `mac/Tests/SanduhrTests/Fixtures/desk-designs/`
+(wrap one as `{"design": <file>}`). Back up the Sanduhr folder and the desk preferences first (section 45) and
+note your layout, font, ink, plate and shadow.
+
+1. **Refusals write nothing.** Propose `windows-only-fields.json`, `windows-only-monitor.json`,
+   `system-weather-pieces.json`, `tilt-conflict.json`, `tilt-out-of-range.json`, `style-on-clock.json`,
+   `font-path.json`, `ink-windows-words.json` and `unknown-field.json`. Each answers `rejected` with a reason per
+   problem, in the tool result, and there is no `desk-request.json`, no banner and no notification. `messages`,
+   `looks` and `theme` named inside a design point at their own tools.
+2. **Preview.** Propose `tilt.json` and `style.json` merged into one design with Sanduhr running and the Desk on.
+   The tool answers `previewing` with a `changes` list. The request file is gone at once, `desk-result.json`
+   exists with mode `0600`, and `smoke/smoke state` shows `pending_suggestions.desk: true` and nothing else about
+   it. Settings, Desk shows **Claude suggests a Desk design** at the top with the name, the note and **What
+   changed**. The Desk itself has not changed and `defaults read` shows your old values.
+3. Press **Preview on the Desk**: the layout, slant, styles, font, plate, shadow and ink show. Settings still shows
+   your saved values, `defaults read com.626labs.sanduhr.desk layout` is unchanged, and the button reads **End
+   preview**. Turn the Desk off: **Preview on the Desk** is disabled with "Turn the Desk on to preview it."
+4. **Dismiss.** The banner goes, the preview goes, the notification clears and the answer for that request is
+   `rejected`, `dismissed`. With nothing waiting the banner is not on the page at all and Settings search finds no
+   entry for it.
+5. **Apply.** Propose again, press **Apply**: the preview gives way to the saved result. Only the keys the design
+   changes are written (`layout`, `font`, `inkColor`, `plate`, `inkShadow`; the others keep their old values: compare
+   the whole `defaults read` before and after). The answer is `applied` with the `changes`. Margins, the clock size,
+   the messages and the theme did not change.
+6. **Put my Desk back.** After Apply, Settings, Desk shows `Undo "<name>" from Claude, applied <when>.` with **Put my
+   Desk back** and **Keep it**. Put my Desk back restores the saved values (a key that was unset is unset again,
+   `defaults read` fails for it) and the row goes. Apply again and press **Keep it**: the row goes and nothing
+   else changes. Apply two designs in a row: only the second's undo exists, and it puts back the first design's
+   result. Apply a design that changes nothing: an earlier undo stays. Reset Sanduhr… clears `deskDesignBefore`.
+7. **Font needs install.** Propose `font-needs-font.json`: the banner lists **Fonts to install** with the family
+   and Claude's link as text (it does not open), Apply is disabled with "Apply waits until the font is installed.",
+   and the answer carries `fonts`. Install the font (Font Book): the line and the disabled Apply clear on their own.
+   A preview before that draws in the nearest look the Mac has.
+8. **Replaced.** With one proposal waiting, propose another. The banner shows the newer one only and its
+   notification replaces the older one's; a preview of the older one comes down. (The older request's own answer,
+   `rejected`, `replaced`, is pinned by `DeskDesignReviewTests`; `desk-result.json` holds only the last answer.)
+9. **Busy.** Turn Arrange Desk on and propose: the answer is `rejected`, reason `busy`, and nothing waits.
+10. **Not running.** Quit Sanduhr and propose: after about ten seconds the answer is `queued`, reason
+    `widget_not_responding`, and `desk-request.json` stays (mode `0600`). Start Sanduhr within ten minutes: the
+    banner appears and the file is gone. Leave one for over ten minutes: it is dropped, with no banner and no answer.
+11. **No direct switch.** Settings, Integrations, and every Let Claude… switch on, propose a design: it still waits
+    for Apply. Quitting Sanduhr with one waiting drops it.
+
+## 67. Idle CPU with a slant, a ring and the Desk state (2.37.0)
+
+Dev build against the file store (section 45), Desk on, nothing else open. Measure by CPU time over a few minutes,
+not `ps %cpu` (the idle CPU lesson).
+
+1. Baseline: Sanduhr 2.36.0 or this build with every place straight and every style bar. Note
+   `ps -o cputime= -p <pid>` at the start and ten minutes later.
+2. Slant the Desk's busiest place to -12 and set the meters to ring. Wait a minute for the rebuild to settle, then
+   measure again over ten minutes: the CPU time grows by about what the baseline did (a static shear costs nothing per
+   frame). Repeat with the Desk not slanted and the ring: same.
+3. `desk-state.json` is rewritten only on a setting change: with nothing changing its modification time stays put for
+   the ten minutes, and Activity Monitor, Sample Process shows no `DeskStateExporter` work between ticks.
+4. Poll `get_desk` once a second for a minute: the app's CPU time barely moves (the tool reads a file; it does not
+   wake the app).

@@ -1,0 +1,404 @@
+{
+  "installed_fonts": [
+    "Segoe UI",
+    "Caveat"
+  ],
+  "cases": {
+    "bad-anchor.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.clock.anchor",
+          "message": "must be one of tl, tc, tr, ml, mr, bl, bc, br"
+        },
+        {
+          "field": "layout.claude.anchor",
+          "message": "must be one of tl, tc, tr, ml, mr, bl, bc, br"
+        }
+      ],
+      "fonts": []
+    },
+    "empty.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {}
+    },
+    "font-bad-link.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "font.link",
+          "message": "A link must start with https://."
+        }
+      ],
+      "fonts": []
+    },
+    "font-bundled.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "font": "EsteFont 26"
+      }
+    },
+    "font-installed.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "font": "caveat"
+      }
+    },
+    "font-needs-font.json": {
+      "status": "needs_font",
+      "reasons": [],
+      "fonts": [
+        {
+          "family": "Pacifico",
+          "link": "https://fonts.google.com/specimen/Pacifico"
+        }
+      ],
+      "design": {
+        "font": {
+          "family": "Pacifico",
+          "link": "https://fonts.google.com/specimen/Pacifico"
+        }
+      }
+    },
+    "font-path.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "font",
+          "message": "must be a font family name, not a path, link or list"
+        }
+      ],
+      "fonts": []
+    },
+    "hidden-clears.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "layout": {
+          "clock": {
+            "hidden": true
+          },
+          "claude": {
+            "hidden": true
+          }
+        }
+      }
+    },
+    "ink-bad.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "ink",
+          "message": "must be one #rrggbb color, or two to four colors for a gradient"
+        }
+      ],
+      "fonts": []
+    },
+    "ink-change.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "name": "Calm",
+        "ink": "#ffaa00"
+      }
+    },
+    "ink-gradient.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "ink": [
+          "#9ad7ff",
+          "#ffffff"
+        ],
+        "plate": true,
+        "shadow": false
+      }
+    },
+    "ink-windows-words.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "ink",
+          "message": "auto is a Windows ink word; the Mac Desk's ink is one #rrggbb color, or two to four for a gradient"
+        }
+      ],
+      "fonts": []
+    },
+    "layout-change.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "name": "Dusk",
+        "note": "Warm and low.",
+        "layout": {
+          "clock": {
+            "anchor": "tr",
+            "size": 1.2
+          },
+          "claude": {
+            "anchor": "tr",
+            "hidden": false
+          }
+        }
+      }
+    },
+    "multi-reasons.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.clock.size",
+          "message": "must be a number from 0.6 to 1.6"
+        },
+        {
+          "field": "ink",
+          "message": "must be one #rrggbb color, or two to four colors for a gradient"
+        },
+        {
+          "field": "plate",
+          "message": "must be true or false"
+        }
+      ],
+      "fonts": []
+    },
+    "not-object.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "design",
+          "message": "must be an object"
+        }
+      ],
+      "fonts": []
+    },
+    "null-members.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "layout": {
+          "clock": {
+            "size": 1
+          }
+        }
+      }
+    },
+    "size-out-of-range.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.clock.size",
+          "message": "must be a number from 0.6 to 1.6"
+        },
+        {
+          "field": "layout.claude.size",
+          "message": "must be a number from 0.6 to 1.6"
+        },
+        {
+          "field": "layout.meters.size",
+          "message": "must be a number from 0.6 to 1.6"
+        }
+      ],
+      "fonts": []
+    },
+    "style-on-clock.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.clock.style",
+          "message": "only claude, meters have a style"
+        },
+        {
+          "field": "layout.meters.style",
+          "message": "must be one of bar, slim, ring, ticks"
+        },
+        {
+          "field": "layout.claude.style",
+          "message": "must be one of bar, slim, ring, ticks"
+        }
+      ],
+      "fonts": []
+    },
+    "style.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "layout": {
+          "meters": {
+            "anchor": "mr",
+            "tilt": 18,
+            "style": "slim"
+          },
+          "claude": {
+            "style": "ticks"
+          }
+        }
+      }
+    },
+    "system-weather-pieces.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.system",
+          "message": "arrives in Sanduhr 2.38.0; the Mac Desk does not have it yet"
+        },
+        {
+          "field": "layout.weather",
+          "message": "arrives in Sanduhr 2.38.0; the Mac Desk does not have it yet"
+        },
+        {
+          "field": "layout.telemetry",
+          "message": "is the Windows system piece; the Mac gets a system piece in Sanduhr 2.38.0"
+        },
+        {
+          "field": "layout.launcher",
+          "message": "is a Windows piece; the Mac Desk has no Launcher"
+        },
+        {
+          "field": "layout.glow",
+          "message": "is a Windows piece; the Mac Desk has no glow piece"
+        }
+      ],
+      "fonts": []
+    },
+    "text-fields.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "name",
+          "message": "must be at most 40 characters"
+        },
+        {
+          "field": "note",
+          "message": "must be one line, with no control characters"
+        }
+      ],
+      "fonts": []
+    },
+    "tilt-conflict.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.clock.tilt",
+          "message": "the pieces at ml share one slant; give clock and claude and meters the same tilt"
+        }
+      ],
+      "fonts": []
+    },
+    "tilt-out-of-range.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.clock.tilt",
+          "message": "must be a number of degrees from -20 to 20 (0 is upright)"
+        },
+        {
+          "field": "layout.claude.tilt",
+          "message": "must be a number of degrees from -20 to 20 (0 is upright)"
+        }
+      ],
+      "fonts": []
+    },
+    "tilt.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "layout": {
+          "clock": {
+            "anchor": "ml",
+            "tilt": -18
+          },
+          "claude": {
+            "anchor": "ml",
+            "tilt": -18
+          },
+          "meters": {
+            "anchor": "mr",
+            "tilt": 18
+          }
+        }
+      }
+    },
+    "unknown-field.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "design",
+          "message": "unknown field(s): command, plat. The fields are name, note, layout, font, ink, plate, shadow."
+        }
+      ],
+      "fonts": []
+    },
+    "unknown-member.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.clock",
+          "message": "unknown member 'color'; use anchor, size, hidden, tilt and style"
+        },
+        {
+          "field": "layout.clock",
+          "message": "unknown member 'zindex'; use anchor, size, hidden, tilt and style"
+        }
+      ],
+      "fonts": []
+    },
+    "unknown-piece.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.toaster",
+          "message": "is not a Desk piece; the pieces are message, clock, claude, meters, nowPlaying, watchers, meetings, companion"
+        }
+      ],
+      "fonts": []
+    },
+    "windows-only-fields.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "weather",
+          "message": "arrives with the weather piece in Sanduhr 2.38.0; the Mac Desk has none yet, so nothing was applied"
+        },
+        {
+          "field": "launcher",
+          "message": "is Windows only: the Mac Desk has no Launcher piece"
+        },
+        {
+          "field": "messages",
+          "message": "is not part of a Mac Desk design; send message lines with propose_desk_messages"
+        },
+        {
+          "field": "looks",
+          "message": "is not part of a Mac Desk design; send song looks with propose_now_playing_looks"
+        },
+        {
+          "field": "theme",
+          "message": "is not part of a Mac Desk design; send a widget theme with propose_theme"
+        }
+      ],
+      "fonts": []
+    },
+    "windows-only-monitor.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.clock",
+          "message": "monitor is Windows only: the Mac Desk has no per-monitor placement; use anchor, size, hidden, tilt and style"
+        }
+      ],
+      "fonts": []
+    }
+  }
+}

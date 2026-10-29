@@ -145,6 +145,7 @@ struct DebugStateInput {
     var pendingMessages = false
     var pendingTheme = false
     var pendingWidget = false
+    var pendingDeskDesign = false
     var menu: [MenuGroup] = []
     /// The submenus every Sanduhr menu shows after Show or Hide Widget, by title (Accounts, Menu Bar
     /// Shows; Settings v2, slice 1). Titles only: the Accounts submenu's labels never appear.
@@ -430,9 +431,10 @@ enum DebugState {
               YAMLPair("meters_installed", .int(meters)), YAMLPair("hooks_installed", .int(hooks))])
     }
 
-    /// `pending_suggestions:` (items 54, 55, 2.36.0): whether a suggestion from Claude waits, no content.
-    static func pendingSuggestionsYAML(messages: Bool, theme: Bool, widget: Bool = false) -> YAMLNode {
-        .map([YAMLPair("messages", .bool(messages)), YAMLPair("theme", .bool(theme)), YAMLPair("widget", .bool(widget))])
+    /// `pending_suggestions:` (items 54, 55, 2.36.0, 2.37.0): whether a suggestion from Claude waits, no content.
+    static func pendingSuggestionsYAML(messages: Bool, theme: Bool, widget: Bool = false, desk: Bool = false) -> YAMLNode {
+        .map([YAMLPair("messages", .bool(messages)), YAMLPair("theme", .bool(theme)), YAMLPair("widget", .bool(widget)),
+              YAMLPair("desk", .bool(desk))])
     }
 
     /// `whats_new:` (item 57): versions, a count and two flags.
@@ -628,7 +630,7 @@ enum DebugState {
         pairs.append(("vault", vaultYAML(s.vault)))
         pairs.append(("integrations", integrationsYAML(mcp: s.mcpInstalled, statusline: s.statuslineInstalled,
                                                                 meters: s.metersInstalled, hooks: s.hooksInstalled)))
-        pairs.append(("pending_suggestions", pendingSuggestionsYAML(messages: s.pendingMessages, theme: s.pendingTheme, widget: s.pendingWidget)))
+        pairs.append(("pending_suggestions", pendingSuggestionsYAML(messages: s.pendingMessages, theme: s.pendingTheme, widget: s.pendingWidget, desk: s.pendingDeskDesign)))
         pairs.append(("follow", .bool(s.follow)))
         pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("snapshots", .int(s.seatSnapshots)))

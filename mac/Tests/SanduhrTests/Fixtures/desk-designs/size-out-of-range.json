@@ -1,0 +1,13 @@
+{
+  "layout": {
+    "clock": {
+      "size": 9
+    },
+    "claude": {
+      "size": 0.5
+    },
+    "meters": {
+      "size": "big"
+    }
+  }
+}
