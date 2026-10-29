@@ -178,7 +178,11 @@ enum DeskDesignApply {
             }
         }
         let fa = a.family(available: available)
-        if let asked = b.font, asked.lowercased() != fa.lowercased() { lines.append("Font: \(fontName(fa)) to \(fontName(asked))") }
+        // A design that names no font carries the saved value over, which may be a family no longer installed
+        // (it draws as EsteFont Pro): only a change in the saved value is a change.
+        if let asked = b.font, asked != a.font, asked.lowercased() != fa.lowercased() {
+            lines.append("Font: \(fontName(fa)) to \(fontName(asked))")
+        }
         if a.inkWords != b.inkWords { lines.append("Ink: \(a.inkWords.joined(separator: ", ")) to \(b.inkWords.joined(separator: ", "))") }
         if a.plate != b.plate { lines.append("\(DeskPlate.title): \(b.plate ? "on" : "off")") }
         if a.shadow != b.shadow { lines.append("\(DeskInkShadow.title): \(b.shadow ? "on" : "off")") }

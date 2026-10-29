@@ -133,6 +133,17 @@ struct DeskDesignReviewTests {
         #expect(try TJ.get(w.result(), ["result", "changes"]) == nil)
     }
 
+    @Test func aSavedFontNoLongerInstalledIsNotAChangeWhenTheDesignNamesNone() {
+        let look = DeskDesignLook(arrangement: DeskArrangement(DeskLayout.standard), font: "Gone Family 2.1",
+                                  ink: "ffffff", plate: false, shadow: true)
+        var next = look
+        next.plate = true
+        let lines = DeskDesignApply.changes(from: look, to: next, available: { _ in false })
+        #expect(!lines.contains { $0.hasPrefix("Font:") })
+        next.font = "Menlo"
+        #expect(DeskDesignApply.changes(from: look, to: next, available: { _ in false }).contains("Font: EsteFont Pro to Menlo"))
+    }
+
     @Test func theRequestFileIsTakenAndTheResultIsOwnerOnly() throws {
         let w = World()
         try FileManager.default.createDirectory(at: w.handoff.paths.support, withIntermediateDirectories: true)
