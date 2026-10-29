@@ -429,6 +429,73 @@ struct DeskDesignReviewTests {
         #expect(store.object(forKey: "layout") == nil && store.object(forKey: "plate") == nil)
     }
 
+    // MARK: - Put my Desk back
+
+    @Test func applyThenPutBackRestoresEveryChangedKeyAndAbsentStaysAbsent() throws {
+        let w = World()
+        w.defaults.set("ffffff", forKey: "inkColor")   // font, plate and inkShadow are absent
+        w.send("u1", Self.dusk)
+        #expect(w.defaults.string(forKey: "deskDesignBefore") == nil, "a preview records nothing")
+        w.handoff.apply()
+        let undo = try #require(DeskDesignApply.Undo.read(w.defaults))
+        #expect(undo.name == "Dusk" && undo.at == Self.now)
+        #expect(w.defaults.string(forKey: "font") == "Menlo")
+        undo.putBack(in: w.defaults)
+        #expect(w.layout == "message:tl clock:bl claude:bl meetings:bl")
+        #expect(w.defaults.string(forKey: "inkColor") == "ffffff")
+        #expect(w.defaults.object(forKey: "font") == nil && w.defaults.object(forKey: "plate") == nil && w.defaults.object(forKey: "inkShadow") == nil)
+        #expect(w.defaults.object(forKey: "deskDesignBefore") == nil)
+        #expect(w.defaults.double(forKey: "left") == 52)
+    }
+
+    @Test func onlyTheKeysTheDesignChangesAreSaved() throws {
+        let w = World()
+        w.defaults.set("Georgia", forKey: "font")
+        w.send("u2", #"{"name":"Plain","plate":true}"#)
+        w.handoff.apply()
+        w.defaults.set("Helvetica Neue", forKey: "font")   // changed by hand afterwards
+        try #require(DeskDesignApply.Undo.read(w.defaults)).putBack(in: w.defaults)
+        #expect(w.defaults.object(forKey: "plate") == nil)
+        #expect(w.defaults.string(forKey: "font") == "Helvetica Neue", "a key the design did not change is not touched")
+    }
+
+    @Test func keepItClearsOnlyTheSnapshot() throws {
+        let w = World()
+        w.send("u3", Self.dusk)
+        w.handoff.apply()
+        let after = w.snapshot().mutableCopy() as! NSMutableDictionary
+        after.removeObject(forKey: "deskDesignBefore")
+        DeskDesignApply.keepIt(in: w.defaults)
+        #expect(w.snapshot().isEqual(after))
+        #expect(DeskDesignApply.Undo.read(w.defaults) == nil)
+    }
+
+    @Test func aSecondApplyReplacesTheSnapshot() throws {
+        let w = World()
+        w.send("u4", #"{"name":"One","plate":true}"#)
+        w.handoff.apply()
+        w.send("u5", #"{"name":"Two","shadow":false}"#)
+        w.handoff.apply()
+        let undo = try #require(DeskDesignApply.Undo.read(w.defaults))
+        #expect(undo.name == "Two")
+        undo.putBack(in: w.defaults)
+        #expect(w.defaults.bool(forKey: "plate") == true, "the first design stays; only the second is undone")
+        #expect(w.defaults.object(forKey: "inkShadow") == nil)
+    }
+
+    @Test func theCaptionNamesTheDesignAndWhenItWasApplied() throws {
+        let w = World()
+        w.send("u6", Self.dusk)
+        w.handoff.apply()
+        let undo = try #require(DeskDesignApply.Undo.read(w.defaults))
+        #expect(undo.caption(now: Self.now.addingTimeInterval(120)) == "Undo \"Dusk\" from Claude, applied 2 minutes ago.")
+    }
+
+    @Test func resetRemovesTheSnapshotWithTheDeskDomain() {
+        // Reset clears the whole com.626labs.sanduhr.desk domain (Reset.swift), and the snapshot is a key in it.
+        #expect(Reset.deskDomain == "com.626labs.sanduhr.desk")
+    }
+
     @Test func theDebugSnapshotFlagsAWaitingDesignAndNothingElse() {
         let flags = DebugState.pendingSuggestionsYAML(messages: false, theme: false, widget: false, desk: true)
         let text = YAMLEmitter.emit(flags)

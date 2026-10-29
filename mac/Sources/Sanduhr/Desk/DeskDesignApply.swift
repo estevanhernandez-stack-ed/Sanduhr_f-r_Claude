@@ -82,6 +82,68 @@ enum DeskDesignApply {
         if next.shadow != current.shadow { defaults.set(next.shadow, forKey: DeskLook.shadowKey) }
     }
 
+    // MARK: - Put my Desk back
+
+    /// The Desk suite key holding the values the last applied design replaced (JSON text).
+    static let beforeKey = "deskDesignBefore"
+
+    /// The suite keys a design writes, in the order `write` checks them.
+    static func changedKeys(_ next: DeskDesignLook, over current: DeskDesignLook) -> [String] {
+        var keys: [String] = []
+        if next.arrangement.string != current.arrangement.string { keys.append(DeskArrangeMode.layoutKey) }
+        if next.font != current.font, next.font != nil { keys.append(DeskFont.key) }
+        if next.ink != current.ink { keys.append(DeskLook.inkKey) }
+        if next.plate != current.plate { keys.append(DeskPlate.key) }
+        if next.shadow != current.shadow { keys.append(DeskLook.shadowKey) }
+        return keys
+    }
+
+    /// Saves the stored values of the keys a design is about to change (an absent key is recorded as absent), with the
+    /// design's name and the time. Replaces an earlier snapshot; a design that changes nothing leaves it alone.
+    static func recordBefore(_ next: DeskDesignLook, over current: DeskDesignLook, name: String?, now: Date, in store: DefaultsStore) {
+        let keys = changedKeys(next, over: current)
+        guard !keys.isEmpty else { return }
+        var values: [String: Any] = [:]
+        for k in keys { values[k] = store.object(forKey: k) ?? NSNull() }
+        let root: [String: Any] = ["name": name ?? "", "at": ISO8601.stamp(now), "keys": values]
+        guard let data = try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys]) else { return }
+        store.set(String(decoding: data, as: UTF8.self), forKey: beforeKey)
+    }
+
+    /// What `Put my Desk back` would restore.
+    struct Undo {
+        let name: String?
+        let at: Date?
+        fileprivate let values: [String: Any]
+
+        /// The snapshot in `store`, nil with none (or one that cannot be read).
+        static func read(_ store: DefaultsStore) -> Undo? {
+            guard let text = store.object(forKey: DeskDesignApply.beforeKey) as? String,
+                  let obj = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
+                  let keys = obj["keys"] as? [String: Any] else { return nil }
+            let name = (obj["name"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            return Undo(name: name, at: (obj["at"] as? String).flatMap(ISO8601.parse), values: keys)
+        }
+
+        /// Writes the saved values back (removing keys that were absent) and clears the snapshot; nothing else.
+        func putBack(in store: DefaultsStore) {
+            let known = [DeskArrangeMode.layoutKey, DeskFont.key, DeskLook.inkKey, DeskPlate.key, DeskLook.shadowKey]
+            for (k, v) in values where known.contains(k) { store.set(v is NSNull ? nil : v, forKey: k) }
+            store.set(nil, forKey: DeskDesignApply.beforeKey)
+        }
+
+        /// The caption under the button.
+        func caption(now: Date = Date()) -> String {
+            let f = RelativeDateTimeFormatter()
+            f.unitsStyle = .full
+            let when = at.map { f.localizedString(for: $0, relativeTo: now) } ?? "earlier"
+            return "Undo \"\(name ?? "a design")\" from Claude, applied \(when)."
+        }
+    }
+
+    /// Keep it: drops the snapshot and changes nothing else.
+    static func keepIt(in store: DefaultsStore) { store.set(nil, forKey: beforeKey) }
+
     // MARK: - What changes
 
     /// The "what changed" lines for the banner: one plain sentence per difference, pieces first (in the Desk's

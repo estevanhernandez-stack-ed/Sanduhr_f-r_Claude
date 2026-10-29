@@ -18,6 +18,7 @@ struct DeskLayoutSection: View {
         let arranging = DeskController.shared.model.arrange.active
         Form {
             DeskDesignSuggestionSection()
+            DeskDesignUndoSection()
             Section {
                 Toggle(SettingsNames.deskSwitch, isOn: $deskOn)
                     .onChange(of: deskOn) { _, _ in DeskController.shared.apply() }
@@ -73,6 +74,25 @@ private struct DeskDesignSuggestionSection: View {
                     endPreview: { handoff.endPreview() },
                     apply: { handoff.apply() },
                     dismiss: { handoff.dismiss() })
+            }
+        }
+    }
+}
+
+/// "Put my Desk back", only while the last applied Claude design's snapshot exists (`deskDesignBefore`). No search entry.
+private struct DeskDesignUndoSection: View {
+    @AppStorage(DeskDesignApply.beforeKey, store: .desk) private var before = ""
+
+    var body: some View {
+        if !before.isEmpty, let undo = DeskDesignApply.Undo.read(UserDefaults.desk) {
+            Section {
+                Text(undo.caption()).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button("Put my Desk back") { undo.putBack(in: UserDefaults.desk) }
+                    Button("Keep it") { DeskDesignApply.keepIt(in: UserDefaults.desk) }
+                    Spacer()
+                }
             }
         }
     }

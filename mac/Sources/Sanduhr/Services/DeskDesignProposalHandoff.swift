@@ -308,6 +308,7 @@ final class DeskDesignProposalHandoff {
         let current = DeskDesignLook.read(defaults)
         let next = DeskDesignApply.merged(current, p.design)
         let changes = DeskDesignApply.changes(from: current, to: next, available: { [self] in fontInstalled($0) })
+        DeskDesignApply.recordBefore(next, over: current, name: p.design.name, now: now(), in: defaults)
         DeskDesignApply.write(next, over: current, to: defaults)
         endPreview()   // the preview gives way to what was written
         onDecided?(p.id)
