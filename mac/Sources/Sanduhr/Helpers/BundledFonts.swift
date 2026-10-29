@@ -138,6 +138,11 @@ enum DeskFont {
     nonisolated(unsafe) private static var cache: [String: Bool] = [:]
     nonisolated(unsafe) private static var generation = 0
     nonisolated(unsafe) private static var watcher: NSObjectProtocol?
+    // Families of font packs released this session, lowercased. CoreText can't be trusted to drop
+    // them: after the font set notice that follows launch, unregistering a pack's file fails with
+    // "not registered" (201) while the family list goes on naming it, so the Desk kept drawing an
+    // uninstalled pack's font. A registration takes its families back out.
+    nonisolated(unsafe) private static var withdrawn: Set<String> = []
 
     /// Whether a font family is available to this process (installed, or registered from the
     /// bundle or a font pack). Asked of CoreText's family list: NSFontManager goes on listing a
@@ -153,6 +158,7 @@ enum DeskFont {
                 DeskFont.forgetAvailability()
             }
         }
+        if withdrawn.contains(family.lowercased()) { lock.unlock(); return false }
         if let hit = cache[family] { lock.unlock(); return hit }
         let asked = generation
         lock.unlock()
@@ -170,6 +176,17 @@ enum DeskFont {
         (CTFontManagerCopyAvailableFontFamilyNames() as? [String] ?? []).contains(family)
     }
 
+    /// A font pack's families stop counting as available, whatever CoreText says (see `withdrawn`).
+    /// A pack that duplicates an installed family hides it until the next launch.
+    static func withdraw(_ families: [String]) {
+        lock.lock(); withdrawn.formUnion(families.map { $0.lowercased() }); lock.unlock()
+    }
+
+    /// A registered pack's families count again.
+    static func restore(_ families: [String]) {
+        lock.lock(); withdrawn.subtract(families.map { $0.lowercased() }); lock.unlock()
+    }
+
     /// The font set changed (a pack registered or released, Font Book, the bundled fonts): the
     /// cache is dropped and every view that resolved a family redraws with the new answer.
     static func forgetAvailability() {
@@ -179,11 +196,12 @@ enum DeskFont {
 
     /// The font families for the Desk and widget pickers: the bundled families first (EsteFont
     /// Pro, then EsteFont 26), then everything installed and the installed font packs' families,
-    /// sorted, without a second copy of any name.
+    /// sorted, without a second copy of any name or a released pack's family.
     static func pickerFamilies(installed: [String], packs: [String] = PackFonts.shared.families) -> [String] {
         let bundled = BundledFonts.families.map(\.name)
+        lock.lock(); let gone = withdrawn; lock.unlock()
         var rest: [String] = []
-        for name in installed + packs where !bundled.contains(name)
+        for name in installed.filter({ !gone.contains($0.lowercased()) }) + packs where !bundled.contains(name)
             && !rest.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
             rest.append(name)
         }

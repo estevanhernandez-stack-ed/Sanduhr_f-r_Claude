@@ -12,7 +12,7 @@
 
 - **Meter styles.** The Claude line and the meters take a Style: Bar (as before), Slim, Ring or Ticks. Every style keeps the pace mark and the nearly-full warning, and nothing animates in the new ones. The slant and the style are two more fields of the existing layout setting, so an older build keeps reading the rest.
 
-- **Font packs.** Font packs from the widget catalog load for Sanduhr only, never installed on your Mac, and unload when you uninstall them. Their families join the Desk and widget font lists. A face the system refuses is left out, and the pack's row says so.
+- **Font packs.** Font packs from the widget catalog load for Sanduhr only, never installed on your Mac, and leave its font lists, the Desk and the message the moment you uninstall them. An updated pack shows its new letters after Sanduhr restarts. Their families join the Desk and widget font lists. A face the system refuses is left out, and the pack's row says so.
 
 - **For the smoke harness.** `smoke/smoke state` has `pending_suggestions.desk`, a flag that is true while a Claude-made Desk design waits. Never its content.
 

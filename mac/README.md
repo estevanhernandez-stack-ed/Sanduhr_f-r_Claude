@@ -1984,7 +1984,11 @@ A pack of kind `font` in the widget catalog (Settings, Widgets) is loaded for Sa
 when the app quits. Windows copies the fonts into a cache first because WPF holds the file open; Core Text holds
 nothing open, so the faces are registered from the pack's own folder, and `release` unloads them before an install
 replaces or an uninstall removes the folder. `sync` runs at launch (before any view draws) and whenever the installed
-packs change (`WidgetsModel.refreshPackLists`), and unloads a pack that is gone, switched off or changed. The families
+packs change (`WidgetsModel.refreshPackLists`), and unloads a pack that is gone, switched off or changed. Core Text
+can refuse that: after the system's font set notice that follows launch, `CTFontManagerUnregisterFontsForURL` answers
+201 (not registered) and the family stays listed. So a released pack's families go into `DeskFont`'s withdrawn set,
+which `isAvailable` and the pickers honour until the pack registers again; a pack updated in place may draw its old
+faces until relaunch, and one that duplicates an installed family hides it until relaunch. The families
 join `DeskFont.pickerFamilies`, so the Desk and widget font pickers and `desk-state.json` list them. A face Core Text
 refuses is counted per face and left out; the pack's row says "One font couldn't be loaded and is left out." (or the
 count). A font already available to the process (installed in Font Book) is harmless and draws. The test fixtures are a

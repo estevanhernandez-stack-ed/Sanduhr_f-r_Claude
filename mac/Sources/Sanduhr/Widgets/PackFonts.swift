@@ -59,6 +59,7 @@ final class PackFonts: @unchecked Sendable {
         let wanted = Dictionary(packs.map { ($0.row.id, Self.stamp($0)) }, uniquingKeysWith: { a, _ in a })
         for (id, entry) in loaded where wanted[id] != entry.stamp {
             entry.urls.forEach(unregister)
+            DeskFont.withdraw(entry.families)
             loaded[id] = nil
             changed = true
         }
@@ -77,6 +78,7 @@ final class PackFonts: @unchecked Sendable {
         lock.lock()
         let entry = loaded.removeValue(forKey: packId)
         entry?.urls.forEach(unregister)
+        if let entry { DeskFont.withdraw(entry.families) }
         lock.unlock()
         if entry != nil { DeskFont.forgetAvailability() }
     }
@@ -93,6 +95,7 @@ final class PackFonts: @unchecked Sendable {
                 families.append(name)
             }
         }
+        DeskFont.restore(families)
         return Loaded(packId: pack.row.id, stamp: Self.stamp(pack), urls: urls, families: families, refused: refused)
     }
 

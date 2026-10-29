@@ -9,6 +9,8 @@ import Testing
 /// `Fixtures/font-packs/real-font` (a tiny generated font, OFL-1.1) and `refused-font` (a font file cut
 /// short that still carries a valid magic number, so it passes the pack checks and CoreText refuses it).
 /// Serialized: process-scope registration is shared by every test in the process.
+/// Gone is asserted as `DeskFont.isAvailable`, not CoreText's list: once the system's font set notice
+/// has come, CoreText refuses to unregister a pack's file and goes on listing its family.
 @Suite("Font packs", .serialized)
 struct PackFontsTests {
     static let family = "Fixture Pack Sans"
@@ -49,7 +51,7 @@ struct PackFontsTests {
         let store = root.store()
         let fonts = PackFonts()
         try Self.install("real-font", in: store)
-        #expect(!Self.processKnows(Self.family))
+        #expect(!DeskFont.isAvailable(Self.family))
 
         #expect(fonts.sync(store))
         #expect(fonts.families == [Self.family])
@@ -62,7 +64,7 @@ struct PackFontsTests {
 
         fonts.release("real-font")
         #expect(fonts.families.isEmpty)
-        #expect(!Self.processKnows(Self.family))
+        #expect(!DeskFont.isAvailable(Self.family))
     }
 
     /// A pack font picked for the Desk and the message draws while installed and falls back the
@@ -80,10 +82,36 @@ struct PackFontsTests {
         #expect(DeskFont.resolveMessage(saved: Self.family, desk: "EsteFont Pro") == Self.family)
 
         fonts.release("real-font")
-        #expect(!DeskFont.coreTextHas(Self.family))
+        #expect(!DeskFont.isAvailable(Self.family))
         #expect(!DeskFont.isAvailable(Self.family))
         #expect(DeskFont.resolve(saved: Self.family) == DeskFont.defaultFamily)
         #expect(DeskFont.resolveMessage(saved: Self.family, desk: "EsteFont Pro") == "EsteFont Pro")
+    }
+
+    // On a running app CoreText answers the unregister with "not registered" and keeps listing the
+    // family; the pack's font falls back all the same, and a reinstall brings it back.
+    @Test func aReleasedPackFontFallsBackEvenWhenCoreTextKeepsListingIt() throws {
+        let root = WidgetTestRoot()
+        let store = root.store()
+        var skipped: [URL] = []
+        let fonts = PackFonts(unregister: { skipped.append($0) })
+        defer { skipped.forEach(PackFonts.coreTextUnregister) }
+        try Self.install("real-font", in: store)
+        #expect(fonts.sync(store))
+        #expect(DeskFont.isAvailable(Self.family))
+
+        fonts.release("real-font")
+        #expect(DeskFont.coreTextHas(Self.family))
+        #expect(!DeskFont.isAvailable(Self.family))
+        #expect(DeskFont.resolve(saved: Self.family) == DeskFont.defaultFamily)
+        #expect(DeskFont.resolveMessage(saved: Self.family, desk: "EsteFont Pro") == "EsteFont Pro")
+        #expect(!DeskFont.pickerFamilies(installed: [Self.family, "Menlo"], packs: fonts.families).contains(Self.family))
+
+        #expect(fonts.sync(store))
+        #expect(DeskFont.pickerFamilies(installed: [Self.family], packs: fonts.families).contains(Self.family))
+        #expect(DeskFont.isAvailable(Self.family))
+        fonts.release("real-font")
+        #expect(!DeskFont.isAvailable(Self.family))
     }
 
     @Test func messageFontIsItsOwnPickWhileAvailableElseTheDesks() {
@@ -147,7 +175,7 @@ struct PackFontsTests {
         #expect(fonts.sync(store))
         #expect(fonts.families.isEmpty)
         #expect(!DeskFont.pickerFamilies(installed: ["Menlo"], packs: fonts.families).contains(Self.family))
-        #expect(!Self.processKnows(Self.family))
+        #expect(!DeskFont.isAvailable(Self.family))
 
         try Data(on.utf8).write(to: store.registryFile)
         fonts.sync(store)
@@ -185,7 +213,7 @@ struct PackFontsTests {
 
         #expect(store.uninstall("real-font").ok)
         fonts.sync(store)
-        #expect(!Self.processKnows(Self.family))
+        #expect(!DeskFont.isAvailable(Self.family))
         #expect(!DeskFont.isAvailable(Self.family))
         #expect(fonts.families.isEmpty)
     }
@@ -204,13 +232,15 @@ struct PackFontsTests {
         #expect(Self.processKnows(Self.family))
         #expect(fonts.families == [Self.family])
         fonts.release("real-font")
-        #expect(!Self.processKnows(Self.family))
+        #expect(!DeskFont.isAvailable(Self.family))
     }
 
     @Test func pickerListsPutPackFamiliesAfterTheBuiltInsOnceEach() {
-        let list = DeskFont.pickerFamilies(installed: ["Zapfino", "Menlo", "fixture pack sans"],
-                                           packs: [Self.family, "Menlo", "Aardvark Sans"])
-        #expect(list == ["EsteFont Pro", "EsteFont 26", "Aardvark Sans", "fixture pack sans", "Menlo", "Zapfino"])
+        // Not the fixture's family: a test before this one may have released it, and a released
+        // pack's family is left out of the pickers.
+        let list = DeskFont.pickerFamilies(installed: ["Zapfino", "Menlo", "quill pack sans"],
+                                           packs: ["Quill Pack Sans", "Menlo", "Aardvark Sans"])
+        #expect(list == ["EsteFont Pro", "EsteFont 26", "Aardvark Sans", "Menlo", "quill pack sans", "Zapfino"])
         #expect(DeskFont.pickerFamilies(installed: [], packs: [Self.family, "EsteFont Pro"])
             == ["EsteFont Pro", "EsteFont 26", Self.family])
         #expect(DeskFont.pickerFamilies(installed: [], packs: []) == ["EsteFont Pro", "EsteFont 26"])
@@ -235,7 +265,7 @@ struct PackFontsTests {
         model.uninstall("real-font")
         #expect(model.notice == nil)
         #expect(fonts.families.isEmpty)
-        #expect(!Self.processKnows(Self.family))
+        #expect(!DeskFont.isAvailable(Self.family))
         #expect(!DeskFont.pickerFamilies(installed: [], packs: fonts.families).contains(Self.family))
     }
 
