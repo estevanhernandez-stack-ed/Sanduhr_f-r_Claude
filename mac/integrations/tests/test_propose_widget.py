@@ -252,6 +252,8 @@ class ProposeWidget(Base):
             source = f.read()
         body = re.search(r"private const string WidgetGuide =\n(.*?);\n", source, re.S).group(1)
         windows = "".join(re.findall(r'^\s*"(.*)"\s*\+?\s*$', body, re.M))
+        # The one platform word: Windows 4.0 files widgets under Mods & Widgets, Installed; the Mac page is Widgets.
+        windows = windows.replace("Settings, Mods & Widgets, Installed", "Settings, Widgets")
         self.assertEqual(mcp.WIDGET_GUIDE, windows)
 
 
