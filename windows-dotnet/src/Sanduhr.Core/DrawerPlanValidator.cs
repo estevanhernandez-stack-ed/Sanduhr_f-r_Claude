@@ -40,6 +40,26 @@ public static class DrawerPaths
     public static bool IsInside(string path, string root) =>
         string.Equals(path, root, StringComparison.OrdinalIgnoreCase)
         || path.StartsWith(root + "\\", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The check each move makes just before it runs, on <b>final</b> paths (junctions, links and 8.3 names resolved by the App), so a
+    /// link swapped in after the plan was checked is caught (spec section 1). The source must sit directly on the Desktop or in a home;
+    /// the target must be a home, or the Desktop when <paramref name="toDesktop"/> (undo and turning off). Null allows the move.
+    /// </summary>
+    public static string? MoveAllowed(string finalSource, string finalTargetDir, string finalDesktop, IReadOnlyList<string> finalHomes, bool toDesktop)
+    {
+        var source = Normalize(finalSource);
+        var target = Normalize(finalTargetDir);
+        var desktop = Normalize(finalDesktop);
+        if (source is null || target is null || desktop is null) return DrawerSkip.Outside;
+        var homes = finalHomes.Select(Normalize).OfType<string>().ToArray();
+        bool fromOk = IsChildOf(source, desktop) || homes.Any(h => IsChildOf(source, h));
+        bool toOk = homes.Any(h => string.Equals(h, target, StringComparison.OrdinalIgnoreCase))
+            || (toDesktop && string.Equals(desktop, target, StringComparison.OrdinalIgnoreCase));
+        // A source that is or holds a home would swallow a drawer.
+        bool swallows = homes.Any(h => IsInside(h, source));
+        return fromOk && toOk && !swallows ? null : DrawerSkip.Outside;
+    }
 }
 
 /// <summary>A checked plan: when <see cref="Ok"/>, the drawers to create and the moves to run (no-ops dropped) and the shared
@@ -60,6 +80,9 @@ public static class DrawerPlanValidator
 
     public static DrawerPlanCheck Check(DrawerPlan plan, DrawerRoots roots, IReadOnlyList<DrawerDef> existing)
     {
+        // A decoder bug or a hand-built plan must refuse, never throw (plan 1's final review, deferred minor).
+        if (plan.Drawers is null || plan.Moves is null || plan.Drawers.Any(d => d is null) || plan.Moves.Any(m => m is null))
+            return Refuse("A plan entry is empty.");
         if (plan.Source == DrawerPlanSource.Agent && (string.IsNullOrWhiteSpace(plan.Agent) || plan.Agent.Length > MaxAgentName))
             return Refuse("An agent plan needs the agent's name, at most 40 characters.");
         if (plan.Drawers.Count > MaxDrawers) return Refuse($"A plan can hold at most {MaxDrawers} drawers.");

@@ -12,6 +12,9 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
 {
     public const string Key = "drawers";
 
+    /// <summary>The drawers shown folded (title bar and count only), by id.</summary>
+    public IReadOnlyList<string> Folded { get; init; } = [];
+
     public static DrawerSettings Default { get; } = new(false, null, [], DrawerRules.Defaults, false, false);
 
     /// <summary>The default root (decision KNT1mDtN3kQ0rlz2sePq): a Drawers folder on the Desktop itself, so after any uninstall,
@@ -32,7 +35,12 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
             o["drawers"] is JsonArray ds ? ds.OfType<JsonObject>().Select(DecodeDrawer).OfType<DrawerDef>().DistinctBy(d => d.Id).ToArray() : [],
             o["rules"] is JsonArray rs ? rs.OfType<JsonObject>().Select(DecodeRule).OfType<DrawerRule>().ToArray() : DrawerRules.Defaults,
             unlocked && SettingsJson.Bool(o, "auto_tidy", false),
-            unlocked);
+            unlocked)
+        {
+            Folded = o["folded"] is JsonArray fs
+                ? [.. fs.OfType<JsonValue>().Select(v => v.TryGetValue<string>(out var s) ? s : null).Where(DrawerIds.IsValid).OfType<string>().Distinct()]
+                : [],
+        };
     }
 
     public JsonObject Encode() => new()
@@ -49,6 +57,7 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
         })]),
         ["auto_tidy"] = AutoTidy,
         ["auto_tidy_unlocked"] = AutoTidyUnlocked,
+        ["folded"] = new JsonArray([.. Folded.Select(f => (JsonNode?)f)]),
     };
 
     private static DrawerDef? DecodeDrawer(JsonObject o)

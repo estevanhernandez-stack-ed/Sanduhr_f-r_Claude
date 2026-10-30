@@ -39,6 +39,9 @@ public sealed class DrawerJournal
         return new DrawerJournal(all);
     }
 
+    /// <summary>The journal without one entry (undone, or its files all gone). An unknown id changes nothing.</summary>
+    public DrawerJournal Without(string id) => new(Entries.Where(e => e.Id != id).ToArray());
+
     public IReadOnlyList<JournalSummaryLine> Summary() =>
         Entries.Select(e => new JournalSummaryLine(e.AtUtc, e.Source, e.Agent, e.Moves.Count)).ToArray();
 
@@ -108,8 +111,8 @@ public sealed record UndoPlan(IReadOnlyList<UndoStep> Steps, IReadOnlyList<UndoS
 /// that is gone or changed since is skipped and named; a taken old place gets a clash name, so undo never overwrites.</summary>
 public static class DrawerUndo
 {
-    public const string MovedSince = "it was moved since.";
-    public const string ChangedSince = "it changed since.";
+    public const string MovedSince = DrawerSkip.MovedSince;
+    public const string ChangedSince = DrawerSkip.ChangedSince;
 
     public static UndoPlan Plan(JournalEntry entry, Func<string, DateTime?> writtenUtc, Func<string, bool> exists)
     {

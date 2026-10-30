@@ -45,5 +45,19 @@ public static class DrawerIds
         return id.Length == 0 ? "drawer" : id;
     }
 
+    /// <summary>An id for <paramref name="name"/> that <paramref name="taken"/> does not hold: <see cref="From"/>, then "-2", "-3" and on,
+    /// cut so the whole stays within 40. Two names with no ASCII letters ("Фото", "写真") get "drawer" and "drawer-2".</summary>
+    public static string Unique(string name, IReadOnlyCollection<string> taken)
+    {
+        var id = From(name);
+        if (!taken.Contains(id)) return id;
+        for (var n = 2; ; n++)
+        {
+            var tail = "-" + n;
+            var candidate = id[..Math.Min(id.Length, MaxLength - tail.Length)].TrimEnd('-') + tail;
+            if (!taken.Contains(candidate)) return candidate;
+        }
+    }
+
     private static bool IsSlugChar(char c) => c is >= 'a' and <= 'z' or >= '0' and <= '9' or '-';
 }
