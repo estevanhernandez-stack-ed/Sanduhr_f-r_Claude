@@ -173,6 +173,29 @@ public sealed class DrawerMoverTests
     });
 
     [Fact]
+    public void A_look_alike_already_in_the_drawer_is_never_journaled_in_place_of_the_moved_file() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var images = Def(box, "Images");
+        box.File(@"Desktop\Drawers\Images\a (3).png", "newer");
+        box.File(@"Desktop\Drawers\Images\a (draft).png", "newer");
+        File.SetLastWriteTimeUtc(Path.Combine(images.Home, "a (3).png"), DateTime.UtcNow.AddHours(1));
+        File.SetLastWriteTimeUtc(Path.Combine(images.Home, "a (draft).png"), DateTime.UtcNow.AddHours(1));
+        var a = box.File(@"Desktop\a.png", "mine");
+        File.SetLastWriteTimeUtc(a, DateTime.UtcNow.AddDays(-2));
+        var existing = new[] { images };
+        var check = Check(box, existing, (a, images));   // a.png is free here, so the plan is a.png
+        File.WriteAllText(Path.Combine(images.Home, "a.png"), "taken since");   // something else took the planned name
+        var mover = new DrawerMover(box.Desktop, (src, dir, name) =>
+        {
+            File.Move(src, Path.Combine(dir, "a (2).png"));
+            return new ShellResult(false, null, unchecked((int)0x80004005));
+        });
+        var run = mover.Apply(check, existing);
+        Assert.Equal(Path.Combine(images.Home, "a (2).png"), Assert.Single(run.Moved).To, ignoreCase: true);
+    });
+
+    [Fact]
     public void The_journal_store_adds_reads_and_removes_entries()
     {
         using var box = new DrawerSandbox();
@@ -181,6 +204,21 @@ public sealed class DrawerMoverTests
         Assert.Equal(e.Id, Assert.Single(store.Load().Entries).Id);
         store.Remove(e.Id);
         Assert.Empty(store.Load().Entries);
+    }
+
+    [Fact]
+    public void A_journal_that_cannot_be_read_is_never_overwritten()
+    {
+        using var box = new DrawerSandbox();
+        var file = Path.Combine(box.Root, "app", "drawers-journal.json");
+        var store = new DrawerJournalStore(file);
+        var first = store.Add(DrawerPlanSource.User, null, [new JournalMove(@"C:\a", @"C:\b", false, DateTime.UtcNow)], DateTime.UtcNow);
+        Assert.NotNull(first);
+        JournalEntry? blocked;
+        using (new FileStream(file, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            blocked = store.Add(DrawerPlanSource.User, null, [new JournalMove(@"C:\c", @"C:\d", false, DateTime.UtcNow)], DateTime.UtcNow);
+        Assert.Null(blocked);
+        Assert.Equal(first!.Id, Assert.Single(store.Load().Entries).Id);
     }
 
     [Fact]

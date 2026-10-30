@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.RegularExpressions;
 using Sanduhr.App.Interop;
 using Sanduhr.Core;
 
@@ -104,44 +105,58 @@ internal sealed class DrawerMover
             try { to = DrawerNames.Free(targetDir, Path.GetFileName(step.To), isFolder, Exists); }   // streamer: key - a file's leaf names its new place, never drawn
             catch (InvalidOperationException) { skipped.Add(new(name, DrawerSkip.CouldNotMove)); continue; }
             DateTime? written = isFolder ? null : File.GetLastWriteTimeUtc(step.From);
+            var before = isFolder ? Names(targetDir) : null;   // a folder has no write time to match, so what was already there rules out a look-alike
             var result = _move(step.From, targetDir, Path.GetFileName(to));   // streamer: key - a file's leaf names its new place, never drawn
 
             // The disk decides, not the Shell report: a source that is gone has moved, and an unjournaled move is one undo cannot reverse.
             if (Exists(step.From)) { skipped.Add(new(name, Reason(step.From))); continue; }
-            if (Landed(result, to, targetDir) is { } at) moved.Add(new JournalMove(step.From, at, isFolder, written));
+            if (Landed(result, to, targetDir, written, before) is { } at) moved.Add(new JournalMove(step.From, at, isFolder, written));
             else skipped.Add(new(name, DrawerSkip.MovedSince));   // gone, and nowhere to be found: moved or removed by someone else
         }
         return new DrawerRun(moved, skipped);
     }
 
-    /// <summary>Where a move that took its source away landed: the path the Shell named, else the planned one, else the item of that
-    /// name in the target folder (the newest when the Shell renamed it on a collision). Null when nothing can be found.</summary>
-    private static string? Landed(ShellResult result, string planned, string targetDir)
+    /// <summary>Where a move that took its source away landed: the path the Shell named, else the planned one, else "name (N).ext" in the
+    /// target folder. A file counts only when its write time is the moved file's; a folder only when it was not in the folder before the
+    /// move. Anything else could be someone else's item. Null when nothing qualifies.</summary>
+    private static string? Landed(ShellResult result, string planned, string targetDir, DateTime? written, HashSet<string>? before)
     {
         if (result.NewPath is { } named && Exists(named)) return named;
-        if (Exists(planned)) return planned;
         var leaf = Path.GetFileName(planned);   // streamer: key - a file's leaf locates it in its folder, never drawn
         var stem = Path.GetFileNameWithoutExtension(leaf);   // streamer: key - a file's leaf locates it in its folder, never drawn
         var ext = Path.GetExtension(leaf);   // streamer: key - a file's leaf locates it in its folder, never drawn
+        var numbered = new Regex("^" + Regex.Escape(stem) + @" \(\d+\)" + Regex.Escape(ext) + "$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        bool Ours(string p)
+        {
+            if (!Exists(p)) return false;
+            if (before is not null) return !before.Contains(Path.GetFileName(p));   // streamer: key - compared with the earlier listing, never drawn
+            return written is { } w && File.GetLastWriteTimeUtc(p) == w;
+        }
+        if (Ours(planned)) return planned;
         try
         {
             return Directory.EnumerateFileSystemEntries(targetDir)
                 .Where(p =>
                 {
                     var n = Path.GetFileName(p);   // streamer: key - compared with the planned name, never drawn
-                    return string.Equals(n, leaf, StringComparison.OrdinalIgnoreCase)
-                        || (n.StartsWith(stem + " (", StringComparison.OrdinalIgnoreCase) && n.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
+                    return numbered.IsMatch(n) && Ours(p);
                 })
-                .OrderByDescending(p => File.GetLastWriteTimeUtc(p))
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
                 .FirstOrDefault();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }
     }
 
+    private static HashSet<string> Names(string dir)
+    {
+        try { return Directory.EnumerateFileSystemEntries(dir).Select(p => Path.GetFileName(p)).ToHashSet(StringComparer.OrdinalIgnoreCase); }   // streamer: key - a listing compared by name, never drawn
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return []; }
+    }
+
     private static string Reason(string path) => ShellFiles.Holder(path) is { } app ? DrawerSkip.OpenIn(app) : DrawerSkip.CouldNotMove;
 
     /// <summary>Removes a folder that holds nothing but Windows' own housekeeping files (desktop.ini, Thumbs.db), which Windows writes into
-    /// folders it shows; they are never a user's. False when anything else is in it or it cannot be removed.</summary>
+    /// folders it shows: Windows' own folder settings files. False when anything else is in it or it cannot be removed.</summary>
     private static bool RemoveIfEmpty(string dir)
     {
         try
