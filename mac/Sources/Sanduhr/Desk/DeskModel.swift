@@ -179,6 +179,12 @@ final class DeskModel {
     /// What plays, after Now Playing's hide rules (NowPlayingController), nil for nothing to show.
     /// In memory only.
     var nowPlaying: NowPlayingInfo?
+    /// The system piece's newest reading (CPU, memory, disk), nil while it is not sampled. In memory
+    /// only: read locally, never sent or stored.
+    var telemetry: TelemetrySample?
+    /// Runs only while the Desk runs and the layout places the system piece (`syncTelemetry`).
+    @ObservationIgnored var telemetrySampler = TelemetrySampler()
+    @ObservationIgnored private var telemetryLayout: String?
     /// The watchers that show (item 66), most urgent first: every watcher but the work ones while
     /// demo mode is on (WatcherBoard.shown). In memory only. Set by WatcherStore.
     var watchers: [Watcher] = []
@@ -282,6 +288,7 @@ final class DeskModel {
         timer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
             self?.refreshEvents()
         }
+        syncTelemetry()
         MessageEngine.ensureFile()
         refreshClaude()
         refreshMessage()
@@ -302,7 +309,32 @@ final class DeskModel {
         guard defaultsObserver == nil else { return }
         defaultsObserver = NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
-        ) { [weak self] _ in self?.refreshMeterWarnings() }
+        ) { [weak self] _ in
+            self?.refreshMeterWarnings()
+            self?.syncTelemetry()
+        }
+    }
+
+    /// Whether the system piece wants readings: the Desk runs (`timer` exists), the saved layout places
+    /// it and demo mode is off (demo shows made-up readings). Starts or stops the sampler to match, so
+    /// there is no timer while the Desk is hidden or the piece is not placed. Cheap when the layout is
+    /// unchanged, which is what most defaults changes are.
+    func syncTelemetry() {
+        applyTelemetry(running: timer != nil,
+                       layout: UserDefaults.desk.string(forKey: "layout") ?? DeskLayout.standard)
+    }
+
+    /// `syncTelemetry` with its inputs given, so the rule tests without a running Desk.
+    func applyTelemetry(running: Bool, layout: String) {
+        if running, layout == telemetryLayout, !demo { return }
+        telemetryLayout = running ? layout : nil
+        let wants = running && !demo && DeskArrangement(layout).placement("telemetry") != nil
+        telemetrySampler.onSample = { [weak self] in self?.setTelemetry($0) }
+        if wants { telemetrySampler.start() } else { telemetrySampler.stop() }
+    }
+
+    private func setTelemetry(_ sample: TelemetrySample?) {
+        if sample != telemetry { telemetry = sample }
     }
 
     private func observeStore() {
@@ -358,6 +390,7 @@ final class DeskModel {
     func stop() {
         companion.hide()
         timer?.invalidate(); timer = nil
+        syncTelemetry()
         claudeTimer?.invalidate(); claudeTimer = nil
         // A block observer is removed by its token; removeObserver(self) would leave it behind
         // and every Desk off and on would add another.
@@ -414,6 +447,9 @@ final class DeskModel {
 
     func setDemo(_ on: Bool, now: Date = Date()) {
         demo = on
+        syncTelemetry()
+        // Demo shows made-up readings; leaving it drops them unless the sampler is running for real.
+        if on { telemetry = Telemetry.demoSample(now: now) } else if !telemetrySampler.isRunning { telemetry = nil }
         setWatchers(allWatchers)
         companion.reload(force: true)
         if on {

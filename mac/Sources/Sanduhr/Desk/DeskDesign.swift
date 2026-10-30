@@ -190,7 +190,9 @@ struct DeskDesign: Equatable {
         let before = r.count
         for key in lo.keys {
             let field = "layout." + clip(key, 24)
-            guard DeskArrangement.known.contains(key) else {
+            // `telemetry` is a Mac layout word now (the System piece) but a design may not carry it until
+            // the design validator learns it, so the refusal is checked first.
+            guard DeskArrangement.known.contains(key), windowsOnlyPieces[key] == nil else {
                 if let why = windowsOnlyPieces[key] {
                     r.append(DeskReason(field, why))
                 } else {

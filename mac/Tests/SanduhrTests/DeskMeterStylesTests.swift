@@ -52,7 +52,7 @@ struct DeskMeterStylesTests {
     }
 
     @Test func onlyTheMeterLikePiecesHaveAStyle() {
-        #expect(DeskMeterStyles.pieces == ["claude", "meters"])
+        #expect(DeskMeterStyles.pieces == ["claude", "meters", "telemetry"])
         #expect(DeskMeterStyle.allCases.map(DeskMeterStyles.name) == ["Bars", "Slim", "Rings", "Ticks"])
     }
 

@@ -55,9 +55,9 @@ enum DeskMeterStyle: String, CaseIterable, Hashable {
 
 /// Words, names and the pieces that take a `DeskMeterStyle`.
 enum DeskMeterStyles {
-    /// The pieces that have a style: the Claude line and the Claude limits. 2.38.0 adds `system`
-    /// here (Windows also lists `telemetry`); everything below reads this one list.
-    static let pieces = ["claude", "meters"]
+    /// The pieces that have a style: the Claude line, the Claude limits and the system piece (layout
+    /// word `telemetry`, as on Windows); everything below reads this one list.
+    static let pieces = ["claude", "meters", "telemetry"]
 
     static func supports(_ widget: String) -> Bool { pieces.contains(widget) }
 
@@ -158,10 +158,12 @@ struct DeskArrangement: Equatable {
     }
 
     /// Where a piece goes when its anchor is not one this build knows: where the standard
-    /// layout puts it (the message top left, the companion bottom center, the rest bottom left with the clock).
+    /// layout puts it (the message top left, the system piece top right as on Windows, the companion
+    /// bottom center, the rest bottom left with the clock).
     static func defaultAnchor(_ widget: String) -> DeskAnchor {
         switch widget {
         case "message": return .tl
+        case "telemetry": return .tr
         case "companion": return .bc
         default: return .bl
         }

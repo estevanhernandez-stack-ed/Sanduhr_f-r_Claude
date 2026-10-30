@@ -226,7 +226,7 @@ struct DeskFoldStyleTests {
     // MARK: Which pieces have a style
 
     @Test func onlyTheMeterLikePiecesHaveAStyle() {
-        #expect(DeskMeterStyles.pieces == ["claude", "meters"])
+        #expect(DeskMeterStyles.pieces == ["claude", "meters", "telemetry"])
         for w in DeskArrangement.known where !DeskMeterStyles.pieces.contains(w) {
             #expect(!DeskMeterStyles.supports(w))
         }
@@ -241,7 +241,7 @@ struct DeskFoldStyleTests {
 
     @Test func theRefusalNamesThePiecesAndTheWords() {
         let noStyle = DeskMeterStyles.refusal(widget: "clock", word: "ring")
-        #expect(noStyle?.contains("claude, meters") == true)
+        #expect(noStyle?.contains("claude, meters, telemetry") == true)
         let unknown = DeskMeterStyles.refusal(widget: "meters", word: "donut")
         #expect(unknown?.contains("bar, slim, ring, ticks") == true)
         #expect(DeskMeterStyles.refusal(widget: "meters", word: " Ticks ") == nil)

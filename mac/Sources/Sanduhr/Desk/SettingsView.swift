@@ -270,7 +270,10 @@ enum DeskMeterStyleSettings {
     }
 
     static func caption(_ widget: String) -> String {
-        widget == "claude"
+        if widget == "telemetry" {
+            return "CPU, memory and disk. Every style shows all three readings; Slim, Rings and Ticks take less room."
+        }
+        return widget == "claude"
             ? "Bars keep the one line. Slim makes it two short rows; Rings and Ticks show the session and week limits as small gauges."
             : "Bars show a reset time; Slim, Rings and Ticks leave it out and take less room. Every style keeps the pace mark and the nearly-full warning."
     }
@@ -506,7 +509,8 @@ enum DeskLayout {
 
     static let widgets: [(key: String, name: String)] = [
         ("message", "Message"), ("clock", "Clock and date"), ("claude", SettingsNames.claudeMetersLine),
-        ("meters", SettingsNames.claudeMetersBars), ("nowPlaying", "Now playing"), ("watchers", "Watchers"),
+        ("meters", SettingsNames.claudeMetersBars), ("nowPlaying", "Now playing"), ("telemetry", SettingsNames.system),
+        ("watchers", "Watchers"),
         ("meetings", "Meetings"), ("companion", "Companion"),
     ]
 
