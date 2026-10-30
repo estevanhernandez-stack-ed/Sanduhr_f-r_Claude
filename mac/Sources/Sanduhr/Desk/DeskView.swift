@@ -53,7 +53,7 @@ struct DeskView: View {
     @AppStorage(DeskController.notchKey, store: .desk) private var island = false
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
 
-    enum Widget: String, CaseIterable { case clock, claude, meters, nowPlaying, watchers, meetings, message, companion }
+    enum Widget: String, CaseIterable { case clock, claude, meters, nowPlaying, telemetry, watchers, meetings, message, companion }
 
     private var inset: CGFloat { timeSize * 0.18 }
 
@@ -275,6 +275,9 @@ struct DeskPiece: View {
         case .claude: claude.deskPieceClickArea(.claudeLine) { model.claudeLineFrame = $0 }.deskInk()
         case .meters: meters.deskInk()
         case .nowPlaying: nowPlaying.deskInk()
+        case .telemetry:
+            DeskTelemetryPiece(sample: model.telemetry, style: style, ink: ink, font: font, timeSize: timeSize,
+                               alignment: alignment).deskInk()
         case .watchers: DeskWatchers(model: model, font: font, size: timeSize * 0.17, alignment: alignment).deskInk()
         case .meetings: meetings.deskInk()
         case .message: message.deskPieceClickArea(.message) { model.messageFrame = $0 }
@@ -706,7 +709,7 @@ extension Color {
 
 /// One Desk meter: "Session (5hr)   42%" over the bar, the reset time under it. The fill is
 /// clamped to the bar; the percent says how far past 100 a limit went.
-private struct MeterRow: View {
+struct MeterRow: View {
     let row: DeskMeterRow
     let ink: String
     let font: String

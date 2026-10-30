@@ -41,6 +41,8 @@ enum SettingsNames {
     /// The Desk pieces with the Claude numbers: one line of text, and the bars.
     static let claudeMetersLine = "Claude meters (line)"
     static let claudeMetersBars = "Claude meters (bars)"
+    /// The Desk piece with the machine's own readings: CPU, memory and disk (layout word `telemetry`).
+    static let system = "System"
     /// Updates' button and every menu's item.
     static let checkForUpdates = "Check for Updates…"
     /// Themes and a theme suggestion's card.
