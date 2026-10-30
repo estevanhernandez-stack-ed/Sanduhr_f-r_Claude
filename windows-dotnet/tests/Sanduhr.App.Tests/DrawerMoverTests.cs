@@ -202,6 +202,26 @@ public sealed class DrawerMoverTests
     });
 
     [Fact]
+    public void A_copy_with_the_same_write_time_already_in_the_drawer_is_never_journaled_for_the_landing() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var images = Def(box, "Images");
+        var a = box.File(@"Desktop\a.png", "mine");
+        var stamp = DateTime.UtcNow.AddDays(-2);
+        File.SetLastWriteTimeUtc(a, stamp);
+        var copy = box.File(@"Desktop\Drawers\Images\a (1).png", "an Explorer copy keeps its write time");
+        File.SetLastWriteTimeUtc(copy, stamp);
+        var check = Check(box, [images], (a, images));   // plans a.png
+        var mover = new DrawerMover(box.Desktop, (src, dir, name) =>
+        {
+            File.Move(src, Path.Combine(dir, "a (3).png"));
+            return ShellFailed();
+        });
+        var run = mover.Apply(check, [images]);
+        Assert.Equal(Path.Combine(images.Home, "a (3).png"), Assert.Single(run.Moved).To, ignoreCase: true);
+    });
+
+    [Fact]
     public void A_folder_the_Shell_landed_unnamed_is_found_by_what_was_not_there_before() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();
