@@ -71,6 +71,12 @@ internal sealed record DeskFrame
     public IReadOnlyList<string>? MeterStops { get; init; }
     public string? MeterTrackHex { get; init; }
     public string? PaceHex { get; init; }
+
+    /// <summary>Drawers' live state (5.0 drawers spec); null draws no drawer.</summary>
+    public DrawerService? Drawers { get; init; }
+
+    /// <summary>The followed theme's accent (six hex digits), for a drawer's hover and selection; null is the ink's last color.</summary>
+    public string? AccentHex { get; init; }
 }
 
 /// <summary>
@@ -91,6 +97,17 @@ internal sealed partial class DeskView : Grid, IDisposable
 
     /// <summary>The pieces this build draws (watchers: only from the harness until their tools ship).</summary>
     public static readonly IReadOnlyList<string> Drawn = ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "glow", "companion"];
+
+    /// <summary>The pieces this build draws on <paramref name="arrangement"/>: the built-in ones and every drawer placed in it.</summary>
+    internal static IReadOnlyList<string> DrawnFor(DeskArrangement arrangement) =>
+        [.. Drawn, .. arrangement.Pieces.Select(p => p.Widget).Where(DrawerPieces.IsWord)];
+
+    /// <summary>A piece's name in Arrange and on the Desk menu: a drawer's own name (its codename while streamer mode is on), else the
+    /// built-in piece's name.</summary>
+    internal static string PieceName(string widget) =>
+        DrawerPieces.IdOf(widget) is { } id
+            ? DrawerService.Current?.Get(id) is { } state ? state.Title + " drawer" : "Drawer"   // streamer: masked - Title is the codename while on
+            : SettingsNames.DeskPieceName(widget);
 
     private readonly DeskScreen _screen;
     private readonly DeskSettings _settings;
@@ -320,7 +337,8 @@ internal sealed partial class DeskView : Grid, IDisposable
         var arrangement = new DeskArrangement(_settings.Layout);
         // A roaming companion is not in a stack: it walks the screen's edges in an island of its own.
         bool roams = !Arranging && _frame.Companion is { Ready: true, Roaming: true } && arrangement.Placement(CompanionSettings.Widget) is not null;
-        var stacks = arrangement.Stacks(roams ? Drawn.Where(w => w != CompanionSettings.Widget).ToList() : Drawn);
+        var drawn = DrawnFor(arrangement);
+        var stacks = arrangement.Stacks(roams ? drawn.Where(w => w != CompanionSettings.Widget).ToList() : drawn);
         var m = _settings.Margins;
         var margins = DeskGeometry.Margins(m.Left, m.Right, m.Top, m.Bottom, _screen.Taskbar, Inset);
         var size = _screen.SizeDips;
@@ -506,6 +524,7 @@ internal sealed partial class DeskView : Grid, IDisposable
             "launcher" => LauncherPiece(ts),
             "glow" => GlowSlot(ts),
             "companion" => _frame.Companion is { Ready: true } c ? CompanionPieceVisual.Create(c, p.Scale, _gate, _live) : null,
+            var w when DrawerPieces.IdOf(w) is { } id => DrawerPieceFor(id, p.Scale),
             _ => null,
         };
         if (piece is null && Arranging && p.Widget != "glow")
@@ -515,8 +534,18 @@ internal sealed partial class DeskView : Grid, IDisposable
         piece.Tag = p.Widget; // which piece this is, for the Desk's clicks (DeskClicks, spec 7.4)
         // The message carries its own glow (spec 6.2) and the glow's spot is clear at rest; every other
         // piece takes the ink's shadow.
-        if (p.Widget is not ("message" or "nowPlaying" or "glow" or "launcher" or "companion") && _ink.ShadowOpacity > 0)
+        if (p.Widget is not ("message" or "nowPlaying" or "glow" or "launcher" or "companion") && !DrawerPieces.IsWord(p.Widget) && _ink.ShadowOpacity > 0)
             piece.Effect = Shadow(_ink);
+        return piece;
+    }
+
+    /// <summary>A drawer piece (5.0 drawers spec, section 2), or null when there is no such drawer to draw. Its subscriptions end with
+    /// the view.</summary>
+    private FrameworkElement? DrawerPieceFor(string id, double scale)
+    {
+        if (_frame.Drawers is not { } service || service.Get(id) is not { } state) return null;
+        var piece = new DrawerPiece(state, service, DrawerLook.From(_ink, _frame.PlateHex, _frame.PlateOpacity, _frame.AccentHex, _family), scale);
+        _live.Add(piece);
         return piece;
     }
 

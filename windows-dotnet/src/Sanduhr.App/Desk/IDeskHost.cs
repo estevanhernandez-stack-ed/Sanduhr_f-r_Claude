@@ -33,6 +33,10 @@ internal sealed record DeskIsland(FrameworkElement Content, Point Anchor, Horizo
     /// it to the desktop. False keeps the whole window click-through, as before.</summary>
     public bool TakesClicks { get; init; }
 
+    /// <summary>The island holds a drawer (5.0 drawers spec, section 2): a click into it may make its window active so the keyboard
+    /// reaches the drawer (<see cref="DeskFocus"/>), and activation is given back on a click away. False never activates, as before.</summary>
+    public bool TakesFocus { get; init; }
+
     /// <summary>A roaming island (the companion walking its edges): the host keeps the window's aligned edge on the motion's
     /// anchor as it moves, without laying the island out again. Null for an island that stays where it hangs.</summary>
     public DeskIslandMotion? Motion { get; init; }

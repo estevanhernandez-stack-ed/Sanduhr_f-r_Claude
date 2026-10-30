@@ -136,7 +136,7 @@ public sealed record ThemeDeskLook(
         ["pace_tick"] = "#" + PaceTick,
     };
 
-    private static string Hex(string? h) => InkHex.Normalize(h) ?? InkHex.Fallback;
+    public static string Hex(string? h) => InkHex.Normalize(h) ?? InkHex.Fallback;
 
     /// <summary>Colors as stops: normalized, at most <see cref="ThemeLint.MaxDeskStops"/>, a color equal to the one before it dropped
     /// (a gradient of one color is that color); none usable is white.</summary>

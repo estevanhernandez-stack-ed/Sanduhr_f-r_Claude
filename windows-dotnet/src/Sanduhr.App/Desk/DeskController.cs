@@ -72,6 +72,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// second, about a second at most, then off).</summary>
     private readonly DispatcherTimer _pump;
     private bool _stopped;
+    /// <summary>Drawers' live state; null draws no drawer. A redraw waits while it is busy (Review Focus 3).</summary>
+    private readonly DrawerService? _drawers;
+    private bool _renderWanted;
     private DeskArrangeSession? _session;
     private DeskArrangeMode? _arrangeMode;
     /// <summary>A design under review (the live review): drawn from memory in place of the saved layout, font, plate, ink and Launcher.
@@ -86,8 +89,14 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     public DeskController(SettingsStore store, Func<IDeskHost> hostFactory, Func<DeskUsage> usageSource,
         NowPlayingHub nowPlaying, DeskMessageSource messages, WatcherStore? watchers = null,
         Paths? paths = null, LauncherAppCache? launcherApps = null, OledCareDriver? oled = null, NowPlayingLookService? looks = null,
-        CompanionService? companion = null)
+        CompanionService? companion = null, DrawerService? drawers = null)
     {
+        _drawers = drawers;
+        if (_drawers is not null)
+        {
+            _drawers.Changed += OnDrawersChanged;
+            _drawers.BusyEnded += OnDrawersBusyEnded;
+        }
         _companion = companion ?? (paths is null ? null : new CompanionService(paths, store));
         if (_companion is not null) _companion.Changed += OnCompanionChanged;
         _looks = looks;
@@ -466,6 +475,11 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     public void Dispose()
     {
         _stopped = true;
+        if (_drawers is not null)
+        {
+            _drawers.Changed -= OnDrawersChanged;
+            _drawers.BusyEnded -= OnDrawersBusyEnded;
+        }
         StopHost();
         _oled.DriftStepped -= ApplyDrift;
         _oled.DimChanged -= OnDim;
@@ -538,6 +552,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Companion = CompanionNow(),
             WarnAt = _warnAt,
             UrgentAt = _urgentAt,
+            Drawers = _drawers,
         };
         // Arrange draws what the Desk shows: while it follows the widget theme, the theme's font, plate and colors.
         var (arrangeSettings, arrangeFrame) = ArrangeLook(frame);
@@ -751,10 +766,18 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
 
     /// <summary>Lays each screen out afresh and hands the host its islands; the host keeps its windows
     /// when the islands line up with the last ones.</summary>
+    private void OnDrawersChanged() { if (!_stopped) Reload(); }
+
+    private void OnDrawersBusyEnded() { if (_renderWanted) Render(); }
+
     private void Render()
     {
         // While arranging the arrange surfaces draw; the islands come back when it ends.
         if (_host is null || _stopped || _screens.Count == 0 || _rendering || Arranging) return;
+        // A drawer is mid-interaction (a drag, Explorer's menu, an inline rename): rebuilding it now would cut that short. The redraw
+        // runs when the last hold is released (Review Focus 3).
+        if (_drawers?.Busy == true) { _renderWanted = true; return; }
+        _renderWanted = false;
         _rendering = true;
         try { RenderOnce(); }
         finally { _rendering = false; }
@@ -789,6 +812,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             Companion = CompanionNow(),
             WarnAt = _warnAt,
             UrgentAt = _urgentAt,
+            Drawers = _drawers,
         };
         // Following the widget theme (theme match): the theme's look in place of the Desk's own.
         var draw = DeskLookResolver.For(_follows, _theme);

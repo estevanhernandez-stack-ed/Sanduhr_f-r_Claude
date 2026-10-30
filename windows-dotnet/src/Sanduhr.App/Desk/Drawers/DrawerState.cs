@@ -43,6 +43,9 @@ internal sealed partial class DrawerState : ObservableObject
     [ObservableProperty] private bool _folded;
     [ObservableProperty] private bool _missing;
 
+    /// <summary>The selected items' paths, so a redraw that builds a new piece keeps the selection.</summary>
+    public IReadOnlyList<string> Selected { get; set; } = [];
+
     /// <summary>The drawer's name as drawn: its codename while streamer mode is on.</summary>
     public string Title => StreamerMode.Mask.Name(CodenameCategory.Folder, Def.Name);   // streamer: masked - Mask.Name gives the codename while on
 

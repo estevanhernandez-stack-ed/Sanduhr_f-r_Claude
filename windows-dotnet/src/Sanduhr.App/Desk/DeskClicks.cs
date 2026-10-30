@@ -70,19 +70,31 @@ internal static class DeskClicks
         var result = new List<DeskIsland>(islands.Count);
         foreach (var island in islands)
         {
+            bool drawer = HasDrawer(island.Content);
             var found = Find(island.Content);
             var kinds = Kinds(found, island.Widgets, piecesTakeClicks);
             if (kinds.Count == 0)
             {
-                result.Add(island);
+                result.Add(drawer ? island with { TakesClicks = true, TakesFocus = true } : island);
                 continue;
             }
             var targets = found.Where(f => kinds.Contains(f.Kind)).ToList();
             foreach (var (_, element) in targets) SetPlate(element);
             Wire(island.Content, targets, actions);
-            result.Add(island with { TakesClicks = true });
+            result.Add(island with { TakesClicks = true, TakesFocus = drawer });
         }
         return result;
+    }
+
+    /// <summary>The island holds a drawer, which takes its own clicks (Task 8) and may take focus.</summary>
+    private static bool HasDrawer(DependencyObject node)
+    {
+        if (node is DrawerPiece) return true;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
+            if (HasDrawer(VisualTreeHelper.GetChild(node, i))) return true;
+        return node is ContentControl { Content: DependencyObject c } && HasDrawer(c)
+            || node is Decorator { Child: { } d } && HasDrawer(d)
+            || node is Panel p && p.Children.OfType<DependencyObject>().Any(HasDrawer);
     }
 
     /// <summary>The click kinds this island has, by the Core rule (<see cref="DeskElements.Build"/>).</summary>

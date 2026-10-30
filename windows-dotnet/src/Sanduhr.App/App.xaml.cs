@@ -38,6 +38,7 @@ public partial class App : Application
     private Desk.DeskMessageHandoffService? _handoff;
     private Desk.DeskDesignService? _deskDesign;
     private Desk.WidgetReviewService? _widgetReview;
+    private Desk.DrawerService? _drawers;
     private Desk.NowPlayingLookService? _looks;
     private Desk.WatcherStore? _watchers;
     private Desk.DockerPipe? _dockerPipe;
@@ -624,8 +625,10 @@ public partial class App : Application
         _looks = new Desk.NowPlayingLookService(paths, store, _nowPlaying, () => _deskDesign.LooksContext());
         Desk.NowPlayingLookService.Current = _looks;
         _deskDesign.Looks = _looks;
+        _drawers = new Desk.DrawerService(store, paths, Desk.DrawerPlaces.ForThisUser());
+        Desk.DrawerService.Current = _drawers;
         _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
-            () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers, paths, _launcherApps, looks: _looks)
+            () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers, paths, _launcherApps, looks: _looks, drawers: _drawers)
         {
             ThemeText = ThemeTextHex,
         };
@@ -1207,6 +1210,8 @@ public partial class App : Application
         _handoff?.Dispose();
         _deskDesign?.Dispose();
         _widgetReview?.Dispose();
+        _drawers?.Dispose();
+        Desk.DrawerService.Current = null;
         _runners?.Dispose();
         _dockerPipe?.Dispose();
         _watchers?.Dispose();
@@ -1247,6 +1252,8 @@ public partial class App : Application
         _handoff?.Dispose();
         _deskDesign?.Dispose();
         _widgetReview?.Dispose();
+        _drawers?.Dispose();
+        Desk.DrawerService.Current = null;
         _runners?.Dispose();
         _dockerPipe?.Dispose();
         _watchers?.Dispose();
