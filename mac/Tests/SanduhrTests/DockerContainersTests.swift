@@ -13,9 +13,9 @@ struct DockerContainersTests {
     // The shape of GET /containers/json, trimmed to the fields Sanduhr reads.
     static let json = """
         [
-          {"Id":"\(id1)","Names":["/ci-runners-alpha-1-1"],"Image":"dunder-gh-runner:2.337.0","State":"running",
+          {"Id":"\(id1)","Names":["/ci-runners-alpha-1-1"],"Image":"ci-host-gh-runner:2.337.0","State":"running",
            "Labels":{"com.docker.compose.project":"ci-runners","com.docker.compose.service":"alpha-1"}},
-          {"Id":"\(id2)","Names":["/ci-runners-egress-proxy-1"],"Image":"dunder-egress-proxy:1","State":"running",
+          {"Id":"\(id2)","Names":["/ci-runners-egress-proxy-1"],"Image":"ci-host-egress-proxy:1","State":"running",
            "Labels":{"com.docker.compose.service":"egress-proxy"}},
           {"Id":"\(id3)","Names":["/my-runner"],"Image":"ghcr.io/actions/actions-runner:latest","State":"exited","Labels":{}}
         ]
@@ -25,9 +25,9 @@ struct DockerContainersTests {
 
     @Test func parsesTheListCall() {
         #expect(parse(Self.json) == [
-            DockerContainer(id: Self.id1, image: "dunder-gh-runner:2.337.0", name: "alpha-1", running: true,
+            DockerContainer(id: Self.id1, image: "ci-host-gh-runner:2.337.0", name: "alpha-1", running: true,
                             key: "ci-runners-alpha-1-1"),
-            DockerContainer(id: Self.id2, image: "dunder-egress-proxy:1", name: "egress-proxy", running: true,
+            DockerContainer(id: Self.id2, image: "ci-host-egress-proxy:1", name: "egress-proxy", running: true,
                             key: "ci-runners-egress-proxy-1"),
             DockerContainer(id: Self.id3, image: "ghcr.io/actions/actions-runner:latest", name: "my-runner",
                             running: false, key: "my-runner"),
@@ -35,7 +35,7 @@ struct DockerContainersTests {
     }
 
     @Test func anIdWithATrailingNewlineIsSkipped() {
-        #expect(parse(#"[{"Id":"\#(Self.id1)\n","Image":"dunder-gh-runner:1","State":"running","Labels":{}}]"#).isEmpty)
+        #expect(parse(#"[{"Id":"\#(Self.id1)\n","Image":"ci-host-gh-runner:1","State":"running","Labels":{}}]"#).isEmpty)
     }
 
     @Test func runnersAreRunningContainersWithARunnerImage() {
@@ -61,13 +61,13 @@ struct DockerContainersTests {
     }
 
     @Test(arguments: [
-        ("dunder-gh-runner:2.337.0", true),
-        ("dunder-gh-runner:2.338.0", true),
+        ("ci-host-gh-runner:2.337.0", true),
+        ("ci-host-gh-runner:2.338.0", true),
         ("ghcr.io/actions/actions-runner:2.321.0", true),
         ("myoung34/github-runner:latest", true),
         ("summerwind/actions-runner@sha256:0123abcd", true),
         ("localhost:5000/team/GH-Runner", true),
-        ("dunder-egress-proxy:1", false),
+        ("ci-host-egress-proxy:1", false),
         ("postgres:16", false),
         ("registry.gh-runner.example.com/postgres:16", false), // only the image's own name counts
         ("", false),
@@ -77,7 +77,7 @@ struct DockerContainersTests {
     }
 
     @Test(arguments: [
-        "not json", "{}", #"[{"Id":"short","Image":"dunder-gh-runner:1","State":"running"}]"#,
+        "not json", "{}", #"[{"Id":"short","Image":"ci-host-gh-runner:1","State":"running"}]"#,
     ])
     func malformedIsEmpty(json: String) {
         #expect(parse(json).isEmpty)
