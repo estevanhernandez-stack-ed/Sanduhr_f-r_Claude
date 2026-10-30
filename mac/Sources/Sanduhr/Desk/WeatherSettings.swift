@@ -30,7 +30,7 @@ final class WeatherPageModel {
         saved = DeskWeatherSettings.load(defaults)
     }
 
-    static let nicknameHint = "Shown on the Desk instead of the city's name, up to \(Weather.nicknameMax) characters. It stays on this Mac and is never sent anywhere; the forecast still uses the city you picked."
+    static let nicknameHint = "Shown on the Desk instead of the city's name, up to \(Weather.nicknameMax) characters. It is never sent to the weather service, which still gets the city you picked; Claude can read it when you use Sanduhr's MCP server."
 
     /// "Fort Worth, Texas, United States", or "No city set".
     var placeText: String { saved.place?.label ?? "No city set" }

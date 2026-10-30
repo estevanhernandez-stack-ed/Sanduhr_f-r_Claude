@@ -2514,3 +2514,90 @@ not `ps %cpu` (the idle CPU lesson).
    the ten minutes, and Activity Monitor, Sample Process shows no `DeskStateExporter` work between ticks.
 4. Poll `get_desk` once a second for a minute: the app's CPU time barely moves (the tool reads a file; it does not
    wake the app).
+
+## 68. The system piece (2.38.0)
+
+Dev build, signed out, against the file store (section 45). Desk on. Settings, Desk, Pieces: place System.
+
+1. The Desk shows CPU, RAM and Disk. Bars by default; the Style menu offers Slim, Ring and Ticks and each draws
+   the three readings (no pace mark, no warning color, no reset line). The piece takes no clicks and nothing animates.
+2. **The numbers.** Open Activity Monitor. CPU follows its CPU load within a few points over a few ticks (the first
+   tick after the piece starts shows 0 for CPU: it needs two readings). RAM runs a little above Activity Monitor's
+   "Memory Used", never below it by much. Disk matches Finder's used share of the startup disk (total minus
+   available). Start a busy loop (`yes > /dev/null`) in Terminal: CPU climbs within 10 seconds; stop it and it falls.
+3. **Only while it shows.** `sample <pid> 1 -file /tmp/s.txt` (or Activity Monitor, Sample Process) with the Desk on
+   shows the sampler's timer firing about every 5 seconds. Hide the Desk, or take the piece off in Pieces: the timer
+   is gone and CPU time stops growing. Put it back: it starts again.
+4. **Demo mode** (section 48) draws made-up readings and starts no sampler.
+5. **Idle CPU.** Measure by CPU time over ten minutes, not `ps %cpu`: with the piece placed it grows by a few
+   hundredths of a percent over the baseline; with it unplaced, by nothing.
+6. `defaults read com.626labs.sanduhr.desk layout` carries `telemetry:tr:1` (and the slant and style fields as for
+   any piece). Nothing about the readings is written to disk: `grep -r` the Sanduhr folder for a reading finds none.
+
+## 69. Weather: lookup, the piece and the nickname (2.38.0)
+
+Dev build against the file store. Needs the network. Back up the desk preferences first (section 45). To watch the
+traffic, use Little Snitch or `nettop -p <pid>`, not a proxy that rewrites anything.
+
+1. **Look up.** Settings, Weather. With Desk off, the page says it needs the Desk (the Needs Desk row). Type
+   "Fort Worth", press Look up: "Looking up…" then "Pick your place:" and up to five rows, each "name, region,
+   country". Exactly one request goes out, to `geocoding-api.open-meteo.com`, and its query carries the typed name,
+   `count=5`, `language=en` and `format=json`: nothing else, no cookie, user agent `Sanduhr`. An empty field says
+   "Type a city first." and sends nothing. A nonsense name says "No place by that name." Offline: "Open-Meteo didn't
+   answer. Check the connection and try again."
+2. **Pick.** Choose a row: Place shows it, the list clears, and `defaults read com.626labs.sanduhr.desk desk_weather`
+   shows `name`, `admin`, `country`, `lat` and `lon` at two decimals (and no `unit` until you choose one). Temperature
+   follows the region until you pick Fahrenheit or Celsius; picking writes `unit`.
+3. **The piece.** Settings, Desk, Pieces: place Weather. The Desk shows the place, now with a symbol, today's range,
+   tomorrow, and "Weather data by Open-Meteo.com". The credit on the Desk is plain text; the one in Settings, Weather
+   opens open-meteo.com, and the licence link opens the CC BY 4.0 page. One request goes to `api.open-meteo.com`
+   with `latitude` and `longitude` at two decimals, the unit, `timezone=auto` and `forecast_days=2`: nothing else.
+4. **Cadence.** Leave the Desk on for 65 minutes: two or three more forecast requests, 30 minutes apart, none in
+   between. Hide the Desk, or take the piece off: no request after that. Turn the Desk on again: one request at once.
+   Disconnect the network for an attempt: the piece keeps the last reading, the next attempt waits the full 30
+   minutes, and a reading older than 3 hours draws dim.
+5. **The unit and the place.** Flip the unit: the old reading goes and a new request follows at once, in the new
+   unit. Pick another place: same. Clear: the piece says "Set a city in Settings, Weather" and no request is made.
+6. **Show it as.** Type "Home" (a longer one is cut to 24 characters): the Desk shows "Home" in place of the
+   place's name. `desk_weather` gains `nickname`. The network shows no request carrying it. Empty the field: the key's
+   member is gone and the place's own name is back. Clear the place with a nickname set: the nickname stays.
+7. **Through Claude.** With the MCP server installed, `get_desk` returns `design.weather.nickname`, and no place,
+   coordinates or unit. `propose_desk` with `{"weather": {"nickname": "Studio"}}` waits for Apply like any design;
+   Apply writes only the nickname into `desk_weather` and keeps the place and unit. A 25 character nickname, a
+   newline in it and a member other than `nickname` are each refused with a reason (fixtures `weather-*.json` in
+   `mac/Tests/SanduhrTests/Fixtures/desk-designs/`).
+8. **Demo mode** shows "Mapleton" with a made-up reading and makes no request.
+9. Reset Sanduhr… with All settings checked: `defaults read com.626labs.sanduhr.desk desk_weather` fails afterwards.
+
+## 70. CI runner cards (2.38.0)
+
+Needs Docker Desktop (or another Docker with a socket at `~/.docker/run/docker.sock` or `/var/run/docker.sock`)
+and a GitHub Actions runner container whose image name contains `actions-runner`, `github-runner` or `gh-runner`.
+Without one, make a stand-in: `docker tag alpine local/actions-runner:test`, then run it with `--name host-test` and a
+shell that prints lines in the runner's shape, `<Docker timestamp> <yyyy-MM-dd HH:mm:ssZ>: Running job: build`
+(the fixtures in `mac/Tests/SanduhrTests/Fixtures/runners/` show the exact lines). Use made-up names only.
+
+1. **Off by default.** Settings, Watchers shows **Show my CI runners' jobs** off. With it off, `lsof -p <pid>` shows
+   no connection to either Docker socket and the page has no status line.
+2. **Docker running, a runner up.** Turn it on with the Desk on: the line reads "Watching 1 runner: <name>". A job
+   in that runner's log ("Running job: build") puts up a card "<runner> · build" with the note "CI runner",
+   running, on the Desk's Watchers piece (when placed) and the notch place. "Job build completed with result:
+   Succeeded" turns it passed and it fades after about 6 seconds; Failed stays until dismissed and glows the notch
+   once; Canceled ends it as finished, without the glow. A job that ended before you turned the switch on puts up no card.
+3. **Other containers.** A container whose image is not a runner is never followed: its log is not read. Two
+   replicas of one Compose service show by their container names.
+4. **Docker quit.** Quit Docker Desktop with the switch on: within 30 seconds the line reads "Docker isn't running."
+   and any open runner card ends as finished. Start Docker again: within about a minute the line returns to Watching.
+5. **Denied.** If you can reach a Docker whose socket your account may not open (a root-only socket), the line reads
+   "Docker refused the connection. Check that your account can use Docker's socket." and nothing else happens. If
+   you cannot make one, the wording and the retry are pinned by `DockerSocketTests` and `RunnerWatchServiceTests`.
+6. **Never inspect.** `sudo fs_usage -w -f network <pid>` or Docker Desktop's request log (Troubleshoot, Logs) shows
+   only `GET /containers/json` and `GET /containers/<id>/logs?follow=1&stdout=1&stderr=1&timestamps=1&tail=200`,
+   never `/containers/<id>/json`, and never a POST, PUT or DELETE.
+7. **Switch off.** Turn it off: every runner card goes at once and the socket connections close.
+8. **Above the prompt.** With **Show watchers above the prompt** on, `band.json` holds the runner's card as
+   `{"source":"automatic","kind":"runner","state":...}` with no title, runner or job name. `grep` it for the runner's
+   name: no match.
+9. **Demo mode** hides runner cards. Quitting Sanduhr drops them all; relaunching with the switch on rebuilds from
+   the log's replay without putting up cards for jobs that ended earlier.
+10. Reset Sanduhr… with All settings checked: `defaults read com.626labs.sanduhr watchersCiRunners` fails afterwards.
