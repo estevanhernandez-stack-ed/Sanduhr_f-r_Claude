@@ -239,6 +239,11 @@ internal sealed class DrawerService : IDisposable
         return any;
     }
 
+    /// <summary>A drawer's "Drawers settings…" was chosen: the app opens Settings at the Drawers page.</summary>
+    public event Action? SettingsRequested;
+
+    public void RequestSettings() => SettingsRequested?.Invoke();
+
     /// <summary>The user's drop (spec section 1): no review, one journal entry. Items already in the drawer are left alone; a Public
     /// Desktop item is named and skipped.</summary>
     public DrawerRun MoveIn(IReadOnlyList<string> paths, string id)

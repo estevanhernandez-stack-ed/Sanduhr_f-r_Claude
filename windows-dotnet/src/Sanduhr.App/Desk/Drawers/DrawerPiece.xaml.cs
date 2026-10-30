@@ -1,16 +1,35 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
+using System.Windows.Threading;
+using Sanduhr.App.Interop;
 using Sanduhr.App.Services;
+using Sanduhr.App.Views;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.Desk;
+
+/// <summary>The drawer's own menu items under Explorer's (spec section 2).</summary>
+internal static class DrawerPieceCopy
+{
+    public const string RenameDrawer = "Rename drawer";
+    public const string Fold = "Fold";
+    public const string Open = "Open";
+    public const string Hide = "Hide";
+    /// <summary>Opens the Desk page until Task 11 adds the Drawers page and swaps in <c>SettingsNames.LinkTitle(SettingsPage.Drawers)</c> (the source scan refuses a link to a page that does not exist).</summary>
+    public const string Settings = "Desk settings…";
+    public const string UndoLost = " Undo is not available for this move.";
+}
 
 /// <summary>
 /// A drawer on the Desk (5.0 drawers spec, section 2): a themed frame with the drawer's name, and open, a grid of Shell icons and names
@@ -93,12 +112,211 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         return b;
     }
 
-    /// <summary>The interaction (Task 8).</summary>
-    private void Wire() { }
+    private const int RenameId = ShellMenu.OwnFirst, FoldId = ShellMenu.OwnFirst + 1, HideId = ShellMenu.OwnFirst + 2, SettingsId = ShellMenu.OwnFirst + 3;
+    private Point _dragStart;
+    private IDisposable? _renameHold;
+    private DispatcherTimer? _statusTimer;
 
-    private void Editor_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e) { }
-    private void Editor_KeyDown(object sender, KeyEventArgs e) { }
-    private void Editor_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) { }
+    private void Wire()
+    {
+        PreviewMouseDown += (_, _) => DeskFocus.Take(List);
+        TitleBar.MouseLeftButtonUp += (_, e) => { _service.SetFolded(_state.Def.Id, !_state.Folded); e.Handled = true; };
+        Frame.DragEnter += OnDragOver;
+        Frame.DragOver += OnDragOver;
+        Frame.Drop += OnDrop;
+        List.PreviewMouseLeftButtonDown += (_, e) => _dragStart = e.GetPosition(this);
+        List.PreviewMouseMove += OnMaybeDrag;
+        List.MouseDoubleClick += (_, e) => { if (ItemAt(e.OriginalSource) is { Pending: false } item) ShellFiles.Open(item.Path); };
+        List.KeyDown += OnKey;
+        MouseRightButtonUp += OnRightClick;
+    }
+
+    // ---- drops ----
+
+    internal static string[]? FilesOf(IDataObject data) =>
+        data.GetDataPresent(DataFormats.FileDrop) ? data.GetData(DataFormats.FileDrop) as string[] : null;
+
+    /// <summary>A drop this drawer takes: files from the Desktop or another drawer, not all already here (Review Focus 4).</summary>
+    internal bool Accepts(IDataObject data) => FilesOf(data) is { Length: > 0 } files && _service.Accepts(files, _state.Def.Id);
+
+    /// <summary>Moves the dropped files in and says what was skipped or cannot be undone.</summary>
+    internal void Land(IReadOnlyList<string> files)
+    {
+        var run = _service.MoveIn(files, _state.Def.Id);
+        if (run.Skipped.Count > 0 || run.UndoLost) Say(run);
+    }
+
+    private void OnDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = Accepts(e.Data) ? DragDropEffects.Move : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        if (!Accepts(e.Data) || FilesOf(e.Data) is not { } files) { e.Effects = DragDropEffects.None; return; }
+        Land(files);
+        // An optimized move (Shell, "Handling Optimized Move Operations"): this drawer moved the files itself, so the source is told
+        // the logical effect was a move and the performed effect nothing, and never deletes anything of its own.
+        e.Effects = DragDropEffects.None;
+        try
+        {
+            e.Data.SetData("Logical Performed DropEffect", new MemoryStream(BitConverter.GetBytes((int)DragDropEffects.Move)));
+            e.Data.SetData("Performed DropEffect", new MemoryStream(BitConverter.GetBytes((int)DragDropEffects.None)));
+        }
+        catch (Exception x) when (x is COMException or NotSupportedException or InvalidOperationException) { /* a source that takes no answer */ }
+    }
+
+    // ---- drags out ----
+
+    private void OnMaybeDrag(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed) return;
+        var d = e.GetPosition(this) - _dragStart;
+        if (Math.Abs(d.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(d.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+        var paths = List.SelectedItems.OfType<DrawerItem>().Where(i => !i.Pending && !i.Editing).Select(i => i.Path).ToArray();
+        if (paths.Length == 0) return;
+        var data = new DataObject(DataFormats.FileDrop, paths);
+        data.SetData("Preferred DropEffect", new MemoryStream(BitConverter.GetBytes((int)DragDropEffects.Move)));
+        using (_service.Hold())
+            // The result is never acted on (VERDICT.md): the target moved the files, or the drop landed back here and did nothing.
+            DragDrop.DoDragDrop(List, data, DragDropEffects.Move | DragDropEffects.Copy);
+    }
+
+    // ---- keys ----
+
+    private void OnKey(object sender, KeyEventArgs e)
+    {
+        if (List.SelectedItem is not DrawerItem { Pending: false, Editing: false } item) return;
+        switch (e.Key)
+        {
+            case Key.Enter: ShellFiles.Open(item.Path); e.Handled = true; break;
+            case Key.F2: BeginRename(item); e.Handled = true; break;
+            case Key.Delete: ShellMenu.InvokeVerb(Handle, item.Path, "delete"); e.Handled = true; break;   // Explorer's own delete: the Recycle Bin, its confirmation
+        }
+    }
+
+    // ---- the menu ----
+
+    private void OnRightClick(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        var item = ItemAt(e.OriginalSource);
+        if (item is { Pending: false } && !List.SelectedItems.Contains(item))
+        {
+            List.SelectedItems.Clear();
+            List.SelectedItem = item;
+        }
+        var at = PointToScreen(e.GetPosition(this));
+        ShellMenuItem[] extras =
+        [
+            new(RenameId, DrawerPieceCopy.RenameDrawer),
+            new(FoldId, _state.Folded ? DrawerPieceCopy.Open : DrawerPieceCopy.Fold),
+            new(HideId, DrawerPieceCopy.Hide),
+            new(SettingsId, DrawerPieceCopy.Settings),
+        ];
+        ShellMenuChoice? choice;
+        using (_service.Hold())
+            choice = ShellMenu.Show(Handle, item is { Pending: false } ? item.Path : null, (int)at.X, (int)at.Y, extras, verb => verb == "rename");
+        if (choice is { Verb: "rename" } && item is not null) BeginRename(item);
+        switch (choice?.Own)
+        {
+            case RenameId: RenameDrawer(); break;
+            case FoldId: _service.SetFolded(_state.Def.Id, !_state.Folded); break;
+            case HideId: _service.Hide(_state.Def.Id); break;
+            case SettingsId: _service.RequestSettings(); break;
+        }
+    }
+
+    private void RenameDrawer()
+    {
+        var prompt = new TextPromptWindow(DrawerPieceCopy.RenameDrawer, "Name", StreamerMode.Mask.Omit(_state.Def.Name) ?? "");   // streamer: masked - the prompt opens blank while on; the drawer name is not shown
+        if (prompt.ShowDialog() != true) return;
+        if (_service.RenameDrawer(_state.Def.Id, prompt.Value) is { } error) Say(error);
+    }
+
+    // ---- inline rename ----
+
+    internal void BeginRename(DrawerItem item)
+    {
+        if (item.Pending || item.Editing) return;
+        _renameHold ??= _service.Hold();
+        item.Editing = true;
+    }
+
+    internal void CommitRename(DrawerItem item, string text)
+    {
+        if (!item.Editing) return;
+        item.Editing = false;
+        if (text.Trim() != item.Name && _service.RenameItem(item.Path, text) is { } error) Say(error);
+        EndRename();
+    }
+
+    private void CancelRename(DrawerItem item)
+    {
+        item.Editing = false;
+        EndRename();
+    }
+
+    private void EndRename()
+    {
+        _renameHold?.Dispose();
+        _renameHold = null;
+    }
+
+    private void Editor_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (sender is not TextBox box || e.NewValue is not true || box.DataContext is not DrawerItem item) return;
+        box.Text = item.Name;
+        // Explorer selects the name without its extension.
+        int stem = item.IsFolder ? item.Name.Length : Path.GetFileNameWithoutExtension(item.Name).Length;   // streamer: key - a length, never drawn
+        box.Dispatcher.BeginInvoke(() => { box.Focus(); box.Select(0, stem); }, DispatcherPriority.Input);
+    }
+
+    private void Editor_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not TextBox { DataContext: DrawerItem item } box) return;
+        if (e.Key == Key.Enter) { CommitRename(item, box.Text); List.Focus(); e.Handled = true; }
+        else if (e.Key == Key.Escape) { CancelRename(item); List.Focus(); e.Handled = true; }
+    }
+
+    private void Editor_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is TextBox { DataContext: DrawerItem item } box) CommitRename(item, box.Text);
+    }
+
+    // ---- helpers ----
+
+    private IntPtr Handle => PresentationSource.FromVisual(this) is HwndSource src ? src.Handle : IntPtr.Zero;
+
+    private static DrawerItem? ItemAt(object source) =>
+        (source as DependencyObject) is { } d && ItemsControl.ContainerFromElement(null, d) is ListBoxItem { DataContext: DrawerItem item } ? item
+        : (source as FrameworkElement)?.DataContext as DrawerItem;
+
+    /// <summary>A drop's result: the named line, or only the counts while streamer mode is on (the line names files).</summary>
+    internal void Say(DrawerRun run) =>
+        Say((StreamerMode.Mask.Omit(run.Line) ?? $"{run.Moved.Count} moved, {run.Skipped.Count} skipped.")   // streamer: masked - Mask.Omit drops the file-naming line while on, leaving the counts
+            + (run.UndoLost ? DrawerPieceCopy.UndoLost : ""));
+
+    /// <summary>One line at the drawer's foot for six seconds: what a drop skipped, or why a rename did not happen.</summary>
+    internal void Say(string line)
+    {
+        Status.Text = line;
+        AutomationProperties.SetName(Status, line);   // streamer: notname - a rename error or the drop line, which Say(DrawerRun) already cut to counts while streamer mode is on
+        Status.Visibility = Visibility.Visible;
+        _statusTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+        _statusTimer.Stop();
+        _statusTimer.Tick += Hide;
+        _statusTimer.Start();
+
+        void Hide(object? s, EventArgs a)
+        {
+            _statusTimer!.Tick -= Hide;
+            _statusTimer.Stop();
+            Status.Visibility = Visibility.Collapsed;
+        }
+    }
 
     public void Dispose()
     {
@@ -107,5 +325,7 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         List.ItemsSource = null;
         _state.PropertyChanged -= OnStateChanged;
         _state.Items.CollectionChanged -= OnItemsChanged;
+        EndRename();
+        _statusTimer?.Stop();
     }
 }

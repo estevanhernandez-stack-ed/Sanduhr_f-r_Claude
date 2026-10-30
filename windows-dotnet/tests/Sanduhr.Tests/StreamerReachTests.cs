@@ -136,6 +136,7 @@ public class StreamerReachTests
         ("Sanduhr.App/Desk/DeskView.cs", "notname", 1),
         ("Sanduhr.App/Desk/Drawers/DrawerJournalStore.cs", "notname", 1),
         ("Sanduhr.App/Desk/Drawers/DrawerMover.cs", "key", 12),
+        ("Sanduhr.App/Desk/Drawers/DrawerPiece.xaml.cs", "notname", 1),
         ("Sanduhr.App/Desk/Drawers/DrawerService.cs", "key", 4),
         ("Sanduhr.App/Desk/Drawers/DrawerService.cs", "notname", 1),
         ("Sanduhr.App/Desk/Drawers/DrawerState.cs", "key", 1),

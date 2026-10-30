@@ -73,6 +73,8 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        Interop.DarkMenus.Enable();   // Explorer's menu in a drawer follows the system's dark mode (drawers, VERDICT.md change 3)
+
         // Settings whose shape changed (S6: hotkey_settings as a per-action map), once, before any read.
         var startupSettings = new SettingsStore(new Sanduhr.Core.Paths());
         startupSettings.RunMigrations();
@@ -627,6 +629,7 @@ public partial class App : Application
         _deskDesign.Looks = _looks;
         _drawers = new Desk.DrawerService(store, paths, Desk.DrawerPlaces.ForThisUser());
         Desk.DrawerService.Current = _drawers;
+        _drawers.SettingsRequested += () => _ = ShowSettingsAsync(SettingsPage.Desk, null);   // Task 11 points this at the Drawers page
         _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
             () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers, paths, _launcherApps, looks: _looks, drawers: _drawers)
         {

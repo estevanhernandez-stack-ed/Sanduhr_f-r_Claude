@@ -558,6 +558,12 @@ internal sealed class DesktopLayerHost : IDeskHost
 
     private IntPtr DeskHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        // Open with and Send to fill in lazily: the open Shell menu needs these messages (VERDICT.md change 3).
+        if (ShellMenu.Forward(msg, wParam, lParam, out var menuResult))
+        {
+            handled = true;
+            return menuResult;
+        }
         switch (msg)
         {
             case DeskNative.WM_WINDOWPOSCHANGING:
@@ -566,10 +572,14 @@ internal sealed class DesktopLayerHost : IDeskHost
             case DeskNative.WM_MOUSEACTIVATE:
                 handled = true;
                 return new IntPtr(DeskNative.MA_NOACTIVATE);
+            case DeskNative.WM_ACTIVATE when (wParam.ToInt64() & 0xFFFF) == DeskNative.WA_INACTIVE:
+                DeskFocus.GaveBack(hwnd);
+                break;
             case DeskNative.WM_DPICHANGED:
                 Schedule("DPI changed");
                 break;
             case DeskNative.WM_DESTROY:
+                DeskFocus.GaveBack(hwnd);
                 if (!_closing)
                 {
                     _stale = true;

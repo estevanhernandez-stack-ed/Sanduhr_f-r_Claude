@@ -38,6 +38,8 @@ internal static class DeskNative
     public const int WM_DESTROY = 0x0002;
     public const int WM_SETTINGCHANGE = 0x001A;
     public const int WM_MOUSEACTIVATE = 0x0021;
+    public const int WM_ACTIVATE = 0x0006;
+    public const int WA_INACTIVE = 0;
     public const int WM_KEYDOWN = 0x0100;
     public const int VK_RETURN = 0x0D;
     public const int VK_ESCAPE = 0x1B;
