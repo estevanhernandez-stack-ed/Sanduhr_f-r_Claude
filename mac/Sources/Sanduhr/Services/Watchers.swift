@@ -54,6 +54,8 @@ enum WatcherSource: String, Sendable {
     case agent
     /// Claude Code's background work, through the Stop hook.
     case automatic
+    /// A job on a local CI runner container, from its log (RunnerLog, RunnerBoard).
+    case runner
 }
 
 struct Watcher: Equatable, Identifiable, Sendable {
@@ -82,6 +84,10 @@ struct Watcher: Equatable, Identifiable, Sendable {
     /// An automatic watcher's kind of task (shell, subagent, monitor, workflow): all the band file
     /// (BandFile) says of it besides its state.
     var kind: String?
+    /// A runner card's label, its container's key (unique per daemon) and the job it runs.
+    var runner: String?
+    var runnerKey: String?
+    var job: String?
 
     /// How long it has run: until now, or until it ended.
     func elapsed(now: Date) -> TimeInterval { max(0, (ended ?? now).timeIntervalSince(started)) }
@@ -184,6 +190,12 @@ struct StopReport: Equatable, Sendable {
     var tasks: [BackgroundTask]
 }
 
+/// What a runner line did to the board: whether any card changed, and whether a job just failed.
+struct RunnerChange: Equatable, Sendable {
+    var changed = false
+    var failed = false
+}
+
 /// Every watcher, and how they change. Pure: the time comes in.
 struct WatcherBoard: Equatable, Sendable {
     /// An agent's watcher with no update for this long has lost touch.
@@ -200,8 +212,13 @@ struct WatcherBoard: Equatable, Sendable {
 
     private(set) var watchers: [Watcher] = []
 
-    static func window(_ source: WatcherSource) -> TimeInterval {
-        source == .agent ? agentWindow : automaticWindow
+    /// Nil for a runner card: its log ends it, the clock never does.
+    static func window(_ source: WatcherSource) -> TimeInterval? {
+        switch source {
+        case .agent: agentWindow
+        case .automatic: automaticWindow
+        case .runner: nil
+        }
     }
 
     static func agentID(_ id: String) -> String { "a:\(id)" }
@@ -292,7 +309,7 @@ struct WatcherBoard: Equatable, Sendable {
             return now.timeIntervalSince(ended) >= Self.fadeAfter
         }
         for i in watchers.indices where watchers[i].state == .running || watchers[i].state == .waiting {
-            if now.timeIntervalSince(watchers[i].touched) > Self.window(watchers[i].source) {
+            if let window = Self.window(watchers[i].source), now.timeIntervalSince(watchers[i].touched) > window {
                 watchers[i].state = .lostTouch
             }
         }
@@ -303,11 +320,69 @@ struct WatcherBoard: Equatable, Sendable {
     func nextChange() -> Date? {
         watchers.compactMap { w -> Date? in
             if w.state.fades, let ended = w.ended { return ended.addingTimeInterval(Self.fadeAfter) }
-            if w.state == .running || w.state == .waiting {
-                return w.touched.addingTimeInterval(Self.window(w.source) + 1)
+            if w.state == .running || w.state == .waiting, let window = Self.window(w.source) {
+                return w.touched.addingTimeInterval(window + 1)
             }
             return nil
         }.min()
+    }
+
+    static func runnerID(key: String, job: String) -> String { "r:\(key):\(job)" }
+
+    /// A runner started a job. `key` is the runner container's own name (unique); `runner` is the
+    /// label the card shows. The runner's open card ends as finished (a runner runs one job at a
+    /// time) and the new one goes up with the runner's own start time. Another container with the
+    /// same label is not touched.
+    @discardableResult
+    mutating func runnerStart(key: String, runner: String, job: String, startedAt: Date, now: Date) -> RunnerChange {
+        let before = watchers
+        endOpenRunnerCards(key: key, now: now)
+        let id = Self.runnerID(key: key, job: job)
+        watchers.removeAll { $0.id == id }
+        watchers.append(Watcher(id: id, source: .runner,
+                                title: WatcherText.clip("\(runner) · \(job)", WatcherLimits.title),
+                                short: WatcherText.clip(job, WatcherLimits.short), link: nil, total: nil, done: nil,
+                                note: "CI runner", state: .running, started: startedAt, touched: now, ended: nil,
+                                runner: runner, runnerKey: key, job: job))
+        trim()
+        return RunnerChange(changed: watchers != before, failed: false)
+    }
+
+    /// A runner's job ended: the matching open card closes with the result.
+    @discardableResult
+    mutating func runnerEnd(key: String, job: String, result: WatcherState, now: Date) -> RunnerChange {
+        let before = watchers
+        let id = Self.runnerID(key: key, job: job)
+        guard let i = watchers.firstIndex(where: { $0.id == id && !$0.state.isEnded }) else { return RunnerChange() }
+        watchers[i].state = result
+        watchers[i].touched = now
+        watchers[i].ended = now
+        return RunnerChange(changed: watchers != before, failed: result == .failed)
+    }
+
+    /// The runner (re)started and holds no job: its open card ends as finished.
+    @discardableResult
+    mutating func runnerOnline(key: String, now: Date) -> RunnerChange {
+        let before = watchers
+        endOpenRunnerCards(key: key, now: now)
+        return RunnerChange(changed: watchers != before, failed: false)
+    }
+
+    /// The runner's container stopped or left the list: its open card ends as finished.
+    @discardableResult
+    mutating func runnerGone(key: String, now: Date) -> Bool {
+        let before = watchers
+        endOpenRunnerCards(key: key, now: now)
+        return watchers != before
+    }
+
+    private mutating func endOpenRunnerCards(key: String, now: Date) {
+        for i in watchers.indices where watchers[i].source == .runner && watchers[i].runnerKey == key
+            && !watchers[i].state.isEnded {
+            watchers[i].state = .finished
+            watchers[i].touched = now
+            watchers[i].ended = now
+        }
     }
 
     mutating func dismiss(_ id: String) { watchers.removeAll { $0.id == id } }
@@ -327,9 +402,10 @@ struct WatcherBoard: Equatable, Sendable {
         }
     }
 
-    /// What the notch and the Desk show: the ordered watchers, less the work ones in demo mode.
+    /// What the notch and the Desk show: the ordered watchers, less the work ones and the runners'
+    /// in demo mode (a runner's name can name a private repo).
     static func shown(_ ordered: [Watcher], demo: Bool) -> [Watcher] {
-        demo ? ordered.filter { !$0.work } : ordered
+        demo ? ordered.filter { !$0.work && $0.source != .runner } : ordered
     }
 
     /// Past capacity, the least urgent and oldest go first.
@@ -406,6 +482,7 @@ enum WatcherText {
     /// The Desk row's second line: the note, else the state when it says something the dot
     /// doesn't ("waiting on you", "lost touch").
     static func deskNote(_ w: Watcher) -> String? {
+        if w.source == .runner, w.state.isEnded { return w.state.label }
         if let note = w.note { return note }
         switch w.state {
         case .waiting, .lostTouch, .failed, .finished: return w.state.label
@@ -415,9 +492,11 @@ enum WatcherText {
 
     /// What VoiceOver reads for a watcher.
     static func spoken(_ w: Watcher, now: Date) -> String {
-        var parts = [w.title, w.state.label, elapsed(w.elapsed(now: now))]
+        var name = w.title
+        if w.source == .runner, let runner = w.runner, let job = w.job { name = "CI job \(job) on \(runner)" }
+        var parts = [name, w.state.label, elapsed(w.elapsed(now: now))]
         if let p = w.progress { parts.append(p) }
-        if let note = w.note { parts.append(note) }
+        if let note = w.note, w.source != .runner { parts.append(note) }
         return parts.joined(separator: ", ")
     }
 }

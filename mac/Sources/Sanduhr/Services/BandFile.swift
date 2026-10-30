@@ -33,6 +33,9 @@ enum BandFile {
         switch w.source {
         case .automatic:
             return ["source": "automatic", "kind": w.kind ?? "task", "state": w.state.rawValue]
+        case .runner:
+            // State and kind only: a runner's name can name a private repo.
+            return ["source": "automatic", "kind": "runner", "state": w.state.rawValue]
         case .agent:
             var o: [String: Any] = ["source": "agent", "title": w.title, "state": w.state.rawValue,
                                     "started_at": HandoffFiles.stamp(w.started)]
