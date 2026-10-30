@@ -171,14 +171,55 @@ public sealed class DrawerServiceTests
     {
         using var box = new DrawerSandbox();
         var (s, store) = Make(box, "Images");
-        store.SaveDesk(store.LoadDesk() with { Layout = "clock:bl drawer.images:tl:1" });
+        var layout = store.LoadDesk().Layout;
         s.SetFolded("images", true);
         Assert.True(s.Get("images")!.Folded);
         Assert.Equal(["images"], store.LoadDrawers().Folded);
+        Assert.True(s.IsShown("images"));
         s.Hide("images");
-        Assert.Null(new DeskArrangement(store.LoadDesk().Layout).Placement("drawer.images"));
+        Assert.Equal(["images"], store.LoadDrawers().Hidden);
+        Assert.False(s.IsShown("images"));
         s.ShowAll();
-        Assert.Equal(DeskAnchor.TL, new DeskArrangement(store.LoadDesk().Layout).Placement("drawer.images")!.Anchor);
+        Assert.Empty(store.LoadDrawers().Hidden);
+        Assert.True(s.IsShown("images"));
+        Assert.Equal(layout, store.LoadDesk().Layout);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void SetPlace_saves() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, store) = Make(box, "Images");
+        s.SetPlace("images", new DrawerPlace("main", 50, 60));
+        Assert.Equal(new DrawerPlace("main", 50, 60), store.LoadDrawers().Places["images"]);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void HasHidden_is_true_only_for_a_hidden_drawer_that_exists() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, _) = Make(box, "Images");
+        Assert.False(s.HasHidden);
+        s.Save(s.Settings with { Hidden = ["ghost"] });
+        Assert.False(s.HasHidden);
+        s.Hide("images");
+        Assert.True(s.HasHidden);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void PreviewDrawers_lists_a_plans_new_drawers_while_pending() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, _) = Make(box, "Images");
+        Assert.Empty(s.PreviewDrawers);
+        var fresh = new DrawerDef("music", "Music", Path.Combine(box.Drawers, "Music"), true);
+        s.SetPending(new DrawerPlanCheck(true, null, [fresh], [], []));
+        Assert.Equal(["music"], s.PreviewDrawers.Select(d => d.Def.Id));
+        s.ClearPending();
+        Assert.Empty(s.PreviewDrawers);
         s.Dispose();
     });
 

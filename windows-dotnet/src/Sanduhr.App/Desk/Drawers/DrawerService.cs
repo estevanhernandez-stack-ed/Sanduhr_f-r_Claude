@@ -282,25 +282,30 @@ internal sealed class DrawerService : IDisposable
         Save(Settings with { Folded = set });
     }
 
-    /// <summary>Hidden: gone from the Desk, files where they are (spec section 2). The layout word is removed; Show drawers puts it back.</summary>
+    /// <summary>Whether a drawer is on the Desk: it is not in <see cref="DrawerSettings.Hidden"/>.</summary>
+    public bool IsShown(string id) => !Settings.Hidden.Contains(id);
+
+    /// <summary>A drawer is hidden and still exists: "Show drawers" has something to bring back.</summary>
+    public bool HasHidden => Settings.Enabled && Settings.Hidden.Any(h => Settings.Drawers.Any(d => d.Id == h));
+
+    /// <summary>Hidden: gone from the Desk, files where they are (spec section 2). Drawers are free panels, so this is a settings word and
+    /// the Desk layout is not touched; Show drawers clears it.</summary>
     public void Hide(string id)
     {
-        var desk = _store.LoadDesk();
-        var layout = new DeskArrangement(desk.Layout);
-        layout.Hide(DrawerPieces.Word(id));
-        _store.SaveDesk(desk with { Layout = layout.Layout });
-        Changed?.Invoke();
+        if (Settings.Hidden.Contains(id)) return;
+        Save(Settings with { Hidden = [.. Settings.Hidden, id] });
     }
 
-    /// <summary>"Show drawers": every drawer not on the Desk comes back, top left.</summary>
+    /// <summary>"Show drawers": every hidden drawer comes back where it was.</summary>
     public void ShowAll()
     {
-        var desk = _store.LoadDesk();
-        var layout = DrawerArrival.Place(desk.Layout, Settings.Drawers);
-        if (layout == desk.Layout) return;
-        _store.SaveDesk(desk with { Layout = layout });
-        Changed?.Invoke();
+        if (Settings.Hidden.Count == 0) return;
+        Save(Settings with { Hidden = [] });
     }
+
+    /// <summary>Saves where a drawer sits after the user moved it.</summary>
+    public void SetPlace(string id, DrawerPlace place) =>
+        Save(Settings with { Places = new Dictionary<string, DrawerPlace>(Settings.Places, StringComparer.Ordinal) { [id] = place } });
 
     /// <summary>Renames a drawer; an owned drawer's folder takes the name too (its id, and so its layout word, stays). Null on success,
     /// otherwise the line to show.</summary>
@@ -350,6 +355,9 @@ internal sealed class DrawerService : IDisposable
     }
 
     // ---- the review's preview ----
+
+    /// <summary>The drawers a plan under review would create, empty when none is pending.</summary>
+    public IReadOnlyList<DrawerState> PreviewDrawers => [.. _preview.Values];
 
     /// <summary>Shows a checked plan's moves as faded items in their drawers, with the drawers it would create.</summary>
     public void SetPending(DrawerPlanCheck check)

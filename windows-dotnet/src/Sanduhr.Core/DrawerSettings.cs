@@ -15,6 +15,12 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
     /// <summary>The drawers shown folded (title bar and count only), by id.</summary>
     public IReadOnlyList<string> Folded { get; init; } = [];
 
+    /// <summary>Where each free drawer sits, by id (drawers amendment 1). A drawer with no entry arrives top-right.</summary>
+    public IReadOnlyDictionary<string, DrawerPlace> Places { get; init; } = new Dictionary<string, DrawerPlace>();
+
+    /// <summary>The drawers hidden from the Desk, by id; their files stay where they are.</summary>
+    public IReadOnlyList<string> Hidden { get; init; } = [];
+
     public static DrawerSettings Default { get; } = new(false, null, [], DrawerRules.Defaults, false, false);
 
     /// <summary>The default root (decision KNT1mDtN3kQ0rlz2sePq): a Drawers folder on the Desktop itself, so after any uninstall,
@@ -40,7 +46,26 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
             Folded = o["folded"] is JsonArray fs
                 ? [.. fs.OfType<JsonValue>().Select(v => v.TryGetValue<string>(out var s) ? s : null).Where(DrawerIds.IsValid).OfType<string>().Distinct()]
                 : [],
+            Places = DecodePlaces(o["places"]),
+            Hidden = o["hidden"] is JsonArray hs
+                ? [.. hs.OfType<JsonValue>().Select(v => v.TryGetValue<string>(out var s) ? s : null).Where(DrawerIds.IsValid).OfType<string>().Distinct()]
+                : [],
         };
+    }
+
+    private static Dictionary<string, DrawerPlace> DecodePlaces(JsonNode? node)
+    {
+        var places = new Dictionary<string, DrawerPlace>(StringComparer.Ordinal);
+        if (node is not JsonObject o) return places;
+        foreach (var (id, v) in o)
+        {
+            if (!DrawerIds.IsValid(id) || v is not JsonObject p) continue;
+            var monitor = SettingsJson.String(p, "monitor", "");
+            double x = SettingsJson.Number(p, "x", double.NaN), y = SettingsJson.Number(p, "y", double.NaN);
+            if (monitor.Length == 0 || monitor.Length > DeskMonitors.MaxIdLength || !double.IsFinite(x) || !double.IsFinite(y)) continue;
+            places[id] = new DrawerPlace(monitor, x, y);
+        }
+        return places;
     }
 
     public JsonObject Encode() => new()
@@ -58,6 +83,9 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
         ["auto_tidy"] = AutoTidy,
         ["auto_tidy_unlocked"] = AutoTidyUnlocked,
         ["folded"] = new JsonArray([.. Folded.Select(f => (JsonNode?)f)]),
+        ["places"] = new JsonObject(Places.Select(kv => KeyValuePair.Create<string, JsonNode?>(kv.Key,
+            new JsonObject { ["monitor"] = kv.Value.Monitor, ["x"] = kv.Value.X, ["y"] = kv.Value.Y }))),
+        ["hidden"] = new JsonArray([.. Hidden.Select(h => (JsonNode?)h)]),
     };
 
     private static DrawerDef? DecodeDrawer(JsonObject o)
