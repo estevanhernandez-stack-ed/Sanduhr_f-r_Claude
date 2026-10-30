@@ -391,8 +391,9 @@ DESIGN_GUIDE_READ = (
     "usage, a handwritten message and other pieces, each placed at one of eight anchors (tl tc tr ml mr bl bc br) "
     "with a size, in a font and an ink, optionally on a soft plate. Returns design (the current look as a design: "
     "layout with every piece's anchor, size, hidden and tilt (the slant of its stack in degrees, 0 upright), and "
-    "for claude and meters its style (bar, slim, ring or ticks; limits.piece_style lists the pieces and the "
-    "words), font, ink, plate, shadow), pieces and anchors (the allowed words), fonts (installed families, and the "
+    "for claude, meters and telemetry its style (bar, slim, ring or ticks; limits.piece_style lists the pieces and "
+    "the words), weather.nickname (the name the weather piece shows instead of the place's, \"\" for the place's own), "
+    "font, ink, plate, shadow), pieces and anchors (the allowed words), fonts (installed families, and the "
     "bundled handwriting fonts EsteFont Pro and EsteFont 26), shown (the pieces the Desk draws now), "
     "message_color and notch_text_color (hex colors, read-only: propose_desk does not change them) and limits. "
     "The Mac Desk has no monitors, wallpaper summary, Launcher, saved designs or direct-change switch, so those "
@@ -409,7 +410,7 @@ DESIGN_GUIDE_PROPOSE = (
     "tilt in a layout piece slants the piece's whole stack from -20 to 20 degrees (negative rises to the right, "
     "positive falls; 0 upright), so a left stack at -18 and a right stack at 18 read as two faces of a fold; pieces "
     "at one anchor share one slant, so give them the same tilt; "
-    "style in a layout piece, only on claude and meters, is how its numbers draw so a stack fits its column: bar "
+    "style in a layout piece, only on claude, meters and telemetry, is how its numbers draw so a stack fits its column: bar "
     "(the default, a full-width bar with its label above), slim (label and value on one line over a thin bar, about "
     "half the height; claude becomes a compact two-row line), ring (small arc gauges with the value inside, side by "
     "side in a row), ticks (ten segmented cells, the OLED-friendly one); a Claude limit keeps its pace mark in every "
@@ -417,9 +418,10 @@ DESIGN_GUIDE_PROPOSE = (
     "link} with an https link to get a font the user lacks: Sanduhr never downloads it, the review shows the link "
     "and Apply waits for the font, status needs_font); ink (one #rrggbb, or a list of 2 to 4 #rrggbb for a "
     "left-to-right gradient); plate and shadow (true or false; the plate is a soft panel behind each stack of "
-    "pieces). The Mac refuses, with a reason and nothing written, what only Windows has: monitor in a layout piece, "
-    "the launcher, telemetry and glow pieces, the launcher field, the weather piece and field (they arrive with "
-    "Sanduhr 2.38.0), the messages, looks and theme fields (send message lines with propose_desk_messages, song "
+    "pieces); weather {nickname} (up to 24 characters, shown on the Desk's weather piece instead of the place's "
+    "name, \"\" for the place's own name; the city and the unit stay the user's to choose in Settings, Weather). "
+    "The Mac refuses, with a reason and nothing written, what only Windows has: monitor in a layout piece, "
+    "the launcher and glow pieces, the launcher field, the messages, looks and theme fields (send message lines with propose_desk_messages, song "
     "looks with propose_now_playing_looks and a widget theme with propose_theme), and the Windows ink words auto, "
     "light, dark and theme. The server checks before anything is sent: every field's shape and range, the tilt of "
     "each stack and the style words. status rejected comes with reasons, each {field, message}: fix those fields "
@@ -795,9 +797,11 @@ TOOLS += [
                         "name": {"type": "string", "maxLength": 40},
                         "note": {"type": "string", "maxLength": 200},
                         "layout": {"type": "object",
-                                   "description": "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean, tilt: -20 to 20 degrees, the slant of the piece's whole stack, style: bar|slim|ring|ticks, only on claude and meters}. monitor is Windows only and refused here."},
+                                   "description": "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean, tilt: -20 to 20 degrees, the slant of the piece's whole stack, style: bar|slim|ring|ticks, only on claude, meters and telemetry}. monitor is Windows only and refused here."},
                         "weather": {"type": "object",
-                                    "description": "Windows only until Sanduhr 2.38.0: refused here with a reason."},
+                                    "description": "{nickname: up to 24 characters}: the name the weather piece shows instead of the place's own; \"\" goes back to the place's name. Local only; the forecast keeps the city's coordinates.",
+                                    "properties": {"nickname": {"type": "string", "maxLength": 24}},
+                                    "additionalProperties": False},
                         "font": {"description": "A font family name, or {family, link} with an https link to get a font the user lacks."},
                         "ink": {"description": "One #rrggbb color, or a list of 2 to 4 #rrggbb colors (gradient). The Windows words auto, light, dark and theme are refused here."},
                         "plate": {"type": "boolean"},
@@ -3676,19 +3680,21 @@ def build_propose_widget(args, now=None, paths=None, wait=WIDGET_WAIT_SECONDS, p
 # tools' entries; the app's Swift DeskDesign and DeskDesignValidator are the third copy, and
 # Tests/SanduhrTests/Fixtures/desk-designs/ holds the designs both this file and the Swift build are held
 # to. Rules and messages are Windows' where the field exists on the Mac. What only Windows has (monitors,
-# the launcher, telemetry, glow and weather pieces, the launcher, weather, messages, looks and theme fields,
+# the launcher and glow pieces, the launcher, messages, looks and theme fields,
 # the auto, light, dark and theme ink words) is refused with a reason, never dropped. This server never
 # changes the Desk: it validates, queues desk-request.json and waits for desk-result.json.
 
 DESIGN_ARGS = ("design", "name", "note")
-DESIGN_FIELDS = ("name", "note", "layout", "font", "ink", "plate", "shadow")
+DESIGN_FIELDS = ("name", "note", "layout", "weather", "font", "ink", "plate", "shadow")
 DESIGN_NAME_MAX = 40
 DESIGN_NOTE_MAX = 200
 DESIGN_FONT_FAMILY_MAX = 64
 DESIGN_MAX_PIECES = 16
-DESIGN_PIECES = ("message", "clock", "claude", "meters", "nowPlaying", "watchers", "meetings", "companion")
+DESIGN_WEATHER_NICKNAME_MAX = 24
+DESIGN_PIECES = ("message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "meetings",
+                 "companion")
 DESIGN_ANCHORS = ("tl", "tc", "tr", "ml", "mr", "bl", "bc", "br")
-DESIGN_STYLE_PIECES = ("claude", "meters")
+DESIGN_STYLE_PIECES = ("claude", "meters", "telemetry")
 DESIGN_STYLES = ("bar", "slim", "ring", "ticks")
 DESIGN_MIN_SCALE = 0.6
 DESIGN_MAX_SCALE = 1.6
@@ -3701,16 +3707,12 @@ DESIGN_ANSWER_STATUSES = ("previewing", "applied", "rejected", "needs_font")
 DESIGN_STATE_KEYS = ("design", "pieces", "anchors", "fonts", "shown", "message_color", "notch_text_color", "limits")
 DESIGN_INK_WORDS = ("auto", "light", "dark", "theme")
 DESIGN_WINDOWS_ONLY_FIELDS = {
-    "weather": "arrives with the weather piece in Sanduhr 2.38.0; the Mac Desk has none yet, so nothing was applied",
     "launcher": "is Windows only: the Mac Desk has no Launcher piece",
     "messages": "is not part of a Mac Desk design; send message lines with propose_desk_messages",
     "looks": "is not part of a Mac Desk design; send song looks with propose_now_playing_looks",
     "theme": "is not part of a Mac Desk design; send a widget theme with propose_theme",
 }
 DESIGN_WINDOWS_ONLY_PIECES = {
-    "telemetry": "is the Windows system piece; the Mac gets a system piece in Sanduhr 2.38.0",
-    "system": "arrives in Sanduhr 2.38.0; the Mac Desk does not have it yet",
-    "weather": "arrives in Sanduhr 2.38.0; the Mac Desk does not have it yet",
     "launcher": "is a Windows piece; the Mac Desk has no Launcher",
     "glow": "is a Windows piece; the Mac Desk has no glow piece",
 }
@@ -3789,6 +3791,36 @@ def design_bool(o, key, reasons):
         return o[key]
     reasons.append(design_reason(key, "must be true or false"))
     return None
+
+
+def design_parse_weather(node, reasons):
+    """Windows' ParseWeather: {nickname} with a one-line string of at most 24 characters; "" is kept (it goes back
+    to the place's own name). Returns the nickname or None."""
+    if node is None:
+        return None
+    if not isinstance(node, dict):
+        reasons.append(design_reason("weather", "must be an object with nickname"))
+        return None
+    before = len(reasons)
+    for bad in sorted((k for k in node if k != "nickname"), key=u16)[:3]:
+        reasons.append(design_reason("weather", "unknown member '%s'; use nickname" % design_clip(bad, 20)))
+    nn = node.get("nickname")
+    if nn is None:
+        if len(reasons) == before:
+            reasons.append(design_reason("weather.nickname", "is missing; send a name, or an empty string for the place's own name"))
+        return None
+    raw = design_str(nn)
+    if raw is None:
+        reasons.append(design_reason("weather.nickname", "must be a string"))
+        return None
+    if design_has_control(raw):
+        reasons.append(design_reason("weather.nickname", "must be one line, with no control characters"))
+        return None
+    nick = raw.strip()
+    if len(u16(nick)) // 2 > DESIGN_WEATHER_NICKNAME_MAX * 4 or len(nick) > DESIGN_WEATHER_NICKNAME_MAX:
+        reasons.append(design_reason("weather.nickname", "must be at most %d characters" % DESIGN_WEATHER_NICKNAME_MAX))
+        return None
+    return None if len(reasons) > before else nick
 
 
 def design_parse_layout(node, reasons):
@@ -4015,8 +4047,7 @@ def design_parse(node):
     name = design_text(node, "name", DESIGN_NAME_MAX, r)
     note = design_text(node, "note", DESIGN_NOTE_MAX, r)
     layout = design_parse_layout(node.get("layout"), r)
-    if node.get("weather") is not None:
-        r.append(design_reason("weather", DESIGN_WINDOWS_ONLY_FIELDS["weather"]))
+    weather_nickname = design_parse_weather(node.get("weather"), r)
     font = design_parse_font(node.get("font"), r)
     ink = design_parse_ink(node.get("ink"), r)
     plate = design_bool(node, "plate", r)
@@ -4026,7 +4057,8 @@ def design_parse(node):
             r.append(design_reason(key, DESIGN_WINDOWS_ONLY_FIELDS[key]))
     if r:
         return None, r[:40]
-    return {"name": name, "note": note, "layout": layout, "font": font, "ink": ink, "plate": plate, "shadow": shadow}, []
+    return {"name": name, "note": note, "layout": layout, "font": font, "ink": ink, "plate": plate, "shadow": shadow,
+                 "weather_nickname": weather_nickname}, []
 
 
 def design_to_json(d):
@@ -4052,6 +4084,8 @@ def design_to_json(d):
                 po["style"] = p["style"]
             lo[p["piece"]] = po
         o["layout"] = lo
+    if d.get("weather_nickname") is not None:
+        o["weather"] = {"nickname": d["weather_nickname"]}
     if d["font"] is not None:
         o["font"] = d["font"]["family"] if d["font"]["link"] is None else {"family": d["font"]["family"], "link": d["font"]["link"]}
     if d["ink"] is not None:

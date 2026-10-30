@@ -185,6 +185,11 @@ final class DeskModel {
     /// Runs only while the Desk runs and the layout places the system piece (`syncTelemetry`).
     @ObservationIgnored var telemetrySampler = TelemetrySampler()
     @ObservationIgnored private var telemetryLayout: String?
+    /// What the weather piece draws: the saved place and nickname with the service's newest reading.
+    /// In memory only; the reading is never stored.
+    var weather = DeskWeatherShown()
+    /// Runs only while the Desk runs and the layout places the weather piece (`syncWeather`).
+    @ObservationIgnored var weatherService = WeatherService()
     /// The watchers that show (item 66), most urgent first: every watcher but the work ones while
     /// demo mode is on (WatcherBoard.shown). In memory only. Set by WatcherStore.
     var watchers: [Watcher] = []
@@ -289,11 +294,13 @@ final class DeskModel {
             self?.refreshEvents()
         }
         syncTelemetry()
+        MainActor.assumeIsolated { weatherService.onUpdate = { [weak self] in self?.weatherChanged() } }
         MessageEngine.ensureFile()
         refreshClaude()
         refreshMessage()
         claudeTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.refreshClaude()
+            self?.refreshWeatherStale()
             if self?.demo != true { self?.refreshMessage() }   // picks up messages.txt edits within a minute
             // A grant made in System Settings shows within a minute, no relaunch.
             if self?.calendarStatus != .fullAccess { self?.recheckCalendar() }
@@ -312,6 +319,7 @@ final class DeskModel {
         ) { [weak self] _ in
             self?.refreshMeterWarnings()
             self?.syncTelemetry()
+            self?.syncWeather()
         }
     }
 
@@ -331,6 +339,46 @@ final class DeskModel {
         let wants = running && !demo && DeskArrangement(layout).placement("telemetry") != nil
         telemetrySampler.onSample = { [weak self] in self?.setTelemetry($0) }
         if wants { telemetrySampler.start() } else { telemetrySampler.stop() }
+    }
+
+    /// Whether the weather piece wants a forecast: the Desk runs, the layout places it and demo mode is
+    /// off (demo shows a made-up reading). Reads the saved place and nickname into `weather`, then starts
+    /// or stops the service to match, so there is no timer while the Desk is hidden or the piece is not
+    /// placed. Called wherever `syncTelemetry` is, and when Settings, Weather changes.
+    func syncWeather() {
+        applyWeather(running: timer != nil,
+                     layout: UserDefaults.desk.string(forKey: "layout") ?? DeskLayout.standard)
+    }
+
+    /// `syncWeather` with its inputs given, so the rule tests without a running Desk.
+    func applyWeather(running: Bool, layout: String, settings: DeskWeatherSettings = .load(), now: Date = Date()) {
+        let placed = MainActor.assumeIsolated { WeatherService.isPlaced(layout: layout) }
+        if !demo {
+            var next = weather
+            next.place = settings.place
+            next.nickname = settings.nickname
+            if settings.place == nil { next.reading = nil }
+            if next != weather { weather = next }
+        }
+        MainActor.assumeIsolated {
+            weatherService.onUpdate = { [weak self] in self?.weatherChanged() }
+            weatherService.sync(running: running && !demo, placed: placed)
+        }
+    }
+
+    private func weatherChanged(now: Date = Date()) {
+        guard !demo else { return }
+        var next = weather
+        next.reading = MainActor.assumeIsolated { weatherService.latest }
+        next.stale = next.reading.map { WeatherSchedule.isStale($0, now: now) } ?? false
+        if next != weather { weather = next }
+    }
+
+    /// A reading goes stale after 3 hours with no redraw to say so: the minute timer re-checks it.
+    private func refreshWeatherStale(now: Date = Date()) {
+        guard !demo, let reading = weather.reading else { return }
+        let stale = WeatherSchedule.isStale(reading, now: now)
+        if stale != weather.stale { weather.stale = stale }
     }
 
     private func setTelemetry(_ sample: TelemetrySample?) {
@@ -391,6 +439,7 @@ final class DeskModel {
         companion.hide()
         timer?.invalidate(); timer = nil
         syncTelemetry()
+        syncWeather()
         claudeTimer?.invalidate(); claudeTimer = nil
         // A block observer is removed by its token; removeObserver(self) would leave it behind
         // and every Desk off and on would add another.
@@ -448,6 +497,8 @@ final class DeskModel {
     func setDemo(_ on: Bool, now: Date = Date()) {
         demo = on
         syncTelemetry()
+        syncWeather()
+        if on { weather = WeatherDemo.shown(now: now) } else { weather = DeskWeatherShown(); syncWeather() }
         // Demo shows made-up readings; leaving it drops them unless the sampler is running for real.
         if on { telemetry = Telemetry.demoSample(now: now) } else if !telemetrySampler.isRunning { telemetry = nil }
         setWatchers(allWatchers)

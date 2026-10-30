@@ -53,7 +53,7 @@ struct DeskView: View {
     @AppStorage(DeskController.notchKey, store: .desk) private var island = false
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
 
-    enum Widget: String, CaseIterable { case clock, claude, meters, nowPlaying, telemetry, watchers, meetings, message, companion }
+    enum Widget: String, CaseIterable { case clock, claude, meters, nowPlaying, telemetry, weather, watchers, meetings, message, companion }
 
     private var inset: CGFloat { timeSize * 0.18 }
 
@@ -263,6 +263,13 @@ struct DeskPiece: View {
     private var inkSpec: String { DeskInkPreview.shared.resolved(saved: savedInk) }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// The weather as drawn: a design under review shows its nickname (DeskDesignPreview), never saved.
+    private var shownWeather: DeskWeatherShown {
+        var shown = model.weather
+        if let nick = DeskDesignPreview.shared.weatherNickname { shown.nickname = nick }
+        return shown
+    }
+
     /// Every piece, the message included, over its plate (DeskPlate) when the plate is on.
     var body: some View {
         piece.deskPlate()
@@ -278,6 +285,8 @@ struct DeskPiece: View {
         case .telemetry:
             DeskTelemetryPiece(sample: model.telemetry, style: style, ink: ink, font: font, timeSize: timeSize,
                                alignment: alignment).deskInk()
+        case .weather:
+            DeskWeatherPiece(shown: shownWeather, font: font, timeSize: timeSize, alignment: alignment).deskInk()
         case .watchers: DeskWatchers(model: model, font: font, size: timeSize * 0.17, alignment: alignment).deskInk()
         case .meetings: meetings.deskInk()
         case .message: message.deskPieceClickArea(.message) { model.messageFrame = $0 }

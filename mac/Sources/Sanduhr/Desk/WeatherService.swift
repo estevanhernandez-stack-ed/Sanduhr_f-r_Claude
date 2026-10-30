@@ -44,7 +44,7 @@ final class WeatherService {
     /// The layout places the weather piece somewhere (the layout word is `weather`, as on Windows).
     static func isPlaced(layout: String) -> Bool { DeskArrangement(layout).placement("weather") != nil }
 
-    init(session: URLSession = WeatherService.makeSession(),
+    nonisolated init(session: URLSession = WeatherService.makeSession(),
          settings: @escaping () -> DeskWeatherSettings = { DeskWeatherSettings.load() },
          isMetric: @escaping () -> Bool = { Weather.regionIsMetric },
          schedule: @escaping Schedule = WeatherService.liveSchedule,

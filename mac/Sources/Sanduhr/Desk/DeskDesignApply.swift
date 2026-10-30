@@ -3,7 +3,7 @@ import Observation
 
 /// The Desk settings a design can change (spec 8), read from and written to the `.desk` defaults suite: the layout
 /// (anchors, sizes, tilt, style), the font, the ink, the plate and the shadow. The Mac subset of Windows'
-/// `DeskDesignSettings`: no Launcher, no theme, no monitor, no weather nickname. Margins, sizes of the clock and
+/// `DeskDesignSettings`: no Launcher, no theme, no monitor. The weather nickname rides along (saved in `desk_weather`). Margins, sizes of the clock and
 /// whether the Desk is on are not part of a design and are never touched.
 struct DeskDesignLook: Equatable {
     var arrangement: DeskArrangement
@@ -13,6 +13,8 @@ struct DeskDesignLook: Equatable {
     var ink: String
     var plate: Bool
     var shadow: Bool
+    /// The weather piece's nickname ("" is the place's own name), kept in the `desk_weather` member of the suite.
+    var weatherNickname = ""
 
     static let defaultInk = "ffffff"
 
@@ -22,7 +24,8 @@ struct DeskDesignLook: Equatable {
                  font: defaults.object(forKey: DeskFont.key) as? String,
                  ink: defaults.object(forKey: DeskLook.inkKey) as? String ?? defaultInk,
                  plate: defaults.object(forKey: DeskPlate.key) as? Bool ?? DeskPlate.defaultOn,
-                 shadow: defaults.object(forKey: DeskLook.shadowKey) as? Bool ?? true)
+                 shadow: defaults.object(forKey: DeskLook.shadowKey) as? Bool ?? true,
+                 weatherNickname: DeskWeatherSettings.decode(defaults.object(forKey: DeskWeatherSettings.key) as? [String: Any]).nickname)
     }
 
     /// The family the Desk draws in for this look (EsteFont Pro for a font never chosen or no longer installed).
@@ -48,6 +51,7 @@ enum DeskDesignApply {
         if let ink = design.ink, !ink.isEmpty { next.ink = ink.compactMap { DeskDesign.hex($0) }.prefix(4).joined(separator: ",") }
         if let plate = design.plate { next.plate = plate }
         if let shadow = design.shadow { next.shadow = shadow }
+        if let nick = design.weatherNickname { next.weatherNickname = Weather.normalizeNickname(nick) }
         return next
     }
 
@@ -80,6 +84,15 @@ enum DeskDesignApply {
         if next.ink != current.ink { defaults.set(next.ink, forKey: DeskLook.inkKey) }
         if next.plate != current.plate { defaults.set(next.plate, forKey: DeskPlate.key) }
         if next.shadow != current.shadow { defaults.set(next.shadow, forKey: DeskLook.shadowKey) }
+        if next.weatherNickname != current.weatherNickname { writeNickname(next.weatherNickname, to: defaults) }
+    }
+
+    /// Sets the nickname inside `desk_weather`, keeping the place and unit; an emptied suite value is removed.
+    private static func writeNickname(_ nickname: String, to defaults: DefaultsStore) {
+        var settings = DeskWeatherSettings.decode(defaults.object(forKey: DeskWeatherSettings.key) as? [String: Any])
+        settings.nickname = nickname
+        let encoded = settings.encode()
+        defaults.set(encoded.isEmpty ? nil : encoded, forKey: DeskWeatherSettings.key)
     }
 
     // MARK: - Put my Desk back
@@ -95,6 +108,7 @@ enum DeskDesignApply {
         if next.ink != current.ink { keys.append(DeskLook.inkKey) }
         if next.plate != current.plate { keys.append(DeskPlate.key) }
         if next.shadow != current.shadow { keys.append(DeskLook.shadowKey) }
+        if next.weatherNickname != current.weatherNickname { keys.append(DeskWeatherSettings.key) }
         return keys
     }
 
@@ -127,7 +141,8 @@ enum DeskDesignApply {
 
         /// Writes the saved values back (removing keys that were absent) and clears the snapshot; nothing else.
         func putBack(in store: DefaultsStore) {
-            let known = [DeskArrangeMode.layoutKey, DeskFont.key, DeskLook.inkKey, DeskPlate.key, DeskLook.shadowKey]
+            let known = [DeskArrangeMode.layoutKey, DeskFont.key, DeskLook.inkKey, DeskPlate.key, DeskLook.shadowKey,
+                         DeskWeatherSettings.key]
             for (k, v) in values where known.contains(k) { store.set(v is NSNull ? nil : v, forKey: k) }
             store.set(nil, forKey: DeskDesignApply.beforeKey)
         }
@@ -176,6 +191,9 @@ enum DeskDesignApply {
                 if DeskMeterStyles.supports(key), style != .bar { line += ", \(DeskMeterStyles.word(style))" }
                 lines.append(line)
             }
+        }
+        if a.weatherNickname != b.weatherNickname {
+            lines.append(b.weatherNickname.isEmpty ? "Weather: shows the place's own name" : "Weather: shown as \u{201C}\(b.weatherNickname)\u{201D}")
         }
         let fa = a.family(available: available)
         // A design that names no font carries the saved value over, which may be a family no longer installed
@@ -229,8 +247,10 @@ final class DeskDesignPreview {
     var font: String?
     var plate: Bool?
     var shadow: Bool?
+    /// The weather nickname to draw ("" is the place's own name).
+    var weatherNickname: String?
 
-    var isShowing: Bool { layout != nil || font != nil || plate != nil || shadow != nil }
+    var isShowing: Bool { layout != nil || font != nil || plate != nil || shadow != nil || weatherNickname != nil }
 
     /// The layout string to draw from: the preview's, else `saved`.
     func layoutString(saved: String) -> String { layout?.string ?? saved }
@@ -240,5 +260,6 @@ final class DeskDesignPreview {
         if font != nil { font = nil }
         if plate != nil { plate = nil }
         if shadow != nil { shadow = nil }
+        if weatherNickname != nil { weatherNickname = nil }
     }
 }

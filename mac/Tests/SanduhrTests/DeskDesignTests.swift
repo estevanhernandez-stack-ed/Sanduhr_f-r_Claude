@@ -64,7 +64,7 @@ struct DeskDesignTests {
         #expect(DeskDesignHandoff.maxAge == 600)
         #expect(DeskDesign.maxJsonBytes == 128 * 1024)
         #expect(DeskAnswer.statuses == ["previewing", "applied", "rejected", "needs_font"])
-        #expect(DeskDesign.fields == ["name", "note", "layout", "font", "ink", "plate", "shadow"])
+        #expect(DeskDesign.fields == ["name", "note", "layout", "weather", "font", "ink", "plate", "shadow"])
     }
 
     @Test func aGoodRequestIsAProposal() {

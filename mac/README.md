@@ -1942,12 +1942,13 @@ with `state_age_seconds` and `writer_version`; with no file it answers `no_data`
 
 **`propose_desk`** takes `{design, name?, note?}` where `design` has only the fields to change: `layout` (a piece to
 `{anchor, size, hidden, tilt, style}`), `font` (a family, or `{family, link}`), `ink` (`#rrggbb`, or two to four for a
-gradient), `plate` and `shadow`. `design_validate` in `sanduhr_mcp.py` checks it with the app's rules; a refusal returns
+gradient), `plate`, `shadow` and `weather` (`{nickname}`: up to 24 characters, `""` goes back to the place's name; the
+`telemetry` and `weather` pieces are ordinary layout pieces, `telemetry` takes a style). `design_validate` in `sanduhr_mcp.py` checks it with the app's rules; a refusal returns
 `rejected` with reasons and writes nothing. Windows' rules govern the fields and the messages (the Windows C# is the
 guide), the spec governs the Mac surfaces. The Mac refuses, with a reason and never silently: `messages`, `looks` and
 `theme` (their own tools exist), Windows-only fields (`launcher`, `monitor`, the ink words `auto`, `light`, `dark` and
-`theme`, the telemetry and glow pieces) and the 2.38 pieces (`system`, `weather`). A tilt that differs inside one
-stack is refused, a style on a piece other than `claude` and `meters` or an unknown word is refused, and Windows'
+`theme`, the glow piece, the Launcher piece). A tilt that differs inside one
+stack is refused, a style on a piece other than `claude`, `meters` and `telemetry` or an unknown word is refused, and Windows'
 wallpaper contrast rule is skipped. A good design goes to `desk-request.json` (owner-only, atomic, at most 128 KB) and
 the tool waits about ten seconds for `desk-result.json`; no answer is `queued`, `widget_not_responding`, and the request
 stays for ten minutes.

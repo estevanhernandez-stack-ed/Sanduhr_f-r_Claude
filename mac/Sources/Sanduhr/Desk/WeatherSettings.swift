@@ -127,8 +127,11 @@ struct WeatherSection: View {
             }
         }
         .formStyle(.grouped)
-        // `model.changed` is where the Desk model's weather sync hooks in with the piece (2.38.0 item 3).
-        .onAppear { nickname = model.nickname }
+        .onAppear {
+            nickname = model.nickname
+            // A new place, unit or nickname reaches the Desk at once: the service re-asks for a new place or unit.
+            model.changed = { DeskController.shared.model.syncWeather() }
+        }
     }
 }
 

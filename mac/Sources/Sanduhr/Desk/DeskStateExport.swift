@@ -4,7 +4,7 @@ import Foundation
 /// `desk-state.json` (spec 8, ledger D2): what `get_desk` reads. The Desk's settings live in the
 /// `com.626labs.sanduhr.desk` defaults suite, which the MCP server cannot read without racing cfprefsd, so the
 /// app keeps this small owner-only file current instead. It holds only the schema version, the layout words
-/// (anchor, size, tilt, style per piece), the Desk ink, plate and shadow, the font names, which pieces show,
+/// (anchor, size, tilt, style per piece), the Desk ink, plate and shadow, the font names, the weather nickname, which pieces show,
 /// the message and notch text colors, and the limits a design must keep. No usage numbers, no message text,
 /// no paths, no account names.
 enum DeskStateExport {
@@ -50,6 +50,8 @@ enum DeskStateExport {
             "ink": inkJson(d.string(forKey: "inkColor") ?? "ffffff"),
             "plate": d.object(forKey: DeskPlate.key) as? Bool ?? DeskPlate.defaultOn,
             "shadow": d.object(forKey: "inkShadow") as? Bool ?? true,
+            // The weather piece's nickname ("" is the place's own name); the place and unit stay on this Mac.
+            "weather": ["nickname": DeskWeatherSettings.load(d).nickname],
         ]
         let showMeetings = d.object(forKey: "showMeetings") as? Bool ?? true
         let root: [String: Any] = [

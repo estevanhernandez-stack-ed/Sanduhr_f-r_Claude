@@ -1,0 +1,12 @@
+{
+  "layout": {
+    "telemetry": {
+      "anchor": "tr",
+      "style": "ring"
+    },
+    "weather": {
+      "anchor": "mr",
+      "size": 1.2
+    }
+  }
+}

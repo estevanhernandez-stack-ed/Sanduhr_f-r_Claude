@@ -245,7 +245,7 @@ struct TelemetryTests {
         #expect(m.telemetry == nil)
     }
 
-    @Test func demoModeShowsMadeUpReadingsAndNoSampler() {
+    @MainActor @Test func demoModeShowsMadeUpReadingsAndNoSampler() {
         let clock = FakeClock()
         let m = model(clock)
         m.applyTelemetry(running: true, layout: "telemetry:tr")
@@ -260,7 +260,7 @@ struct TelemetryTests {
 
     @Test func theWordIsKnownAfterNowPlayingAndTakesTheTopRight() {
         #expect(DeskArrangement.known == ["message", "clock", "claude", "meters", "nowPlaying", "telemetry",
-                                          "watchers", "meetings", "companion"])
+                                          "weather", "watchers", "meetings", "companion"])
         #expect(DeskArrangement.defaultAnchor("telemetry") == .tr)
         #expect(DeskLayout.widgets.first { $0.key == "telemetry" }?.name == "System")
         var a = DeskArrangement(DeskLayout.standard)
@@ -305,9 +305,10 @@ struct TelemetryTests {
         #expect(DeskArrangement(DeskLayout.standard).hidden.contains("telemetry"))
     }
 
-    @Test func aDesignStillCannotCarryTheSystemPieceYet() {
-        let json = #"{"layout":{"telemetry":{"anchor":"tr"}}}"#
+    @Test func aDesignCanCarryTheSystemPieceAndItsStyle() {
+        let json = #"{"layout":{"telemetry":{"anchor":"tr","style":"ring"}}}"#
         let v = DeskDesign.validate(TJ.parse(json), context: DeskDesignContext(installedFonts: []))
-        #expect(v.status.word == "rejected")
+        #expect(v.status.word == "ok")
+        #expect(v.design?.layout?.first?.style == .ring)
     }
 }

@@ -218,7 +218,7 @@ struct DeskLayoutTests {
     }
 
     @Test func placingDropsWordsTheTabDoesNotKnow() {
-        #expect(DeskLayout.placing("clock", in: "bl", layout: "weather:tr clock:tl") == "clock:bl")
+        #expect(DeskLayout.placing("clock", in: "bl", layout: "toaster:tr clock:tl") == "clock:bl")
     }
 
     @Test func metersIsAPieceAndStacksAfterTheClaudeLine() {

@@ -39,7 +39,7 @@ def state_doc(edit=None):
         "message_color": "9ad7ff",
         "notch_text_color": "ffffff",
         "limits": {"piece_tilt": {"min": -20, "max": 20},
-                   "piece_style": {"pieces": ["claude", "meters"], "values": ["bar", "slim", "ring", "ticks"], "default": "bar"}},
+                   "piece_style": {"pieces": ["claude", "meters", "telemetry"], "values": ["bar", "slim", "ring", "ticks"], "default": "bar"}},
         "secret": "not passed on",
     }
     if edit:
@@ -117,6 +117,18 @@ class SharedFixtures(unittest.TestCase):
 
 
 class GetDesk(Base):
+    def test_it_returns_the_weather_nickname_and_the_new_pieces(self):
+        def edit(doc):
+            doc["design"]["weather"] = {"nickname": "Funky Town"}
+            doc["design"]["layout"]["telemetry"] = {"anchor": "tr", "size": 1, "hidden": False, "tilt": 0, "style": "ring"}
+            doc["design"]["layout"]["weather"] = {"anchor": "mr", "size": 1, "hidden": False, "tilt": 0}
+        self.write_state(edit)
+        r = mcp.build_get_desk(now=NOW, paths=self.paths)
+        self.assertEqual(r["design"]["weather"]["nickname"], "Funky Town")
+        self.assertEqual(r["design"]["layout"]["telemetry"]["style"], "ring")
+        self.assertIn("telemetry", r["pieces"])
+        self.assertIn("weather", r["pieces"])
+
     def test_without_a_state_file_it_says_to_start_sanduhr(self):
         r = mcp.build_get_desk(now=NOW, paths=self.paths)
         self.assertEqual((r["status"], r["reason"]), ("no_data", "missing"))
@@ -133,7 +145,7 @@ class GetDesk(Base):
         self.assertEqual(r["writer_version"], "2.37.0")
         self.assertEqual(r["design"]["font"], "EsteFont Pro")
         self.assertEqual(r["design"]["layout"]["clock"]["anchor"], "bl")
-        self.assertEqual(len(r["pieces"]), 8)
+        self.assertEqual(len(r["pieces"]), 10)
         self.assertEqual(len(r["anchors"]), 8)
         self.assertEqual(r["fonts"]["installed"][1], "Caveat")
         self.assertEqual(r["shown"], ["clock", "claude"])
@@ -229,14 +241,11 @@ class ProposeRefusals(Base):
     def test_what_only_windows_has_is_refused_with_a_reason_never_dropped(self):
         cases = (
             ({"launcher": {"buttons": []}}, "launcher", "Windows only"),
-            ({"weather": {"nickname": "Funky Town"}}, "weather", "2.38.0"),
             ({"messages": {"lines": ["Hello."]}}, "messages", "propose_desk_messages"),
             ({"looks": []}, "looks", "propose_now_playing_looks"),
             ({"theme": {"name": "x"}}, "theme", "propose_theme"),
             ({"layout": {"clock": {"anchor": "bl", "monitor": "main"}}}, "layout.clock", "monitor is Windows only"),
-            ({"layout": {"system": {"anchor": "tr"}}}, "layout.system", "2.38.0"),
-            ({"layout": {"weather": {"anchor": "tr"}}}, "layout.weather", "2.38.0"),
-            ({"layout": {"telemetry": {"anchor": "tr"}}}, "layout.telemetry", "Windows system piece"),
+            ({"layout": {"system": {"anchor": "tr"}}}, "layout.system", "not a Desk piece"),
             ({"layout": {"launcher": {"anchor": "tr"}}}, "layout.launcher", "no Launcher"),
             ({"layout": {"glow": {}}}, "layout.glow", "no glow piece"),
             ({"ink": "auto"}, "ink", "Windows ink word"),
@@ -269,6 +278,43 @@ class ProposeRefusals(Base):
         self.assertEqual(r["status"], "queued")
         design = self.request()["design"]
         self.assertEqual((design["name"], design["note"]), ("Outer", "Outer note."))
+
+
+class ProposeWeather(Base):
+    def test_telemetry_and_weather_pieces_are_accepted(self):
+        r = self.propose({"layout": {"telemetry": {"anchor": "tr", "style": "ring"}, "weather": {"anchor": "mr"}}})
+        self.assertEqual(r["status"], "queued")
+        layout = self.request()["design"]["layout"]
+        self.assertEqual(layout["telemetry"]["style"], "ring")
+        self.assertEqual(layout["weather"]["anchor"], "mr")
+
+    def test_a_nickname_is_trimmed_and_queued_and_empty_goes_back_to_the_place(self):
+        self.propose({"weather": {"nickname": "  Funky Town "}})
+        self.assertEqual(self.request()["design"]["weather"]["nickname"], "Funky Town")
+        self.propose({"weather": {"nickname": ""}})
+        self.assertEqual(self.request()["design"]["weather"]["nickname"], "")
+
+    def test_a_bad_nickname_is_refused_without_a_request(self):
+        cases = (
+            ({"weather": {"nickname": "Dallas Fort Worth Metroplex Area"}}, "weather.nickname"),
+            ({"weather": {"nickname": "abcdefghijklmnopqrstuvwxy"}}, "weather.nickname"),
+            ({"weather": {"nickname": "two\nlines"}}, "weather.nickname"),
+            ({"weather": {"city": "Paris"}}, "weather"),
+            ({"weather": "Funky Town"}, "weather"),
+            ({"weather": {}}, "weather.nickname"),
+            ({"layout": {"weather": {"style": "slim"}}}, "layout.weather.style"),
+        )
+        for design, field in cases:
+            with self.subTest(design=design):
+                r = self.propose(design)
+                self.assertEqual(r["status"], "rejected")
+                self.assertIn(field, [x["field"] for x in r["reasons"]])
+                self.assert_no_request()
+
+    def test_the_guide_names_the_nickname(self):
+        propose = [t for t in mcp.TOOLS if t["name"] == "propose_desk"][0]
+        self.assertIn("weather {nickname}", propose["description"])
+        self.assertIn("nickname", propose["inputSchema"]["properties"]["design"]["properties"]["weather"]["properties"])
 
 
 class ProposeHandoff(Base):
@@ -391,7 +437,7 @@ class Catalog(unittest.TestCase):
         self.assertFalse(propose["inputSchema"]["additionalProperties"])
         self.assertFalse(propose["inputSchema"]["properties"]["design"]["additionalProperties"])
         self.assertIn("tilt: -20 to 20 degrees", json.dumps(propose["inputSchema"]))
-        self.assertIn("style: bar|slim|ring|ticks, only on claude and meters", json.dumps(propose["inputSchema"]))
+        self.assertIn("style: bar|slim|ring|ticks, only on claude, meters and telemetry", json.dumps(propose["inputSchema"]))
         self.assertIn("ticks (ten segmented cells, the OLED-friendly one)", propose["description"])
 
     def test_call_tool_routes_both(self):
