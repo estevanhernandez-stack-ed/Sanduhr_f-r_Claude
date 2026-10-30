@@ -309,7 +309,10 @@ internal sealed class WidgetReviewHost : IWidgetReviewHost, IDisposable
         _settingsFollow = settingsFollow;
     }
 
-    public bool DeskBusy => DeskDesignService.Current?.Reviewing == true || DrawerReviewService.Current?.Reviewing == true;
+    /// <summary>A drawers plan is under review (one review at a time); a seam so a test never sets the process-wide static.</summary>
+    internal Func<bool> DrawersReviewing { get; set; } = () => DrawerReviewService.Current?.Reviewing == true;
+
+    public bool DeskBusy => DeskDesignService.Current?.Reviewing == true || DrawersReviewing();
 
     public void ShowPreview(WidgetPreview preview, DeskReviewModel model, Action<bool> apply, Action dismiss)
     {

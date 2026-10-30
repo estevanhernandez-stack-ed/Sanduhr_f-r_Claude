@@ -136,7 +136,7 @@ public class StreamerReachTests
         ("Sanduhr.App/Desk/DeskView.cs", "notname", 1),
         ("Sanduhr.App/Desk/Drawers/DrawerJournalStore.cs", "notname", 1),
         ("Sanduhr.App/Desk/Drawers/DrawerPlanEditWindow.xaml.cs", "masked", 2),
-        ("Sanduhr.App/Desk/Drawers/DrawerMover.cs", "key", 12),
+        ("Sanduhr.App/Desk/Drawers/DrawerMover.cs", "key", 13),   // final review I1: a move into a drawer that left settings is skipped by its leaf
         ("Sanduhr.App/Desk/Drawers/DrawerPiece.xaml.cs", "notname", 1),
         ("Sanduhr.App/Desk/Drawers/DrawerService.cs", "key", 4),
         ("Sanduhr.App/Desk/Drawers/DrawerService.cs", "notname", 1),

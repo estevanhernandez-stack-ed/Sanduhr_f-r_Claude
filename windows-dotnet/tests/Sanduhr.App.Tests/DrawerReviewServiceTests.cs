@@ -6,7 +6,9 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.Tests;
 
-/// <summary>The drawers review from the rules' plan to Apply, Edit, Undo and Dismiss, with a fake bar (drawers plan 2, Task 9).</summary>
+/// <summary>The drawers review from the rules' plan to Apply, Edit, Undo and Dismiss, with a fake bar (drawers plan 2, Task 9). In the
+/// SettingsWindow collection: the bar's drawer names and result line read streamer mode, which tests there turn on.</summary>
+[Collection("SettingsWindow")]
 public sealed class DrawerReviewServiceTests
 {
     private sealed class FakeHost : IDrawerReviewHost

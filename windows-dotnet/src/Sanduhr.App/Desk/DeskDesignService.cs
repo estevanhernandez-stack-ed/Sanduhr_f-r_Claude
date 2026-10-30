@@ -126,6 +126,10 @@ internal sealed class DeskDesignService : IDisposable
     /// <summary>The clock (tests set it).</summary>
     internal Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.UtcNow;
 
+    /// <summary>A drawers plan is under review, so a design waits (one review at a time). Tests set it rather than the process-wide
+    /// <see cref="DrawerReviewService.Current"/>, which parallel test classes would see.</summary>
+    internal Func<bool> DrawersReviewing { get; set; } = () => DrawerReviewService.Current?.Reviewing == true;
+
     /// <summary>The saved designs or "Put my Desk back" changed (Settings and the tray follow).</summary>
     public event Action? DesignsChanged;
 
@@ -327,7 +331,7 @@ internal sealed class DeskDesignService : IDisposable
     private DeskAnswer OnProposalCore(string id, DeskValidation verdict)
     {
         if (ResetGuard.Done || verdict.Design is not { } proposal) return DeskAnswer.NotReady;
-        if (DrawerReviewService.Current?.Reviewing == true)
+        if (DrawersReviewing())
             return new DeskAnswer(DeskAnswer.Rejected, "busy",
                 [new DeskReason("design", "a drawers plan is waiting for the user's review; ask them to Apply or Dismiss it, then propose the design again")]);
         var current = CurrentDesign();

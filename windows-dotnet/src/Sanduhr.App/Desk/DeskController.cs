@@ -773,8 +773,6 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         if (!presence.OnScreen(now)) Render();
     }
 
-    /// <summary>Lays each screen out afresh and hands the host its islands; the host keeps its windows
-    /// when the islands line up with the last ones.</summary>
     /// <summary>Streamer mode moved: names and labels on the Desk must follow now, so this redraws past a busy drawer (an inline rename
     /// in progress loses its edit box; privacy beats interaction).</summary>
     internal void PrivacyChanged()
@@ -861,6 +859,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         foreach (var piece in old) piece.Dispose();
     }
 
+    /// <summary>Lays each screen out afresh and hands the host its islands; the host keeps its windows
+    /// when the islands line up with the last ones.</summary>
     private void Render()
     {
         // While arranging the arrange surfaces draw; the islands come back when it ends.

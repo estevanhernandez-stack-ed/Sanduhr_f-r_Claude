@@ -39,6 +39,10 @@ internal sealed class DrawerJournalStore
     /// <summary>Drops one entry. False when the journal could not be read or written, so the caller can tell the entry is still there.</summary>
     public bool Remove(string id) => Change(j => j.Without(id));
 
+    /// <summary>A drawer's folder was renamed: its entries follow it (<see cref="DrawerJournal.Repoint"/>). False when the journal could
+    /// not be read or written; the entries then still name the old folder.</summary>
+    public bool Repoint(string oldHome, string newHome) => Change(j => j.Repoint(oldHome, newHome));
+
     private bool Change(Func<DrawerJournal, DrawerJournal> edit)
     {
         if (ResetGuard.Done) return false;

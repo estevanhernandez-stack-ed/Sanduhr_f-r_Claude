@@ -42,6 +42,18 @@ public sealed class DrawerJournal
     /// <summary>The journal without one entry (undone, or its files all gone). An unknown id changes nothing.</summary>
     public DrawerJournal Without(string id) => new(Entries.Where(e => e.Id != id).ToArray());
 
+    /// <summary>A drawer's folder was renamed: every move that landed in <paramref name="oldHome"/> (or below it) now points under
+    /// <paramref name="newHome"/>, so undo still finds the files. Other entries, and each move's source, are untouched.</summary>
+    public DrawerJournal Repoint(string oldHome, string newHome)
+    {
+        var from = oldHome.TrimEnd('\\', '/');
+        var to = newHome.TrimEnd('\\', '/');
+        if (from.Length == 0) return this;
+        string Map(string path) =>
+            path.StartsWith(from + "\\", StringComparison.OrdinalIgnoreCase) ? to + path[from.Length..] : path;
+        return new(Entries.Select(e => e with { Moves = [.. e.Moves.Select(m => m with { To = Map(m.To) })] }).ToArray());
+    }
+
     public IReadOnlyList<JournalSummaryLine> Summary() =>
         Entries.Select(e => new JournalSummaryLine(e.AtUtc, e.Source, e.Agent, e.Moves.Count)).ToArray();
 

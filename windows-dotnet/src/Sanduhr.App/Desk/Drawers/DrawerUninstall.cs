@@ -21,7 +21,8 @@ internal static class DrawerUninstall
         {
             var s = new SettingsStore(paths).LoadDrawers();
             if (s.Drawers.Count == 0) return null;
-            var plan = DrawerReturn.Plan(s.Drawers, s.RootOr(places.Desktop), places.Desktop, DrawerService.ChildrenOf, DrawerMover.Exists);
+            var plan = DrawerReturn.Plan(s.Drawers, s.RootOr(places.Desktop), places.Desktop, DrawerService.ChildrenOf, DrawerMover.Exists,
+                removeRoot: s.RootIsDefault(places.Desktop));
             var until = DateTime.UtcNow + budget;
             return new DrawerMover(places.Desktop).Return(plan, [.. s.Drawers.Select(d => d.Home)], () => DateTime.UtcNow >= until);
         }

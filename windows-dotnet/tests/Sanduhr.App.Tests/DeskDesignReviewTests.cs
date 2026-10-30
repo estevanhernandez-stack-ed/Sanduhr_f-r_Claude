@@ -641,19 +641,16 @@ public sealed class DeskDesignReviewTests : IDisposable
         var review = new DrawerReviewService(drawers, store, new QuietDrawerHost());
         box.File(@"Desktop\notes.pdf");
         Assert.Null(review.SortNow());
-        DrawerReviewService.Current = review;
-        try
-        {
-            var fake = new FakeHost();
-            using var s = new DeskDesignService(_paths, _store) { Host = fake, InstalledFonts = () => Installed, Clock = () => _now };
-            Send(s, "d1", Dusk);
-            Assert.False(s.Reviewing);
-            Assert.Empty(fake.Calls);
-            Assert.Equal("busy", (string?)Result()["result"]!["reason"]);
-            review.Dismiss();
-            Send(s, "d2", Dusk);   // free again
-            Assert.True(s.Reviewing);
-        }
-        finally { DrawerReviewService.Current = null; }
+        // The seam, never the process-wide DrawerReviewService.Current: the other Designs classes run in parallel and would read it.
+        var fake = new FakeHost();
+        using var s = new DeskDesignService(_paths, _store)
+            { Host = fake, InstalledFonts = () => Installed, Clock = () => _now, DrawersReviewing = () => review.Reviewing };
+        Send(s, "d1", Dusk);
+        Assert.False(s.Reviewing);
+        Assert.Empty(fake.Calls);
+        Assert.Equal("busy", (string?)Result()["result"]!["reason"]);
+        review.Dismiss();
+        Send(s, "d2", Dusk);   // free again
+        Assert.True(s.Reviewing);
     });
 }

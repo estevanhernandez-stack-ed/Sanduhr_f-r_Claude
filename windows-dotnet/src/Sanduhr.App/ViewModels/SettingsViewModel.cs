@@ -318,7 +318,7 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
         ClaudeCodePage.StatusText = "";
         Desk.Companion.Reload();
         Desk.Launcher.Reload();   // preflight P3: a link's URL and a raw target
-        Drawers.Refresh();   // the drawer names and the Drawers folder's path
+        Drawers.ReloadNames();   // the drawer names and the Drawers folder's path; its status line goes like the others
         History.RefreshNames();
         ClaudeCode.Overview.RefreshNames();
         ClaudeCode.Trends.RefreshNames();

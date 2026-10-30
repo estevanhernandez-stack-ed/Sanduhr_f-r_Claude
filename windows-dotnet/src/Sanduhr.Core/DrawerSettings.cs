@@ -30,6 +30,12 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
     /// <summary>The Drawers root in force: the user's, or the Desktop default.</summary>
     public string RootOr(string desktop) => string.IsNullOrWhiteSpace(Root) ? DefaultRoot(desktop) : Root;
 
+    /// <summary>The Drawers root is Sanduhr's own Desktop\Drawers (no folder picked, or the default picked by its path), which turning off
+    /// may remove once it is empty. A folder the user picked is theirs and always stays.</summary>
+    public bool RootIsDefault(string desktop) =>
+        string.IsNullOrWhiteSpace(Root)
+        || (DrawerPaths.Normalize(Root) is { } r && string.Equals(r, DrawerPaths.Normalize(DefaultRoot(desktop)), StringComparison.OrdinalIgnoreCase));
+
     public static DrawerSettings Decode(JsonNode? node)
     {
         if (node is not JsonObject o) return Default;

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using Sanduhr.App.Interop;
+using Sanduhr.App.Services;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.Desk;
@@ -15,6 +16,13 @@ internal sealed record DrawerRun(IReadOnlyList<JournalMove> Moved, IReadOnlyList
 
     /// <summary>"13 moved, 1 skipped: report.docx is open in Word."</summary>
     public string Line => DrawerReview.ResultLine(Moved.Count, Skipped);
+
+    /// <summary>The line every surface draws (the review's result bar, a drawer's foot, the Drawers page): <see cref="Line"/>, cut to the
+    /// counts while streamer mode is on and a skipped file would be named, then " Undo is not available for this move." when
+    /// <see cref="UndoLost"/>.</summary>
+    public string Shown =>
+        (Skipped.Count > 0 && StreamerMode.On ? $"{Moved.Count} moved, {Skipped.Count} skipped." : Line)   // streamer: masked - the file-naming line becomes counts while on
+        + (UndoLost ? DrawerPieceCopy.UndoLost : "");
 }
 
 /// <summary>Turning drawers off: the run, and the homes (and root) kept because something in them could not move.</summary>
@@ -67,7 +75,12 @@ internal sealed class DrawerMover
         var unnamed = new List<DrawerSkipped>();
         foreach (var m in check.Moves)
         {
-            var dir = homes[m.DrawerId];
+            // A drawer that left settings since the plan was checked (turned off or removed mid-review) has no home: skip, never throw.
+            if (!homes.TryGetValue(m.DrawerId, out var dir))
+            {
+                unnamed.Add(new(Path.GetFileName(m.Source), DrawerSkip.CouldNotMove));   // streamer: key - a file's leaf for the result line, which its reader masks
+                continue;
+            }
             try
             {
                 var to = DrawerNames.Free(dir, Path.GetFileName(m.Source), Directory.Exists(m.Source), p => Exists(p) || claimed.Contains(p));   // streamer: key - a file's leaf names its new place, never drawn

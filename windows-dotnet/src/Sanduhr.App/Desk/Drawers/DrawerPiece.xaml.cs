@@ -384,6 +384,8 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         if (_disposed || !item.Editing) return;
         item.Editing = false;
         text = text.Trim();
+        // A blank box under streamer mode (it opens blank, see EditorStart) keeps the name, as Escape does.
+        if (text.Length == 0 && StreamerMode.On) { EndRename(); return; }
         if (text != item.Name && _service.RenameItem(item.Path, text) is { } error) Say(error);
         EndRename();
     }
@@ -404,11 +406,19 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
     private void Editor_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         if (sender is not TextBox box || e.NewValue is not true || box.DataContext is not DrawerItem item) return;
-        box.Text = item.Name;
-        // Explorer selects the name without its extension.
-        int stem = item.IsFolder ? item.Name.Length : Path.GetFileNameWithoutExtension(item.Name).Length;   // streamer: key - a length, never drawn
-        if (stem == 0) stem = item.Name.Length;   // a dotfile (.gitignore) has no stem: select the whole name, as Explorer does
+        var (text, stem) = EditorStart(item);
+        box.Text = text;
         box.Dispatcher.BeginInvoke(() => { box.Focus(); box.Select(0, stem); }, DispatcherPriority.Input);
+    }
+
+    /// <summary>What the inline rename box opens with and how much of it is selected: the name with its stem selected, as Explorer does;
+    /// blank while streamer mode is on, as the drawer-rename prompt opens (the box is not blurred).</summary>
+    internal static (string Text, int Select) EditorStart(DrawerItem item)
+    {
+        if (StreamerMode.Mask.Omit(item.Name) is not { } name) return ("", 0);   // streamer: masked - Mask.Omit opens the box blank while on
+        int stem = item.IsFolder ? name.Length : Path.GetFileNameWithoutExtension(name).Length;   // streamer: key - a length, never drawn
+        if (stem == 0) stem = name.Length;   // a dotfile (.gitignore) has no stem: select the whole name, as Explorer does
+        return (name, stem);
     }
 
     private void Editor_KeyDown(object sender, KeyEventArgs e)
@@ -432,9 +442,7 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         : (source as FrameworkElement)?.DataContext as DrawerItem;
 
     /// <summary>A drop's result: the named line, or only the counts while streamer mode is on (the line names files).</summary>
-    internal void Say(DrawerRun run) =>
-        Say((StreamerMode.Mask.Omit(run.Line) ?? $"{run.Moved.Count} moved, {run.Skipped.Count} skipped.")   // streamer: masked - Mask.Omit drops the file-naming line while on, leaving the counts
-            + (run.UndoLost ? DrawerPieceCopy.UndoLost : ""));
+    internal void Say(DrawerRun run) => Say(run.Shown);   // streamer: masked - DrawerRun.Shown cuts the file-naming line to counts while on
 
     /// <summary>One line at the drawer's foot for six seconds: what a drop skipped, or why a rename did not happen.</summary>
     internal void Say(string line)

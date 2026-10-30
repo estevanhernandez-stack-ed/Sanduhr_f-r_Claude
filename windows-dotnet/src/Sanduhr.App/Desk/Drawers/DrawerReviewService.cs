@@ -43,6 +43,7 @@ internal sealed class DrawerReviewService
     private DrawerPlan? _plan;
     private DrawerPlanCheck? _check;
     private string? _undoId;
+    private IReadOnlyList<string> _madeHomes = [];
 
     public DrawerReviewService(DrawerService drawers, SettingsStore store, IDrawerReviewHost host)
     {
@@ -101,20 +102,52 @@ internal sealed class DrawerReviewService
         string? note = s.Drawers.Count == 0 && string.IsNullOrWhiteSpace(s.Root) ? DrawerReview.FirstOnLine : null;
         var sync = DrawerSync.Warning(places.Desktop, s.RootOr(places.Desktop), places.Synced);
         var warnings = new List<string>();
-        if (sync is not null) warnings.Add(sync);
+        if (sync is not null) warnings.Add(StreamerMode.Mask.Paths(sync));   // streamer: masked - Mask.Paths hides the profile folder in the root's path while on
         warnings.AddRange(extraWarnings);
-        return DrawerReview.Model(plan, check, [.. s.Drawers.Select(d => d.Id)], note, warnings);
+        return DrawerReview.Model(plan, check, [.. s.Drawers.Select(d => d.Id)], note, warnings,
+            name => StreamerMode.Mask.Name(CodenameCategory.Folder, name));   // streamer: masked - Mask.Name gives each drawer's codename while on
+    }
+
+    /// <summary>The review is over: the plan goes, the faded items and the preview end.</summary>
+    private void End()
+    {
+        _plan = null;
+        _check = null;
+        _drawers.ClearPending();
+        _host.EndPreview();
     }
 
     private void Apply()
     {
-        if (_plan is not { } plan || _check is not { } check) return;
+        if (_plan is not { } plan || _check is null) return;
+        // The drawers may have changed under the review (turned off, one removed, the folder moved): check the plan again against them
+        // and refuse rather than run a plan that no longer fits (final review I1).
+        var check = _drawers.Settings.Enabled ? DrawerPlanValidator.Check(plan, _drawers.Roots, _drawers.Settings.Drawers) : null;
+        if (check is not { Ok: true } || check.Moves.Count == 0)
+        {
+            var why = check is null ? DrawerReview.DrawersOff
+                : check.Ok ? DrawerReview.NothingToSort
+                : StreamerMode.Mask.Omit(check.Error) ?? DrawerReview.PlanChanged;   // streamer: masked - a check's error can name files; Mask.Omit drops it while on
+            _undoId = null;
+            End();
+            _host.Bar(DrawerReview.Result(why, canUndo: false), Undo, null, Done);
+            return;
+        }
         DrawerRun run;
-        JournalEntry? entry;
+        try { run = RunApply(check, _drawers.Settings.Drawers); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            // Never leave the review stuck: the preview ends and the bar says nothing more moved, with no Undo.
+            _undoId = null;
+            End();
+            _host.Bar(DrawerReview.Result(DrawerReview.ApplyFailed, canUndo: false), Undo, null, Done);
+            return;
+        }
+        // The journal before the settings: a save that fails after files moved still leaves the entry Undo needs (final review M1).
+        var entry = run.Moved.Count > 0 ? _drawers.Journal.Add(plan.Source, plan.Agent, run.Moved, DateTime.UtcNow) : null;
+        _drawers.ClearPending();
         try
         {
-            run = RunApply(check, _drawers.Settings.Drawers);
-            _drawers.ClearPending();
             var s = _drawers.Settings;
             _drawers.Save(s with
             {
@@ -123,34 +156,25 @@ internal sealed class DrawerReviewService
                 AutoTidyUnlocked = s.AutoTidyUnlocked || plan.Source == DrawerPlanSource.Rules,
             });
             // No layout and no places: new drawers arrive top right at render (free panels).
-            entry = run.Moved.Count > 0 ? _drawers.Journal.Add(plan.Source, plan.Agent, run.Moved, DateTime.UtcNow) : null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            // Never leave the review stuck: the preview ends and the bar says nothing more moved, with no Undo.
-            _plan = null;
-            _check = null;
-            _undoId = null;
-            _drawers.ClearPending();
-            _host.EndPreview();
-            _host.Bar(DrawerReview.Result(DrawerReview.ApplyFailed, canUndo: false), Undo, null, Done);
-            return;
+            /* the files moved and the line says so; the journal entry (and the homes below) still undo them */
         }
         _undoId = entry?.Id;
-        bool lost = run.Moved.Count > 0 && entry is null;
-        var line = run.Line + (lost ? DrawerPieceCopy.UndoLost : "");
-        _plan = null;
-        _check = null;
-        _host.EndPreview();
-        _host.Bar(DrawerReview.Result(line, _undoId is not null), Undo, null, Done);
+        _madeHomes = [.. check.Drawers.Select(d => d.Home)];
+        End();
+        var shown = (run with { UndoLost = run.Moved.Count > 0 && entry is null }).Shown;   // streamer: masked - DrawerRun.Shown cuts the file-naming line to counts while on
+        _host.Bar(DrawerReview.Result(shown, _undoId is not null), Undo, null, Done);
     }
 
     private void Undo()
     {
         if (_undoId is not { } id) return;
         _undoId = null;
-        var run = _drawers.Undo(id);
-        _host.Bar(DrawerReview.Result(run.Line, canUndo: false), Undo, null, Done);
+        // The homes this Apply made count as homes even when their settings save failed, so the files in them can come back.
+        var run = _drawers.Undo(id, _madeHomes);
+        _host.Bar(DrawerReview.Result(run.Shown, canUndo: false), Undo, null, Done);   // streamer: masked - DrawerRun.Shown cuts the file-naming line to counts while on
     }
 
     private void Done()
@@ -169,7 +193,8 @@ internal sealed class DrawerReviewService
         if (!check.Ok || check.Moves.Count == 0)
         {
             // Keep the review open on the plan the user was looking at, and say why the edit did not take.
-            _host.Bar(Model(plan, _check!, [check.Ok ? DrawerReview.NothingToSort : check.Error!]), Apply, Edit, Dismiss);
+            var why = check.Ok ? DrawerReview.NothingToSort : StreamerMode.Mask.Paths(check.Error!);   // streamer: masked - Mask.Paths hides the profile folder in a refused path while on
+            _host.Bar(Model(plan, _check!, [why]), Apply, Edit, Dismiss);
             return;
         }
         Show(next, check);
@@ -179,10 +204,7 @@ internal sealed class DrawerReviewService
     public void Dismiss()
     {
         if (_plan is null) { Done(); return; }
-        _plan = null;
-        _check = null;
-        _drawers.ClearPending();
-        _host.EndPreview();
+        End();
         _host.CloseBar();
     }
 }

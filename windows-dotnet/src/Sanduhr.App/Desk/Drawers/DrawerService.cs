@@ -258,14 +258,15 @@ internal sealed class DrawerService : IDisposable
         return run with { Skipped = [.. shared, .. run.Skipped], UndoLost = lost };
     }
 
-    /// <summary>Undoes one journal entry and drops it from the journal.</summary>
-    public DrawerRun Undo(string entryId)
+    /// <summary>Undoes one journal entry and drops it from the journal. <paramref name="alsoHomes"/> are homes a review's Apply just
+    /// made whose settings save failed: they count as homes for this undo.</summary>
+    public DrawerRun Undo(string entryId, IReadOnlyList<string>? alsoHomes = null)
     {
         if (Journal.Load().Entries.FirstOrDefault(e => e.Id == entryId) is not { } entry) return DrawerRun.Empty;
         UndoPlan plan;
         try { plan = DrawerUndo.Plan(entry, Written, DrawerMover.Exists); }
         catch (InvalidOperationException) { return DrawerRun.Empty; }   // no free clash name for one entry: left in the journal, never thrown out of the service
-        var run = Mover.Undo(plan, Homes);
+        var run = Mover.Undo(plan, [.. Homes, .. alsoHomes ?? []]);
         Journal.Remove(entryId);   // a false here is harmless: replaying a stale entry skips files no longer there as "was moved since"
         return run;
     }
@@ -294,7 +295,11 @@ internal sealed class DrawerService : IDisposable
 
     private ReturnPlan? PlanReturn(IReadOnlyList<DrawerDef> drawers)
     {
-        try { return DrawerReturn.Plan(drawers, Settings.RootOr(Places.Desktop), Places.Desktop, ChildrenOf, DrawerMover.Exists); }
+        try
+        {
+            return DrawerReturn.Plan(drawers, Settings.RootOr(Places.Desktop), Places.Desktop, ChildrenOf, DrawerMover.Exists,
+                removeRoot: Settings.RootIsDefault(Places.Desktop));   // a root the user picked is theirs: it stays (final review M3)
+        }
         catch (InvalidOperationException) { return null; }   // DrawerNames.Free ran out of clash names
     }
 
@@ -396,6 +401,9 @@ internal sealed class DrawerService : IDisposable
                 return "A folder of that name is already in the Drawers folder.";
             if (!ShellFiles.Rename(def.Home, name).Ok) return "The drawer's folder could not be renamed.";
             next = next with { Home = home };
+            // Earlier moves into this drawer follow its folder, so their Undo still finds the files. A journal that cannot be rewritten
+            // leaves the rename standing; those entries then skip their files as moved since (final review M4).
+            Journal.Repoint(def.Home, home);
         }
         Save(Settings with { Drawers = [.. Settings.Drawers.Select(d => d.Id == id ? next : d)] });
         return null;

@@ -11,8 +11,9 @@ public sealed record ReturnPlan(IReadOnlyList<UndoStep> Moves, IReadOnlyList<str
 /// </summary>
 public static class DrawerReturn
 {
+    /// <summary>The return. <paramref name="removeRoot"/> is false for a Drawers root the user picked: its emptied homes go, it stays.</summary>
     public static ReturnPlan Plan(IReadOnlyList<DrawerDef> drawers, string drawersRoot, string desktop,
-        Func<string, IEnumerable<DesktopItem>> childrenOf, Func<string, bool> exists)
+        Func<string, IEnumerable<DesktopItem>> childrenOf, Func<string, bool> exists, bool removeRoot = true)
     {
         var root = DrawerPaths.Normalize(drawersRoot);
         var desk = DrawerPaths.Normalize(desktop);
@@ -34,7 +35,7 @@ public static class DrawerReturn
             homes.Add(home);
         }
         // The root last: the App removes each folder only once it is empty, so a root holding anything else stays.
-        if (homes.Count > 0) homes.Add(root);
+        if (homes.Count > 0 && removeRoot) homes.Add(root);
         return new ReturnPlan(moves, homes);
     }
 

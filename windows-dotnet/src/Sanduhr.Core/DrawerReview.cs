@@ -15,20 +15,27 @@ public static class DrawerReview
     public const string Undo = "Undo";
     public const string Done = "Done";
     public const string ApplyFailed = "The plan could not be applied. Nothing more was moved.";
+    /// <summary>Apply found drawers off since the review opened (turned off on the Drawers page or by Reset): nothing runs.</summary>
+    public const string DrawersOff = "Drawers are off. Nothing was moved.";
+    /// <summary>Apply checked the plan again and the drawers had changed under it; said in place of a check's error that would name
+    /// files while streamer mode is on.</summary>
+    public const string PlanChanged = "Your drawers changed since this plan was made. Nothing was moved.";
     private const int NamedSkips = 3;
 
     public static string Title(int files, int drawers) =>
         $"{files} {(files == 1 ? "file" : "files")} into {drawers} {(drawers == 1 ? "drawer" : "drawers")}";
 
-    /// <summary>The bar for a checked plan. <paramref name="existingIds"/> are the drawers the user already has (no "(new)").</summary>
+    /// <summary>The bar for a checked plan. <paramref name="existingIds"/> are the drawers the user already has (no "(new)").
+    /// <paramref name="showName"/> draws a drawer's name (the App passes its streamer mask); null draws it as it is.</summary>
     public static DeskReviewModel Model(DrawerPlan plan, DrawerPlanCheck check, IReadOnlyCollection<string> existingIds, string? note,
-        IEnumerable<string> warnings)
+        IEnumerable<string> warnings, Func<string, string>? showName = null)
     {
         var names = plan.Drawers.GroupBy(d => d.Id).ToDictionary(g => g.Key, g => g.First().Name, StringComparer.Ordinal);
         var lines = check.Moves.GroupBy(m => m.DrawerId)
             .Select(g =>
             {
-                var name = names.TryGetValue(g.Key, out var n) ? n : g.Key;
+                var real = names.TryGetValue(g.Key, out var n) ? n : g.Key;
+                var name = showName is null ? real : showName(real);
                 var count = g.Count();
                 return $"{name}{(existingIds.Contains(g.Key) ? "" : " (new)")}: {count} {(count == 1 ? "file" : "files")}";
             })

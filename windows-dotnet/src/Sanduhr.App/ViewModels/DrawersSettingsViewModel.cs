@@ -84,6 +84,14 @@ internal sealed partial class DrawersSettingsViewModel : ObservableObject, IDisp
         finally { _loading = false; }
     }
 
+    /// <summary>Streamer mode moved or the codenames changed (Settings' ReloadNames): the rows are built again, and the status line goes,
+    /// since it is a sentence written with the names as they were then.</summary>
+    public void ReloadNames()
+    {
+        Status = "";
+        Refresh();
+    }
+
     private string NameOf(string id) =>
         _drawers?.Settings.Drawers.FirstOrDefault(d => d.Id == id) is { } d
             ? StreamerMode.Mask.Name(CodenameCategory.Folder, d.Name)   // streamer: masked - Mask.Name gives the codename while on
@@ -123,6 +131,7 @@ internal sealed partial class DrawersSettingsViewModel : ObservableObject, IDisp
         if (_disposed || _drawers is null || Enabled || !_drawers.Settings.Enabled) return;
         if (_drawers.ReturnPlan() is not { } plan) { Status = DrawerService.NoFreeName; StayOn(); return; }
         if (plan.Moves.Count > 0 && !Confirm(DrawerReturn.Prompt(plan.Moves.Count))) { StayOn(); return; }
+        DismissReview();   // a plan under review would move files into drawers that are going (final review I1)
         Status = Say(_drawers.TurnOff());
         Refresh();
         DeskChanged?.Invoke();
@@ -145,12 +154,18 @@ internal sealed partial class DrawersSettingsViewModel : ObservableObject, IDisp
         _loading = false;
     }
 
-    /// <summary>What a return said: the failure alone, else the result line and what had to stay.</summary>
+    /// <summary>A drawers review on the Desk ends before its drawers can change under it.</summary>
+    private void DismissReview()
+    {
+        if (_review?.Reviewing == true) _review.Dismiss();
+    }
+
+    /// <summary>What a return said: the failure alone, else the result line (counts only while streamer mode is on) and what had to stay.</summary>
     private static string Say(DrawerReturnRun result) =>
-        result.Failure ?? string.Join(" ", new[] { result.Run.Line, result.KeptNote }.OfType<string>().Where(l => l.Length > 0));
+        result.Failure ?? string.Join(" ", new[] { result.Run.Shown, result.KeptNote }.OfType<string>().Where(l => l.Length > 0));   // streamer: masked - DrawerRun.Shown cuts the file-naming line to counts while on
 
     [RelayCommand]
-    private void SortNow() => Status = _review is null ? SettingsNames.DrawersSortUnavailable : _review.SortNow() ?? "";
+    private void SortNow() => Status = _review is null ? SettingsNames.DrawersSortUnavailable : StreamerMode.Mask.Paths(_review.SortNow() ?? "");   // streamer: masked - a refused plan's line can carry a path; Mask.Paths hides the profile folder while on
 
     [RelayCommand]
     private void ChangeRoot()
@@ -232,12 +247,13 @@ internal sealed partial class DrawersSettingsViewModel : ObservableObject, IDisp
     internal void Remove(string id)
     {
         if (_drawers is null) return;
+        DismissReview();   // a plan under review may move files into this drawer (final review I1)
         var r = _drawers.Remove(id);
         Status = Say(r);
         Refresh();
     }
 
-    internal void Undo(string entryId) { Status = _drawers?.Undo(entryId).Line ?? ""; Refresh(); }
+    internal void Undo(string entryId) { Status = _drawers?.Undo(entryId).Shown ?? ""; Refresh(); }   // streamer: masked - DrawerRun.Shown cuts the file-naming line to counts while on
 }
 
 /// <summary>One rule's row: what it matches, the drawer it fills, on or off, and its place in the order.</summary>
