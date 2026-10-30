@@ -43,6 +43,10 @@ enum SettingsNames {
     static let claudeMetersBars = "Claude meters (bars)"
     /// The Desk piece with the machine's own readings: CPU, memory and disk (layout word `telemetry`).
     static let system = "System"
+    /// Weather: looks a typed city up with Open-Meteo.
+    static let weatherLookUp = "Look up"
+    /// Weather: the nickname the Desk shows instead of the place's name (desk key `desk_weather`, member `nickname`, local only).
+    static let weatherShowAs = "Show it as"
     /// Updates' button and every menu's item.
     static let checkForUpdates = "Check for Updates…"
     /// Themes and a theme suggestion's card.
@@ -69,6 +73,7 @@ enum SettingsNames {
         (showWidget, .widgetLook), (checkForUpdates, .updates), (saveAndApply, .themes),
         (listMode, .message), (textMode, .message),
         (linkFolder, .credentials),
+        (weatherLookUp, .weather), (weatherShowAs, .weather),
         (resetSanduhr, .about),
     ]
 
