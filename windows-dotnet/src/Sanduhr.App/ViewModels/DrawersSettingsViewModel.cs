@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sanduhr.App.Desk;
@@ -11,12 +12,14 @@ namespace Sanduhr.App.ViewModels;
 
 /// <summary>Settings, Drawers (5.0 drawers spec): on and off, where files live, Sort my desktop now, the rules, the drawers and the recent
 /// moves with Undo. Works with no drawer service (tests, the harness): the page opens empty.</summary>
-internal sealed partial class DrawersSettingsViewModel : ObservableObject
+internal sealed partial class DrawersSettingsViewModel : ObservableObject, IDisposable
 {
     private readonly DrawerService? _drawers;
     private readonly DrawerReviewService? _review;
     private readonly SettingsStore _store;
+    private readonly Dispatcher _ui = Dispatcher.CurrentDispatcher;
     private bool _loading;
+    private bool _disposed;
 
     public DrawersSettingsViewModel(DrawerService? drawers, DrawerReviewService? review, SettingsStore store)
     {
@@ -25,6 +28,17 @@ internal sealed partial class DrawersSettingsViewModel : ObservableObject
         _store = store;
         if (_drawers is not null) _drawers.Changed += Refresh;
         Refresh();
+    }
+
+    /// <summary>The running Desk is told to start or stop drawing (the Desk page's own switch does the same through its Changed hook).</summary>
+    public Action? DeskChanged { get; set; }
+
+    /// <summary>Stops following the drawer service; the Settings window calls this when it closes.</summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        if (_drawers is not null) _drawers.Changed -= Refresh;
     }
 
     /// <summary>Asks a yes or no question (the turn-off count); the page sets a themed dialog.</summary>
@@ -50,6 +64,7 @@ internal sealed partial class DrawersSettingsViewModel : ObservableObject
 
     public void Refresh()
     {
+        if (_disposed) return;
         _loading = true;
         try
         {
@@ -80,18 +95,45 @@ internal sealed partial class DrawersSettingsViewModel : ObservableObject
         var s = _drawers.Settings;
         if (value)
         {
-            var desk = _store.LoadDesk();
-            if (!desk.Enabled) _store.SaveDesk(desk with { Enabled = true });
+            try
+            {
+                var desk = _store.LoadDesk();
+                if (!desk.Enabled) _store.SaveDesk(desk with { Enabled = true });
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                Status = SettingsNames.DrawersDeskSaveFailed;
+                StayOff();
+                return;
+            }
             _drawers.Save(s with { Enabled = true });
             _drawers.ShowAll();
+            DeskChanged?.Invoke();   // the running Desk starts drawing the drawers, as the Desk page's own switch does
             Status = DrawerReview.FirstOnLine;
             return;
         }
-        // A clash name that ran out means nothing can be planned: say why and stay on.
+        // The check box is still mid-update here: the question, and any revert, wait until its binding has settled.
+        _ui.BeginInvoke(TurnOff);
+    }
+
+    /// <summary>Turning off, after the switch settled: a clash name that ran out means nothing can be planned (say why and stay on); a no to
+    /// the count keeps drawers on; a yes returns the files.</summary>
+    private void TurnOff()
+    {
+        if (_disposed || _drawers is null || Enabled || !_drawers.Settings.Enabled) return;
         if (_drawers.ReturnPlan() is not { } plan) { Status = DrawerService.NoFreeName; StayOn(); return; }
         if (plan.Moves.Count > 0 && !Confirm(DrawerReturn.Prompt(plan.Moves.Count))) { StayOn(); return; }
         Status = Say(_drawers.TurnOff());
         Refresh();
+        DeskChanged?.Invoke();
+    }
+
+    /// <summary>The switch goes back to off without running the on path again.</summary>
+    private void StayOff()
+    {
+        _loading = true;
+        Enabled = false;
+        _loading = false;
     }
 
     /// <summary>The switch goes back to on without running the on path again.</summary>
@@ -107,7 +149,7 @@ internal sealed partial class DrawersSettingsViewModel : ObservableObject
         result.Failure ?? string.Join(" ", new[] { result.Run.Line, result.KeptNote }.OfType<string>().Where(l => l.Length > 0));
 
     [RelayCommand]
-    private void SortNow() => Status = _review?.SortNow() ?? "";
+    private void SortNow() => Status = _review is null ? SettingsNames.DrawersSortUnavailable : _review.SortNow() ?? "";
 
     [RelayCommand]
     private void ChangeRoot()
@@ -115,7 +157,7 @@ internal sealed partial class DrawersSettingsViewModel : ObservableObject
         if (_drawers is null || !CanChangeRoot) { Status = SettingsNames.DrawersFolderLocked; return; }
         if (PickFolder() is not { } folder) return;
         var p = _drawers.Places;
-        if (!DrawerPaths.IsSafeRoot(folder, p.Desktop, p.PublicDesktop)) { Status = "The Drawers folder can't be the Desktop or a folder that holds it."; return; }
+        if (!DrawerPaths.IsSafeRoot(folder, p.Desktop, p.PublicDesktop)) { Status = SettingsNames.DrawersRootUnsafe; return; }
         _drawers.Save(_drawers.Settings with { Root = folder });
         Refresh();
     }
@@ -209,27 +251,39 @@ internal sealed partial class DrawerRuleRow : ObservableObject
         _index = index;
         _on = rule.On;
         _days = rule.Days;
+        _drawerName = drawerName;
+        _text = rule.Text;
         Kind = rule.Kind;
-        Label = rule.Kind switch
-        {
-            DrawerRuleKind.Screenshots => "Screenshots",
-            DrawerRuleKind.Images => "Images",
-            DrawerRuleKind.Documents => "Documents",
-            DrawerRuleKind.Installers => "Installers",
-            DrawerRuleKind.Archives => "Archives",
-            DrawerRuleKind.Shortcuts => "Shortcuts",
-            DrawerRuleKind.OlderThan => "Not touched in",
-            DrawerRuleKind.NameContains => $"Name contains \"{rule.Text}\"",
-            _ => $"Name starts with \"{rule.Text}\"",
-        } + $" to {drawerName}";
     }
 
+    private readonly string _drawerName;
+    private readonly string? _text;
+
     public DrawerRuleKind Kind { get; }
-    public string Label { get; }
+
+    /// <summary>"Screenshots to Screenshots", "Not touched in 30 days to Older files": it follows the Days box.</summary>
+    public string Label => (Kind switch
+    {
+        DrawerRuleKind.Screenshots => "Screenshots",
+        DrawerRuleKind.Images => "Images",
+        DrawerRuleKind.Documents => "Documents",
+        DrawerRuleKind.Installers => "Installers",
+        DrawerRuleKind.Archives => "Archives",
+        DrawerRuleKind.Shortcuts => "Shortcuts",
+        DrawerRuleKind.OlderThan => $"Not touched in {Days} {(Days == 1 ? "day" : "days")}",
+        DrawerRuleKind.NameContains => $"Name contains \"{_text}\"",
+        _ => $"Name starts with \"{_text}\"",
+    }) + $" to {_drawerName}";
+
+    // Each button names its own rule, so a screen reader can tell the rows apart.
+    public string DeleteName => $"{SettingsNames.DrawersDelete} rule: {Label}";
+    public string UpName => $"{SettingsNames.DrawersUp}, move rule up: {Label}";
+    public string DownName => $"{SettingsNames.DrawersDown}, move rule down: {Label}";
+    public string DaysName => $"Days for the rule: {Label}";
     public bool HasDays => Kind == DrawerRuleKind.OlderThan;
 
     [ObservableProperty] private bool _on;
-    [ObservableProperty] private int _days;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(Label), nameof(DeleteName), nameof(UpName), nameof(DownName), nameof(DaysName))] private int _days;
 
     partial void OnOnChanged(bool value) => _page.SaveRule(_index, r => r with { On = value });
     partial void OnDaysChanged(int value) => _page.SaveRule(_index, r => r with { Days = Math.Clamp(value, 1, 3650) });
@@ -250,12 +304,15 @@ internal sealed partial class DrawerRow : ObservableObject
         _page = page;
         _id = def.Id;
         Name = StreamerMode.Mask.Name(CodenameCategory.Folder, def.Name);   // streamer: masked - Mask.Name gives the codename while on
-        Kind = def.Owned ? "In the Drawers folder" : "Shows a folder in place";
+        Kind = def.Owned ? SettingsNames.DrawersKindOwned : SettingsNames.DrawersKindView;
         _newName = StreamerMode.On ? "" : def.Name;   // streamer: masked - the real name only while streamer mode is off
     }
 
     public string Name { get; }
     public string Kind { get; }
+    public string RemoveName => $"{SettingsNames.DrawersRemove} drawer: {Name}";
+    public string RenameName => $"{SettingsNames.DrawersRename} drawer: {Name}";
+    public string NewNameName => $"New name for {Name}";
 
     [ObservableProperty] private string _newName;
 
@@ -280,6 +337,7 @@ internal sealed partial class DrawerRecentRow : ObservableObject
     }
 
     public string Line { get; }
+    public string UndoName => $"{SettingsNames.DrawersUndo} these moves: {Line}";
 
     [RelayCommand] private void Undo() => _page.Undo(_id);
 }

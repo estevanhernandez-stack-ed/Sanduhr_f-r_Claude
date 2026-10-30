@@ -771,6 +771,8 @@ public partial class App : Application
         svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
         svm.Desk.Changed = () => _desk?.Reload();
+        // Turning drawers on or off from Settings reaches the running Desk the way the Desk page's own switch does.
+        svm.Drawers.DeskChanged = () => { _desk?.Reload(); svm.Desk.Reload(); };
         // Desk Look, Match the widget theme: the plate note follows the running Desk's readability guard.
         svm.ThemeMatch.PlateForced = () => _desk?.PlateForced == true;
         Action plateShown = () => svm.ThemeMatch.Reload();

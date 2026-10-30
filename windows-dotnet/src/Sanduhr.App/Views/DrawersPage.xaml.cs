@@ -13,7 +13,7 @@ public partial class DrawersPage : UserControl
         DataContextChanged += (_, _) =>
         {
             if (DataContext is not ViewModels.DrawersSettingsViewModel vm) return;
-            vm.Confirm = q => ThemedDialog.ShowConfirm(Window.GetWindow(this), SettingsNames.DrawersTurnOffTitle, q, "Put them back", "Cancel");
+            vm.Confirm = q => ThemedDialog.ShowConfirm(Window.GetWindow(this), SettingsNames.DrawersTurnOffTitle, q, SettingsNames.DrawersPutThemBack, SettingsNames.DrawersCancel);
             vm.PickFolder = () =>
             {
                 var dialog = new Microsoft.Win32.OpenFolderDialog { Title = SettingsNames.DrawersFolder };

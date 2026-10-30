@@ -19,14 +19,20 @@ public sealed class DrawersSettingsViewModelTests
         return (new DrawersSettingsViewModel(s, null, store) { Confirm = _ => true, PickFolder = () => null }, s, store);
     }
 
+    /// <summary>Turning off waits for the check box's binding to settle, so a test lets the dispatcher run what it queued.</summary>
+    private static void Pump() => Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+
     [Fact]
     public void Turning_drawers_on_turns_the_Desk_on_and_says_where_files_live() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();
         var (vm, s, store) = Make(box);
+        int deskTold = 0;
+        vm.DeskChanged = () => deskTold++;
         vm.Enabled = true;
         Assert.True(store.LoadDrawers().Enabled);
         Assert.True(store.LoadDesk().Enabled);
+        Assert.Equal(1, deskTold);   // the running Desk is told, not only the file
         Assert.Equal(DrawerReview.FirstOnLine, vm.Status);
         s.Dispose();
     });
@@ -42,6 +48,7 @@ public sealed class DrawersSettingsViewModelTests
         string? asked = null;
         vm.Confirm = q => { asked = q; return false; };
         vm.Enabled = false;
+        Pump();
         Assert.Equal(DrawerReturn.Prompt(1), asked);
         Assert.True(vm.Enabled);
         Assert.True(store.LoadDrawers().Enabled);
@@ -57,6 +64,7 @@ public sealed class DrawersSettingsViewModelTests
         box.File(@"Desktop\Drawers\Images\a.png");
         s.Save(s.Settings with { Drawers = [new DrawerDef("images", "Images", home, true)] });
         vm.Enabled = false;
+        Pump();
         Assert.False(store.LoadDrawers().Enabled);
         Assert.True(File.Exists(Path.Combine(box.Desktop, "a.png")));
         Assert.Equal("1 moved.", vm.Status);
@@ -128,6 +136,52 @@ public sealed class DrawersSettingsViewModelTests
         Assert.Single(store.LoadDrawers().Hidden);
         vm.ShowDrawersCommand.Execute(null);
         Assert.Empty(store.LoadDrawers().Hidden);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void After_Dispose_a_service_change_no_longer_touches_the_view_model() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (vm, s, store) = Make(box, enabled: true);
+        int rules = vm.Rules.Count;
+        vm.Dispose();
+        s.Save(s.Settings with { Rules = [] });
+        Assert.Equal(rules, vm.Rules.Count);   // a followed view model would have refreshed to none
+        s.Dispose();
+    });
+
+    [Fact]
+    public void A_followed_view_model_refreshes_on_a_service_change() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (vm, s, _) = Make(box, enabled: true);
+        s.Save(s.Settings with { Rules = [] });
+        Assert.Empty(vm.Rules);
+        vm.Dispose();
+        s.Dispose();
+    });
+
+    [Fact]
+    public void Sort_my_desktop_without_a_review_service_says_so() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (vm, s, _) = Make(box, enabled: true);
+        vm.SortNowCommand.Execute(null);
+        Assert.Equal(SettingsNames.DrawersSortUnavailable, vm.Status);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void The_older_than_label_is_a_sentence_that_follows_the_days() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (vm, s, _) = Make(box, enabled: true);
+        var row = vm.Rules.Single(r => r.HasDays);
+        Assert.Equal("Not touched in 30 days to Older files", row.Label);
+        row.Days = 1;
+        Assert.Equal("Not touched in 1 day to Older files", row.Label);
+        Assert.Contains(row.Label, row.DeleteName);
         s.Dispose();
     });
 

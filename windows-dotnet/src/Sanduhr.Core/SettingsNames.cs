@@ -1120,6 +1120,19 @@ public static class SettingsNames
     public const string DrawersNothingRecent = "Nothing has moved yet.";
     public const string DrawersStoreNote = "If you remove Sanduhr from the Microsoft Store, drawer files stay in the Drawers folder on your Desktop.";
     public const string DrawersTurnOffTitle = "Turn off drawers";
+    public const string DrawersPutThemBack = "Put them back";
+    public const string DrawersCancel = "Cancel";
+    public const string DrawersDelete = "Delete";
+    public const string DrawersUp = "Up";
+    public const string DrawersDown = "Down";
+    public const string DrawersRename = "Rename";
+    public const string DrawersRemove = "Remove";
+    public const string DrawersUndo = "Undo";
+    public const string DrawersKindOwned = "In the Drawers folder";
+    public const string DrawersKindView = "Shows a folder in place";
+    public const string DrawersRootUnsafe = "The Drawers folder can't be the Desktop or a folder that holds it.";
+    public const string DrawersSortUnavailable = "Sorting is not available right now.";
+    public const string DrawersDeskSaveFailed = "The Desk setting could not be saved, so drawers stay off.";
 
     /// <summary>Watchers and Launcher: the section that holds the piece's status line.</summary>
     public const string WatchersPlace = "Where they show";
