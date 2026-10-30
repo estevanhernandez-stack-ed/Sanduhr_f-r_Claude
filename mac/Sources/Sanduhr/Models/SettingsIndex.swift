@@ -89,6 +89,7 @@ enum SettingsAnchor {
     // Watchers
     static let switches = "switches"
     static let whereTheyShow = "where"
+    static let ciRunners = "ci-runners"
     static let abovePrompt = "above-prompt"
     // Claude Code
     static let python = "python"
@@ -230,6 +231,8 @@ enum SettingsAnchor {
                       synonyms: ["agents", "Show Claude Code's background work", "background work"]),
         SettingsEntry(title: "Where they show", page: .watchers, anchor: whereTheyShow,
                       synonyms: [SettingsNames.watchersOnNotch, SettingsNames.watchersOnDesk, "placement"]),
+        SettingsEntry(title: SettingsNames.ciRunnersSwitch, page: .watchers, anchor: ciRunners,
+                      synonyms: ["CI runners", "runner", "runners", "GitHub Actions", "Docker", "jobs", "CI"]),
         SettingsEntry(title: "Glow when a watcher waits on you", page: .watchers, anchor: glow),
         SettingsEntry(title: "Above the prompt", page: .watchers, anchor: abovePrompt,
                       synonyms: ["Show watchers above the prompt", "band"]),
@@ -301,6 +304,7 @@ extension SettingsNames {
         weatherLookUp: SettingsAnchor.weatherPlace, weatherShowAs: SettingsAnchor.weatherPlace,
         claudeMetersLine: SettingsAnchor.pieces, claudeMetersBars: SettingsAnchor.pieces,
         watchersOnNotch: SettingsAnchor.whereTheyShow, watchersOnDesk: SettingsAnchor.whereTheyShow,
+        ciRunnersSwitch: SettingsAnchor.ciRunners,
         showWidget: SettingsAnchor.show, checkForUpdates: SettingsAnchor.check, saveAndApply: SettingsAnchor.ownThemes,
         listMode: SettingsAnchor.editor, textMode: SettingsAnchor.editor,
         linkFolder: SettingsAnchor.data,

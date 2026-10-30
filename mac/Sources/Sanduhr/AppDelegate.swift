@@ -165,6 +165,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Watchers (item 66): the MCP server's watch_* requests and the Stop hook's background
         // work, on the same folder watch; watchers.json follows the two switches.
         WatcherStore.shared.startForApp()
+        // CI watchers (2.38.0): cards for local runner jobs from Docker's socket, while their switch
+        // is on and the Desk shows. Off by default.
+        RunnerWatchController.shared.startForApp()
         // Per-song looks (item 65c): propose_now_playing_looks' requests, on the same folder watch.
         NowPlayingLookStore.shared.start()
         // Claude's proposed mods (item 75, slice G): propose_mod's requests, on the same folder
