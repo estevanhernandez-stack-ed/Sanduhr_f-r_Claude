@@ -46,6 +46,41 @@ public sealed class DrawersPageTests : AppWindowFixture
         }
     }
 
+    /// <summary>The Desk setting cannot be saved (a read-only settings file): the check box ends unchecked, drawers stay off and the status says why.</summary>
+    [Fact]
+    public void Checking_the_switch_when_the_Desk_cannot_be_saved_leaves_the_box_unchecked() => AppHost.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var paths = new Paths(appDataBase: Path.Combine(box.Root, "appdata"));
+        var store = new SettingsStore(paths);
+        store.SaveDesk(DeskSettings.Default with { Enabled = false, Layout = "clock:bl" });
+        store.SaveDrawers(DrawerSettings.Default with { Enabled = false });
+        var s = new DrawerService(store, paths, new DrawerPlaces(box.Desktop, box.Public, []), System.Windows.Threading.Dispatcher.CurrentDispatcher);
+        var vm = new DrawersSettingsViewModel(s, null, store);
+        var page = new DrawersPage { DataContext = vm };
+        page.Measure(new Size(600, 900));
+        page.Arrange(new Rect(0, 0, 600, 900));
+        page.UpdateLayout();
+        var check = Below<CheckBox>(page).First();
+        Assert.False(check.IsChecked);
+        var file = paths.SettingsFile;
+        var attrs = File.GetAttributes(file);
+        File.SetAttributes(file, attrs | FileAttributes.ReadOnly);
+        try
+        {
+            check.IsChecked = true;
+            Pump();
+            Assert.False(check.IsChecked);
+            Assert.False(vm.Enabled);
+            Assert.False(store.LoadDrawers().Enabled);
+            Assert.False(store.LoadDesk().Enabled);
+            Assert.Equal(SettingsNames.DrawersDeskSaveFailed, vm.Status);
+        }
+        finally { File.SetAttributes(file, attrs); }
+        vm.Dispose();
+        s.Dispose();
+    });
+
     /// <summary>The real check box, bound two-way: unchecking it and answering no leaves the box checked and drawers on.</summary>
     [Fact]
     public void Unchecking_the_switch_and_answering_no_leaves_the_box_checked() => AppHost.Run(() =>

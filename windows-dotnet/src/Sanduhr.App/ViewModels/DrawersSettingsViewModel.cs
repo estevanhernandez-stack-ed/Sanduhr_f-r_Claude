@@ -103,7 +103,7 @@ internal sealed partial class DrawersSettingsViewModel : ObservableObject, IDisp
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
                 Status = SettingsNames.DrawersDeskSaveFailed;
-                StayOff();
+                _ui.BeginInvoke(StayOff);   // like the turn-off revert: after the check box's binding has settled
                 return;
             }
             _drawers.Save(s with { Enabled = true });
@@ -131,6 +131,7 @@ internal sealed partial class DrawersSettingsViewModel : ObservableObject, IDisp
     /// <summary>The switch goes back to off without running the on path again.</summary>
     private void StayOff()
     {
+        if (_disposed) return;
         _loading = true;
         Enabled = false;
         _loading = false;
