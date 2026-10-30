@@ -220,6 +220,7 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "masked", 3),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "notname", 18),
         ("Sanduhr.App/Views/DeskLayoutMap.cs", "notname", 1),
+        ("Sanduhr.App/Views/DrawersPage.xaml.cs", "notname", 1),   // Drawers (plan 2, Task 11): the folder picker's result, used for IO
         ("Sanduhr.App/Views/IntegrationConsentDialog.xaml.cs", "notname", 1),
         ("Sanduhr.App/Views/ManualKeyWindow.xaml.cs", "masked", 1),
         ("Sanduhr.App/Views/McpConsentDialog.xaml.cs", "masked", 3),

@@ -524,6 +524,7 @@ public partial class App : Application
             case Desk.DeskMenuAction.EditMessages: _ = ShowSettingsAsync(SettingsPage.DeskMessage, SettingsIndex.MenuAnchor(SettingsPage.DeskMessage)); break;
             case Desk.DeskMenuAction.DeskSettings: _ = ShowSettingsAsync(SettingsPage.Desk, SettingsIndex.MenuAnchor(SettingsPage.Desk)); break;
             case Desk.DeskMenuAction.LauncherSettings: _ = ShowSettingsAsync(SettingsPage.Launcher, SettingsIndex.MenuAnchor(SettingsPage.Launcher)); break;
+            case Desk.DeskMenuAction.ShowDrawers: _drawers?.ShowAll(); break;
             case Desk.DeskMenuAction.Arrange: _desk?.BeginArrange(); break;
             case Desk.DeskMenuAction.TurnOffDesk:
                 try
@@ -631,7 +632,7 @@ public partial class App : Application
         _deskDesign.Looks = _looks;
         _drawers = new Desk.DrawerService(store, paths, Desk.DrawerPlaces.ForThisUser());
         Desk.DrawerService.Current = _drawers;
-        _drawers.SettingsRequested += () => _ = ShowSettingsAsync(SettingsPage.Desk, null);   // Task 11 points this at the Drawers page
+        _drawers.SettingsRequested += () => _ = ShowSettingsAsync(SettingsPage.Drawers, SettingsIndex.MenuAnchor(SettingsPage.Drawers));
         _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
             () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers, paths, _launcherApps, looks: _looks, drawers: _drawers)
         {

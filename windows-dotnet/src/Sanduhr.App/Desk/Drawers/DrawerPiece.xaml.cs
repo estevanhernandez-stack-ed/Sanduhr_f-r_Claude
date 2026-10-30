@@ -26,8 +26,8 @@ internal static class DrawerPieceCopy
     public const string Fold = "Fold";
     public const string Open = "Open";
     public const string Hide = "Hide";
-    /// <summary>Opens the Desk page until Task 11 adds the Drawers page and swaps in <c>SettingsNames.LinkTitle(SettingsPage.Drawers)</c> (the source scan refuses a link to a page that does not exist).</summary>
-    public const string Settings = "Desk settings…";
+    /// <summary>Opens the Drawers page: "Drawers settings…", a page name like every Settings entry point.</summary>
+    public static readonly string Settings = SettingsNames.LinkTitle(SettingsPage.Drawers);
     public const string UndoLost = " Undo is not available for this move.";
 }
 

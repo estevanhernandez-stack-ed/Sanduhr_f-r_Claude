@@ -72,11 +72,11 @@ public class SettingsSlice7IndexTests
     }
 
     [Fact]
-    public void The_masking_pages_are_the_eleven_the_reach_inventory_names()
+    public void The_masking_pages_are_the_twelve_the_reach_inventory_names_with_Drawers()
     {
         Assert.Equal(
             [SettingsPage.Accounts, SettingsPage.Privacy, SettingsPage.ClaudeUsage, SettingsPage.Publish, SettingsPage.Desk, SettingsPage.Weather,
-             SettingsPage.Watchers, SettingsPage.ClaudeCode, SettingsPage.Mods, SettingsPage.About, SettingsPage.Launcher],
+             SettingsPage.Watchers, SettingsPage.ClaudeCode, SettingsPage.Mods, SettingsPage.About, SettingsPage.Launcher, SettingsPage.Drawers],   // Drawers (plan 2, Task 11) shows drawer names and the Drawers folder's path
             SettingsIndex.StreamerPages);
     }
 }

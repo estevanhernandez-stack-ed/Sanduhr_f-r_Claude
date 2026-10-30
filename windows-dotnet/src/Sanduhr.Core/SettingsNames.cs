@@ -30,7 +30,7 @@ public static class SettingsNames
         new("Extend", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Widget, SettingsPage.Themes]),
         new("Desktop", [SettingsPage.Desk, SettingsPage.DeskLook, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather,
-            SettingsPage.Watchers, SettingsPage.Launcher]),
+            SettingsPage.Watchers, SettingsPage.Launcher, SettingsPage.Drawers]),
         new("Help", [SettingsPage.About]),
     ];
 
@@ -68,6 +68,7 @@ public static class SettingsNames
         SettingsPage.DeskLook => DeskLookTitle,
         SettingsPage.Watchers => WatchersTitle,
         SettingsPage.Launcher => LauncherTitle,
+        SettingsPage.Drawers => DrawersTitle,
         SettingsPage.Widgets => "Widgets",   // retired in slice 4: keeps its old title for aliases and logs
         SettingsPage.About => "About",
         SettingsPage.Widget => "Widget",
@@ -278,6 +279,7 @@ public static class SettingsNames
         "watchers" => SettingsPage.Watchers,
         "launcher" => SettingsPage.Launcher,
         "glow" => SettingsPage.ClaudeCode,
+        _ when DrawerPieces.IsWord(widget) => SettingsPage.Drawers,
         _ => null,
     };
 
@@ -1096,6 +1098,29 @@ public static class SettingsNames
     public const string ThemeDefaultFont = "Segoe UI (the default)";
     public const string ThemeStudioDeskNote =
         "The Desk shows these while it follows the widget theme (Settings, Desk Look, Match the widget theme).";
+    // ---- Drawers (5.0 drawers spec) ----
+    public const string DrawersTitle = "Drawers";
+    public const string DrawersSwitch = "Use drawers";
+    public const string DrawersLine = "Drawers sort your desktop into folders on the Desk. Nothing moves until you say so, and turning drawers off puts every file back on the Desktop.";
+    public const string DrawersSwitchCaption = "Drawers live on the Desk, so turning them on turns the Desk on.";
+    public const string DrawersFolder = "Where drawer files live";
+    public const string DrawersChangeFolder = "Change folder…";
+    public const string DrawersFolderLocked = "Turn drawers off first to move the Drawers folder.";
+    public const string DrawersSort = "Sort my desktop";
+    public const string DrawersSortButton = "Sort my desktop now";
+    public const string DrawersSortCaption = "The rules below make a plan. It shows on your Desk for review, and nothing moves until you choose Apply.";
+    public const string DrawersRules = "Rules";
+    public const string DrawersRulesCaption = "Rules run top to bottom and the first match wins. Files no rule takes stay on the Desktop.";
+    public const string DrawersAddRule = "Add rule";
+    public const string DrawersList = "Your drawers";
+    public const string DrawersShow = "Show drawers";
+    public const string DrawersAddFolder = "Show a folder as a drawer…";
+    public const string DrawersPutBack = "Put drawers back top right";
+    public const string DrawersRecent = "Recent moves";
+    public const string DrawersNothingRecent = "Nothing has moved yet.";
+    public const string DrawersStoreNote = "If you remove Sanduhr from the Microsoft Store, drawer files stay in the Drawers folder on your Desktop.";
+    public const string DrawersTurnOffTitle = "Turn off drawers";
+
     /// <summary>Watchers and Launcher: the section that holds the piece's status line.</summary>
     public const string WatchersPlace = "Where they show";
     public const string LauncherPlace = "Where it shows";

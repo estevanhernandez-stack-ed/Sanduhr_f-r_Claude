@@ -58,7 +58,7 @@ public class SettingsDeskSplitIndexTests
     public void The_Desk_split_pages_mark_their_headings()
     {
         var sources = new[] { TabRange("Desk"), TabRange("NowPlaying"), TabRange("Weather") }
-            .Concat(new[] { "DeskLookPage", "WatchersPage", "LauncherPage" }
+            .Concat(new[] { "DeskLookPage", "WatchersPage", "LauncherPage", "DrawersPage" }
                 .Select(p => File.ReadAllText(Path.Combine(AppDir(), "Views", p + ".xaml"))));
         var bad = new List<string>();
         foreach (var src in sources)
@@ -158,7 +158,7 @@ public class SettingsDeskSplitIndexTests
     {
         var desktop = SettingsNames.Sidebar.Single(g => g.Title == "Desktop").Pages;
         Assert.Equal([SettingsPage.Desk, SettingsPage.DeskLook, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather,
-            SettingsPage.Watchers, SettingsPage.Launcher], desktop);
+            SettingsPage.Watchers, SettingsPage.Launcher, SettingsPage.Drawers], desktop);
         Assert.Equal(["desklook", "watchers", "launcher"],
             new[] { SettingsPage.DeskLook, SettingsPage.Watchers, SettingsPage.Launcher }.Select(SettingsIndex.PageId));
     }
