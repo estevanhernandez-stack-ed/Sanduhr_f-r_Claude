@@ -292,6 +292,9 @@ public sealed class DeskArrangement
     public static readonly IReadOnlyList<string> Known =
         ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "launcher", "meetings", "glow", "companion"];
 
+    /// <summary>A word the layout can hold: a built-in piece or a drawer (<c>drawer.&lt;id&gt;</c>, 5.0 drawers spec, section 2).</summary>
+    public static bool IsPiece(string widget) => Known.Contains(widget, StringComparer.Ordinal) || DrawerPieces.IsWord(widget);
+
     /// <summary>The widgets Stage 5 draws.</summary>
     public static readonly IReadOnlyList<string> DrawnInS5 = ["clock", "claude", "meters"];
 

@@ -129,7 +129,8 @@ Explorer's context menu is the one surface that is not ours.
 **Interaction.** Double-click opens through the Shell. Right-click shows Explorer's menu, plus a Sanduhr
 section: Rename drawer, Fold, Hide, and Drawer settings… (a page name, as every Settings entry point is).
 Dragging out moves the file to the drop target, dragging in moves it into the drawer, and dragging between
-drawers moves it from one to the other. All three go through the journal. Renaming a file goes through the
+drawers moves it from one to the other. All three go through the journal. A drag out to Explorer is Explorer's own move (its undo
+covers it): Sanduhr never learns where the file landed, so it is not journaled. A Desk design never moves, hides or drops a drawer. Renaming a file goes through the
 Shell. The keyboard works only after a click into the drawer, which takes focus then and gives it back on a
 click away (spike item 4).
 
