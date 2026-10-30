@@ -28,6 +28,9 @@ enum SettingsNames {
     /// Watchers, Where they show: the notch place and the Desk place, one stored value each.
     static let watchersOnNotch = "On the notch"
     static let watchersOnDesk = "On the Desk"
+    /// Watchers, CI runners: cards for local GitHub Actions runner jobs (key `watchersCiRunners`,
+    /// off by default). Windows' name, so the two apps say the same thing.
+    static let ciRunnersSwitch = "Show my CI runners' jobs"
     /// Mods & Config, Sanduhr's own mod at the top: the meters mod's switch, Update and Remove per
     /// folder (was Claude Code's folder row in slice 2, and Mods' "Sanduhr's mod" before that).
     static let metersAbovePrompt = "Meters above the prompt"
@@ -41,6 +44,12 @@ enum SettingsNames {
     /// The Desk pieces with the Claude numbers: one line of text, and the bars.
     static let claudeMetersLine = "Claude meters (line)"
     static let claudeMetersBars = "Claude meters (bars)"
+    /// The Desk piece with the machine's own readings: CPU, memory and disk (layout word `telemetry`).
+    static let system = "System"
+    /// Weather: looks a typed city up with Open-Meteo.
+    static let weatherLookUp = "Look up"
+    /// Weather: the nickname the Desk shows instead of the place's name (desk key `desk_weather`, member `nickname`, local only).
+    static let weatherShowAs = "Show it as"
     /// Updates' button and every menu's item.
     static let checkForUpdates = "Check for Updates…"
     /// Themes and a theme suggestion's card.
@@ -63,10 +72,11 @@ enum SettingsNames {
         (notchSwitch, .notch), (notchGlow, .notch), (cameraMicPlace, .notch),
         (claudeCodeGlowHook, .integrations), (metersAbovePrompt, .mods), (byFolder, .mods),
         (claudeMetersLine, .deskLayout), (claudeMetersBars, .deskLayout),
-        (watchersOnNotch, .watchers), (watchersOnDesk, .watchers),
+        (watchersOnNotch, .watchers), (watchersOnDesk, .watchers), (ciRunnersSwitch, .watchers),
         (showWidget, .widgetLook), (checkForUpdates, .updates), (saveAndApply, .themes),
         (listMode, .message), (textMode, .message),
         (linkFolder, .credentials),
+        (weatherLookUp, .weather), (weatherShowAs, .weather),
         (resetSanduhr, .about),
     ]
 

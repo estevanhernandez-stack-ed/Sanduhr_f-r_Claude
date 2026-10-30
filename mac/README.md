@@ -1942,12 +1942,13 @@ with `state_age_seconds` and `writer_version`; with no file it answers `no_data`
 
 **`propose_desk`** takes `{design, name?, note?}` where `design` has only the fields to change: `layout` (a piece to
 `{anchor, size, hidden, tilt, style}`), `font` (a family, or `{family, link}`), `ink` (`#rrggbb`, or two to four for a
-gradient), `plate` and `shadow`. `design_validate` in `sanduhr_mcp.py` checks it with the app's rules; a refusal returns
+gradient), `plate`, `shadow` and `weather` (`{nickname}`: up to 24 characters, `""` goes back to the place's name; the
+`telemetry` and `weather` pieces are ordinary layout pieces, `telemetry` takes a style). `design_validate` in `sanduhr_mcp.py` checks it with the app's rules; a refusal returns
 `rejected` with reasons and writes nothing. Windows' rules govern the fields and the messages (the Windows C# is the
 guide), the spec governs the Mac surfaces. The Mac refuses, with a reason and never silently: `messages`, `looks` and
 `theme` (their own tools exist), Windows-only fields (`launcher`, `monitor`, the ink words `auto`, `light`, `dark` and
-`theme`, the telemetry and glow pieces) and the 2.38 pieces (`system`, `weather`). A tilt that differs inside one
-stack is refused, a style on a piece other than `claude` and `meters` or an unknown word is refused, and Windows'
+`theme`, the glow piece, the Launcher piece). A tilt that differs inside one
+stack is refused, a style on a piece other than `claude`, `meters` and `telemetry` or an unknown word is refused, and Windows'
 wallpaper contrast rule is skipped. A good design goes to `desk-request.json` (owner-only, atomic, at most 128 KB) and
 the tool waits about ten seconds for `desk-result.json`; no answer is `queued`, `widget_not_responding`, and the request
 stays for ten minutes.
@@ -1994,6 +1995,81 @@ refuses is counted per face and left out; the pack's row says "One font couldn't
 count). A font already available to the process (installed in Font Book) is harmless and draws. The test fixtures are a
 tiny generated font ("Fixture Pack Sans", three glyphs, OFL-1.1) and a truncated copy for the refused case, not a
 relabelled bundled font, because EsteFont is not OFL.
+
+## The system piece
+
+The Desk's System piece (layout word `telemetry`, as on Windows; the UI says "System"): CPU, memory and disk as
+three rows (2.38.0, spec 12). Place it in Settings, Desk, Pieces; it takes the Claude line's meter styles (bar,
+slim, ring, ticks) and no clicks. It is a reading, not usage: no pace mark, no warning, no reset line, and nothing
+animates (`DeskTelemetryView.swift`).
+
+- `TelemetryReader` reads the numbers: CPU from the summed `host_processor_info` tick counters, mapped onto
+  Windows' shape (idle = idle, kernel = system + idle, user = user + nice) so `Telemetry.cpuPercent` and its tests
+  port as they are; memory from `host_statistics64` as active + wired + compressed pages over physical memory
+  (a little above Activity Monitor's "Memory Used", which also subtracts purgeable pages); disk from the boot
+  volume's total and `volumeAvailableCapacityForImportantUsage` (what Finder shows as available).
+- `TelemetrySampler` samples every 5 seconds (`Telemetry.interval`) and only while the Desk runs and the layout
+  places the piece: `DeskModel.syncTelemetry` starts and stops it, so no timer exists with the Desk hidden or the
+  piece unplaced. The first CPU figure needs a second tick reading, so the sample at start carries 0 for CPU.
+- Read locally, never sent or stored. Demo mode draws made-up readings and starts no sampler.
+
+## The weather piece and Settings, Weather
+
+The Desk's Weather piece (layout word `weather`, default place middle right) and its page, Settings, Weather
+(2.38.0, spec 13; Windows' piece with the #315 nickname). Rules and numbers are ports of Windows' `Weather`
+(`Desk/Weather.swift`, pure, with its tolerant readers); the service is `Desk/WeatherService.swift`.
+
+- **Look up.** Type a city, press Look up: one request to `geocoding-api.open-meteo.com` carrying that name,
+  trimmed and capped at 100 characters, and only that. Pick one of up to five places. The Temperature unit
+  defaults to the region (Celsius where metric, else Fahrenheit) until you choose. **Clear** forgets the place.
+- **The forecast.** `api.open-meteo.com` gets the place's latitude and longitude at two decimals (about 1 km) and
+  the unit, once when the piece starts and then at most every 30 minutes, a failed attempt waiting as long as a
+  success. `WeatherService.sync(running:placed:)` is the whole rule: it runs only while the Desk runs, the layout
+  places the piece, a place is chosen and demo mode is off; otherwise there is no timer and the reading is dropped.
+  A new place or unit drops the old reading and asks at once. A reading older than 3 hours draws dim. The reading
+  lives in memory.
+- **The session.** Ephemeral: no cookies, cache or credentials, no redirects followed (`NoRedirects`), a 15 second
+  request timeout, the user agent `Sanduhr`. No Location Services, no account, no key.
+- **Show it as.** A nickname of up to 24 characters the Desk shows instead of the place's name; empty goes back to
+  the place's name. The search and the forecast never see it. It is saved with the rest in the Desk suite under
+  `desk_weather` (`name`, `admin`, `country`, `lat`, `lon`, `unit`, and `nickname` only when set).
+  `propose_desk` takes `weather {nickname}` and `get_desk` reports it from `desk-state.json` (the place, its
+  coordinates and the unit are not in that file); Apply writes it into `desk_weather` and keeps the place and unit.
+- **The credit.** The piece draws "Weather data by Open-Meteo.com" as plain text (it sits under the click layer,
+  so a link would need a hit area of its own); Settings, Weather carries the clickable credit and the CC BY 4.0
+  licence link. With no place chosen the piece says "Set a city in Settings, Weather".
+- Demo mode shows a made-up place ("Mapleton") and reading.
+
+## CI runner cards
+
+Watcher cards for the jobs a GitHub Actions runner container on this Mac runs (2.38.0, spec 15; Windows 3.9's rule,
+unchanged: **list and logs, never inspect**). Settings, Watchers, **Show my CI runners' jobs** (`watchersCiRunners`
+in `com.626labs.sanduhr`), off by default; with it off nothing opens a socket. The line under the switch says what
+Docker is doing: `Watching 2 runners: ...`, `No runner containers are running.`, `Docker isn't running.`, `Docker
+refused the connection. Check that your account can use Docker's socket.` or `Docker answered but refused the
+request.`
+
+- **The socket.** `DockerSocket` speaks HTTP/1.1 over Docker's Unix socket (`DockerUnixConnection`, `NWConnection`):
+  `~/.docker/run/docker.sock` (Docker Desktop), then `/var/run/docker.sock`. Exactly two requests, built from the
+  two-value `DockerRequest` enum: `GET /containers/json` and
+  `GET /containers/{id}/logs?follow=1&stdout=1&stderr=1&timestamps=1&tail=200`. The id must match
+  `^[0-9a-f]{64}$` or the request is not built. No redirect is followed (any non-2xx, a 3xx included, is a refusal),
+  and the headers get 10 seconds. Never inspect (its answer holds the runner's registration token), never write,
+  start, stop or exec. `DockerSocketBoundaryTests` pins it structurally: the socket paths appear in one file, and
+  that file's only request call takes the enum.
+- **Which containers.** A running container whose image's own name (no registry, owner, tag or digest) contains
+  `actions-runner`, `github-runner` or `gh-runner` (`DockerContainers.runners`). Scaled Compose replicas show their
+  container names so the cards tell them apart. The list answer is capped at 4 MB.
+- **The service.** `RunnerWatchService` lists every 30 seconds (every 60 while Docker is down, denied or refusing),
+  follows each runner's log on its own task, and runs only while the switch is on and the Desk runs
+  (`RunnerWatchController`). The log grammar (`Running job: ...`, `Job ... completed with result: ...`,
+  `Listening for Jobs`) and the multiplexed frame decoder are ports of Windows' `RunnerLog` and `DockerLogFrames`,
+  tested on its captured logs (fixtures renamed `host-*`). Docker replays the last 200 lines on connect; `RunnerFollow`
+  keeps that replay from putting up cards for jobs that ended long ago.
+- **The cards.** One per job, titled "<runner> · <job>", with the note "CI runner", on the Watchers piece, the notch
+  and the companion's triggers like any watcher; they follow the board's rules (passed fades after 6 seconds, failed
+  stays until dismissed and glows the notch once). In memory only; demo mode hides them. In `band.json` a runner's
+  card is `{source: automatic, kind: runner, state}` with no title, because a runner's name can name a private repo.
 
 ## The companion
 
@@ -2116,6 +2192,9 @@ refusal. `ResetShutdownTests` covers the gate (each writer a no-op inside
 - OLED care (2.35.0) → the desk preference `deskOledCare` (off when absent); nothing on disk
 - Desk for Claude (2.37.0) → `desk-state.json` (app; what `get_desk` reads), `desk-request.json` (server) and `desk-result.json` (app), all mode 0600 in `~/Library/Application Support/Sanduhr/`; the undo in the desk preference `deskDesignBefore`; the slant and style are fields of the desk preference `layout`; no new file for them
 - Font packs (2.37.0) → the faces stay in the pack's folder under `widgets/`; they are registered for the process only, nothing is installed on the Mac
+- System piece (2.38.0) → nothing on disk; the readings live in memory
+- Weather (2.38.0) → the desk preference `desk_weather` (place, rounded coordinates, unit, and the nickname when set); the forecast is never written
+- CI runner cards (2.38.0) → the preference `watchersCiRunners` (off when absent); nothing on disk, the cards live in memory
 
 ## Controls
 

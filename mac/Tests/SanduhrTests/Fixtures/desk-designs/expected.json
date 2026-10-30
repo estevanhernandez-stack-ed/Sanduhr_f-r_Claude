@@ -215,7 +215,7 @@
       "reasons": [
         {
           "field": "layout.clock.style",
-          "message": "only claude, meters have a style"
+          "message": "only claude, meters, telemetry have a style"
         },
         {
           "field": "layout.meters.style",
@@ -244,32 +244,6 @@
           }
         }
       }
-    },
-    "system-weather-pieces.json": {
-      "status": "rejected",
-      "reasons": [
-        {
-          "field": "layout.system",
-          "message": "arrives in Sanduhr 2.38.0; the Mac Desk does not have it yet"
-        },
-        {
-          "field": "layout.weather",
-          "message": "arrives in Sanduhr 2.38.0; the Mac Desk does not have it yet"
-        },
-        {
-          "field": "layout.telemetry",
-          "message": "is the Windows system piece; the Mac gets a system piece in Sanduhr 2.38.0"
-        },
-        {
-          "field": "layout.launcher",
-          "message": "is a Windows piece; the Mac Desk has no Launcher"
-        },
-        {
-          "field": "layout.glow",
-          "message": "is a Windows piece; the Mac Desk has no glow piece"
-        }
-      ],
-      "fonts": []
     },
     "text-fields.json": {
       "status": "rejected",
@@ -335,7 +309,7 @@
       "reasons": [
         {
           "field": "design",
-          "message": "unknown field(s): command, plat. The fields are name, note, layout, font, ink, plate, shadow."
+          "message": "unknown field(s): command, plat. The fields are name, note, layout, weather, font, ink, plate, shadow."
         }
       ],
       "fonts": []
@@ -359,18 +333,101 @@
       "reasons": [
         {
           "field": "layout.toaster",
-          "message": "is not a Desk piece; the pieces are message, clock, claude, meters, nowPlaying, watchers, meetings, companion"
+          "message": "is not a Desk piece; the pieces are message, clock, claude, meters, nowPlaying, telemetry, weather, watchers, meetings, companion"
         }
       ],
       "fonts": []
     },
-    "windows-only-fields.json": {
+    "weather-bad-member.json": {
       "status": "rejected",
       "reasons": [
         {
           "field": "weather",
-          "message": "arrives with the weather piece in Sanduhr 2.38.0; the Mac Desk has none yet, so nothing was applied"
-        },
+          "message": "unknown member 'city'; use nickname"
+        }
+      ],
+      "fonts": []
+    },
+    "weather-nickname-24.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "weather": {
+          "nickname": "abcdefghijklmnopqrstuvwx"
+        }
+      }
+    },
+    "weather-nickname-25.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "weather.nickname",
+          "message": "must be at most 24 characters"
+        }
+      ],
+      "fonts": []
+    },
+    "weather-nickname-empty.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "weather": {
+          "nickname": ""
+        }
+      }
+    },
+    "weather-nickname-newline.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "weather.nickname",
+          "message": "must be one line, with no control characters"
+        }
+      ],
+      "fonts": []
+    },
+    "weather-nickname.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "weather": {
+          "nickname": "Funky Town"
+        }
+      }
+    },
+    "weather-not-object.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "weather",
+          "message": "must be an object with nickname"
+        }
+      ],
+      "fonts": []
+    },
+    "weather-pieces.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "layout": {
+          "telemetry": {
+            "anchor": "tr",
+            "style": "ring"
+          },
+          "weather": {
+            "anchor": "mr",
+            "size": 1.2
+          }
+        }
+      }
+    },
+    "windows-only-fields.json": {
+      "status": "rejected",
+      "reasons": [
         {
           "field": "launcher",
           "message": "is Windows only: the Mac Desk has no Launcher piece"
@@ -396,6 +453,24 @@
         {
           "field": "layout.clock",
           "message": "monitor is Windows only: the Mac Desk has no per-monitor placement; use anchor, size, hidden, tilt and style"
+        }
+      ],
+      "fonts": []
+    },
+    "windows-only-pieces.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.system",
+          "message": "is not a Desk piece; the pieces are message, clock, claude, meters, nowPlaying, telemetry, weather, watchers, meetings, companion"
+        },
+        {
+          "field": "layout.launcher",
+          "message": "is a Windows piece; the Mac Desk has no Launcher"
+        },
+        {
+          "field": "layout.glow",
+          "message": "is a Windows piece; the Mac Desk has no glow piece"
         }
       ],
       "fonts": []

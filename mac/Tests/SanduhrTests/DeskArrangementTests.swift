@@ -114,7 +114,7 @@ struct DeskArrangementHideShowTests {
         a.hide("clock")
         #expect(a.string == "message:tl meters:bl:0.8 meetings:bl")
         #expect(a.string == DeskLayout.placing("clock", in: "", layout: "message:tl clock:tr:1.2 meters:bl:0.8 meetings:bl"))
-        #expect(a.hidden == ["clock", "claude", "nowPlaying", "watchers", "companion"])
+        #expect(a.hidden == ["clock", "claude", "nowPlaying", "telemetry", "weather", "watchers", "companion"])
         // Hiding a hidden piece changes nothing.
         a.hide("watchers")
         #expect(a.string == "message:tl meters:bl:0.8 meetings:bl")
@@ -153,10 +153,10 @@ struct DeskArrangementHideShowTests {
     @Test("nothing placed: an empty string or one with only unknown words")
     func placesNothing() {
         #expect(DeskArrangement("").placesNothing)
-        #expect(DeskArrangement("weather:tr").placesNothing)
+        #expect(DeskArrangement("toaster:tr").placesNothing)
         #expect(!DeskArrangement("clock:bl").placesNothing)
         #expect(DeskArrangement("").hidden == DeskArrangement.known)
-        #expect(DeskArrangement(DeskLayout.standard).hidden == ["meters", "nowPlaying", "watchers", "companion"])
+        #expect(DeskArrangement(DeskLayout.standard).hidden == ["meters", "nowPlaying", "telemetry", "weather", "watchers", "companion"])
     }
 }
 

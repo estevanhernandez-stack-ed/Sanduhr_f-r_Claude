@@ -1,0 +1,139 @@
+{
+  "run": "desk-2-38",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "95000929cb103a278c40176593caaa43139df535",
+  "integration_branch": "cart/desk-2-38",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-desk-2-38/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-desk-2-38",
+  "builder_branch": "main",
+  "uncommitted_at_start": [],
+  "started_at": "2026-10-30T05:53:38.139Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "system-piece",
+      "title": "The system piece",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-38--01-system-piece",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "weather-core",
+      "title": "Weather: lookup, forecast and settings",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-38--02-weather-core",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "weather-piece-design",
+      "title": "The weather piece and propose_desk/get_desk",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-38--03-weather-piece-design",
+      "worktree": "",
+      "on": 2,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && python3 -m pytest -q integrations/tests && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "bars-spike",
+      "title": "Bars spike: the Core Audio process tap",
+      "stop_class": "hold",
+      "status": "held",
+      "branch": "cart/desk-2-38--04-bars-spike",
+      "worktree": "~/.cwt/sanduhr-f-r-clau-desk-2-38/04",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "test -s docs/spikes/2026-10-30-audio-tap-bars.md",
+          "result": "pass"
+        }
+      ],
+      "reason": "Owner call: accept a System Audio Recording permission (opt-in, off by default) for the bars, or keep the position bar."
+    },
+    {
+      "n": 5,
+      "slug": "runner-rules",
+      "title": "Runner log rules (pure ports)",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-38--05-runner-rules",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "ci-watchers",
+      "title": "CI watchers: the Docker socket and the cards",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-38--06-ci-watchers",
+      "worktree": "",
+      "on": 5,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && python3 -m pytest -q integrations/tests && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 7,
+      "slug": "docs-2-38",
+      "title": "Docs, What's New, CHANGELOG",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-38--07-docs-2-38",
+      "worktree": "",
+      "on": 6,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && python3 -m pytest -q integrations/tests && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}

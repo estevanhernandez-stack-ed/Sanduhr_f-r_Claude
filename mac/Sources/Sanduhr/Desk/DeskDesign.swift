@@ -65,9 +65,9 @@ struct DeskValidation {
 /// A Desk design (spec 8): a PARTIAL set of changes to the Desk; a nil field leaves the current value alone.
 /// The Mac subset of Windows' `DeskDesign`: `name`, `note`, `layout` ({piece: {anchor, size, hidden, tilt,
 /// style}}), `font` (a family, or {family, link}), `ink` (one `#rrggbb`, or two to four for a gradient),
-/// `plate` and `shadow`. What only Windows has is refused with a reason, never dropped: `monitor` in a layout
-/// piece, the launcher, telemetry and glow pieces, the launcher, weather, messages, looks and theme fields,
-/// the auto, light, dark and theme ink words, and (until 2.38.0) the system and weather pieces.
+/// `plate`, `shadow` and `weather` ({nickname}). What only Windows has is refused with a reason, never
+/// dropped: `monitor` in a layout piece, the launcher and glow pieces, the launcher, messages, looks and theme
+/// fields, and the auto, light, dark and theme ink words.
 ///
 /// Pure data and rules, no IO. `Tests/SanduhrTests/Fixtures/desk-designs/` holds the designs this and the
 /// Python MCP's `design_validate` must judge the same way.
@@ -80,32 +80,33 @@ struct DeskDesign: Equatable {
     var ink: [String]?
     var plate: Bool?
     var shadow: Bool?
+    /// The weather piece's nickname (Windows' `weather.nickname`): nil leaves it alone, "" goes back to the
+    /// place's own name.
+    var weatherNickname: String?
 
     static let nameMax = 40
     static let noteMax = 200
     static let fontFamilyMax = 64
     static let maxPieces = 16
+    /// The longest weather nickname, in characters.
+    static let weatherNicknameMax = Weather.nicknameMax
     static let linkMax = 2048
     /// The whole design is far below this by construction; the cap is a belt against a runaway request.
     static let maxJsonBytes = 128 * 1024
 
-    static let fields = ["name", "note", "layout", "font", "ink", "plate", "shadow"]
+    static let fields = ["name", "note", "layout", "weather", "font", "ink", "plate", "shadow"]
     static let layoutMembers = ["anchor", "size", "hidden", "tilt", "style"]
     static let inkWords = ["auto", "light", "dark", "theme"]
 
     /// Fields Windows has and the Mac Desk lacks: refused with this reason.
     static let windowsOnlyFields: [(field: String, reason: String)] = [
-        ("weather", "arrives with the weather piece in Sanduhr 2.38.0; the Mac Desk has none yet, so nothing was applied"),
         ("launcher", "is Windows only: the Mac Desk has no Launcher piece"),
         ("messages", "is not part of a Mac Desk design; send message lines with propose_desk_messages"),
         ("looks", "is not part of a Mac Desk design; send song looks with propose_now_playing_looks"),
         ("theme", "is not part of a Mac Desk design; send a widget theme with propose_theme"),
     ]
-    /// Pieces Windows has and the Mac Desk does not (yet): refused with this reason.
+    /// Pieces Windows has and the Mac Desk does not: refused with this reason.
     static let windowsOnlyPieces: [String: String] = [
-        "telemetry": "is the Windows system piece; the Mac gets a system piece in Sanduhr 2.38.0",
-        "system": "arrives in Sanduhr 2.38.0; the Mac Desk does not have it yet",
-        "weather": "arrives in Sanduhr 2.38.0; the Mac Desk does not have it yet",
         "launcher": "is a Windows piece; the Mac Desk has no Launcher",
         "glow": "is a Windows piece; the Mac Desk has no glow piece",
     ]
@@ -127,16 +128,17 @@ struct DeskDesign: Equatable {
         let name = text(o, "name", nameMax, &r)
         let note = text(o, "note", noteMax, &r)
         let layout = parseLayout(present(o["layout"]), &r)
-        if present(o["weather"]) != nil { r.append(DeskReason("weather", windowsOnlyFields[0].reason)) }
+        let weatherNickname = parseWeather(present(o["weather"]), &r)
         let font = parseFont(present(o["font"]), &r)
         let ink = parseInk(present(o["ink"]), &r)
         let plate = bool(o, "plate", &r)
         let shadow = bool(o, "shadow", &r)
-        for (field, reason) in windowsOnlyFields.dropFirst() where present(o[field]) != nil {
+        for (field, reason) in windowsOnlyFields where present(o[field]) != nil {
             r.append(DeskReason(field, reason))
         }
         if !r.isEmpty { return (nil, Array(r.prefix(40))) }
-        return (DeskDesign(name: name, note: note, layout: layout, font: font, ink: ink, plate: plate, shadow: shadow), [])
+        return (DeskDesign(name: name, note: note, layout: layout, font: font, ink: ink, plate: plate, shadow: shadow,
+                           weatherNickname: weatherNickname), [])
     }
 
     /// A key's value, nil when it is absent or a JSON null (System.Text.Json reads a null as no node).
@@ -174,6 +176,34 @@ struct DeskDesign: Equatable {
         if let b = n.bool { return b }
         r.append(DeskReason(key, "must be true or false"))
         return nil
+    }
+
+    /// Windows' `ParseWeather`: an object with one member, `nickname`, a one-line string of at most 24 characters;
+    /// "" is kept (it goes back to the place's own name).
+    private static func parseWeather(_ node: PackValue?, _ r: inout [DeskReason]) -> String? {
+        guard let node else { return nil }
+        guard let wo = node.object else {
+            r.append(DeskReason("weather", "must be an object with nickname"))
+            return nil
+        }
+        let before = r.count
+        for bad in WidgetProposal.ordinalSorted(wo.keys.filter { $0 != "nickname" }).prefix(3) {
+            r.append(DeskReason("weather", "unknown member '\(clip(bad, 20))'; use nickname"))
+        }
+        guard let nn = present(wo["nickname"]) else {
+            if r.count == before {
+                r.append(DeskReason("weather.nickname", "is missing; send a name, or an empty string for the place's own name"))
+            }
+            return nil
+        }
+        guard let raw = nn.string else { r.append(DeskReason("weather.nickname", "must be a string")); return nil }
+        if hasControl(raw) { r.append(DeskReason("weather.nickname", "must be one line, with no control characters")); return nil }
+        let nick = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if nick.utf16.count > weatherNicknameMax * 4 || nick.unicodeScalars.count > weatherNicknameMax {
+            r.append(DeskReason("weather.nickname", "must be at most \(weatherNicknameMax) characters"))
+            return nil
+        }
+        return r.count > before ? nil : nick
     }
 
     private static func parseLayout(_ node: PackValue?, _ r: inout [DeskReason]) -> [DeskPieceLayout]? {
@@ -425,6 +455,7 @@ struct DeskDesign: Equatable {
             }
             f.append(("layout", .object(lo)))
         }
+        if let weatherNickname { f.append(("weather", .object(WidgetJson.object([("nickname", .string(weatherNickname))])))) }
         if let font {
             if let link = font.link {
                 f.append(("font", .object(WidgetJson.object([("family", .string(font.family)), ("link", .string(link))]))))

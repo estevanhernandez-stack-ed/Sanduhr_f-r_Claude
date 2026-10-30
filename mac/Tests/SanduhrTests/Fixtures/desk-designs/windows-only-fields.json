@@ -2,9 +2,6 @@
   "launcher": {
     "buttons": []
   },
-  "weather": {
-    "nickname": "Funky Town"
-  },
   "messages": {
     "lines": [
       "Hello."

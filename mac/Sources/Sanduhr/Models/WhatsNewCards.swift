@@ -7,8 +7,26 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2370 + release2360 + release2350 + release2340 + release2330 + release2320 + release2310 + release2300 + release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2380 + release2370 + release2360 + release2350 + release2340 + release2330 + release2320 + release2310 + release2300 + release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2380: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.38.0", id: "system-piece",
+            title: "CPU, memory and disk on the Desk",
+            body: "A new System piece shows how hard your Mac is working. It reads locally every few seconds while the Desk shows, and nothing is sent or saved.",
+            art: .symbol("cpu"), destination: .deskLayout),
+        WhatsNewCard(
+            version: "2.38.0", id: "weather-piece",
+            title: "Weather on the Desk",
+            body: "Look up a city in Settings, Weather and place the piece. Only the city name and rounded coordinates go to Open-Meteo, no account or Location Services, and you can give the place a nickname.",
+            art: .symbol("cloud.sun"), destination: .weather),
+        WhatsNewCard(
+            version: "2.38.0", id: "ci-runners",
+            title: "CI runners as watchers",
+            body: "Turn on Show my CI runners' jobs in Settings, Watchers and every job a GitHub Actions runner in Docker runs gets a card. Off by default, local to this Mac.",
+            art: .symbol("shippingbox"), destination: .watchers),
+    ]
 
     static let release2370: [WhatsNewCard] = [
         WhatsNewCard(

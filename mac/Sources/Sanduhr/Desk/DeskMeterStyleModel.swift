@@ -79,7 +79,9 @@ enum DeskMeterStyleModel {
         var fill: Double
         var pace: Double?
         var warning: Bool
-        var id: String { tier.rawValue }
+        /// Set by a reading that is not a Claude limit (the system piece's rows), so two share no id.
+        var key: String? = nil
+        var id: String { key ?? tier.rawValue }
     }
 
     /// The Claude limits' meters as gauges, in the rows' order.

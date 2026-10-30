@@ -83,9 +83,13 @@ enum SettingsAnchor {
     static let idle = "idle"
     static let apps = "apps"
     static let fallback = "fallback"
+    // Weather
+    static let weatherPlace = "weather-place"
+    static let weatherCredit = "weather-credit"
     // Watchers
     static let switches = "switches"
     static let whereTheyShow = "where"
+    static let ciRunners = "ci-runners"
     static let abovePrompt = "above-prompt"
     // Claude Code
     static let python = "python"
@@ -156,11 +160,12 @@ enum SettingsAnchor {
         SettingsEntry(title: SettingsNames.deskSwitch, page: .deskLayout, anchor: desk, synonyms: ["turn on", "desktop"]),
         SettingsEntry(title: "Arrange Desk…", page: .deskLayout, anchor: arrange, synonyms: ["drag", "move", "arrange"]),
         SettingsEntry(title: "Where each piece sits", page: .deskLayout, anchor: pieces,
-                      synonyms: ["corner", "position", "place", "hidden", "clock", "meetings", "Read today's meetings"]),
+                      synonyms: ["corner", "position", "place", "hidden", "clock", "meetings", "Read today's meetings",
+                                 "system", "CPU", "RAM", "memory", "disk", "telemetry", "weather"]),
         SettingsEntry(title: DeskSlant.title, page: .deskLayout, anchor: slant,
                       synonyms: ["tilt", "fold", "lean", "angle", "skew", "degrees", "straight"]),
         SettingsEntry(title: "Meter style", page: .deskLayout, anchor: meterStyle,
-                      synonyms: ["style", "slim", "ring", "rings", "gauge", "ticks", "bars", "bar", "meters", "claude line", "compact", "oled"]),
+                      synonyms: ["style", "slim", "ring", "rings", "gauge", "ticks", "bars", "bar", "meters", "claude line", "compact", "oled", "system"]),
         SettingsEntry(title: "Order", page: .deskLayout, anchor: order, synonyms: ["stack", "reorder"]),
         SettingsEntry(title: "Clicks", page: .deskLayout, anchor: clicks, synonyms: [DeskPieceClicks.title, "click", DeskLayer.title, "under desktop icons", "bottom", "behind files"]),
         SettingsEntry(title: SettingsNames.oledCareSwitch, page: .deskLayout, anchor: oled,
@@ -218,10 +223,16 @@ enum SettingsAnchor {
         SettingsEntry(title: "Apps", page: .nowPlaying, anchor: apps, synonyms: ["Music", "Spotify", "browser"]),
         SettingsEntry(title: "When the system now playing is unavailable", page: .nowPlaying, anchor: fallback,
                       synonyms: ["Ask Music and Spotify directly"]),
+        SettingsEntry(title: SettingsNames.weatherLookUp, page: .weather, anchor: weatherPlace,
+                      synonyms: ["weather", "city", "forecast", "temperature", "Fahrenheit", "Celsius", "Open-Meteo", "location",
+                                 "nickname", "display name", SettingsNames.weatherShowAs]),
+        SettingsEntry(title: Weather.credit, page: .weather, anchor: weatherCredit, synonyms: ["Open-Meteo", "credit", "attribution", "GeoNames"]),
         SettingsEntry(title: "Let agents show watchers", page: .watchers, anchor: switches,
                       synonyms: ["agents", "Show Claude Code's background work", "background work"]),
         SettingsEntry(title: "Where they show", page: .watchers, anchor: whereTheyShow,
                       synonyms: [SettingsNames.watchersOnNotch, SettingsNames.watchersOnDesk, "placement"]),
+        SettingsEntry(title: SettingsNames.ciRunnersSwitch, page: .watchers, anchor: ciRunners,
+                      synonyms: ["CI runners", "runner", "runners", "GitHub Actions", "Docker", "jobs", "CI"]),
         SettingsEntry(title: "Glow when a watcher waits on you", page: .watchers, anchor: glow),
         SettingsEntry(title: "Above the prompt", page: .watchers, anchor: abovePrompt,
                       synonyms: ["Show watchers above the prompt", "band"]),
@@ -290,8 +301,10 @@ extension SettingsNames {
         cameraMicPlace: SettingsAnchor.cameraMic,
         claudeCodeGlowHook: SettingsAnchor.folders, metersAbovePrompt: SettingsAnchor.metersMod,
         byFolder: SettingsAnchor.inventory,
+        weatherLookUp: SettingsAnchor.weatherPlace, weatherShowAs: SettingsAnchor.weatherPlace,
         claudeMetersLine: SettingsAnchor.pieces, claudeMetersBars: SettingsAnchor.pieces,
         watchersOnNotch: SettingsAnchor.whereTheyShow, watchersOnDesk: SettingsAnchor.whereTheyShow,
+        ciRunnersSwitch: SettingsAnchor.ciRunners,
         showWidget: SettingsAnchor.show, checkForUpdates: SettingsAnchor.check, saveAndApply: SettingsAnchor.ownThemes,
         listMode: SettingsAnchor.editor, textMode: SettingsAnchor.editor,
         linkFolder: SettingsAnchor.data,
@@ -310,6 +323,7 @@ enum SettingsSearch {
         .integrations: ["statusline", "prompt", "MCP", "Integrations"],
         .mods: ["mods", "plugins", "config"],
         .widgetLook: ["Widget Look", "Pacing & Focus"],
+        .weather: ["forecast", "temperature", "city"],
         .updates: ["update", "Sparkle"],
     ]
 

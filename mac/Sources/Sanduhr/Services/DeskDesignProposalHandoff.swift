@@ -63,6 +63,7 @@ struct DeskDesignPreviewState: Equatable {
     var ink: String?
     var plate: Bool?
     var shadow: Bool?
+    var weatherNickname: String?
 }
 
 /// The Desk side of a review, behind a seam so the review's tests need no Desk window.
@@ -261,6 +262,7 @@ final class DeskDesignProposalHandoff {
         if p.design.ink != nil { state.ink = next.ink }
         if p.design.plate != nil { state.plate = next.plate }
         if p.design.shadow != nil { state.shadow = next.shadow }
+        if p.design.weatherNickname != nil { state.weatherNickname = next.weatherNickname }
         return state
     }
 
@@ -342,6 +344,7 @@ final class DeskDesignDeskHost: DeskDesignPreviewHost {
         preview.font = state.font
         preview.plate = state.plate
         preview.shadow = state.shadow
+        preview.weatherNickname = state.weatherNickname
         ink.spec = state.ink
     }
 

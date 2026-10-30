@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **The system piece.** The Desk can show CPU, memory and disk: place **System** in Settings, Desk, Pieces. It takes the same Bar, Slim, Ring and Ticks styles as the meters, with no pace mark and no warning, because it is a reading and not usage. Sanduhr reads it from the Mac every 5 seconds, only while the Desk shows and the piece is placed, and nothing is sent or stored. Claude can place it and style it with `propose_desk`, where it is the `telemetry` piece, as on Windows.
+
+- **The weather piece.** Settings, Weather: type a city, press **Look up** and pick the place. The Desk's Weather piece shows now, today's range and tomorrow, with the Open-Meteo credit. Two hosts, and only while the Desk shows the piece: `geocoding-api.open-meteo.com` gets the city name you typed, and `api.open-meteo.com` gets the place's coordinates, rounded to about 1 km, every 30 minutes at most. The user agent is `Sanduhr`, nothing is kept in cookies, and there is no account, no key and no Location Services. The place, unit and nickname are saved in your Desk settings; the forecast is not saved. A reading older than 3 hours draws dim. Reset Sanduhr… removes them with the rest.
+
+- **A nickname for the place.** **Show it as** (up to 24 characters) is what the Desk shows instead of the place's name. Neither request carries it. With the MCP server installed, `get_desk` reports the nickname and `propose_desk` can suggest one (`weather {nickname}`); it waits for Apply like any design. The place and its coordinates stay out of what Claude reads, and the system and weather pieces are no longer refused in a design.
+
+- **CI runner cards.** Settings, Watchers, **Show my CI runners' jobs**, off by default. With it on and the Desk showing, Sanduhr asks Docker's local socket (`~/.docker/run/docker.sock`, then `/var/run/docker.sock`) for two things only: the running containers, and the log of each GitHub Actions runner container. It never inspects a container (that answer holds the runner's registration token), and never starts, stops or changes one. Each job gets a card with the runner's name on the Desk's Watchers piece and the notch: a passed one fades, a failed one stays and glows the notch once. Cards live in memory, demo mode hides them, and with **Show watchers above the prompt** on, Claude Code's band gets a runner's kind and state only, never its name. The line under the switch says when Docker isn't running or refuses the connection.
+
+- **Not in this release.** The Now playing bars stay the position bar. Moving bars need Sanduhr to tap system audio, which asks for a new permission, so it waits for your call.
+
 ## Unreleased (windows)
 
 ### Fixes
