@@ -1001,7 +1001,7 @@ public partial class App : Application
     {
         if (_tray is not null)
             OnTrayReadingChanged(_vm?.CurrentTrayReading);
-        _desk?.Reload();
+        _desk?.PrivacyChanged();
         RunnerStatusShown?.Invoke();
     }
 

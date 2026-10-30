@@ -43,11 +43,11 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         List.ItemsSource = state.Items;
         foreach (var path in state.Selected)
             if (state.Items.FirstOrDefault(i => i.Path == path) is { } item) List.SelectedItems.Add(item);
-        List.SelectionChanged += (_, _) => _state.Selected = [.. List.SelectedItems.OfType<DrawerItem>().Select(i => i.Path)];
+        List.SelectionChanged += OnSelectionChanged;
         _state.PropertyChanged += OnStateChanged;
         _state.Items.CollectionChanged += OnItemsChanged;
         // The group name is bound to SpokenName, which carries the codename while on (DrawerState.Title masks it), so it follows the count.
-        BindingOperations.SetBinding(this, AutomationProperties.NameProperty, new Binding(nameof(DrawerState.SpokenName)) { Source = _state });
+        BindingOperations.SetBinding(this, AutomationProperties.NameProperty, new Binding(nameof(DrawerState.SpokenName)) { Source = _state });   // streamer: masked - SpokenName is built from Title, which passes Mask.Name
         Show();
         Wire();
     }
@@ -57,12 +57,15 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
     private void Show()
     {
         TitleText.Text = _state.Folded ? _state.FoldedTitle : _state.Title;
-        AutomationProperties.SetName(TitleText, TitleText.Text);   // Title and FoldedTitle carry the codename while streamer mode is on
+        AutomationProperties.SetName(TitleText, TitleText.Text);   // streamer: masked - Title and FoldedTitle carry the codename (Mask.Name in DrawerState) while streamer mode is on
         MissingText.Text = DrawerState.MissingLine;
         bool open = !_state.Folded;
         MissingText.Visibility = open && _state.Missing ? Visibility.Visible : Visibility.Collapsed;
         List.Visibility = open && !_state.Missing ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    private void OnSelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        _state.Selected = [.. List.SelectedItems.OfType<DrawerItem>().Select(i => i.Path)];
 
     private void OnStateChanged(object? sender, PropertyChangedEventArgs e) => Show();
 
@@ -100,6 +103,8 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
     public void Dispose()
     {
         BindingOperations.ClearBinding(this, AutomationProperties.NameProperty);
+        List.SelectionChanged -= OnSelectionChanged;
+        List.ItemsSource = null;
         _state.PropertyChanged -= OnStateChanged;
         _state.Items.CollectionChanged -= OnItemsChanged;
     }

@@ -75,6 +75,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// <summary>Drawers' live state; null draws no drawer. A redraw waits while it is busy (Review Focus 3).</summary>
     private readonly DrawerService? _drawers;
     private bool _renderWanted;
+    private bool _privacyRender;
     private DeskArrangeSession? _session;
     private DeskArrangeMode? _arrangeMode;
     /// <summary>A design under review (the live review): drawn from memory in place of the saved layout, font, plate, ink and Launcher.
@@ -766,6 +767,17 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
 
     /// <summary>Lays each screen out afresh and hands the host its islands; the host keeps its windows
     /// when the islands line up with the last ones.</summary>
+    /// <summary>Streamer mode moved: names and labels on the Desk must follow now, so this redraws past a busy drawer (an inline rename
+    /// in progress loses its edit box; privacy beats interaction).</summary>
+    internal void PrivacyChanged()
+    {
+        if (_stopped) return;
+        _renderWanted = false;
+        _privacyRender = true;
+        try { Reload(); }
+        finally { _privacyRender = false; }
+    }
+
     private void OnDrawersChanged() { if (!_stopped) Reload(); }
 
     private void OnDrawersBusyEnded() { if (_renderWanted) Render(); }
@@ -776,7 +788,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         if (_host is null || _stopped || _screens.Count == 0 || _rendering || Arranging) return;
         // A drawer is mid-interaction (a drag, Explorer's menu, an inline rename): rebuilding it now would cut that short. The redraw
         // runs when the last hold is released (Review Focus 3).
-        if (_drawers?.Busy == true) { _renderWanted = true; return; }
+        if (_drawers?.Busy == true && !_privacyRender) { _renderWanted = true; return; }
         _renderWanted = false;
         _rendering = true;
         try { RenderOnce(); }
@@ -932,6 +944,13 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _minute.Start();
     }
 
+    /// <summary>The minute tick with the full redraw due, for tests.</summary>
+    internal void MinuteWithFullDue()
+    {
+        _fullAt = DateTimeOffset.MinValue;
+        OnMinute();
+    }
+
     private void OnMinute()
     {
         _minute.Stop();
@@ -943,8 +962,11 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         }
         var now = DateTimeOffset.Now;
         // A full layout every five minutes, and on the hour (hourly rotation, special-day windows, a new day).
-        if (now - _fullAt >= FullEvery || _surfaces.Count == 0 || now.ToLocalTime().Hour != _fullAt.ToLocalTime().Hour
-            || now.ToLocalTime().Date != _fullAt.ToLocalTime().Date)
+        bool full = now - _fullAt >= FullEvery || _surfaces.Count == 0 || now.ToLocalTime().Hour != _fullAt.ToLocalTime().Hour
+            || now.ToLocalTime().Date != _fullAt.ToLocalTime().Date;
+        // A busy drawer holds the full redraw, but the clock still ticks in place; the redraw runs when the hold ends.
+        if (full && _drawers?.Busy == true && _surfaces.Count > 0) { _renderWanted = true; full = false; }
+        if (full)
             Render();
         else
         {

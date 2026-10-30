@@ -90,11 +90,13 @@ internal static class DeskClicks
     private static bool HasDrawer(DependencyObject node)
     {
         if (node is DrawerPiece) return true;
-        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
+        int visual = VisualTreeHelper.GetChildrenCount(node);
+        for (int i = 0; i < visual; i++)
             if (HasDrawer(VisualTreeHelper.GetChild(node, i))) return true;
-        return node is ContentControl { Content: DependencyObject c } && HasDrawer(c)
+        // Only a node with no visual children follows its logical ones, so no subtree is walked twice.
+        return visual == 0 && (node is ContentControl { Content: DependencyObject c } && HasDrawer(c)
             || node is Decorator { Child: { } d } && HasDrawer(d)
-            || node is Panel p && p.Children.OfType<DependencyObject>().Any(HasDrawer);
+            || node is Panel p && p.Children.OfType<DependencyObject>().Any(HasDrawer));
     }
 
     /// <summary>The click kinds this island has, by the Core rule (<see cref="DeskElements.Build"/>).</summary>

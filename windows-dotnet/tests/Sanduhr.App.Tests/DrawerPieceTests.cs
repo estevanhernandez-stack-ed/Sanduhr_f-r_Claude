@@ -130,6 +130,8 @@ public sealed class DrawerPieceTests
             Assert.IsType<BlurEffect>(piece.Resources["Drawer.LabelEffect"]);
             var item = (ListBoxItem)piece.List.ItemContainerGenerator.ContainerFromIndex(0);
             Assert.DoesNotContain("salary", AutomationProperties.GetName(item));
+            var label = (TextBlock)FindNamed(item, "Label");
+            Assert.DoesNotContain("salary", AutomationProperties.GetName(label));
         }
         finally { StreamerMode.Reset(); s.Dispose(); }
     });
@@ -196,6 +198,63 @@ public sealed class DrawerPieceTests
             Assert.Contains("drawer.images", DeskView.DrawnFor(new DeskArrangement("clock:bl drawer.images:tl:1")));
         }
         finally { DrawerService.Current = null; s.Dispose(); }
+    });
+
+    private static FrameworkElement FindNamed(DependencyObject root, string name)
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var c = VisualTreeHelper.GetChild(root, i);
+            if (c is FrameworkElement { Name: var n } fe && n == name) return fe;
+            if (FindNamed(c, name) is { } deeper) return deeper;
+        }
+        return null!;
+    }
+
+    [Fact]
+    public void HasDrawer_is_quick_on_a_deep_island_without_a_drawer_and_finds_one_at_the_bottom() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, _, _) = Make(box, "a.png");
+        FrameworkElement Nest(FrameworkElement leaf)
+        {
+            FrameworkElement cur = leaf;
+            for (int i = 0; i < 24; i++)
+                cur = i % 2 == 0 ? new Border { Child = cur } : (FrameworkElement)new StackPanel { Children = { cur } };
+            return cur;
+        }
+        var plain = Nest(new TextBlock { Text = "x" });
+        var withDrawer = Nest(new DrawerPiece(s.Get("images")!, s, Look(), 1));
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var none = DeskClicks.Prepare([new DeskIsland(plain, new Point(), HorizontalAlignment.Left, VerticalAlignment.Top) { Widgets = ["clock"] }], false, new NoClicks());
+        var found = DeskClicks.Prepare([new DeskIsland(withDrawer, new Point(), HorizontalAlignment.Left, VerticalAlignment.Top) { Widgets = ["drawer.images"] }], false, new NoClicks());
+        clock.Stop();
+        Assert.False(none[0].TakesFocus);
+        Assert.True(found[0].TakesFocus);
+        Assert.True(clock.ElapsedMilliseconds < 2000);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void The_views_tick_while_a_drawer_is_busy_and_a_privacy_change_redraws_past_the_hold() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, store, paths) = Make(box, "a.png");
+        var host = new CountingHost();
+        var desk = new DeskController(store, () => host, () => DeskUsage.Empty, new NowPlayingHub(), new DeskMessageSource(store, paths),
+            paths: paths, drawers: s);
+        desk.Reload();
+        int before = host.Shows;
+        var hold = s.Hold();
+        try
+        {
+            desk.MinuteWithFullDue();
+            Assert.Equal(before + 1, host.Shows);      // the in-place tick still shows
+            StreamerMode.Use(new StreamerMask(true, CodenameBook.New(), box.Root));
+            desk.PrivacyChanged();
+            Assert.True(host.Shows >= before + 2);      // the redraw ran past the busy hold
+        }
+        finally { StreamerMode.Reset(); hold.Dispose(); desk.Dispose(); s.Dispose(); }
     });
 
     private sealed class NoClicks : IDeskClickActions

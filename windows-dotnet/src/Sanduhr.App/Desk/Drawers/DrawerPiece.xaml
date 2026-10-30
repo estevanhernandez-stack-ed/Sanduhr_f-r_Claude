@@ -37,7 +37,7 @@
         <DataTemplate x:Key="DrawerTile">
             <StackPanel Width="72" Margin="2,6,2,4">
                 <Image Source="{Binding Icon}" Width="40" Height="40" HorizontalAlignment="Center" />
-                <TextBlock x:Name="Label" Text="{Binding Name}" FontSize="11.5" TextAlignment="Center" TextWrapping="Wrap"
+                <TextBlock x:Name="Label" Text="{Binding Name}" AutomationProperties.Name="{Binding SpokenName}" FontSize="11.5" TextAlignment="Center" TextWrapping="Wrap"
                            TextTrimming="CharacterEllipsis" MaxHeight="32" Margin="0,4,0,0"
                            Foreground="{DynamicResource Drawer.Ink}" Effect="{DynamicResource Drawer.LabelEffect}" />
                 <TextBox x:Name="Editor" Visibility="Collapsed" FontSize="11.5" Margin="0,4,0,0" TextWrapping="Wrap"
