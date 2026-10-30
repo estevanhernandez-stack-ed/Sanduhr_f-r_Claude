@@ -186,7 +186,7 @@ internal sealed class DrawerService : IDisposable
         catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException)
         {
             // Gone between the check and the watcher: shown missing; Reload tries again.
-            state.Missing = true;
+            if (!state.Missing) { state.Missing = true; Changed?.Invoke(); }
         }
     }
 
@@ -246,11 +246,11 @@ internal sealed class DrawerService : IDisposable
         if (Get(id) is not { Missing: false }) return DrawerRun.Empty;
         var plan = new DrawerPlan(DrawerPlanSource.User, null, [], [.. paths.Select(p => new DrawerMove(p, id))]);
         var check = DrawerPlanValidator.Check(plan, Roots, Settings.Drawers);
-        if (!check.Ok) return new DrawerRun([], [.. paths.Select(p => new DrawerSkipped(Path.GetFileName(p), DrawerSkip.Outside))]);   // streamer: key - a file's leaf for the result line
+        if (!check.Ok) return new DrawerRun([], [.. paths.Select(p => new DrawerSkipped(Path.GetFileName(p), DrawerSkip.Outside))]);   // streamer: key - the leaf goes into DrawerRun.Skipped; DrawerPiece.Say shows counts only while streamer mode is on
         var run = Mover.Apply(check, Settings.Drawers);
-        var shared = check.Shared.Select(p => new DrawerSkipped(Path.GetFileName(p), DrawerSkip.Shared));   // streamer: key - a file's leaf for the result line
-        if (run.Moved.Count > 0) Journal.Add(DrawerPlanSource.User, null, run.Moved, DateTime.UtcNow);
-        return run with { Skipped = [.. shared, .. run.Skipped] };
+        var shared = check.Shared.Select(p => new DrawerSkipped(Path.GetFileName(p), DrawerSkip.Shared));   // streamer: key - the leaf goes into DrawerRun.Skipped; DrawerPiece.Say shows counts only while streamer mode is on
+        bool lost = run.Moved.Count > 0 && Journal.Add(DrawerPlanSource.User, null, run.Moved, DateTime.UtcNow) is null;
+        return run with { Skipped = [.. shared, .. run.Skipped], UndoLost = lost };
     }
 
     /// <summary>Undoes one journal entry and drops it from the journal.</summary>
@@ -261,7 +261,7 @@ internal sealed class DrawerService : IDisposable
         try { plan = DrawerUndo.Plan(entry, Written, DrawerMover.Exists); }
         catch (InvalidOperationException) { return DrawerRun.Empty; }   // no free clash name for one entry: left in the journal, never thrown out of the service
         var run = Mover.Undo(plan, Homes);
-        Journal.Remove(entryId);
+        Journal.Remove(entryId);   // a false here is harmless: replaying a stale entry skips files no longer there as "was moved since"
         return run;
     }
 

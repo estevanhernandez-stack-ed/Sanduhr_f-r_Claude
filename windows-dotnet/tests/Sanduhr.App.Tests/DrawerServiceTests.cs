@@ -92,6 +92,24 @@ public sealed class DrawerServiceTests
     });
 
     [Fact]
+    public void A_hand_move_that_cannot_be_journaled_says_undo_is_lost() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, _) = Make(box, "Images");
+        var a = box.File(@"Desktop\a.png");
+        var journal = Path.Combine(box.Root, "appdata", "Sanduhr", "drawers-journal.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(journal)!);
+        using (new FileStream(journal, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            var run = s.MoveIn([a], "images");
+            Assert.Single(run.Moved);
+            Assert.True(run.UndoLost);
+        }
+        Assert.True(File.Exists(Path.Combine(box.Drawers, "Images", "a.png")));
+        s.Dispose();
+    });
+
+    [Fact]
     public void Dropping_a_file_on_the_drawer_already_holding_it_does_nothing() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();

@@ -10,6 +10,9 @@ internal sealed record DrawerRun(IReadOnlyList<JournalMove> Moved, IReadOnlyList
 {
     public static DrawerRun Empty { get; } = new([], []);
 
+    /// <summary>The moves landed but could not be journaled, so they cannot be undone.</summary>
+    public bool UndoLost { get; init; }
+
     /// <summary>"13 moved, 1 skipped: report.docx is open in Word."</summary>
     public string Line => DrawerReview.ResultLine(Moved.Count, Skipped);
 }

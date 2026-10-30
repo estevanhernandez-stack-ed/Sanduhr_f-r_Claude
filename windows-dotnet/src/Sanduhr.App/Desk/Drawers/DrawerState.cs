@@ -12,7 +12,7 @@ internal sealed partial class DrawerItem : ObservableObject
     public DrawerItem(string path, bool isFolder, bool pending)
     {
         Path = path;
-        Name = System.IO.Path.GetFileName(path);   // streamer: key - the item's own name, for lookups; the drawn label blurs in the piece and SpokenName masks the spoken one
+        Name = System.IO.Path.GetFileName(path);   // streamer: key - drawn only through DrawerPiece, which blurs labels while streamer mode is on; spoken via SpokenName (masked)
         IsFolder = isFolder;
         Pending = pending;
     }
