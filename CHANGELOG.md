@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.38.0-mac — 2026-10-30
 
 - **The system piece.** The Desk can show CPU, memory and disk: place **System** in Settings, Desk, Pieces. It takes the same Bar, Slim, Ring and Ticks styles as the meters, with no pace mark and no warning, because it is a reading and not usage. Sanduhr reads it from the Mac every 5 seconds, only while the Desk shows and the piece is placed, and nothing is sent or stored. Claude can place it and style it with `propose_desk`, where it is the `telemetry` piece, as on Windows.
 
