@@ -142,7 +142,7 @@ private struct WeatherPlaceSection: View {
         Section {
             LabeledContent("Place", value: model.placeText)
             HStack {
-                TextField("City", text: $model.city)
+                TextField("City", text: $model.city, prompt: Text("Type a city, then Look up"))
                     .onSubmit { model.lookUp() }
                 Button(SettingsNames.weatherLookUp) { model.lookUp() }
                 if model.hasPlace { Button("Clear") { model.clear() } }
@@ -180,7 +180,7 @@ private struct WeatherNicknameSection: View {
 
     var body: some View {
         Section {
-            TextField(SettingsNames.weatherShowAs, text: $nickname)
+            TextField(SettingsNames.weatherShowAs, text: $nickname, prompt: Text("Optional, up to \(Weather.nicknameMax) characters"))
                 .onChange(of: nickname) { _, value in
                     let kept = Weather.normalizeNickname(value)
                     // Typing past 24 characters stops at 24; spaces stay while typing.
