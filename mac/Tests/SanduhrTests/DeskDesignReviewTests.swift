@@ -29,7 +29,7 @@ struct DeskDesignReviewTests {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("sanduhr-deskdesign-" + UUID().uuidString.prefix(10), isDirectory: true)
         let defaults: UserDefaults
-        let suite = "sanduhr-deskdesign-" + UUID().uuidString.prefix(8)
+        let suite = "sanduhr.tests.deskdesign." + UUID().uuidString.prefix(8)
         let host = FakeHost()
         let handoff: DeskDesignProposalHandoff
         var families = DeskDesignReviewTests.installed
@@ -431,7 +431,7 @@ struct DeskDesignReviewTests {
     }
 
     @Test func aStyleOrSizeOnAHiddenPieceChangesNothingAndWriteTouchesOnlyWhatDiffers() {
-        let store = UserDefaults(suiteName: "sanduhr-apply-" + UUID().uuidString.prefix(8))!
+        let store = UserDefaults(suiteName: "sanduhr.tests.apply." + UUID().uuidString.prefix(8))!
         let current = DeskDesignLook.read(store)
         #expect(current.arrangement.string == DeskLayout.standard && current.ink == "ffffff" && current.shadow && !current.plate)
         let next = DeskDesignApply.merged(current, DeskDesign(layout: [DeskPieceLayout(piece: "watchers", size: 1.5)]))

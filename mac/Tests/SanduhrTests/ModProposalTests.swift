@@ -26,7 +26,7 @@ struct ModProposalTests {
 
     private func rig(allowed: Bool = true) -> (TempHome, ModProposalStore, UserDefaults) {
         let h = TempHome()
-        let defaults = UserDefaults(suiteName: "proposals-\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: "sanduhr.tests.proposals.\(UUID().uuidString)")!
         defaults.set(allowed, forKey: ModProposalStore.switchKey)
         let paths = ModProposalStore.Paths(support: URL(fileURLWithPath: h.at("Support")),
                                            kept: KeptMods(dir: URL(fileURLWithPath: h.at("Support/mods"))))
@@ -168,7 +168,7 @@ struct ModProposalTests {
         let h = TempHome()
         defer { h.cleanUp() }
         let personal = h.at(".claude-personal")
-        let defaults = UserDefaults(suiteName: "proposals-\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: "sanduhr.tests.proposals.\(UUID().uuidString)")!
         defaults.set(true, forKey: ModProposalStore.switchKey)
         let paths = ModProposalStore.Paths(support: URL(fileURLWithPath: h.at("Support")),
                                            kept: KeptMods(dir: URL(fileURLWithPath: h.at("Support/mods"))))
@@ -220,7 +220,7 @@ struct ModProposalTests {
         r.home.file("dev/ci-band/.claude-plugin/plugin.json", #"{"name": "ci-band", "version": "0.1.0", "description": "CI runs."}"#)
         let kept = KeptMods(dir: URL(fileURLWithPath: r.home.at("Support/Sanduhr/mods")))
         let mod = try kept.keep(r.home.at("dev/ci-band"), session: "s", proposed: true)
-        let defaults = UserDefaults(suiteName: "installs-\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: "sanduhr.tests.installs.\(UUID().uuidString)")!
         defaults.set(true, forKey: ModProposalStore.switchKey)
         let store = ModProposalStore(paths: .init(support: URL(fileURLWithPath: r.home.at("Support/Sanduhr")), kept: kept),
                                      defaults: defaults, now: { Self.at.addingTimeInterval(5) },

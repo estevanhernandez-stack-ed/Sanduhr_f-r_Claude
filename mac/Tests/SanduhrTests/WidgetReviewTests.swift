@@ -27,7 +27,7 @@ struct WidgetReviewTests {
     final class World {
         let root = WidgetTestRoot()
         let defaults: UserDefaults
-        let suite = "sanduhr-review-" + UUID().uuidString.prefix(8)
+        let suite = "sanduhr.tests.review." + UUID().uuidString.prefix(8)
         let host = FakeHost()
         let handoff: WidgetProposalHandoff
         let store: WidgetStore

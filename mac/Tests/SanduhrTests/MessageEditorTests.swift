@@ -567,7 +567,7 @@ struct MessageSpecialModeTests {
     }
 
     @Test func settingsRoundTrip() throws {
-        let d = try #require(UserDefaults(suiteName: "special-\(UUID().uuidString)"))
+        let d = try #require(UserDefaults(suiteName: "sanduhr.tests.special.\(UUID().uuidString)"))
         #expect(MessageSpecialMode.saved(in: d) == .stack)
         #expect(MessageSpecialMode.savedSeconds(in: d) == 10)
         d.set("scroll", forKey: MessageSpecialMode.key)
@@ -596,7 +596,7 @@ struct MessageSpecialModeTests {
     }
 
     @Test func theMessageCardShowsASampleSpecialDay() throws {
-        let d = try #require(UserDefaults(suiteName: "special-card-\(UUID().uuidString)"))
+        let d = try #require(UserDefaults(suiteName: "sanduhr.tests.special-card.\(UUID().uuidString)"))
         d.set("turns", forKey: MessageSpecialMode.key)
         let live = DeskModel()
         live.message = "keep."

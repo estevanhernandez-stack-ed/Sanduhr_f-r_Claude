@@ -160,7 +160,7 @@ struct DeskDesignTests {
 @Suite("Desk state export")
 struct DeskStateExportTests {
     private func suite() -> UserDefaults {
-        let name = "sanduhr.test.deskstate.\(UUID().uuidString)"
+        let name = "sanduhr.tests.deskstate.\(UUID().uuidString)"
         let d = UserDefaults(suiteName: name)!
         d.removePersistentDomain(forName: name)
         return d
