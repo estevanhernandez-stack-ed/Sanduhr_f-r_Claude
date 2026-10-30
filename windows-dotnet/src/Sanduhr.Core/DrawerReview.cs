@@ -66,6 +66,14 @@ public static class DrawerReview
         return $"{moved} moved, {skipped.Count} skipped: {named}{more}";
     }
 
+    /// <summary>What turning off left behind: the folders kept because a file in them could not move (the root counts as one).</summary>
+    public static string? KeptLine(int kept) => kept switch
+    {
+        <= 0 => null,
+        1 => "1 drawer folder stays on your Desktop until its files can move. Turn drawers off again to finish.",
+        _ => $"{kept} drawer folders stay on your Desktop until their files can move. Turn drawers off again to finish.",
+    };
+
     /// <summary>The bar after Apply: the result line, Undo (when anything moved) and Done.</summary>
     public static DeskReviewModel Result(string line, bool canUndo) =>
         new(line, null, [], [], DeskOff: false, [])

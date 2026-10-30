@@ -18,7 +18,14 @@ internal sealed record DrawerRun(IReadOnlyList<JournalMove> Moved, IReadOnlyList
 }
 
 /// <summary>Turning drawers off: the run, and the homes (and root) kept because something in them could not move.</summary>
-internal sealed record DrawerReturnRun(DrawerRun Run, IReadOnlyList<string> KeptHomes);
+internal sealed record DrawerReturnRun(DrawerRun Run, IReadOnlyList<string> KeptHomes)
+{
+    /// <summary>Set when nothing was attempted because the return could not be planned; it replaces the result line.</summary>
+    public string? Failure { get; init; }
+
+    /// <summary>The line to show: the failure, else the run's result line.</summary>
+    public string Line => Failure ?? Run.Line;
+}
 
 /// <summary>
 /// The only code that moves a user's file (5.0 drawers spec, section 4). One item per Shell operation; before each, the final paths

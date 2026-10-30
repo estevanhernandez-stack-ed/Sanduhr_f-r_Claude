@@ -1114,7 +1114,8 @@ public partial class App : Application
             },
             vm.InactiveReader.DeleteAllProfilesAsync,
             () => new SettingsStore(paths).ClearMcpSwitchesForReset(),
-            () => new SettingsStore(paths).ClearStatuslineSwitchesForReset());
+            () => new SettingsStore(paths).ClearStatuslineSwitchesForReset(),
+            () => _drawers?.TurnOff());
         var folders = ResetFolderListViewModel.Read(vm);
         var svm = _settingsWindow?.ViewModel;
         if (svm is not null) svm.ResetFolders = folders;   // a streamer flip renames the rows (decision 13)

@@ -273,6 +273,74 @@ internal sealed class DrawerService : IDisposable
     private static DateTime? Written(string path) =>
         File.Exists(path) ? File.GetLastWriteTimeUtc(path) : Directory.Exists(path) ? Directory.GetLastWriteTimeUtc(path) : null;
 
+    // ---- turning off ----
+
+    /// <summary>The line when a clash name ran out, so nothing was attempted.</summary>
+    internal const string NoFreeName = "Drawers could not be turned off: a file name on the Desktop has no free version.";
+
+    /// <summary>A home's items for the return: everything but Windows' own housekeeping files, hidden or not (a hidden file a user put in a
+    /// drawer is still theirs).</summary>
+    internal static IEnumerable<DesktopItem> ChildrenOf(string dir)
+    {
+        if (!Directory.Exists(dir)) yield break;
+        foreach (var info in new DirectoryInfo(dir).EnumerateFileSystemInfos())
+            if (!Housekeeping.Contains(info.Name, StringComparer.OrdinalIgnoreCase))   // streamer: key - compared with fixed names
+                yield return new DesktopItem(info.FullName, info is DirectoryInfo, info.LastWriteTimeUtc);
+    }
+
+    /// <summary>What turning off would move (the confirmation counts these). Null when a file name on the Desktop has no free version, so
+    /// nothing can be planned.</summary>
+    public ReturnPlan? ReturnPlan() => PlanReturn(Settings.Drawers);
+
+    private ReturnPlan? PlanReturn(IReadOnlyList<DrawerDef> drawers)
+    {
+        try { return DrawerReturn.Plan(drawers, Settings.RootOr(Places.Desktop), Places.Desktop, ChildrenOf, DrawerMover.Exists); }
+        catch (InvalidOperationException) { return null; }   // DrawerNames.Free ran out of clash names
+    }
+
+    /// <summary>
+    /// Turning drawers off (spec section 4): every owned home empties onto the Desktop and goes, then the root; views stay as they are.
+    /// A drawer whose home had to stay (a file open in another app) stays listed with its place, hidden word and fold, so turning off again
+    /// finishes the job. Drawers go off, the entries of the drawers that left go, and auto-tidy goes off; the rules stay. When a clash name
+    /// ran out nothing is touched and the line says why.
+    /// </summary>
+    public DrawerReturnRun TurnOff(Func<bool>? stop = null)
+    {
+        if (ReturnPlan() is not { } plan) return new DrawerReturnRun(DrawerRun.Empty, []) { Failure = NoFreeName };
+        var result = Mover.Return(plan, Homes, stop);
+        var kept = result.KeptHomes.Select(DrawerPaths.Normalize).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var stay = Settings.Drawers.Where(d => d.Owned && DrawerPaths.Normalize(d.Home) is { } h && kept.Contains(h)).ToArray();
+        Save(Without(Settings, [.. Settings.Drawers.Select(d => d.Id).Except(stay.Select(d => d.Id))]) with { Enabled = false, AutoTidy = false, Drawers = stay });
+        return result;
+    }
+
+    /// <summary>Removes one drawer: an owned one returns its files to the Desktop first and keeps its listing if a file could not move;
+    /// a view just goes (its folder is the user's). Its place, hidden word and fold go with it.</summary>
+    public DrawerReturnRun Remove(string id)
+    {
+        if (Settings.Drawers.FirstOrDefault(d => d.Id == id) is not { } def) return new DrawerReturnRun(DrawerRun.Empty, []);
+        var result = new DrawerReturnRun(DrawerRun.Empty, []);
+        if (def.Owned)
+        {
+            if (PlanReturn([def]) is not { } plan) return result with { Failure = NoFreeName };
+            // Only this drawer's home: the root stays for the other drawers.
+            var root = DrawerPaths.Normalize(Settings.RootOr(Places.Desktop));
+            plan = plan with { HomesToRemove = [.. plan.HomesToRemove.Where(h => !string.Equals(DrawerPaths.Normalize(h), root, StringComparison.OrdinalIgnoreCase))] };
+            result = Mover.Return(plan, Homes);
+            if (result.KeptHomes.Count > 0) return result;
+        }
+        Save(Without(Settings, [id]) with { Drawers = [.. Settings.Drawers.Where(d => d.Id != id)] });
+        return result;
+    }
+
+    /// <summary>The settings with these drawers' places, hidden words and folds cleared.</summary>
+    private static DrawerSettings Without(DrawerSettings s, IReadOnlyCollection<string> ids) => s with
+    {
+        Places = s.Places.Where(kv => !ids.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal),
+        Hidden = [.. s.Hidden.Where(h => !ids.Contains(h))],
+        Folded = [.. s.Folded.Where(f => !ids.Contains(f))],
+    };
+
     // ---- fold, hide, names ----
 
     public void SetFolded(string id, bool folded)

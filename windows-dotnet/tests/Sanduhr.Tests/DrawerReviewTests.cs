@@ -139,4 +139,12 @@ public sealed class DrawerReviewTests
         var created = new[] { Def("Images"), Def("Documents"), Def("Archives") };
         Assert.Equal(["archives"], DrawerArrival.Folded(created));
     }
+
+    [Fact]
+    public void The_kept_line_says_what_stays_and_how_to_finish()
+    {
+        Assert.Null(DrawerReview.KeptLine(0));
+        Assert.Equal("1 drawer folder stays on your Desktop until its files can move. Turn drawers off again to finish.", DrawerReview.KeptLine(1));
+        Assert.Equal("2 drawer folders stay on your Desktop until their files can move. Turn drawers off again to finish.", DrawerReview.KeptLine(2));
+    }
 }

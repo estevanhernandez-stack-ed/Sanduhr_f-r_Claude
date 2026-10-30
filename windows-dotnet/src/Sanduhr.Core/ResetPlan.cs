@@ -161,6 +161,7 @@ public static partial class ResetPlan
         AddFile(history, Path.Combine(local, "last-update-check.txt"));
         AddFile(history, paths.LegacyHistoryFile);
         AddFile(history, paths.LastErrorFile);
+        AddFile(history, paths.DrawerJournalFile);
         AddMatchingFiles(history, app, "sanduhr.log*");
         AddFile(history, Path.Combine(app, "fetch-debug.log"));
         AddFile(history, Path.Combine(app, "signin-debug.log"));
