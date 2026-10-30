@@ -25,6 +25,14 @@ internal sealed record DrawerReturnRun(DrawerRun Run, IReadOnlyList<string> Kept
 
     /// <summary>The line to show: the failure, else the run's result line.</summary>
     public string Line => Failure ?? Run.Line;
+
+    /// <summary>How many owned drawers' folders stayed (the Drawers root is counted in <see cref="KeptHomes"/> but is not one of these).</summary>
+    public int KeptDrawers { get; init; }
+
+    /// <summary>What was left behind and what to do about it, or null when nothing was: a kept drawer folder is finished by turning off
+    /// again; a root kept alone (the user's own file sits in it) is not.</summary>
+    public string? KeptNote => KeptHomes.Count == 0 ? null
+        : KeptDrawers == 0 ? DrawerReview.RootKeptLine : DrawerReview.KeptLine(KeptHomes.Count);
 }
 
 /// <summary>

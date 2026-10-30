@@ -311,7 +311,7 @@ internal sealed class DrawerService : IDisposable
         var kept = result.KeptHomes.Select(DrawerPaths.Normalize).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
         var stay = Settings.Drawers.Where(d => d.Owned && DrawerPaths.Normalize(d.Home) is { } h && kept.Contains(h)).ToArray();
         Save(Without(Settings, [.. Settings.Drawers.Select(d => d.Id).Except(stay.Select(d => d.Id))]) with { Enabled = false, AutoTidy = false, Drawers = stay });
-        return result;
+        return result with { KeptDrawers = stay.Length };
     }
 
     /// <summary>Removes one drawer: an owned one returns its files to the Desktop first and keeps its listing if a file could not move;

@@ -140,6 +140,62 @@ public sealed class DrawerTurnOffTests
     });
 
     [Fact]
+    public void A_file_dropped_in_the_root_keeps_only_the_root_and_says_so() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, store, _) = Make(box, Owned(box, "Images"));
+        box.File(@"Desktop\Drawers\Images\a.png");
+        var own = box.File(@"Desktop\Drawers\mine.txt");
+        var run = s.TurnOff();
+        Assert.True(File.Exists(Path.Combine(box.Desktop, "a.png")));
+        Assert.True(File.Exists(own));
+        Assert.Equal([box.Drawers], run.KeptHomes.Select(h => h.TrimEnd((char)92)), StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(0, run.KeptDrawers);
+        Assert.Equal(DrawerReview.RootKeptLine, run.KeptNote);
+        Assert.Empty(store.LoadDrawers().Drawers);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void A_kept_drawer_folder_gets_the_try_again_note() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, _, _) = Make(box, Owned(box, "Images"));
+        var locked = box.File(@"Desktop\Drawers\Images\a.png");
+        DrawerReturnRun run;
+        using (new FileStream(locked, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            run = s.TurnOff();
+        Assert.Equal(1, run.KeptDrawers);
+        Assert.Equal(DrawerReview.KeptLine(2), run.KeptNote);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void Reset_reports_a_drawer_file_that_stayed_and_still_clears_settings() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var paths = new Paths(Path.Combine(box.Root, "roaming"), Path.Combine(box.Root, "home"), Path.Combine(box.Root, "local"), Path.Combine(box.Root, "ext"));
+        var store = new SettingsStore(paths);
+        var def = Owned(box, "Images");
+        Directory.CreateDirectory(def.Home);
+        store.SaveDrawers(DrawerSettings.Default with { Enabled = true, Drawers = [def] });
+        var locked = box.File(@"Desktop\Drawers\Images\a.png");
+        var s = new DrawerService(store, paths, new DrawerPlaces(box.Desktop, box.Public, []), Dispatcher.CurrentDispatcher);
+        var service = new ResetService(paths, new AccountStore(new AppWindowFixture.MemoryCredentials()),
+            new PublishTokenStore(new AppWindowFixture.MemoryCredentials()), _ => Task.FromResult(ClaudeCodeUndoResult.Clean), () => { },
+            returnDrawers: () => s.TurnOff());
+        IReadOnlyList<ResetStepResult> results;
+        using (new FileStream(locked, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            results = service.RunAsync(new ResetChoices(ClaudeCodeEntries: false, Accounts: false, History: false, Themes: false, Settings: true), []).GetAwaiter().GetResult();
+        s.Dispose();
+        var step = Assert.Single(results);
+        Assert.False(step.Ok);
+        Assert.Contains("Some drawer files stayed in the Drawers folder on your Desktop.", step.Failures);
+        Assert.True(File.Exists(locked));   // safe and in plain sight
+        Assert.False(File.Exists(paths.SettingsFile));
+    });
+
+    [Fact]
     public void The_uninstall_return_puts_files_back_and_stops_when_its_time_is_up() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();

@@ -141,6 +141,14 @@ public sealed class DrawerReviewTests
     }
 
     [Fact]
+    public void A_root_kept_alone_says_why_and_does_not_promise_a_retry()
+    {
+        Assert.Equal("The Drawers folder stays on your Desktop: it holds files that are not in a drawer.", DrawerReview.RootKeptLine);
+        Assert.DoesNotContain("again", DrawerReview.RootKeptLine);
+        Assert.DoesNotContain(((char)0x2014).ToString(), DrawerReview.RootKeptLine);
+    }
+
+    [Fact]
     public void The_kept_line_says_what_stays_and_how_to_finish()
     {
         Assert.Null(DrawerReview.KeptLine(0));

@@ -74,6 +74,10 @@ public static class DrawerReview
         _ => $"{kept} drawer folders stay on your Desktop until their files can move. Turn drawers off again to finish.",
     };
 
+    /// <summary>The Drawers folder stayed although every drawer is back: it holds files that are not in a drawer, which turning off again
+    /// cannot move.</summary>
+    public const string RootKeptLine = "The Drawers folder stays on your Desktop: it holds files that are not in a drawer.";
+
     /// <summary>The bar after Apply: the result line, Undo (when anything moved) and Done.</summary>
     public static DeskReviewModel Result(string line, bool canUndo) =>
         new(line, null, [], [], DeskOff: false, [])
