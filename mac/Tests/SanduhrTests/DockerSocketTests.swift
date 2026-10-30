@@ -112,7 +112,8 @@ struct DockerSocketTests {
         let s = socket([c], limit: .milliseconds(60))
         let started = ContinuousClock.now
         await #expect(throws: DockerFailure.down) { _ = try await s.listContainers() }
-        #expect(ContinuousClock.now - started < .seconds(5))
+        // A bound for a hang, not a speed test: a busy CI runner has taken 14 s here.
+        #expect(ContinuousClock.now - started < .seconds(60))
         #expect(c.isClosed)
     }
 
@@ -122,7 +123,7 @@ struct DockerSocketTests {
 
     @Test func headersInTimeAreNotCutOffByTheLimit() async throws {
         let c = FakeConnection(replies: [HTTPFixture.response(headers: ["Content-Length: 2"], body: Data("[]".utf8))])
-        let data = try await socket([c], limit: .seconds(5)).listContainers()
+        let data = try await socket([c], limit: .seconds(60)).listContainers()
         #expect(data == Data("[]".utf8))
     }
 

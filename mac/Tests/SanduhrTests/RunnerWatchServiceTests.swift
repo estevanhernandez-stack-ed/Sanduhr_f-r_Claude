@@ -134,9 +134,10 @@ struct RunnerWatchServiceTests {
         RunnerWatchService(docker: d, enabled: { on.on }, sink: s, now: { Self.now }, replayWait: replayWait)
     }
 
-    /// Waits for `done` with a deadline, never an unbounded sleep.
+    /// Waits for `done` with a deadline, never an unbounded sleep. The deadline catches a hang; it is
+    /// generous because a busy CI runner has held the main actor for more than 10 s.
     private func until(_ what: String = "condition", _ done: () -> Bool) async throws {
-        let deadline = ContinuousClock.now + .seconds(10)
+        let deadline = ContinuousClock.now + .seconds(60)
         while !done() {
             #expect(ContinuousClock.now < deadline, "timed out waiting for \(what)")
             if ContinuousClock.now >= deadline { return }
