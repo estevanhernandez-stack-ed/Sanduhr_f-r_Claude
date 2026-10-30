@@ -41,7 +41,7 @@ public sealed class StoreUpdateService
         _log = log;
     }
 
-    /// <summary>The Store's answer: the waiting update's version, or null. A seam for tests, which never ask the real Store.</summary>
+    /// <summary>The Store's answer: <see cref="RestartToUpdate.AnyUpdate"/> while an update waits, or null. A seam for tests, which never ask the real Store.</summary>
     internal Func<Task<string?>> Query { get; init; } = AskTheStoreAsync;
 
     private static async Task<string?> AskTheStoreAsync()
@@ -49,7 +49,9 @@ public sealed class StoreUpdateService
         var context = StoreContext.GetDefault();
         // network: store-update
         var updates = await context.GetAppAndOptionalStorePackageUpdatesAsync();
-        return updates.Count > 0 ? VersionOf(updates[0]) : null;
+        // StorePackageUpdate.Package is the installed package, not the incoming one ("Sanduhr 4.0.0 is
+        // ready" offered 4.0.1, 2026-10-30), and the Store names no other version: offer without one.
+        return updates.Count > 0 ? RestartToUpdate.AnyUpdate : null;
     }
 
     /// <summary>Called from the widget's 30-second tick on the UI thread. The Store query itself is
@@ -90,19 +92,6 @@ public sealed class StoreUpdateService
             else
                 _offers.Offer(version, new StoreUpdateInstaller(_ownerWindow, _log));
         });
-    }
-
-    private static string VersionOf(StorePackageUpdate update)
-    {
-        try
-        {
-            var v = update.Package.Id.Version;
-            return RestartToUpdate.DisplayVersion(v.Major, v.Minor, v.Build, v.Revision);
-        }
-        catch
-        {
-            return "update"; // reads "Sanduhr update is ready", still true
-        }
     }
 
     private void Log(string stage, Exception e) => _log?.Invoke($"store update {stage} ({e.GetType().Name}: {e.Message})");   // streamer: notname - written to the log file, never drawn

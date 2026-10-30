@@ -193,7 +193,11 @@ public sealed class RestartToUpdate
     // -- copy -------------------------------------------------------------------
 
     /// <summary>The toast, tray and status text for a waiting version.</summary>
-    public static string ReadyText(string version) => $"Sanduhr {version} is ready. Restart to update?";
+    public static string ReadyText(string version) =>
+        version == AnyUpdate ? "A Sanduhr update is ready. Restart to update?" : $"Sanduhr {version} is ready. Restart to update?";
+
+    /// <summary>The offer's version when the channel cannot say which version is coming (the Store).</summary>
+    public const string AnyUpdate = "update";
 
     /// <summary>The button, everywhere (toast, tray, widget), on both channels.</summary>
     public const string ButtonText = "Restart to update";
