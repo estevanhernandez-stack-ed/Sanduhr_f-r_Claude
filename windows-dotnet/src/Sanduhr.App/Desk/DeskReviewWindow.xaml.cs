@@ -64,17 +64,19 @@ public sealed partial class DeskReviewWindow : Window
     public void SetModel(DeskReviewModel model)
     {
         bool wasApplyEnabled = Bar.Apply.IsEnabled;
+        bool wasEnterDismisses = Bar.Model?.EnterDismisses == true;
         Bar.SetModel(model);
         Title = model.BarName ?? DeskReviewCopy.BarName;
         AutomationProperties.SetName(this, Title);   // streamer: notname - the window's fixed title
-        if (IsLoaded && Bar.Apply.IsEnabled != wasApplyEnabled) FocusDefault();
+        if (IsLoaded && (Bar.Apply.IsEnabled != wasApplyEnabled || (Bar.Model?.EnterDismisses == true) != wasEnterDismisses)) FocusDefault();
     }
 
     private void FocusDefault()
     {
         // Apply when it is available. While a font is missing the window itself holds the keyboard, so Enter does nothing (it must
         // not dismiss) and Escape still dismisses.
-        if (Bar.Apply.IsEnabled) Bar.Apply.Focus();
+        if (Bar.Model?.EnterDismisses == true) Bar.Dismiss.Focus();
+        else if (Bar.Apply.IsEnabled) Bar.Apply.Focus();
         else Focus();
     }
 
@@ -93,7 +95,8 @@ public sealed partial class DeskReviewWindow : Window
         }
         if (key is Key.Enter or Key.Return && !EnterBelongsToTheFocus(focused))
         {
-            if (Bar.Model?.CanApply == true) ApplyRequested?.Invoke();
+            if (Bar.Model?.EnterDismisses == true) DismissRequested?.Invoke();
+            else if (Bar.Model?.CanApply == true) ApplyRequested?.Invoke();
             return true;
         }
         return false;
@@ -101,7 +104,7 @@ public sealed partial class DeskReviewWindow : Window
 
     /// <summary>Enter on a focused button or link chooses it, as in any dialog.</summary>
     private bool EnterBelongsToTheFocus(IInputElement? focused) =>
-        ReferenceEquals(focused, Bar.Dismiss) || focused is Hyperlink;
+        ReferenceEquals(focused, Bar.Dismiss) || ReferenceEquals(focused, Bar.Edit) || focused is Hyperlink;
 
     /// <summary>Top center of the target screen's work area, else the primary's.</summary>
     private void Place()

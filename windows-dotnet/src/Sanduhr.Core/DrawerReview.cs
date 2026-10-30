@@ -14,6 +14,7 @@ public static class DrawerReview
     public const string Busy = "Finish the review on your Desk first.";
     public const string Undo = "Undo";
     public const string Done = "Done";
+    public const string ApplyFailed = "The plan could not be applied. Nothing more was moved.";
     private const int NamedSkips = 3;
 
     public static string Title(int files, int drawers) =>
@@ -75,7 +76,8 @@ public static class DrawerReview
             ApplyLabel = Undo,
             DismissLabel = Done,
             ApplyOff = !canUndo,
-            KeysLine = canUndo ? "Enter undoes. Escape closes." : "Escape closes.",
+            KeysLine = "Enter or Escape closes.",
+            EnterDismisses = true,
         };
 }
 

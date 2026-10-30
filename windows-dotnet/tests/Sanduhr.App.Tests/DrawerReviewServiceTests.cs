@@ -235,7 +235,7 @@ public sealed class DrawerReviewServiceTests
         Assert.StartsWith("1 moved.", host.Model!.Title);
         Assert.EndsWith(" Undo is not available for this move.", host.Model.Title);
         Assert.False(host.Model.CanApply);
-        Assert.Equal("Escape closes.", host.Model.Keys);
+        Assert.Equal("Enter or Escape closes.", host.Model.Keys);
         drawers.Dispose();
     });
 
@@ -247,7 +247,92 @@ public sealed class DrawerReviewServiceTests
         box.File(@"Desktop\notes.pdf");
         review.SortNow();
         host.Apply!();
-        Assert.Equal("Enter undoes. Escape closes.", host.Model!.Keys);
+        Assert.Equal("Enter or Escape closes.", host.Model!.Keys);
+        drawers.Dispose();
+    });
+
+    /// <summary>A host with a real review window (never shown), so the keys and clicks go through the window's own handling.</summary>
+    private sealed class WindowHost : IDrawerReviewHost
+    {
+        public DeskReviewWindow? Window;
+        private Action _apply = () => { }, _dismiss = () => { };
+        public bool Closed { get; private set; }
+        public bool OtherReviewOpen => false;
+        public void Preview(string layout) { }
+        public void EndPreview() { }
+        public void Bar(DeskReviewModel model, Action apply, Action? edit, Action dismiss)
+        {
+            (_apply, _dismiss) = (apply, dismiss);
+            if (Window is null)
+            {
+                Window = new DeskReviewWindow();
+                Window.ApplyRequested += () => _apply();
+                Window.DismissRequested += () => _dismiss();
+            }
+            Window.SetModel(model);
+        }
+        public void CloseBar() { Closed = true; Window = null; }
+        public DrawerPlanEdits? Edit(DrawerPlan plan, IReadOnlyCollection<string> existingIds) => null;
+    }
+
+    private static (DrawerReviewService Review, DrawerService Drawers, WindowHost Host) MakeWindowed(DrawerSandbox box)
+    {
+        _ = System.IO.Packaging.PackUriHelper.UriSchemePack;
+        var paths = new Paths(appDataBase: Path.Combine(box.Root, "appdata"));
+        var store = new SettingsStore(paths);
+        store.SaveDesk(DeskSettings.Default with { Enabled = true, Layout = "clock:bl" });
+        store.SaveDrawers(DrawerSettings.Default with { Enabled = true });
+        var drawers = new DrawerService(store, paths, new DrawerPlaces(box.Desktop, box.Public, []), Dispatcher.CurrentDispatcher);
+        var host = new WindowHost();
+        return (new DrawerReviewService(drawers, store, host), drawers, host);
+    }
+
+    [Fact]
+    public void On_the_result_Enter_twice_leaves_the_files_sorted_and_closes_the_bar() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (review, drawers, host) = MakeWindowed(box);
+        var pdf = box.File(@"Desktop\notes.pdf");
+        review.SortNow();
+        var window = host.Window!;
+        Assert.True(window.HandleKey(System.Windows.Input.Key.Enter, null));   // Apply
+        Assert.False(File.Exists(pdf));
+        Assert.True(window.HandleKey(System.Windows.Input.Key.Enter, null));   // the result: Enter closes
+        Assert.False(File.Exists(pdf));
+        Assert.True(File.Exists(Path.Combine(box.Drawers, "Documents", "notes.pdf")));
+        Assert.True(host.Closed);
+        drawers.Dispose();
+    });
+
+    [Fact]
+    public void A_click_on_Undo_on_the_result_still_undoes() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (review, drawers, host) = MakeWindowed(box);
+        var pdf = box.File(@"Desktop\notes.pdf");
+        review.SortNow();
+        var window = host.Window!;
+        window.HandleKey(System.Windows.Input.Key.Enter, null);
+        window.ReviewBar.Apply.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        Assert.True(File.Exists(pdf));
+        drawers.Dispose();
+    });
+
+    [Fact]
+    public void Apply_that_throws_ends_the_preview_and_shows_a_result_with_no_Undo() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (review, drawers, _, host) = Make(box);
+        var pdf = box.File(@"Desktop\notes.pdf");
+        review.RunApply = (_, _) => throw new IOException("disk gone");
+        review.SortNow();
+        host.Apply!();
+        Assert.False(review.Reviewing);
+        Assert.Null(host.Previewing);
+        Assert.Empty(drawers.PreviewDrawers);
+        Assert.Equal(DrawerReview.ApplyFailed, host.Model!.Title);
+        Assert.False(host.Model.CanApply);
+        Assert.True(File.Exists(pdf));
         drawers.Dispose();
     });
 

@@ -37,6 +37,9 @@ internal sealed class DrawerReviewService
     private readonly DrawerService _drawers;
     private readonly SettingsStore _store;
     private readonly IDrawerReviewHost _host;
+
+    /// <summary>What moves the files; the mover's own Apply, and a seam for tests.</summary>
+    internal Func<DrawerPlanCheck, IReadOnlyList<DrawerDef>, DrawerRun> RunApply { get; set; }
     private DrawerPlan? _plan;
     private DrawerPlanCheck? _check;
     private string? _undoId;
@@ -46,6 +49,7 @@ internal sealed class DrawerReviewService
         _drawers = drawers;
         _store = store;
         _host = host;
+        RunApply = (check, drawerDefs) => _drawers.Mover.Apply(check, drawerDefs);
     }
 
     /// <summary>A plan is on the Desk waiting for Apply, Edit or Dismiss.</summary>
@@ -105,17 +109,33 @@ internal sealed class DrawerReviewService
     private void Apply()
     {
         if (_plan is not { } plan || _check is not { } check) return;
-        var run = _drawers.Mover.Apply(check, _drawers.Settings.Drawers);
-        _drawers.ClearPending();
-        var s = _drawers.Settings;
-        _drawers.Save(s with
+        DrawerRun run;
+        JournalEntry? entry;
+        try
         {
-            Drawers = [.. s.Drawers, .. check.Drawers],
-            Folded = [.. s.Folded, .. DrawerArrival.Folded(check.Drawers)],
-            AutoTidyUnlocked = s.AutoTidyUnlocked || plan.Source == DrawerPlanSource.Rules,
-        });
-        // No layout and no places: new drawers arrive top right at render (free panels).
-        var entry = run.Moved.Count > 0 ? _drawers.Journal.Add(plan.Source, plan.Agent, run.Moved, DateTime.UtcNow) : null;
+            run = RunApply(check, _drawers.Settings.Drawers);
+            _drawers.ClearPending();
+            var s = _drawers.Settings;
+            _drawers.Save(s with
+            {
+                Drawers = [.. s.Drawers, .. check.Drawers],
+                Folded = [.. s.Folded, .. DrawerArrival.Folded(check.Drawers)],
+                AutoTidyUnlocked = s.AutoTidyUnlocked || plan.Source == DrawerPlanSource.Rules,
+            });
+            // No layout and no places: new drawers arrive top right at render (free panels).
+            entry = run.Moved.Count > 0 ? _drawers.Journal.Add(plan.Source, plan.Agent, run.Moved, DateTime.UtcNow) : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            // Never leave the review stuck: the preview ends and the bar says nothing more moved, with no Undo.
+            _plan = null;
+            _check = null;
+            _undoId = null;
+            _drawers.ClearPending();
+            _host.EndPreview();
+            _host.Bar(DrawerReview.Result(DrawerReview.ApplyFailed, canUndo: false), Undo, null, Done);
+            return;
+        }
         _undoId = entry?.Id;
         bool lost = run.Moved.Count > 0 && entry is null;
         var line = run.Line + (lost ? DrawerPieceCopy.UndoLost : "");

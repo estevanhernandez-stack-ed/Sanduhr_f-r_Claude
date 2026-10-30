@@ -67,6 +67,9 @@ public sealed record DeskReviewModel(
     /// <summary>Apply is available once every font the design names is installed.</summary>
     public bool CanApply => MissingFonts.Count == 0 && !ApplyOff;
 
+    /// <summary>Enter closes the bar like Dismiss and never chooses Apply (the drawers result: Undo runs only from a deliberate press).</summary>
+    public bool EnterDismisses { get; init; }
+
     /// <summary>The keys line when it is not the design review's (the drawers result: "Enter undoes. Escape closes."); null keeps it.</summary>
     public string? KeysLine { get; init; }
 

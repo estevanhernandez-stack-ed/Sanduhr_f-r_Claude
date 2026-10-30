@@ -223,6 +223,20 @@ public sealed class DeskReviewBarTests
     }
 
     [Fact]
+    public void EnterOnAFocusedEditButtonIsLeftToThatControl()
+    {
+        OnSta(() =>
+        {
+            var window = new DeskReviewWindow();
+            window.SetModel(Model() with { CanEdit = true });
+            int applied = 0;
+            window.ApplyRequested += () => applied++;
+            Assert.False(window.HandleKey(Key.Enter, window.ReviewBar.Edit));
+            Assert.Equal(0, applied);
+        });
+    }
+
+    [Fact]
     public void EnterOnTheDismissButtonOrALinkIsLeftToThatControl()
     {
         OnSta(() =>
@@ -248,7 +262,7 @@ public sealed class DeskReviewBarTests
             var header = (TextBlock)bar.FindName("ChangesHeader");
             Assert.Equal(Visibility.Collapsed, header.Visibility);
             Assert.Equal(Visibility.Collapsed, ((FrameworkElement)bar.FindName("Changes")).Visibility);
-            Assert.Equal("Enter undoes. Escape closes.", ((TextBlock)bar.FindName("Keys")).Text);
+            Assert.Equal("Enter or Escape closes.", ((TextBlock)bar.FindName("Keys")).Text);
             bar.SetModel(Model());   // a design review brings them back
             Assert.Equal(Visibility.Visible, header.Visibility);
             Assert.Equal(Visibility.Visible, ((FrameworkElement)bar.FindName("Changes")).Visibility);
