@@ -83,6 +83,16 @@ public sealed class DrawerReviewTests
     }
 
     [Fact]
+    public void The_result_model_has_its_own_keys_line()
+    {
+        var undo = DrawerReview.Result("13 moved.", canUndo: true);
+        Assert.Equal("Enter undoes. Escape closes.", undo.Keys);
+        var none = DrawerReview.Result("13 moved. Undo is not available for this move.", canUndo: false);
+        Assert.Equal("Escape closes.", none.Keys);
+        Assert.Equal(DeskReviewCopy.KeysLine, new DeskReviewModel("t", null, [], [], false, []).Keys);   // null keeps today's
+    }
+
+    [Fact]
     public void Edit_drops_unticked_moves_and_drawers_left_empty()
     {
         var (plan, _) = Plan(("a.png", "Images"), ("c.pdf", "Documents"));

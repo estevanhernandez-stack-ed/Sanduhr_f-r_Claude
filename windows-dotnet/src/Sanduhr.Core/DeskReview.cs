@@ -67,8 +67,11 @@ public sealed record DeskReviewModel(
     /// <summary>Apply is available once every font the design names is installed.</summary>
     public bool CanApply => MissingFonts.Count == 0 && !ApplyOff;
 
+    /// <summary>The keys line when it is not the design review's (the drawers result: "Enter undoes. Escape closes."); null keeps it.</summary>
+    public string? KeysLine { get; init; }
+
     /// <summary>The keys line under the changes.</summary>
-    public string Keys => CanApply ? DeskReviewCopy.KeysLine : DeskReviewCopy.KeysLineWaiting;
+    public string Keys => KeysLine ?? (CanApply ? DeskReviewCopy.KeysLine : DeskReviewCopy.KeysLineWaiting);
 
     /// <summary>A link the bar may show and open: absolute https only, no user info; anything else is dropped.</summary>
     public static string? SafeLink(string? link)

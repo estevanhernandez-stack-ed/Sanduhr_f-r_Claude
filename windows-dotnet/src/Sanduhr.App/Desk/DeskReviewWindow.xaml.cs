@@ -24,6 +24,7 @@ public sealed partial class DeskReviewWindow : Window
         AutomationProperties.SetName(this, DeskReviewCopy.BarName);
         Bar.ApplyRequested += () => ApplyRequested?.Invoke();
         Bar.DismissRequested += () => DismissRequested?.Invoke();
+        Bar.EditRequested += () => EditRequested?.Invoke();
         SizeChanged += (_, _) => Place();
         Loaded += (_, _) =>
         {
@@ -55,6 +56,9 @@ public sealed partial class DeskReviewWindow : Window
 
     /// <summary>Dismiss was chosen (button or Escape).</summary>
     public event Action? DismissRequested;
+
+    /// <summary>Edit was chosen (the drawers review only).</summary>
+    public event Action? EditRequested;
 
     /// <summary>Shows a model and puts the keyboard on the button Enter would choose.</summary>
     public void SetModel(DeskReviewModel model)

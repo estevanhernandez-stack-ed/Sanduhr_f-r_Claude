@@ -327,6 +327,9 @@ internal sealed class DeskDesignService : IDisposable
     private DeskAnswer OnProposalCore(string id, DeskValidation verdict)
     {
         if (ResetGuard.Done || verdict.Design is not { } proposal) return DeskAnswer.NotReady;
+        if (DrawerReviewService.Current?.Reviewing == true)
+            return new DeskAnswer(DeskAnswer.Rejected, "busy",
+                [new DeskReason("design", "a drawers plan is waiting for the user's review; ask them to Apply or Dismiss it, then propose the design again")]);
         var current = CurrentDesign();
         var merged = DeskDesign.Merge(current, proposal);
         var changes = DeskDesign.Diff(current, merged, SettingsNames.DeskPieceName, MonitorName);

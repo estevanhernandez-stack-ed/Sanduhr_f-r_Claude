@@ -39,6 +39,8 @@ public partial class App : Application
     private Desk.DeskDesignService? _deskDesign;
     private Desk.WidgetReviewService? _widgetReview;
     private Desk.DrawerService? _drawers;
+    private Desk.DrawerReviewService? _drawerReview;
+    private Desk.DrawerReviewHost? _drawerReviewHost;
     private Desk.NowPlayingLookService? _looks;
     private Desk.WatcherStore? _watchers;
     private Desk.DockerPipe? _dockerPipe;
@@ -648,6 +650,10 @@ public partial class App : Application
             _settingsWindow?.ViewModel.PacksChanged();
         });
         _widgetReview.Start();
+        // The drawers review: the rules' plan previews on the Desk, Apply moves, the bar turns into the result with Undo. One review at a time.
+        _drawerReviewHost = new Desk.DrawerReviewHost(_desk, store);
+        _drawerReview = new Desk.DrawerReviewService(_drawers, store, _drawerReviewHost);
+        Desk.DrawerReviewService.Current = _drawerReview;
         _desk.LauncherMissingClicked += OnLauncherMissing;
         _vm.DeskUsageChanged += _desk.UsageChanged;
         // The glow's Desk spot (spec 7.3): the glow service asks the Desk first and falls back to the window.
@@ -1212,6 +1218,8 @@ public partial class App : Application
         _messages?.Dispose();
         _handoff?.Dispose();
         _deskDesign?.Dispose();
+        _drawerReviewHost?.Dispose();
+        Desk.DrawerReviewService.Current = null;
         _widgetReview?.Dispose();
         _drawers?.Dispose();
         Desk.DrawerService.Current = null;
@@ -1254,6 +1262,8 @@ public partial class App : Application
         _messages?.Dispose();
         _handoff?.Dispose();
         _deskDesign?.Dispose();
+        _drawerReviewHost?.Dispose();
+        Desk.DrawerReviewService.Current = null;
         _widgetReview?.Dispose();
         _drawers?.Dispose();
         Desk.DrawerService.Current = null;

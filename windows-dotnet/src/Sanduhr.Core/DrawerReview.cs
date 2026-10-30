@@ -75,6 +75,7 @@ public static class DrawerReview
             ApplyLabel = Undo,
             DismissLabel = Done,
             ApplyOff = !canUndo,
+            KeysLine = canUndo ? "Enter undoes. Escape closes." : "Escape closes.",
         };
 }
 
