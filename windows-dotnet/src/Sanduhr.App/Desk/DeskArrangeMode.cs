@@ -178,10 +178,10 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     }
 
     /// <summary>False while every drawn piece is hidden: Done and Return wait, Cancel works.</summary>
-    private bool CanFinish => !_working.PlacesNothing(DeskView.DrawnFor(_working));
+    private bool CanFinish => !_working.PlacesNothing(DeskView.Drawn);
 
     /// <summary>The pieces the Desk draws that the working layout leaves out, in Settings order.</summary>
-    private IReadOnlyList<string> HiddenPieces => _working.Hidden(DeskView.DrawnFor(_working));
+    private IReadOnlyList<string> HiddenPieces => _working.Hidden(DeskView.Drawn);
 
     private Button ChromeButton(string text, string accessibleName)
     {
@@ -239,7 +239,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         _buttons.Clear();
         foreach (var (widget, r) in _rects)
         {
-            var name = DeskView.PieceName(widget);   // streamer: masked - DeskView.PieceName gives a drawer's codename while streamer mode is on
+            var name = SettingsNames.DeskPieceName(widget);
             var hide = ChromeButton("Hide", DeskArrangeCopy.HideLabel(name));
             var w = widget;
             hide.Click += (_, _) => Toggle(w, hide: true);
@@ -298,7 +298,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         row.Children.Add(title);
         foreach (var widget in hidden)
         {
-            var name = DeskView.PieceName(widget);   // streamer: masked - DeskView.PieceName gives a drawer's codename while streamer mode is on
+            var name = SettingsNames.DeskPieceName(widget);
             var label = new TextBlock { Text = name, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
             Ref(label, TextBlock.ForegroundProperty, "Sanduhr.Brush.TextSecondary");
             var show = ChromeButton("Show", DeskArrangeCopy.ShowLabel(name));
@@ -336,14 +336,14 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         _ghost = null;
         foreach (var (widget, r) in _rects)
         {
-            var name = DeskView.PieceName(widget);   // streamer: masked - DeskView.PieceName gives a drawer's codename while streamer mode is on
+            var name = SettingsNames.DeskPieceName(widget);
             // A slanted piece is outlined along its slant; an upright one keeps the rounded rectangle.
             var outline = OutlineShape(widget, r);
             outline.StrokeThickness = 1.5;
             outline.StrokeDashArray = [4, 3];
             outline.Fill = Brushes.Transparent;
             Ref(outline, Shape.StrokeProperty, "Sanduhr.Brush.Accent");
-            AutomationProperties.SetName(outline, name + ", piece");   // streamer: notname - name from DeskView.PieceName: a piece type name, or a drawer's codename while streamer mode is on
+            AutomationProperties.SetName(outline, name + ", piece");   // streamer: notname - piece type name from SettingsNames.DeskPieceName, not an identifying name
             Canvas.SetLeft(outline, r.X - OutlinePad);
             Canvas.SetTop(outline, r.Y - OutlinePad);
             _adorn.Children.Add(outline);
@@ -358,7 +358,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
                 Opacity = 0.92,
             };
             Ref(label, Border.BackgroundProperty, "Sanduhr.Brush.Bg");
-            AutomationProperties.SetName(label, name);   // streamer: notname - name from DeskView.PieceName: a piece type name, or a drawer's codename while streamer mode is on
+            AutomationProperties.SetName(label, name);   // streamer: notname - piece type name from SettingsNames.DeskPieceName, not an identifying name
             label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             double y = TagTop(widget, r) - OutlinePad - label.DesiredSize.Height - 3;
             if (y < 2) y = r.Bottom + OutlinePad + 3;

@@ -123,7 +123,10 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
     private void Wire()
     {
         PreviewMouseDown += (_, _) => DeskFocus.Take(List);
-        TitleBar.MouseLeftButtonUp += (_, e) => { _service.SetFolded(_state.Def.Id, !_state.Folded); e.Handled = true; };
+        TitleBar.MouseLeftButtonDown += OnTitleDown;
+        TitleBar.MouseMove += (_, _) => { if (_title is not null) TitleMove(DeskNative.CursorPx()); };
+        TitleBar.MouseLeftButtonUp += OnTitleUp;
+        TitleBar.LostMouseCapture += (_, _) => { if (!_releasing) TitleLost(); };
         Frame.DragEnter += OnDragOver;
         Frame.DragOver += OnDragOver;
         Frame.Drop += OnDrop;
@@ -133,6 +136,119 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         List.MouseDoubleClick += (_, e) => { if (ItemAt(e.OriginalSource) is { Pending: false } item) ShellFiles.Open(item.Path); };
         List.KeyDown += OnKey;
         MouseRightButtonUp += OnRightClick;
+    }
+
+    // ---- the title: a click folds, a drag moves (drawers amendment 1) ----
+
+    /// <summary>A press on the title: the cursor, the window's top-left and the piece's offset inside its window, all in screen pixels.</summary>
+    private (PxPoint Cursor, PxPoint Window, PxPoint Offset)? _title;
+    private PxPoint _lastCursor;
+    private bool _moving;
+    private bool _releasing;
+    private IDisposable? _moveHold;
+
+    private void OnTitleDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        var cursor = DeskNative.CursorPx();
+        PxPoint window = default, offset = default;
+        if (PresentationSource.FromVisual(this) is HwndSource { IsDisposed: false } src && DeskNative.RectPx(src.Handle) is { } r)
+        {
+            window = new PxPoint(r.X, r.Y);
+            offset = OffsetIn(src);
+        }
+        TitleDown(cursor, window, offset);
+        TitleBar.CaptureMouse();
+    }
+
+    private void OnTitleUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_title is null) return;
+        e.Handled = true;
+        var at = DeskNative.CursorPx();
+        // Capture goes first, so a redraw the place or fold sets off never finds this title still holding the mouse.
+        _releasing = true;
+        try { TitleBar.ReleaseMouseCapture(); }
+        finally { _releasing = false; }
+        TitleUp(at);
+    }
+
+    /// <summary>Where this piece's top-left sits inside its window, in the window's pixels (the host scales its root so a DIP is the
+    /// monitor's, and WPF draws the root at its own scale).</summary>
+    private PxPoint OffsetIn(HwndSource src)
+    {
+        if (src.RootVisual is not Visual root || !root.IsAncestorOf(this)) return default;
+        double wpf = src.CompositionTarget?.TransformToDevice.M11 is > 0 and var t ? t : 1.0;
+        var p = TransformToAncestor(root).Transform(new Point());
+        return new PxPoint((int)Math.Round(p.X * wpf), (int)Math.Round(p.Y * wpf));
+    }
+
+    internal void TitleDown(PxPoint cursor, PxPoint window, PxPoint offset)
+    {
+        EndMove();
+        _title = (cursor, window, offset);
+        _lastCursor = cursor;
+    }
+
+    /// <summary>The mouse moved with the title pressed: past the system's drag distance the drawer's own window follows it (no size, no
+    /// z-order, no activation), and the service is held busy so no redraw rebuilds the drawer under the hand.</summary>
+    internal void TitleMove(PxPoint cursor)
+    {
+        if (_title is not { } t || _disposed) return;
+        _lastCursor = cursor;
+        if (!_moving)
+        {
+            if (Math.Abs(cursor.X - t.Cursor.X) < SystemParameters.MinimumHorizontalDragDistance
+                && Math.Abs(cursor.Y - t.Cursor.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+            _moving = true;
+            _moveHold ??= _service.Hold();
+        }
+        if (Handle is var h && h != IntPtr.Zero) DeskNative.MoveTo(h, WindowAt(t, cursor));
+    }
+
+    /// <summary>The title was let go: after a move the Desk is asked to keep the drawer where it was dropped; without one, it folds or opens.</summary>
+    internal void TitleUp(PxPoint cursor)
+    {
+        if (_title is not { } t) return;
+        TitleMove(cursor);
+        bool moved = _moving;
+        if (moved) Place(t, cursor);
+        else
+        {
+            EndMove();
+            _service.SetFolded(_state.Def.Id, !_state.Folded);
+        }
+    }
+
+    /// <summary>The title lost the mouse without a release (another window took it): a move in progress ends where it is; a press ends
+    /// with nothing.</summary>
+    internal void TitleLost()
+    {
+        if (_title is not { } t) return;
+        if (_moving) Place(t, _lastCursor);
+        else EndMove();
+    }
+
+    private void Place((PxPoint Cursor, PxPoint Window, PxPoint Offset) t, PxPoint cursor)
+    {
+        var w = WindowAt(t, cursor);
+        var hold = _moveHold;
+        _moveHold = null;
+        EndMove();
+        // The request lands while the hold still stands, so the Desk draws the drawer once, at its new place, when the hold is released.
+        try { _service.RequestPlace(_state.Def.Id, new PxPoint(w.X + t.Offset.X, w.Y + t.Offset.Y)); }
+        finally { hold?.Dispose(); }
+    }
+
+    private static PxPoint WindowAt((PxPoint Cursor, PxPoint Window, PxPoint Offset) t, PxPoint cursor) =>
+        new(t.Window.X + cursor.X - t.Cursor.X, t.Window.Y + cursor.Y - t.Cursor.Y);
+
+    private void EndMove()
+    {
+        _title = null;
+        _moving = false;
+        _moveHold?.Dispose();
+        _moveHold = null;
     }
 
     // ---- drops ----
@@ -351,6 +467,7 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         _disposed = true;
         if (_editing is { } editing) editing.Editing = false;
         EndRename();
+        EndMove();
         _statusTimer?.Stop();
     }
 }

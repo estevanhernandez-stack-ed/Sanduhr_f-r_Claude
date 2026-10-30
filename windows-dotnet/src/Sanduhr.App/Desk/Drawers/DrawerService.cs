@@ -303,6 +303,12 @@ internal sealed class DrawerService : IDisposable
         Save(Settings with { Hidden = [] });
     }
 
+    /// <summary>A drawer was dragged by its title and let go with its top-left at this point, in screen pixels. The Desk knows the screens,
+    /// so it turns the point into a place and calls <see cref="SetPlace"/>.</summary>
+    public event Action<string, PxPoint>? PlaceRequested;
+
+    public void RequestPlace(string id, PxPoint topLeft) => PlaceRequested?.Invoke(id, topLeft);
+
     /// <summary>Saves where a drawer sits after the user moved it.</summary>
     public void SetPlace(string id, DrawerPlace place) =>
         Save(Settings with { Places = new Dictionary<string, DrawerPlace>(Settings.Places, StringComparer.Ordinal) { [id] = place } });

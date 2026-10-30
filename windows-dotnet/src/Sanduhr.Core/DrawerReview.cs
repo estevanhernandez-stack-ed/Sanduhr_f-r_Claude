@@ -112,22 +112,11 @@ public static class DrawerSync
     }
 }
 
-/// <summary>Where drawers a plan creates appear: the top-left stack, the first two open and the rest folded so a six-drawer plan fits a
-/// 1080-pixel screen. A drawer already placed keeps its place.</summary>
+/// <summary>How drawers a plan creates arrive: the first two open and the rest folded, so a six-drawer plan fits a 1080-pixel screen.
+/// Where they arrive is <see cref="DrawerPlacement.Arrive"/>.</summary>
 public static class DrawerArrival
 {
     public const int OpenOnArrival = 2;
-
-    public static string Place(string layout, IReadOnlyList<DrawerDef> created)
-    {
-        var arr = new DeskArrangement(layout);
-        foreach (var d in created)
-        {
-            var word = DrawerPieces.Word(d.Id);
-            if (arr.Placement(word) is null) arr.Place(word, DeskAnchor.TL);
-        }
-        return arr.Layout;
-    }
 
     public static IReadOnlyList<string> Folded(IReadOnlyList<DrawerDef> created) => [.. created.Skip(OpenOnArrival).Select(d => d.Id)];
 }

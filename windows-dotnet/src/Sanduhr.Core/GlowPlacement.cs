@@ -8,6 +8,9 @@ public readonly record struct PxRect(int X, int Y, int Width, int Height)
     public bool IsEmpty => Width <= 0 || Height <= 0;
 }
 
+/// <summary>An integer point in device pixels (virtual-screen coordinates), such as where a dragged drawer was dropped.</summary>
+public readonly record struct PxPoint(int X, int Y);
+
 /// <summary>
 /// What the service learned about the foreground window, as plain values so placement is testable
 /// without a screen. <see cref="Frame"/> is the DWM extended frame (the visible bounds, shadow excluded);

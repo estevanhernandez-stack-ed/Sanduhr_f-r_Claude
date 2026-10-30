@@ -11,7 +11,8 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.Tests;
 
-/// <summary>The drawer piece, themed and named, in the Desk's stacks; redraws wait while a drawer is busy (drawers plan 2, Task 7).</summary>
+/// <summary>The drawer piece, themed and named; redraws wait while a drawer is busy (drawers plan 2, Task 7). Where the Desk puts it is
+/// <see cref="DrawerFreePanelTests"/>.</summary>
 [Collection("SettingsWindow")]
 public sealed class DrawerPieceTests
 {
@@ -22,7 +23,7 @@ public sealed class DrawerPieceTests
         var home = box.Dir(@"Desktop\Drawers\Images");
         foreach (var f in files) box.File(Path.Combine(@"Desktop\Drawers\Images", f));
         store.SaveDrawers(DrawerSettings.Default with { Enabled = true, Drawers = [new DrawerDef("images", "Images", home, true)] });
-        store.SaveDesk(DeskSettings.Default with { Enabled = true, Layout = "clock:bl drawer.images:tl:1", Font = "" });
+        store.SaveDesk(DeskSettings.Default with { Enabled = true, Layout = "clock:bl", Font = "" });
         return (new DrawerService(store, paths, new DrawerPlaces(box.Desktop, box.Public, []), Dispatcher.CurrentDispatcher), store, paths);
     }
 
@@ -35,13 +36,6 @@ public sealed class DrawerPieceTests
         piece.Arrange(new Rect(piece.DesiredSize));
         piece.UpdateLayout();
         return piece;
-    }
-
-    private static DeskScreen Screen()
-    {
-        var bounds = new PxRect(0, 0, 1920, 1080);
-        var work = new PxRect(0, 0, 1920, 1032);
-        return new DeskScreen("TEST", bounds, work, 1.0, true, TaskbarClearance.Insets(bounds, work, [], 1.0));
     }
 
     [Fact]
@@ -137,35 +131,6 @@ public sealed class DrawerPieceTests
     });
 
     [Fact]
-    public void The_Desk_draws_a_placed_drawer_and_its_island_takes_clicks_and_focus() => Sta.Run(() =>
-    {
-        using var box = new DrawerSandbox();
-        var (s, store, _) = Make(box, "a.png");
-        var view = new DeskView(Screen(), store.LoadDesk(), new DeskFonts(["Segoe UI"]));
-        view.Update(new DeskFrame { Drawers = s }, DeskInkMap.Light);
-        var islands = DeskClicks.Prepare(view.TakeIslands(), false, new NoClicks());
-        var island = islands.Single(i => i.Widgets.Contains("drawer.images"));
-        Assert.True(island.TakesClicks);
-        Assert.True(island.TakesFocus);
-        Assert.False(islands.Single(i => i.Widgets.Contains("clock")).TakesFocus);
-        view.Dispose();
-        s.Dispose();
-    });
-
-    [Fact]
-    public void A_drawer_word_with_no_drawer_draws_nothing() => Sta.Run(() =>
-    {
-        using var box = new DrawerSandbox();
-        var (s, store, _) = Make(box);
-        store.SaveDesk(store.LoadDesk() with { Layout = "clock:bl drawer.ghost:tl:1" });
-        var view = new DeskView(Screen(), store.LoadDesk(), new DeskFonts(["Segoe UI"]));
-        view.Update(new DeskFrame { Drawers = s }, DeskInkMap.Light);
-        Assert.DoesNotContain(view.TakeIslands(), i => i.Widgets.Contains("drawer.ghost"));
-        view.Dispose();
-        s.Dispose();
-    });
-
-    [Fact]
     public void A_redraw_waits_while_a_drawer_is_busy_and_runs_when_it_is_released() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();
@@ -184,22 +149,6 @@ public sealed class DrawerPieceTests
         s.Dispose();
     });
 
-    [Fact]
-    public void Arrange_mode_names_a_drawer_by_its_name() => Sta.Run(() =>
-    {
-        using var box = new DrawerSandbox();
-        var (s, _, _) = Make(box);
-        DrawerService.Current = s;
-        try
-        {
-            Assert.Equal("Images drawer", DeskView.PieceName("drawer.images"));
-            Assert.Equal("Drawer", DeskView.PieceName("drawer.ghost"));
-            Assert.Equal(SettingsNames.DeskPieceName("clock"), DeskView.PieceName("clock"));
-            Assert.Contains("drawer.images", DeskView.DrawnFor(new DeskArrangement("clock:bl drawer.images:tl:1")));
-        }
-        finally { DrawerService.Current = null; s.Dispose(); }
-    });
-
     private static FrameworkElement FindNamed(DependencyObject root, string name)
     {
         for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
@@ -210,30 +159,6 @@ public sealed class DrawerPieceTests
         }
         return null!;
     }
-
-    [Fact]
-    public void HasDrawer_is_quick_on_a_deep_island_without_a_drawer_and_finds_one_at_the_bottom() => Sta.Run(() =>
-    {
-        using var box = new DrawerSandbox();
-        var (s, _, _) = Make(box, "a.png");
-        FrameworkElement Nest(FrameworkElement leaf)
-        {
-            FrameworkElement cur = leaf;
-            for (int i = 0; i < 24; i++)
-                cur = i % 2 == 0 ? new Border { Child = cur } : (FrameworkElement)new StackPanel { Children = { cur } };
-            return cur;
-        }
-        var plain = Nest(new TextBlock { Text = "x" });
-        var withDrawer = Nest(new DrawerPiece(s.Get("images")!, s, Look(), 1));
-        var clock = System.Diagnostics.Stopwatch.StartNew();
-        var none = DeskClicks.Prepare([new DeskIsland(plain, new Point(), HorizontalAlignment.Left, VerticalAlignment.Top) { Widgets = ["clock"] }], false, new NoClicks());
-        var found = DeskClicks.Prepare([new DeskIsland(withDrawer, new Point(), HorizontalAlignment.Left, VerticalAlignment.Top) { Widgets = ["drawer.images"] }], false, new NoClicks());
-        clock.Stop();
-        Assert.False(none[0].TakesFocus);
-        Assert.True(found[0].TakesFocus);
-        Assert.True(clock.ElapsedMilliseconds < 2000);
-        s.Dispose();
-    });
 
     [Fact]
     public void The_views_tick_while_a_drawer_is_busy_and_a_privacy_change_redraws_past_the_hold() => Sta.Run(() =>
@@ -256,14 +181,6 @@ public sealed class DrawerPieceTests
         }
         finally { StreamerMode.Reset(); hold.Dispose(); desk.Dispose(); s.Dispose(); }
     });
-
-    private sealed class NoClicks : IDeskClickActions
-    {
-        public void PlayPause() { }
-        public void OpenWeatherCredit() { }
-        public void Menu(DeskMenuAction action) { }
-        public void LaunchButton(int index) { }
-    }
 
     private sealed class CountingHost : IDeskHost
     {

@@ -123,18 +123,9 @@ public sealed class DrawerReviewTests
     }
 
     [Fact]
-    public void New_drawers_arrive_top_left_and_all_but_the_first_two_folded()
+    public void All_but_the_first_two_new_drawers_arrive_folded()
     {
         var created = new[] { Def("Images"), Def("Documents"), Def("Archives") };
-        var layout = new DeskArrangement(DrawerArrival.Place("clock:bl", created));
-        Assert.All(created, d => Assert.Equal(DeskAnchor.TL, layout.Placement(DrawerPieces.Word(d.Id))!.Anchor));
         Assert.Equal(["archives"], DrawerArrival.Folded(created));
-    }
-
-    [Fact]
-    public void A_drawer_already_placed_keeps_its_place()
-    {
-        var layout = new DeskArrangement(DrawerArrival.Place("drawer.images:br:1", [Def("Images")]));
-        Assert.Equal(DeskAnchor.BR, layout.Placement("drawer.images")!.Anchor);
     }
 }

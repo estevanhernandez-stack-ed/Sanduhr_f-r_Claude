@@ -37,6 +37,10 @@ internal sealed record DeskIsland(FrameworkElement Content, Point Anchor, Horizo
     /// reaches the drawer (<see cref="DeskFocus"/>), and activation is given back on a click away. False never activates, as before.</summary>
     public bool TakesFocus { get; init; }
 
+    /// <summary>The island is a free drawer (drawers amendment 1): the host keeps its window above every widget window and below every app,
+    /// and leaves where it sits to the drawer while the user moves it.</summary>
+    public bool Drawer { get; init; }
+
     /// <summary>A roaming island (the companion walking its edges): the host keeps the window's aligned edge on the motion's
     /// anchor as it moves, without laying the island out again. Null for an island that stays where it hangs.</summary>
     public DeskIslandMotion? Motion { get; init; }

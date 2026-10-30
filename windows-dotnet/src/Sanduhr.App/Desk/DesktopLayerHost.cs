@@ -28,6 +28,10 @@ namespace Sanduhr.App.Desk;
 /// The sentinel also hears <c>TaskbarCreated</c> (Explorer restarted, which destroys the owned Desk
 /// windows with their owner), display changes and work-area changes; each raises
 /// <see cref="ScreensChanged"/> once per 500 ms burst and the controller rebuilds into new windows.
+///
+/// Free drawers (<see cref="DeskIsland.Drawer"/>, drawers amendment 1) draw above every widget window and below every app: each window
+/// goes to <c>HWND_BOTTOM</c> in turn, so the last one sent there is the lowest, and drawer windows are sent first (<see cref="DrawersFirst"/>);
+/// Show desktop's lift inserts each just under the same window, so there drawers go last (<see cref="DrawersLast"/>).
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal sealed class DesktopLayerHost : IDeskHost
@@ -43,6 +47,8 @@ internal sealed class DesktopLayerHost : IDeskHost
     private readonly List<HwndSource> _windows = [];
     /// <summary>The screen each window in <see cref="_windows"/> draws on.</summary>
     private readonly List<DeskScreen> _screens = [];
+    /// <summary>Whether each window in <see cref="_windows"/> holds a drawer, as of the last <see cref="Show"/>.</summary>
+    private readonly List<bool> _drawers = [];
     private readonly HwndSource _sentinel;
     private readonly uint _taskbarCreated;
     private readonly DispatcherTimer _coalesce;
@@ -147,6 +153,7 @@ internal sealed class DesktopLayerHost : IDeskHost
         bool reuse = !_stale
             && wanted.Count == _windows.Count
             && wanted.Select(w => w.Screen).SequenceEqual(_screens)
+            && wanted.Select(w => w.Island.Drawer).SequenceEqual(_drawers)
             && _windows.All(w => !w.IsDisposed && DeskNative.IsWindow(w.Handle));
         if (!reuse)
         {
@@ -158,7 +165,10 @@ internal sealed class DesktopLayerHost : IDeskHost
                 _screens.Add(screen);
             }
         }
-        for (int i = 0; i < wanted.Count; i++)
+        _drawers.Clear();
+        _drawers.AddRange(wanted.Select(w => w.Island.Drawer));
+        // New windows go to the bottom one by one: drawers first, so every widget window ends up under them.
+        foreach (int i in reuse ? Enumerable.Range(0, wanted.Count) : DrawersFirst(_drawers))
             Place(_windows[i], wanted[i].Screen, wanted[i].Island, first: !reuse);
         if (reuse)
         {
@@ -238,7 +248,8 @@ internal sealed class DesktopLayerHost : IDeskHost
             same.Height = h;
             same.IsHitTestVisible = !through;
             same.LayoutTransform = Math.Abs(k - 1) < 0.001 ? Transform.Identity : new ScaleTransform(k, k);
-            Fit(src, screen, left, top, w, h, first);
+            // A drawer handed back as it was (the minute's in-place tick) stays where it is: the user may be moving it by its title.
+            if (!island.Drawer) Fit(src, screen, left, top, w, h, first);
             return;
         }
         if (content.Parent is Border previous) previous.Child = null;
@@ -301,9 +312,13 @@ internal sealed class DesktopLayerHost : IDeskHost
         m.Motion.Moved -= m.Handler;
     }
 
+    /// <summary>The window passes every click to what is under it now (<c>WS_EX_TRANSPARENT</c> is set).</summary>
+    internal static bool IsClickThrough(IntPtr hwnd) => (DeskNative.GetWindowLong(hwnd, DeskNative.GWL_EXSTYLE) & DeskNative.WS_EX_TRANSPARENT) != 0;
+
     /// <summary>Sets or clears <c>WS_EX_TRANSPARENT</c> on a Desk window when it differs. Fully transparent
-    /// pixels pass clicks to the desktop either way; without the flag the drawn ones take them.</summary>
-    private static void SetClickThrough(IntPtr hwnd, bool through)
+    /// pixels pass clicks to the desktop either way; without the flag the drawn ones take them. The drawer click-through poll
+    /// (<see cref="DrawerClickThrough"/>) uses it for one window at a time.</summary>
+    internal static void SetClickThrough(IntPtr hwnd, bool through)
     {
         int ex = DeskNative.GetWindowLong(hwnd, DeskNative.GWL_EXSTYLE);
         int want = through ? ex | DeskNative.WS_EX_TRANSPARENT : ex & ~DeskNative.WS_EX_TRANSPARENT;
@@ -381,6 +396,16 @@ internal sealed class DesktopLayerHost : IDeskHost
             if (!w.IsDisposed && w.RootVisual is Border b) CareOpacity.Ease(b, opacity, ease);
     }
 
+    /// <summary>Window indexes for sending each to <c>HWND_BOTTOM</c> in turn: drawers first, then the rest, each in island order. The last
+    /// sent is the lowest, so drawers end above every widget.</summary>
+    internal static IReadOnlyList<int> DrawersFirst(IReadOnlyList<bool> drawer) =>
+        [.. Enumerable.Range(0, drawer.Count).Where(i => drawer[i]), .. Enumerable.Range(0, drawer.Count).Where(i => !drawer[i])];
+
+    /// <summary>Window indexes for inserting each just under one window in turn: the rest first, then drawers. The last inserted is the
+    /// highest, so drawers end above every widget.</summary>
+    internal static IReadOnlyList<int> DrawersLast(IReadOnlyList<bool> drawer) =>
+        [.. Enumerable.Range(0, drawer.Count).Where(i => !drawer[i]), .. Enumerable.Range(0, drawer.Count).Where(i => drawer[i])];
+
     private void CloseWindows()
     {
         _closing = true;
@@ -393,6 +418,7 @@ internal sealed class DesktopLayerHost : IDeskHost
             }
             _windows.Clear();
             _screens.Clear();
+            _drawers.Clear();
             _homes.Clear();
         }
         finally { _closing = false; }
@@ -523,7 +549,7 @@ internal sealed class DesktopLayerHost : IDeskHost
             ? DeskNative.HWND_NOTOPMOST : above;
         DeskNative.PerMonitor(() =>
         {
-            foreach (var w in _windows)
+            foreach (var w in InOrder(DrawersLast))
             {
                 if (w.IsDisposed) continue;
                 var h = w.Handle;
@@ -534,11 +560,15 @@ internal sealed class DesktopLayerHost : IDeskHost
         });
     }
 
+    /// <summary>The windows in the order <paramref name="order"/> gives for their drawer flags.</summary>
+    private IEnumerable<HwndSource> InOrder(Func<IReadOnlyList<bool>, IReadOnlyList<int>> order) =>
+        _drawers.Count == _windows.Count ? order(_drawers).Select(i => _windows[i]) : _windows;
+
     private void Drop()
     {
         DeskNative.PerMonitor(() =>
         {
-            foreach (var w in _windows)
+            foreach (var w in InOrder(DrawersFirst))
             {
                 if (w.IsDisposed) continue;
                 var h = w.Handle;
