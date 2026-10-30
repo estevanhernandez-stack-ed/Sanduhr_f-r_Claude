@@ -28,7 +28,7 @@ enum SettingsPreviewKind: String, CaseIterable {
         case .general: .menuBar
         case .integrations: .integrations
         case .mods: .mods
-        case .credentials, .usage, .lockScreen, .widgets, .themes, .updates, .about: nil
+        case .credentials, .usage, .lockScreen, .weather, .widgets, .themes, .updates, .about: nil
         }
     }
 

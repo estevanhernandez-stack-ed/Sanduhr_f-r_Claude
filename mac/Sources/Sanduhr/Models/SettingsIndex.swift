@@ -83,6 +83,9 @@ enum SettingsAnchor {
     static let idle = "idle"
     static let apps = "apps"
     static let fallback = "fallback"
+    // Weather
+    static let weatherPlace = "weather-place"
+    static let weatherCredit = "weather-credit"
     // Watchers
     static let switches = "switches"
     static let whereTheyShow = "where"
@@ -219,6 +222,10 @@ enum SettingsAnchor {
         SettingsEntry(title: "Apps", page: .nowPlaying, anchor: apps, synonyms: ["Music", "Spotify", "browser"]),
         SettingsEntry(title: "When the system now playing is unavailable", page: .nowPlaying, anchor: fallback,
                       synonyms: ["Ask Music and Spotify directly"]),
+        SettingsEntry(title: SettingsNames.weatherLookUp, page: .weather, anchor: weatherPlace,
+                      synonyms: ["weather", "city", "forecast", "temperature", "Fahrenheit", "Celsius", "Open-Meteo", "location",
+                                 "nickname", "display name", SettingsNames.weatherShowAs]),
+        SettingsEntry(title: Weather.credit, page: .weather, anchor: weatherCredit, synonyms: ["Open-Meteo", "credit", "attribution", "GeoNames"]),
         SettingsEntry(title: "Let agents show watchers", page: .watchers, anchor: switches,
                       synonyms: ["agents", "Show Claude Code's background work", "background work"]),
         SettingsEntry(title: "Where they show", page: .watchers, anchor: whereTheyShow,
@@ -291,6 +298,7 @@ extension SettingsNames {
         cameraMicPlace: SettingsAnchor.cameraMic,
         claudeCodeGlowHook: SettingsAnchor.folders, metersAbovePrompt: SettingsAnchor.metersMod,
         byFolder: SettingsAnchor.inventory,
+        weatherLookUp: SettingsAnchor.weatherPlace, weatherShowAs: SettingsAnchor.weatherPlace,
         claudeMetersLine: SettingsAnchor.pieces, claudeMetersBars: SettingsAnchor.pieces,
         watchersOnNotch: SettingsAnchor.whereTheyShow, watchersOnDesk: SettingsAnchor.whereTheyShow,
         showWidget: SettingsAnchor.show, checkForUpdates: SettingsAnchor.check, saveAndApply: SettingsAnchor.ownThemes,
@@ -311,6 +319,7 @@ enum SettingsSearch {
         .integrations: ["statusline", "prompt", "MCP", "Integrations"],
         .mods: ["mods", "plugins", "config"],
         .widgetLook: ["Widget Look", "Pacing & Focus"],
+        .weather: ["forecast", "temperature", "city"],
         .updates: ["update", "Sparkle"],
     ]
 
