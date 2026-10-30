@@ -107,4 +107,41 @@ public sealed class DrawerInteractionTests
         Assert.EndsWith(" Undo is not available for this move.", piece.Status.Text);
         s.Dispose();
     });
+
+    [Fact]
+    public void A_press_that_did_not_start_on_an_item_never_starts_a_drag() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, piece) = Make(box);
+        box.File(@"Desktop\Drawers\Images\a.png");
+        s.Reload();
+        var item = s.Get("images")!.Items.Single();
+        var far = new Point(200, 200);
+        piece.Press(null, new Point(0, 0));
+        Assert.False(piece.CanDrag(far));
+        piece.Press(item, new Point(0, 0));
+        Assert.False(piece.CanDrag(new Point(1, 1)));
+        Assert.True(piece.CanDrag(far));
+        piece.BeginRename(item);
+        piece.Press(item, new Point(0, 0));
+        Assert.False(piece.CanDrag(far));
+        s.Dispose();
+    });
+
+    [Fact]
+    public void Disposing_a_piece_mid_edit_closes_the_editor_and_releases_the_hold() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, piece) = Make(box);
+        box.File(@"Desktop\Drawers\Images\a.png");
+        s.Reload();
+        var item = s.Get("images")!.Items.Single();
+        piece.BeginRename(item);
+        piece.Dispose();
+        Assert.False(item.Editing);
+        Assert.False(s.Busy);
+        piece.CommitRename(item, "z.png");
+        Assert.True(File.Exists(Path.Combine(box.Drawers, "Images", "a.png")));
+        s.Dispose();
+    });
 }

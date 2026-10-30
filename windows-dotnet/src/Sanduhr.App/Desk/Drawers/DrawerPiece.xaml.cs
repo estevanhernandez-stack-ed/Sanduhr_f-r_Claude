@@ -114,6 +114,9 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
 
     private const int RenameId = ShellMenu.OwnFirst, FoldId = ShellMenu.OwnFirst + 1, HideId = ShellMenu.OwnFirst + 2, SettingsId = ShellMenu.OwnFirst + 3;
     private Point _dragStart;
+    private DrawerItem? _pressed;
+    private DrawerItem? _editing;
+    private bool _disposed;
     private IDisposable? _renameHold;
     private DispatcherTimer? _statusTimer;
 
@@ -124,7 +127,8 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         Frame.DragEnter += OnDragOver;
         Frame.DragOver += OnDragOver;
         Frame.Drop += OnDrop;
-        List.PreviewMouseLeftButtonDown += (_, e) => _dragStart = e.GetPosition(this);
+        List.PreviewMouseLeftButtonDown += (_, e) => Press(ItemAt(e.OriginalSource), e.GetPosition(this));
+        List.PreviewMouseLeftButtonUp += (_, _) => _pressed = null;
         List.PreviewMouseMove += OnMaybeDrag;
         List.MouseDoubleClick += (_, e) => { if (ItemAt(e.OriginalSource) is { Pending: false } item) ShellFiles.Open(item.Path); };
         List.KeyDown += OnKey;
@@ -170,11 +174,26 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
 
     // ---- drags out ----
 
+    /// <summary>A press in the list: a drag may start only from a press that began on a file or folder (not the scrollbar or empty space).</summary>
+    internal void Press(DrawerItem? onItem, Point at)
+    {
+        _dragStart = at;
+        _pressed = onItem is { Pending: false, Editing: false } ? onItem : null;
+    }
+
+    /// <summary>Whether the pointer, now at <paramref name="at"/>, has moved far enough from a press on an item to start a drag.</summary>
+    internal bool CanDrag(Point at)
+    {
+        if (_pressed is null) return false;
+        var d = at - _dragStart;
+        return Math.Abs(d.X) >= SystemParameters.MinimumHorizontalDragDistance || Math.Abs(d.Y) >= SystemParameters.MinimumVerticalDragDistance;
+    }
+
     private void OnMaybeDrag(object sender, MouseEventArgs e)
     {
-        if (e.LeftButton != MouseButtonState.Pressed) return;
-        var d = e.GetPosition(this) - _dragStart;
-        if (Math.Abs(d.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(d.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+        if (e.LeftButton != MouseButtonState.Pressed) { _pressed = null; return; }
+        if (!CanDrag(e.GetPosition(this))) return;
+        _pressed = null;
         var paths = List.SelectedItems.OfType<DrawerItem>().Where(i => !i.Pending && !i.Editing).Select(i => i.Path).ToArray();
         if (paths.Length == 0) return;
         var data = new DataObject(DataFormats.FileDrop, paths);
@@ -242,14 +261,16 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
     {
         if (item.Pending || item.Editing) return;
         _renameHold ??= _service.Hold();
+        _editing = item;
         item.Editing = true;
     }
 
     internal void CommitRename(DrawerItem item, string text)
     {
-        if (!item.Editing) return;
+        if (_disposed || !item.Editing) return;
         item.Editing = false;
-        if (text.Trim() != item.Name && _service.RenameItem(item.Path, text) is { } error) Say(error);
+        text = text.Trim();
+        if (text != item.Name && _service.RenameItem(item.Path, text) is { } error) Say(error);
         EndRename();
     }
 
@@ -261,6 +282,7 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
 
     private void EndRename()
     {
+        _editing = null;
         _renameHold?.Dispose();
         _renameHold = null;
     }
@@ -271,6 +293,7 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         box.Text = item.Name;
         // Explorer selects the name without its extension.
         int stem = item.IsFolder ? item.Name.Length : Path.GetFileNameWithoutExtension(item.Name).Length;   // streamer: key - a length, never drawn
+        if (stem == 0) stem = item.Name.Length;   // a dotfile (.gitignore) has no stem: select the whole name, as Explorer does
         box.Dispatcher.BeginInvoke(() => { box.Focus(); box.Select(0, stem); }, DispatcherPriority.Input);
     }
 
@@ -325,6 +348,8 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         List.ItemsSource = null;
         _state.PropertyChanged -= OnStateChanged;
         _state.Items.CollectionChanged -= OnItemsChanged;
+        _disposed = true;
+        if (_editing is { } editing) editing.Editing = false;
         EndRename();
         _statusTimer?.Stop();
     }

@@ -25,6 +25,8 @@ internal static class DeskFocus
             int style = DeskNative.GetWindowLong(h, DeskNative.GWL_EXSTYLE);
             DeskNative.SetWindowLongPtr(h, DeskNative.GWL_EXSTYLE, (IntPtr)(style & ~DeskNative.WS_EX_NOACTIVATE));
             DeskNative.SetForegroundWindow(h);
+            // Refused (the foreground lock): no WA_INACTIVE will ever come, so give the style back now.
+            if (DeskNative.GetForegroundWindow() != h) { GaveBack(h); return false; }
         }
         Keyboard.Focus(target);
         return DeskNative.GetForegroundWindow() == h;
