@@ -3888,6 +3888,119 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
+## Amendment 1 (2026-10-30, after Task 8's live check): drawers are free panels
+
+On the live Desk the top-left drawer covered the desktop icons and could not be moved off them. Este ruled (dashboard decision
+`d9u8eTTkYsJFjjA5ujBY`): **drawers are free panels, separate from the widget stacks.** Each drawer is its own Desk window,
+dragged anywhere by its title, its spot saved per monitor; new drawers arrive top-right; only items, the title and its lines take
+clicks, so the empty frame lets clicks through to the desktop icons; drawers always draw above widgets. Widgets under the icons
+is a separate spike (dashboard task, decision `4HUaqTJkwY8Hej7Er7s2`) and not in this plan.
+
+This replaces the `drawer.<id>` anchor-stack placement from Tasks 3 (`DrawerArrival.Place`), 6 (`Hide`/`ShowAll` through layout
+words) and 7 (the `DeskView` drawer arm, `DrawnFor`, `PieceName`). Task 1's rule (a design never moves or drops a drawer word)
+stays: it is harmless with no drawer words in new layouts and protects any written by plan-2 builds.
+
+### Task 8A: Where a drawer sits (Core and service)
+
+**Files:**
+- Create: `windows-dotnet/src/Sanduhr.Core/DrawerPlacement.cs`
+- Modify: `windows-dotnet/src/Sanduhr.Core/DrawerSettings.cs` (`Places`, `Hidden`)
+- Modify: `windows-dotnet/src/Sanduhr.App/Desk/Drawers/DrawerService.cs` (`Hide`, `ShowAll`, `IsShown`, `SetPlace`, `HasHidden`, `PreviewDrawers`)
+- Test: `windows-dotnet/tests/Sanduhr.Tests/DrawerPlacementTests.cs` (new); update `DrawerServiceTests.Fold_and_hide_are_saved`
+
+**Interfaces (produced):**
+- `record DrawerPlace(string Monitor, double X, double Y)`: a monitor word (`DeskMonitors.Main` for the primary, or a monitor id) and the drawer's top-left offset from that monitor's work area, in DIPs.
+- `DrawerPlacement` constants `Width = 360`, `OpenHeight = 330`, `FoldedHeight = 42`, `Margin = 24`, `Gap = 12`; `Height(bool folded)`; `Arrive(IReadOnlyList<DrawerDef> drawers, IReadOnlyDictionary<string, DrawerPlace> placed, double workWidth, IReadOnlyCollection<string> folded) : IReadOnlyDictionary<string, DrawerPlace>`; `Clamp(DrawerPlace p, double workWidth, double workHeight) : DrawerPlace`.
+- `DrawerSettings.Places : IReadOnlyDictionary<string, DrawerPlace>` and `DrawerSettings.Hidden : IReadOnlyList<string>` (init, default empty; JSON `places` as `{ "<id>": { "monitor": "main", "x": 1400, "y": 24 } }` and `hidden` as an id array; entries with a bad id, a non-finite number or an empty or over-long monitor word drop).
+- `DrawerService`: `IsShown(string id) : bool`; `Hide(id)` adds to `Hidden`; `ShowAll()` clears `Hidden`; `SetPlace(string id, DrawerPlace place)` saves it; `HasHidden` (shown drawers only: `Settings.Enabled && Settings.Hidden.Any(h => Settings.Drawers.Any(d => d.Id == h))`); `PreviewDrawers : IReadOnlyList<DrawerState>` (the states a plan under review would create). `Hide` and `ShowAll` no longer touch the Desk layout.
+
+**Code:**
+
+```csharp
+namespace Sanduhr.Core;
+
+/// <summary>Where a free drawer sits (drawers amendment 1): its monitor (a <see cref="DeskMonitors"/> word, "main" for the primary) and
+/// its top-left's offset from that monitor's work area, in DIPs.</summary>
+public sealed record DrawerPlace(string Monitor, double X, double Y);
+
+/// <summary>Where drawers go when nobody has moved them, and how one is kept on its screen.</summary>
+public static class DrawerPlacement
+{
+    public const double Width = 360;
+    public const double OpenHeight = 330;
+    public const double FoldedHeight = 42;
+    public const double Margin = 24;
+    public const double Gap = 12;
+
+    public static double Height(bool folded) => folded ? FoldedHeight : OpenHeight;
+
+    /// <summary>Places for every drawer in <paramref name="drawers"/> that has none: the top-right of the main monitor, away from where
+    /// Windows lines up desktop icons, each under the last, below any drawer already standing in that column. Placed drawers keep theirs.</summary>
+    public static IReadOnlyDictionary<string, DrawerPlace> Arrive(IReadOnlyList<DrawerDef> drawers, IReadOnlyDictionary<string, DrawerPlace> placed,
+        double workWidth, IReadOnlyCollection<string> folded)
+    {
+        var places = new Dictionary<string, DrawerPlace>(placed, StringComparer.Ordinal);
+        double x = Math.Max(0, workWidth - Margin - Width);
+        double y = Margin;
+        foreach (var (id, p) in placed)
+            if (p.Monitor == DeskMonitors.Main && Math.Abs(p.X - x) < 1)
+                y = Math.Max(y, p.Y + Height(folded.Contains(id)) + Gap);
+        foreach (var d in drawers)
+        {
+            if (places.ContainsKey(d.Id)) continue;
+            places[d.Id] = new DrawerPlace(DeskMonitors.Main, x, y);
+            y += Height(folded.Contains(d.Id)) + Gap;
+        }
+        return places;
+    }
+
+    /// <summary>Keeps a drawer on its screen: its title bar stays inside the work area, so it can always be grabbed again.</summary>
+    public static DrawerPlace Clamp(DrawerPlace p, double workWidth, double workHeight) => p with
+    {
+        X = Math.Clamp(p.X, 0, Math.Max(0, workWidth - Width)),
+        Y = Math.Clamp(p.Y, 0, Math.Max(0, workHeight - FoldedHeight)),
+    };
+}
+```
+
+**Tests to write first (`DrawerPlacementTests`):** two new drawers on a 1920-wide work area arrive at `(1536, 24)` and `(1536, 366)`
+(open height 330 + gap 12), the second folded one making the next start 42 + 12 lower; a drawer already in that column pushes new
+arrivals below it; a drawer placed elsewhere does not; `Arrive` never moves a placed drawer; `Clamp` pulls a drawer dragged off the
+right or bottom back so its title shows, and leaves an on-screen one alone; `DrawerSettings` round-trips `Places` and `Hidden` and
+drops a bad id, a NaN, an empty monitor word and a monitor word longer than `DeskMonitors.MaxIdLength`; a settings file with neither
+key reads empty. In `DrawerServiceTests`, rewrite `Fold_and_hide_are_saved` to assert `Hidden` instead of layout words, and add:
+`SetPlace` saves; `HasHidden` is true only for a hidden drawer that exists; `PreviewDrawers` lists a plan's new drawers while pending
+and is empty after `ClearPending`.
+
+### Task 8B: Drawers as free panels on the Desk (App)
+
+**Files:**
+- Modify: `DeskView.cs`, `DeskArrangeMode.cs` (take drawer words out: no drawer arm, `DrawnFor` and `PieceName` go back to the built-in pieces, markers back to Task 7's base where they were moved)
+- Modify: `DeskController.cs` (build one drawer island per shown drawer on its screen; preview drawers too; drawers above widgets; place requests)
+- Create: `Desk/Drawers/DrawerScreens.cs` (pure-ish placement maths) and `Desk/Drawers/DrawerClickThrough.cs` (the cursor poll)
+- Modify: `DrawerPiece.xaml.cs` (title-drag move), `DrawerService.cs` (`PlaceRequested` event, `RequestPlace`), `DesktopLayerHost.cs` (expose the click-through toggle for one window, keep drawer windows above widget windows), `IDeskHost.cs` if the island needs a drawer flag
+- Test: `DrawerFreePanelTests.cs` (new); update `DrawerPieceTests` where it relied on `DeskView` drawing a drawer word
+
+**Rules the code must meet:**
+1. A drawer is drawn only by the controller, never by `DeskView`. Each shown drawer (`DrawerService.IsShown`, drawers on) and each preview drawer is one `DeskIsland` on exactly one screen: its saved `DrawerPlace`'s monitor (`DeskMonitors.Main` is the primary; an id not connected falls back to the primary), at `Clamp`ed X and Y from that screen's work area, aligned left and top, with `TakesClicks` and `TakesFocus`. A drawer with no saved place takes `DrawerPlacement.Arrive`'s place for the primary's work width (computed at render, not saved).
+2. **Drawers draw above widgets.** Read how `DesktopLayerHost` orders windows (`Place`, `Fit`, `KeepZOrder`, `HWND_BOTTOM`) and make drawer windows sit above every widget window and still below every app window. Pin it with a test where the host can tell (the windows' order in `Handles` after `Show`), and put it on the live gate list either way.
+3. **Move by the title.** A press on the title bar that moves past the system drag distance moves the drawer's own window as the mouse moves (`SetWindowPos` with no z-order, no size, no activate), holding the drawer service busy; on release, the piece raises `DrawerService.RequestPlace(id, PxPoint topLeft)` and the controller turns that screen-pixel point into a `DrawerPlace` (the screen holding the point, offset from its work area, in that screen's DIPs, clamped) and calls `SetPlace`. A press and release without movement still folds or opens the drawer. Pure helpers in `DrawerScreens`: `ToPlace(PxPoint topLeft, IReadOnlyList<DeskScreen> screens) : DrawerPlace` and `ToAnchor(DrawerPlace place, IReadOnlyList<DeskScreen> screens) : (DeskScreen Screen, Point Anchor)`, both tested on a two-monitor layout with different scales.
+4. **The empty frame lets clicks through.** `DrawerClickThrough` polls the cursor (a `DispatcherTimer`, about 50 ms, running only while a drawer is shown). For each drawer window under the cursor, the window takes clicks only when the point is over a `ListBoxItem`, the title bar, the status or missing line, or when any mouse button is down (so a file dragged from Explorer can still drop on empty space), or the drawer service is busy, or the window has the keyboard. Otherwise it gets `WS_EX_TRANSPARENT`, so a click on the empty frame reaches the desktop icon underneath. Change the style only when the decision changes. Test the decision as a pure function (`DrawerClickThrough.TakesClicks(DrawerPiece piece, Point inPiece, bool buttonDown, bool busy, bool focused)`) with `Sta.Run`.
+5. Nothing about widgets changes: the Desk's own islands, clicks, Arrange and layout behave exactly as before Task 7 for every built-in piece.
+
+**Live gate (replaces Task 8 Step 6; Este runs it once 8B lands):** Task 8 Step 6's six checks, plus: a new drawer arrives top-right;
+dragging its title moves it, and it stays where it was dropped after a Desk redraw and an app restart, on either monitor; a click on
+the empty frame selects or opens the desktop icon underneath; a file dragged from Explorer drops on the empty frame; the drawer stays
+above the clock and other widgets and below app windows; folding by a plain title click still works.
+
+### Rulings for Tasks 9 to 11 (carried into their dispatches)
+
+- **Task 9:** `DrawerReviewService` no longer places layout words. `Show` calls `host.Preview` with the Desk's current layout unchanged (the preview drawers come from `DrawerService.PreviewDrawers`); `Apply` saves the new drawers and their folded state but writes no layout and no places (they arrive top-right at render). The tests that asserted `drawer.<id>` in the preview layout or the saved layout assert instead that `DrawerService.Get(id)` is a preview drawer while reviewing and a saved drawer after Apply.
+- **Task 10:** turning off and `Remove(id)` clear the removed drawers' `Places`, `Hidden` and `Folded` entries instead of hiding layout words; the tests assert those lists.
+- **Task 11:** `HasHidden` is Task 8A's; "Show drawers" calls `ShowAll` (clears `Hidden`); the Drawers page adds a "Put drawers back top right" button that clears `Places`; `DrawerPieceCopy.Settings` becomes `SettingsNames.LinkTitle(SettingsPage.Drawers)` (Task 8's ruling).
+
+---
+
 ### Task 9: Review with Edit, Apply's result with Undo, one review at a time
 
 The rules' plan previews on the Desk (new drawers placed, waiting files faded) under the existing review window, now with an Edit
