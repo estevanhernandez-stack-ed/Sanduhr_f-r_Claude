@@ -118,6 +118,8 @@ final class DeskController: NSObject, NSMenuDelegate {
             self, selector: #selector(otherAppActivated),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
         watchVisibility()
+        // CI watchers follow runners only while the Desk shows.
+        MainActor.assumeIsolated { RunnerWatchController.shared.refresh() }
     }
 
     @objc private func otherAppActivated() {
@@ -245,6 +247,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         DistributedNotificationCenter.default().removeObserver(self)
         screensAsleep = false; screenSaver = false; sessionAway = false
+        MainActor.assumeIsolated { RunnerWatchController.shared.refresh() }
     }
 
     /// Called at launch, when Desk starts or stops, when either shortcut's switch flips and when

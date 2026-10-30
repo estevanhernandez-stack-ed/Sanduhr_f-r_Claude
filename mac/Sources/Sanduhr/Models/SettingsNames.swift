@@ -28,6 +28,9 @@ enum SettingsNames {
     /// Watchers, Where they show: the notch place and the Desk place, one stored value each.
     static let watchersOnNotch = "On the notch"
     static let watchersOnDesk = "On the Desk"
+    /// Watchers, CI runners: cards for local GitHub Actions runner jobs (key `watchersCiRunners`,
+    /// off by default). Windows' name, so the two apps say the same thing.
+    static let ciRunnersSwitch = "Show my CI runners' jobs"
     /// Mods & Config, Sanduhr's own mod at the top: the meters mod's switch, Update and Remove per
     /// folder (was Claude Code's folder row in slice 2, and Mods' "Sanduhr's mod" before that).
     static let metersAbovePrompt = "Meters above the prompt"
@@ -69,7 +72,7 @@ enum SettingsNames {
         (notchSwitch, .notch), (notchGlow, .notch), (cameraMicPlace, .notch),
         (claudeCodeGlowHook, .integrations), (metersAbovePrompt, .mods), (byFolder, .mods),
         (claudeMetersLine, .deskLayout), (claudeMetersBars, .deskLayout),
-        (watchersOnNotch, .watchers), (watchersOnDesk, .watchers),
+        (watchersOnNotch, .watchers), (watchersOnDesk, .watchers), (ciRunnersSwitch, .watchers),
         (showWidget, .widgetLook), (checkForUpdates, .updates), (saveAndApply, .themes),
         (listMode, .message), (textMode, .message),
         (linkFolder, .credentials),

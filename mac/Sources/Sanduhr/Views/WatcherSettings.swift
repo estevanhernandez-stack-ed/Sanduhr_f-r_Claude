@@ -10,6 +10,7 @@ struct WatchersSection: View {
         Form {
             NeedsDeskRow()
             WatcherSwitchesSection(hooked: page.hooked)
+            WatcherRunnersSection()
             WatcherPlacesSection()
             WatcherGlowSection()
             WatcherBandSection(page: page)
@@ -83,6 +84,26 @@ private struct WatcherSwitchesSection: View {
             Text("Background shells, monitors, subagents and workflows show as watchers on their own and end when they leave the session's list. Claude Code hands over each task's kind, status and short description, never a command or anything from the conversation; Sanduhr reads it and deletes it at once, and never logs it. Watchers from a work account's folder hide in demo mode.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// CI runners (2.38.0, spec section 15): one switch, off by default, and the status line under it.
+private struct WatcherRunnersSection: View {
+    @AppStorage(RunnerWatchController.switchKey) private var on = false
+
+    var body: some View {
+        Section("CI runners") {
+            Toggle(SettingsNames.ciRunnersSwitch, isOn: $on)
+                .settingsAnchor(SettingsAnchor.ciRunners)
+            Text("Cards for the jobs a GitHub Actions runner container on this Mac runs. Sanduhr asks Docker's local socket for two things only: the list of running containers and each runner's log. It never inspects a container, and runs only while the Desk is on. Names stay on this Mac.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if on {
+                Text(RunnerWatchController.shared.statusLine)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }

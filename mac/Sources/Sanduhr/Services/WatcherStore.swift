@@ -180,6 +180,30 @@ final class WatcherStore {
     }
 }
 
+/// CI watchers' cards (RunnerWatchService): a runner's lines go through the board's runner rules
+/// and out to the Desk, the notch, the band and the companion like any other watcher's change.
+extension WatcherStore: RunnerSink {
+    func apply(key: String, runner: String, line: RunnerLine) {
+        let change = board.applyRunner(key: key, runner: runner, line: line, now: now())
+        if change.changed { changed() }
+        // A failed job glows the notch once, the way a watcher waiting on you does.
+        if change.failed, case let .jobEnded(job, _, _) = line,
+           let w = board.watcher(WatcherBoard.runnerID(key: key, job: job)) {
+            onWaiting?(w)
+        }
+    }
+
+    func gone(key: String) {
+        if board.runnerGone(key: key, now: now()) { changed() }
+    }
+
+    func clear() {
+        guard board.watchers.contains(where: { $0.source == .runner }) else { return }
+        board.clear(.runner)
+        changed()
+    }
+}
+
 extension WatcherStore {
     /// Whether `folder` (nil: the default `~/.claude`) is linked to an account marked work in
     /// Settings, Accounts, Data.
