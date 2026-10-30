@@ -160,7 +160,7 @@ enum SettingsAnchor {
         SettingsEntry(title: "Arrange Desk…", page: .deskLayout, anchor: arrange, synonyms: ["drag", "move", "arrange"]),
         SettingsEntry(title: "Where each piece sits", page: .deskLayout, anchor: pieces,
                       synonyms: ["corner", "position", "place", "hidden", "clock", "meetings", "Read today's meetings",
-                                 "system", "CPU", "RAM", "memory", "disk", "telemetry"]),
+                                 "system", "CPU", "RAM", "memory", "disk", "telemetry", "weather"]),
         SettingsEntry(title: DeskSlant.title, page: .deskLayout, anchor: slant,
                       synonyms: ["tilt", "fold", "lean", "angle", "skew", "degrees", "straight"]),
         SettingsEntry(title: "Meter style", page: .deskLayout, anchor: meterStyle,

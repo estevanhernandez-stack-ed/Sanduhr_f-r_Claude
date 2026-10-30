@@ -193,6 +193,8 @@ private struct DeskPieceExtra: View {
                 .padding(.leading, 16)
         case NowPlayingPlacement.widget:
             link("Shows only while something plays.", .nowPlaying)
+        case "weather":
+            link("The city and the unit are in Weather.", .weather, anchor: SettingsAnchor.weatherPlace)
         case WatcherPlacement.widget:
             link("Shows only while there is a watcher.", .watchers, anchor: SettingsAnchor.whereTheyShow)
         default:
@@ -510,7 +512,7 @@ enum DeskLayout {
     static let widgets: [(key: String, name: String)] = [
         ("message", "Message"), ("clock", "Clock and date"), ("claude", SettingsNames.claudeMetersLine),
         ("meters", SettingsNames.claudeMetersBars), ("nowPlaying", "Now playing"), ("telemetry", SettingsNames.system),
-        ("watchers", "Watchers"),
+        ("weather", "Weather"), ("watchers", "Watchers"),
         ("meetings", "Meetings"), ("companion", "Companion"),
     ]
 

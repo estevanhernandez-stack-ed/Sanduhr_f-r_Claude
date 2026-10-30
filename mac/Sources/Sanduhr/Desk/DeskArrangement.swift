@@ -158,12 +158,14 @@ struct DeskArrangement: Equatable {
     }
 
     /// Where a piece goes when its anchor is not one this build knows: where the standard
-    /// layout puts it (the message top left, the system piece top right as on Windows, the companion
+    /// layout puts it (the message top left, the system piece top right and the weather piece
+    /// middle right as on Windows, the companion
     /// bottom center, the rest bottom left with the clock).
     static func defaultAnchor(_ widget: String) -> DeskAnchor {
         switch widget {
         case "message": return .tl
         case "telemetry": return .tr
+        case "weather": return .mr
         case "companion": return .bc
         default: return .bl
         }
