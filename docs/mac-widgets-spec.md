@@ -45,8 +45,8 @@ is the Mac's own addition (sections 18 and 19).
 | **2.35.0: the catalog, the companion and OLED care** | Settings ▸ Widgets, the signed catalog, install, update and uninstall, the `companion` Desk piece, theme and palette packs joining the Mac's lists, effects packs listed only (as on Windows). OLED care for the whole Desk and the widget. | 3.8 spec A, 3.7 OLED care |
 | **2.36.0: Claude-made widgets and your own art** | `propose_widget` in the Mac MCP, the review banner with a live Desk preview, made-here packs, and "Use my own art…". | 3.8 spec B and C |
 | **2.37.0: the Desk, shaped by hand or by Claude** | `get_desk` and `propose_desk` in the Mac MCP, the fold (a per-stack slant), meter styles (bar, slim, ring, ticks), and font packs. | 3.8 E to G, #314, #336 |
-| **2.38.0: new pieces** | The system piece (CPU, RAM, disk), the weather piece with its nickname, livelier now-playing bars (owner call below), and CI watchers from local runners. | 3.6 system and weather, 3.8 G, 3.9 |
-| **2.39.0: sprites from your own art** | "New sprite from an image…": a PNG sheet, a cell size, cells tagged to actions, a pack made here. Claude can propose the motion for it (which cells walk, the frame rate, moods to actions) from the sheet's size alone, never its pixels. | Mac first; Windows parity handed over |
+| **2.38.0: new pieces** | The system piece (CPU, RAM, disk), the weather piece with its nickname, and CI watchers from local runners. | 3.6 system and weather, 3.8 G, 3.9 |
+| **2.39.0: sprites from your own art** | "New sprite from an image…": a PNG sheet, a cell size, cells tagged to actions, a pack made here. Claude can propose the motion for it (which cells walk, the frame rate, moods to actions) from the sheet's size alone, never its pixels. Live now-playing bars from the playing app's audio, opt-in (section 14). | Mac first; Windows parity handed over; bars are 3.8 G parity |
 
 Out of scope: pushing anything to the catalog from the app, and the Rainmeter spike (a report on
 Windows skins, not a feature).
@@ -339,14 +339,24 @@ Windows' Settings ▸ Weather and Desk piece, with the #315 nickname.
 Windows draws the bars from the playing app's peak meter, an audio level only. The Mac has no
 public per-app level that doesn't involve capture: the route macOS offers is a Core Audio process
 tap (macOS 14.2+), which hands the app the audio itself and asks for the System Audio Recording
-permission. A spike confirms that before anything is built (settled call 6).
-- **If the owner takes the tap:** its own switch, off by default, under Now playing; the tap reads
-  only the playing app's output, computes a peak per frame in memory, and keeps and sends nothing.
-  Then Windows' `AudioBarMotion` as built: attack, decay, a peak cap that holds 9 frames and then
-  falls faster, "Gradient bars" (`nowPlaying.barsGradient`, off), and calm bars with Reduce Motion.
-  Bars are a `CAReplicatorLayer` driven by the level, so the idle rule holds.
-- **If not:** the Mac keeps its position bar, and the backlog item stays open. Bars that move
-  without a real level are not built.
+permission. The spike (`docs/spikes/2026-10-30-audio-tap-bars.md`) confirmed it: no per-app level exists without the tap, and a denied
+tap returns silence with no error. **Decided 2026-10-30: the tap ships in 2.39.0, opt-in** (settled
+call 6). It was left out of 2.38.0.
+- **First, see the prompt.** A throwaway dev build turns the switch on once on a live Mac to record the
+  prompt's exact text and the System Settings label; the PRIVACY and Settings copy are written from that.
+- **The switch:** its own, off by default, under Now playing, with a one-line note that turning it on asks
+  for System Audio Recording. Turning it on is the only moment a prompt can appear; off ends the tap at once.
+- **The tap:** `CATapDescription` on the playing app's process only (from `NowPlayingInfo.pid`, re-tapped
+  when it changes), in a private aggregate device, unmuted; one peak per callback into memory; nothing
+  kept, written or sent. Torn down on pause, on switch off and while the Desk is hidden.
+- **Denied:** the position bar stays, and the row shows "Allow in System Settings" when the player is
+  producing output (`kAudioProcessPropertyIsRunningOutput`) but every buffer is zero for a few seconds.
+  Never re-prompted; no private TCC calls.
+- **Motion:** Windows' `AudioBars` and `AudioBarMotion` as built: attack, decay, a peak cap that holds 9
+  frames and then falls faster, "Gradient bars" (`nowPlaying.barsGradient`, off), and calm bars with Reduce
+  Motion. Bars are a `CAReplicatorLayer` driven by the level, still at idle, so the idle rule holds.
+- `NSAudioCaptureUsageDescription` joins `mac/Info.plist` (the owner's file). Bars that move without a real
+  level are not built.
 
 ## 15. CI watchers from local runners
 
@@ -417,9 +427,10 @@ from nothing.
   - **2.36.0:** the widget handoff files; a user's own art stays on the Mac.
   - **2.37.0:** the Desk handoff files; font packs registered for this app only.
   - **2.39.0:** the new-sprite panel and `art/sprite.png`; the motion handoff files and that Claude
-    sees only a sprite's frame size and cell count.
+    sees only a sprite's frame size and cell count; the bars' audio tap (one app's output, a peak in
+    memory, nothing kept or sent, the permission and how to revoke it).
   - **2.38.0:** the system readings (local only); the two Open-Meteo hosts and exactly what each
-    sees; the bars' audio tap if it ships; the Docker socket and its two requests.
+    sees; the Docker socket and its two requests.
   - The hub's privacy page gets the same rows (hub issue) before each release.
 - **Docs:** `mac/README.md` sections per feature; `docs/mac-smoke-test.md` sections for each.
 - **Release:** each release gets its What's New card(s) and CHANGELOG, as usual.
@@ -448,9 +459,9 @@ drawing and 5 need live checks on the Desk.
 3. **Reset** gets a Widgets checkbox of its own.
 4. **`sanduhr_min`** stays the shared, Windows-numbered pack-format level (section 1).
 5. **OLED care** ships in 2.35.0 with the companion.
-6. **Bars (2.38.0): spike first.** A short spike confirms whether a Core Audio process tap needs the
-   System Audio Recording permission and how its prompt reads. The tap ships behind its own
-   off-by-default switch only if that prompt is acceptable; otherwise the Mac keeps its position bar.
+6. **Bars: spike first, then 2.39.0 opt-in.** The spike confirmed a Core Audio process tap needs the
+   System Audio Recording permission. The owner chose (2026-10-30) to ship it in 2.39.0 behind its own
+   off-by-default switch, after the prompt is seen once on a live Mac; 2.38.0 keeps the position bar.
 7. **CI watchers (2.38.0): built for parity, last in the release.**
 8. **Own sprite art (2026-10-28).** A new sprite from the user's own sheet and Claude-proposed motion
    go in as 2.39.0 (sections 18 and 19). GIF and Aseprite import, art per growth stage and pack export
