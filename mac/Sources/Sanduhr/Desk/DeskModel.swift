@@ -362,7 +362,9 @@ final class DeskModel {
         }
         MainActor.assumeIsolated {
             weatherService.onUpdate = { [weak self] in self?.weatherChanged() }
-            weatherService.sync(running: running && !demo, placed: placed)
+            // The settings this call was given decide, so a caller (or a test) without a place never
+            // reaches a service that would read a place from the saved settings.
+            weatherService.sync(running: running && !demo, placed: placed && settings.place != nil)
         }
     }
 
