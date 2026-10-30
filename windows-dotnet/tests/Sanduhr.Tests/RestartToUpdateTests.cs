@@ -214,6 +214,15 @@ public class RestartToUpdateTests
         => Assert.Equal(expected, RestartToUpdate.DisplayVersion(major, minor, build, revision));
 
     [Fact]
+    public void A_Store_update_is_offered_without_a_version()
+    {
+        // The Store reports the installed package, not the incoming one: 4.0.1 was offered as
+        // "Sanduhr 4.0.0 is ready" on a 4.0.0 install (2026-10-30). The notice names no version.
+        Assert.Equal("A Sanduhr update is ready. Restart to update?", RestartToUpdate.ReadyText(RestartToUpdate.AnyUpdate));
+        Assert.Equal("Sanduhr 3.8.1 is ready. Restart to update?", RestartToUpdate.ReadyText("3.8.1"));
+    }
+
+    [Fact]
     public void The_Store_build_relaunches_through_its_app_id_and_others_by_path()
     {
         Assert.Equal(("explorer.exe", @"shell:AppsFolder\626Labs.Sanduhr_abc123!Sanduhr"),
