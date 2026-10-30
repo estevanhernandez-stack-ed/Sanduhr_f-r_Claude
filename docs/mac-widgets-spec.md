@@ -435,7 +435,7 @@ from nothing.
 - **Docs:** `mac/README.md` sections per feature; `docs/mac-smoke-test.md` sections for each.
 - **Release:** each release gets its What's New card(s) and CHANGELOG, as usual.
 - **The ship check:** every new file, preference, host and helper has its PRIVACY paragraph in the
-  same release. This is the 2.33.0 lesson.
+  same release, and a new host also updates "Privacy in one paragraph" in `docs/setup-guide.md`. This is the 2.33.0 lesson.
 
 ## 17. Order of work (2.35.0)
 
