@@ -123,8 +123,8 @@ internal sealed class DrawerMover
     {
         if (result.NewPath is { } named && Exists(named)) return named;
         var leaf = Path.GetFileName(planned);   // streamer: key - a file's leaf locates it in its folder, never drawn
-        var stem = Path.GetFileNameWithoutExtension(leaf);   // streamer: key - a file's leaf locates it in its folder, never drawn
-        var ext = Path.GetExtension(leaf);   // streamer: key - a file's leaf locates it in its folder, never drawn
+        var stem = Regex.Replace(before is not null ? leaf : Path.GetFileNameWithoutExtension(leaf), @" \(\d+\)$", "");   // streamer: key - a file's leaf locates it in its folder, never drawn (a clash-named plan is cut back to its base)
+        var ext = before is not null ? "" : Path.GetExtension(leaf);   // streamer: key - a file's leaf locates it in its folder, never drawn
         var numbered = new Regex("^" + Regex.Escape(stem) + @" \(\d+\)" + Regex.Escape(ext) + "$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         bool Ours(string p)
         {

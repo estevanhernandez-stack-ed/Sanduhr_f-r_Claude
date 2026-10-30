@@ -36,7 +36,8 @@ internal sealed class DrawerJournalStore
         return Change(j => j.Add(entry, nowUtc)) ? entry : null;
     }
 
-    public void Remove(string id) => Change(j => j.Without(id));
+    /// <summary>Drops one entry. False when the journal could not be read or written, so the caller can tell the entry is still there.</summary>
+    public bool Remove(string id) => Change(j => j.Without(id));
 
     private bool Change(Func<DrawerJournal, DrawerJournal> edit)
     {

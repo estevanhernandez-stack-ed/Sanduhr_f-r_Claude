@@ -172,27 +172,74 @@ public sealed class DrawerMoverTests
         Assert.Equal(Path.Combine(images.Home, "a (2).png"), Assert.Single(run.Moved).To, ignoreCase: true);
     });
 
+    private static ShellResult ShellFailed() => new(false, null, unchecked((int)0x80004005));
+
     [Fact]
-    public void A_look_alike_already_in_the_drawer_is_never_journaled_in_place_of_the_moved_file() => Sta.Run(() =>
+    public void A_landing_the_Shell_did_not_name_is_found_by_numbered_name_and_write_time_not_by_look_alike() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();
         var images = Def(box, "Images");
-        box.File(@"Desktop\Drawers\Images\a (3).png", "newer");
-        box.File(@"Desktop\Drawers\Images\a (draft).png", "newer");
-        File.SetLastWriteTimeUtc(Path.Combine(images.Home, "a (3).png"), DateTime.UtcNow.AddHours(1));
-        File.SetLastWriteTimeUtc(Path.Combine(images.Home, "a (draft).png"), DateTime.UtcNow.AddHours(1));
         var a = box.File(@"Desktop\a.png", "mine");
-        File.SetLastWriteTimeUtc(a, DateTime.UtcNow.AddDays(-2));
-        var existing = new[] { images };
-        var check = Check(box, existing, (a, images));   // a.png is free here, so the plan is a.png
-        File.WriteAllText(Path.Combine(images.Home, "a.png"), "taken since");   // something else took the planned name
+        var stamp = DateTime.UtcNow.AddDays(-2);
+        File.SetLastWriteTimeUtc(a, stamp);
+        // Look-alikes that sort before "a (2).png": a numbered one that is newer, and a non-numbered one with the same write time.
+        var newer = box.File(@"Desktop\Drawers\Images\a (1).png", "newer");
+        File.SetLastWriteTimeUtc(newer, DateTime.UtcNow.AddHours(1));
+        var copy = box.File(@"Desktop\Drawers\Images\a (1st).png", "copy");
+        File.SetLastWriteTimeUtc(copy, stamp);
+        var older = box.File(@"Desktop\Drawers\Images\a (3).png", "newer");
+        File.SetLastWriteTimeUtc(older, DateTime.UtcNow.AddHours(1));
+        box.File(@"Desktop\Drawers\Images\a (draft).png", "draft");
+        var check = Check(box, [images], (a, images));   // a.png is free, so the plan is a.png and it is absent after the move
         var mover = new DrawerMover(box.Desktop, (src, dir, name) =>
         {
             File.Move(src, Path.Combine(dir, "a (2).png"));
-            return new ShellResult(false, null, unchecked((int)0x80004005));
+            return ShellFailed();
         });
-        var run = mover.Apply(check, existing);
+        var run = mover.Apply(check, [images]);
         Assert.Equal(Path.Combine(images.Home, "a (2).png"), Assert.Single(run.Moved).To, ignoreCase: true);
+        Assert.Empty(run.Skipped);
+    });
+
+    [Fact]
+    public void A_folder_the_Shell_landed_unnamed_is_found_by_what_was_not_there_before() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var images = Def(box, "Images");
+        var src = box.Dir(@"Desktop\Stuff");
+        box.Dir(@"Desktop\Drawers\Images\Stuff");
+        box.Dir(@"Desktop\Drawers\Images\Stuff (1)");   // numbered and sorts first, but it was already there
+        var check = Check(box, [images], (src, images));   // plans "Stuff (2)"
+        var mover = new DrawerMover(box.Desktop, (s, dir, name) =>
+        {
+            Directory.Move(s, Path.Combine(dir, "Stuff (3)"));   // not the planned name
+            return ShellFailed();
+        });
+        var run = mover.Apply(check, [images]);
+        Assert.True(run.Moved.Count == 1, string.Join("; ", run.Skipped.Select(k => k.Name + " " + k.Reason)));
+        var m = Assert.Single(run.Moved);
+        Assert.Equal(Path.Combine(images.Home, "Stuff (3)"), m.To, ignoreCase: true);
+        Assert.True(m.IsFolder);
+    });
+
+    [Fact]
+    public void A_source_that_vanished_with_nothing_found_is_a_skip_and_not_journaled() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var images = Def(box, "Images");
+        var a = box.File(@"Desktop\a.png");
+        Directory.CreateDirectory(images.Home);
+        var check = Check(box, [images], (a, images));
+        var mover = new DrawerMover(box.Desktop, (src, dir, name) =>
+        {
+            File.Delete(src);
+            return ShellFailed();
+        });
+        var run = mover.Apply(check, [images]);
+        Assert.Empty(run.Moved);
+        var skip = Assert.Single(run.Skipped);
+        Assert.Equal("a.png", skip.Name);
+        Assert.Equal(DrawerSkip.MovedSince, skip.Reason);
     });
 
     [Fact]
@@ -201,8 +248,9 @@ public sealed class DrawerMoverTests
         using var box = new DrawerSandbox();
         var store = new DrawerJournalStore(Path.Combine(box.Root, "app", "drawers-journal.json"));
         var e = store.Add(DrawerPlanSource.User, null, [new JournalMove(@"C:\a", @"C:\b", false, DateTime.UtcNow)], DateTime.UtcNow);
+        Assert.NotNull(e);
         Assert.Equal(e.Id, Assert.Single(store.Load().Entries).Id);
-        store.Remove(e.Id);
+        Assert.True(store.Remove(e.Id));
         Assert.Empty(store.Load().Entries);
     }
 
