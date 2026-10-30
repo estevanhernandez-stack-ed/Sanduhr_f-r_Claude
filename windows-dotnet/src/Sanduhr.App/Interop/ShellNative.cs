@@ -1,3 +1,4 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -141,8 +142,14 @@ internal static class ShellNative
         public int Hr { get; private set; } = unchecked((int)0x80004005);   // E_FAIL until the Shell reports
         public string? NewPath { get; private set; }
 
-        public void PostMoveItem(uint f, IShellItem i, IShellItem d, string? n, int hr, IShellItem? created) { Hr = hr; NewPath = PathOf(created); }
-        public void PostRenameItem(uint f, IShellItem i, string? n, int hr, IShellItem? created) { Hr = hr; NewPath = PathOf(created); }
+        public void PostMoveItem(uint f, IShellItem i, IShellItem d, string? n, int hr, IShellItem? created) { Hr = hr; NewPath = SafePathOf(created); }
+        public void PostRenameItem(uint f, IShellItem i, string? n, int hr, IShellItem? created) { Hr = hr; NewPath = SafePathOf(created); }
+
+        private static string? SafePathOf(IShellItem? item)
+        {
+            try { return PathOf(item); }
+            catch (Exception e) when (e is COMException or IOException or UnauthorizedAccessException or ArgumentException or InvalidCastException) { return null; }
+        }
         public void StartOperations() { }
         public void FinishOperations(int hrResult) { }
         public void PreRenameItem(uint f, IShellItem i, string? n) { }

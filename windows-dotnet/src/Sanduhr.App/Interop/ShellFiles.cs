@@ -25,6 +25,8 @@ internal static class ShellFiles
 
     private static ShellResult Run(Action<ShellNative.IFileOperation> queue)
     {
+        // IFileOperation is apartment-threaded: off an STA thread, fail without touching COM.
+        if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA) return new ShellResult(false, null, unchecked((int)0x8001010E));
         ShellNative.IFileOperation? op = null;
         try
         {
@@ -36,10 +38,10 @@ internal static class ShellFiles
             op.PerformOperations();
             bool aborted = op.GetAnyOperationsAborted();
             op.Unadvise(cookie);
-            return new ShellResult(sink.Hr >= 0 && !aborted, sink.NewPath, sink.Hr);
+            // A completed move or rename always hands back its new item; success codes like USER_IGNORED or S_NOT_HANDLED do not.
+            return new ShellResult(sink.Hr >= 0 && !aborted && sink.NewPath is not null, sink.NewPath, sink.Hr);
         }
-        catch (Exception e) when (e is COMException or FileNotFoundException or DirectoryNotFoundException or ArgumentException
-            or UnauthorizedAccessException or InvalidCastException)
+        catch (Exception e) when (e is COMException or IOException or UnauthorizedAccessException or ArgumentException or InvalidCastException)
         {
             return new ShellResult(false, null, e.HResult);
         }
@@ -103,7 +105,7 @@ internal static class ShellFiles
             image.Freeze();
             return image;
         }
-        catch (Exception e) when (e is COMException or FileNotFoundException or InvalidCastException or ArgumentException) { return null; }
+        catch (Exception e) when (e is COMException or IOException or UnauthorizedAccessException or ArgumentException or InvalidCastException) { return null; }
         finally { if (hbm != IntPtr.Zero) ShellNative.DeleteObject(hbm); }
     }
 

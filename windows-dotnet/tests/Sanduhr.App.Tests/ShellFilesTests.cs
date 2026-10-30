@@ -47,6 +47,43 @@ public sealed class ShellFilesTests
     });
 
     [Fact]
+    public void Move_off_an_STA_thread_fails_without_touching_the_file()
+    {
+        using var box = new DrawerSandbox();
+        var a = box.File(@"Desktop\a.txt");
+        var home = box.Dir(@"Desktop\Drawers\Docs");
+        ShellResult? r = null;
+        var t = new Thread(() => r = ShellFiles.Move(a, home, "a.txt"));
+        t.SetApartmentState(ApartmentState.MTA);
+        t.Start();
+        t.Join();
+        Assert.False(r!.Ok);
+        Assert.Equal(unchecked((int)0x8001010E), r.HResult);
+        Assert.True(File.Exists(a));
+    }
+
+    [Fact]
+    public void Move_of_a_folder_never_merges_into_a_folder_of_the_same_name() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        box.File(@"Desktop\Stuff\new.txt", "new");
+        var home = box.Dir(@"Desktop\Drawers\Docs");
+        box.File(@"Desktop\Drawers\Docs\Stuff\old.txt", "old");
+        var r = ShellFiles.Move(Path.Combine(box.Desktop, "Stuff"), home, "Stuff");
+        Assert.True(r.Ok, $"0x{r.HResult:X8}");
+        Assert.False(string.Equals(Path.Combine(home, "Stuff"), r.NewPath, StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(["old.txt"], Directory.GetFiles(Path.Combine(home, "Stuff")).Select(Path.GetFileName));
+        Assert.Equal("new", File.ReadAllText(Path.Combine(r.NewPath!, "new.txt")));
+    });
+
+    [Fact]
+    public void Thumbnail_of_a_missing_path_is_null_not_a_throw() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        Assert.Null(ShellFiles.Thumbnail(Path.Combine(box.Desktop, "gone", "x.txt"), 64));
+    });
+
+    [Fact]
     public void Rename_renames_through_the_Shell() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();

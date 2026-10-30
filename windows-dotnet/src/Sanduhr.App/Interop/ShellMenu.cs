@@ -54,7 +54,7 @@ internal static class ShellMenu
                     t_open = o as ShellNative.IContextMenu3;
                     menu.QueryContextMenu(h, 0, First, Last, CMF_NORMAL | CMF_CANRENAME);
                 }
-                catch (Exception e) when (e is COMException or FileNotFoundException or InvalidCastException) { menu = null; }
+                catch (Exception e) when (e is COMException or IOException or UnauthorizedAccessException or ArgumentException or InvalidCastException) { menu = null; }
             }
             if (extras.Count > 0 && ShellNative.GetMenuItemCount(h) > 0) ShellNative.AppendMenuW(h, MF_SEPARATOR, UIntPtr.Zero, null);
             foreach (var item in extras) ShellNative.AppendMenuW(h, MF_STRING, (UIntPtr)(uint)item.Id, item.Text);
@@ -95,7 +95,7 @@ internal static class ShellMenu
             menu.QueryContextMenu(h, 0, First, Last, CMF_NORMAL);
             return Invoke(menu, owner, ansi, wide, 0, 0) >= 0;
         }
-        catch (Exception e) when (e is COMException or FileNotFoundException or InvalidCastException) { return false; }
+        catch (Exception e) when (e is COMException or IOException or UnauthorizedAccessException or ArgumentException or InvalidCastException) { return false; }
         finally
         {
             Marshal.FreeHGlobal(ansi);
