@@ -12,6 +12,12 @@
 
 - **Not in this release.** The Now playing bars stay the position bar. Moving bars need Sanduhr to tap system audio, which asks for a new permission, so it waits for your call.
 
+## Unreleased (windows)
+
+### Fixes
+
+- **The Store update notice no longer names the version you already have.** Windows' Store API reports the installed package, not the incoming one, so 4.0.1 was offered as "Sanduhr 4.0.0 is ready" on a 4.0.0 install. Store installs now read "A Sanduhr update is ready. Restart to update?". The GitHub (Setup.exe) channel still names the version, which it reads from the release feed.
+
 ## v2.37.0-mac — 2026-10-29
 
 - **Claude can shape your Desk.** With the MCP server installed, `get_desk` tells Claude how your Desk is set up and `propose_desk` hands Sanduhr a whole look: pieces (place, size, slant, style), font, ink, plate and shadow. The server checks it with the app's own rules and refuses what the Mac Desk can't do with a reason: messages, song looks and themes (they keep their tools), the Windows-only fields, and the system and weather pieces until 2.38.0. A good one waits at the top of Settings, Desk as **Claude suggests a Desk design**, with what it changes. **Preview on the Desk** shows it from memory with your saved settings untouched, **Apply** writes only the settings it changes, and **Dismiss** drops it. A font you lack is named with Claude's link as text, and Apply waits until you install it. No setting lets Claude skip Apply, and the design is held in memory only.
