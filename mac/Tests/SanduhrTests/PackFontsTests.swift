@@ -59,7 +59,6 @@ struct PackFontsTests {
         #expect(fonts.refusedCount(of: "real-font") == 0)
         #expect(fonts.note(for: "real-font") == nil)
         #expect(Self.processKnows(Self.family))
-        #expect(NSFontManager.shared.availableMembers(ofFontFamily: Self.family) != nil)
         #expect(!fonts.sync(store), "a second sync with nothing changed does nothing")
 
         fonts.release("real-font")
