@@ -334,7 +334,7 @@ internal sealed class DesktopLayerHost : IDeskHost
         var hwnd = src.Handle;
         var home = new PxRect(x, y, pw, ph);
         _homes[src] = (home, screen);
-        var at = Drifted(home, screen);
+        var at = IsDrawer(src) ? home : Drifted(home, screen);
         // Physical pixels in, physical pixels out: the same per-monitor context the monitors were read in.
         DeskNative.PerMonitor(() =>
         {
@@ -348,9 +348,17 @@ internal sealed class DesktopLayerHost : IDeskHost
         });
     }
 
+    /// <summary>The window holds a free drawer: OLED care's drift leaves it out, so it sits exactly where the user put it and a drop never
+    /// carries a drift offset into its saved place.</summary>
+    private bool IsDrawer(HwndSource src)
+    {
+        int i = _windows.IndexOf(src);
+        return i >= 0 && i < _drawers.Count && _drawers[i];
+    }
+
     /// <summary>Where a window at <paramref name="home"/> sits with OLED care's drift: the orbit's point, applied to the
     /// window as a whole. The orbit is held to the content (the window less its shadow room) so a piece never leaves the
-    /// monitor's work area or crosses the taskbar's clearance; the padding rides along.</summary>
+    /// monitor's work area or crosses the taskbar's clearance; the padding rides along. Drawer windows never drift (<see cref="IsDrawer"/>).</summary>
     private PxRect Drifted(PxRect home, DeskScreen screen)
     {
         if (_drift is not { } step) return home;
@@ -379,7 +387,7 @@ internal sealed class DesktopLayerHost : IDeskHost
         {
             foreach (var w in _windows)
             {
-                if (w.IsDisposed || !_homes.TryGetValue(w, out var h)) continue;
+                if (w.IsDisposed || IsDrawer(w) || !_homes.TryGetValue(w, out var h)) continue;
                 var at = Drifted(h.Home, h.Screen);
                 if (DeskNative.Rect(w.Handle) != at)
                     DeskNative.SetWindowPos(w.Handle, IntPtr.Zero, at.X, at.Y, at.Width, at.Height,

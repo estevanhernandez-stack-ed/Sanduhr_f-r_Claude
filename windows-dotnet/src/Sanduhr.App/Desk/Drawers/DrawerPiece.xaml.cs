@@ -173,14 +173,12 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         TitleUp(at);
     }
 
-    /// <summary>Where this piece's top-left sits inside its window, in the window's pixels (the host scales its root so a DIP is the
-    /// monitor's, and WPF draws the root at its own scale).</summary>
+    /// <summary>Where this piece's top-left sits inside its window, in the window's pixels (<see cref="DrawerScreens.PixelsPerUnit(HwndSource)"/>:
+    /// the root's own layout scale counts, so a drop on a monitor at another scale than WPF's saves no offset error).</summary>
     private PxPoint OffsetIn(HwndSource src)
     {
         if (src.RootVisual is not Visual root || !root.IsAncestorOf(this)) return default;
-        double wpf = src.CompositionTarget?.TransformToDevice.M11 is > 0 and var t ? t : 1.0;
-        var p = TransformToAncestor(root).Transform(new Point());
-        return new PxPoint((int)Math.Round(p.X * wpf), (int)Math.Round(p.Y * wpf));
+        return DrawerScreens.RootToWindow(TransformToAncestor(root).Transform(new Point()), DrawerScreens.PixelsPerUnit(src));
     }
 
     internal void TitleDown(PxPoint cursor, PxPoint window, PxPoint offset)

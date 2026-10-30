@@ -66,7 +66,7 @@ public sealed class DrawerFreePanelTests
     {
         var screens = TwoScreens();
         Assert.Equal(new DrawerPlace(DeskMonitors.Main, 300, 120), DrawerScreens.ToPlace(new PxPoint(300, 120), screens));
-        var p = DrawerScreens.ToPlace(new PxPoint(3440 + 300, 60 + 150), screens);
+        var p = DrawerScreens.ToPlace(new PxPoint(3440 + 300, 60 + 150), screens)!;
         Assert.Equal(SecondId, p.Monitor);
         Assert.Equal(200, p.X, 6);
         Assert.Equal(100, p.Y, 6);
@@ -81,10 +81,60 @@ public sealed class DrawerFreePanelTests
     {
         var screens = TwoScreens();
         Assert.Equal(new DrawerPlace(DeskMonitors.Main, 0, 0), DrawerScreens.ToPlace(new PxPoint(-500, -300), screens));
-        var far = DrawerScreens.ToPlace(new PxPoint(3440 + 2880 + 400, 2000), screens);
+        var far = DrawerScreens.ToPlace(new PxPoint(3440 + 2880 + 400, 2000), screens)!;
         Assert.Equal(SecondId, far.Monitor);
         Assert.Equal(2880 / 1.5 - DrawerPlacement.Width, far.X, 6);
         Assert.Equal(1560 / 1.5 - DrawerPlacement.FoldedHeight, far.Y, 6);
+    }
+
+    [Fact]
+    public void ToPlace_refuses_a_drop_on_a_secondary_screen_Windows_would_not_name()
+    {
+        var screens = TwoScreens();
+        var unnamed = new[] { screens[0], screens[1] with { Id = null } };
+        Assert.Null(DrawerScreens.ToPlace(new PxPoint(3440 + 300, 60 + 150), unnamed));
+        Assert.Equal(new DrawerPlace(DeskMonitors.Main, 300, 120), DrawerScreens.ToPlace(new PxPoint(300, 120), unnamed));
+        Assert.Null(DrawerScreens.ToPlace(new PxPoint(10, 10), []));
+    }
+
+    [Fact]
+    public void Window_pixels_and_piece_points_convert_through_the_roots_own_scale_both_ways() => Sta.Run(() =>
+    {
+        // The host's root: 16 DIPs of shadow room, scaled by k = screen 1.5 / WPF 1.0; transforms against the root leave k out.
+        var piece = new Border { Width = 100, Height = 50 };
+        var root = new Border { Padding = new Thickness(16), Child = piece, LayoutTransform = new ScaleTransform(1.5, 1.5) };
+        root.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        root.Arrange(new Rect(root.DesiredSize));
+        root.UpdateLayout();
+        double ppu = DrawerScreens.PixelsPerUnit(1.0, root.LayoutTransform);
+        Assert.Equal(1.5, ppu, 6);
+        Assert.Equal(1.5, DrawerScreens.PixelsPerUnit(1.25, new ScaleTransform(1.2, 1.2)), 6);   // a 120% WPF on a 150% monitor
+
+        var offset = DrawerScreens.RootToWindow(piece.TransformToAncestor(root).Transform(new Point()), ppu);
+        Assert.Equal(new PxPoint(24, 24), offset);   // 16 DIPs at 150%, not 16 px
+        var inPiece = root.TransformToDescendant(piece)!.Transform(DrawerScreens.WindowToRoot(new PxPoint(24 + 15, 24 + 30), ppu));
+        Assert.Equal(10, inPiece.X, 6);
+        Assert.Equal(20, inPiece.Y, 6);
+    });
+
+    [Fact]
+    public void A_drop_on_a_150_percent_screen_round_trips_without_creep()
+    {
+        var screens = TwoScreens();
+        var s = screens[1];
+        var place = new DrawerPlace(SecondId, 100.4, 50.2);
+        var offset = new PxPoint(24, 24);   // the piece inside its window at 150% (see the conversion test)
+        PxPoint? first = null;
+        for (int i = 0; i < 5; i++)
+        {
+            var (_, anchor) = DrawerScreens.ToAnchor(place, screens);
+            // The host's Fit: the window's top-left is the anchor less the 16 DIP room, in the screen's pixels.
+            var window = new PxPoint(s.Bounds.X + (int)Math.Round((anchor.X - 16) * s.Scale), s.Bounds.Y + (int)Math.Round((anchor.Y - 16) * s.Scale));
+            first ??= window;
+            Assert.Equal(first, window);
+            // A drop without moving: the same window and offset hand back the place.
+            place = DrawerScreens.ToPlace(new PxPoint(window.X + offset.X, window.Y + offset.Y), screens)!;
+        }
     }
 
     // ---- the piece ----
@@ -336,6 +386,26 @@ public sealed class DrawerFreePanelTests
         finally { desk.Dispose(); s.Dispose(); }
     });
 
+    [Fact]
+    public void Dragging_a_preview_drawer_saves_no_place() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, store, paths) = Make(box);
+        var fresh = new DrawerDef("archives", "Archives", Path.Combine(box.Drawers, "Archives"), true);
+        s.SetPending(DrawerPlanValidator.Check(new DrawerPlan(DrawerPlanSource.Rules, null, [fresh], []), box.Roots, s.Settings.Drawers));
+        var (desk, host) = Start(store, paths, s);
+        try
+        {
+            var before = DrawerIslands(host).Single(d => IdOf(d.Island) == "archives").Island.Anchor;
+            s.RequestPlace("archives", new PxPoint(3440 + 300, 60 + 150));
+            Assert.False(store.LoadDrawers().Places.ContainsKey("archives"));
+            var after = DrawerIslands(host).Single(d => IdOf(d.Island) == "archives");
+            Assert.True(after.Screen.Primary);
+            Assert.Equal(before, after.Island.Anchor);
+        }
+        finally { desk.Dispose(); s.Dispose(); }
+    });
+
     // ---- the host's z-order ----
 
     [Fact]
@@ -361,6 +431,35 @@ public sealed class DrawerFreePanelTests
             var h = host.Handles;
             Assert.True(Interop.DeskNative.IsBelow(h[0], h[2]));
             Assert.True(Interop.DeskNative.IsBelow(h[1], h[2]));
+        }
+        finally { host.Dispose(); }
+    });
+
+    [Fact]
+    public void OLED_drift_moves_widget_windows_and_never_a_drawer_window() => Sta.Run(() =>
+    {
+        var bounds = new PxRect(0, 0, 1920, 1080);
+        var screen = new DeskScreen("TEST", bounds, bounds, 1.0, true, DeskInsets.None);
+        var host = new DesktopLayerHost { OwnedByShell = false, WatchShowDesktop = false };
+        try
+        {
+            DeskIsland Box(double x, bool drawer) =>
+                new(new Border { Width = 120, Height = 40, Background = Brushes.White }, new Point(x, 300), HorizontalAlignment.Left, VerticalAlignment.Top)
+                { Drawer = drawer, TakesClicks = drawer };
+            host.SetDrift(3);   // set before the windows exist
+            host.Show([new DeskSurface(screen, [Box(100, false), Box(500, true)])]);
+            var (ox, oy) = OledDrift.Offset(3);
+            var widget = Interop.DeskNative.Rect(host.Handles[0])!.Value;
+            var drawer = Interop.DeskNative.Rect(host.Handles[1])!.Value;
+            Assert.Equal((100 - 16 + ox, 300 - 16 + oy), (widget.X, widget.Y));
+            Assert.Equal((500 - 16, 300 - 16), (drawer.X, drawer.Y));
+
+            host.SetDrift(5);   // a step while shown
+            var (ox5, oy5) = OledDrift.Offset(5);
+            widget = Interop.DeskNative.Rect(host.Handles[0])!.Value;
+            drawer = Interop.DeskNative.Rect(host.Handles[1])!.Value;
+            Assert.Equal((100 - 16 + ox5, 300 - 16 + oy5), (widget.X, widget.Y));
+            Assert.Equal((500 - 16, 300 - 16), (drawer.X, drawer.Y));
         }
         finally { host.Dispose(); }
     });

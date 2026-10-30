@@ -791,11 +791,15 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private void OnDrawersBusyEnded() { if (_renderWanted) Render(); }
 
     /// <summary>A drawer was dragged by its title and let go: its top-left, in screen pixels, becomes a place on the screen holding it,
-    /// clamped to that screen's work area, and saved (the save redraws the Desk).</summary>
+    /// clamped to that screen's work area, and saved (the save redraws the Desk). A drawer only a plan under review would create, or a drop
+    /// on a screen Windows would not name, saves nothing: the Desk draws the drawer back where it was.</summary>
     private void OnPlaceRequested(string id, PxPoint topLeft)
     {
         if (_stopped || _drawers is null || _screens.Count == 0) return;
-        _drawers.SetPlace(id, DrawerScreens.ToPlace(topLeft, _screens));
+        if (_drawers.Settings.Drawers.Any(d => d.Id == id) && DrawerScreens.ToPlace(topLeft, _screens) is { } place)
+            _drawers.SetPlace(id, place);
+        else
+            Render();   // waits for the move's hold, then puts the window back
     }
 
     /// <summary>
@@ -809,7 +813,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         var settings = service.Settings;
         List<DrawerDef> drawn = settings.Enabled ? [.. settings.Drawers.Where(d => service.IsShown(d.Id) && service.Get(d.Id) is not null)] : [];
         drawn.AddRange(service.PreviewDrawers.Select(p => p.Def).Where(p => drawn.All(d => d.Id != p.Id)));
-        var ids = drawn.Select(d => d.Id).ToHashSet(StringComparer.Ordinal);
+        var ids = settings.Drawers.Select(d => d.Id).Where(id => drawn.Any(d => d.Id == id)).ToHashSet(StringComparer.Ordinal);
         var placed = settings.Places.Where(kv => ids.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
         var folded = drawn.Where(d => service.Get(d.Id)?.Folded == true).Select(d => d.Id).ToList();
         var places = DrawerPlacement.Arrive(drawn, placed, DrawerScreens.WorkDips(DrawerScreens.Primary(_screens)).Width, folded);

@@ -38,7 +38,14 @@ internal sealed class DrawerClickThrough : IDisposable
     public void Follow(IReadOnlyList<DrawerPiece> pieces)
     {
         _pieces = pieces;
-        if (pieces.Count > 0) _poll.Start(); else _poll.Stop();
+        bool run = pieces.Count > 0;
+        if (run != _poll.IsEnabled)
+        {
+            // A press seen before the poll stopped or started says nothing about the windows now.
+            _wasDown = false;
+            _through = IntPtr.Zero;
+        }
+        if (run) _poll.Start(); else _poll.Stop();
     }
 
     /// <summary>Whether a drawer's window takes the mouse with the cursor at <paramref name="inPiece"/> (the piece's own coordinates).</summary>
@@ -61,7 +68,7 @@ internal sealed class DrawerClickThrough : IDisposable
 
     private void Poll()
     {
-        if (_pieces.Count == 0) { _poll.Stop(); return; }
+        if (_pieces.Count == 0) { _poll.Stop(); _wasDown = false; _through = IntPtr.Zero; return; }
         var cursor = DeskNative.CursorPx();
         bool down = DeskNative.AnyMouseButtonDown();
         bool pressed = down && !_wasDown;
@@ -74,9 +81,8 @@ internal sealed class DrawerClickThrough : IDisposable
             if (PresentationSource.FromVisual(piece) is not HwndSource { IsDisposed: false, RootVisual: Visual root } src) continue;
             var h = src.Handle;
             if (DeskNative.RectPx(h) is not { } r || cursor.X < r.X || cursor.Y < r.Y || cursor.X >= r.Right || cursor.Y >= r.Bottom) continue;
-            // The window's pixels to the root's units (the host scales the root so a DIP is the monitor's), then into the piece.
-            double wpf = src.CompositionTarget?.TransformToDevice.M11 is > 0 and var t ? t : 1.0;
-            var inRoot = new Point((cursor.X - r.X) / wpf, (cursor.Y - r.Y) / wpf);
+            // The window's pixels to the root's own units (the root's layout scale counts), then into the piece.
+            var inRoot = DrawerScreens.WindowToRoot(new PxPoint(cursor.X - r.X, cursor.Y - r.Y), DrawerScreens.PixelsPerUnit(src));
             var inPiece = root.TransformToDescendant(piece)?.Transform(inRoot) ?? new Point(-1, -1);
             if (pressed && DesktopLayerHost.IsClickThrough(h)) _through = h;
             DesktopLayerHost.SetClickThrough(h, !TakesClicks(piece, inPiece, down && _through != h, busy, fg == h));

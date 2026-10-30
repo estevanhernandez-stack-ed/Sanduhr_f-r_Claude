@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.Desk;
@@ -35,17 +37,37 @@ internal static class DrawerScreens
     }
 
     /// <summary>The place for a drawer whose top-left was dropped at <paramref name="topLeft"/>: the screen holding the point (else the
-    /// nearest), saved as "main" for the primary and by id otherwise, offset from its work area in its DIPs and clamped.</summary>
-    public static DrawerPlace ToPlace(PxPoint topLeft, IReadOnlyList<DeskScreen> screens)
+    /// nearest), saved as "main" for the primary and by id otherwise, offset from its work area in its DIPs and clamped. Null when that
+    /// screen is a secondary one Windows would not name: there is no identity to save it by, so the drop is refused.</summary>
+    public static DrawerPlace? ToPlace(PxPoint topLeft, IReadOnlyList<DeskScreen> screens)
     {
-        if (screens.Count == 0) throw new ArgumentException("No screens to place a drawer on.", nameof(screens));
+        if (screens.Count == 0) return null;
         var screen = screens.FirstOrDefault(s => Contains(s.Bounds, topLeft)) ?? screens.MinBy(s => Distance(s.Bounds, topLeft))!;
-        // A secondary screen Windows would not name has no identity to save: the place is kept on the primary.
-        string monitor = screen.Primary || screen.Id is null ? DeskMonitors.Main : screen.Id;
+        if (!screen.Primary && screen.Id is null) return null;
+        string monitor = screen.Primary ? DeskMonitors.Main : screen.Id!;
         var work = WorkDips(screen);
         var place = new DrawerPlace(monitor, (topLeft.X - screen.Work.X) / screen.Scale, (topLeft.Y - screen.Work.Y) / screen.Scale);
         return DrawerPlacement.Clamp(place, work.Width, work.Height);
     }
+
+    /// <summary>
+    /// A Desk window's pixels per unit of its root's own coordinates: WPF's device scale times the root's layout scale. The host scales the
+    /// root by the monitor's scale over WPF's (<c>k</c>), so this is the monitor's own scale; transforms taken against the root never
+    /// include the root's own layout transform, so every conversion between window pixels and a point in the piece goes through this.
+    /// </summary>
+    public static double PixelsPerUnit(double wpf, Transform? rootLayout) =>
+        (wpf > 0 ? wpf : 1.0) * (rootLayout?.Value.M11 is > 0 and var k ? k : 1.0);
+
+    /// <summary><see cref="PixelsPerUnit(double, Transform?)"/> for a live Desk window.</summary>
+    public static double PixelsPerUnit(HwndSource src) =>
+        PixelsPerUnit(src.CompositionTarget?.TransformToDevice.M11 ?? 1.0, (src.RootVisual as FrameworkElement)?.LayoutTransform);
+
+    /// <summary>A point in a window's pixels (from its top-left) as a point in its root's own coordinates.</summary>
+    public static Point WindowToRoot(PxPoint inWindow, double pixelsPerUnit) => new(inWindow.X / pixelsPerUnit, inWindow.Y / pixelsPerUnit);
+
+    /// <summary>A point in a window's root coordinates as the window's pixels from its top-left.</summary>
+    public static PxPoint RootToWindow(Point inRoot, double pixelsPerUnit) =>
+        new((int)Math.Round(inRoot.X * pixelsPerUnit), (int)Math.Round(inRoot.Y * pixelsPerUnit));
 
     private static bool Contains(PxRect r, PxPoint p) => p.X >= r.X && p.X < r.Right && p.Y >= r.Y && p.Y < r.Bottom;
 
