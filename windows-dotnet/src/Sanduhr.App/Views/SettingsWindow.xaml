@@ -932,6 +932,14 @@
                             <TextBlock Text="General" FontSize="14" FontWeight="SemiBold"
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
 
+                            <StackPanel views:SettingsAnchor.Id="setup" Margin="0,0,0,4">
+                                <Button Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Padding="12,6"
+                                        Content="{Binding SetupTitle}" Command="{Binding OpenSetupCommand}"
+                                        AutomationProperties.Name="{Binding SetupTitle}"
+                                        ToolTip="Choose what Sanduhr shows: a nicer desktop, drawers, your AI usage." />
+                            </StackPanel>
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
                             <!-- Tray (W3): which number the tray icon shows, with a live preview. -->
                             <StackPanel views:SettingsAnchor.Id="tray">
                                 <TextBlock Text="Tray" FontSize="13" FontWeight="SemiBold"

@@ -348,6 +348,11 @@ public partial class App : Application
     /// <summary>A card's Show me: the widget, or Settings at the card's page and section (WF17).</summary>
     private void ShowMe(SettingsPage page, string? anchor)
     {
+        if (SettingsIndex.OpensSetup(new SettingsLink(page, anchor)))
+        {
+            OpenSetup(firstRun: false);   // the card's promise is Set up Sanduhr, not a page
+            return;
+        }
         if (SettingsIndex.ShowsTheWidget(new SettingsLink(page, anchor)))
             ShowWindow();
         else
@@ -468,6 +473,8 @@ public partial class App : Application
 
         var settings = new MenuItem { Header = SettingsNames.OpenSettings };
         settings.Click += async (_, _) => await ShowSettingsAsync();
+        var setup = new MenuItem { Header = SetupCopy.MenuItem };
+        setup.Click += (_, _) => OpenSetup(firstRun: false);
 
         var whatsNew = new MenuItem { Header = SettingsNames.WhatsNew };
         whatsNew.Click += (_, _) => ShowWhatsNewFromMenu();
@@ -549,6 +556,7 @@ public partial class App : Application
         menu.Items.Add(_endDemoItem);
         menu.Items.Add(show);
         menu.Items.Add(settings);
+        menu.Items.Add(setup);
         menu.Items.Add(whatsNew);
         menu.Items.Add(tour);
         menu.Items.Add(_arrangeItem);
@@ -859,6 +867,7 @@ public partial class App : Application
         Action showRunnerStatus = () => svm.Desk.CiRunnersStatus = RunnerStatusText(_runners?.Status);
         RunnerStatusShown += showRunnerStatus;
         svm.QuitRequested = QuitApp;
+        svm.SetupRequested = () => OpenSetup(firstRun: false);
         // Settings, Widget, Usage is off: Set up Sanduhr (setup spec, section 4).
         svm.WidgetPage.SetupRequested = () => OpenSetup(firstRun: false);
         svm.ResetRequested = () =>

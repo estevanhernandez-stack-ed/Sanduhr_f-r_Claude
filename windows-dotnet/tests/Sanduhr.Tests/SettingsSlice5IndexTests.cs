@@ -132,6 +132,14 @@ public class SettingsSlice5IndexTests
     }
 
     [Fact]
+    public void OpensSetup_is_only_the_General_setup_anchor()
+    {
+        Assert.True(SettingsIndex.OpensSetup(new SettingsLink(SettingsPage.General, SettingsIndex.GeneralSetup)));
+        Assert.False(SettingsIndex.OpensSetup(new SettingsLink(SettingsPage.General, null)));
+        Assert.False(SettingsIndex.OpensSetup(new SettingsLink(SettingsPage.Widget, SettingsIndex.GeneralSetup)));
+    }
+
+    [Fact]
     public void Widget_is_a_page_and_widget_without_an_anchor_still_shows_the_widget()
     {
         Assert.Contains(SettingsPage.Widget, SettingsNames.Pages);

@@ -11,6 +11,7 @@ public sealed class WhatsNewShowMeTests
     {
         var expected = new Dictionary<string, string>
         {
+            ["choose-what-shows"] = "Opens Set up Sanduhr",
             ["widgets"] = "Opens Settings, Mods & Widgets",
             ["companion"] = "Opens Settings, Desk",
             ["claude-widgets"] = "Opens Settings, Mods & Widgets",

@@ -12,7 +12,7 @@ public class WhatsNewCardsTests
     public void Table_HasEveryReleaseNewestFirst()
     {
         Assert.Equal(
-            ["settings-rearranged", "one-theme", "streamer-mode",
+            ["choose-what-shows", "settings-rearranged", "one-theme", "streamer-mode",
              "ci-runners",
              "widgets", "companion", "claude-widgets", "restart-to-update", "desk-fold", "weather-nickname", "livelier-bars", "meter-styles",
              "desk-design", "launcher", "per-monitor", "song-looks", "oled-care", "saved-designs",
@@ -20,6 +20,17 @@ public class WhatsNewCardsTests
              "desk", "settings-redesigned", "claude-code-page",
              "shortcut-keys", "tray-shows", "limits-come-and-go", "every-folder", "steady-sparklines", "whats-new"],
             Table.Select(c => c.Id));
+    }
+
+    [Fact]
+    public void Release450_ShowsTheSetupCard()
+    {
+        var cards = WhatsNew.Cards("4.0.1", "4.5.0");
+        var card = Assert.Single(cards);
+        Assert.Equal("choose-what-shows", card.Id);
+        Assert.Equal("Choose what Sanduhr shows", card.Title);
+        Assert.Equal(SettingsPage.General, card.Destination);
+        Assert.Equal(SettingsIndex.GeneralSetup, card.Anchor);
     }
 
     /// <summary>4.0.0 (spec, Outside Settings, same release): "Settings, rearranged" lands on What leaves this PC, one theme on Desk Look's
