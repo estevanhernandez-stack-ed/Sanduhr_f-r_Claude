@@ -21,6 +21,11 @@ extension WhatsNew {
             title: "Claude maps its motion",
             body: "With the Sanduhr MCP server installed, Claude can suggest how a sprite you made moves, from its frame size and cell count and never the picture. Preview it on the Desk, then Apply or Decline.",
             art: .symbol("figure.walk"), destination: .widgets),
+        WhatsNewCard(
+            version: "2.39.0", id: "live-bars",
+            title: "Now playing bars that move",
+            body: "Turn on Live audio bars in Settings, Now Playing, and the Desk's bars move with how loud the playing app is. macOS asks once; Sanduhr keeps one level in memory and never records audio.",
+            art: .symbol("waveform"), destination: .nowPlaying),
     ]
 
     static let release2380: [WhatsNewCard] = [
