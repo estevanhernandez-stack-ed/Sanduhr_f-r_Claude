@@ -348,7 +348,7 @@ public partial class App : Application
     /// <summary>A card's Show me: the widget, or Settings at the card's page and section (WF17).</summary>
     private void ShowMe(SettingsPage page, string? anchor)
     {
-        if (page == SettingsPage.General && anchor == SettingsIndex.GeneralSetup)
+        if (SettingsIndex.OpensSetup(new SettingsLink(page, anchor)))
         {
             OpenSetup(firstRun: false);   // the card's promise is Set up Sanduhr, not a page
             return;

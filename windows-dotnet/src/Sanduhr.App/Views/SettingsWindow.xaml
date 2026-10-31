@@ -936,7 +936,7 @@
                                 <Button Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Padding="12,6"
                                         Content="{Binding SetupTitle}" Command="{Binding OpenSetupCommand}"
                                         AutomationProperties.Name="{Binding SetupTitle}"
-                                        ToolTip="Choose what Sanduhr shows: a nicer desktop, drawers, your AI usage" />
+                                        ToolTip="Choose what Sanduhr shows: a nicer desktop, drawers, your AI usage." />
                             </StackPanel>
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
