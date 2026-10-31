@@ -20,18 +20,50 @@ enum AudioBarsPrefs {
 /// A level source for one app's output. The real one is a Core Audio process tap; tests use a fake.
 /// Called from the main thread; `takePeak` and the wake handler cross to the audio thread inside.
 protocol AudioLevelTap: AnyObject {
-    /// Taps `pid` only. False when the tap could not be built (no such audio process, macOS older
+    /// Taps `pid` and its helpers (`AudioPlayerProcesses`), nothing else. False when the tap could not be built (no such audio process, macOS older
     /// than 14.2, Core Audio refused). Never throws and never retries on its own.
     func start(pid: Int) -> Bool
     /// Ends everything the tap built: IO, aggregate device and tap. Safe to call when stopped.
     func stop()
     /// The largest absolute sample since the last call (0 to 1), then zero again.
     func takePeak() -> Float
-    /// True while the player's process is producing output (`kAudioProcessPropertyIsRunningOutput`).
+    /// True while the player or one of its helpers is producing output (`kAudioProcessPropertyIsRunningOutput`).
     func playerIsOutputting(pid: Int) -> Bool
     /// Calls `handler` once, on the main queue, the next time a callback sees a peak of at least
     /// `AudioBars.idleThreshold`; the idle driver sleeps between. Replaces any earlier handler.
     func armWake(_ handler: @escaping () -> Void)
+}
+
+/// Which audio processes belong to the player. A browser plays through a helper, not the process
+/// the system now playing names: Chrome's sound comes from its audio service, a child of the main
+/// process with a bundle id under Chrome's. So the tap takes the player, its descendants and the
+/// processes whose bundle id sits under the player's. Pure; the tap supplies the lookups.
+enum AudioPlayerProcesses {
+    struct Candidate: Equatable {
+        var pid: Int
+        var bundleID: String?
+    }
+
+    /// How far up a candidate's parents are followed looking for the player.
+    static let maxDepth = 8
+
+    /// The pids to tap, the player first when it has an audio process. `parent` gives a pid's parent.
+    static func members(player: Int, playerBundleID: String?, candidates: [Candidate],
+                        parent: (Int) -> Int?) -> [Int] {
+        let prefix = playerBundleID.map { $0 + "." }
+        let picked = candidates.filter { c in
+            if c.pid == player { return true }
+            if let prefix, let id = c.bundleID, id.hasPrefix(prefix) { return true }
+            var p = c.pid
+            for _ in 0..<maxDepth {
+                guard let up = parent(p), up > 1, up != p else { return false }
+                if up == player { return true }
+                p = up
+            }
+            return false
+        }.map(\.pid)
+        return picked.sorted { a, b in a == player ? true : (b == player ? false : a < b) }
+    }
 }
 
 /// What decides whether a tap exists.

@@ -53,11 +53,12 @@ final class CoreAudioProcessTap: AudioLevelTap {
 
     func start(pid: Int) -> Bool {
         stop()
-        guard let process = Self.processObject(for: pid) else {
+        let processes = Self.playerObjects(for: pid)
+        guard !processes.isEmpty else {
             Self.log.info("no audio process for the player")
             return false
         }
-        let description = CATapDescription(stereoMixdownOfProcesses: [process])
+        let description = CATapDescription(stereoMixdownOfProcesses: processes)
         description.muteBehavior = .unmuted
         description.isPrivate = true
         description.name = "Sanduhr level"
@@ -140,15 +141,16 @@ final class CoreAudioProcessTap: AudioLevelTap {
     }
 
     func playerIsOutputting(pid: Int) -> Bool {
-        guard let process = Self.processObject(for: pid) else { return false }
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioProcessPropertyIsRunningOutput,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain)
-        var value: UInt32 = 0
-        var size = UInt32(MemoryLayout<UInt32>.size)
-        guard AudioObjectGetPropertyData(process, &address, 0, nil, &size, &value) == noErr else { return false }
-        return value != 0
+        Self.playerObjects(for: pid).contains { process in
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioProcessPropertyIsRunningOutput,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain)
+            var value: UInt32 = 0
+            var size = UInt32(MemoryLayout<UInt32>.size)
+            guard AudioObjectGetPropertyData(process, &address, 0, nil, &size, &value) == noErr else { return false }
+            return value != 0
+        }
     }
 
     func armWake(_ handler: @escaping () -> Void) {
@@ -158,6 +160,62 @@ final class CoreAudioProcessTap: AudioLevelTap {
     deinit { stop() }
 
     // MARK: Core Audio reads
+
+    /// The audio process objects of the player and its helpers (AudioPlayerProcesses decides which).
+    private static func playerObjects(for pid: Int) -> [AudioObjectID] {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyProcessObjectList,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        let system = AudioObjectID(kAudioObjectSystemObject)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &size) == noErr, size > 0 else {
+            return processObject(for: pid).map { [$0] } ?? []
+        }
+        var objects = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(system, &address, 0, nil, &size, &objects) == noErr else {
+            return processObject(for: pid).map { [$0] } ?? []
+        }
+        let pids = objects.compactMap { o in processPID(o).map { (pid: $0, object: o) } }
+        let byPid = Dictionary(pids.map { ($0.pid, $0.object) }, uniquingKeysWith: { a, _ in a })
+        let candidates = pids.map { AudioPlayerProcesses.Candidate(pid: $0.pid, bundleID: processBundleID($0.object)) }
+        let playerBundle = candidates.first { $0.pid == pid }?.bundleID
+        return AudioPlayerProcesses.members(player: pid, playerBundleID: playerBundle,
+                                            candidates: candidates, parent: parentPID)
+            .compactMap { byPid[$0] }
+    }
+
+    private static func processPID(_ object: AudioObjectID) -> Int? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioProcessPropertyPID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var value = pid_t(0)
+        var size = UInt32(MemoryLayout<pid_t>.size)
+        guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr, value > 0 else { return nil }
+        return Int(value)
+    }
+
+    private static func processBundleID(_ object: AudioObjectID) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioProcessPropertyBundleID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr,
+              let id = value?.takeRetainedValue() as String?, !id.isEmpty else { return nil }
+        return id
+    }
+
+    /// A pid's parent, from the kernel's process table. Nil when the process is gone.
+    private static func parentPID(_ pid: Int) -> Int? {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, Int32(pid)]
+        guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0 else { return nil }
+        return Int(info.kp_eproc.e_ppid)
+    }
 
     /// The audio process object for a pid, nil when that pid has none (it has not touched audio).
     private static func processObject(for pid: Int) -> AudioObjectID? {

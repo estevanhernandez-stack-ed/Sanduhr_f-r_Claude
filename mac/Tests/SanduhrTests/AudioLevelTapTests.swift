@@ -445,3 +445,47 @@ struct AudioBarsPrefsTests {
         #expect(hits.contains { $0.anchor == SettingsAnchor.bars && $0.title == "Live audio bars" })
     }
 }
+
+@Suite("Which processes the tap takes")
+struct AudioPlayerProcessesTests {
+    // Chrome's shape: the main process (100) has an audio object but is silent; its audio service
+    // (210) is a child with a bundle id under Chrome's, and plays.
+    let parents: [Int: Int] = [100: 1, 210: 100, 300: 1, 400: 210, 500: 1]
+
+    func members(_ player: Int, _ bundle: String?, _ cands: [AudioPlayerProcesses.Candidate]) -> [Int] {
+        AudioPlayerProcesses.members(player: player, playerBundleID: bundle, candidates: cands,
+                                     parent: { parents[$0] })
+    }
+
+    @Test func aBrowsersAudioHelperIsTappedWithIt() {
+        let cands: [AudioPlayerProcesses.Candidate] = [
+            .init(pid: 210, bundleID: "com.google.Chrome.helper"),
+            .init(pid: 100, bundleID: "com.google.Chrome"),
+            .init(pid: 300, bundleID: "com.apple.Music"),
+        ]
+        #expect(members(100, "com.google.Chrome", cands) == [100, 210])
+    }
+
+    @Test func aDescendantCountsWithoutAMatchingBundleID() {
+        let cands: [AudioPlayerProcesses.Candidate] = [.init(pid: 400, bundleID: nil), .init(pid: 300, bundleID: nil)]
+        #expect(members(100, nil, cands) == [400])
+    }
+
+    @Test func aLookalikeBundleIDIsNotTheSameApp() {
+        let cands: [AudioPlayerProcesses.Candidate] = [.init(pid: 500, bundleID: "com.google.ChromeRemote")]
+        #expect(members(100, "com.google.Chrome", cands).isEmpty)
+    }
+
+    @Test func anAppThatPlaysItselfIsTappedAlone() {
+        let cands: [AudioPlayerProcesses.Candidate] = [.init(pid: 300, bundleID: "com.apple.Music"),
+                                                       .init(pid: 100, bundleID: "com.google.Chrome")]
+        #expect(members(300, "com.apple.Music", cands) == [300])
+    }
+
+    @Test func aParentLoopEnds() {
+        let looping = AudioPlayerProcesses.members(player: 9, playerBundleID: nil,
+                                                   candidates: [.init(pid: 7, bundleID: nil)],
+                                                   parent: { $0 == 7 ? 8 : 7 })
+        #expect(looping.isEmpty)
+    }
+}
