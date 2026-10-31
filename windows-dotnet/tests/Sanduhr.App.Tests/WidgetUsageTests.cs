@@ -1,3 +1,6 @@
+using System.IO;
+using System.Reflection;
+using System.Text.Json.Nodes;
 using Sanduhr.App.Services;
 using Sanduhr.App.ViewModels;
 using Sanduhr.Core;
@@ -95,6 +98,144 @@ public sealed class WidgetUsageTests : AppWindowFixture
             Assert.True(widget.CurrentDeskUsage.SignInNeeded);
             widget.SetUsageOn(false);
             Assert.False(widget.CurrentDeskUsage.SignInNeeded);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    private static readonly string TwoLimits =
+        $$"""{ "{{TierModel.FiveHour}}": {"utilization": 10, "resets_at": null}, "{{TierModel.SevenDay}}": {"utilization": 20, "resets_at": null} }""";
+
+    /// <summary>Hands the widget a fetched answer without a network: the field a fetch sets.</summary>
+    private static void Feed(WidgetViewModel widget, string json) =>
+        typeof(WidgetViewModel).GetField("_lastData", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(widget, JsonNode.Parse(json));
+
+    [Fact]
+    public void Usage_off_pauses_the_seat_meters_and_following_and_usage_on_resumes_them() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            widget.FollowAccount = true;
+            Assert.True(widget.FollowerRunning);
+            Assert.False(widget.SeatMetersPaused);
+
+            widget.SetUsageOn(false);
+            Assert.False(widget.FollowerRunning);
+            Assert.True(widget.SeatMetersPaused);
+
+            widget.FollowAccount = false;
+            widget.FollowAccount = true;   // turning following on while usage is off starts nothing
+            Assert.False(widget.FollowerRunning);
+
+            widget.SetUsageOn(true, fetchNow: false);   // no client is built, so nothing reaches the network
+            Assert.True(widget.FollowerRunning);
+            Assert.False(widget.SeatMetersPaused);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void Start_with_usage_off_leaves_the_seat_meters_paused_following_idle_and_the_timer_ticking() => AppHost.Run(() =>
+    {
+        new SettingsStore(ScratchPaths()).SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false }));
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            widget.FollowAccount = true;
+            widget.Start();
+            Assert.True(widget.SeatMetersPaused);
+            Assert.False(widget.FollowerRunning);
+            var timer = (System.Windows.Threading.DispatcherTimer)typeof(WidgetViewModel)
+                .GetField("_refreshTimer", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(widget)!;
+            Assert.True(timer.IsEnabled);   // a tick fetches nothing, but the local burn and the vault still refresh
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void Usage_off_leaves_no_numbers_on_the_cards_the_Desk_the_tray_or_the_snapshot() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        TrayReading? lastTray = new(10, "5h");
+        try
+        {
+            Feed(widget, TwoLimits);
+            widget.SetLimitOrder([TierModel.FiveHour, TierModel.SevenDay]);
+            Assert.NotEmpty(widget.Tiers);
+            Assert.NotEmpty(widget.CurrentDeskUsage.Tiers);
+            var snapshot = ScratchPaths().SnapshotFile;
+            Directory.CreateDirectory(Path.GetDirectoryName(snapshot)!);
+            File.WriteAllText(snapshot, "{}");
+            widget.TrayReadingChanged += r => lastTray = r;
+            int desk = 0;
+            widget.DeskUsageChanged += () => desk++;
+
+            widget.SetUsageOn(false);
+
+            Assert.Empty(widget.Tiers);
+            Assert.Empty(widget.CurrentDeskUsage.Tiers);
+            Assert.Empty(widget.CurrentDeskUsage.LineTiers ?? []);
+            Assert.False(widget.CurrentDeskUsage.SignInNeeded);
+            Assert.Null(lastTray);
+            Assert.Null(widget.CurrentTrayReading);
+            Assert.False(File.Exists(snapshot));
+            Assert.True(desk > 0);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void A_sign_in_while_usage_is_off_turns_it_on_and_the_rebuild_then_asks_for_it() => AppHost.Run(() =>
+    {
+        new SettingsStore(ScratchPaths()).SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false }));
+        var (widget, _) = ScratchWidget();   // no account, so the rebuild builds no client and reaches no network
+        try
+        {
+            widget.Start();
+            widget.SetUsageOn(true, fetchNow: false);
+            Assert.True(widget.UsageOn);
+            Assert.Equal(SignInReason.None, widget.Reason);   // fetchNow: false rebuilds nothing
+
+            widget.ReloadAfterSignInAsync().GetAwaiter().GetResult();   // completes synchronously: no fetcher, no await
+            Assert.Equal(SignInReason.FirstRun, widget.Reason);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void A_failed_save_still_turns_usage_on_for_a_sign_in_but_not_for_a_plain_toggle() => AppHost.Run(() =>
+    {
+        new SettingsStore(ScratchPaths()).SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false }));
+        var (widget, _) = ScratchWidget();
+        try
+        {
+            var settings = ScratchPaths().SettingsFile;
+            File.Delete(settings);
+            Directory.CreateDirectory(settings);   // the file cannot be written
+            Assert.ThrowsAny<Exception>(() => widget.SetUsageOn(true));
+            Assert.False(widget.UsageOn);
+
+            widget.SetUsageOn(true, fetchNow: false);
+            Assert.True(widget.UsageOn);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void A_v1_config_becomes_an_account_before_the_setup_migration_counts() => AppHost.Run(() =>
+    {
+        var paths = ScratchPaths();
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.LegacyConfigFile)!);
+        File.WriteAllText(paths.LegacyConfigFile, "{\"session_key\": \"placeholder-legacy\"}");
+        var (widget, accounts) = ScratchWidget();
+        try
+        {
+            Assert.Empty(accounts.ListAccounts());
+            widget.MigrateLegacyCredentials();
+            Assert.Single(accounts.ListAccounts());
+            widget.MigrateLegacyCredentials();   // idempotent
+            Assert.Single(accounts.ListAccounts());
         }
         finally { widget.Dispose(); }
     });

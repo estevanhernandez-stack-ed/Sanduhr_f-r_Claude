@@ -85,6 +85,8 @@ public partial class App : Application
         startupSettings.SyncMcpExport();
 
         _vm = new WidgetViewModel();
+        // A pre-2.2.0 key or a v1 config becomes an account first (Start() runs it again, harmlessly), so the setup migration counts it.
+        _vm.MigrateLegacyCredentials();
         // Setup (setup spec, section 1): a file from before setup becomes one, once; a first run stays without one.
         try
         {
@@ -943,9 +945,15 @@ public partial class App : Application
     {
         try
         {
-            if (vm.AccountStore.ListAccounts().Count == 0 || vm.UsageOn) return;   // streamer: key - a count, never drawn
-            vm.SetUsageOn(true, fetchNow: false);   // ReloadAfterSignInAsync rebuilds and fetches next
-            ShowWindow();
+            if (vm.AccountStore.ListAccounts().Count == 0) return;   // streamer: key - a count, never drawn
+            bool wasOff = !vm.UsageOn;
+            if (wasOff)
+                vm.SetUsageOn(true, fetchNow: false);   // ReloadAfterSignInAsync rebuilds and fetches next
+            // Usage was off, or no setup was made yet (a first run put away with Not now, which starts the widget hidden): the
+            // sign-in shows the widget. No setup is saved in the second case: the setup screen stays pending, and the next launch's
+            // migration sees the account and writes usage on.
+            if (wasOff || new SettingsStore(new Sanduhr.Core.Paths()).LoadSetup() is null)
+                ShowWindow();
         }
         catch
         {
