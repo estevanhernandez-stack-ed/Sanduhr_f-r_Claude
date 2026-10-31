@@ -2601,3 +2601,54 @@ shell that prints lines in the runner's shape, `<Docker timestamp> <yyyy-MM-dd H
 9. **Demo mode** hides runner cards. Quitting Sanduhr drops them all; relaunching with the switch on rebuilds from
    the log's replay without putting up cards for jobs that ended earlier.
 10. Reset Sanduhr… with All settings checked: `defaults read com.626labs.sanduhr watchersCiRunners` fails afterwards.
+
+## 71. New sprite from an image (2.39.0)
+
+Back up `~/Library/Application Support/Sanduhr` first (section 45) and quit the release app. Make a small test sheet
+of made-up art: a PNG of 4 by 2 cells of 16x16 (64x32 pixels), any drawing.
+
+1. Settings, Widgets shows **New sprite from an image…**. Settings search finds it. Choose a text file renamed
+   `.png`: the sheet says it isn't a PNG image and offers no grid. Choose a PNG over 2 MB: it says it is larger
+   than 2 MB.
+2. Choose the test sheet. The sheet shows a 4 by 2 grid for a 16x16 cell. Set the cell width to 24: the line
+   says the image isn't a whole number of cells and **Make** stays off or refuses. Set it back to 16.
+3. With nothing tagged, Make refuses: tag at least one cell as sit, and walk needs two or more cells. Tag cells
+   1 and 2 as walk (the order you click is the order played) and cell 3 as sit. Untagged nap, cheer and worry
+   are listed as using sit's cells. Click a tagged cell again: it untags.
+4. Give it the name "Test Blob" and make it. The sheet closes and the row "Test Blob" reads "made here" with id
+   `my-test-blob`. `widgets/my-test-blob/` holds `pack.json`, `sprite.json`, `LICENSE` and `art/sprite.png`
+   (the same bytes as the picked file); `pack.json` says version 1.0.0 and license CC0-1.0; `widgets.json`
+   lists it as `local`. Make a second one with the same name: its id is `my-test-blob-2`.
+5. Make it the companion (Settings, Desk, Companion): with the Desk showing, the sprite walks and rests from the
+   cells you tagged. A name with no letter or digit, and one over 40 characters, are refused with a sentence.
+6. A network monitor shows no request during any of this. The picked image is read only after you choose it.
+7. Uninstall it: the folder is gone and the row with it.
+
+## 72. Claude maps a sprite's motion (2.39.0)
+
+Needs the MCP server installed and a sprite made here from section 71 (a catalog sprite is never offered).
+Quit the release app and keep a backup, as above.
+
+1. `get_desk` lists the sprite under `sprites` with its id, name, frame size and cell count (8 for the test
+   sheet), and nothing else: no path, no image data. A catalog sprite is not listed. Uninstall the test sprite:
+   the next `get_desk` no longer lists it.
+2. `propose_sprite_motion` with the sprite's id and `animations` using a cell index past the cell count, or with
+   an extra field such as `image`, or with a catalog sprite's id: each is refused with a reason, and
+   `sprite-motion-request.json` is not written.
+3. A good proposal (for example `walk` as `[0, 1, 2, 3]`, `fps` 6, a note): the tool answers `previewing`. The
+   request file is gone at once, `sprite-motion-result.json` exists with mode `0600` and holds the id and status,
+   not the fields, and a notification reads "Claude suggested a motion: <name>". Settings, Widgets shows the
+   banner with the sprite, Claude's note and what changes (fps, animation lengths), plus "The art is
+   unchanged." Nothing is applied: `sprite.json` and the pack version are as before.
+4. **Preview on the Desk** with the Desk showing: the sprite is drawn with the proposed motion; `sprite.json` on
+   disk is unchanged. With the Desk off the button says so. Quit and relaunch Sanduhr: the proposal is gone.
+5. **Apply**: the answer is `applied`, `sprite.json` has the new fields, the pack's patch version goes up by one
+   (1.0.0 to 1.0.1), `art/sprite.png` is byte-identical, and the companion moves the new way. A Claude-made
+   sprite stays source `claude`; one made in section 71 stays `local`.
+6. **Decline** on a new proposal: the banner and notification go, nothing changes, and the answer is `rejected`,
+   `dismissed`. With one waiting, propose another: the first is answered `rejected`, `replaced`.
+7. Uninstall the sprite while a proposal waits, then Apply: the answer is `rejected`, `install_failed`.
+8. Quit Sanduhr and propose: the tool answers `queued` after about ten seconds and the request file stays (mode
+   `0600`). Start Sanduhr within ten minutes: the banner appears and the file is gone. One left over ten minutes
+   is deleted unanswered when Sanduhr starts.
+9. Reset Sanduhr… removes `sprite-motion-request.json`, `sprite-motion-result.json` and `desk-state.json`.
