@@ -9,7 +9,7 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Desk;
 
 /// <summary>What a Desk menu item asks the app to do (spec 7.4).</summary>
-internal enum DeskMenuAction { EditMessages, DeskSettings, LauncherSettings, Arrange, TurnOffDesk }
+internal enum DeskMenuAction { EditMessages, DeskSettings, LauncherSettings, ShowDrawers, Arrange, TurnOffDesk }
 
 /// <summary>What a click on the Desk can do; the controller answers.</summary>
 internal interface IDeskClickActions
@@ -53,6 +53,8 @@ internal static class DeskClicks
     /// <summary>A Launcher button's menu item: "Launcher settings…" (WF17, WF19), the page's own name like every entry point.</summary>
     public static readonly string LauncherSettings = SettingsNames.LinkTitle(SettingsPage.Launcher);
     public const string TurnOffDesk = "Turn off the Desk";
+    /// <summary>Brings back every drawer that was hidden from the Desk (offered only while one is).</summary>
+    public const string ShowDrawers = SettingsNames.DrawersShow;
 
     private static readonly Brush Plate = Frozen(Color.FromArgb(1, 0, 0, 0));
 
@@ -285,6 +287,7 @@ internal static class DeskClicks
         if (kind == DeskElementKind.LauncherButton) Add(LauncherSettings, DeskMenuAction.LauncherSettings);
         Add(DeskSettings, DeskMenuAction.DeskSettings);
         Add(DeskArrangeCopy.MenuItem, DeskMenuAction.Arrange);
+        if (DrawerService.Current?.HasHidden == true) Add(ShowDrawers, DeskMenuAction.ShowDrawers);
         menu.Items.Add(new Separator());
         Add(TurnOffDesk, DeskMenuAction.TurnOffDesk);
         menu.IsOpen = true;

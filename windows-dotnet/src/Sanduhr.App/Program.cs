@@ -30,6 +30,9 @@ public static class Program
             {
                 try { ToastNotificationManagerCompat.Uninstall(); }
                 catch { /* best-effort — uninstall must never fail on toast cleanup */ }
+                // Drawers go back to the Desktop (5.0 drawers spec, section 4), best-effort within the fast callback's time.
+                try { Desk.DrawerUninstall.Run(new Sanduhr.Core.Paths(), Desk.DrawerUninstall.Budget); }
+                catch { /* best-effort: uninstall must never fail on drawers */ }
             })
             .Run();
 

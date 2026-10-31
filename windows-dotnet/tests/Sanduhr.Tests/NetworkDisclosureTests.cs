@@ -108,6 +108,7 @@ public class NetworkDisclosureTests
         ("Sanduhr.App/Desk/DockerPipe.cs", "local", 3),
         ("Sanduhr.App/App.xaml.cs", "local", 1),
         ("Sanduhr.App/Interop/LauncherApps.cs", "local", 1),
+        ("Sanduhr.App/Interop/ShellFiles.cs", "local", 1),
         ("Sanduhr.App/Services/VaultService.cs", "local", 1),
         ("Sanduhr.App/ViewModels/SettingsViewModel.cs", "local", 1),
         ("Sanduhr.App/ViewModels/ThemesViewModel.cs", "local", 1),
@@ -129,6 +130,7 @@ public class NetworkDisclosureTests
         ("Sanduhr.App/Desk/DockerPipe.cs", 3),
         ("Sanduhr.App/Desk/WeatherService.cs", 3),
         ("Sanduhr.App/Interop/LauncherApps.cs", 2),
+        ("Sanduhr.App/Interop/ShellFiles.cs", 1),
         ("Sanduhr.App/Modals/WebView2NotInstalledWindow.xaml.cs", 1),
         ("Sanduhr.App/Services/StoreUpdateService.cs", 3),
         ("Sanduhr.App/Services/VaultService.cs", 1),
@@ -144,8 +146,8 @@ public class NetworkDisclosureTests
         ("Sanduhr.Core/UsagePublisher.cs", 2),
     ];
 
-    /// <summary>Lines the scan must find: 25 calls Sanduhr makes, 6 browser hand-offs, 9 local.</summary>
-    private const int KnownSites = 40;
+    /// <summary>Lines the scan must find: 25 calls Sanduhr makes, 6 browser hand-offs, 10 local.</summary>
+    private const int KnownSites = 41;
     private const int KnownOutboundSites = 25;
 
     private static HashSet<string> Allowed() =>

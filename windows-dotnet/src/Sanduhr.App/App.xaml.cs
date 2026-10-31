@@ -38,6 +38,9 @@ public partial class App : Application
     private Desk.DeskMessageHandoffService? _handoff;
     private Desk.DeskDesignService? _deskDesign;
     private Desk.WidgetReviewService? _widgetReview;
+    private Desk.DrawerService? _drawers;
+    private Desk.DrawerReviewService? _drawerReview;
+    private Desk.DrawerReviewHost? _drawerReviewHost;
     private Desk.NowPlayingLookService? _looks;
     private Desk.WatcherStore? _watchers;
     private Desk.DockerPipe? _dockerPipe;
@@ -71,6 +74,8 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        Interop.DarkMenus.Enable();   // Explorer's menu in a drawer follows the system's dark mode (drawers, VERDICT.md change 3)
 
         // Settings whose shape changed (S6: hotkey_settings as a per-action map), once, before any read.
         var startupSettings = new SettingsStore(new Sanduhr.Core.Paths());
@@ -519,6 +524,7 @@ public partial class App : Application
             case Desk.DeskMenuAction.EditMessages: _ = ShowSettingsAsync(SettingsPage.DeskMessage, SettingsIndex.MenuAnchor(SettingsPage.DeskMessage)); break;
             case Desk.DeskMenuAction.DeskSettings: _ = ShowSettingsAsync(SettingsPage.Desk, SettingsIndex.MenuAnchor(SettingsPage.Desk)); break;
             case Desk.DeskMenuAction.LauncherSettings: _ = ShowSettingsAsync(SettingsPage.Launcher, SettingsIndex.MenuAnchor(SettingsPage.Launcher)); break;
+            case Desk.DeskMenuAction.ShowDrawers: _drawers?.ShowAll(); break;
             case Desk.DeskMenuAction.Arrange: _desk?.BeginArrange(); break;
             case Desk.DeskMenuAction.TurnOffDesk:
                 try
@@ -624,8 +630,11 @@ public partial class App : Application
         _looks = new Desk.NowPlayingLookService(paths, store, _nowPlaying, () => _deskDesign.LooksContext());
         Desk.NowPlayingLookService.Current = _looks;
         _deskDesign.Looks = _looks;
+        _drawers = new Desk.DrawerService(store, paths, Desk.DrawerPlaces.ForThisUser());
+        Desk.DrawerService.Current = _drawers;
+        _drawers.SettingsRequested += () => _ = ShowSettingsAsync(SettingsPage.Drawers, SettingsIndex.MenuAnchor(SettingsPage.Drawers));
         _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
-            () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers, paths, _launcherApps, looks: _looks)
+            () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers, paths, _launcherApps, looks: _looks, drawers: _drawers)
         {
             ThemeText = ThemeTextHex,
         };
@@ -642,6 +651,10 @@ public partial class App : Application
             _settingsWindow?.ViewModel.PacksChanged();
         });
         _widgetReview.Start();
+        // The drawers review: the rules' plan previews on the Desk, Apply moves, the bar turns into the result with Undo. One review at a time.
+        _drawerReviewHost = new Desk.DrawerReviewHost(_desk, store);
+        _drawerReview = new Desk.DrawerReviewService(_drawers, store, _drawerReviewHost);
+        Desk.DrawerReviewService.Current = _drawerReview;
         _desk.LauncherMissingClicked += OnLauncherMissing;
         _vm.DeskUsageChanged += _desk.UsageChanged;
         // The glow's Desk spot (spec 7.3): the glow service asks the Desk first and falls back to the window.
@@ -758,6 +771,8 @@ public partial class App : Application
         svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
         svm.Desk.Changed = () => _desk?.Reload();
+        // Turning drawers on or off from Settings reaches the running Desk the way the Desk page's own switch does.
+        svm.Drawers.DeskChanged = () => { _desk?.Reload(); svm.Desk.Reload(); };
         // Desk Look, Match the widget theme: the plate note follows the running Desk's readability guard.
         svm.ThemeMatch.PlateForced = () => _desk?.PlateForced == true;
         Action plateShown = () => svm.ThemeMatch.Reload();
@@ -998,7 +1013,7 @@ public partial class App : Application
     {
         if (_tray is not null)
             OnTrayReadingChanged(_vm?.CurrentTrayReading);
-        _desk?.Reload();
+        _desk?.PrivacyChanged();
         RunnerStatusShown?.Invoke();
     }
 
@@ -1102,7 +1117,8 @@ public partial class App : Application
             },
             vm.InactiveReader.DeleteAllProfilesAsync,
             () => new SettingsStore(paths).ClearMcpSwitchesForReset(),
-            () => new SettingsStore(paths).ClearStatuslineSwitchesForReset());
+            () => new SettingsStore(paths).ClearStatuslineSwitchesForReset(),
+            () => _drawers?.TurnOff());
         var folders = ResetFolderListViewModel.Read(vm);
         var svm = _settingsWindow?.ViewModel;
         if (svm is not null) svm.ResetFolders = folders;   // a streamer flip renames the rows (decision 13)
@@ -1206,7 +1222,11 @@ public partial class App : Application
         _messages?.Dispose();
         _handoff?.Dispose();
         _deskDesign?.Dispose();
+        _drawerReviewHost?.Dispose();
+        Desk.DrawerReviewService.Current = null;
         _widgetReview?.Dispose();
+        _drawers?.Dispose();
+        Desk.DrawerService.Current = null;
         _runners?.Dispose();
         _dockerPipe?.Dispose();
         _watchers?.Dispose();
@@ -1246,7 +1266,11 @@ public partial class App : Application
         _messages?.Dispose();
         _handoff?.Dispose();
         _deskDesign?.Dispose();
+        _drawerReviewHost?.Dispose();
+        Desk.DrawerReviewService.Current = null;
         _widgetReview?.Dispose();
+        _drawers?.Dispose();
+        Desk.DrawerService.Current = null;
         _runners?.Dispose();
         _dockerPipe?.Dispose();
         _watchers?.Dispose();

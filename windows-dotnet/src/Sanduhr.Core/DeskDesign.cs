@@ -663,7 +663,7 @@ public sealed partial record DeskDesign
     {
         var arr = new DeskArrangement();
         if (layout is null) return arr;
-        var placed = layout.Where(p => !p.IsHidden && DeskArrangement.Known.Contains(p.Piece, StringComparer.Ordinal))
+        var placed = layout.Where(p => !p.IsHidden && DeskArrangement.IsPiece(p.Piece))
             .Select(p => new DeskPlacement(p.Piece, p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece), p.Size ?? 1, DeskMonitors.FromWord(p.Monitor),
                 DeskArrangement.ClampTilt(p.Tilt ?? 0), DeskMeterStyles.For(p.Piece, p.Style ?? DeskMeterStyle.Bar)));
         return new DeskArrangement(placed);

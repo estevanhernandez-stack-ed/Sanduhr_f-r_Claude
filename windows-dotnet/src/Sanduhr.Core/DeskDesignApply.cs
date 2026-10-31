@@ -20,7 +20,7 @@ public static class DeskDesignApply
     {
         var nextDesk = desk with
         {
-            Layout = design.Layout is null ? desk.Layout : Layout(design.Layout),
+            Layout = design.Layout is null ? desk.Layout : WithDrawers(Layout(design.Layout), desk.Layout),
             Font = design.Font is null ? desk.Font : FontSetting(design.Font),
             Plate = design.Plate ?? desk.Plate,
         };
@@ -32,10 +32,19 @@ public static class DeskDesignApply
     public static string Layout(IReadOnlyList<DeskPieceLayout> pieces)
     {
         var placed = pieces
-            .Where(p => !p.IsHidden && DeskArrangement.Known.Contains(p.Piece, StringComparer.Ordinal))
+            .Where(p => !p.IsHidden && DeskArrangement.IsPiece(p.Piece))
             .Select(p => new DeskPlacement(p.Piece, p.Anchor ?? DeskArrangement.DefaultAnchor(p.Piece), DeskArrangement.ClampScale(p.Size ?? 1), DeskMonitors.FromWord(p.Monitor),
                 DeskArrangement.ClampTilt(p.Tilt ?? 0), DeskMeterStyles.For(p.Piece, p.Style ?? DeskMeterStyle.Bar)));
         return new DeskArrangement(placed).Layout;
+    }
+
+    /// <summary>A design never moves, hides or drops a drawer: <paramref name="layout"/>'s drawer words are replaced by the ones placed in
+    /// <paramref name="current"/>, where they were. Drawers belong to the user's folders, not to a look.</summary>
+    public static string WithDrawers(string layout, string current)
+    {
+        var kept = new DeskArrangement(current).Pieces.Where(p => DrawerPieces.IsWord(p.Widget));
+        var rest = new DeskArrangement(layout).Pieces.Where(p => !DrawerPieces.IsWord(p.Widget));
+        return new DeskArrangement(rest.Concat(kept)).Layout;
     }
 
     /// <summary>The <c>desk_font</c> value for a font: null is the default family, "" the system font, anything else a family name.</summary>

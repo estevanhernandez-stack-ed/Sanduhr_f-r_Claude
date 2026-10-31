@@ -129,11 +129,18 @@ public class StreamerReachTests
         ("Sanduhr.App/Desk/DeskLauncherPiece.cs", "notname", 2),   // controller, after Task 13: the Desk names an unlabelled link by codename
         ("Sanduhr.App/Desk/DeskLookResolver.cs", "notname", 3),
         ("Sanduhr.App/Desk/DeskMessagePiece.cs", "notname", 3),
-        ("Sanduhr.App/Desk/DeskReviewBar.xaml.cs", "notname", 10),
+        ("Sanduhr.App/Desk/DeskReviewBar.xaml.cs", "notname", 12),
         ("Sanduhr.App/Desk/DeskReviewWindow.xaml.cs", "notname", 1),
         ("Sanduhr.App/Desk/DeskView.Styles.cs", "notname", 1),
         ("Sanduhr.App/Desk/DeskView.cs", "cant", 1),
         ("Sanduhr.App/Desk/DeskView.cs", "notname", 1),
+        ("Sanduhr.App/Desk/Drawers/DrawerJournalStore.cs", "notname", 1),
+        ("Sanduhr.App/Desk/Drawers/DrawerPlanEditWindow.xaml.cs", "masked", 2),
+        ("Sanduhr.App/Desk/Drawers/DrawerMover.cs", "key", 13),   // final review I1: a move into a drawer that left settings is skipped by its leaf
+        ("Sanduhr.App/Desk/Drawers/DrawerPiece.xaml.cs", "notname", 1),
+        ("Sanduhr.App/Desk/Drawers/DrawerService.cs", "key", 4),
+        ("Sanduhr.App/Desk/Drawers/DrawerService.cs", "notname", 1),
+        ("Sanduhr.App/Desk/Drawers/DrawerState.cs", "key", 1),
         ("Sanduhr.App/Desk/NowPlayingLookService.cs", "notname", 1),
         ("Sanduhr.App/Desk/RunnerWatchService.cs", "key", 1),
         ("Sanduhr.App/Desk/WallpaperPreviewFile.cs", "notname", 1),
@@ -213,6 +220,7 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "masked", 3),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "notname", 18),
         ("Sanduhr.App/Views/DeskLayoutMap.cs", "notname", 1),
+        ("Sanduhr.App/Views/DrawersPage.xaml.cs", "notname", 1),   // Drawers (plan 2, Task 11): the folder picker's result, used for IO
         ("Sanduhr.App/Views/IntegrationConsentDialog.xaml.cs", "notname", 1),
         ("Sanduhr.App/Views/ManualKeyWindow.xaml.cs", "masked", 1),
         ("Sanduhr.App/Views/McpConsentDialog.xaml.cs", "masked", 3),

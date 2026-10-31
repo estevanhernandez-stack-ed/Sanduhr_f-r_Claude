@@ -1,4 +1,5 @@
 using System.IO;
+using Sanduhr.App.Desk;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.Services;
@@ -33,6 +34,9 @@ internal sealed class ResetService
     private readonly Action? _clearMcpSwitches;
     private readonly Action? _clearStatuslineSwitches;
 
+    /// <summary>Puts every drawer file back on the Desktop (the drawers' turn-off); null in contexts without drawers.</summary>
+    private readonly Func<DrawerReturnRun?>? _returnDrawers;
+
     public ResetService(
         Paths paths,
         AccountStore accounts,
@@ -41,8 +45,10 @@ internal sealed class ResetService
         Action stopBackgroundWork,
         Func<Task<int>>? deleteAccountProfiles = null,
         Action? clearMcpSwitches = null,
-        Action? clearStatuslineSwitches = null)
+        Action? clearStatuslineSwitches = null,
+        Func<DrawerReturnRun?>? returnDrawers = null)
     {
+        _returnDrawers = returnDrawers;
         _clearMcpSwitches = clearMcpSwitches;
         _clearStatuslineSwitches = clearStatuslineSwitches;
         _deleteAccountProfiles = deleteAccountProfiles;
@@ -75,6 +81,7 @@ internal sealed class ResetService
             {
                 ResetPart.ClaudeCodeEntries => await ClaudeCodeEntriesAsync(keepFolders),
                 ResetPart.Accounts => await AccountsAsync(),
+                ResetPart.Settings => await SettingsAsync(),
                 _ => await DeleteInventoryAsync(part),
             };
         });
@@ -190,6 +197,25 @@ internal sealed class ResetService
 
         failures.AddRange(await DeleteItemsAsync(ResetPart.Accounts));
         return ResetStepResult.Failed(ResetPart.Accounts, Distinct(failures));
+    }
+
+    /// <summary>The failure line when Reset could not put every drawer file back.</summary>
+    internal const string DrawerStayedFailure = "Some drawer files stayed in the Drawers folder on your Desktop.";
+
+    /// <summary>Reset's drawers part (5.0 drawers spec, section 4) runs inside Settings, first: every drawer file goes back to the Desktop
+    /// while the drawer settings that say where they are still exist. Reset never deletes a user's file.</summary>
+    private async Task<ResetStepResult> SettingsAsync()
+    {
+        var stayed = false;
+        try
+        {
+            var run = _returnDrawers?.Invoke();
+            stayed = run is not null && (run.KeptHomes.Count > 0 || run.Failure is not null);
+        }
+        catch (Exception) { stayed = true; /* the files stay in plain sight; the reset carries on */ }
+        var result = await DeleteInventoryAsync(ResetPart.Settings);
+        // Settings is deleted either way: the files are safe and in plain sight, and the step says so.
+        return stayed ? ResetStepResult.Failed(ResetPart.Settings, [.. result.Failures, DrawerStayedFailure]) : result;
     }
 
     private async Task<ResetStepResult> DeleteInventoryAsync(ResetPart part)

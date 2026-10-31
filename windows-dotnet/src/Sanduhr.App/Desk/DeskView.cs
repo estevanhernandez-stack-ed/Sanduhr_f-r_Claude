@@ -71,6 +71,9 @@ internal sealed record DeskFrame
     public IReadOnlyList<string>? MeterStops { get; init; }
     public string? MeterTrackHex { get; init; }
     public string? PaceHex { get; init; }
+
+    /// <summary>The followed theme's accent (six hex digits), for a drawer's hover and selection; null is the ink's last color.</summary>
+    public string? AccentHex { get; init; }
 }
 
 /// <summary>

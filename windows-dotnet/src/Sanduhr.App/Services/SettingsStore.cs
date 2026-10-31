@@ -843,6 +843,16 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>Drawers (5.0 drawers spec): <c>drawers</c>, absent = off with the built-in rules, so an upgrade changes nothing.</summary>
+    public DrawerSettings LoadDrawers() => DrawerSettings.Decode(Read()[DrawerSettings.Key]);
+
+    public void SaveDrawers(DrawerSettings drawers)
+    {
+        var root = Read();
+        root[DrawerSettings.Key] = drawers.Encode();
+        Write(root);
+    }
+
     /// <summary>"Let Claude show watchers" (spec 6.9): <c>watchers_agents</c>, absent = off. The MCP tools
     /// <c>watch_start</c>, <c>watch_update</c> and <c>watch_end</c> write nothing while it is off.</summary>
     public bool LoadWatchersAgents() => ReadBool(Read(), "watchers_agents", false);

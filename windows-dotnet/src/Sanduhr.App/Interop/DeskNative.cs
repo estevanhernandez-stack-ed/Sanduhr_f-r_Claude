@@ -38,6 +38,8 @@ internal static class DeskNative
     public const int WM_DESTROY = 0x0002;
     public const int WM_SETTINGCHANGE = 0x001A;
     public const int WM_MOUSEACTIVATE = 0x0021;
+    public const int WM_ACTIVATE = 0x0006;
+    public const int WA_INACTIVE = 0;
     public const int WM_KEYDOWN = 0x0100;
     public const int VK_RETURN = 0x0D;
     public const int VK_ESCAPE = 0x1B;
@@ -138,6 +140,21 @@ internal static class DeskNative
     }
 
     public static PxRect? Rect(IntPtr h) => GetWindowRect(h, out var r) ? r.ToPx() : null;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int X, Y; }
+
+    [DllImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetCursorPos(out POINT p);
+
+    /// <summary>A window's rectangle in physical pixels, read per-monitor aware (the Desk's windows are placed in these).</summary>
+    public static PxRect? RectPx(IntPtr h) => PerMonitor(() => Rect(h));
+
+    /// <summary>The cursor in physical pixels, read per-monitor aware; far off every screen when Windows would not say.</summary>
+    public static PxPoint CursorPx() => PerMonitor(() => GetCursorPos(out var p) ? new PxPoint(p.X, p.Y) : new PxPoint(int.MinValue / 2, int.MinValue / 2));
+
+    /// <summary>Moves a Desk window to <paramref name="at"/> (physical pixels) without touching its size, z-order or activation.</summary>
+    public static void MoveTo(IntPtr h, PxPoint at) => PerMonitor(() =>
+        SetWindowPos(h, IntPtr.Zero, at.X, at.Y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE));
 
     public static bool SameProcess(IntPtr a, IntPtr b)
     {

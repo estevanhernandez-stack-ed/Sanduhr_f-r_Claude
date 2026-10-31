@@ -46,6 +46,7 @@ internal static class DeskLookResolver
             MeterStops = look.Bars,
             MeterTrackHex = look.BarTrack,
             PaceHex = look.PaceTick,
+            AccentHex = theme is null ? null : ThemeDeskLook.Hex(theme.Accent),
             Message = message,
         };
     }

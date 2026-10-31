@@ -617,4 +617,40 @@ public sealed class DeskDesignReviewTests : IDisposable
             Assert.Equal("Funky Town", (string?)s.CurrentDesign().ToJson()["weather"]!["nickname"]);
         });
     }
+
+    // ---- one review at a time: a drawers plan under review ----
+
+    private sealed class QuietDrawerHost : IDrawerReviewHost
+    {
+        public bool OtherReviewOpen => false;
+        public void Preview(string layout) { }
+        public void EndPreview() { }
+        public void Bar(DeskReviewModel model, Action apply, Action? edit, Action dismiss) { }
+        public void CloseBar() { }
+        public DrawerPlanEdits? Edit(DrawerPlan plan, IReadOnlyCollection<string> existingIds) => null;
+    }
+
+    [Fact]
+    public void AProposalIsAnsweredBusyWhileADrawersPlanIsUnderReview() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var store = new SettingsStore(new Paths(appDataBase: Path.Combine(box.Root, "appdata")));
+        store.SaveDrawers(DrawerSettings.Default with { Enabled = true });
+        using var drawers = new DrawerService(store, new Paths(appDataBase: Path.Combine(box.Root, "appdata")),
+            new DrawerPlaces(box.Desktop, box.Public, []), System.Windows.Threading.Dispatcher.CurrentDispatcher);
+        var review = new DrawerReviewService(drawers, store, new QuietDrawerHost());
+        box.File(@"Desktop\notes.pdf");
+        Assert.Null(review.SortNow());
+        // The seam, never the process-wide DrawerReviewService.Current: the other Designs classes run in parallel and would read it.
+        var fake = new FakeHost();
+        using var s = new DeskDesignService(_paths, _store)
+            { Host = fake, InstalledFonts = () => Installed, Clock = () => _now, DrawersReviewing = () => review.Reviewing };
+        Send(s, "d1", Dusk);
+        Assert.False(s.Reviewing);
+        Assert.Empty(fake.Calls);
+        Assert.Equal("busy", (string?)Result()["result"]!["reason"]);
+        review.Dismiss();
+        Send(s, "d2", Dusk);   // free again
+        Assert.True(s.Reviewing);
+    });
 }

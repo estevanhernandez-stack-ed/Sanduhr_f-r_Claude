@@ -34,6 +34,9 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
     /// <summary>Settings, Desk (spec 5.1).</summary>
     public DeskSettingsViewModel Desk { get; }
 
+    /// <summary>Settings, Drawers (5.0 drawers spec): on and off, the folder, Sort my desktop now, the rules, the drawers and the recent moves.</summary>
+    public DrawersSettingsViewModel Drawers { get; }
+
     /// <summary>Settings, Message (spec 6.2): the editor, rotation, special days, the look, Claude's suggestions.</summary>
     public DeskMessagePageViewModel MessagePage { get; }
 
@@ -220,6 +223,7 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
         ClaudeCodePage = new ClaudeCodeViewModel(widget);
         Desk = new DeskSettingsViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies(),
             inkPresets: () => PackInkPresets.Merged(new WidgetStore(new Paths().WidgetsDir, Sanduhr.App.Services.WidgetCatalogService.EncodePng)));
+        Drawers = new DrawersSettingsViewModel(Sanduhr.App.Desk.DrawerService.Current, Sanduhr.App.Desk.DrawerReviewService.Current, new SettingsStore(new Paths()));
         var msgPaths = new Paths();
         MessagePage = new DeskMessagePageViewModel(new SettingsStore(msgPaths), System.IO.Path.Combine(msgPaths.AppDataDir, "messages.txt"),
             () => !ResetGuard.Done, () => MessageChanged?.Invoke(), Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies(),
@@ -314,6 +318,7 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
         ClaudeCodePage.StatusText = "";
         Desk.Companion.Reload();
         Desk.Launcher.Reload();   // preflight P3: a link's URL and a raw target
+        Drawers.ReloadNames();   // the drawer names and the Drawers folder's path; its status line goes like the others
         History.RefreshNames();
         ClaudeCode.Overview.RefreshNames();
         ClaudeCode.Trends.RefreshNames();
