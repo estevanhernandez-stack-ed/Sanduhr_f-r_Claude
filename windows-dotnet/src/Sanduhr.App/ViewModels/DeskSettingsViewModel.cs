@@ -262,7 +262,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     [ObservableProperty] private string? _arrangingLayout;
 
     /// <summary>The button is live while the Desk is on and no Arrange session runs.</summary>
-    public bool CanArrange => Enabled && !Arranging;
+    public bool CanArrange => Enabled && !Arranging && (_store.LoadSetup()?.Desktop ?? true);
 
     /// <summary>The line under the button: why it is off, what Arrange mode is doing, or what it does.</summary>
     public string ArrangeNote => Arranging ? DeskArrangeCopy.SettingsArranging
@@ -282,6 +282,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         RefreshInkPresets();
         OnPropertyChanged(nameof(Layout));
         OnPropertyChanged(nameof(Settings));
+        OnPropertyChanged(nameof(CanArrange));
     }
 
     /// <summary>The font packs changed (one switched, installed or removed): the Desk font list follows. The saved family stays listed, so the
