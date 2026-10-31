@@ -7,8 +7,21 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2380 + release2370 + release2360 + release2350 + release2340 + release2330 + release2320 + release2310 + release2300 + release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2390 + release2380 + release2370 + release2360 + release2350 + release2340 + release2330 + release2320 + release2310 + release2300 + release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2390: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.39.0", id: "new-sprite",
+            title: "A sprite from your own art",
+            body: "In Settings, Widgets, choose New sprite from an image, set the cell size and tag which cells walk, sit, nap, cheer and worry. Your PNG is copied into the sprite's folder and goes nowhere else.",
+            art: .symbol("photo.badge.plus"), destination: .widgets),
+        WhatsNewCard(
+            version: "2.39.0", id: "sprite-motion",
+            title: "Claude maps its motion",
+            body: "With the Sanduhr MCP server installed, Claude can suggest how a sprite you made moves, from its frame size and cell count and never the picture. Preview it on the Desk, then Apply or Decline.",
+            art: .symbol("figure.walk"), destination: .widgets),
+    ]
 
     static let release2380: [WhatsNewCard] = [
         WhatsNewCard(

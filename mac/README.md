@@ -1925,6 +1925,20 @@ files in `pack.json`, adds one to its patch version and validates the whole pack
 (`WidgetsModel.useOwnArt`) reinstalls it as `.local` with `replaceMadeHere`. Nothing leaves the Mac. Only the
 first eligible row carries the search anchor, and the banner has no search entry.
 
+### A new sprite from an image (2.39.0)
+
+Settings, Widgets, **New sprite from an image…** (`NewSpritePicker`, `NewSpriteSheet`) opens a file panel for one
+PNG; `NewSpriteModel` holds the choices and `WidgetNewSprite` holds the rules, so the sheet is only a view. The
+image meets the pack image rules (`WidgetOwnArt.imageSize`: a PNG, at most 2 MB and 4096 pixels). A cell is 8 to
+64 pixels on each side and the sheet a whole number of them, numbered row-major. Cells are tagged to `walk`,
+`sit`, `nap`, `cheer` and `worry`: `sit` needs one cell, `walk` two or more in the order clicked, and an
+untagged `nap`, `cheer` or `worry` plays `sit`'s cells. The tags fill the nine animations the format requires
+the way the hourglass does (`pop` and `celebrate` play `cheer`, `focus` plays `sit`, `sleep` plays `nap`), with
+the hourglass's moods and triggers. The name becomes the id `my-<slug>` (`-2`, `-3` when taken), the scale is 1
+to 4 (default 2), and `fps` is 8. `make` writes `pack.json` (version 1.0.0, CC0-1.0), `sprite.json`, a
+`LICENSE` and `art/sprite.png`, validates the whole pack strict, and `WidgetsModel.installNewSprite` installs it
+as `.local` with `replaceMadeHere`. One stage only. The image is never sent and Claude never supplies or sees it.
+
 ### Claude maps a sprite's motion (`propose_sprite_motion`, 2.39.0)
 
 Claude never sees a sprite's art. `desk-state.json` (the file `get_desk` reads) carries a `sprites` list: for
