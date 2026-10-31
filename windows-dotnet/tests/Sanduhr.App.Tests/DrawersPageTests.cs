@@ -36,6 +36,56 @@ public sealed class DrawersPageTests : AppWindowFixture
         finally { window.Close(); }
     });
 
+    /// <summary>The tab binds through SettingsViewModel.Drawers: WPF cannot see an internal property, so the whole page once read as an empty
+    /// switch over empty lists. Built the way the app builds it (a real window over the view model that takes the running service).</summary>
+    [Fact]
+    public void The_Drawers_tab_binds_to_the_drawer_service_through_the_Settings_window() => AppHost.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var paths = new Paths(appDataBase: Path.Combine(box.Root, "appdata"));
+        var store = new SettingsStore(paths);
+        var home = box.Dir(@"Desktop\Drawers\Images");
+        store.SaveDrawers(DrawerSettings.Default with
+        {
+            Enabled = true,
+            Drawers = [new DrawerDef("images", "Images", home, true)],
+            Rules = [new DrawerRule(DrawerRuleKind.Images, "images"), new DrawerRule(DrawerRuleKind.Screenshots, "images")],
+        });
+        var s = new DrawerService(store, paths, new DrawerPlaces(box.Desktop, box.Public, []), System.Windows.Threading.Dispatcher.CurrentDispatcher);
+        var before = DrawerService.Current;
+        DrawerService.Current = s;
+        try
+        {
+            var (widget, _) = ScratchWidget("Personal");
+            var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+            var window = new SettingsWindow(svm);
+            var guard = NoActivate.Show(window);
+            try
+            {
+                window.SelectPage(SettingsPage.Drawers, SettingsIndex.MenuAnchor(SettingsPage.Drawers));
+                window.UpdateLayout();
+                Pump();
+                var tab = ((TabControl)window.FindName("Tabs")).Items.OfType<TabItem>().Single(t => (string)t.Tag == "Drawers");
+                Assert.IsType<DrawersSettingsViewModel>(tab.DataContext);
+                var content = (DependencyObject)tab.Content;
+                var use = Below<CheckBox>(content).First();
+                Assert.True(s.Settings.Enabled);
+                Assert.True(use.IsChecked);
+                var ruleBoxes = Below<CheckBox>(content).Skip(1).ToList();
+                Assert.NotEmpty(s.Settings.Rules);
+                Assert.Equal(s.Settings.Rules.Count, ruleBoxes.Count);
+                Assert.Equal(s.Settings.Rules.Count, svm.Drawers.Rules.Count);
+                Assert.All(ruleBoxes, c => Assert.False(string.IsNullOrEmpty(c.Content as string)));
+            }
+            finally { guard.Check(); window.Close(); }
+        }
+        finally
+        {
+            DrawerService.Current = before;
+            s.Dispose();
+        }
+    });
+
     private static IEnumerable<T> Below<T>(DependencyObject root) where T : DependencyObject
     {
         for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)

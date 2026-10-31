@@ -312,13 +312,9 @@ internal sealed class DesktopLayerHost : IDeskHost
         m.Motion.Moved -= m.Handler;
     }
 
-    /// <summary>The window passes every click to what is under it now (<c>WS_EX_TRANSPARENT</c> is set).</summary>
-    internal static bool IsClickThrough(IntPtr hwnd) => (DeskNative.GetWindowLong(hwnd, DeskNative.GWL_EXSTYLE) & DeskNative.WS_EX_TRANSPARENT) != 0;
-
     /// <summary>Sets or clears <c>WS_EX_TRANSPARENT</c> on a Desk window when it differs. Fully transparent
-    /// pixels pass clicks to the desktop either way; without the flag the drawn ones take them. The drawer click-through poll
-    /// (<see cref="DrawerClickThrough"/>) uses it for one window at a time.</summary>
-    internal static void SetClickThrough(IntPtr hwnd, bool through)
+    /// pixels pass clicks to the desktop either way; without the flag the drawn ones take them.</summary>
+    private static void SetClickThrough(IntPtr hwnd, bool through)
     {
         int ex = DeskNative.GetWindowLong(hwnd, DeskNative.GWL_EXSTYLE);
         int want = through ? ex | DeskNative.WS_EX_TRANSPARENT : ex & ~DeskNative.WS_EX_TRANSPARENT;

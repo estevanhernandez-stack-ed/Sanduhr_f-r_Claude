@@ -62,9 +62,6 @@ internal static class DrawerScreens
     public static double PixelsPerUnit(HwndSource src) =>
         PixelsPerUnit(src.CompositionTarget?.TransformToDevice.M11 ?? 1.0, (src.RootVisual as FrameworkElement)?.LayoutTransform);
 
-    /// <summary>A point in a window's pixels (from its top-left) as a point in its root's own coordinates.</summary>
-    public static Point WindowToRoot(PxPoint inWindow, double pixelsPerUnit) => new(inWindow.X / pixelsPerUnit, inWindow.Y / pixelsPerUnit);
-
     /// <summary>A point in a window's root coordinates as the window's pixels from its top-left.</summary>
     public static PxPoint RootToWindow(Point inRoot, double pixelsPerUnit) =>
         new((int)Math.Round(inRoot.X * pixelsPerUnit), (int)Math.Round(inRoot.Y * pixelsPerUnit));

@@ -35,7 +35,7 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
     public DeskSettingsViewModel Desk { get; }
 
     /// <summary>Settings, Drawers (5.0 drawers spec): on and off, the folder, Sort my desktop now, the rules, the drawers and the recent moves.</summary>
-    internal DrawersSettingsViewModel Drawers { get; }
+    public DrawersSettingsViewModel Drawers { get; }
 
     /// <summary>Settings, Message (spec 6.2): the editor, rotation, special days, the look, Claude's suggestions.</summary>
     public DeskMessagePageViewModel MessagePage { get; }

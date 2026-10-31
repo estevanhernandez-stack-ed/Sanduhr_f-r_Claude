@@ -145,17 +145,12 @@ internal static class DeskNative
     private struct POINT { public int X, Y; }
 
     [DllImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetCursorPos(out POINT p);
-    [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
 
     /// <summary>A window's rectangle in physical pixels, read per-monitor aware (the Desk's windows are placed in these).</summary>
     public static PxRect? RectPx(IntPtr h) => PerMonitor(() => Rect(h));
 
     /// <summary>The cursor in physical pixels, read per-monitor aware; far off every screen when Windows would not say.</summary>
     public static PxPoint CursorPx() => PerMonitor(() => GetCursorPos(out var p) ? new PxPoint(p.X, p.Y) : new PxPoint(int.MinValue / 2, int.MinValue / 2));
-
-    /// <summary>Any physical mouse button is down now (left, right or middle, whichever way the buttons are swapped).</summary>
-    public static bool AnyMouseButtonDown() =>
-        (((ushort)GetAsyncKeyState(0x01) | (ushort)GetAsyncKeyState(0x02) | (ushort)GetAsyncKeyState(0x04)) & 0x8000) != 0;
 
     /// <summary>Moves a Desk window to <paramref name="at"/> (physical pixels) without touching its size, z-order or activation.</summary>
     public static void MoveTo(IntPtr h, PxPoint at) => PerMonitor(() =>

@@ -12,7 +12,7 @@ namespace Sanduhr.App.ViewModels;
 
 /// <summary>Settings, Drawers (5.0 drawers spec): on and off, where files live, Sort my desktop now, the rules, the drawers and the recent
 /// moves with Undo. Works with no drawer service (tests, the harness): the page opens empty.</summary>
-internal sealed partial class DrawersSettingsViewModel : ObservableObject, IDisposable
+public sealed partial class DrawersSettingsViewModel : ObservableObject, IDisposable
 {
     private readonly DrawerService? _drawers;
     private readonly DrawerReviewService? _review;
@@ -21,7 +21,7 @@ internal sealed partial class DrawersSettingsViewModel : ObservableObject, IDisp
     private bool _loading;
     private bool _disposed;
 
-    public DrawersSettingsViewModel(DrawerService? drawers, DrawerReviewService? review, SettingsStore store)
+    internal DrawersSettingsViewModel(DrawerService? drawers, DrawerReviewService? review, SettingsStore store)
     {
         _drawers = drawers;
         _review = review;
@@ -257,12 +257,12 @@ internal sealed partial class DrawersSettingsViewModel : ObservableObject, IDisp
 }
 
 /// <summary>One rule's row: what it matches, the drawer it fills, on or off, and its place in the order.</summary>
-internal sealed partial class DrawerRuleRow : ObservableObject
+public sealed partial class DrawerRuleRow : ObservableObject
 {
     private readonly DrawersSettingsViewModel _page;
     private readonly int _index;
 
-    public DrawerRuleRow(DrawersSettingsViewModel page, int index, DrawerRule rule, string drawerName)
+    internal DrawerRuleRow(DrawersSettingsViewModel page, int index, DrawerRule rule, string drawerName)
     {
         _page = page;
         _index = index;
@@ -299,6 +299,9 @@ internal sealed partial class DrawerRuleRow : ObservableObject
     public string DaysName => $"Days for the rule: {Label}";
     public bool HasDays => Kind == DrawerRuleKind.OlderThan;
 
+    /// <summary>The row's name for a screen reader (the list item reads as this, not as the type).</summary>
+    public override string ToString() => Label;
+
     [ObservableProperty] private bool _on;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(Label), nameof(DeleteName), nameof(UpName), nameof(DownName), nameof(DaysName))] private int _days;
 
@@ -311,12 +314,12 @@ internal sealed partial class DrawerRuleRow : ObservableObject
 }
 
 /// <summary>One drawer's row: its name, what it is, and Rename and Remove.</summary>
-internal sealed partial class DrawerRow : ObservableObject
+public sealed partial class DrawerRow : ObservableObject
 {
     private readonly DrawersSettingsViewModel _page;
     private readonly string _id;
 
-    public DrawerRow(DrawersSettingsViewModel page, DrawerDef def)
+    internal DrawerRow(DrawersSettingsViewModel page, DrawerDef def)
     {
         _page = page;
         _id = def.Id;
@@ -331,6 +334,9 @@ internal sealed partial class DrawerRow : ObservableObject
     public string RenameName => $"{SettingsNames.DrawersRename} drawer: {Name}";
     public string NewNameName => $"New name for {Name}";
 
+    /// <summary>The row's name for a screen reader (the list item reads as this, not as the type).</summary>
+    public override string ToString() => $"{Name}, {Kind}";
+
     [ObservableProperty] private string _newName;
 
     [RelayCommand] private void Rename() => _page.Rename(_id, NewName);
@@ -338,12 +344,12 @@ internal sealed partial class DrawerRow : ObservableObject
 }
 
 /// <summary>One journal entry: "Today 10:42 · Rules · 14 files", with Undo.</summary>
-internal sealed partial class DrawerRecentRow : ObservableObject
+public sealed partial class DrawerRecentRow : ObservableObject
 {
     private readonly DrawersSettingsViewModel _page;
     private readonly string _id;
 
-    public DrawerRecentRow(DrawersSettingsViewModel page, JournalEntry e)
+    internal DrawerRecentRow(DrawersSettingsViewModel page, JournalEntry e)
     {
         _page = page;
         _id = e.Id;
@@ -355,6 +361,9 @@ internal sealed partial class DrawerRecentRow : ObservableObject
 
     public string Line { get; }
     public string UndoName => $"{SettingsNames.DrawersUndo} these moves: {Line}";
+
+    /// <summary>The row's name for a screen reader (the list item reads as this, not as the type).</summary>
+    public override string ToString() => Line;
 
     [RelayCommand] private void Undo() => _page.Undo(_id);
 }

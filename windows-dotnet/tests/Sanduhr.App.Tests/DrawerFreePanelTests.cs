@@ -10,7 +10,7 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Tests;
 
 /// <summary>Drawers as free panels (drawers amendment 1, Task 8B): placed per monitor by the controller, never by the Desk's stacks; moved by
-/// the title; the empty frame lets clicks through; drawer windows above widget windows.</summary>
+/// the title; every click lands on the drawer; drawer windows above widget windows.</summary>
 [Collection("SettingsWindow")]
 public sealed class DrawerFreePanelTests
 {
@@ -98,7 +98,7 @@ public sealed class DrawerFreePanelTests
     }
 
     [Fact]
-    public void Window_pixels_and_piece_points_convert_through_the_roots_own_scale_both_ways() => Sta.Run(() =>
+    public void A_pieces_offset_in_its_window_counts_the_roots_own_scale() => Sta.Run(() =>
     {
         // The host's root: 16 DIPs of shadow room, scaled by k = screen 1.5 / WPF 1.0; transforms against the root leave k out.
         var piece = new Border { Width = 100, Height = 50 };
@@ -112,9 +112,6 @@ public sealed class DrawerFreePanelTests
 
         var offset = DrawerScreens.RootToWindow(piece.TransformToAncestor(root).Transform(new Point()), ppu);
         Assert.Equal(new PxPoint(24, 24), offset);   // 16 DIPs at 150%, not 16 px
-        var inPiece = root.TransformToDescendant(piece)!.Transform(DrawerScreens.WindowToRoot(new PxPoint(24 + 15, 24 + 30), ppu));
-        Assert.Equal(10, inPiece.X, 6);
-        Assert.Equal(20, inPiece.Y, 6);
     });
 
     [Fact]
@@ -162,49 +159,6 @@ public sealed class DrawerFreePanelTests
         piece.UpdateLayout();
         return piece;
     }
-
-    [Fact]
-    public void Only_items_the_title_and_its_lines_take_clicks_unless_a_button_is_down_busy_or_focused() => Sta.Run(() =>
-    {
-        using var box = new DrawerSandbox();
-        var (s, _, _) = Make(box);
-        var piece = Piece(s);
-        var title = piece.TitleBar.TranslatePoint(new Point(40, 10), piece);
-        var item = ((ListBoxItem)piece.List.ItemContainerGenerator.ContainerFromIndex(0)).TranslatePoint(new Point(10, 10), piece);
-        var empty = piece.List.TranslatePoint(new Point(piece.List.ActualWidth - 12, piece.List.ActualHeight - 12), piece);
-        var frameEdge = new Point(piece.ActualWidth - 3, piece.ActualHeight / 2);
-
-        Assert.True(DrawerClickThrough.TakesClicks(piece, title, false, false, false));
-        Assert.True(DrawerClickThrough.TakesClicks(piece, item, false, false, false));
-        Assert.False(DrawerClickThrough.TakesClicks(piece, empty, false, false, false));
-        Assert.False(DrawerClickThrough.TakesClicks(piece, frameEdge, false, false, false));
-        Assert.False(DrawerClickThrough.TakesClicks(piece, new Point(-30, -30), false, false, false));
-
-        Assert.True(DrawerClickThrough.TakesClicks(piece, empty, buttonDown: true, false, false));
-        Assert.True(DrawerClickThrough.TakesClicks(piece, empty, false, busy: true, false));
-        Assert.True(DrawerClickThrough.TakesClicks(piece, empty, false, false, focused: true));
-
-        piece.Say("1 moved, 1 skipped.");
-        piece.UpdateLayout();
-        var status = piece.Status.TranslatePoint(new Point(10, 5), piece);
-        Assert.True(DrawerClickThrough.TakesClicks(piece, status, false, false, false));
-        piece.Dispose();
-        s.Dispose();
-    });
-
-    [Fact]
-    public void The_missing_line_takes_clicks() => Sta.Run(() =>
-    {
-        using var box = new DrawerSandbox();
-        var (s, _, _) = Make(box);
-        Directory.Delete(Path.Combine(box.Drawers, "Images"), recursive: true);
-        s.Reload();
-        var piece = Piece(s);
-        var line = piece.MissingText.TranslatePoint(new Point(10, 5), piece);
-        Assert.True(DrawerClickThrough.TakesClicks(piece, line, false, false, false));
-        piece.Dispose();
-        s.Dispose();
-    });
 
     [Fact]
     public void A_title_click_without_moving_folds_and_a_drag_past_the_distance_asks_for_a_place_holding_the_service_busy() => Sta.Run(() =>

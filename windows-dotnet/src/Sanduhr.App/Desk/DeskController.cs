@@ -76,8 +76,6 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private readonly DrawerService? _drawers;
     /// <summary>The drawers drawn now, each the content of its own island (drawers amendment 1: free panels, never in a stack).</summary>
     private readonly List<DrawerPiece> _drawerPieces = [];
-    /// <summary>Lets clicks on a drawer's empty frame through to the desktop icons; null without drawers.</summary>
-    private readonly DrawerClickThrough? _clickThrough;
     private bool _renderWanted;
     private bool _privacyRender;
     private DeskArrangeSession? _session;
@@ -102,7 +100,6 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             _drawers.Changed += OnDrawersChanged;
             _drawers.BusyEnded += OnDrawersBusyEnded;
             _drawers.PlaceRequested += OnPlaceRequested;
-            _clickThrough = new DrawerClickThrough(_drawers, _ui);
         }
         _companion = companion ?? (paths is null ? null : new CompanionService(paths, store));
         if (_companion is not null) _companion.Changed += OnCompanionChanged;
@@ -489,7 +486,6 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             _drawers.PlaceRequested -= OnPlaceRequested;
         }
         StopHost();
-        _clickThrough?.Dispose();
         _oled.DriftStepped -= ApplyDrift;
         _oled.DimChanged -= OnDim;
         _oled.Dispose();
@@ -850,10 +846,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         return Care(DeskInk.Resolve(_ink, ThemeText(), Luminance(screen, rect)));
     }
 
-    /// <summary>Ends every drawn drawer (its subscriptions, a rename or move in progress) and stops the click-through poll.</summary>
+    /// <summary>Ends every drawn drawer (its subscriptions, a rename or move in progress).</summary>
     private void DisposeDrawers()
     {
-        _clickThrough?.Follow([]);
         var old = _drawerPieces.ToArray();
         _drawerPieces.Clear();
         foreach (var piece in old) piece.Dispose();
@@ -961,10 +956,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             // on the next rebuild rather than let a timer tick take the app down.
             System.Diagnostics.Debug.WriteLine($"[Sanduhr] Desk redraw failed: {e.GetType().Name}");
             host.Hide();
-            _clickThrough?.Follow([]);
             return;
         }
-        _clickThrough?.Follow([.. _drawerPieces]);
         // The new islands start in sight: take the host's reading and let the sources follow it.
         ApplyCoverage();
         SyncSources(track);
