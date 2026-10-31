@@ -16,6 +16,7 @@ struct WidgetsSettings: View {
             WidgetsSuggestionSection(handoff: handoff)
             WidgetsCatalogSection(model: model)
             WidgetsInstalledSection(model: model)
+            WidgetsNewSpriteSection(model: model)
             WidgetsCompanionSection(model: model)
         }
         .formStyle(.grouped)
@@ -144,6 +145,32 @@ private struct WidgetsInstalledSection: View {
             }
         }
         .settingsAnchor(SettingsAnchor.installedWidgets)
+    }
+}
+
+/// "New sprite from an image...": pick a PNG, then the sheet tags its cells to actions and makes a sprite of it.
+private struct WidgetsNewSpriteSection: View {
+    let model: WidgetsModel
+    @State private var sprite: NewSpriteModel?
+
+    var body: some View {
+        Section("New sprite") {
+            HStack {
+                Text("Make a companion from your own sprite sheet.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("New sprite from an image\u{2026}") { open() }
+                    .settingsAnchor(SettingsAnchor.newSprite)
+            }
+        }
+        .sheet(isPresented: Binding(get: { sprite != nil }, set: { if !$0 { sprite = nil } })) {
+            if let sprite { NewSpriteSheet(model: sprite, close: { self.sprite = nil }) }
+        }
+    }
+
+    private func open() {
+        guard let png = NewSpritePicker.pick() else { return }
+        sprite = NewSpriteModel(png: png, install: { model.installNewSprite($0) })
     }
 }
 
