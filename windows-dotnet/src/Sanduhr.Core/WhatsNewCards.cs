@@ -7,7 +7,16 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class WhatsNewCards
 {
-    public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release400(), .. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
+    public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release450(), .. Release400(), .. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
+
+    // 4.5.0 (setup spec): Set up Sanduhr, one screen of free choices. Show me opens the setup window itself (App.ShowMe).
+    private static WhatsNewCard[] Release450() =>
+    [
+        WhatsNewCard.Of("4.5.0", "choose-what-shows", "Choose what Sanduhr shows",
+            "Pick a nicer desktop, tidy drawers, your AI usage or any mix. Change it any time from Set up Sanduhr in the tray.",
+            "", // Settings
+            WhatsNewPreview.None, SettingsPage.General),
+    ];
 
     // 4.0.0 (Settings v2; spec, Outside Settings, same release): Settings rearranged, landing on What leaves this PC; one theme for the
     // widget and the Desk (theme match, with the message's own switch); and Streamer mode.
@@ -181,6 +190,7 @@ public static class WhatsNewCards
     /// </summary>
     private static string? AnchorFor(string id) => id switch
     {
+        "choose-what-shows" => SettingsIndex.GeneralSetup,
         "settings-rearranged" => SettingsIndex.Network,
         "one-theme" => SettingsIndex.DeskThemeMatch,
         "streamer-mode" => SettingsIndex.Streamer,

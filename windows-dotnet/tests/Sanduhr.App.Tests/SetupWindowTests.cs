@@ -274,4 +274,20 @@ public sealed class SetupWindowTests : AppWindowFixture
         vm.DesignWithChatCommand.Execute(null);
         Assert.Equal(1, asked);
     });
+
+    [Fact]
+    public void Settings_General_has_Set_up_Sanduhr_and_it_asks_the_app_to_open_it() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget();
+        try
+        {
+            var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+            bool asked = false;
+            svm.SetupRequested = () => asked = true;
+            svm.OpenSetupCommand.Execute(null);
+            Assert.True(asked);
+            Assert.Equal(SetupCopy.Title, svm.SetupTitle);
+        }
+        finally { widget.Dispose(); }
+    });
 }

@@ -29,6 +29,7 @@ public sealed record SettingsLink(SettingsPage Page, string? Anchor);
 public static class SettingsIndex
 {
     // General
+    public const string GeneralSetup = "setup";
     public const string Tray = "tray";
     public const string Startup = "startup";
     public const string Shortcuts = "shortcuts";
@@ -165,6 +166,8 @@ public static class SettingsIndex
     /// <summary>Every anchor in sidebar order, with its title and the words a person might type for it.</summary>
     public static IReadOnlyList<SettingsEntry> Anchors { get; } =
     [
+        E(SetupCopy.Title, SettingsPage.General, GeneralSetup,
+            ["setup", "set up", "wizard", "choose what shows", "desktop", "drawers", "usage", "first run", "start over", "what Sanduhr shows"]),
         E(SettingsNames.TrayShows, SettingsPage.General, Tray,
             ["tray", "percent", "number", "icon", "rotate", "session", "weekly", "highest", "whichever is higher"]),
         E("Startup", SettingsPage.General, Startup,
