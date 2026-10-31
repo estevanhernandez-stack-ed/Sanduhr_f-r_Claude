@@ -136,15 +136,36 @@ Settings, Desk.
 2. Answer with exactly one design block in the format Sanduhr reads.
 
 It lists only what this build's Desk can do: the pieces, anchors, sizes, ink, fonts, the message and weather,
-and drawers with rules by kind, age or name. It carries the monitor layout (count, sizes, which is main) and
-nothing personal: no file names, no account, no usage, no paths.
+and drawers with rules by kind, age or name. It carries the monitor layout as names only ("1920×1080, right of
+main", from `DeskMonitorNames`) and the words `main` and `all`, never a monitor id: an id is a Windows device
+path. Nothing personal: no file names, no account, no usage, no paths.
+
+**The answer has two parts, each optional, each checked by its own rules:**
+
+```json
+{ "desk": { ...a Desk design, exactly what propose_desk takes... },
+  "drawers": { "rules": [ { "kind": "images", "drawer": "Photos" },
+                          { "kind": "name_contains", "text": "invoice", "drawer": "Receipts" },
+                          { "kind": "older_than", "days": 60, "drawer": "Old stuff" } ] } }
+```
+
+- `desk` goes through `DeskDesign.Validate`, unchanged. A Desk design still never moves, hides or drops a
+  drawer (the drawers plan 1 rule, pinned by `DeskDesignDrawerTests`), and the MCP's linked files and
+  `TrustBoundaryTests` do not change.
+- `drawers` is new, App-side only, and holds rules alone: a kind (`screenshots`, `images`, `documents`,
+  `installers`, `archives`, `shortcuts`, `older_than`, `name_contains`, `name_starts_with`), a drawer name
+  (`DrawerNames.IsValid`), `text` for the two name kinds, `days` (1 to 3650) for `older_than`. At most 20 rules.
+  Applying it replaces the drawer rules (the box says so before Apply) and then opens the rules' plan for
+  review. Nothing moves until that review's Apply.
 
 **Coming back.**
 
 - A paste box with the live check, like the theme box. Problems are listed by field, and Preview stays
   disabled until there are none.
 - **Preview** shows the design on the Desk through the existing review bar. **Apply** and **Undo** work there as
-  they do for `propose_desk`.
+  they do for `propose_desk`; Undo is the existing Put my Desk back. The bar's heading for a pasted design is
+  "Your AI chat's Desk design", never the Claude wording `propose_desk` uses, and "Let Claude change the Desk
+  directly" does not apply to a paste: a paste always reviews.
 - A pasted design passes exactly the rules an MCP design does, so a chat can do no more than Claude Code can.
 - A paste holding several blocks uses the first good one and says so.
 - A design naming a piece this build lacks is refused with the reason. Nothing applies partly.
