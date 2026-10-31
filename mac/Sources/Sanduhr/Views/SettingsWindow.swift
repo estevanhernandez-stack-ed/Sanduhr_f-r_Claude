@@ -375,7 +375,7 @@ struct SettingsRoot: View {
         switch s {
         case .message: DeskMessageHandoff.shared.pending != nil ? 1 : 0
         case .themes: ThemeProposalHandoff.shared.pending != nil ? 1 : 0
-        case .widgets: WidgetProposalHandoff.shared.pending != nil ? 1 : 0
+        case .widgets: (WidgetProposalHandoff.shared.pending != nil ? 1 : 0) + (SpriteMotionHandoff.shared.pending != nil ? 1 : 0)
         default: 0
         }
     }
