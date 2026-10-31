@@ -72,6 +72,12 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// second, about a second at most, then off).</summary>
     private readonly DispatcherTimer _pump;
     private bool _stopped;
+    /// <summary>Drawers' live state; null draws no drawer. A redraw waits while it is busy (Review Focus 3).</summary>
+    private readonly DrawerService? _drawers;
+    /// <summary>The drawers drawn now, each the content of its own island (drawers amendment 1: free panels, never in a stack).</summary>
+    private readonly List<DrawerPiece> _drawerPieces = [];
+    private bool _renderWanted;
+    private bool _privacyRender;
     private DeskArrangeSession? _session;
     private DeskArrangeMode? _arrangeMode;
     /// <summary>A design under review (the live review): drawn from memory in place of the saved layout, font, plate, ink and Launcher.
@@ -86,8 +92,15 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     public DeskController(SettingsStore store, Func<IDeskHost> hostFactory, Func<DeskUsage> usageSource,
         NowPlayingHub nowPlaying, DeskMessageSource messages, WatcherStore? watchers = null,
         Paths? paths = null, LauncherAppCache? launcherApps = null, OledCareDriver? oled = null, NowPlayingLookService? looks = null,
-        CompanionService? companion = null)
+        CompanionService? companion = null, DrawerService? drawers = null)
     {
+        _drawers = drawers;
+        if (_drawers is not null)
+        {
+            _drawers.Changed += OnDrawersChanged;
+            _drawers.BusyEnded += OnDrawersBusyEnded;
+            _drawers.PlaceRequested += OnPlaceRequested;
+        }
         _companion = companion ?? (paths is null ? null : new CompanionService(paths, store));
         if (_companion is not null) _companion.Changed += OnCompanionChanged;
         _looks = looks;
@@ -466,6 +479,12 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     public void Dispose()
     {
         _stopped = true;
+        if (_drawers is not null)
+        {
+            _drawers.Changed -= OnDrawersChanged;
+            _drawers.BusyEnded -= OnDrawersBusyEnded;
+            _drawers.PlaceRequested -= OnPlaceRequested;
+        }
         StopHost();
         _oled.DriftStepped -= ApplyDrift;
         _oled.DimChanged -= OnDim;
@@ -558,6 +577,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         // The islands go down while the arrange surfaces are up; coverage and sources have nothing to follow.
         foreach (var v in _views) v.Dispose();
         _views.Clear();
+        DisposeDrawers();
         _surfaces = [];
         _host.Hide();
         // The arrange view has no bars; the readings it shows keep sampling.
@@ -749,12 +769,101 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         if (!presence.OnScreen(now)) Render();
     }
 
+    /// <summary>Streamer mode moved: names and labels on the Desk must follow now, so this redraws past a busy drawer (an inline rename
+    /// in progress loses its edit box; privacy beats interaction).</summary>
+    internal void PrivacyChanged()
+    {
+        if (_stopped) return;
+        _renderWanted = false;
+        _privacyRender = true;
+        try { Reload(); }
+        finally { _privacyRender = false; }
+    }
+
+    private void OnDrawersChanged() { if (!_stopped) Reload(); }
+
+    private void OnDrawersBusyEnded() { if (_renderWanted) Render(); }
+
+    /// <summary>A drawer was dragged by its title and let go: its top-left, in screen pixels, becomes a place on the screen holding it,
+    /// clamped to that screen's work area, and saved (the save redraws the Desk). A drawer only a plan under review would create, or a drop
+    /// on a screen Windows would not name, saves nothing: the Desk draws the drawer back where it was.</summary>
+    private void OnPlaceRequested(string id, PxPoint topLeft)
+    {
+        if (_stopped || _drawers is null || _screens.Count == 0) return;
+        if (_drawers.Settings.Drawers.Any(d => d.Id == id) && DrawerScreens.ToPlace(topLeft, _screens) is { } place)
+            _drawers.SetPlace(id, place);
+        else
+            Render();   // waits for the move's hold, then puts the window back
+    }
+
+    /// <summary>
+    /// The drawers to draw and where (drawers amendment 1): each saved drawer while drawers are on and it is not hidden, then each drawer a
+    /// plan under review would create. A saved place stands; a drawer with none arrives top-right of the primary screen
+    /// (<see cref="DrawerPlacement.Arrive"/>, handed only the places of the drawers drawn here, and not saved).
+    /// </summary>
+    private IReadOnlyList<(DrawerState State, DrawerPlace Place)> DrawerPlacesNow()
+    {
+        if (_drawers is not { } service || _screens.Count == 0) return [];
+        var settings = service.Settings;
+        List<DrawerDef> drawn = settings.Enabled ? [.. settings.Drawers.Where(d => service.IsShown(d.Id) && service.Get(d.Id) is not null)] : [];
+        drawn.AddRange(service.PreviewDrawers.Select(p => p.Def).Where(p => drawn.All(d => d.Id != p.Id)));
+        var ids = settings.Drawers.Select(d => d.Id).Where(id => drawn.Any(d => d.Id == id)).ToHashSet(StringComparer.Ordinal);
+        var placed = settings.Places.Where(kv => ids.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+        var folded = drawn.Where(d => service.Get(d.Id)?.Folded == true).Select(d => d.Id).ToList();
+        var places = DrawerPlacement.Arrive(drawn, placed, DrawerScreens.WorkDips(DrawerScreens.Primary(_screens)).Width, folded);
+        return [.. drawn.Select(d => (service.Get(d.Id)!, places[d.Id]))];
+    }
+
+    /// <summary>Adds one island per drawer to the surface of the screen it sits on, after the Desk's own islands: aligned left and top on
+    /// its clamped place, taking clicks and focus, flagged so the host keeps it above the widgets. Its look is the Desk's on that screen.</summary>
+    private List<DeskSurface> WithDrawers(List<DeskSurface> surfaces, DeskFrame frame, DeskThemeDraw? draw,
+        IReadOnlyList<(DeskSettings Settings, DeskInkMap Inks)> looks)
+    {
+        if (_drawers is null || _fonts is null) return surfaces;
+        var extra = surfaces.Select(_ => new List<DeskIsland>()).ToList();
+        foreach (var (state, place) in DrawerPlacesNow())
+        {
+            var (screen, anchor) = DrawerScreens.ToAnchor(place, _screens);
+            int i = Enumerable.Range(0, _screens.Count).First(k => ReferenceEquals(_screens[k], screen));
+            var ink = DrawerInk(screen, anchor, state.Folded, looks[i].Inks, draw);
+            var look = DrawerLook.From(ink, frame.PlateHex, frame.PlateOpacity, frame.AccentHex, _fonts.Families(looks[i].Settings.Font).Regular);
+            var piece = new DrawerPiece(state, _drawers, look, 1);
+            _drawerPieces.Add(piece);
+            extra[i].Add(new DeskIsland(piece, anchor, HorizontalAlignment.Left, VerticalAlignment.Top)
+            {
+                Widgets = [state.Word], TakesClicks = true, TakesFocus = true, Drawer = true,
+            });
+        }
+        return [.. surfaces.Select((s, i) => extra[i].Count == 0 ? s : s with { Islands = [.. s.Islands, .. extra[i]] })];
+    }
+
+    /// <summary>A drawer's ink: Automatic reads the wallpaper behind the drawer itself (it sits in no stack); every other mode, and a followed
+    /// theme, is the screen's one ink.</summary>
+    private ResolvedInk DrawerInk(DeskScreen screen, Point anchor, bool folded, DeskInkMap inks, DeskThemeDraw? draw)
+    {
+        if (draw is not null || _ink.Mode != DeskInkMode.Auto) return inks.Default;
+        var rect = Px(screen, new Rect(anchor.X, anchor.Y, DrawerPlacement.Width, DrawerPlacement.Height(folded)));
+        return Care(DeskInk.Resolve(_ink, ThemeText(), Luminance(screen, rect)));
+    }
+
+    /// <summary>Ends every drawn drawer (its subscriptions, a rename or move in progress).</summary>
+    private void DisposeDrawers()
+    {
+        var old = _drawerPieces.ToArray();
+        _drawerPieces.Clear();
+        foreach (var piece in old) piece.Dispose();
+    }
+
     /// <summary>Lays each screen out afresh and hands the host its islands; the host keeps its windows
     /// when the islands line up with the last ones.</summary>
     private void Render()
     {
         // While arranging the arrange surfaces draw; the islands come back when it ends.
         if (_host is null || _stopped || _screens.Count == 0 || _rendering || Arranging) return;
+        // A drawer is mid-interaction (a drag, Explorer's menu, an inline rename): rebuilding it now would cut that short. The redraw
+        // runs when the last hold is released (Review Focus 3).
+        if (_drawers?.Busy == true && !_privacyRender) { _renderWanted = true; return; }
+        _renderWanted = false;
         _rendering = true;
         try { RenderOnce(); }
         finally { _rendering = false; }
@@ -797,7 +906,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _fullAt = now;
         foreach (var old in _views) old.Dispose();
         _views.Clear();
+        DisposeDrawers();
         var surfaces = new List<DeskSurface>();
+        var looks = new List<(DeskSettings Settings, DeskInkMap Inks)>();
         bool forced = false;
         foreach (var screen in _screens)
         {
@@ -824,7 +935,10 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             view.Update(shown, inks);
             _views.Add(view);
             surfaces.Add(new DeskSurface(screen, DeskClicks.Prepare(view.TakeIslands(), _piecesTakeClicks, this)));
+            looks.Add((settings, inks));
         }
+        // Drawers are free panels (drawers amendment 1): the controller places them, one island each, never the view's stacks.
+        surfaces = WithDrawers(surfaces, frame, draw, looks);
         if (forced != _plateForced)
         {
             _plateForced = forced;
@@ -908,6 +1022,13 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _minute.Start();
     }
 
+    /// <summary>The minute tick with the full redraw due, for tests.</summary>
+    internal void MinuteWithFullDue()
+    {
+        _fullAt = DateTimeOffset.MinValue;
+        OnMinute();
+    }
+
     private void OnMinute()
     {
         _minute.Stop();
@@ -919,8 +1040,11 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         }
         var now = DateTimeOffset.Now;
         // A full layout every five minutes, and on the hour (hourly rotation, special-day windows, a new day).
-        if (now - _fullAt >= FullEvery || _surfaces.Count == 0 || now.ToLocalTime().Hour != _fullAt.ToLocalTime().Hour
-            || now.ToLocalTime().Date != _fullAt.ToLocalTime().Date)
+        bool full = now - _fullAt >= FullEvery || _surfaces.Count == 0 || now.ToLocalTime().Hour != _fullAt.ToLocalTime().Hour
+            || now.ToLocalTime().Date != _fullAt.ToLocalTime().Date;
+        // A busy drawer holds the full redraw, but the clock still ticks in place; the redraw runs when the hold ends.
+        if (full && _drawers?.Busy == true && _surfaces.Count > 0) { _renderWanted = true; full = false; }
+        if (full)
             Render();
         else
         {
@@ -943,6 +1067,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _screens = [];
         foreach (var v in _views) v.Dispose();
         _views.Clear();
+        DisposeDrawers();
         _surfaces = [];
         // A Desk that is off holds no plate: the plate note in Settings must not outlive it.
         if (_plateForced)

@@ -148,7 +148,7 @@ internal sealed class WidgetReviewService : IDisposable
         if (ResetGuard.Done || _disposed || Host is not { } host) return WidgetAnswer.NotReady;
         if (host.DeskBusy)
             return new WidgetAnswer(WidgetAnswer.Rejected, "busy",
-                [new DeskReason("widget", "a Desk design is waiting for the user's review; ask them to Apply or Dismiss it, then propose the widget again")],
+                [new DeskReason("widget", "a Desk design or a drawers plan is waiting for the user's review; ask them to Apply or Dismiss it, then propose the widget again")],
                 PackId: pack.Id);
 
         ReplaceReview();
@@ -309,7 +309,10 @@ internal sealed class WidgetReviewHost : IWidgetReviewHost, IDisposable
         _settingsFollow = settingsFollow;
     }
 
-    public bool DeskBusy => DeskDesignService.Current?.Reviewing == true;
+    /// <summary>A drawers plan is under review (one review at a time); a seam so a test never sets the process-wide static.</summary>
+    internal Func<bool> DrawersReviewing { get; set; } = () => DrawerReviewService.Current?.Reviewing == true;
+
+    public bool DeskBusy => DeskDesignService.Current?.Reviewing == true || DrawersReviewing();
 
     public void ShowPreview(WidgetPreview preview, DeskReviewModel model, Action<bool> apply, Action dismiss)
     {

@@ -87,6 +87,7 @@
                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
                 <Button x:Name="DismissButton" Style="{StaticResource BarButton}" Content="Dismiss" />
+                <Button x:Name="EditButton" Style="{StaticResource BarButton}" Content="Edit" Visibility="Collapsed" />
                 <Button x:Name="ApplyButton" Style="{StaticResource BarPrimary}" Content="Apply" />
             </StackPanel>
         </StackPanel>

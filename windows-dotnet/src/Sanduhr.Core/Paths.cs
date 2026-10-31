@@ -172,6 +172,9 @@ public sealed class Paths
     /// holds real names and is never sent anywhere.</summary>
     public string CodenamesFile => Path.Combine(AppDataDir, Codenames.FileName);
 
+    /// <summary>The move journal: paths only, beside settings.json, apart from the Velopack install tree.</summary>
+    public string DrawerJournalFile => Path.Combine(AppDataDir, "drawers-journal.json");
+
     /// <summary>Statusline/MCP rendezvous file (WS-E): the widget's active-account
     /// usage snapshot, written atomically each fetch when the Claude Code
     /// statusline integration is enabled. Read-only for every consumer.

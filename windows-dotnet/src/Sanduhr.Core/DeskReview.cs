@@ -14,6 +14,7 @@ public static class DeskReviewCopy
 {
     public const string Apply = "Apply";
     public const string Dismiss = "Dismiss";
+    public const string Edit = "Edit";
     public const string BarName = "Review Claude's Desk design";
     public const string ChangesName = "What changed";
     public const string FontsName = "Fonts to install";
@@ -53,11 +54,27 @@ public sealed record DeskReviewModel(
     /// <summary>One choice the user makes with Apply, as a check box (a Claude-made sprite's "Make it the companion"); null for none.</summary>
     public string? Option { get; init; }
 
+    /// <summary>The bar shows an Edit button (the drawers review: untick moves, rename a new drawer).</summary>
+    public bool CanEdit { get; init; }
+
+    /// <summary>Apply's and Dismiss's words when not "Apply" and "Dismiss" (the drawers result: "Undo" and "Done"); null keeps them.</summary>
+    public string? ApplyLabel { get; init; }
+    public string? DismissLabel { get; init; }
+
+    /// <summary>Apply is off for a reason other than a missing font (a result with nothing to undo).</summary>
+    public bool ApplyOff { get; init; }
+
     /// <summary>Apply is available once every font the design names is installed.</summary>
-    public bool CanApply => MissingFonts.Count == 0;
+    public bool CanApply => MissingFonts.Count == 0 && !ApplyOff;
+
+    /// <summary>Enter closes the bar like Dismiss and never chooses Apply (the drawers result: Undo runs only from a deliberate press).</summary>
+    public bool EnterDismisses { get; init; }
+
+    /// <summary>The keys line when it is not the design review's (the drawers result: "Enter undoes. Escape closes."); null keeps it.</summary>
+    public string? KeysLine { get; init; }
 
     /// <summary>The keys line under the changes.</summary>
-    public string Keys => CanApply ? DeskReviewCopy.KeysLine : DeskReviewCopy.KeysLineWaiting;
+    public string Keys => KeysLine ?? (CanApply ? DeskReviewCopy.KeysLine : DeskReviewCopy.KeysLineWaiting);
 
     /// <summary>A link the bar may show and open: absolute https only, no user info; anything else is dropped.</summary>
     public static string? SafeLink(string? link)

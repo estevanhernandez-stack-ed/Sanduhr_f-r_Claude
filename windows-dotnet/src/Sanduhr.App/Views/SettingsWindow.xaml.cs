@@ -116,6 +116,7 @@ internal partial class SettingsWindow : Window
             ViewModel.Privacy.Streamer?.Detach();
             ViewModel.Desk.Flush();
             ViewModel.Desk.Launcher.Detach();
+            ViewModel.Drawers.Dispose();
             ViewModel.MessagePage.Dispose();
             ViewModel.Shortcuts.Detach();
             ViewModel.General.Detach();

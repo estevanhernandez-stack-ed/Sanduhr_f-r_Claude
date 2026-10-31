@@ -20,6 +20,9 @@ public sealed partial class DeskReviewBar : UserControl
     /// <summary>Dismiss was pressed.</summary>
     public event Action? DismissRequested;
 
+    /// <summary>Edit was pressed (the drawers review only).</summary>
+    public event Action? EditRequested;
+
     /// <summary>Opens a font's link; the shell opens it in the default browser. Tests replace it.</summary>
     public Action<string> OpenLink { get; set; } = DefaultOpen;
 
@@ -40,6 +43,8 @@ public sealed partial class DeskReviewBar : UserControl
         AutomationProperties.SetName(DismissButton, DeskReviewCopy.Dismiss);
         AutomationProperties.SetHelpText(DismissButton, "Put your Desk back as it was. Escape does the same");
         AutomationProperties.SetName(ApplyButton, DeskReviewCopy.Apply);
+        AutomationProperties.SetName(EditButton, DeskReviewCopy.Edit);
+        EditButton.Click += (_, _) => EditRequested?.Invoke();
         DismissButton.Click += (_, _) => DismissRequested?.Invoke();
         ApplyButton.Click += (_, _) =>
         {
@@ -59,6 +64,7 @@ public sealed partial class DeskReviewBar : UserControl
     /// <summary>The bar's buttons, for the window's key handling and for tests.</summary>
     public Button Apply => ApplyButton;
     public Button Dismiss => DismissButton;
+    public Button Edit => EditButton;
 
     /// <summary>Shows a model: the name, the note, the lines, the fonts still missing, and whether Apply is available.</summary>
     public void SetModel(DeskReviewModel model)
@@ -73,6 +79,10 @@ public sealed partial class DeskReviewBar : UserControl
         ChangesHeader.Text = model.ChangesTitle ?? DeskReviewCopy.ChangesName;
         AutomationProperties.SetName(ChangesHeader, ChangesHeader.Text);
         AutomationProperties.SetName(Changes, ChangesHeader.Text);
+        // An empty title means no header and no list (the drawers result is one line and its buttons).
+        var showChanges = model.ChangesTitle != "" ? Visibility.Visible : Visibility.Collapsed;
+        ChangesHeader.Visibility = showChanges;
+        Changes.Visibility = showChanges;
         // A widget's one choice with Apply ("Make it the companion"), on by default; kept as the user left it while the same bar updates.
         OptionBox.Content = model.Option ?? "";
         AutomationProperties.SetName(OptionBox, model.Option ?? "");   // streamer: notname - the choice text is fixed copy (WidgetReviewCopy.MakeCompanion)
@@ -105,6 +115,11 @@ public sealed partial class DeskReviewBar : UserControl
 
         Keys.Text = model.Keys;
         AutomationProperties.SetName(Keys, model.Keys);   // streamer: notname - key hints, fixed copy
+        EditButton.Visibility = model.CanEdit ? Visibility.Visible : Visibility.Collapsed;
+        ApplyButton.Content = model.ApplyLabel ?? DeskReviewCopy.Apply;
+        AutomationProperties.SetName(ApplyButton, (string)ApplyButton.Content);   // streamer: notname - fixed copy, Apply or Undo
+        DismissButton.Content = model.DismissLabel ?? DeskReviewCopy.Dismiss;
+        AutomationProperties.SetName(DismissButton, (string)DismissButton.Content);   // streamer: notname - fixed copy, Dismiss or Done
         ApplyButton.IsEnabled = model.CanApply;
         AutomationProperties.SetHelpText(ApplyButton, DeskReviewCopy.ApplyHelp(model.CanApply));   // streamer: notname - help text from DeskReviewCopy.ApplyHelp, fixed copy
     }

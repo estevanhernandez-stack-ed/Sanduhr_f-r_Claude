@@ -107,6 +107,13 @@ public static class SettingsIndex
     public const string LauncherPlace = "launcher";
     public const string LauncherButtons = "launcher-buttons";
     public const string DeskLauncher = "desk-launcher";
+    // Drawers (5.0 drawers spec)
+    public const string Drawers = "drawers";
+    public const string DrawersFolder = "drawers-folder";
+    public const string DrawersSort = "drawers-sort";
+    public const string DrawersRules = "drawers-rules";
+    public const string DrawersList = "drawers-list";
+    public const string DrawersRecent = "drawers-recent";
     public const string DeskDirect = "desk-direct";
     public const string DeskOled = "desk-oled";
     public const string DeskDesigns = "desk-designs";
@@ -329,6 +336,17 @@ public static class SettingsIndex
             ["launcher", "button", "buttons", "shortcut", "shortcuts", "app", "apps", "link", "TouchButton", "Rainmeter",
              SettingsNames.LauncherAddApp, SettingsNames.LauncherAddLink, "image", "label", "PNG", "Chrome app", "PWA", "row", "column"]),
 
+        E(SettingsNames.DrawersSwitch, SettingsPage.Drawers, Drawers,
+            ["drawers", "drawer", "tidy", "organize", "organise", "clean up", "desktop icons", "turn off", "put back"]),
+        E(SettingsNames.DrawersFolder, SettingsPage.Drawers, DrawersFolder, ["folder", "Drawers folder", "OneDrive", "location", "where"]),
+        E(SettingsNames.DrawersSort, SettingsPage.Drawers, DrawersSort,
+            [SettingsNames.DrawersSortButton, "sort", "sort my desktop", "plan", "review", "apply", "screenshots", "installers"]),
+        E(SettingsNames.DrawersRules, SettingsPage.Drawers, DrawersRules,
+            ["rules", "by kind", "by age", "by name", "older than", "first match", "order", SettingsNames.DrawersAddRule]),
+        E(SettingsNames.DrawersList, SettingsPage.Drawers, DrawersList,
+            ["rename", "hide", "show", SettingsNames.DrawersShow, SettingsNames.DrawersPutBack, "top right", "remove", "view", "existing folder", "Downloads"]),
+        E(SettingsNames.DrawersRecent, SettingsPage.Drawers, DrawersRecent, ["undo", "history", "journal", "moved"]),
+
         E(SettingsNames.WidgetOptions, SettingsPage.Widget, WidgetOptions,
             [SettingsNames.CompactMode, "compact", "Ctrl+D", SettingsNames.GraphStyle, "graph", "sparkline", "classic", "horizon",
              SettingsNames.KeepWidgetOnTop, "on top", "pin", "always on top", SettingsNames.DeepWorkLength, "deep work", "focus", "timer",
@@ -454,6 +472,7 @@ public static class SettingsIndex
         [SettingsPage.DeskLook] = ["look", "fonts", "size", "ink", "color", "colour", "plate"],
         [SettingsPage.Watchers] = ["watcher", "cards", "CI", "progress"],
         [SettingsPage.Launcher] = ["buttons", "apps", "links", "shortcuts"],
+        [SettingsPage.Drawers] = ["tidy", "sort", "folders", "organize"],
         [SettingsPage.Widget] = ["floating window", "meters window"],
         [SettingsPage.About] = ["help", "version", "trademark"],
     };
@@ -815,6 +834,7 @@ public static class SettingsIndex
         SettingsPage.Desk => DeskPieces,
         SettingsPage.DeskMessage => MessageLines,
         SettingsPage.Launcher => LauncherButtons,
+        SettingsPage.Drawers => DrawersList,
         SettingsPage.Widget => WidgetOptions,
         _ => null,
     };
@@ -825,6 +845,7 @@ public static class SettingsIndex
     [
         SettingsPage.Accounts, SettingsPage.Privacy, SettingsPage.ClaudeUsage, SettingsPage.Publish, SettingsPage.Desk, SettingsPage.Weather,
         SettingsPage.Watchers, SettingsPage.ClaudeCode, SettingsPage.Mods, SettingsPage.About, SettingsPage.Launcher,
+        SettingsPage.Drawers,
     ];
 
     /// <summary>Where an opening Settings lands: the place asked for; else where it was left this session; else General.</summary>
@@ -845,6 +866,7 @@ public static class SettingsIndex
         // Reset's is the section's name: the entry's own title is the command (preflight P15).
         SettingsPage.About => [.. Links(page, Version, Updates, Trademark, Where), (SettingsNames.ResetJump, Reset), .. Links(page, Notices)],
         SettingsPage.Desk => Links(page, DeskPieces, DeskClicks, DeskDesigns, DeskAdvanced),
+        SettingsPage.Drawers => Links(page, DrawersSort, DrawersRules, DrawersList, DrawersRecent),
         SettingsPage.DeskLook => Links(page, DeskThemeMatch, DeskLook, DeskSizes, DeskInk, DeskPlate),
         // The first is named for the widget it sits in; the others read as their index rows.
         SettingsPage.NowPlaying => [(SettingsNames.NowPlayingJumpWidget, NowPlayingWidget),

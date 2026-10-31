@@ -2757,6 +2757,10 @@
                     <views:LauncherPage />
                 </TabItem>
 
+                <TabItem Header="Drawers" Tag="Drawers" AutomationProperties.Name="Drawers" DataContext="{Binding Drawers}">
+                    <views:DrawersPage />
+                </TabItem>
+
                 <!-- About (Settings v2): the version, What's New and the tour, the trademark notice,
                      where Sanduhr keeps its files, and the packages it ships with. -->
                 <TabItem Header="About" Tag="About" AutomationProperties.Name="About">

@@ -52,6 +52,10 @@ public class TrustBoundaryTests
                 //   Watchers, WatcherRequest: the limits, the commands, the request and switch files.
                 "DeskArrangement.cs", "DeskDesign.cs", "DeskDesignValidator.cs", "DeskFont.cs", "DeskInk.cs",
                 "DeskMessages.cs", "DeskPlate.cs",
+                // Drawers (5.0, plan 1): DeskArrangement reads drawer.<id> layout words, so get_desk sees drawer pieces. One
+                // file, pure (string checks; no IO, network, credentials or process): DrawerPieces and the DrawerIds slug rules.
+                // The drawer model, validator, journal and every move stay with the widget until propose_drawers (plan 2).
+                "DrawerPieces.cs",
                 // get_desk and propose_desk (3.7.0, the agent-designed Desk). Nine files, all pure (text, JSON, regex and
                 // math; no IO, network, credentials or process), so the server validates a design with the widget's own
                 // code. The widget owns every write that matters; the server queues request files and reads desk-state.json.
@@ -126,6 +130,7 @@ public class TrustBoundaryTests
     [InlineData("PackValidator.cs")]
     [InlineData("WidgetProposal.cs")]
     [InlineData("ThemeDeskLook.cs")]
+    [InlineData("DrawerPieces.cs")]
     public void Files_linked_for_watchers_desk_messages_and_desk_designs_are_pure(string file)
     {
         string path = Path.Combine(Path.GetDirectoryName(McpCsprojPath())!, "..", "Sanduhr.Core", file);

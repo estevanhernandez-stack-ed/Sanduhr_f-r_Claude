@@ -223,6 +223,20 @@ public sealed class DeskReviewBarTests
     }
 
     [Fact]
+    public void EnterOnAFocusedEditButtonIsLeftToThatControl()
+    {
+        OnSta(() =>
+        {
+            var window = new DeskReviewWindow();
+            window.SetModel(Model() with { CanEdit = true });
+            int applied = 0;
+            window.ApplyRequested += () => applied++;
+            Assert.False(window.HandleKey(Key.Enter, window.ReviewBar.Edit));
+            Assert.Equal(0, applied);
+        });
+    }
+
+    [Fact]
     public void EnterOnTheDismissButtonOrALinkIsLeftToThatControl()
     {
         OnSta(() =>
@@ -236,6 +250,52 @@ public sealed class DeskReviewBarTests
             Assert.False(window.HandleKey(Key.Enter, new Hyperlink()));            // the link's own click opens
             window.SetModel(Model());
             Assert.Equal(0, applied);
+        });
+    }
+
+    [Fact]
+    public void TheBarHidesTheHeaderAndListWhenTheModelHasNoChangesTitle()
+    {
+        OnSta(() =>
+        {
+            var bar = Build(DrawerReview.Result("1 moved.", canUndo: true));
+            var header = (TextBlock)bar.FindName("ChangesHeader");
+            Assert.Equal(Visibility.Collapsed, header.Visibility);
+            Assert.Equal(Visibility.Collapsed, ((FrameworkElement)bar.FindName("Changes")).Visibility);
+            Assert.Equal("Enter or Escape closes.", ((TextBlock)bar.FindName("Keys")).Text);
+            bar.SetModel(Model());   // a design review brings them back
+            Assert.Equal(Visibility.Visible, header.Visibility);
+            Assert.Equal(Visibility.Visible, ((FrameworkElement)bar.FindName("Changes")).Visibility);
+        });
+    }
+
+    [Fact]
+    public void EditShowsOnlyWhenTheModelAllowsItAndRaisesEditRequested()
+    {
+        OnSta(() =>
+        {
+            var bar = Build(Model());
+            Assert.Equal(Visibility.Collapsed, bar.Edit.Visibility);
+            bar.SetModel(Model() with { CanEdit = true });
+            Assert.Equal(Visibility.Visible, bar.Edit.Visibility);
+            Assert.Equal("Edit", AutomationProperties.GetName(bar.Edit));
+            int edits = 0;
+            bar.EditRequested += () => edits++;
+            bar.Edit.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            Assert.Equal(1, edits);
+        });
+    }
+
+    [Fact]
+    public void ApplyAndDismissTakeTheModelsLabels()
+    {
+        OnSta(() =>
+        {
+            var bar = Build(DrawerReview.Result("1 moved.", canUndo: true));
+            Assert.Equal("Undo", bar.Apply.Content);
+            Assert.Equal("Done", bar.Dismiss.Content);
+            Assert.Equal("Undo", AutomationProperties.GetName(bar.Apply));
+            Assert.Equal("Done", AutomationProperties.GetName(bar.Dismiss));
         });
     }
 }

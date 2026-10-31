@@ -273,4 +273,14 @@ public class ResetPlanTests : IDisposable
         Assert.True(ResetPlan.ReceiptsUnreadable(paths));
         Assert.True(ResetPlan.ReceiptsUnreadable(file));
     }
+
+    [Fact]
+    public void The_drawer_journal_goes_with_History()
+    {
+        var paths = new Paths(appDataBase: Path.Combine(Path.GetTempPath(), "inv-" + Guid.NewGuid().ToString("N")[..6]));
+        Directory.CreateDirectory(paths.AppDataDir);
+        File.WriteAllText(paths.DrawerJournalFile, "{}");
+        try { Assert.Contains(ResetPlan.Inventory(paths)[ResetPart.History], i => i.Path == paths.DrawerJournalFile); }
+        finally { Directory.Delete(paths.AppDataDir, true); }
+    }
 }

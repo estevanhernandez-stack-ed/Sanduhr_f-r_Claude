@@ -28,6 +28,10 @@ namespace Sanduhr.App.Desk;
 /// The sentinel also hears <c>TaskbarCreated</c> (Explorer restarted, which destroys the owned Desk
 /// windows with their owner), display changes and work-area changes; each raises
 /// <see cref="ScreensChanged"/> once per 500 ms burst and the controller rebuilds into new windows.
+///
+/// Free drawers (<see cref="DeskIsland.Drawer"/>, drawers amendment 1) draw above every widget window and below every app: each window
+/// goes to <c>HWND_BOTTOM</c> in turn, so the last one sent there is the lowest, and drawer windows are sent first (<see cref="DrawersFirst"/>);
+/// Show desktop's lift inserts each just under the same window, so there drawers go last (<see cref="DrawersLast"/>).
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal sealed class DesktopLayerHost : IDeskHost
@@ -43,6 +47,8 @@ internal sealed class DesktopLayerHost : IDeskHost
     private readonly List<HwndSource> _windows = [];
     /// <summary>The screen each window in <see cref="_windows"/> draws on.</summary>
     private readonly List<DeskScreen> _screens = [];
+    /// <summary>Whether each window in <see cref="_windows"/> holds a drawer, as of the last <see cref="Show"/>.</summary>
+    private readonly List<bool> _drawers = [];
     private readonly HwndSource _sentinel;
     private readonly uint _taskbarCreated;
     private readonly DispatcherTimer _coalesce;
@@ -147,6 +153,7 @@ internal sealed class DesktopLayerHost : IDeskHost
         bool reuse = !_stale
             && wanted.Count == _windows.Count
             && wanted.Select(w => w.Screen).SequenceEqual(_screens)
+            && wanted.Select(w => w.Island.Drawer).SequenceEqual(_drawers)
             && _windows.All(w => !w.IsDisposed && DeskNative.IsWindow(w.Handle));
         if (!reuse)
         {
@@ -158,7 +165,10 @@ internal sealed class DesktopLayerHost : IDeskHost
                 _screens.Add(screen);
             }
         }
-        for (int i = 0; i < wanted.Count; i++)
+        _drawers.Clear();
+        _drawers.AddRange(wanted.Select(w => w.Island.Drawer));
+        // New windows go to the bottom one by one: drawers first, so every widget window ends up under them.
+        foreach (int i in reuse ? Enumerable.Range(0, wanted.Count) : DrawersFirst(_drawers))
             Place(_windows[i], wanted[i].Screen, wanted[i].Island, first: !reuse);
         if (reuse)
         {
@@ -238,7 +248,8 @@ internal sealed class DesktopLayerHost : IDeskHost
             same.Height = h;
             same.IsHitTestVisible = !through;
             same.LayoutTransform = Math.Abs(k - 1) < 0.001 ? Transform.Identity : new ScaleTransform(k, k);
-            Fit(src, screen, left, top, w, h, first);
+            // A drawer handed back as it was (the minute's in-place tick) stays where it is: the user may be moving it by its title.
+            if (!island.Drawer) Fit(src, screen, left, top, w, h, first);
             return;
         }
         if (content.Parent is Border previous) previous.Child = null;
@@ -319,7 +330,7 @@ internal sealed class DesktopLayerHost : IDeskHost
         var hwnd = src.Handle;
         var home = new PxRect(x, y, pw, ph);
         _homes[src] = (home, screen);
-        var at = Drifted(home, screen);
+        var at = IsDrawer(src) ? home : Drifted(home, screen);
         // Physical pixels in, physical pixels out: the same per-monitor context the monitors were read in.
         DeskNative.PerMonitor(() =>
         {
@@ -333,9 +344,17 @@ internal sealed class DesktopLayerHost : IDeskHost
         });
     }
 
+    /// <summary>The window holds a free drawer: OLED care's drift leaves it out, so it sits exactly where the user put it and a drop never
+    /// carries a drift offset into its saved place.</summary>
+    private bool IsDrawer(HwndSource src)
+    {
+        int i = _windows.IndexOf(src);
+        return i >= 0 && i < _drawers.Count && _drawers[i];
+    }
+
     /// <summary>Where a window at <paramref name="home"/> sits with OLED care's drift: the orbit's point, applied to the
     /// window as a whole. The orbit is held to the content (the window less its shadow room) so a piece never leaves the
-    /// monitor's work area or crosses the taskbar's clearance; the padding rides along.</summary>
+    /// monitor's work area or crosses the taskbar's clearance; the padding rides along. Drawer windows never drift (<see cref="IsDrawer"/>).</summary>
     private PxRect Drifted(PxRect home, DeskScreen screen)
     {
         if (_drift is not { } step) return home;
@@ -364,7 +383,7 @@ internal sealed class DesktopLayerHost : IDeskHost
         {
             foreach (var w in _windows)
             {
-                if (w.IsDisposed || !_homes.TryGetValue(w, out var h)) continue;
+                if (w.IsDisposed || IsDrawer(w) || !_homes.TryGetValue(w, out var h)) continue;
                 var at = Drifted(h.Home, h.Screen);
                 if (DeskNative.Rect(w.Handle) != at)
                     DeskNative.SetWindowPos(w.Handle, IntPtr.Zero, at.X, at.Y, at.Width, at.Height,
@@ -381,6 +400,16 @@ internal sealed class DesktopLayerHost : IDeskHost
             if (!w.IsDisposed && w.RootVisual is Border b) CareOpacity.Ease(b, opacity, ease);
     }
 
+    /// <summary>Window indexes for sending each to <c>HWND_BOTTOM</c> in turn: drawers first, then the rest, each in island order. The last
+    /// sent is the lowest, so drawers end above every widget.</summary>
+    internal static IReadOnlyList<int> DrawersFirst(IReadOnlyList<bool> drawer) =>
+        [.. Enumerable.Range(0, drawer.Count).Where(i => drawer[i]), .. Enumerable.Range(0, drawer.Count).Where(i => !drawer[i])];
+
+    /// <summary>Window indexes for inserting each just under one window in turn: the rest first, then drawers. The last inserted is the
+    /// highest, so drawers end above every widget.</summary>
+    internal static IReadOnlyList<int> DrawersLast(IReadOnlyList<bool> drawer) =>
+        [.. Enumerable.Range(0, drawer.Count).Where(i => !drawer[i]), .. Enumerable.Range(0, drawer.Count).Where(i => drawer[i])];
+
     private void CloseWindows()
     {
         _closing = true;
@@ -393,6 +422,7 @@ internal sealed class DesktopLayerHost : IDeskHost
             }
             _windows.Clear();
             _screens.Clear();
+            _drawers.Clear();
             _homes.Clear();
         }
         finally { _closing = false; }
@@ -523,7 +553,7 @@ internal sealed class DesktopLayerHost : IDeskHost
             ? DeskNative.HWND_NOTOPMOST : above;
         DeskNative.PerMonitor(() =>
         {
-            foreach (var w in _windows)
+            foreach (var w in InOrder(DrawersLast))
             {
                 if (w.IsDisposed) continue;
                 var h = w.Handle;
@@ -534,11 +564,15 @@ internal sealed class DesktopLayerHost : IDeskHost
         });
     }
 
+    /// <summary>The windows in the order <paramref name="order"/> gives for their drawer flags.</summary>
+    private IEnumerable<HwndSource> InOrder(Func<IReadOnlyList<bool>, IReadOnlyList<int>> order) =>
+        _drawers.Count == _windows.Count ? order(_drawers).Select(i => _windows[i]) : _windows;
+
     private void Drop()
     {
         DeskNative.PerMonitor(() =>
         {
-            foreach (var w in _windows)
+            foreach (var w in InOrder(DrawersFirst))
             {
                 if (w.IsDisposed) continue;
                 var h = w.Handle;
@@ -558,6 +592,12 @@ internal sealed class DesktopLayerHost : IDeskHost
 
     private IntPtr DeskHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        // Open with and Send to fill in lazily: the open Shell menu needs these messages (VERDICT.md change 3).
+        if (ShellMenu.Forward(msg, wParam, lParam, out var menuResult))
+        {
+            handled = true;
+            return menuResult;
+        }
         switch (msg)
         {
             case DeskNative.WM_WINDOWPOSCHANGING:
@@ -566,10 +606,14 @@ internal sealed class DesktopLayerHost : IDeskHost
             case DeskNative.WM_MOUSEACTIVATE:
                 handled = true;
                 return new IntPtr(DeskNative.MA_NOACTIVATE);
+            case DeskNative.WM_ACTIVATE when (wParam.ToInt64() & 0xFFFF) == DeskNative.WA_INACTIVE:
+                DeskFocus.GaveBack(hwnd);
+                break;
             case DeskNative.WM_DPICHANGED:
                 Schedule("DPI changed");
                 break;
             case DeskNative.WM_DESTROY:
+                DeskFocus.GaveBack(hwnd);
                 if (!_closing)
                 {
                     _stale = true;
