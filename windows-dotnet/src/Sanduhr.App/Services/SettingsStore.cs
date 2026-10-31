@@ -879,9 +879,10 @@ public sealed class SettingsStore
         var jtd = LoadJustTheDesk();
         var m = SetupMigration.From(hasAccount, jtd.On, jtd.SilencedReminder, ReadBool(root, "desk_enabled", false));
         if (m is null) return false;
-        SaveSetup(m.Setup);
+        // The Desk and the reminder first, the setup last: setup is the "ran" marker, so a write that fails before it runs again next launch.
         if (m.DeskOn) SaveDesk(LoadDesk() with { Enabled = true });
         if (m.ReminderOn) SaveDeskSignInReminder(true);
+        SaveSetup(m.Setup);
         return true;
     }
 
