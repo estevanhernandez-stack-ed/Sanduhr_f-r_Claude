@@ -619,7 +619,8 @@ and result shapes: `get_usage`, `get_local_burn_by_project`, `get_model_usage`,
 `get_usage_history`, `ping`, `propose_theme` (below), plus two Mac tools for Desk messages (below),
 the watcher tools, `propose_now_playing_looks` (Now playing, below), `propose_widget` (Claude-made
 widgets, below; no switch needed, because nothing installs until you press Apply), `get_desk` and
-`propose_desk` (the Desk for Claude, below; no switch needed either, because a design waits for Apply), and `propose_mod`,
+`propose_desk` (the Desk for Claude, below; no switch needed either, because a design waits for Apply),
+`propose_sprite_motion` (a made-here sprite's motion, below), and `propose_mod`,
 `list_catalog`, `propose_install` with `get_mod_status` (Mod Studio: a mod's files for you to
 review, your kept mods, a request to turn one on in a folder; only while **Let agents propose
 mods** is on), and `propose_config` under the same switch (agents, skills, commands, output
@@ -1923,6 +1924,23 @@ frames the animations use). `WidgetOwnArt.apply` copies each chosen image into t
 files in `pack.json`, adds one to its patch version and validates the whole pack again; the model
 (`WidgetsModel.useOwnArt`) reinstalls it as `.local` with `replaceMadeHere`. Nothing leaves the Mac. Only the
 first eligible row carries the search anchor, and the banner has no search entry.
+
+### Claude maps a sprite's motion (`propose_sprite_motion`, 2.39.0)
+
+Claude never sees a sprite's art. `desk-state.json` (the file `get_desk` reads) carries a `sprites` list: for
+each sprite made here, its `id`, `name`, `frame_w`, `frame_h` and `cells`, and nothing else. The app works the
+cell count out from the sheet's pixel size and the frame size (`SpriteMotionState`; a PNG's header is all it
+reads), so the MCP server never opens an image; the list follows installs and uninstalls through the same
+`widgetPacksDidChange` the rest of that file does. `propose_sprite_motion` takes the sprite's id and
+`sprite.json` fields only (`animations`, `moods` and `triggers` whole; `fps`, `scale`, `roam` optional).
+Any other field is refused with a message, an id that is not listed (a catalog sprite) is refused, and the
+fields run through the vendored validator's `check_sprite` plus the cell count, with no files read. A good one
+becomes `sprite-motion-request.json` (owner-only, atomic; same statuses, ten-second wait and ten-minute window as
+`propose_widget`, 256 KB cap) and the answer comes back in `sprite-motion-result.json`.
+`SpriteMotionHandoff` and `SpriteMotionProposal.decode` are the app's file layer: the decoder re-checks the
+fields, finds the installed made-here sprite and validates the pack with the new `sprite.json` (strict, every
+index against the real sheet). The review banner, preview and Apply are a later layer; until `isReady` says
+otherwise a good request is answered `rejected`, `not_ready`.
 
 ## The Desk for Claude
 

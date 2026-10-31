@@ -39,6 +39,9 @@ tools the same way on either machine:
                              checks it with the catalog's own rules (widgets/validate.py, strict), and
                              hands it to Sanduhr, which previews it on the Desk; it installs only when
                              the user presses Apply (no switch lets Claude skip that)
+  propose_sprite_motion      re-times a sprite made here (animations, fps, scale, moods, triggers, roam) from
+                             the frame size and cell count get_desk lists, never the art; checked here with
+                             the same validator, then previewed and applied only on the user's Apply
 
 What each tool may read is decided per account in Sanduhr (Settings, Accounts, Data, Share
 with Claude) and handed over in ~/Library/Application Support/Sanduhr/mcp-access.json. No
@@ -60,9 +63,10 @@ watch-request-<ms>-<seq>-<id>.json (the watch tools, only while watchers.json, w
 says agents may show watchers) and mod-request.json, mod-install-request.json and config-request.json (propose_mod,
 propose_install and propose_config, only while mods-agents.json says agents may propose mods) and
 widget-request.json (propose_widget, always: a new pack waits for the user's Apply) and desk-request.json
-(propose_desk, always: a whole design waits for the user's Apply), atomically and owner-only; get_desk reads
+(propose_desk, always: a whole design waits for the user's Apply) and sprite-motion-request.json
+(propose_sprite_motion, always: a new motion waits for the user's Apply), atomically and owner-only; get_desk reads
 desk-state.json, which the app keeps current with the Desk settings (layout, ink, fonts, plate and shadow, no
-usage and no message text); it never writes messages.txt, a theme or
+usage and no message text) and each sprite made here's id, name, frame size and cell count (never its image); it never writes messages.txt, a theme or
 the saved looks. No tool takes a path. Failures are typed results (status/reason/remedy), never protocol
 errors. Python 3.9 standard library only.
 
@@ -384,6 +388,27 @@ WIDGET_GUIDE = (
     "queued means Sanduhr did not answer: it is not running. Nothing is uploaded; sharing a pack "
     "is a pull request to the sanduhr-widgets catalog.")
 
+# propose_sprite_motion (2.39.0): how a made-here sprite moves, mapped by Claude without ever seeing the art.
+MOTION_GUIDE = (
+    "Re-time a sprite the user made here (Settings, Widgets, New sprite, or one Claude made): which cells play "
+    "for walk, sit, nap and the rest, how fast, how big, which mood or trigger plays what, and how it roams. "
+    "You never see or supply the image: get_desk returns sprites, a list of {id, name, frame_w, frame_h, cells} "
+    "for each sprite made here (cells is how many frames the sheet holds, numbered from 0, row by row). Call "
+    "get_desk first and map the motion from those numbers and what the user tells you the cells show. Pass "
+    "sprite_id (an id from that list; a catalog sprite is not listed and cannot be changed) and sprite.json "
+    "fields only: animations (name to 1-64 cell indexes, each below cells; required: walk, sit, nap, pop, "
+    "cheer, worry, focus, sleep, celebrate), moods {content, focused, worried, exhausted, celebrate} and "
+    "triggers {needs_you, job_passed, near_limit, idle} each naming an animation, and optionally fps 1-24, "
+    "scale 1-4 and roam {edges: subset of bottom, left, right; speed_px_s 5-120}; an optional field you leave "
+    "out stays as it is. animations, moods and triggers replace the sprite's whole tables, so send them whole. "
+    "Any other field (an image, pixels, a sheet, stages, files, a name) is refused with status rejected; the art "
+    "never changes. Trademark rule as propose_widget. Sanduhr checks the fields against the cell count and "
+    "refuses with status rejected and reasons before anything is sent; then it checks again and shows the user "
+    "a review bar with Preview on the Desk and Apply: previewing means the user is looking at it; it changes the "
+    "sprite only when they press Apply (applied; the patch version goes up), and Dismiss answers rejected with "
+    "reason dismissed and changes nothing. queued means Sanduhr did not answer: it is not running. Nothing is "
+    "uploaded.")
+
 # get_desk and propose_desk (2.37.0): Windows' tool names and schemas, with the guide text cut to what the
 # Mac Desk has (no monitors, wallpaper summary, Launcher, saved designs or direct-change switch).
 DESIGN_GUIDE_READ = (
@@ -395,7 +420,8 @@ DESIGN_GUIDE_READ = (
     "the words), weather.nickname (the name the weather piece shows instead of the place's, \"\" for the place's own), "
     "font, ink, plate, shadow), pieces and anchors (the allowed words), fonts (installed families, and the "
     "bundled handwriting fonts EsteFont Pro and EsteFont 26), shown (the pieces the Desk draws now), "
-    "message_color and notch_text_color (hex colors, read-only: propose_desk does not change them) and limits. "
+    "message_color and notch_text_color (hex colors, read-only: propose_desk does not change them), limits and "
+    "sprites (each sprite made here: id, name, frame_w, frame_h and cells, never its image; propose_sprite_motion uses it). "
     "The Mac Desk has no monitors, wallpaper summary, Launcher, saved designs or direct-change switch, so those "
     "keys are never here, and propose_desk cannot judge ink against the wallpaper: choose an ink that reads on "
     "what the user has. Call this before propose_desk and design from what it says. status no_data with reason "
@@ -824,6 +850,31 @@ TOOLS += [
                         "openWorldHint": False},
     },
 ]
+TOOLS += [
+    {
+        "name": "propose_sprite_motion",
+        "description": MOTION_GUIDE,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sprite_id": {"type": "string", "description": "A made-here sprite's id from get_desk sprites (my-...)."},
+                "animations": {"type": "object",
+                               "description": "Animation name to 1-64 cell indexes (0 to cells - 1). walk, sit, nap, pop, cheer, worry, focus, sleep and celebrate are required."},
+                "moods": {"type": "object", "description": "{content, focused, worried, exhausted, celebrate}, each an animation name."},
+                "triggers": {"type": "object", "description": "{needs_you, job_passed, near_limit, idle}, each an animation name."},
+                "fps": {"type": "integer", "minimum": 1, "maximum": 24, "description": "Frames per second. Left out: unchanged."},
+                "scale": {"type": "integer", "minimum": 1, "maximum": 4, "description": "Nearest-neighbour scale. Left out: unchanged."},
+                "roam": {"type": "object", "description": "{edges: subset of bottom, left, right; speed_px_s 5-120}. Left out: unchanged."},
+                "note": {"type": "string", "maxLength": 200,
+                         "description": "One short sentence for the user on what you changed and why (shown on the review bar)."},
+            },
+            "required": ["sprite_id", "animations", "moods", "triggers"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False,
+                        "openWorldHint": False},
+    },
+]
 TOOL_NAMES = [t["name"] for t in TOOLS]
 # The Desk messages handoff (item 54). The app mirrors these names (DeskMessageHandoff); a test on
 # each side pins them.
@@ -866,6 +917,12 @@ WIDGET_REQUEST_FILE = "widget-request.json"
 WIDGET_RESULT_FILE = "widget-result.json"
 WIDGET_MAX_BYTES = 4 * 1024 * 1024
 WIDGET_WAIT_SECONDS = 10.0
+# The sprite motion handoff (2.39.0, propose_sprite_motion). The app mirrors these names and limits
+# (SpriteMotionProposal); a test on each side pins them.
+MOTION_REQUEST_FILE = "sprite-motion-request.json"
+MOTION_RESULT_FILE = "sprite-motion-result.json"
+MOTION_MAX_BYTES = 256 * 1024
+MOTION_WAIT_SECONDS = 10.0
 # The Desk design handoff (2.37.0, get_desk and propose_desk). The app mirrors these names and limits
 # (DeskDesign, DeskDesignHandoff, DeskStateExport); a test on each side pins them.
 DESIGN_REQUEST_FILE = "desk-request.json"
@@ -955,6 +1012,8 @@ class Paths:
         self.config_result = os.path.join(self.support_dir, CONFIG_RESULT_FILE)
         self.widget_request = os.path.join(self.support_dir, WIDGET_REQUEST_FILE)
         self.widget_result = os.path.join(self.support_dir, WIDGET_RESULT_FILE)
+        self.motion_request = os.path.join(self.support_dir, MOTION_REQUEST_FILE)
+        self.motion_result = os.path.join(self.support_dir, MOTION_RESULT_FILE)
         self.design_request = os.path.join(self.support_dir, DESIGN_REQUEST_FILE)
         self.design_result = os.path.join(self.support_dir, DESIGN_RESULT_FILE)
         self.design_state = os.path.join(self.support_dir, DESIGN_STATE_FILE)
@@ -3674,6 +3733,148 @@ def build_propose_widget(args, now=None, paths=None, wait=WIDGET_WAIT_SECONDS, p
                       % int(wait)}
 
 
+# -- propose_sprite_motion (2.39.0): a made-here sprite's motion, mapped without the art ---------
+#
+# The app keeps desk-state.json's `sprites` current: id, name, frame size and cell count of each sprite made here,
+# never the image or a pixel (the cell count is the app's, from the sheet's size; this server never opens a PNG).
+# The fields are checked here with the vendored validator's sprite rules (check_sprite, on no files at all)
+# plus the cell count, and handed over in sprite-motion-request.json; the app checks again and the user's Apply
+# rewrites sprite.json. This server never installs or reads art and never touches the network.
+
+MOTION_FIELDS = ("animations", "fps", "scale", "moods", "triggers", "roam")
+MOTION_REQUIRED = ("animations", "moods", "triggers")
+MOTION_ARGS = ("sprite_id",) + MOTION_FIELDS + ("note",)
+MOTION_MAX_SPRITES = 64
+
+
+def motion_sprites(state):
+    """The made-here sprites the app listed, as {id: {name, frame_w, frame_h, cells}}; anything malformed is skipped."""
+    rows = state.get("sprites") if isinstance(state, dict) else None
+    found = {}
+    for row in (rows if isinstance(rows, list) else [])[:MOTION_MAX_SPRITES]:
+        if not isinstance(row, dict) or not isinstance(row.get("id"), str):
+            continue
+        nums = [row.get(k) for k in ("frame_w", "frame_h", "cells")]
+        if any(isinstance(n, bool) or not isinstance(n, int) or n < 1 for n in nums):
+            continue
+        found[row["id"]] = {"name": row.get("name") if isinstance(row.get("name"), str) else row["id"],
+                            "frame_w": nums[0], "frame_h": nums[1], "cells": nums[2]}
+    return found
+
+
+def motion_check(sprite, fields):
+    """The validator's sprite rules on the given fields for a sprite of frame_w x frame_h and `cells` cells.
+    Returns reasons ({field, message}). Raises WidgetValidatorMissing."""
+    validate = widget_validator()
+    from pathlib import Path
+    doc = {"schema_version": 2, "frame_w": sprite["frame_w"], "frame_h": sprite["frame_h"], "scale": 2, "fps": 8,
+           "sheet": "sheet.png", "roam": {"edges": ["bottom"], "speed_px_s": 30}}
+    doc.update(fields)
+    rep = validate.Report("sprite.json")
+    # No pack folder and no sheet: the rules that read files skip, and the cell count is checked below.
+    validate.check_sprite(rep, Path("/nonexistent-sanduhr-motion"), doc, ["sprite.json", "sheet.png"])
+    for text in validate.iter_strings(fields):
+        validate.check_trademark(rep, "sprite.json", text)
+    reasons = [widget_reason("sprite", e.replace("sprite.json: ", "", 1)) for e in (rep.errors + rep.warnings)[:24]]
+    anims = fields.get("animations")
+    if isinstance(anims, dict):
+        for name in ordinal(k for k in anims if isinstance(k, str)):
+            frames = anims[name]
+            if isinstance(frames, list) and all(isinstance(i, int) and not isinstance(i, bool) and i >= 0 for i in frames):
+                over = [i for i in frames if i >= sprite["cells"]]
+                if over:
+                    reasons.append(widget_reason("animations", "%s uses cell %d, but this sprite's sheet has %d cell%s (0 to %d)"
+                                                 % (clip16(name, 24), max(over), sprite["cells"],
+                                                    "" if sprite["cells"] == 1 else "s", sprite["cells"] - 1)))
+    return reasons[:24]
+
+
+def build_propose_sprite_motion(args, now=None, paths=None, wait=MOTION_WAIT_SECONDS, poll=DESK_POLL_SECONDS,
+                                sleep=time.sleep, clock=time.monotonic):
+    """Checks the motion here (a refusal returns status rejected with reasons and writes nothing), hands it
+    to the app through sprite-motion-request.json and waits briefly for sprite-motion-result.json. Never
+    changes a sprite: the user's Apply does."""
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    args = args if isinstance(args, dict) else {}
+    reasons = []
+    unknown = ordinal(k for k in args if k not in MOTION_ARGS)
+    if unknown:
+        reasons.append(widget_reason("arguments", "unknown argument(s): " + ", ".join(clip16(k, 24) for k in unknown[:5])
+                                     + ". The arguments are sprite_id, animations, moods, triggers, fps, scale, roam and note. "
+                                       "Claude never supplies or sees an image: the art is not changed here."))
+    sprite_id = widget_str(args.get("sprite_id"))
+    if sprite_id is None:
+        reasons.append(widget_reason("sprite_id", "must be the id of a sprite made here, from get_desk sprites"))
+    note = None
+    if args.get("note") is not None:
+        note = widget_str(args["note"])
+        if note is None or u16len(note) > 200 or any(unicodedata.category(c) == "Cc" for c in note):
+            reasons.append(widget_reason("note", "must be one line of at most 200 characters"))
+            note = None
+    for key in MOTION_REQUIRED:
+        if key not in args:
+            reasons.append(widget_reason(key, "is required: the whole table is sent (get_desk does not return the current one)"))
+    if reasons:
+        return {"status": "rejected", "reasons": reasons}
+
+    outcome, state = read_design_state(paths)
+    if outcome != "ok":
+        return no_data(outcome, "Sanduhr has not written its state (or it cannot be read now), so the sprites made here are "
+                                "not known. Start Sanduhr, wait a few seconds, call get_desk and try again.")
+    sprites = motion_sprites(state)
+    sprite = sprites.get(sprite_id)
+    if sprite is None:
+        return {"status": "rejected", "reasons": [widget_reason(
+            "sprite_id", "is not a sprite made here on this Mac (get_desk sprites lists them); a catalog sprite cannot be changed")]}
+
+    fields = {k: args[k] for k in MOTION_FIELDS if k in args}
+    try:
+        reasons = motion_check(sprite, fields)
+    except WidgetValidatorMissing:
+        return {"status": "error", "reason": "validator_missing",
+                "remedy": "This copy of the Sanduhr server has no widgets/validate.py beside it. Update the Sanduhr "
+                          "integrations (Settings, Integrations, or bash mac/integrations/install.sh)."}
+    if reasons:
+        return {"status": "rejected", "reasons": reasons}
+
+    request_id = uuid.uuid4().hex
+    request = {"schema_version": 1, "id": request_id, "requested_at": widget_stamp(now), "sprite_id": sprite_id}
+    if note is not None and note.strip():
+        request["note"] = note
+    request["sprite"] = fields
+    try:
+        text = widget_json(request)
+    except ValueError:
+        return {"status": "rejected", "reasons": [widget_reason("sprite", "is not readable as JSON text")]}
+    if len(text.encode("utf-8")) > MOTION_MAX_BYTES:
+        return {"status": "rejected", "reasons": [widget_reason("sprite", "is too large for the widget to read (a motion is at most 256 KB of JSON)")]}
+    try:
+        os.makedirs(paths.support_dir, mode=0o700, exist_ok=True)
+        tmp = paths.motion_request + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, paths.motion_request)   # atomic: the app never reads half a file
+    except OSError as e:
+        return {"status": "error", "reason": "request_write_failed",
+                "remedy": "Could not queue the request (%s)." % type(e).__name__}
+
+    deadline = clock() + wait
+    while True:
+        res = read_desk_result(paths.motion_result, request_id)
+        if res is not None:
+            return widget_answer(res, sprite_id, request_id)
+        if clock() >= deadline:
+            break
+        sleep(poll)
+    # The request stays for the app's next look within its ten-minute window.
+    return {"status": "queued", "reason": "widget_not_responding", "pack_id": sprite_id, "request_id": request_id,
+            "remedy": "Sanduhr did not answer within %d seconds. Start Sanduhr: it picks the request up within ten "
+                      "minutes of when it was made and shows the user the new motion to preview, Apply or Dismiss."
+                      % int(wait)}
+
+
 # -- get_desk and propose_desk (2.37.0): the Desk, read and designed with Claude -------------
 #
 # A port of the Mac subset of Windows' DeskDesign.Parse and Validate (Core), ToolLogic.Desk.cs and the two
@@ -3704,7 +3905,8 @@ DESIGN_MAX_TILT = 20
 DESIGN_BUNDLED_FONTS = ("EsteFont Pro", "EsteFont 26")
 DESIGN_LINK_MAX = 2048
 DESIGN_ANSWER_STATUSES = ("previewing", "applied", "rejected", "needs_font")
-DESIGN_STATE_KEYS = ("design", "pieces", "anchors", "fonts", "shown", "message_color", "notch_text_color", "limits")
+DESIGN_STATE_KEYS = ("design", "pieces", "anchors", "fonts", "shown", "message_color", "notch_text_color", "limits",
+                     "sprites")
 DESIGN_INK_WORDS = ("auto", "light", "dark", "theme")
 DESIGN_WINDOWS_ONLY_FIELDS = {
     "launcher": "is Windows only: the Mac Desk has no Launcher piece",
@@ -4308,6 +4510,8 @@ def call_tool(name, args):
         return build_get_desk()
     if name == "propose_desk":
         return build_propose_desk(args)
+    if name == "propose_sprite_motion":
+        return build_propose_sprite_motion(args)
     if name == "get_mod_status":
         return build_get_mod_status(args)
     if name == "list_catalog":
