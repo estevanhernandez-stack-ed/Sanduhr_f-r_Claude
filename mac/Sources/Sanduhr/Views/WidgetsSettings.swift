@@ -10,10 +10,13 @@ struct WidgetsSettings: View {
     let model: WidgetsModel
     /// The proposal waiting for review (Claude's `propose_widget`); observed, so the banner comes and goes with it.
     var handoff = WidgetProposalHandoff.shared
+    /// A sprite motion waiting for review (Claude's `propose_sprite_motion`).
+    var motion = SpriteMotionHandoff.shared
 
     var body: some View {
         Form {
             WidgetsSuggestionSection(handoff: handoff)
+            WidgetsMotionSection(handoff: motion)
             WidgetsCatalogSection(model: model)
             WidgetsInstalledSection(model: model)
             WidgetsNewSpriteSection(model: model)
@@ -25,6 +28,7 @@ struct WidgetsSettings: View {
         .onChange(of: model.installed) { _, _ in vm.userThemesTick &+= 1 }
         // A proposal arrived or was decided: the installed list and the companion pick are read again (Apply installs).
         .onChange(of: handoff.pending?.id) { _, _ in model.reloadInstalled() }
+        .onChange(of: motion.pending?.id) { _, _ in model.reloadInstalled() }
     }
 }
 
@@ -42,6 +46,24 @@ private struct WidgetsSuggestionSection: View {
                     makeCompanion: { handoff.apply(makeCompanion: true) },
                     apply: { handoff.apply() },
                     dismiss: { handoff.dismiss() })
+            }
+        }
+    }
+}
+
+/// The motion review banner, while a motion waits.
+private struct WidgetsMotionSection: View {
+    let handoff: SpriteMotionHandoff
+
+    var body: some View {
+        if let review = handoff.model {
+            Section {
+                SpriteMotionBanner(
+                    model: review, previewNote: handoff.previewNote,
+                    preview: { handoff.previewOnDesk() },
+                    endPreview: { handoff.endPreview() },
+                    apply: { handoff.apply() },
+                    decline: { handoff.decline() })
             }
         }
     }

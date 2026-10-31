@@ -1939,8 +1939,14 @@ becomes `sprite-motion-request.json` (owner-only, atomic; same statuses, ten-sec
 `propose_widget`, 256 KB cap) and the answer comes back in `sprite-motion-result.json`.
 `SpriteMotionHandoff` and `SpriteMotionProposal.decode` are the app's file layer: the decoder re-checks the
 fields, finds the installed made-here sprite and validates the pack with the new `sprite.json` (strict, every
-index against the real sheet). The review banner, preview and Apply are a later layer; until `isReady` says
-otherwise a good request is answered `rejected`, `not_ready`.
+index against the real sheet). Settings, Widgets shows the review banner (`SpriteMotionBanner`): the sprite, Claude's note and what changes
+(fps, size, animation lengths), then **Preview on the Desk** (the sprite drawn with the proposed motion from
+memory, nothing written), **Apply** and **Decline**. Apply re-reads the installed pack, merges the fields, bumps
+the patch in `pack.json`, validates strict and reinstalls as the user's own (`.local`); the art files are the
+installed bytes. Answers: `applied`; `rejected` with `dismissed` (Decline), `replaced` (a newer request),
+`install_failed` (uninstalled meanwhile, or the pack no longer fits) or `not_ready`. A request past ten
+minutes is dropped unanswered; there is no `expired` status. `SpriteMotionReview` holds the logic behind a
+`SpriteMotionStoring` seam.
 
 ## The Desk for Claude
 

@@ -212,7 +212,7 @@ struct SpriteMotionTests {
         #expect(w.handoff.pending?.id == "r2")
         #expect(w.answers.count == 3)
         #expect(w.answers.first { $0.0 == "r1" && $0.1.status == "rejected" }?.1.reason == "replaced")
-        w.handoff.finish(WidgetAnswer(WidgetAnswer.rejected, reason: "dismissed", packId: "my-my-blob"))
+        w.handoff.decline()
         #expect(w.handoff.pending == nil)
         #expect(w.answers.last?.0 == "r2" && w.answers.last?.1.reason == "dismissed")
     }

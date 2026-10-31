@@ -9,10 +9,16 @@ import Observation
 /// than ten minutes is dropped unanswered.
 ///
 /// - A good proposal is held as `pending` and answered `previewing` once `isReady` says the review can be shown;
-///   until then it is answered `rejected`, `not_ready`. The review banner, **Preview on the Desk** and **Apply**
-///   are not here: whoever builds them reads `pending`, rewrites the sprite, and closes it with `finish`.
-/// - A newer request answers the older one `rejected`, `replaced`.
-/// - Nothing here changes a sprite or draws anything. Nothing logs a motion's content.
+///   until then it is answered `rejected`, `not_ready`. The Settings banner (`model`) offers **Preview on the Desk**,
+///   **Apply** and **Decline**.
+/// - **Preview on the Desk** draws the sprite with the proposed motion, from memory: nothing is written, the saved
+///   companion choice is untouched. Decline, Apply and a newer request take it down.
+/// - **Apply** rewrites the installed sprite (`SpriteMotionReview.apply`) and answers `applied`; a sprite uninstalled
+///   meanwhile, or a pack that no longer validates, answers `rejected`, `install_failed` with a sentence. **Decline**
+///   answers `rejected`, `dismissed` and changes nothing.
+/// - A newer request answers the older one `rejected`, `replaced`. One older than ten minutes is dropped unanswered
+///   (the same window as widgets; there is no `expired` status).
+/// - Nothing logs a motion's content.
 @MainActor
 @Observable
 final class SpriteMotionHandoff {
@@ -36,18 +42,35 @@ final class SpriteMotionHandoff {
         let motion: PackObject
         let files: [String: Data]
         let note: String?
+        let name: String
+        /// "What changes", worked out once when the request arrived.
+        let changes: [String]
     }
 
     /// The motion waiting for the user, if any. In memory only: quitting Sanduhr drops it.
     private(set) var pending: Review?
+    /// The pending motion is on the Desk now (Preview on the Desk).
+    private(set) var previewing = false
+    /// One sentence when Preview on the Desk could not show it, else nil.
+    private(set) var previewNote: String?
 
     @ObservationIgnored let paths: Paths
     @ObservationIgnored private let storeFor: () -> WidgetStore
     @ObservationIgnored private let now: () -> Date
-    /// Whether a review can be shown now. False answers a good proposal `not_ready` (the banner is a later layer).
+    /// The sprite is read and rewritten through this (the store, or a fake in tests).
+    @ObservationIgnored var motionStore: (() -> SpriteMotionStoring)?
+    /// The Desk side of a preview; nil previews nothing (tests, a build with no Desk).
+    @ObservationIgnored var host: WidgetPreviewHost?
+    /// Called just before the Desk shows this preview, so another preview can come down.
+    @ObservationIgnored var willPreview: (() -> Void)?
+    /// The motion was applied, declined or replaced (its notification can go).
+    @ObservationIgnored var onDecided: ((String) -> Void)?
+    /// The sprite was rewritten: the companion and the lists follow.
+    @ObservationIgnored var onInstalled: ((String) -> Void)?
+    /// Whether a review can be shown now. False answers a good proposal `not_ready`.
     @ObservationIgnored var isReady: () -> Bool = { false }
-    /// A proposal arrived and waits.
-    @ObservationIgnored var onPending: ((Review) -> Void)?
+    /// A proposal arrived and waits (the notification is the caller's).
+    @ObservationIgnored var onPending: ((SpriteMotionReviewModel) -> Void)?
     /// Every answer written (a test seam: the result file holds only the last).
     @ObservationIgnored var onAnswered: ((String, WidgetAnswer) -> Void)?
     @ObservationIgnored private var watching = false
@@ -85,24 +108,80 @@ final class SpriteMotionHandoff {
         }
     }
 
-    /// The review is over (applied, dismissed or failed): the pending motion goes and the caller is told.
-    func finish(_ result: WidgetAnswer) {
+    /// What the banner shows for the pending motion, nil with none.
+    var model: SpriteMotionReviewModel? {
+        guard let p = pending else { return nil }
+        return SpriteMotionReviewModel(
+            id: p.id, spriteId: p.spriteId, name: p.name, heading: SpriteMotionReviewCopy.heading(p.name),
+            note: p.note.flatMap { $0.unicodeScalars.contains { !$0.properties.isWhitespace } ? $0 : nil },
+            changesTitle: SpriteMotionReviewCopy.changesTitle, changes: p.changes + [SpriteMotionReviewCopy.unchangedArt],
+            deskOff: !(host?.deskRunning ?? false), previewing: previewing)
+    }
+
+    /// Preview on the Desk: the sprite as the companion with the proposed motion, for now. False (and `previewNote`
+    /// says why) when the Desk is off or the sprite can't be drawn. Nothing is written.
+    @discardableResult
+    func previewOnDesk() -> Bool {
+        guard let p = pending, let host else { return false }
+        guard host.deskRunning else { previewNote = WidgetReviewCopy.deskOff; return false }
+        guard let companion = CompanionPreview.make(packId: p.spriteId, files: p.files) else {
+            previewNote = "This sprite could not be drawn, so there is nothing to preview. Nothing was changed."
+            return false
+        }
+        willPreview?()
+        host.show(WidgetDeskPreview(companion: companion, ink: nil))
+        previewing = true
+        previewNote = nil
+        return true
+    }
+
+    /// Takes the preview down: the Desk is as it was. Nothing is answered (the motion still waits).
+    func endPreview() {
+        guard previewing else { return }
+        previewing = false
+        host?.end()
+    }
+
+    /// Decline: nothing is changed, the preview goes, and the caller is told.
+    func decline() {
         guard let p = pending else { return }
-        pending = nil
+        close(p)
+        answer(p.id, WidgetAnswer(WidgetAnswer.rejected, reason: "dismissed",
+                                  reasons: [DeskReason("sprite", "declined by the user")], packId: p.spriteId))
+    }
+
+    /// Apply: rewrites the installed sprite with the motion. The caller is told either way.
+    func apply() {
+        guard let p = pending else { return }
+        close(p)
+        let result = SpriteMotionReview.apply(spriteId: p.spriteId, motion: p.motion, store: motionStore?() ?? storeFor())
+        if result.status == WidgetAnswer.applied { onInstalled?(p.spriteId) }
         answer(p.id, result)
+    }
+
+    private func close(_ p: Review) {
+        pending = nil
+        endPreview()
+        previewNote = nil
+        onDecided?(p.id)
     }
 
     private func take(_ request: SpriteMotionRequest) -> WidgetAnswer {
         let spriteId = request.spriteId!
         guard !ResetGate.isOn, isReady() else { return Self.notReady(spriteId) }
         if let old = pending {
-            pending = nil
+            close(old)
             answer(old.id, WidgetAnswer(WidgetAnswer.rejected, reason: "replaced",
                                         reasons: [DeskReason("sprite", "replaced by a newer proposal")], packId: old.spriteId))
         }
-        let review = Review(id: request.id!, spriteId: spriteId, motion: request.motion!, files: request.files!, note: request.note)
+        let files = request.files!
+        let installed = storeFor().readFiles(spriteId)?["sprite.json"]
+        let name = storeFor().readInfo(spriteId)?.name ?? spriteId
+        let review = Review(id: request.id!, spriteId: spriteId, motion: request.motion!, files: files, note: request.note,
+                            name: name, changes: SpriteMotionReview.changes(old: installed, new: files["sprite.json"] ?? Data()))
         pending = review
-        onPending?(review)
+        previewNote = nil
+        if let m = model { onPending?(m) }
         return WidgetAnswer(WidgetAnswer.previewing, packId: spriteId)
     }
 
@@ -115,5 +194,22 @@ final class SpriteMotionHandoff {
     private func answer(_ id: String, _ answer: WidgetAnswer) {
         onAnswered?(id, answer)
         HandoffFiles.writeOwnerOnly(SpriteMotionProposal.resultJson(id: id, answer: answer, now: now()), to: paths.result)
+    }
+}
+
+extension SpriteMotionHandoff {
+    /// The app's wiring: the Desk preview host, the suggestion notification, and an applied motion reloads what
+    /// lists packs (the companion redraws with the new motion).
+    func startForApp() {
+        host = DeskWidgetPreviewHost()
+        isReady = { true }
+        willPreview = { WidgetProposalHandoff.shared.endPreview() }
+        onPending = { Notifier.shared.suggestSpriteMotion($0) }
+        onDecided = { Notifier.shared.clearSpriteMotion(id: $0) }
+        onInstalled = { _ in
+            WidgetsModel.refreshPackLists()
+            NotificationCenter.default.post(name: .widgetPacksDidChange, object: self)
+        }
+        start()
     }
 }
