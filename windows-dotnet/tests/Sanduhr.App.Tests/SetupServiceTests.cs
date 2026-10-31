@@ -146,6 +146,25 @@ public sealed class SetupServiceTests : IDisposable
         new SetupService(Store(), host).Apply(new SetupChoices(true, true, false));
         Assert.DoesNotContain("on", host.Calls);
         Assert.DoesNotContain("sort", host.Calls);
-        Assert.Single(host.Calls.Where(c => c == "reload"));
+        Assert.Single(host.Calls, c => c == "reload");
+    }
+
+    [Fact]
+    public void A_save_that_fails_says_so_and_still_tells_the_Desk_about_a_turn_off()
+    {
+        var store = Store();
+        store.SaveDesk(store.LoadDesk() with { Enabled = true });
+        var file = new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local")).SettingsFile;
+        Assert.True(File.Exists(file));
+        File.SetAttributes(file, FileAttributes.ReadOnly);   // the write throws UnauthorizedAccessException
+        try
+        {
+            var host = new FakeHost { DrawersOn = true };
+            var result = new SetupService(store, host).Apply(new SetupChoices(true, false, false));
+            Assert.Contains(SetupCopy.SaveFailed, result.Lines);
+            Assert.Contains("reload", host.Calls);
+            Assert.False(result.Now.Drawers);
+        }
+        finally { File.SetAttributes(file, FileAttributes.Normal); }
     }
 }

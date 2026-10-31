@@ -50,11 +50,13 @@ internal sealed class SetupService(SettingsStore store, ISetupHost host)
         // Drawers off first: it can be refused (a no to the count, no free name, a file in use), and then drawers stay ticked
         // while the rest of the change still applies.
         bool drawers = after.Drawers;
+        bool turnedOff = false;
         if (!after.Drawers && host.DrawersOn)
         {
             var off = host.TurnOffDrawers();
             if (off.Line is { } line) lines.Add(line);
             drawers = !off.Off;
+            turnedOff = off.Off;
         }
 
         var now = after with { Drawers = drawers };
@@ -66,7 +68,8 @@ internal sealed class SetupService(SettingsStore store, ISetupHost host)
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            lines.Add(SettingsNames.DrawersDeskSaveFailed);   // the Drawers page's own line: nothing past the save is touched
+            lines.Add(SetupCopy.SaveFailed);   // nothing past the save is touched
+            if (turnedOff) host.ReloadDesk();   // the turn-off already happened: the Desk stops drawing the drawers
             return new SetupResult(Current(), lines, false);
         }
 
@@ -103,11 +106,7 @@ internal sealed class AppSetupHost(Func<DrawerService?> drawers, Func<DrawerRevi
 
     public SetupDrawersOff TurnOffDrawers()
     {
-        if (drawers() is not { } d)
-        {
-            store.SaveDrawers(store.LoadDrawers() with { Enabled = false });
-            return new SetupDrawersOff(true, null);
-        }
+        if (drawers() is not { } d) return new SetupDrawersOff(false, SettingsNames.DrawersSortUnavailable);   // no service, no way to return the files: drawers stay on
         if (d.ReturnPlan() is not { } plan) return new SetupDrawersOff(false, DrawerService.NoFreeName);
         if (plan.Moves.Count > 0 && !confirm(DrawerReturn.Prompt(plan.Moves.Count))) return new SetupDrawersOff(false, null);
         if (review() is { Reviewing: true } r) r.Dismiss();   // a plan under review would move files into drawers that are going
