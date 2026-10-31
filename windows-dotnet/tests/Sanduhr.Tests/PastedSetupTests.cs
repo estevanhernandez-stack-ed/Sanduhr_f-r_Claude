@@ -170,6 +170,99 @@ public class PastedSetupTests
         Assert.Single(r.Rules!);
     }
 
+    // -- duplicate keys, the first good block, drawer ids, forgiving JSON -----------------------------------------
+
+    [Fact]
+    public void A_repeated_key_is_refused_not_thrown_at_top_level_inside_desk_and_inside_a_rule()
+    {
+        var top = PastedSetup.Read("""{"desk":{"name":"A"},"desk":{"name":"B"}}""");
+        Assert.False(top.Ok);
+        Assert.Equal("design", Assert.Single(top.Reasons).Field);
+
+        var nested = PastedSetup.Read("""{"desk":{"name":"A","name":"B"}}""");
+        Assert.False(nested.Ok);
+
+        var inRule = PastedSetup.Read("""{"drawers":{"rules":[{"kind":"images","kind":"documents","drawer":"A"}]}}""");
+        Assert.False(inRule.Ok);
+
+        var inDrawers = PastedSetup.Read("""{"drawers":{"rules":[{"kind":"images","drawer":"A"}],"rules":[]}}""");
+        Assert.False(inDrawers.Ok);
+
+        // A later block that is clean is still found past the broken one.
+        var after = PastedSetup.Read("""{"desk":{"name":"A"},"desk":{"name":"B"}} then {"desk":{"name":"C"}}""");
+        Assert.True(after.Ok);
+        Assert.Equal("C", (string?)after.Desk!["name"]);
+    }
+
+    [Fact]
+    public void The_first_good_block_is_used_not_the_first_candidate()
+    {
+        var r = PastedSetup.Read("""{"desk":[]} {"desk":{"name":"A"}}""");
+        Assert.True(r.Ok);
+        Assert.Equal("A", (string?)r.Desk!["name"]);
+        Assert.Equal(2, r.Blocks);
+
+        var none = PastedSetup.Read("""{"desk":[]} {"drawers":{"rules":[]}}""");
+        Assert.False(none.Ok);
+        Assert.Equal(2, none.Blocks);
+        Assert.Contains(none.Reasons, x => x.Field == "desk");
+        Assert.DoesNotContain(none.Reasons, x => x.Field == "drawers.rules");
+    }
+
+    [Fact]
+    public void Distinct_drawer_names_get_distinct_ids_and_one_name_keeps_one_id()
+    {
+        string Rules(params string[] names) =>
+            "{\"drawers\":{\"rules\":[" + string.Join(",", names.Select(n => "{\"kind\":\"images\",\"drawer\":\"" + n + "\"}")) + "]}}";
+
+        var scripts = PastedSetup.Read(Rules("写真", "Фото"));
+        Assert.True(scripts.Ok);
+        Assert.NotEqual(scripts.Rules![0].DrawerId, scripts.Rules[1].DrawerId);
+
+        var slug = PastedSetup.Read(Rules("My Photos", "My-Photos"));
+        Assert.True(slug.Ok);
+        Assert.NotEqual(slug.Rules![0].DrawerId, slug.Rules[1].DrawerId);
+        Assert.Equal(["My Photos", "My-Photos"], slug.RuleDrawerNames);
+
+        var same = PastedSetup.Read(Rules("Photos", "Photos", "photos"));
+        Assert.True(same.Ok);
+        Assert.Single(same.Rules!.Select(x => x.DrawerId).Distinct());
+        Assert.All(same.Rules!, x => Assert.True(DrawerIds.IsValid(x.DrawerId)));
+    }
+
+    [Fact]
+    public void Rule_text_may_not_hold_a_character_a_file_name_cannot()
+    {
+        foreach (var ch in new[] { "*", "?", "<", ">", "|" })
+            Assert.Contains(PastedSetup.Read("{\"drawers\":{\"rules\":[{\"kind\":\"name_contains\",\"drawer\":\"A\",\"text\":\"a" + ch + "b\"}]}}").Reasons,
+                x => x.Field == "drawers.rules[0].text");
+        Assert.True(PastedSetup.Read("""{"drawers":{"rules":[{"kind":"name_contains","drawer":"A","text":"invoice 2026-10"}]}}""").Ok);
+    }
+
+    [Fact]
+    public void Trailing_commas_and_comments_are_forgiven()
+    {
+        var r = PastedSetup.Read("""
+            {
+              // a look
+              "desk": { "name": "Calm", },
+              "drawers": { "rules": [ { "kind": "images", "drawer": "Photos", }, ], },
+            }
+            """);
+        Assert.True(r.Ok, string.Join("; ", r.Reasons));
+        Assert.Equal("Calm", (string?)r.Desk!["name"]);
+        Assert.Single(r.Rules!);
+    }
+
+    [Fact]
+    public void A_block_that_nearly_parsed_is_told_apart_from_no_block()
+    {
+        var broken = PastedSetup.Read("""{"desk":{"name":"A" "note":"x"}}""");
+        Assert.False(broken.Ok);
+        Assert.Contains("did not parse", Assert.Single(broken.Reasons).Message);
+        Assert.Contains("no Sanduhr block", Assert.Single(PastedSetup.Read("nothing here").Reasons).Message);
+    }
+
     [Fact]
     public void The_kind_words_are_the_enums_in_snake_case()
     {

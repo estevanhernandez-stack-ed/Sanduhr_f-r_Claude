@@ -91,7 +91,7 @@ public static class SetupPrompt
         Line($"- drawer: a short folder name of up to {DrawerNames.MaxLength} characters, a name and never a path.");
         Line($"- text: for {PastedSetup.KindWord(DrawerRuleKind.NameContains)} and {PastedSetup.KindWord(DrawerRuleKind.NameStartsWith)}, part of a file name, up to {PastedSetup.MaxTextChars} characters.");
         Line($"- days: for {PastedSetup.KindWord(DrawerRuleKind.OlderThan)}, a whole number from 1 to {PastedSetup.MaxDays}.");
-        Line($"Up to {PastedSetup.MaxRules} rules. The first rule that matches a file wins, and a file no rule matches stays on the desktop.");
+        Line($"1 to {PastedSetup.MaxRules} rules; leave drawers out to keep my rules as they are. The first rule that matches a file wins, and a file no rule matches stays on the desktop.");
         Line();
         var names = monitorNames.Select(CleanName).Where(n => n.Length > 0).ToList();
         Line("My monitors, for reference (in the design use only all or main): " + (names.Count == 0 ? "one." : string.Join("; ", names) + "."));

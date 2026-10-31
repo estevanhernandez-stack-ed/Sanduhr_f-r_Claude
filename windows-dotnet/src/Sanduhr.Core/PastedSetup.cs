@@ -51,56 +51,81 @@ public static class PastedSetup
         if (raw.Length > MaxPasteChars)
             return new(null, null, [], [new DeskReason("design", $"is longer than {MaxPasteChars} characters; paste only the answer")], 0);
 
-        var candidates = Blocks(raw)
+        var blocks = Blocks(raw, out int broken);
+        var candidates = blocks
             .OfType<JsonObject>()
             .Where(o => o.ContainsKey("desk") || o.ContainsKey("drawers"))
             .ToList();
         if (candidates.Count == 0)
             return new(null, null, [],
-                [new DeskReason("design", "no Sanduhr block found; ask the chat for one JSON block with a desk part, a drawers part or both")], 0);
-        var first = candidates[0];
+                [new DeskReason("design", broken > 0
+                    ? "a block that looks like Sanduhr's did not parse as JSON; check for a missing quote or bracket, or ask the chat to send it again"
+                    : "no Sanduhr block found; ask the chat for one JSON block with a desk part, a drawers part or both")], 0);
 
+        // The first good block is the first whose parts pass this reader's checks; DeskDesign.Validate runs later, with this PC's context.
+        // When none is clean, the first block's problems are the ones to show.
+        PastedSetupRead? firstRead = null;
+        foreach (var candidate in candidates)
+        {
+            var read = ReadBlock(candidate, candidates.Count);
+            if (read.Reasons.Count == 0) return read;
+            firstRead ??= read;
+        }
+        return firstRead!;
+    }
+
+    private static PastedSetupRead ReadBlock(JsonObject block, int count)
+    {
         var reasons = new List<DeskReason>();
-        foreach (var (key, _) in first)
+        foreach (var (key, _) in block)
             if (key is not ("desk" or "drawers"))
                 reasons.Add(new DeskReason(Clip(key, 24), "is not a part of the answer; the parts are desk and drawers"));
 
         JsonNode? desk = null;
-        if (first.ContainsKey("desk"))
+        if (block.ContainsKey("desk"))
         {
-            if (first["desk"] is JsonObject d) desk = d.DeepClone();
+            if (block["desk"] is JsonObject d) desk = d.DeepClone();
             else reasons.Add(new DeskReason("desk", "must be an object"));
         }
 
         List<DrawerRule>? rules = null;
         var names = new List<string>();
-        if (first.ContainsKey("drawers"))
+        if (block.ContainsKey("drawers"))
         {
-            if (first["drawers"] is not JsonObject dobj)
+            if (block["drawers"] is not JsonObject dobj)
                 reasons.Add(new DeskReason("drawers", "must be { \"rules\": [ ... ] }"));
             else
             {
                 foreach (var (key, _) in dobj)
                     if (key != "rules") reasons.Add(new DeskReason("drawers." + Clip(key, 24), "is not part of drawers; it holds rules only"));
                 if (dobj["rules"] is not JsonArray arr || arr.Count == 0)
-                    reasons.Add(new DeskReason("drawers.rules", $"must be a list of 1 to {MaxRules} rules"));
+                    reasons.Add(new DeskReason("drawers.rules", $"must be a list of 1 to {MaxRules} rules; leave drawers out to keep the rules as they are"));
                 else if (arr.Count > MaxRules)
                     reasons.Add(new DeskReason("drawers.rules", $"has {arr.Count} rules; at most {MaxRules}"));
                 else
                 {
                     rules = [];
+                    var ids = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    string IdFor(string name)
+                    {
+                        // One name is one drawer; two names that slug alike ("My Photos", "My-Photos") or have no ASCII letters get ids of their own.
+                        if (ids.TryGetValue(name, out var id)) return id;
+                        id = DrawerIds.Unique(name, ids.Values);
+                        ids[name] = id;
+                        return id;
+                    }
                     for (int i = 0; i < arr.Count; i++)
-                        if (Rule(arr[i], $"drawers.rules[{i}]", reasons) is { } rule) { rules.Add(rule.Rule); names.Add(rule.Name); }
+                        if (Rule(arr[i], $"drawers.rules[{i}]", reasons, IdFor) is { } rule) { rules.Add(rule.Rule); names.Add(rule.Name); }
                 }
             }
         }
 
         // Nothing applies partly: a part that had a problem hands back nothing of itself.
         if (reasons.Count > 0) rules = null;
-        return new(desk, rules, reasons.Count > 0 ? [] : names, [.. reasons.Take(40)], candidates.Count);
+        return new(desk, rules, reasons.Count > 0 ? [] : names, [.. reasons.Take(40)], count);
     }
 
-    private static (DrawerRule Rule, string Name)? Rule(JsonNode? node, string at, List<DeskReason> reasons)
+    private static (DrawerRule Rule, string Name)? Rule(JsonNode? node, string at, List<DeskReason> reasons, Func<string, string> idFor)
     {
         if (node is not JsonObject o) { reasons.Add(new DeskReason(at, "must be an object with kind and drawer")); return null; }
         int before = reasons.Count;
@@ -125,7 +150,7 @@ public static class PastedSetup
             text = Str(o["text"])?.Trim();
             if (string.IsNullOrEmpty(text)) reasons.Add(new DeskReason(at + ".text", $"is needed for {kindWord}: part of a file name"));
             else if (text.EnumerateRunes().Count() > MaxTextChars) reasons.Add(new DeskReason(at + ".text", $"must be at most {MaxTextChars} characters"));
-            else if (text.IndexOfAny(['\\', '/', ':']) >= 0 || text.EnumerateRunes().Any(MessageProposal.IsControl))
+            else if (text.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || text.EnumerateRunes().Any(MessageProposal.IsControl))
                 reasons.Add(new DeskReason(at + ".text", "must be part of a file name, not a path"));
         }
 
@@ -137,7 +162,7 @@ public static class PastedSetup
         }
 
         if (reasons.Count > before) return null;
-        return (new DrawerRule(kind, DrawerIds.From(name!), On: true, Text: text, Days: days), name!);
+        return (new DrawerRule(kind, idFor(name!), On: true, Text: text, Days: days), name!);
     }
 
     private static string? Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
@@ -152,15 +177,27 @@ public static class PastedSetup
 
     private static string Clip(string s, int n) => s.Length <= n ? s : s[..n];
 
-    /// <summary>Every top-level JSON object in the paste, in order: a scan for balanced braces outside strings, each parsed alone.
-    /// A span that does not parse is skipped and the scan goes on from the next character, so a prose brace before the real block is harmless.</summary>
-    private static IEnumerable<JsonNode> Blocks(string raw)
+    /// <summary>The reader's JSON rules for a chat's block: trailing commas and comments are forgiven, a repeated key is not (it would be
+    /// ambiguous, and a JSON node cannot hold it).</summary>
+    private static readonly JsonDocumentOptions ParseOptions = new()
     {
+        AllowTrailingCommas = true,
+        CommentHandling = JsonCommentHandling.Skip,
+        AllowDuplicateProperties = false,
+    };
+
+    /// <summary>Every top-level JSON object in the paste, in order: a scan for balanced braces outside strings, each parsed alone.
+    /// A span that does not parse is skipped and the scan goes on from the next character, so a prose brace before the real block is harmless.
+    /// <paramref name="broken"/> counts the skipped spans that mention desk or drawers, so a block that was nearly right can be told apart from none.</summary>
+    private static List<JsonNode> Blocks(string raw, out int broken)
+    {
+        var found = new List<JsonNode>();
+        broken = 0;
         int misses = 0;
         for (int i = 0; i < raw.Length; i++)
         {
             if (raw[i] != '{') continue;
-            if (misses > MaxMisses) yield break;
+            if (misses > MaxMisses) break;
             int depth = 0, end = -1;
             bool inString = false, escaped = false;
             for (int j = i; j < raw.Length; j++)
@@ -178,12 +215,19 @@ public static class PastedSetup
                 else if (c == '}' && --depth == 0) { end = j; break; }
             }
             if (end < 0) { misses++; continue; }
+            var span = raw[i..(end + 1)];
             JsonNode? node = null;
-            try { node = JsonNode.Parse(raw[i..(end + 1)]); }
+            try { node = JsonNode.Parse(span, null, ParseOptions); }
             catch (JsonException) { }
-            if (node is null) { misses++; continue; }
-            yield return node;
+            if (node is null)
+            {
+                misses++;
+                if (span.Contains("\"desk\"", StringComparison.Ordinal) || span.Contains("\"drawers\"", StringComparison.Ordinal)) broken++;
+                continue;
+            }
+            found.Add(node);
             i = end;
         }
+        return found;
     }
 }

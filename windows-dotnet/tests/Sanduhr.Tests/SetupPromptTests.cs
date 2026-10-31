@@ -232,7 +232,7 @@ public class SetupPromptTests
         Assert.False(PastedSetup.Read("""{"drawers":{"rules":[{"kind":"older_than","drawer":"A","days":0}]}}""").Ok);
         Assert.False(PastedSetup.Read(F("""{"drawers":{"rules":[{"kind":"older_than","drawer":"A","days":<0>}]}}""", int.Parse(max) + 1)).Ok);
 
-        var (count, _) = Pair(@"Up to (\d+) rules\. (The first)");
+        var (count, _) = Pair(@"1 to (\d+) rules; leave drawers out to keep my rules as they are\. (The first)");
         Assert.Equal(PastedSetup.MaxRules, int.Parse(count));
         var (nameLen, _) = Pair(@"a short folder name of up to (\d+) characters, (a name)");
         Assert.True(PastedSetup.Read(F("""{"drawers":{"rules":[{"kind":"images","drawer":"<0>"}]}}""", new string('d', int.Parse(nameLen)))).Ok);
