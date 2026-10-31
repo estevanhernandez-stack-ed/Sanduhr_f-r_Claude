@@ -109,6 +109,9 @@ public sealed partial record DeskDesign
     private static readonly string[] Fields =
         ["name", "note", "layout", "weather", "font", "ink", "plate", "shadow", "launcher", "messages", "looks", "theme", "follows_theme"];
 
+    /// <summary>The design's field names, read-only: the words <see cref="Parse"/> accepts at the top level.</summary>
+    public static IReadOnlyList<string> FieldNames => Fields;
+
     public static string Word(MessageProposalMode mode) => mode == MessageProposalMode.Add ? "add" : "replace";
 
     // -- reading ------------------------------------------------------------------------------------------
