@@ -64,7 +64,7 @@ enum SpriteMotionReview {
 
     /// Apply: the installed pack read again now (the user may have changed it since the proposal came), the motion's
     /// fields merged into its `sprite.json`, the patch version bumped in `pack.json`, the whole pack validated strict
-    /// and reinstalled as the user's own (`.local`). The art files are the installed bytes, never rewritten.
+    /// and reinstalled from the source it was installed from (a motion changes how a sprite moves, not whose it is). The art files are the installed bytes, never rewritten.
     static func apply(spriteId: String, motion: PackObject, store: SpriteMotionStoring) -> WidgetAnswer {
         func failed(_ why: String) -> WidgetAnswer {
             WidgetAnswer(WidgetAnswer.rejected, reason: "install_failed", reasons: [DeskReason("sprite", why)], packId: spriteId)
@@ -87,7 +87,7 @@ enum SpriteMotionReview {
         guard verdict.ok, let checked = verdict.manifest else {
             return failed("The motion no longer fits this sprite: " + (verdict.errors.first ?? "it did not pass the check") + " Nothing was changed.")
         }
-        let result = store.installLocal(files, checked)
+        let result = store.reinstall(files, checked)
         guard result.ok else { return failed(result.error ?? "could not be installed") }
         return WidgetAnswer(WidgetAnswer.applied, packId: spriteId)
     }
@@ -103,13 +103,13 @@ enum SpriteMotionReview {
 protocol SpriteMotionStoring {
     func isMadeHere(_ id: String) -> Bool
     func files(_ id: String) -> [String: Data]?
-    func installLocal(_ files: [String: Data], _ manifest: PackManifest) -> WidgetStoreResult
+    func reinstall(_ files: [String: Data], _ manifest: PackManifest) -> WidgetStoreResult
 }
 
 extension WidgetStore: SpriteMotionStoring {
     func isMadeHere(_ id: String) -> Bool { load().find(id)?.madeHere ?? false }
     func files(_ id: String) -> [String: Data]? { readFiles(id) }
-    func installLocal(_ files: [String: Data], _ manifest: PackManifest) -> WidgetStoreResult {
-        install(files, manifest, source: .local, replaceMadeHere: true)
+    func reinstall(_ files: [String: Data], _ manifest: PackManifest) -> WidgetStoreResult {
+        install(files, manifest, source: load().find(manifest.id)?.source ?? .local, replaceMadeHere: true)
     }
 }

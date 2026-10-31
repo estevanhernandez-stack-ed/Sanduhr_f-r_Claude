@@ -18,7 +18,7 @@ final class FakeMotionStore: SpriteMotionStoring {
 
     func isMadeHere(_ id: String) -> Bool { madeHere.contains(id) }
     func files(_ id: String) -> [String: Data]? { packs[id] }
-    func installLocal(_ files: [String: Data], _ manifest: PackManifest) -> WidgetStoreResult {
+    func reinstall(_ files: [String: Data], _ manifest: PackManifest) -> WidgetStoreResult {
         if let failWith { return .failed(failWith) }
         installs.append((files, manifest))
         packs[manifest.id] = files
@@ -106,6 +106,15 @@ struct SpriteMotionReviewTests {
         #expect(row.source == .local && row.version == "1.0.1")
         // A second pack is untouched.
         #expect(try sprite(w.store.readFiles("my-from-catalog")).fps == 8)
+    }
+
+    @Test func aReinstallKeepsTheSourceTheSpriteHad() throws {
+        let w = try World()
+        let claude = try #require(w.store.load().packs.first { $0.source == .claude })
+        let files = try #require(w.store.readFiles(claude.id))
+        let manifest = try #require(PackValidator.validate(files, folderName: claude.id, strict: true).manifest)
+        #expect(w.store.reinstall(files, manifest).ok)
+        #expect(w.store.load().find(claude.id)?.source == .claude)
     }
 
     @Test func anInstallFailureIsAnsweredWithItsSentence() throws {
