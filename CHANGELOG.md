@@ -6,8 +6,6 @@
 
 - **Claude maps the motion, never sees the art.** With the MCP server installed, `get_desk` lists each sprite made here with its id, name, frame size and cell count, and `propose_sprite_motion` hands Sanduhr the motion fields only: which cells play for each action, the frame rate, the moods. Settings, Widgets shows what changes, **Preview on the Desk** plays it from memory, **Apply** rewrites the sprite's motion (patch version up by one, art untouched) and **Decline** drops it. A suggestion notifies you; it is never applied without the button. Two owner-only files carry it, `sprite-motion-request.json` (deleted when read) and `sprite-motion-result.json`, and Reset Sanduhr… removes them.
 
-- **Not in this release.** The Now playing bars stay the position bar. Moving bars need Sanduhr to tap system audio, which asks for a new permission, so they wait for your call.
-
 ## v2.38.0-mac — 2026-10-30
 
 - **The system piece.** The Desk can show CPU, memory and disk: place **System** in Settings, Desk, Pieces. It takes the same Bar, Slim, Ring and Ticks styles as the meters, with no pace mark and no warning, because it is a reading and not usage. Sanduhr reads it from the Mac every 5 seconds, only while the Desk shows and the piece is placed, and nothing is sent or stored. Claude can place it and style it with `propose_desk`, where it is the `telemetry` piece, as on Windows.

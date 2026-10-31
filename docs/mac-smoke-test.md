@@ -2611,7 +2611,7 @@ of made-up art: a PNG of 4 by 2 cells of 16x16 (64x32 pixels), any drawing.
    `.png`: the sheet says it isn't a PNG image and offers no grid. Choose a PNG over 2 MB: it says it is larger
    than 2 MB.
 2. Choose the test sheet. The sheet shows a 4 by 2 grid for a 16x16 cell. Set the cell width to 24: the line
-   says the image isn't a whole number of cells and **Make** stays off or refuses. Set it back to 16.
+   says the image isn't a whole number of cells and **Make** refuses with the same sentence. Set it back to 16.
 3. With nothing tagged, Make refuses: tag at least one cell as sit, and walk needs two or more cells. Tag cells
    1 and 2 as walk (the order you click is the order played) and cell 3 as sit. Untagged nap, cheer and worry
    are listed as using sit's cells. Click a tagged cell again: it untags.
