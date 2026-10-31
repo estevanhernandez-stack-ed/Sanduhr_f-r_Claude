@@ -854,6 +854,36 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
   licenses. Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr" AND category ==
   "nowplaying"'`) shows only on/off, test and stream lines, never a title.
 
+## 23b. Live audio bars (spec 14, held for the owner)
+
+<!-- owner: finalise from the real prompt text -->
+A live Mac only: this is the one check that triggers the System Audio Recording prompt, and the CI
+and the run that built it never did. Use a release-signed build (a dev build's grant does not carry),
+Desk on, Now playing placed at Bottom left in Layout, Music (or Spotify) with a song queued.
+
+- [ ] Off by default: Settings, Desk, Now Playing, Live audio bars is off; no Gradient bars row;
+  `sanduhr` shows no audio permission entry yet; the Desk line is text over the position bar.
+- [ ] Play a song. Still no prompt. Turn **Live audio bars** on: the note says macOS asks for System
+  Audio Recording; the prompt appears now or at once when the song is playing with the Desk showing.
+  Record here: the exact prompt text ______ ; the System Settings label and list it lands in ______ .
+- [ ] Allow. Within a second the line shows 16 bars over the position bar and they move with the music;
+  silence for 5 seconds leaves them at rest dots; the idle CPU check (cputime deltas, not `%cpu`) shows
+  no timer cost at rest.
+- [ ] Pause: the tap goes (System Settings shows no active recording indicator for Sanduhr; the orange
+  dot on the menu bar clears) and the bars rest. Play: they move again.
+- [ ] Hide the Desk (cover it with a full screen app): the indicator clears. Show it: it returns.
+- [ ] Skip to a track in another app (Spotify, then Music): the bars follow the new app.
+- [ ] Gradient bars on: the bars blend across the Desk ink's stops; off: one color. Reduce Motion on
+  (System Settings, Accessibility, Display): the bars update slowly and carry no caps.
+- [ ] Turn the switch off: the bars row is gone at once, the indicator clears, the line is as at the start.
+- [ ] Deny path: turn the switch on, then remove Sanduhr from the list in System Settings (or answer Don't
+  Allow on a fresh grant) and play: after about 3 seconds the bars give way to the position bar and
+  "Allow in System Settings (two-finger click)"; the two-finger menu and the Settings button both open
+  Privacy & Security, Screen & System Audio Recording. Allow it there: the bars come back (a restart
+  of the song or of Sanduhr may be needed; note which) ______ .
+- [ ] Console (filter `com.626labs.sanduhr`, category `audiotap`) says only "level tap on" and failures,
+  never a title or a level.
+
 ## 24. Claude writes your Desk messages (item 54)
 
 Desk on with the message in a corner. Back up the list first and put it back at the end:

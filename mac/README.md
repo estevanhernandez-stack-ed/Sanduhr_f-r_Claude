@@ -1602,6 +1602,44 @@ switch and "Notch Settings…" / "Layout Settings…").
 - **Privacy.** Titles and artists stay in memory: never on disk, in a log or in `state.yaml`
   (`now_playing: {enabled, placed, source, state}` only). No network.
 
+### Live audio bars (opt-in)
+
+<!-- owner: finalise from the real prompt text -->
+Spec 14. Settings, Desk, Now Playing, **Live audio bars** (`nowPlaying.barsLevel`, off by default; a
+**Gradient bars** switch, `nowPlaying.barsGradient`, shows under it while it is on). With it off
+nothing here exists: no tap, no timer, no Core Audio call, and the Desk line looks as it always did.
+Turning it on is the only moment macOS can show the System Audio Recording prompt (text from
+`NSAudioCaptureUsageDescription` in `Info.plist`), and the prompt comes at the first tap, so when a
+track first plays with the Desk showing.
+
+- **The tap** (`Services/CoreAudioProcessTap.swift`, the only file that touches Core Audio, public API
+  only): the playing app's pid (`NowPlayingInfo.pid`) is translated to a process object, a
+  `CATapDescription(stereoMixdownOfProcesses:)` for that one process (unmuted, private) becomes a tap, a
+  private aggregate device holds it, and an IOProc keeps one peak (the largest absolute sample) under a
+  lock. Nothing is kept, written or sent. macOS 14.2+ (the app targets 14.0, so the tap is behind
+  `#available`; before 14.2 the switch is disabled). `AudioLevelTap` is the protocol the tests fake.
+- **When it runs** (`AudioTapInputs`, `AudioLevelController`): switch on, Desk showing (`DeskController`'s
+  motion check), the Now playing line placed on the Desk, a track playing, a pid. It is torn down (IOProc
+  stopped and destroyed, aggregate destroyed, tap destroyed) on pause, on switch off, while the Desk is
+  hidden and on a pid change, when it taps the new pid. A tap that fails for a pid is not retried until
+  the target changes.
+- **The bars** (`AudioBarsDriver`): one timer at `AudioBars.frameInterval` (0.2 s with Reduce Motion), only
+  while a tap runs. Each tick reads the peak, steps `AudioBars` and `AudioBarMotion`, and hands the
+  heights to `AudioBarsLayerView`: a `CAReplicatorLayer` repeats the resting dot, and 16 bar layers
+  plus caps are set directly (a replicator copies one layer, so it cannot give each copy a height).
+  After 5 seconds under 0.004 the timer stops and the layers settle at rest; the tap's next real peak
+  wakes it (`armWake`). Gradient bars blend the Desk ink's stops across the bars.
+- **Denied** (`AudioDeniedInference`): macOS gives no error for a denied tap, only zeros. The state
+  shows when the player is producing output (`kAudioProcessPropertyIsRunningOutput`) and every peak has
+  been exactly zero for 3 seconds. The Desk line then shows the position bar and "Allow in System Settings
+  (two-finger click)" (the Desk takes clicks itself, so the action is in the two-finger menu); Settings
+  has a button. Both open Privacy & Security, Screen & System Audio Recording
+  (`x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture`). No private TCC calls,
+  no second prompt. A browser's sound often comes from a helper process, not the pid Now playing reports,
+  so a browser tab may leave the bars still.
+- **Tests:** `AudioLevelTapTests.swift` (fake tap and ticker; a boundary suite pins that the real tap is
+  built in one file and that no private permission call exists). Nothing in the suite creates a tap.
+
 ## Fonts
 
 The Desk draws in **EsteFont Pro** (Regular and Bold, version 3.000), the author's handwriting,

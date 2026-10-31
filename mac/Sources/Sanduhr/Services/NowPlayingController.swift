@@ -99,11 +99,13 @@ final class NowPlayingController {
         let wanted = NowPlayingPlacement.isRunning(deskRunning: DeskController.shared.running, places: places)
         if wanted, !active { start() }
         if !wanted, active { stop() }
+        AudioBarsDriver.shared.settingsChanged()
         publish()
     }
 
     /// Quitting: the child processes go with Sanduhr.
     func shutdown() {
+        AudioBarsDriver.shared.shutdown()
         if active { stop() }
     }
 
@@ -409,6 +411,8 @@ final class NowPlayingController {
         if v != visible { visible = v }
         let model = DeskController.shared.model
         if model.nowPlaying != v { model.nowPlaying = v }
+        // The live bars' tap follows the track the line shows (spec 14).
+        AudioBarsDriver.shared.setTrack(v)
     }
 
     // MARK: Controls
@@ -434,6 +438,12 @@ final class NowPlayingController {
             item.isEnabled = MediaRemoteControl.available
             menu.addItem(item)
         }
+        if AudioBarsDriver.shared.switchOn, AudioBarsDriver.shared.denied {
+            menu.addItem(.separator())
+            let allow = NSMenuItem(title: AudioBarsPrefs.allowTitle + "…", action: #selector(NowPlayingMenuTarget.allowAudio), keyEquivalent: "")
+            allow.target = NowPlayingMenuTarget.shared
+            menu.addItem(allow)
+        }
         menu.addItem(.separator())
         let settings = NSMenuItem(title: SettingsSection.nowPlaying.linkTitle, action: #selector(NowPlayingMenuTarget.settings), keyEquivalent: "")
         settings.target = NowPlayingMenuTarget.shared
@@ -448,6 +458,7 @@ final class NowPlayingMenuTarget: NSObject {
     @objc func previous() { NowPlayingController.shared.previous() }
     @objc func toggle() { NowPlayingController.shared.togglePlayPause() }
     @objc func next() { NowPlayingController.shared.next() }
+    @objc func allowAudio() { NSWorkspace.shared.open(AudioBarsPrefs.settingsURL) }
     @objc func settings() {
         // Menu items act on the main thread.
         MainActor.assumeIsolated { SettingsWindowController.shared.show(.nowPlaying) }

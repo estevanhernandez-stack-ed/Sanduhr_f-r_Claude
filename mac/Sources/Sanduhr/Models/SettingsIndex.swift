@@ -81,6 +81,7 @@ enum SettingsAnchor {
     static let source = "source"
     static let show = "show"
     static let looks = "looks"
+    static let bars = "bars"
     static let idle = "idle"
     static let apps = "apps"
     static let fallback = "fallback"
@@ -223,6 +224,8 @@ enum SettingsAnchor {
         SettingsEntry(title: "Now playing", page: .nowPlaying, anchor: source, synonyms: ["source", "place it"]),
         SettingsEntry(title: "Show", page: .nowPlaying, anchor: show, synonyms: ["Hide while paused"]),
         SettingsEntry(title: "Looks", page: .nowPlaying, anchor: looks),
+        SettingsEntry(title: "Live audio bars", page: .nowPlaying, anchor: bars,
+                      synonyms: ["Gradient bars", "System Audio Recording", "audio", "visualizer", "permission"]),
         SettingsEntry(title: "When nothing is playing", page: .nowPlaying, anchor: idle, synonyms: ["idle", "paused"]),
         SettingsEntry(title: "Apps", page: .nowPlaying, anchor: apps, synonyms: ["Music", "Spotify", "browser"]),
         SettingsEntry(title: "When the system now playing is unavailable", page: .nowPlaying, anchor: fallback,
