@@ -19,6 +19,7 @@ public static class SetupCopy
     public const string Cancel = "Cancel";
     public const string MenuItem = "Set up Sanduhr…";
     public const string PickOne = "Pick at least one, or Sanduhr has nothing to show.";
+    public const string SaveFailed = "Your choices could not be saved.";
     public const string DesktopOffLine = "The clock, message and weather hide. Your layout is kept.";
     public const string UsageOffLine = "Your account stays saved. Remove it in Settings, Accounts.";
     public const string AddOnsStayLine = "The Claude Code add-ons stay installed. Remove them on the Claude Code page.";
@@ -32,7 +33,7 @@ public static class SetupCopy
     public static IReadOnlyList<string> All { get; } =
     [
         Title, Intro, DesktopTitle, DesktopBody, DrawersTitle, DrawersBody, UsageTitle, UsageBody, ClaudeSource, ClaudeTrademark,
-        DesignWithChat, Continue, NotNow, Cancel, MenuItem, PickOne, DesktopOffLine, UsageOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DrawersOffLine(2),
+        DesignWithChat, Continue, NotNow, Cancel, MenuItem, PickOne, SaveFailed, DesktopOffLine, UsageOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DrawersOffLine(2),
     ];
 }
 
