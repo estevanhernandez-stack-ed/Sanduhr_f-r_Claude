@@ -56,19 +56,20 @@ public static class WelcomeTour
     ]);
 
     /// <summary>
-    /// The tour for someone who chose Just the Desk: three steps with no meters, accounts or Claude
+    /// The tour for someone who set up Sanduhr without usage: three steps with no meters, accounts or Claude
     /// Code in them. The desk and tray cards are the table's, moved up a step (the tray body is
     /// rewritten for a tray with no numbers); a last card says the Desk stands alone and where
-    /// sign-in lives.
+    /// usage is turned on.
     /// </summary>
     public static IReadOnlyList<TourCard> DeskOnly { get; } = Anchored(
     [
         Moved(ById("desk"), 1),
         Moved(ById("tray"), 2,
             "Right-click the hourglass in the tray for Settings and Arrange Desk; a click brings back the widget. Once you sign in it shows a percent of your limits."),
-        new(3, new WhatsNewCard([], "sign-in", "Sign in any time",
-            "The Desk works without a Claude account. Sign in from Settings, Accounts whenever you have one, and the meters fill in on the desktop.",
-            "", WhatsNewPreview.None, SettingsPage.Accounts), ShowMeTitle: "Accounts"),
+        // Show me lands on the Widget page's usage-off section, where the Set up Sanduhr button is.
+        new(3, new WhatsNewCard([], "usage", "Usage any time",
+            "The Desk works without an account. Turn on usage in Set up Sanduhr whenever you want it, and the meters fill in on the desktop.",
+            "", WhatsNewPreview.None, SettingsPage.Widget) { Anchor = SettingsIndex.UsageOffSection }, ShowMeTitle: SetupCopy.Title),
     ]);
 
     private static TourCard ById(string id) => Table.Single(c => c.Id == id);
@@ -85,18 +86,18 @@ public static class WelcomeTour
         };
 
     /// <summary>
-    /// The steps to show: the Desk-only tour while Just the Desk is on (it has no meters step, so
+    /// The steps to show: the Desk-only tour while usage is off (it has no meters step, so
     /// signing out changes nothing in it), the full tour otherwise.
     /// </summary>
-    public static IReadOnlyList<IReadOnlyList<TourCard>> StepsFor(bool justTheDesk,
+    public static IReadOnlyList<IReadOnlyList<TourCard>> StepsFor(bool deskOnly,
         IReadOnlySet<TourFeature> features, bool signedIn = true) =>
-        justTheDesk ? Steps(features, DeskOnly) : Steps(features, signedIn: signedIn);
+        deskOnly ? Steps(features, DeskOnly) : Steps(features, signedIn: signedIn);
 
     /// <summary>
-    /// Choosing Just the Desk offers the tour once a launch, while it is still pending (no fetch is
+    /// Setting up without usage offers the tour once a launch, while it is still pending (no fetch is
     /// coming to offer it).
     /// </summary>
-    public static bool ShowsForJustTheDesk(TourState? state, bool offeredThisLaunch) =>
+    public static bool ShowsForDeskOnly(TourState? state, bool offeredThisLaunch) =>
         state == TourState.Pending && !offeredThisLaunch;
 
     /// <summary>The cards this machine shows: features met, sorted by step, ties in table order.</summary>
@@ -188,7 +189,7 @@ public static class WelcomeTour
     /// <summary><paramref name="card"/> with the anchor its destination calls for; the same card when it has it already.</summary>
     private static TourCard WithAnchor(TourCard card)
     {
-        var anchor = AnchorFor(card.Card.Destination);
+        var anchor = card.Card.Anchor ?? AnchorFor(card.Card.Destination);   // a card that names its own section keeps it
         return card.Card.Anchor == anchor ? card : card with { Card = card.Card with { Anchor = anchor } };
     }
 

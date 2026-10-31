@@ -116,7 +116,7 @@ public class StreamerReachTests
     /// shared by neighbouring lines counts once per line.</summary>
     private static readonly (string File, string Id, int Count)[] Known =
     [
-        ("Sanduhr.App/App.xaml.cs", "key", 6),
+        ("Sanduhr.App/App.xaml.cs", "key", 7),
         ("Sanduhr.App/App.xaml.cs", "masked", 2),
         ("Sanduhr.App/App.xaml.cs", "notname", 4),
         ("Sanduhr.App/Desk/DeskArrangeMode.cs", "notname", 3),
@@ -216,7 +216,7 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/TierCardViewModel.cs", "notname", 1),
         ("Sanduhr.App/ViewModels/WelcomeTourViewModel.cs", "masked", 1),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "cant", 4),
-        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "key", 18),
+        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "key", 19),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "masked", 3),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "notname", 19),
         ("Sanduhr.App/Views/DeskLayoutMap.cs", "notname", 1),

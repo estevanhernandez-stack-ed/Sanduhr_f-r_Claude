@@ -56,6 +56,22 @@ internal sealed class DrawerReviewService
     /// <summary>A plan is on the Desk waiting for Apply, Edit or Dismiss.</summary>
     public bool Reviewing => _plan is not null;
 
+    /// <summary>The review's bar is up: a plan under review, or Apply's result with its Undo. The welcome tour waits while it is.</summary>
+    public bool BarOpen => _barOpen;
+    private bool _barOpen;
+
+    private void ShowBar(DeskReviewModel model, Action apply, Action? edit, Action dismiss)
+    {
+        _barOpen = true;
+        _host.Bar(model, apply, edit, dismiss);
+    }
+
+    private void CloseBar()
+    {
+        _barOpen = false;
+        _host.CloseBar();
+    }
+
     /// <summary>The built-in rules over the Desktop, opened for review. Null when the bar opened; otherwise the line to show instead.</summary>
     public string? SortNow()
     {
@@ -92,7 +108,7 @@ internal sealed class DrawerReviewService
         _drawers.SetPending(check);
         // Drawers are free panels: the layout is the Desk's own, and the drawers the plan would create are drawn from DrawerService.PreviewDrawers.
         _host.Preview(_store.LoadDesk().Layout);
-        _host.Bar(Model(plan, check, []), Apply, Edit, Dismiss);
+        ShowBar(Model(plan, check, []), Apply, Edit, Dismiss);
     }
 
     private DeskReviewModel Model(DrawerPlan plan, DrawerPlanCheck check, IEnumerable<string> extraWarnings)
@@ -130,7 +146,7 @@ internal sealed class DrawerReviewService
                 : StreamerMode.Mask.Omit(check.Error) ?? DrawerReview.PlanChanged;   // streamer: masked - a check's error can name files; Mask.Omit drops it while on
             _undoId = null;
             End();
-            _host.Bar(DrawerReview.Result(why, canUndo: false), Undo, null, Done);
+            ShowBar(DrawerReview.Result(why, canUndo: false), Undo, null, Done);
             return;
         }
         DrawerRun run;
@@ -140,7 +156,7 @@ internal sealed class DrawerReviewService
             // Never leave the review stuck: the preview ends and the bar says nothing more moved, with no Undo.
             _undoId = null;
             End();
-            _host.Bar(DrawerReview.Result(DrawerReview.ApplyFailed, canUndo: false), Undo, null, Done);
+            ShowBar(DrawerReview.Result(DrawerReview.ApplyFailed, canUndo: false), Undo, null, Done);
             return;
         }
         // The journal before the settings: a save that fails after files moved still leaves the entry Undo needs (final review M1).
@@ -165,7 +181,7 @@ internal sealed class DrawerReviewService
         _madeHomes = [.. check.Drawers.Select(d => d.Home)];
         End();
         var shown = (run with { UndoLost = run.Moved.Count > 0 && entry is null }).Shown;   // streamer: masked - DrawerRun.Shown cuts the file-naming line to counts while on
-        _host.Bar(DrawerReview.Result(shown, _undoId is not null), Undo, null, Done);
+        ShowBar(DrawerReview.Result(shown, _undoId is not null), Undo, null, Done);
     }
 
     private void Undo()
@@ -174,13 +190,13 @@ internal sealed class DrawerReviewService
         _undoId = null;
         // The homes this Apply made count as homes even when their settings save failed, so the files in them can come back.
         var run = _drawers.Undo(id, _madeHomes);
-        _host.Bar(DrawerReview.Result(run.Shown, canUndo: false), Undo, null, Done);   // streamer: masked - DrawerRun.Shown cuts the file-naming line to counts while on
+        ShowBar(DrawerReview.Result(run.Shown, canUndo: false), Undo, null, Done);   // streamer: masked - DrawerRun.Shown cuts the file-naming line to counts while on
     }
 
     private void Done()
     {
         _undoId = null;
-        _host.CloseBar();
+        CloseBar();
     }
 
     private void Edit()
@@ -194,7 +210,7 @@ internal sealed class DrawerReviewService
         {
             // Keep the review open on the plan the user was looking at, and say why the edit did not take.
             var why = check.Ok ? DrawerReview.NothingToSort : StreamerMode.Mask.Paths(check.Error!);   // streamer: masked - Mask.Paths hides the profile folder in a refused path while on
-            _host.Bar(Model(plan, _check!, [why]), Apply, Edit, Dismiss);
+            ShowBar(Model(plan, _check!, [why]), Apply, Edit, Dismiss);
             return;
         }
         Show(next, check);
@@ -205,7 +221,7 @@ internal sealed class DrawerReviewService
     {
         if (_plan is null) { Done(); return; }
         End();
-        _host.CloseBar();
+        CloseBar();
     }
 }
 
