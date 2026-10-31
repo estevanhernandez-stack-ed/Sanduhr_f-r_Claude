@@ -1604,7 +1604,6 @@ switch and "Notch Settings…" / "Layout Settings…").
 
 ### Live audio bars (opt-in)
 
-<!-- owner: finalise from the real prompt text -->
 Spec 14. Settings, Desk, Now Playing, **Live audio bars** (`nowPlaying.barsLevel`, off by default; a
 **Gradient bars** switch, `nowPlaying.barsGradient`, shows under it while it is on). With it off
 nothing here exists: no tap, no timer, no Core Audio call, and the Desk line looks as it always did.
@@ -1613,8 +1612,10 @@ Turning it on is the only moment macOS can show the System Audio Recording promp
 track first plays with the Desk showing.
 
 - **The tap** (`Services/CoreAudioProcessTap.swift`, the only file that touches Core Audio, public API
-  only): the playing app's pid (`NowPlayingInfo.pid`) is translated to a process object, a
-  `CATapDescription(stereoMixdownOfProcesses:)` for that one process (unmuted, private) becomes a tap, a
+  only): the playing app's pid (`NowPlayingInfo.pid`) and its helpers (`AudioPlayerProcesses`: its
+  descendants and the processes whose bundle id sits under its own, since Chrome plays through an audio
+  helper) are matched against Core Audio's process list, a
+  `CATapDescription(stereoMixdownOfProcesses:)` for those (unmuted, private) becomes a tap, a
   private aggregate device holds it, and an IOProc keeps one peak (the largest absolute sample) under a
   lock. Nothing is kept, written or sent. macOS 14.2+ (the app targets 14.0, so the tap is behind
   `#available`; before 14.2 the switch is disabled). `AudioLevelTap` is the protocol the tests fake.
@@ -1635,8 +1636,9 @@ track first plays with the Desk showing.
   (two-finger click)" (the Desk takes clicks itself, so the action is in the two-finger menu); Settings
   has a button. Both open Privacy & Security, Screen & System Audio Recording
   (`x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture`). No private TCC calls,
-  no second prompt. A browser's sound often comes from a helper process, not the pid Now playing reports,
-  so a browser tab may leave the bars still.
+  no second prompt. The grant shows in that pane's **System Audio Recording Only** list. A player whose
+  sound comes from a process that is neither its child nor under its bundle id (Safari's WebKit GPU
+  process may be one) still leaves the bars still.
 - **Tests:** `AudioLevelTapTests.swift` (fake tap and ticker; a boundary suite pins that the real tap is
   built in one file and that no private permission call exists). Nothing in the suite creates a tap.
 

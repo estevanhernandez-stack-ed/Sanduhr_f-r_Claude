@@ -161,7 +161,7 @@ private struct NowPlayingBarsSection: View {
 
     private var deniedRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("macOS is not giving Sanduhr that app's audio level. Allow Sanduhr under Screen & System Audio Recording in System Settings.")
+            Text("macOS is not giving Sanduhr that app's audio level. Allow Sanduhr in System Settings, Screen & System Audio Recording, under System Audio Recording Only.")
                 .font(.caption).foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
