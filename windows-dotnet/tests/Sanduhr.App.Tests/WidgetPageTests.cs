@@ -241,92 +241,60 @@ public sealed class WidgetPageTests : AppWindowFixture
         finally { window.Close(); widget.Dispose(); }
     });
 
-    /// <summary>Just the Desk on, with no account, the reminder silenced by Just the Desk (the first-run card's choice).</summary>
-    private Sanduhr.App.Services.SettingsStore InJustTheDesk(bool reminderWasOn)
-    {
-        var store = new Sanduhr.App.Services.SettingsStore(ScratchPaths());
-        var (state, reminderOn, _) = JustTheDesk.Choose(JustTheDeskState.Off, reminderWasOn);
-        store.SaveJustTheDesk(state);
-        store.SaveDeskSignInReminder(reminderOn);
-        return store;
-    }
-
     [Fact]
-    public void Show_the_widget_ends_Just_the_Desk_and_shows_the_first_run_card() => AppHost.Run(() =>
+    public void The_Widget_page_offers_Set_up_Sanduhr_while_usage_is_off() => AppHost.Run(() =>
     {
-        var store = InJustTheDesk(reminderWasOn: true);
+        new Sanduhr.App.Services.SettingsStore(ScratchPaths())
+            .SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false }));
         var (widget, _) = ScratchWidget();
         var page = new WidgetPageViewModel(widget);
-        int shown = 0;
-        page.ShowWidgetRequested = () => shown++;
         try
         {
-            Assert.True(page.IsJustTheDesk);
-
-            page.ShowWidgetCommand.Execute(null);
-
-            Assert.False(page.IsJustTheDesk);
-            Assert.False(widget.JustTheDesk);
-            Assert.Equal(1, shown);
-            Assert.False(store.LoadJustTheDesk().On);
-            Assert.True(store.LoadDeskSignInReminder());
-            Assert.False(widget.ShowNotSignedInLine);   // the first-run card, not the one-line way in: never a blank widget
+            bool opened = false;
+            page.SetupRequested = () => opened = true;
+            Assert.True(page.ShowUsageOff);
+            page.OpenSetupCommand.Execute(null);
+            Assert.True(opened);
         }
         finally { page.Detach(); widget.Dispose(); }
     });
 
     [Fact]
-    public void A_reminder_the_person_had_turned_off_stays_off() => AppHost.Run(() =>
+    public void The_Widget_page_follows_usage_turning_on() => AppHost.Run(() =>
     {
-        var store = InJustTheDesk(reminderWasOn: false);
-        var (widget, _) = ScratchWidget();
+        new Sanduhr.App.Services.SettingsStore(ScratchPaths())
+            .SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false }));
+        var (widget, _) = ScratchWidget();   // no account: turning usage on builds no client and reaches no network
         var page = new WidgetPageViewModel(widget);
         try
         {
-            page.ShowWidgetCommand.Execute(null);
-            Assert.False(store.LoadDeskSignInReminder());
+            Assert.True(page.ShowUsageOff);
+            widget.SetUsageOn(true);
+            Assert.False(page.ShowUsageOff);
         }
         finally { page.Detach(); widget.Dispose(); }
     });
 
     [Fact]
-    public void The_next_launch_shows_the_widget() => AppHost.Run(() =>
+    public void The_section_shows_only_while_usage_is_off() => AppHost.Run(() =>
     {
-        InJustTheDesk(reminderWasOn: true);
-        var (widget, accounts) = ScratchWidget();
-        var page = new WidgetPageViewModel(widget);
-        page.ShowWidgetCommand.Execute(null);
-        page.Detach();
-        widget.Dispose();
-
-        var relaunched = new WidgetViewModel(ScratchPaths(), accounts);
-        try
-        {
-            Assert.False(relaunched.JustTheDesk);
-            Assert.False(JustTheDesk.WidgetStartsHidden(relaunched.JustTheDesk, hasAccount: false, deskOn: true));
-        }
-        finally { relaunched.Dispose(); }
-    });
-
-    [Fact]
-    public void The_section_shows_only_while_Just_the_Desk_is_on() => AppHost.Run(() =>
-    {
-        InJustTheDesk(reminderWasOn: true);
-        var (widget, _) = ScratchWidget();
+        new Sanduhr.App.Services.SettingsStore(ScratchPaths())
+            .SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false }));
+        var (widget, _) = ScratchWidget();   // no account: turning usage on builds no client and reaches no network
         var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
         var window = new SettingsWindow(svm);
         var guard = NoActivate.Show(window);
         try
         {
-            window.SelectPage(SettingsPage.Widget, SettingsIndex.JustTheDeskSection);
+            window.SelectPage(SettingsPage.Widget, SettingsIndex.UsageOffSection);
             window.UpdateLayout();
             Pump();
             guard.Check();
             var tab = ((TabControl)window.FindName("Tabs")).Items.OfType<TabItem>().Single(t => (string)t.Tag == "Widget");
-            var section = SettingsAnchor.Find((DependencyObject)tab.Content, SettingsIndex.JustTheDeskSection)!;
+            var section = SettingsAnchor.Find((DependencyObject)tab.Content, SettingsIndex.UsageOffSection)!;
             Assert.True(section.IsVisible);
 
-            svm.WidgetPage.ShowWidgetCommand.Execute(null);
+            widget.SetUsageOn(true);
             window.UpdateLayout();
             Pump();
             Assert.False(section.IsVisible);

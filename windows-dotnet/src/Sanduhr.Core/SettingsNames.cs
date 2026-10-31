@@ -293,8 +293,6 @@ public static class SettingsNames
     public const string MessageColor = "Message color";
     /// <summary>Desk, Behavior: the Desk's sign-in reminder switch (settings.json "desk_sign_in_reminder", on by default; WF32).</summary>
     public const string SignInReminders = SignInReminder.Title;
-    /// <summary>The first-run card's third action (settings.json "just_the_desk"), and the Widget page's Just the Desk section.</summary>
-    public const string JustTheDeskButton = JustTheDesk.ButtonTitle;
     /// <summary>Now playing: the widget's line (settings.json "now_playing.widget", off by default).</summary>
     public const string NowPlayingInWidget = "Show what's playing in the widget";
     /// <summary>Now playing, Looks: the Desk draws the song in its look (settings.json "now_playing.style", off by default).</summary>
@@ -647,9 +645,9 @@ public static class SettingsNames
     public const string LimitOrderListName = "Limits in the widget's order";
     public static string MoveLimitUp(string limit) => $"{MoveUp}, {limit}";
     public static string MoveLimitDown(string limit) => $"{MoveDown}, {limit}";
-    public const string JustTheDeskOn = "Sanduhr is in Just the Desk: the widget is hidden.";
-    public const string ShowTheWidget = "Show the widget";
-    public const string ShowTheWidgetCaption = "Ends Just the Desk and shows the widget, which offers Sign in. The Desk stays on.";
+    /// <summary>The Widget page's section while Claude usage is off (setup spec, section 4): the heading and the line under it.</summary>
+    public const string UsageOffTitle = "Usage is off";
+    public const string UsageOffWidgetLine = "The widget shows your usage. Turn it on in Set up Sanduhr.";
 
     // ---- Settings v2, slice 5: Publish usage, What gets sent (WF28) ----
 
@@ -1256,7 +1254,6 @@ public static class SettingsNames
         (KeepWidgetOnTop, SettingsPage.Widget),
         (DeepWorkLength, SettingsPage.Widget),
         (LimitOrder, SettingsPage.Widget),
-        (ShowTheWidget, SettingsPage.Widget),
     ];
 
     /// <summary>

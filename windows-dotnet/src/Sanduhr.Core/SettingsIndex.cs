@@ -143,7 +143,7 @@ public static class SettingsIndex
     public const string GlowWhere = "glow-where";
     // Widget (slice 5)
     public const string WidgetOptions = "widget-options";
-    public const string JustTheDeskSection = "just-the-desk";
+    public const string UsageOffSection = "usage-off";
     // About
     public const string Version = "version";
     /// <summary>About, Updates (slice 6): Check for updates once a day and Check now.</summary>
@@ -351,8 +351,8 @@ public static class SettingsIndex
             [SettingsNames.CompactMode, "compact", "Ctrl+D", SettingsNames.GraphStyle, "graph", "sparkline", "classic", "horizon",
              SettingsNames.KeepWidgetOnTop, "on top", "pin", "always on top", SettingsNames.DeepWorkLength, "deep work", "focus", "timer",
              SettingsNames.LimitOrder, "tier order", "order", "reorder", "move up", "move down"]),
-        E(JustTheDesk.ButtonTitle, SettingsPage.Widget, JustTheDeskSection,
-            [SettingsNames.ShowTheWidget, "show the widget", "widget hidden", "hidden widget", "desk only", "no account", "without an account"]),
+        E(SetupCopy.Title, SettingsPage.Widget, UsageOffSection,
+            [SettingsNames.UsageOffTitle, "usage off", "show the widget", "widget hidden", "hidden widget", "desk only", "no account", "without an account"]),
 
         E("Version", SettingsPage.About, Version,
             ["version", "What's New", "Take the tour", "tour", "release", "update", "don't show", "after updates", SettingsNames.HideWhatsNewAfterUpdates]),
@@ -375,7 +375,6 @@ public static class SettingsIndex
         [SettingsNames.KeepWidgetOnTop] = WidgetOptions,
         [SettingsNames.DeepWorkLength] = WidgetOptions,
         [SettingsNames.LimitOrder] = WidgetOptions,
-        [SettingsNames.ShowTheWidget] = JustTheDeskSection,
         [SettingsNames.TrayShows] = Tray,
         [SettingsNames.StreamerSection] = Streamer,
         [SettingsNames.ShuffleCodenames] = Streamer,

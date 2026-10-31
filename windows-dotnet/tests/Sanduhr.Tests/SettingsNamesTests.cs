@@ -586,9 +586,10 @@ public class SettingsNamesTests
     {
         Assert.Equal("Claude Usage, Alerts and the meters fill in after you sign in.", SettingsNames.SignedOutAccountsLine);
         Assert.Equal("Sign in to start recording your meters. Sanduhr keeps 30 days on this PC.", SettingsNames.MeterHistorySignedOut);
-        Assert.Equal("Sanduhr is in Just the Desk: the widget is hidden.", SettingsNames.JustTheDeskOn);
-        Assert.Equal(("Show the widget", "Warn for this limit", "Show this limit", "Hidden until it resets"),
-            (SettingsNames.ShowTheWidget, SettingsNames.WarnForThisLimit, SettingsNames.ShowThisLimit, SettingsNames.HiddenUntilItResets));
+        Assert.Equal(("Usage is off", "The widget shows your usage. Turn it on in Set up Sanduhr."),
+            (SettingsNames.UsageOffTitle, SettingsNames.UsageOffWidgetLine));
+        Assert.Equal(("Warn for this limit", "Show this limit", "Hidden until it resets"),
+            (SettingsNames.WarnForThisLimit, SettingsNames.ShowThisLimit, SettingsNames.HiddenUntilItResets));
         Assert.Equal(("Clear this account's history…", "Remove account…", "Show a sample…", "Data for this account", "Linked folders"),
             (SettingsNames.ClearAccountHistory, SettingsNames.RemoveAccount, SettingsNames.ShowASample, SettingsNames.AccountDataSection,
              SettingsNames.LinkedFolders));
@@ -651,7 +652,7 @@ public class SettingsNamesTests
             SettingsNames.SignedOutAccountsLine, SettingsNames.ClearHistoryDetail, SettingsNames.RemoveAccountDetail("Work"),
             SettingsNames.EachLimitCaption, SettingsNames.HiddenUntilResetCaption, SettingsNames.EachLimitSignedOut, SettingsNames.EachLimitNotYet, SettingsNames.LimitOrderAllHidden,
             SettingsNames.MetersIntro, SettingsNames.MeterHistorySignedOut, SettingsNames.MeterHistoryEmpty, SettingsNames.WidgetLine,
-            SettingsNames.CompactModeCaption, SettingsNames.DeepWorkRange, SettingsNames.JustTheDeskOn, SettingsNames.ShowTheWidgetCaption,
+            SettingsNames.CompactModeCaption, SettingsNames.DeepWorkRange, SettingsNames.UsageOffWidgetLine,
             SettingsNames.PublishRecordLine, SettingsNames.SampleNoFolders(true, true), SettingsNames.SampleNoFolders(true, false), SettingsNames.SampleNoFolders(false, true),
             SettingsNames.SampleFailed, SettingsNames.SampleHeader("2026-10-24", null, false), SettingsNames.SampleHeader("2026-10-24", "example.com", true),
         })

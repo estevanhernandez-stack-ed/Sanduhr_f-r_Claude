@@ -160,15 +160,13 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>Visibility of the recovery card: any non-None reason shows it, except a
     /// first-run card put away with Not now.</summary>
-    public bool ShowSignInPrompt => Reason != SignInReason.None && !ShowNotSignedInLine;
+    public bool ShowSignInPrompt => UsageOn && Reason != SignInReason.None && !ShowNotSignedInLine;
 
     /// <summary>The first-run card's Not now link (first run only; a recovery card stays).</summary>
     public bool ShowNotNow => Reason == SignInReason.FirstRun;
 
-    /// <summary>The one-line "Not signed in" way in, shown after Not now, and in place of the first-run
-    /// card while Just the Desk is on (spec 7.5).</summary>
-    public bool ShowNotSignedInLine =>
-        Reason == SignInReason.FirstRun && (SignInPutOff || !Sanduhr.Core.JustTheDesk.ShowsFirstRunCard(false, JustTheDesk));
+    /// <summary>The one-line "Not signed in" way in, shown after Not now (never with usage off).</summary>
+    public bool ShowNotSignedInLine => UsageOn && Reason == SignInReason.FirstRun && SignInPutOff;
 
     partial void OnSignInPutOffChanged(bool value)
     {
@@ -176,23 +174,50 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowNotSignedInLine));
     }
 
-    /// <summary>Just the Desk is on (settings.json "just_the_desk"): the Desk without a Claude account.
-    /// Loaded at construction; the App sets it when the first-run card chooses it and when an account ends it.</summary>
-    [ObservableProperty] private bool _justTheDesk;
+    /// <summary>Claude usage on (setup spec, section 1). Off: no fetching, no sign-in card, the widget hidden by App; accounts are kept.
+    /// Loaded at construction from <c>setup.usage.claude</c>; absent (before any setup) reads as on, so an account's meters never vanish.</summary>
+    [ObservableProperty] private bool _usageOn = true;
 
-    partial void OnJustTheDeskChanged(bool value)
+    partial void OnUsageOnChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowSignInPrompt));
         OnPropertyChanged(nameof(ShowNotSignedInLine));
+        OnPropertyChanged(nameof(ShowUsageOff));
+        RaiseDesk();
     }
 
-    /// <summary>Raised by the first-run card's Just the Desk button; the App saves the choice, turns the
-    /// Desk on and hides the widget.</summary>
-    public event Action? JustTheDeskRequested;
+    /// <summary>The Widget page's "usage is off" line.</summary>
+    public bool ShowUsageOff => !UsageOn;
 
-    /// <summary>Just the Desk on the first-run card.</summary>
-    [RelayCommand]
-    private void ChooseJustTheDesk() => JustTheDeskRequested?.Invoke();
+    /// <summary>Turns Claude usage on or off and saves it. Off stops the refresh timer and drops the client; on rebuilds it and fetches.
+    /// Never signs out or removes an account. <paramref name="fetchNow"/> false is for a caller that rebuilds and fetches right after
+    /// (an added account's <see cref="ReloadAfterSignInAsync"/>): turning on then only saves, flags and restarts the timer.</summary>
+    public void SetUsageOn(bool on, bool fetchNow = true)
+    {
+        var setup = _settings.LoadSetup() ?? SetupChoices.FirstRun.ToSettings(null);
+        _settings.SaveSetup(setup.WithClaude(on));
+        if (UsageOn == on) return;
+        UsageOn = on;
+        if (IsDemo) return;   // demo mode pauses fetching; leaving it rebuilds the fetcher against this setting
+        if (on)
+        {
+            _refreshTimer.Start();
+            if (!fetchNow) return;
+            RebuildFetcher();
+            RefreshAccountLabel();
+            _ = RefreshCoreAsync();
+        }
+        else
+        {
+            _refreshTimer.Stop();
+            _fetcherGeneration++;
+            (_client as IDisposable)?.Dispose();
+            _client = null;
+            _fetcher = null;
+            WatchTransport(null);
+            Reason = SignInReason.None;
+        }
+    }
 
     /// <summary>The Desk's sign-in reminder switch (spec 7.5), read for the Desk and Settings, Alerts.</summary>
     public bool LoadDeskSignInReminder() => _settings.LoadDeskSignInReminder();
@@ -746,7 +771,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         };
         AccountsChanged += SyncSeats;
 
-        _justTheDesk = _settings.LoadJustTheDesk().On;
+        _usageOn = _settings.LoadSetup()?.ClaudeUsage ?? true;
         _pinned = _settings.LoadPinned();
         _isThemesExpanded = _settings.LoadThemesExpanded();
         _savedOrder = _settings.LoadTierOrder().ToList();
@@ -798,7 +823,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _follower.Apply(_followAccount);
         SyncSeats();
         _tickTimer.Start();
-        _refreshTimer.Start();
+        if (UsageOn) _refreshTimer.Start();
         await RefreshAsync();
     }
 
@@ -1058,6 +1083,13 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _client = null;
         _fetcher = null;
 
+        if (!UsageOn)
+        {
+            Reason = SignInReason.None;   // usage off: no card, nothing to fetch
+            WatchTransport(null);
+            return;
+        }
+
         var creds = _credentials.Load();
         if (string.IsNullOrEmpty(creds.SessionKey))
         {
@@ -1125,7 +1157,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         ClearTray();   // the sample percent never lingers on the tray unlabelled
         FooterText = "";
         OnPropertyChanged(nameof(DemoAccount));
-        _refreshTimer.Start();
+        if (UsageOn) _refreshTimer.Start();
         AccountsChanged?.Invoke();   // Settings and menus go back to the real accounts
     }
 
@@ -1837,7 +1869,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         get
         {
-            bool signIn = !IsDemo && Reason != SignInReason.None;
+            bool signIn = UsageOn && !IsDemo && Reason != SignInReason.None;
             // Streamer mode (slice 7, decision 3): the Claude line names the account by its codename, in every style and in its reminder.
             string? account = IsDemo ? DemoMode.ChipText(_demoAccount)   // streamer: demo - demo's sample name is not a real one
                 : _accounts.ListAccounts().Count > 1 && _accounts.GetActive() is { } active   // streamer: masked - CP 5: Mask.Name masks on the next line
@@ -2182,23 +2214,6 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             return;
         Pinned = on;
         _settings.SavePinned(on);
-    }
-
-    /// <summary>
-    /// Ends Just the Desk (Settings, Widget, Show the widget, and an added account; <see cref="Sanduhr.Core.JustTheDesk.End"/>): saves
-    /// it off, brings the sign-in reminder back only when Just the Desk silenced it, and redraws the Desk. False when it was not on.
-    /// Showing the widget is the App's.
-    /// </summary>
-    public bool EndJustTheDesk()
-    {
-        var (state, reminderOn, ended) = Sanduhr.Core.JustTheDesk.End(_settings.LoadJustTheDesk(), _settings.LoadDeskSignInReminder());
-        if (!ended)
-            return false;
-        _settings.SaveJustTheDesk(state);
-        _settings.SaveDeskSignInReminder(reminderOn);
-        JustTheDesk = false;
-        RefreshDesk();
-        return true;
     }
 
     private void PersistOrder()

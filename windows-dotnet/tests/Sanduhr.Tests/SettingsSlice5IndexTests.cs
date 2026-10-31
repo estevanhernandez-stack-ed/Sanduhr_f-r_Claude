@@ -158,11 +158,11 @@ public class SettingsSlice5IndexTests
         Assert.Contains(SettingsIndex.Search(query).Take(3), h => h.Entry.Page == SettingsPage.Widget && h.Entry.Anchor == SettingsIndex.WidgetOptions);
 
     [Fact]
-    public void Just_the_Desk_has_a_section_and_the_query_still_has_an_always_visible_hit()
+    public void Usage_off_has_a_section_and_the_query_still_has_an_always_visible_hit()
     {
-        Assert.NotNull(SettingsIndex.Find(SettingsPage.Widget, SettingsIndex.JustTheDeskSection));
-        Assert.Equal((SettingsPage.Widget, SettingsIndex.JustTheDeskSection),
-            (Top("show the widget").Entry.Page, Top("show the widget").Entry.Anchor));
+        Assert.NotNull(SettingsIndex.Find(SettingsPage.Widget, SettingsIndex.UsageOffSection));
+        Assert.Equal((SettingsPage.Widget, SettingsIndex.UsageOffSection),
+            (Top("widget hidden").Entry.Page, Top("widget hidden").Entry.Anchor));
         // P16: the Widget section is collapsed unless the mode is on, so the Desk row keeps the words too.
         Assert.Contains(SettingsIndex.Search("Just the Desk"), h => h.Entry.Page == SettingsPage.Desk && h.Entry.Anchor == SettingsIndex.SignInReminders);
     }
