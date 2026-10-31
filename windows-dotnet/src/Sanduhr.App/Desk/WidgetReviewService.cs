@@ -320,7 +320,7 @@ internal sealed class WidgetReviewHost : IWidgetReviewHost, IDisposable
         _dismiss = dismiss;
         var settings = PreviewSettings(preview);
         if (preview.Staged is { } staged) _desk.Companion?.PreviewPack(staged, preview.Pack.Id);
-        _desk.ShowPreview(settings);
+        _desk.ShowPreview(settings);   // full: a look the user asked to see shows in full, like a design, even with desktop off
         _ownsDeskPreview = true;
 
         if (_window is null)

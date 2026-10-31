@@ -575,7 +575,7 @@ public partial class App : Application
     {
         if (_arrangeItem is null) return;
         bool arranging = _desk?.Arranging == true;
-        _arrangeItem.Visibility = arranging || _desk?.Running == true ? Visibility.Visible : Visibility.Collapsed;
+        _arrangeItem.Visibility = arranging || (_desk?.Running == true && _desk.DesktopShown) ? Visibility.Visible : Visibility.Collapsed;
         _arrangeItem.Header = arranging ? DeskArrangeCopy.TrayFinish : DeskArrangeCopy.MenuItem;
     }
 

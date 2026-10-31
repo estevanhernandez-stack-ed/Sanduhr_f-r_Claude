@@ -231,7 +231,7 @@ internal sealed class DrawerReviewHost : IDrawerReviewHost, IDisposable
     public void Preview(string layout)
     {
         _preview = new DeskDesignSettings(_store.LoadDesk() with { Layout = layout }, _store.LoadDeskInk(), _store.LoadLauncher());
-        _desk.ShowPreview(_preview);
+        _desk.ShowPreview(_preview, full: false);   // drawers only while desktop is off
     }
 
     public void EndPreview()

@@ -375,6 +375,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         if (_stopped) return;
         _settings = _store.LoadDesk();
+        _desktopShown = _store.LoadSetup()?.Desktop ?? true;
+        // Desktop went off under a running Arrange: end it as Cancel (nothing saved); a design under review already ended it.
+        if (!_desktopShown && Arranging && _preview is null) EndArrangeCore(DeskArrangeEnd.Cancel, reload: false);
         _ink = _store.LoadDeskInk();
         _np = _store.LoadNowPlaying();
         _nowPlaying.Configure(_np.Prefs);
@@ -421,11 +424,12 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// Draws a design under review (the live review): the layout, font, plate, ink and Launcher in <paramref name="design"/> replace the
     /// saved ones on every screen until <see cref="EndPreview"/>. Nothing is saved; Arrange mode, if it runs, ends as Cancel.
     /// </summary>
-    public void ShowPreview(DeskDesignSettings design)
+    public void ShowPreview(DeskDesignSettings design, bool full = true)
     {
         if (_stopped) return;
         if (Arranging) EndArrangeCore(DeskArrangeEnd.Cancel, reload: false);
         _preview = design;
+        _previewFull = full;
         Reload();
     }
 
@@ -446,6 +450,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         if (_preview is null) return;
         _preview = null;
+        _previewFull = true;
         Reload();
     }
 
@@ -536,6 +541,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         // Not tied to Running: a Desk that is on but draws nothing yet (an empty message, no numbers) can
         // still be arranged, since arrange mode draws every placed piece.
         if (_host is null || _stopped || Arranging || _screens.Count == 0) return;
+        if (!_desktopShown) return;   // nothing to arrange; drawers move by their titles, and a filtered layout is never saved
         _fonts ??= _paths is null ? new DeskFonts() : DeskFonts.ForThisPc(_paths);
         var session = new DeskArrangeSession(_settings.Layout);
         var now = DateTimeOffset.Now;
@@ -647,9 +653,25 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// <summary>The layout string of the pieces drawn on one screen: those on every monitor and those placed on this one
     /// (<see cref="DeskArrangement.ForScreen"/>). The saved layout is never changed by this.</summary>
     private string LayoutFor(DeskScreen screen) =>
-        new DeskArrangement(_settings.Layout).ForScreen(screen.Ref, ConnectedIds).Layout;
+        SetupDesk.Layout(new DeskArrangement(_settings.Layout).ForScreen(screen.Ref, ConnectedIds).Layout, DrawsDesktop);
 
-    private bool Placed(string widget) => new DeskArrangement(_settings.Layout).Placement(widget) is not null;
+    private bool Placed(string widget) =>
+        SetupDesk.Shows(widget, DrawsDesktop) && new DeskArrangement(_settings.Layout).Placement(widget) is not null;
+
+    private bool _desktopShown = true;
+
+    /// <summary>"A nicer desktop" is on: the Desk draws its own pieces, not only drawers (setup spec, section 1).</summary>
+    public bool DesktopShown => _desktopShown;
+
+    /// <summary>The Desk's own pieces are drawn: desktop is on, or a design is under review (shown in full, never saved). The filter
+    /// lives only in <see cref="LayoutFor"/> and <see cref="Placed"/>; the saved layout is never written filtered.</summary>
+    private bool DrawsDesktop => _desktopShown || (_preview is not null && _previewFull);
+
+    /// <summary>The preview shows the Desk's own pieces too: a design or a widget look under review does; a drawers review (full: false) shows
+    /// only drawers while desktop is off.</summary>
+    private bool _previewFull = true;
+
+    internal bool IsPlaced(string widget) => Placed(widget);
 
     /// <summary>A widget's reading is wanted when its piece is placed and at least one island holding it
     /// is in sight. With no islands yet nothing is paused, so it is wanted (S7, 7.1).</summary>
