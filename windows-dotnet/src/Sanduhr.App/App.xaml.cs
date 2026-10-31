@@ -70,6 +70,11 @@ public partial class App : Application
     private TourState? _tourState;
     /// <summary>The tour opens after a first successful fetch at most once a launch.</summary>
     private bool _tourOfferedThisLaunch;
+    /// <summary>A first run's setup screen is holding the tour back (it is offered last, from what was picked).</summary>
+    private bool _tourHeldBySetup;
+    /// <summary>A fetch has succeeded this launch (a sign-in made before the setup screen was answered).</summary>
+    private bool _fetchedThisLaunch;
+    private SetupWindow? _setupWindow;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -94,6 +99,8 @@ public partial class App : Application
                 _vm.UsageOn = startupSettings.LoadSetup()?.ClaudeUsage ?? true;
         }
         catch { /* best-effort; no setup means the setup screen opens */ }
+        // No setup yet: the Desk draws no usage line behind the setup screen, as if usage were off. In memory only; nothing is saved.
+        _vm.SetupPending = startupSettings.LoadSetup() is null;
         // A theme's font (theme match): drawn when this PC has the family, bundled, installed or from a font pack; the theme lint warns
         // about one it lacks. Set before the first ApplyThemeResources so the first paint is in the theme's font.
         _themeFonts = Desk.DeskFonts.ForThisPc(new Sanduhr.Core.Paths());
@@ -309,8 +316,10 @@ public partial class App : Application
                 store.SaveWhatsNewLastSeen(current);
             if (onboarding)
             {
-                // A first run: the setup screen opens, and no card or tour opens over it (the tour waits for what was picked).
+                // A first run: the setup screen opens, and no card or tour opens over it. The tour is held back (offered last, from
+                // what was picked: AfterSetup lets it go).
                 _tourOfferedThisLaunch = true;
+                _tourHeldBySetup = true;
                 Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => OpenSetup(firstRun: true)));
                 return;
             }
@@ -351,10 +360,34 @@ public partial class App : Application
     /// </summary>
     private void OnFetchSucceeded()
     {
+        _fetchedThisLaunch = true;
+        OfferTourAfterFetch();
+    }
+
+    private void OfferTourAfterFetch()
+    {
         if (!WelcomeTour.ShowsAfterFetch(_tourState, fetched: true, _tourOfferedThisLaunch))
             return;
         _tourOfferedThisLaunch = true;
-        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(ShowTour));
+        OpenTourWhenDeskIsFree();
+    }
+
+    /// <summary>The tour comes last (setup spec, section 2): while a drawers review is open on the Desk it waits, checking every second.</summary>
+    private void OpenTourWhenDeskIsFree()
+    {
+        if (_drawerReview?.Reviewing != true)
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(ShowTour));
+            return;
+        }
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) =>
+        {
+            if (_drawerReview?.Reviewing == true) return;
+            timer.Stop();
+            ShowTour();
+        };
+        timer.Start();
     }
 
     /// <summary>
@@ -961,8 +994,58 @@ public partial class App : Application
         }
     }
 
-    /// <summary>Opens Set up Sanduhr (setup spec, sections 2 and 4). Filled in by the setup window task.</summary>
-    private void OpenSetup(bool firstRun) { }
+    /// <summary>
+    /// Opens Set up Sanduhr (setup spec, sections 2 and 4), one at a time. Continue applies the choices; closing the window any other way
+    /// saves nothing. With no setup saved yet it is a first run whichever entry opened it: the default ticks and Not now, since there is
+    /// no current state to show.
+    /// </summary>
+    private void OpenSetup(bool firstRun)
+    {
+        if (_vm is not { } vm) return;
+        if (_setupWindow is { } open) { open.Activate(); return; }
+        var store = new SettingsStore(new Sanduhr.Core.Paths());
+        firstRun |= store.LoadSetup() is null;
+        // The turn-off question is the Drawers page's own, in the themed dialog (it follows light mode).
+        var host = new AppSetupHost(() => _drawers, () => _drawerReview, vm, () => _desk, store,
+            question => ThemedDialog.ShowConfirm(_setupWindow, SettingsNames.DrawersTurnOffTitle, question,
+                SettingsNames.DrawersPutThemBack, SettingsNames.DrawersCancel));
+        var model = new SetupViewModel(new SetupService(store, host), firstRun) { DesignWithChatRequested = OpenChatDesign };
+        model.Applied += result => AfterSetup(result, firstRun);
+        var window = new SetupWindow(model);
+        _setupWindow = window;
+        window.Closed += (_, _) => { if (ReferenceEquals(_setupWindow, window)) _setupWindow = null; };
+        window.Show();
+        window.Activate();
+    }
+
+    /// <summary>What follows Continue: the widget shows with usage on and hides with it off, the open Settings Desk page re-reads, any notes
+    /// are shown, and the welcome tour comes last.</summary>
+    private void AfterSetup(SetupResult result, bool firstRun)
+    {
+        if (_vm is not { } vm) return;
+        vm.SetupPending = false;
+        if (result.Now.ClaudeUsage) ShowWindow(); else _window?.Hide();
+        _settingsWindow?.ViewModel.Desk.Reload();
+        // Notes and errors from the apply (a drawers turn-off that was refused, the first-drawers line): one themed notice, after the
+        // window has closed. Streamer mode: the host already masked any path in them.
+        if (result.Lines.Count > 0)
+            ThemedDialog.Show(null, SetupCopy.Title, string.Join(Environment.NewLine, result.Lines));
+        if (!firstRun || !_tourHeldBySetup) return;
+        _tourHeldBySetup = false;
+        _tourOfferedThisLaunch = false;
+        if (result.Now.ClaudeUsage)
+        {
+            // The first fetch offers the tour (OnFetchSucceeded); one that already succeeded (signed in before this screen) offers it now.
+            if (_fetchedThisLaunch) OfferTourAfterFetch();
+            return;
+        }
+        if (!WelcomeTour.ShowsForDeskOnly(_tourState, _tourOfferedThisLaunch)) return;
+        _tourOfferedThisLaunch = true;
+        OpenTourWhenDeskIsFree();
+    }
+
+    /// <summary>Opens Design it with an AI chat. Filled in by the AI chat task.</summary>
+    private void OpenChatDesign() { }
 
     private void OnTrayReadingChanged(TrayReading? reading)
     {

@@ -186,6 +186,19 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         RaiseDesk();
     }
 
+    /// <summary>No setup was made yet and the setup screen is up (or was put off with Not now): the Desk draws no usage line behind it, as
+    /// if usage were off. Set by App, in memory only; it never saves a setup, so the screen stays pending. An account ends it: a sign-in
+    /// before setup shows the meters, as <c>UsageOnForAccount</c> shows the widget.</summary>
+    public bool SetupPending
+    {
+        get => _setupPending;
+        set { if (_setupPending == value) return; _setupPending = value; RaiseDesk(); }
+    }
+    private bool _setupPending;
+
+    /// <summary>The Desk draws usage: on, and not held back by a setup still pending with nothing signed in.</summary>
+    private bool DeskDrawsUsage => UsageOn && !(SetupPending && !IsDemo && _accounts.ListAccounts().Count == 0);   // streamer: key - a count, never drawn
+
     /// <summary>The seat meters and account following are idle (the tests read them).</summary>
     internal bool SeatMetersPaused => _seatMeters.Paused;
     internal bool FollowerRunning => _follower.Running;
@@ -1902,12 +1915,13 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         get
         {
-            bool signIn = UsageOn && !IsDemo && Reason != SignInReason.None;
+            bool usage = DeskDrawsUsage;
+            bool signIn = usage && !IsDemo && Reason != SignInReason.None;
             // Streamer mode (slice 7, decision 3): the Claude line names the account by its codename, in every style and in its reminder.
             string? account = IsDemo ? DemoMode.ChipText(_demoAccount)   // streamer: demo - demo's sample name is not a real one
                 : _accounts.ListAccounts().Count > 1 && _accounts.GetActive() is { } active   // streamer: masked - CP 5: Mask.Name masks on the next line
                     ? StreamerMode.Mask.Name(CodenameCategory.Account, active) : null;
-            bool hide = signIn || !UsageOn;   // usage off draws no numbers, whatever is left in memory
+            bool hide = signIn || !usage;   // usage off (or not set up yet) draws no numbers, whatever is left in memory
             return new DeskUsage(hide ? [] : _deskTiers,
                 IsDemo ? DateTimeOffset.Now : _lastFetchAt,
                 signIn, Reason == SignInReason.FirstRun, account, hide ? [] : _deskLineTiers,

@@ -108,7 +108,7 @@ public class WelcomeTourTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void StepsFor_JustTheDeskPicksTheDeskOnlyTour(bool signedIn)
+    public void StepsFor_DeskOnlyPicksTheDeskOnlyTour(bool signedIn)
     {
         Assert.Equal(new[] { new[] { "desk" }, ["tray"], ["sign-in"] },
             Ids(WelcomeTour.StepsFor(true, None, signedIn)));
@@ -124,12 +124,12 @@ public class WelcomeTourTests
     [InlineData(TourState.Finished, false, false)]
     [InlineData(TourState.Skipped, false, false)]
     [InlineData(TourState.NotOffered, false, false)]
-    public void ShowsForJustTheDesk_OnlyPendingOncePerLaunch(TourState state, bool offered, bool expected) =>
-        Assert.Equal(expected, WelcomeTour.ShowsForJustTheDesk(state, offered));
+    public void ShowsForDeskOnly_OnlyPendingOncePerLaunch(TourState state, bool offered, bool expected) =>
+        Assert.Equal(expected, WelcomeTour.ShowsForDeskOnly(state, offered));
 
     [Fact]
-    public void ShowsForJustTheDesk_NoStateIsNotOffered() =>
-        Assert.False(WelcomeTour.ShowsForJustTheDesk(null, false));
+    public void ShowsForDeskOnly_NoStateIsNotOffered() =>
+        Assert.False(WelcomeTour.ShowsForDeskOnly(null, false));
 
     [Fact]
     public void CopyIsShortAndPlain()

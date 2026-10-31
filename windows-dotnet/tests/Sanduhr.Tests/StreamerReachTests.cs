@@ -216,7 +216,7 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/TierCardViewModel.cs", "notname", 1),
         ("Sanduhr.App/ViewModels/WelcomeTourViewModel.cs", "masked", 1),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "cant", 4),
-        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "key", 18),
+        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "key", 19),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "masked", 3),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "notname", 19),
         ("Sanduhr.App/Views/DeskLayoutMap.cs", "notname", 1),

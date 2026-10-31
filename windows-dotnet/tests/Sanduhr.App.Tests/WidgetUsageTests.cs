@@ -102,6 +102,29 @@ public sealed class WidgetUsageTests : AppWindowFixture
         finally { widget.Dispose(); }
     });
 
+    [Fact]
+    public void A_setup_still_pending_with_no_account_draws_no_sign_in_line_and_saves_nothing() => AppHost.Run(() =>
+    {
+        var store = new SettingsStore(ScratchPaths());
+        var (widget, _) = ScratchWidget();   // no setup, no account: usage reads on in memory
+        try
+        {
+            widget.Start();
+            Assert.True(widget.UsageOn);
+            Assert.True(widget.CurrentDeskUsage.SignInNeeded);
+            int raised = 0;
+            widget.DeskUsageChanged += () => raised++;
+            widget.SetupPending = true;
+            Assert.Equal(1, raised);
+            Assert.False(widget.CurrentDeskUsage.SignInNeeded);
+            Assert.Empty(widget.CurrentDeskUsage.Tiers);
+            Assert.Null(store.LoadSetup());   // held back in memory only: the setup screen stays pending
+            widget.SetupPending = false;
+            Assert.True(widget.CurrentDeskUsage.SignInNeeded);
+        }
+        finally { widget.Dispose(); }
+    });
+
     private static readonly string TwoLimits =
         $$"""{ "{{TierModel.FiveHour}}": {"utilization": 10, "resets_at": null}, "{{TierModel.SevenDay}}": {"utilization": 20, "resets_at": null} }""";
 
