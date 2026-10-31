@@ -35,20 +35,28 @@ enum WidgetOwnArt {
     /// The path a stage's own art is copied to.
     static func artPath(_ stageId: String) -> String { "\(artFolder)/\(stageId).png" }
 
-    /// The pack image rules on one picked file, before it is copied: nil when it may be used, else one sentence.
-    /// The chunk stream and the CRCs are checked again with the whole pack.
-    static func checkImage(_ data: Data, stage: CompanionStage, maxFrame: Int) -> String? {
+    /// The pack image rules every picked PNG meets, whatever it is for: a PNG, at most 2 MB and 4096 pixels on a
+    /// side. The pixel size, or one sentence. The chunk stream and the CRCs are checked again with the whole pack.
+    static func imageSize(_ data: Data) -> (width: Int, height: Int, error: String?) {
         let png = [UInt8](data)
         if png.count > PackValidator.maxImageBytes {
-            return "That image is larger than 2 MB. A sprite sheet is at most 2 MB."
+            return (0, 0, "That image is larger than 2 MB. A sprite sheet is at most 2 MB.")
         }
         if png.count < 33 || Array(png[0..<8]) != pngSignature || Array(png[12..<16]) != ihdr {
-            return "That file isn't a PNG image. A sprite sheet is a PNG."
+            return (0, 0, "That file isn't a PNG image. A sprite sheet is a PNG.")
         }
         let w = bigEndian32(png, 16), h = bigEndian32(png, 20)
         if w == 0 || h == 0 || w > PackValidator.maxImageSide || h > PackValidator.maxImageSide {
-            return "That image is \(w)x\(h). A sprite sheet is at most \(PackValidator.maxImageSide) pixels on a side."
+            return (w, h, "That image is \(w)x\(h). A sprite sheet is at most \(PackValidator.maxImageSide) pixels on a side.")
         }
+        return (w, h, nil)
+    }
+
+    /// The pack image rules on one picked file, before it is copied: nil when it may be used, else one sentence.
+    static func checkImage(_ data: Data, stage: CompanionStage, maxFrame: Int) -> String? {
+        let size = imageSize(data)
+        if let why = size.error { return why }
+        let w = size.width, h = size.height
         if w % stage.frameWidth != 0 || h % stage.frameHeight != 0 {
             return "That image is \(w)x\(h), which isn't a whole number of \(stage.frameWidth)x\(stage.frameHeight) cells (the size of \(stage.name)'s frames)."
         }
