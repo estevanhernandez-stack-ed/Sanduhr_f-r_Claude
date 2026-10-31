@@ -85,6 +85,15 @@ public partial class App : Application
         startupSettings.SyncMcpExport();
 
         _vm = new WidgetViewModel();
+        // A pre-2.2.0 key or a v1 config becomes an account first (Start() runs it again, harmlessly), so the setup migration counts it.
+        _vm.MigrateLegacyCredentials();
+        // Setup (setup spec, section 1): a file from before setup becomes one, once; a first run stays without one.
+        try
+        {
+            if (startupSettings.MigrateSetup(_vm.AccountStore.ListAccounts().Count > 0))   // streamer: key - a count, never drawn
+                _vm.UsageOn = startupSettings.LoadSetup()?.ClaudeUsage ?? true;
+        }
+        catch { /* best-effort; no setup means the setup screen opens */ }
         // A theme's font (theme match): drawn when this PC has the family, bundled, installed or from a font pack; the theme lint warns
         // about one it lacks. Set before the first ApplyThemeResources so the first paint is in the theme's font.
         _themeFonts = Desk.DeskFonts.ForThisPc(new Sanduhr.Core.Paths());
@@ -112,16 +121,14 @@ public partial class App : Application
         _vm.SettingsRequested += () => ShowSettingsAsync();
         // "<Page> settings…" from the tier card and the account menus lands on its section (spec, Menus table).
         _vm.SettingsPageRequested += page => ShowSettingsAsync(page, SettingsIndex.MenuAnchor(page));
-        _vm.JustTheDeskRequested += ChooseJustTheDesk;
         // Keep an open Settings window's account list in sync with quick-switches
         // made elsewhere (tray / widget chip / right-click).
         _vm.AccountsChanged += () => _settingsWindow?.ViewModel.Accounts.Reload();
 
         _window = new MainWindow { DataContext = _vm };
-        // Just the Desk with no account (spec 7.5): the widget starts hidden and the tray is the way back.
-        // The handle is created without showing, so the glow, alerts and tray have a window to point at.
-        if (JustTheDesk.WidgetStartsHidden(_vm.JustTheDesk, _vm.AccountStore.ListAccounts().Count > 0,   // streamer: key - a count, never drawn
-                new SettingsStore(new Sanduhr.Core.Paths()).LoadDesk().Enabled))
+        // Usage off with the Desk running, or no setup yet (the setup screen is what shows): the widget starts hidden and the tray is the
+        // way back. The handle is created without showing, so the glow, alerts and tray have a window to point at.
+        if (SetupLaunch.WidgetStartsHidden(startupSettings.LoadSetup(), startupSettings.LoadDesk().Enabled))
             new System.Windows.Interop.WindowInteropHelper(_window).EnsureHandle();
         else
             _window.Show();
@@ -280,7 +287,7 @@ public partial class App : Application
             // After Start(): it migrates legacy credentials, so the account list is settled.
             var fresh = WhatsNew.IsFresh(lastSeen, store.LoadWhatsNewInstalledVersion(),
                 _vm.AccountStore.ListAccounts().Count);   // streamer: key - a count, never drawn
-            var onboarding = JustTheDesk.Onboarding(_vm.ActiveAccount is not null, store.LoadJustTheDesk().On);   // streamer: key - a null check, never drawn
+            var onboarding = SetupLaunch.OpensSetup(store.LoadSetup());   // no setup yet: the setup screen opens
 
             // The tour is decided before What's New records anything: pending only on a fresh
             // install (no account, nothing seen). While it is pending, What's New waits for it.
@@ -300,6 +307,13 @@ public partial class App : Application
             store.SeedDeskPlate(fresh);
             if (decision.Record)
                 store.SaveWhatsNewLastSeen(current);
+            if (onboarding)
+            {
+                // A first run: the setup screen opens, and no card or tour opens over it (the tour waits for what was picked).
+                _tourOfferedThisLaunch = true;
+                Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => OpenSetup(firstRun: true)));
+                return;
+            }
             if (decision.Show.Count == 0)
                 return;
 
@@ -354,7 +368,7 @@ public partial class App : Application
         try
         {
             var signedIn = _vm.ActiveAccount is not null || _vm.IsDemo;   // streamer: key - a null check, never drawn
-            var steps = WelcomeTour.StepsFor(_vm.JustTheDesk, new HashSet<TourFeature>(), signedIn);
+            var steps = WelcomeTour.StepsFor(!_vm.UsageOn, new HashSet<TourFeature>(), signedIn);
             WhatsNewWindow.ShowTour(new WelcomeTourViewModel(steps, _vm), ShowMe, EndTour);
         }
         catch (Exception e)
@@ -808,12 +822,8 @@ public partial class App : Application
         Action showRunnerStatus = () => svm.Desk.CiRunnersStatus = RunnerStatusText(_runners?.Status);
         RunnerStatusShown += showRunnerStatus;
         svm.QuitRequested = QuitApp;
-        // Settings, Widget, Just the Desk's "Show the widget" (WF32): the widget view model has ended it and redrawn the Desk; the window is App's.
-        svm.WidgetPage.ShowWidgetRequested = () =>
-        {
-            if (_vm is { } widgetVm) svm.Alerts.DeskSignInReminder = widgetVm.LoadDeskSignInReminder();
-            ShowWindow();
-        };
+        // Settings, Widget, Usage is off: Set up Sanduhr (setup spec, section 4).
+        svm.WidgetPage.SetupRequested = () => OpenSetup(firstRun: false);
         svm.ResetRequested = () =>
         {
             ShowReset();
@@ -917,29 +927,33 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// The one place an added account is settled (spec 7.5): rebuild the widget on it, then end Just the
-    /// Desk if it was on. Every sign-in, pasted key and re-sign-in routes here, so the decision runs once
-    /// per add. Ending it restores the reminder only when Just the Desk had turned it off, redraws the
-    /// Desk and shows the widget for the new account, with no relaunch.
+    /// The one place an added account is settled (setup spec, section 1): turn Claude usage on if it was off, then rebuild the widget
+    /// on the account. Every sign-in, pasted key and re-sign-in routes here, so the decision runs once per add. Turning usage on shows
+    /// the widget for the new account, with no relaunch, so a sign-in never vanishes.
     /// </summary>
     private async Task ReloadAfterSignInAsync()
     {
         if (_vm is not { } vm)
             return;
-        // The account is saved by now: end Just the Desk before the fetch, so the widget comes up for it at
-        // once and a fetch that throws can't leave Just the Desk on.
-        EndJustTheDeskIfAccount(vm);
+        // The account is saved by now: usage on before the fetch, so the widget comes up for it at once and a
+        // fetch that throws can't leave usage off.
+        UsageOnForAccount(vm);
         await vm.ReloadAfterSignInAsync();
     }
 
-    private void EndJustTheDeskIfAccount(WidgetViewModel vm)
+    private void UsageOnForAccount(WidgetViewModel vm)
     {
         try
         {
-            if (vm.AccountStore.ListAccounts().Count == 0 || !vm.EndJustTheDesk())   // streamer: key - a count, never drawn
-                return;
-            if (_settingsWindow?.ViewModel.Alerts is { } alerts) alerts.DeskSignInReminder = vm.LoadDeskSignInReminder();
-            ShowWindow();
+            if (vm.AccountStore.ListAccounts().Count == 0) return;   // streamer: key - a count, never drawn
+            bool wasOff = !vm.UsageOn;
+            if (wasOff)
+                vm.SetUsageOn(true, fetchNow: false);   // ReloadAfterSignInAsync rebuilds and fetches next
+            // Usage was off, or no setup was made yet (a first run put away with Not now, which starts the widget hidden): the
+            // sign-in shows the widget. No setup is saved in the second case: the setup screen stays pending, and the next launch's
+            // migration sees the account and writes usage on.
+            if (wasOff || new SettingsStore(new Sanduhr.Core.Paths()).LoadSetup() is null)
+                ShowWindow();
         }
         catch
         {
@@ -947,45 +961,8 @@ public partial class App : Application
         }
     }
 
-    /// <summary>
-    /// The first-run card's Just the Desk: save the choice, turn the Desk on, redraw it (the Claude pieces
-    /// stay placed and draw nothing) and put the widget away. The tray icon stays the way back.
-    /// </summary>
-    private void ChooseJustTheDesk()
-    {
-        if (_vm is not { } vm)
-            return;
-        try
-        {
-            var store = new SettingsStore(new Sanduhr.Core.Paths());
-            var (state, reminderOn, deskEnabled) = JustTheDesk.Choose(store.LoadJustTheDesk(), store.LoadDeskSignInReminder());
-            // The Desk first: a failed write after it leaves Just the Desk unchosen, never chosen with no Desk.
-            if (deskEnabled)
-                store.SaveDesk(store.LoadDesk() with { Enabled = true });
-            store.SaveDeskSignInReminder(reminderOn);
-            store.SaveJustTheDesk(state);
-        }
-        catch
-        {
-            return;   // nothing saved, nothing changed: the card stays
-        }
-        vm.JustTheDesk = true;
-        _desk?.Reload();
-        vm.RefreshDesk();
-        _window?.Hide();
-
-        // No fetch is coming to offer a pending tour, so it opens a moment after the choice instead.
-        if (!WelcomeTour.ShowsForJustTheDesk(_tourState, _tourOfferedThisLaunch))
-            return;
-        _tourOfferedThisLaunch = true;
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-            ShowTour();
-        };
-        timer.Start();
-    }
+    /// <summary>Opens Set up Sanduhr (setup spec, sections 2 and 4). Filled in by the setup window task.</summary>
+    private void OpenSetup(bool firstRun) { }
 
     private void OnTrayReadingChanged(TrayReading? reading)
     {

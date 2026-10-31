@@ -22,21 +22,18 @@
                 <TextBlock Text="{x:Static core:SettingsNames.WidgetLine}" FontSize="11" TextWrapping="Wrap"
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,-8,0,12" />
 
-                <!-- Just the Desk (WF32): shown only while it is on; above the options, because then it is the way back. -->
-                <StackPanel views:SettingsAnchor.Id="just-the-desk" Margin="0,0,0,16"
-                            Visibility="{Binding IsJustTheDesk, Converter={StaticResource BoolVis}}">
-                    <TextBlock Text="{x:Static core:SettingsNames.JustTheDeskButton}" FontSize="13" FontWeight="SemiBold"
+                <!-- Usage is off (setup spec, section 4): shown only while Claude usage is off; above the options, because then it is the way back. -->
+                <StackPanel views:SettingsAnchor.Id="usage-off" Margin="0,0,0,16"
+                            Visibility="{Binding ShowUsageOff, Converter={StaticResource BoolVis}}">
+                    <TextBlock Text="{x:Static core:SettingsNames.UsageOffTitle}" FontSize="13" FontWeight="SemiBold"
                                AutomationProperties.HeadingLevel="Level2"
                                Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
-                    <TextBlock Text="{x:Static core:SettingsNames.JustTheDeskOn}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8"
+                    <TextBlock Text="{x:Static core:SettingsNames.UsageOffWidgetLine}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8"
                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                     <Button Style="{DynamicResource AccentButton}" HorizontalAlignment="Left"
-                            Content="{x:Static core:SettingsNames.ShowTheWidget}"
-                            Command="{Binding ShowWidgetCommand}"
-                            AutomationProperties.Name="{x:Static core:SettingsNames.ShowTheWidget}"
-                            AutomationProperties.HelpText="{x:Static core:SettingsNames.ShowTheWidgetCaption}" />
-                    <TextBlock Text="{x:Static core:SettingsNames.ShowTheWidgetCaption}" FontSize="10.5" TextWrapping="Wrap" Margin="0,4,0,0"
-                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                            Content="{x:Static core:SetupCopy.Title}"
+                            Command="{Binding OpenSetupCommand}"
+                            AutomationProperties.Name="{x:Static core:SetupCopy.Title}" />
                     <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,0" />
                 </StackPanel>
 

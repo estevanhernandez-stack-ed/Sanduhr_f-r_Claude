@@ -239,25 +239,4 @@ public sealed class WidgetLimitsTests : AppWindowFixture
         }
         finally { widget.Dispose(); }
     });
-
-    [Fact]
-    public void Ending_Just_the_Desk_saves_it_off_and_brings_back_a_reminder_it_had_silenced() => AppHost.Run(() =>
-    {
-        var store = new SettingsStore(ScratchPaths());
-        store.SaveJustTheDesk(new JustTheDeskState(true, SilencedReminder: true));
-        store.SaveDeskSignInReminder(false);
-        var (widget, _) = ScratchWidget();
-        try
-        {
-            Assert.True(widget.JustTheDesk);
-
-            Assert.True(widget.EndJustTheDesk());
-
-            Assert.False(widget.JustTheDesk);
-            Assert.False(store.LoadJustTheDesk().On);
-            Assert.True(store.LoadDeskSignInReminder());
-            Assert.False(widget.EndJustTheDesk());   // not on: nothing to end
-        }
-        finally { widget.Dispose(); }
-    });
 }

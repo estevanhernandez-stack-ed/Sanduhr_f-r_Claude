@@ -2,7 +2,7 @@ using Sanduhr.Core;
 
 namespace Sanduhr.Tests;
 
-/// <summary>Just the Desk and the sign-in reminder (S7 7.5; the Mac's JustTheDeskTests plus the Windows rules).</summary>
+/// <summary>The sign-in reminder (S7 7.5) and the retired Just the Desk keys, which the setup migration still reads.</summary>
 public class JustTheDeskTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 11, 0, 0, 0, TimeSpan.Zero);
@@ -13,83 +13,6 @@ public class JustTheDeskTests
         Assert.False(JustTheDeskState.Off.On);
         Assert.False(JustTheDeskState.Off.SilencedReminder);
     }
-
-    [Fact]
-    public void ChoosingTurnsTheDeskOnAndTheReminderOff()
-    {
-        var r = JustTheDesk.Choose(JustTheDeskState.Off, reminderOn: true);
-        Assert.True(r.State.On);
-        Assert.True(r.State.SilencedReminder);
-        Assert.False(r.ReminderOn);
-        Assert.True(r.DeskEnabled);
-    }
-
-    [Fact]
-    public void ChoosingWithTheReminderAlreadyOffSilencesNothing()
-    {
-        var r = JustTheDesk.Choose(JustTheDeskState.Off, reminderOn: false);
-        Assert.True(r.State.On);
-        Assert.False(r.State.SilencedReminder);
-        Assert.False(r.ReminderOn);
-    }
-
-    [Fact]
-    public void ChoosingTwiceKeepsTheFirstSilencedValue()
-    {
-        var first = JustTheDesk.Choose(JustTheDeskState.Off, reminderOn: true);
-        var second = JustTheDesk.Choose(first.State, first.ReminderOn);
-        Assert.True(second.State.SilencedReminder);
-        Assert.False(second.ReminderOn);
-    }
-
-    [Fact]
-    public void SigningInEndsItAndBringsTheReminderBack()
-    {
-        var chosen = JustTheDesk.Choose(JustTheDeskState.Off, reminderOn: true);
-        var ended = JustTheDesk.EndBySignIn(chosen.State, chosen.ReminderOn);
-        Assert.True(ended.Ended);
-        Assert.Equal(JustTheDeskState.Off, ended.State);
-        Assert.True(ended.ReminderOn);
-    }
-
-    [Fact]
-    public void AReminderTheyHadTurnedOffStaysOff()
-    {
-        var chosen = JustTheDesk.Choose(JustTheDeskState.Off, reminderOn: false);
-        var ended = JustTheDesk.EndBySignIn(chosen.State, chosen.ReminderOn);
-        Assert.True(ended.Ended);
-        Assert.False(ended.ReminderOn);
-    }
-
-    [Fact]
-    public void SigningInWhenNotOnChangesNothing()
-    {
-        var r = JustTheDesk.EndBySignIn(JustTheDeskState.Off, reminderOn: false);
-        Assert.False(r.Ended);
-        Assert.Equal(JustTheDeskState.Off, r.State);
-        Assert.False(r.ReminderOn);
-        Assert.True(JustTheDesk.EndBySignIn(JustTheDeskState.Off, reminderOn: true).ReminderOn);
-    }
-
-    [Theory]
-    [InlineData(false, false, true)]
-    [InlineData(false, true, false)]
-    [InlineData(true, false, false)]
-    [InlineData(true, true, false)]
-    public void OnboardingAndTheFirstRunCardNeedNoAccountAndNoChoice(bool hasAccount, bool justTheDesk, bool expected)
-    {
-        Assert.Equal(expected, JustTheDesk.Onboarding(hasAccount, justTheDesk));
-        Assert.Equal(expected, JustTheDesk.ShowsFirstRunCard(hasAccount, justTheDesk));
-    }
-
-    [Theory]
-    [InlineData(true, false, true, true)]
-    [InlineData(true, false, false, false)]
-    [InlineData(true, true, true, false)]
-    [InlineData(false, false, true, false)]
-    [InlineData(false, true, true, false)]
-    public void TheWidgetStartsHiddenOnlyWithJustTheDeskNoAccountAndTheDeskOn(bool justTheDesk, bool hasAccount, bool deskOn, bool expected) =>
-        Assert.Equal(expected, JustTheDesk.WidgetStartsHidden(justTheDesk, hasAccount, deskOn));
 
     [Fact]
     public void TheDeskDrawsNoSignInLineWithTheReminderOff()
@@ -125,48 +48,10 @@ public class JustTheDeskTests
     {
         Assert.Equal("just_the_desk", JustTheDesk.Key);
         Assert.Equal("just_the_desk_silenced_reminder", JustTheDesk.SilencedKey);
-        Assert.Equal("Just the Desk", JustTheDesk.ButtonTitle);
-        Assert.Equal(
-            "No Claude account? Use the Desk on its own: a clock, a message and more on the desktop. Sign in any time from Settings, Accounts.",
-            JustTheDesk.Caption);
         Assert.Equal("desk_sign_in_reminder", SignInReminder.Key);
         Assert.True(SignInReminder.DefaultOn);
         Assert.Equal("Sign-in reminders on the Desk", SignInReminder.Title);
         Assert.Contains("“sign in to Sanduhr”", SignInReminder.Caption);
         Assert.EndsWith("The widget always says when you're not signed in.", SignInReminder.Caption);
-    }
-
-    // ---- Settings v2, slice 5: Settings, Widget's "Show the widget" (WF32) ----
-
-    [Fact]
-    public void ShowingTheWidgetEndsItTheWaySigningInDoes()
-    {
-        foreach (bool reminderWasOn in new[] { true, false })
-        {
-            var chosen = JustTheDesk.Choose(JustTheDeskState.Off, reminderWasOn);
-            var shown = JustTheDesk.EndByShowWidget(chosen.State, chosen.ReminderOn);
-            Assert.Equal(JustTheDesk.EndBySignIn(chosen.State, chosen.ReminderOn), shown);
-            Assert.True(shown.Ended);
-            Assert.Equal(JustTheDeskState.Off, shown.State);
-            Assert.Equal(reminderWasOn, shown.ReminderOn);
-        }
-    }
-
-    [Fact]
-    public void ShowingTheWidgetWhenItIsNotOnChangesNothing()
-    {
-        var r = JustTheDesk.EndByShowWidget(JustTheDeskState.Off, reminderOn: false);
-        Assert.False(r.Ended);
-        Assert.Equal(JustTheDeskState.Off, r.State);
-        Assert.False(r.ReminderOn);
-    }
-
-    [Fact]
-    public void AfterShowingTheWidgetTheNextLaunchShowsIt()
-    {
-        var chosen = JustTheDesk.Choose(JustTheDeskState.Off, reminderOn: true);
-        var shown = JustTheDesk.EndByShowWidget(chosen.State, chosen.ReminderOn);
-        Assert.False(JustTheDesk.WidgetStartsHidden(shown.State.On, hasAccount: false, deskOn: true));
-        Assert.True(JustTheDesk.ShowsFirstRunCard(hasAccount: false, shown.State.On));
     }
 }
