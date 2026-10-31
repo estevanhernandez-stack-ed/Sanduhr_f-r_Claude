@@ -376,6 +376,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         if (_stopped) return;
         _settings = _store.LoadDesk();
         _desktopShown = _store.LoadSetup()?.Desktop ?? true;
+        // Desktop went off under a running Arrange: end it as Cancel (nothing saved); a design under review already ended it.
+        if (!_desktopShown && Arranging && _preview is null) EndArrangeCore(DeskArrangeEnd.Cancel, reload: false);
         _ink = _store.LoadDeskInk();
         _np = _store.LoadNowPlaying();
         _nowPlaying.Configure(_np.Prefs);
@@ -422,11 +424,12 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// Draws a design under review (the live review): the layout, font, plate, ink and Launcher in <paramref name="design"/> replace the
     /// saved ones on every screen until <see cref="EndPreview"/>. Nothing is saved; Arrange mode, if it runs, ends as Cancel.
     /// </summary>
-    public void ShowPreview(DeskDesignSettings design)
+    public void ShowPreview(DeskDesignSettings design, bool full = true)
     {
         if (_stopped) return;
         if (Arranging) EndArrangeCore(DeskArrangeEnd.Cancel, reload: false);
         _preview = design;
+        _previewFull = full;
         Reload();
     }
 
@@ -447,6 +450,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         if (_preview is null) return;
         _preview = null;
+        _previewFull = true;
         Reload();
     }
 
@@ -661,7 +665,13 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
 
     /// <summary>The Desk's own pieces are drawn: desktop is on, or a design is under review (shown in full, never saved). The filter
     /// lives only in <see cref="LayoutFor"/> and <see cref="Placed"/>; the saved layout is never written filtered.</summary>
-    private bool DrawsDesktop => _desktopShown || _preview is not null;
+    private bool DrawsDesktop => _desktopShown || (_preview is not null && _previewFull);
+
+    /// <summary>The preview shows the Desk's own pieces too: a design or a widget look under review does; a drawers review (full: false) shows
+    /// only drawers while desktop is off.</summary>
+    private bool _previewFull = true;
+
+    internal bool IsPlaced(string widget) => Placed(widget);
 
     /// <summary>A widget's reading is wanted when its piece is placed and at least one island holding it
     /// is in sight. With no islands yet nothing is paused, so it is wanted (S7, 7.1).</summary>

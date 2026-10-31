@@ -23,6 +23,8 @@ public static class SetupCopy
     public const string UsageOffLine = "Your account stays saved. Remove it in Settings, Accounts.";
     public const string AddOnsStayLine = "The Claude Code add-ons stay installed. Remove them on the Claude Code page.";
 
+    public const string ArrangeNeedsDesktop = "Turn on A nicer desktop in Set up Sanduhr to arrange the Desk.";
+
     public static string DrawersOffLine(int files) =>
         files == 1 ? "1 drawer file goes back to your Desktop." : $"{files} drawer files go back to your Desktop.";
 
@@ -30,7 +32,7 @@ public static class SetupCopy
     public static IReadOnlyList<string> All { get; } =
     [
         Title, Intro, DesktopTitle, DesktopBody, DrawersTitle, DrawersBody, UsageTitle, UsageBody, ClaudeSource, ClaudeTrademark,
-        DesignWithChat, Continue, NotNow, Cancel, MenuItem, PickOne, DesktopOffLine, UsageOffLine, AddOnsStayLine, DrawersOffLine(2),
+        DesignWithChat, Continue, NotNow, Cancel, MenuItem, PickOne, DesktopOffLine, UsageOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DrawersOffLine(2),
     ];
 }
 

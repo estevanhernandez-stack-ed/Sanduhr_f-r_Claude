@@ -262,11 +262,14 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     [ObservableProperty] private string? _arrangingLayout;
 
     /// <summary>The button is live while the Desk is on and no Arrange session runs.</summary>
-    public bool CanArrange => Enabled && !Arranging && (_store.LoadSetup()?.Desktop ?? true);
+    public bool CanArrange => Enabled && !Arranging && DesktopOn;
 
     /// <summary>The line under the button: why it is off, what Arrange mode is doing, or what it does.</summary>
     public string ArrangeNote => Arranging ? DeskArrangeCopy.SettingsArranging
-        : !Enabled ? DeskArrangeCopy.SettingsDeskOff : DeskArrangeCopy.SettingsNote;
+        : !Enabled ? DeskArrangeCopy.SettingsDeskOff
+        : !DesktopOn ? SetupCopy.ArrangeNeedsDesktop : DeskArrangeCopy.SettingsNote;
+
+    private bool DesktopOn => _store.LoadSetup()?.Desktop ?? true;
 
     /// <summary>Starts Arrange mode on the desktop.</summary>
     [CommunityToolkit.Mvvm.Input.RelayCommand]
@@ -283,6 +286,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(Layout));
         OnPropertyChanged(nameof(Settings));
         OnPropertyChanged(nameof(CanArrange));
+        OnPropertyChanged(nameof(ArrangeNote));
     }
 
     /// <summary>The font packs changed (one switched, installed or removed): the Desk font list follows. The saved family stays listed, so the
