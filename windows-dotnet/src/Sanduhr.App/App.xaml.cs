@@ -1024,7 +1024,7 @@ public partial class App : Application
         {
             if (ReferenceEquals(_setupWindow, window)) _setupWindow = null;
             // After the window is gone and the click has unwound, so a notice never opens over a disabled setup window: close, notice, tour.
-            // Read at run time: Applied reaches this handler after the window's own, which closes it.
+            // Read at run time, so the result is there whichever Applied handler runs first.
             Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
             {
                 if (applied is { } result && !_quitting) AfterSetup(result, firstRun);
