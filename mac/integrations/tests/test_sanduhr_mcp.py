@@ -548,7 +548,7 @@ class ActivityLevel(Base):
                           "get_desk_messages", "propose_desk_messages", "propose_theme",
                           "watch_start", "watch_update", "watch_end", "propose_now_playing_looks",
                           "propose_mod", "list_catalog", "propose_install", "get_mod_status", "propose_config",
-                          "propose_widget", "get_desk", "propose_desk"])
+                          "propose_widget", "get_desk", "propose_desk", "propose_sprite_motion"])
         self.assertFalse(p["watchers_allowed"])
         self.assertEqual(sorted(p["tools_not_on_mac"]), ["publish_usage"])
         text = json.dumps(p)
@@ -612,7 +612,7 @@ class Protocol(Base):
                                  "get_desk_messages", "propose_desk_messages", "propose_theme",
                                  "watch_start", "watch_update", "watch_end", "propose_now_playing_looks",
                                  "propose_mod", "list_catalog", "propose_install", "get_mod_status", "propose_config",
-                                 "propose_widget", "get_desk", "propose_desk"])
+                                 "propose_widget", "get_desk", "propose_desk", "propose_sprite_motion"])
         for t in frames[1]["result"]["tools"]:
             if t["name"] == "propose_desk_messages":
                 # The one tool that asks for a change: not read-only, never destructive, no path.
@@ -679,6 +679,15 @@ class Protocol(Base):
                 self.assertFalse(t["annotations"]["destructiveHint"])
                 self.assertEqual(sorted(t["inputSchema"]["properties"]), ["design", "name", "note"])
                 self.assertEqual(t["inputSchema"]["required"], ["design"])
+                self.assertFalse(t["inputSchema"]["additionalProperties"])
+                continue
+            if t["name"] == "propose_sprite_motion":
+                # Asks, never changes a sprite; closed shape, no image and no path.
+                self.assertFalse(t["annotations"]["readOnlyHint"])
+                self.assertFalse(t["annotations"]["destructiveHint"])
+                self.assertEqual(sorted(t["inputSchema"]["properties"]),
+                                 ["animations", "fps", "moods", "note", "roam", "scale", "sprite_id", "triggers"])
+                self.assertEqual(t["inputSchema"]["required"], ["sprite_id", "animations", "moods", "triggers"])
                 self.assertFalse(t["inputSchema"]["additionalProperties"])
                 continue
             if t["name"] == "get_mod_status":
