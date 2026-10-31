@@ -29,6 +29,13 @@ public sealed class DrawerServiceTests
         Dispatcher.PushFrame(frame);
     }
 
+    /// <summary>Pumps until the watcher has caught up, up to 10 s: a slow CI runner delivers the change late.</summary>
+    private static void PumpUntil(Func<bool> done)
+    {
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (!done() && DateTime.UtcNow < until) Pump(100);
+    }
+
     [Fact]
     public void Each_drawer_lists_its_folder_folders_first_and_skips_housekeeping_files() => Sta.Run(() =>
     {
@@ -62,7 +69,7 @@ public sealed class DrawerServiceTests
         box.File(@"Desktop\Drawers\Images\a.png");
         var (s, _) = Make(box, "Images");
         Directory.Delete(Path.Combine(box.Drawers, "Images"), recursive: true);
-        Pump(1500);
+        PumpUntil(() => s.Get("images")!.Missing);
         Assert.True(s.Get("images")!.Missing);
         s.Dispose();
     });
@@ -73,7 +80,7 @@ public sealed class DrawerServiceTests
         using var box = new DrawerSandbox();
         var (s, _) = Make(box, "Images");
         box.File(@"Desktop\Drawers\Images\new.png");
-        Pump(1500);
+        PumpUntil(() => s.Get("images")!.Items.Any(i => i.Name == "new.png"));
         Assert.Contains(s.Get("images")!.Items, i => i.Name == "new.png");
         s.Dispose();
     });
