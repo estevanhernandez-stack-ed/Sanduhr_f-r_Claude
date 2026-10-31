@@ -76,6 +76,7 @@ enum SettingsAnchor {
     static let installedWidgets = "installed"
     static let companion = "companion"
     static let ownArt = "own-art"
+    static let newSprite = "new-sprite"
     // Now Playing
     static let source = "source"
     static let show = "show"
@@ -199,6 +200,9 @@ enum SettingsAnchor {
                       synonyms: ["uninstall", "remove", "made here", "from the catalog", "effects"]),
         SettingsEntry(title: "Use my own art\u{2026}", page: .widgets, anchor: ownArt,
                       synonyms: ["own art", "my art", "png", "sprite sheet", "image", "replace the art", "made here"]),
+        SettingsEntry(title: "New sprite from an image\u{2026}", page: .widgets, anchor: newSprite,
+                      synonyms: ["make a sprite", "sprite sheet", "png", "cells", "tag", "walk", "sit", "nap", "cheer",
+                                 "worry", "own art", "my art", "image", "made here"]),
         SettingsEntry(title: "Companion", page: .widgets, anchor: companion,
                       synonyms: ["roam", "sprite", "pet", "hourglass"]),
     ]
