@@ -290,6 +290,8 @@ struct NowPlayingPrefs: Equatable {
     static let hidePausedKey = "nowPlayingHidePaused"
     static let excludedKey = "nowPlayingExcluded"
     static let askAppsKey = "nowPlayingAskApps"
+    /// "Gradient bars" for the audio bars (spec 14), off by default. Constant only until the bars are drawn.
+    static let barsGradientKey = "nowPlaying.barsGradient"
 
     var hideWhilePaused = false
     /// Bundle ids whose playback never shows.
