@@ -65,6 +65,8 @@ private struct NowPlayingShowSection: View {
         Section("Show") {
             Toggle("Hide while paused", isOn: $hidePaused)
                 .settingsAnchor(SettingsAnchor.show)
+            Text("Hidden \(Int(NowPlayingPrefs.pausedGrace)) seconds after you pause, so a short pause leaves the title to click to play again.")
+                .font(.caption).foregroundStyle(.secondary)
             Text("While paused, a wing shows a Next button at its outer edge (the strip at its end): click the title to play, the button to skip.")
                 .font(.caption).foregroundStyle(.secondary)
         }

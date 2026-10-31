@@ -812,8 +812,10 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
 - [ ] Stop the browser tab and play in Music: the wing and the line follow Music within two seconds.
   Settings, Apps lists Chrome and Music; switch Chrome off and play in the browser: the wing shows
   its stand-in (When nothing is playing, below), never the browser's title; switch it back on.
-- [ ] Hide while paused on: pausing hides the line and puts the wing's stand-in in its place
-  (When nothing is playing, below); playing brings both back. With nothing playing at all, the line
+- [ ] Hide while paused on: pausing keeps the line for 15 seconds (click it to play again), then
+  hides it and puts the wing's stand-in in its place (When nothing is playing, below); playing
+  within the 15 seconds keeps it, and playing later brings both back. A track already paused when
+  Sanduhr starts hides at once. With nothing playing at all, the line
   is gone and no timer ticks.
 - [ ] When nothing is playing. Right wing and the strip (Text under the camera on) on Now playing,
   nothing playing. Settings, Desk, Now Playing has "When nothing is playing" reading "What that spot

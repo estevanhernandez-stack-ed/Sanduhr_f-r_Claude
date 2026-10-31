@@ -82,6 +82,9 @@ final class NowPlayingController {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var pending: [DispatchWorkItem] = []
     @ObservationIgnored private var settleItem: DispatchWorkItem?
+    @ObservationIgnored private var pauseGrace = NowPlayingPauseGrace()
+    /// Re-publishes when a paused track's grace ends, so Hide while paused takes it then.
+    @ObservationIgnored private var graceItem: DispatchWorkItem?
     @ObservationIgnored private var fallbackObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var observing = false
 
@@ -389,6 +392,15 @@ final class NowPlayingController {
         DispatchQueue.main.asyncAfter(deadline: .now() + wait + 0.05, execute: item)
     }
 
+    private func scheduleGraceEnd(_ pausedFor: TimeInterval?) {
+        graceItem?.cancel()
+        graceItem = nil
+        guard prefs.hideWhilePaused, let pausedFor, pausedFor < NowPlayingPrefs.pausedGrace else { return }
+        let item = DispatchWorkItem { [weak self] in self?.publish() }
+        graceItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + NowPlayingPrefs.pausedGrace - pausedFor + 0.05, execute: item)
+    }
+
     private func later(_ wait: TimeInterval, gen: Int, _ work: @escaping () -> Void) {
         let item = DispatchWorkItem { [weak self] in
             guard let self, gen == self.generation else { return }
@@ -405,7 +417,9 @@ final class NowPlayingController {
         if state != newState { state = newState }
         let seen = NowPlayingApps.seen(seenApps, adding: shown?.bundleID)
         if seen != seenApps { seenApps = seen }
-        let v = prefs.visible(shown)
+        let pausedFor = pauseGrace.observe(newState, now: Date())
+        scheduleGraceEnd(pausedFor)
+        let v = prefs.visible(shown, pausedFor: pausedFor)
         if v != visible { visible = v }
         let model = DeskController.shared.model
         if model.nowPlaying != v { model.nowPlaying = v }

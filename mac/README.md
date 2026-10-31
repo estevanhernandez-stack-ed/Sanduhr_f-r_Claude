@@ -1527,7 +1527,7 @@ paused, and for apps switched off on the Now Playing page (which also has the so
 switch and "Notch Settings…" / "Layout Settings…").
 
 - **When nothing is playing.** A notch wing or the strip on Now playing doesn't go blank when there
-  is no line (nothing plays, Hide while paused while paused, the app switched off, now playing
+  is no line (nothing plays, paused for 15 seconds with Hide while paused on, the app switched off, now playing
   unavailable): it shows the Now Playing page's "When nothing is playing" choice instead, by default
   what that spot shows when Now playing isn't picked (left wing: next meeting or the time; right
   wing: the Claude meters; strip: next meeting or the meters), or any other notch content, or Nothing

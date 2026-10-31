@@ -317,6 +317,31 @@ struct NowPlayingVisibilityTests {
         #expect(prefs.visible(playing) == playing)
     }
 
+    @Test func hideWhilePausedWaitsOutTheGrace() {
+        let prefs = NowPlayingPrefs(hideWhilePaused: true)
+        #expect(prefs.visible(paused, pausedFor: 0) == paused)
+        #expect(prefs.visible(paused, pausedFor: NowPlayingPrefs.pausedGrace - 1) == paused)
+        #expect(prefs.visible(paused, pausedFor: NowPlayingPrefs.pausedGrace) == nil)
+        // Off, the grace changes nothing.
+        #expect(NowPlayingPrefs().visible(paused, pausedFor: 999) == paused)
+    }
+
+    @Test func onlyAPauseSeenWhilePlayingStartsTheGrace() {
+        let t0 = Date(timeIntervalSince1970: 1_000)
+        var grace = NowPlayingPauseGrace()
+        #expect(grace.observe(.playing, now: t0) == nil)
+        #expect(grace.observe(.paused, now: t0.addingTimeInterval(1)) == 0)
+        #expect(grace.observe(.paused, now: t0.addingTimeInterval(9)) == 8)
+        // Playing again resets it; the next pause starts from zero.
+        #expect(grace.observe(.playing, now: t0.addingTimeInterval(10)) == nil)
+        #expect(grace.observe(.paused, now: t0.addingTimeInterval(12)) == 0)
+
+        // Already paused when first seen: past the grace at once.
+        var fresh = NowPlayingPauseGrace()
+        let first = fresh.observe(.paused, now: t0) ?? 0
+        #expect(first >= NowPlayingPrefs.pausedGrace)
+    }
+
     @Test func excludedAppsNeverShow() {
         let prefs = NowPlayingPrefs(excluded: ["com.google.Chrome"])
         #expect(prefs.visible(playing) == nil)
