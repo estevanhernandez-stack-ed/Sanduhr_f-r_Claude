@@ -66,9 +66,10 @@ public static class WelcomeTour
         Moved(ById("desk"), 1),
         Moved(ById("tray"), 2,
             "Right-click the hourglass in the tray for Settings and Arrange Desk; a click brings back the widget. Once you sign in it shows a percent of your limits."),
-        new(3, new WhatsNewCard([], "sign-in", "Sign in any time",
+        // Show me lands on the Widget page's usage-off section, where the Set up Sanduhr button is.
+        new(3, new WhatsNewCard([], "usage", "Usage any time",
             "The Desk works without an account. Turn on usage in Set up Sanduhr whenever you want it, and the meters fill in on the desktop.",
-            "", WhatsNewPreview.None, SettingsPage.Accounts), ShowMeTitle: "Accounts"),
+            "", WhatsNewPreview.None, SettingsPage.Widget) { Anchor = SettingsIndex.UsageOffSection }, ShowMeTitle: SetupCopy.Title),
     ]);
 
     private static TourCard ById(string id) => Table.Single(c => c.Id == id);
@@ -188,7 +189,7 @@ public static class WelcomeTour
     /// <summary><paramref name="card"/> with the anchor its destination calls for; the same card when it has it already.</summary>
     private static TourCard WithAnchor(TourCard card)
     {
-        var anchor = AnchorFor(card.Card.Destination);
+        var anchor = card.Card.Anchor ?? AnchorFor(card.Card.Destination);   // a card that names its own section keeps it
         return card.Card.Anchor == anchor ? card : card with { Card = card.Card with { Anchor = anchor } };
     }
 

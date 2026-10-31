@@ -76,10 +76,10 @@ public class WelcomeTourTests
     }
 
     [Fact]
-    public void DeskOnly_IsThreeStepsEndingInSignIn()
+    public void DeskOnly_IsThreeStepsEndingInUsage()
     {
         var steps = WelcomeTour.Steps(None, WelcomeTour.DeskOnly);
-        Assert.Equal(new[] { new[] { "desk" }, ["tray"], ["sign-in"] }, Ids(steps));
+        Assert.Equal(new[] { new[] { "desk" }, ["tray"], ["usage"] }, Ids(steps));
         Assert.Equal([1, 2, 3], steps.Select(s => s[0].Step).ToArray());
         Assert.DoesNotContain(WelcomeTour.DeskOnly, c => c.Id is "paced" or "accounts" or "claude-code");
     }
@@ -97,12 +97,15 @@ public class WelcomeTourTests
     }
 
     [Fact]
-    public void DeskOnly_SignInCardOpensAccounts()
+    public void DeskOnly_UsageCardOpensSetupOnTheWidgetPagesUsageOffSection()
     {
-        var card = WelcomeTour.DeskOnly.Single(c => c.Id == "sign-in");
-        Assert.Equal("Sign in any time", card.Card.Title);
-        Assert.Equal(SettingsPage.Accounts, card.Card.Destination);
-        Assert.Equal("Accounts", card.ShowMeTitle);
+        var card = WelcomeTour.DeskOnly.Single(c => c.Id == "usage");
+        Assert.Equal("Usage any time", card.Card.Title);
+        Assert.Equal(SettingsPage.Widget, card.Card.Destination);
+        Assert.Equal(SettingsIndex.UsageOffSection, card.Card.Anchor);
+        Assert.False(SettingsIndex.ShowsTheWidget(new SettingsLink(card.Card.Destination, card.Card.Anchor)));   // Settings, not the widget itself
+        Assert.Equal(SetupCopy.Title, card.ShowMeTitle);
+        Assert.Contains("Set up Sanduhr", card.Card.Body);
     }
 
     [Theory]
@@ -110,7 +113,7 @@ public class WelcomeTourTests
     [InlineData(false)]
     public void StepsFor_DeskOnlyPicksTheDeskOnlyTour(bool signedIn)
     {
-        Assert.Equal(new[] { new[] { "desk" }, ["tray"], ["sign-in"] },
+        Assert.Equal(new[] { new[] { "desk" }, ["tray"], ["usage"] },
             Ids(WelcomeTour.StepsFor(true, None, signedIn)));
         Assert.Equal(Ids(WelcomeTour.Steps(None, signedIn: signedIn)),
             Ids(WelcomeTour.StepsFor(false, None, signedIn)));

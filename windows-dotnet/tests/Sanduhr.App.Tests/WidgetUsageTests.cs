@@ -134,6 +134,21 @@ public sealed class WidgetUsageTests : AppWindowFixture
             .SetValue(widget, JsonNode.Parse(json));
 
     [Fact]
+    public void A_setup_still_pending_with_an_account_signed_in_still_draws_the_tiers() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");   // signed in before any setup: the hold ends with the account
+        try
+        {
+            Feed(widget, TwoLimits);
+            widget.SetLimitOrder([TierModel.FiveHour, TierModel.SevenDay]);
+            Assert.NotEmpty(widget.CurrentDeskUsage.Tiers);
+            widget.SetupPending = true;
+            Assert.NotEmpty(widget.CurrentDeskUsage.Tiers);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
     public void Usage_off_pauses_the_seat_meters_and_following_and_usage_on_resumes_them() => AppHost.Run(() =>
     {
         var (widget, _) = ScratchWidget("Personal");

@@ -11,15 +11,20 @@ namespace Sanduhr.App.ViewModels;
 internal sealed partial class SetupViewModel : ObservableObject
 {
     private readonly SetupService _service;
+    private readonly Func<bool> _hasAccount;
+    private bool _usageTouched, _settingUsage;
 
-    internal SetupViewModel(SetupService service, bool firstRun)
+    /// <param name="hasAccount">Whether an account is signed in now. On a first run an account (added from the widget's card while this
+    /// screen was up) means usage is wanted: it is ticked when the window opens, and again at Continue if the person never touched that tick.</param>
+    internal SetupViewModel(SetupService service, bool firstRun, Func<bool>? hasAccount = null)
     {
         _service = service;
+        _hasAccount = hasAccount ?? (() => false);
         FirstRun = firstRun;
         var now = firstRun ? SetupChoices.FirstRun : service.Current();
         _desktop = now.Desktop;
         _drawers = now.Drawers;
-        _claudeUsage = now.ClaudeUsage;
+        _claudeUsage = now.ClaudeUsage || (firstRun && _hasAccount());
         Refresh();
     }
 
@@ -47,7 +52,11 @@ internal sealed partial class SetupViewModel : ObservableObject
 
     partial void OnDesktopChanged(bool value) => Refresh();
     partial void OnDrawersChanged(bool value) => Refresh();
-    partial void OnClaudeUsageChanged(bool value) => Refresh();
+    partial void OnClaudeUsageChanged(bool value)
+    {
+        if (!_settingUsage) _usageTouched = true;
+        Refresh();
+    }
     partial void OnBlockedChanged(string? value)
     {
         OnPropertyChanged(nameof(CanContinue));
@@ -79,6 +88,12 @@ internal sealed partial class SetupViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanContinue))]
     private void Continue()
     {
+        if (FirstRun && !_usageTouched && !ClaudeUsage && _hasAccount())
+        {
+            _settingUsage = true;   // signed in while the screen was up: the person's own sign-in said yes to usage
+            ClaudeUsage = true;
+            _settingUsage = false;
+        }
         var result = _service.Apply(Choices);   // on the UI thread: a turn-off asks a question first
         if (result.Lines.Contains(SetupCopy.SaveFailed))
         {

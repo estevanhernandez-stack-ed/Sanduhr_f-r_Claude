@@ -372,10 +372,11 @@ public partial class App : Application
         OpenTourWhenDeskIsFree();
     }
 
-    /// <summary>The tour comes last (setup spec, section 2): while a drawers review is open on the Desk it waits, checking every second.</summary>
+    /// <summary>The tour comes last (setup spec, section 2): while a drawers review is on the Desk, a plan under review or its result bar
+    /// with Undo, it waits, checking every second. A quit ends the wait.</summary>
     private void OpenTourWhenDeskIsFree()
     {
-        if (_drawerReview?.Reviewing != true)
+        if (!DrawersReviewUp)
         {
             Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(ShowTour));
             return;
@@ -383,12 +384,15 @@ public partial class App : Application
         var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         timer.Tick += (_, _) =>
         {
-            if (_drawerReview?.Reviewing == true) return;
+            if (_quitting) { timer.Stop(); return; }
+            if (DrawersReviewUp) return;
             timer.Stop();
             ShowTour();
         };
         timer.Start();
     }
+
+    private bool DrawersReviewUp => _drawerReview is { Reviewing: true } or { BarOpen: true };
 
     /// <summary>
     /// The welcome tour: from the first fetch, the tray's "Take the tour…" and Settings, About.
@@ -1009,11 +1013,23 @@ public partial class App : Application
         var host = new AppSetupHost(() => _drawers, () => _drawerReview, vm, () => _desk, store,
             question => ThemedDialog.ShowConfirm(_setupWindow, SettingsNames.DrawersTurnOffTitle, question,
                 SettingsNames.DrawersPutThemBack, SettingsNames.DrawersCancel));
-        var model = new SetupViewModel(new SetupService(store, host), firstRun) { DesignWithChatRequested = OpenChatDesign };
-        model.Applied += result => AfterSetup(result, firstRun);
+        var model = new SetupViewModel(new SetupService(store, host), firstRun,
+            hasAccount: () => vm.AccountStore.ListAccounts().Count > 0)   // streamer: key - a count, never drawn
+        { DesignWithChatRequested = OpenChatDesign };
+        SetupResult? applied = null;
+        model.Applied += result => applied = result;
         var window = new SetupWindow(model);
         _setupWindow = window;
-        window.Closed += (_, _) => { if (ReferenceEquals(_setupWindow, window)) _setupWindow = null; };
+        window.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_setupWindow, window)) _setupWindow = null;
+            // After the window is gone and the click has unwound, so a notice never opens over a disabled setup window: close, notice, tour.
+            // Read at run time: Applied reaches this handler after the window's own, which closes it.
+            Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+            {
+                if (applied is { } result && !_quitting) AfterSetup(result, firstRun);
+            }));
+        };
         window.Show();
         window.Activate();
     }
@@ -1026,10 +1042,11 @@ public partial class App : Application
         vm.SetupPending = false;
         if (result.Now.ClaudeUsage) ShowWindow(); else _window?.Hide();
         _settingsWindow?.ViewModel.Desk.Reload();
-        // Notes and errors from the apply (a drawers turn-off that was refused, the first-drawers line): one themed notice, after the
-        // window has closed. Streamer mode: the host already masked any path in them.
-        if (result.Lines.Count > 0)
-            ThemedDialog.Show(null, SetupCopy.Title, string.Join(Environment.NewLine, result.Lines));
+        // What went wrong or was refused (a drawers turn-off that was not done, a failed save): one themed notice, now that the window has
+        // closed. The first-drawers line is a note, not a problem, and is left out. Streamer mode: the host already masked any path in them.
+        var problems = result.Lines.Where(l => l != DrawerReview.FirstOnLine).ToList();
+        if (problems.Count > 0)
+            ThemedDialog.Show(null, SetupCopy.Title, string.Join(Environment.NewLine, problems));
         if (!firstRun || !_tourHeldBySetup) return;
         _tourHeldBySetup = false;
         _tourOfferedThisLaunch = false;

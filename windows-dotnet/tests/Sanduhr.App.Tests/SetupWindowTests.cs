@@ -218,13 +218,51 @@ public sealed class SetupWindowTests : AppWindowFixture
             Assert.False(closed);
             Assert.False(vm.Saved);
             Assert.Contains(SetupCopy.SaveFailed, vm.ResultLines);
-            Assert.Contains(NamesOf(w), n => n == "What happened");
+            Assert.Contains(NamesOf(w), n => n == SetupCopy.WhatHappened);
         }
         finally
         {
             File.SetAttributes(file, FileAttributes.Normal);
             w.Close();
         }
+    });
+
+    [Fact]
+    public void A_first_run_with_an_account_already_signed_in_opens_with_usage_ticked() => AppHost.Run(() =>
+    {
+        var store = new SettingsStore(ScratchPaths());
+        var vm = new SetupViewModel(new SetupService(store, new Host()), firstRun: true, hasAccount: () => true);
+        Assert.True(vm.ClaudeUsage);
+        Assert.True(vm.Desktop);
+        Assert.True(vm.Drawers);
+    });
+
+    [Fact]
+    public void An_account_added_while_the_screen_is_up_ticks_usage_at_Continue_if_the_tick_was_never_touched() => AppHost.Run(() =>
+    {
+        var store = new SettingsStore(ScratchPaths());
+        bool account = false;
+        var host = new Host { UsageOn = true };   // the widget loads usage on before any setup
+        var vm = new SetupViewModel(new SetupService(store, host), firstRun: true, hasAccount: () => account);
+        Assert.False(vm.ClaudeUsage);
+        account = true;   // signed in from the widget's card
+        vm.ContinueCommand.Execute(null);
+        Assert.True(vm.ClaudeUsage);
+        Assert.True(store.LoadSetup()!.ClaudeUsage);
+    });
+
+    [Fact]
+    public void An_account_added_while_the_screen_is_up_does_not_override_a_tick_the_person_touched() => AppHost.Run(() =>
+    {
+        var store = new SettingsStore(ScratchPaths());
+        bool account = false;
+        var vm = new SetupViewModel(new SetupService(store, new Host()), firstRun: true, hasAccount: () => account);
+        vm.ClaudeUsage = true;
+        vm.ClaudeUsage = false;   // they looked at it and chose no
+        account = true;
+        vm.ContinueCommand.Execute(null);
+        Assert.False(vm.ClaudeUsage);
+        Assert.False(store.LoadSetup()!.ClaudeUsage);
     });
 
     [Fact]
