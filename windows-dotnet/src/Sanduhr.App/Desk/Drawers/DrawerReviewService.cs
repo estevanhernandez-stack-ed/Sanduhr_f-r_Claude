@@ -72,6 +72,27 @@ internal sealed class DrawerReviewService
         _host.CloseBar();
     }
 
+    /// <summary>A result line with Undo on the drawers bar, for a change that moves no file (Tidy): null when it showed, else the line to
+    /// show instead. It holds the bar like a review's result (<see cref="BarOpen"/>), but a sort replaces it rather than waits:
+    /// <see cref="Open"/> checks only <see cref="Reviewing"/>. Undo runs <paramref name="undo"/> once and shows the line again without
+    /// Undo, and Done closes.</summary>
+    public string? ShowResult(string line, Action undo)
+    {
+        if (Reviewing || BarOpen || _host.OtherReviewOpen) return DrawerReview.Busy;
+        _undoId = null;   // a sort's Undo is not this one's
+        bool undone = false;
+        void Close() => CloseBar();
+        void Undoit()
+        {
+            if (undone) return;
+            undone = true;
+            undo();
+            ShowBar(DrawerReview.Result(line, canUndo: false), Undoit, null, Close);
+        }
+        ShowBar(DrawerReview.Result(line, canUndo: true), Undoit, null, Close);
+        return null;
+    }
+
     /// <summary>The built-in rules over the Desktop, opened for review. Null when the bar opened; otherwise the line to show instead.
     /// <paramref name="names"/> are the names a pasted answer gave the drawers its rules name, by drawer id: a drawer that does not exist
     /// yet is made under that name, else under <see cref="NameFromId"/>.</summary>

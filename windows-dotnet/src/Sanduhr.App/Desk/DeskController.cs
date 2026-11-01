@@ -867,6 +867,105 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             })];
     }
 
+    // ---- Tidy drawers ----
+
+    /// <summary>Whether a review or a result bar is up that Tidy must not rearrange under (look and placement spec, section 3): a drawers
+    /// review or its result bar, a Desk design review or a widget review. A seam for tests.</summary>
+    internal Func<bool> TidyBusy { get; set; } = () =>
+        DrawerReviewService.Current is { Reviewing: true } or { BarOpen: true }
+        || DeskDesignService.Current?.Reviewing == true || WidgetReviewService.Current?.Reviewing == true;
+
+    /// <summary>
+    /// Tidy drawers on one monitor (look and placement spec, section 2): every drawer drawn there lines up from <paramref name="tidy"/>'s
+    /// corner in its current order, off the desktop icons (when they are kept clear) and the Desk's pieces. A drawer that fits nowhere is left
+    /// out and keeps its place, and the drawers that did fit never land on it. <paramref name="monitor"/> is the monitor word of the
+    /// drawer whose menu asked, else the main monitor. Moves panels only, never a file. Returns null while a review is open (nothing moved),
+    /// else how many drawers moved and, for each drawer Tidy wrote a place for, the place it was drawn at before and the place written,
+    /// for <see cref="RestorePlaces"/>.
+    /// </summary>
+    internal (int Moved, IReadOnlyDictionary<string, TidyChange> Changes)? Tidy(DrawerTidy tidy, string? monitor)
+    {
+        if (_stopped || _drawers is not { } service) return null;
+        if (TidyBusy()) return null;
+        var before = new Dictionary<string, DrawerPlace>(service.Settings.Places, StringComparer.Ordinal);
+        if (_screens.Count == 0) return (0, new Dictionary<string, TidyChange>());
+        var screen = DrawerScreens.Find(monitor ?? DeskMonitors.Main, _screens)!;
+        if (!screen.Primary && screen.Id is null) screen = DrawerScreens.Primary(_screens);
+        string mon = screen.Primary ? DeskMonitors.Main : screen.Id!;
+        var work = WorkRect(screen);
+
+        ClearIcons();   // the person may have moved an icon since the last reading
+        var here = DrawerPlacesNow().Where(p => ReferenceEquals(DrawerScreens.Find(p.Place.Monitor, _screens), screen)).ToList();
+        var now = new Dictionary<string, DrawerRect>(StringComparer.Ordinal);
+        var drawn = new Dictionary<string, DrawerPlace>(StringComparer.Ordinal);   // where each is drawn now, on the monitor it is drawn on
+        foreach (var (state, place) in here)
+        {
+            var c = DrawerPlacement.Clamp(place, work.W, work.H);
+            now[state.Def.Id] = new DrawerRect(c.X, c.Y, DrawerPlacement.Width, DrawerPlacement.Height(state.Folded));
+            drawn[state.Def.Id] = c;
+        }
+        var order = DrawerTidyPlan.Order(now, work, tidy.Corner);
+        var ordered = order.Select(id => (id, now[id].H)).ToList();
+
+        var fixedBlocks = new List<DrawerRect>();
+        if (service.Settings.KeepClear) fixedBlocks.AddRange(IconArea(screen));
+        fixedBlocks.AddRange(PieceRects(screen));
+        // A drawer with no room keeps its place, so the others must not land on it: leave it out, block its rectangle, and place the rest
+        // again (it only ever grows the set, so this ends within one pass per drawer).
+        var leftOut = new HashSet<string>(StringComparer.Ordinal);
+        IReadOnlyDictionary<string, DrawerRect> slots;
+        while (true)
+        {
+            var blocked = new List<DrawerRect>(fixedBlocks);
+            blocked.AddRange(leftOut.Select(id => now[id]));
+            slots = DrawerTidyPlan.Slots([.. ordered.Where(o => !leftOut.Contains(o.id))], work, tidy, blocked);
+            var more = order.Where(id => !leftOut.Contains(id) && !slots.ContainsKey(id)).ToList();
+            if (more.Count == 0) break;
+            leftOut.UnionWith(more);
+        }
+
+        var next = new Dictionary<string, DrawerPlace>(before, StringComparer.Ordinal);
+        var changes = new Dictionary<string, TidyChange>(StringComparer.Ordinal);
+        int moved = 0;
+        foreach (var id in order)
+        {
+            DrawerPlace written;
+            if (slots.TryGetValue(id, out var r))
+            {
+                if (Math.Abs(now[id].X - r.X) > 0.5 || Math.Abs(now[id].Y - r.Y) > 0.5) moved++;
+                written = new DrawerPlace(mon, r.X, r.Y);
+            }
+            else if (!next.ContainsKey(id))
+                written = drawn[id];   // arrived without a saved place and has none to keep: freeze where it is drawn
+            else
+                continue;              // left out with a saved place: it keeps it, and Undo has nothing to put back
+            // A drawer with no saved place is put back where it was drawn, not to "no place": its arrival slot moves with Tidy's corner.
+            changes[id] = new TidyChange(before.TryGetValue(id, out var saved) ? saved : drawn[id], written);
+            next[id] = written;
+        }
+        service.Save(service.Settings with { Places = next, Tidy = tidy });
+        return (moved, changes);
+    }
+
+    /// <summary>A drawer's place before a Tidy and the place Tidy wrote for it.</summary>
+    internal readonly record struct TidyChange(DrawerPlace Before, DrawerPlace Written);
+
+    /// <summary>Tidy's Undo: puts back the places Tidy wrote, and only those. A drawer the user dragged since (its place is no longer what
+    /// Tidy wrote) or removed since keeps what it has; nothing else is touched.</summary>
+    internal void RestorePlaces(IReadOnlyDictionary<string, TidyChange> changes)
+    {
+        if (_stopped || _drawers is not { } service) return;
+        var settings = service.Settings;
+        var next = new Dictionary<string, DrawerPlace>(settings.Places, StringComparer.Ordinal);
+        foreach (var (id, change) in changes)
+            if (settings.Drawers.Any(d => d.Id == id) && next.TryGetValue(id, out var now) && now == change.Written)
+                next[id] = change.Before;
+        service.Save(settings with { Places = next });
+    }
+
+    /// <summary>The Desk has screens to place drawers on.</summary>
+    internal bool HasScreens => _screens.Count > 0;
+
     internal IReadOnlyList<DrawerRect> PieceRects(DeskScreen screen) =>
         _pieceRects.TryGetValue(screen.Device, out var rects) ? rects : [];
 
