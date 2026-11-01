@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.39.0-mac — 2026-10-31
 
 - **A sprite from your own art.** Settings, Widgets, **New sprite from an image…**: choose a PNG, set the cell size (8 to 64 pixels on a side, the sheet a whole number of cells), and tag cells to walk, sit, nap, cheer and worry. Sit needs a cell and walk needs two or more, in order; an untagged nap, cheer or worry plays sit. Name it and Sanduhr makes the pack (CC0, one stage, `art/sprite.png`), checks it strictly and installs it as a widget made on this Mac only. The picture is copied into the pack's folder and is never sent anywhere or shown to Claude.
 
