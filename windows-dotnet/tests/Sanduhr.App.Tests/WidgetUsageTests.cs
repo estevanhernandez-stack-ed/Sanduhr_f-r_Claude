@@ -81,6 +81,7 @@ public sealed class WidgetUsageTests : AppWindowFixture
             Assert.False(widget.UsageOn);
             Assert.Equal(SignInReason.None, widget.Reason);
             Assert.False(widget.ShowSignInPrompt);
+            Assert.Equal("", widget.StatusText);   // no "Connecting…" for a fetch that will not come
         }
         finally { widget.Dispose(); }
     });

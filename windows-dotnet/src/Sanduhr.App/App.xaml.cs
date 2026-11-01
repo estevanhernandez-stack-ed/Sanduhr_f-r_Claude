@@ -157,7 +157,8 @@ public partial class App : Application
         // attach order is the consent gate; Start()'s first fetch cycle then
         // kicks the initial backfill through the attached service.
         var vaultService = new VaultService(new SettingsStore(new Sanduhr.Core.Paths()), _vm.CcReader);
-        if (vaultService.NeedsConsentPrompt)
+        // The archive is about Claude Code usage: asked only once a setup exists with usage on, never ahead of the setup screen.
+        if (vaultService.NeedsConsentPrompt && startupSettings.LoadSetup()?.ClaudeUsage == true)
             vaultService.SaveConsent(VaultConsentDialog.ShowConsent(_window, vaultService.DetectedRootNames()));   // streamer: masked - via ShowConsent: the consent dialog draws each folder as Mask.FolderName
         _vm.AttachVaultService(vaultService);
 

@@ -1141,6 +1141,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (!UsageOn)
         {
             Reason = SignInReason.None;   // usage off: no card, nothing to fetch
+            StatusText = "";              // and no "Connecting…" for a fetch that will not come
             WatchTransport(null);
             return;
         }

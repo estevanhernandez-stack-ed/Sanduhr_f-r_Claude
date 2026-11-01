@@ -154,16 +154,11 @@
         </StackPanel>
 
         <!-- What unticking does, said before Continue applies it (reopened later only). -->
-        <ItemsControl ItemsSource="{Binding ChangeLines}" Margin="0,18,0,0" Focusable="False"
-                      AutomationProperties.Name="{x:Static core:SetupCopy.WhatChanges}"
-                      Visibility="{Binding HasChangeLines, Converter={StaticResource BoolVis}}">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,4"
-                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        <TextBlock Text="{Binding ChangeText}" Margin="0,18,0,0" TextWrapping="Wrap" FontSize="11" LineHeight="18"
+                   AutomationProperties.HelpText="{x:Static core:SetupCopy.WhatChanges}"
+                   AutomationProperties.LiveSetting="Polite"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                   Visibility="{Binding HasChangeLines, Converter={StaticResource BoolVis}}" />
 
         <!-- Why Continue is off. -->
         <TextBlock Text="{Binding Blocked}" TextWrapping="Wrap" FontSize="11" Margin="0,14,0,0"

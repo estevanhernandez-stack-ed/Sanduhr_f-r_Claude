@@ -48,6 +48,9 @@ internal sealed partial class SetupViewModel : ObservableObject
 
     public bool CanContinue => Blocked is null;
     public bool HasChangeLines => ChangeLines.Count > 0;
+
+    /// <summary>The change lines as one text, one per line: a single TextBlock a screen reader reads (an ItemsControl's items are not text to it).</summary>
+    public string ChangeText => string.Join(Environment.NewLine, ChangeLines);
     public bool HasResultLines => ResultLines.Count > 0;
 
     /// <summary>The Claude trademark line shows whenever Claude is named on the screen (Store 10.1.4.4): usage ticked, or a change line
@@ -77,6 +80,7 @@ internal sealed partial class SetupViewModel : ObservableObject
             foreach (var line in _service.Preview(Choices)) ChangeLines.Add(line);
         ResultLines.Clear();
         OnPropertyChanged(nameof(HasChangeLines));
+        OnPropertyChanged(nameof(ChangeText));
         OnPropertyChanged(nameof(HasResultLines));
         OnPropertyChanged(nameof(ShowTrademark));
     }

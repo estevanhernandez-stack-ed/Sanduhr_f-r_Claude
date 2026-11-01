@@ -192,6 +192,7 @@ public sealed class SetupWindowTests : AppWindowFixture
         Assert.Empty(vm.ChangeLines);
         vm.ClaudeUsage = false;
         Assert.Contains(SetupCopy.UsageOffLine, vm.ChangeLines);
+        Assert.Contains(SetupCopy.UsageOffLine, vm.ChangeText);   // one text a screen reader reads
         vm.Desktop = false;
         Assert.Contains(SetupCopy.DesktopOffLine, vm.ChangeLines);
         vm.Desktop = true;
