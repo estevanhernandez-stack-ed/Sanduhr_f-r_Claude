@@ -18,6 +18,7 @@ public sealed class DrawerTurnOffTests
         store.SaveDrawers(DrawerSettings.Default with { Enabled = true, Drawers = defs } with
         {
             Places = defs.ToDictionary(d => d.Id, d => new DrawerPlace("m", 10, 20), StringComparer.Ordinal),
+            Looks = defs.ToDictionary(d => d.Id, d => DrawerLookKind.Bare, StringComparer.Ordinal),
             Hidden = [.. defs.Select(d => d.Id)],
             Folded = [.. defs.Select(d => d.Id)],
         });
@@ -118,6 +119,7 @@ public sealed class DrawerTurnOffTests
         var after = store.LoadDrawers();
         Assert.Equal(["documents"], after.Drawers.Select(d => d.Id));
         Assert.Equal(["documents"], after.Places.Keys);
+        Assert.Equal(["documents"], after.Looks.Keys);
         Assert.Equal(["documents"], after.Hidden);
         Assert.Equal(["documents"], after.Folded);
         s.Dispose();

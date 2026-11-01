@@ -349,10 +349,11 @@ internal sealed class DrawerService : IDisposable
         return result;
     }
 
-    /// <summary>The settings with these drawers' places, hidden words and folds cleared.</summary>
+    /// <summary>The settings with these drawers' places, looks, hidden words and folds cleared.</summary>
     private static DrawerSettings Without(DrawerSettings s, IReadOnlyCollection<string> ids) => s with
     {
         Places = s.Places.Where(kv => !ids.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal),
+        Looks = s.Looks.Where(kv => !ids.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal),
         Hidden = [.. s.Hidden.Where(h => !ids.Contains(h))],
         Folded = [.. s.Folded.Where(f => !ids.Contains(f))],
     };
