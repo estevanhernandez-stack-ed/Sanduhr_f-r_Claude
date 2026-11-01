@@ -91,7 +91,7 @@ public static class SetupPrompt
         Line($"- drawer: a short folder name of up to {DrawerNames.MaxLength} characters, a name and never a path.");
         Line($"- text: for {PastedSetup.KindWord(DrawerRuleKind.NameContains)} and {PastedSetup.KindWord(DrawerRuleKind.NameStartsWith)}, part of a file name, up to {PastedSetup.MaxTextChars} characters.");
         Line($"- days: for {PastedSetup.KindWord(DrawerRuleKind.OlderThan)}, a whole number from 1 to {PastedSetup.MaxDays}.");
-        Line($"1 to {PastedSetup.MaxRules} rules; leave drawers out to keep my rules as they are. The first rule that matches a file wins, and a file no rule matches stays on the desktop.");
+        Line($"1 to {PastedSetup.MaxRules} rules; leave rules out to keep my rules as they are. The first rule that matches a file wins, and a file no rule matches stays on the desktop.");
         Line("\"drawers\" can also set how drawers look and line up. Send any of these, and leave out the rest:");
         Line("- look: " + string.Join(", ", DrawerStyle.LookWords) + " (solid is a plate, glass a lighter plate, outline a thin frame, bare no frame).");
         Line($"- opacity: a whole number from {DrawerStyle.MinOpacity} to {DrawerStyle.MaxOpacity}, for solid and glass.");
