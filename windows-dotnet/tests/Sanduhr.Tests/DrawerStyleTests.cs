@@ -42,15 +42,29 @@ public class DrawerStyleTests
     [InlineData("""{"opacity":5}""")]
     [InlineData("""{"opacity":"x"}""")]
     [InlineData("""{"snap":"yes"}""")]
+    [InlineData("""{"keep_clear":"yes"}""")]
     [InlineData("""{"tidy":{"corner":"middle","direction":"row"}}""")]
     [InlineData("""{"looks":{"images":"neon","BAD ID":"bare"}}""")]
     public void Each_unreadable_key_takes_its_default_alone(string json)
     {
         var s = DrawerSettings.Decode(JsonNode.Parse(json));
         Assert.Equal(DrawerLookKind.Solid, s.Look);
-        Assert.InRange(s.Opacity, DrawerStyle.MinOpacity, DrawerStyle.MaxOpacity);
+        Assert.Equal(DrawerStyle.DefaultOpacity, s.Opacity);
+        Assert.Equal(55, s.Opacity);
         Assert.True(s.Snap);
+        Assert.True(s.KeepClear);
+        // The tidy row's direction ("row") is readable, so only its corner falls back.
+        Assert.Equal(DrawerTidy.Default.Corner, s.Tidy.Corner);
+        Assert.Equal(json.Contains("\"direction\"") ? DrawerFlow.Row : DrawerTidy.Default.Flow, s.Tidy.Flow);
         Assert.Empty(s.Looks);
+    }
+
+    [Fact]
+    public void A_bad_looks_id_is_dropped_and_the_good_one_stays()
+    {
+        var s = DrawerSettings.Decode(JsonNode.Parse("""{"looks":{"images":"bare","BAD ID":"bare"}}"""));
+        Assert.Equal(DrawerLookKind.Bare, Assert.Single(s.Looks).Value);
+        Assert.Equal(DrawerLookKind.Bare, s.Looks["images"]);
     }
 
     [Fact]
