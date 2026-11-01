@@ -812,8 +812,10 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
 - [ ] Stop the browser tab and play in Music: the wing and the line follow Music within two seconds.
   Settings, Apps lists Chrome and Music; switch Chrome off and play in the browser: the wing shows
   its stand-in (When nothing is playing, below), never the browser's title; switch it back on.
-- [ ] Hide while paused on: pausing hides the line and puts the wing's stand-in in its place
-  (When nothing is playing, below); playing brings both back. With nothing playing at all, the line
+- [ ] Hide while paused on: pausing keeps the line for 15 seconds (click it to play again), then
+  hides it and puts the wing's stand-in in its place (When nothing is playing, below); playing
+  within the 15 seconds keeps it, and playing later brings both back. A track already paused when
+  Sanduhr starts hides at once. With nothing playing at all, the line
   is gone and no timer ticks.
 - [ ] When nothing is playing. Right wing and the strip (Text under the camera on) on Now playing,
   nothing playing. Settings, Desk, Now Playing has "When nothing is playing" reading "What that spot
@@ -840,8 +842,9 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
   `layout` reads `message:tl clock:bl meters:bl nowPlaying:bl meetings:bl` and the line sits under
   the meters. Move it to Hidden and relaunch: it stays hidden.
 - [ ] Fallback: quit, then `open -n --env SANDUHR_NOWPLAYING_TEST=fail mac/Sanduhr.app`. Source
-  reads "Fallback (Music and Spotify only): the system now playing isn't available on this macOS";
-  no adapter process runs; no prompt appears. Play, pause or skip in Music: the wing follows from the
+  reads "Fallback (Music and Spotify only): the system now playing didn't answer. Sanduhr checks
+  again every few minutes."; `state.yaml` `now_playing` has `source: fallback` and
+  `fallback_reason: test_failed`; no adapter process runs; no prompt appears. Play, pause or skip in Music: the wing follows from the
   next change. The browser player shows nothing (expected). Clicks still play and pause.
 - [ ] Still on the fallback, switch Ask Music and Spotify directly on with Music open: macOS asks
   once whether Sanduhr may control Music; Allow, and the current track shows without waiting for a
@@ -849,10 +852,46 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
   `tccutil reset AppleEvents com.626labs.sanduhr` if you want the prompt back.
 - [ ] Sleep the Mac while now playing runs and wake it: Source settles on Adapter working again and
   the wing follows the next change.
+- [ ] Retry (2.39.1): quit, then `open -n --env SANDUHR_NOWPLAYING_TEST=fail-once mac/Sanduhr.app`.
+  Source starts on the fallback with `fallback_reason: test_failed`; about a minute later it reads
+  Adapter working, `fallback_reason: null`, and a `perl` process runs `stream --no-artwork --micros`.
+  A browser track shows again without a relaunch.
 - [ ] Settings, About: "Now playing uses mediaremote-adapter by Jonas van den Berg (BSD-3-Clause)"
   links to its GitHub page; Third-Party Notices opens the text with the adapter's and Sparkle's
   licenses. Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr" AND category ==
   "nowplaying"'`) shows only on/off, test and stream lines, never a title.
+
+## 23b. Live audio bars (spec 14, held for the owner)
+
+A live Mac only: this is the one check that triggers the System Audio Recording prompt, and the CI
+and the run that built it never did. Use a release-signed build (a grant belongs to the signature that asked, so a dev build's does not carry to the release app),
+Desk on, Now playing placed at Bottom left in Layout, Music (or Spotify) with a song queued.
+
+- [ ] Off by default: Settings, Desk, Now Playing, Live audio bars is off; no Gradient bars row;
+  `sanduhr` shows no audio permission entry yet; the Desk line is text over the position bar.
+- [ ] Play a song. Still no prompt. Turn **Live audio bars** on: the note says macOS asks for System
+  Audio Recording; the prompt appears now or at once when the song is playing with the Desk showing.
+  The prompt shows the Info.plist sentence. Sanduhr lands in Privacy & Security, Screen & System
+  Audio Recording, in the **System Audio Recording Only** list.
+- [ ] Allow. Within a second the line shows 16 bars over the position bar and they move with the music;
+  silence for 5 seconds leaves them at rest dots; the idle CPU check (cputime deltas, not `%cpu`) shows
+  no timer cost at rest.
+- [ ] Pause: the tap goes (System Settings shows no active recording indicator for Sanduhr; the orange
+  dot on the menu bar clears) and the bars rest. Play: they move again.
+- [ ] Hide the Desk (cover it with a full screen app): the indicator clears. Show it: it returns.
+- [ ] Skip to a track in another app (Spotify, then Music): the bars follow the new app.
+- [ ] A browser (YouTube Music in Chrome): the bars move. Chrome plays through its audio helper, which
+  the tap takes with it. Safari: note whether they move ______ .
+- [ ] Gradient bars on: the bars blend across the Desk ink's stops; off: one color. Reduce Motion on
+  (System Settings, Accessibility, Display): the bars update slowly and carry no caps.
+- [ ] Turn the switch off: the bars row is gone at once, the indicator clears, the line is as at the start.
+- [ ] Deny path: turn the switch on, then remove Sanduhr from the list in System Settings (or answer Don't
+  Allow on a fresh grant) and play: after about 3 seconds the bars give way to the position bar and
+  "Allow in System Settings (two-finger click)"; the two-finger menu and the Settings button both open
+  Privacy & Security, Screen & System Audio Recording. Allow it there: the bars come back (a restart
+  of the song or of Sanduhr may be needed; note which) ______ .
+- [ ] Console (filter `com.626labs.sanduhr`, category `audiotap`) says only "level tap on" and failures,
+  never a title or a level.
 
 ## 24. Claude writes your Desk messages (item 54)
 
@@ -2601,3 +2640,54 @@ shell that prints lines in the runner's shape, `<Docker timestamp> <yyyy-MM-dd H
 9. **Demo mode** hides runner cards. Quitting Sanduhr drops them all; relaunching with the switch on rebuilds from
    the log's replay without putting up cards for jobs that ended earlier.
 10. Reset Sanduhr… with All settings checked: `defaults read com.626labs.sanduhr watchersCiRunners` fails afterwards.
+
+## 71. New sprite from an image (2.39.0)
+
+Back up `~/Library/Application Support/Sanduhr` first (section 45) and quit the release app. Make a small test sheet
+of made-up art: a PNG of 4 by 2 cells of 16x16 (64x32 pixels), any drawing.
+
+1. Settings, Widgets shows **New sprite from an image…**. Settings search finds it. Choose a text file renamed
+   `.png`: the sheet says it isn't a PNG image and offers no grid. Choose a PNG over 2 MB: it says it is larger
+   than 2 MB.
+2. Choose the test sheet. The sheet shows a 4 by 2 grid for a 16x16 cell. Set the cell width to 24: the line
+   says the image isn't a whole number of cells and **Make** refuses with the same sentence. Set it back to 16.
+3. With nothing tagged, Make refuses: tag at least one cell as sit, and walk needs two or more cells. Tag cells
+   1 and 2 as walk (the order you click is the order played) and cell 3 as sit. Untagged nap, cheer and worry
+   are listed as using sit's cells. Click a tagged cell again: it untags.
+4. Give it the name "Test Blob" and make it. The sheet closes and the row "Test Blob" reads "made here" with id
+   `my-test-blob`. `widgets/my-test-blob/` holds `pack.json`, `sprite.json`, `LICENSE` and `art/sprite.png`
+   (the same bytes as the picked file); `pack.json` says version 1.0.0 and license CC0-1.0; `widgets.json`
+   lists it as `local`. Make a second one with the same name: its id is `my-test-blob-2`.
+5. Make it the companion (Settings, Desk, Companion): with the Desk showing, the sprite walks and rests from the
+   cells you tagged. A name with no letter or digit, and one over 40 characters, are refused with a sentence.
+6. A network monitor shows no request during any of this. The picked image is read only after you choose it.
+7. Uninstall it: the folder is gone and the row with it.
+
+## 72. Claude maps a sprite's motion (2.39.0)
+
+Needs the MCP server installed and a sprite made here from section 71 (a catalog sprite is never offered).
+Quit the release app and keep a backup, as above.
+
+1. `get_desk` lists the sprite under `sprites` with its id, name, frame size and cell count (8 for the test
+   sheet), and nothing else: no path, no image data. A catalog sprite is not listed. Uninstall the test sprite:
+   the next `get_desk` no longer lists it.
+2. `propose_sprite_motion` with the sprite's id and `animations` using a cell index past the cell count, or with
+   an extra field such as `image`, or with a catalog sprite's id: each is refused with a reason, and
+   `sprite-motion-request.json` is not written.
+3. A good proposal (for example `walk` as `[0, 1, 2, 3]`, `fps` 6, a note): the tool answers `previewing`. The
+   request file is gone at once, `sprite-motion-result.json` exists with mode `0600` and holds the id and status,
+   not the fields, and a notification reads "Claude suggested a motion: <name>". Settings, Widgets shows the
+   banner with the sprite, Claude's note and what changes (fps, animation lengths), plus "The art is
+   unchanged." Nothing is applied: `sprite.json` and the pack version are as before.
+4. **Preview on the Desk** with the Desk showing: the sprite is drawn with the proposed motion; `sprite.json` on
+   disk is unchanged. With the Desk off the button says so. Quit and relaunch Sanduhr: the proposal is gone.
+5. **Apply**: the answer is `applied`, `sprite.json` has the new fields, the pack's patch version goes up by one
+   (1.0.0 to 1.0.1), `art/sprite.png` is byte-identical, and the companion moves the new way. A Claude-made
+   sprite stays source `claude`; one made in section 71 stays `local`.
+6. **Decline** on a new proposal: the banner and notification go, nothing changes, and the answer is `rejected`,
+   `dismissed`. With one waiting, propose another: the first is answered `rejected`, `replaced`.
+7. Uninstall the sprite while a proposal waits, then Apply: the answer is `rejected`, `install_failed`.
+8. Quit Sanduhr and propose: the tool answers `queued` after about ten seconds and the request file stays (mode
+   `0600`). Start Sanduhr within ten minutes: the banner appears and the file is gone. One left over ten minutes
+   is deleted unanswered when Sanduhr starts.
+9. Reset Sanduhr… removes `sprite-motion-request.json`, `sprite-motion-result.json` and `desk-state.json`.

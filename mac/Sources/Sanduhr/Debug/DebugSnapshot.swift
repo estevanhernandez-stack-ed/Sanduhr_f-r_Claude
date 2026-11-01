@@ -336,6 +336,8 @@ struct NowPlayingDebug: Equatable {
     /// Where it is placed (item 53b), never what plays.
     var placed: [NowPlayingPlacement.Place] = []
     var source = NowPlayingSource.off
+    /// Why it is on the fallback; null otherwise.
+    var fallbackReason: NowPlayingFallbackReason?
     var state = NowPlayingState.none
 }
 
@@ -345,6 +347,7 @@ enum DebugState {
         .map([YAMLPair("enabled", .bool(n.enabled)),
               YAMLPair("placed", .list(n.placed.map { .string($0.rawValue) })),
               YAMLPair("source", .string(n.source.rawValue)),
+              YAMLPair("fallback_reason", n.fallbackReason.map { .string($0.rawValue) } ?? .null),
               YAMLPair("state", .string(n.state.rawValue))])
     }
 

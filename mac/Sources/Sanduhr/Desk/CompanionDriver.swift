@@ -20,6 +20,7 @@ final class CompanionDriver {
     @ObservationIgnored private weak var model: DeskModel?
     @ObservationIgnored private weak var view: CompanionNSView?
     @ObservationIgnored private var shown = false
+    @ObservationIgnored private var pieces = CompanionPieceViews()
     @ObservationIgnored private var settings = CompanionSettings()
     @ObservationIgnored private var demo = false
     @ObservationIgnored private var demoStart = Date()
@@ -65,9 +66,10 @@ final class CompanionDriver {
 
     // MARK: Showing and hiding
 
-    /// The piece appeared: read the choice, and start what the pack needs. Idempotent.
+    /// A companion piece appeared: read the choice, and start what the pack needs. Idempotent.
     func show(_ model: DeskModel) {
         self.model = model
+        pieces.appeared()
         guard !shown else { reload(force: true); return }
         shown = true
         brain = CompanionBrain()
@@ -85,8 +87,15 @@ final class CompanionDriver {
                                              queue: .main) { [weak self] _ in self?.reload(force: true) }))
     }
 
+    /// A companion piece's view went away. The driver stops only when no piece shows: moving the piece
+    /// rebuilds its view, and SwiftUI calls the new view's onAppear before the old one's onDisappear.
+    func pieceDisappeared() {
+        if pieces.disappeared() { hide() }
+    }
+
     /// The piece went away (Hidden, or the Desk stopped): nothing runs.
     func hide() {
+        pieces = CompanionPieceViews()
         guard shown else { return }
         shown = false
         for (center, token) in observers { center.removeObserver(token) }
@@ -447,5 +456,20 @@ final class CompanionDriver {
     var debug: CompanionDebug? {
         guard shown, let pick, let stage else { return nil }
         return CompanionDebug(pack: pick.packId, stage: stage.id, mood: lastMood.key, roaming: segment != nil)
+    }
+}
+
+/// How many companion piece views are on screen. Their onAppear and onDisappear can come in either
+/// order when SwiftUI rebuilds the piece, so the driver counts instead of trusting the last call.
+struct CompanionPieceViews: Equatable {
+    private(set) var count = 0
+
+    mutating func appeared() { count += 1 }
+
+    /// True when this was the last one.
+    @discardableResult
+    mutating func disappeared() -> Bool {
+        count = max(0, count - 1)
+        return count == 0
     }
 }

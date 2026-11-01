@@ -172,4 +172,18 @@ struct CompanionPieceTests {
         for _ in 0..<11 { r.advance(1, allowed: true) }
         #expect(!r.walking && r.secondsLeftInPhase == 8)
     }
+
+    @Test func theDriverStopsOnlyWhenTheLastPieceViewGoes() {
+        // Moving the piece: the new view appears before the old one disappears.
+        var views = CompanionPieceViews()
+        views.appeared()
+        views.appeared()
+        let first = views.disappeared()
+        #expect(!first && views.count == 1)
+        let last = views.disappeared()
+        #expect(last)
+        // An extra disappear (the Desk stopping first) never goes below zero.
+        let extra = views.disappeared()
+        #expect(extra && views.count == 0)
+    }
 }

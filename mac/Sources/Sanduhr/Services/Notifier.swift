@@ -190,6 +190,26 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     static let widgetSuggestionPrefix = "widget-suggestion-"
 
+    // MARK: - Claude's sprite motion suggestions (2.39.0)
+
+    /// The same gentle banner for a proposed motion. Clicking it opens Settings, Widgets.
+    func suggestSpriteMotion(_ m: SpriteMotionReviewModel) {
+        guard MessageSuggestionNotice.banner(AlertSettings(defaults), deskRunning: DeskController.shared.running,
+                                             now: Date()) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Claude suggested a motion: \(m.name)"
+        content.body = m.note ?? "Preview, apply or decline it in Sanduhr Settings, Widgets."
+        content.sound = nil
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: Self.spriteMotionPrefix + m.id, content: content, trigger: nil))
+    }
+
+    func clearSpriteMotion(id: String) {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [Self.spriteMotionPrefix + id])
+    }
+
+    static let spriteMotionPrefix = "sprite-motion-suggestion-"
+
     // MARK: - Claude's Desk design suggestions (2.37.0)
 
     /// The same gentle banner for a proposed Desk design. Clicking it opens Settings, Desk.
@@ -217,7 +237,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let id = response.notification.request.identifier
         let section: SettingsSection? = id.hasPrefix(Self.deskSuggestionPrefix) ? .message
             : id.hasPrefix(Self.themeSuggestionPrefix) ? .themes
-            : id.hasPrefix(Self.widgetSuggestionPrefix) ? .widgets
+            : id.hasPrefix(Self.widgetSuggestionPrefix) || id.hasPrefix(Self.spriteMotionPrefix) ? .widgets
             : id.hasPrefix(Self.deskDesignSuggestionPrefix) ? .deskLayout : nil
         if let section {
             DispatchQueue.main.async { MainActor.assumeIsolated { SettingsWindowController.shared.show(section) } }

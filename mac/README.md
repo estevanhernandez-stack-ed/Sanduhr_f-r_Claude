@@ -619,7 +619,8 @@ and result shapes: `get_usage`, `get_local_burn_by_project`, `get_model_usage`,
 `get_usage_history`, `ping`, `propose_theme` (below), plus two Mac tools for Desk messages (below),
 the watcher tools, `propose_now_playing_looks` (Now playing, below), `propose_widget` (Claude-made
 widgets, below; no switch needed, because nothing installs until you press Apply), `get_desk` and
-`propose_desk` (the Desk for Claude, below; no switch needed either, because a design waits for Apply), and `propose_mod`,
+`propose_desk` (the Desk for Claude, below; no switch needed either, because a design waits for Apply),
+`propose_sprite_motion` (a made-here sprite's motion, below), and `propose_mod`,
 `list_catalog`, `propose_install` with `get_mod_status` (Mod Studio: a mod's files for you to
 review, your kept mods, a request to turn one on in a folder; only while **Let agents propose
 mods** is on), and `propose_config` under the same switch (agents, skills, commands, output
@@ -1526,7 +1527,7 @@ paused, and for apps switched off on the Now Playing page (which also has the so
 switch and "Notch Settings…" / "Layout Settings…").
 
 - **When nothing is playing.** A notch wing or the strip on Now playing doesn't go blank when there
-  is no line (nothing plays, Hide while paused while paused, the app switched off, now playing
+  is no line (nothing plays, paused for 15 seconds with Hide while paused on, the app switched off, now playing
   unavailable): it shows the Now Playing page's "When nothing is playing" choice instead, by default
   what that spot shows when Now playing isn't picked (left wing: next meeting or the time; right
   wing: the Claude meters; strip: next meeting or the meters), or any other notch content, or Nothing
@@ -1582,7 +1583,7 @@ switch and "Notch Settings…" / "Layout Settings…").
   processes, so Sanduhr bundles [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter)
   (BSD-3, vendored unchanged in `Vendor/mediaremote-adapter/`, built by
   `scripts/build-mediaremote-adapter.sh`) and runs its script with `/usr/bin/perl`: `test` once at
-  start and after a wake, then `stream --no-artwork --micros` as a child process, restarted with a
+  start and five seconds after a wake, then `stream --no-artwork --micros` as a child process, restarted with a
   growing wait if it exits and given up after four quick exits in a row. The findings behind this are
   in `docs/mac-now-playing-spike.md`.
 - **Fallback.** When `test` fails (or the stream keeps dying), Music's and Spotify's distributed
@@ -1590,8 +1591,14 @@ switch and "Notch Settings…" / "Layout Settings…").
   but only those two apps and only from their next change. "Ask Music and Spotify directly" adds
   AppleScript to the running ones when the fallback starts (the Automation prompt, once per app; the
   app's `com.apple.security.automation.apple-events` entitlement and `NSAppleEventsUsageDescription`
-  exist for this). The page's Source line says Adapter working, Fallback (Music and Spotify only) or
-  Off. Force the fallback with `open -n --env SANDUHR_NOWPLAYING_TEST=fail mac/Sanduhr.app`.
+  exist for this). While on the fallback, `test` runs again after a minute and then every five
+  (`NowPlayingRetry`), keeping the fallback's track on screen; a pass goes back to the stream (2.39.1:
+  one failed test after a wake used to leave the fallback in place until a relaunch). The page's
+  Source line says Adapter working, Fallback (Music and Spotify only) with the reason (the test
+  failed, the stream kept stopping, or the adapter is missing), or Off; `state.yaml` carries the
+  reason as `fallback_reason`. Force the fallback with
+  `open -n --env SANDUHR_NOWPLAYING_TEST=fail mac/Sanduhr.app`, or `=fail-once` to fail only the
+  first test and watch the retry take it back.
 - **Controls** go from Sanduhr's own process through `MRMediaRemoteSendCommand` (not gated).
 - **In the bundle:** `Contents/Frameworks/MediaRemoteAdapter.framework`,
   `Contents/Helpers/MediaRemoteAdapterTestClient`, `Contents/Resources/NowPlaying/mediaremote-adapter.pl`,
@@ -1600,6 +1607,46 @@ switch and "Notch Settings…" / "Layout Settings…").
   signatures.
 - **Privacy.** Titles and artists stay in memory: never on disk, in a log or in `state.yaml`
   (`now_playing: {enabled, placed, source, state}` only). No network.
+
+### Live audio bars (opt-in)
+
+Spec 14. Settings, Desk, Now Playing, **Live audio bars** (`nowPlaying.barsLevel`, off by default; a
+**Gradient bars** switch, `nowPlaying.barsGradient`, shows under it while it is on). With it off
+nothing here exists: no tap, no timer, no Core Audio call, and the Desk line looks as it always did.
+Turning it on is the only moment macOS can show the System Audio Recording prompt (text from
+`NSAudioCaptureUsageDescription` in `Info.plist`), and the prompt comes at the first tap, so when a
+track first plays with the Desk showing.
+
+- **The tap** (`Services/CoreAudioProcessTap.swift`, the only file that touches Core Audio, public API
+  only): the playing app's pid (`NowPlayingInfo.pid`) and its helpers (`AudioPlayerProcesses`: its
+  descendants and the processes whose bundle id sits under its own, since Chrome plays through an audio
+  helper) are matched against Core Audio's process list, a
+  `CATapDescription(stereoMixdownOfProcesses:)` for those (unmuted, private) becomes a tap, a
+  private aggregate device holds it, and an IOProc keeps one peak (the largest absolute sample) under a
+  lock. Nothing is kept, written or sent. macOS 14.2+ (the app targets 14.0, so the tap is behind
+  `#available`; before 14.2 the switch is disabled). `AudioLevelTap` is the protocol the tests fake.
+- **When it runs** (`AudioTapInputs`, `AudioLevelController`): switch on, Desk showing (`DeskController`'s
+  motion check), the Now playing line placed on the Desk, a track playing, a pid. It is torn down (IOProc
+  stopped and destroyed, aggregate destroyed, tap destroyed) on pause, on switch off, while the Desk is
+  hidden and on a pid change, when it taps the new pid. A tap that fails for a pid is not retried until
+  the target changes.
+- **The bars** (`AudioBarsDriver`): one timer at `AudioBars.frameInterval` (0.2 s with Reduce Motion), only
+  while a tap runs. Each tick reads the peak, steps `AudioBars` and `AudioBarMotion`, and hands the
+  heights to `AudioBarsLayerView`: a `CAReplicatorLayer` repeats the resting dot, and 16 bar layers
+  plus caps are set directly (a replicator copies one layer, so it cannot give each copy a height).
+  After 5 seconds under 0.004 the timer stops and the layers settle at rest; the tap's next real peak
+  wakes it (`armWake`). Gradient bars blend the Desk ink's stops across the bars.
+- **Denied** (`AudioDeniedInference`): macOS gives no error for a denied tap, only zeros. The state
+  shows when the player is producing output (`kAudioProcessPropertyIsRunningOutput`) and every peak has
+  been exactly zero for 3 seconds. The Desk line then shows the position bar and "Allow in System Settings
+  (two-finger click)" (the Desk takes clicks itself, so the action is in the two-finger menu); Settings
+  has a button. Both open Privacy & Security, Screen & System Audio Recording
+  (`x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture`). No private TCC calls,
+  no second prompt. The grant shows in that pane's **System Audio Recording Only** list. A player whose
+  sound comes from a process that is neither its child nor under its bundle id (Safari's WebKit GPU
+  process may be one) still leaves the bars still.
+- **Tests:** `AudioLevelTapTests.swift` (fake tap and ticker; a boundary suite pins that the real tap is
+  built in one file and that no private permission call exists). Nothing in the suite creates a tap.
 
 ## Fonts
 
@@ -1923,6 +1970,43 @@ frames the animations use). `WidgetOwnArt.apply` copies each chosen image into t
 files in `pack.json`, adds one to its patch version and validates the whole pack again; the model
 (`WidgetsModel.useOwnArt`) reinstalls it as `.local` with `replaceMadeHere`. Nothing leaves the Mac. Only the
 first eligible row carries the search anchor, and the banner has no search entry.
+
+### A new sprite from an image (2.39.0)
+
+Settings, Widgets, **New sprite from an image…** (`NewSpritePicker`, `NewSpriteSheet`) opens a file panel for one
+PNG; `NewSpriteModel` holds the choices and `WidgetNewSprite` holds the rules, so the sheet is only a view. The
+image meets the pack image rules (`WidgetOwnArt.imageSize`: a PNG, at most 2 MB and 4096 pixels). A cell is 8 to
+64 pixels on each side and the sheet a whole number of them, numbered row-major. Cells are tagged to `walk`,
+`sit`, `nap`, `cheer` and `worry`: `sit` needs one cell, `walk` two or more in the order clicked, and an
+untagged `nap`, `cheer` or `worry` plays `sit`'s cells. The tags fill the nine animations the format requires
+the way the hourglass does (`pop` and `celebrate` play `cheer`, `focus` plays `sit`, `sleep` plays `nap`), with
+the hourglass's moods and triggers. The name becomes the id `my-<slug>` (`-2`, `-3` when taken), the scale is 1
+to 4 (default 2), and `fps` is 8. `make` writes `pack.json` (version 1.0.0, CC0-1.0), `sprite.json`, a
+`LICENSE` and `art/sprite.png`, validates the whole pack strict, and `WidgetsModel.installNewSprite` installs it
+as `.local` with `replaceMadeHere`. One stage only. The image is never sent and Claude never supplies or sees it.
+
+### Claude maps a sprite's motion (`propose_sprite_motion`, 2.39.0)
+
+Claude never sees a sprite's art. `desk-state.json` (the file `get_desk` reads) carries a `sprites` list: for
+each sprite made here, its `id`, `name`, `frame_w`, `frame_h` and `cells`, and nothing else. The app works the
+cell count out from the sheet's pixel size and the frame size (`SpriteMotionState`; a PNG's header is all it
+reads), so the MCP server never opens an image; the list follows installs and uninstalls through the same
+`widgetPacksDidChange` the rest of that file does. `propose_sprite_motion` takes the sprite's id and
+`sprite.json` fields only (`animations`, `moods` and `triggers` whole; `fps`, `scale`, `roam` optional).
+Any other field is refused with a message, an id that is not listed (a catalog sprite) is refused, and the
+fields run through the vendored validator's `check_sprite` plus the cell count, with no files read. A good one
+becomes `sprite-motion-request.json` (owner-only, atomic; same statuses, ten-second wait and ten-minute window as
+`propose_widget`, 256 KB cap) and the answer comes back in `sprite-motion-result.json`.
+`SpriteMotionHandoff` and `SpriteMotionProposal.decode` are the app's file layer: the decoder re-checks the
+fields, finds the installed made-here sprite and validates the pack with the new `sprite.json` (strict, every
+index against the real sheet). Settings, Widgets shows the review banner (`SpriteMotionBanner`): the sprite, Claude's note and what changes
+(fps, size, animation lengths), then **Preview on the Desk** (the sprite drawn with the proposed motion from
+memory, nothing written), **Apply** and **Decline**. Apply re-reads the installed pack, merges the fields, bumps
+the patch in `pack.json`, validates strict and reinstalls as the user's own (`.local`); the art files are the
+installed bytes. Answers: `applied`; `rejected` with `dismissed` (Decline), `replaced` (a newer request),
+`install_failed` (uninstalled meanwhile, or the pack no longer fits) or `not_ready`. A request past ten
+minutes is dropped unanswered; there is no `expired` status. `SpriteMotionReview` holds the logic behind a
+`SpriteMotionStoring` seam.
 
 ## The Desk for Claude
 

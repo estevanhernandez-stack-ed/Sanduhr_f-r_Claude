@@ -1,0 +1,139 @@
+{
+  "run": "desk-2-39",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "a2961bc471e06e8f5a3dece3be8d6805a8c2e001",
+  "integration_branch": "cart/desk-2-39",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-desk-2-39/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-desk-2-39",
+  "builder_branch": "main",
+  "uncommitted_at_start": [],
+  "started_at": "2026-10-31T00:44:37.437Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "sprite-sheet-rules",
+      "title": "Sprite sheet rules",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-39--01-sprite-sheet-rules",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "new-sprite-settings",
+      "title": "New sprite from an image",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-39--02-new-sprite-settings",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "mcp-sprite-motion",
+      "title": "propose_sprite_motion",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-39--03-mcp-sprite-motion",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && python3 -m pytest -q integrations/tests && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "motion-review",
+      "title": "Motion review",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-39--04-motion-review",
+      "worktree": "",
+      "on": 3,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && python3 -m pytest -q integrations/tests && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "bar-motion-rules",
+      "title": "Bar motion rules",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-39--05-bar-motion-rules",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "audio-tap-bars",
+      "title": "Audio tap and live bars",
+      "stop_class": "hold",
+      "status": "held",
+      "branch": "cart/desk-2-39--06-audio-tap-bars",
+      "worktree": "~/.cwt/sanduhr-f-r-clau-desk-2-39/06",
+      "on": 5,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb && python3 -m pytest -q integrations/tests",
+          "result": "pass"
+        }
+      ],
+      "reason": "New TCC permission (System Audio Recording). Owner walkthrough on a live Mac records the prompt text and finalises the marked PRIVACY, README, smoke and setup-guide copy."
+    },
+    {
+      "n": 7,
+      "slug": "docs-2-39",
+      "title": "Docs 2.39.0",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-2-39--07-docs-2-39",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}

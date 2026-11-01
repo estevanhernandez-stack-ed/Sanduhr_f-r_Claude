@@ -34,7 +34,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.38.0</string>
+	<string>2.39.0</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -48,13 +48,15 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>50</string>
+	<string>51</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Only if you turn on "Ask Music and Spotify directly" in Settings, Desk, Now Playing: Sanduhr asks Music and Spotify what is playing when the system now playing is unavailable. Nothing leaves your Mac.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Sanduhr reads how loud the playing app is to move the now-playing bars. It keeps one level in memory and never records, saves or sends audio.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Desk shows the rest of today's meetings on the desktop and by the notch. Only the time and title are shown.</string>
 	<key>NSCalendarsUsageDescription</key>

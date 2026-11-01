@@ -219,6 +219,23 @@ struct NowPlayingSupervisorTests {
     }
 }
 
+@Suite("Now playing retries from the fallback")
+struct NowPlayingRetryTests {
+    @Test func aMinuteThenEveryFive() {
+        #expect(NowPlayingRetry.wait(attempt: 0) == 60)
+        #expect(NowPlayingRetry.wait(attempt: 1) == 60)
+        #expect(NowPlayingRetry.wait(attempt: 2) == 300)
+        #expect(NowPlayingRetry.wait(attempt: 40) == 300)
+    }
+
+    @Test func theWakeCheckWaitsLessThanTheFirstRetry() {
+        #expect(NowPlayingRetry.wakeDelay > 0)
+        #expect(NowPlayingRetry.wakeDelay < NowPlayingRetry.first)
+        // Longer than the self-test's own timeout, so a retry never overlaps a test.
+        #expect(NowPlayingRetry.first > NowPlayingController.testTimeout)
+    }
+}
+
 @Suite("Now playing fallback")
 struct NowPlayingFallbackTests {
     @Test func musicNotification() {
@@ -284,12 +301,19 @@ struct NowPlayingFallbackTests {
 
     @Test func statusLines() {
         func text(_ s: NowPlayingSource, placed: Bool = true, desk: Bool = true, checking: Bool = false,
-                  failed: Bool = false) -> String {
-            NowPlayingStatus.text(source: s, placed: placed, deskRunning: desk, checking: checking, adapterFailed: failed)
+                  reason: NowPlayingFallbackReason? = nil) -> String {
+            NowPlayingStatus.text(source: s, placed: placed, deskRunning: desk, checking: checking, reason: reason)
         }
         #expect(text(.adapter) == "Adapter working")
         #expect(text(.fallback) == "Fallback (Music and Spotify only)")
-        #expect(text(.fallback, failed: true).hasPrefix("Fallback (Music and Spotify only): "))
+        for reason in [NowPlayingFallbackReason.testFailed, .streamExits, .adapterMissing] {
+            #expect(text(.fallback, reason: reason).hasPrefix("Fallback (Music and Spotify only): "))
+        }
+        // A failure that can pass later says Sanduhr tries again, never that macOS lacks it.
+        #expect(text(.fallback, reason: .testFailed).contains("checks again"))
+        #expect(text(.fallback, reason: .streamExits).contains("checks again"))
+        #expect(!text(.fallback, reason: .testFailed).contains("macOS"))
+        #expect(text(.adapter, reason: .testFailed) == "Adapter working")
         #expect(text(.off) == "Off")
         #expect(text(.adapter, placed: false) == "Not placed anywhere")
         #expect(text(.off, placed: false, desk: false) == "Not placed anywhere")
@@ -315,6 +339,31 @@ struct NowPlayingVisibilityTests {
         let prefs = NowPlayingPrefs(hideWhilePaused: true)
         #expect(prefs.visible(paused) == nil)
         #expect(prefs.visible(playing) == playing)
+    }
+
+    @Test func hideWhilePausedWaitsOutTheGrace() {
+        let prefs = NowPlayingPrefs(hideWhilePaused: true)
+        #expect(prefs.visible(paused, pausedFor: 0) == paused)
+        #expect(prefs.visible(paused, pausedFor: NowPlayingPrefs.pausedGrace - 1) == paused)
+        #expect(prefs.visible(paused, pausedFor: NowPlayingPrefs.pausedGrace) == nil)
+        // Off, the grace changes nothing.
+        #expect(NowPlayingPrefs().visible(paused, pausedFor: 999) == paused)
+    }
+
+    @Test func onlyAPauseSeenWhilePlayingStartsTheGrace() {
+        let t0 = Date(timeIntervalSince1970: 1_000)
+        var grace = NowPlayingPauseGrace()
+        #expect(grace.observe(.playing, now: t0) == nil)
+        #expect(grace.observe(.paused, now: t0.addingTimeInterval(1)) == 0)
+        #expect(grace.observe(.paused, now: t0.addingTimeInterval(9)) == 8)
+        // Playing again resets it; the next pause starts from zero.
+        #expect(grace.observe(.playing, now: t0.addingTimeInterval(10)) == nil)
+        #expect(grace.observe(.paused, now: t0.addingTimeInterval(12)) == 0)
+
+        // Already paused when first seen: past the grace at once.
+        var fresh = NowPlayingPauseGrace()
+        let first = fresh.observe(.paused, now: t0) ?? 0
+        #expect(first >= NowPlayingPrefs.pausedGrace)
     }
 
     @Test func excludedAppsNeverShow() {
@@ -456,9 +505,11 @@ struct NowPlayingDebugTests {
         var s = DebugStateInput()
         s.nowPlaying = NowPlayingDebug(enabled: true, placed: [.wingRight, .desk], source: .adapter, state: .playing)
         let yaml = YAMLEmitter.emit(DebugState.yaml(s))
-        #expect(yaml.contains("camera_light: false\nnow_playing:\n  enabled: true\n  placed:\n    - wing_right\n    - desk\n  source: adapter\n  state: playing\nnow_playing_idle: automatic\n"))
+        #expect(yaml.contains("camera_light: false\nnow_playing:\n  enabled: true\n  placed:\n    - wing_right\n    - desk\n  source: adapter\n  fallback_reason: null\n  state: playing\nnow_playing_idle: automatic\n"))
         let off = YAMLEmitter.emit(DebugState.yaml(DebugStateInput()))
-        #expect(off.contains("now_playing:\n  enabled: false\n  placed: []\n  source: \"off\"\n  state: none\n"))
+        #expect(off.contains("now_playing:\n  enabled: false\n  placed: []\n  source: \"off\"\n  fallback_reason: null\n  state: none\n"))
+        s.nowPlaying = NowPlayingDebug(enabled: true, placed: [.desk], source: .fallback, fallbackReason: .testFailed, state: .none)
+        #expect(YAMLEmitter.emit(DebugState.yaml(s)).contains("  source: fallback\n  fallback_reason: test_failed\n"))
     }
 }
 

@@ -5,7 +5,8 @@ import Foundation
 /// `com.626labs.sanduhr.desk` defaults suite, which the MCP server cannot read without racing cfprefsd, so the
 /// app keeps this small owner-only file current instead. It holds only the schema version, the layout words
 /// (anchor, size, tilt, style per piece), the Desk ink, plate and shadow, the font names, the weather nickname, which pieces show,
-/// the message and notch text colors, and the limits a design must keep. No usage numbers, no message text,
+/// the message and notch text colors, the limits a design must keep, and each sprite made here (id, name, frame size and
+/// cell count, for `propose_sprite_motion`; never an image). No usage numbers, no message text,
 /// no paths, no account names.
 enum DeskStateExport {
     static let schemaVersion = 1
@@ -33,6 +34,7 @@ enum DeskStateExport {
 
     /// The state file's bytes for the Desk settings in `defaults`.
     static func stateJson(defaults d: UserDefaults, installedFonts: [String], writerVersion: String,
+                          sprites: [SpriteMotionSprite] = [],
                           fontAvailable: (String) -> Bool = DeskFont.isAvailable) -> Data {
         let arrangement = DeskArrangement(d.string(forKey: "layout") ?? DeskLayout.standard)
         var layout: [String: Any] = [:]
@@ -65,6 +67,8 @@ enum DeskStateExport {
             "shown": arrangement.shown(showMeetings: showMeetings).map(\.widget),
             "message_color": d.string(forKey: "messageColor") ?? "9ad7ff",
             "notch_text_color": d.string(forKey: "notchTextColor") ?? "ffffff",
+            // Each sprite made here, for propose_sprite_motion: id, name, frame size and cell count. Never an image.
+            "sprites": sprites.map(\.json),
             "limits": [
                 "name_chars": DeskDesign.nameMax,
                 "note_chars": DeskDesign.noteMax,
@@ -126,7 +130,8 @@ final class DeskStateExporter {
         pending = nil
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
         let families = DeskFont.pickerFamilies(installed: NSFontManager.shared.availableFontFamilies)
-        let data = DeskStateExport.stateJson(defaults: defaults, installedFonts: families, writerVersion: version)
+        let sprites = SpriteMotionState.sprites(store: .shared)
+        let data = DeskStateExport.stateJson(defaults: defaults, installedFonts: families, writerVersion: version, sprites: sprites)
         guard !data.isEmpty, data != lastData else { return false }
         lastData = data
         HandoffFiles.writeOwnerOnly(data, to: url)

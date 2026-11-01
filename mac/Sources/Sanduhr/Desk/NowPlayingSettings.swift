@@ -21,6 +21,7 @@ struct NowPlayingSection: View {
             }
             NowPlayingShowSection()
             NowPlayingLooksSection()
+            NowPlayingBarsSection()
             NowPlayingIdleSection()
             NowPlayingAppsSection()
             NowPlayingAskSection()
@@ -43,7 +44,7 @@ private struct NowPlayingSourceRow: View {
         let c = NowPlayingController.shared
         LabeledContent("Source", value: NowPlayingStatus.text(
             source: c.source, placed: !c.placed.isEmpty, deskRunning: deskEnabled,
-            checking: c.checking, adapterFailed: c.adapterFailed))
+            checking: c.checking, reason: c.fallbackReason))
     }
 }
 
@@ -65,6 +66,8 @@ private struct NowPlayingShowSection: View {
         Section("Show") {
             Toggle("Hide while paused", isOn: $hidePaused)
                 .settingsAnchor(SettingsAnchor.show)
+            Text("Hidden \(Int(NowPlayingPrefs.pausedGrace)) seconds after you pause, so a short pause leaves the title to click to play again.")
+                .font(.caption).foregroundStyle(.secondary)
             Text("While paused, a wing shows a Next button at its outer edge (the strip at its end): click the title to play, the button to skip.")
                 .font(.caption).foregroundStyle(.secondary)
         }
@@ -125,6 +128,49 @@ private struct NowPlayingAppsSection: View {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return bundleID }
         let name = FileManager.default.displayName(atPath: url.path)
         return name.hasSuffix(".app") ? String(name.dropLast(4)) : name
+    }
+}
+
+/// Live audio bars (spec 14): off by default. Turning the switch on is the only moment macOS can ask
+/// for System Audio Recording; turning it off ends the tap at once.
+private struct NowPlayingBarsSection: View {
+    @AppStorage(AudioBarsPrefs.levelKey, store: .desk) private var on = false
+    @AppStorage(NowPlayingPrefs.barsGradientKey, store: .desk) private var gradient = false
+
+    var body: some View {
+        let driver = AudioBarsDriver.shared
+        Section("Live bars") {
+            Toggle("Live audio bars", isOn: Binding(
+                get: { on && AudioBarsDriver.supported },
+                set: { on = $0; driver.settingsChanged() }))
+                .disabled(!AudioBarsDriver.supported)
+                .settingsAnchor(SettingsAnchor.bars)
+            Text(note)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if on, AudioBarsDriver.supported {
+                Toggle("Gradient bars", isOn: $gradient)
+                if driver.denied { deniedRow }
+            }
+        }
+    }
+
+    private var note: String {
+        AudioBarsDriver.supported
+            ? "Moves bars on the Desk line with how loud the playing app is. Turning this on asks macOS for System Audio Recording. Sanduhr reads one level from that app, keeps it in memory and never records, saves or sends audio."
+            : "Needs macOS 14.2 or later."
+    }
+
+    private var deniedRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("macOS is not giving Sanduhr that app's audio level. Allow Sanduhr in System Settings, Screen & System Audio Recording, under System Audio Recording Only.")
+                .font(.caption).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button(AudioBarsPrefs.allowTitle + "…") { NSWorkspace.shared.open(AudioBarsPrefs.settingsURL) }
+                .controlSize(.small)
+                .accessibilityLabel("Open Screen and System Audio Recording in System Settings, to let Sanduhr read the playing app's level")
+        }
     }
 }
 

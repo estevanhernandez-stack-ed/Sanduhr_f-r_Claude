@@ -157,6 +157,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Claude-made widgets (2.36.0): propose_widget's requests, on the same folder watch. Held in memory,
         // previewed on the Desk on request, installed only on the user's Apply.
         WidgetProposalHandoff.shared.startForApp()
+        // Claude's sprite motion (2.39.0): propose_sprite_motion's requests, same watch. Previewed on the Desk on
+        // request, written to the sprite only on the user's Apply.
+        SpriteMotionHandoff.shared.startForApp()
         // Claude's Desk designs (2.37.0): propose_desk's requests, on the same folder watch. Held in memory,
         // previewed on the Desk on request, written to the Desk settings only on the user's Apply.
         DeskDesignProposalHandoff.shared.startForApp()

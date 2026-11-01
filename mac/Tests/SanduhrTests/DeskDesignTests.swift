@@ -239,7 +239,7 @@ struct DeskStateExportTests {
         #expect(!text.contains("pinned message"))
         let s = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect(Set(s.keys) == ["schema_version", "writer_version", "design", "pieces", "anchors", "fonts", "shown",
-                                "message_color", "notch_text_color", "limits"])
+                                "message_color", "notch_text_color", "limits", "sprites"])
     }
 
     @Test func installedFamiliesAreValidNamesOnceEachAndCapped() {
