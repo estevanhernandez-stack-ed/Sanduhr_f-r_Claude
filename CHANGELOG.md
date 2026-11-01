@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.39.1-mac — 2026-11-01
 
 - **Now playing finds its way back.** When the system now playing didn't answer once, often right after the Mac woke, Sanduhr stayed on Music and Spotify only until you relaunched it, and browser tracks and the live bars went quiet. It now checks again after a minute and then every five, and goes back as soon as it answers. The check after a wake also waits a few seconds for the Mac to settle. Settings, Now Playing says why it is on the fallback instead of blaming macOS.
 
