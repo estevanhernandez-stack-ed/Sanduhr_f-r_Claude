@@ -94,6 +94,9 @@ public sealed partial class DeskReviewBar : UserControl
         Note.Visibility = model.Note is null ? Visibility.Collapsed : Visibility.Visible;
         AutomationProperties.SetName(Note, model.Note ?? "");   // streamer: notname - the proposal's own note as Claude wrote it; no account, folder or project is read
         Changes.ItemsSource = model.Changes;
+        Footer.Text = model.Footer ?? "";
+        Footer.Visibility = model.Footer is null || model.ChangesTitle == "" ? Visibility.Collapsed : Visibility.Visible;
+        AutomationProperties.SetName(Footer, model.Footer ?? "");   // streamer: notname - fixed copy (DrawerReview.RulesFooter), no name in it
 
         Fonts.Children.Clear();
         foreach (var font in model.MissingFonts) Fonts.Children.Add(FontLine(font));

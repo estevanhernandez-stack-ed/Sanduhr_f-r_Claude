@@ -117,12 +117,12 @@
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
             </StackPanel>
         </CheckBox>
-        <TextBlock Margin="28,6,0,0">
-            <Hyperlink Command="{Binding DesignWithChatCommand}" Foreground="{DynamicResource Sanduhr.Brush.Accent}"
-                       AutomationProperties.Name="{x:Static core:SetupCopy.DesignWithChat}">
-                <Run Text="{x:Static core:SetupCopy.DesignWithChat}" FontSize="11" />
-            </Hyperlink>
-        </TextBlock>
+        <Button x:Name="DesignWithChatButton" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="28,10,0,0" Padding="12,6"
+                Content="{x:Static core:SetupCopy.DesignWithChat}" Command="{Binding DesignWithChatCommand}"
+                AutomationProperties.Name="{x:Static core:SetupCopy.DesignWithChat}"
+                AutomationProperties.HelpText="{x:Static core:SetupCopy.DesignWithChatCaption}" />
+        <TextBlock x:Name="DesignWithChatCaption" Text="{x:Static core:SetupCopy.DesignWithChatCaption}" TextWrapping="Wrap" FontSize="11"
+                   Margin="28,4,0,0" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
 
         <CheckBox x:Name="DrawersBox" Style="{StaticResource TickTile}" Margin="0,16,0,0" IsChecked="{Binding Drawers}"
                   AutomationProperties.Name="{x:Static core:SetupCopy.DrawersTitle}"

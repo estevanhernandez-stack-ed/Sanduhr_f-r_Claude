@@ -90,6 +90,26 @@ public static class TrayIconRenderer
         }
     }
 
+    /// <summary>The app's hourglass (Assets/Sanduhr.ico) for the tray while usage is off: nothing to count, so the tray shows what the app
+    /// is. Falls back to the "--" plate if the resource can't be read. The caller owns and disposes it, as with <see cref="Render"/>.</summary>
+    internal static readonly Uri HourglassUri =
+        new($"pack://application:,,,/{typeof(TrayIconRenderer).Assembly.GetName().Name};component/Assets/Sanduhr.ico");
+
+    public static Icon Hourglass()
+    {
+        try
+        {
+            var info = System.Windows.Application.GetResourceStream(HourglassUri);
+            if (info is null) return Render(-1);
+            using var stream = info.Stream;
+            return new Icon(stream, 32, 32);
+        }
+        catch
+        {
+            return Render(-1);
+        }
+    }
+
     private static Color Ramp(int pct)
     {
         if (pct < 50) return Color.FromArgb(0x4a, 0xde, 0x80);

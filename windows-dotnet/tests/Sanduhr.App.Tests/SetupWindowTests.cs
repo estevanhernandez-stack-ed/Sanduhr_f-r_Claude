@@ -49,7 +49,7 @@ public sealed class SetupWindowTests : AppWindowFixture
             var names = NamesOf(w);
             Assert.Empty(LeaksIn(names));
             foreach (var expected in new[] { SetupCopy.Title, SetupCopy.DesktopTitle, SetupCopy.DrawersTitle, SetupCopy.UsageTitle,
-                SetupCopy.DesignWithChat, SetupCopy.NotNow, SetupCopy.Continue })
+                SetupCopy.DesignWithChat, SetupCopy.DesignWithChatCaption, SetupCopy.NotNow, SetupCopy.Continue })
                 Assert.Contains(names, n => n == expected);
             // Every control that takes a click or a key reads as words, not as an empty name.
             var unnamed = Walk(UIElementAutomationPeer.CreatePeerForElement(w))
@@ -58,6 +58,9 @@ public sealed class SetupWindowTests : AppWindowFixture
                 .Select(p => p.GetType().Name)
                 .ToList();
             Assert.Empty(unnamed);
+            // Design it with an AI chat is a button of its own with a caption, not a link under a tick.
+            Assert.True(w.FindName("DesignWithChatButton") is System.Windows.Controls.Button { Content: SetupCopy.DesignWithChat });
+            Assert.True(w.FindName("DesignWithChatCaption") is System.Windows.Controls.TextBlock { Text: SetupCopy.DesignWithChatCaption });
             // Streamer mode: the screen is fixed copy. It draws no name, path or usage of anyone's.
             Assert.DoesNotContain(names, n => n.Contains(":\\"));
         }

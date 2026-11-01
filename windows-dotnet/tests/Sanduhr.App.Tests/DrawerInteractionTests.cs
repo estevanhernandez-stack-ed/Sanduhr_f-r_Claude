@@ -57,6 +57,53 @@ public sealed class DrawerInteractionTests
     });
 
     [Fact]
+    public void A_shortcut_is_drawn_without_its_extension_and_a_rename_keeps_the_extension_on_disk() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, piece) = Make(box);
+        box.File(@"Desktop\Drawers\Images\Phasmophobia.lnk");
+        s.Reload();
+        var item = s.Get("images")!.Items.Single();
+        Assert.Equal("Phasmophobia.lnk", item.Name);
+        Assert.Equal("Phasmophobia", item.DisplayName);
+        Assert.Equal("Phasmophobia", item.SpokenName);
+        Assert.Equal(("Phasmophobia", 12), DrawerPiece.EditorStart(item));
+        piece.BeginRename(item);
+        piece.CommitRename(item, "Ghost game");
+        Assert.True(File.Exists(Path.Combine(box.Drawers, "Images", "Ghost game.lnk")));
+        Assert.False(File.Exists(Path.Combine(box.Drawers, "Images", "Ghost game")));
+        s.Dispose();
+    });
+
+    [Fact]
+    public void An_unchanged_rename_box_renames_nothing_even_when_the_name_ends_in_its_hidden_extension() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, piece) = Make(box);
+        box.File(@"Desktop\Drawers\Images\Foo.lnk.lnk");
+        s.Reload();
+        var item = s.Get("images")!.Items.Single();
+        Assert.Equal("Foo.lnk", item.DisplayName);
+        piece.BeginRename(item);
+        piece.CommitRename(item, "Foo.lnk");
+        Assert.True(File.Exists(Path.Combine(box.Drawers, "Images", "Foo.lnk.lnk")));
+        Assert.False(File.Exists(Path.Combine(box.Drawers, "Images", "Foo.lnk")));
+        Assert.False(s.Busy);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void A_name_with_its_own_extension_is_not_drawn_short() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var item = new DrawerItem(box.File(@"Desktop\Drawers\Images\report.docx"), isFolder: false, pending: false);
+        Assert.Equal("report.docx", item.DisplayName);
+        Assert.Equal(("report.docx", 6), DrawerPiece.EditorStart(item));
+        var folder = new DrawerItem(Path.Combine(box.Drawers, "Images", "Old.lnk"), isFolder: true, pending: false);
+        Assert.Equal("Old.lnk", folder.DisplayName);
+    });
+
+    [Fact]
     public void A_rename_to_a_taken_name_says_why_and_changes_nothing() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();

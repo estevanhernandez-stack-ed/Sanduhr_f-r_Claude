@@ -19,6 +19,10 @@ internal sealed partial class DrawerItem : ObservableObject
 
     public string Path { get; }
     public string Name { get; }
+
+    /// <summary>The name as Explorer draws it: a shortcut's ".lnk" (and ".url", ".pif") hidden. Labels, the accessible name and the rename box's
+    /// text use this; the file keeps its full <see cref="Name"/> on disk and every path.</summary>
+    public string DisplayName => IsFolder ? Name : DrawerNames.Display(Name);   // streamer: key - Name cut of a hidden extension; drawn only through DrawerPiece, which blurs labels while streamer mode is on; spoken via SpokenName (masked)
     public bool IsFolder { get; }
     public bool Pending { get; }
 
@@ -26,7 +30,7 @@ internal sealed partial class DrawerItem : ObservableObject
     [ObservableProperty] private bool _editing;
 
     /// <summary>The item's accessible name: its file name (spec section 2), or "File" while streamer mode is on.</summary>
-    public string SpokenName => StreamerMode.Mask.Omit(Name) ?? (IsFolder ? "Folder" : "File");
+    public string SpokenName => StreamerMode.Mask.Omit(DisplayName) ?? (IsFolder ? "Folder" : "File");
 }
 
 /// <summary>One drawer's live state, kept across Desk redraws (the piece is rebuilt, this is not).</summary>

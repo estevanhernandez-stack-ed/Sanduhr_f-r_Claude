@@ -86,6 +86,31 @@ public sealed class DrawersPageTests : AppWindowFixture
         }
     });
 
+    [Fact]
+    public void The_Drawers_page_has_a_Design_it_with_an_AI_chat_button_and_a_caption() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+        int asked = 0;
+        svm.Drawers.DesignWithChatRequested = () => asked++;
+        var window = new SettingsWindow(svm);
+        var guard = NoActivate.Show(window);
+        try
+        {
+            window.SelectPage(SettingsPage.Drawers, SettingsIndex.MenuAnchor(SettingsPage.Drawers));
+            window.UpdateLayout();
+            Pump();
+            var tab = ((TabControl)window.FindName("Tabs")).Items.OfType<TabItem>().Single(t => (string)t.Tag == "Drawers");
+            var content = (DependencyObject)tab.Content;
+            var button = Below<Button>(content).Single(b => b.Content as string == SetupCopy.DesignWithChat);
+            Assert.Equal(SetupCopy.DesignWithChat, System.Windows.Automation.AutomationProperties.GetName(button));
+            Assert.Contains(Below<TextBlock>(content), t => t.Text == SetupCopy.DesignWithChatCaption);
+            button.Command.Execute(null);
+            Assert.Equal(1, asked);
+        }
+        finally { guard.Check(); window.Close(); }
+    });
+
     private static IEnumerable<T> Below<T>(DependencyObject root) where T : DependencyObject
     {
         for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)

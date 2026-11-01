@@ -58,6 +58,10 @@ public sealed record DeskReviewModel(
     /// <summary>One choice the user makes with Apply, as a check box (a Claude-made sprite's "Make it the companion"); null for none.</summary>
     public string? Option { get; init; }
 
+    /// <summary>A small line under the changes that belongs to the whole list, not to one change (the drawers review: where the files no
+    /// rule matches stay); null for none.</summary>
+    public string? Footer { get; init; }
+
     /// <summary>The bar shows an Edit button (the drawers review: untick moves, rename a new drawer).</summary>
     public bool CanEdit { get; init; }
 

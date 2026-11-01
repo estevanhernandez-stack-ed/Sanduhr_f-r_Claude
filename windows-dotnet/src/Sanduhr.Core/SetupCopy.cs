@@ -8,12 +8,14 @@ public static class SetupCopy
     public const string DesktopTitle = "A nicer desktop";
     public const string DesktopBody = "A clock, a message and the weather on your desktop.";
     public const string DrawersTitle = "Tidy my files";
-    public const string DrawersBody = "Sort your desktop files into drawers you can fold away. Nothing moves until you say so.";
+    public const string DrawersBody = "Sorts screenshots, pictures, documents, installers, zip and other archive files, shortcuts and files you haven't changed in a month into drawers. Nothing moves until you say so.";
     public const string UsageTitle = "Track my AI usage";
     public const string UsageBody = "See how much of your plan you've used.";
     public const string ClaudeSource = "Claude";
     public const string ClaudeTrademark = SettingsNames.TrademarkNotice;
     public const string DesignWithChat = "Design it with an AI chat";
+    /// <summary>Under the button on the setup screen and the Drawers page: what the chat does, in a line.</summary>
+    public const string DesignWithChatCaption = "Tell any AI chat what you like and paste back its design.";
     public const string Continue = "Continue";
     public const string NotNow = "Not now";
     public const string Cancel = "Cancel";
@@ -109,7 +111,7 @@ public static class SetupCopy
     public static IReadOnlyList<string> All { get; } =
     [
         Title, Intro, DesktopTitle, DesktopBody, DrawersTitle, DrawersBody, UsageTitle, UsageBody, ClaudeSource, ClaudeTrademark,
-        DesignWithChat, Continue, NotNow, Cancel, MenuItem, PickOne, SaveFailed, WhatChanges, WhatHappened, DesktopOffLine, UsageOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DesignDesktopOffNote, DrawersOffLine(2),
+        DesignWithChat, DesignWithChatCaption, Continue, NotNow, Cancel, MenuItem, PickOne, SaveFailed, WhatChanges, WhatHappened, DesktopOffLine, UsageOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DesignDesktopOffNote, DrawersOffLine(2),
         ChatIntro, ChatCopyPrompt, ChatPasteName, ChatPastePlaceholder, ChatPreview, ChatUseRules, ChatUseDrawerSettings, ChatClose, ChatFindingsName, ChatReady,
         ChatPromptCopied, ChatDeskShown, ChatRulesShown, ChatNoDeskService, ChatRulesSavedNothing, ChatUntitledDesign, ChatFixCount(1), ChatFixCount(2), ChatManyBlocks(2),
         ChatRulesLine(1, ["Photos"]), ChatRulesLine(2, ["Photos", "Receipts"]), ChatNotShown("the Desk is busy"),

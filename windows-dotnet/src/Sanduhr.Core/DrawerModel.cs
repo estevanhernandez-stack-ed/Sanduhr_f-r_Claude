@@ -30,6 +30,33 @@ public static class DrawerNames
         "COM¹", "COM²", "COM³", "LPT¹", "LPT²", "LPT³", "CONIN$", "CONOUT$",
     };
 
+    /// <summary>The extensions Explorer hides on a desktop whatever the folder options say: shortcuts, internet shortcuts and PIF files.</summary>
+    private static readonly string[] HiddenExtensions = [".lnk", ".url", ".pif"];
+
+    /// <summary>A file's name as Explorer draws it: without a ".lnk", ".url" or ".pif" ending. Display only: the file on disk and every
+    /// path keep the extension. A name that is nothing but the extension (".lnk") is left as it is.</summary>
+    public static string Display(string fileName)
+    {
+        var hidden = HiddenExtension(fileName);
+        return hidden.Length > 0 && fileName.Length > hidden.Length ? fileName[..^hidden.Length] : fileName;
+    }
+
+    /// <summary>The hidden extension <paramref name="fileName"/> ends with, as written on disk (".lnk"), or empty when it shows its own.</summary>
+    public static string HiddenExtension(string fileName)
+    {
+        foreach (var ext in HiddenExtensions)
+            if (fileName.Length > ext.Length && fileName.EndsWith(ext, StringComparison.OrdinalIgnoreCase)) return fileName[^ext.Length..];
+        return "";
+    }
+
+    /// <summary>The name a rename box's text means for a file whose name was drawn without its hidden extension: the extension goes back on
+    /// unless the text already ends with it, so renaming a shortcut never turns it into a file Windows no longer opens as one.</summary>
+    public static string WithHiddenExtension(string originalName, string typed)
+    {
+        var ext = HiddenExtension(originalName);
+        return ext.Length == 0 || string.IsNullOrWhiteSpace(typed) || typed.EndsWith(ext, StringComparison.OrdinalIgnoreCase) ? typed : typed + ext;
+    }
+
     /// <summary>A name Windows takes as a folder name: 1 to 40 characters, none of the forbidden ones, not "." or "..", no trailing dot
     /// or space, and not a device name (CON, NUL, COM1 and the rest, with or without an extension).</summary>
     public static bool IsValid(string? name)

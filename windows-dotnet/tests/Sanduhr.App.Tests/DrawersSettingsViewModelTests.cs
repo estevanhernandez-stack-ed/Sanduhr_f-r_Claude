@@ -175,10 +175,23 @@ public sealed class DrawersSettingsViewModelTests
         using var box = new DrawerSandbox();
         var (vm, s, _) = Make(box, enabled: true);
         var row = vm.Rules.Single(r => r.HasDays);
-        Assert.Equal("Not touched in 30 days to Older files", row.Label);
+        Assert.Equal("Files not changed in 30 days go to Older files", row.Label);
         row.Days = 1;
-        Assert.Equal("Not touched in 1 day to Older files", row.Label);
+        Assert.Equal("Files not changed in 1 day go to Older files", row.Label);
         Assert.Contains(row.Label, row.DeleteName);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void Design_it_with_an_AI_chat_asks_the_app_to_open_it() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (vm, s, _) = Make(box);
+        vm.DesignWithChatCommand.Execute(null);   // nothing wired yet: nothing happens
+        int asked = 0;
+        vm.DesignWithChatRequested = () => asked++;
+        vm.DesignWithChatCommand.Execute(null);
+        Assert.Equal(1, asked);
         s.Dispose();
     });
 

@@ -22,6 +22,7 @@ public class DrawerRulesTests
     [InlineData("backup.7z", DrawerRuleKind.Archives, true)]
     [InlineData("Game.lnk", DrawerRuleKind.Shortcuts, true)]
     [InlineData("site.url", DrawerRuleKind.Shortcuts, true)]
+    [InlineData("Old tool.PIF", DrawerRuleKind.Shortcuts, true)]
     [InlineData("noextension", DrawerRuleKind.Documents, false)]
     public void Kind_rules_match_by_extension_and_screenshots_by_name_too(string name, DrawerRuleKind kind, bool match) =>
         Assert.Equal(match, DrawerRules.Matches(new DrawerRule(kind, "x"), File(name), Now));
@@ -89,9 +90,10 @@ public class DrawerRulesTests
     }
 
     [Fact]
-    public void Defaults_leave_shortcuts_alone_and_sweep_old_files_last()
+    public void Defaults_turn_shortcuts_on_and_sweep_old_files_last()
     {
-        Assert.False(DrawerRules.Defaults.Single(r => r.Kind == DrawerRuleKind.Shortcuts).On);
+        Assert.All(DrawerRules.Defaults, r => Assert.True(r.On));
+        Assert.True(DrawerRules.Defaults.Single(r => r.Kind == DrawerRuleKind.Shortcuts).On);
         Assert.Equal(DrawerRuleKind.OlderThan, DrawerRules.Defaults[^1].Kind);
         foreach (var r in DrawerRules.Defaults)
             Assert.Contains(DrawerRules.DefaultDrawers(Root), d => d.Id == r.DrawerId);

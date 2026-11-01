@@ -942,6 +942,15 @@
 
                             <!-- Tray (W3): which number the tray icon shows, with a live preview. -->
                             <StackPanel views:SettingsAnchor.Id="tray">
+                                <!-- Usage off: the tray number has nothing to show, so one line says how to get it back. -->
+                                <StackPanel Visibility="{Binding General.ShowTrayOff, Converter={StaticResource BoolVis}}">
+                                    <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                               Text="{Binding General.TrayOffLine}" />
+                                    <Button Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Padding="12,6" Margin="0,8,0,0"
+                                            Content="{Binding SetupTitle}" Command="{Binding OpenSetupCommand}"
+                                            AutomationProperties.Name="{Binding SetupTitle}" />
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding General.ShowTray, Converter={StaticResource BoolVis}}">
                                 <TextBlock Text="Tray" FontSize="13" FontWeight="SemiBold"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
                                 <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
@@ -967,6 +976,7 @@
                                 <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                            Text="The number on the tray icon. Rotate switches between session and weekly every 8 seconds." />
+                                </StackPanel>
                             </StackPanel>
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />

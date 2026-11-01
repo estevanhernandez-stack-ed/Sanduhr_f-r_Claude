@@ -156,7 +156,8 @@ public sealed class DrawerReviewServiceTests
         drawers.Reload();
         box.File(@"Desktop\invoice-0042.txt");
         Assert.Null(review.SortNow());
-        Assert.Contains("Receipts (new): 1 file", host.Model!.Changes);
+        Assert.Contains("Receipts (new): 1 file, including invoice-0042.txt", host.Model!.Changes);
+        Assert.Equal(DrawerReview.RulesFooter, host.Model.Footer);
         drawers.Dispose();
     });
 

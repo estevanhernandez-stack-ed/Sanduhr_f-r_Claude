@@ -115,4 +115,33 @@ public class TrayReadoutTests
         Assert.Equal("Rotate (session and weekly)", TrayReadout.Title(TrayMode.Rotate));
         Assert.Equal(TimeSpan.FromSeconds(8), TrayReadout.RotateInterval);
     }
+
+    [Fact]
+    public void Usage_off_with_no_number_shows_the_hourglass_and_the_plain_name()
+    {
+        var g = TrayReadout.Glyph(usageOn: false, reading: null, demo: false);
+        Assert.Equal(TrayGlyphKind.Hourglass, g.Kind);
+        Assert.Equal("Sanduhr für Claude", g.Tooltip);
+    }
+
+    [Fact]
+    public void Usage_on_with_no_number_keeps_the_dashes()
+    {
+        var g = TrayReadout.Glyph(usageOn: true, reading: null, demo: false);
+        Assert.Equal(TrayGlyphKind.NoData, g.Kind);
+        Assert.Equal("Sanduhr für Claude — no data yet", g.Tooltip);
+    }
+
+    [Fact]
+    public void A_reading_shows_its_number_whatever_the_usage_switch_says()
+    {
+        var on = TrayReadout.Glyph(usageOn: true, new TrayReading(42, "Session"), demo: false);
+        Assert.Equal(TrayGlyphKind.Number, on.Kind);
+        Assert.Equal(42, on.Percent);
+        Assert.Equal("Sanduhr für Claude — Session 42%", on.Tooltip);
+        // Demo mode draws its samples even with usage off.
+        var demo = TrayReadout.Glyph(usageOn: false, new TrayReading(42, "Session"), demo: true);
+        Assert.Equal(TrayGlyphKind.Number, demo.Kind);
+        Assert.Equal($"Sanduhr für Claude — {DemoMode.TrayLabel("Session", 42)}", demo.Tooltip);
+    }
 }

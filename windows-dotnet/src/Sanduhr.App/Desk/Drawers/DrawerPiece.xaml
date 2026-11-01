@@ -4,6 +4,7 @@
              Focusable="False">
     <!-- A drawer on the Desk (5.0 drawers spec, section 2). Brushes are set per piece from DrawerLook; nothing here reads the widget theme. -->
     <UserControl.Resources>
+        <!-- File labels and the rename box read in the system UI font whatever the Desk font is: a handwriting font is for the title, not for a name to be read. -->
         <Style x:Key="DrawerItem" TargetType="ListBoxItem">
             <Setter Property="Margin" Value="2" />
             <Setter Property="Padding" Value="0" />
@@ -40,11 +41,11 @@
                 <!-- The chip is transparent unless the look put labels on chips (DrawerLook.Chips); it hides with the label while renaming. -->
                 <Border x:Name="LabelChip" Background="{DynamicResource Drawer.Chip}" CornerRadius="4" Padding="{DynamicResource Drawer.ChipPadding}"
                         HorizontalAlignment="Center" Margin="0,4,0,0">
-                    <TextBlock x:Name="Label" Text="{Binding Name}" AutomationProperties.Name="{Binding SpokenName}" FontSize="11.5" TextAlignment="Center" TextWrapping="Wrap"
+                    <TextBlock x:Name="Label" Text="{Binding DisplayName}" FontFamily="{x:Static SystemFonts.MessageFontFamily}" AutomationProperties.Name="{Binding SpokenName}" FontSize="11.5" TextAlignment="Center" TextWrapping="Wrap"
                                TextTrimming="CharacterEllipsis" MaxHeight="32"
                                Foreground="{DynamicResource Drawer.Ink}" Effect="{DynamicResource Drawer.LabelEffect}" />
                 </Border>
-                <TextBox x:Name="Editor" Visibility="Collapsed" FontSize="11.5" Margin="0,4,0,0" TextWrapping="Wrap"
+                <TextBox x:Name="Editor" Visibility="Collapsed" FontFamily="{x:Static SystemFonts.MessageFontFamily}" FontSize="11.5" Margin="0,4,0,0" TextWrapping="Wrap"
                          AutomationProperties.Name="New name"
                          IsVisibleChanged="Editor_IsVisibleChanged" KeyDown="Editor_KeyDown" LostKeyboardFocus="Editor_LostKeyboardFocus" />
             </StackPanel>

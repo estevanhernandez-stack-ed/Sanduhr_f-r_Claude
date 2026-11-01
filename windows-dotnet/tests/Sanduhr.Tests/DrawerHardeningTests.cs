@@ -170,8 +170,8 @@ public sealed class DrawerHardeningTests
             [new DrawerMove(Desk + @"\a.pdf", "tax")]);
         var check = DrawerPlanValidator.Check(plan, new DrawerRoots(Desk, @"C:\Users\Public\Desktop", DrawersRoot), []);
         Assert.True(check.Ok, check.Error);
-        Assert.Equal("Tax 2026 (new): 1 file", DrawerReview.Model(plan, check, [], null, []).Changes.Single());
-        Assert.Equal("Larkspur (new): 1 file", DrawerReview.Model(plan, check, [], null, [], _ => "Larkspur").Changes.Single());
+        Assert.Equal("Tax 2026 (new): 1 file, including a.pdf", DrawerReview.Model(plan, check, [], null, []).Changes.Single());
+        Assert.Equal("Larkspur (new): 1 file, including a.pdf", DrawerReview.Model(plan, check, [], null, [], _ => "Larkspur").Changes.Single());
     }
 
     [Fact]

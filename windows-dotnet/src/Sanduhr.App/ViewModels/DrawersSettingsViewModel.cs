@@ -30,6 +30,13 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
         Refresh();
     }
 
+    /// <summary>The Design it with an AI chat button was pressed (App opens the paste window, as the Desk page's button does).</summary>
+    public Action? DesignWithChatRequested { get; set; }
+
+    /// <summary>Opens Design it with an AI chat.</summary>
+    [RelayCommand]
+    private void DesignWithChat() => DesignWithChatRequested?.Invoke();
+
     /// <summary>The running Desk is told to start or stop drawing (the Desk page's own switch does the same through its Changed hook).</summary>
     public Action? DeskChanged { get; set; }
 
@@ -359,28 +366,17 @@ public sealed partial class DrawerRuleRow : ObservableObject
         _on = rule.On;
         _days = rule.Days;
         _drawerName = drawerName;
-        _text = rule.Text;
+        _rule = rule;
         Kind = rule.Kind;
     }
 
     private readonly string _drawerName;
-    private readonly string? _text;
+    private readonly DrawerRule _rule;
 
     public DrawerRuleKind Kind { get; }
 
-    /// <summary>"Screenshots to Screenshots", "Not touched in 30 days to Older files": it follows the Days box.</summary>
-    public string Label => (Kind switch
-    {
-        DrawerRuleKind.Screenshots => "Screenshots",
-        DrawerRuleKind.Images => "Images",
-        DrawerRuleKind.Documents => "Documents",
-        DrawerRuleKind.Installers => "Installers",
-        DrawerRuleKind.Archives => "Archives",
-        DrawerRuleKind.Shortcuts => "Shortcuts",
-        DrawerRuleKind.OlderThan => $"Not touched in {Days} {(Days == 1 ? "day" : "days")}",
-        DrawerRuleKind.NameContains => $"Name contains \"{_text}\"",
-        _ => $"Name starts with \"{_text}\"",
-    }) + $" to {_drawerName}";
+    /// <summary>"Screenshots go to Screenshots", "Files not changed in 30 days go to Older files": it follows the Days box.</summary>
+    public string Label => DrawerRuleText.Sentence(_rule with { Days = Days }, _drawerName);
 
     // Each button names its own rule, so a screen reader can tell the rows apart.
     public string DeleteName => $"{SettingsNames.DrawersDelete} rule: {Label}";

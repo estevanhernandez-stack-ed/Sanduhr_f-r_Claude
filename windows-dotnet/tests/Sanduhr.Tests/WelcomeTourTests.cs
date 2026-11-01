@@ -19,14 +19,14 @@ public class WelcomeTourTests
     private static TourCard ById(string id) => WelcomeTour.Table.Single(c => c.Id == id);
 
     [Fact]
-    public void DefaultTable_IsFiveStepsNumberedOneToFive()
+    public void DefaultTable_IsSixStepsNumberedOneToSix()
     {
-        var expected = new[] { new[] { "paced" }, ["desk"], ["tray"], ["accounts"], ["claude-code"] };
+        var expected = new[] { new[] { "paced" }, ["desk"], ["design-with-chat"], ["tray"], ["accounts"], ["claude-code"] };
         foreach (var features in new[] { None, WithDesk })
         {
             var steps = WelcomeTour.Steps(features);
             Assert.Equal(expected, Ids(steps));
-            Assert.Equal([1, 2, 3, 4, 5], steps.Select(s => s[0].Step).ToArray());
+            Assert.Equal([1, 2, 3, 4, 5, 6], steps.Select(s => s[0].Step).ToArray());
         }
     }
 
@@ -70,18 +70,37 @@ public class WelcomeTourTests
     {
         Assert.Equal(SettingsPage.Widget, ById("paced").Card.Destination);
         Assert.Equal(SettingsPage.Desk, ById("desk").Card.Destination);
+        Assert.Equal(SettingsPage.Desk, ById("design-with-chat").Card.Destination);
         Assert.Equal(SettingsPage.General, ById("tray").Card.Destination);
         Assert.Equal(SettingsPage.Accounts, ById("accounts").Card.Destination);
         Assert.Equal(SettingsPage.ClaudeCode, ById("claude-code").Card.Destination);
     }
 
     [Fact]
-    public void DeskOnly_IsThreeStepsEndingInUsage()
+    public void DeskOnly_IsFourStepsEndingInUsage()
     {
         var steps = WelcomeTour.Steps(None, WelcomeTour.DeskOnly);
-        Assert.Equal(new[] { new[] { "desk" }, ["tray"], ["usage"] }, Ids(steps));
-        Assert.Equal([1, 2, 3], steps.Select(s => s[0].Step).ToArray());
+        Assert.Equal(new[] { new[] { "desk" }, ["design-with-chat"], ["tray"], ["usage"] }, Ids(steps));
+        Assert.Equal([1, 2, 3, 4], steps.Select(s => s[0].Step).ToArray());
         Assert.DoesNotContain(WelcomeTour.DeskOnly, c => c.Id is "paced" or "accounts" or "claude-code");
+    }
+
+    [Fact]
+    public void The_AI_chat_card_opens_Design_it_with_an_AI_chat_in_both_tours()
+    {
+        foreach (var table in new[] { WelcomeTour.Table, WelcomeTour.DeskOnly })
+        {
+            var card = table.Single(c => c.Id == "design-with-chat");
+            Assert.Equal(SetupCopy.DesignWithChat, card.Card.Title);
+            Assert.Equal(SettingsPage.Desk, card.Card.Destination);
+            Assert.Equal(SettingsIndex.DeskDesignWithChat, card.Card.Anchor);
+            Assert.Equal("Show me", card.ShowMeTitle);
+            Assert.Single(card.Card.Glyph);
+            Assert.InRange(card.Card.Glyph[0], '\uE000', '\uF8FF');   // one private-use character
+            Assert.DoesNotContain("ChatGPT", card.Card.Body);
+        }
+        Assert.Equal(WelcomeTour.Table.Single(c => c.Id == "design-with-chat").Card.Body,
+            WelcomeTour.DeskOnly.Single(c => c.Id == "design-with-chat").Card.Body);
     }
 
     [Fact]
@@ -114,7 +133,7 @@ public class WelcomeTourTests
     [InlineData(false)]
     public void StepsFor_DeskOnlyPicksTheDeskOnlyTour(bool signedIn)
     {
-        Assert.Equal(new[] { new[] { "desk" }, ["tray"], ["usage"] },
+        Assert.Equal(new[] { new[] { "desk" }, ["design-with-chat"], ["tray"], ["usage"] },
             Ids(WelcomeTour.StepsFor(true, None, signedIn)));
         Assert.Equal(Ids(WelcomeTour.Steps(None, signedIn: signedIn)),
             Ids(WelcomeTour.StepsFor(false, None, signedIn)));

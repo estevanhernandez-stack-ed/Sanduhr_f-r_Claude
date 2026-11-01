@@ -131,6 +131,27 @@ public sealed class DrawerPieceTests
     });
 
     [Fact]
+    public void File_labels_and_the_rename_box_use_the_system_font_while_the_title_keeps_the_desk_font() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, _, _) = Make(box, "a.png");
+        var hand = new FontFamily("Segoe Script");
+        var look = DrawerLook.From(DeskInkMap.Light.Default, null, null, null, hand);
+        var piece = new DrawerPiece(s.Get("images")!, s, look, 1);
+        piece.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        piece.Arrange(new Rect(piece.DesiredSize));
+        piece.UpdateLayout();
+        var item = (ListBoxItem)piece.List.ItemContainerGenerator.ContainerFromIndex(0);
+        var label = (TextBlock)FindNamed(item, "Label");
+        var editor = (TextBox)FindNamed(item, "Editor");
+        Assert.Equal(SystemFonts.MessageFontFamily.Source, label.FontFamily.Source);
+        Assert.Equal(SystemFonts.MessageFontFamily.Source, editor.FontFamily.Source);
+        Assert.Equal(hand.Source, piece.TitleText.FontFamily.Source);
+        Assert.NotEqual(hand.Source, label.FontFamily.Source);
+        s.Dispose();
+    });
+
+    [Fact]
     public void A_redraw_waits_while_a_drawer_is_busy_and_runs_when_it_is_released() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();
