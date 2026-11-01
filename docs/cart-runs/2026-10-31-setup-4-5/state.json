@@ -1,0 +1,253 @@
+{
+  "run": "setup-4-5",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "52a97067adca7472f3a643d213df0cdc3b3017fa",
+  "base_ref": "HEAD",
+  "merged_at_start": null,
+  "behind_at_start": 0,
+  "integration_branch": "cart/setup-4-5",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-setup-4-5/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-setup-4-5",
+  "builder_branch": "docs/setup-spec",
+  "uncommitted_at_start": [
+    ".playwright-mcp/",
+    "dist/"
+  ],
+  "started_at": "2026-10-31T22:31:52.380Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "setup-model",
+      "title": "setup-model",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-4-5--01-setup-model",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "dotnet test windows-dotnet/tests/Sanduhr.Tests/Sanduhr.Tests.csproj --filter SetupSettingsTests (12/12) + review APPROVE",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "setup-store",
+      "title": "setup-store",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-4-5--02-setup-store",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "SetupStoreTests 3/3 + review APPROVE + marker-last fix bc66785c",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "setup-copy",
+      "title": "setup-copy",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-4-5--03-setup-copy",
+      "worktree": "",
+      "on": 2,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "SetupCopyTests 4/4 + review APPROVE",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "usage-off",
+      "title": "usage-off",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-4-5--04-usage-off",
+      "worktree": "",
+      "on": 3,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "build 0 errors; App 1240/1240; Core 4904/4904; re-review APPROVE (6b7c4f99)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "desktop-filter",
+      "title": "desktop-filter",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-4-5--05-desktop-filter",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "Desk|Drawer App 433/433; SetupDesk|SetupCopy 6/6; re-review APPROVE (742e813e)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "setup-service",
+      "title": "setup-service",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-4-5--06-setup-service",
+      "worktree": "",
+      "on": 5,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "SetupServiceTests 12/12; Drawer 146/146; review APPROVE + fixes b05ec389 verified",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 7,
+      "slug": "setup-window",
+      "title": "setup-window",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-4-5--07-setup-window",
+      "worktree": "",
+      "on": 6,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "App 1274/1274; Core 4906/4906; re-review APPROVE (c7709df5)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 8,
+      "slug": "entries-whats-new",
+      "title": "entries-whats-new",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-4-5--08-entries-whats-new",
+      "worktree": "",
+      "on": 7,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "build 0 errors; Core WhatsNew|SettingsIndex 113/113; App 15/15; review APPROVE + tooltip fix a5dff4d8",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 9,
+      "slug": "chat-prompt-reader",
+      "title": "chat-prompt-reader",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-4-5--09-chat-prompt-reader",
+      "worktree": "",
+      "on": 8,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "Core 4946/4946; prompt+reader 38/38; TrustBoundary 28/28; re-review APPROVE (7ba8777d)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 10,
+      "slug": "chat-design-app",
+      "title": "chat-design-app",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-4-5--10-chat-design-app",
+      "worktree": "",
+      "on": 9,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "whole App 1315/1315 on ddef06e6; Core 4953/4953; TrustBoundary 28/28; re-review APPROVE",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 11,
+      "slug": "harness-shots",
+      "title": "harness-shots",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-4-5--11-harness-shots",
+      "worktree": "",
+      "on": 10,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "harness setup scenario: 6 PNGs (obsidian, aurora; first-run, later, chat); orchestrator viewed them; solution build 0 errors",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 12,
+      "slug": "suite-live-check",
+      "title": "suite-live-check",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-4-5--12-suite-live-check",
+      "worktree": "",
+      "on": 11,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "dotnet build Sanduhr.slnx -c Release (0 errors) + dotnet test Sanduhr.slnx -c Release: Mcp 300/300, Core 4953/4953, App 1315/1315",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 13,
+      "slug": "branch-review-fixes",
+      "title": "branch-review-fixes",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-4-5--13-branch-review-fixes",
+      "worktree": "",
+      "on": 12,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "Release suites 6583/6583; branch re-review READY; tray-click rule 3075b72b",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}
