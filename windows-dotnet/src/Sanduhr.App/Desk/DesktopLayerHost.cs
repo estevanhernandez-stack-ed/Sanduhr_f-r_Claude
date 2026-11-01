@@ -44,11 +44,16 @@ internal sealed class DesktopLayerHost : IDeskHost
     /// <summary>Room around an island for the ink's shadow, in DIPs.</summary>
     private const double Pad = 16;
 
+    /// <summary>The room around an island: none for a Glass drawer, whose blur fills the whole window and so must be the panel's size.</summary>
+    private static double PadOf(DeskIsland island) => island is { Glass: true, Drawer: true } ? 0 : Pad;
+
     private readonly List<HwndSource> _windows = [];
     /// <summary>The screen each window in <see cref="_windows"/> draws on.</summary>
     private readonly List<DeskScreen> _screens = [];
     /// <summary>Whether each window in <see cref="_windows"/> holds a drawer, as of the last <see cref="Show"/>.</summary>
     private readonly List<bool> _drawers = [];
+    /// <summary>Whether Windows took the blur on each window that asked for one (a window absent here has none).</summary>
+    private readonly Dictionary<HwndSource, bool> _blur = [];
     private readonly HwndSource _sentinel;
     private readonly uint _taskbarCreated;
     private readonly DispatcherTimer _coalesce;
@@ -103,6 +108,9 @@ internal sealed class DesktopLayerHost : IDeskHost
     public event Action? CoverageChanged;
 
     /// <summary>The Desk windows' handles, in island order (the runner queries them).</summary>
+    /// <summary>Per window in <see cref="Handles"/> order: true when a Glass drawer's blur is on (a test seam).</summary>
+    internal IReadOnlyList<bool> Blurred => [.. _windows.Select(w => _blur.TryGetValue(w, out var on) && on)];
+
     public IReadOnlyList<IntPtr> Handles => [.. _windows.Select(w => w.Handle)];
 
     /// <summary>The sentinel's handle (the runner checks its z-order).</summary>
@@ -235,8 +243,9 @@ internal sealed class DesktopLayerHost : IDeskHost
         content.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         double cw = Math.Ceiling(content.DesiredSize.Width), ch = Math.Ceiling(content.DesiredSize.Height);
         Unfollow(src);
-        var (left, top) = Origin(island, island.Motion?.Anchor ?? island.Anchor, cw, ch);
-        double w = cw + 2 * Pad, h = ch + 2 * Pad;
+        double pad = PadOf(island);
+        var (left, top) = Origin(island, island.Motion?.Anchor ?? island.Anchor, cw, ch, pad);
+        double w = cw + 2 * pad, h = ch + 2 * pad;
         if (island.Motion is { } motion) Follow(src, screen, island, motion, cw, ch);
         bool through = ClickThrough && !island.TakesClicks;
         SetClickThrough(src.Handle, through);
@@ -250,13 +259,14 @@ internal sealed class DesktopLayerHost : IDeskHost
             same.LayoutTransform = Math.Abs(k - 1) < 0.001 ? Transform.Identity : new ScaleTransform(k, k);
             // A drawer handed back as it was (the minute's in-place tick) stays where it is: the user may be moving it by its title.
             if (!island.Drawer) Fit(src, screen, left, top, w, h, first);
+            SyncBackdrop(src, island);
             return;
         }
         if (content.Parent is Border previous) previous.Child = null;
         var root = new Border
         {
             Child = content,
-            Padding = new Thickness(Pad),
+            Padding = new Thickness(pad),
             Width = w,
             Height = h,
             HorizontalAlignment = HorizontalAlignment.Left,
@@ -270,19 +280,36 @@ internal sealed class DesktopLayerHost : IDeskHost
         TextOptions.SetTextFormattingMode(root, TextFormattingMode.Ideal);
         src.RootVisual = root;
         Fit(src, screen, left, top, w, h, first);
+        SyncBackdrop(src, island);
+    }
+
+    /// <summary>A Glass drawer's window gets the wallpaper blur and DWM's round corners; a window whose drawer is no longer Glass has them
+    /// taken off. Asked once per change, never on every redraw, and never for a Desk widget's window. Nothing here can fail the draw: a
+    /// refused or missing call leaves the drawer on its tinted plate.</summary>
+    private void SyncBackdrop(HwndSource src, DeskIsland island)
+    {
+        if (src.IsDisposed) return;
+        bool had = _blur.TryGetValue(src, out var on) && on;
+        if (island.Glass && island.Drawer)
+        {
+            if (had) return;
+            _blur[src] = DrawerBackdrop.Apply(src.Handle, island.GlassTint);
+        }
+        else if (_blur.Remove(src))
+            DrawerBackdrop.Clear(src.Handle);
     }
 
     /// <summary>The window's top-left, in the screen's DIPs, for an island of content <paramref name="cw"/> by <paramref name="ch"/> whose
     /// aligned edge sits on <paramref name="anchor"/>.</summary>
-    private static (double Left, double Top) Origin(DeskIsland island, Point anchor, double cw, double ch)
+    private static (double Left, double Top) Origin(DeskIsland island, Point anchor, double cw, double ch, double pad)
     {
-        double left = anchor.X - Pad - island.Horizontal switch
+        double left = anchor.X - pad - island.Horizontal switch
         {
             HorizontalAlignment.Right => cw,
             HorizontalAlignment.Center => cw / 2,
             _ => 0,
         };
-        double top = anchor.Y - Pad - island.Vertical switch
+        double top = anchor.Y - pad - island.Vertical switch
         {
             VerticalAlignment.Bottom => ch,
             VerticalAlignment.Center => ch / 2,
@@ -295,11 +322,12 @@ internal sealed class DesktopLayerHost : IDeskHost
     /// applies). Only the position changes; the content is never laid out again for a move.</summary>
     private void Follow(HwndSource src, DeskScreen screen, DeskIsland island, DeskIslandMotion motion, double cw, double ch)
     {
-        double w = cw + 2 * Pad, h = ch + 2 * Pad;
+        double pad = PadOf(island);
+        double w = cw + 2 * pad, h = ch + 2 * pad;
         void Moved(Point p)
         {
             if (_disposed || src.IsDisposed) return;
-            var (left, top) = Origin(island, p, cw, ch);
+            var (left, top) = Origin(island, p, cw, ch, pad);
             Fit(src, screen, left, top, w, h, first: false);
         }
         motion.Moved += Moved;
@@ -424,6 +452,7 @@ internal sealed class DesktopLayerHost : IDeskHost
             _screens.Clear();
             _drawers.Clear();
             _homes.Clear();
+            _blur.Clear();
         }
         finally { _closing = false; }
     }
