@@ -467,6 +467,31 @@
                         </Button.Template>
                     </Button>
 
+                    <!-- Usage off (Set up Sanduhr): the widget would be blank, so one line says why and is the way back. -->
+                    <StackPanel Orientation="Horizontal" Margin="2,4,2,8"
+                                Visibility="{Binding ShowUsageOff, Converter={StaticResource BoolVis}, FallbackValue=Collapsed}">
+                        <TextBlock Text="{Binding UsageOffLabel}" FontSize="12" VerticalAlignment="Center" Margin="0,0,10,0"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                   AutomationProperties.Name="{Binding UsageOffLabel}" />
+                        <Button Command="{Binding OpenSetupCommand}" Cursor="Hand"
+                                Background="Transparent" BorderThickness="0" FontSize="12"
+                                Foreground="{DynamicResource Sanduhr.Brush.Accent}"
+                                ToolTip="Opens Set up Sanduhr"
+                                AutomationProperties.Name="{Binding SetupLinkLabel}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <TextBlock x:Name="text" Text="{Binding SetupLinkLabel}" TextDecorations="Underline"
+                                               Foreground="{TemplateBinding Foreground}" />
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsKeyboardFocused" Value="True">
+                                            <Setter TargetName="text" Property="FontWeight" Value="SemiBold" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </StackPanel>
+
                     <!-- Empty-state: first-run "Sign in to Claude" prompt (item 6).
                          Shown when there's no active account; the headline feature's
                          front door. The 626 cyan->magenta pairing on the accent.

@@ -443,6 +443,8 @@ internal sealed class DeskDesignService : IDisposable
         var model = DeskReviewModel.Build(r.Proposal, current, merged, r.Fonts, FontInstalled, desk.Enabled, SettingsNames.DeskPieceName, r.Warnings, MonitorName);
         // A pasted design names no product: its own heading and bar name.
         if (r.Pasted) model = model with { Heading = DeskReviewCopy.PastedHeading, BarName = DeskReviewCopy.PastedBarName };
+        // A nicer desktop is off in Set up Sanduhr: the design is still saved on Apply, and the bar says it will not draw yet.
+        if (_store.LoadSetup() is { Desktop: false }) model = model with { Warnings = [.. model.Warnings, SetupCopy.DesignDesktopOffNote] };
 
         var settings = DeskDesignApply.Settings(desk, _store.LoadDeskInk(), _store.LoadLauncher(), merged);
         // A font this PC lacks previews in the nearest installed look; the design keeps the family it asked for.

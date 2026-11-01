@@ -50,6 +50,10 @@ internal sealed partial class SetupViewModel : ObservableObject
     public bool HasChangeLines => ChangeLines.Count > 0;
     public bool HasResultLines => ResultLines.Count > 0;
 
+    /// <summary>The Claude trademark line shows whenever Claude is named on the screen (Store 10.1.4.4): usage ticked, or a change line
+    /// that says Claude (the add-ons line names Claude Code with usage unticked).</summary>
+    public bool ShowTrademark => ClaudeUsage || ChangeLines.Any(l => l.Contains("Claude", StringComparison.Ordinal));
+
     partial void OnDesktopChanged(bool value) => Refresh();
     partial void OnDrawersChanged(bool value) => Refresh();
     partial void OnClaudeUsageChanged(bool value)
@@ -74,6 +78,7 @@ internal sealed partial class SetupViewModel : ObservableObject
         ResultLines.Clear();
         OnPropertyChanged(nameof(HasChangeLines));
         OnPropertyChanged(nameof(HasResultLines));
+        OnPropertyChanged(nameof(ShowTrademark));
     }
 
     /// <summary>Continue applied the choices; the result's lines are notes for the caller to show.</summary>

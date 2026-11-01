@@ -19,6 +19,7 @@ public sealed class SetupServiceTests : IDisposable
         public int DrawerFiles { get; set; }
         public bool AddOnsInstalled { get; set; }
         public bool UsageOn { get; set; }
+        public bool HasAccount { get; set; }
         public SetupDrawersOff OffAnswer { get; set; } = new(true, null);
         public string? SortAnswer { get; set; }
         public List<string> Calls { get; } = [];
@@ -96,9 +97,22 @@ public sealed class SetupServiceTests : IDisposable
         var store = Store();
         store.SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = true }));
         store.SaveDesk(store.LoadDesk() with { Enabled = true });
-        var host = new FakeHost { DrawersOn = true, DrawerFiles = 2, UsageOn = true, AddOnsInstalled = true };
+        var host = new FakeHost { DrawersOn = true, DrawerFiles = 2, UsageOn = true, AddOnsInstalled = true, HasAccount = true };
         var lines = new SetupService(store, host).Preview(new SetupChoices(true, false, false));
         Assert.Equal([SetupCopy.DrawersOffLine(2), SetupCopy.UsageOffLine, SetupCopy.AddOnsStayLine], lines);
+    }
+
+    [Fact]
+    public void Preview_says_the_account_stays_saved_only_when_there_is_an_account()
+    {
+        var store = Store();
+        store.SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = true }));
+        store.SaveDesk(store.LoadDesk() with { Enabled = true });
+        var host = new FakeHost { UsageOn = true, HasAccount = false };
+        var svc = new SetupService(store, host);
+        Assert.DoesNotContain(SetupCopy.UsageOffLine, svc.Preview(new SetupChoices(true, false, false)));
+        host.HasAccount = true;
+        Assert.Contains(SetupCopy.UsageOffLine, svc.Preview(new SetupChoices(true, false, false)));
     }
 
     [Fact]

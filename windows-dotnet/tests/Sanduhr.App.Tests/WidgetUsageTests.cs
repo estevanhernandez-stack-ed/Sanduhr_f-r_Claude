@@ -24,6 +24,12 @@ public sealed class WidgetUsageTests : AppWindowFixture
             Assert.False(widget.UsageOn);
             Assert.False(widget.ShowSignInPrompt);
             Assert.True(widget.ShowUsageOff);
+            Assert.Equal(SettingsNames.UsageOffTitle, widget.UsageOffLabel);
+            Assert.Equal(SetupCopy.Title, widget.SetupLinkLabel);
+            int raised = 0;
+            widget.SetupRequested += () => raised++;
+            widget.OpenSetupCommand.Execute(null);
+            Assert.Equal(1, raised);
             Assert.Single(accounts.ListAccounts());
             Assert.False(store.LoadSetup()!.ClaudeUsage);
         }

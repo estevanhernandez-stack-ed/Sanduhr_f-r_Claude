@@ -203,8 +203,17 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     internal bool SeatMetersPaused => _seatMeters.Paused;
     internal bool FollowerRunning => _follower.Running;
 
-    /// <summary>The Widget page's "usage is off" line.</summary>
+    /// <summary>The Widget page's "usage is off" line, and the widget's own one-line row (<see cref="UsageOffLabel"/> and a Set up Sanduhr link).</summary>
     public bool ShowUsageOff => !UsageOn;
+
+    public string UsageOffLabel => SettingsNames.UsageOffTitle;
+    public string SetupLinkLabel => SetupCopy.Title;
+
+    /// <summary>Raised by the widget's usage-off row: App opens Set up Sanduhr.</summary>
+    public event Action? SetupRequested;
+
+    [RelayCommand]
+    private void OpenSetup() => SetupRequested?.Invoke();
 
     /// <summary>Turns Claude usage on or off and saves it. Off stops every Claude fetch (the main fetcher, the seat meters and
     /// account following), drops the client and the numbers it drew, and deletes the snapshot; on rebuilds and fetches. The refresh timer

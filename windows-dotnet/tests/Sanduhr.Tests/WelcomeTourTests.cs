@@ -97,13 +97,14 @@ public class WelcomeTourTests
     }
 
     [Fact]
-    public void DeskOnly_UsageCardOpensSetupOnTheWidgetPagesUsageOffSection()
+    public void DeskOnly_UsageCardShowMeOpensTheSetupWindow()
     {
         var card = WelcomeTour.DeskOnly.Single(c => c.Id == "usage");
         Assert.Equal("Usage any time", card.Card.Title);
-        Assert.Equal(SettingsPage.Widget, card.Card.Destination);
-        Assert.Equal(SettingsIndex.UsageOffSection, card.Card.Anchor);
-        Assert.False(SettingsIndex.ShowsTheWidget(new SettingsLink(card.Card.Destination, card.Card.Anchor)));   // Settings, not the widget itself
+        Assert.Equal(SettingsPage.General, card.Card.Destination);
+        Assert.Equal(SettingsIndex.GeneralSetup, card.Card.Anchor);
+        Assert.True(SettingsIndex.OpensSetup(new SettingsLink(card.Card.Destination, card.Card.Anchor)));   // Set up Sanduhr, not a Settings page or the widget
+        Assert.False(SettingsIndex.ShowsTheWidget(new SettingsLink(card.Card.Destination, card.Card.Anchor)));
         Assert.Equal(SetupCopy.Title, card.ShowMeTitle);
         Assert.Contains("Set up Sanduhr", card.Card.Body);
     }

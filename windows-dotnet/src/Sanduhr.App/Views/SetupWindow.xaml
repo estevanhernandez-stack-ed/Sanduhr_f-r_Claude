@@ -143,9 +143,11 @@
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
             </StackPanel>
         </CheckBox>
-        <!-- Ticking usage opens the source list: Claude, with the trademark line wherever Claude is named. -->
-        <StackPanel Margin="28,8,0,0" Visibility="{Binding ClaudeUsage, Converter={StaticResource BoolVis}}">
+        <!-- Ticking usage opens the source list: Claude. The trademark line shows wherever Claude is named: usage ticked, or a change
+             line that says Claude (Claude Code) with usage unticked. -->
+        <StackPanel Margin="28,8,0,0" Visibility="{Binding ShowTrademark, Converter={StaticResource BoolVis}}">
             <TextBlock Text="{x:Static core:SetupCopy.ClaudeSource}" FontSize="12" FontWeight="SemiBold"
+                       Visibility="{Binding ClaudeUsage, Converter={StaticResource BoolVis}}"
                        Foreground="{DynamicResource Sanduhr.Brush.Text}" />
             <TextBlock Text="{x:Static core:SetupCopy.ClaudeTrademark}" TextWrapping="Wrap" FontSize="10" Margin="0,2,0,0"
                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />

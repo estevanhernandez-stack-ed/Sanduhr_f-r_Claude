@@ -21,6 +21,7 @@ public sealed class SetupWindowTests : AppWindowFixture
         public int DrawerFiles { get; set; }
         public bool AddOnsInstalled { get; set; }
         public bool UsageOn { get; set; }
+        public bool HasAccount { get; set; } = true;
         public SetupDrawersOff TurnOffDrawers() { DrawersOn = false; return new(true, null); }
         public void TurnOnDrawers() => DrawersOn = true;
         public string? SortNow() => null;
@@ -85,6 +86,44 @@ public sealed class SetupWindowTests : AppWindowFixture
             Assert.Contains(SetupCopy.ClaudeTrademark, shown);
         }
         finally { w.Close(); }
+    });
+
+    [Fact]
+    public void A_change_line_that_names_Claude_Code_shows_the_trademark_line_with_usage_unticked() => AppHost.Run(() =>
+    {
+        var store = new SettingsStore(ScratchPaths());
+        store.SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = true }));
+        store.SaveDesk(store.LoadDesk() with { Enabled = true });
+        var vm = Model(store, firstRun: false, new Host { UsageOn = true, AddOnsInstalled = true, HasAccount = false });
+        Assert.True(vm.ShowTrademark);                       // usage ticked
+        vm.ClaudeUsage = false;
+        Assert.Equal([SetupCopy.AddOnsStayLine], vm.ChangeLines);
+        Assert.True(vm.ShowTrademark);                       // the add-ons line names Claude Code
+        var w = new SetupWindow(vm);
+        OffScreen(w);
+        w.Show();
+        try
+        {
+            w.UpdateLayout();
+            var shown = new List<string>();
+            CollectText(w, shown);
+            Assert.Contains(SetupCopy.ClaudeTrademark, shown);
+            Assert.DoesNotContain(SetupCopy.ClaudeSource, shown);   // the source row itself needs usage ticked
+        }
+        finally { w.Close(); }
+    });
+
+    [Fact]
+    public void No_trademark_line_when_Claude_is_not_named() => AppHost.Run(() =>
+    {
+        var store = new SettingsStore(ScratchPaths());
+        store.SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false }));
+        store.SaveDesk(store.LoadDesk() with { Enabled = true });
+        var vm = Model(store, firstRun: false, new Host { AddOnsInstalled = true });
+        Assert.False(vm.ShowTrademark);
+        vm.Desktop = false;                                  // a change line that does not name Claude
+        Assert.Contains(SetupCopy.DesktopOffLine, vm.ChangeLines);
+        Assert.False(vm.ShowTrademark);
     });
 
     private static void CollectText(DependencyObject root, List<string> into)

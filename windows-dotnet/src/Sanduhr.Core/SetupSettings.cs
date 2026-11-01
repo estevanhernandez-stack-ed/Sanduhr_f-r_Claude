@@ -72,11 +72,12 @@ public sealed record SetupMigrationResult(SetupSettings Setup, bool DeskOn, bool
 public static class SetupMigration
 {
     /// <summary>Null for a first run (no account, no Just the Desk): the setup screen opens. An account wins over Just the Desk,
-    /// as signing in did. The sign-in reminder comes back only where Just the Desk had silenced it.</summary>
+    /// as signing in did, with desktop on and the Desk's own switch untouched: an upgrader whose Desk was off turns it on later in
+    /// Settings and gets the whole Desk, not an empty one. The sign-in reminder comes back only where Just the Desk had silenced it.</summary>
     public static SetupMigrationResult? From(bool hasAccount, bool justTheDesk, bool silencedReminder, bool deskEnabled)
     {
         if (hasAccount)
-            return new(new SetupSettings(deskEnabled, new Dictionary<string, bool> { [SetupSettings.Claude] = true }), deskEnabled,
+            return new(new SetupSettings(true, new Dictionary<string, bool> { [SetupSettings.Claude] = true }), deskEnabled,
                 justTheDesk && silencedReminder);
         if (justTheDesk)
             return new(new SetupSettings(true, new Dictionary<string, bool> { [SetupSettings.Claude] = false }), true, silencedReminder);
@@ -88,6 +89,9 @@ public static class SetupLaunch
 {
     /// <summary>No setup yet: the setup screen opens first.</summary>
     public static bool OpensSetup(SetupSettings? setup) => setup is null;
+
+    /// <summary>A tray left-click while no setup exists yet opens the setup screen, not the widget (whose first-run card is gone).</summary>
+    public static bool TrayClickOpensSetup(bool setupPending) => setupPending;
 
     /// <summary>The widget starts hidden (the tray is the way back) with usage off and the Desk running; with the Desk off as well
     /// the widget shows, so a launch never shows nothing. Before any setup the setup screen is what shows.</summary>

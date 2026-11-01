@@ -82,7 +82,7 @@ absent:
 
 | Found | Becomes |
 |---|---|
-| An account (any) | usage `claude` on; desktop = `desk_enabled`; drawers unchanged |
+| An account (any) | usage `claude` on; desktop on (`desk_enabled` unchanged, so a Desk that was off stays off and the screen shows desktop unticked); drawers unchanged |
 | `just_the_desk` on, no account | usage off; desktop on; Desk on; drawers unchanged |
 | Both | as an account (an account wins, as sign-in did) |
 | Neither | no `setup` key: this is a first run, and the setup screen opens |
