@@ -380,6 +380,27 @@ public sealed class ChatDesignTests : AppWindowFixture
     });
 
     [Fact]
+    public void A_chat_name_that_matches_a_view_drawer_gets_an_owned_drawer_of_its_own() => AppHost.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        // A view shows a folder the user already has in place; a chat cannot see it, so a name match is chance.
+        var view = new DrawerDef("documents", "Documents", Path.Combine(box.Root, "UserDocs"), Owned: false);
+        var rig = MakeRig(box, drawersOn: true, deskOn: true, defs: view);
+        try
+        {
+            box.File(@"Desktop\report.pdf");
+            var read = PastedSetup.Read("""{"drawers":{"rules":[{"kind":"documents","drawer":"Documents"}]}}""");
+            Assert.Null(rig.Review.UseRules(read.Rules!, read.RuleDrawerNames));
+
+            Assert.Equal(["documents-2"], rig.Store.LoadDrawers().Rules.Select(r => r.DrawerId));   // not the view's id
+            Assert.Contains("Documents (new): 1 file", rig.Host.Model!.Changes);
+            Assert.Equal(view.Home, rig.Store.LoadDrawers().Drawers.Single().Home);                     // the view is as it was
+            Assert.True(File.Exists(Path.Combine(box.Desktop, "report.pdf")));                          // and nothing moved
+        }
+        finally { rig.Drawers.Dispose(); }
+    });
+
+    [Fact]
     public void A_chat_id_that_belongs_to_a_different_drawer_gets_a_free_one() => AppHost.Run(() =>
     {
         using var box = new DrawerSandbox();

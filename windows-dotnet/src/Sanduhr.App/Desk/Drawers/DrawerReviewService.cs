@@ -132,8 +132,8 @@ internal sealed class DrawerReviewService
         return Open(plan);
     }
 
-    /// <summary>Points each rule at a drawer: the existing one whose name is the chat's (any case) or whose folder is that name in the
-    /// Drawers folder, else a new one under the id the reader gave it, or a free one when that id belongs to a different drawer.
+    /// <summary>Points each rule at a drawer: the existing owned one whose name is the chat's (any case) or whose folder is that name in the
+    /// Drawers folder (never a view of a folder the user already has), else a new one under the id the reader gave it, or a free one when that id belongs to a different drawer.
     /// <c>fresh</c> holds the chat's name for each new drawer, by id.</summary>
     private static (List<DrawerRule> Rules, Dictionary<string, string> Fresh) ResolveDrawers(
         DrawerSettings s, string root, IReadOnlyList<DrawerRule> rules, IReadOnlyList<string> names)
@@ -148,9 +148,13 @@ internal sealed class DrawerReviewService
             string name = i < names.Count ? names[i] : NameFromId(rules[i].DrawerId);
             if (!byName.TryGetValue(name, out var id))
             {
-                string home = Path.Combine(root, name);
-                var existing = known.FirstOrDefault(d => string.Equals(d.Name, name, StringComparison.OrdinalIgnoreCase)
-                                                         || string.Equals(d.Home, home, StringComparison.OrdinalIgnoreCase));
+                string? home = DrawerPaths.Normalize(Path.Combine(root, name));
+                // Only a drawer Sanduhr made can be named by a chat. A view shows a folder the user already has (Documents, Downloads) in
+                // place, and a chat cannot see the user's drawers, so a name that matches a view is chance: moving Desktop files into that
+                // real folder is not what the rules asked for. Such a name gets a drawer of its own.
+                var existing = known.FirstOrDefault(d => d.Owned
+                    && (string.Equals(d.Name, name, StringComparison.OrdinalIgnoreCase)
+                        || (home is not null && string.Equals(DrawerPaths.Normalize(d.Home), home, StringComparison.OrdinalIgnoreCase))));
                 if (existing is not null) id = existing.Id;
                 else
                 {
