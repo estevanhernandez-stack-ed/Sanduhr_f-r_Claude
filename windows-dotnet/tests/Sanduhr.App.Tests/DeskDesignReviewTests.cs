@@ -653,4 +653,130 @@ public sealed class DeskDesignReviewTests : IDisposable
         Send(s, "d2", Dusk);   // free again
         Assert.True(s.Reviewing);
     });
+
+    // ---- a design pasted from an AI chat (setup spec, section 3) ----
+
+    private DeskValidation Pasted(DeskDesignService s, string designJson) => s.ValidatePasted(JsonNode.Parse(designJson)!);
+
+    private bool ResultFileExists => File.Exists(Path.Combine(_paths.ExternalDir, DeskDesign.ResultFile));
+
+    [Fact]
+    public void APastedDesignIsReviewedUnderTheNeutralHeadingAndWritesNoResultFile()
+    {
+        WithService((s, host) =>
+        {
+            var answer = s.ProposePasted(Pasted(s, Dusk));
+            Assert.Equal(DeskAnswer.Previewing, answer.Status);
+            Assert.True(s.Reviewing);
+            Assert.Equal(["show"], host.Calls);
+            Assert.Equal(DeskReviewCopy.PastedHeading, host.Model!.Heading);
+            Assert.Equal(DeskReviewCopy.PastedBarName, host.Model.BarName);
+            Assert.Equal("Dusk", host.Model.Title);
+            Assert.True(host.Model.CanApply);
+            SameLayout("clock:bl claude:bl", _store.LoadDesk().Layout);   // previewing wrote nothing
+
+            // Nothing the bar shows for it names a product.
+            var shown = new List<string?> { host.Model.Heading, host.Model.BarName, host.Model.Title, host.Model.Note, host.Model.Keys,
+                host.Model.ApplyLabel ?? DeskReviewCopy.Apply, host.Model.DismissLabel ?? DeskReviewCopy.Dismiss, host.Model.ChangesTitle ?? DeskReviewCopy.ChangesName };
+            shown.AddRange(host.Model.Changes);
+            shown.AddRange(host.Model.Warnings);
+            Assert.All(shown, text => Assert.DoesNotContain("Claude", text ?? ""));
+
+            host.Apply!();
+            SameLayout("clock:tr:1.4 claude:bl", _store.LoadDesk().Layout);   // Apply is the ordinary Apply: it saves the Desk it replaces
+            Assert.Equal(["Dusk", "Before Dusk"], s.Designs().Select(d => d.Name).ToArray());
+            Assert.True(s.CanPutBack);                                         // and Undo is Put my Desk back
+        });
+        Assert.False(ResultFileExists);
+    }
+
+    [Fact]
+    public void APastedDesignAlwaysReviewsEvenWithTheDirectSwitchOnAndWritesNoResultFileWhateverTheUserDoes()
+    {
+        _store.SaveDeskDirect(true);
+        WithService((s, host) =>
+        {
+            Assert.Equal(DeskAnswer.Previewing, s.ProposePasted(Pasted(s, Dusk)).Status);
+            Assert.True(s.Reviewing);                                           // not applied at once
+            Assert.Equal(["show"], host.Calls);
+            SameLayout("clock:bl claude:bl", _store.LoadDesk().Layout);
+            Assert.False(ResultFileExists);
+
+            host.Dismiss!();                                                    // Dismiss answers nobody
+            Assert.False(s.Reviewing);
+            Assert.False(ResultFileExists);
+
+            s.ProposePasted(Pasted(s, Dusk));
+            s.ProposePasted(Pasted(s, """{"name":"Other","plate":true}"""));   // a newer paste replaces the older one: still nobody to tell
+            Assert.True(s.Reviewing);
+            Assert.False(ResultFileExists);
+            Assert.Equal("Other", host.Model!.Title);
+        });
+    }
+
+    [Fact]
+    public void AMcpProposalStillAnswersItsCallerAfterAPasteWasReviewed()
+    {
+        WithService((s, host) =>
+        {
+            s.ProposePasted(Pasted(s, Dusk));
+            Send(s, "m9", """{"name":"Quiet","plate":true}""");   // replaces the pasted review, which answers no one
+            Assert.Equal("previewing", ResultStatus);
+            Assert.Equal("m9", (string?)Result()["id"]);
+            Assert.Equal(DeskReviewCopy.BarName, host.Model!.BarName ?? DeskReviewCopy.BarName);   // the MCP's own wording is untouched
+            Assert.Null(host.Model.Heading);
+        });
+    }
+
+    [Fact]
+    public void APastedDesignIsRefusedBusyWhileADrawersPlanIsUnderReview()
+    {
+        Sta.Run(() =>
+        {
+            var fake = new FakeHost();
+            using var s = new DeskDesignService(_paths, _store)
+                { Host = fake, InstalledFonts = () => Installed, Clock = () => _now, DrawersReviewing = () => true };
+            var answer = s.ProposePasted(Pasted(s, Dusk));
+            Assert.Equal(DeskAnswer.Rejected, answer.Status);
+            Assert.Equal("busy", answer.Reason);
+            Assert.False(s.Reviewing);
+            Assert.Empty(fake.Calls);
+        });
+    }
+
+    [Fact]
+    public void APastedMeetingsPieceIsRefusedByFieldBecauseWindowsDoesNotDrawIt()
+    {
+        WithService((s, host) =>
+        {
+            var verdict = Pasted(s, """{"name":"Busy","layout":{"meetings":{"anchor":"tr"}}}""");
+            Assert.Equal(DeskDesignStatus.Rejected, verdict.Status);
+            Assert.Contains(verdict.Reasons, r => r.Field == "layout.meetings");
+            // Even a verdict that skipped the check (the plain validator accepts the word) is refused on the way in.
+            var plain = DeskDesign.Validate(JsonNode.Parse("""{"name":"Busy","layout":{"meetings":{"anchor":"tr"}}}""")!, DeskDesignContext.Unknown);
+            Assert.Equal(DeskDesignStatus.Ok, plain.Status);
+            var answer = s.ProposePasted(plain);
+            Assert.Equal(DeskAnswer.Rejected, answer.Status);
+            Assert.Contains(answer.Reasons!, r => r.Field == "layout.meetings");
+            Assert.False(s.Reviewing);
+            Assert.Empty(host.Calls);
+        });
+    }
+
+    [Fact]
+    public void APastedDesignNamingAMissingLauncherImageIsRefused()
+    {
+        WithService((s, host) =>
+        {
+            string image = new string('a', 64) + ".png";
+            var design = DeskDesign.Parse(JsonNode.Parse(
+                "{\"name\":\"Pics\",\"launcher\":{\"orientation\":\"row\",\"buttons\":[{\"kind\":\"link\",\"target\":\"https://example.com\",\"image\":\"" + image + "\"}]}}")).Design;
+            Assert.NotNull(design);
+            var answer = s.ProposePasted(new DeskValidation(DeskDesignStatus.Ok, [], [], [], design));
+            Assert.Equal(DeskAnswer.Rejected, answer.Status);
+            Assert.Contains(answer.Reasons!, r => r.Field == "launcher");
+            Assert.False(s.Reviewing);
+            Assert.Empty(host.Calls);
+        });
+    }
 }

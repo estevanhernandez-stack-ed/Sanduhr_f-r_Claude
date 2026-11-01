@@ -14,6 +14,9 @@ public sealed record PastedSetupRead(JsonNode? Desk, IReadOnlyList<DrawerRule>? 
     public bool Ok => Reasons.Count == 0 && (Desk is not null || Rules is not null);
 }
 
+/// <summary>One line of the paste window's list: the field, what is wrong with it, and whether it blocks (an error) or only advises.</summary>
+public sealed record PastedFinding(string Field, string Text, bool IsError);
+
 /// <summary>
 /// Reads a pasted AI chat answer. The answer is prose around one JSON block, often fenced; the reader scans balanced JSON objects
 /// (a brace inside a string does not count), takes the first one holding <c>desk</c> or <c>drawers</c>, and says how many there were.
@@ -73,6 +76,32 @@ public static class PastedSetup
         }
         return firstRead!;
     }
+
+    /// <summary>Refuses a desk part that names a piece this Windows build does not draw (<see cref="SetupPrompt.NotDrawn"/>, today
+    /// <c>meetings</c>): <see cref="DeskDesign.Validate(JsonNode?, DeskDesignContext)"/> knows the word, since the Mac draws it, so it passes there.
+    /// The reason is by field (<c>layout.meetings</c>), and nothing applies partly: the verdict comes back rejected with no design.</summary>
+    public static DeskValidation RefuseUndrawn(DeskValidation verdict)
+    {
+        if (verdict.Design?.Layout is not { } layout) return verdict;
+        var reasons = layout
+            .Where(p => SetupPrompt.NotDrawn.Contains(p.Piece, StringComparer.Ordinal))
+            .Select(p => new DeskReason("layout." + p.Piece, "is not drawn by Sanduhr on Windows yet; leave it out"))
+            .ToList();
+        return reasons.Count == 0
+            ? verdict
+            : verdict with { Status = DeskDesignStatus.Rejected, Reasons = [.. verdict.Reasons, .. reasons], Fonts = [], Design = null };
+    }
+
+    /// <summary>A reason's words as the AI chat window shows them: the Desk's own rules were written for Claude Code, and the chat window
+    /// names no product, so "Claude" reads "an AI chat".</summary>
+    public static string Neutral(string text) => text.Replace("Claude", "an AI chat", StringComparison.Ordinal);
+
+    /// <summary>The paste window's problem list: each reason by field in the window's neutral words, errors first, then the warnings.</summary>
+    public static IReadOnlyList<PastedFinding> Findings(IEnumerable<DeskReason> errors, IEnumerable<DeskReason> warnings) =>
+    [
+        .. errors.Select(r => new PastedFinding(Neutral(r.Field), Neutral(r.Message), IsError: true)),
+        .. warnings.Select(r => new PastedFinding(Neutral(r.Field), Neutral(r.Message), IsError: false)),
+    ];
 
     private static PastedSetupRead ReadBlock(JsonObject block, int count)
     {

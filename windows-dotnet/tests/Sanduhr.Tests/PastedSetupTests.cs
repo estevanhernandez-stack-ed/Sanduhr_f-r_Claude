@@ -268,4 +268,46 @@ public class PastedSetupTests
     {
         Assert.Equal(["screenshots", "images", "documents", "installers", "archives", "shortcuts", "older_than", "name_contains", "name_starts_with"], PastedSetup.KindWords);
     }
+
+    // ---- what the paste window adds on top of the reader (Design it with an AI chat) ----
+
+    private static DeskValidation Validate(string json) =>
+        DeskDesign.Validate(System.Text.Json.Nodes.JsonNode.Parse(json), DeskDesignContext.Unknown);
+
+    [Fact]
+    public void A_piece_this_build_does_not_draw_is_refused_by_field_though_the_Desk_rules_accept_the_word()
+    {
+        var plain = Validate("""{"layout":{"meetings":{"anchor":"tr"}}}""");
+        Assert.True(plain.Ok);   // the Mac draws it, so the layout grammar knows it
+        var refused = PastedSetup.RefuseUndrawn(plain);
+        Assert.Equal(DeskDesignStatus.Rejected, refused.Status);
+        Assert.Null(refused.Design);
+        Assert.Equal("layout.meetings", Assert.Single(refused.Reasons).Field);
+        // Hidden is no way around it: the word itself is the piece this build lacks.
+        Assert.Equal("layout.meetings", Assert.Single(PastedSetup.RefuseUndrawn(Validate("""{"layout":{"meetings":{"hidden":true}}}""")).Reasons).Field);
+    }
+
+    [Fact]
+    public void A_drawn_piece_and_a_design_with_no_layout_pass_the_undrawn_check_untouched()
+    {
+        var clock = Validate("""{"layout":{"clock":{"anchor":"tr"}}}""");
+        Assert.Same(clock, PastedSetup.RefuseUndrawn(clock));
+        var none = Validate("""{"name":"Calm"}""");
+        Assert.Same(none, PastedSetup.RefuseUndrawn(none));
+        Assert.All(SetupPrompt.Pieces, piece =>
+            Assert.True(PastedSetup.RefuseUndrawn(Validate("{\"layout\":{\"" + piece + "\":{\"hidden\":true}}}")).Ok, piece));
+    }
+
+    [Fact]
+    public void The_findings_read_an_AI_chat_not_Claude_and_list_errors_before_warnings()
+    {
+        var found = PastedSetup.Findings(
+            [new DeskReason("launcher.buttons[0].image", "must be the stored image name; Claude cannot supply a new image")],
+            [new DeskReason("ink", "is hard to read")]);
+        Assert.Equal(2, found.Count);
+        Assert.True(found[0].IsError);
+        Assert.Contains("an AI chat cannot supply", found[0].Text);
+        Assert.False(found[1].IsError);
+        Assert.DoesNotContain(found, f => f.Field.Contains("Claude") || f.Text.Contains("Claude"));
+    }
 }

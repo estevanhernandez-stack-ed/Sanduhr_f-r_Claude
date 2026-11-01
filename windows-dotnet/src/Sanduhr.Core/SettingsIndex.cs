@@ -97,6 +97,7 @@ public static class SettingsIndex
     public const string DeskMap = "map";
     public const string DeskInk = "ink";
     public const string DeskArrange = "arrange";
+    public const string DeskDesignWithChat = "design-with-chat";
     public const string DeskClicks = "desk-clicks";
     public const string DeskPlate = "desk-plate";
     public const string DeskWatchers = "desk-watchers";
@@ -267,6 +268,8 @@ public static class SettingsIndex
             ["desktop", "wallpaper", "clock", "meters", "Rainmeter", "show the Desk", "on the desktop", "off by default", "monitors"]),
         E(SettingsNames.ArrangeDesk, SettingsPage.Desk, DeskArrange,
             ["drag", "move", "rearrange", "arrange", "reorder", "on the desktop", "layout", "arrow keys", "keyboard"]),
+        E(SetupCopy.DesignWithChat, SettingsPage.Desk, DeskDesignWithChat,
+            ["AI chat", "chat", "chatbot", "prompt", "paste", "copy prompt", "design", "ask an AI", "drawer rules", "set up", "any AI chat"]),
         E(SettingsNames.DeskLayoutMap, SettingsPage.Desk, DeskMap,
             ["map", "preview", "layout", "taskbar", "screen", "monitor", "where"]),
         E(SettingsNames.PiecesSection, SettingsPage.Desk, DeskPieces,
@@ -404,6 +407,7 @@ public static class SettingsIndex
         [SettingsNames.DeskSwitch] = DeskOn,
         [SettingsNames.DeskInkPicker] = DeskInk,
         [SettingsNames.ArrangeDesk] = DeskArrange,
+        [SetupCopy.DesignWithChat] = DeskDesignWithChat,
         [SettingsNames.DeskPieceClicksSwitch] = DeskClicks,
         [SettingsNames.DeskPlateSwitch] = DeskPlate,
         [SettingsNames.WatchersSwitch] = Watchers,

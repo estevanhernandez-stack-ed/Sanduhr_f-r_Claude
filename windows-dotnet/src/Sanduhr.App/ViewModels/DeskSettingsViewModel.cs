@@ -250,6 +250,13 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     /// <summary>The Arrange Desk… button was pressed (App begins Arrange mode on the desktop).</summary>
     public Action? ArrangeRequested { get; set; }
 
+    /// <summary>The Design it with an AI chat button was pressed (App opens the paste window).</summary>
+    public Action? DesignWithChatRequested { get; set; }
+
+    /// <summary>Opens Design it with an AI chat.</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void DesignWithChat() => DesignWithChatRequested?.Invoke();
+
     /// <summary>True while Arrange mode is up on the desktop (App sets it).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanArrange), nameof(ArrangeNote), nameof(NotArranging))]

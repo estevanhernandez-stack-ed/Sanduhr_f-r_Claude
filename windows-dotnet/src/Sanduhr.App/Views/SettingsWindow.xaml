@@ -2446,6 +2446,13 @@
                                                    Text="{Binding ArrangeNote}" />
                                     </StackPanel>
 
+                                    <StackPanel views:SettingsAnchor.Id="design-with-chat" Margin="0,12,0,0">
+                                        <Button Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Padding="12,6"
+                                                Content="{x:Static core:SetupCopy.DesignWithChat}"
+                                                Command="{Binding DesignWithChatCommand}"
+                                                AutomationProperties.Name="{x:Static core:SetupCopy.DesignWithChat}" />
+                                    </StackPanel>
+
                                     <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
                                     <!-- The Layout map, on top (spec, Desk): a picture of where each piece sits, not a control (WF5). Below 600 DIP of

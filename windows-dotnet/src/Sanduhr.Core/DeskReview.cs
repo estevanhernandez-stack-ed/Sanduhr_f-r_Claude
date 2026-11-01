@@ -16,6 +16,10 @@ public static class DeskReviewCopy
     public const string Dismiss = "Dismiss";
     public const string Edit = "Edit";
     public const string BarName = "Review Claude's Desk design";
+
+    /// <summary>A design pasted from an AI chat (setup spec, section 3) names no product: the bar's small heading and its accessible name.</summary>
+    public const string PastedHeading = "Your AI chat's Desk design";
+    public const string PastedBarName = "Review your AI chat's Desk design";
     public const string ChangesName = "What changed";
     public const string FontsName = "Fonts to install";
     public const string KeysLine = "Enter applies. Escape dismisses.";
