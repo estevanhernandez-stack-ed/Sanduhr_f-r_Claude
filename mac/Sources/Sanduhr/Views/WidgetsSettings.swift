@@ -10,12 +10,16 @@ struct WidgetsSettings: View {
     let model: WidgetsModel
     /// The proposal waiting for review (Claude's `propose_widget`); observed, so the banner comes and goes with it.
     var handoff = WidgetProposalHandoff.shared
+    /// A sprite motion waiting for review (Claude's `propose_sprite_motion`).
+    var motion = SpriteMotionHandoff.shared
 
     var body: some View {
         Form {
             WidgetsSuggestionSection(handoff: handoff)
+            WidgetsMotionSection(handoff: motion)
             WidgetsCatalogSection(model: model)
             WidgetsInstalledSection(model: model)
+            WidgetsNewSpriteSection(model: model)
             WidgetsCompanionSection(model: model)
         }
         .formStyle(.grouped)
@@ -24,6 +28,7 @@ struct WidgetsSettings: View {
         .onChange(of: model.installed) { _, _ in vm.userThemesTick &+= 1 }
         // A proposal arrived or was decided: the installed list and the companion pick are read again (Apply installs).
         .onChange(of: handoff.pending?.id) { _, _ in model.reloadInstalled() }
+        .onChange(of: motion.pending?.id) { _, _ in model.reloadInstalled() }
     }
 }
 
@@ -41,6 +46,24 @@ private struct WidgetsSuggestionSection: View {
                     makeCompanion: { handoff.apply(makeCompanion: true) },
                     apply: { handoff.apply() },
                     dismiss: { handoff.dismiss() })
+            }
+        }
+    }
+}
+
+/// The motion review banner, while a motion waits.
+private struct WidgetsMotionSection: View {
+    let handoff: SpriteMotionHandoff
+
+    var body: some View {
+        if let review = handoff.model {
+            Section {
+                SpriteMotionBanner(
+                    model: review, previewNote: handoff.previewNote,
+                    preview: { handoff.previewOnDesk() },
+                    endPreview: { handoff.endPreview() },
+                    apply: { handoff.apply() },
+                    decline: { handoff.decline() })
             }
         }
     }
@@ -144,6 +167,32 @@ private struct WidgetsInstalledSection: View {
             }
         }
         .settingsAnchor(SettingsAnchor.installedWidgets)
+    }
+}
+
+/// "New sprite from an image...": pick a PNG, then the sheet tags its cells to actions and makes a sprite of it.
+private struct WidgetsNewSpriteSection: View {
+    let model: WidgetsModel
+    @State private var sprite: NewSpriteModel?
+
+    var body: some View {
+        Section("New sprite") {
+            HStack {
+                Text("Make a companion from your own sprite sheet.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("New sprite from an image\u{2026}") { open() }
+                    .settingsAnchor(SettingsAnchor.newSprite)
+            }
+        }
+        .sheet(isPresented: Binding(get: { sprite != nil }, set: { if !$0 { sprite = nil } })) {
+            if let sprite { NewSpriteSheet(model: sprite, close: { self.sprite = nil }) }
+        }
+    }
+
+    private func open() {
+        guard let png = NewSpritePicker.pick() else { return }
+        sprite = NewSpriteModel(png: png, install: { model.installNewSprite($0) })
     }
 }
 

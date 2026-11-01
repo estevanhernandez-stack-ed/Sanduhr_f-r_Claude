@@ -185,6 +185,6 @@ struct CompanionPiece: View {
             }
         }
         .onAppear { driver.show(model) }
-        .onDisappear { driver.hide() }
+        .onDisappear { driver.pieceDisappeared() }
     }
 }

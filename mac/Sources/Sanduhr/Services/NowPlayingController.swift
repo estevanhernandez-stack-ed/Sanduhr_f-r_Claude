@@ -82,6 +82,9 @@ final class NowPlayingController {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var pending: [DispatchWorkItem] = []
     @ObservationIgnored private var settleItem: DispatchWorkItem?
+    @ObservationIgnored private var pauseGrace = NowPlayingPauseGrace()
+    /// Re-publishes when a paused track's grace ends, so Hide while paused takes it then.
+    @ObservationIgnored private var graceItem: DispatchWorkItem?
     @ObservationIgnored private var fallbackObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var observing = false
 
@@ -99,11 +102,13 @@ final class NowPlayingController {
         let wanted = NowPlayingPlacement.isRunning(deskRunning: DeskController.shared.running, places: places)
         if wanted, !active { start() }
         if !wanted, active { stop() }
+        AudioBarsDriver.shared.settingsChanged()
         publish()
     }
 
     /// Quitting: the child processes go with Sanduhr.
     func shutdown() {
+        AudioBarsDriver.shared.shutdown()
         if active { stop() }
     }
 
@@ -389,6 +394,15 @@ final class NowPlayingController {
         DispatchQueue.main.asyncAfter(deadline: .now() + wait + 0.05, execute: item)
     }
 
+    private func scheduleGraceEnd(_ pausedFor: TimeInterval?) {
+        graceItem?.cancel()
+        graceItem = nil
+        guard prefs.hideWhilePaused, let pausedFor, pausedFor < NowPlayingPrefs.pausedGrace else { return }
+        let item = DispatchWorkItem { [weak self] in self?.publish() }
+        graceItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + NowPlayingPrefs.pausedGrace - pausedFor + 0.05, execute: item)
+    }
+
     private func later(_ wait: TimeInterval, gen: Int, _ work: @escaping () -> Void) {
         let item = DispatchWorkItem { [weak self] in
             guard let self, gen == self.generation else { return }
@@ -405,10 +419,14 @@ final class NowPlayingController {
         if state != newState { state = newState }
         let seen = NowPlayingApps.seen(seenApps, adding: shown?.bundleID)
         if seen != seenApps { seenApps = seen }
-        let v = prefs.visible(shown)
+        let pausedFor = pauseGrace.observe(newState, now: Date())
+        scheduleGraceEnd(pausedFor)
+        let v = prefs.visible(shown, pausedFor: pausedFor)
         if v != visible { visible = v }
         let model = DeskController.shared.model
         if model.nowPlaying != v { model.nowPlaying = v }
+        // The live bars' tap follows the track the line shows (spec 14).
+        AudioBarsDriver.shared.setTrack(v)
     }
 
     // MARK: Controls
@@ -434,6 +452,12 @@ final class NowPlayingController {
             item.isEnabled = MediaRemoteControl.available
             menu.addItem(item)
         }
+        if AudioBarsDriver.shared.switchOn, AudioBarsDriver.shared.denied {
+            menu.addItem(.separator())
+            let allow = NSMenuItem(title: AudioBarsPrefs.allowTitle + "…", action: #selector(NowPlayingMenuTarget.allowAudio), keyEquivalent: "")
+            allow.target = NowPlayingMenuTarget.shared
+            menu.addItem(allow)
+        }
         menu.addItem(.separator())
         let settings = NSMenuItem(title: SettingsSection.nowPlaying.linkTitle, action: #selector(NowPlayingMenuTarget.settings), keyEquivalent: "")
         settings.target = NowPlayingMenuTarget.shared
@@ -448,6 +472,7 @@ final class NowPlayingMenuTarget: NSObject {
     @objc func previous() { NowPlayingController.shared.previous() }
     @objc func toggle() { NowPlayingController.shared.togglePlayPause() }
     @objc func next() { NowPlayingController.shared.next() }
+    @objc func allowAudio() { NSWorkspace.shared.open(AudioBarsPrefs.settingsURL) }
     @objc func settings() {
         // Menu items act on the main thread.
         MainActor.assumeIsolated { SettingsWindowController.shared.show(.nowPlaying) }

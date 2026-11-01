@@ -38,6 +38,10 @@ struct DeskNowPlayingLine: View {
     @AppStorage(NowPlayingLooks.styleKey, store: .desk) private var styleSongs = false
     /// OLED care: the song's gradient, like the Desk ink, never holds pure white.
     @AppStorage(OledCare.key, store: .desk) private var oled = OledCare.defaultOn
+    /// Live audio bars (spec 14): off by default; with it off the line is exactly the text and the position bar.
+    @AppStorage(AudioBarsPrefs.levelKey, store: .desk) private var liveBars = false
+    @AppStorage(NowPlayingPrefs.barsGradientKey, store: .desk) private var gradientBars = false
+    private var audio: AudioBarsDriver { AudioBarsDriver.shared }
 
     private func drawnInk(_ look: SongLook?) -> String {
         let spec = NowPlayingStyled.ink(look, fallback: ink)
@@ -55,6 +59,7 @@ struct DeskNowPlayingLine: View {
                 .truncationMode(.tail)
                 .opacity(0.85)
                 .frame(maxWidth: width, alignment: alignment.deskEdge)
+            audioRow(drawnInk(look))
             if (info.duration ?? 0) > 0 {
                 if info.state == .playing {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -76,6 +81,27 @@ struct DeskNowPlayingLine: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Plays or pauses")
+    }
+
+    /// The live bars above the position bar, or the quiet permission line in their stead (spec 14).
+    @ViewBuilder
+    private func audioRow(_ ink: String) -> some View {
+        switch AudioBarsLook.of(switchOn: liveBars && AudioBarsDriver.supported, denied: audio.denied) {
+        case .positionOnly:
+            EmptyView()
+        case .bars:
+            AudioBarsLayerView(colors: AudioBarColors.colors(
+                stops: Color.inkStops(ink, fallback: "ffffff").map { NSColor($0) }, count: 16, gradient: gradientBars))
+                .frame(width: width, height: max(8, size * 1.1))
+                .accessibilityHidden(true)
+        case .denied:
+            Text(AudioBarsPrefs.allowTitle + " (two-finger click)")
+                .font(.custom(font, size: size * 0.85))
+                .foregroundStyle(LinearGradient.ink(ink))
+                .opacity(0.55)
+                .lineLimit(1)
+                .frame(maxWidth: width, alignment: alignment.deskEdge)
+        }
     }
 
     private func bar(_ fraction: Double, ink: String) -> some View {

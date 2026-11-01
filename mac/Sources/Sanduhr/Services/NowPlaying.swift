@@ -290,6 +290,8 @@ struct NowPlayingPrefs: Equatable {
     static let hidePausedKey = "nowPlayingHidePaused"
     static let excludedKey = "nowPlayingExcluded"
     static let askAppsKey = "nowPlayingAskApps"
+    /// "Gradient bars" for the audio bars (spec 14), off by default. Constant only until the bars are drawn.
+    static let barsGradientKey = "nowPlaying.barsGradient"
 
     var hideWhilePaused = false
     /// Bundle ids whose playback never shows.
@@ -304,17 +306,37 @@ struct NowPlayingPrefs: Equatable {
             askApps: defaults.bool(forKey: askAppsKey))
     }
 
-    /// The track to draw, or nil: nothing plays, its app is excluded, or it is paused and paused
-    /// tracks hide.
-    func visible(_ info: NowPlayingInfo?) -> NowPlayingInfo? {
+    /// How long a track paused while it played stays before Hide while paused hides it, so a short
+    /// pause leaves something to click to play again.
+    static let pausedGrace: TimeInterval = 15
+
+    /// The track to draw, or nil: nothing plays, its app is excluded, or it is paused, paused
+    /// tracks hide and the grace is over. `pausedFor` is NowPlayingPauseGrace's; nil means past it.
+    func visible(_ info: NowPlayingInfo?, pausedFor: TimeInterval? = nil) -> NowPlayingInfo? {
         guard let info else { return nil }
         switch info.state {
         case .none: return nil
-        case .paused where hideWhilePaused: return nil
+        case .paused where hideWhilePaused && (pausedFor ?? .infinity) >= Self.pausedGrace: return nil
         default: break
         }
         if let app = info.bundleID, excluded.contains(app) { return nil }
         return info
+    }
+}
+
+/// How long the shown track has been paused, for Hide while paused's grace. Only a pause seen
+/// while the track played starts the clock; a track already paused when first seen (at launch, or
+/// when now playing is placed) counts as paused for good, so it hides at once as before.
+struct NowPlayingPauseGrace: Equatable {
+    private var lastState: NowPlayingState = .none
+    private var pausedSince: Date?
+
+    /// Takes the state now shown and returns the seconds paused, or nil when not paused.
+    mutating func observe(_ state: NowPlayingState, now: Date) -> TimeInterval? {
+        defer { lastState = state }
+        guard state == .paused else { pausedSince = nil; return nil }
+        if pausedSince == nil { pausedSince = lastState == .playing ? now : .distantPast }
+        return now.timeIntervalSince(pausedSince ?? now)
     }
 }
 

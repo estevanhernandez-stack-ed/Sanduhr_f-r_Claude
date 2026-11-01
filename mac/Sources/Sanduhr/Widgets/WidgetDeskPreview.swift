@@ -17,17 +17,27 @@ struct CompanionPreview {
     /// The preview of a sprite proposal; nil for another kind, an unreadable `sprite.json`, a stage that is not a pixel
     /// sheet (a Claude-made pack holds JSON only, so none is) or a sheet that does not rasterize.
     static func make(_ pack: WidgetProposalPack) -> CompanionPreview? {
-        guard pack.kind == "sprite", let bytes = pack.files["sprite.json"], let sprite = CompanionSprite.parse(bytes) else { return nil }
+        guard pack.kind == "sprite" else { return nil }
+        return make(packId: pack.id, files: pack.files)
+    }
+
+    /// The preview of a sprite's files held in memory: pixel sheets are rasterized, a PNG sheet (the user's own art)
+    /// is decoded as it is. Nil for an unreadable `sprite.json` or a sheet that does not decode. Writes nothing.
+    static func make(packId: String, files: [String: Data]) -> CompanionPreview? {
+        guard let bytes = files["sprite.json"], let sprite = CompanionSprite.parse(bytes) else { return nil }
         var sheets: [String: Sheet] = [:]
         for stage in sprite.stages {
-            guard stage.isPixelSheet, let data = pack.files[stage.sheet],
-                  case .success(let raster) = PixelSheet.rasterize(data),
-                  let png = raster.pngData(),
-                  let src = CGImageSourceCreateWithData(png as CFData, nil),
+            guard let data = files[stage.sheet] else { return nil }
+            var png = data
+            if stage.isPixelSheet {
+                guard case .success(let raster) = PixelSheet.rasterize(data), let encoded = raster.pngData() else { return nil }
+                png = encoded
+            }
+            guard let src = CGImageSourceCreateWithData(png as CFData, nil),
                   let image = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return nil }
             sheets[stage.id] = (image, image.width, image.height)
         }
-        return CompanionPreview(packId: pack.id, sprite: sprite, sheets: sheets)
+        return CompanionPreview(packId: packId, sprite: sprite, sheets: sheets)
     }
 
     func sheet(for stage: CompanionStage) -> Sheet? { sheets[stage.id] }

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **A sprite from your own art.** Settings, Widgets, **New sprite from an image…**: choose a PNG, set the cell size (8 to 64 pixels on a side, the sheet a whole number of cells), and tag cells to walk, sit, nap, cheer and worry. Sit needs a cell and walk needs two or more, in order; an untagged nap, cheer or worry plays sit. Name it and Sanduhr makes the pack (CC0, one stage, `art/sprite.png`), checks it strictly and installs it as a widget made on this Mac only. The picture is copied into the pack's folder and is never sent anywhere or shown to Claude.
+
+- **Claude maps the motion, never sees the art.** With the MCP server installed, `get_desk` lists each sprite made here with its id, name, frame size and cell count, and `propose_sprite_motion` hands Sanduhr the motion fields only: which cells play for each action, the frame rate, the moods. Settings, Widgets shows what changes, **Preview on the Desk** plays it from memory, **Apply** rewrites the sprite's motion (patch version up by one, art untouched) and **Decline** drops it. A suggestion notifies you; it is never applied without the button. Two owner-only files carry it, `sprite-motion-request.json` (deleted when read) and `sprite-motion-result.json`, and Reset Sanduhr… removes them.
+
+- **Now playing bars that move.** Settings, Desk, Now Playing, **Live audio bars**, off by default. Turned on, the Desk's Now playing line shows 16 bars over the position bar that move with how loud the playing app is, and **Gradient bars** blends them across the Desk ink. macOS asks once for System Audio Recording (the grant shows under Privacy & Security, Screen & System Audio Recording, System Audio Recording Only). Sanduhr taps only the playing app and its own helper processes, so a song in Chrome moves them too, and keeps one loudness number in memory: no audio is recorded, saved or sent. The tap goes when you pause, hide the Desk or turn the switch off. If the permission is denied, the line says **Allow in System Settings**. Needs macOS 14.2 or later.
+
+- **A short pause keeps the song.** With **Hide while paused** on, a track you pause stays on the notch and the Desk for 15 seconds before it hides, so a click on the title plays it again. A track that was already paused when Sanduhr started still hides at once.
+
 ## v2.38.0-mac — 2026-10-30
 
 - **The system piece.** The Desk can show CPU, memory and disk: place **System** in Settings, Desk, Pieces. It takes the same Bar, Slim, Ring and Ticks styles as the meters, with no pace mark and no warning, because it is a reading and not usage. Sanduhr reads it from the Mac every 5 seconds, only while the Desk shows and the piece is placed, and nothing is sent or stored. Claude can place it and style it with `propose_desk`, where it is the `telemetry` piece, as on Windows.

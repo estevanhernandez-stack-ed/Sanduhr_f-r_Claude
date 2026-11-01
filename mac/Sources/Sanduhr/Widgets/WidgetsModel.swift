@@ -280,6 +280,21 @@ final class WidgetsModel {
         return r.ok
     }
 
+    /// "New sprite from an image...": the pack `WidgetNewSprite` makes from the sheet and tags, installed as the
+    /// user's own (`.local`, the same install as own art). The sentences why not, empty when it went in. Nothing
+    /// leaves this Mac.
+    func installNewSprite(_ input: WidgetNewSprite.Input, now: Date = Date()) -> [String] {
+        ownArtStatus = nil
+        let made = WidgetNewSprite.make(input, installedIds: installed.map(\.id), now: now)
+        guard let files = made.files, let manifest = made.manifest else {
+            return made.errors.isEmpty ? ["The sprite couldn't be made."] : made.errors
+        }
+        let r = store.install(files, manifest, source: .local, replaceMadeHere: true)
+        if r.ok { ownArtStatus = "\(manifest.name) is made. It stays on this Mac." }
+        packsChanged(posting: r.ok)
+        return r.ok ? [] : [r.error ?? "\(manifest.name) couldn't be installed."]
+    }
+
     /// The sentence under a font pack's row when CoreText refused one of its faces, nil otherwise.
     func fontNote(_ row: InstalledRow) -> String? {
         row.kind == "font" ? fonts.note(for: row.id) : nil
