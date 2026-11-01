@@ -851,6 +851,7 @@ public partial class App : Application
         svm.ThemeMatch.Service.PlateForced = () => _desk?.PlateForced == true;
         svm.Desk.ArrangeRequested = () => _desk?.BeginArrange();
         svm.Desk.DesignWithChatRequested = OpenChatDesign;
+        svm.Drawers.DesignWithChatRequested = OpenChatDesign;
         svm.Desk.Arranging = _desk?.Arranging == true;
         svm.Desk.ArrangingLayout = _desk?.Session?.Working.Layout;
         svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); _looks?.SettingsChanged(); };

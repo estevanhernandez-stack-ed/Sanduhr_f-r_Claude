@@ -30,6 +30,13 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
         Refresh();
     }
 
+    /// <summary>The Design it with an AI chat button was pressed (App opens the paste window, as the Desk page's button does).</summary>
+    public Action? DesignWithChatRequested { get; set; }
+
+    /// <summary>Opens Design it with an AI chat.</summary>
+    [RelayCommand]
+    private void DesignWithChat() => DesignWithChatRequested?.Invoke();
+
     /// <summary>The running Desk is told to start or stop drawing (the Desk page's own switch does the same through its Changed hook).</summary>
     public Action? DeskChanged { get; set; }
 

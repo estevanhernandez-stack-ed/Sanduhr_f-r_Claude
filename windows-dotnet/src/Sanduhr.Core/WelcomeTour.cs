@@ -33,7 +33,7 @@ public static class WelcomeTour
     public const string SkipTitle = "Skip the tour";
 
     /// <summary>
-    /// Every card, in step order: five steps numbered 1 to 5. The Desk is on every Windows build,
+    /// Every card, in step order: six steps numbered 1 to 6. The Desk is on every Windows build,
     /// so its card needs no feature.
     /// </summary>
     public static IReadOnlyList<TourCard> Table { get; } = Anchored(
@@ -44,19 +44,22 @@ public static class WelcomeTour
         new(2, new WhatsNewCard([], "desk", "On your desktop",
             "The Desk is the clock, meters and pieces Sanduhr draws on your desktop, under every window. A piece is one thing on the Desk, and you arrange each in Settings, Desk, Pieces.",
             "\uE7F4", WhatsNewPreview.None, SettingsPage.Desk)),
-        new(3, new WhatsNewCard([], "tray", "At a glance",
+        new(3, new WhatsNewCard([], "design-with-chat", SetupCopy.DesignWithChat,
+            "Tell any AI chat what you like and paste back its design for your Desk and your drawers. You see it on your Desk first, and nothing changes until you apply it.",
+            "\uE8BD", WhatsNewPreview.None, SettingsPage.Desk) { Anchor = SettingsIndex.DeskDesignWithChat }),
+        new(4, new WhatsNewCard([], "tray", "At a glance",
             "The hourglass in the tray shows a percent: your session, your weekly limit, whichever is higher, both in turn, or the highest of any.",
             "\uE7C4", WhatsNewPreview.Tray, SettingsPage.General), TourChoice.TrayMode),
-        new(4, new WhatsNewCard([], "accounts", "More than one account",
+        new(5, new WhatsNewCard([], "accounts", "More than one account",
             "Add each Claude account with its own sign-in and history, then switch from the name chip or the tray's Accounts menu.",
             "\uE716", WhatsNewPreview.AccountChip, SettingsPage.Accounts)),
-        new(5, new WhatsNewCard([], "claude-code", "Claude Code, connected",
+        new(6, new WhatsNewCard([], "claude-code", "Claude Code, connected",
             "The Claude Usage page shows your Claude Code tokens by day and project. The Claude Code page adds the MCP tools, the statusline and a mod, an add-on that Claude Code loads, each after you say yes.",
             "\uEA86", WhatsNewPreview.None, SettingsPage.ClaudeCode)),
     ]);
 
     /// <summary>
-    /// The tour for someone who set up Sanduhr without usage: three steps with no meters, accounts or Claude
+    /// The tour for someone who set up Sanduhr without usage: four steps with no meters, accounts or Claude
     /// Code in them. The desk and tray cards are the table's, moved up a step (the tray body is
     /// rewritten for a tray with no numbers); a last card says the Desk stands alone and where
     /// usage is turned on.
@@ -64,10 +67,11 @@ public static class WelcomeTour
     public static IReadOnlyList<TourCard> DeskOnly { get; } = Anchored(
     [
         Moved(ById("desk"), 1),
-        Moved(ById("tray"), 2,
+        Moved(ById("design-with-chat"), 2),
+        Moved(ById("tray"), 3,
             "Right-click the hourglass in the tray for Settings and Arrange Desk; a click brings back the widget. Once you sign in it shows a percent of your limits."),
         // Show me opens the Set up Sanduhr window itself (SettingsIndex.OpensSetup), where usage is ticked.
-        new(3, new WhatsNewCard([], "usage", "Usage any time",
+        new(4, new WhatsNewCard([], "usage", "Usage any time",
             "The Desk works without an account. Turn on usage in Set up Sanduhr whenever you want it, and the meters fill in on the desktop.",
             "", WhatsNewPreview.None, SettingsPage.General) { Anchor = SettingsIndex.GeneralSetup }, ShowMeTitle: SetupCopy.Title),
     ]);

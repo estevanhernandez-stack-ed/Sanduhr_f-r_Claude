@@ -183,6 +183,19 @@ public sealed class DrawersSettingsViewModelTests
     });
 
     [Fact]
+    public void Design_it_with_an_AI_chat_asks_the_app_to_open_it() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (vm, s, _) = Make(box);
+        vm.DesignWithChatCommand.Execute(null);   // nothing wired yet: nothing happens
+        int asked = 0;
+        vm.DesignWithChatRequested = () => asked++;
+        vm.DesignWithChatCommand.Execute(null);
+        Assert.Equal(1, asked);
+        s.Dispose();
+    });
+
+    [Fact]
     public void Without_drawers_the_page_still_opens() => Sta.Run(() =>
     {
         var paths = new Paths(appDataBase: Path.Combine(Path.GetTempPath(), "dvm-" + Guid.NewGuid().ToString("N")[..6]));
