@@ -388,11 +388,16 @@ internal sealed class DrawerService : IDisposable
         Save(Settings with { Hidden = [] });
     }
 
-    /// <summary>A drawer was dragged by its title and let go with its top-left at this point, in screen pixels. The Desk knows the screens,
-    /// so it turns the point into a place and calls <see cref="SetPlace"/>.</summary>
-    public event Action<string, PxPoint>? PlaceRequested;
+    /// <summary>A drawer was dragged by its title and let go with its top-left at this point, in screen pixels; the flag is whether it may
+    /// snap (false when the person held Alt). The Desk knows the screens, so it turns the point into a place, snaps it and keeps it off the
+    /// desktop icons as the settings ask, and calls <see cref="SetPlace"/>.</summary>
+    public event Action<string, PxPoint, bool>? PlaceRequested;
 
-    public void RequestPlace(string id, PxPoint topLeft) => PlaceRequested?.Invoke(id, topLeft);
+    public void RequestPlace(string id, PxPoint topLeft, bool snap = true) => PlaceRequested?.Invoke(id, topLeft, snap);
+
+    /// <summary>Set by the Desk while it runs: the drawer id and the top-left a drag proposes (screen pixels) in, the snapped top-left out.
+    /// Live while the drawer is moving, so it snaps only; keeping clear of the icons waits for the drop. Null with no Desk.</summary>
+    public Func<string, PxPoint, PxPoint>? Snapper { get; set; }
 
     /// <summary>Saves where a drawer sits after the user moved it.</summary>
     public void SetPlace(string id, DrawerPlace place) =>
@@ -491,6 +496,7 @@ internal sealed class DrawerService : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        Snapper = null;
         _debounce.Stop();
         foreach (var w in _watchers.Values) w.Dispose();
         _watchers.Clear();

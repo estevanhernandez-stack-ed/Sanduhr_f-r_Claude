@@ -245,7 +245,20 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
             _moving = true;
             _moveHold ??= _service.Hold();
         }
-        if (Handle is var h && h != IntPtr.Zero) DeskNative.MoveTo(h, WindowAt(t, cursor));
+        if (Handle is var h && h != IntPtr.Zero) DeskNative.MoveTo(h, SnappedWindowAt(t, cursor));
+    }
+
+    /// <summary>Whether this move snaps: the setting is on and Alt is not held (Alt places the drawer exactly where the hand puts it).</summary>
+    private bool Snaps => _service.Settings.Snap && (Keyboard.Modifiers & ModifierKeys.Alt) == 0;
+
+    /// <summary>The window's top-left for the cursor, pulled to the nearest snap when snapping: the Desk answers for the piece's top-left (the
+    /// panel, not the window around it), so the offset of the piece inside its window is taken off again.</summary>
+    private PxPoint SnappedWindowAt((PxPoint Cursor, PxPoint Window, PxPoint Offset) t, PxPoint cursor)
+    {
+        var w = WindowAt(t, cursor);
+        if (!Snaps || _service.Snapper is not { } snapper) return w;
+        var top = snapper(_state.Def.Id, new PxPoint(w.X + t.Offset.X, w.Y + t.Offset.Y));
+        return new PxPoint(top.X - t.Offset.X, top.Y - t.Offset.Y);
     }
 
     /// <summary>The title was let go: after a move the Desk is asked to keep the drawer where it was dropped; without one, it folds or opens.</summary>
@@ -278,7 +291,7 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         _moveHold = null;
         EndMove();
         // The request lands while the hold still stands, so the Desk draws the drawer once, at its new place, when the hold is released.
-        try { _service.RequestPlace(_state.Def.Id, new PxPoint(w.X + t.Offset.X, w.Y + t.Offset.Y)); }
+        try { _service.RequestPlace(_state.Def.Id, new PxPoint(w.X + t.Offset.X, w.Y + t.Offset.Y), Snaps); }
         finally { hold?.Dispose(); }
     }
 

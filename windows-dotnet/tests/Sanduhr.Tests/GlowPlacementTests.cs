@@ -13,6 +13,19 @@ public class GlowPlacementTests
         new(frame, mon ?? Mon, min, cloaked, cls, own, caption);
 
     [Fact]
+    public void PxRect_contains_a_rect_wholly_inside_edges_touching_and_nothing_else()
+    {
+        var r = new PxRect(100, 50, 200, 100);
+        Assert.True(r.Contains(new PxRect(100, 50, 200, 100)));
+        Assert.True(r.Contains(new PxRect(150, 60, 10, 10)));
+        Assert.False(r.Contains(new PxRect(99, 60, 10, 10)));
+        Assert.False(r.Contains(new PxRect(250, 60, 51, 10)));
+        Assert.False(r.Contains(new PxRect(150, 140, 10, 11)));
+        Assert.False(r.Contains(new PxRect(150, 60, 0, 10)));
+        Assert.False(new PxRect(0, 0, 0, 0).Contains(new PxRect(0, 0, 0, 0)));
+    }
+
+    [Fact]
     public void MaximizedWindowGetsMiddleHalfAtItsTop()
     {
         var r = GlowPlacement.Compute(T(new PxRect(0, 0, 1920, 1040)), Mon, 1.0);

@@ -100,6 +100,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             _drawers.Changed += OnDrawersChanged;
             _drawers.BusyEnded += OnDrawersBusyEnded;
             _drawers.PlaceRequested += OnPlaceRequested;
+            _drawers.Snapper = SnapLive;
         }
         _companion = companion ?? (paths is null ? null : new CompanionService(paths, store));
         if (_companion is not null) _companion.Changed += OnCompanionChanged;
@@ -374,6 +375,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     public void Reload()
     {
         if (_stopped) return;
+        ClearIcons();
         _settings = _store.LoadDesk();
         _desktopShown = _store.LoadSetup()?.Desktop ?? true;
         // Desktop went off under a running Arrange: end it as Cancel (nothing saved); a design under review already ended it.
@@ -489,6 +491,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             _drawers.Changed -= OnDrawersChanged;
             _drawers.BusyEnded -= OnDrawersBusyEnded;
             _drawers.PlaceRequested -= OnPlaceRequested;
+            _drawers.Snapper = null;
         }
         StopHost();
         _oled.DriftStepped -= ApplyDrift;
@@ -630,6 +633,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private void OnScreensChanged()
     {
         _wallpaper.Invalidate();
+        ClearIcons();   // Explorer restarting and a monitor change both land here: the icons are read again
         // The arrange windows sit on the old monitors: drop the edit and lay out on the new ones.
         if (Arranging) EndArrangeCore(DeskArrangeEnd.Cancel, reload: false);
         Rebuild();
@@ -809,13 +813,142 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// <summary>A drawer was dragged by its title and let go: its top-left, in screen pixels, becomes a place on the screen holding it,
     /// clamped to that screen's work area, and saved (the save redraws the Desk). A drawer only a plan under review would create, or a drop
     /// on a screen Windows would not name, saves nothing: the Desk draws the drawer back where it was.</summary>
-    private void OnPlaceRequested(string id, PxPoint topLeft)
+    private void OnPlaceRequested(string id, PxPoint topLeft, bool snap)
     {
         if (_stopped || _drawers is null || _screens.Count == 0) return;
-        if (_drawers.Settings.Drawers.Any(d => d.Id == id) && DrawerScreens.ToPlace(topLeft, _screens) is { } place)
-            _drawers.SetPlace(id, place);
-        else
+        if (!_drawers.Settings.Drawers.Any(d => d.Id == id) || DrawerScreens.ToPlace(topLeft, _screens) is not { } place)
+        {
             Render();   // waits for the move's hold, then puts the window back
+            return;
+        }
+        var settings = _drawers.Settings;
+        var screen = DrawerScreens.Find(place.Monitor, _screens)!;
+        var rect = DrawerRectOf(id, place);
+        // Snap first (unless Alt was held or snapping is off), then keep clear of the icons: when the two disagree the icons win, and the
+        // drawer still ends on screen (DrawerIconArea.NearestFree keeps it there).
+        if (snap && settings.Snap) rect = DrawerSnap.Snap(rect, WorkRect(screen), OtherDrawers(id, screen), PieceRects(screen));
+        if (settings.KeepClear)
+        {
+            ClearIcons();   // the person may have moved an icon since the last reading: a drop reads them fresh
+            rect = DrawerIconArea.NearestFree(rect, WorkRect(screen), IconArea(screen));
+        }
+        _drawers.SetPlace(id, place with { X = rect.X, Y = rect.Y });
+    }
+
+    /// <summary>What <see cref="DrawerService.Snapper"/> answers while a drawer is dragged: the proposed top-left (screen pixels) snapped to the
+    /// other drawers, the Desk's pieces, the screen's margin and the grid, as a top-left in screen pixels again. Never keeps clear of the icons
+    /// (that waits for the drop); a point it cannot place is handed back as it came.</summary>
+    private PxPoint SnapLive(string id, PxPoint proposed)
+    {
+        if (_stopped || _drawers is not { } service || _screens.Count == 0 || !service.Settings.Snap) return proposed;
+        if (DrawerScreens.ToPlace(proposed, _screens) is not { } place) return proposed;
+        var screen = DrawerScreens.Find(place.Monitor, _screens)!;
+        var snapped = DrawerSnap.Snap(DrawerRectOf(id, place), WorkRect(screen), OtherDrawers(id, screen), PieceRects(screen));
+        return DrawerScreens.WorkToPx(snapped.X, snapped.Y, screen);
+    }
+
+    /// <summary>A screen's work area as the rectangle placement rules measure in: its work DIPs, from the origin.</summary>
+    private static DrawerRect WorkRect(DeskScreen screen)
+    {
+        var work = DrawerScreens.WorkDips(screen);
+        return new DrawerRect(0, 0, work.Width, work.Height);
+    }
+
+    private DrawerRect DrawerRectOf(string id, DrawerPlace place) =>
+        new(place.X, place.Y, DrawerPlacement.Width, DrawerPlacement.Height(_drawers?.Get(id)?.Folded == true));
+
+    /// <summary>The other drawn drawers that sit on <paramref name="screen"/>, as the rectangles they are drawn at (clamped like the Desk clamps them).</summary>
+    private List<DrawerRect> OtherDrawers(string id, DeskScreen screen)
+    {
+        var work = DrawerScreens.WorkDips(screen);
+        return [.. DrawerPlacesNow()
+            .Where(p => p.State.Def.Id != id && ReferenceEquals(DrawerScreens.Find(p.Place.Monitor, _screens), screen))
+            .Select(p =>
+            {
+                var c = DrawerPlacement.Clamp(p.Place, work.Width, work.Height);
+                return new DrawerRect(c.X, c.Y, DrawerPlacement.Width, DrawerPlacement.Height(p.State.Folded));
+            })];
+    }
+
+    internal IReadOnlyList<DrawerRect> PieceRects(DeskScreen screen) =>
+        _pieceRects.TryGetValue(screen.Device, out var rects) ? rects : [];
+
+    // ---- the desktop icons, as an area drawers keep clear of ----
+
+    /// <summary>Reads the desktop icons' rectangles in physical screen pixels; null when the Shell does not answer. A seam for tests.</summary>
+    internal Func<IReadOnlyList<PxRect>?> IconReader { get; set; } = DesktopIcons.Read;
+
+    /// <summary>The desktop's item count and icon cell, in physical pixels, for the fallback columns; null when the Shell does not answer. A seam for tests.</summary>
+    internal Func<(int Count, PxPoint Cell)?> SpacingReader { get; set; } = DesktopIcons.Spacing;
+
+    /// <summary>When set, the icon area of every screen, in work DIPs, in place of any reading. A seam for tests.</summary>
+    internal IReadOnlyList<DrawerRect>? IconAreaOverride { get; set; }
+
+    /// <summary>The screens the Desk has now, for tests.</summary>
+    internal IReadOnlyList<DeskScreen> ScreensForTests => _screens;
+
+    private readonly Dictionary<string, IReadOnlyList<DrawerRect>> _iconArea = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IReadOnlyList<DrawerRect>> _pieceRects = new(StringComparer.Ordinal);
+    private bool _iconsRead;
+    private IReadOnlyList<PxRect>? _iconRects;
+
+    private void ClearIcons()
+    {
+        _iconArea.Clear();
+        _iconsRead = false;
+        _iconRects = null;
+    }
+
+    /// <summary>The area the desktop icons take on <paramref name="screen"/>, in that screen's work DIPs, each icon grown by the drawer gap:
+    /// read through the Shell once and cached until the screens change, a drawer is dropped or the Desk reloads; when the Shell does not
+    /// answer (or the reader throws), the left-hand columns Windows fills by default, on the primary screen only. Never throws.</summary>
+    internal IReadOnlyList<DrawerRect> IconArea(DeskScreen screen)
+    {
+        if (IconAreaOverride is { } fixedArea) return fixedArea;
+        if (_iconArea.TryGetValue(screen.Device, out var cached)) return cached;
+        IReadOnlyList<DrawerRect> area;
+        try
+        {
+            if (!_iconsRead)
+            {
+                _iconRects = IconReader();
+                _iconsRead = true;
+            }
+            area = _iconRects is null
+                ? Fallback(screen)
+                : DrawerIconArea.From([.. _iconRects.Where(screen.Bounds.Contains).Select(r => DrawerScreens.PxToWork(r, screen))], DrawerPlacement.Gap);
+        }
+        catch (Exception)
+        {
+            _iconsRead = true;   // a reader that throws is not asked again until the next invalidation
+            area = Fallback(screen);
+        }
+        _iconArea[screen.Device] = area;
+        return area;
+    }
+
+    /// <summary>Windows fills icons down the primary screen's left edge: as many columns as the desktop's items need. Other screens: none.</summary>
+    private IReadOnlyList<DrawerRect> Fallback(DeskScreen screen)
+    {
+        if (!screen.Primary) return [];
+        try
+        {
+            int count;
+            double cellW, cellH;
+            if (SpacingReader() is { } spacing)
+                (count, cellW, cellH) = (spacing.Count, spacing.Cell.X / screen.Scale, spacing.Cell.Y / screen.Scale);
+            else
+            {
+                count = _drawers?.DesktopListing().Count(i => !i.Hidden) ?? 0;
+                (cellW, cellH) = (SystemParameters.IconHorizontalSpacing, SystemParameters.IconVerticalSpacing);
+            }
+            var work = DrawerScreens.WorkDips(screen);
+            return DrawerIconArea.Fallback(new DrawerRect(0, 0, work.Width, work.Height), count, cellW, cellH);
+        }
+        catch (Exception)
+        {
+            return [];
+        }
     }
 
     /// <summary>
@@ -832,7 +965,10 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         var ids = settings.Drawers.Select(d => d.Id).Where(id => drawn.Any(d => d.Id == id)).ToHashSet(StringComparer.Ordinal);
         var placed = settings.Places.Where(kv => ids.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
         var folded = drawn.Where(d => service.Get(d.Id)?.Folded == true).Select(d => d.Id).ToList();
-        var places = DrawerPlacement.Arrive(drawn, placed, DrawerScreens.WorkDips(DrawerScreens.Primary(_screens)).Width, folded);
+        var primary = DrawerScreens.Primary(_screens);
+        var primaryWork = DrawerScreens.WorkDips(primary);
+        var places = DrawerPlacement.Arrive(drawn, placed, primaryWork.Width, folded, settings.Tidy, primaryWork.Height,
+            settings.KeepClear ? IconArea(primary) : []);
         return [.. drawn.Select(d => (service.Get(d.Id)!, places[d.Id]))];
     }
 
@@ -978,6 +1114,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             }
             view.Update(shown, inks);
             _views.Add(view);
+            // Where the Desk's own pieces sit, for drawers to snap to: read before TakeIslands spends the view; none with the desktop off.
+            _pieceRects[screen.Device] = DrawsDesktop ? [.. view.StackRects().Values.Select(r => DrawerScreens.ScreenDipsToWork(r, screen))] : [];
             surfaces.Add(new DeskSurface(screen, DeskClicks.Prepare(view.TakeIslands(), _piecesTakeClicks, this)));
             looks.Add((settings, inks));
         }

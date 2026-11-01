@@ -18,7 +18,7 @@ public sealed class DrawerFreePanelTests
 
     /// <summary>A 3440x1440 primary at 100% with a 40 px taskbar at the bottom, and a 2880x1620 monitor at 150% to its right whose work area
     /// starts 60 px down (a taskbar at its top).</summary>
-    private static IReadOnlyList<DeskScreen> TwoScreens()
+    internal static IReadOnlyList<DeskScreen> TwoScreens()
     {
         var b1 = new PxRect(0, 0, 3440, 1440);
         var w1 = new PxRect(0, 0, 3440, 1400);
@@ -136,7 +136,7 @@ public sealed class DrawerFreePanelTests
 
     // ---- the piece ----
 
-    private static (DrawerService Service, SettingsStore Store, Paths Paths) Make(DrawerSandbox box, Func<DrawerSettings, DrawerSettings>? edit = null,
+    internal static (DrawerService Service, SettingsStore Store, Paths Paths) Make(DrawerSandbox box, Func<DrawerSettings, DrawerSettings>? edit = null,
         params string[] names)
     {
         var paths = new Paths(appDataBase: Path.Combine(box.Root, "appdata"), localAppDataBase: Path.Combine(box.Root, "local"));
@@ -150,7 +150,7 @@ public sealed class DrawerFreePanelTests
         return (new DrawerService(store, paths, new DrawerPlaces(box.Desktop, box.Public, []), Dispatcher.CurrentDispatcher), store, paths);
     }
 
-    private static DrawerPiece Piece(DrawerService s, string id = "images")
+    internal static DrawerPiece Piece(DrawerService s, string id = "images")
     {
         var look = DrawerLook.From(DeskInkMap.Light.Default, null, null, null, new FontFamily("Segoe UI"));
         var piece = new DrawerPiece(s.Get(id)!, s, look, 1);
@@ -166,7 +166,7 @@ public sealed class DrawerFreePanelTests
         using var box = new DrawerSandbox();
         var (s, _, _) = Make(box);
         var asked = new List<(string Id, PxPoint At)>();
-        s.PlaceRequested += (id, at) => asked.Add((id, at));
+        s.PlaceRequested += (id, at, _) => asked.Add((id, at));
         var piece = Piece(s);
 
         piece.TitleDown(new PxPoint(500, 300), window: new PxPoint(400, 280), offset: new PxPoint(16, 16));
@@ -196,7 +196,7 @@ public sealed class DrawerFreePanelTests
         using var box = new DrawerSandbox();
         var (s, _, _) = Make(box);
         var asked = new List<PxPoint>();
-        s.PlaceRequested += (_, at) => asked.Add(at);
+        s.PlaceRequested += (_, at, _) => asked.Add(at);
         var piece = Piece(s);
         piece.TitleDown(new PxPoint(10, 10), new PxPoint(0, 0), new PxPoint(16, 16));
         piece.TitleLost();
@@ -214,14 +214,15 @@ public sealed class DrawerFreePanelTests
 
     // ---- the controller ----
 
-    private sealed class TwoScreenHost : IDeskHost
+    internal sealed class TwoScreenHost(IReadOnlyList<DeskScreen>? screens = null) : IDeskHost
     {
-        public event Action? ScreensChanged { add { } remove { } }
+        public event Action? ScreensChanged;
         public event Action? CoverageChanged { add { } remove { } }
+        public void RaiseScreensChanged() => ScreensChanged?.Invoke();
         public IReadOnlyList<DeskSurface> Shown { get; private set; } = [];
         public bool IsShowing { get; private set; }
         public IReadOnlyList<bool> Coverage => [];
-        public IReadOnlyList<DeskScreen> Screens() => TwoScreens();
+        public IReadOnlyList<DeskScreen> Screens() => screens ?? TwoScreens();
         public void Show(IReadOnlyList<DeskSurface> surfaces) { Shown = surfaces; IsShowing = true; }
         public void Hide() { Shown = []; IsShowing = false; }
         public void SetDrift(int? step) { }
@@ -229,19 +230,23 @@ public sealed class DrawerFreePanelTests
         public void Dispose() { }
     }
 
-    private static (DeskController Desk, TwoScreenHost Host) Start(SettingsStore store, Paths paths, DrawerService s)
+    /// <summary>The Desk over the fake host. The icon reader is stubbed to a desktop with no icons: no test reads the real Explorer.</summary>
+    internal static (DeskController Desk, TwoScreenHost Host) Start(SettingsStore store, Paths paths, DrawerService s,
+        IReadOnlyList<DeskScreen>? screens = null)
     {
-        var host = new TwoScreenHost();
+        var host = new TwoScreenHost(screens);
         var desk = new DeskController(store, () => host, () => DeskUsage.Empty, new NowPlayingHub(), new DeskMessageSource(store, paths),
             paths: paths, drawers: s);
+        desk.IconReader = () => [];
+        desk.SpacingReader = () => null;
         desk.Reload();
         return (desk, host);
     }
 
-    private static List<(DeskScreen Screen, DeskIsland Island)> DrawerIslands(TwoScreenHost host) =>
+    internal static List<(DeskScreen Screen, DeskIsland Island)> DrawerIslands(TwoScreenHost host) =>
         [.. host.Shown.SelectMany(sf => sf.Islands.Where(i => i.Content is DrawerPiece).Select(i => (sf.Screen, i)))];
 
-    private static string IdOf(DeskIsland i) => ((DrawerPiece)i.Content).State.Def.Id;
+    internal static string IdOf(DeskIsland i) => ((DrawerPiece)i.Content).State.Def.Id;
 
     [Fact]
     public void Each_shown_drawer_is_one_island_on_its_saved_monitor_and_one_with_no_place_arrives_top_right_of_the_primary() => Sta.Run(() =>
@@ -355,7 +360,7 @@ public sealed class DrawerFreePanelTests
     public void A_place_request_saves_the_screen_holding_the_point_clamped() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();
-        var (s, store, paths) = Make(box);
+        var (s, store, paths) = Make(box, d => d with { Snap = false, KeepClear = false });   // the unsnapped conversion; DrawerPlacementLiveTests snaps
         var (desk, host) = Start(store, paths, s);
         try
         {

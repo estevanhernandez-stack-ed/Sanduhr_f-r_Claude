@@ -6,6 +6,9 @@ public readonly record struct PxRect(int X, int Y, int Width, int Height)
     public int Right => X + Width;
     public int Bottom => Y + Height;
     public bool IsEmpty => Width <= 0 || Height <= 0;
+
+    /// <summary>Whether <paramref name="o"/> lies wholly inside this rectangle (edges may touch). An empty one is inside nothing.</summary>
+    public bool Contains(PxRect o) => !IsEmpty && !o.IsEmpty && o.X >= X && o.Y >= Y && o.Right <= Right && o.Bottom <= Bottom;
 }
 
 /// <summary>An integer point in device pixels (virtual-screen coordinates), such as where a dragged drawer was dropped.</summary>

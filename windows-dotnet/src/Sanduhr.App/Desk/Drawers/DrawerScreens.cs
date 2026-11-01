@@ -50,6 +50,20 @@ internal static class DrawerScreens
         return DrawerPlacement.Clamp(place, work.Width, work.Height);
     }
 
+    /// <summary>A rectangle in physical screen pixels (an icon's) as that screen's work-area DIPs: the offset is the work area's, the scale the
+    /// screen's. This is the unit <see cref="DrawerPlace"/> and every placement rule work in.</summary>
+    public static DrawerRect PxToWork(PxRect r, DeskScreen s) =>
+        new((r.X - s.Work.X) / s.Scale, (r.Y - s.Work.Y) / s.Scale, r.Width / s.Scale, r.Height / s.Scale);
+
+    /// <summary>A rectangle in the screen's DIPs from its <i>bounds</i> (what <see cref="DeskView.StackRects"/> gives) as the screen's work-area
+    /// DIPs: the work area starts at a different offset than the bounds whenever a taskbar sits at the top or left.</summary>
+    public static DrawerRect ScreenDipsToWork(Rect r, DeskScreen s) =>
+        new(r.X - (s.Work.X - s.Bounds.X) / s.Scale, r.Y - (s.Work.Y - s.Bounds.Y) / s.Scale, r.Width, r.Height);
+
+    /// <summary>A work-area DIP position on <paramref name="s"/> as physical screen pixels (the inverse of <see cref="ToPlace"/>'s offset).</summary>
+    public static PxPoint WorkToPx(double x, double y, DeskScreen s) =>
+        new((int)Math.Round(s.Work.X + x * s.Scale), (int)Math.Round(s.Work.Y + y * s.Scale));
+
     /// <summary>
     /// A Desk window's pixels per unit of its root's own coordinates: WPF's device scale times the root's layout scale. The host scales the
     /// root by the monitor's scale over WPF's (<c>k</c>), so this is the monitor's own scale; transforms taken against the root never
