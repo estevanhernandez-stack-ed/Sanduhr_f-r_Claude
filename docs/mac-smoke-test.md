@@ -842,8 +842,9 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
   `layout` reads `message:tl clock:bl meters:bl nowPlaying:bl meetings:bl` and the line sits under
   the meters. Move it to Hidden and relaunch: it stays hidden.
 - [ ] Fallback: quit, then `open -n --env SANDUHR_NOWPLAYING_TEST=fail mac/Sanduhr.app`. Source
-  reads "Fallback (Music and Spotify only): the system now playing isn't available on this macOS";
-  no adapter process runs; no prompt appears. Play, pause or skip in Music: the wing follows from the
+  reads "Fallback (Music and Spotify only): the system now playing didn't answer. Sanduhr checks
+  again every few minutes."; `state.yaml` `now_playing` has `source: fallback` and
+  `fallback_reason: test_failed`; no adapter process runs; no prompt appears. Play, pause or skip in Music: the wing follows from the
   next change. The browser player shows nothing (expected). Clicks still play and pause.
 - [ ] Still on the fallback, switch Ask Music and Spotify directly on with Music open: macOS asks
   once whether Sanduhr may control Music; Allow, and the current track shows without waiting for a
@@ -851,6 +852,10 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
   `tccutil reset AppleEvents com.626labs.sanduhr` if you want the prompt back.
 - [ ] Sleep the Mac while now playing runs and wake it: Source settles on Adapter working again and
   the wing follows the next change.
+- [ ] Retry (2.39.1): quit, then `open -n --env SANDUHR_NOWPLAYING_TEST=fail-once mac/Sanduhr.app`.
+  Source starts on the fallback with `fallback_reason: test_failed`; about a minute later it reads
+  Adapter working, `fallback_reason: null`, and a `perl` process runs `stream --no-artwork --micros`.
+  A browser track shows again without a relaunch.
 - [ ] Settings, About: "Now playing uses mediaremote-adapter by Jonas van den Berg (BSD-3-Clause)"
   links to its GitHub page; Third-Party Notices opens the text with the adapter's and Sparkle's
   licenses. Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr" AND category ==

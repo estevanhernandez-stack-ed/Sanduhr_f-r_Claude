@@ -1583,7 +1583,7 @@ switch and "Notch Settings…" / "Layout Settings…").
   processes, so Sanduhr bundles [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter)
   (BSD-3, vendored unchanged in `Vendor/mediaremote-adapter/`, built by
   `scripts/build-mediaremote-adapter.sh`) and runs its script with `/usr/bin/perl`: `test` once at
-  start and after a wake, then `stream --no-artwork --micros` as a child process, restarted with a
+  start and five seconds after a wake, then `stream --no-artwork --micros` as a child process, restarted with a
   growing wait if it exits and given up after four quick exits in a row. The findings behind this are
   in `docs/mac-now-playing-spike.md`.
 - **Fallback.** When `test` fails (or the stream keeps dying), Music's and Spotify's distributed
@@ -1591,8 +1591,14 @@ switch and "Notch Settings…" / "Layout Settings…").
   but only those two apps and only from their next change. "Ask Music and Spotify directly" adds
   AppleScript to the running ones when the fallback starts (the Automation prompt, once per app; the
   app's `com.apple.security.automation.apple-events` entitlement and `NSAppleEventsUsageDescription`
-  exist for this). The page's Source line says Adapter working, Fallback (Music and Spotify only) or
-  Off. Force the fallback with `open -n --env SANDUHR_NOWPLAYING_TEST=fail mac/Sanduhr.app`.
+  exist for this). While on the fallback, `test` runs again after a minute and then every five
+  (`NowPlayingRetry`), keeping the fallback's track on screen; a pass goes back to the stream (2.39.1:
+  one failed test after a wake used to leave the fallback in place until a relaunch). The page's
+  Source line says Adapter working, Fallback (Music and Spotify only) with the reason (the test
+  failed, the stream kept stopping, or the adapter is missing), or Off; `state.yaml` carries the
+  reason as `fallback_reason`. Force the fallback with
+  `open -n --env SANDUHR_NOWPLAYING_TEST=fail mac/Sanduhr.app`, or `=fail-once` to fail only the
+  first test and watch the retry take it back.
 - **Controls** go from Sanduhr's own process through `MRMediaRemoteSendCommand` (not gated).
 - **In the bundle:** `Contents/Frameworks/MediaRemoteAdapter.framework`,
   `Contents/Helpers/MediaRemoteAdapterTestClient`, `Contents/Resources/NowPlaying/mediaremote-adapter.pl`,

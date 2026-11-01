@@ -43,10 +43,13 @@ enum MediaRemoteControl {
 ///    (NowPlayingSupervisor); several quick exits in a row switch to the fallback.
 /// 3. On failure: Music's and Spotify's change notifications, no prompt (NowPlayingFallback);
 ///    with "Ask Music and Spotify directly" also AppleScript to them when the fallback starts.
+///    The self-test runs again after a minute, then every five (NowPlayingRetry); a pass goes
+///    back to the stream.
 ///
 /// Nothing leaves the Mac. Titles and artists stay in memory; the log says only the source and
-/// exit codes. `SANDUHR_NOWPLAYING_TEST=fail` in the environment fails the self-test, for
-/// checking the fallback by hand (docs/mac-smoke-test.md).
+/// exit codes. `SANDUHR_NOWPLAYING_TEST=fail` in the environment fails every self-test, for
+/// checking the fallback by hand; `fail-once` fails only the first, for checking the retry
+/// (docs/mac-smoke-test.md).
 @Observable
 final class NowPlayingController {
     static let shared = NowPlayingController()
@@ -59,8 +62,8 @@ final class NowPlayingController {
     private(set) var source: NowPlayingSource = .off
     /// The self-test is running.
     private(set) var checking = false
-    /// The last self-test failed (Settings says the system now playing isn't available).
-    private(set) var adapterFailed = false
+    /// Why it is on the fallback (Settings' source line, state.yaml `fallback_reason`).
+    private(set) var fallbackReason: NowPlayingFallbackReason?
     /// macOS is not letting Sanduhr ask Music or Spotify (Automation declined or reset); set by
     /// the last ask that was denied, cleared by the next that was not. Settings shows a row.
     private(set) var automationDenied = false
@@ -86,6 +89,10 @@ final class NowPlayingController {
     /// Re-publishes when a paused track's grace ends, so Hide while paused takes it then.
     @ObservationIgnored private var graceItem: DispatchWorkItem?
     @ObservationIgnored private var fallbackObservers: [NSObjectProtocol] = []
+    /// Self-test retries since the fallback started (NowPlayingRetry).
+    @ObservationIgnored private var retries = 0
+    @ObservationIgnored private var wakeItem: DispatchWorkItem?
+    @ObservationIgnored private var forcedFailures = 0
     @ObservationIgnored private var observing = false
 
     private init() {}
@@ -132,6 +139,7 @@ final class NowPlayingController {
         pending.forEach { $0.cancel() }
         pending = []
         settleItem?.cancel(); settleItem = nil
+        wakeItem?.cancel(); wakeItem = nil
         testProcess?.terminate(); testProcess = nil
         if let p = streamProcess {
             (p.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil
@@ -140,6 +148,8 @@ final class NowPlayingController {
         streamProcess = nil
         outputBuffer = Data()
         stopFallback()
+        retries = 0
+        if fallbackReason != nil { fallbackReason = nil }
         tracker.reset()
         supervisor.reset()
     }
@@ -169,13 +179,21 @@ final class NowPlayingController {
         publish()
     }
 
+    /// Waits a few seconds first: a test run the moment the Mac wakes can fail while the session
+    /// comes back.
     private func restartAfterWake() {
         guard active else { return }
-        Self.log.info("wake: checking the adapter again")
-        teardown()
-        source = .off
-        runTest()
-        publish()
+        wakeItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self, self.active else { return }
+            Self.log.info("wake: checking the adapter again")
+            self.teardown()
+            self.source = .off
+            self.runTest()
+            self.publish()
+        }
+        wakeItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + NowPlayingRetry.wakeDelay, execute: item)
     }
 
     // MARK: The adapter
@@ -203,13 +221,34 @@ final class NowPlayingController {
     /// A `test` that has not finished by then counts as failed.
     static let testTimeout: TimeInterval = 10
 
+    /// `launchTest`'s status when the adapter or perl is missing, and when the environment fails
+    /// the test on purpose.
+    static let missingStatus: Int32 = -1
+    static let forcedFailStatus: Int32 = -3
+
     private func runTest() {
         checking = true
+        launchTest { [weak self] passed, status in self?.testFinished(passed: passed, status: status) }
+    }
+
+    /// Runs the adapter's `test`; `done` gets the verdict on the main thread, only while this
+    /// run's generation lasts.
+    private func launchTest(_ done: @escaping (_ passed: Bool, _ status: Int32) -> Void) {
         let gen = generation
-        guard ProcessInfo.processInfo.environment["SANDUHR_NOWPLAYING_TEST"] != "fail",
-              let paths = AdapterPaths.inBundle(),
+        let finish: (Bool, Int32) -> Void = { [weak self] passed, status in
+            guard let self, gen == self.generation, self.active else { return }
+            self.testProcess = nil
+            done(passed, status)
+        }
+        let forced = ProcessInfo.processInfo.environment["SANDUHR_NOWPLAYING_TEST"]
+        if forced == "fail" || (forced == "fail-once" && forcedFailures == 0) {
+            forcedFailures += 1
+            finish(false, Self.forcedFailStatus)
+            return
+        }
+        guard let paths = AdapterPaths.inBundle(),
               FileManager.default.isExecutableFile(atPath: Self.perl) else {
-            testFinished(passed: false, status: -1, gen: gen)
+            finish(false, Self.missingStatus)
             return
         }
         let p = Process()
@@ -217,9 +256,9 @@ final class NowPlayingController {
         p.arguments = AdapterWatchdog.arguments([paths.script, paths.framework, paths.testClient, "test"])
         p.standardOutput = FileHandle.nullDevice
         p.standardError = FileHandle.nullDevice
-        p.terminationHandler = { [weak self] process in
+        p.terminationHandler = { process in
             let status = process.terminationStatus
-            DispatchQueue.main.async { self?.testFinished(passed: status == 0, status: status, gen: gen) }
+            DispatchQueue.main.async { finish(status == 0, status) }
         }
         do {
             try p.run()
@@ -230,27 +269,50 @@ final class NowPlayingController {
                 t.terminate()
             }
         } catch {
-            testFinished(passed: false, status: -2, gen: gen)
+            finish(false, -2)
         }
     }
 
-    private func testFinished(passed: Bool, status: Int32, gen: Int) {
-        guard gen == generation, active else { return }
-        testProcess = nil
+    private func testFinished(passed: Bool, status: Int32) {
         checking = false
-        adapterFailed = !passed
         if passed {
             Self.log.info("adapter test passed")
             startStream()
         } else {
             Self.log.error("adapter test failed (exit \(status, privacy: .public)): using the fallback")
-            startFallback()
+            startFallback(status == Self.missingStatus ? .adapterMissing : .testFailed)
         }
         publish()
     }
 
+    /// On the fallback: the next self-test, after NowPlayingRetry's wait.
+    private func scheduleRetry() {
+        retries += 1
+        later(NowPlayingRetry.wait(attempt: retries), gen: generation) { [weak self] in
+            self?.retryAdapter()
+        }
+    }
+
+    /// A pass leaves the fallback for the stream, with a fresh supervisor; a fail waits again.
+    /// The fallback keeps showing its track while the test runs.
+    private func retryAdapter() {
+        guard active, source == .fallback, testProcess == nil else { return }
+        launchTest { [weak self] passed, status in
+            guard let self, self.source == .fallback else { return }
+            guard passed else {
+                Self.log.info("adapter retry failed (exit \(status, privacy: .public))")
+                self.scheduleRetry()
+                return
+            }
+            Self.log.info("adapter retry passed: back to the stream")
+            self.teardown()
+            self.startStream()
+            self.publish()
+        }
+    }
+
     private func startStream() {
-        guard let paths = AdapterPaths.inBundle() else { startFallback(); return }
+        guard let paths = AdapterPaths.inBundle() else { startFallback(.adapterMissing); return }
         source = .adapter
         let gen = generation
         let p = Process()
@@ -275,7 +337,7 @@ final class NowPlayingController {
             streamStarted = Date()
         } catch {
             Self.log.error("adapter stream did not start: using the fallback")
-            startFallback()
+            startFallback(.streamExits)
         }
     }
 
@@ -306,15 +368,16 @@ final class NowPlayingController {
         case .fallback:
             Self.log.error("adapter stream keeps exiting: using the fallback")
             tracker.reset()
-            startFallback()
+            startFallback(.streamExits)
             publish()
         }
     }
 
     // MARK: The fallback
 
-    private func startFallback() {
+    private func startFallback(_ reason: NowPlayingFallbackReason) {
         source = .fallback
+        if fallbackReason != reason { fallbackReason = reason }
         tracker.reset()
         let center = DistributedNotificationCenter.default()
         for entry in NowPlayingFallback.notifications {
@@ -328,6 +391,7 @@ final class NowPlayingController {
             })
         }
         if prefs.askApps { askApps() }
+        scheduleRetry()
     }
 
     private func stopFallback() {
