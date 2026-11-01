@@ -38,6 +38,32 @@ public sealed class DrawerLookTests
         Assert.Equal((byte)Math.Round(0.7 * 255), L(DrawerLookKind.Solid, 70, 0.1).Plate.A);
     }
 
+    [Theory]
+    [InlineData(DrawerLookKind.Outline)]
+    [InlineData(DrawerLookKind.Bare)]
+    public void Outline_and_Bare_always_carry_a_label_shadow_in_the_opposite_tone_of_the_ink(DrawerLookKind kind)
+    {
+        // Light ink gets a dark shadow, dark ink a light one, on a wallpaper the average of which needs no chips.
+        foreach (var ink in new[] { DeskInkMap.Light.Default, DeskInk.Resolve(DeskInkSettings.Default with { Mode = DeskInkMode.Dark }, null, null) })
+        {
+            var look = DrawerLook.From(ink, null, null, Font, kind, 55, 0.4);
+            var shadow = Assert.IsType<DropShadowEffect>(look.LabelShadow);
+            Assert.Same(shadow, look.LabelEffect);
+            Assert.Equal(ink.DarkInk ? Colors.White : Colors.Black, shadow.Color);
+            Assert.True(shadow.Opacity >= 0.9 && shadow.BlurRadius >= 4);
+        }
+    }
+
+    [Theory]
+    [InlineData(DrawerLookKind.Solid)]
+    [InlineData(DrawerLookKind.Glass)]
+    public void Solid_and_Glass_keep_the_inks_own_shadow(DrawerLookKind kind)
+    {
+        var look = L(kind, 55, 0.4);
+        Assert.Null(look.LabelShadow);
+        Assert.Same(look.Shadow, look.LabelEffect);
+    }
+
     [Fact]
     public void The_old_overload_is_Solid_at_no_less_than_55()
     {

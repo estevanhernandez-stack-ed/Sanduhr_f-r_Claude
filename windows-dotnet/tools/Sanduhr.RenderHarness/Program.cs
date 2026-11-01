@@ -29,7 +29,7 @@ using Sanduhr.Core;
 //                        polish-smoke is not part of all and runs alone: the 4.0 polish live checks, SANDUHR_DEV_PROFILE under %TEMP% (see PolishSmokeScenario.cs)
 //                        store-shots is not part of all: Store screenshots, 2560x1440 frames of Settings and the widget (see StoreShotsScenario.cs)
 //                        setup is not part of all: Set up Sanduhr (first run, reopened) and the AI chat window, in obsidian and aurora (see SetupScenario.cs)
-//                        drawer-looks is not part of all: the four drawer looks in obsidian and aurora over a busy and a plain wallpaper stand-in, 16 PNGs (see DrawerLooksScenario.cs)
+//                        drawer-looks is not part of all: the four drawer looks in obsidian and aurora over a busy, a plain and a bright wallpaper stand-in, 24 PNGs (see DrawerLooksScenario.cs)
 //   --pages <list>       settings-pass only: comma-separated page names to run (default every page)
 //   --parts <list>       settings-pass only: pages, tab, focus, search, links, contrast (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)

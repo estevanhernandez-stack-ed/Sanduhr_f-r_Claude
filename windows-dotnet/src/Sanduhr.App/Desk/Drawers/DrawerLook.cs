@@ -25,6 +25,11 @@ internal sealed record DrawerLook(Color Plate, Color Ink, Color Accent, Effect? 
     public Color HoverBorder { get; init; } = Colors.Transparent;
     /// <summary>Glass's top and left edge highlight.</summary>
     public Color Edge { get; init; } = Colors.Transparent;
+    /// <summary>Outline's and Bare's label and title shadow: strong and in the opposite tone of the ink (dark behind light ink, light behind
+    /// dark), whatever the theme's own shadow is, the way Windows keeps desktop icon labels readable on a busy wallpaper. Null for Solid and Glass.</summary>
+    public Effect? LabelShadow { get; init; }
+    /// <summary>What the labels and the title wear: <see cref="LabelShadow"/> where there is no plate, else the ink's own <see cref="Shadow"/>.</summary>
+    public Effect? LabelEffect => LabelShadow ?? Shadow;
 
     /// <summary>The Solid look at the plate opacity a theme or the Desk gave (no less than <see cref="MinPlateOpacity"/>, the drawers'
     /// default of 55): what a drawer was before looks existed.</summary>
@@ -70,7 +75,18 @@ internal sealed record DrawerLook(Color Plate, Color Ink, Color Accent, Effect? 
                 _ => Colors.Transparent,
             },
             Edge = kind == DrawerLookKind.Glass ? WithAlpha(inkColor, 0.25) : Colors.Transparent,
+            LabelShadow = kind is DrawerLookKind.Outline or DrawerLookKind.Bare ? OppositeShadow(ink.DarkInk) : null,
         };
+    }
+
+    private static Effect OppositeShadow(bool darkInk)
+    {
+        var e = new DropShadowEffect
+        {
+            Color = darkInk ? Colors.White : Colors.Black, BlurRadius = 4, ShadowDepth = 1, Direction = 270, Opacity = 0.9,
+        };
+        e.Freeze();
+        return e;
     }
 
     private static Color WithAlpha(Color c, double a) => Color.FromArgb((byte)Math.Round(a * 255), c.R, c.G, c.B);
