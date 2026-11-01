@@ -12,7 +12,7 @@ namespace Sanduhr.App.ViewModels;
 /// Design it with an AI chat (setup spec, section 3): copy a prompt, paste the answer back, see each problem by field, then Preview
 /// the Desk part through the review bar or use the drawer rules, which replace the rules and open their plan for review. The parts are
 /// checked by their own rules (<see cref="DeskDesign.Validate(JsonNode?, DeskDesignContext)"/> for the Desk, <see cref="PastedSetup"/> for
-/// the rules), and nothing applies while anything in the paste is wrong. Copy here names no product (<see cref="SetupCopy.Chat"/>).
+/// the rules and the drawer look), and nothing applies while anything in the paste is wrong. Copy here names no product (<see cref="SetupCopy.Chat"/>).
 /// </summary>
 public sealed partial class ChatDesignViewModel : ObservableObject
 {
@@ -20,7 +20,9 @@ public sealed partial class ChatDesignViewModel : ObservableObject
     private readonly Func<DeskValidation, DeskAnswer>? _previewDesk;
     private readonly Func<JsonNode, DeskValidation> _validate;
     private readonly Func<IReadOnlyList<DrawerRule>, IReadOnlyList<string>, string?> _useRules;
+    private readonly Func<PastedDrawerLook, string?>? _useDrawerSettings;
     private DeskValidation? _desk;
+    private PastedDrawerLook? _drawerLook;
     private IReadOnlyList<DrawerRule>? _rules;
     private IReadOnlyList<string> _ruleNames = [];
 
@@ -29,13 +31,17 @@ public sealed partial class ChatDesignViewModel : ObservableObject
     /// <param name="validate">The Desk's rules for the Desk part, with this PC's context.</param>
     /// <param name="useRules">Replaces the drawer rules with the chat's and opens their plan for review: the rules and the chat's name for
     /// each rule's drawer. Null when the review opened; otherwise the line to show.</param>
+    /// <param name="useDrawerSettings">Saves the chat's drawer look and opacity and, with an arrangement, lines the drawers up with Undo on
+    /// the drawers bar. Null when it was done; otherwise the line to show (nothing applied). Null where there is no Desk to apply it on.</param>
     internal ChatDesignViewModel(Func<IReadOnlyList<string>> monitorNames, Func<DeskValidation, DeskAnswer>? previewDesk,
-        Func<JsonNode, DeskValidation> validate, Func<IReadOnlyList<DrawerRule>, IReadOnlyList<string>, string?> useRules)
+        Func<JsonNode, DeskValidation> validate, Func<IReadOnlyList<DrawerRule>, IReadOnlyList<string>, string?> useRules,
+        Func<PastedDrawerLook, string?>? useDrawerSettings = null)
     {
         _monitorNames = monitorNames;
         _previewDesk = previewDesk;
         _validate = validate;
         _useRules = useRules;
+        _useDrawerSettings = useDrawerSettings;
     }
 
     /// <summary>The prompt Copy prompt puts on the clipboard.</summary>
@@ -47,9 +53,11 @@ public sealed partial class ChatDesignViewModel : ObservableObject
     [ObservableProperty] private string _pasteText = "";
     [ObservableProperty] private string _summary = "";
     [ObservableProperty] private string _rulesLine = "";
+    [ObservableProperty] private string _drawerSettingsLine = "";
     [ObservableProperty] private string _status = "";
     [ObservableProperty] private bool _canPreview;
     [ObservableProperty] private bool _canUseRules;
+    [ObservableProperty] private bool _canUseDrawerSettings;
 
     /// <summary>Called when the window should close (the Close button).</summary>
     public Action? CloseRequested { get; set; }
@@ -62,8 +70,9 @@ public sealed partial class ChatDesignViewModel : ObservableObject
         _desk = null;
         _rules = null;
         _ruleNames = [];
-        CanPreview = CanUseRules = false;
-        RulesLine = Summary = Status = "";
+        _drawerLook = null;
+        CanPreview = CanUseRules = CanUseDrawerSettings = false;
+        RulesLine = DrawerSettingsLine = Summary = Status = "";
         if (string.IsNullOrWhiteSpace(raw)) return;
 
         var read = PastedSetup.Read(raw);
@@ -98,8 +107,33 @@ public sealed partial class ChatDesignViewModel : ObservableObject
                 .Select(n => StreamerMode.Mask.Name(CodenameCategory.Folder, n)).ToList();   // streamer: masked - Mask.Name gives each drawer name its codename while on
             RulesLine = SetupCopy.ChatRulesLine(rules.Count, shown);
         }
+        if (read.DrawerLook is { } look)
+        {
+            _drawerLook = look;
+            CanUseDrawerSettings = true;
+            DrawerSettingsLine = DescribeDrawerSettings(look);
+        }
         Summary = read.Blocks > 1 ? SetupCopy.ChatManyBlocks(read.Blocks) : SetupCopy.ChatReady;
     }
+
+    /// <summary>What the drawer settings would do, in the window's words: the look and opacity, and where Tidy would line the drawers up,
+    /// naming only the parts the paste gave.</summary>
+    internal static string DescribeDrawerSettings(PastedDrawerLook look)
+    {
+        string? corner = look.Arrange is { } a && look.HasCorner ? CornerName(a.Corner) : null;
+        string? flow = look.Arrange is { } b && look.HasFlow ? FlowName(b.Flow) : null;
+        return SetupCopy.ChatDrawerSettingsLine(look.Look is { } k ? DrawerStyle.Word(k) : null, look.Opacity, corner, flow);
+    }
+
+    private static string CornerName(DrawerCorner c) => c switch
+    {
+        DrawerCorner.TopLeft => "top left",
+        DrawerCorner.TopRight => "top right",
+        DrawerCorner.BottomLeft => "bottom left",
+        _ => "bottom right",
+    };
+
+    private static string FlowName(DrawerFlow f) => f == DrawerFlow.Row ? "row" : "column";
 
     [RelayCommand]
     private void CopyPrompt()
@@ -129,6 +163,16 @@ public sealed partial class ChatDesignViewModel : ObservableObject
     {
         if (_rules is not { } rules) return;
         Status = _useRules(rules, _ruleNames) is { } said ? StreamerMode.Mask.Paths(said) : SetupCopy.ChatRulesShown;
+    }
+
+    [RelayCommand]
+    private void UseDrawerSettings()
+    {
+        if (_drawerLook is not { } look) return;
+        if (_useDrawerSettings is null) { Status = SetupCopy.ChatNoDeskService; return; }
+        Status = _useDrawerSettings(look) is { } said
+            ? StreamerMode.Mask.Paths(said)
+            : look.Arrange is null ? SetupCopy.ChatDrawerSettingsDone : SetupCopy.ChatDrawerSettingsArranged;
     }
 
     [RelayCommand]

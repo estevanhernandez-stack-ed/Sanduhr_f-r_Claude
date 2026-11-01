@@ -149,6 +149,7 @@
             <ItemsControl x:Name="FindingsList" ItemsSource="{Binding Findings}" ItemTemplate="{StaticResource FindingTemplate}" Focusable="False" />
         </ScrollViewer>
         <TextBlock x:Name="RulesText" Style="{StaticResource LineText}" Margin="0,8,0,0" Text="{Binding RulesLine}" />
+        <TextBlock x:Name="DrawerSettingsText" Style="{StaticResource LineText}" Margin="0,8,0,0" Text="{Binding DrawerSettingsLine}" />
 
         <Grid Margin="0,18,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
@@ -156,10 +157,14 @@
                         Content="{x:Static core:SetupCopy.ChatPreview}" Command="{Binding PreviewCommand}"
                         IsEnabled="{Binding CanPreview}"
                         AutomationProperties.Name="{x:Static core:SetupCopy.ChatPreview}" />
-                <Button x:Name="UseRulesButton" Style="{StaticResource FlatButton}"
+                <Button x:Name="UseRulesButton" Style="{StaticResource FlatButton}" Margin="0,0,8,0"
                         Content="{x:Static core:SetupCopy.ChatUseRules}" Command="{Binding UseRulesCommand}"
                         IsEnabled="{Binding CanUseRules}"
                         AutomationProperties.Name="{x:Static core:SetupCopy.ChatUseRules}" />
+                <Button x:Name="UseDrawerSettingsButton" Style="{StaticResource FlatButton}"
+                        Content="{x:Static core:SetupCopy.ChatUseDrawerSettings}" Command="{Binding UseDrawerSettingsCommand}"
+                        IsEnabled="{Binding CanUseDrawerSettings}"
+                        AutomationProperties.Name="{x:Static core:SetupCopy.ChatUseDrawerSettings}" />
             </StackPanel>
             <Button x:Name="CloseButton" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" IsCancel="True"
                     Content="{x:Static core:SetupCopy.ChatClose}" Command="{Binding CloseCommand}"

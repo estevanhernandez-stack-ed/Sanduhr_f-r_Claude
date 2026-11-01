@@ -232,7 +232,7 @@ public class SetupPromptTests
         Assert.False(PastedSetup.Read("""{"drawers":{"rules":[{"kind":"older_than","drawer":"A","days":0}]}}""").Ok);
         Assert.False(PastedSetup.Read(F("""{"drawers":{"rules":[{"kind":"older_than","drawer":"A","days":<0>}]}}""", int.Parse(max) + 1)).Ok);
 
-        var (count, _) = Pair(@"1 to (\d+) rules; leave drawers out to keep my rules as they are\. (The first)");
+        var (count, _) = Pair(@"1 to (\d+) rules; leave rules out to keep my rules as they are\. (The first)");
         Assert.Equal(PastedSetup.MaxRules, int.Parse(count));
         var (nameLen, _) = Pair(@"a short folder name of up to (\d+) characters, (a name)");
         Assert.True(PastedSetup.Read(F("""{"drawers":{"rules":[{"kind":"images","drawer":"<0>"}]}}""", new string('d', int.Parse(nameLen)))).Ok);
@@ -240,6 +240,34 @@ public class SetupPromptTests
         var (textLen, _) = Pair(@"part of a file name, up to (\d+) (characters)");
         Assert.True(PastedSetup.Read(F("""{"drawers":{"rules":[{"kind":"name_contains","drawer":"A","text":"<0>"}]}}""", new string('t', int.Parse(textLen)))).Ok);
         Assert.False(PastedSetup.Read(F("""{"drawers":{"rules":[{"kind":"name_contains","drawer":"A","text":"<0>"}]}}""", new string('t', int.Parse(textLen) + 1))).Ok);
+    }
+
+    [Fact]
+    public void The_prompt_teaches_every_look_corner_and_direction_and_the_opacity_range()
+    {
+        Assert.Equal(DrawerStyle.LookWords, ListAfter("- look: ", " ("));
+        Assert.Equal(DrawerStyle.CornerWords, ListAfter(" corner: ", " ("));
+        Assert.Equal(DrawerStyle.FlowWords, ListAfter(" direction: ", ". Send"));
+        Assert.Contains($"{DrawerStyle.MinOpacity} to {DrawerStyle.MaxOpacity}", Prompt);
+
+        foreach (var w in DrawerStyle.LookWords) Assert.True(PastedSetup.Read(F("""{"drawers":{"look":"<0>"}}""", w)).Ok, w);
+        foreach (var w in DrawerStyle.CornerWords) Assert.True(PastedSetup.Read(F("""{"drawers":{"arrange":{"corner":"<0>"}}}""", w)).Ok, w);
+        foreach (var w in DrawerStyle.FlowWords) Assert.True(PastedSetup.Read(F("""{"drawers":{"arrange":{"direction":"<0>"}}}""", w)).Ok, w);
+
+        var (min, max) = Pair(@"a whole number from (\d+) to (\d+), for solid");
+        Assert.Equal(DrawerStyle.MinOpacity, int.Parse(min));
+        Assert.Equal(DrawerStyle.MaxOpacity, int.Parse(max));
+        Assert.True(PastedSetup.Read(F("""{"drawers":{"opacity":<0>}}""", min)).Ok);
+        Assert.True(PastedSetup.Read(F("""{"drawers":{"opacity":<0>}}""", max)).Ok);
+        Assert.False(PastedSetup.Read(F("""{"drawers":{"opacity":<0>}}""", int.Parse(min) - 1)).Ok);
+        Assert.False(PastedSetup.Read(F("""{"drawers":{"opacity":<0>}}""", int.Parse(max) + 1)).Ok);
+    }
+
+    [Fact]
+    public void The_prompts_answer_shape_names_the_drawers_members_and_no_others()
+    {
+        Assert.Contains("\"rules\": [ ... ], \"look\": ..., \"opacity\": ..., \"arrange\": { ... }", Prompt);
+        Assert.Contains("never file moves", Prompt);
     }
 
     [Fact]
