@@ -1073,6 +1073,13 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         drawn.AddRange(service.PreviewDrawers.Select(p => p.Def).Where(p => drawn.All(d => d.Id != p.Id)));
         var ids = settings.Drawers.Select(d => d.Id).Where(id => drawn.Any(d => d.Id == id)).ToHashSet(StringComparer.Ordinal);
         var placed = settings.Places.Where(kv => ids.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+        // An arrival that could not be saved (settings.json unwritable) stays where it arrived for the session; a saved place wins.
+        foreach (var gone in _arrivedPlaces.Keys.Where(k => !settings.Drawers.Any(d => d.Id == k) || settings.Places.ContainsKey(k)).ToArray())
+            _arrivedPlaces.Remove(gone);
+        foreach (var gone in _arrivalTried.Where(k => !settings.Drawers.Any(d => d.Id == k)).ToArray())
+            _arrivalTried.Remove(gone);
+        foreach (var (id, place) in _arrivedPlaces)
+            if (ids.Contains(id)) placed.TryAdd(id, place);
         var folded = drawn.Where(d => service.Get(d.Id)?.Folded == true).Select(d => d.Id).ToList();
         var primary = DrawerScreens.Primary(screens);
         var primaryWork = DrawerScreens.WorkDips(primary);
@@ -1085,8 +1092,10 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         // A drawer that arrived without a saved place is saved where it arrived, once (a preview drawer is not a saved drawer's).
         bool any = false;
         foreach (var d in drawn)
-            if (ids.Contains(d.Id) && !placed.ContainsKey(d.Id) && !settings.Places.ContainsKey(d.Id))
+            if (ids.Contains(d.Id) && !settings.Places.ContainsKey(d.Id))
             {
+                _arrivedPlaces[d.Id] = places[d.Id];
+                if (_arrivalTried.Contains(d.Id)) continue;   // one save attempt per drawer per session: a store that cannot write is not asked again
                 _arrived[d.Id] = places[d.Id];
                 any = true;
             }
@@ -1098,7 +1107,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         return [.. drawn.Select(d => (service.Get(d.Id)!, places[d.Id]))];
     }
 
-    private readonly Dictionary<string, DrawerPlace> _arrived = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, DrawerPlace> _arrived = new(StringComparer.Ordinal);          // arrivals waiting to be saved
+    private readonly Dictionary<string, DrawerPlace> _arrivedPlaces = new(StringComparer.Ordinal);    // every unsaved arrival, kept for the session
+    private readonly HashSet<string> _arrivalTried = new(StringComparer.Ordinal);                      // ids a save was attempted for
     private bool _arrivalSaveQueued;
 
     /// <summary>Saves the places drawers arrived at, merged into the settings as they are now (a drawer placed meanwhile keeps its place),
@@ -1108,6 +1119,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _arrivalSaveQueued = false;
         var arrived = _arrived.ToArray();
         _arrived.Clear();
+        foreach (var (id, _) in arrived) _arrivalTried.Add(id);   // before the save: SettingsStore.Write swallows a failed write, and Save still redraws
         if (_stopped || _drawers is not { } service || arrived.Length == 0) return;
         var current = service.Settings;
         var merged = new Dictionary<string, DrawerPlace>(current.Places, StringComparer.Ordinal);

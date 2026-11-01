@@ -12,6 +12,8 @@ public static class DrawerReview
     public const string NothingToSort = "Nothing on your Desktop matches a rule.";
     public const string FirstOnLine = "Drawer files live in the Drawers folder on your Desktop.";
     public const string Busy = "Finish the review on your Desk first.";
+    /// <summary>Tidy or a chat's arrangement would replace a sort's result bar while its Undo can still put files back.</summary>
+    public const string UndoFirst = "Undo or close the last sort first.";
     public const string Undo = "Undo";
     public const string Done = "Done";
     public const string ApplyFailed = "The plan could not be applied. Nothing more was moved.";

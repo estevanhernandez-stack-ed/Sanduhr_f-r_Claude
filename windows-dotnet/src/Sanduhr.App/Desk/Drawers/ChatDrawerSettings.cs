@@ -31,6 +31,7 @@ internal static class ChatDrawerSettings
             return SetupCopy.ChatDrawerSettingsSavedOff;
         }
         if (!desk.HasScreens) return SettingsNames.DrawersSortUnavailable;
+        if (review.HoldsFileUndo) return DrawerReview.UndoFirst;   // before anything moves: the result bar would replace a sort's live Undo
         var tidy = new DrawerTidy(look.HasCorner ? wanted.Corner : before.Tidy.Corner, look.HasFlow ? wanted.Flow : before.Tidy.Flow);
         // Tidy goes first: it refuses (nothing written) while a review is open, so a refusal leaves the look as it was too.
         if (desk.Tidy(tidy, null) is not { } r) return DrawerReview.Busy;

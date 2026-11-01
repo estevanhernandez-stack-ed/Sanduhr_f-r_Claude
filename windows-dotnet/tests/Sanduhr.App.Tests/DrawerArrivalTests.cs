@@ -199,4 +199,30 @@ public sealed class DrawerArrivalTests
         }
         finally { desk.Dispose(); s.Dispose(); }
     });
+
+    [Fact]
+    public void A_settings_file_that_cannot_be_written_gets_one_save_attempt_and_the_drawer_stays_where_it_arrived() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (desk, s, store, host) = Start(box, legacy: false, "Images");
+        int saves = 0;
+        s.Changed += () => saves++;
+        // Open for reading with writers shut out: reads still work, SettingsStore.Write swallows the IOException, and Save still redraws.
+        using var lockFile = new FileStream(new Paths(appDataBase: Path.Combine(box.Root, "appdata"), localAppDataBase: Path.Combine(box.Root, "local")).SettingsFile,
+            FileMode.Open, FileAccess.Read, FileShare.Read);
+        try
+        {
+            var arrived = Anchors(host)["images"];
+            for (int i = 0; i < 5; i++) Pump();
+            Assert.Equal(1, saves);                        // not asked again, however many renders follow
+            Assert.Empty(store.LoadDrawers().Places);      // and nothing was written
+
+            desk.IconAreaOverride = [new DrawerRect(1300, 0, 620, 1032)];   // icons now fill the arrival corner
+            desk.Reload();
+            for (int i = 0; i < 5; i++) Pump();
+            Assert.Equal(1, saves);
+            Assert.Equal(arrived, Anchors(host)["images"]);   // it stays put for the session
+        }
+        finally { desk.Dispose(); s.Dispose(); }
+    });
 }

@@ -1128,6 +1128,7 @@ public partial class App : Application
         if (_quitting || _desk is null || _drawers is null || _drawerReview is null) return SettingsNames.DrawersSortUnavailable;
         if (!_drawers.Settings.Enabled) return DrawerReview.DrawersOff;
         if (!_desk.HasScreens) return SettingsNames.DrawersSortUnavailable;
+        if (_drawerReview.HoldsFileUndo) return DrawerReview.UndoFirst;   // before anything moves: the result bar would replace a sort's live Undo
         var t = tidy ?? _drawers.Settings.Tidy;
         if (_desk.Tidy(t, monitor) is not { } r) return DrawerReview.Busy;
         if (r.Moved == 0) return DrawerReview.TidyNothing;

@@ -240,6 +240,44 @@ public sealed class DrawerTidyTests
     });
 
     [Fact]
+    public void A_sorts_result_bar_with_a_live_file_Undo_is_not_replaced_by_Tidy_or_a_chat_until_it_is_used_or_closed() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var saved = Places(("images", 700, 400));
+        var (desk, s, store) = Desk(box, Screen(1920, 1080), d => d with { Places = saved }, "Images");
+        var (review, host) = Review(s, store);
+        DrawerReviewService.Current = review;
+        try
+        {
+            box.File(@"Desktop\notes.pdf");
+            Assert.Null(review.SortNow());
+            host.Apply!();                                  // the sort ran: its result bar holds Undo for the moved file
+            Assert.False(review.Reviewing);
+            Assert.True(review.HoldsFileUndo);
+            var title = host.Model!.Title;
+
+            Assert.Equal(DrawerReview.UndoFirst, review.ShowResult("1 drawer lined up.", () => { }));
+            Assert.Equal(title, host.Model!.Title);
+            var places = store.LoadDrawers().Places;
+            Assert.Equal(DrawerReview.UndoFirst,
+                ChatDrawerSettings.Apply(Look("""{"drawers":{"look":"glass","arrange":{"corner":"bl"}}}"""), s, desk, review));
+            Assert.Equal(DrawerLookKind.Solid, store.LoadDrawers().Look);   // nothing applied
+            Assert.Equal(places, store.LoadDrawers().Places);
+            Assert.Null(ChatDrawerSettings.Apply(Look("""{"drawers":{"opacity":30}}"""), s, desk, review));   // a look alone shows no bar
+
+            host.Apply!();                                  // Undo is used: the bar stays, with no Undo left
+            Assert.False(review.HoldsFileUndo);
+            Assert.Null(review.ShowResult("1 drawer lined up.", () => { }));
+            Assert.Equal("1 drawer lined up.", host.Model!.Title);
+
+            // A closed sort bar holds nothing either.
+            host.Dismiss!();
+            Assert.False(review.HoldsFileUndo);
+        }
+        finally { DrawerReviewService.Current = null; desk.Dispose(); s.Dispose(); }
+    });
+
+    [Fact]
     public void A_drawer_that_cannot_fit_keeps_its_place_and_nothing_lands_on_it_or_off_screen() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();

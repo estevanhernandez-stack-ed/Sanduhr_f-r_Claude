@@ -40,7 +40,9 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
     public DrawerTidy Tidy { get; init; } = DrawerTidy.Default;
 
     /// <summary>The file was written before 4.5 (a <c>drawers</c> object with no <c>tidy</c> key): drawers with no saved place arrive in today's
-    /// column rule, once, and are saved, so an upgrader's drawers sit exactly as before. Cleared by that first save; never encoded.</summary>
+    /// column rule, once, and are saved, so an upgrader's drawers sit exactly as before. Cleared by that first save; never encoded.
+    /// Any drawers save that lands before the first render also clears it on the next load, because <c>Encode</c> always writes the
+    /// <c>tidy</c> key and that key is the test. Low risk: the startup render comes first.</summary>
     public bool LegacyArrival { get; init; }
 
     public DrawerLookKind LookFor(string id) => Looks.TryGetValue(id, out var k) ? k : Look;
