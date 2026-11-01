@@ -152,6 +152,11 @@ internal static class DeskNative
     /// <summary>The cursor in physical pixels, read per-monitor aware; far off every screen when Windows would not say.</summary>
     public static PxPoint CursorPx() => PerMonitor(() => GetCursorPos(out var p) ? new PxPoint(p.X, p.Y) : new PxPoint(int.MinValue / 2, int.MinValue / 2));
 
+    [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int vKey);
+
+    /// <summary>Whether Alt (VK_MENU) is down right now, whichever window is active: the Desk's windows never are.</summary>
+    public static bool AltDown() => (GetAsyncKeyState(0x12) & 0x8000) != 0;
+
     /// <summary>Moves a Desk window to <paramref name="at"/> (physical pixels) without touching its size, z-order or activation.</summary>
     public static void MoveTo(IntPtr h, PxPoint at) => PerMonitor(() =>
         SetWindowPos(h, IntPtr.Zero, at.X, at.Y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE));

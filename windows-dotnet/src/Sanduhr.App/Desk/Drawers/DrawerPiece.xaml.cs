@@ -230,6 +230,7 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         EndMove();
         _title = (cursor, window, offset);
         _lastCursor = cursor;
+        _snapLatch = true;
     }
 
     /// <summary>The mouse moved with the title pressed: past the system's drag distance the drawer's own window follows it (no size, no
@@ -245,14 +246,34 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
             _moving = true;
             _moveHold ??= _service.Hold();
         }
-        if (Handle is var h && h != IntPtr.Zero) DeskNative.MoveTo(h, WindowAt(t, cursor));
+        _snapLatch = Snaps;
+        if (Handle is var h && h != IntPtr.Zero) DeskNative.MoveTo(h, SnappedWindowAt(t, cursor));
+    }
+
+    /// <summary>Whether Alt is down; a seam for tests (the real key state is read whichever window is active).</summary>
+    internal Func<bool> AltDown { get; set; } = DeskNative.AltDown;
+
+    /// <summary>Whether this move snaps: the setting is on and Alt is not held (Alt places the drawer exactly where the hand puts it).</summary>
+    private bool Snaps => _service.Settings.Snap && !AltDown();
+
+    /// <summary>The last move's decision to snap. The drop uses it, so the Desk saves what the hand last saw even if Alt changed on release.</summary>
+    private bool _snapLatch = true;
+
+    /// <summary>The window's top-left for the cursor, pulled to the nearest snap when snapping: the Desk answers for the piece's top-left (the
+    /// panel, not the window around it), so the offset of the piece inside its window is taken off again.</summary>
+    private PxPoint SnappedWindowAt((PxPoint Cursor, PxPoint Window, PxPoint Offset) t, PxPoint cursor)
+    {
+        var w = WindowAt(t, cursor);
+        if (!Snaps || _service.Snapper is not { } snapper) return w;
+        var top = snapper(_state.Def.Id, new PxPoint(w.X + t.Offset.X, w.Y + t.Offset.Y));
+        return new PxPoint(top.X - t.Offset.X, top.Y - t.Offset.Y);
     }
 
     /// <summary>The title was let go: after a move the Desk is asked to keep the drawer where it was dropped; without one, it folds or opens.</summary>
     internal void TitleUp(PxPoint cursor)
     {
         if (_title is not { } t) return;
-        TitleMove(cursor);
+        if (cursor != _lastCursor) TitleMove(cursor);   // a release where the last move already was changes nothing, Alt included
         bool moved = _moving;
         if (moved) Place(t, cursor);
         else
@@ -278,7 +299,7 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         _moveHold = null;
         EndMove();
         // The request lands while the hold still stands, so the Desk draws the drawer once, at its new place, when the hold is released.
-        try { _service.RequestPlace(_state.Def.Id, new PxPoint(w.X + t.Offset.X, w.Y + t.Offset.Y)); }
+        try { _service.RequestPlace(_state.Def.Id, new PxPoint(w.X + t.Offset.X, w.Y + t.Offset.Y), _snapLatch); }
         finally { hold?.Dispose(); }
     }
 
