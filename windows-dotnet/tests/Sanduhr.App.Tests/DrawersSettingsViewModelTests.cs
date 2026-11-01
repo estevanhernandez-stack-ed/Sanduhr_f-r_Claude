@@ -175,9 +175,9 @@ public sealed class DrawersSettingsViewModelTests
         using var box = new DrawerSandbox();
         var (vm, s, _) = Make(box, enabled: true);
         var row = vm.Rules.Single(r => r.HasDays);
-        Assert.Equal("Files not opened in 30 days go to Older files", row.Label);
+        Assert.Equal("Files not changed in 30 days go to Older files", row.Label);
         row.Days = 1;
-        Assert.Equal("Files not opened in 1 day go to Older files", row.Label);
+        Assert.Equal("Files not changed in 1 day go to Older files", row.Label);
         Assert.Contains(row.Label, row.DeleteName);
         s.Dispose();
     });

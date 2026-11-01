@@ -16,7 +16,7 @@ public static class DrawerRules
     private static readonly HashSet<string> DocumentExt = Set(".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".md", ".rtf", ".odt", ".ods", ".odp", ".csv");
     private static readonly HashSet<string> InstallerExt = Set(".exe", ".msi", ".msix", ".msixbundle", ".appx", ".appxbundle");
     private static readonly HashSet<string> ArchiveExt = Set(".zip", ".7z", ".rar", ".tar", ".gz", ".tgz", ".bz2", ".xz", ".iso");
-    private static readonly HashSet<string> ShortcutExt = Set(".lnk", ".url");
+    private static readonly HashSet<string> ShortcutExt = Set(".lnk", ".url", ".pif");
 
     /// <summary>The built-in set, in order. Every rule starts on, shortcuts included (a desktop is mostly shortcuts, and nothing moves until the user
     /// applies the review; saved rule lists are never touched); old files go last,

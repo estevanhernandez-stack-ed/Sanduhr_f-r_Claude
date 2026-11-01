@@ -479,6 +479,9 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         text = text.Trim();
         // A blank box under streamer mode (it opens blank, see EditorStart) keeps the name, as Escape does.
         if (text.Length == 0 && StreamerMode.On) { EndRename(); return; }
+        // An unchanged box is a no-op: the box shows the name without its hidden extension, so putting the extension back could rename a
+        // file whose real name already ends in it ("Foo.lnk.lnk" is drawn "Foo.lnk").
+        if (text == item.DisplayName) { EndRename(); return; }
         var newName = item.IsFolder ? text : DrawerNames.WithHiddenExtension(item.Name, text);   // streamer: key - the typed name with the file's hidden extension put back, used for IO
         if (newName != item.Name && _service.RenameItem(item.Path, newName) is { } error) Say(error);
         EndRename();

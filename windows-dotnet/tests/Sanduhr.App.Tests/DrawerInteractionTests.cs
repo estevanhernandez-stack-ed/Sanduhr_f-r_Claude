@@ -76,6 +76,23 @@ public sealed class DrawerInteractionTests
     });
 
     [Fact]
+    public void An_unchanged_rename_box_renames_nothing_even_when_the_name_ends_in_its_hidden_extension() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, piece) = Make(box);
+        box.File(@"Desktop\Drawers\Images\Foo.lnk.lnk");
+        s.Reload();
+        var item = s.Get("images")!.Items.Single();
+        Assert.Equal("Foo.lnk", item.DisplayName);
+        piece.BeginRename(item);
+        piece.CommitRename(item, "Foo.lnk");
+        Assert.True(File.Exists(Path.Combine(box.Drawers, "Images", "Foo.lnk.lnk")));
+        Assert.False(File.Exists(Path.Combine(box.Drawers, "Images", "Foo.lnk")));
+        Assert.False(s.Busy);
+        s.Dispose();
+    });
+
+    [Fact]
     public void A_name_with_its_own_extension_is_not_drawn_short() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();

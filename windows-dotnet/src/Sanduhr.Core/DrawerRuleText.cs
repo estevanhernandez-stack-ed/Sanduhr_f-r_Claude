@@ -4,7 +4,7 @@ namespace Sanduhr.Core;
 /// page's rule rows and their accessible names.</summary>
 public static class DrawerRuleText
 {
-    /// <summary>"Screenshots go to Screenshots", "Files not opened in 30 days go to Older files", "Names with \"invoice\" go to Receipts".
+    /// <summary>"Screenshots go to Screenshots", "Files not changed in 30 days go to Older files", "Names with \"invoice\" go to Receipts".
     /// <paramref name="drawerName"/> is the drawer as the caller draws it (the page passes its streamer-masked name). Name rules quote
     /// the user's own text.</summary>
     public static string Sentence(DrawerRule rule, string drawerName) => Subject(rule) + " go to " + drawerName;
@@ -16,9 +16,9 @@ public static class DrawerRuleText
         DrawerRuleKind.Images => "Pictures",
         DrawerRuleKind.Documents => "Documents",
         DrawerRuleKind.Installers => "Installers",
-        DrawerRuleKind.Archives => "Zip files",
+        DrawerRuleKind.Archives => "Zip files and other archives",
         DrawerRuleKind.Shortcuts => "Shortcuts",
-        DrawerRuleKind.OlderThan => $"Files not opened in {rule.Days} {(rule.Days == 1 ? "day" : "days")}",
+        DrawerRuleKind.OlderThan => $"Files not changed in {rule.Days} {(rule.Days == 1 ? "day" : "days")}",
         DrawerRuleKind.NameContains => $"Names with \"{rule.Text}\"",
         _ => $"Names starting with \"{rule.Text}\"",
     };

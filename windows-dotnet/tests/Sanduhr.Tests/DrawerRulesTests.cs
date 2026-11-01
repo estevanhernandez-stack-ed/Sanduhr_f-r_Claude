@@ -22,6 +22,7 @@ public class DrawerRulesTests
     [InlineData("backup.7z", DrawerRuleKind.Archives, true)]
     [InlineData("Game.lnk", DrawerRuleKind.Shortcuts, true)]
     [InlineData("site.url", DrawerRuleKind.Shortcuts, true)]
+    [InlineData("Old tool.PIF", DrawerRuleKind.Shortcuts, true)]
     [InlineData("noextension", DrawerRuleKind.Documents, false)]
     public void Kind_rules_match_by_extension_and_screenshots_by_name_too(string name, DrawerRuleKind kind, bool match) =>
         Assert.Equal(match, DrawerRules.Matches(new DrawerRule(kind, "x"), File(name), Now));

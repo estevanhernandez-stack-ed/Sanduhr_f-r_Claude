@@ -43,7 +43,7 @@ public class SetupCopyTests
     [Fact]
     public void Tidy_my_files_says_what_the_default_rules_sort()
     {
-        Assert.Equal("Sorts screenshots, pictures, documents, installers, zip files, shortcuts and files you haven't opened in a month into drawers. Nothing moves until you say so.",
+        Assert.Equal("Sorts screenshots, pictures, documents, installers, zip and other archive files, shortcuts and files you haven't changed in a month into drawers. Nothing moves until you say so.",
             SetupCopy.DrawersBody);
         // The body speaks for the defaults: every kind it lists is a default rule, and every default rule is on.
         Assert.All(DrawerRules.Defaults, r => Assert.True(r.On));

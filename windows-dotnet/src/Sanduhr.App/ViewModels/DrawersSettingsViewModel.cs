@@ -375,7 +375,7 @@ public sealed partial class DrawerRuleRow : ObservableObject
 
     public DrawerRuleKind Kind { get; }
 
-    /// <summary>"Screenshots go to Screenshots", "Files not opened in 30 days go to Older files": it follows the Days box.</summary>
+    /// <summary>"Screenshots go to Screenshots", "Files not changed in 30 days go to Older files": it follows the Days box.</summary>
     public string Label => DrawerRuleText.Sentence(_rule with { Days = Days }, _drawerName);
 
     // Each button names its own rule, so a screen reader can tell the rows apart.
