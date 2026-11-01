@@ -85,6 +85,12 @@ public static class DrawerReview
     /// cannot move.</summary>
     public const string RootKeptLine = "The Drawers folder stays on your Desktop: it holds files that are not in a drawer.";
 
+    /// <summary>Tidy's result line: how many drawers lined up.</summary>
+    public static string Tidied(int n) => n == 1 ? "1 drawer lined up." : $"{n} drawers lined up.";
+
+    /// <summary>Tidy found every drawer where it would put it.</summary>
+    public const string TidyNothing = "The drawers are already lined up.";
+
     /// <summary>The bar after Apply: the result line, Undo (when anything moved) and Done.</summary>
     public static DeskReviewModel Result(string line, bool canUndo) =>
         new(line, null, [], [], DeskOff: false, [])

@@ -155,4 +155,12 @@ public sealed class DrawerReviewTests
         Assert.Equal("1 drawer folder stays on your Desktop until its files can move. Turn drawers off again to finish.", DrawerReview.KeptLine(1));
         Assert.Equal("2 drawer folders stay on your Desktop until their files can move. Turn drawers off again to finish.", DrawerReview.KeptLine(2));
     }
+
+    [Fact]
+    public void Tidys_result_line_counts_the_drawers_lined_up()
+    {
+        Assert.Equal("1 drawer lined up.", DrawerReview.Tidied(1));
+        Assert.Equal("3 drawers lined up.", DrawerReview.Tidied(3));
+        Assert.Equal("The drawers are already lined up.", DrawerReview.TidyNothing);
+    }
 }
