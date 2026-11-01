@@ -56,7 +56,7 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         Resources["Drawer.Accent"] = Brush(look.Accent);
         Resources["Drawer.Hover"] = Brush(Color.FromArgb(46, look.Accent.R, look.Accent.G, look.Accent.B));
         Resources["Drawer.Selected"] = Brush(Color.FromArgb(90, look.Accent.R, look.Accent.G, look.Accent.B));
-        Resources["Drawer.LabelEffect"] = StreamerMode.On ? Blur() : look.Shadow;   // streamer: masked - file labels blur while streamer mode is on
+        Resources["Drawer.LabelEffect"] = StreamerMode.On ? Blur() : look.LabelEffect;   // streamer: masked - file labels blur while streamer mode is on
         Resources["Drawer.Border"] = Brush(look.Border);
         Resources["Drawer.HoverBorder"] = Brush(look.HoverBorder);
         Resources["Drawer.Edge"] = Brush(look.Edge);
@@ -109,7 +109,7 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
             Frame.Padding = new Thickness(7);
         }
         if (look.Kind == DrawerLookKind.Bare) TitleText.FontSize = 11;
-        if (look.Kind is DrawerLookKind.Outline or DrawerLookKind.Bare) TitleText.Effect = StreamerMode.On ? null : look.Shadow;
+        if (look.Kind is DrawerLookKind.Outline or DrawerLookKind.Bare) TitleText.Effect = StreamerMode.On ? null : look.LabelShadow;
         if (look.Chips)
         {
             TitleChip.Margin = new Thickness(0, 0, 0, 0);
