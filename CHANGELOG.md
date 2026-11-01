@@ -26,7 +26,25 @@
 
 - **Not in this release.** The Now playing bars stay the position bar. Moving bars need Sanduhr to tap system audio, which asks for a new permission, so it waits for your call.
 
-## Unreleased (windows)
+## v4.5.0 — 2026-11-01
+
+**Platform:** Windows (.NET 10 / WPF). Sanduhr works without Claude now: pick a nicer desktop, drawers for your files, your AI usage, or any mix. `Sanduhr.Mcp` to 4.5.0. No new outbound destination and no new capability: the manifest changes only its version.
+
+### Set up Sanduhr
+
+- **One screen of free choices.** A new install opens **Set up Sanduhr**: **A nicer desktop** (the clock, a message and the weather), **Tidy my files** (drawers) and **Track my AI usage**. Tick any mix. Nothing is a one-way door: the tray and Settings open it again, and unticking puts things back.
+- **No Claude account needed.** With usage off there is no sign-in screen, no meter and no fetching. The widget hides, the saved `snapshot.json` is deleted and any saved account stays until you remove it. The welcome tour skips the usage steps.
+- **Design it with an AI chat.** **Copy prompt** puts a prompt on your clipboard for any AI chat. It asks what you like, then gives you a block to paste back. **Preview on my Desk** shows it first, and nothing is saved or moved until you apply it. The answer can set the Desk and the drawers (rules, look, opacity and arrangement). Sanduhr sends nothing anywhere; you carry the text both ways.
+- **The tray when usage is off** shows the Sanduhr hourglass instead of "--", and **Tray shows** hides. Settings, General folds the Tray section to one line with a Set up Sanduhr button.
+- Upgrades change nothing and the screen does not open. A What's New card, **Choose what Sanduhr shows**, opens it.
+
+### Drawers
+
+- **Drawers on the Desk.** Settings, Drawers: themed panels on the Desk, each showing a real folder in a **Drawers** folder on your Desktop. They open, fold and hide. Drag files in from Explorer or out again; double-click opens; right-click is Explorer's own menu.
+- **Rules sort your Desktop, after you say so.** The built-in rules sort screenshots, pictures, documents, installers, archives, shortcuts and files you haven't changed in a month. The review lists every drawer with a few of its files and what stays on the Desktop, and **Apply** moves them with **Undo** on the bar. Rules read as plain sentences and you can switch each one off. Labels drop `.lnk`, `.url` and `.pif`, as Explorer does.
+- **Turning drawers off puts every file back** on the Desktop. Moves are the only thing drawers do: no rule deletes, overwrites or renames a file.
+- **Four looks.** **Solid**, **Glass** (Windows' own blur), **Outline** and **Bare**, with an opacity slider, in Settings, Drawers or a drawer's right-click **Look** menu.
+- **Placement that behaves.** A dragged drawer snaps to other drawers, the Desk's pieces and the screen edges, and slides off your desktop icons when dropped on them; hold **Alt** to place it freely. **Tidy drawers** lines them up from a corner, with **Undo**. A new drawer finds a free place on its own.
 
 ### Fixes
 
