@@ -78,11 +78,85 @@ public sealed class DrawersLookPageTests
         using var box = new DrawerSandbox();
         var (vm, s, store) = Make(box);
         vm.Opacity = 5;
+        vm.Flush();
         Assert.Equal(DrawerStyle.MinOpacity, vm.Opacity);
         Assert.Equal(DrawerStyle.MinOpacity, store.LoadDrawers().Opacity);
         vm.Opacity = 400;
+        vm.Flush();
         Assert.Equal(DrawerStyle.MaxOpacity, vm.Opacity);
         Assert.Equal(DrawerStyle.MaxOpacity, store.LoadDrawers().Opacity);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void Dragging_the_opacity_slider_saves_once_when_it_settles() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (vm, s, store) = Make(box);
+        int saves = 0;
+        s.Changed += () => saves++;
+        foreach (var v in new[] { 60, 65, 70, 75 }) vm.Opacity = v;
+        Assert.Equal(75, vm.Opacity);
+        Assert.Equal("75%", vm.OpacityText);   // the readout follows the thumb at once
+        Assert.Equal(0, saves);
+        Assert.Equal(55, store.LoadDrawers().Opacity);
+        vm.Flush();
+        Assert.Equal(1, saves);
+        Assert.Equal(75, store.LoadDrawers().Opacity);
+        vm.Flush();
+        Assert.Equal(1, saves);   // nothing pending, nothing saved
+        s.Dispose();
+    });
+
+    [Fact]
+    public void The_settle_timer_saves_a_resting_opacity() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (vm, s, store) = Make(box);
+        vm.Opacity = 90;
+        Assert.Equal(55, store.LoadDrawers().Opacity);
+        Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+        var until = DateTime.UtcNow.AddSeconds(5);
+        while (store.LoadDrawers().Opacity != 90 && DateTime.UtcNow < until)
+        {
+            var frame = new DispatcherFrame();
+            Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, () => { Thread.Sleep(20); frame.Continue = false; });
+            Dispatcher.PushFrame(frame);
+        }
+        Assert.Equal(90, store.LoadDrawers().Opacity);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void Another_change_saves_a_settling_opacity_first_and_closing_keeps_it() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (vm, s, store) = Make(box);
+        vm.Opacity = 80;
+        vm.Snap = false;
+        var saved = store.LoadDrawers();
+        Assert.Equal(80, saved.Opacity);
+        Assert.False(saved.Snap);
+
+        vm.Opacity = 30;
+        vm.Dispose();   // Settings closes before the timer ticks
+        Assert.Equal(30, store.LoadDrawers().Opacity);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void A_settling_opacity_survives_a_change_made_elsewhere() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (vm, s, store) = Make(box);
+        vm.Opacity = 70;
+        s.Save(s.Settings with { Snap = false });   // the service changes under the drag; Refresh runs
+        Assert.Equal(70, vm.Opacity);
+        Assert.False(vm.Snap);
+        vm.Flush();
+        var saved = store.LoadDrawers();
+        Assert.Equal(70, saved.Opacity);
+        Assert.False(saved.Snap);
         s.Dispose();
     });
 
@@ -110,7 +184,8 @@ public sealed class DrawersLookPageTests
         vm.TidyCornerIndex = (int)DrawerCorner.TopLeft;
         vm.TidyCommand.Execute(null);
         Assert.Equal(new DrawerTidy(DrawerCorner.TopLeft, DrawerFlow.Column), asked);
-        Assert.Equal("Nothing to tidy.", vm.Status);
+        Assert.Equal("Nothing to tidy.", vm.TidyStatus);
+        Assert.Equal("", vm.Status);   // the refusal shows under the Tidy row, not in the line at the top of the page
         s.Dispose();
     });
 
@@ -119,9 +194,9 @@ public sealed class DrawersLookPageTests
     {
         using var box = new DrawerSandbox();
         var (vm, s, _) = Make(box);
-        vm.Status = "old";
+        vm.TidyStatus = "old";
         vm.TidyCommand.Execute(null);
-        Assert.Equal("", vm.Status);
+        Assert.Equal("", vm.TidyStatus);
         s.Dispose();
     });
 
@@ -142,6 +217,7 @@ public sealed class DrawersLookPageTests
         Assert.All(controls, c => Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(c)), c.GetType().Name));
         Assert.Contains(controls.OfType<ComboBox>(), c => AutomationProperties.GetName(c) == SettingsNames.DrawersLook && c.Items.Count == 4);
         Assert.Contains(controls.OfType<Button>(), b => AutomationProperties.GetName(b) == SettingsNames.DrawersTidy);
+        Assert.Contains(Below<TextBlock>(section!), b => AutomationProperties.GetLiveSetting(b) == AutomationLiveSetting.Polite);   // the Tidy line
 
         var slider = controls.OfType<Slider>().Single();
         Assert.Equal(SettingsNames.DrawersOpacity, AutomationProperties.GetName(slider));

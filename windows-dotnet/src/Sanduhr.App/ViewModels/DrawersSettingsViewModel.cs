@@ -39,6 +39,7 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
         if (_disposed) return;
         _disposed = true;
         if (_drawers is not null) _drawers.Changed -= Refresh;
+        Flush();   // a drag that has not settled yet is not lost when Settings closes
     }
 
     /// <summary>Asks a yes or no question (the turn-off count); the page sets a themed dialog.</summary>
@@ -69,6 +70,7 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
     [ObservableProperty] private bool _keepClear = true;
     [ObservableProperty] private int _tidyCornerIndex;
     [ObservableProperty] private int _tidyFlowIndex;
+    [ObservableProperty] private string _tidyStatus = "";
 
     /// <summary>Opacity shows only for the looks that draw a plate (Solid, Glass).</summary>
     public bool ShowOpacity => LookIndex is >= 0 and <= (int)DrawerLookKind.Bare && DrawerStyle.HasFill((DrawerLookKind)LookIndex);
@@ -89,7 +91,7 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
             var s = _drawers.Settings;
             Enabled = s.Enabled;
             LookIndex = (int)s.Look;
-            Opacity = s.Opacity;
+            if (_pendingOpacity is null) Opacity = s.Opacity;   // a slider drag still settling keeps the value under the thumb
             Snap = s.Snap;
             KeepClear = s.KeepClear;
             TidyCornerIndex = (int)s.Tidy.Corner;
@@ -221,12 +223,41 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
     /// <summary>Tidy drawers, from the corner and direction the page shows.</summary>
     [RelayCommand]
     private void Tidy() =>
-        Status = TidyRequested?.Invoke(new DrawerTidy((DrawerCorner)TidyCornerIndex, (DrawerFlow)TidyFlowIndex)) ?? "";
+        TidyStatus = TidyRequested?.Invoke(new DrawerTidy((DrawerCorner)TidyCornerIndex, (DrawerFlow)TidyFlowIndex)) ?? "";
 
     private void SaveWith(Func<DrawerSettings, DrawerSettings> change)
     {
         if (_loading || _drawers is null) return;
+        Flush();   // a settling opacity lands first, so this change is made on top of it
         _drawers.Save(change(_drawers.Settings));
+    }
+
+    /// <summary>How long the opacity slider rests before its value is saved (a drag would otherwise save and rebuild the Desk on every tick).</summary>
+    public static readonly TimeSpan SettleFor = TimeSpan.FromMilliseconds(200);
+    private DispatcherTimer? _settle;
+    private int? _pendingOpacity;
+
+    private void SaveOpacitySoon(int value)
+    {
+        if (_drawers is null) return;
+        _pendingOpacity = value;
+        if (_settle is null)
+        {
+            _settle = new DispatcherTimer(DispatcherPriority.Background) { Interval = SettleFor };
+            _settle.Tick += (_, _) => Flush();
+        }
+        _settle.Stop();
+        _settle.Start();
+    }
+
+    /// <summary>Saves a settling opacity now (the settle timer, any other change first, or closing Settings).</summary>
+    public void Flush()
+    {
+        _settle?.Stop();
+        if (_pendingOpacity is not { } pending) return;
+        _pendingOpacity = null;
+        if (_drawers is null || _drawers.Settings.Opacity == pending) return;
+        _drawers.Save(_drawers.Settings with { Opacity = pending });
     }
 
     partial void OnLookIndexChanged(int value)
@@ -241,7 +272,7 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
         var clamped = Math.Clamp(value, DrawerStyle.MinOpacity, DrawerStyle.MaxOpacity);
         if (clamped != value) { Opacity = clamped; return; }
         OnPropertyChanged(nameof(OpacityText));
-        SaveWith(s => s with { Opacity = clamped });
+        if (!_loading) SaveOpacitySoon(clamped);
     }
 
     partial void OnSnapChanged(bool value) => SaveWith(s => s with { Snap = value });

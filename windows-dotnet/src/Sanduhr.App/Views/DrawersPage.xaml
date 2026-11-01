@@ -128,6 +128,9 @@
                                 Content="{x:Static core:SettingsNames.DrawersTidy}" Command="{Binding TidyCommand}"
                                 AutomationProperties.Name="{x:Static core:SettingsNames.DrawersTidy}" />
                     </WrapPanel>
+                    <TextBlock Text="{Binding TidyStatus}" FontSize="11.5" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                               AutomationProperties.LiveSetting="Polite" />
                 </StackPanel>
 
                 <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />

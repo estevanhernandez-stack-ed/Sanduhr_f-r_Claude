@@ -543,17 +543,17 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         Status.Text = line;
         AutomationProperties.SetName(Status, line);   // streamer: notname - a rename error or the drop line, which Say(DrawerRun) already cut to counts while streamer mode is on
         Status.Visibility = Visibility.Visible;
-        _statusTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
-        _statusTimer.Stop();
-        _statusTimer.Tick += Hide;
-        _statusTimer.Start();
-
-        void Hide(object? s, EventArgs a)
+        if (_statusTimer is null)
         {
-            _statusTimer!.Tick -= Hide;
-            _statusTimer.Stop();
-            Status.Visibility = Visibility.Collapsed;
+            _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+            _statusTimer.Tick += (_, _) =>
+            {
+                _statusTimer.Stop();
+                Status.Visibility = Visibility.Collapsed;
+            };
         }
+        _statusTimer.Stop();
+        _statusTimer.Start();
     }
 
     public void Dispose()
