@@ -104,6 +104,8 @@ public static class SettingsNames
     public const string TakeTheTour = "Take the tour…";
     /// <summary>General's picker and the tray menu's submenu: what the tray icon's number follows.</summary>
     public const string TrayShows = "Tray shows";
+    /// <summary>General, in place of the tray number's section while usage is off: the number is the AI usage, so it has nothing to show.</summary>
+    public const string TrayNeedsUsage = "The tray number shows your AI usage. Turn on usage in " + SetupCopy.Title + ".";
     /// <summary>The tray menu while demo mode runs.</summary>
     public const string EndDemoMode = "End demo mode";
     /// <summary>The signed-out widget and the tour's first step before sign-in.</summary>

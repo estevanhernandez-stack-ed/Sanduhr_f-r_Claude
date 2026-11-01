@@ -37,6 +37,36 @@ public sealed class WidgetUsageTests : AppWindowFixture
     });
 
     [Fact]
+    public void General_hides_the_tray_number_while_usage_is_off_and_says_why() => AppHost.Run(() =>
+    {
+        new SettingsStore(ScratchPaths()).SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false }));
+        var (widget, _) = ScratchWidget();   // no account: turning usage on builds no client and reaches no network
+        var general = new GeneralViewModel(widget: widget);
+        try
+        {
+            Assert.False(general.ShowTray);
+            Assert.True(general.ShowTrayOff);
+            Assert.Equal("The tray number shows your AI usage. Turn on usage in Set up Sanduhr.", SettingsNames.TrayNeedsUsage);
+            Assert.Equal(SettingsNames.TrayNeedsUsage, general.TrayOffLine);
+            var raised = new List<string?>();
+            general.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+            widget.SetUsageOn(true);
+            Assert.True(general.ShowTray);
+            Assert.False(general.ShowTrayOff);
+            Assert.Contains(nameof(GeneralViewModel.ShowTray), raised);
+        }
+        finally { general.Detach(); widget.Dispose(); }
+    });
+
+    [Fact]
+    public void General_shows_the_tray_number_when_there_is_no_widget_to_ask() => AppHost.Run(() =>
+    {
+        var general = new GeneralViewModel();
+        Assert.True(general.ShowTray);
+        Assert.False(general.ShowTrayOff);
+    });
+
+    [Fact]
     public void Usage_back_on_with_no_account_brings_the_sign_in_card_back() => AppHost.Run(() =>
     {
         // No account, so resuming builds no client and reaches no network.

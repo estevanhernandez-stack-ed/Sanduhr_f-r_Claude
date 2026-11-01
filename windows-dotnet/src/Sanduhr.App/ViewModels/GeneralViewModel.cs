@@ -37,6 +37,15 @@ public sealed partial class GeneralViewModel : ObservableObject
         }
     }
 
+    /// <summary>The tray number is the AI usage, so its section (the preview and the picker) shows only while usage is on. With no widget
+    /// to ask (a test, a bare page) it shows.</summary>
+    public bool ShowTray => _widget?.UsageOn ?? true;
+
+    /// <summary>The one line General says in the section's place while usage is off.</summary>
+    public bool ShowTrayOff => !ShowTray;
+
+    public string TrayOffLine => SettingsNames.TrayNeedsUsage;
+
     /// <summary>General's live tray preview: the icon as the tray draws it now.</summary>
     [ObservableProperty] private System.Windows.Media.ImageSource? _trayPreviewImage;
 
@@ -80,6 +89,11 @@ public sealed partial class GeneralViewModel : ObservableObject
     {
         if (e.PropertyName == nameof(WidgetViewModel.TrayMode))
             OnPropertyChanged(nameof(SelectedTrayMode));
+        if (e.PropertyName == nameof(WidgetViewModel.UsageOn))
+        {
+            OnPropertyChanged(nameof(ShowTray));
+            OnPropertyChanged(nameof(ShowTrayOff));
+        }
     }
 
     /// <summary>Stop following the widget (Settings closed). The widget outlives every
