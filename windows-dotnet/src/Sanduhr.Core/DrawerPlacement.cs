@@ -15,9 +15,31 @@ public static class DrawerPlacement
 
     public static double Height(bool folded) => folded ? FoldedHeight : OpenHeight;
 
-    /// <summary>Places for every drawer in <paramref name="drawers"/> that has none: the top-right of the main monitor, away from where
-    /// Windows lines up desktop icons, each under the last, below any drawer already standing in that column. Placed drawers keep theirs.</summary>
+    /// <summary>Places for every drawer in <paramref name="drawers"/> that has none. With no <paramref name="tidy"/>, no
+    /// <paramref name="blocked"/> areas and no <paramref name="workHeight"/> it is today's rule: the top-right of the main monitor, each
+    /// under the last, below any drawer already standing in that column. Otherwise each takes the next free Tidy slot for that corner and
+    /// direction (default top right, column) on a work area <paramref name="workWidth"/> by <paramref name="workHeight"/> (pass the real
+    /// height for a bottom corner), skipping <paramref name="blocked"/> (the icon area) and the drawers already placed on the main
+    /// monitor. A drawer with no room anywhere arrives at the top right. Placed drawers keep theirs.</summary>
     public static IReadOnlyDictionary<string, DrawerPlace> Arrive(IReadOnlyList<DrawerDef> drawers, IReadOnlyDictionary<string, DrawerPlace> placed,
+        double workWidth, IReadOnlyCollection<string> folded, DrawerTidy? tidy = null, double workHeight = double.PositiveInfinity,
+        IReadOnlyList<DrawerRect>? blocked = null)
+    {
+        if (tidy is null && blocked is not { Count: > 0 } && double.IsPositiveInfinity(workHeight))
+            return ArriveColumn(drawers, placed, workWidth, folded);
+        var work = new DrawerRect(0, 0, workWidth, double.IsPositiveInfinity(workHeight) ? 100_000 : workHeight);
+        var held = placed.Where(p => p.Value.Monitor == DeskMonitors.Main)
+            .Select(p => new DrawerRect(p.Value.X, p.Value.Y, Width, Height(folded.Contains(p.Key))));
+        var fresh = drawers.Where(d => !placed.ContainsKey(d.Id)).Select(d => (d.Id, H: Height(folded.Contains(d.Id)))).ToList();
+        var slots = DrawerTidyPlan.Slots(fresh, work, tidy ?? DrawerTidy.Default, [.. blocked ?? [], .. held]);
+        var places = new Dictionary<string, DrawerPlace>(placed, StringComparer.Ordinal);
+        foreach (var (id, _) in fresh)
+            places[id] = slots.TryGetValue(id, out var r) ? new DrawerPlace(DeskMonitors.Main, r.X, r.Y)
+                : new DrawerPlace(DeskMonitors.Main, Math.Max(0, workWidth - Margin - Width), Margin);
+        return places;
+    }
+
+    private static IReadOnlyDictionary<string, DrawerPlace> ArriveColumn(IReadOnlyList<DrawerDef> drawers, IReadOnlyDictionary<string, DrawerPlace> placed,
         double workWidth, IReadOnlyCollection<string> folded)
     {
         var places = new Dictionary<string, DrawerPlace>(placed, StringComparer.Ordinal);
