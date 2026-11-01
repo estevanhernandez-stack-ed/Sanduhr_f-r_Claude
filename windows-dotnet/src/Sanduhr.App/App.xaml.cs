@@ -1193,7 +1193,7 @@ public partial class App : Application
     {
         // No setup yet (Not now, or still up): the tray's click brings back Set up Sanduhr, not the widget's first-run card. The tray's
         // explicit Show item still shows the widget.
-        if (SetupLaunch.TrayClickOpensSetup(_vm?.SetupPending == true))
+        if (SetupLaunch.TrayClickOpensSetup(_vm?.SetupPending == true, _vm?.AccountStore.ListAccounts().Count > 0))   // streamer: key - a count, never drawn
         {
             OpenSetup(firstRun: true);
             return;

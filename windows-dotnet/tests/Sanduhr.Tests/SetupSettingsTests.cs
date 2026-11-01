@@ -66,8 +66,9 @@ public class SetupSettingsTests
     [Fact]
     public void A_tray_click_opens_the_setup_screen_only_while_no_setup_exists()
     {
-        Assert.True(SetupLaunch.TrayClickOpensSetup(setupPending: true));
-        Assert.False(SetupLaunch.TrayClickOpensSetup(setupPending: false));
+        Assert.True(SetupLaunch.TrayClickOpensSetup(setupPending: true, hasAccount: false));
+        Assert.False(SetupLaunch.TrayClickOpensSetup(setupPending: true, hasAccount: true));   // signed in: the widget has meters
+        Assert.False(SetupLaunch.TrayClickOpensSetup(setupPending: false, hasAccount: false));
     }
 
     [Theory]

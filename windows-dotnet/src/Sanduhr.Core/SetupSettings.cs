@@ -90,8 +90,9 @@ public static class SetupLaunch
     /// <summary>No setup yet: the setup screen opens first.</summary>
     public static bool OpensSetup(SetupSettings? setup) => setup is null;
 
-    /// <summary>A tray left-click while no setup exists yet opens the setup screen, not the widget (whose first-run card is gone).</summary>
-    public static bool TrayClickOpensSetup(bool setupPending) => setupPending;
+    /// <summary>A tray left-click while no setup exists yet and no account is signed in opens the setup screen, not the widget
+    /// (whose first-run card is gone). With an account the widget has meters to show, so the click toggles it as usual.</summary>
+    public static bool TrayClickOpensSetup(bool setupPending, bool hasAccount) => setupPending && !hasAccount;
 
     /// <summary>The widget starts hidden (the tray is the way back) with usage off and the Desk running; with the Desk off as well
     /// the widget shows, so a launch never shows nothing. Before any setup the setup screen is what shows.</summary>
