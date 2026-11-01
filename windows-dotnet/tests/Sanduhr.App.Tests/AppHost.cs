@@ -21,6 +21,14 @@ internal static class AppHost
         typeof(Application).GetField("_resourceAssembly", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)
             ?.SetValue(null, typeof(Sanduhr.App.App).Assembly);
 
+    /// <summary>No test reads the real desktop through Explorer: a controller built in this assembly starts with a desktop of no icons.</summary>
+    [System.Runtime.CompilerServices.ModuleInitializer]
+    internal static void TurnTheShellOff()
+    {
+        Sanduhr.App.Desk.DeskController.DefaultIconReader = () => [];
+        Sanduhr.App.Desk.DeskController.DefaultSpacingReader = () => null;
+    }
+
     private static readonly Lazy<Dispatcher> Dispatch = new(Start);
 
     private static Dispatcher Start()

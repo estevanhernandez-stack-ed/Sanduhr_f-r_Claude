@@ -16,7 +16,7 @@ internal static class DesktopIcons
     /// list for a desktop with no icons; null when the Shell does not answer.</summary>
     public static IReadOnlyList<PxRect>? Read()
     {
-        if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA) return null;
+        if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA || !ShellAnswers()) return null;
         try { return DeskNative.PerMonitor(ReadCore); }
         catch (Exception) { return null; }   // the Shell can fail in more ways than COM names; a reading is never worth a crash
     }
@@ -24,7 +24,7 @@ internal static class DesktopIcons
     /// <summary>How many icons the desktop holds and the size of one icon cell, in physical pixels; null when the Shell does not answer.</summary>
     public static (int Count, PxPoint Cell)? Spacing()
     {
-        if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA) return null;
+        if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA || !ShellAnswers()) return null;
         try
         {
             return DeskNative.PerMonitor<(int, PxPoint)?>(() =>
@@ -37,6 +37,20 @@ internal static class DesktopIcons
             });
         }
         catch (Exception) { return null; }
+    }
+
+    /// <summary>Outgoing COM to a hung Explorer would block this thread (and the Desk) with no timeout: before any call, ask the icons' window
+    /// for a no-op and give it a quarter of a second. A hung, missing or restarting Shell is a null reading and the caller falls back.</summary>
+    private static bool ShellAnswers()
+    {
+        try
+        {
+            var host = DeskNative.IconsHost();
+            if (host == IntPtr.Zero) return false;
+            return Native.SendMessageTimeoutW(host, 0 /* WM_NULL */, IntPtr.Zero, IntPtr.Zero, 0x0002 | 0x0001 /* SMTO_ABORTIFHUNG | SMTO_BLOCK */,
+                250, out _) != IntPtr.Zero;
+        }
+        catch (Exception) { return false; }
     }
 
     /// <summary>Horizontal room, in device-independent pixels, between a cell's left edge and the icon image in it (the spike measured 14 at 100%).</summary>
@@ -215,6 +229,9 @@ internal static class DesktopIcons
 
         [DllImport("user32.dll")]
         public static extern uint GetDpiForWindow(IntPtr hwnd);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern IntPtr SendMessageTimeoutW(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam, uint flags, uint timeoutMs, out IntPtr result);
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern int MapWindowPoints(IntPtr from, IntPtr to, [In, Out] POINT[] points, uint count);

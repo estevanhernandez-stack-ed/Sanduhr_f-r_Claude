@@ -50,6 +50,18 @@ internal static class DrawerScreens
         return DrawerPlacement.Clamp(place, work.Width, work.Height);
     }
 
+    /// <summary>The part of an icon's rectangle (physical screen pixels) that belongs to <paramref name="s"/>: the icon sits on the screen
+    /// holding its centre, and is clipped to that screen's bounds (a bottom-row cell often overhangs the edge). Null for another screen's icon.</summary>
+    public static PxRect? ClipToScreen(PxRect icon, DeskScreen s)
+    {
+        int cx = icon.X + icon.Width / 2, cy = icon.Y + icon.Height / 2;
+        var b = s.Bounds;
+        if (cx < b.X || cx >= b.Right || cy < b.Y || cy >= b.Bottom) return null;
+        int x = Math.Max(icon.X, b.X), y = Math.Max(icon.Y, b.Y);
+        int right = Math.Min(icon.Right, b.Right), bottom = Math.Min(icon.Bottom, b.Bottom);
+        return right > x && bottom > y ? new PxRect(x, y, right - x, bottom - y) : null;
+    }
+
     /// <summary>A rectangle in physical screen pixels (an icon's) as that screen's work-area DIPs: the offset is the work area's, the scale the
     /// screen's. This is the unit <see cref="DrawerPlace"/> and every placement rule work in.</summary>
     public static DrawerRect PxToWork(PxRect r, DeskScreen s) =>

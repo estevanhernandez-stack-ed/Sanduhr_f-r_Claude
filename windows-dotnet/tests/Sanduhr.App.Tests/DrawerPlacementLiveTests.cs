@@ -287,6 +287,50 @@ public sealed class DrawerPlacementLiveTests
         finally { desk.Dispose(); s.Dispose(); }
     });
 
+    [Fact]
+    public void An_icon_belongs_to_the_screen_holding_its_centre_and_is_clipped_to_that_screens_bounds() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (desk, s, _, _) = Desk(box, TaskbarsTopAndLeft());
+        try
+        {
+            var (top, left) = (desk.ScreensForTests[0], desk.ScreensForTests[1]);
+            // Bottom row overhanging the top screen's bottom edge (1620): centre at 1573, so it stays, cut to 120 px tall.
+            Assert.Equal(new PxRect(300, 1500, 114, 120), DrawerScreens.ClipToScreen(new PxRect(300, 1500, 114, 147), top));
+            Assert.Null(DrawerScreens.ClipToScreen(new PxRect(300, 1500, 114, 147), left));
+            // Straddling the seam at x = 2880 with its centre on the second screen: that screen's, cut at its left edge.
+            var seam = new PxRect(2850, 100, 76, 98);
+            Assert.Null(DrawerScreens.ClipToScreen(seam, top));
+            Assert.Equal(new PxRect(2880, 100, 46, 98), DrawerScreens.ClipToScreen(seam, left));
+            // Centre off the bottom: another screen's (here, nobody's).
+            Assert.Null(DrawerScreens.ClipToScreen(new PxRect(300, 1580, 114, 147), top));
+
+            desk.IconReader = () => [new PxRect(300, 1500, 114, 147), new PxRect(2850, 100, 76, 98)];
+            desk.Reload();
+            var g = DrawerPlacement.Gap;
+            // 150%: 300 px = 200 DIPs across, 1500 - 60 = 1440 px = 960 DIPs down, 114 x 120 px = 76 x 80 DIPs.
+            Assert.Equal([new DrawerRect(200 - g, 960 - g, 76 + 2 * g, 80 + 2 * g)], desk.IconArea(top));
+            // Second screen (100%, work origin 2980, 0): clipped x from 2880 = -100 in work DIPs, 46 wide.
+            Assert.Equal([new DrawerRect(-100 - g, 100 - g, 46 + 2 * g, 98 + 2 * g)], desk.IconArea(left));
+        }
+        finally { desk.Dispose(); s.Dispose(); }
+    });
+
+    [Fact]
+    public void A_drop_reads_the_icons_once_for_its_snap_and_its_lane() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (desk, s, _, _) = Desk(box, One1080(), null, "", "Images", "Documents");
+        try
+        {
+            int reads = 0;
+            desk.IconReader = () => { reads++; return []; };
+            s.RequestPlace("images", new PxPoint(803, 501));
+            Assert.Equal(2, reads);   // the drop reads once for its snap and its lane; the save then reloads the Desk, which reads once more (three before the fix)
+        }
+        finally { desk.Dispose(); s.Dispose(); }
+    });
+
     // ---- the reader failing ----
 
     [Fact]
@@ -367,6 +411,25 @@ public sealed class DrawerPlacementLiveTests
     });
 
     // ---- the piece ----
+
+    [Fact]
+    public void Alt_held_during_the_move_drops_without_snapping_and_releasing_it_first_changes_nothing() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, _, _) = DrawerFreePanelTests.Make(box);
+        var asked = new List<bool>();
+        s.PlaceRequested += (_, _, canSnap) => asked.Add(canSnap);
+        var piece = DrawerFreePanelTests.Piece(s);
+        bool alt = true;
+        piece.AltDown = () => alt;
+        piece.TitleDown(new PxPoint(500, 300), new PxPoint(400, 280), new PxPoint(16, 16));
+        piece.TitleMove(new PxPoint(620, 250));
+        alt = false;   // let go of Alt a moment before the mouse button
+        piece.TitleUp(new PxPoint(620, 250));
+        Assert.Equal([false], asked);
+        piece.Dispose();
+        s.Dispose();
+    });
 
     [Fact]
     public void A_title_drop_asks_for_a_snapping_place_when_snap_is_on_and_not_when_it_is_off() => Sta.Run(() =>
