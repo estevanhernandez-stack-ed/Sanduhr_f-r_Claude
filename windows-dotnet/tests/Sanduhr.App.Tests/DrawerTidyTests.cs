@@ -57,14 +57,74 @@ public sealed class DrawerTidyTests
             var result = desk.Tidy(DrawerTidy.Default, DeskMonitors.Main);
             Assert.NotNull(result);
             Assert.Equal(2, result!.Value.Moved);
-            Assert.Equal(saved, result.Value.Before);
+            Assert.Equal(saved["images"], result.Value.Changes["images"].Before);
             var after = store.LoadDrawers().Places;
             // Top right, a column down: 1920 - 24 - 360 across, then the margin and an open drawer's height plus the gap down.
             Assert.Equal(new DrawerPlace(DeskMonitors.Main, 1536, 24), after["images"]);   // nearer the corner, so first
             Assert.Equal(new DrawerPlace(DeskMonitors.Main, 1536, 24 + DrawerPlacement.OpenHeight + DrawerPlacement.Gap), after["documents"]);
 
-            desk.RestorePlaces(result.Value.Before);
+            desk.RestorePlaces(result.Value.Changes);
             Assert.Equal(saved, store.LoadDrawers().Places);
+        }
+        finally { desk.Dispose(); s.Dispose(); }
+    });
+
+    [Fact]
+    public void Undo_puts_a_never_placed_drawer_back_where_it_was_drawn_after_Tidy_changed_the_corner() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (desk, s, store) = Desk(box, Screen(1920, 1080), d => d, "Images");
+        try
+        {
+            Assert.Empty(store.LoadDrawers().Places);
+            // No saved place: it arrives top right (1536, 24). Tidy to the bottom left, then Undo.
+            var result = desk.Tidy(new DrawerTidy(DrawerCorner.BottomLeft, DrawerFlow.Column), null);
+            Assert.Equal(1, result!.Value.Moved);
+            Assert.Equal(new DrawerPlace(DeskMonitors.Main, 24, 1080 - 24 - DrawerPlacement.OpenHeight), store.LoadDrawers().Places["images"]);
+            desk.RestorePlaces(result.Value.Changes);
+            Assert.Equal(new DrawerPlace(DeskMonitors.Main, 1536, 24), store.LoadDrawers().Places["images"]);
+        }
+        finally { desk.Dispose(); s.Dispose(); }
+    });
+
+    [Fact]
+    public void Undo_leaves_a_drawer_dragged_since_where_it_was_dropped() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var saved = Places(("images", 700, 400), ("documents", 100, 600));
+        var (desk, s, store) = Desk(box, Screen(1920, 1080), d => d with { Places = saved }, "Images", "Documents");
+        try
+        {
+            var result = desk.Tidy(DrawerTidy.Default, null)!.Value;
+            var dropped = new DrawerPlace(DeskMonitors.Main, 333, 111);
+            s.SetPlace("images", dropped);
+            desk.RestorePlaces(result.Changes);
+            var after = store.LoadDrawers().Places;
+            Assert.Equal(dropped, after["images"]);        // the drag survives
+            Assert.Equal(saved["documents"], after["documents"]);   // the untouched one is put back
+        }
+        finally { desk.Dispose(); s.Dispose(); }
+    });
+
+    [Fact]
+    public void Undo_does_not_bring_back_the_place_of_a_drawer_removed_since() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var saved = Places(("images", 700, 400), ("documents", 100, 600));
+        var (desk, s, store) = Desk(box, Screen(1920, 1080), d => d with { Places = saved }, "Images", "Documents");
+        try
+        {
+            var result = desk.Tidy(DrawerTidy.Default, null)!.Value;
+            var now = s.Settings;
+            s.Save(now with
+            {
+                Drawers = [.. now.Drawers.Where(d => d.Id != "documents")],
+                Places = now.Places.Where(p => p.Key != "documents").ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal),
+            });
+            desk.RestorePlaces(result.Changes);
+            var after = store.LoadDrawers();
+            Assert.DoesNotContain("documents", after.Places.Keys);
+            Assert.Equal(saved["images"], after.Places["images"]);
         }
         finally { desk.Dispose(); s.Dispose(); }
     });

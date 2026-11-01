@@ -1114,10 +1114,12 @@ public partial class App : Application
     private string? TidyDrawers(DrawerTidy? tidy = null, string? monitor = null)
     {
         if (_quitting || _desk is null || _drawers is null || _drawerReview is null) return SettingsNames.DrawersSortUnavailable;
+        if (!_drawers.Settings.Enabled) return DrawerReview.DrawersOff;
+        if (!_desk.HasScreens) return SettingsNames.DrawersSortUnavailable;
         var t = tidy ?? _drawers.Settings.Tidy;
         if (_desk.Tidy(t, monitor) is not { } r) return DrawerReview.Busy;
         if (r.Moved == 0) return DrawerReview.TidyNothing;
-        return _drawerReview.ShowResult(DrawerReview.Tidied(r.Moved), () => _desk.RestorePlaces(r.Before));
+        return _drawerReview.ShowResult(DrawerReview.Tidied(r.Moved), () => _desk.RestorePlaces(r.Changes));
     }
 
     private void OnTrayReadingChanged(TrayReading? reading)
