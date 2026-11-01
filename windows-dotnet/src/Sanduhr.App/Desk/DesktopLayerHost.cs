@@ -52,8 +52,9 @@ internal sealed class DesktopLayerHost : IDeskHost
     private readonly List<DeskScreen> _screens = [];
     /// <summary>Whether each window in <see cref="_windows"/> holds a drawer, as of the last <see cref="Show"/>.</summary>
     private readonly List<bool> _drawers = [];
-    /// <summary>Whether Windows took the blur on each window that asked for one (a window absent here has none).</summary>
-    private readonly Dictionary<HwndSource, bool> _blur = [];
+    /// <summary>What was asked of Windows for each Glass drawer window (a window absent here has no blur asked): the tint, and whether the
+    /// blur and the round corners took. Kept even when refused, so a refusal is not retried on every redraw.</summary>
+    private readonly Dictionary<HwndSource, (int Tint, bool Blurred, bool Rounded)> _blur = [];
     private readonly HwndSource _sentinel;
     private readonly uint _taskbarCreated;
     private readonly DispatcherTimer _coalesce;
@@ -107,10 +108,10 @@ internal sealed class DesktopLayerHost : IDeskHost
 
     public event Action? CoverageChanged;
 
-    /// <summary>The Desk windows' handles, in island order (the runner queries them).</summary>
     /// <summary>Per window in <see cref="Handles"/> order: true when a Glass drawer's blur is on (a test seam).</summary>
-    internal IReadOnlyList<bool> Blurred => [.. _windows.Select(w => _blur.TryGetValue(w, out var on) && on)];
+    internal IReadOnlyList<bool> Blurred => [.. _windows.Select(w => _blur.TryGetValue(w, out var b) && b.Blurred)];
 
+    /// <summary>The Desk windows' handles, in island order (the runner queries them).</summary>
     public IReadOnlyList<IntPtr> Handles => [.. _windows.Select(w => w.Handle)];
 
     /// <summary>The sentinel's handle (the runner checks its z-order).</summary>
@@ -284,16 +285,21 @@ internal sealed class DesktopLayerHost : IDeskHost
     }
 
     /// <summary>A Glass drawer's window gets the wallpaper blur and DWM's round corners; a window whose drawer is no longer Glass has them
-    /// taken off. Asked once per change, never on every redraw, and never for a Desk widget's window. Nothing here can fail the draw: a
-    /// refused or missing call leaves the drawer on its tinted plate.</summary>
+    /// taken off. Windows is asked when the window first becomes Glass or its tint changes, and the answer is kept (a refusal too), so
+    /// a redraw asks nothing and a refused call is not retried until the tint changes. Never for a Desk widget's window. Nothing here can
+    /// fail the draw: a refused or missing call leaves the drawer on its tinted plate. Every layout still tells the island's piece whether
+    /// the corners are round, since a redraw builds a new piece over the same window.</summary>
     private void SyncBackdrop(HwndSource src, DeskIsland island)
     {
         if (src.IsDisposed) return;
-        bool had = _blur.TryGetValue(src, out var on) && on;
         if (island.Glass && island.Drawer)
         {
-            if (had) return;
-            _blur[src] = DrawerBackdrop.Apply(src.Handle, island.GlassTint);
+            if (!_blur.TryGetValue(src, out var asked) || asked.Tint != island.GlassTint)
+            {
+                var (blurred, rounded) = DrawerBackdrop.Apply(src.Handle, island.GlassTint);
+                _blur[src] = asked = (island.GlassTint, blurred, rounded);
+            }
+            if (asked.Blurred) island.GlassCorners?.Invoke(asked.Rounded);
         }
         else if (_blur.Remove(src))
             DrawerBackdrop.Clear(src.Handle);

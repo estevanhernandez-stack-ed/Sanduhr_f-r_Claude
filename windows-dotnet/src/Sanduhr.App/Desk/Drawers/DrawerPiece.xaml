@@ -57,7 +57,7 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Border x:Name="Frame" CornerRadius="10" Padding="8" BorderThickness="1" Background="{DynamicResource Drawer.Plate}" AllowDrop="True">
+    <Border x:Name="Frame" CornerRadius="10" Padding="8" BorderThickness="0" Background="{DynamicResource Drawer.Plate}" AllowDrop="True">
         <Border.Style>
             <Style TargetType="Border">
                 <Setter Property="BorderBrush" Value="{DynamicResource Drawer.Border}" />

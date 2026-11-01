@@ -45,22 +45,22 @@ internal static class DrawerBackdrop
     [DllImport("dwmapi.dll", PreserveSig = true)]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
-    /// <summary>Blurs what is behind the window and rounds its corners. True when Windows took the blur; false leaves the window as it was
-    /// (the corner preference is put back too).</summary>
+    /// <summary>Blurs what is behind the window and asks DWM to round its corners. <c>Blurred</c> is whether Windows took the blur (false
+    /// leaves the window as it was); <c>Rounded</c> is whether DWM took the corner preference (Windows 10 does not, and the blur then fills
+    /// a square window).</summary>
     /// <param name="tintAbgr">The accent's gradient color, AABBGGRR. The spike ran it near-clear (alpha 1): the panel's own brush does the tint.</param>
-    public static bool Apply(IntPtr hwnd, int tintAbgr)
+    public static (bool Blurred, bool Rounded) Apply(IntPtr hwnd, int tintAbgr)
     {
-        if (hwnd == IntPtr.Zero) return false;
+        if (hwnd == IntPtr.Zero) return (false, false);
         try
         {
-            if (!SetAccent(hwnd, AccentAcrylicBlurBehind, tintAbgr)) return false;
-            SetCorners(hwnd, DwmwcpRound);
-            return true;
+            if (!SetAccent(hwnd, AccentAcrylicBlurBehind, tintAbgr)) return (false, false);
+            return (true, SetCorners(hwnd, DwmwcpRound));
         }
         catch (Exception e) when (e is EntryPointNotFoundException or DllNotFoundException or MarshalDirectiveException or SEHException
             or InvalidOperationException or ArgumentException or OverflowException)
         {
-            return false;
+            return (false, false);
         }
     }
 
@@ -97,9 +97,10 @@ internal static class DrawerBackdrop
         finally { Marshal.FreeHGlobal(p); }
     }
 
-    private static void SetCorners(IntPtr hwnd, int preference)
+    /// <summary>True when DWM took the preference; a build without the attribute answers an error code and the corners stay square.</summary>
+    private static bool SetCorners(IntPtr hwnd, int preference)
     {
         int value = preference;
-        DwmSetWindowAttribute(hwnd, DwmaWindowCornerPreference, ref value, sizeof(int));   // a build without the attribute answers an error code; the corners stay square
+        return DwmSetWindowAttribute(hwnd, DwmaWindowCornerPreference, ref value, sizeof(int)) == 0;
     }
 }

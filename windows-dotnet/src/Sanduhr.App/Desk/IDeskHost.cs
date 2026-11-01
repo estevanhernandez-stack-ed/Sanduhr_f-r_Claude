@@ -49,6 +49,10 @@ internal sealed record DeskIsland(FrameworkElement Content, Point Anchor, Horizo
     /// <summary>The blur's gradient color (AABBGGRR); near-clear, as the spike ran it, because the panel's own brush does the tint.</summary>
     public int GlassTint { get; init; } = 0x01000000;
 
+    /// <summary>Called by the host with whether DWM rounded the window's corners, each time it lays out a Glass drawer whose blur took.
+    /// Never called when the blur was refused (the tinted plate keeps its rounded corners in a transparent window).</summary>
+    public Action<bool>? GlassCorners { get; init; }
+
     /// <summary>A roaming island (the companion walking its edges): the host keeps the window's aligned edge on the motion's
     /// anchor as it moves, without laying the island out again. Null for an island that stays where it hangs.</summary>
     public DeskIslandMotion? Motion { get; init; }

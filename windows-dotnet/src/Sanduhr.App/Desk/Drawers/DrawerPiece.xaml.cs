@@ -80,12 +80,22 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
 
     public DrawerState State => _state;
 
+    /// <summary>Told by the host once a Glass drawer's window has its blur: whether DWM rounded the window's corners. Where it did not
+    /// (Windows 10), the blur fills a square window, so the panel's corners go square to match.</summary>
+    internal void SetGlassCorners(bool rounded)
+    {
+        if (rounded) return;
+        Frame.CornerRadius = new CornerRadius(0);
+        EdgeLine.CornerRadius = new CornerRadius(0);
+    }
+
     /// <summary>The look this piece was drawn with.</summary>
     internal DrawerLook Look { get; }
 
-    /// <summary>What the look changes beyond brushes: Glass's corners match DWM's round corner (the blur is clipped to it); Bare's title is
-    /// smaller; Outline and Bare have no plate behind the title, so it carries the ink's shadow as the labels do; a chip on the title
-    /// keeps its own padding in place of the title's margin.</summary>
+    /// <summary>What the look changes beyond brushes: Glass's corners match DWM's round corner (the blur is clipped to it; see
+    /// <see cref="SetGlassCorners"/>); Outline and Bare draw a 1 px border, taken out of the padding so the piece is the same size in every
+    /// look; Bare's title is smaller; Outline and Bare have no plate behind the title, so it carries the ink's shadow as the labels do; a
+    /// chip on the title keeps its own padding in place of the title's margin.</summary>
     private void ApplyKind(DrawerLook look)
     {
         if (look.Kind == DrawerLookKind.Glass)
@@ -93,11 +103,12 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
             Frame.CornerRadius = new CornerRadius(8);
             EdgeLine.CornerRadius = new CornerRadius(8);
         }
-        if (look.Kind == DrawerLookKind.Bare)
+        if (look.Kind is DrawerLookKind.Outline or DrawerLookKind.Bare)
         {
-            TitleText.FontSize = 11;
-            TitleBar.Height = 22;
+            Frame.BorderThickness = new Thickness(1);
+            Frame.Padding = new Thickness(7);
         }
+        if (look.Kind == DrawerLookKind.Bare) TitleText.FontSize = 11;
         if (look.Kind is DrawerLookKind.Outline or DrawerLookKind.Bare) TitleText.Effect = StreamerMode.On ? null : look.Shadow;
         if (look.Chips)
         {

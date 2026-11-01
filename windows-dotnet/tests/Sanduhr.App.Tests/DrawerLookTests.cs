@@ -53,7 +53,8 @@ public sealed class DrawerLookTests
         foreach (var k in new[] { DrawerLookKind.Outline, DrawerLookKind.Bare })
         {
             var look = L(k, 70, 0.1);
-            Assert.InRange(look.Plate.A, (byte)1, (byte)5);
+            Assert.Equal((byte)5, look.Plate.A);
+            Assert.True(look.Plate.A * 0.40 >= 1.5);   // OLED care's deepest dim still leaves a hit-testable alpha
         }
     }
 
@@ -114,10 +115,43 @@ public sealed class DrawerLookTests
         var bare = new DrawerPiece(s.Get("images")!, s, L(DrawerLookKind.Bare, 55, 0.9), 1);
         var solid = new DrawerPiece(s.Get("images")!, s, L(DrawerLookKind.Solid, 55, 0.9), 1);
         Assert.True(bare.TitleText.FontSize < solid.TitleText.FontSize);
-        Assert.True(bare.TitleBar.Height < solid.TitleBar.Height);
         var chip = Assert.IsType<SolidColorBrush>(bare.Resources["Drawer.Chip"]);
         Assert.Equal(178, chip.Color.A);
         Assert.Same(Brushes.Transparent, solid.Resources["Drawer.Chip"]);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void Every_look_is_the_same_size_open_and_folded() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var s = Service(box);
+        Size Measured(DrawerLookKind k)
+        {
+            var piece = new DrawerPiece(s.Get("images")!, s, L(k, 55, 0.5), 1);
+            piece.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            return piece.DesiredSize;
+        }
+        var open = Enum.GetValues<DrawerLookKind>().Select(Measured).ToList();
+        Assert.All(open, z => Assert.Equal(open[0], z));
+        s.SetFolded("images", true);
+        var folded = Enum.GetValues<DrawerLookKind>().Select(Measured).ToList();
+        Assert.All(folded, z => Assert.Equal(folded[0], z));
+        Assert.Equal(DrawerPlacement.FoldedHeight, folded[0].Height);
+        s.Dispose();
+    });
+
+    [Fact]
+    public void A_glass_piece_goes_square_when_the_corners_were_not_rounded() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var s = Service(box);
+        var piece = new DrawerPiece(s.Get("images")!, s, L(DrawerLookKind.Glass, 55, 0.5), 1);
+        Assert.Equal(new CornerRadius(8), piece.Frame.CornerRadius);
+        piece.SetGlassCorners(true);
+        Assert.Equal(new CornerRadius(8), piece.Frame.CornerRadius);
+        piece.SetGlassCorners(false);
+        Assert.Equal(new CornerRadius(0), piece.Frame.CornerRadius);
         s.Dispose();
     });
 
@@ -195,8 +229,8 @@ public sealed class DrawerLookTests
     [Fact]
     public void The_backdrop_never_throws_on_a_window_that_is_not_there()
     {
-        Assert.False(DrawerBackdrop.Apply(IntPtr.Zero, 0x01000000));
-        Assert.False(DrawerBackdrop.Apply(new IntPtr(0x7FFF0001), 0x01000000));
+        Assert.Equal((false, false), DrawerBackdrop.Apply(IntPtr.Zero, 0x01000000));
+        Assert.Equal((false, false), DrawerBackdrop.Apply(new IntPtr(0x7FFF0001), 0x01000000));
         DrawerBackdrop.Clear(IntPtr.Zero);
         DrawerBackdrop.Clear(new IntPtr(0x7FFF0001));
     }

@@ -14,8 +14,9 @@ internal sealed record DrawerLook(Color Plate, Color Ink, Color Accent, Effect? 
 {
     public const double MinPlateOpacity = 0.55;
     /// <summary>Outline's and Bare's fill: invisible, but a per-pixel layered window still hands a fully transparent pixel's click to the
-    /// desktop, so the frame keeps this much alpha and a click on an empty part of the drawer lands on the drawer.</summary>
-    public const double HitFill = 0.01;
+    /// desktop, so the frame keeps this much alpha and a click on an empty part of the drawer lands on the drawer. 5 of 255: OLED care's
+    /// dimming (down to 0.40 of opacity) still leaves 2, where 0.01 (3 of 255) could round to 1 or 0.</summary>
+    public const double HitFill = 0.02;
 
     public DrawerLookKind Kind { get; init; } = DrawerLookKind.Solid;
     /// <summary>Labels draw on chips: the plate is too faint for the ink to read against the wallpaper without one.</summary>

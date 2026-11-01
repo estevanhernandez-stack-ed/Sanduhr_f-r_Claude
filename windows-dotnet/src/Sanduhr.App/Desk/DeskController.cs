@@ -860,6 +860,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
                 Widgets = [state.Word], TakesClicks = true, TakesFocus = true, Drawer = true,
                 Glass = kind == DrawerLookKind.Glass,
                 GlassTint = DrawerBackdrop.NearClearTint(look.Plate.R, look.Plate.G, look.Plate.B),
+                GlassCorners = piece.SetGlassCorners,
             });
         }
         return [.. surfaces.Select((s, i) => extra[i].Count == 0 ? s : s with { Islands = [.. s.Islands, .. extra[i]] })];
