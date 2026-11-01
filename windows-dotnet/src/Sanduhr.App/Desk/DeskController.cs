@@ -869,10 +869,11 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
 
     // ---- Tidy drawers ----
 
-    /// <summary>Whether a review or a result bar is up that Tidy must not rearrange under (look and placement spec, section 3): a drawers
-    /// review or its result bar, a Desk design review or a widget review. A seam for tests.</summary>
+    /// <summary>Whether a review is open that Tidy must not rearrange under (look and placement spec, section 3): a drawers review, a Desk
+    /// design review or a widget review. A result bar with no review behind it (a sort's, a Tidy's or a chat's) does not hold Tidy off: Tidy
+    /// replaces it, as a sort does. A seam for tests.</summary>
     internal Func<bool> TidyBusy { get; set; } = () =>
-        DrawerReviewService.Current is { Reviewing: true } or { BarOpen: true }
+        DrawerReviewService.Current is { Reviewing: true }
         || DeskDesignService.Current?.Reviewing == true || WidgetReviewService.Current?.Reviewing == true;
 
     /// <summary>
@@ -1072,12 +1073,61 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         drawn.AddRange(service.PreviewDrawers.Select(p => p.Def).Where(p => drawn.All(d => d.Id != p.Id)));
         var ids = settings.Drawers.Select(d => d.Id).Where(id => drawn.Any(d => d.Id == id)).ToHashSet(StringComparer.Ordinal);
         var placed = settings.Places.Where(kv => ids.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+        // An arrival that could not be saved (settings.json unwritable) stays where it arrived for the session; a saved place wins.
+        foreach (var gone in _arrivedPlaces.Keys.Where(k => !settings.Drawers.Any(d => d.Id == k) || settings.Places.ContainsKey(k)).ToArray())
+            _arrivedPlaces.Remove(gone);
+        foreach (var gone in _arrivalTried.Where(k => !settings.Drawers.Any(d => d.Id == k)).ToArray())
+            _arrivalTried.Remove(gone);
+        foreach (var (id, place) in _arrivedPlaces)
+            if (ids.Contains(id)) placed.TryAdd(id, place);
         var folded = drawn.Where(d => service.Get(d.Id)?.Folded == true).Select(d => d.Id).ToList();
         var primary = DrawerScreens.Primary(screens);
         var primaryWork = DrawerScreens.WorkDips(primary);
-        var places = DrawerPlacement.Arrive(drawn, placed, primaryWork.Width, folded, settings.Tidy, primaryWork.Height,
-            settings.KeepClear ? IconArea(primary) : []);
+        // A pre-4.5 file keeps today's column rule for its first arrivals (the upgrader's drawers sit exactly as before); everything after
+        // goes through Tidy's slots, off the icons. Only drawn drawers read the icons: with none, nothing touches the Shell.
+        var places = settings.LegacyArrival
+            ? DrawerPlacement.Arrive(drawn, placed, primaryWork.Width, folded)
+            : DrawerPlacement.Arrive(drawn, placed, primaryWork.Width, folded, settings.Tidy, primaryWork.Height,
+                settings.KeepClear && drawn.Count > 0 ? IconArea(primary) : []);
+        // A drawer that arrived without a saved place is saved where it arrived, once (a preview drawer is not a saved drawer's).
+        bool any = false;
+        foreach (var d in drawn)
+            if (ids.Contains(d.Id) && !settings.Places.ContainsKey(d.Id))
+            {
+                _arrivedPlaces[d.Id] = places[d.Id];
+                if (_arrivalTried.Contains(d.Id)) continue;   // one save attempt per drawer per session: a store that cannot write is not asked again
+                _arrived[d.Id] = places[d.Id];
+                any = true;
+            }
+        if (any && !_arrivalSaveQueued && !_stopped)
+        {
+            _arrivalSaveQueued = true;
+            _ui.BeginInvoke(DispatcherPriority.Normal, new Action(SaveArrivals));
+        }
         return [.. drawn.Select(d => (service.Get(d.Id)!, places[d.Id]))];
+    }
+
+    private readonly Dictionary<string, DrawerPlace> _arrived = new(StringComparer.Ordinal);          // arrivals waiting to be saved
+    private readonly Dictionary<string, DrawerPlace> _arrivedPlaces = new(StringComparer.Ordinal);    // every unsaved arrival, kept for the session
+    private readonly HashSet<string> _arrivalTried = new(StringComparer.Ordinal);                      // ids a save was attempted for
+    private bool _arrivalSaveQueued;
+
+    /// <summary>Saves the places drawers arrived at, merged into the settings as they are now (a drawer placed meanwhile keeps its place),
+    /// so an arrival never moves again when the icons or the Tidy corner do. Clears the pre-4.5 flag: the file now carries a <c>tidy</c> key.</summary>
+    internal void SaveArrivals()
+    {
+        _arrivalSaveQueued = false;
+        var arrived = _arrived.ToArray();
+        _arrived.Clear();
+        foreach (var (id, _) in arrived) _arrivalTried.Add(id);   // before the save: SettingsStore.Write swallows a failed write, and Save still redraws
+        if (_stopped || _drawers is not { } service || arrived.Length == 0) return;
+        var current = service.Settings;
+        var merged = new Dictionary<string, DrawerPlace>(current.Places, StringComparer.Ordinal);
+        foreach (var (id, place) in arrived)
+            if (current.Drawers.Any(d => d.Id == id) && !merged.ContainsKey(id)) merged[id] = place;
+        if (merged.Count == current.Places.Count) return;
+        try { service.Save(current with { Places = merged, LegacyArrival = false }); }
+        catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException) { }   // not saved: the drawers arrive again next render
     }
 
     /// <summary>Adds one island per drawer to the surface of the screen it sits on, after the Desk's own islands: aligned left and top on
@@ -1164,7 +1214,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         // The Shell read (outgoing COM) runs a modal message loop, which can re-enter this controller: take it before any state is touched,
         // so the rest of the draw works on one list of screens and a cache that is already warm.
-        if (_drawers?.Settings.KeepClear == true && _screens.Count > 0) IconArea(DrawerScreens.Primary(_screens));
+        if (_drawers is { Settings.KeepClear: true } && (_drawers.Settings.Enabled || _drawers.PreviewDrawers.Count > 0) && _screens.Count > 0)
+            IconArea(DrawerScreens.Primary(_screens));
         var screens = _screens;
         _fonts ??= _paths is null ? new DeskFonts() : DeskFonts.ForThisPc(_paths);
         var now = DateTimeOffset.Now;

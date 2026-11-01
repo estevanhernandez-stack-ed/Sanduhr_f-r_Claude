@@ -60,6 +60,10 @@ internal sealed class DrawerReviewService
     public bool BarOpen => _barOpen;
     private bool _barOpen;
 
+    /// <summary>The result bar holds a sort's Undo, which can still put files back: Tidy and a chat's arrangement must not replace it.
+    /// Every other result bar (a Tidy's, a chat's, a sort that moved nothing, an Undo already used) is replaced.</summary>
+    public bool HoldsFileUndo => _barOpen && _undoId is not null;
+
     private void ShowBar(DeskReviewModel model, Action apply, Action? edit, Action dismiss)
     {
         _barOpen = true;
@@ -73,12 +77,14 @@ internal sealed class DrawerReviewService
     }
 
     /// <summary>A result line with Undo on the drawers bar, for a change that moves no file (Tidy): null when it showed, else the line to
-    /// show instead. It holds the bar like a review's result (<see cref="BarOpen"/>), but a sort replaces it rather than waits:
-    /// <see cref="Open"/> checks only <see cref="Reviewing"/>. Undo runs <paramref name="undo"/> once and shows the line again without
+    /// show instead. It holds the bar like a review's result (<see cref="BarOpen"/>), but a sort, a Tidy or a chat replaces a result
+    /// bar rather than waits: only a review (this one's, or a Desk design or widget review) refuses it, and a sort's bar while its file
+    /// Undo is live (<see cref="HoldsFileUndo"/>). Undo runs <paramref name="undo"/> once and shows the line again without
     /// Undo, and Done closes.</summary>
     public string? ShowResult(string line, Action undo)
     {
-        if (Reviewing || BarOpen || _host.OtherReviewOpen) return DrawerReview.Busy;
+        if (Reviewing || _host.OtherReviewOpen) return DrawerReview.Busy;
+        if (HoldsFileUndo) return DrawerReview.UndoFirst;
         _undoId = null;   // a sort's Undo is not this one's
         bool undone = false;
         void Close() => CloseBar();

@@ -392,7 +392,7 @@ public sealed class DrawerPlacementLiveTests
     // ---- arrival through Tidy's slots, around the icons ----
 
     [Fact]
-    public void A_drawer_with_no_place_arrives_by_the_tidy_corner_on_the_primary_work_height_and_clear_of_the_icons() => Sta.Run(() =>
+    public void A_drawer_with_no_place_arrives_by_the_tidy_corner_on_the_primary_work_height() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();
         var (desk, s, store, host) = Desk(box, One1080(), d => d with { Tidy = new DrawerTidy(DrawerCorner.BottomLeft, DrawerFlow.Column), KeepClear = false });
@@ -401,11 +401,12 @@ public sealed class DrawerPlacementLiveTests
             var at = DrawerFreePanelTests.DrawerIslands(host).Single().Island.Anchor;
             Assert.Equal(new Point(DrawerPlacement.Margin, 1080 - DrawerPlacement.Margin - DrawerPlacement.OpenHeight), at);
 
+            // An arrival stays where it arrived for the session (it is saved, or kept in memory when the file cannot be written), so icons
+            // that move later do not push it. Arriving clear of the icons is DrawerArrivalTests' A_4_5_file_arrives_through_Tidys_slots_off_the_icons.
             s.Save(s.Settings with { KeepClear = true });
             desk.IconAreaOverride = [new DrawerRect(0, 0, 300, 1080)];
             desk.Reload();
-            var clear = DrawerFreePanelTests.DrawerIslands(host).Single().Island.Anchor;
-            Assert.True(clear.X >= 300, $"arrived at {clear}, on the icons");
+            Assert.Equal(at, DrawerFreePanelTests.DrawerIslands(host).Single().Island.Anchor);
         }
         finally { desk.Dispose(); s.Dispose(); }
     });

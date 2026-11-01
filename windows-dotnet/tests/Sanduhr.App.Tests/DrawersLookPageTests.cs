@@ -73,6 +73,27 @@ public sealed class DrawersLookPageTests
     });
 
     [Fact]
+    public void The_opacity_readout_also_shows_when_any_drawers_own_look_has_a_fill() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (vm, s, _) = Make(box);
+        vm.LookIndex = (int)DrawerLookKind.Outline;
+        Assert.False(vm.ShowOpacity);
+
+        s.Save(s.Settings with { Looks = new Dictionary<string, DrawerLookKind> { ["images"] = DrawerLookKind.Bare } });
+        vm.Refresh();
+        Assert.False(vm.ShowOpacity);   // no drawer draws a plate
+
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        s.Save(s.Settings with { Looks = new Dictionary<string, DrawerLookKind> { ["images"] = DrawerLookKind.Glass } });
+        vm.Refresh();
+        Assert.True(vm.ShowOpacity);    // the shared look is Outline, but one drawer is Glass
+        Assert.Contains(nameof(DrawersSettingsViewModel.ShowOpacity), changed);
+        s.Dispose();
+    });
+
+    [Fact]
     public void Opacity_stays_in_range() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();

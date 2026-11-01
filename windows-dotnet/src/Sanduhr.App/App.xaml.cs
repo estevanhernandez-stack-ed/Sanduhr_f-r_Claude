@@ -1122,12 +1122,13 @@ public partial class App : Application
 
     /// <summary>Tidy drawers (look and placement spec, section 2): lines the drawers on one monitor up from the remembered corner (or
     /// <paramref name="tidy"/>) and shows how many moved on the drawers bar with Undo. Moves panels only. Null when the bar opened,
-    /// otherwise the line to show (the busy line while a review or result bar is up, nothing moved).</summary>
+    /// otherwise the line to show (the busy line while a review is open, nothing moved; a result bar is replaced).</summary>
     private string? TidyDrawers(DrawerTidy? tidy = null, string? monitor = null)
     {
         if (_quitting || _desk is null || _drawers is null || _drawerReview is null) return SettingsNames.DrawersSortUnavailable;
         if (!_drawers.Settings.Enabled) return DrawerReview.DrawersOff;
         if (!_desk.HasScreens) return SettingsNames.DrawersSortUnavailable;
+        if (_drawerReview.HoldsFileUndo) return DrawerReview.UndoFirst;   // before anything moves: the result bar would replace a sort's live Undo
         var t = tidy ?? _drawers.Settings.Tidy;
         if (_desk.Tidy(t, monitor) is not { } r) return DrawerReview.Busy;
         if (r.Moved == 0) return DrawerReview.TidyNothing;
