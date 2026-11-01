@@ -7,15 +7,15 @@ namespace Sanduhr.App.Desk;
 /// A chat's drawer settings (look and placement spec, section 3): the look and opacity are saved and, with an arrangement, the drawers line
 /// up from the chat's corner and direction (a part the chat left out comes from the user's own Tidy) with the result and Undo on the drawers
 /// bar. Undo puts back the places Tidy wrote and, field by field, the look, opacity and remembered Tidy from before, but only a field that
-/// still holds what the chat applied: one the user changed since keeps their value. Refused with the busy line while a review or a result
-/// bar is up, and nothing applies partly: every check runs before the first save. Moves panels only, never a file.
+/// still holds what the chat applied: one the user changed since keeps their value. With drawers off the look is saved and Tidy is skipped. Refused with the busy line while a review is open (a
+/// result bar with no review behind it is replaced), and nothing applies partly: every check runs before the first save. Moves panels only, never a file.
 /// </summary>
 internal static class ChatDrawerSettings
 {
     /// <summary>Null when it was done, otherwise the line to show (nothing applied).</summary>
     public static string? Apply(PastedDrawerLook look, DrawerService drawers, DeskController desk, DrawerReviewService review)
     {
-        if (desk.TidyBusy() || review.Reviewing || review.BarOpen) return DrawerReview.Busy;
+        if (desk.TidyBusy() || review.Reviewing) return DrawerReview.Busy;
         var before = drawers.Settings;
         DrawerSettings WithLook(DrawerSettings s) => s with { Look = look.Look ?? s.Look, Opacity = look.Opacity ?? s.Opacity };
         if (look.Arrange is not { } wanted)
@@ -23,7 +23,13 @@ internal static class ChatDrawerSettings
             drawers.Save(WithLook(before));
             return null;
         }
-        if (!before.Enabled) return DrawerReview.DrawersOff;
+        if (!before.Enabled)
+        {
+            // Drawers off: the look is still the person's to set, but there is nothing to line up, and the line says so.
+            if (look.Look is null && look.Opacity is null) return DrawerReview.DrawersOff;
+            drawers.Save(WithLook(before));
+            return SetupCopy.ChatDrawerSettingsSavedOff;
+        }
         if (!desk.HasScreens) return SettingsNames.DrawersSortUnavailable;
         var tidy = new DrawerTidy(look.HasCorner ? wanted.Corner : before.Tidy.Corner, look.HasFlow ? wanted.Flow : before.Tidy.Flow);
         // Tidy goes first: it refuses (nothing written) while a review is open, so a refusal leaves the look as it was too.

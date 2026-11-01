@@ -70,6 +70,9 @@ public static class SetupCopy
     /// <summary>The window's status once a Tidy ran with the look: the result and its Undo are on the drawers bar.</summary>
     public const string ChatDrawerSettingsArranged = "Drawer settings applied. Undo is on your Desk.";
 
+    /// <summary>The window's line when the chat asked for an arrangement while drawers are off: the look is saved, nothing was lined up.</summary>
+    public const string ChatDrawerSettingsSavedOff = "Drawer look saved. Drawers are off, so nothing was lined up.";
+
     /// <summary>The drawers bar line after the chat's settings ran a Tidy: what the look did, then what Tidy did.</summary>
     public static string ChatDrawerSettingsResult(bool lookSaved, string tidyLine) =>
         lookSaved ? ChatDrawerSettingsDone + " " + tidyLine : tidyLine;
@@ -110,7 +113,7 @@ public static class SetupCopy
         ChatIntro, ChatCopyPrompt, ChatPasteName, ChatPastePlaceholder, ChatPreview, ChatUseRules, ChatUseDrawerSettings, ChatClose, ChatFindingsName, ChatReady,
         ChatPromptCopied, ChatDeskShown, ChatRulesShown, ChatNoDeskService, ChatRulesSavedNothing, ChatUntitledDesign, ChatFixCount(1), ChatFixCount(2), ChatManyBlocks(2),
         ChatRulesLine(1, ["Photos"]), ChatRulesLine(2, ["Photos", "Receipts"]), ChatNotShown("the Desk is busy"),
-        ChatDrawerSettingsDone, ChatDrawerSettingsArranged, ChatDrawerSettingsResult(true, "2 drawers lined up."), ChatDrawerSettingsResult(false, "2 drawers lined up."),
+        ChatDrawerSettingsDone, ChatDrawerSettingsArranged, ChatDrawerSettingsSavedOff, ChatDrawerSettingsResult(true, "2 drawers lined up."), ChatDrawerSettingsResult(false, "2 drawers lined up."),
         ChatDrawerSettingsLine("glass", 70, "bottom left", "row"), ChatDrawerSettingsLine("outline", null, null, null),
         ChatDrawerSettingsLine(null, 40, "top right", null), ChatDrawerSettingsLine(null, null, null, "column"),
     ];

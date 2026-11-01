@@ -175,14 +175,66 @@ public sealed class DrawerTidyTests
             Assert.Null(desk.Tidy(DrawerTidy.Default, DeskMonitors.Main));
             Assert.Equal(saved, store.LoadDrawers().Places);
 
-            // The real wiring: a drawers result bar that is still up holds Tidy off until Done.
+            // The real wiring: a drawers review that is open holds Tidy off until it is dismissed.
             desk.TidyBusy = wired;
             DrawerReviewService.Current = review;
-            Assert.Null(review.ShowResult("3 drawers lined up.", () => { }));
+            box.File(@"Desktop\notes.pdf");
+            Assert.Null(review.SortNow());
+            Assert.True(review.Reviewing);
             Assert.Null(desk.Tidy(DrawerTidy.Default, DeskMonitors.Main));
             Assert.Equal(saved, store.LoadDrawers().Places);
             host.Dismiss!();
+            Assert.False(review.Reviewing);
             Assert.NotNull(desk.Tidy(DrawerTidy.Default, DeskMonitors.Main));
+        }
+        finally { DrawerReviewService.Current = null; desk.Dispose(); s.Dispose(); }
+    });
+
+    [Fact]
+    public void Tidy_and_a_chat_replace_a_result_bar_that_has_no_review_behind_it_and_a_second_Tidy_runs() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (desk, s, store) = Desk(box, Screen(1920, 1080), d => d with { Places = Places(("images", 700, 400)) }, "Images");
+        var (review, host) = Review(s, store);
+        DrawerReviewService.Current = review;
+        try
+        {
+            var first = desk.Tidy(new DrawerTidy(DrawerCorner.BottomLeft, DrawerFlow.Column), null);
+            Assert.NotNull(first);
+            Assert.Null(review.ShowResult("1 drawer lined up.", () => { }));
+            Assert.True(review.BarOpen);
+            Assert.False(review.Reviewing);
+
+            // The result bar is up, with no review: a second Tidy runs, and its result replaces the first.
+            var second = desk.Tidy(new DrawerTidy(DrawerCorner.TopLeft, DrawerFlow.Column), null);
+            Assert.NotNull(second);
+            Assert.Equal(1, second!.Value.Moved);
+            Assert.Null(review.ShowResult("second", () => { }));
+            Assert.Equal("second", host.Model!.Title);
+
+            // A chat's look and arrangement replace it too.
+            Assert.Null(ChatDrawerSettings.Apply(Look("""{"drawers":{"look":"glass","arrange":{"corner":"br"}}}"""), s, desk, review));
+            Assert.Equal(DrawerLookKind.Glass, store.LoadDrawers().Look);
+            Assert.StartsWith(SetupCopy.ChatDrawerSettingsDone, host.Model!.Title);
+        }
+        finally { DrawerReviewService.Current = null; desk.Dispose(); s.Dispose(); }
+    });
+
+    [Fact]
+    public void UseRules_still_refuses_while_a_review_is_open() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (desk, s, store) = Desk(box, Screen(1920, 1080), d => d, "Images");
+        var (review, _) = Review(s, store);
+        DrawerReviewService.Current = review;
+        try
+        {
+            box.File(@"Desktop\notes.pdf");
+            Assert.Null(review.SortNow());
+            Assert.True(review.Reviewing);
+            Assert.Equal(DrawerReview.Busy, review.UseRules([new DrawerRule(DrawerRuleKind.Images, "images")], ["Images"]));
+            Assert.Equal(DrawerReview.Busy, ChatDrawerSettings.Apply(Look("""{"drawers":{"look":"glass"}}"""), s, desk, review));
+            Assert.Equal(DrawerLookKind.Solid, store.LoadDrawers().Look);
         }
         finally { DrawerReviewService.Current = null; desk.Dispose(); s.Dispose(); }
     });
@@ -231,8 +283,6 @@ public sealed class DrawerTidyTests
             Assert.Equal("2 drawers lined up.", host.Model!.Title);
             Assert.False(host.Model.ApplyOff);
             Assert.Equal(DrawerReview.Undo, host.Model.ApplyLabel);
-            Assert.Equal(DrawerReview.Busy, review.ShowResult("again", () => { }));   // a second bar waits for the first
-
             host.Apply!();
             Assert.Equal(1, undone);
             Assert.True(review.BarOpen);   // the line stays, until Done
@@ -424,7 +474,7 @@ public sealed class DrawerTidyTests
     });
 
     [Fact]
-    public void A_chat_look_is_refused_busy_while_a_review_or_result_bar_is_open_and_nothing_changes() => Sta.Run(() =>
+    public void A_chat_look_is_refused_busy_while_a_review_is_open_and_nothing_changes() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();
         var saved = Places(("images", 700, 400));
@@ -439,23 +489,34 @@ public sealed class DrawerTidyTests
             Assert.Equal(saved, store.LoadDrawers().Places);
 
             desk.TidyBusy = () => false;
-            Assert.Null(review.ShowResult("3 drawers lined up.", () => { }));   // a result bar is still up
-            Assert.Equal(DrawerReview.Busy, ChatDrawerSettings.Apply(Look("""{"drawers":{"opacity":30}}"""), s, desk, review));
-            Assert.Equal(DrawerStyle.DefaultOpacity, store.LoadDrawers().Opacity);
+            Assert.Null(review.ShowResult("3 drawers lined up.", () => { }));   // a result bar is up, with no review: the chat replaces it
+            Assert.Null(ChatDrawerSettings.Apply(Look("""{"drawers":{"opacity":30}}"""), s, desk, review));
+            Assert.Equal(30, store.LoadDrawers().Opacity);
         }
         finally { desk.Dispose(); s.Dispose(); }
     });
 
     [Fact]
-    public void A_chat_arrange_with_drawers_off_changes_nothing_not_even_the_look() => Sta.Run(() =>
+    public void A_chat_look_and_arrange_with_drawers_off_saves_the_look_skips_tidy_and_says_so() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();
-        var (desk, s, store) = Desk(box, Screen(1920, 1080), d => d with { Enabled = false }, "Images");
-        var (review, _) = Review(s, store);
+        var saved = Places(("images", 700, 400));
+        var (desk, s, store) = Desk(box, Screen(1920, 1080), d => d with { Enabled = false, Places = saved }, "Images");
+        var (review, host) = Review(s, store);
         try
         {
-            Assert.Equal(DrawerReview.DrawersOff, ChatDrawerSettings.Apply(Look("""{"drawers":{"look":"glass","arrange":{"corner":"tl"}}}"""), s, desk, review));
-            Assert.Equal(DrawerLookKind.Solid, store.LoadDrawers().Look);
+            Assert.Equal(SetupCopy.ChatDrawerSettingsSavedOff,
+                ChatDrawerSettings.Apply(Look("""{"drawers":{"look":"glass","opacity":70,"arrange":{"corner":"tl"}}}"""), s, desk, review));
+            var after = store.LoadDrawers();
+            Assert.Equal(DrawerLookKind.Glass, after.Look);
+            Assert.Equal(70, after.Opacity);
+            Assert.Equal(saved, after.Places);                 // Tidy did not run
+            Assert.Equal(DrawerTidy.Default, after.Tidy);
+            Assert.False(review.BarOpen);
+            Assert.Null(host.Model);
+
+            // An arrangement alone, with nothing to save, is still just the drawers-off line.
+            Assert.Equal(DrawerReview.DrawersOff, ChatDrawerSettings.Apply(Look("""{"drawers":{"arrange":{"corner":"tl"}}}"""), s, desk, review));
         }
         finally { desk.Dispose(); s.Dispose(); }
     });

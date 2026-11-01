@@ -39,6 +39,10 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
     /// <summary>Where Tidy and arrival line drawers up.</summary>
     public DrawerTidy Tidy { get; init; } = DrawerTidy.Default;
 
+    /// <summary>The file was written before 4.5 (a <c>drawers</c> object with no <c>tidy</c> key): drawers with no saved place arrive in today's
+    /// column rule, once, and are saved, so an upgrader's drawers sit exactly as before. Cleared by that first save; never encoded.</summary>
+    public bool LegacyArrival { get; init; }
+
     public DrawerLookKind LookFor(string id) => Looks.TryGetValue(id, out var k) ? k : Look;
 
     public static DrawerSettings Default { get; } = new(false, null, [], DrawerRules.Defaults, false, false);
@@ -82,6 +86,7 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
             Snap = SettingsJson.Bool(o, "snap", true),
             KeepClear = SettingsJson.Bool(o, "keep_clear", true),
             Tidy = DecodeTidy(o["tidy"]),
+            LegacyArrival = o["tidy"] is null,
         };
     }
 

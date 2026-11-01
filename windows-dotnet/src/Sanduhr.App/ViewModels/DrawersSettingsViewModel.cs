@@ -72,8 +72,10 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
     [ObservableProperty] private int _tidyFlowIndex;
     [ObservableProperty] private string _tidyStatus = "";
 
-    /// <summary>Opacity shows only for the looks that draw a plate (Solid, Glass).</summary>
-    public bool ShowOpacity => LookIndex is >= 0 and <= (int)DrawerLookKind.Bare && DrawerStyle.HasFill((DrawerLookKind)LookIndex);
+    /// <summary>Opacity shows when any look in force draws a plate (Solid, Glass): the shared look, or a drawer's own.</summary>
+    public bool ShowOpacity =>
+        (LookIndex is >= 0 and <= (int)DrawerLookKind.Bare && DrawerStyle.HasFill((DrawerLookKind)LookIndex))
+        || (_drawers?.Settings.Looks.Values.Any(DrawerStyle.HasFill) ?? false);
 
     /// <summary>The slider's readout: "55%".</summary>
     public string OpacityText => $"{Opacity}%";
@@ -105,6 +107,7 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
             Recent.Clear();
             foreach (var e in _drawers.Journal.Load().Entries.OrderByDescending(e => e.AtUtc).Take(10)) Recent.Add(new DrawerRecentRow(this, e));
             OnPropertyChanged(nameof(NothingRecent));
+            OnPropertyChanged(nameof(ShowOpacity));   // a drawer's own look may have changed without the shared one
         }
         finally { _loading = false; }
     }
