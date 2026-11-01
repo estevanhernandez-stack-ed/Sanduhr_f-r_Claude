@@ -373,6 +373,7 @@ internal sealed class DeskDesignService : IDisposable
     {
         try
         {
+            if (_disposed) return DeskAnswer.NotReady;
             verdict = PastedSetup.RefuseUndrawn(verdict);
             if (ResetGuard.Done || verdict.Design is not { } proposal)
                 return verdict.Reasons.Count > 0 ? DeskAnswer.Refused(verdict.Reasons) : DeskAnswer.NotReady;
@@ -403,7 +404,25 @@ internal sealed class DeskDesignService : IDisposable
 
     /// <summary>The Desk's rules for a pasted design, with this PC's context: <see cref="DeskDesign.Validate(JsonNode?, DeskDesignContext)"/>
     /// unchanged, then a refusal for a piece this Windows build does not draw (<see cref="PastedSetup.RefuseUndrawn"/>).</summary>
-    internal DeskValidation ValidatePasted(JsonNode design) => PastedSetup.RefuseUndrawn(DeskDesign.Validate(design, Context()));
+    internal DeskValidation ValidatePasted(JsonNode design) => PastedSetup.RefuseUndrawn(DeskDesign.Validate(design, PasteContext()));
+
+    /// <summary>How long the paste window's check reuses what it read of this PC (fonts, wallpaper, Start menu, monitors). The check runs on
+    /// every edit of the paste box, and reading those on each keystroke would be work for nothing.</summary>
+    internal static readonly TimeSpan PasteContextLife = TimeSpan.FromSeconds(5);
+
+    private DeskDesignContext? _pasteContext;
+    private DateTimeOffset _pasteContextAt;
+
+    private DeskDesignContext PasteContext()
+    {
+        var now = Clock();
+        if (_pasteContext is null || now - _pasteContextAt > PasteContextLife || now < _pasteContextAt)
+        {
+            _pasteContext = Context();
+            _pasteContextAt = now;
+        }
+        return _pasteContext;
+    }
 
     /// <summary>A newer proposal takes the place of the one on the desktop: the older one is answered rejected.</summary>
     private void ReplaceReview()
@@ -455,7 +474,7 @@ internal sealed class DeskDesignService : IDisposable
         _review = null;
         var merged = DeskDesign.Merge(CurrentDesign(), r.Proposal);
         var changes = DeskDesign.Diff(CurrentDesign(), merged, SettingsNames.DeskPieceName, MonitorName);
-        var answer = ApplyDesign(r.Proposal, changes, r.Warnings);
+        var answer = ApplyDesign(r.Proposal, changes, r.Warnings, r.Pasted);
         HostEnd();   // the preview gives way to what was written
         Answer(r, answer);
     }
@@ -474,9 +493,9 @@ internal sealed class DeskDesignService : IDisposable
     /// "Before &lt;name&gt;"), then the layout, font, plate, ink, Launcher, theme and messages are written, the new look is saved
     /// under the design's name, and "Put my Desk back" is pointed at the saved previous Desk.
     /// </summary>
-    private DeskAnswer ApplyDesign(DeskDesign proposal, IReadOnlyList<string> changes, IReadOnlyList<DeskReason> warnings)
+    private DeskAnswer ApplyDesign(DeskDesign proposal, IReadOnlyList<string> changes, IReadOnlyList<DeskReason> warnings, bool pasted = false)
     {
-        try { return ApplyDesignCore(proposal, changes, warnings); }
+        try { return ApplyDesignCore(proposal, changes, warnings, pasted); }
         catch (Exception e) when (IsRecoverable(e))
         {
             Log("apply", e);
@@ -484,12 +503,15 @@ internal sealed class DeskDesignService : IDisposable
         }
     }
 
-    private DeskAnswer ApplyDesignCore(DeskDesign proposal, IReadOnlyList<string> changes, IReadOnlyList<DeskReason> warnings)
+    private DeskAnswer ApplyDesignCore(DeskDesign proposal, IReadOnlyList<string> changes, IReadOnlyList<DeskReason> warnings, bool pasted)
     {
+        // A design with no name is saved as "Claude's design" for the MCP's callers; one pasted from an AI chat names no product.
+        string? name = proposal.Name;
+        if (pasted && DeskDesigns.NormalizeName(name) is null) name = SetupCopy.ChatUntitledDesign;
         var before = CurrentDesign();
         var merged = DeskDesign.Merge(before, proposal);
         var warn = new List<DeskReason>(warnings);
-        var saved = SaveCurrentFirst(before, proposal.Name);
+        var saved = SaveCurrentFirst(before, name);
         if (saved is null)
             return DeskAnswer.Refused([new DeskReason("design", "the Desk it replaces could not be saved, so nothing was changed")]);
 
@@ -506,7 +528,7 @@ internal sealed class DeskDesignService : IDisposable
         }
 
         var after = CurrentDesign();
-        KeepApplied(after, proposal.Name);
+        KeepApplied(after, name);
         _store.SaveDeskPutBack(saved.Id);
         HostApplied(themeKey);
         AfterChange();

@@ -1097,7 +1097,7 @@ public partial class App : Application
     /// that review's Apply. Null when the review opened, otherwise the line to show.</summary>
     private string? UseChatRules(IReadOnlyList<DrawerRule> rules, IReadOnlyList<string> names)
     {
-        if (_drawerReview is not { } review) return SettingsNames.DrawersSortUnavailable;
+        if (_quitting || _drawerReview is not { } review) return SettingsNames.DrawersSortUnavailable;
         var said = review.UseRules(rules, names, () =>
         {
             _desk?.Reload();
@@ -1329,6 +1329,7 @@ public partial class App : Application
         if (_quitting)
             return;
         _quitting = true;
+        _chatWindow?.Close();   // its Preview and Use rules reach services that are about to be disposed
         Instance?.StopAnswering();
         // After a reset nothing may write settings.json, snapshot.json or history on the way out.
         // (QuitApp is also the normal quit; the guard is a no-op until a reset has run.)

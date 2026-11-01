@@ -115,6 +115,17 @@ internal sealed class DrawerService : IDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>Saves drawers' settings and the Desk's in one write (see <see cref="SettingsStore.SaveDrawersAndDesk"/>) and follows them.</summary>
+    public void Save(DrawerSettings next, DeskSettings? desk)
+    {
+        _store.SaveDrawersAndDesk(next, desk);
+        Reload();
+        Changed?.Invoke();
+    }
+
+    /// <summary>The service was disposed (the app is quitting): nothing should use it.</summary>
+    public bool IsDisposed => _disposed;
+
     private void Refresh(DrawerState state)
     {
         bool wasMissing = state.Missing;

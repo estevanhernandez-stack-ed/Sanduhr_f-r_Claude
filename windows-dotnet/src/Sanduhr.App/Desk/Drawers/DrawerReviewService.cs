@@ -75,9 +75,11 @@ internal sealed class DrawerReviewService
     /// <summary>The built-in rules over the Desktop, opened for review. Null when the bar opened; otherwise the line to show instead.
     /// <paramref name="names"/> are the names a pasted answer gave the drawers its rules name, by drawer id: a drawer that does not exist
     /// yet is made under that name, else under <see cref="NameFromId"/>.</summary>
-    public string? SortNow(IReadOnlyDictionary<string, string>? names = null)
+    public string? SortNow(IReadOnlyDictionary<string, string>? names = null) => Open(SortPlan(_drawers.Settings, names));
+
+    /// <summary>The plan the rules in <paramref name="s"/> make over the Desktop now.</summary>
+    private DrawerPlan SortPlan(DrawerSettings s, IReadOnlyDictionary<string, string>? names)
     {
-        var s = _drawers.Settings;
         var root = s.RootOr(_drawers.Places.Desktop);
         var known = s.Drawers.Concat(DrawerRules.DefaultDrawers(root).Where(d => s.Drawers.All(x => x.Id != d.Id))).ToList();
         // A rule the user added for a drawer that does not exist yet ("invoice" to Receipts) gets that drawer when it first matches.
@@ -86,36 +88,81 @@ internal sealed class DrawerReviewService
             var name = names is not null && names.TryGetValue(id, out var given) && DrawerNames.IsValid(given) ? given : NameFromId(id);
             known.Add(new DrawerDef(id, name, Path.Combine(root, name), Owned: true));
         }
-        return Open(DrawerRules.Plan(_drawers.DesktopListing(), s.Rules, known, root, DateTime.UtcNow));
+        return DrawerRules.Plan(_drawers.DesktopListing(), s.Rules, known, root, DateTime.UtcNow);
     }
 
     /// <summary>
-    /// An AI chat's drawer rules (setup spec, section 3): they replace the drawer rules, drawers come on if they were off, and the rules'
-    /// plan opens for review. Nothing moves before that review's Apply. Refused with <see cref="DrawerReview.Busy"/> while any review is
-    /// open, before anything is changed. <paramref name="names"/> parallels <paramref name="rules"/> (the chat's name for each rule's
-    /// drawer) so a drawer the rules create keeps the chat's name. <paramref name="deskChanged"/> runs after the settings are written and
-    /// before the review opens (the Desk reloads to draw the drawers). Null when the review opened; otherwise the line to show.
+    /// An AI chat's drawer rules (setup spec, section 3): they replace the drawer rules, drawers and the Desk come on if they were off, and
+    /// the rules' plan opens for review. Nothing moves before that review's Apply.
+    /// <list type="bullet">
+    /// <item><description>Refused with <see cref="DrawerReview.Busy"/> while any review is open or a sort's result bar (with its Undo) is up.</description></item>
+    /// <item><description>A rule's drawer is the existing drawer of that name (or whose folder is that name in the Drawers folder), not a second one.</description></item>
+    /// <item><description>The plan is built and checked first. A refusal writes nothing. Rules that match nothing now are still saved, and
+    /// the line says so. The settings go in one write.</description></item>
+    /// </list>
+    /// <paramref name="names"/> parallels <paramref name="rules"/> (the chat's name for each rule's drawer) so a drawer the rules create keeps
+    /// the chat's name. <paramref name="deskChanged"/> runs after the settings are written and before the review opens (the Desk reloads to
+    /// draw the drawers). Null when the review opened; otherwise the line to show.
     /// </summary>
     public string? UseRules(IReadOnlyList<DrawerRule> rules, IReadOnlyList<string> names, Action? deskChanged = null)
     {
-        if (Reviewing || _host.OtherReviewOpen) return DrawerReview.Busy;
+        if (_drawers.IsDisposed) return SettingsNames.DrawersSortUnavailable;
+        if (Reviewing || BarOpen || _host.OtherReviewOpen) return DrawerReview.Busy;
+
+        var s = _drawers.Settings;
+        var (mapped, fresh) = ResolveDrawers(s, s.RootOr(_drawers.Places.Desktop), rules, names);
+        // Drawers coming on show again anything hidden before they went off, as turning them on does.
+        var next = s with { Enabled = true, Rules = mapped, Hidden = s.Enabled ? s.Hidden : [] };
+        var plan = SortPlan(next, fresh);
+        var check = DrawerPlanValidator.Check(plan, _drawers.Roots, next.Drawers);
+        if (!check.Ok) return check.Error;
+
         try
         {
             // Drawers draw on the Desk, so the Desk has to be on for them; setup writes the same pair (Desk on = desktop or drawers).
             var desk = _store.LoadDesk();
-            if (!desk.Enabled) _store.SaveDesk(desk with { Enabled = true });
-            bool wasOn = _drawers.Settings.Enabled;
-            _drawers.Save(_drawers.Settings with { Enabled = true, Rules = [.. rules] });
-            if (!wasOn) _drawers.ShowAll();
+            _drawers.Save(next, desk.Enabled ? null : desk with { Enabled = true });
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             return SetupCopy.SaveFailed;
         }
         deskChanged?.Invoke();
-        var byId = new Dictionary<string, string>(StringComparer.Ordinal);
-        for (int i = 0; i < rules.Count && i < names.Count; i++) byId.TryAdd(rules[i].DrawerId, names[i]);
-        return SortNow(byId);
+        if (check.Moves.Count == 0) return SetupCopy.ChatRulesSavedNothing;
+        return Open(plan);
+    }
+
+    /// <summary>Points each rule at a drawer: the existing one whose name is the chat's (any case) or whose folder is that name in the
+    /// Drawers folder, else a new one under the id the reader gave it, or a free one when that id belongs to a different drawer.
+    /// <c>fresh</c> holds the chat's name for each new drawer, by id.</summary>
+    private static (List<DrawerRule> Rules, Dictionary<string, string> Fresh) ResolveDrawers(
+        DrawerSettings s, string root, IReadOnlyList<DrawerRule> rules, IReadOnlyList<string> names)
+    {
+        var known = s.Drawers.Concat(DrawerRules.DefaultDrawers(root).Where(d => s.Drawers.All(x => x.Id != d.Id))).ToList();
+        var taken = new HashSet<string>(known.Select(d => d.Id), StringComparer.Ordinal);
+        var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var fresh = new Dictionary<string, string>(StringComparer.Ordinal);
+        var mapped = new List<DrawerRule>();
+        for (int i = 0; i < rules.Count; i++)
+        {
+            string name = i < names.Count ? names[i] : NameFromId(rules[i].DrawerId);
+            if (!byName.TryGetValue(name, out var id))
+            {
+                string home = Path.Combine(root, name);
+                var existing = known.FirstOrDefault(d => string.Equals(d.Name, name, StringComparison.OrdinalIgnoreCase)
+                                                         || string.Equals(d.Home, home, StringComparison.OrdinalIgnoreCase));
+                if (existing is not null) id = existing.Id;
+                else
+                {
+                    id = taken.Contains(rules[i].DrawerId) ? DrawerIds.Unique(name, taken) : rules[i].DrawerId;
+                    taken.Add(id);
+                    fresh[id] = name;
+                }
+                byName[name] = id;
+            }
+            mapped.Add(rules[i] with { DrawerId = id });
+        }
+        return (mapped, fresh);
     }
 
     /// <summary>The name a drawer a rule names gets before it exists: its id in words ("older-files" is "Older files").</summary>

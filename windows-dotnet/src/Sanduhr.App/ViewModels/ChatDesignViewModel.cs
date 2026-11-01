@@ -70,7 +70,8 @@ public sealed partial class ChatDesignViewModel : ObservableObject
         var errors = new List<DeskReason>(read.Reasons);
         var warnings = new List<DeskReason>();
         DeskValidation? verdict = null;
-        if (read.Desk is { } deskNode && errors.Count == 0)
+        // The Desk part is checked whatever the drawers part held, so every problem in the paste shows at once.
+        if (read.Desk is { } deskNode)
         {
             verdict = _validate(deskNode);
             errors.AddRange(verdict.Reasons);

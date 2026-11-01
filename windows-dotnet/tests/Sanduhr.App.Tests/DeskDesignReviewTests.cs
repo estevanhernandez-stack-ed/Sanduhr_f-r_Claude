@@ -764,7 +764,7 @@ public sealed class DeskDesignReviewTests : IDisposable
     }
 
     [Fact]
-    public void APastedDesignNamingAMissingLauncherImageIsRefused()
+    public void APastedDesignWithLauncherButtonsIsRefusedByField()
     {
         WithService((s, host) =>
         {
@@ -774,9 +774,60 @@ public sealed class DeskDesignReviewTests : IDisposable
             Assert.NotNull(design);
             var answer = s.ProposePasted(new DeskValidation(DeskDesignStatus.Ok, [], [], [], design));
             Assert.Equal(DeskAnswer.Rejected, answer.Status);
-            Assert.Contains(answer.Reasons!, r => r.Field == "launcher");
+            // Launcher buttons are not a field a chat can set, so the field check refuses it before the image check is reached.
+            Assert.Contains(answer.Reasons!, r => r.Field == "desk.launcher");
             Assert.False(s.Reviewing);
             Assert.Empty(host.Calls);
+        });
+    }
+
+    [Fact]
+    public void APastedDesignWithNoNameIsSavedUnderANeutralNameNotClaudes()
+    {
+        WithService((s, host) =>
+        {
+            Assert.Equal(DeskAnswer.Previewing, s.ProposePasted(Pasted(s, """{"plate":true}""")).Status);
+            host.Apply!();
+            var names = s.Designs().Select(d => d.Name).ToArray();
+            Assert.Contains(SetupCopy.ChatUntitledDesign, names);
+            Assert.Contains("Before " + SetupCopy.ChatUntitledDesign, names);
+            Assert.DoesNotContain(names, n => n.Contains("Claude"));
+        });
+    }
+
+    [Fact]
+    public void APastedDesignAfterTheServiceIsDisposedIsNotReady()
+    {
+        Sta.Run(() =>
+        {
+            var s = new DeskDesignService(_paths, _store) { Host = new FakeHost(), InstalledFonts = () => Installed, Clock = () => _now };
+            var verdict = Pasted(s, Dusk);
+            s.Dispose();
+            var answer = s.ProposePasted(verdict);
+            Assert.Equal(DeskAnswer.Rejected, answer.Status);
+            Assert.Equal("not_ready", answer.Reason);
+        });
+    }
+
+    [Fact]
+    public void ThePasteCheckReadsThisPcOnceInAFewSecondsNotOnEveryKeystroke()
+    {
+        Sta.Run(() =>
+        {
+            int reads = 0;
+            using var s = new DeskDesignService(_paths, _store)
+            {
+                Host = new FakeHost(), InstalledFonts = () => Installed, Clock = () => _now,
+                Monitors = () => { reads++; return []; },
+            };
+            Pasted(s, Dusk);
+            int first = reads;
+            Assert.True(first >= 1);
+            for (int i = 0; i < 20; i++) Pasted(s, Dusk);
+            Assert.Equal(first, reads);                                   // typing: the same read
+            _now = _now.AddSeconds(6);
+            Pasted(s, Dusk);
+            Assert.True(reads > first);                                   // a few seconds on: read again
         });
     }
 }

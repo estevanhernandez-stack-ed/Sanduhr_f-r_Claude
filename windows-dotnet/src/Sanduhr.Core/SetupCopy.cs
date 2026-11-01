@@ -57,8 +57,14 @@ public static class SetupCopy
         string head = rules == 1 ? "1 drawer rule" : $"{rules} drawer rules";
         string into = drawerNames.Count == 0 ? "" : " into " + string.Join(", ", drawerNames);
         string them = rules == 1 ? "it" : "them";
-        return $"{head}{into}. Using {them} replaces your drawer rules, turns drawers on if they are off, then shows what {them} would sort. Nothing moves until you Apply.";
+        return $"{head}{into}. Using {them} replaces your drawer rules, turns drawers and your Desk on if they are off, then shows what {them} would sort. Nothing moves until you Apply.";
     }
+
+    /// <summary>Rules that parse and check out but match nothing on the Desktop now are still saved.</summary>
+    public const string ChatRulesSavedNothing = "The rules are saved, but nothing on your Desktop matches them yet.";
+
+    /// <summary>The name a pasted design is saved under when the chat gave it none.</summary>
+    public const string ChatUntitledDesign = "Your AI chat's design";
 
     public static string ChatNotShown(string why) => $"Not shown: {why}.";
 
@@ -71,7 +77,7 @@ public static class SetupCopy
         Title, Intro, DesktopTitle, DesktopBody, DrawersTitle, DrawersBody, UsageTitle, UsageBody, ClaudeSource, ClaudeTrademark,
         DesignWithChat, Continue, NotNow, Cancel, MenuItem, PickOne, SaveFailed, WhatChanges, WhatHappened, DesktopOffLine, UsageOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DrawersOffLine(2),
         ChatIntro, ChatCopyPrompt, ChatPasteName, ChatPastePlaceholder, ChatPreview, ChatUseRules, ChatClose, ChatFindingsName, ChatReady,
-        ChatPromptCopied, ChatDeskShown, ChatRulesShown, ChatNoDeskService, ChatFixCount(1), ChatFixCount(2), ChatManyBlocks(2),
+        ChatPromptCopied, ChatDeskShown, ChatRulesShown, ChatNoDeskService, ChatRulesSavedNothing, ChatUntitledDesign, ChatFixCount(1), ChatFixCount(2), ChatManyBlocks(2),
         ChatRulesLine(1, ["Photos"]), ChatRulesLine(2, ["Photos", "Receipts"]), ChatNotShown("the Desk is busy"),
     ];
 

@@ -82,26 +82,47 @@ public static class PastedSetup
     /// The reason is by field (<c>layout.meetings</c>), and nothing applies partly: the verdict comes back rejected with no design.</summary>
     public static DeskValidation RefuseUndrawn(DeskValidation verdict)
     {
-        if (verdict.Design?.Layout is not { } layout) return verdict;
-        var reasons = layout
+        if (verdict.Design is not { } design) return verdict;
+        var reasons = new List<DeskReason>();
+        // The reader already names a field outside the prompt's list; a verdict built another way is held to the same list here.
+        foreach (var (key, _) in design.ToJson())
+            if (!SetupPrompt.DeskFields.Contains(key, StringComparer.Ordinal))
+                reasons.Add(new DeskReason("desk." + key, "is not a field a chat can set; the fields are " + string.Join(", ", SetupPrompt.DeskFields)));
+        reasons.AddRange((design.Layout ?? [])
             .Where(p => SetupPrompt.NotDrawn.Contains(p.Piece, StringComparer.Ordinal))
-            .Select(p => new DeskReason("layout." + p.Piece, "is not drawn by Sanduhr on Windows yet; leave it out"))
-            .ToList();
+            .Select(p => new DeskReason("layout." + p.Piece, "is not drawn by Sanduhr on Windows yet; leave it out")));
         return reasons.Count == 0
             ? verdict
             : verdict with { Status = DeskDesignStatus.Rejected, Reasons = [.. verdict.Reasons, .. reasons], Fonts = [], Design = null };
     }
 
+    /// <summary>The validator's own phrasings that name a product or a tool, and what the AI chat window says instead. Only these are
+    /// replaced: text echoed from the paste (a field a chat made up, a name it typed) stays as typed.</summary>
+    private static readonly (string From, string To)[] Phrasings =
+    [
+        ("\"all\", \"main\" or a monitor id from get_desk monitors", "\"all\" or \"main\""),
+        ("use \"all\", \"main\" or an id from monitors in get_desk.", "use \"all\" or \"main\"."),
+        ("use an id from start_menu_apps in get_desk. A button opens only what the Start menu offers.", "A button opens only what this PC's Start menu offers."),
+        ("must be the stored image name from get_desk, or null", "must be an image Sanduhr already stored, or null"),
+        ("Claude cannot", "an AI chat cannot"),
+        ("Claude's", "the AI chat's"),
+        ("get_desk", "this PC's Desk settings"),
+    ];
+
     /// <summary>A reason's words as the AI chat window shows them: the Desk's own rules were written for Claude Code, and the chat window
-    /// names no product, so "Claude" reads "an AI chat".</summary>
-    public static string Neutral(string text) => text.Replace("Claude", "an AI chat", StringComparison.Ordinal);
+    /// names no product and no tool, so "Claude cannot" reads "an AI chat cannot" and a mention of <c>get_desk</c> reads in plain words.</summary>
+    public static string Neutral(string text)
+    {
+        foreach (var (from, to) in Phrasings) text = text.Replace(from, to, StringComparison.Ordinal);
+        return text;
+    }
 
     /// <summary>The paste window's problem list: each reason by field in the window's neutral words, errors first, then the warnings.</summary>
     public static IReadOnlyList<PastedFinding> Findings(IEnumerable<DeskReason> errors, IEnumerable<DeskReason> warnings) =>
-    [
-        .. errors.Select(r => new PastedFinding(Neutral(r.Field), Neutral(r.Message), IsError: true)),
-        .. warnings.Select(r => new PastedFinding(Neutral(r.Field), Neutral(r.Message), IsError: false)),
-    ];
+        errors.Select(r => new PastedFinding(Neutral(r.Field), Neutral(r.Message), IsError: true))
+            .Concat(warnings.Select(r => new PastedFinding(Neutral(r.Field), Neutral(r.Message), IsError: false)))
+            .Distinct()   // the reader and the validator can name the same field twice
+            .ToList();
 
     private static PastedSetupRead ReadBlock(JsonObject block, int count)
     {
@@ -113,7 +134,14 @@ public static class PastedSetup
         JsonNode? desk = null;
         if (block.ContainsKey("desk"))
         {
-            if (block["desk"] is JsonObject d) desk = d.DeepClone();
+            if (block["desk"] is JsonObject d)
+            {
+                desk = d.DeepClone();
+                // The prompt teaches these fields and says any other is refused: a chat cannot bring a theme, song looks or Launcher buttons.
+                foreach (var (key, _) in d)
+                    if (!SetupPrompt.DeskFields.Contains(key, StringComparer.Ordinal))
+                        reasons.Add(new DeskReason("desk." + Clip(key, 24), "is not a field a chat can set; the fields are " + string.Join(", ", SetupPrompt.DeskFields)));
+            }
             else reasons.Add(new DeskReason("desk", "must be an object"));
         }
 

@@ -752,8 +752,24 @@ public sealed class SettingsStore
 
     public void SaveDesk(DeskSettings desk)
     {
-        var d = desk.Normalized();
         var root = Read();
+        PutDesk(root, desk);
+        Write(root);
+    }
+
+    /// <summary>Drawers and the Desk in one write, so a save that fails cannot leave one without the other (drawers on and the Desk off
+    /// draws nothing). A null <paramref name="desk"/> leaves the Desk as it is.</summary>
+    public void SaveDrawersAndDesk(DrawerSettings drawers, DeskSettings? desk)
+    {
+        var root = Read();
+        if (desk is not null) PutDesk(root, desk);
+        root[DrawerSettings.Key] = drawers.Encode();
+        Write(root);
+    }
+
+    private static void PutDesk(JsonObject root, DeskSettings desk)
+    {
+        var d = desk.Normalized();
         root["desk_enabled"] = d.Enabled;
         root["desk_layout"] = d.Layout;
         root["desk_margins"] = new JsonObject
@@ -766,7 +782,6 @@ public sealed class SettingsStore
         if (d.Font is null) root.Remove("desk_font");
         else root["desk_font"] = d.Font;
         root["desk_time_size"] = d.TimeSize;
-        Write(root);
     }
 
     /// <summary>The Desk Launcher (spec, Desk Launcher): <c>desk_launcher</c> {orientation, buttons[]}. Absent, or

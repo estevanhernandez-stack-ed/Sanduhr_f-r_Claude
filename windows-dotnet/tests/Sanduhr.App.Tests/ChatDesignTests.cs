@@ -247,22 +247,24 @@ public sealed class ChatDesignTests : AppWindowFixture
     {
         public bool Other { get; set; }
         public DeskReviewModel? Model { get; private set; }
+        public Action? Apply { get; private set; }
         public bool OtherReviewOpen => Other;
         public void Preview(string layout) { }
         public void EndPreview() { }
-        public void Bar(DeskReviewModel model, Action apply, Action? edit, Action dismiss) => Model = model;
+        public void Bar(DeskReviewModel model, Action apply, Action? edit, Action dismiss) { Model = model; Apply = apply; }
         public void CloseBar() => Model = null;
         public DrawerPlanEdits? Edit(DrawerPlan plan, IReadOnlyCollection<string> existingIds) => null;
     }
 
     private sealed record Rig(DrawerService Drawers, DrawerReviewService Review, SettingsStore Store, FakeDrawerHost Host);
 
-    private static Rig MakeRig(DrawerSandbox box, bool drawersOn, bool deskOn)
+    private static Rig MakeRig(DrawerSandbox box, bool drawersOn, bool deskOn, string? root = null, params DrawerDef[] defs)
     {
         var paths = new Paths(appDataBase: Path.Combine(box.Root, "appdata"));
         var store = new SettingsStore(paths);
         store.SaveDesk(DeskSettings.Default with { Enabled = deskOn, Layout = "clock:bl" });
-        store.SaveDrawers(DrawerSettings.Default with { Enabled = drawersOn });
+        foreach (var d in defs) Directory.CreateDirectory(d.Home);
+        store.SaveDrawers(DrawerSettings.Default with { Enabled = drawersOn, Root = root, Drawers = defs });
         var drawers = new DrawerService(store, paths, new DrawerPlaces(box.Desktop, box.Public, []), System.Windows.Threading.Dispatcher.CurrentDispatcher);
         var host = new FakeDrawerHost();
         return new Rig(drawers, new DrawerReviewService(drawers, store, host), store, host);
@@ -326,14 +328,14 @@ public sealed class ChatDesignTests : AppWindowFixture
     });
 
     [Fact]
-    public void Rules_that_sort_nothing_say_so_and_still_replace_the_rules() => AppHost.Run(() =>
+    public void Rules_that_sort_nothing_are_saved_and_say_so() => AppHost.Run(() =>
     {
         using var box = new DrawerSandbox();
         var rig = MakeRig(box, drawersOn: true, deskOn: true);
         try
         {
             var read = Rules("""{"drawers":{"rules":[{"kind":"archives","drawer":"Zips"}]}}""");
-            Assert.Equal(DrawerReview.NothingToSort, rig.Review.UseRules(read.Rules!, read.RuleDrawerNames));
+            Assert.Equal(SetupCopy.ChatRulesSavedNothing, rig.Review.UseRules(read.Rules!, read.RuleDrawerNames));
             Assert.False(rig.Review.Reviewing);
             Assert.Equal(["zips"], rig.Store.LoadDrawers().Rules.Select(r => r.DrawerId));
         }
@@ -354,4 +356,148 @@ public sealed class ChatDesignTests : AppWindowFixture
         }
         finally { rig.Drawers.Dispose(); }
     });
+
+    [Fact]
+    public void A_rule_naming_a_renamed_existing_drawer_uses_that_drawer_and_makes_no_second_one() => AppHost.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        // "images" is the built-in drawer id; the user renamed it Photos, so its folder is Drawers\Photos.
+        var photos = new DrawerDef("images", "Photos", Path.Combine(box.Drawers, "Photos"), Owned: true);
+        var rig = MakeRig(box, drawersOn: true, deskOn: true, defs: photos);
+        try
+        {
+            box.File(@"Desktop\holiday.png");
+            var read = PastedSetup.Read("""{"drawers":{"rules":[{"kind":"images","drawer":"photos"}]}}""");
+            Assert.Equal("photos", read.Rules![0].DrawerId);   // the reader's own id for the chat's name
+
+            Assert.Null(rig.Review.UseRules(read.Rules!, read.RuleDrawerNames));
+
+            Assert.Equal(["images"], rig.Store.LoadDrawers().Rules.Select(r => r.DrawerId));
+            Assert.Equal(["images"], rig.Store.LoadDrawers().Drawers.Select(d => d.Id));
+            Assert.Contains("Photos: 1 file", rig.Host.Model!.Changes);   // the existing drawer, so no "(new)"
+        }
+        finally { rig.Drawers.Dispose(); }
+    });
+
+    [Fact]
+    public void A_chat_id_that_belongs_to_a_different_drawer_gets_a_free_one() => AppHost.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var photos = new DrawerDef("images", "Photos", Path.Combine(box.Drawers, "Photos"), Owned: true);
+        var rig = MakeRig(box, drawersOn: true, deskOn: true, defs: photos);
+        try
+        {
+            box.File(@"Desktop\holiday.png");
+            // "Images" is the built-in id "images", which is the Photos drawer here: this rule is for a drawer of its own.
+            var read = PastedSetup.Read("""{"drawers":{"rules":[{"kind":"images","drawer":"Images"}]}}""");
+            Assert.Null(rig.Review.UseRules(read.Rules!, read.RuleDrawerNames));
+            Assert.Equal(["images-2"], rig.Store.LoadDrawers().Rules.Select(r => r.DrawerId));
+            Assert.Contains("Images (new): 1 file", rig.Host.Model!.Changes);
+        }
+        finally { rig.Drawers.Dispose(); }
+    });
+
+    [Fact]
+    public void A_refused_plan_writes_nothing() => AppHost.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        // A Drawers folder that is the Desktop itself is unsafe: the check refuses every plan built on it.
+        var rig = MakeRig(box, drawersOn: false, deskOn: false, root: box.Desktop);
+        try
+        {
+            box.File(@"Desktop\holiday.png");
+            string before = File.ReadAllText(Path.Combine(box.Root, "appdata", "Sanduhr", "settings.json"));
+            var read = PastedSetup.Read("""{"drawers":{"rules":[{"kind":"images","drawer":"Photos"}]}}""");
+            bool reloaded = false;
+
+            var said = rig.Review.UseRules(read.Rules!, read.RuleDrawerNames, () => reloaded = true);
+
+            Assert.Contains("Drawers folder", said);
+            Assert.False(reloaded);
+            Assert.False(rig.Review.Reviewing);
+            Assert.False(rig.Store.LoadDrawers().Enabled);
+            Assert.False(rig.Store.LoadDesk().Enabled);
+            Assert.Equal(DrawerRules.Defaults.Select(r => r.DrawerId), rig.Store.LoadDrawers().Rules.Select(r => r.DrawerId));
+            Assert.Equal(before, File.ReadAllText(Path.Combine(box.Root, "appdata", "Sanduhr", "settings.json")));
+        }
+        finally { rig.Drawers.Dispose(); }
+    });
+
+    [Fact]
+    public void Drawers_and_the_Desk_go_in_one_write_and_both_hold() => AppHost.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var rig = MakeRig(box, drawersOn: false, deskOn: false);
+        try
+        {
+            box.File(@"Desktop\holiday.png");
+            var read = PastedSetup.Read("""{"drawers":{"rules":[{"kind":"images","drawer":"Photos"}]}}""");
+            Assert.Null(rig.Review.UseRules(read.Rules!, read.RuleDrawerNames));
+            var fresh = new SettingsStore(new Paths(appDataBase: Path.Combine(box.Root, "appdata")));
+            Assert.True(fresh.LoadDrawers().Enabled);
+            Assert.True(fresh.LoadDesk().Enabled);
+            Assert.Equal("clock:bl", fresh.LoadDesk().Layout);   // the rest of the Desk is as it was
+        }
+        finally { rig.Drawers.Dispose(); }
+    });
+
+    [Fact]
+    public void Use_rules_is_busy_while_a_sorts_result_bar_with_its_Undo_is_up() => AppHost.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var rig = MakeRig(box, drawersOn: true, deskOn: true);
+        try
+        {
+            box.File(@"Desktop\holiday.png");
+            var read = PastedSetup.Read("""{"drawers":{"rules":[{"kind":"images","drawer":"Photos"}]}}""");
+            Assert.Null(rig.Review.UseRules(read.Rules!, read.RuleDrawerNames));
+            rig.Host.Apply!();                        // Apply: the files move and the result bar (with Undo) stays up
+            Assert.False(rig.Review.Reviewing);
+            Assert.True(rig.Review.BarOpen);
+            Assert.Equal(DrawerReview.Busy, rig.Review.UseRules(read.Rules!, read.RuleDrawerNames));
+        }
+        finally { rig.Drawers.Dispose(); }
+    });
+
+    [Fact]
+    public void Use_rules_after_the_drawers_service_is_disposed_says_sorting_is_unavailable() => AppHost.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var rig = MakeRig(box, drawersOn: true, deskOn: true);
+        rig.Drawers.Dispose();
+        var read = PastedSetup.Read("""{"drawers":{"rules":[{"kind":"images","drawer":"Photos"}]}}""");
+        Assert.Equal(SettingsNames.DrawersSortUnavailable, rig.Review.UseRules(read.Rules!, read.RuleDrawerNames));
+    });
+
+    // ---- the whole paste is checked at once ----
+
+    [Fact]
+    public void A_desk_problem_and_a_drawers_problem_are_both_listed()
+    {
+        var vm = Make([], new DeskValidation(DeskDesignStatus.Rejected, [new DeskReason("layout.clock.anchor", "must be one of tl, tc")], [], [], null));
+        vm.PasteText = """{"desk":{"layout":{"clock":{"anchor":"zz"}}},"drawers":{"rules":[{"kind":"images","drawer":"a/b"}]}}""";
+        Assert.Contains(vm.Findings, f => f.Field == "layout.clock.anchor");
+        Assert.Contains(vm.Findings, f => f.Field == "drawers.rules[0].drawer");
+        Assert.Equal(SetupCopy.ChatFixCount(2), vm.Summary);
+    }
+
+    [Fact]
+    public void The_rules_line_says_the_Desk_turns_on_too()
+    {
+        var vm = Make([]);
+        vm.PasteText = """{"drawers":{"rules":[{"kind":"images","drawer":"Photos"}]}}""";
+        Assert.Contains("your Desk on", vm.RulesLine);
+    }
+
+    [Fact]
+    public void A_desk_field_the_prompt_does_not_teach_is_listed_by_field_and_nothing_is_usable()
+    {
+        var vm = new ChatDesignViewModel(() => [], _ => new DeskAnswer(DeskAnswer.Previewing),
+            node => PastedSetup.RefuseUndrawn(DeskDesign.Validate(node, DeskDesignContext.Unknown)), (_, _) => null);
+        vm.PasteText = """{"desk":{"name":"A","follows_theme":true,"launcher":{"orientation":"row","buttons":[]}}}""";
+        Assert.False(vm.CanPreview);
+        Assert.Contains(vm.Findings, f => f.Field == "desk.follows_theme" && f.IsError);
+        Assert.Contains(vm.Findings, f => f.Field == "desk.launcher" && f.IsError);
+        Assert.Equal(vm.Findings.Count, vm.Findings.Select(f => f.Field + f.Message).Distinct().Count());   // none twice
+    }
 }
