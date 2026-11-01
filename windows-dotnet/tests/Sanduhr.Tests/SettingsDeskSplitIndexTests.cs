@@ -270,7 +270,7 @@ public class SettingsDeskSplitIndexTests
     public void The_Desk_page_runs_in_the_specs_order()
     {
         var marks = Regex.Matches(TabRange("Desk"), "views:SettingsAnchor\\.Id=\"([\\w-]+)\"").Select(m => m.Groups[1].Value).ToList();
-        Assert.Equal(["desk", "arrange", "map", "pieces", "desk-clicks", "signin-reminders", "desk-designs", "desk-advanced", "margins", "desk-oled"], marks);
+        Assert.Equal(["desk", "arrange", "design-with-chat", "map", "pieces", "desk-clicks", "signin-reminders", "desk-designs", "desk-advanced", "margins", "desk-oled"], marks);
         Assert.DoesNotContain("signin-reminders", TabRange("Alerts"));
     }
 

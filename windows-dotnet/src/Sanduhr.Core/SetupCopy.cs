@@ -30,6 +30,44 @@ public static class SetupCopy
 
     public const string ArrangeNeedsDesktop = "Turn on A nicer desktop in Set up Sanduhr to arrange the Desk.";
 
+    // ---- Design it with an AI chat (spec 3): the window's copy. It says "any AI chat" and names no product, Claude included. ----
+
+    public const string ChatIntro = "Copy a prompt into any AI chat. It asks what you like, then gives you a block to paste below.";
+    public const string ChatCopyPrompt = "Copy prompt";
+    public const string ChatPasteName = "The AI chat's answer";
+    public const string ChatPastePlaceholder = "{\"desk\": {...}, \"drawers\": {\"rules\": [...]}}";
+    public const string ChatPreview = "Preview on my Desk";
+    public const string ChatUseRules = "Use these drawer rules";
+    public const string ChatClose = "Close";
+    public const string ChatFindingsName = "What to fix in the paste";
+    public const string ChatReady = "Ready.";
+    public const string ChatPromptCopied = "Prompt copied. Paste it into any AI chat, answer its questions, then paste its answer here.";
+    public const string ChatDeskShown = "Showing it on your Desk. Apply or Dismiss it there.";
+    public const string ChatRulesShown = "Showing what the rules would sort on your Desk. Nothing moves until you Apply.";
+    public const string ChatNoDeskService = "The Desk is not running, so there is nothing to preview on.";
+
+    public static string ChatFixCount(int n) => n == 1 ? "1 thing to fix before this can be used." : $"{n} things to fix before this can be used.";
+
+    public static string ChatManyBlocks(int n) => $"The paste held {n} blocks. The first good one is used.";
+
+    /// <summary>What Use these drawer rules will do, said before it does it: the rules replace the current ones, drawers come on if they
+    /// were off, and nothing moves before Apply. <paramref name="drawerNames"/> are already masked for streamer mode.</summary>
+    public static string ChatRulesLine(int rules, IReadOnlyList<string> drawerNames)
+    {
+        string head = rules == 1 ? "1 drawer rule" : $"{rules} drawer rules";
+        string into = drawerNames.Count == 0 ? "" : " into " + string.Join(", ", drawerNames);
+        string them = rules == 1 ? "it" : "them";
+        return $"{head}{into}. Using {them} replaces your drawer rules, turns drawers and your Desk on if they are off, then shows what {them} would sort. Nothing moves until you Apply.";
+    }
+
+    /// <summary>Rules that parse and check out but match nothing on the Desktop now are still saved.</summary>
+    public const string ChatRulesSavedNothing = "The rules are saved, but nothing on your Desktop matches them yet.";
+
+    /// <summary>The name a pasted design is saved under when the chat gave it none.</summary>
+    public const string ChatUntitledDesign = "Your AI chat's design";
+
+    public static string ChatNotShown(string why) => $"Not shown: {why}.";
+
     public static string DrawersOffLine(int files) =>
         files == 1 ? "1 drawer file goes back to your Desktop." : $"{files} drawer files go back to your Desktop.";
 
@@ -38,7 +76,13 @@ public static class SetupCopy
     [
         Title, Intro, DesktopTitle, DesktopBody, DrawersTitle, DrawersBody, UsageTitle, UsageBody, ClaudeSource, ClaudeTrademark,
         DesignWithChat, Continue, NotNow, Cancel, MenuItem, PickOne, SaveFailed, WhatChanges, WhatHappened, DesktopOffLine, UsageOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DrawersOffLine(2),
+        ChatIntro, ChatCopyPrompt, ChatPasteName, ChatPastePlaceholder, ChatPreview, ChatUseRules, ChatClose, ChatFindingsName, ChatReady,
+        ChatPromptCopied, ChatDeskShown, ChatRulesShown, ChatNoDeskService, ChatRulesSavedNothing, ChatUntitledDesign, ChatFixCount(1), ChatFixCount(2), ChatManyBlocks(2),
+        ChatRulesLine(1, ["Photos"]), ChatRulesLine(2, ["Photos", "Receipts"]), ChatNotShown("the Desk is busy"),
     ];
+
+    /// <summary>The strings the AI chat window draws, which name no product at all.</summary>
+    public static IReadOnlyList<string> Chat { get; } = [.. All.Skip(All.ToList().IndexOf(ChatIntro)), DesignWithChat];
 }
 
 /// <summary>What a change says before Continue applies it (spec 4): one line per tick taken away.</summary>

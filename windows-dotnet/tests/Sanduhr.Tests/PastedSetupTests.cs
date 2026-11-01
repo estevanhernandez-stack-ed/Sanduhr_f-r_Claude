@@ -268,4 +268,89 @@ public class PastedSetupTests
     {
         Assert.Equal(["screenshots", "images", "documents", "installers", "archives", "shortcuts", "older_than", "name_contains", "name_starts_with"], PastedSetup.KindWords);
     }
+
+    // ---- what the paste window adds on top of the reader (Design it with an AI chat) ----
+
+    private static DeskValidation Validate(string json) =>
+        DeskDesign.Validate(System.Text.Json.Nodes.JsonNode.Parse(json), DeskDesignContext.Unknown);
+
+    [Fact]
+    public void A_piece_this_build_does_not_draw_is_refused_by_field_though_the_Desk_rules_accept_the_word()
+    {
+        var plain = Validate("""{"layout":{"meetings":{"anchor":"tr"}}}""");
+        Assert.True(plain.Ok);   // the Mac draws it, so the layout grammar knows it
+        var refused = PastedSetup.RefuseUndrawn(plain);
+        Assert.Equal(DeskDesignStatus.Rejected, refused.Status);
+        Assert.Null(refused.Design);
+        Assert.Equal("layout.meetings", Assert.Single(refused.Reasons).Field);
+        // Hidden is no way around it: the word itself is the piece this build lacks.
+        Assert.Equal("layout.meetings", Assert.Single(PastedSetup.RefuseUndrawn(Validate("""{"layout":{"meetings":{"hidden":true}}}""")).Reasons).Field);
+    }
+
+    [Fact]
+    public void A_drawn_piece_and_a_design_with_no_layout_pass_the_undrawn_check_untouched()
+    {
+        var clock = Validate("""{"layout":{"clock":{"anchor":"tr"}}}""");
+        Assert.Same(clock, PastedSetup.RefuseUndrawn(clock));
+        var none = Validate("""{"name":"Calm"}""");
+        Assert.Same(none, PastedSetup.RefuseUndrawn(none));
+        Assert.All(SetupPrompt.Pieces, piece =>
+            Assert.True(PastedSetup.RefuseUndrawn(Validate("{\"layout\":{\"" + piece + "\":{\"hidden\":true}}}")).Ok, piece));
+    }
+
+    [Fact]
+    public void The_findings_read_an_AI_chat_not_Claude_and_list_errors_before_warnings()
+    {
+        var found = PastedSetup.Findings(
+            [new DeskReason("launcher.buttons[0].image", "must be the stored image name; Claude cannot supply a new image")],
+            [new DeskReason("ink", "is hard to read")]);
+        Assert.Equal(2, found.Count);
+        Assert.True(found[0].IsError);
+        Assert.Contains("an AI chat cannot supply", found[0].Text);
+        Assert.False(found[1].IsError);
+        Assert.DoesNotContain(found, f => f.Field.Contains("Claude") || f.Text.Contains("Claude"));
+    }
+
+    // ---- fields outside the prompt's list, and the neutral wording ----
+
+    [Fact]
+    public void A_desk_field_outside_the_prompts_list_is_refused_by_field_in_the_paste_path()
+    {
+        var r = PastedSetup.Read("""{"desk":{"name":"A","theme":{"name":"X"},"looks":[],"launcher":{"buttons":[]},"follows_theme":true}}""");
+        Assert.False(r.Ok);
+        Assert.Equal(["desk.theme", "desk.looks", "desk.launcher", "desk.follows_theme"], r.Reasons.Select(x => x.Field));
+        foreach (var field in SetupPrompt.DeskFields)
+            Assert.True(PastedSetup.Read("{\"desk\":{\"" + field + "\":null}}").Reasons.All(x => !x.Field.StartsWith("desk.", StringComparison.Ordinal)), field);
+    }
+
+    [Fact]
+    public void A_verdict_built_another_way_is_held_to_the_same_field_list()
+    {
+        var plain = Validate("""{"name":"A","follows_theme":true}""");
+        Assert.True(plain.Ok);
+        var refused = PastedSetup.RefuseUndrawn(plain);
+        Assert.Equal(DeskDesignStatus.Rejected, refused.Status);
+        Assert.Equal("desk.follows_theme", Assert.Single(refused.Reasons).Field);
+    }
+
+    [Fact]
+    public void Neutral_replaces_the_validators_phrasings_and_leaves_pasted_text_as_typed()
+    {
+        Assert.Equal("an AI chat cannot supply a new image", PastedSetup.Neutral("Claude cannot supply a new image"));
+        Assert.Equal("must be \"all\" or \"main\"", PastedSetup.Neutral("must be \"all\", \"main\" or a monitor id from get_desk monitors"));
+        Assert.DoesNotContain("get_desk", PastedSetup.Neutral("is not a monitor connected to this PC; use \"all\", \"main\" or an id from monitors in get_desk."));
+        Assert.DoesNotContain("get_desk", PastedSetup.Neutral("is not an app this PC's Start menu lists; use an id from start_menu_apps in get_desk. A button opens only what the Start menu offers."));
+        Assert.DoesNotContain("get_desk", PastedSetup.Neutral("must be the stored image name from get_desk, or null; Claude cannot supply a new image"));
+        // Text the chat typed comes back as it was.
+        const string echoed = "unknown member 'Claude'; use anchor, size and Claude Code";
+        Assert.Equal(echoed, PastedSetup.Neutral(echoed));
+    }
+
+    [Fact]
+    public void The_same_finding_from_the_reader_and_the_validator_shows_once()
+    {
+        var one = new DeskReason("desk.theme", "is not a field a chat can set");
+        Assert.Single(PastedSetup.Findings([one], [one]), f => f.IsError);
+        Assert.Single(PastedSetup.Findings([one, one], []));
+    }
 }

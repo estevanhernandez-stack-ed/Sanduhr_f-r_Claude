@@ -1214,6 +1214,7 @@ public static class SettingsNames
         (DeskSwitch, SettingsPage.Desk),
         (DeskInkPicker, SettingsPage.DeskLook),
         (ArrangeDesk, SettingsPage.Desk),
+        (SetupCopy.DesignWithChat, SettingsPage.Desk),
         (DeskPieceClicksSwitch, SettingsPage.Desk),
         (DeskPlateSwitch, SettingsPage.DeskLook),
         (WatchersSwitch, SettingsPage.Watchers),

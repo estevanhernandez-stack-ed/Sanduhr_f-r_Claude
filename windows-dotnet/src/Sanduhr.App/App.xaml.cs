@@ -75,6 +75,7 @@ public partial class App : Application
     /// <summary>A fetch has succeeded this launch (a sign-in made before the setup screen was answered).</summary>
     private bool _fetchedThisLaunch;
     private SetupWindow? _setupWindow;
+    private ChatDesignWindow? _chatWindow;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -843,6 +844,7 @@ public partial class App : Application
         svm.ThemeMatch.Service.WallpaperLuminance = () => _desk?.ClockLuminance() ?? [];
         svm.ThemeMatch.Service.PlateForced = () => _desk?.PlateForced == true;
         svm.Desk.ArrangeRequested = () => _desk?.BeginArrange();
+        svm.Desk.DesignWithChatRequested = OpenChatDesign;
         svm.Desk.Arranging = _desk?.Arranging == true;
         svm.Desk.ArrangingLayout = _desk?.Session?.Working.Layout;
         svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); _looks?.SettingsChanged(); };
@@ -1070,8 +1072,39 @@ public partial class App : Application
         OpenTourWhenDeskIsFree();
     }
 
-    /// <summary>Opens Design it with an AI chat. Filled in by the AI chat task.</summary>
-    private void OpenChatDesign() { }
+    /// <summary>
+    /// Opens Design it with an AI chat (setup spec, section 3), one at a time: from the setup screen's link and from Settings, Desk. The
+    /// Desk part previews through the Desk design service's review bar and the drawer rules through <see cref="UseChatRules"/>. The
+    /// window is not modal, so the review bar it opens stays usable.
+    /// </summary>
+    private void OpenChatDesign()
+    {
+        if (_chatWindow is { } open) { open.Activate(); return; }
+        var design = _deskDesign;
+        var model = new ChatDesignViewModel(
+            () => Desk.DeskMonitorSource.Read().Select(m => m.Name).ToList(),
+            design is null ? null : design.ProposePasted,
+            node => design is null ? PastedSetup.RefuseUndrawn(DeskDesign.Validate(node, DeskDesignContext.Unknown)) : design.ValidatePasted(node),
+            UseChatRules);
+        var window = new ChatDesignWindow(model);
+        _chatWindow = window;
+        window.Closed += (_, _) => { if (ReferenceEquals(_chatWindow, window)) _chatWindow = null; };
+        window.Show();
+        window.Activate();
+    }
+
+    /// <summary>A chat's drawer rules: they replace the rules, drawers turn on, and the rules' plan opens for review; nothing moves before
+    /// that review's Apply. Null when the review opened, otherwise the line to show.</summary>
+    private string? UseChatRules(IReadOnlyList<DrawerRule> rules, IReadOnlyList<string> names)
+    {
+        if (_quitting || _drawerReview is not { } review) return SettingsNames.DrawersSortUnavailable;
+        var said = review.UseRules(rules, names, () =>
+        {
+            _desk?.Reload();
+            _settingsWindow?.ViewModel.Desk.Reload();
+        });
+        return said is null ? null : StreamerMode.Mask.Paths(said);   // streamer: masked - Mask.Paths hides the profile folder in a refused plan's line while on
+    }
 
     private void OnTrayReadingChanged(TrayReading? reading)
     {
@@ -1296,6 +1329,7 @@ public partial class App : Application
         if (_quitting)
             return;
         _quitting = true;
+        _chatWindow?.Close();   // its Preview and Use rules reach services that are about to be disposed
         Instance?.StopAnswering();
         // After a reset nothing may write settings.json, snapshot.json or history on the way out.
         // (QuitApp is also the normal quit; the guard is a no-op until a reset has run.)

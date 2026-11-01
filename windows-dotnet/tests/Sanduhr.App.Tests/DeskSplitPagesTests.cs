@@ -644,7 +644,7 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
                 stops++;
             }
             Assert.True(Inside(at, pieces), $"Tab never reached Pieces; it stopped on {at?.GetType().Name ?? "nothing"}");
-            Assert.True(stops == 8, $"Pieces is Tab stop {stops} from the page's first stop (pinned at 8 so a creeping count shows before the spec's 10)");
+            Assert.True(stops == 9, $"Pieces is Tab stop {stops} from the page's first stop (pinned at 9 so a creeping count shows before the spec's 10; the Design it with an AI chat button is one of the stops before it)");
         }
         finally { window.Close(); }
     });
