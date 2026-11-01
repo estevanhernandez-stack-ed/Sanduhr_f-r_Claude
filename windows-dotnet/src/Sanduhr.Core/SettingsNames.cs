@@ -293,8 +293,6 @@ public static class SettingsNames
     public const string MessageColor = "Message color";
     /// <summary>Desk, Behavior: the Desk's sign-in reminder switch (settings.json "desk_sign_in_reminder", on by default; WF32).</summary>
     public const string SignInReminders = SignInReminder.Title;
-    /// <summary>The first-run card's third action (settings.json "just_the_desk"), and the Widget page's Just the Desk section.</summary>
-    public const string JustTheDeskButton = JustTheDesk.ButtonTitle;
     /// <summary>Now playing: the widget's line (settings.json "now_playing.widget", off by default).</summary>
     public const string NowPlayingInWidget = "Show what's playing in the widget";
     /// <summary>Now playing, Looks: the Desk draws the song in its look (settings.json "now_playing.style", off by default).</summary>
@@ -647,9 +645,9 @@ public static class SettingsNames
     public const string LimitOrderListName = "Limits in the widget's order";
     public static string MoveLimitUp(string limit) => $"{MoveUp}, {limit}";
     public static string MoveLimitDown(string limit) => $"{MoveDown}, {limit}";
-    public const string JustTheDeskOn = "Sanduhr is in Just the Desk: the widget is hidden.";
-    public const string ShowTheWidget = "Show the widget";
-    public const string ShowTheWidgetCaption = "Ends Just the Desk and shows the widget, which offers Sign in. The Desk stays on.";
+    /// <summary>The Widget page's section while Claude usage is off (setup spec, section 4): the heading and the line under it.</summary>
+    public const string UsageOffTitle = "Usage is off";
+    public const string UsageOffWidgetLine = "The widget shows your usage. Turn it on in Set up Sanduhr.";
 
     // ---- Settings v2, slice 5: Publish usage, What gets sent (WF28) ----
 
@@ -1115,7 +1113,6 @@ public static class SettingsNames
     public const string DrawersList = "Your drawers";
     public const string DrawersShow = "Show drawers";
     public const string DrawersAddFolder = "Show a folder as a drawer…";
-    public const string DrawersPutBack = "Put drawers back top right";
     public const string DrawersRecent = "Recent moves";
     public const string DrawersNothingRecent = "Nothing has moved yet.";
     public const string DrawersStoreNote = "If you remove Sanduhr from the Microsoft Store, drawer files stay in the Drawers folder on your Desktop.";
@@ -1133,6 +1130,21 @@ public static class SettingsNames
     public const string DrawersRootUnsafe = "The Drawers folder can't be the Desktop or a folder that holds it.";
     public const string DrawersSortUnavailable = "Sorting is not available right now.";
     public const string DrawersDeskSaveFailed = "The Desk setting could not be saved, so drawers stay off.";
+
+    // ---- Drawer look and placement (look and placement spec, sections 1 and 2) ----
+    public const string DrawersLook = "Drawer look";
+    public static IReadOnlyList<string> DrawersLookWords { get; } = ["Solid", "Glass", "Outline", "Bare"];
+    public const string DrawersOpacity = "Opacity";
+    public const string DrawersSnap = "Snap drawers";
+    public const string DrawersSnapHint = "Hold Alt while dragging to place a drawer freely.";
+    public const string DrawersKeepClear = "Keep clear of desktop icons";
+    public const string DrawersTidy = "Tidy drawers";
+    public const string DrawersTidyCorner = "Corner";
+    public static IReadOnlyList<string> DrawersTidyCornerWords { get; } = ["Top left", "Top right", "Bottom left", "Bottom right"];
+    public const string DrawersTidyFlow = "Direction";
+    public static IReadOnlyList<string> DrawersTidyFlowWords { get; } = ["Column", "Row"];
+    public const string DrawerLookMenu = "Look";
+    public const string DrawerLookSame = "Same as the others";
 
     /// <summary>Watchers and Launcher: the section that holds the piece's status line.</summary>
     public const string WatchersPlace = "Where they show";
@@ -1216,6 +1228,7 @@ public static class SettingsNames
         (DeskSwitch, SettingsPage.Desk),
         (DeskInkPicker, SettingsPage.DeskLook),
         (ArrangeDesk, SettingsPage.Desk),
+        (SetupCopy.DesignWithChat, SettingsPage.Desk),
         (DeskPieceClicksSwitch, SettingsPage.Desk),
         (DeskPlateSwitch, SettingsPage.DeskLook),
         (WatchersSwitch, SettingsPage.Watchers),
@@ -1256,7 +1269,6 @@ public static class SettingsNames
         (KeepWidgetOnTop, SettingsPage.Widget),
         (DeepWorkLength, SettingsPage.Widget),
         (LimitOrder, SettingsPage.Widget),
-        (ShowTheWidget, SettingsPage.Widget),
     ];
 
     /// <summary>

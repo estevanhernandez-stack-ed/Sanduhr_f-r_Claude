@@ -56,16 +56,144 @@ internal sealed class DrawerReviewService
     /// <summary>A plan is on the Desk waiting for Apply, Edit or Dismiss.</summary>
     public bool Reviewing => _plan is not null;
 
-    /// <summary>The built-in rules over the Desktop, opened for review. Null when the bar opened; otherwise the line to show instead.</summary>
-    public string? SortNow()
+    /// <summary>The review's bar is up: a plan under review, or Apply's result with its Undo. The welcome tour waits while it is.</summary>
+    public bool BarOpen => _barOpen;
+    private bool _barOpen;
+
+    /// <summary>The result bar holds a sort's Undo, which can still put files back: Tidy and a chat's arrangement must not replace it.
+    /// Every other result bar (a Tidy's, a chat's, a sort that moved nothing, an Undo already used) is replaced.</summary>
+    public bool HoldsFileUndo => _barOpen && _undoId is not null;
+
+    private void ShowBar(DeskReviewModel model, Action apply, Action? edit, Action dismiss)
     {
-        var s = _drawers.Settings;
+        _barOpen = true;
+        _host.Bar(model, apply, edit, dismiss);
+    }
+
+    private void CloseBar()
+    {
+        _barOpen = false;
+        _host.CloseBar();
+    }
+
+    /// <summary>A result line with Undo on the drawers bar, for a change that moves no file (Tidy): null when it showed, else the line to
+    /// show instead. It holds the bar like a review's result (<see cref="BarOpen"/>), but a sort, a Tidy or a chat replaces a result
+    /// bar rather than waits: only a review (this one's, or a Desk design or widget review) refuses it, and a sort's bar while its file
+    /// Undo is live (<see cref="HoldsFileUndo"/>). Undo runs <paramref name="undo"/> once and shows the line again without
+    /// Undo, and Done closes.</summary>
+    public string? ShowResult(string line, Action undo)
+    {
+        if (Reviewing || _host.OtherReviewOpen) return DrawerReview.Busy;
+        if (HoldsFileUndo) return DrawerReview.UndoFirst;
+        _undoId = null;   // a sort's Undo is not this one's
+        bool undone = false;
+        void Close() => CloseBar();
+        void Undoit()
+        {
+            if (undone) return;
+            undone = true;
+            undo();
+            ShowBar(DrawerReview.Result(line, canUndo: false), Undoit, null, Close);
+        }
+        ShowBar(DrawerReview.Result(line, canUndo: true), Undoit, null, Close);
+        return null;
+    }
+
+    /// <summary>The built-in rules over the Desktop, opened for review. Null when the bar opened; otherwise the line to show instead.
+    /// <paramref name="names"/> are the names a pasted answer gave the drawers its rules name, by drawer id: a drawer that does not exist
+    /// yet is made under that name, else under <see cref="NameFromId"/>.</summary>
+    public string? SortNow(IReadOnlyDictionary<string, string>? names = null) => Open(SortPlan(_drawers.Settings, names));
+
+    /// <summary>The plan the rules in <paramref name="s"/> make over the Desktop now.</summary>
+    private DrawerPlan SortPlan(DrawerSettings s, IReadOnlyDictionary<string, string>? names)
+    {
         var root = s.RootOr(_drawers.Places.Desktop);
         var known = s.Drawers.Concat(DrawerRules.DefaultDrawers(root).Where(d => s.Drawers.All(x => x.Id != d.Id))).ToList();
         // A rule the user added for a drawer that does not exist yet ("invoice" to Receipts) gets that drawer when it first matches.
         foreach (var id in s.Rules.Select(r => r.DrawerId).Distinct().Where(id => known.All(d => d.Id != id)).ToArray())
-            known.Add(new DrawerDef(id, NameFromId(id), Path.Combine(root, NameFromId(id)), Owned: true));
-        return Open(DrawerRules.Plan(_drawers.DesktopListing(), s.Rules, known, root, DateTime.UtcNow));
+        {
+            var name = names is not null && names.TryGetValue(id, out var given) && DrawerNames.IsValid(given) ? given : NameFromId(id);
+            known.Add(new DrawerDef(id, name, Path.Combine(root, name), Owned: true));
+        }
+        return DrawerRules.Plan(_drawers.DesktopListing(), s.Rules, known, root, DateTime.UtcNow);
+    }
+
+    /// <summary>
+    /// An AI chat's drawer rules (setup spec, section 3): they replace the drawer rules, drawers and the Desk come on if they were off, and
+    /// the rules' plan opens for review. Nothing moves before that review's Apply.
+    /// <list type="bullet">
+    /// <item><description>Refused with <see cref="DrawerReview.Busy"/> while any review is open or a sort's result bar (with its Undo) is up.</description></item>
+    /// <item><description>A rule's drawer is the existing drawer of that name (or whose folder is that name in the Drawers folder), not a second one.</description></item>
+    /// <item><description>The plan is built and checked first. A refusal writes nothing. Rules that match nothing now are still saved, and
+    /// the line says so. The settings go in one write.</description></item>
+    /// </list>
+    /// <paramref name="names"/> parallels <paramref name="rules"/> (the chat's name for each rule's drawer) so a drawer the rules create keeps
+    /// the chat's name. <paramref name="deskChanged"/> runs after the settings are written and before the review opens (the Desk reloads to
+    /// draw the drawers). Null when the review opened; otherwise the line to show.
+    /// </summary>
+    public string? UseRules(IReadOnlyList<DrawerRule> rules, IReadOnlyList<string> names, Action? deskChanged = null)
+    {
+        if (_drawers.IsDisposed) return SettingsNames.DrawersSortUnavailable;
+        if (Reviewing || BarOpen || _host.OtherReviewOpen) return DrawerReview.Busy;
+
+        var s = _drawers.Settings;
+        var (mapped, fresh) = ResolveDrawers(s, s.RootOr(_drawers.Places.Desktop), rules, names);
+        // Drawers coming on show again anything hidden before they went off, as turning them on does.
+        var next = s with { Enabled = true, Rules = mapped, Hidden = s.Enabled ? s.Hidden : [] };
+        var plan = SortPlan(next, fresh);
+        var check = DrawerPlanValidator.Check(plan, _drawers.Roots, next.Drawers);
+        if (!check.Ok) return check.Error;
+
+        try
+        {
+            // Drawers draw on the Desk, so the Desk has to be on for them; setup writes the same pair (Desk on = desktop or drawers).
+            var desk = _store.LoadDesk();
+            _drawers.Save(next, desk.Enabled ? null : desk with { Enabled = true });
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return SetupCopy.SaveFailed;
+        }
+        deskChanged?.Invoke();
+        if (check.Moves.Count == 0) return SetupCopy.ChatRulesSavedNothing;
+        return Open(plan);
+    }
+
+    /// <summary>Points each rule at a drawer: the existing owned one whose name is the chat's (any case) or whose folder is that name in the
+    /// Drawers folder (never a view of a folder the user already has), else a new one under the id the reader gave it, or a free one when that id belongs to a different drawer.
+    /// <c>fresh</c> holds the chat's name for each new drawer, by id.</summary>
+    private static (List<DrawerRule> Rules, Dictionary<string, string> Fresh) ResolveDrawers(
+        DrawerSettings s, string root, IReadOnlyList<DrawerRule> rules, IReadOnlyList<string> names)
+    {
+        var known = s.Drawers.Concat(DrawerRules.DefaultDrawers(root).Where(d => s.Drawers.All(x => x.Id != d.Id))).ToList();
+        var taken = new HashSet<string>(known.Select(d => d.Id), StringComparer.Ordinal);
+        var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var fresh = new Dictionary<string, string>(StringComparer.Ordinal);
+        var mapped = new List<DrawerRule>();
+        for (int i = 0; i < rules.Count; i++)
+        {
+            string name = i < names.Count ? names[i] : NameFromId(rules[i].DrawerId);
+            if (!byName.TryGetValue(name, out var id))
+            {
+                string? home = DrawerPaths.Normalize(Path.Combine(root, name));
+                // Only a drawer Sanduhr made can be named by a chat. A view shows a folder the user already has (Documents, Downloads) in
+                // place, and a chat cannot see the user's drawers, so a name that matches a view is chance: moving Desktop files into that
+                // real folder is not what the rules asked for. Such a name gets a drawer of its own.
+                var existing = known.FirstOrDefault(d => d.Owned
+                    && (string.Equals(d.Name, name, StringComparison.OrdinalIgnoreCase)
+                        || (home is not null && string.Equals(DrawerPaths.Normalize(d.Home), home, StringComparison.OrdinalIgnoreCase))));
+                if (existing is not null) id = existing.Id;
+                else
+                {
+                    id = taken.Contains(rules[i].DrawerId) ? DrawerIds.Unique(name, taken) : rules[i].DrawerId;
+                    taken.Add(id);
+                    fresh[id] = name;
+                }
+                byName[name] = id;
+            }
+            mapped.Add(rules[i] with { DrawerId = id });
+        }
+        return (mapped, fresh);
     }
 
     /// <summary>The name a drawer a rule names gets before it exists: its id in words ("older-files" is "Older files").</summary>
@@ -92,7 +220,7 @@ internal sealed class DrawerReviewService
         _drawers.SetPending(check);
         // Drawers are free panels: the layout is the Desk's own, and the drawers the plan would create are drawn from DrawerService.PreviewDrawers.
         _host.Preview(_store.LoadDesk().Layout);
-        _host.Bar(Model(plan, check, []), Apply, Edit, Dismiss);
+        ShowBar(Model(plan, check, []), Apply, Edit, Dismiss);
     }
 
     private DeskReviewModel Model(DrawerPlan plan, DrawerPlanCheck check, IEnumerable<string> extraWarnings)
@@ -130,7 +258,7 @@ internal sealed class DrawerReviewService
                 : StreamerMode.Mask.Omit(check.Error) ?? DrawerReview.PlanChanged;   // streamer: masked - a check's error can name files; Mask.Omit drops it while on
             _undoId = null;
             End();
-            _host.Bar(DrawerReview.Result(why, canUndo: false), Undo, null, Done);
+            ShowBar(DrawerReview.Result(why, canUndo: false), Undo, null, Done);
             return;
         }
         DrawerRun run;
@@ -140,7 +268,7 @@ internal sealed class DrawerReviewService
             // Never leave the review stuck: the preview ends and the bar says nothing more moved, with no Undo.
             _undoId = null;
             End();
-            _host.Bar(DrawerReview.Result(DrawerReview.ApplyFailed, canUndo: false), Undo, null, Done);
+            ShowBar(DrawerReview.Result(DrawerReview.ApplyFailed, canUndo: false), Undo, null, Done);
             return;
         }
         // The journal before the settings: a save that fails after files moved still leaves the entry Undo needs (final review M1).
@@ -165,7 +293,7 @@ internal sealed class DrawerReviewService
         _madeHomes = [.. check.Drawers.Select(d => d.Home)];
         End();
         var shown = (run with { UndoLost = run.Moved.Count > 0 && entry is null }).Shown;   // streamer: masked - DrawerRun.Shown cuts the file-naming line to counts while on
-        _host.Bar(DrawerReview.Result(shown, _undoId is not null), Undo, null, Done);
+        ShowBar(DrawerReview.Result(shown, _undoId is not null), Undo, null, Done);
     }
 
     private void Undo()
@@ -174,13 +302,13 @@ internal sealed class DrawerReviewService
         _undoId = null;
         // The homes this Apply made count as homes even when their settings save failed, so the files in them can come back.
         var run = _drawers.Undo(id, _madeHomes);
-        _host.Bar(DrawerReview.Result(run.Shown, canUndo: false), Undo, null, Done);   // streamer: masked - DrawerRun.Shown cuts the file-naming line to counts while on
+        ShowBar(DrawerReview.Result(run.Shown, canUndo: false), Undo, null, Done);   // streamer: masked - DrawerRun.Shown cuts the file-naming line to counts while on
     }
 
     private void Done()
     {
         _undoId = null;
-        _host.CloseBar();
+        CloseBar();
     }
 
     private void Edit()
@@ -194,7 +322,7 @@ internal sealed class DrawerReviewService
         {
             // Keep the review open on the plan the user was looking at, and say why the edit did not take.
             var why = check.Ok ? DrawerReview.NothingToSort : StreamerMode.Mask.Paths(check.Error!);   // streamer: masked - Mask.Paths hides the profile folder in a refused path while on
-            _host.Bar(Model(plan, _check!, [why]), Apply, Edit, Dismiss);
+            ShowBar(Model(plan, _check!, [why]), Apply, Edit, Dismiss);
             return;
         }
         Show(next, check);
@@ -205,7 +333,7 @@ internal sealed class DrawerReviewService
     {
         if (_plan is null) { Done(); return; }
         End();
-        _host.CloseBar();
+        CloseBar();
     }
 }
 
@@ -231,7 +359,7 @@ internal sealed class DrawerReviewHost : IDrawerReviewHost, IDisposable
     public void Preview(string layout)
     {
         _preview = new DeskDesignSettings(_store.LoadDesk() with { Layout = layout }, _store.LoadDeskInk(), _store.LoadLauncher());
-        _desk.ShowPreview(_preview);
+        _desk.ShowPreview(_preview, full: false);   // drawers only while desktop is off
     }
 
     public void EndPreview()

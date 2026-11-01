@@ -4,8 +4,9 @@ using System.Text;
 
 namespace Sanduhr.App.Interop;
 
-/// <summary>One of Sanduhr's own items under Explorer's menu (Rename drawer, Fold, Hide, Drawer settings…).</summary>
-internal sealed record ShellMenuItem(int Id, string Text);
+/// <summary>One of Sanduhr's own items under Explorer's menu (Rename drawer, Fold, Hide, Drawer settings…). <paramref name="Checked"/> draws a
+/// check mark; <paramref name="Children"/> makes it a submenu (its own <paramref name="Id"/> is then unused, the children's ids are the picks).</summary>
+internal sealed record ShellMenuItem(int Id, string Text, bool Checked = false, IReadOnlyList<ShellMenuItem>? Children = null);
 
 /// <summary>What was picked: the Shell's canonical verb ("open", "rename", "delete"; null for one without), or one of ours.</summary>
 internal sealed record ShellMenuChoice(string? Verb, int? Own);
@@ -21,7 +22,7 @@ internal static class ShellMenu
     public const int OwnFirst = 0x8000;
     private const uint First = 1, Last = 0x7FFF;
     private const uint CMF_NORMAL = 0, CMF_CANRENAME = 0x10, TPM_RETURNCMD = 0x100, TPM_RIGHTBUTTON = 0x2;
-    private const uint CMIC_MASK_UNICODE = 0x4000, CMIC_MASK_PTINVOKE = 0x20000000, GCS_VERBW = 4, MF_STRING = 0, MF_SEPARATOR = 0x800;
+    private const uint CMIC_MASK_UNICODE = 0x4000, CMIC_MASK_PTINVOKE = 0x20000000, GCS_VERBW = 4, MF_STRING = 0, MF_SEPARATOR = 0x800, MF_CHECKED = 0x8, MF_POPUP = 0x10;
 
     [ThreadStatic] private static ShellNative.IContextMenu3? t_open;
 
@@ -57,7 +58,7 @@ internal static class ShellMenu
                 catch (Exception e) when (e is COMException or IOException or UnauthorizedAccessException or ArgumentException or InvalidCastException) { menu = null; }
             }
             if (extras.Count > 0 && ShellNative.GetMenuItemCount(h) > 0) ShellNative.AppendMenuW(h, MF_SEPARATOR, UIntPtr.Zero, null);
-            foreach (var item in extras) ShellNative.AppendMenuW(h, MF_STRING, (UIntPtr)(uint)item.Id, item.Text);
+            Append(h, extras);
             if (ShellNative.GetMenuItemCount(h) == 0) return null;
 
             DeskNative.SetForegroundWindow(owner);
@@ -77,6 +78,24 @@ internal static class ShellMenu
             t_open = null;
             ShellNative.DestroyMenu(h);
             if (menu is not null) Marshal.FinalReleaseComObject(menu);
+        }
+    }
+
+    /// <summary>Appends Sanduhr's own items to a menu: a checked item gets the check mark, one with children gets a popup submenu, which
+    /// belongs to <paramref name="menu"/> and is destroyed with it (<c>DestroyMenu</c> on the parent takes its attached popups).</summary>
+    internal static void Append(IntPtr menu, IReadOnlyList<ShellMenuItem> items)
+    {
+        foreach (var item in items)
+        {
+            if (item.Children is { Count: > 0 } children)
+            {
+                var sub = ShellNative.CreatePopupMenu();
+                Append(sub, children);
+                if (!ShellNative.AppendMenuW(menu, MF_POPUP | MF_STRING | (item.Checked ? MF_CHECKED : 0), (UIntPtr)(nuint)sub, item.Text))
+                    ShellNative.DestroyMenu(sub);   // not attached, so nothing else will free it
+            }
+            else
+                ShellNative.AppendMenuW(menu, MF_STRING | (item.Checked ? MF_CHECKED : 0), (UIntPtr)(uint)item.Id, item.Text);
         }
     }
 

@@ -160,15 +160,13 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>Visibility of the recovery card: any non-None reason shows it, except a
     /// first-run card put away with Not now.</summary>
-    public bool ShowSignInPrompt => Reason != SignInReason.None && !ShowNotSignedInLine;
+    public bool ShowSignInPrompt => UsageOn && Reason != SignInReason.None && !ShowNotSignedInLine;
 
     /// <summary>The first-run card's Not now link (first run only; a recovery card stays).</summary>
     public bool ShowNotNow => Reason == SignInReason.FirstRun;
 
-    /// <summary>The one-line "Not signed in" way in, shown after Not now, and in place of the first-run
-    /// card while Just the Desk is on (spec 7.5).</summary>
-    public bool ShowNotSignedInLine =>
-        Reason == SignInReason.FirstRun && (SignInPutOff || !Sanduhr.Core.JustTheDesk.ShowsFirstRunCard(false, JustTheDesk));
+    /// <summary>The one-line "Not signed in" way in, shown after Not now (never with usage off).</summary>
+    public bool ShowNotSignedInLine => UsageOn && Reason == SignInReason.FirstRun && SignInPutOff;
 
     partial void OnSignInPutOffChanged(bool value)
     {
@@ -176,23 +174,97 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowNotSignedInLine));
     }
 
-    /// <summary>Just the Desk is on (settings.json "just_the_desk"): the Desk without a Claude account.
-    /// Loaded at construction; the App sets it when the first-run card chooses it and when an account ends it.</summary>
-    [ObservableProperty] private bool _justTheDesk;
+    /// <summary>Claude usage on (setup spec, section 1). Off: no fetching, no sign-in card, the widget hidden by App; accounts are kept.
+    /// Loaded at construction from <c>setup.usage.claude</c>; absent (before any setup) reads as on, so an account's meters never vanish.</summary>
+    [ObservableProperty] private bool _usageOn = true;
 
-    partial void OnJustTheDeskChanged(bool value)
+    partial void OnUsageOnChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowSignInPrompt));
         OnPropertyChanged(nameof(ShowNotSignedInLine));
+        OnPropertyChanged(nameof(ShowUsageOff));
+        RaiseDesk();
     }
 
-    /// <summary>Raised by the first-run card's Just the Desk button; the App saves the choice, turns the
-    /// Desk on and hides the widget.</summary>
-    public event Action? JustTheDeskRequested;
+    /// <summary>No setup was made yet and the setup screen is up (or was put off with Not now): the Desk draws no usage line behind it, as
+    /// if usage were off. Set by App, in memory only; it never saves a setup, so the screen stays pending. An account ends it: a sign-in
+    /// before setup shows the meters, as <c>UsageOnForAccount</c> shows the widget.</summary>
+    public bool SetupPending
+    {
+        get => _setupPending;
+        set { if (_setupPending == value) return; _setupPending = value; RaiseDesk(); }
+    }
+    private bool _setupPending;
 
-    /// <summary>Just the Desk on the first-run card.</summary>
+    /// <summary>The Desk draws usage: on, and not held back by a setup still pending with nothing signed in.</summary>
+    private bool DeskDrawsUsage => UsageOn && !(SetupPending && !IsDemo && _accounts.ListAccounts().Count == 0);   // streamer: key - a count, never drawn
+
+    /// <summary>The seat meters and account following are idle (the tests read them).</summary>
+    internal bool SeatMetersPaused => _seatMeters.Paused;
+    internal bool FollowerRunning => _follower.Running;
+
+    /// <summary>The Widget page's "usage is off" line, and the widget's own one-line row (<see cref="UsageOffLabel"/> and a Set up Sanduhr link).</summary>
+    public bool ShowUsageOff => !UsageOn;
+
+    public string UsageOffLabel => SettingsNames.UsageOffTitle;
+    public string SetupLinkLabel => SetupCopy.Title;
+
+    /// <summary>Raised by the widget's usage-off row: App opens Set up Sanduhr.</summary>
+    public event Action? SetupRequested;
+
     [RelayCommand]
-    private void ChooseJustTheDesk() => JustTheDeskRequested?.Invoke();
+    private void OpenSetup() => SetupRequested?.Invoke();
+
+    /// <summary>Turns Claude usage on or off and saves it. Off stops every Claude fetch (the main fetcher, the seat meters and
+    /// account following), drops the client and the numbers it drew, and deletes the snapshot; on rebuilds and fetches. The refresh timer
+    /// keeps ticking either way, so the local Claude Code burn and the vault stay fresh (a tick fetches nothing without a fetcher).
+    /// Never signs out or removes an account. <paramref name="fetchNow"/> false is for a caller that rebuilds and fetches right after
+    /// (an added account's <see cref="ReloadAfterSignInAsync"/>): turning on then saves, flags and resumes the side fetchers, and a
+    /// failed save does not stop the flag flipping, so a sign-in never vanishes.</summary>
+    public void SetUsageOn(bool on, bool fetchNow = true)
+    {
+        try
+        {
+            var setup = _settings.LoadSetup() ?? SetupChoices.FirstRun.ToSettings(null);
+            _settings.SaveSetup(setup.WithClaude(on));
+        }
+        catch (Exception ex) when (!fetchNow)
+        {
+            Debug.WriteLine($"[Sanduhr.Setup] usage not saved: {ex.Message}");   // streamer: notname - written to the log file, never drawn
+        }
+        if (UsageOn == on) return;
+        UsageOn = on;
+        if (IsDemo) return;   // demo mode pauses fetching; leaving it rebuilds the fetcher against this setting
+        if (on)
+        {
+            _seatMeters.Paused = false;
+            _follower.Apply(_followAccount);
+            SyncSeats();
+            if (!fetchNow) return;
+            RebuildFetcher();
+            RefreshAccountLabel();
+            _ = RefreshCoreAsync();
+        }
+        else
+        {
+            _follower.Apply(false);
+            _seatMeters.Paused = true;
+            _fetcherGeneration++;
+            (_client as IDisposable)?.Dispose();
+            _client = null;
+            _fetcher = null;
+            WatchTransport(null);
+            Reason = SignInReason.None;
+            // The last reading must not stay drawn or served as current: the cards, tray, Desk and snapshot go.
+            ClearSignedInChrome();
+            ClearTray();
+            _deskTiers = [];
+            _deskLineTiers = [];
+            StatusText = "";
+            _snapshotWriter?.Delete();
+            RaiseDesk();
+        }
+    }
 
     /// <summary>The Desk's sign-in reminder switch (spec 7.5), read for the Desk and Settings, Alerts.</summary>
     public bool LoadDeskSignInReminder() => _settings.LoadDeskSignInReminder();
@@ -746,7 +818,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         };
         AccountsChanged += SyncSeats;
 
-        _justTheDesk = _settings.LoadJustTheDesk().On;
+        _usageOn = _settings.LoadSetup()?.ClaudeUsage ?? true;
         _pinned = _settings.LoadPinned();
         _isThemesExpanded = _settings.LoadThemesExpanded();
         _savedOrder = _settings.LoadTierOrder().ToList();
@@ -790,16 +862,24 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // / MigrateLegacy are idempotent (no-op on a populated registry) and swallow
         // their own Json/IO faults; guard anyway so a migration fault never blocks
         // first paint.
-        try { _credentials.MigrateFromV1(); }
-        catch (Exception ex) { Debug.WriteLine($"[Sanduhr.Migrate] skipped: {ex.Message}"); }   // streamer: notname - written to the log file, never drawn
+        MigrateLegacyCredentials();
 
         RebuildFetcher();
         RefreshAccountLabel();
-        _follower.Apply(_followAccount);
+        _follower.Apply(_followAccount && UsageOn);
+        _seatMeters.Paused = !UsageOn;
         SyncSeats();
         _tickTimer.Start();
-        _refreshTimer.Start();
+        _refreshTimer.Start();   // with usage off a tick fetches nothing (no fetcher) but still ingests the local Claude Code burn
         await RefreshAsync();
+    }
+
+    /// <summary>Promotes a v1 config or a pre-v2.2.0 single-slot key to a "Personal" account. Idempotent (a second call finds nothing to
+    /// promote), and a fault never blocks first paint. App calls it before the setup migration, so the account list it counts is settled.</summary>
+    public void MigrateLegacyCredentials()
+    {
+        try { _credentials.MigrateFromV1(); }
+        catch (Exception ex) { Debug.WriteLine($"[Sanduhr.Migrate] skipped: {ex.Message}"); }   // streamer: notname - written to the log file, never drawn
     }
 
     // -- theming --------------------------------------------------------------
@@ -968,7 +1048,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             if (_followAccount == value) return;
             _followAccount = value;
             _settings.SaveFollowAccount(value);
-            _follower.Apply(value && !IsDemo);
+            _follower.Apply(value && !IsDemo && UsageOn);
             OnPropertyChanged();
             InUseChanged?.Invoke();
         }
@@ -1058,6 +1138,14 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _client = null;
         _fetcher = null;
 
+        if (!UsageOn)
+        {
+            Reason = SignInReason.None;   // usage off: no card, nothing to fetch
+            StatusText = "";              // and no "Connecting…" for a fetch that will not come
+            WatchTransport(null);
+            return;
+        }
+
         var creds = _credentials.Load();
         if (string.IsNullOrEmpty(creds.SessionKey))
         {
@@ -1116,8 +1204,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void LeaveDemo()
     {
         IsDemo = false;
-        _seatMeters.Paused = false;
-        _follower.Apply(_followAccount);
+        _seatMeters.Paused = !UsageOn;
+        _follower.Apply(_followAccount && UsageOn);
         _demoData = null;
         _lastData = null;
         Tiers.Clear();
@@ -1837,14 +1925,16 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         get
         {
-            bool signIn = !IsDemo && Reason != SignInReason.None;
+            bool usage = DeskDrawsUsage;
+            bool signIn = usage && !IsDemo && Reason != SignInReason.None;
             // Streamer mode (slice 7, decision 3): the Claude line names the account by its codename, in every style and in its reminder.
             string? account = IsDemo ? DemoMode.ChipText(_demoAccount)   // streamer: demo - demo's sample name is not a real one
                 : _accounts.ListAccounts().Count > 1 && _accounts.GetActive() is { } active   // streamer: masked - CP 5: Mask.Name masks on the next line
                     ? StreamerMode.Mask.Name(CodenameCategory.Account, active) : null;
-            return new DeskUsage(signIn ? [] : _deskTiers,
+            bool hide = signIn || !usage;   // usage off (or not set up yet) draws no numbers, whatever is left in memory
+            return new DeskUsage(hide ? [] : _deskTiers,
                 IsDemo ? DateTimeOffset.Now : _lastFetchAt,
-                signIn, Reason == SignInReason.FirstRun, account, signIn ? [] : _deskLineTiers,
+                signIn, Reason == SignInReason.FirstRun, account, hide ? [] : _deskLineTiers,
                 signIn ? _settings.LoadDeskSignInReminder() : true);
         }
     }
@@ -2182,23 +2272,6 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             return;
         Pinned = on;
         _settings.SavePinned(on);
-    }
-
-    /// <summary>
-    /// Ends Just the Desk (Settings, Widget, Show the widget, and an added account; <see cref="Sanduhr.Core.JustTheDesk.End"/>): saves
-    /// it off, brings the sign-in reminder back only when Just the Desk silenced it, and redraws the Desk. False when it was not on.
-    /// Showing the widget is the App's.
-    /// </summary>
-    public bool EndJustTheDesk()
-    {
-        var (state, reminderOn, ended) = Sanduhr.Core.JustTheDesk.End(_settings.LoadJustTheDesk(), _settings.LoadDeskSignInReminder());
-        if (!ended)
-            return false;
-        _settings.SaveJustTheDesk(state);
-        _settings.SaveDeskSignInReminder(reminderOn);
-        JustTheDesk = false;
-        RefreshDesk();
-        return true;
     }
 
     private void PersistOrder()

@@ -82,6 +82,23 @@ public sealed class DrawerReviewServiceTests
     });
 
     [Fact]
+    public void The_bar_stays_open_after_Apply_until_it_is_done_and_BarOpen_says_so() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (review, drawers, _, host) = Make(box);
+        box.File(@"Desktop\notes.pdf");
+        Assert.False(review.BarOpen);
+        review.SortNow();
+        Assert.True(review.BarOpen);   // a plan under review
+        host.Apply!();
+        Assert.False(review.Reviewing);
+        Assert.True(review.BarOpen);   // Apply's result with its Undo is still up
+        host.Dismiss!();
+        Assert.False(review.BarOpen);
+        drawers.Dispose();
+    });
+
+    [Fact]
     public void Undo_from_the_result_puts_the_files_back() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();

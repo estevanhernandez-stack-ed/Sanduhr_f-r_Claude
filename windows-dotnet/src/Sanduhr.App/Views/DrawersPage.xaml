@@ -81,6 +81,60 @@
 
                 <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
+                <!-- The drawers' look, snapping, keeping clear of desktop icons and Tidy. -->
+                <StackPanel views:SettingsAnchor.Id="drawers-look">
+                    <TextBlock Text="{x:Static core:SettingsNames.DrawersLook}" FontSize="13" FontWeight="SemiBold"
+                               AutomationProperties.HeadingLevel="Level2"
+                               Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                    <ComboBox Style="{DynamicResource ThemedComboBox}" Width="200" HorizontalAlignment="Left"
+                              ItemsSource="{x:Static core:SettingsNames.DrawersLookWords}" SelectedIndex="{Binding LookIndex, Mode=TwoWay}"
+                              AutomationProperties.Name="{x:Static core:SettingsNames.DrawersLook}" />
+                    <Grid Margin="0,10,0,0" Visibility="{Binding ShowOpacity, Converter={StaticResource BoolVis}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="48" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Static core:SettingsNames.DrawersOpacity}" FontSize="11" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        <Slider Grid.Column="1" Style="{DynamicResource ThemedSlider}"
+                                Minimum="20" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+                                SmallChange="1" LargeChange="10" Value="{Binding Opacity, Mode=TwoWay}"
+                                AutomationProperties.Name="{x:Static core:SettingsNames.DrawersOpacity}" />
+                        <TextBlock Grid.Column="2" Text="{Binding OpacityText}"
+                                   FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}" FontFamily="Cascadia Code, Consolas" />
+                    </Grid>
+                    <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,12,0,0" Content="{x:Static core:SettingsNames.DrawersSnap}"
+                              IsChecked="{Binding Snap, Mode=TwoWay}"
+                              AutomationProperties.Name="{x:Static core:SettingsNames.DrawersSnap}" />
+                    <TextBlock Text="{x:Static core:SettingsNames.DrawersSnapHint}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                    <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,10,0,0" Content="{x:Static core:SettingsNames.DrawersKeepClear}"
+                              IsChecked="{Binding KeepClear, Mode=TwoWay}"
+                              AutomationProperties.Name="{x:Static core:SettingsNames.DrawersKeepClear}" />
+                    <WrapPanel Margin="0,12,0,0">
+                        <TextBlock Text="{x:Static core:SettingsNames.DrawersTidyCorner}" FontSize="11" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,6,4" />
+                        <ComboBox Style="{DynamicResource ThemedComboBox}" Width="130" Margin="0,0,12,4"
+                                  ItemsSource="{x:Static core:SettingsNames.DrawersTidyCornerWords}" SelectedIndex="{Binding TidyCornerIndex, Mode=TwoWay}"
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.DrawersTidyCorner}" />
+                        <TextBlock Text="{x:Static core:SettingsNames.DrawersTidyFlow}" FontSize="11" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,6,4" />
+                        <ComboBox Style="{DynamicResource ThemedComboBox}" Width="100" Margin="0,0,12,4"
+                                  ItemsSource="{x:Static core:SettingsNames.DrawersTidyFlowWords}" SelectedIndex="{Binding TidyFlowIndex, Mode=TwoWay}"
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.DrawersTidyFlow}" />
+                        <Button Style="{DynamicResource FlatButton}" Padding="12,6" Margin="0,0,0,4"
+                                Content="{x:Static core:SettingsNames.DrawersTidy}" Command="{Binding TidyCommand}"
+                                AutomationProperties.Name="{x:Static core:SettingsNames.DrawersTidy}" />
+                    </WrapPanel>
+                    <TextBlock Text="{Binding TidyStatus}" FontSize="11.5" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                               AutomationProperties.LiveSetting="Polite" />
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
                 <!-- The rules. -->
                 <StackPanel views:SettingsAnchor.Id="drawers-rules">
                     <TextBlock Text="{x:Static core:SettingsNames.DrawersRules}" FontSize="13" FontWeight="SemiBold"
@@ -151,9 +205,6 @@
                         <Button Style="{DynamicResource FlatButton}" Padding="12,6" Margin="0,0,8,4"
                                 Content="{x:Static core:SettingsNames.DrawersShow}" Command="{Binding ShowDrawersCommand}"
                                 AutomationProperties.Name="{x:Static core:SettingsNames.DrawersShow}" />
-                        <Button Style="{DynamicResource FlatButton}" Padding="12,6" Margin="0,0,8,4"
-                                Content="{x:Static core:SettingsNames.DrawersPutBack}" Command="{Binding ResetPlacesCommand}"
-                                AutomationProperties.Name="{x:Static core:SettingsNames.DrawersPutBack}" />
                         <Button Style="{DynamicResource FlatButton}" Padding="12,6" Margin="0,0,0,4"
                                 Content="{x:Static core:SettingsNames.DrawersAddFolder}" Command="{Binding AddFolderCommand}"
                                 AutomationProperties.Name="Show a folder as a drawer" />

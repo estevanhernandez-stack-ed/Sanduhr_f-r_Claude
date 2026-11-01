@@ -21,6 +21,32 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
     /// <summary>The drawers hidden from the Desk, by id; their files stay where they are.</summary>
     public IReadOnlyList<string> Hidden { get; init; } = [];
 
+    /// <summary>How every drawer blends in, unless <see cref="Looks"/> names one (look and placement spec, section 1).</summary>
+    public DrawerLookKind Look { get; init; } = DrawerLookKind.Solid;
+
+    /// <summary>Solid's and Glass's fill, 20 to 100 percent.</summary>
+    public int Opacity { get; init; } = DrawerStyle.DefaultOpacity;
+
+    /// <summary>A drawer's own look, by id, when it differs from <see cref="Look"/>.</summary>
+    public IReadOnlyDictionary<string, DrawerLookKind> Looks { get; init; } = new Dictionary<string, DrawerLookKind>();
+
+    /// <summary>Drawers snap while dragged (spec, section 2).</summary>
+    public bool Snap { get; init; } = true;
+
+    /// <summary>Drawers keep clear of the desktop icons when dropped, arriving or tidied.</summary>
+    public bool KeepClear { get; init; } = true;
+
+    /// <summary>Where Tidy and arrival line drawers up.</summary>
+    public DrawerTidy Tidy { get; init; } = DrawerTidy.Default;
+
+    /// <summary>The file was written before 4.5 (a <c>drawers</c> object with no <c>tidy</c> key): drawers with no saved place arrive in today's
+    /// column rule, once, and are saved, so an upgrader's drawers sit exactly as before. Cleared by that first save; never encoded.
+    /// Any drawers save that lands before the first render also clears it on the next load, because <c>Encode</c> always writes the
+    /// <c>tidy</c> key and that key is the test. Low risk: the startup render comes first.</summary>
+    public bool LegacyArrival { get; init; }
+
+    public DrawerLookKind LookFor(string id) => Looks.TryGetValue(id, out var k) ? k : Look;
+
     public static DrawerSettings Default { get; } = new(false, null, [], DrawerRules.Defaults, false, false);
 
     /// <summary>The default root (decision KNT1mDtN3kQ0rlz2sePq): a Drawers folder on the Desktop itself, so after any uninstall,
@@ -56,7 +82,39 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
             Hidden = o["hidden"] is JsonArray hs
                 ? [.. hs.OfType<JsonValue>().Select(v => v.TryGetValue<string>(out var s) ? s : null).Where(DrawerIds.IsValid).OfType<string>().Distinct()]
                 : [],
+            Look = DrawerStyle.Look(SettingsJson.String(o, "look", "")) ?? DrawerLookKind.Solid,
+            Opacity = DecodeOpacity(o["opacity"]),
+            Looks = DecodeLooks(o["looks"]),
+            Snap = SettingsJson.Bool(o, "snap", true),
+            KeepClear = SettingsJson.Bool(o, "keep_clear", true),
+            Tidy = DecodeTidy(o["tidy"]),
+            LegacyArrival = o["tidy"] is null,
         };
+    }
+
+    private static int DecodeOpacity(JsonNode? n)
+    {
+        if (n is not JsonValue v || !v.TryGetValue<double>(out var d) || !double.IsFinite(d) || d < DrawerStyle.MinOpacity)
+            return DrawerStyle.DefaultOpacity;
+        return (int)Math.Round(Math.Min(d, DrawerStyle.MaxOpacity));
+    }
+
+    private static IReadOnlyDictionary<string, DrawerLookKind> DecodeLooks(JsonNode? n)
+    {
+        var looks = new Dictionary<string, DrawerLookKind>(StringComparer.Ordinal);
+        if (n is JsonObject o)
+            foreach (var (id, v) in o)
+                if (DrawerIds.IsValid(id) && v is JsonValue s && s.TryGetValue<string>(out var w) && DrawerStyle.Look(w) is { } k)
+                    looks[id] = k;
+        return looks;
+    }
+
+    private static DrawerTidy DecodeTidy(JsonNode? n)
+    {
+        if (n is not JsonObject o) return DrawerTidy.Default;
+        return new DrawerTidy(
+            DrawerStyle.Corner(SettingsJson.String(o, "corner", "")) ?? DrawerTidy.Default.Corner,
+            DrawerStyle.Flow(SettingsJson.String(o, "direction", "")) ?? DrawerTidy.Default.Flow);
     }
 
     private static Dictionary<string, DrawerPlace> DecodePlaces(JsonNode? node)
@@ -92,6 +150,13 @@ public sealed record DrawerSettings(bool Enabled, string? Root, IReadOnlyList<Dr
         ["places"] = new JsonObject(Places.Select(kv => KeyValuePair.Create<string, JsonNode?>(kv.Key,
             new JsonObject { ["monitor"] = kv.Value.Monitor, ["x"] = kv.Value.X, ["y"] = kv.Value.Y }))),
         ["hidden"] = new JsonArray([.. Hidden.Select(h => (JsonNode?)h)]),
+        ["look"] = DrawerStyle.Word(Look),
+        ["opacity"] = Opacity,
+        ["looks"] = new JsonObject(Looks.OrderBy(p => p.Key, StringComparer.Ordinal)
+            .Select(p => KeyValuePair.Create(p.Key, (JsonNode?)DrawerStyle.Word(p.Value)))),
+        ["snap"] = Snap,
+        ["keep_clear"] = KeepClear,
+        ["tidy"] = new JsonObject { ["corner"] = DrawerStyle.Word(Tidy.Corner), ["direction"] = DrawerStyle.Word(Tidy.Flow) },
     };
 
     private static DrawerDef? DecodeDrawer(JsonObject o)

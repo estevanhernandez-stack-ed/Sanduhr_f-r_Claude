@@ -104,6 +104,45 @@ public sealed class DeskDesignReviewTests : IDisposable
          "layout":{"clock":{"anchor":"tr","size":1.4}}}
         """;
 
+    // ---- A nicer desktop off (setup spec): the bar says Apply only saves ----
+
+    [Fact]
+    public void AReviewWithADesktopOffSetupAddsTheSavedForLaterNoteToTheBar()
+    {
+        _store.SaveSetup(new SetupSettings(false, new Dictionary<string, bool> { ["claude"] = true }));
+        WithService((s, host) =>
+        {
+            Send(s, "d1", Dusk);
+            Assert.Contains(SetupCopy.DesignDesktopOffNote, host.Model!.Warnings);
+            Assert.Equal("A nicer desktop is off, so Apply saves this for when you turn it on.", SetupCopy.DesignDesktopOffNote);
+        });
+    }
+
+    [Fact]
+    public void APastedReviewWithADesktopOffSetupAddsTheNoteToo()
+    {
+        _store.SaveSetup(new SetupSettings(false, new Dictionary<string, bool> { ["claude"] = false }));
+        WithService((s, host) =>
+        {
+            Assert.Equal(DeskAnswer.Previewing, s.ProposePasted(Pasted(s, Dusk)).Status);
+            Assert.Contains(SetupCopy.DesignDesktopOffNote, host.Model!.Warnings);
+        });
+    }
+
+    [Fact]
+    public void NoNoteWhenADesktopIsOnOrNoSetupWasMadeYet()
+    {
+        WithService((s, host) =>
+        {
+            Send(s, "n1", Dusk);   // no setup yet
+            Assert.DoesNotContain(SetupCopy.DesignDesktopOffNote, host.Model!.Warnings);
+            s.DismissReview();
+            _store.SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = true }));
+            Send(s, "n2", Dusk);
+            Assert.DoesNotContain(SetupCopy.DesignDesktopOffNote, host.Model!.Warnings);
+        });
+    }
+
     // ---- previewing: nothing is written ----
 
     [Fact]
@@ -653,4 +692,181 @@ public sealed class DeskDesignReviewTests : IDisposable
         Send(s, "d2", Dusk);   // free again
         Assert.True(s.Reviewing);
     });
+
+    // ---- a design pasted from an AI chat (setup spec, section 3) ----
+
+    private DeskValidation Pasted(DeskDesignService s, string designJson) => s.ValidatePasted(JsonNode.Parse(designJson)!);
+
+    private bool ResultFileExists => File.Exists(Path.Combine(_paths.ExternalDir, DeskDesign.ResultFile));
+
+    [Fact]
+    public void APastedDesignIsReviewedUnderTheNeutralHeadingAndWritesNoResultFile()
+    {
+        WithService((s, host) =>
+        {
+            var answer = s.ProposePasted(Pasted(s, Dusk));
+            Assert.Equal(DeskAnswer.Previewing, answer.Status);
+            Assert.True(s.Reviewing);
+            Assert.Equal(["show"], host.Calls);
+            Assert.Equal(DeskReviewCopy.PastedHeading, host.Model!.Heading);
+            Assert.Equal(DeskReviewCopy.PastedBarName, host.Model.BarName);
+            Assert.Equal("Dusk", host.Model.Title);
+            Assert.True(host.Model.CanApply);
+            SameLayout("clock:bl claude:bl", _store.LoadDesk().Layout);   // previewing wrote nothing
+
+            // Nothing the bar shows for it names a product.
+            var shown = new List<string?> { host.Model.Heading, host.Model.BarName, host.Model.Title, host.Model.Note, host.Model.Keys,
+                host.Model.ApplyLabel ?? DeskReviewCopy.Apply, host.Model.DismissLabel ?? DeskReviewCopy.Dismiss, host.Model.ChangesTitle ?? DeskReviewCopy.ChangesName };
+            shown.AddRange(host.Model.Changes);
+            shown.AddRange(host.Model.Warnings);
+            Assert.All(shown, text => Assert.DoesNotContain("Claude", text ?? ""));
+
+            host.Apply!();
+            SameLayout("clock:tr:1.4 claude:bl", _store.LoadDesk().Layout);   // Apply is the ordinary Apply: it saves the Desk it replaces
+            Assert.Equal(["Dusk", "Before Dusk"], s.Designs().Select(d => d.Name).ToArray());
+            Assert.True(s.CanPutBack);                                         // and Undo is Put my Desk back
+        });
+        Assert.False(ResultFileExists);
+    }
+
+    [Fact]
+    public void APastedDesignAlwaysReviewsEvenWithTheDirectSwitchOnAndWritesNoResultFileWhateverTheUserDoes()
+    {
+        _store.SaveDeskDirect(true);
+        WithService((s, host) =>
+        {
+            Assert.Equal(DeskAnswer.Previewing, s.ProposePasted(Pasted(s, Dusk)).Status);
+            Assert.True(s.Reviewing);                                           // not applied at once
+            Assert.Equal(["show"], host.Calls);
+            SameLayout("clock:bl claude:bl", _store.LoadDesk().Layout);
+            Assert.False(ResultFileExists);
+
+            host.Dismiss!();                                                    // Dismiss answers nobody
+            Assert.False(s.Reviewing);
+            Assert.False(ResultFileExists);
+
+            s.ProposePasted(Pasted(s, Dusk));
+            s.ProposePasted(Pasted(s, """{"name":"Other","plate":true}"""));   // a newer paste replaces the older one: still nobody to tell
+            Assert.True(s.Reviewing);
+            Assert.False(ResultFileExists);
+            Assert.Equal("Other", host.Model!.Title);
+        });
+    }
+
+    [Fact]
+    public void AMcpProposalStillAnswersItsCallerAfterAPasteWasReviewed()
+    {
+        WithService((s, host) =>
+        {
+            s.ProposePasted(Pasted(s, Dusk));
+            Send(s, "m9", """{"name":"Quiet","plate":true}""");   // replaces the pasted review, which answers no one
+            Assert.Equal("previewing", ResultStatus);
+            Assert.Equal("m9", (string?)Result()["id"]);
+            Assert.Equal(DeskReviewCopy.BarName, host.Model!.BarName ?? DeskReviewCopy.BarName);   // the MCP's own wording is untouched
+            Assert.Null(host.Model.Heading);
+        });
+    }
+
+    [Fact]
+    public void APastedDesignIsRefusedBusyWhileADrawersPlanIsUnderReview()
+    {
+        Sta.Run(() =>
+        {
+            var fake = new FakeHost();
+            using var s = new DeskDesignService(_paths, _store)
+                { Host = fake, InstalledFonts = () => Installed, Clock = () => _now, DrawersReviewing = () => true };
+            var answer = s.ProposePasted(Pasted(s, Dusk));
+            Assert.Equal(DeskAnswer.Rejected, answer.Status);
+            Assert.Equal("busy", answer.Reason);
+            Assert.False(s.Reviewing);
+            Assert.Empty(fake.Calls);
+        });
+    }
+
+    [Fact]
+    public void APastedMeetingsPieceIsRefusedByFieldBecauseWindowsDoesNotDrawIt()
+    {
+        WithService((s, host) =>
+        {
+            var verdict = Pasted(s, """{"name":"Busy","layout":{"meetings":{"anchor":"tr"}}}""");
+            Assert.Equal(DeskDesignStatus.Rejected, verdict.Status);
+            Assert.Contains(verdict.Reasons, r => r.Field == "layout.meetings");
+            // Even a verdict that skipped the check (the plain validator accepts the word) is refused on the way in.
+            var plain = DeskDesign.Validate(JsonNode.Parse("""{"name":"Busy","layout":{"meetings":{"anchor":"tr"}}}""")!, DeskDesignContext.Unknown);
+            Assert.Equal(DeskDesignStatus.Ok, plain.Status);
+            var answer = s.ProposePasted(plain);
+            Assert.Equal(DeskAnswer.Rejected, answer.Status);
+            Assert.Contains(answer.Reasons!, r => r.Field == "layout.meetings");
+            Assert.False(s.Reviewing);
+            Assert.Empty(host.Calls);
+        });
+    }
+
+    [Fact]
+    public void APastedDesignWithLauncherButtonsIsRefusedByField()
+    {
+        WithService((s, host) =>
+        {
+            string image = new string('a', 64) + ".png";
+            var design = DeskDesign.Parse(JsonNode.Parse(
+                "{\"name\":\"Pics\",\"launcher\":{\"orientation\":\"row\",\"buttons\":[{\"kind\":\"link\",\"target\":\"https://example.com\",\"image\":\"" + image + "\"}]}}")).Design;
+            Assert.NotNull(design);
+            var answer = s.ProposePasted(new DeskValidation(DeskDesignStatus.Ok, [], [], [], design));
+            Assert.Equal(DeskAnswer.Rejected, answer.Status);
+            // Launcher buttons are not a field a chat can set, so the field check refuses it before the image check is reached.
+            Assert.Contains(answer.Reasons!, r => r.Field == "desk.launcher");
+            Assert.False(s.Reviewing);
+            Assert.Empty(host.Calls);
+        });
+    }
+
+    [Fact]
+    public void APastedDesignWithNoNameIsSavedUnderANeutralNameNotClaudes()
+    {
+        WithService((s, host) =>
+        {
+            Assert.Equal(DeskAnswer.Previewing, s.ProposePasted(Pasted(s, """{"plate":true}""")).Status);
+            host.Apply!();
+            var names = s.Designs().Select(d => d.Name).ToArray();
+            Assert.Contains(SetupCopy.ChatUntitledDesign, names);
+            Assert.Contains("Before " + SetupCopy.ChatUntitledDesign, names);
+            Assert.DoesNotContain(names, n => n.Contains("Claude"));
+        });
+    }
+
+    [Fact]
+    public void APastedDesignAfterTheServiceIsDisposedIsNotReady()
+    {
+        Sta.Run(() =>
+        {
+            var s = new DeskDesignService(_paths, _store) { Host = new FakeHost(), InstalledFonts = () => Installed, Clock = () => _now };
+            var verdict = Pasted(s, Dusk);
+            s.Dispose();
+            var answer = s.ProposePasted(verdict);
+            Assert.Equal(DeskAnswer.Rejected, answer.Status);
+            Assert.Equal("not_ready", answer.Reason);
+        });
+    }
+
+    [Fact]
+    public void ThePasteCheckReadsThisPcOnceInAFewSecondsNotOnEveryKeystroke()
+    {
+        Sta.Run(() =>
+        {
+            int reads = 0;
+            using var s = new DeskDesignService(_paths, _store)
+            {
+                Host = new FakeHost(), InstalledFonts = () => Installed, Clock = () => _now,
+                Monitors = () => { reads++; return []; },
+            };
+            Pasted(s, Dusk);
+            int first = reads;
+            Assert.True(first >= 1);
+            for (int i = 0; i < 20; i++) Pasted(s, Dusk);
+            Assert.Equal(first, reads);                                   // typing: the same read
+            _now = _now.AddSeconds(6);
+            Pasted(s, Dusk);
+            Assert.True(reads > first);                                   // a few seconds on: read again
+        });
+    }
 }

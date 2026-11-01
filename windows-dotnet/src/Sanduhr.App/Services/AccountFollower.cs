@@ -52,6 +52,9 @@ public sealed class AccountFollower
 
     // Lifecycle
 
+    /// <summary>The checks are scheduled (the tests read it).</summary>
+    internal bool Running => _cts is not null;
+
     /// <summary>Starts or stops the checks to match the setting.</summary>
     public void Apply(bool enabled)
     {

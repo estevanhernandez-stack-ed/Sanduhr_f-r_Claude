@@ -12,6 +12,8 @@ public static class DrawerReview
     public const string NothingToSort = "Nothing on your Desktop matches a rule.";
     public const string FirstOnLine = "Drawer files live in the Drawers folder on your Desktop.";
     public const string Busy = "Finish the review on your Desk first.";
+    /// <summary>Tidy or a chat's arrangement would replace a sort's result bar while its Undo can still put files back.</summary>
+    public const string UndoFirst = "Undo or close the last sort first.";
     public const string Undo = "Undo";
     public const string Done = "Done";
     public const string ApplyFailed = "The plan could not be applied. Nothing more was moved.";
@@ -84,6 +86,12 @@ public static class DrawerReview
     /// <summary>The Drawers folder stayed although every drawer is back: it holds files that are not in a drawer, which turning off again
     /// cannot move.</summary>
     public const string RootKeptLine = "The Drawers folder stays on your Desktop: it holds files that are not in a drawer.";
+
+    /// <summary>Tidy's result line: how many drawers lined up.</summary>
+    public static string Tidied(int n) => n == 1 ? "1 drawer lined up." : $"{n} drawers lined up.";
+
+    /// <summary>Tidy found every drawer where it would put it.</summary>
+    public const string TidyNothing = "The drawers are already lined up.";
 
     /// <summary>The bar after Apply: the result line, Undo (when anything moved) and Done.</summary>
     public static DeskReviewModel Result(string line, bool canUndo) =>

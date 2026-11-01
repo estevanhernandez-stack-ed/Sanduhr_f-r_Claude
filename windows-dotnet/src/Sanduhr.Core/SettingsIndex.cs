@@ -29,6 +29,7 @@ public sealed record SettingsLink(SettingsPage Page, string? Anchor);
 public static class SettingsIndex
 {
     // General
+    public const string GeneralSetup = "setup";
     public const string Tray = "tray";
     public const string Startup = "startup";
     public const string Shortcuts = "shortcuts";
@@ -96,6 +97,7 @@ public static class SettingsIndex
     public const string DeskMap = "map";
     public const string DeskInk = "ink";
     public const string DeskArrange = "arrange";
+    public const string DeskDesignWithChat = "design-with-chat";
     public const string DeskClicks = "desk-clicks";
     public const string DeskPlate = "desk-plate";
     public const string DeskWatchers = "desk-watchers";
@@ -111,6 +113,7 @@ public static class SettingsIndex
     public const string Drawers = "drawers";
     public const string DrawersFolder = "drawers-folder";
     public const string DrawersSort = "drawers-sort";
+    public const string DrawersLookSection = "drawers-look";
     public const string DrawersRules = "drawers-rules";
     public const string DrawersList = "drawers-list";
     public const string DrawersRecent = "drawers-recent";
@@ -143,7 +146,7 @@ public static class SettingsIndex
     public const string GlowWhere = "glow-where";
     // Widget (slice 5)
     public const string WidgetOptions = "widget-options";
-    public const string JustTheDeskSection = "just-the-desk";
+    public const string UsageOffSection = "usage-off";
     // About
     public const string Version = "version";
     /// <summary>About, Updates (slice 6): Check for updates once a day and Check now.</summary>
@@ -165,6 +168,8 @@ public static class SettingsIndex
     /// <summary>Every anchor in sidebar order, with its title and the words a person might type for it.</summary>
     public static IReadOnlyList<SettingsEntry> Anchors { get; } =
     [
+        E(SetupCopy.Title, SettingsPage.General, GeneralSetup,
+            ["setup", "set up", "wizard", "choose what shows", "desktop", "drawers", "usage", "first run", "start over", "what Sanduhr shows"]),
         E(SettingsNames.TrayShows, SettingsPage.General, Tray,
             ["tray", "percent", "number", "icon", "rotate", "session", "weekly", "highest", "whichever is higher"]),
         E("Startup", SettingsPage.General, Startup,
@@ -264,6 +269,8 @@ public static class SettingsIndex
             ["desktop", "wallpaper", "clock", "meters", "Rainmeter", "show the Desk", "on the desktop", "off by default", "monitors"]),
         E(SettingsNames.ArrangeDesk, SettingsPage.Desk, DeskArrange,
             ["drag", "move", "rearrange", "arrange", "reorder", "on the desktop", "layout", "arrow keys", "keyboard"]),
+        E(SetupCopy.DesignWithChat, SettingsPage.Desk, DeskDesignWithChat,
+            ["AI chat", "chat", "chatbot", "prompt", "paste", "copy prompt", "design", "ask an AI", "drawer rules", "set up", "any AI chat"]),
         E(SettingsNames.DeskLayoutMap, SettingsPage.Desk, DeskMap,
             ["map", "preview", "layout", "taskbar", "screen", "monitor", "where"]),
         E(SettingsNames.PiecesSection, SettingsPage.Desk, DeskPieces,
@@ -341,18 +348,20 @@ public static class SettingsIndex
         E(SettingsNames.DrawersFolder, SettingsPage.Drawers, DrawersFolder, ["folder", "Drawers folder", "OneDrive", "location", "where"]),
         E(SettingsNames.DrawersSort, SettingsPage.Drawers, DrawersSort,
             [SettingsNames.DrawersSortButton, "sort", "sort my desktop", "plan", "review", "apply", "screenshots", "installers"]),
+        E(SettingsNames.DrawersLook, SettingsPage.Drawers, DrawersLookSection,
+            ["style", "blend", "glass", "outline", "transparent", "opacity", "snap", "tidy", "align", "arrange", "icons", SettingsNames.DrawersTidy, SettingsNames.DrawersKeepClear, SettingsNames.DrawersSnap]),
         E(SettingsNames.DrawersRules, SettingsPage.Drawers, DrawersRules,
             ["rules", "by kind", "by age", "by name", "older than", "first match", "order", SettingsNames.DrawersAddRule]),
         E(SettingsNames.DrawersList, SettingsPage.Drawers, DrawersList,
-            ["rename", "hide", "show", SettingsNames.DrawersShow, SettingsNames.DrawersPutBack, "top right", "remove", "view", "existing folder", "Downloads"]),
+            ["rename", "hide", "show", SettingsNames.DrawersShow, "remove", "view", "existing folder", "Downloads"]),
         E(SettingsNames.DrawersRecent, SettingsPage.Drawers, DrawersRecent, ["undo", "history", "journal", "moved"]),
 
         E(SettingsNames.WidgetOptions, SettingsPage.Widget, WidgetOptions,
             [SettingsNames.CompactMode, "compact", "Ctrl+D", SettingsNames.GraphStyle, "graph", "sparkline", "classic", "horizon",
              SettingsNames.KeepWidgetOnTop, "on top", "pin", "always on top", SettingsNames.DeepWorkLength, "deep work", "focus", "timer",
              SettingsNames.LimitOrder, "tier order", "order", "reorder", "move up", "move down"]),
-        E(JustTheDesk.ButtonTitle, SettingsPage.Widget, JustTheDeskSection,
-            [SettingsNames.ShowTheWidget, "show the widget", "widget hidden", "hidden widget", "desk only", "no account", "without an account"]),
+        E(SetupCopy.Title, SettingsPage.Widget, UsageOffSection,
+            [SettingsNames.UsageOffTitle, "usage off", "show the widget", "widget hidden", "hidden widget", "desk only", "no account", "without an account"]),
 
         E("Version", SettingsPage.About, Version,
             ["version", "What's New", "Take the tour", "tour", "release", "update", "don't show", "after updates", SettingsNames.HideWhatsNewAfterUpdates]),
@@ -375,7 +384,6 @@ public static class SettingsIndex
         [SettingsNames.KeepWidgetOnTop] = WidgetOptions,
         [SettingsNames.DeepWorkLength] = WidgetOptions,
         [SettingsNames.LimitOrder] = WidgetOptions,
-        [SettingsNames.ShowTheWidget] = JustTheDeskSection,
         [SettingsNames.TrayShows] = Tray,
         [SettingsNames.StreamerSection] = Streamer,
         [SettingsNames.ShuffleCodenames] = Streamer,
@@ -402,6 +410,7 @@ public static class SettingsIndex
         [SettingsNames.DeskSwitch] = DeskOn,
         [SettingsNames.DeskInkPicker] = DeskInk,
         [SettingsNames.ArrangeDesk] = DeskArrange,
+        [SetupCopy.DesignWithChat] = DeskDesignWithChat,
         [SettingsNames.DeskPieceClicksSwitch] = DeskClicks,
         [SettingsNames.DeskPlateSwitch] = DeskPlate,
         [SettingsNames.WatchersSwitch] = Watchers,
@@ -767,6 +776,9 @@ public static class SettingsIndex
             ? new(SettingsPage.General, null)
             : link;
     }
+
+    /// <summary>The link whose Show me opens the Set up Sanduhr window rather than a Settings page.</summary>
+    public static bool OpensSetup(SettingsLink link) => link.Page == SettingsPage.General && link.Anchor == GeneralSetup;
 
     /// <summary>
     /// Whether a place means the widget itself rather than Settings (Settings v2, slice 5, decision 1): <see cref="SettingsPage.Widget"/>

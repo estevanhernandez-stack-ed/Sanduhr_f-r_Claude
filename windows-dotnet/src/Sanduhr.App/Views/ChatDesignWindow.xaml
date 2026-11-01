@@ -1,0 +1,177 @@
+<Window x:Class="Sanduhr.App.Views.ChatDesignWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
+        Title="{x:Static core:SetupCopy.DesignWithChat}"
+        SizeToContent="Height" Width="560"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="{DynamicResource Sanduhr.Brush.Bg}"
+        FontFamily="Segoe UI Variable Display, Segoe UI"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        Icon="/Assets/Sanduhr.ico">
+
+    <Window.Resources>
+        <!-- The same flat and accent buttons as the other small windows, which keep theirs in their own resources. -->
+        <Style x:Key="FlatButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="16,7" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg" CornerRadius="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Opacity" Value="0.88" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                <Setter TargetName="bg" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bg" Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Padding" Value="22,7" />
+        </Style>
+
+        <!-- The paste box: the same themed input as the themes page. -->
+        <Style x:Key="Input" TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="SelectionBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Style.Triggers>
+                <Trigger Property="IsFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- A finding: the field in the accent, the sentence after it; an error takes the pace-marker ink for the field so the two levels read apart. -->
+        <DataTemplate x:Key="FindingTemplate">
+            <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,1"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}">
+                <Run Text="{Binding Field, Mode=OneWay}" FontFamily="Cascadia Code, Consolas">
+                    <Run.Style>
+                        <Style TargetType="Run">
+                            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.AccentText}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsError}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.PaceMarker}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Run.Style>
+                </Run><Run Text=" " /><Run Text="{Binding Message, Mode=OneWay}" />
+            </TextBlock>
+        </DataTemplate>
+
+        <!-- A line of status under the paste: collapsed while it is empty. -->
+        <Style x:Key="LineText" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+            <Style.Triggers>
+                <Trigger Property="Text" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <StackPanel Margin="26,24,26,22">
+        <TextBlock Text="{x:Static core:SetupCopy.DesignWithChat}" FontSize="18" FontWeight="SemiBold"
+                   Foreground="{DynamicResource Sanduhr.Brush.Accent}"
+                   AutomationProperties.HeadingLevel="Level1" />
+        <TextBlock Text="{x:Static core:SetupCopy.ChatIntro}" TextWrapping="Wrap" Margin="0,6,0,14" FontSize="12"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+
+        <Button x:Name="CopyPromptButton" Style="{StaticResource FlatButton}" HorizontalAlignment="Left"
+                Content="{x:Static core:SetupCopy.ChatCopyPrompt}" Command="{Binding CopyPromptCommand}"
+                AutomationProperties.Name="{x:Static core:SetupCopy.ChatCopyPrompt}" />
+
+        <!-- The paste box with its hint, and the live check under it. -->
+        <Grid Height="150" Margin="0,14,0,0">
+            <TextBox x:Name="PasteBox" Style="{StaticResource Input}"
+                     Text="{Binding PasteText, UpdateSourceTrigger=PropertyChanged}"
+                     AcceptsReturn="True" TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top"
+                     FontFamily="Cascadia Code, Consolas"
+                     AutomationProperties.Name="{x:Static core:SetupCopy.ChatPasteName}" />
+            <TextBlock Text="{x:Static core:SetupCopy.ChatPastePlaceholder}"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}" Margin="8,6"
+                       IsHitTestVisible="False" FontSize="11" FontFamily="Cascadia Code, Consolas">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Text.Length, ElementName=PasteBox}" Value="0">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </Grid>
+
+        <TextBlock x:Name="SummaryText" Style="{StaticResource LineText}" Margin="0,6,0,0" Text="{Binding Summary}"
+                   AutomationProperties.LiveSetting="Polite" />
+        <ScrollViewer MaxHeight="110" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,2,0,0"
+                      AutomationProperties.Name="{x:Static core:SetupCopy.ChatFindingsName}">
+            <ItemsControl x:Name="FindingsList" ItemsSource="{Binding Findings}" ItemTemplate="{StaticResource FindingTemplate}" Focusable="False" />
+        </ScrollViewer>
+        <TextBlock x:Name="RulesText" Style="{StaticResource LineText}" Margin="0,8,0,0" Text="{Binding RulesLine}" />
+        <TextBlock x:Name="DrawerSettingsText" Style="{StaticResource LineText}" Margin="0,8,0,0" Text="{Binding DrawerSettingsLine}" />
+
+        <Grid Margin="0,18,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button x:Name="PreviewButton" Style="{StaticResource AccentButton}" Margin="0,0,8,0"
+                        Content="{x:Static core:SetupCopy.ChatPreview}" Command="{Binding PreviewCommand}"
+                        IsEnabled="{Binding CanPreview}"
+                        AutomationProperties.Name="{x:Static core:SetupCopy.ChatPreview}" />
+                <Button x:Name="UseRulesButton" Style="{StaticResource FlatButton}" Margin="0,0,8,0"
+                        Content="{x:Static core:SetupCopy.ChatUseRules}" Command="{Binding UseRulesCommand}"
+                        IsEnabled="{Binding CanUseRules}"
+                        AutomationProperties.Name="{x:Static core:SetupCopy.ChatUseRules}" />
+                <Button x:Name="UseDrawerSettingsButton" Style="{StaticResource FlatButton}"
+                        Content="{x:Static core:SetupCopy.ChatUseDrawerSettings}" Command="{Binding UseDrawerSettingsCommand}"
+                        IsEnabled="{Binding CanUseDrawerSettings}"
+                        AutomationProperties.Name="{x:Static core:SetupCopy.ChatUseDrawerSettings}" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" IsCancel="True"
+                    Content="{x:Static core:SetupCopy.ChatClose}" Command="{Binding CloseCommand}"
+                    AutomationProperties.Name="{x:Static core:SetupCopy.ChatClose}" />
+        </Grid>
+
+        <TextBlock x:Name="StatusText" Style="{StaticResource LineText}" Margin="0,12,0,0" Text="{Binding Status}"
+                   AutomationProperties.LiveSetting="Polite" />
+    </StackPanel>
+</Window>

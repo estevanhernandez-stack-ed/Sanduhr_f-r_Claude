@@ -1,0 +1,236 @@
+{
+  "run": "drawers-look-4-5",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "cf9d4e8f593ccf3a9e6905e32a5455c3c094d8e9",
+  "base_ref": "cart/setup-4-5",
+  "merged_at_start": "docs/setup-spec",
+  "behind_at_start": 27,
+  "integration_branch": "cart/drawers-look-4-5",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-drawers-look-4-5/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-drawers-look-4-5",
+  "builder_branch": "docs/setup-spec",
+  "uncommitted_at_start": [
+    ".playwright-mcp/",
+    "dist/",
+    "docs/cart-runs/2026-10-31-setup-4-5/"
+  ],
+  "started_at": "2026-11-01T13:29:21.393Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "spike",
+      "title": "spike",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-look-4-5--01-spike",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "spike verdicts: blur PASS (SWCA accent 3/4, flags 0), icons PASS (49/49 vs UIA, survives restart)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "settings",
+      "title": "settings",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-look-4-5--02-settings",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "build 0 errors; Core full; review fix f97fce2b (Looks cleared on remove)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "snap",
+      "title": "snap",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-look-4-5--03-snap",
+      "worktree": "",
+      "on": 2,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "DrawerSnapTests 8/8, Core 4980/4980; orchestrator review (plan code verbatim, test arithmetic checked at plan time)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "icon-area-tidy",
+      "title": "icon-area-tidy",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-look-4-5--04-icon-area-tidy",
+      "worktree": "",
+      "on": 3,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "Core 5023/5023; DrawerFreePanel 17/17; re-review APPROVE (555b96ce)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "looks",
+      "title": "looks",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-look-4-5--05-looks",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "App 1340/1340; review APPROVE + fixes 6facffc3",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "drag-keep-clear",
+      "title": "drag-keep-clear",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-look-4-5--06-drag-keep-clear",
+      "worktree": "",
+      "on": 5,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "App 1362/1362; review fixes fe31c72b (Explorer ping, render warm, Alt via GetAsyncKeyState)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 7,
+      "slug": "tidy-undo",
+      "title": "tidy-undo",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-look-4-5--07-tidy-undo",
+      "worktree": "",
+      "on": 6,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "App 1372/1372; review fixes 22d1e6a0 (Undo per id, drawn places)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 8,
+      "slug": "page-menu",
+      "title": "page-menu",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-look-4-5--08-page-menu",
+      "worktree": "",
+      "on": 7,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "App 1391/1391; review fixes 2dcf1c56 (opacity settle, TidyStatus)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 9,
+      "slug": "chat",
+      "title": "chat",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-look-4-5--09-chat",
+      "worktree": "",
+      "on": 8,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "Core prompt/reader 68/68; App chat 40/40; review fixes 37adc9b3 + prompt wording",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 10,
+      "slug": "harness",
+      "title": "harness",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-look-4-5--10-harness",
+      "worktree": "",
+      "on": 9,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "harness 24 PNGs viewed by orchestrator (readable in every look on busy/plain/bright); DrawerLook 28/28; label-shadow fix 163fe7a3",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 11,
+      "slug": "suite",
+      "title": "suite",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-look-4-5--11-suite",
+      "worktree": "",
+      "on": 10,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "build 0 errors; Mcp 300/300, Core 5048/5048, App 1414/1414 (Release, the focus tests included)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 12,
+      "slug": "branch-review-fixes",
+      "title": "branch-review-fixes",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-look-4-5--12-branch-review-fixes",
+      "worktree": "",
+      "on": 11,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "Mcp 300, Core 5048, App 1426 (Release); re-review fixes 3c420cea (N1 loop mutation-tested)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}

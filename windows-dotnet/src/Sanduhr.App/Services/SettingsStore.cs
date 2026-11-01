@@ -752,8 +752,24 @@ public sealed class SettingsStore
 
     public void SaveDesk(DeskSettings desk)
     {
-        var d = desk.Normalized();
         var root = Read();
+        PutDesk(root, desk);
+        Write(root);
+    }
+
+    /// <summary>Drawers and the Desk in one write, so a save that fails cannot leave one without the other (drawers on and the Desk off
+    /// draws nothing). A null <paramref name="desk"/> leaves the Desk as it is.</summary>
+    public void SaveDrawersAndDesk(DrawerSettings drawers, DeskSettings? desk)
+    {
+        var root = Read();
+        if (desk is not null) PutDesk(root, desk);
+        root[DrawerSettings.Key] = drawers.Encode();
+        Write(root);
+    }
+
+    private static void PutDesk(JsonObject root, DeskSettings desk)
+    {
+        var d = desk.Normalized();
         root["desk_enabled"] = d.Enabled;
         root["desk_layout"] = d.Layout;
         root["desk_margins"] = new JsonObject
@@ -766,7 +782,6 @@ public sealed class SettingsStore
         if (d.Font is null) root.Remove("desk_font");
         else root["desk_font"] = d.Font;
         root["desk_time_size"] = d.TimeSize;
-        Write(root);
     }
 
     /// <summary>The Desk Launcher (spec, Desk Launcher): <c>desk_launcher</c> {orientation, buttons[]}. Absent, or
@@ -851,6 +866,39 @@ public sealed class SettingsStore
         var root = Read();
         root[DrawerSettings.Key] = drawers.Encode();
         Write(root);
+    }
+
+    /// <summary>The setup (setup spec, section 1): null when no setup has been made yet, a first run. Decoded entry by entry; an
+    /// unreadable entry takes what the migration would say for it.</summary>
+    public SetupSettings? LoadSetup()
+    {
+        var root = Read();
+        if (root[SetupSettings.Key] is not { } node) return null;
+        var fallback = SetupMigration.From(true, false, false, ReadBool(root, "desk_enabled", false))!.Setup;
+        return SetupSettings.Decode(node, fallback);
+    }
+
+    public void SaveSetup(SetupSettings setup)
+    {
+        var root = Read();
+        root[SetupSettings.Key] = setup.Encode();
+        Write(root);
+    }
+
+    /// <summary>Runs once, on the first launch of a setup build (spec 1, Migration): writes <c>setup</c> only when it is absent and
+    /// the file has an account or Just the Desk. The <c>just_the_desk</c> keys stay. True when it wrote.</summary>
+    public bool MigrateSetup(bool hasAccount)
+    {
+        var root = Read();
+        if (root[SetupSettings.Key] is not null) return false;
+        var jtd = LoadJustTheDesk();
+        var m = SetupMigration.From(hasAccount, jtd.On, jtd.SilencedReminder, ReadBool(root, "desk_enabled", false));
+        if (m is null) return false;
+        // The Desk and the reminder first, the setup last: setup is the "ran" marker, so a write that fails before it runs again next launch.
+        if (m.DeskOn) SaveDesk(LoadDesk() with { Enabled = true });
+        if (m.ReminderOn) SaveDeskSignInReminder(true);
+        SaveSetup(m.Setup);
+        return true;
     }
 
     /// <summary>"Let Claude show watchers" (spec 6.9): <c>watchers_agents</c>, absent = off. The MCP tools

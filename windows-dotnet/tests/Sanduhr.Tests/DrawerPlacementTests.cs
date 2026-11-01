@@ -101,4 +101,73 @@ public sealed class DrawerPlacementTests
         Assert.Empty(back.Places);
         Assert.Empty(back.Hidden);
     }
+
+    [Fact]
+    public void Arrival_with_a_tidy_and_icons_takes_the_next_free_slot()
+    {
+        var drawers = new[] { new DrawerDef("a", "A", @"C:\D\A", true) };
+        var icons = new DrawerRect(1920 - 400, 0, 400, 500);
+        var places = DrawerPlacement.Arrive(drawers, new Dictionary<string, DrawerPlace>(), 1920, [],
+            DrawerTidy.Default, 1032, [icons]);
+        var p = places["a"];
+        Assert.False(new DrawerRect(p.X, p.Y, DrawerPlacement.Width, DrawerPlacement.OpenHeight).Overlaps(icons));
+    }
+
+    [Fact]
+    public void Arrival_with_only_icons_blocked_uses_the_default_tidy()
+    {
+        var icons = new DrawerRect(1920 - 400, 0, 400, 500);
+        var p = DrawerPlacement.Arrive([Def("a")], new Dictionary<string, DrawerPlace>(), 1920, [], blocked: [icons])["a"];
+        Assert.Equal(new DrawerPlace(DeskMonitors.Main, 1536, 512), p);
+    }
+
+    [Fact]
+    public void Arrival_from_the_bottom_left_row_takes_the_next_slot_after_a_placed_drawer()
+    {
+        var tidy = new DrawerTidy(DrawerCorner.BottomLeft, DrawerFlow.Row);
+        var placed = new Dictionary<string, DrawerPlace> { ["old"] = new(DeskMonitors.Main, 24, 678) };
+        var places = DrawerPlacement.Arrive([Def("old"), Def("new")], placed, 1920, [], tidy, 1032, []);
+        Assert.Equal(new DrawerPlace(DeskMonitors.Main, 24 + 360 + 12, 678), places["new"]);
+        Assert.Equal(placed["old"], places["old"]);
+    }
+
+    [Fact]
+    public void A_drawer_with_no_room_arrives_at_the_top_right_and_does_not_throw()
+    {
+        var all = new DrawerRect(0, 0, 1920, 1032);
+        var places = DrawerPlacement.Arrive([Def("a")], new Dictionary<string, DrawerPlace>(), 1920, [],
+            DrawerTidy.Default, 1032, [all]);
+        Assert.Equal(new DrawerPlace(DeskMonitors.Main, 1536, 24), places["a"]);
+    }
+
+    [Fact]
+    public void Drawers_with_no_room_do_not_land_on_each_other()
+    {
+        var all = new DrawerRect(0, 0, 1920, 1032);
+        var places = DrawerPlacement.Arrive([Def("a"), Def("b")], new Dictionary<string, DrawerPlace>(), 1920, [],
+            DrawerTidy.Default, 1032, [all]);
+        Assert.NotEqual(places["a"], places["b"]);
+        Assert.Equal(new DrawerPlace(DeskMonitors.Main, 1536, 24), places["a"]);
+    }
+
+    [Theory]
+    [InlineData(DrawerCorner.BottomRight, 1536)]
+    [InlineData(DrawerCorner.BottomLeft, 24)]
+    public void A_bottom_corner_with_no_work_height_reads_as_the_top_corner_on_its_side(DrawerCorner corner, double x)
+    {
+        var places = DrawerPlacement.Arrive([Def("a")], new Dictionary<string, DrawerPlace>(), 1920, [],
+            new DrawerTidy(corner, DrawerFlow.Column), blocked: []);
+        Assert.Equal(new DrawerPlace(DeskMonitors.Main, x, 24), places["a"]);
+    }
+
+    [Fact]
+    public void Default_arguments_leave_arrival_exactly_as_it_was()
+    {
+        var placed = new Dictionary<string, DrawerPlace> { ["old"] = new(DeskMonitors.Main, 1536, 24) };
+        var plain = DrawerPlacement.Arrive([Def("old"), Def("n1"), Def("n2")], placed, 1920, ["n1"]);
+        var viaNulls = DrawerPlacement.Arrive([Def("old"), Def("n1"), Def("n2")], placed, 1920, ["n1"], null, double.PositiveInfinity, null);
+        Assert.Equal(plain.OrderBy(k => k.Key), viaNulls.OrderBy(k => k.Key));
+        Assert.Equal(new DrawerPlace(DeskMonitors.Main, 1536, 366), plain["n1"]);
+        Assert.Equal(new DrawerPlace(DeskMonitors.Main, 1536, 366 + 42 + 12), plain["n2"]);
+    }
 }

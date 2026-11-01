@@ -39,6 +39,7 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
         if (_disposed) return;
         _disposed = true;
         if (_drawers is not null) _drawers.Changed -= Refresh;
+        Flush();   // a drag that has not settled yet is not lost when Settings closes
     }
 
     /// <summary>Asks a yes or no question (the turn-off count); the page sets a themed dialog.</summary>
@@ -62,6 +63,26 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
     [ObservableProperty] private string _newRuleText = "";
     [ObservableProperty] private string _newRuleDrawer = "";
 
+    // ---- Drawer look and placement (look and placement spec, sections 1 and 2) ----
+    [ObservableProperty] private int _lookIndex;
+    [ObservableProperty] private int _opacity = DrawerStyle.DefaultOpacity;
+    [ObservableProperty] private bool _snap = true;
+    [ObservableProperty] private bool _keepClear = true;
+    [ObservableProperty] private int _tidyCornerIndex;
+    [ObservableProperty] private int _tidyFlowIndex;
+    [ObservableProperty] private string _tidyStatus = "";
+
+    /// <summary>Opacity shows when any look in force draws a plate (Solid, Glass): the shared look, or a drawer's own.</summary>
+    public bool ShowOpacity =>
+        (LookIndex is >= 0 and <= (int)DrawerLookKind.Bare && DrawerStyle.HasFill((DrawerLookKind)LookIndex))
+        || (_drawers?.Settings.Looks.Values.Any(DrawerStyle.HasFill) ?? false);
+
+    /// <summary>The slider's readout: "55%".</summary>
+    public string OpacityText => $"{Opacity}%";
+
+    /// <summary>Set by the app: lines the drawers up from the chosen corner and direction. Null when the Tidy bar opened, else the line to show.</summary>
+    public Func<DrawerTidy, string?>? TidyRequested { get; set; }
+
     public void Refresh()
     {
         if (_disposed) return;
@@ -71,6 +92,12 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
             if (_drawers is null) return;
             var s = _drawers.Settings;
             Enabled = s.Enabled;
+            LookIndex = (int)s.Look;
+            if (_pendingOpacity is null) Opacity = s.Opacity;   // a slider drag still settling keeps the value under the thumb
+            Snap = s.Snap;
+            KeepClear = s.KeepClear;
+            TidyCornerIndex = (int)s.Tidy.Corner;
+            TidyFlowIndex = (int)s.Tidy.Flow;
             RootText = StreamerMode.Mask.Paths(s.RootOr(_drawers.Places.Desktop));   // streamer: masked - Mask.Paths hides the profile folder while on
             CanChangeRoot = !s.Drawers.Any(d => d.Owned);
             Rules.Clear();
@@ -80,6 +107,7 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
             Recent.Clear();
             foreach (var e in _drawers.Journal.Load().Entries.OrderByDescending(e => e.AtUtc).Take(10)) Recent.Add(new DrawerRecentRow(this, e));
             OnPropertyChanged(nameof(NothingRecent));
+            OnPropertyChanged(nameof(ShowOpacity));   // a drawer's own look may have changed without the shared one
         }
         finally { _loading = false; }
     }
@@ -195,12 +223,74 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
     [RelayCommand]
     private void ShowDrawers() => _drawers?.ShowAll();
 
-    /// <summary>Drawers are free panels, so no saved place means "top right": clearing the places sends every drawer back there at the next render.</summary>
+    /// <summary>Tidy drawers, from the corner and direction the page shows.</summary>
     [RelayCommand]
-    private void ResetPlaces()
+    private void Tidy() =>
+        TidyStatus = TidyRequested?.Invoke(new DrawerTidy((DrawerCorner)TidyCornerIndex, (DrawerFlow)TidyFlowIndex)) ?? "";
+
+    private void SaveWith(Func<DrawerSettings, DrawerSettings> change)
+    {
+        if (_loading || _drawers is null) return;
+        Flush();   // a settling opacity lands first, so this change is made on top of it
+        _drawers.Save(change(_drawers.Settings));
+    }
+
+    /// <summary>How long the opacity slider rests before its value is saved (a drag would otherwise save and rebuild the Desk on every tick).</summary>
+    public static readonly TimeSpan SettleFor = TimeSpan.FromMilliseconds(200);
+    private DispatcherTimer? _settle;
+    private int? _pendingOpacity;
+
+    private void SaveOpacitySoon(int value)
     {
         if (_drawers is null) return;
-        _drawers.Save(_drawers.Settings with { Places = new Dictionary<string, DrawerPlace>() });
+        _pendingOpacity = value;
+        if (_settle is null)
+        {
+            _settle = new DispatcherTimer(DispatcherPriority.Background) { Interval = SettleFor };
+            _settle.Tick += (_, _) => Flush();
+        }
+        _settle.Stop();
+        _settle.Start();
+    }
+
+    /// <summary>Saves a settling opacity now (the settle timer, any other change first, or closing Settings).</summary>
+    public void Flush()
+    {
+        _settle?.Stop();
+        if (_pendingOpacity is not { } pending) return;
+        _pendingOpacity = null;
+        if (_drawers is null || _drawers.Settings.Opacity == pending) return;
+        _drawers.Save(_drawers.Settings with { Opacity = pending });
+    }
+
+    partial void OnLookIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(ShowOpacity));
+        if (value is < 0 or > (int)DrawerLookKind.Bare) return;   // a cleared combo box: the next Refresh puts the saved look back
+        SaveWith(s => s with { Look = (DrawerLookKind)value });
+    }
+
+    partial void OnOpacityChanged(int value)
+    {
+        var clamped = Math.Clamp(value, DrawerStyle.MinOpacity, DrawerStyle.MaxOpacity);
+        if (clamped != value) { Opacity = clamped; return; }
+        OnPropertyChanged(nameof(OpacityText));
+        if (!_loading) SaveOpacitySoon(clamped);
+    }
+
+    partial void OnSnapChanged(bool value) => SaveWith(s => s with { Snap = value });
+    partial void OnKeepClearChanged(bool value) => SaveWith(s => s with { KeepClear = value });
+
+    partial void OnTidyCornerIndexChanged(int value)
+    {
+        if (value is < 0 or > (int)DrawerCorner.BottomRight) return;
+        SaveWith(s => s with { Tidy = s.Tidy with { Corner = (DrawerCorner)value } });
+    }
+
+    partial void OnTidyFlowIndexChanged(int value)
+    {
+        if (value is < 0 or > (int)DrawerFlow.Row) return;
+        SaveWith(s => s with { Tidy = s.Tidy with { Flow = (DrawerFlow)value } });
     }
 
     [RelayCommand]

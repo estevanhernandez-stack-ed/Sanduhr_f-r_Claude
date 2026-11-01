@@ -70,6 +70,12 @@ public partial class App : Application
     private TourState? _tourState;
     /// <summary>The tour opens after a first successful fetch at most once a launch.</summary>
     private bool _tourOfferedThisLaunch;
+    /// <summary>A first run's setup screen is holding the tour back (it is offered last, from what was picked).</summary>
+    private bool _tourHeldBySetup;
+    /// <summary>A fetch has succeeded this launch (a sign-in made before the setup screen was answered).</summary>
+    private bool _fetchedThisLaunch;
+    private SetupWindow? _setupWindow;
+    private ChatDesignWindow? _chatWindow;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -85,6 +91,17 @@ public partial class App : Application
         startupSettings.SyncMcpExport();
 
         _vm = new WidgetViewModel();
+        // A pre-2.2.0 key or a v1 config becomes an account first (Start() runs it again, harmlessly), so the setup migration counts it.
+        _vm.MigrateLegacyCredentials();
+        // Setup (setup spec, section 1): a file from before setup becomes one, once; a first run stays without one.
+        try
+        {
+            if (startupSettings.MigrateSetup(_vm.AccountStore.ListAccounts().Count > 0))   // streamer: key - a count, never drawn
+                _vm.UsageOn = startupSettings.LoadSetup()?.ClaudeUsage ?? true;
+        }
+        catch { /* best-effort; no setup means the setup screen opens */ }
+        // No setup yet: the Desk draws no usage line behind the setup screen, as if usage were off. In memory only; nothing is saved.
+        _vm.SetupPending = startupSettings.LoadSetup() is null;
         // A theme's font (theme match): drawn when this PC has the family, bundled, installed or from a font pack; the theme lint warns
         // about one it lacks. Set before the first ApplyThemeResources so the first paint is in the theme's font.
         _themeFonts = Desk.DeskFonts.ForThisPc(new Sanduhr.Core.Paths());
@@ -110,18 +127,17 @@ public partial class App : Application
         _vm.ManualReauthRequested += RunManualReauthAsync;
         _vm.PasteKeyRequested += () => RunSignInAsync(embedded: false);
         _vm.SettingsRequested += () => ShowSettingsAsync();
+        _vm.SetupRequested += () => OpenSetup(firstRun: false);   // the widget's usage-off row
         // "<Page> settings…" from the tier card and the account menus lands on its section (spec, Menus table).
         _vm.SettingsPageRequested += page => ShowSettingsAsync(page, SettingsIndex.MenuAnchor(page));
-        _vm.JustTheDeskRequested += ChooseJustTheDesk;
         // Keep an open Settings window's account list in sync with quick-switches
         // made elsewhere (tray / widget chip / right-click).
         _vm.AccountsChanged += () => _settingsWindow?.ViewModel.Accounts.Reload();
 
         _window = new MainWindow { DataContext = _vm };
-        // Just the Desk with no account (spec 7.5): the widget starts hidden and the tray is the way back.
-        // The handle is created without showing, so the glow, alerts and tray have a window to point at.
-        if (JustTheDesk.WidgetStartsHidden(_vm.JustTheDesk, _vm.AccountStore.ListAccounts().Count > 0,   // streamer: key - a count, never drawn
-                new SettingsStore(new Sanduhr.Core.Paths()).LoadDesk().Enabled))
+        // Usage off with the Desk running, or no setup yet (the setup screen is what shows): the widget starts hidden and the tray is the
+        // way back. The handle is created without showing, so the glow, alerts and tray have a window to point at.
+        if (SetupLaunch.WidgetStartsHidden(startupSettings.LoadSetup(), startupSettings.LoadDesk().Enabled))
             new System.Windows.Interop.WindowInteropHelper(_window).EnsureHandle();
         else
             _window.Show();
@@ -141,7 +157,8 @@ public partial class App : Application
         // attach order is the consent gate; Start()'s first fetch cycle then
         // kicks the initial backfill through the attached service.
         var vaultService = new VaultService(new SettingsStore(new Sanduhr.Core.Paths()), _vm.CcReader);
-        if (vaultService.NeedsConsentPrompt)
+        // The archive is about Claude Code usage: asked only once a setup exists with usage on, never ahead of the setup screen.
+        if (vaultService.NeedsConsentPrompt && startupSettings.LoadSetup()?.ClaudeUsage == true)
             vaultService.SaveConsent(VaultConsentDialog.ShowConsent(_window, vaultService.DetectedRootNames()));   // streamer: masked - via ShowConsent: the consent dialog draws each folder as Mask.FolderName
         _vm.AttachVaultService(vaultService);
 
@@ -280,7 +297,7 @@ public partial class App : Application
             // After Start(): it migrates legacy credentials, so the account list is settled.
             var fresh = WhatsNew.IsFresh(lastSeen, store.LoadWhatsNewInstalledVersion(),
                 _vm.AccountStore.ListAccounts().Count);   // streamer: key - a count, never drawn
-            var onboarding = JustTheDesk.Onboarding(_vm.ActiveAccount is not null, store.LoadJustTheDesk().On);   // streamer: key - a null check, never drawn
+            var onboarding = SetupLaunch.OpensSetup(store.LoadSetup());   // no setup yet: the setup screen opens
 
             // The tour is decided before What's New records anything: pending only on a fresh
             // install (no account, nothing seen). While it is pending, What's New waits for it.
@@ -300,6 +317,15 @@ public partial class App : Application
             store.SeedDeskPlate(fresh);
             if (decision.Record)
                 store.SaveWhatsNewLastSeen(current);
+            if (onboarding)
+            {
+                // A first run: the setup screen opens, and no card or tour opens over it. The tour is held back (offered last, from
+                // what was picked: AfterSetup lets it go).
+                _tourOfferedThisLaunch = true;
+                _tourHeldBySetup = true;
+                Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => OpenSetup(firstRun: true)));
+                return;
+            }
             if (decision.Show.Count == 0)
                 return;
 
@@ -325,6 +351,11 @@ public partial class App : Application
     /// <summary>A card's Show me: the widget, or Settings at the card's page and section (WF17).</summary>
     private void ShowMe(SettingsPage page, string? anchor)
     {
+        if (SettingsIndex.OpensSetup(new SettingsLink(page, anchor)))
+        {
+            OpenSetup(firstRun: false);   // the card's promise is Set up Sanduhr, not a page
+            return;
+        }
         if (SettingsIndex.ShowsTheWidget(new SettingsLink(page, anchor)))
             ShowWindow();
         else
@@ -337,11 +368,39 @@ public partial class App : Application
     /// </summary>
     private void OnFetchSucceeded()
     {
+        _fetchedThisLaunch = true;
+        OfferTourAfterFetch();
+    }
+
+    private void OfferTourAfterFetch()
+    {
         if (!WelcomeTour.ShowsAfterFetch(_tourState, fetched: true, _tourOfferedThisLaunch))
             return;
         _tourOfferedThisLaunch = true;
-        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(ShowTour));
+        OpenTourWhenDeskIsFree();
     }
+
+    /// <summary>The tour comes last (setup spec, section 2): while a drawers review is on the Desk, a plan under review or its result bar
+    /// with Undo, it waits, checking every second. A quit ends the wait.</summary>
+    private void OpenTourWhenDeskIsFree()
+    {
+        if (!DrawersReviewUp)
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(ShowTour));
+            return;
+        }
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) =>
+        {
+            if (_quitting) { timer.Stop(); return; }
+            if (DrawersReviewUp) return;
+            timer.Stop();
+            ShowTour();
+        };
+        timer.Start();
+    }
+
+    private bool DrawersReviewUp => _drawerReview is { Reviewing: true } or { BarOpen: true };
 
     /// <summary>
     /// The welcome tour: from the first fetch, the tray's "Take the tour…" and Settings, About.
@@ -354,7 +413,7 @@ public partial class App : Application
         try
         {
             var signedIn = _vm.ActiveAccount is not null || _vm.IsDemo;   // streamer: key - a null check, never drawn
-            var steps = WelcomeTour.StepsFor(_vm.JustTheDesk, new HashSet<TourFeature>(), signedIn);
+            var steps = WelcomeTour.StepsFor(!_vm.UsageOn, new HashSet<TourFeature>(), signedIn);
             WhatsNewWindow.ShowTour(new WelcomeTourViewModel(steps, _vm), ShowMe, EndTour);
         }
         catch (Exception e)
@@ -417,6 +476,8 @@ public partial class App : Application
 
         var settings = new MenuItem { Header = SettingsNames.OpenSettings };
         settings.Click += async (_, _) => await ShowSettingsAsync();
+        var setup = new MenuItem { Header = SetupCopy.MenuItem };
+        setup.Click += (_, _) => OpenSetup(firstRun: false);
 
         var whatsNew = new MenuItem { Header = SettingsNames.WhatsNew };
         whatsNew.Click += (_, _) => ShowWhatsNewFromMenu();
@@ -498,6 +559,7 @@ public partial class App : Application
         menu.Items.Add(_endDemoItem);
         menu.Items.Add(show);
         menu.Items.Add(settings);
+        menu.Items.Add(setup);
         menu.Items.Add(whatsNew);
         menu.Items.Add(tour);
         menu.Items.Add(_arrangeItem);
@@ -561,7 +623,7 @@ public partial class App : Application
     {
         if (_arrangeItem is null) return;
         bool arranging = _desk?.Arranging == true;
-        _arrangeItem.Visibility = arranging || _desk?.Running == true ? Visibility.Visible : Visibility.Collapsed;
+        _arrangeItem.Visibility = arranging || (_desk?.Running == true && _desk.DesktopShown) ? Visibility.Visible : Visibility.Collapsed;
         _arrangeItem.Header = arranging ? DeskArrangeCopy.TrayFinish : DeskArrangeCopy.MenuItem;
     }
 
@@ -638,6 +700,8 @@ public partial class App : Application
         {
             ThemeText = ThemeTextHex,
         };
+        // "Tidy drawers" in a drawer's menu tidies the monitor that drawer is on.
+        _drawers.TidyRequested = id => TidyDrawers(null, _desk?.MonitorOf(id));
         // The live review of Claude's Desk designs: the Desk and widget draw a design from memory, the floating bar asks Apply or Dismiss.
         _deskDesign.Host = new Desk.DeskDesignHost(_desk, () => _vm, FollowDesignChange);
         _deskDesign.DesignsChanged += () => _settingsWindow?.ViewModel.Desk.Designs.Reload();
@@ -773,6 +837,8 @@ public partial class App : Application
         svm.Desk.Changed = () => _desk?.Reload();
         // Turning drawers on or off from Settings reaches the running Desk the way the Desk page's own switch does.
         svm.Drawers.DeskChanged = () => { _desk?.Reload(); svm.Desk.Reload(); };
+        // Tidy drawers on the Drawers page lines the drawers up from the corner and direction the page shows.
+        svm.Drawers.TidyRequested = t => TidyDrawers(t);
         // Desk Look, Match the widget theme: the plate note follows the running Desk's readability guard.
         svm.ThemeMatch.PlateForced = () => _desk?.PlateForced == true;
         Action plateShown = () => svm.ThemeMatch.Reload();
@@ -784,6 +850,7 @@ public partial class App : Application
         svm.ThemeMatch.Service.WallpaperLuminance = () => _desk?.ClockLuminance() ?? [];
         svm.ThemeMatch.Service.PlateForced = () => _desk?.PlateForced == true;
         svm.Desk.ArrangeRequested = () => _desk?.BeginArrange();
+        svm.Desk.DesignWithChatRequested = OpenChatDesign;
         svm.Desk.Arranging = _desk?.Arranging == true;
         svm.Desk.ArrangingLayout = _desk?.Session?.Working.Layout;
         svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); _looks?.SettingsChanged(); };
@@ -808,12 +875,9 @@ public partial class App : Application
         Action showRunnerStatus = () => svm.Desk.CiRunnersStatus = RunnerStatusText(_runners?.Status);
         RunnerStatusShown += showRunnerStatus;
         svm.QuitRequested = QuitApp;
-        // Settings, Widget, Just the Desk's "Show the widget" (WF32): the widget view model has ended it and redrawn the Desk; the window is App's.
-        svm.WidgetPage.ShowWidgetRequested = () =>
-        {
-            if (_vm is { } widgetVm) svm.Alerts.DeskSignInReminder = widgetVm.LoadDeskSignInReminder();
-            ShowWindow();
-        };
+        svm.SetupRequested = () => OpenSetup(firstRun: false);
+        // Settings, Widget, Usage is off: Set up Sanduhr (setup spec, section 4).
+        svm.WidgetPage.SetupRequested = () => OpenSetup(firstRun: false);
         svm.ResetRequested = () =>
         {
             ShowReset();
@@ -917,29 +981,33 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// The one place an added account is settled (spec 7.5): rebuild the widget on it, then end Just the
-    /// Desk if it was on. Every sign-in, pasted key and re-sign-in routes here, so the decision runs once
-    /// per add. Ending it restores the reminder only when Just the Desk had turned it off, redraws the
-    /// Desk and shows the widget for the new account, with no relaunch.
+    /// The one place an added account is settled (setup spec, section 1): turn Claude usage on if it was off, then rebuild the widget
+    /// on the account. Every sign-in, pasted key and re-sign-in routes here, so the decision runs once per add. Turning usage on shows
+    /// the widget for the new account, with no relaunch, so a sign-in never vanishes.
     /// </summary>
     private async Task ReloadAfterSignInAsync()
     {
         if (_vm is not { } vm)
             return;
-        // The account is saved by now: end Just the Desk before the fetch, so the widget comes up for it at
-        // once and a fetch that throws can't leave Just the Desk on.
-        EndJustTheDeskIfAccount(vm);
+        // The account is saved by now: usage on before the fetch, so the widget comes up for it at once and a
+        // fetch that throws can't leave usage off.
+        UsageOnForAccount(vm);
         await vm.ReloadAfterSignInAsync();
     }
 
-    private void EndJustTheDeskIfAccount(WidgetViewModel vm)
+    private void UsageOnForAccount(WidgetViewModel vm)
     {
         try
         {
-            if (vm.AccountStore.ListAccounts().Count == 0 || !vm.EndJustTheDesk())   // streamer: key - a count, never drawn
-                return;
-            if (_settingsWindow?.ViewModel.Alerts is { } alerts) alerts.DeskSignInReminder = vm.LoadDeskSignInReminder();
-            ShowWindow();
+            if (vm.AccountStore.ListAccounts().Count == 0) return;   // streamer: key - a count, never drawn
+            bool wasOff = !vm.UsageOn;
+            if (wasOff)
+                vm.SetUsageOn(true, fetchNow: false);   // ReloadAfterSignInAsync rebuilds and fetches next
+            // Usage was off, or no setup was made yet (a first run put away with Not now, which starts the widget hidden): the
+            // sign-in shows the widget. No setup is saved in the second case: the setup screen stays pending, and the next launch's
+            // migration sees the account and writes usage on.
+            if (wasOff || new SettingsStore(new Sanduhr.Core.Paths()).LoadSetup() is null)
+                ShowWindow();
         }
         catch
         {
@@ -948,43 +1016,123 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// The first-run card's Just the Desk: save the choice, turn the Desk on, redraw it (the Claude pieces
-    /// stay placed and draw nothing) and put the widget away. The tray icon stays the way back.
+    /// Opens Set up Sanduhr (setup spec, sections 2 and 4), one at a time. Continue applies the choices; closing the window any other way
+    /// saves nothing. With no setup saved yet it is a first run whichever entry opened it: the default ticks and Not now, since there is
+    /// no current state to show.
     /// </summary>
-    private void ChooseJustTheDesk()
+    private void OpenSetup(bool firstRun)
     {
-        if (_vm is not { } vm)
-            return;
-        try
+        if (_vm is not { } vm) return;
+        if (_setupWindow is { } open) { open.Activate(); return; }
+        var store = new SettingsStore(new Sanduhr.Core.Paths());
+        firstRun |= store.LoadSetup() is null;
+        // The turn-off question is the Drawers page's own, in the themed dialog (it follows light mode).
+        var host = new AppSetupHost(() => _drawers, () => _drawerReview, vm, () => _desk, store,
+            question => ThemedDialog.ShowConfirm(_setupWindow, SettingsNames.DrawersTurnOffTitle, question,
+                SettingsNames.DrawersPutThemBack, SettingsNames.DrawersCancel));
+        var model = new SetupViewModel(new SetupService(store, host), firstRun,
+            hasAccount: () => vm.AccountStore.ListAccounts().Count > 0)   // streamer: key - a count, never drawn
+        { DesignWithChatRequested = OpenChatDesign };
+        SetupResult? applied = null;
+        model.Applied += result => applied = result;
+        var window = new SetupWindow(model);
+        _setupWindow = window;
+        window.Closed += (_, _) =>
         {
-            var store = new SettingsStore(new Sanduhr.Core.Paths());
-            var (state, reminderOn, deskEnabled) = JustTheDesk.Choose(store.LoadJustTheDesk(), store.LoadDeskSignInReminder());
-            // The Desk first: a failed write after it leaves Just the Desk unchosen, never chosen with no Desk.
-            if (deskEnabled)
-                store.SaveDesk(store.LoadDesk() with { Enabled = true });
-            store.SaveDeskSignInReminder(reminderOn);
-            store.SaveJustTheDesk(state);
-        }
-        catch
-        {
-            return;   // nothing saved, nothing changed: the card stays
-        }
-        vm.JustTheDesk = true;
-        _desk?.Reload();
-        vm.RefreshDesk();
-        _window?.Hide();
-
-        // No fetch is coming to offer a pending tour, so it opens a moment after the choice instead.
-        if (!WelcomeTour.ShowsForJustTheDesk(_tourState, _tourOfferedThisLaunch))
-            return;
-        _tourOfferedThisLaunch = true;
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-            ShowTour();
+            if (ReferenceEquals(_setupWindow, window)) _setupWindow = null;
+            // After the window is gone and the click has unwound, so a notice never opens over a disabled setup window: close, notice, tour.
+            // Read at run time, so the result is there whichever Applied handler runs first.
+            Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+            {
+                if (applied is { } result && !_quitting) AfterSetup(result, firstRun);
+            }));
         };
-        timer.Start();
+        window.Show();
+        window.Activate();
+    }
+
+    /// <summary>What follows Continue: the widget shows with usage on and hides with it off, the open Settings Desk page re-reads, any notes
+    /// are shown, and the welcome tour comes last.</summary>
+    private void AfterSetup(SetupResult result, bool firstRun)
+    {
+        if (_vm is not { } vm) return;
+        vm.SetupPending = false;
+        if (result.Now.ClaudeUsage) ShowWindow(); else _window?.Hide();
+        _settingsWindow?.ViewModel.Desk.Reload();
+        // What went wrong or was refused (a drawers turn-off that was not done, a failed save): one themed notice, now that the window has
+        // closed. The first-drawers line is a note, not a problem, and is left out. Streamer mode: the host already masked any path in them.
+        var problems = result.Lines.Where(l => l != DrawerReview.FirstOnLine).ToList();
+        if (problems.Count > 0)
+            ThemedDialog.Show(null, SetupCopy.Title, string.Join(Environment.NewLine, problems));
+        if (!firstRun || !_tourHeldBySetup) return;
+        _tourHeldBySetup = false;
+        _tourOfferedThisLaunch = false;
+        if (result.Now.ClaudeUsage)
+        {
+            // The first fetch offers the tour (OnFetchSucceeded); one that already succeeded (signed in before this screen) offers it now.
+            if (_fetchedThisLaunch) OfferTourAfterFetch();
+            return;
+        }
+        if (!WelcomeTour.ShowsForDeskOnly(_tourState, _tourOfferedThisLaunch)) return;
+        _tourOfferedThisLaunch = true;
+        OpenTourWhenDeskIsFree();
+    }
+
+    /// <summary>
+    /// Opens Design it with an AI chat (setup spec, section 3), one at a time: from the setup screen's link and from Settings, Desk. The
+    /// Desk part previews through the Desk design service's review bar and the drawer rules through <see cref="UseChatRules"/>. The
+    /// window is not modal, so the review bar it opens stays usable.
+    /// </summary>
+    private void OpenChatDesign()
+    {
+        if (_chatWindow is { } open) { open.Activate(); return; }
+        var design = _deskDesign;
+        var model = new ChatDesignViewModel(
+            () => Desk.DeskMonitorSource.Read().Select(m => m.Name).ToList(),
+            design is null ? null : design.ProposePasted,
+            node => design is null ? PastedSetup.RefuseUndrawn(DeskDesign.Validate(node, DeskDesignContext.Unknown)) : design.ValidatePasted(node),
+            UseChatRules,
+            UseChatDrawerSettings);
+        var window = new ChatDesignWindow(model);
+        _chatWindow = window;
+        window.Closed += (_, _) => { if (ReferenceEquals(_chatWindow, window)) _chatWindow = null; };
+        window.Show();
+        window.Activate();
+    }
+
+    /// <summary>A chat's drawer rules: they replace the rules, drawers turn on, and the rules' plan opens for review; nothing moves before
+    /// that review's Apply. Null when the review opened, otherwise the line to show.</summary>
+    private string? UseChatRules(IReadOnlyList<DrawerRule> rules, IReadOnlyList<string> names)
+    {
+        if (_quitting || _drawerReview is not { } review) return SettingsNames.DrawersSortUnavailable;
+        var said = review.UseRules(rules, names, () =>
+        {
+            _desk?.Reload();
+            _settingsWindow?.ViewModel.Desk.Reload();
+        });
+        return said is null ? null : StreamerMode.Mask.Paths(said);   // streamer: masked - Mask.Paths hides the profile folder in a refused plan's line while on
+    }
+
+    /// <summary>A chat's drawer settings (look and placement spec, section 3): see <see cref="Desk.ChatDrawerSettings.Apply"/>. Null when it was
+    /// done, otherwise the line to show.</summary>
+    private string? UseChatDrawerSettings(PastedDrawerLook look) =>
+        _quitting || _desk is null || _drawers is null || _drawerReview is null
+            ? SettingsNames.DrawersSortUnavailable
+            : Desk.ChatDrawerSettings.Apply(look, _drawers, _desk, _drawerReview);
+
+    /// <summary>Tidy drawers (look and placement spec, section 2): lines the drawers on one monitor up from the remembered corner (or
+    /// <paramref name="tidy"/>) and shows how many moved on the drawers bar with Undo. Moves panels only. Null when the bar opened,
+    /// otherwise the line to show (the busy line while a review is open, nothing moved; a result bar is replaced).</summary>
+    private string? TidyDrawers(DrawerTidy? tidy = null, string? monitor = null)
+    {
+        if (_quitting || _desk is null || _drawers is null || _drawerReview is null) return SettingsNames.DrawersSortUnavailable;
+        if (!_drawers.Settings.Enabled) return DrawerReview.DrawersOff;
+        if (!_desk.HasScreens) return SettingsNames.DrawersSortUnavailable;
+        if (_drawerReview.HoldsFileUndo) return DrawerReview.UndoFirst;   // before anything moves: the result bar would replace a sort's live Undo
+        var t = tidy ?? _drawers.Settings.Tidy;
+        if (_desk.Tidy(t, monitor) is not { } r) return DrawerReview.Busy;
+        if (r.Moved == 0) return DrawerReview.TidyNothing;
+        return _drawerReview.ShowResult(DrawerReview.Tidied(r.Moved), () => _desk.RestorePlaces(r.Changes));
     }
 
     private void OnTrayReadingChanged(TrayReading? reading)
@@ -1071,6 +1219,13 @@ public partial class App : Application
 
     private void ToggleWindow()
     {
+        // No setup yet (Not now, or still up): the tray's click brings back Set up Sanduhr, not the widget's first-run card. The tray's
+        // explicit Show item still shows the widget.
+        if (SetupLaunch.TrayClickOpensSetup(_vm?.SetupPending == true, _vm?.AccountStore.ListAccounts().Count > 0))   // streamer: key - a count, never drawn
+        {
+            OpenSetup(firstRun: true);
+            return;
+        }
         if (_window is null)
             return;
         if (_window.IsVisible)
@@ -1210,6 +1365,7 @@ public partial class App : Application
         if (_quitting)
             return;
         _quitting = true;
+        _chatWindow?.Close();   // its Preview and Use rules reach services that are about to be disposed
         Instance?.StopAnswering();
         // After a reset nothing may write settings.json, snapshot.json or history on the way out.
         // (QuitApp is also the normal quit; the guard is a no-op until a reset has run.)

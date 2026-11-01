@@ -181,6 +181,13 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
     /// <summary>Connected by the orchestrator: the same quit the tray's Quit runs. Null does nothing.</summary>
     public Action? QuitRequested { get; set; }
 
+    /// <summary>Set up Sanduhr at the top of General (setup spec, section 4); App opens the window.</summary>
+    public Action? SetupRequested { get; set; }
+
+    public string SetupTitle => SetupCopy.Title;
+
+    public ICommand OpenSetupCommand { get; }
+
     /// <summary>What the sidebar's Quit asks first (spec, General). The tray's Quit stays immediate: using the tray is an explicit act.</summary>
     public const string QuitQuestion = SettingsNames.QuitQuestion;
 
@@ -208,6 +215,7 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
         _widget = widget;
         ShowWhatsNewCommand = new RelayCommand(() => showWhatsNew?.Invoke());
         ShowTourCommand = new RelayCommand(() => showTour?.Invoke());
+        OpenSetupCommand = new RelayCommand(() => SetupRequested?.Invoke());
         AboutVersion = new AboutVersionViewModel(new SettingsStore(new Paths()));
         // About, Updates (slice 6): App's checker reads "update_check" from this same file; the Store build (StoreUpdateService's rule) shows its line instead.
         AboutUpdates = new AboutUpdatesViewModel(new SettingsStore(new Paths()), isStoreBuild ?? Sanduhr.Core.Startup.IsPackaged(), checkForUpdatesNow);

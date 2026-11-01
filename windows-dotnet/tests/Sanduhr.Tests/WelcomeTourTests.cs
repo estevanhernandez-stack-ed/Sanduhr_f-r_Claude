@@ -76,10 +76,10 @@ public class WelcomeTourTests
     }
 
     [Fact]
-    public void DeskOnly_IsThreeStepsEndingInSignIn()
+    public void DeskOnly_IsThreeStepsEndingInUsage()
     {
         var steps = WelcomeTour.Steps(None, WelcomeTour.DeskOnly);
-        Assert.Equal(new[] { new[] { "desk" }, ["tray"], ["sign-in"] }, Ids(steps));
+        Assert.Equal(new[] { new[] { "desk" }, ["tray"], ["usage"] }, Ids(steps));
         Assert.Equal([1, 2, 3], steps.Select(s => s[0].Step).ToArray());
         Assert.DoesNotContain(WelcomeTour.DeskOnly, c => c.Id is "paced" or "accounts" or "claude-code");
     }
@@ -97,20 +97,24 @@ public class WelcomeTourTests
     }
 
     [Fact]
-    public void DeskOnly_SignInCardOpensAccounts()
+    public void DeskOnly_UsageCardShowMeOpensTheSetupWindow()
     {
-        var card = WelcomeTour.DeskOnly.Single(c => c.Id == "sign-in");
-        Assert.Equal("Sign in any time", card.Card.Title);
-        Assert.Equal(SettingsPage.Accounts, card.Card.Destination);
-        Assert.Equal("Accounts", card.ShowMeTitle);
+        var card = WelcomeTour.DeskOnly.Single(c => c.Id == "usage");
+        Assert.Equal("Usage any time", card.Card.Title);
+        Assert.Equal(SettingsPage.General, card.Card.Destination);
+        Assert.Equal(SettingsIndex.GeneralSetup, card.Card.Anchor);
+        Assert.True(SettingsIndex.OpensSetup(new SettingsLink(card.Card.Destination, card.Card.Anchor)));   // Set up Sanduhr, not a Settings page or the widget
+        Assert.False(SettingsIndex.ShowsTheWidget(new SettingsLink(card.Card.Destination, card.Card.Anchor)));
+        Assert.Equal(SetupCopy.Title, card.ShowMeTitle);
+        Assert.Contains("Set up Sanduhr", card.Card.Body);
     }
 
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void StepsFor_JustTheDeskPicksTheDeskOnlyTour(bool signedIn)
+    public void StepsFor_DeskOnlyPicksTheDeskOnlyTour(bool signedIn)
     {
-        Assert.Equal(new[] { new[] { "desk" }, ["tray"], ["sign-in"] },
+        Assert.Equal(new[] { new[] { "desk" }, ["tray"], ["usage"] },
             Ids(WelcomeTour.StepsFor(true, None, signedIn)));
         Assert.Equal(Ids(WelcomeTour.Steps(None, signedIn: signedIn)),
             Ids(WelcomeTour.StepsFor(false, None, signedIn)));
@@ -124,12 +128,12 @@ public class WelcomeTourTests
     [InlineData(TourState.Finished, false, false)]
     [InlineData(TourState.Skipped, false, false)]
     [InlineData(TourState.NotOffered, false, false)]
-    public void ShowsForJustTheDesk_OnlyPendingOncePerLaunch(TourState state, bool offered, bool expected) =>
-        Assert.Equal(expected, WelcomeTour.ShowsForJustTheDesk(state, offered));
+    public void ShowsForDeskOnly_OnlyPendingOncePerLaunch(TourState state, bool offered, bool expected) =>
+        Assert.Equal(expected, WelcomeTour.ShowsForDeskOnly(state, offered));
 
     [Fact]
-    public void ShowsForJustTheDesk_NoStateIsNotOffered() =>
-        Assert.False(WelcomeTour.ShowsForJustTheDesk(null, false));
+    public void ShowsForDeskOnly_NoStateIsNotOffered() =>
+        Assert.False(WelcomeTour.ShowsForDeskOnly(null, false));
 
     [Fact]
     public void CopyIsShortAndPlain()

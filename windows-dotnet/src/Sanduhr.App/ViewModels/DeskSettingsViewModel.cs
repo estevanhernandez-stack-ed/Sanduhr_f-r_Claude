@@ -250,6 +250,13 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     /// <summary>The Arrange Desk… button was pressed (App begins Arrange mode on the desktop).</summary>
     public Action? ArrangeRequested { get; set; }
 
+    /// <summary>The Design it with an AI chat button was pressed (App opens the paste window).</summary>
+    public Action? DesignWithChatRequested { get; set; }
+
+    /// <summary>Opens Design it with an AI chat.</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void DesignWithChat() => DesignWithChatRequested?.Invoke();
+
     /// <summary>True while Arrange mode is up on the desktop (App sets it).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanArrange), nameof(ArrangeNote), nameof(NotArranging))]
@@ -262,11 +269,14 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     [ObservableProperty] private string? _arrangingLayout;
 
     /// <summary>The button is live while the Desk is on and no Arrange session runs.</summary>
-    public bool CanArrange => Enabled && !Arranging;
+    public bool CanArrange => Enabled && !Arranging && DesktopOn;
 
     /// <summary>The line under the button: why it is off, what Arrange mode is doing, or what it does.</summary>
     public string ArrangeNote => Arranging ? DeskArrangeCopy.SettingsArranging
-        : !Enabled ? DeskArrangeCopy.SettingsDeskOff : DeskArrangeCopy.SettingsNote;
+        : !Enabled ? DeskArrangeCopy.SettingsDeskOff
+        : !DesktopOn ? SetupCopy.ArrangeNeedsDesktop : DeskArrangeCopy.SettingsNote;
+
+    private bool DesktopOn => _store.LoadSetup()?.Desktop ?? true;
 
     /// <summary>Starts Arrange mode on the desktop.</summary>
     [CommunityToolkit.Mvvm.Input.RelayCommand]
@@ -282,6 +292,8 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         RefreshInkPresets();
         OnPropertyChanged(nameof(Layout));
         OnPropertyChanged(nameof(Settings));
+        OnPropertyChanged(nameof(CanArrange));
+        OnPropertyChanged(nameof(ArrangeNote));
     }
 
     /// <summary>The font packs changed (one switched, installed or removed): the Desk font list follows. The saved family stays listed, so the

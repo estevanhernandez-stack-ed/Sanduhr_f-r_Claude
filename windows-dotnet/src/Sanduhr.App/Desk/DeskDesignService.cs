@@ -63,7 +63,12 @@ internal sealed class DeskDesignService : IDisposable
     private sealed record Inputs(DeskDesign Current, IReadOnlyList<string> Fonts, WallpaperOverview? Overview, string? WallpaperPath, string? WallpaperSource, IReadOnlyList<StartMenuApp>? Apps, IReadOnlyList<DeskMonitorInfo> Monitors);
 
     /// <summary>The proposal being reviewed.</summary>
-    private sealed record Review(string Id, DeskDesign Proposal, IReadOnlyList<MissingFont> Fonts, IReadOnlyList<DeskReason> Warnings);
+    private sealed record Review(string Id, DeskDesign Proposal, IReadOnlyList<MissingFont> Fonts, IReadOnlyList<DeskReason> Warnings)
+    {
+        /// <summary>The design was pasted from an AI chat (<see cref="ProposePasted"/>): the bar names no product, and no result file is written.</summary>
+        public bool Pasted { get; init; }
+    }
+
 
     private readonly Paths _paths;
     private readonly SettingsStore _store;
@@ -358,13 +363,74 @@ internal sealed class DeskDesignService : IDisposable
             Warnings: verdict.Warnings.Count > 0 ? verdict.Warnings : null);
     }
 
+    /// <summary>
+    /// A design pasted from an AI chat (setup spec, section 3): the same checks, the same review bar and the same Apply as a
+    /// <c>propose_desk</c> design, with a heading that names no product. It always reviews ("Let Claude change the Desk directly" is for
+    /// the MCP's designs), it is never applied directly, and no result file is written for it. Undo is Put my Desk back, as for any design.
+    /// The verdict comes from <see cref="ValidatePasted"/>. UI thread.
+    /// </summary>
+    internal DeskAnswer ProposePasted(DeskValidation verdict)
+    {
+        try
+        {
+            if (_disposed) return DeskAnswer.NotReady;
+            verdict = PastedSetup.RefuseUndrawn(verdict);
+            if (ResetGuard.Done || verdict.Design is not { } proposal)
+                return verdict.Reasons.Count > 0 ? DeskAnswer.Refused(verdict.Reasons) : DeskAnswer.NotReady;
+            if (DrawersReviewing())
+                return new DeskAnswer(DeskAnswer.Rejected, "busy", [new DeskReason("design", "finish the drawers review on your Desk first")]);
+            if (Host is null) return DeskAnswer.NotReady;
+
+            // A Launcher image is a file Sanduhr stored; a paste cannot bring one, and one that went is not a design to apply.
+            var missingImages = DeskDesigns.MissingImages(proposal, _designs.ImageExists);
+            if (missingImages.Count > 0)
+                return DeskAnswer.Refused([new DeskReason("launcher", "names a Launcher image that is not on this PC: " + string.Join(", ", missingImages.Take(3)))]);
+
+            var current = CurrentDesign();
+            var changes = DeskDesign.Diff(current, DeskDesign.Merge(current, proposal), SettingsNames.DeskPieceName, MonitorName);
+            var fonts = verdict.Fonts.Where(f => !FontInstalled(f.Family)).ToList();
+            ReplaceReview();
+            _review = new Review("paste", proposal, fonts, verdict.Warnings) { Pasted = true };
+            ShowReview();
+            return new DeskAnswer(DeskAnswer.Previewing, Fonts: fonts.Count > 0 ? fonts : null, Changes: changes.Count > 0 ? changes : null,
+                Warnings: verdict.Warnings.Count > 0 ? verdict.Warnings : null);
+        }
+        catch (Exception e) when (IsRecoverable(e))
+        {
+            Log("pasted proposal", e);
+            return DeskAnswer.Refused([new DeskReason("design", "could not be shown (" + e.GetType().Name + "); nothing was changed")]);
+        }
+    }
+
+    /// <summary>The Desk's rules for a pasted design, with this PC's context: <see cref="DeskDesign.Validate(JsonNode?, DeskDesignContext)"/>
+    /// unchanged, then a refusal for a piece this Windows build does not draw (<see cref="PastedSetup.RefuseUndrawn"/>).</summary>
+    internal DeskValidation ValidatePasted(JsonNode design) => PastedSetup.RefuseUndrawn(DeskDesign.Validate(design, PasteContext()));
+
+    /// <summary>How long the paste window's check reuses what it read of this PC (fonts, wallpaper, Start menu, monitors). The check runs on
+    /// every edit of the paste box, and reading those on each keystroke would be work for nothing.</summary>
+    internal static readonly TimeSpan PasteContextLife = TimeSpan.FromSeconds(5);
+
+    private DeskDesignContext? _pasteContext;
+    private DateTimeOffset _pasteContextAt;
+
+    private DeskDesignContext PasteContext()
+    {
+        var now = Clock();
+        if (_pasteContext is null || now - _pasteContextAt > PasteContextLife || now < _pasteContextAt)
+        {
+            _pasteContext = Context();
+            _pasteContextAt = now;
+        }
+        return _pasteContext;
+    }
+
     /// <summary>A newer proposal takes the place of the one on the desktop: the older one is answered rejected.</summary>
     private void ReplaceReview()
     {
         if (_review is not { } old) return;
         _review = null;
         HostEnd();
-        Answer(old.Id, new DeskAnswer(DeskAnswer.Rejected, "replaced", [new DeskReason("design", "replaced by a newer proposal")]));
+        Answer(old, new DeskAnswer(DeskAnswer.Rejected, "replaced", [new DeskReason("design", "replaced by a newer proposal")]));
     }
 
     /// <summary>Draws the review now: the Desk and widget from memory, and the bar (built again when a font arrives).</summary>
@@ -375,6 +441,10 @@ internal sealed class DeskDesignService : IDisposable
         var merged = DeskDesign.Merge(current, r.Proposal);
         var desk = _store.LoadDesk();
         var model = DeskReviewModel.Build(r.Proposal, current, merged, r.Fonts, FontInstalled, desk.Enabled, SettingsNames.DeskPieceName, r.Warnings, MonitorName);
+        // A pasted design names no product: its own heading and bar name.
+        if (r.Pasted) model = model with { Heading = DeskReviewCopy.PastedHeading, BarName = DeskReviewCopy.PastedBarName };
+        // A nicer desktop is off in Set up Sanduhr: the design is still saved on Apply, and the bar says it will not draw yet.
+        if (_store.LoadSetup() is { Desktop: false }) model = model with { Warnings = [.. model.Warnings, SetupCopy.DesignDesktopOffNote] };
 
         var settings = DeskDesignApply.Settings(desk, _store.LoadDeskInk(), _store.LoadLauncher(), merged);
         // A font this PC lacks previews in the nearest installed look; the design keeps the family it asked for.
@@ -395,7 +465,7 @@ internal sealed class DeskDesignService : IDisposable
         if (_review is not { } r) return;
         _review = null;
         HostEnd();
-        Answer(r.Id, new DeskAnswer(DeskAnswer.Rejected, "dismissed", [new DeskReason("design", "dismissed by the user")]));
+        Answer(r, new DeskAnswer(DeskAnswer.Rejected, "dismissed", [new DeskReason("design", "dismissed by the user")]));
     }
 
     /// <summary>Apply (the button, or Enter): saves the Desk it replaces, writes the design, tells the caller. Waits while a font is missing.</summary>
@@ -406,15 +476,16 @@ internal sealed class DeskDesignService : IDisposable
         _review = null;
         var merged = DeskDesign.Merge(CurrentDesign(), r.Proposal);
         var changes = DeskDesign.Diff(CurrentDesign(), merged, SettingsNames.DeskPieceName, MonitorName);
-        var answer = ApplyDesign(r.Proposal, changes, r.Warnings);
+        var answer = ApplyDesign(r.Proposal, changes, r.Warnings, r.Pasted);
         HostEnd();   // the preview gives way to what was written
-        Answer(r.Id, answer);
+        Answer(r, answer);
     }
 
-    private void Answer(string id, DeskAnswer answer)
+    private void Answer(Review review, DeskAnswer answer)
     {
         if (_disposed || ResetGuard.Done) return;
-        Handoff.Answer(id, answer);
+        if (review.Pasted) return;   // a pasted design has no caller: no result file, whatever "Let Claude change the Desk directly" says
+        Handoff.Answer(review.Id, answer);
     }
 
     // -- applying and saved designs ------------------------------------------------------------------------
@@ -424,9 +495,9 @@ internal sealed class DeskDesignService : IDisposable
     /// "Before &lt;name&gt;"), then the layout, font, plate, ink, Launcher, theme and messages are written, the new look is saved
     /// under the design's name, and "Put my Desk back" is pointed at the saved previous Desk.
     /// </summary>
-    private DeskAnswer ApplyDesign(DeskDesign proposal, IReadOnlyList<string> changes, IReadOnlyList<DeskReason> warnings)
+    private DeskAnswer ApplyDesign(DeskDesign proposal, IReadOnlyList<string> changes, IReadOnlyList<DeskReason> warnings, bool pasted = false)
     {
-        try { return ApplyDesignCore(proposal, changes, warnings); }
+        try { return ApplyDesignCore(proposal, changes, warnings, pasted); }
         catch (Exception e) when (IsRecoverable(e))
         {
             Log("apply", e);
@@ -434,12 +505,15 @@ internal sealed class DeskDesignService : IDisposable
         }
     }
 
-    private DeskAnswer ApplyDesignCore(DeskDesign proposal, IReadOnlyList<string> changes, IReadOnlyList<DeskReason> warnings)
+    private DeskAnswer ApplyDesignCore(DeskDesign proposal, IReadOnlyList<string> changes, IReadOnlyList<DeskReason> warnings, bool pasted)
     {
+        // A design with no name is saved as "Claude's design" for the MCP's callers; one pasted from an AI chat names no product.
+        string? name = proposal.Name;
+        if (pasted && DeskDesigns.NormalizeName(name) is null) name = SetupCopy.ChatUntitledDesign;
         var before = CurrentDesign();
         var merged = DeskDesign.Merge(before, proposal);
         var warn = new List<DeskReason>(warnings);
-        var saved = SaveCurrentFirst(before, proposal.Name);
+        var saved = SaveCurrentFirst(before, name);
         if (saved is null)
             return DeskAnswer.Refused([new DeskReason("design", "the Desk it replaces could not be saved, so nothing was changed")]);
 
@@ -456,7 +530,7 @@ internal sealed class DeskDesignService : IDisposable
         }
 
         var after = CurrentDesign();
-        KeepApplied(after, proposal.Name);
+        KeepApplied(after, name);
         _store.SaveDeskPutBack(saved.Id);
         HostApplied(themeKey);
         AfterChange();

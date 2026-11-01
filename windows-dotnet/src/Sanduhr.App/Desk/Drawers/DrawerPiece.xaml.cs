@@ -48,6 +48,7 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         InitializeComponent();
         _state = state;
         _service = service;
+        Look = look;
         Tag = state.Word;
         FontFamily = look.Font;
         Resources["Drawer.Plate"] = Brush(look.Plate);
@@ -55,9 +56,15 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         Resources["Drawer.Accent"] = Brush(look.Accent);
         Resources["Drawer.Hover"] = Brush(Color.FromArgb(46, look.Accent.R, look.Accent.G, look.Accent.B));
         Resources["Drawer.Selected"] = Brush(Color.FromArgb(90, look.Accent.R, look.Accent.G, look.Accent.B));
-        Resources["Drawer.LabelEffect"] = StreamerMode.On ? Blur() : look.Shadow;   // streamer: masked - file labels blur while streamer mode is on
+        Resources["Drawer.LabelEffect"] = StreamerMode.On ? Blur() : look.LabelEffect;   // streamer: masked - file labels blur while streamer mode is on
+        Resources["Drawer.Border"] = Brush(look.Border);
+        Resources["Drawer.HoverBorder"] = Brush(look.HoverBorder);
+        Resources["Drawer.Edge"] = Brush(look.Edge);
+        Resources["Drawer.Chip"] = look.Chips ? Brush(Color.FromArgb(178, look.Plate.R, look.Plate.G, look.Plate.B)) : Brushes.Transparent;
+        Resources["Drawer.ChipPadding"] = look.Chips ? new Thickness(3, 1, 3, 1) : new Thickness(0);
         Frame.Width = FrameWidth;
         List.Height = ListHeight;
+        ApplyKind(look);
         if (Math.Abs(scale - 1) > 0.001) LayoutTransform = new ScaleTransform(scale, scale);
         List.ItemsSource = state.Items;
         foreach (var path in state.Selected)
@@ -72,6 +79,43 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
     }
 
     public DrawerState State => _state;
+
+    /// <summary>Told by the host once a Glass drawer's window has its blur: whether DWM rounded the window's corners. Where it did not
+    /// (Windows 10), the blur fills a square window, so the panel's corners go square to match.</summary>
+    internal void SetGlassCorners(bool rounded)
+    {
+        if (rounded) return;
+        Frame.CornerRadius = new CornerRadius(0);
+        EdgeLine.CornerRadius = new CornerRadius(0);
+    }
+
+    /// <summary>The look this piece was drawn with.</summary>
+    internal DrawerLook Look { get; }
+
+    /// <summary>What the look changes beyond brushes: Glass's corners match DWM's round corner (the blur is clipped to it; see
+    /// <see cref="SetGlassCorners"/>); Outline and Bare draw a 1 px border, taken out of the padding so the piece is the same size in every
+    /// look; Bare's title is smaller; Outline and Bare have no plate behind the title, so it carries the ink's shadow as the labels do; a
+    /// chip on the title keeps its own padding in place of the title's margin.</summary>
+    private void ApplyKind(DrawerLook look)
+    {
+        if (look.Kind == DrawerLookKind.Glass)
+        {
+            Frame.CornerRadius = new CornerRadius(8);
+            EdgeLine.CornerRadius = new CornerRadius(8);
+        }
+        if (look.Kind is DrawerLookKind.Outline or DrawerLookKind.Bare)
+        {
+            Frame.BorderThickness = new Thickness(1);
+            Frame.Padding = new Thickness(7);
+        }
+        if (look.Kind == DrawerLookKind.Bare) TitleText.FontSize = 11;
+        if (look.Kind is DrawerLookKind.Outline or DrawerLookKind.Bare) TitleText.Effect = StreamerMode.On ? null : look.LabelShadow;
+        if (look.Chips)
+        {
+            TitleChip.Margin = new Thickness(0, 0, 0, 0);
+            TitleChip.Padding = new Thickness(6, 1, 6, 1);
+        }
+    }
 
     private void Show()
     {
@@ -112,7 +156,8 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         return b;
     }
 
-    private const int RenameId = ShellMenu.OwnFirst, FoldId = ShellMenu.OwnFirst + 1, HideId = ShellMenu.OwnFirst + 2, SettingsId = ShellMenu.OwnFirst + 3;
+    internal const int RenameId = ShellMenu.OwnFirst, FoldId = ShellMenu.OwnFirst + 1, HideId = ShellMenu.OwnFirst + 2, SettingsId = ShellMenu.OwnFirst + 3,
+        LookId = ShellMenu.OwnFirst + 4, LookSameId = ShellMenu.OwnFirst + 5, TidyId = ShellMenu.OwnFirst + 6, LookFirstId = ShellMenu.OwnFirst + 7;
     private Point _dragStart;
     private DrawerItem? _pressed;
     private DrawerItem? _editing;
@@ -186,6 +231,7 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         EndMove();
         _title = (cursor, window, offset);
         _lastCursor = cursor;
+        _snapLatch = true;
     }
 
     /// <summary>The mouse moved with the title pressed: past the system's drag distance the drawer's own window follows it (no size, no
@@ -201,14 +247,34 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
             _moving = true;
             _moveHold ??= _service.Hold();
         }
-        if (Handle is var h && h != IntPtr.Zero) DeskNative.MoveTo(h, WindowAt(t, cursor));
+        _snapLatch = Snaps;
+        if (Handle is var h && h != IntPtr.Zero) DeskNative.MoveTo(h, SnappedWindowAt(t, cursor));
+    }
+
+    /// <summary>Whether Alt is down; a seam for tests (the real key state is read whichever window is active).</summary>
+    internal Func<bool> AltDown { get; set; } = DeskNative.AltDown;
+
+    /// <summary>Whether this move snaps: the setting is on and Alt is not held (Alt places the drawer exactly where the hand puts it).</summary>
+    private bool Snaps => _service.Settings.Snap && !AltDown();
+
+    /// <summary>The last move's decision to snap. The drop uses it, so the Desk saves what the hand last saw even if Alt changed on release.</summary>
+    private bool _snapLatch = true;
+
+    /// <summary>The window's top-left for the cursor, pulled to the nearest snap when snapping: the Desk answers for the piece's top-left (the
+    /// panel, not the window around it), so the offset of the piece inside its window is taken off again.</summary>
+    private PxPoint SnappedWindowAt((PxPoint Cursor, PxPoint Window, PxPoint Offset) t, PxPoint cursor)
+    {
+        var w = WindowAt(t, cursor);
+        if (!Snaps || _service.Snapper is not { } snapper) return w;
+        var top = snapper(_state.Def.Id, new PxPoint(w.X + t.Offset.X, w.Y + t.Offset.Y));
+        return new PxPoint(top.X - t.Offset.X, top.Y - t.Offset.Y);
     }
 
     /// <summary>The title was let go: after a move the Desk is asked to keep the drawer where it was dropped; without one, it folds or opens.</summary>
     internal void TitleUp(PxPoint cursor)
     {
         if (_title is not { } t) return;
-        TitleMove(cursor);
+        if (cursor != _lastCursor) TitleMove(cursor);   // a release where the last move already was changes nothing, Alt included
         bool moved = _moving;
         if (moved) Place(t, cursor);
         else
@@ -234,7 +300,7 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         _moveHold = null;
         EndMove();
         // The request lands while the hold still stands, so the Desk draws the drawer once, at its new place, when the hold is released.
-        try { _service.RequestPlace(_state.Def.Id, new PxPoint(w.X + t.Offset.X, w.Y + t.Offset.Y)); }
+        try { _service.RequestPlace(_state.Def.Id, new PxPoint(w.X + t.Offset.X, w.Y + t.Offset.Y), _snapLatch); }
         finally { hold?.Dispose(); }
     }
 
@@ -347,6 +413,8 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
             new(RenameId, DrawerPieceCopy.RenameDrawer),
             new(FoldId, _state.Folded ? DrawerPieceCopy.Open : DrawerPieceCopy.Fold),
             new(HideId, DrawerPieceCopy.Hide),
+            LookMenu(_service.Settings, _state.Def.Id),
+            new(TidyId, SettingsNames.DrawersTidy),
             new(SettingsId, DrawerPieceCopy.Settings),
         ];
         ShellMenuChoice? choice;
@@ -359,8 +427,33 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
             case FoldId: _service.SetFolded(_state.Def.Id, !_state.Folded); break;
             case HideId: _service.Hide(_state.Def.Id); break;
             case SettingsId: _service.RequestSettings(); break;
+            case TidyId: if (_service.RequestTidy(_state.Def.Id) is { } line) Say(line); break;
+            case LookSameId: SetLook(null); break;
+            case >= LookFirstId when choice.Own.Value - LookFirstId <= (int)DrawerLookKind.Bare:
+                SetLook((DrawerLookKind)(choice.Own.Value - LookFirstId)); break;
         }
     }
+
+    /// <summary>"Look" with "Same as the others" and the four looks under it, the drawer's own pick checked.</summary>
+    internal static ShellMenuItem LookMenu(DrawerSettings settings, string id)
+    {
+        DrawerLookKind? current = settings.Looks.TryGetValue(id, out var own) ? own : null;
+        var items = new List<ShellMenuItem> { new(LookSameId, SettingsNames.DrawerLookSame, Checked: current is null) };
+        foreach (var kind in Enum.GetValues<DrawerLookKind>())
+            items.Add(new(LookFirstId + (int)kind, SettingsNames.DrawersLookWords[(int)kind], Checked: current == kind));
+        return new ShellMenuItem(LookId, SettingsNames.DrawerLookMenu, Children: items);
+    }
+
+    /// <summary>The looks after a drawer is given its own (<paramref name="kind"/>) or taken back to the shared one (null); the other drawers' stay.</summary>
+    internal static IReadOnlyDictionary<string, DrawerLookKind> LooksWith(DrawerSettings settings, string id, DrawerLookKind? kind)
+    {
+        var looks = new Dictionary<string, DrawerLookKind>(settings.Looks, StringComparer.Ordinal);
+        if (kind is { } k) looks[id] = k; else looks.Remove(id);
+        return looks;
+    }
+
+    private void SetLook(DrawerLookKind? kind) =>
+        _service.Save(_service.Settings with { Looks = LooksWith(_service.Settings, _state.Def.Id, kind) });
 
     private void RenameDrawer()
     {
@@ -450,17 +543,17 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         Status.Text = line;
         AutomationProperties.SetName(Status, line);   // streamer: notname - a rename error or the drop line, which Say(DrawerRun) already cut to counts while streamer mode is on
         Status.Visibility = Visibility.Visible;
-        _statusTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
-        _statusTimer.Stop();
-        _statusTimer.Tick += Hide;
-        _statusTimer.Start();
-
-        void Hide(object? s, EventArgs a)
+        if (_statusTimer is null)
         {
-            _statusTimer!.Tick -= Hide;
-            _statusTimer.Stop();
-            Status.Visibility = Visibility.Collapsed;
+            _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+            _statusTimer.Tick += (_, _) =>
+            {
+                _statusTimer.Stop();
+                Status.Visibility = Visibility.Collapsed;
+            };
         }
+        _statusTimer.Stop();
+        _statusTimer.Start();
     }
 
     public void Dispose()

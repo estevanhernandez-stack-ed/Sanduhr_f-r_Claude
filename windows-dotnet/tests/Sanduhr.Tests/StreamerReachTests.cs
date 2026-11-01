@@ -116,7 +116,7 @@ public class StreamerReachTests
     /// shared by neighbouring lines counts once per line.</summary>
     private static readonly (string File, string Id, int Count)[] Known =
     [
-        ("Sanduhr.App/App.xaml.cs", "key", 7),
+        ("Sanduhr.App/App.xaml.cs", "key", 8),
         ("Sanduhr.App/App.xaml.cs", "masked", 2),
         ("Sanduhr.App/App.xaml.cs", "notname", 4),
         ("Sanduhr.App/Desk/DeskArrangeMode.cs", "notname", 3),
@@ -157,6 +157,7 @@ public class StreamerReachTests
         ("Sanduhr.App/Services/LauncherImages.cs", "notname", 1),
         ("Sanduhr.App/Services/ResetService.cs", "key", 1),
         ("Sanduhr.App/Services/ResetService.cs", "notname", 5),   // slice 8: the per-kind keep reads a leaf
+        ("Sanduhr.App/Services/SetupService.cs", "key", 1),
         ("Sanduhr.App/Services/SignInCoordinator.cs", "key", 7),
         ("Sanduhr.App/Services/SignInCoordinator.cs", "masked", 2),
         ("Sanduhr.App/Services/SingleInstance.cs", "notname", 2),
@@ -216,9 +217,9 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/TierCardViewModel.cs", "notname", 1),
         ("Sanduhr.App/ViewModels/WelcomeTourViewModel.cs", "masked", 1),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "cant", 4),
-        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "key", 18),
+        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "key", 19),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "masked", 3),
-        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "notname", 18),
+        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "notname", 19),
         ("Sanduhr.App/Views/DeskLayoutMap.cs", "notname", 1),
         ("Sanduhr.App/Views/DrawersPage.xaml.cs", "notname", 1),   // Drawers (plan 2, Task 11): the folder picker's result, used for IO
         ("Sanduhr.App/Views/IntegrationConsentDialog.xaml.cs", "notname", 1),

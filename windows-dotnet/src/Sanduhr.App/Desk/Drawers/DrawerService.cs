@@ -115,6 +115,17 @@ internal sealed class DrawerService : IDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>Saves drawers' settings and the Desk's in one write (see <see cref="SettingsStore.SaveDrawersAndDesk"/>) and follows them.</summary>
+    public void Save(DrawerSettings next, DeskSettings? desk)
+    {
+        _store.SaveDrawersAndDesk(next, desk);
+        Reload();
+        Changed?.Invoke();
+    }
+
+    /// <summary>The service was disposed (the app is quitting): nothing should use it.</summary>
+    public bool IsDisposed => _disposed;
+
     private void Refresh(DrawerState state)
     {
         bool wasMissing = state.Missing;
@@ -244,6 +255,12 @@ internal sealed class DrawerService : IDisposable
 
     public void RequestSettings() => SettingsRequested?.Invoke();
 
+    /// <summary>Set by the app while it runs: "Tidy drawers" from a drawer's menu tidies the monitor that drawer is on. Takes the drawer's id;
+    /// returns null when the drawers bar opened, else the line to show (a review is open, drawers are off). Null with no app.</summary>
+    public Func<string, string?>? TidyRequested { get; set; }
+
+    public string? RequestTidy(string id) => TidyRequested?.Invoke(id);
+
     /// <summary>The user's drop (spec section 1): no review, one journal entry. Items already in the drawer are left alone; a Public
     /// Desktop item is named and skipped.</summary>
     public DrawerRun MoveIn(IReadOnlyList<string> paths, string id)
@@ -338,10 +355,11 @@ internal sealed class DrawerService : IDisposable
         return result;
     }
 
-    /// <summary>The settings with these drawers' places, hidden words and folds cleared.</summary>
+    /// <summary>The settings with these drawers' places, looks, hidden words and folds cleared.</summary>
     private static DrawerSettings Without(DrawerSettings s, IReadOnlyCollection<string> ids) => s with
     {
         Places = s.Places.Where(kv => !ids.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal),
+        Looks = s.Looks.Where(kv => !ids.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal),
         Hidden = [.. s.Hidden.Where(h => !ids.Contains(h))],
         Folded = [.. s.Folded.Where(f => !ids.Contains(f))],
     };
@@ -376,11 +394,16 @@ internal sealed class DrawerService : IDisposable
         Save(Settings with { Hidden = [] });
     }
 
-    /// <summary>A drawer was dragged by its title and let go with its top-left at this point, in screen pixels. The Desk knows the screens,
-    /// so it turns the point into a place and calls <see cref="SetPlace"/>.</summary>
-    public event Action<string, PxPoint>? PlaceRequested;
+    /// <summary>A drawer was dragged by its title and let go with its top-left at this point, in screen pixels; the flag is whether it may
+    /// snap (false when the person held Alt). The Desk knows the screens, so it turns the point into a place, snaps it and keeps it off the
+    /// desktop icons as the settings ask, and calls <see cref="SetPlace"/>.</summary>
+    public event Action<string, PxPoint, bool>? PlaceRequested;
 
-    public void RequestPlace(string id, PxPoint topLeft) => PlaceRequested?.Invoke(id, topLeft);
+    public void RequestPlace(string id, PxPoint topLeft, bool snap = true) => PlaceRequested?.Invoke(id, topLeft, snap);
+
+    /// <summary>Set by the Desk while it runs: the drawer id and the top-left a drag proposes (screen pixels) in, the snapped top-left out.
+    /// Live while the drawer is moving, so it snaps only; keeping clear of the icons waits for the drop. Null with no Desk.</summary>
+    public Func<string, PxPoint, PxPoint>? Snapper { get; set; }
 
     /// <summary>Saves where a drawer sits after the user moved it.</summary>
     public void SetPlace(string id, DrawerPlace place) =>
@@ -479,6 +502,8 @@ internal sealed class DrawerService : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        Snapper = null;
+        TidyRequested = null;
         _debounce.Stop();
         foreach (var w in _watchers.Values) w.Dispose();
         _watchers.Clear();

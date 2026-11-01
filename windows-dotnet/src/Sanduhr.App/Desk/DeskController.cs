@@ -100,6 +100,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             _drawers.Changed += OnDrawersChanged;
             _drawers.BusyEnded += OnDrawersBusyEnded;
             _drawers.PlaceRequested += OnPlaceRequested;
+            _drawers.Snapper = SnapLive;
         }
         _companion = companion ?? (paths is null ? null : new CompanionService(paths, store));
         if (_companion is not null) _companion.Changed += OnCompanionChanged;
@@ -374,7 +375,11 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     public void Reload()
     {
         if (_stopped) return;
+        ClearIcons();
         _settings = _store.LoadDesk();
+        _desktopShown = _store.LoadSetup()?.Desktop ?? true;
+        // Desktop went off under a running Arrange: end it as Cancel (nothing saved); a design under review already ended it.
+        if (!_desktopShown && Arranging && _preview is null) EndArrangeCore(DeskArrangeEnd.Cancel, reload: false);
         _ink = _store.LoadDeskInk();
         _np = _store.LoadNowPlaying();
         _nowPlaying.Configure(_np.Prefs);
@@ -421,11 +426,12 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// Draws a design under review (the live review): the layout, font, plate, ink and Launcher in <paramref name="design"/> replace the
     /// saved ones on every screen until <see cref="EndPreview"/>. Nothing is saved; Arrange mode, if it runs, ends as Cancel.
     /// </summary>
-    public void ShowPreview(DeskDesignSettings design)
+    public void ShowPreview(DeskDesignSettings design, bool full = true)
     {
         if (_stopped) return;
         if (Arranging) EndArrangeCore(DeskArrangeEnd.Cancel, reload: false);
         _preview = design;
+        _previewFull = full;
         Reload();
     }
 
@@ -446,6 +452,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         if (_preview is null) return;
         _preview = null;
+        _previewFull = true;
         Reload();
     }
 
@@ -484,6 +491,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             _drawers.Changed -= OnDrawersChanged;
             _drawers.BusyEnded -= OnDrawersBusyEnded;
             _drawers.PlaceRequested -= OnPlaceRequested;
+            _drawers.Snapper = null;
         }
         StopHost();
         _oled.DriftStepped -= ApplyDrift;
@@ -536,6 +544,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         // Not tied to Running: a Desk that is on but draws nothing yet (an empty message, no numbers) can
         // still be arranged, since arrange mode draws every placed piece.
         if (_host is null || _stopped || Arranging || _screens.Count == 0) return;
+        if (!_desktopShown) return;   // nothing to arrange; drawers move by their titles, and a filtered layout is never saved
         _fonts ??= _paths is null ? new DeskFonts() : DeskFonts.ForThisPc(_paths);
         var session = new DeskArrangeSession(_settings.Layout);
         var now = DateTimeOffset.Now;
@@ -624,6 +633,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private void OnScreensChanged()
     {
         _wallpaper.Invalidate();
+        ClearIcons();   // Explorer restarting and a monitor change both land here: the icons are read again
         // The arrange windows sit on the old monitors: drop the edit and lay out on the new ones.
         if (Arranging) EndArrangeCore(DeskArrangeEnd.Cancel, reload: false);
         Rebuild();
@@ -647,9 +657,25 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// <summary>The layout string of the pieces drawn on one screen: those on every monitor and those placed on this one
     /// (<see cref="DeskArrangement.ForScreen"/>). The saved layout is never changed by this.</summary>
     private string LayoutFor(DeskScreen screen) =>
-        new DeskArrangement(_settings.Layout).ForScreen(screen.Ref, ConnectedIds).Layout;
+        SetupDesk.Layout(new DeskArrangement(_settings.Layout).ForScreen(screen.Ref, ConnectedIds).Layout, DrawsDesktop);
 
-    private bool Placed(string widget) => new DeskArrangement(_settings.Layout).Placement(widget) is not null;
+    private bool Placed(string widget) =>
+        SetupDesk.Shows(widget, DrawsDesktop) && new DeskArrangement(_settings.Layout).Placement(widget) is not null;
+
+    private bool _desktopShown = true;
+
+    /// <summary>"A nicer desktop" is on: the Desk draws its own pieces, not only drawers (setup spec, section 1).</summary>
+    public bool DesktopShown => _desktopShown;
+
+    /// <summary>The Desk's own pieces are drawn: desktop is on, or a design is under review (shown in full, never saved). The filter
+    /// lives only in <see cref="LayoutFor"/> and <see cref="Placed"/>; the saved layout is never written filtered.</summary>
+    private bool DrawsDesktop => _desktopShown || (_preview is not null && _previewFull);
+
+    /// <summary>The preview shows the Desk's own pieces too: a design or a widget look under review does; a drawers review (full: false) shows
+    /// only drawers while desktop is off.</summary>
+    private bool _previewFull = true;
+
+    internal bool IsPlaced(string widget) => Placed(widget);
 
     /// <summary>A widget's reading is wanted when its piece is placed and at least one island holding it
     /// is in sight. With no islands yet nothing is paused, so it is wanted (S7, 7.1).</summary>
@@ -787,13 +813,250 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// <summary>A drawer was dragged by its title and let go: its top-left, in screen pixels, becomes a place on the screen holding it,
     /// clamped to that screen's work area, and saved (the save redraws the Desk). A drawer only a plan under review would create, or a drop
     /// on a screen Windows would not name, saves nothing: the Desk draws the drawer back where it was.</summary>
-    private void OnPlaceRequested(string id, PxPoint topLeft)
+    private void OnPlaceRequested(string id, PxPoint topLeft, bool snap)
     {
         if (_stopped || _drawers is null || _screens.Count == 0) return;
-        if (_drawers.Settings.Drawers.Any(d => d.Id == id) && DrawerScreens.ToPlace(topLeft, _screens) is { } place)
-            _drawers.SetPlace(id, place);
-        else
+        if (!_drawers.Settings.Drawers.Any(d => d.Id == id) || DrawerScreens.ToPlace(topLeft, _screens) is not { } place)
+        {
             Render();   // waits for the move's hold, then puts the window back
+            return;
+        }
+        var settings = _drawers.Settings;
+        var screen = DrawerScreens.Find(place.Monitor, _screens)!;
+        ClearIcons();   // the person may have moved an icon since the last reading: a drop reads them fresh, once, for the snap and the lane
+        var rect = DrawerRectOf(id, place);
+        // Snap first (unless Alt was held or snapping is off), then keep clear of the icons: when the two disagree the icons win, and the
+        // drawer still ends on screen (DrawerIconArea.NearestFree keeps it there).
+        if (snap && settings.Snap) rect = DrawerSnap.Snap(rect, WorkRect(screen), OtherDrawers(id, screen), PieceRects(screen));
+        if (settings.KeepClear) rect = DrawerIconArea.NearestFree(rect, WorkRect(screen), IconArea(screen));
+        _drawers.SetPlace(id, place with { X = rect.X, Y = rect.Y });
+    }
+
+    /// <summary>What <see cref="DrawerService.Snapper"/> answers while a drawer is dragged: the proposed top-left (screen pixels) snapped to the
+    /// other drawers, the Desk's pieces, the screen's margin and the grid, as a top-left in screen pixels again. Never keeps clear of the icons
+    /// (that waits for the drop); a point it cannot place is handed back as it came.</summary>
+    private PxPoint SnapLive(string id, PxPoint proposed)
+    {
+        if (_stopped || _drawers is not { } service || _screens.Count == 0 || !service.Settings.Snap) return proposed;
+        if (DrawerScreens.ToPlace(proposed, _screens) is not { } place) return proposed;
+        var screen = DrawerScreens.Find(place.Monitor, _screens)!;
+        var snapped = DrawerSnap.Snap(DrawerRectOf(id, place), WorkRect(screen), OtherDrawers(id, screen), PieceRects(screen));
+        return DrawerScreens.WorkToPx(snapped.X, snapped.Y, screen);
+    }
+
+    /// <summary>A screen's work area as the rectangle placement rules measure in: its work DIPs, from the origin.</summary>
+    private static DrawerRect WorkRect(DeskScreen screen)
+    {
+        var work = DrawerScreens.WorkDips(screen);
+        return new DrawerRect(0, 0, work.Width, work.Height);
+    }
+
+    private DrawerRect DrawerRectOf(string id, DrawerPlace place) =>
+        new(place.X, place.Y, DrawerPlacement.Width, DrawerPlacement.Height(_drawers?.Get(id)?.Folded == true));
+
+    /// <summary>The other drawn drawers that sit on <paramref name="screen"/>, as the rectangles they are drawn at (clamped like the Desk clamps them).</summary>
+    private List<DrawerRect> OtherDrawers(string id, DeskScreen screen)
+    {
+        var work = DrawerScreens.WorkDips(screen);
+        return [.. DrawerPlacesNow()
+            .Where(p => p.State.Def.Id != id && ReferenceEquals(DrawerScreens.Find(p.Place.Monitor, _screens), screen))
+            .Select(p =>
+            {
+                var c = DrawerPlacement.Clamp(p.Place, work.Width, work.Height);
+                return new DrawerRect(c.X, c.Y, DrawerPlacement.Width, DrawerPlacement.Height(p.State.Folded));
+            })];
+    }
+
+    // ---- Tidy drawers ----
+
+    /// <summary>Whether a review is open that Tidy must not rearrange under (look and placement spec, section 3): a drawers review, a Desk
+    /// design review or a widget review. A result bar with no review behind it (a sort's, a Tidy's or a chat's) does not hold Tidy off: Tidy
+    /// replaces it, as a sort does. A seam for tests.</summary>
+    internal Func<bool> TidyBusy { get; set; } = () =>
+        DrawerReviewService.Current is { Reviewing: true }
+        || DeskDesignService.Current?.Reviewing == true || WidgetReviewService.Current?.Reviewing == true;
+
+    /// <summary>
+    /// Tidy drawers on one monitor (look and placement spec, section 2): every drawer drawn there lines up from <paramref name="tidy"/>'s
+    /// corner in its current order, off the desktop icons (when they are kept clear) and the Desk's pieces. A drawer that fits nowhere is left
+    /// out and keeps its place, and the drawers that did fit never land on it. <paramref name="monitor"/> is the monitor word of the
+    /// drawer whose menu asked, else the main monitor. Moves panels only, never a file. Returns null while a review is open (nothing moved),
+    /// else how many drawers moved and, for each drawer Tidy wrote a place for, the place it was drawn at before and the place written,
+    /// for <see cref="RestorePlaces"/>.
+    /// </summary>
+    internal (int Moved, IReadOnlyDictionary<string, TidyChange> Changes)? Tidy(DrawerTidy tidy, string? monitor)
+    {
+        if (_stopped || _drawers is not { } service) return null;
+        if (TidyBusy()) return null;
+        var before = new Dictionary<string, DrawerPlace>(service.Settings.Places, StringComparer.Ordinal);
+        if (_screens.Count == 0) return (0, new Dictionary<string, TidyChange>());
+        var screen = DrawerScreens.Find(monitor ?? DeskMonitors.Main, _screens)!;
+        if (!screen.Primary && screen.Id is null) screen = DrawerScreens.Primary(_screens);
+        string mon = screen.Primary ? DeskMonitors.Main : screen.Id!;
+        var work = WorkRect(screen);
+
+        ClearIcons();   // the person may have moved an icon since the last reading
+        var here = DrawerPlacesNow().Where(p => ReferenceEquals(DrawerScreens.Find(p.Place.Monitor, _screens), screen)).ToList();
+        var now = new Dictionary<string, DrawerRect>(StringComparer.Ordinal);
+        var drawn = new Dictionary<string, DrawerPlace>(StringComparer.Ordinal);   // where each is drawn now, on the monitor it is drawn on
+        foreach (var (state, place) in here)
+        {
+            var c = DrawerPlacement.Clamp(place, work.W, work.H);
+            now[state.Def.Id] = new DrawerRect(c.X, c.Y, DrawerPlacement.Width, DrawerPlacement.Height(state.Folded));
+            drawn[state.Def.Id] = c;
+        }
+        var order = DrawerTidyPlan.Order(now, work, tidy.Corner);
+        var ordered = order.Select(id => (id, now[id].H)).ToList();
+
+        var fixedBlocks = new List<DrawerRect>();
+        if (service.Settings.KeepClear) fixedBlocks.AddRange(IconArea(screen));
+        fixedBlocks.AddRange(PieceRects(screen));
+        // A drawer with no room keeps its place, so the others must not land on it: leave it out, block its rectangle, and place the rest
+        // again (it only ever grows the set, so this ends within one pass per drawer).
+        var leftOut = new HashSet<string>(StringComparer.Ordinal);
+        IReadOnlyDictionary<string, DrawerRect> slots;
+        while (true)
+        {
+            var blocked = new List<DrawerRect>(fixedBlocks);
+            blocked.AddRange(leftOut.Select(id => now[id]));
+            slots = DrawerTidyPlan.Slots([.. ordered.Where(o => !leftOut.Contains(o.id))], work, tidy, blocked);
+            var more = order.Where(id => !leftOut.Contains(id) && !slots.ContainsKey(id)).ToList();
+            if (more.Count == 0) break;
+            leftOut.UnionWith(more);
+        }
+
+        var next = new Dictionary<string, DrawerPlace>(before, StringComparer.Ordinal);
+        var changes = new Dictionary<string, TidyChange>(StringComparer.Ordinal);
+        int moved = 0;
+        foreach (var id in order)
+        {
+            DrawerPlace written;
+            if (slots.TryGetValue(id, out var r))
+            {
+                if (Math.Abs(now[id].X - r.X) > 0.5 || Math.Abs(now[id].Y - r.Y) > 0.5) moved++;
+                written = new DrawerPlace(mon, r.X, r.Y);
+            }
+            else if (!next.ContainsKey(id))
+                written = drawn[id];   // arrived without a saved place and has none to keep: freeze where it is drawn
+            else
+                continue;              // left out with a saved place: it keeps it, and Undo has nothing to put back
+            // A drawer with no saved place is put back where it was drawn, not to "no place": its arrival slot moves with Tidy's corner.
+            changes[id] = new TidyChange(before.TryGetValue(id, out var saved) ? saved : drawn[id], written);
+            next[id] = written;
+        }
+        service.Save(service.Settings with { Places = next, Tidy = tidy });
+        return (moved, changes);
+    }
+
+    /// <summary>The monitor word of the screen a drawer is drawn on now (what <see cref="Tidy"/> takes), or null when it is not drawn.</summary>
+    internal string? MonitorOf(string drawerId) =>
+        DrawerPlacesNow().FirstOrDefault(p => p.State.Def.Id == drawerId) is { Place: { } place } ? place.Monitor : null;
+
+    /// <summary>A drawer's place before a Tidy and the place Tidy wrote for it.</summary>
+    internal readonly record struct TidyChange(DrawerPlace Before, DrawerPlace Written);
+
+    /// <summary>Tidy's Undo: puts back the places Tidy wrote, and only those. A drawer the user dragged since (its place is no longer what
+    /// Tidy wrote) or removed since keeps what it has; nothing else is touched.</summary>
+    internal void RestorePlaces(IReadOnlyDictionary<string, TidyChange> changes)
+    {
+        if (_stopped || _drawers is not { } service) return;
+        var settings = service.Settings;
+        var next = new Dictionary<string, DrawerPlace>(settings.Places, StringComparer.Ordinal);
+        foreach (var (id, change) in changes)
+            if (settings.Drawers.Any(d => d.Id == id) && next.TryGetValue(id, out var now) && now == change.Written)
+                next[id] = change.Before;
+        service.Save(settings with { Places = next });
+    }
+
+    /// <summary>The Desk has screens to place drawers on.</summary>
+    internal bool HasScreens => _screens.Count > 0;
+
+    internal IReadOnlyList<DrawerRect> PieceRects(DeskScreen screen) =>
+        _pieceRects.TryGetValue(screen.Device, out var rects) ? rects : [];
+
+    // ---- the desktop icons, as an area drawers keep clear of ----
+
+    /// <summary>Reads the desktop icons' rectangles in physical screen pixels; null when the Shell does not answer. A seam for tests.</summary>
+    internal Func<IReadOnlyList<PxRect>?> IconReader { get; set; } = DefaultIconReader;
+
+    /// <summary>What a new controller reads icons with: the Shell. The test assembly turns the Shell off for every controller it builds.</summary>
+    internal static Func<IReadOnlyList<PxRect>?> DefaultIconReader { get; set; } = DesktopIcons.Read;
+
+    /// <summary>What a new controller reads the icon cell with: the Shell (see <see cref="DefaultIconReader"/>).</summary>
+    internal static Func<(int Count, PxPoint Cell)?> DefaultSpacingReader { get; set; } = DesktopIcons.Spacing;
+
+    /// <summary>The desktop's item count and icon cell, in physical pixels, for the fallback columns; null when the Shell does not answer. A seam for tests.</summary>
+    internal Func<(int Count, PxPoint Cell)?> SpacingReader { get; set; } = DefaultSpacingReader;
+
+    /// <summary>When set, the icon area of every screen, in work DIPs, in place of any reading. A seam for tests.</summary>
+    internal IReadOnlyList<DrawerRect>? IconAreaOverride { get; set; }
+
+    /// <summary>The screens the Desk has now, for tests.</summary>
+    internal IReadOnlyList<DeskScreen> ScreensForTests => _screens;
+
+    private readonly Dictionary<string, IReadOnlyList<DrawerRect>> _iconArea = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IReadOnlyList<DrawerRect>> _pieceRects = new(StringComparer.Ordinal);
+    private bool _iconsRead;
+    private IReadOnlyList<PxRect>? _iconRects;
+
+    private void ClearIcons()
+    {
+        _iconArea.Clear();
+        _iconsRead = false;
+        _iconRects = null;
+    }
+
+    /// <summary>The area the desktop icons take on <paramref name="screen"/>, in that screen's work DIPs, each icon grown by the drawer gap:
+    /// read through the Shell once and cached until the screens change, a drawer is dropped or the Desk reloads; when the Shell does not
+    /// answer (or the reader throws), the left-hand columns Windows fills by default, on the primary screen only. Never throws.</summary>
+    internal IReadOnlyList<DrawerRect> IconArea(DeskScreen screen)
+    {
+        if (IconAreaOverride is { } fixedArea) return fixedArea;
+        if (_iconArea.TryGetValue(screen.Device, out var cached)) return cached;
+        IReadOnlyList<DrawerRect> area;
+        try
+        {
+            if (!_iconsRead)
+            {
+                _iconRects = IconReader();
+                _iconsRead = true;
+            }
+            area = _iconRects is null
+                ? Fallback(screen)
+                : DrawerIconArea.From([.. _iconRects.Select(r => DrawerScreens.ClipToScreen(r, screen)).OfType<PxRect>()
+                    .Select(r => DrawerScreens.PxToWork(r, screen))], DrawerPlacement.Gap);
+        }
+        catch (Exception)
+        {
+            _iconsRead = true;   // a reader that throws is not asked again until the next invalidation
+            area = Fallback(screen);
+        }
+        _iconArea[screen.Device] = area;
+        return area;
+    }
+
+    /// <summary>Windows fills icons down the primary screen's left edge: as many columns as the desktop's items need. Other screens: none.</summary>
+    private IReadOnlyList<DrawerRect> Fallback(DeskScreen screen)
+    {
+        if (!screen.Primary) return [];
+        try
+        {
+            int count;
+            double cellW, cellH;
+            if (SpacingReader() is { } spacing)
+                (count, cellW, cellH) = (spacing.Count, spacing.Cell.X / screen.Scale, spacing.Cell.Y / screen.Scale);
+            else
+            {
+                count = _drawers?.DesktopListing().Count(i => !i.Hidden) ?? 0;
+                (cellW, cellH) = (SystemParameters.IconHorizontalSpacing, SystemParameters.IconVerticalSpacing);
+            }
+            var work = DrawerScreens.WorkDips(screen);
+            return DrawerIconArea.Fallback(new DrawerRect(0, 0, work.Width, work.Height), count, cellW, cellH);
+        }
+        catch (Exception)
+        {
+            return [];
+        }
     }
 
     /// <summary>
@@ -801,49 +1064,124 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// plan under review would create. A saved place stands; a drawer with none arrives top-right of the primary screen
     /// (<see cref="DrawerPlacement.Arrive"/>, handed only the places of the drawers drawn here, and not saved).
     /// </summary>
-    private IReadOnlyList<(DrawerState State, DrawerPlace Place)> DrawerPlacesNow()
+    private IReadOnlyList<(DrawerState State, DrawerPlace Place)> DrawerPlacesNow(IReadOnlyList<DeskScreen>? screens = null)
     {
-        if (_drawers is not { } service || _screens.Count == 0) return [];
+        screens ??= _screens;
+        if (_drawers is not { } service || screens.Count == 0) return [];
         var settings = service.Settings;
         List<DrawerDef> drawn = settings.Enabled ? [.. settings.Drawers.Where(d => service.IsShown(d.Id) && service.Get(d.Id) is not null)] : [];
         drawn.AddRange(service.PreviewDrawers.Select(p => p.Def).Where(p => drawn.All(d => d.Id != p.Id)));
         var ids = settings.Drawers.Select(d => d.Id).Where(id => drawn.Any(d => d.Id == id)).ToHashSet(StringComparer.Ordinal);
         var placed = settings.Places.Where(kv => ids.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+        // An arrival that could not be saved (settings.json unwritable) stays where it arrived for the session; a saved place wins.
+        foreach (var gone in _arrivedPlaces.Keys.Where(k => !settings.Drawers.Any(d => d.Id == k) || settings.Places.ContainsKey(k)).ToArray())
+            _arrivedPlaces.Remove(gone);
+        foreach (var gone in _arrivalTried.Where(k => !settings.Drawers.Any(d => d.Id == k)).ToArray())
+            _arrivalTried.Remove(gone);
+        foreach (var (id, place) in _arrivedPlaces)
+            if (ids.Contains(id)) placed.TryAdd(id, place);
         var folded = drawn.Where(d => service.Get(d.Id)?.Folded == true).Select(d => d.Id).ToList();
-        var places = DrawerPlacement.Arrive(drawn, placed, DrawerScreens.WorkDips(DrawerScreens.Primary(_screens)).Width, folded);
+        var primary = DrawerScreens.Primary(screens);
+        var primaryWork = DrawerScreens.WorkDips(primary);
+        // A pre-4.5 file keeps today's column rule for its first arrivals (the upgrader's drawers sit exactly as before); everything after
+        // goes through Tidy's slots, off the icons. Only drawn drawers read the icons: with none, nothing touches the Shell.
+        var places = settings.LegacyArrival
+            ? DrawerPlacement.Arrive(drawn, placed, primaryWork.Width, folded)
+            : DrawerPlacement.Arrive(drawn, placed, primaryWork.Width, folded, settings.Tidy, primaryWork.Height,
+                settings.KeepClear && drawn.Count > 0 ? IconArea(primary) : []);
+        // A drawer that arrived without a saved place is saved where it arrived, once (a preview drawer is not a saved drawer's).
+        bool any = false;
+        foreach (var d in drawn)
+            if (ids.Contains(d.Id) && !settings.Places.ContainsKey(d.Id))
+            {
+                _arrivedPlaces[d.Id] = places[d.Id];
+                if (_arrivalTried.Contains(d.Id)) continue;   // one save attempt per drawer per session: a store that cannot write is not asked again
+                _arrived[d.Id] = places[d.Id];
+                any = true;
+            }
+        if (any && !_arrivalSaveQueued && !_stopped)
+        {
+            _arrivalSaveQueued = true;
+            _ui.BeginInvoke(DispatcherPriority.Normal, new Action(SaveArrivals));
+        }
         return [.. drawn.Select(d => (service.Get(d.Id)!, places[d.Id]))];
+    }
+
+    private readonly Dictionary<string, DrawerPlace> _arrived = new(StringComparer.Ordinal);          // arrivals waiting to be saved
+    private readonly Dictionary<string, DrawerPlace> _arrivedPlaces = new(StringComparer.Ordinal);    // every unsaved arrival, kept for the session
+    private readonly HashSet<string> _arrivalTried = new(StringComparer.Ordinal);                      // ids a save was attempted for
+    private bool _arrivalSaveQueued;
+
+    /// <summary>Saves the places drawers arrived at, merged into the settings as they are now (a drawer placed meanwhile keeps its place),
+    /// so an arrival never moves again when the icons or the Tidy corner do. Clears the pre-4.5 flag: the file now carries a <c>tidy</c> key.</summary>
+    internal void SaveArrivals()
+    {
+        _arrivalSaveQueued = false;
+        var arrived = _arrived.ToArray();
+        _arrived.Clear();
+        foreach (var (id, _) in arrived) _arrivalTried.Add(id);   // before the save: SettingsStore.Write swallows a failed write, and Save still redraws
+        if (_stopped || _drawers is not { } service || arrived.Length == 0) return;
+        var current = service.Settings;
+        var merged = new Dictionary<string, DrawerPlace>(current.Places, StringComparer.Ordinal);
+        foreach (var (id, place) in arrived)
+            if (current.Drawers.Any(d => d.Id == id) && !merged.ContainsKey(id)) merged[id] = place;
+        if (merged.Count == current.Places.Count) return;
+        try { service.Save(current with { Places = merged, LegacyArrival = false }); }
+        catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException) { }   // not saved: the drawers arrive again next render
     }
 
     /// <summary>Adds one island per drawer to the surface of the screen it sits on, after the Desk's own islands: aligned left and top on
     /// its clamped place, taking clicks and focus, flagged so the host keeps it above the widgets. Its look is the Desk's on that screen.</summary>
     private List<DeskSurface> WithDrawers(List<DeskSurface> surfaces, DeskFrame frame, DeskThemeDraw? draw,
-        IReadOnlyList<(DeskSettings Settings, DeskInkMap Inks)> looks)
+        IReadOnlyList<(DeskSettings Settings, DeskInkMap Inks)> looks, IReadOnlyList<DeskScreen> screens)
     {
         if (_drawers is null || _fonts is null) return surfaces;
         var extra = surfaces.Select(_ => new List<DeskIsland>()).ToList();
-        foreach (var (state, place) in DrawerPlacesNow())
+        foreach (var (state, place) in DrawerPlacesNow(screens))
         {
-            var (screen, anchor) = DrawerScreens.ToAnchor(place, _screens);
-            int i = Enumerable.Range(0, _screens.Count).First(k => ReferenceEquals(_screens[k], screen));
-            var ink = DrawerInk(screen, anchor, state.Folded, looks[i].Inks, draw);
-            var look = DrawerLook.From(ink, frame.PlateHex, frame.PlateOpacity, frame.AccentHex, _fonts.Families(looks[i].Settings.Font).Regular);
+            var (screen, anchor) = DrawerScreens.ToAnchor(place, screens);
+            int i = Enumerable.Range(0, screens.Count).First(k => ReferenceEquals(screens[k], screen));
+            var settings = _drawers.Settings;
+            var kind = settings.LookFor(state.Def.Id);
+            // The wallpaper under the drawer is sampled once: it picks Automatic's ink and decides whether labels need chips.
+            var (ink, wall) = DrawerInk(screen, anchor, state.Folded, looks[i].Inks, draw, kind, settings.Opacity);
+            var look = DrawerLook.From(ink, frame.PlateHex, frame.AccentHex, _fonts.Families(looks[i].Settings.Font).Regular,
+                kind, settings.Opacity, wall);
             var piece = new DrawerPiece(state, _drawers, look, 1);
             _drawerPieces.Add(piece);
             extra[i].Add(new DeskIsland(piece, anchor, HorizontalAlignment.Left, VerticalAlignment.Top)
             {
                 Widgets = [state.Word], TakesClicks = true, TakesFocus = true, Drawer = true,
+                Glass = kind == DrawerLookKind.Glass,
+                GlassTint = DrawerBackdrop.NearClearTint(look.Plate.R, look.Plate.G, look.Plate.B),
+                GlassCorners = piece.SetGlassCorners,
             });
         }
         return [.. surfaces.Select((s, i) => extra[i].Count == 0 ? s : s with { Islands = [.. s.Islands, .. extra[i]] })];
     }
 
+    /// <summary>The wallpaper luminance a drawer's labels are judged against when the wallpaper cannot be read: mid grey, which light ink fails
+    /// (so it gets chips) and dark ink passes.</summary>
+    private const double UnknownWallpaper = 0.5;
+
     /// <summary>A drawer's ink: Automatic reads the wallpaper behind the drawer itself (it sits in no stack); every other mode, and a followed
-    /// theme, is the screen's one ink.</summary>
-    private ResolvedInk DrawerInk(DeskScreen screen, Point anchor, bool folded, DeskInkMap inks, DeskThemeDraw? draw)
+    /// theme, is the screen's one ink. Also hands back the wallpaper's luminance under the drawer, read once for both: only when the ink
+    /// needs it, or the look draws a faint plate whose labels might need chips (<see cref="DrawerLook.Chips"/>); else the unknown value.</summary>
+    private (ResolvedInk Ink, double Wallpaper) DrawerInk(DeskScreen screen, Point anchor, bool folded, DeskInkMap inks, DeskThemeDraw? draw,
+        DrawerLookKind kind, int opacity)
     {
-        if (draw is not null || _ink.Mode != DeskInkMode.Auto) return inks.Default;
+        bool auto = draw is null && _ink.Mode == DeskInkMode.Auto;
+        bool faint = kind switch
+        {
+            DrawerLookKind.Solid => opacity / 100.0 < DrawerLook.MinPlateOpacity,
+            DrawerLookKind.Glass => opacity / 100.0 * 0.8 < DrawerLook.MinPlateOpacity,
+            _ => true,
+        };
+        if (!auto && !faint) return (inks.Default, UnknownWallpaper);
         var rect = Px(screen, new Rect(anchor.X, anchor.Y, DrawerPlacement.Width, DrawerPlacement.Height(folded)));
-        return Care(DeskInk.Resolve(_ink, ThemeText(), Luminance(screen, rect)));
+        double? lum = Luminance(screen, rect);
+        double wall = lum is { } l && !double.IsNaN(l) ? l : UnknownWallpaper;
+        return (auto ? Care(DeskInk.Resolve(_ink, ThemeText(), lum)) : inks.Default, wall);
     }
 
     /// <summary>Ends every drawn drawer (its subscriptions, a rename or move in progress).</summary>
@@ -859,7 +1197,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private void Render()
     {
         // While arranging the arrange surfaces draw; the islands come back when it ends.
-        if (_host is null || _stopped || _screens.Count == 0 || _rendering || Arranging) return;
+        if (_host is null || _stopped || _screens.Count == 0 || Arranging) return;
+        // A render asked for from inside a render (the Shell read below pumps messages, so a screen change can land mid-draw) runs after it.
+        if (_rendering) { _renderWanted = true; return; }
         // A drawer is mid-interaction (a drag, Explorer's menu, an inline rename): rebuilding it now would cut that short. The redraw
         // runs when the last hold is released (Review Focus 3).
         if (_drawers?.Busy == true && !_privacyRender) { _renderWanted = true; return; }
@@ -867,10 +1207,16 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _rendering = true;
         try { RenderOnce(); }
         finally { _rendering = false; }
+        if (_renderWanted && _drawers?.Busy != true) Render();
     }
 
     private void RenderOnce()
     {
+        // The Shell read (outgoing COM) runs a modal message loop, which can re-enter this controller: take it before any state is touched,
+        // so the rest of the draw works on one list of screens and a cache that is already warm.
+        if (_drawers is { Settings.KeepClear: true } && (_drawers.Settings.Enabled || _drawers.PreviewDrawers.Count > 0) && _screens.Count > 0)
+            IconArea(DrawerScreens.Primary(_screens));
+        var screens = _screens;
         _fonts ??= _paths is null ? new DeskFonts() : DeskFonts.ForThisPc(_paths);
         var now = DateTimeOffset.Now;
         var track = TrackToDraw(now);
@@ -910,7 +1256,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         var surfaces = new List<DeskSurface>();
         var looks = new List<(DeskSettings Settings, DeskInkMap Inks)>();
         bool forced = false;
-        foreach (var screen in _screens)
+        foreach (var screen in screens)
         {
             var settings = DeskLookResolver.Settings(_settings, draw, _fonts.Has) with { Layout = LayoutFor(screen) };
             var view = new DeskView(screen, settings, _fonts);
@@ -934,11 +1280,13 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             }
             view.Update(shown, inks);
             _views.Add(view);
+            // Where the Desk's own pieces sit, for drawers to snap to: read before TakeIslands spends the view; none with the desktop off.
+            _pieceRects[screen.Device] = DrawsDesktop ? [.. view.StackRects().Values.Select(r => DrawerScreens.ScreenDipsToWork(r, screen))] : [];
             surfaces.Add(new DeskSurface(screen, DeskClicks.Prepare(view.TakeIslands(), _piecesTakeClicks, this)));
             looks.Add((settings, inks));
         }
         // Drawers are free panels (drawers amendment 1): the controller places them, one island each, never the view's stacks.
-        surfaces = WithDrawers(surfaces, frame, draw, looks);
+        surfaces = WithDrawers(surfaces, frame, draw, looks, screens);
         if (forced != _plateForced)
         {
             _plateForced = forced;

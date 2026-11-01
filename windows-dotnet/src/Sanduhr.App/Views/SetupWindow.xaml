@@ -1,0 +1,201 @@
+<Window x:Class="Sanduhr.App.Views.SetupWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
+        Title="{x:Static core:SetupCopy.Title}"
+        SizeToContent="Height" Width="480"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="{DynamicResource Sanduhr.Brush.Bg}"
+        FontFamily="Segoe UI Variable Display, Segoe UI"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        Icon="/Assets/Sanduhr.ico">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolVis" />
+
+        <!-- The same flat button and check box as the other small windows, which keep theirs in their own resources. -->
+        <Style x:Key="FlatButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="16,7" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg" CornerRadius="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Opacity" Value="0.88" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                <Setter TargetName="bg" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bg" Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Padding" Value="22,7" />
+        </Style>
+
+        <!-- A tick tile: the box, then a title and a sentence that wrap. -->
+        <Style x:Key="TickTile" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Background="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="box" Width="18" Height="18" CornerRadius="3" VerticalAlignment="Top" Margin="0,1,10,0"
+                                    Background="{DynamicResource Sanduhr.Brush.Bg}"
+                                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                                <Path x:Name="check" Stretch="Uniform" Margin="3"
+                                      Data="M0,5 L4,9 L11,0" Visibility="Collapsed"
+                                      Stroke="{DynamicResource Sanduhr.Brush.Accent}" StrokeThickness="2" />
+                            </Border>
+                            <ContentPresenter Grid.Column="1" VerticalAlignment="Top" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="check" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="box" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="box" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                <Setter TargetName="box" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <StackPanel Margin="26,24,26,22">
+        <TextBlock Text="{x:Static core:SetupCopy.Title}" FontSize="18" FontWeight="SemiBold"
+                   Foreground="{DynamicResource Sanduhr.Brush.Accent}"
+                   AutomationProperties.HeadingLevel="Level1" />
+        <TextBlock Text="{x:Static core:SetupCopy.Intro}" TextWrapping="Wrap" Margin="0,6,0,18" FontSize="12"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+
+        <!-- A nicer desktop, and the way into Design it with an AI chat. -->
+        <CheckBox x:Name="DesktopBox" Style="{StaticResource TickTile}" IsChecked="{Binding Desktop}"
+                  AutomationProperties.Name="{x:Static core:SetupCopy.DesktopTitle}"
+                  AutomationProperties.HelpText="{x:Static core:SetupCopy.DesktopBody}">
+            <StackPanel>
+                <TextBlock Text="{x:Static core:SetupCopy.DesktopTitle}" FontWeight="SemiBold" />
+                <TextBlock Text="{x:Static core:SetupCopy.DesktopBody}" TextWrapping="Wrap" FontSize="11" Margin="0,2,0,0"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+            </StackPanel>
+        </CheckBox>
+        <TextBlock Margin="28,6,0,0">
+            <Hyperlink Command="{Binding DesignWithChatCommand}" Foreground="{DynamicResource Sanduhr.Brush.Accent}"
+                       AutomationProperties.Name="{x:Static core:SetupCopy.DesignWithChat}">
+                <Run Text="{x:Static core:SetupCopy.DesignWithChat}" FontSize="11" />
+            </Hyperlink>
+        </TextBlock>
+
+        <CheckBox x:Name="DrawersBox" Style="{StaticResource TickTile}" Margin="0,16,0,0" IsChecked="{Binding Drawers}"
+                  AutomationProperties.Name="{x:Static core:SetupCopy.DrawersTitle}"
+                  AutomationProperties.HelpText="{x:Static core:SetupCopy.DrawersBody}">
+            <StackPanel>
+                <TextBlock Text="{x:Static core:SetupCopy.DrawersTitle}" FontWeight="SemiBold" />
+                <TextBlock Text="{x:Static core:SetupCopy.DrawersBody}" TextWrapping="Wrap" FontSize="11" Margin="0,2,0,0"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+            </StackPanel>
+        </CheckBox>
+
+        <CheckBox x:Name="UsageBox" Style="{StaticResource TickTile}" Margin="0,16,0,0" IsChecked="{Binding ClaudeUsage}"
+                  AutomationProperties.Name="{x:Static core:SetupCopy.UsageTitle}"
+                  AutomationProperties.HelpText="{x:Static core:SetupCopy.UsageBody}">
+            <StackPanel>
+                <TextBlock Text="{x:Static core:SetupCopy.UsageTitle}" FontWeight="SemiBold" />
+                <TextBlock Text="{x:Static core:SetupCopy.UsageBody}" TextWrapping="Wrap" FontSize="11" Margin="0,2,0,0"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+            </StackPanel>
+        </CheckBox>
+        <!-- Ticking usage opens the source list: Claude. The trademark line shows wherever Claude is named: usage ticked, or a change
+             line that says Claude (Claude Code) with usage unticked. -->
+        <StackPanel Margin="28,8,0,0" Visibility="{Binding ShowTrademark, Converter={StaticResource BoolVis}}">
+            <TextBlock Text="{x:Static core:SetupCopy.ClaudeSource}" FontSize="12" FontWeight="SemiBold"
+                       Visibility="{Binding ClaudeUsage, Converter={StaticResource BoolVis}}"
+                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+            <TextBlock Text="{x:Static core:SetupCopy.ClaudeTrademark}" TextWrapping="Wrap" FontSize="10" Margin="0,2,0,0"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+        </StackPanel>
+
+        <!-- What unticking does, said before Continue applies it (reopened later only). -->
+        <TextBlock Text="{Binding ChangeText}" Margin="0,18,0,0" TextWrapping="Wrap" FontSize="11" LineHeight="18"
+                   AutomationProperties.HelpText="{x:Static core:SetupCopy.WhatChanges}"
+                   AutomationProperties.LiveSetting="Polite"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                   Visibility="{Binding HasChangeLines, Converter={StaticResource BoolVis}}" />
+
+        <!-- Why Continue is off. -->
+        <TextBlock Text="{Binding Blocked}" TextWrapping="Wrap" FontSize="11" Margin="0,14,0,0"
+                   Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                   AutomationProperties.LiveSetting="Assertive">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding CanContinue}" Value="True">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+
+        <!-- What Continue said when it could not finish; the window stays open. -->
+        <ItemsControl ItemsSource="{Binding ResultLines}" Margin="0,14,0,0" Focusable="False"
+                      AutomationProperties.Name="{x:Static core:SetupCopy.WhatHappened}"
+                      Visibility="{Binding HasResultLines, Converter={StaticResource BoolVis}}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,4"
+                               Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                               AutomationProperties.LiveSetting="Assertive" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+            <Button x:Name="DismissButton" Style="{StaticResource FlatButton}" Margin="0,0,8,0"
+                    Content="{Binding DismissLabel}" Command="{Binding DismissCommand}" IsCancel="True"
+                    AutomationProperties.Name="{Binding DismissLabel}" />
+            <Button x:Name="ContinueButton" Style="{StaticResource AccentButton}"
+                    Content="{x:Static core:SetupCopy.Continue}" Command="{Binding ContinueCommand}" IsDefault="True"
+                    AutomationProperties.Name="{x:Static core:SetupCopy.Continue}" />
+        </StackPanel>
+    </StackPanel>
+</Window>
