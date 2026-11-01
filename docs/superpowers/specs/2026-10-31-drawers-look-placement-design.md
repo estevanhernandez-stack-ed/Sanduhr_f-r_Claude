@@ -42,9 +42,8 @@ One setting, **Drawer look**, on the Drawers page, for all drawers:
 | **Outline** | No fill; a 1 px border in the ink | Ink with a soft shadow | On the wallpaper, each label shadowed |
 | **Bare** | None until hover, then a faint outline | Small, above the items | On the wallpaper, each label shadowed |
 
-- **Opacity:** one slider, 20 to 100%, for Solid and Glass's fill. Hidden for Outline and Bare. Solid's floor stays
-  `DrawerLook.MinPlateOpacity` (55%) only when the label contrast check fails at the chosen value; otherwise the
-  user's value holds.
+- **Opacity:** one slider, 20 to 100%, for Solid and Glass's fill (default 55%, today's plate). Hidden for Outline
+  and Bare. Below 55%, labels draw on the readable chips described next whenever the contrast check fails.
 - **Readable on any wallpaper:** Outline and Bare check the ink against the wallpaper under the drawer with the Desk's
   3:1 contrast check (`WallpaperOverview`). Where it fails, labels draw on a small shadowed chip instead of bare text.
 - **Clicks:** Outline and Bare keep a fill at 1% opacity, so a click on the drawer lands on the drawer, never on the
@@ -59,7 +58,7 @@ One setting, **Drawer look**, on the Drawers page, for all drawers:
 Drawers stay free panels. While dragging, a drawer snaps, nearest rule first, within 12 px:
 
 1. **To other drawers:** edges align, and a gap snaps to `DrawerPlacement.Gap` (12 px).
-2. **To Desk pieces:** a drawer docks beside a piece's island at the Desk margin.
+2. **To Desk pieces:** a drawer docks beside a piece's stack at the drawer gap (12 px).
 3. **To the screen:** work-area edges and corners at `DrawerPlacement.Margin` (24 px).
 4. **To the grid:** 8 px steps when nothing else is near.
 
@@ -99,7 +98,7 @@ from the Drawers page.
 | Key | Values | Default |
 |---|---|---|
 | `look` | `solid`, `glass`, `outline`, `bare` | `solid` |
-| `opacity` | 20 to 100 | today's plate opacity, or 85 if none |
+| `opacity` | 20 to 100 | 55 (today's drawer plate: `DrawerLook.MinPlateOpacity`) |
 | `looks` | drawer id → look | empty |
 | `snap` | bool | true |
 | `keep_clear` | bool | true |
