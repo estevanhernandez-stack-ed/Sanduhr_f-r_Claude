@@ -320,6 +320,38 @@ public sealed class DrawerFreePanelTests
     });
 
     [Fact]
+    public void Each_drawers_look_opacity_and_wallpaper_reach_its_piece_and_island() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (s, store, paths) = Make(box, d => d with
+        {
+            Look = DrawerLookKind.Bare,
+            Looks = new Dictionary<string, DrawerLookKind> { ["images"] = DrawerLookKind.Glass },
+            Opacity = 70,
+        }, "Images", "Documents");
+        var (desk, host) = Start(store, paths, s);
+        try
+        {
+            store.SaveDeskInk(DeskInkSettings.Default with { Mode = DeskInkMode.Light });
+            desk.WallpaperLuminance = (_, _) => 0.95;   // a pale wallpaper under light ink: Bare needs chips, Glass at 70 x 0.8 = 56 does not
+            desk.Reload();
+            var drawers = DrawerIslands(host);
+            var images = drawers.Single(d => IdOf(d.Island) == "images");
+            var docs = drawers.Single(d => IdOf(d.Island) == "documents");
+            Assert.True(images.Island.Glass);
+            Assert.False(docs.Island.Glass);
+            Assert.Equal(DrawerLookKind.Glass, ((DrawerPiece)images.Island.Content).Look.Kind);
+            Assert.False(((DrawerPiece)images.Island.Content).Look.Chips);
+            Assert.Equal((byte)Math.Round(0.7 * 0.8 * 255), ((DrawerPiece)images.Island.Content).Look.Plate.A);
+            var bare = ((DrawerPiece)docs.Island.Content).Look;
+            Assert.Equal(DrawerLookKind.Bare, bare.Kind);
+            Assert.True(bare.Chips);
+            Assert.Contains(host.Shown.SelectMany(sf => sf.Islands), i => i.Widgets.Contains("clock") && !i.Glass);
+        }
+        finally { desk.Dispose(); s.Dispose(); }
+    });
+
+    [Fact]
     public void A_place_request_saves_the_screen_holding_the_point_clamped() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();

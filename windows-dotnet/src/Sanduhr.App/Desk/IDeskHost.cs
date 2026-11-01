@@ -41,6 +41,18 @@ internal sealed record DeskIsland(FrameworkElement Content, Point Anchor, Horizo
     /// and leaves where it sits to the drawer while the user moves it.</summary>
     public bool Drawer { get; init; }
 
+    /// <summary>The island is a Glass drawer (drawers look and placement spec, section 1): the host blurs the wallpaper behind its window and
+    /// rounds the window's corners. The blur fills the whole window rectangle, so the window is the panel itself, with no room around it
+    /// for a shadow (the panel keeps the place it was given). Only meaningful with <see cref="Drawer"/>.</summary>
+    public bool Glass { get; init; }
+
+    /// <summary>The blur's gradient color (AABBGGRR); near-clear, as the spike ran it, because the panel's own brush does the tint.</summary>
+    public int GlassTint { get; init; } = 0x01000000;
+
+    /// <summary>Called by the host with whether DWM rounded the window's corners, each time it lays out a Glass drawer whose blur took.
+    /// Never called when the blur was refused (the tinted plate keeps its rounded corners in a transparent window).</summary>
+    public Action<bool>? GlassCorners { get; init; }
+
     /// <summary>A roaming island (the companion walking its edges): the host keeps the window's aligned edge on the motion's
     /// anchor as it moves, without laying the island out again. Null for an island that stays where it hangs.</summary>
     public DeskIslandMotion? Motion { get; init; }

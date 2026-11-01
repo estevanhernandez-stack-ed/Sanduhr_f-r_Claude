@@ -847,25 +847,47 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         {
             var (screen, anchor) = DrawerScreens.ToAnchor(place, _screens);
             int i = Enumerable.Range(0, _screens.Count).First(k => ReferenceEquals(_screens[k], screen));
-            var ink = DrawerInk(screen, anchor, state.Folded, looks[i].Inks, draw);
-            var look = DrawerLook.From(ink, frame.PlateHex, frame.PlateOpacity, frame.AccentHex, _fonts.Families(looks[i].Settings.Font).Regular);
+            var settings = _drawers.Settings;
+            var kind = settings.LookFor(state.Def.Id);
+            // The wallpaper under the drawer is sampled once: it picks Automatic's ink and decides whether labels need chips.
+            var (ink, wall) = DrawerInk(screen, anchor, state.Folded, looks[i].Inks, draw, kind, settings.Opacity);
+            var look = DrawerLook.From(ink, frame.PlateHex, frame.AccentHex, _fonts.Families(looks[i].Settings.Font).Regular,
+                kind, settings.Opacity, wall);
             var piece = new DrawerPiece(state, _drawers, look, 1);
             _drawerPieces.Add(piece);
             extra[i].Add(new DeskIsland(piece, anchor, HorizontalAlignment.Left, VerticalAlignment.Top)
             {
                 Widgets = [state.Word], TakesClicks = true, TakesFocus = true, Drawer = true,
+                Glass = kind == DrawerLookKind.Glass,
+                GlassTint = DrawerBackdrop.NearClearTint(look.Plate.R, look.Plate.G, look.Plate.B),
+                GlassCorners = piece.SetGlassCorners,
             });
         }
         return [.. surfaces.Select((s, i) => extra[i].Count == 0 ? s : s with { Islands = [.. s.Islands, .. extra[i]] })];
     }
 
+    /// <summary>The wallpaper luminance a drawer's labels are judged against when the wallpaper cannot be read: mid grey, which light ink fails
+    /// (so it gets chips) and dark ink passes.</summary>
+    private const double UnknownWallpaper = 0.5;
+
     /// <summary>A drawer's ink: Automatic reads the wallpaper behind the drawer itself (it sits in no stack); every other mode, and a followed
-    /// theme, is the screen's one ink.</summary>
-    private ResolvedInk DrawerInk(DeskScreen screen, Point anchor, bool folded, DeskInkMap inks, DeskThemeDraw? draw)
+    /// theme, is the screen's one ink. Also hands back the wallpaper's luminance under the drawer, read once for both: only when the ink
+    /// needs it, or the look draws a faint plate whose labels might need chips (<see cref="DrawerLook.Chips"/>); else the unknown value.</summary>
+    private (ResolvedInk Ink, double Wallpaper) DrawerInk(DeskScreen screen, Point anchor, bool folded, DeskInkMap inks, DeskThemeDraw? draw,
+        DrawerLookKind kind, int opacity)
     {
-        if (draw is not null || _ink.Mode != DeskInkMode.Auto) return inks.Default;
+        bool auto = draw is null && _ink.Mode == DeskInkMode.Auto;
+        bool faint = kind switch
+        {
+            DrawerLookKind.Solid => opacity / 100.0 < DrawerLook.MinPlateOpacity,
+            DrawerLookKind.Glass => opacity / 100.0 * 0.8 < DrawerLook.MinPlateOpacity,
+            _ => true,
+        };
+        if (!auto && !faint) return (inks.Default, UnknownWallpaper);
         var rect = Px(screen, new Rect(anchor.X, anchor.Y, DrawerPlacement.Width, DrawerPlacement.Height(folded)));
-        return Care(DeskInk.Resolve(_ink, ThemeText(), Luminance(screen, rect)));
+        double? lum = Luminance(screen, rect);
+        double wall = lum is { } l && !double.IsNaN(l) ? l : UnknownWallpaper;
+        return (auto ? Care(DeskInk.Resolve(_ink, ThemeText(), lum)) : inks.Default, wall);
     }
 
     /// <summary>Ends every drawn drawer (its subscriptions, a rename or move in progress).</summary>
