@@ -47,6 +47,26 @@ public class DrawerIconAreaTests
     }
 
     [Fact]
+    public void A_low_drop_on_the_icons_slides_beside_them_and_keeps_its_height()
+    {
+        // A drawer may hang below the bottom (only its title bar must stay), so a low drop slides sideways, not up.
+        var r = new DrawerRect(100, 800, DrawerPlacement.Width, DrawerPlacement.OpenHeight);
+        var free = DrawerIconArea.NearestFree(r, Work, [new DrawerRect(0, 0, 300, 1032)]);
+        Assert.Equal(new DrawerRect(312, 800, DrawerPlacement.Width, DrawerPlacement.OpenHeight), free);
+    }
+
+    [Fact]
+    public void An_L_shaped_area_is_cleared_on_both_sides()
+    {
+        var column = new DrawerRect(0, 0, 300, 1032);
+        var bar = new DrawerRect(0, 0, 1920, 200);
+        var r = new DrawerRect(100, 100, DrawerPlacement.Width, DrawerPlacement.OpenHeight);
+        var free = DrawerIconArea.NearestFree(r, Work, [column, bar]);
+        Assert.False(free.Overlaps(column) || free.Overlaps(bar));
+        Assert.Equal(new DrawerRect(312, 212, DrawerPlacement.Width, DrawerPlacement.OpenHeight), free);
+    }
+
+    [Fact]
     public void A_drop_that_would_slide_off_screen_picks_the_other_side()
     {
         // Icons fill the right edge; sliding right of them is off screen, so the drawer goes left of them.

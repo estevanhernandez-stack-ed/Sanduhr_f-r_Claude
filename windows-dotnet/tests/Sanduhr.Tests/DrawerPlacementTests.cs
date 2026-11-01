@@ -141,6 +141,26 @@ public sealed class DrawerPlacementTests
     }
 
     [Fact]
+    public void Drawers_with_no_room_do_not_land_on_each_other()
+    {
+        var all = new DrawerRect(0, 0, 1920, 1032);
+        var places = DrawerPlacement.Arrive([Def("a"), Def("b")], new Dictionary<string, DrawerPlace>(), 1920, [],
+            DrawerTidy.Default, 1032, [all]);
+        Assert.NotEqual(places["a"], places["b"]);
+        Assert.Equal(new DrawerPlace(DeskMonitors.Main, 1536, 24), places["a"]);
+    }
+
+    [Theory]
+    [InlineData(DrawerCorner.BottomRight, 1536)]
+    [InlineData(DrawerCorner.BottomLeft, 24)]
+    public void A_bottom_corner_with_no_work_height_reads_as_the_top_corner_on_its_side(DrawerCorner corner, double x)
+    {
+        var places = DrawerPlacement.Arrive([Def("a")], new Dictionary<string, DrawerPlace>(), 1920, [],
+            new DrawerTidy(corner, DrawerFlow.Column), blocked: []);
+        Assert.Equal(new DrawerPlace(DeskMonitors.Main, x, 24), places["a"]);
+    }
+
+    [Fact]
     public void Default_arguments_leave_arrival_exactly_as_it_was()
     {
         var placed = new Dictionary<string, DrawerPlace> { ["old"] = new(DeskMonitors.Main, 1536, 24) };

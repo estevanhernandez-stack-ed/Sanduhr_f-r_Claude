@@ -31,6 +31,7 @@ public static class DrawerTidyPlan
         double rowStart = left ? work.X + m : work.Right - m;    // where a row begins along x
         double cursor = column ? lineY : rowStart;               // the next position along the current line
         double lane = 0;                                         // the tallest drawer placed in the current row
+        double edge = double.NaN;                                // the nearest obstacle edge stepped past in the current row
         var placed = new List<DrawerRect>(blocked);
         var slots = new Dictionary<string, DrawerRect>(StringComparer.Ordinal);
 
@@ -39,7 +40,8 @@ public static class DrawerTidyPlan
             // Each pass steps past one obstacle, wraps one line or places the drawer. Stepping always moves the cursor strictly
             // past the obstacle (so it cannot meet it again on that line) and wrapping always moves a line toward the centre until
             // it runs out, so this ends; the bound is a backstop that leaves the drawer out rather than ever spinning.
-            double lineSpan = column ? work.W / (w + g) : work.H / (DrawerPlacement.FoldedHeight + g);
+            double lineSpan = column ? work.W / (w + g) : work.H / g;
+            var (sx, sy, sc, sl, se) = (lineX, lineY, cursor, lane, edge);   // restored if this drawer is left out
             long guard = (placed.Count + 2L) * ((long)Math.Min(lineSpan, 100_000) + 2);
             for (; guard > 0; guard--)
             {
@@ -58,9 +60,14 @@ public static class DrawerTidyPlan
                     }
                     else
                     {
-                        lineY += top ? (lane > 0 ? lane : h) + g : -((lane > 0 ? lane : h) + g);
+                        // Next row: past the tallest drawer here; with none placed, past the nearest obstacle this row stepped over
+                        // (else past a row of this drawer's height).
+                        lineY = lane > 0 ? lineY + (top ? lane + g : -(lane + g))
+                            : !double.IsNaN(edge) ? (top ? edge + g : edge - g)
+                            : lineY + (top ? h + g : -(h + g));
                         cursor = rowStart;
                         lane = 0;
+                        edge = double.NaN;
                         if (lineY < minY || lineY > maxY) break;
                     }
                     continue;
@@ -71,6 +78,8 @@ public static class DrawerTidyPlan
                     // Step past whatever is in the way along the line.
                     var o = placed[hit];
                     cursor = column ? (top ? o.Bottom + g : o.Y - g) : (left ? o.Right + g : o.X - g);
+                    if (!column)
+                        edge = double.IsNaN(edge) ? (top ? o.Bottom : o.Y) : (top ? Math.Min(edge, o.Bottom) : Math.Max(edge, o.Y));
                     continue;
                 }
                 slots[id] = r;
@@ -79,6 +88,8 @@ public static class DrawerTidyPlan
                 else { cursor = left ? r.Right + g : r.X - g; lane = Math.Max(lane, h); }
                 break;
             }
+            // Left out: the next drawer starts from where this one did, not from the end of the lines this one ran off.
+            if (!slots.ContainsKey(id)) (lineX, lineY, cursor, lane, edge) = (sx, sy, sc, sl, se);
         }
         return slots;
     }

@@ -15,24 +15,30 @@ public static class DrawerIconArea
         return [new DrawerRect(work.X, work.Y, Math.Min(work.W, cols * cellW), work.H)];
     }
 
-    /// <summary><paramref name="r"/> (kept on screen) when it overlaps nothing blocked; else the nearest spot beside a blocked area that
-    /// stays on the work area and overlaps nothing; else <paramref name="r"/> only kept on screen.</summary>
+    /// <summary><paramref name="r"/> (kept on screen the way <see cref="DrawerSnap.Keep"/> does) when it overlaps nothing blocked; else
+    /// the nearest spot, kept on screen the same way, that overlaps nothing: each blocked area offers a position beside it on either
+    /// axis, and the candidates are every combination of those x and y values (so an L-shaped area is cleared on both sides); else
+    /// <paramref name="r"/> only kept on screen.</summary>
     public static DrawerRect NearestFree(DrawerRect r, DrawerRect work, IReadOnlyList<DrawerRect> blocked)
     {
         var kept = DrawerSnap.Keep(r, work);
         if (!blocked.Any(kept.Overlaps)) return kept;
-        var candidates = new List<DrawerRect>();
+        var xs = new HashSet<double> { kept.X };
+        var ys = new HashSet<double> { kept.Y };
         foreach (var b in blocked)
         {
-            candidates.Add(kept.At(b.Right + DrawerPlacement.Gap, kept.Y));
-            candidates.Add(kept.At(b.X - DrawerPlacement.Gap - kept.W, kept.Y));
-            candidates.Add(kept.At(kept.X, b.Bottom + DrawerPlacement.Gap));
-            candidates.Add(kept.At(kept.X, b.Y - DrawerPlacement.Gap - kept.H));
+            xs.Add(b.Right + DrawerPlacement.Gap);
+            xs.Add(b.X - DrawerPlacement.Gap - kept.W);
+            ys.Add(b.Bottom + DrawerPlacement.Gap);
+            ys.Add(b.Y - DrawerPlacement.Gap - kept.H);
         }
-        var free = candidates
-            .Where(c => c.X >= work.X && c.Right <= work.Right && c.Y >= work.Y && c.Bottom <= work.Bottom && !blocked.Any(c.Overlaps))
-            .OrderBy(c => Math.Abs(c.X - kept.X) + Math.Abs(c.Y - kept.Y))
-            .ToList();
-        return free.Count > 0 ? free[0] : kept;
+        var candidates = new HashSet<DrawerRect>();
+        foreach (var x in xs)
+            foreach (var y in ys)
+                candidates.Add(DrawerSnap.Keep(kept.At(x, y), work));
+        // Nearest first, and only the nearest few need the overlap test.
+        foreach (var c in candidates.OrderBy(c => Math.Abs(c.X - kept.X) + Math.Abs(c.Y - kept.Y)))
+            if (!blocked.Any(c.Overlaps)) return c;
+        return kept;
     }
 }

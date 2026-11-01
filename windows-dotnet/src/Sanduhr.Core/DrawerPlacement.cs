@@ -20,22 +20,34 @@ public static class DrawerPlacement
     /// under the last, below any drawer already standing in that column. Otherwise each takes the next free Tidy slot for that corner and
     /// direction (default top right, column) on a work area <paramref name="workWidth"/> by <paramref name="workHeight"/> (pass the real
     /// height for a bottom corner), skipping <paramref name="blocked"/> (the icon area) and the drawers already placed on the main
-    /// monitor. A drawer with no room anywhere arrives at the top right. Placed drawers keep theirs.</summary>
+    /// monitor. A drawer with no room anywhere arrives near the top right (each one 24 DIPs further along, off the icons if it can). With no height a bottom corner is read as the top corner on its side. Placed drawers keep theirs.</summary>
     public static IReadOnlyDictionary<string, DrawerPlace> Arrive(IReadOnlyList<DrawerDef> drawers, IReadOnlyDictionary<string, DrawerPlace> placed,
         double workWidth, IReadOnlyCollection<string> folded, DrawerTidy? tidy = null, double workHeight = double.PositiveInfinity,
         IReadOnlyList<DrawerRect>? blocked = null)
     {
         if (tidy is null && blocked is not { Count: > 0 } && double.IsPositiveInfinity(workHeight))
             return ArriveColumn(drawers, placed, workWidth, folded);
-        var work = new DrawerRect(0, 0, workWidth, double.IsPositiveInfinity(workHeight) ? 100_000 : workHeight);
+        tidy ??= DrawerTidy.Default;
+        bool noHeight = double.IsPositiveInfinity(workHeight);
+        // Without the work area's height a bottom corner has nowhere to start: use the top corner on the same side.
+        if (noHeight && tidy.Corner is DrawerCorner.BottomLeft or DrawerCorner.BottomRight)
+            tidy = tidy with { Corner = tidy.Corner == DrawerCorner.BottomLeft ? DrawerCorner.TopLeft : DrawerCorner.TopRight };
+        var work = new DrawerRect(0, 0, workWidth, noHeight ? 100_000 : workHeight);
         var held = placed.Where(p => p.Value.Monitor == DeskMonitors.Main)
             .Select(p => new DrawerRect(p.Value.X, p.Value.Y, Width, Height(folded.Contains(p.Key))));
         var fresh = drawers.Where(d => !placed.ContainsKey(d.Id)).Select(d => (d.Id, H: Height(folded.Contains(d.Id)))).ToList();
-        var slots = DrawerTidyPlan.Slots(fresh, work, tidy ?? DrawerTidy.Default, [.. blocked ?? [], .. held]);
+        var slots = DrawerTidyPlan.Slots(fresh, work, tidy, [.. blocked ?? [], .. held]);
         var places = new Dictionary<string, DrawerPlace>(placed, StringComparer.Ordinal);
-        foreach (var (id, _) in fresh)
-            places[id] = slots.TryGetValue(id, out var r) ? new DrawerPlace(DeskMonitors.Main, r.X, r.Y)
-                : new DrawerPlace(DeskMonitors.Main, Math.Max(0, workWidth - Margin - Width), Margin);
+        int unfit = 0;
+        foreach (var (id, h) in fresh)
+        {
+            if (slots.TryGetValue(id, out var r)) { places[id] = new DrawerPlace(DeskMonitors.Main, r.X, r.Y); continue; }
+            // No room: the top right, each one 24 DIPs further along so they don't hide each other, off the icons if it can.
+            double step = Margin * unfit++;
+            var spot = DrawerIconArea.NearestFree(new DrawerRect(Math.Max(0, workWidth - Margin - Width) + step, Margin + step, Width, h),
+                work, blocked ?? []);
+            places[id] = new DrawerPlace(DeskMonitors.Main, spot.X, spot.Y);
+        }
         return places;
     }
 

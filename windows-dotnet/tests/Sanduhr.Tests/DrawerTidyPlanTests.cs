@@ -21,6 +21,7 @@ public class DrawerTidyPlanTests
     [InlineData(DrawerCorner.TopLeft, DrawerFlow.Row)]
     [InlineData(DrawerCorner.BottomLeft, DrawerFlow.Column)]
     [InlineData(DrawerCorner.BottomRight, DrawerFlow.Row)]
+    [InlineData(DrawerCorner.BottomRight, DrawerFlow.Column)]
     public void Every_corner_starts_at_its_margin(DrawerCorner corner, DrawerFlow flow)
     {
         var first = DrawerTidyPlan.Slots([("a", H)], Work, new DrawerTidy(corner, flow), [])["a"];
@@ -130,6 +131,45 @@ public class DrawerTidyPlanTests
         var s = DrawerTidyPlan.Slots([("a", H), ("b", H)], tiny, DrawerTidy.Default, []);
         Assert.True(s.ContainsKey("a"));
         Assert.False(s.ContainsKey("b"));
+    }
+
+    [Fact]
+    public void A_left_out_drawer_does_not_strand_the_ones_after_it_in_a_column()
+    {
+        // One column of room: a and b fit, c does not, and the folded d still fits under b.
+        var work = new DrawerRect(0, 0, W + 2 * M, M + H + G + H + G + F + M);
+        var s = DrawerTidyPlan.Slots([("a", H), ("b", H), ("c", H), ("d", F)], work, DrawerTidy.Default, []);
+        Assert.False(s.ContainsKey("c"));
+        Assert.Equal(new DrawerRect(M, M + H + G + H + G, W, F), s["d"]);
+    }
+
+    [Fact]
+    public void A_left_out_drawer_does_not_strand_the_ones_after_it_in_a_row()
+    {
+        // One slot across: a fits on the bottom row, c fits nowhere, and the folded d wraps to the row above.
+        var work = new DrawerRect(0, 0, W + 2 * M, M + H + G + F + M);
+        var s = DrawerTidyPlan.Slots([("a", H), ("c", H), ("d", F)], work, new DrawerTidy(DrawerCorner.BottomRight, DrawerFlow.Row), []);
+        Assert.True(s.ContainsKey("a"));
+        Assert.False(s.ContainsKey("c"));
+        Assert.True(s.ContainsKey("d"));
+        Assert.False(s["a"].Overlaps(s["d"]));
+        Assert.Equal(new DrawerRect(M, M, W, F), s["d"]);
+    }
+
+    [Fact]
+    public void A_row_that_only_stepped_past_obstacles_wraps_to_the_nearest_obstacle_edge()
+    {
+        var bar = new DrawerRect(0, 0, 1920, 100);
+        var s = DrawerTidyPlan.Slots([("a", H)], Work, new DrawerTidy(DrawerCorner.TopLeft, DrawerFlow.Row), [bar]);
+        Assert.Equal(new DrawerRect(M, 100 + G, W, H), s["a"]);
+    }
+
+    [Fact]
+    public void A_bottom_row_blocked_across_wraps_above_the_obstacle()
+    {
+        var bar = new DrawerRect(0, 900, 1920, 132);
+        var s = DrawerTidyPlan.Slots([("a", H)], Work, new DrawerTidy(DrawerCorner.BottomLeft, DrawerFlow.Row), [bar]);
+        Assert.Equal(new DrawerRect(M, 900 - G - H, W, H), s["a"]);
     }
 
     [Fact]
