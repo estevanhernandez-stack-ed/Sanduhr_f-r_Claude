@@ -427,8 +427,8 @@ public sealed class ChatDesignTests : AppWindowFixture
             Assert.True(rig.Store.LoadDesk().Enabled);
             Assert.Equal(read.Rules!.Select(r => r.DrawerId), rig.Store.LoadDrawers().Rules.Select(r => r.DrawerId));
             // The new drawers carry the names the chat gave them, not the ids in words ("holiday-photos" would read "Holiday photos").
-            Assert.Contains("Holiday Photos (new): 1 file", rig.Host.Model!.Changes);
-            Assert.Contains("Receipts (new): 1 file", rig.Host.Model.Changes);
+            Assert.Contains("Holiday Photos (new): 1 file, including holiday.png", rig.Host.Model!.Changes);
+            Assert.Contains("Receipts (new): 1 file, including invoice-march.pdf", rig.Host.Model.Changes);
             // Nothing moved before Apply.
             Assert.True(File.Exists(Path.Combine(box.Desktop, "holiday.png")));
             Assert.True(File.Exists(Path.Combine(box.Desktop, "invoice-march.pdf")));
@@ -486,7 +486,7 @@ public sealed class ChatDesignTests : AppWindowFixture
             box.File(@"Desktop\holiday.png");
             rig.Drawers.Save(rig.Drawers.Settings with { Rules = [new DrawerRule(DrawerRuleKind.Images, "old-photos", On: true)] });
             Assert.Null(rig.Review.SortNow());
-            Assert.Contains("Old photos (new): 1 file", rig.Host.Model!.Changes);   // NameFromId, as before
+            Assert.Contains("Old photos (new): 1 file, including holiday.png", rig.Host.Model!.Changes);   // NameFromId, as before
         }
         finally { rig.Drawers.Dispose(); }
     });
@@ -508,7 +508,7 @@ public sealed class ChatDesignTests : AppWindowFixture
 
             Assert.Equal(["images"], rig.Store.LoadDrawers().Rules.Select(r => r.DrawerId));
             Assert.Equal(["images"], rig.Store.LoadDrawers().Drawers.Select(d => d.Id));
-            Assert.Contains("Photos: 1 file", rig.Host.Model!.Changes);   // the existing drawer, so no "(new)"
+            Assert.Contains("Photos: 1 file, including holiday.png", rig.Host.Model!.Changes);   // the existing drawer, so no "(new)"
         }
         finally { rig.Drawers.Dispose(); }
     });
@@ -527,7 +527,7 @@ public sealed class ChatDesignTests : AppWindowFixture
             Assert.Null(rig.Review.UseRules(read.Rules!, read.RuleDrawerNames));
 
             Assert.Equal(["documents-2"], rig.Store.LoadDrawers().Rules.Select(r => r.DrawerId));   // not the view's id
-            Assert.Contains("Documents (new): 1 file", rig.Host.Model!.Changes);
+            Assert.Contains("Documents (new): 1 file, including report.pdf", rig.Host.Model!.Changes);
             Assert.Equal(view.Home, rig.Store.LoadDrawers().Drawers.Single().Home);                     // the view is as it was
             Assert.True(File.Exists(Path.Combine(box.Desktop, "report.pdf")));                          // and nothing moved
         }
@@ -547,7 +547,7 @@ public sealed class ChatDesignTests : AppWindowFixture
             var read = PastedSetup.Read("""{"drawers":{"rules":[{"kind":"images","drawer":"Images"}]}}""");
             Assert.Null(rig.Review.UseRules(read.Rules!, read.RuleDrawerNames));
             Assert.Equal(["images-2"], rig.Store.LoadDrawers().Rules.Select(r => r.DrawerId));
-            Assert.Contains("Images (new): 1 file", rig.Host.Model!.Changes);
+            Assert.Contains("Images (new): 1 file, including holiday.png", rig.Host.Model!.Changes);
         }
         finally { rig.Drawers.Dispose(); }
     });

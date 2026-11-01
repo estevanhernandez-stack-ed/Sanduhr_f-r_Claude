@@ -233,7 +233,8 @@ internal sealed class DrawerReviewService
         if (sync is not null) warnings.Add(StreamerMode.Mask.Paths(sync));   // streamer: masked - Mask.Paths hides the profile folder in the root's path while on
         warnings.AddRange(extraWarnings);
         return DrawerReview.Model(plan, check, [.. s.Drawers.Select(d => d.Id)], note, warnings,
-            name => StreamerMode.Mask.Name(CodenameCategory.Folder, name));   // streamer: masked - Mask.Name gives each drawer's codename while on
+            name => StreamerMode.Mask.Name(CodenameCategory.Folder, name),   // streamer: masked - Mask.Name gives each drawer's codename while on
+            file => StreamerMode.Mask.Omit(file));   // streamer: masked - Mask.Omit leaves a file's name out of the line while on
     }
 
     /// <summary>The review is over: the plan goes, the faded items and the preview end.</summary>

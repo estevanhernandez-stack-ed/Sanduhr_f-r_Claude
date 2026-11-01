@@ -8,7 +8,7 @@ public static class SetupCopy
     public const string DesktopTitle = "A nicer desktop";
     public const string DesktopBody = "A clock, a message and the weather on your desktop.";
     public const string DrawersTitle = "Tidy my files";
-    public const string DrawersBody = "Sort your desktop files into drawers you can fold away. Nothing moves until you say so.";
+    public const string DrawersBody = "Sorts screenshots, pictures, documents, installers, zip files, shortcuts and files you haven't opened in a month into drawers. Nothing moves until you say so.";
     public const string UsageTitle = "Track my AI usage";
     public const string UsageBody = "See how much of your plan you've used.";
     public const string ClaudeSource = "Claude";

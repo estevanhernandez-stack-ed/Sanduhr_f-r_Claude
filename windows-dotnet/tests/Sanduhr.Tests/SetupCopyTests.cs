@@ -41,6 +41,19 @@ public class SetupCopyTests
     }
 
     [Fact]
+    public void Tidy_my_files_says_what_the_default_rules_sort()
+    {
+        Assert.Equal("Sorts screenshots, pictures, documents, installers, zip files, shortcuts and files you haven't opened in a month into drawers. Nothing moves until you say so.",
+            SetupCopy.DrawersBody);
+        // The body speaks for the defaults: every kind it lists is a default rule, and every default rule is on.
+        Assert.All(DrawerRules.Defaults, r => Assert.True(r.On));
+        foreach (var kind in new[] { DrawerRuleKind.Screenshots, DrawerRuleKind.Images, DrawerRuleKind.Documents, DrawerRuleKind.Installers,
+                                     DrawerRuleKind.Archives, DrawerRuleKind.Shortcuts, DrawerRuleKind.OlderThan })
+            Assert.Contains(DrawerRules.Defaults, r => r.Kind == kind);
+        Assert.Equal(30, DrawerRules.Defaults.Single(r => r.Kind == DrawerRuleKind.OlderThan).Days);
+    }
+
+    [Fact]
     public void The_copy_names_no_AI_product_but_Claude_and_has_no_em_dash()
     {
         foreach (var s in SetupCopy.All)

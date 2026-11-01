@@ -22,15 +22,21 @@ public static class DrawerReview
     /// <summary>Apply checked the plan again and the drawers had changed under it; said in place of a check's error that would name
     /// files while streamer mode is on.</summary>
     public const string PlanChanged = "Your drawers changed since this plan was made. Nothing was moved.";
+    /// <summary>Under a rules plan's lines: what becomes of the files no rule takes, and where to change that.</summary>
+    public const string RulesFooter = "Files no rule matches stay on your Desktop. Change the rules on the Drawers page.";
     private const int NamedSkips = 3;
+    /// <summary>A drawer's line names this many of its files.</summary>
+    private const int NamedFiles = 3;
 
     public static string Title(int files, int drawers) =>
         $"{files} {(files == 1 ? "file" : "files")} into {drawers} {(drawers == 1 ? "drawer" : "drawers")}";
 
     /// <summary>The bar for a checked plan. <paramref name="existingIds"/> are the drawers the user already has (no "(new)").
-    /// <paramref name="showName"/> draws a drawer's name (the App passes its streamer mask); null draws it as it is.</summary>
+    /// <paramref name="showName"/> draws a drawer's name (the App passes its streamer mask); null draws it as it is.
+    /// <paramref name="showFile"/> draws a file's name (already without a hidden extension): it returns null for a name that must not be
+    /// drawn (streamer mode), and a line with no name left says only its count; null draws every name as it is.</summary>
     public static DeskReviewModel Model(DrawerPlan plan, DrawerPlanCheck check, IReadOnlyCollection<string> existingIds, string? note,
-        IEnumerable<string> warnings, Func<string, string>? showName = null)
+        IEnumerable<string> warnings, Func<string, string>? showName = null, Func<string, string?>? showFile = null)
     {
         var names = plan.Drawers.GroupBy(d => d.Id).ToDictionary(g => g.Key, g => g.First().Name, StringComparer.Ordinal);
         var lines = check.Moves.GroupBy(m => m.DrawerId)
@@ -39,7 +45,10 @@ public static class DrawerReview
                 var real = names.TryGetValue(g.Key, out var n) ? n : g.Key;
                 var name = showName is null ? real : showName(real);
                 var count = g.Count();
-                return $"{name}{(existingIds.Contains(g.Key) ? "" : " (new)")}: {count} {(count == 1 ? "file" : "files")}";
+                var files = g.Select(m => DrawerNames.Display(Path.GetFileName(m.Source)))
+                    .Select(f => showFile is null ? f : showFile(f))
+                    .OfType<string>().Take(NamedFiles).ToList();
+                return $"{name}{(existingIds.Contains(g.Key) ? "" : " (new)")}: {count} {(count == 1 ? "file" : "files")}{Including(files)}";
             })
             .ToList();
         var all = new List<string>();
@@ -52,8 +61,17 @@ public static class DrawerReview
             ChangesTitle = ChangesTitle,
             BarName = BarName,
             CanEdit = true,
+            Footer = plan.Source == DrawerPlanSource.Rules ? RulesFooter : null,
         };
     }
+
+    /// <summary>", including A, B and C" for up to three names; nothing for none.</summary>
+    private static string Including(IReadOnlyList<string> names) => names.Count switch
+    {
+        0 => "",
+        1 => $", including {names[0]}",
+        _ => $", including {string.Join(", ", names.Take(names.Count - 1))} and {names[^1]}",
+    };
 
     /// <summary>The Public Desktop line (spec section 1): shortcuts when every item is one, items otherwise; null when there are none.</summary>
     public static string? SharedLine(IReadOnlyList<string> shared)

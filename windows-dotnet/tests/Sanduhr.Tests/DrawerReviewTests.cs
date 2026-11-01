@@ -37,8 +37,45 @@ public sealed class DrawerReviewTests
         Assert.Equal(DrawerReview.BarName, m.BarName);
         Assert.True(m.CanEdit);
         Assert.True(m.CanApply);
-        Assert.Contains("Images (new): 2 files", m.Changes);
-        Assert.Contains("Documents: 1 file", m.Changes);
+        Assert.Contains("Images (new): 2 files, including a.png and b.png", m.Changes);
+        Assert.Contains("Documents: 1 file, including c.pdf", m.Changes);
+    }
+
+    [Fact]
+    public void A_line_names_up_to_three_files_without_hidden_extensions()
+    {
+        var (plan, check) = Plan(("notes.txt", "Older files"), ("Google Photos.url", "Older files"), ("HELLDIVERS 2.lnk", "Older files"), ("Phasmophobia.lnk", "Older files"),
+            ("a.txt", "Older files"), ("b.txt", "Older files"), ("c.txt", "Older files"), ("d.txt", "Older files"));
+        var line = DrawerReview.Model(plan, check, [], null, []).Changes.Single();
+        Assert.Equal("Older files (new): 8 files, including notes.txt, Google Photos and HELLDIVERS 2", line);
+    }
+
+    [Fact]
+    public void The_example_line_reads_like_the_spec()
+    {
+        var (plan, check) = Plan(("Google Photos.url", "Older files"), ("HELLDIVERS 2.lnk", "Older files"), ("Phasmophobia.lnk", "Older files"));
+        Assert.Equal("Older files (new): 3 files, including Google Photos, HELLDIVERS 2 and Phasmophobia",
+            DrawerReview.Model(plan, check, [], null, []).Changes.Single());
+    }
+
+    [Fact]
+    public void File_names_go_through_the_hook_and_a_hidden_one_leaves_only_the_count()
+    {
+        var (plan, check) = Plan(("a.png", "Images"), ("b.png", "Images"));
+        Assert.Equal("Images (new): 2 files, including A.PNG and B.PNG",
+            DrawerReview.Model(plan, check, [], null, [], null, f => f.ToUpperInvariant()).Changes.Single());
+        var hidden = DrawerReview.Model(plan, check, [], null, [], null, _ => null).Changes.Single();
+        Assert.Equal("Images (new): 2 files", hidden);
+    }
+
+    [Fact]
+    public void A_rules_plan_says_where_unmatched_files_stay_and_an_agents_plan_does_not()
+    {
+        var (plan, check) = Plan(("a.png", "Images"));
+        Assert.Equal("Files no rule matches stay on your Desktop. Change the rules on the Drawers page.", DrawerReview.RulesFooter);
+        Assert.Equal(DrawerReview.RulesFooter, DrawerReview.Model(plan, check, [], null, []).Footer);
+        Assert.Null(DrawerReview.Model(plan with { Source = DrawerPlanSource.Agent, Agent = "Codex" }, check, [], null, []).Footer);
+        Assert.Equal("1 file into 1 drawer", DrawerReview.Model(plan, check, [], null, []).Title);
     }
 
     [Fact]
