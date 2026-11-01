@@ -255,6 +255,12 @@ internal sealed class DrawerService : IDisposable
 
     public void RequestSettings() => SettingsRequested?.Invoke();
 
+    /// <summary>Set by the app while it runs: "Tidy drawers" from a drawer's menu tidies the monitor that drawer is on. Takes the drawer's id;
+    /// returns null when the drawers bar opened, else the line to show (a review is open, drawers are off). Null with no app.</summary>
+    public Func<string, string?>? TidyRequested { get; set; }
+
+    public string? RequestTidy(string id) => TidyRequested?.Invoke(id);
+
     /// <summary>The user's drop (spec section 1): no review, one journal entry. Items already in the drawer are left alone; a Public
     /// Desktop item is named and skipped.</summary>
     public DrawerRun MoveIn(IReadOnlyList<string> paths, string id)
@@ -497,6 +503,7 @@ internal sealed class DrawerService : IDisposable
         if (_disposed) return;
         _disposed = true;
         Snapper = null;
+        TidyRequested = null;
         _debounce.Stop();
         foreach (var w in _watchers.Values) w.Dispose();
         _watchers.Clear();

@@ -947,6 +947,10 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         return (moved, changes);
     }
 
+    /// <summary>The monitor word of the screen a drawer is drawn on now (what <see cref="Tidy"/> takes), or null when it is not drawn.</summary>
+    internal string? MonitorOf(string drawerId) =>
+        DrawerPlacesNow().FirstOrDefault(p => p.State.Def.Id == drawerId) is { Place: { } place } ? place.Monitor : null;
+
     /// <summary>A drawer's place before a Tidy and the place Tidy wrote for it.</summary>
     internal readonly record struct TidyChange(DrawerPlace Before, DrawerPlace Written);
 

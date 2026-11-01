@@ -156,7 +156,8 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         return b;
     }
 
-    private const int RenameId = ShellMenu.OwnFirst, FoldId = ShellMenu.OwnFirst + 1, HideId = ShellMenu.OwnFirst + 2, SettingsId = ShellMenu.OwnFirst + 3;
+    internal const int RenameId = ShellMenu.OwnFirst, FoldId = ShellMenu.OwnFirst + 1, HideId = ShellMenu.OwnFirst + 2, SettingsId = ShellMenu.OwnFirst + 3,
+        LookId = ShellMenu.OwnFirst + 4, LookSameId = ShellMenu.OwnFirst + 5, TidyId = ShellMenu.OwnFirst + 6, LookFirstId = ShellMenu.OwnFirst + 7;
     private Point _dragStart;
     private DrawerItem? _pressed;
     private DrawerItem? _editing;
@@ -412,6 +413,8 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
             new(RenameId, DrawerPieceCopy.RenameDrawer),
             new(FoldId, _state.Folded ? DrawerPieceCopy.Open : DrawerPieceCopy.Fold),
             new(HideId, DrawerPieceCopy.Hide),
+            LookMenu(_service.Settings, _state.Def.Id),
+            new(TidyId, SettingsNames.DrawersTidy),
             new(SettingsId, DrawerPieceCopy.Settings),
         ];
         ShellMenuChoice? choice;
@@ -424,8 +427,33 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
             case FoldId: _service.SetFolded(_state.Def.Id, !_state.Folded); break;
             case HideId: _service.Hide(_state.Def.Id); break;
             case SettingsId: _service.RequestSettings(); break;
+            case TidyId: if (_service.RequestTidy(_state.Def.Id) is { } line) Say(line); break;
+            case LookSameId: SetLook(null); break;
+            case >= LookFirstId when choice.Own.Value - LookFirstId <= (int)DrawerLookKind.Bare:
+                SetLook((DrawerLookKind)(choice.Own.Value - LookFirstId)); break;
         }
     }
+
+    /// <summary>"Look" with "Same as the others" and the four looks under it, the drawer's own pick checked.</summary>
+    internal static ShellMenuItem LookMenu(DrawerSettings settings, string id)
+    {
+        DrawerLookKind? current = settings.Looks.TryGetValue(id, out var own) ? own : null;
+        var items = new List<ShellMenuItem> { new(LookSameId, SettingsNames.DrawerLookSame, Checked: current is null) };
+        foreach (var kind in Enum.GetValues<DrawerLookKind>())
+            items.Add(new(LookFirstId + (int)kind, SettingsNames.DrawersLookWords[(int)kind], Checked: current == kind));
+        return new ShellMenuItem(LookId, SettingsNames.DrawerLookMenu, Children: items);
+    }
+
+    /// <summary>The looks after a drawer is given its own (<paramref name="kind"/>) or taken back to the shared one (null); the other drawers' stay.</summary>
+    internal static IReadOnlyDictionary<string, DrawerLookKind> LooksWith(DrawerSettings settings, string id, DrawerLookKind? kind)
+    {
+        var looks = new Dictionary<string, DrawerLookKind>(settings.Looks, StringComparer.Ordinal);
+        if (kind is { } k) looks[id] = k; else looks.Remove(id);
+        return looks;
+    }
+
+    private void SetLook(DrawerLookKind? kind) =>
+        _service.Save(_service.Settings with { Looks = LooksWith(_service.Settings, _state.Def.Id, kind) });
 
     private void RenameDrawer()
     {
@@ -515,17 +543,17 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         Status.Text = line;
         AutomationProperties.SetName(Status, line);   // streamer: notname - a rename error or the drop line, which Say(DrawerRun) already cut to counts while streamer mode is on
         Status.Visibility = Visibility.Visible;
-        _statusTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
-        _statusTimer.Stop();
-        _statusTimer.Tick += Hide;
-        _statusTimer.Start();
-
-        void Hide(object? s, EventArgs a)
+        if (_statusTimer is null)
         {
-            _statusTimer!.Tick -= Hide;
-            _statusTimer.Stop();
-            Status.Visibility = Visibility.Collapsed;
+            _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+            _statusTimer.Tick += (_, _) =>
+            {
+                _statusTimer.Stop();
+                Status.Visibility = Visibility.Collapsed;
+            };
         }
+        _statusTimer.Stop();
+        _statusTimer.Start();
     }
 
     public void Dispose()

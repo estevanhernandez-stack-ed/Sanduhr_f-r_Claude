@@ -113,6 +113,7 @@ public static class SettingsIndex
     public const string Drawers = "drawers";
     public const string DrawersFolder = "drawers-folder";
     public const string DrawersSort = "drawers-sort";
+    public const string DrawersLookSection = "drawers-look";
     public const string DrawersRules = "drawers-rules";
     public const string DrawersList = "drawers-list";
     public const string DrawersRecent = "drawers-recent";
@@ -347,10 +348,12 @@ public static class SettingsIndex
         E(SettingsNames.DrawersFolder, SettingsPage.Drawers, DrawersFolder, ["folder", "Drawers folder", "OneDrive", "location", "where"]),
         E(SettingsNames.DrawersSort, SettingsPage.Drawers, DrawersSort,
             [SettingsNames.DrawersSortButton, "sort", "sort my desktop", "plan", "review", "apply", "screenshots", "installers"]),
+        E(SettingsNames.DrawersLook, SettingsPage.Drawers, DrawersLookSection,
+            ["style", "blend", "glass", "outline", "transparent", "opacity", "snap", "tidy", "align", "arrange", "icons", SettingsNames.DrawersTidy, SettingsNames.DrawersKeepClear, SettingsNames.DrawersSnap]),
         E(SettingsNames.DrawersRules, SettingsPage.Drawers, DrawersRules,
             ["rules", "by kind", "by age", "by name", "older than", "first match", "order", SettingsNames.DrawersAddRule]),
         E(SettingsNames.DrawersList, SettingsPage.Drawers, DrawersList,
-            ["rename", "hide", "show", SettingsNames.DrawersShow, SettingsNames.DrawersPutBack, "top right", "remove", "view", "existing folder", "Downloads"]),
+            ["rename", "hide", "show", SettingsNames.DrawersShow, "remove", "view", "existing folder", "Downloads"]),
         E(SettingsNames.DrawersRecent, SettingsPage.Drawers, DrawersRecent, ["undo", "history", "journal", "moved"]),
 
         E(SettingsNames.WidgetOptions, SettingsPage.Widget, WidgetOptions,

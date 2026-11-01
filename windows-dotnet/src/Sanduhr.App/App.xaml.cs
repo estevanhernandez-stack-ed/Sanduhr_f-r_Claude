@@ -700,6 +700,8 @@ public partial class App : Application
         {
             ThemeText = ThemeTextHex,
         };
+        // "Tidy drawers" in a drawer's menu tidies the monitor that drawer is on.
+        _drawers.TidyRequested = id => TidyDrawers(null, _desk?.MonitorOf(id));
         // The live review of Claude's Desk designs: the Desk and widget draw a design from memory, the floating bar asks Apply or Dismiss.
         _deskDesign.Host = new Desk.DeskDesignHost(_desk, () => _vm, FollowDesignChange);
         _deskDesign.DesignsChanged += () => _settingsWindow?.ViewModel.Desk.Designs.Reload();
@@ -835,6 +837,8 @@ public partial class App : Application
         svm.Desk.Changed = () => _desk?.Reload();
         // Turning drawers on or off from Settings reaches the running Desk the way the Desk page's own switch does.
         svm.Drawers.DeskChanged = () => { _desk?.Reload(); svm.Desk.Reload(); };
+        // Tidy drawers on the Drawers page lines the drawers up from the corner and direction the page shows.
+        svm.Drawers.TidyRequested = t => TidyDrawers(t);
         // Desk Look, Match the widget theme: the plate note follows the running Desk's readability guard.
         svm.ThemeMatch.PlateForced = () => _desk?.PlateForced == true;
         Action plateShown = () => svm.ThemeMatch.Reload();

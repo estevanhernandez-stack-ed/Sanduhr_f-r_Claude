@@ -221,4 +221,6 @@ internal static class ShellNative
     [DllImport("user32.dll")] public static extern uint TrackPopupMenuEx(IntPtr h, uint flags, int x, int y, IntPtr hwnd, IntPtr tpm);
     [DllImport("user32.dll")] public static extern bool PostMessageW(IntPtr h, uint msg, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] public static extern int GetMenuItemCount(IntPtr h);
+    [DllImport("user32.dll")] public static extern uint GetMenuState(IntPtr h, uint item, uint flags);
+    [DllImport("user32.dll")] public static extern IntPtr GetSubMenu(IntPtr h, int position);
 }
