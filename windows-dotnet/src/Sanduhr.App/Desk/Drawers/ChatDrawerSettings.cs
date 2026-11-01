@@ -6,7 +6,8 @@ namespace Sanduhr.App.Desk;
 /// <summary>
 /// A chat's drawer settings (look and placement spec, section 3): the look and opacity are saved and, with an arrangement, the drawers line
 /// up from the chat's corner and direction (a part the chat left out comes from the user's own Tidy) with the result and Undo on the drawers
-/// bar. Undo puts back the places Tidy wrote and the look and opacity from before. Refused with the busy line while a review or a result
+/// bar. Undo puts back the places Tidy wrote and, field by field, the look, opacity and remembered Tidy from before, but only a field that
+/// still holds what the chat applied: one the user changed since keeps their value. Refused with the busy line while a review or a result
 /// bar is up, and nothing applies partly: every check runs before the first save. Moves panels only, never a file.
 /// </summary>
 internal static class ChatDrawerSettings
@@ -28,12 +29,21 @@ internal static class ChatDrawerSettings
         // Tidy goes first: it refuses (nothing written) while a review is open, so a refusal leaves the look as it was too.
         if (desk.Tidy(tidy, null) is not { } r) return DrawerReview.Busy;
         bool lookSaved = look.Look is not null || look.Opacity is not null;
-        if (lookSaved) drawers.Save(WithLook(drawers.Settings));
+        if (r.Moved == 0 && !lookSaved) return DrawerReview.TidyNothing;   // nothing changed, so nothing to undo: a plain line, no bar
+        var applied = lookSaved ? WithLook(drawers.Settings) : drawers.Settings;
+        if (lookSaved) drawers.Save(applied);
         string tidyLine = r.Moved == 0 ? DrawerReview.TidyNothing : DrawerReview.Tidied(r.Moved);
         return review.ShowResult(SetupCopy.ChatDrawerSettingsResult(lookSaved, tidyLine), () =>
         {
             desk.RestorePlaces(r.Changes);
-            if (lookSaved) drawers.Save(drawers.Settings with { Look = before.Look, Opacity = before.Opacity });
+            // A field the user changed since keeps their value; only what the chat applied is put back.
+            var now = drawers.Settings;
+            drawers.Save(now with
+            {
+                Look = now.Look == applied.Look ? before.Look : now.Look,
+                Opacity = now.Opacity == applied.Opacity ? before.Opacity : now.Opacity,
+                Tidy = now.Tidy == tidy ? before.Tidy : now.Tidy,
+            });
         });
     }
 }

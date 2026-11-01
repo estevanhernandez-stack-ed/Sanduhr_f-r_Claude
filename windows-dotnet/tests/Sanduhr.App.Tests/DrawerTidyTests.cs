@@ -333,6 +333,62 @@ public sealed class DrawerTidyTests
     });
 
     [Fact]
+    public void Undo_after_a_chat_arrange_keeps_a_look_opacity_or_tidy_the_user_changed_since_and_restores_the_rest() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var saved = Places(("images", 700, 400));
+        var mine = new DrawerTidy(DrawerCorner.TopRight, DrawerFlow.Row);
+        var (desk, s, store) = Desk(box, Screen(1920, 1080), d => d with { Places = saved, Tidy = mine }, "Images");
+        var (review, host) = Review(s, store);
+        try
+        {
+            Assert.Null(ChatDrawerSettings.Apply(Look("""{"drawers":{"look":"glass","opacity":70,"arrange":{"corner":"bl"}}}"""), s, desk, review));
+            // The user changes the look and the remembered Tidy on the settings page; the opacity stays what the chat set.
+            s.Save(s.Settings with { Look = DrawerLookKind.Outline, Tidy = new DrawerTidy(DrawerCorner.TopLeft, DrawerFlow.Column) });
+
+            host.Apply!();   // Undo
+            var after = store.LoadDrawers();
+            Assert.Equal(saved, after.Places);                                  // the places Tidy wrote go back
+            Assert.Equal(DrawerLookKind.Outline, after.Look);                   // the user's look stays
+            Assert.Equal(DrawerStyle.DefaultOpacity, after.Opacity);            // untouched since: put back
+            Assert.Equal(new DrawerTidy(DrawerCorner.TopLeft, DrawerFlow.Column), after.Tidy);   // the user's Tidy stays
+        }
+        finally { desk.Dispose(); s.Dispose(); }
+    });
+
+    [Fact]
+    public void Undo_after_a_chat_arrange_puts_the_remembered_tidy_back_when_the_user_left_it() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var mine = new DrawerTidy(DrawerCorner.TopRight, DrawerFlow.Row);
+        var (desk, s, store) = Desk(box, Screen(1920, 1080), d => d with { Places = Places(("images", 700, 400)), Tidy = mine }, "Images");
+        var (review, host) = Review(s, store);
+        try
+        {
+            Assert.Null(ChatDrawerSettings.Apply(Look("""{"drawers":{"arrange":{"corner":"bl"}}}"""), s, desk, review));
+            Assert.Equal(DrawerCorner.BottomLeft, store.LoadDrawers().Tidy.Corner);
+            host.Apply!();
+            Assert.Equal(mine, store.LoadDrawers().Tidy);
+        }
+        finally { desk.Dispose(); s.Dispose(); }
+    });
+
+    [Fact]
+    public void A_chat_arrange_that_moves_nothing_and_saves_no_look_is_a_plain_line_with_no_bar() => Sta.Run(() =>
+    {
+        using var box = new DrawerSandbox();
+        var (desk, s, store) = Desk(box, Screen(1920, 1080), d => d, "Images");
+        var (review, host) = Review(s, store);
+        try
+        {
+            Assert.Equal(DrawerReview.TidyNothing, ChatDrawerSettings.Apply(Look("""{"drawers":{"arrange":{"corner":"tr","direction":"column"}}}"""), s, desk, review));
+            Assert.False(review.BarOpen);
+            Assert.Null(host.Model);
+        }
+        finally { desk.Dispose(); s.Dispose(); }
+    });
+
+    [Fact]
     public void A_chat_arrange_alone_leaves_the_look_and_says_only_what_tidy_did() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();

@@ -85,14 +85,14 @@ public static class SetupPrompt
         Line($"  1 to {MessageProposal.MaxLines} lines, each plain text of at most {MessageProposal.MaxLineChars} characters on one line, with no curly braces and no colon, not starting with #.");
         Line($"- weather: {{ nickname }}, a name of up to {DeskDesign.WeatherNicknameMax} characters shown in place of the city's name.");
         Line();
-        Line("\"drawers\" holds rules, and can set how drawers look and line up, never file moves: you cannot see my files and you never name one. Each rule sends the");
+        Line("\"drawers\" starts with rules, never file moves: you cannot see my files and you never name one. Each rule sends the");
         Line("desktop files it matches to a drawer, a folder Sanduhr makes for me. A rule is { kind, drawer, text, days }:");
         Line("- kind: " + string.Join(", ", PastedSetup.KindWords) + ".");
         Line($"- drawer: a short folder name of up to {DrawerNames.MaxLength} characters, a name and never a path.");
         Line($"- text: for {PastedSetup.KindWord(DrawerRuleKind.NameContains)} and {PastedSetup.KindWord(DrawerRuleKind.NameStartsWith)}, part of a file name, up to {PastedSetup.MaxTextChars} characters.");
         Line($"- days: for {PastedSetup.KindWord(DrawerRuleKind.OlderThan)}, a whole number from 1 to {PastedSetup.MaxDays}.");
-        Line($"1 to {PastedSetup.MaxRules} rules; leave rules out to keep my rules as they are. The first rule that matches a file wins, and a file no rule matches stays on the desktop.");
-        Line("\"drawers\" can also set how drawers look and where they line up. Send any of these, and leave out what I did not ask for:");
+        Line($"1 to {PastedSetup.MaxRules} rules; leave drawers out to keep my rules as they are. The first rule that matches a file wins, and a file no rule matches stays on the desktop.");
+        Line("\"drawers\" can also set how drawers look and line up. Send any of these, and leave out the rest:");
         Line("- look: " + string.Join(", ", DrawerStyle.LookWords) + " (solid is a plate, glass a lighter plate, outline a thin frame, bare no frame).");
         Line($"- opacity: a whole number from {DrawerStyle.MinOpacity} to {DrawerStyle.MaxOpacity}, for solid and glass.");
         Line("- arrange: { corner, direction } lines the drawers up from that corner. corner: " + string.Join(", ", DrawerStyle.CornerWords)
