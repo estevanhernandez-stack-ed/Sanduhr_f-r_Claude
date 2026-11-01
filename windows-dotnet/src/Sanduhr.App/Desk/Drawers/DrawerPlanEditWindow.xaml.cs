@@ -31,10 +31,10 @@ internal sealed partial class DrawerPlanEditWindow : Window
             }
             foreach (var m in plan.Moves.Where(m => m.DrawerId == d.Id))
             {
-                var name = StreamerMode.Mask.Omit(Path.GetFileName(m.Source)) ?? "File";   // streamer: masked - Mask.Omit hides the file name while on
+                var name = StreamerMode.Mask.Omit(DrawerNames.Display(Path.GetFileName(m.Source))) ?? "File";   // streamer: masked - Mask.Omit hides the file name while on
                 var tick = new CheckBox { Content = name, IsChecked = true, Margin = new Thickness(4, 2, 0, 2) };
                 tick.SetResourceReference(ForegroundProperty, "Sanduhr.Brush.Text");
-                AutomationProperties.SetName(tick, StreamerMode.Mask.Omit(Path.GetFileName(m.Source)) ?? "File");   // streamer: masked - Mask.Omit hides the file name while on
+                AutomationProperties.SetName(tick, StreamerMode.Mask.Omit(DrawerNames.Display(Path.GetFileName(m.Source))) ?? "File");   // streamer: masked - Mask.Omit hides the file name while on
                 _moves[m.Source] = tick;
                 group.Children.Add(tick);
             }

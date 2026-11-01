@@ -40,7 +40,7 @@
                 <!-- The chip is transparent unless the look put labels on chips (DrawerLook.Chips); it hides with the label while renaming. -->
                 <Border x:Name="LabelChip" Background="{DynamicResource Drawer.Chip}" CornerRadius="4" Padding="{DynamicResource Drawer.ChipPadding}"
                         HorizontalAlignment="Center" Margin="0,4,0,0">
-                    <TextBlock x:Name="Label" Text="{Binding Name}" AutomationProperties.Name="{Binding SpokenName}" FontSize="11.5" TextAlignment="Center" TextWrapping="Wrap"
+                    <TextBlock x:Name="Label" Text="{Binding DisplayName}" AutomationProperties.Name="{Binding SpokenName}" FontSize="11.5" TextAlignment="Center" TextWrapping="Wrap"
                                TextTrimming="CharacterEllipsis" MaxHeight="32"
                                Foreground="{DynamicResource Drawer.Ink}" Effect="{DynamicResource Drawer.LabelEffect}" />
                 </Border>

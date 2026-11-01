@@ -70,7 +70,7 @@ public static class DrawerReview
     public static string ResultLine(int moved, IReadOnlyList<DrawerSkipped> skipped)
     {
         if (skipped.Count == 0) return $"{moved} moved.";
-        var named = string.Join(" ", skipped.Take(NamedSkips).Select(s => $"{s.Name} {s.Reason}"));
+        var named = string.Join(" ", skipped.Take(NamedSkips).Select(s => $"{DrawerNames.Display(s.Name)} {s.Reason}"));
         var more = skipped.Count > NamedSkips ? $" And {skipped.Count - NamedSkips} more." : "";
         return $"{moved} moved, {skipped.Count} skipped: {named}{more}";
     }

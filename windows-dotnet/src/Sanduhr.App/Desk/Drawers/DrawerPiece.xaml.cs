@@ -479,7 +479,8 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
         text = text.Trim();
         // A blank box under streamer mode (it opens blank, see EditorStart) keeps the name, as Escape does.
         if (text.Length == 0 && StreamerMode.On) { EndRename(); return; }
-        if (text != item.Name && _service.RenameItem(item.Path, text) is { } error) Say(error);
+        var newName = item.IsFolder ? text : DrawerNames.WithHiddenExtension(item.Name, text);   // streamer: key - the typed name with the file's hidden extension put back, used for IO
+        if (newName != item.Name && _service.RenameItem(item.Path, newName) is { } error) Say(error);
         EndRename();
     }
 
@@ -508,8 +509,8 @@ internal sealed partial class DrawerPiece : UserControl, IDisposable
     /// blank while streamer mode is on, as the drawer-rename prompt opens (the box is not blurred).</summary>
     internal static (string Text, int Select) EditorStart(DrawerItem item)
     {
-        if (StreamerMode.Mask.Omit(item.Name) is not { } name) return ("", 0);   // streamer: masked - Mask.Omit opens the box blank while on
-        int stem = item.IsFolder ? name.Length : Path.GetFileNameWithoutExtension(name).Length;   // streamer: key - a length, never drawn
+        if (StreamerMode.Mask.Omit(item.DisplayName) is not { } name) return ("", 0);   // streamer: masked - Mask.Omit opens the box blank while on
+        int stem = item.IsFolder || name != item.Name ? name.Length : Path.GetFileNameWithoutExtension(name).Length;   // streamer: key - a length, never drawn
         if (stem == 0) stem = name.Length;   // a dotfile (.gitignore) has no stem: select the whole name, as Explorer does
         return (name, stem);
     }
