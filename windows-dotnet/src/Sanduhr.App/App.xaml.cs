@@ -27,6 +27,7 @@ public partial class App : Application
     private Icon? _trayIcon;
     private SettingsWindow? _settingsWindow;
     private DispatcherTimer? _trayRotateTimer;
+    private MenuItem? _trayShowsItem;
     private GlobalHotKeyService? _hotKeys;
     private ClaudeCodeGlowService? _glow;
     private Desk.DeskController? _desk;
@@ -118,6 +119,8 @@ public partial class App : Application
         {
             if (args.PropertyName == nameof(WidgetViewModel.TrayMode))
                 SyncTrayRotation();
+            if (args.PropertyName == nameof(WidgetViewModel.UsageOn) && _trayShowsItem is not null)
+                _trayShowsItem.Visibility = _vm.UsageOn ? Visibility.Visible : Visibility.Collapsed;   // no number to pick while usage is off
             if (args.PropertyName == nameof(WidgetViewModel.IsDemo) && _endDemoItem is not null)
                 _endDemoItem.Visibility = _vm.IsDemo ? Visibility.Visible : Visibility.Collapsed;
         };
@@ -461,11 +464,11 @@ public partial class App : Application
 
     private void SetupTray()
     {
-        _trayIcon = TrayIconRenderer.Render(-1);
+        _trayIcon = _vm?.UsageOn == false ? TrayIconRenderer.Hourglass() : TrayIconRenderer.Render(-1);
         _tray = new TaskbarIcon
         {
             Icon = _trayIcon,
-            ToolTipText = "Sanduhr für Claude",
+            ToolTipText = TrayReadout.AppName,
         };
         _tray.TrayLeftMouseUp += (_, _) => ToggleWindow();
 
@@ -565,7 +568,9 @@ public partial class App : Application
         menu.Items.Add(_arrangeItem);
         menu.Items.Add(_putBackItem);
         menu.Items.Add(refresh);
-        menu.Items.Add(BuildTrayShowsMenu());
+        _trayShowsItem = BuildTrayShowsMenu();
+        _trayShowsItem.Visibility = _vm?.UsageOn == false ? Visibility.Collapsed : Visibility.Visible;
+        menu.Items.Add(_trayShowsItem);
         menu.Items.Add(streamer);
         menu.Items.Add(new Separator());
         menu.Items.Add(accounts);
@@ -1140,15 +1145,12 @@ public partial class App : Application
     {
         if (_tray is null)
             return;
-        var icon = TrayIconRenderer.Render(reading?.Percent ?? -1);
+        var glyph = TrayReadout.Glyph(_vm?.UsageOn ?? true, reading, _vm?.IsDemo == true);
+        var icon = glyph.Kind == TrayGlyphKind.Hourglass ? TrayIconRenderer.Hourglass() : TrayIconRenderer.Render(glyph.Percent);
         _tray.Icon = icon;
         _trayIcon?.Dispose();
         _trayIcon = icon;
-        _tray.ToolTipText = SettingsNames.TrayTooltip(_vm?.Streamer.On == true, reading is null
-            ? "Sanduhr für Claude — no data yet"
-            : _vm?.IsDemo == true
-                ? $"Sanduhr für Claude — {DemoMode.TrayLabel(reading.Label, reading.Percent)}"
-                : $"Sanduhr für Claude — {reading.Label} {reading.Percent}%");
+        _tray.ToolTipText = SettingsNames.TrayTooltip(_vm?.Streamer.On == true, glyph.Tooltip);
     }
 
     /// <summary>Streamer mode moved (slice 7): the tooltip's prefix, the Desk and the Watchers runner line follow. App lives as long as the

@@ -184,6 +184,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowNotSignedInLine));
         OnPropertyChanged(nameof(ShowUsageOff));
         RaiseDesk();
+        RaiseTray();   // the tray swaps "--" and the hourglass
     }
 
     /// <summary>No setup was made yet and the setup screen is up (or was put off with Not now): the Desk draws no usage line behind it, as
@@ -355,6 +356,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <summary>What the tray shows now: Settings, General's preview reads it.</summary>
     public TrayReading? CurrentTrayReading =>
         TrayReadout.Reading(_trayMode, _traySession, _trayWeekly, _trayHighest, _trayStep);
+
+    /// <summary>The tray icon now: the reading's number, or with none the hourglass (usage off) or "--" (usage on, no data yet).</summary>
+    public TrayGlyph CurrentTrayGlyph => TrayReadout.Glyph(UsageOn, CurrentTrayReading, IsDemo);
 
     private void RaiseTray() => TrayReadingChanged?.Invoke(CurrentTrayReading);
 

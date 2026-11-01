@@ -59,6 +59,37 @@ public sealed class WidgetUsageTests : AppWindowFixture
     });
 
     [Fact]
+    public void The_tray_shows_the_hourglass_while_usage_is_off_and_dashes_when_it_comes_back_on() => AppHost.Run(() =>
+    {
+        new SettingsStore(ScratchPaths()).SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false }));
+        var (widget, _) = ScratchWidget();   // no account: turning usage on builds no client and reaches no network
+        try
+        {
+            Assert.Equal(TrayGlyphKind.Hourglass, widget.CurrentTrayGlyph.Kind);
+            var raised = new List<TrayReading?>();
+            widget.TrayReadingChanged += raised.Add;
+            widget.SetUsageOn(true);
+            Assert.Equal(TrayGlyphKind.NoData, widget.CurrentTrayGlyph.Kind);
+            Assert.NotEmpty(raised);   // the tray redraws without waiting for a fetch
+            raised.Clear();
+            widget.SetUsageOn(false);
+            Assert.Equal(TrayGlyphKind.Hourglass, widget.CurrentTrayGlyph.Kind);
+            Assert.NotEmpty(raised);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void The_tray_hourglass_is_the_shipped_app_icon() => AppHost.Run(() =>
+    {
+        var info = System.Windows.Application.GetResourceStream(TrayIconRenderer.HourglassUri);
+        Assert.NotNull(info);
+        info!.Stream.Dispose();
+        using var icon = TrayIconRenderer.Hourglass();
+        Assert.Equal(32, icon.Width);
+    });
+
+    [Fact]
     public void General_shows_the_tray_number_when_there_is_no_widget_to_ask() => AppHost.Run(() =>
     {
         var general = new GeneralViewModel();

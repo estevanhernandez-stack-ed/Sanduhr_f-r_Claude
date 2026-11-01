@@ -10,6 +10,17 @@ public enum TrayMode
     Rotate,
 }
 
+/// <summary>What the tray icon draws: the hourglass (usage off, nothing to count), a number, or "--" (usage on, no data yet).</summary>
+public enum TrayGlyphKind
+{
+    Hourglass,
+    Number,
+    NoData,
+}
+
+/// <summary>The tray icon and its tooltip (before the streamer prefix). <see cref="Percent"/> means something only for a number.</summary>
+public sealed record TrayGlyph(TrayGlyphKind Kind, int Percent, string Tooltip);
+
 /// <summary>One tray reading: the truncated percent and the label for the tooltip.</summary>
 public sealed record TrayReading(int Percent, string Label);
 
@@ -72,6 +83,21 @@ public static class TrayReadout
             default:
                 return highestVisible is { } h ? Make(h.Util, h.Label) : null;
         }
+    }
+
+    public const string AppName = "Sanduhr für Claude";
+
+    /// <summary>The tray icon for a reading. A reading always shows its number (demo samples draw with usage off). No reading: the
+    /// hourglass while usage is off, since no number is coming, and "--" while it is on, the not-connected tell.</summary>
+    public static TrayGlyph Glyph(bool usageOn, TrayReading? reading, bool demo)
+    {
+        if (reading is not null)
+            return new(TrayGlyphKind.Number, reading.Percent, demo
+                ? $"{AppName} — {DemoMode.TrayLabel(reading.Label, reading.Percent)}"
+                : $"{AppName} — {reading.Label} {reading.Percent}%");
+        return usageOn
+            ? new(TrayGlyphKind.NoData, -1, $"{AppName} — no data yet")
+            : new(TrayGlyphKind.Hourglass, -1, AppName);
     }
 
     private static TrayReading? Session(double? v) => v is null ? null : Make(v.Value, "Session");
