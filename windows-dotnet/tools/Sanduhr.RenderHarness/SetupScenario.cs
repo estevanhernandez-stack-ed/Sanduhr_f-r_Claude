@@ -24,6 +24,7 @@ public static partial class Program
         public int DrawerFiles => 0;
         public bool AddOnsInstalled => false;
         public bool UsageOn { get; set; }
+        public bool HasAccount => true;
         public SetupDrawersOff TurnOffDrawers() => new(true, null);
         public void TurnOnDrawers() { }
         public string? SortNow() => null;

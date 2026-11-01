@@ -104,6 +104,45 @@ public sealed class DeskDesignReviewTests : IDisposable
          "layout":{"clock":{"anchor":"tr","size":1.4}}}
         """;
 
+    // ---- A nicer desktop off (setup spec): the bar says Apply only saves ----
+
+    [Fact]
+    public void AReviewWithADesktopOffSetupAddsTheSavedForLaterNoteToTheBar()
+    {
+        _store.SaveSetup(new SetupSettings(false, new Dictionary<string, bool> { ["claude"] = true }));
+        WithService((s, host) =>
+        {
+            Send(s, "d1", Dusk);
+            Assert.Contains(SetupCopy.DesignDesktopOffNote, host.Model!.Warnings);
+            Assert.Equal("A nicer desktop is off, so Apply saves this for when you turn it on.", SetupCopy.DesignDesktopOffNote);
+        });
+    }
+
+    [Fact]
+    public void APastedReviewWithADesktopOffSetupAddsTheNoteToo()
+    {
+        _store.SaveSetup(new SetupSettings(false, new Dictionary<string, bool> { ["claude"] = false }));
+        WithService((s, host) =>
+        {
+            Assert.Equal(DeskAnswer.Previewing, s.ProposePasted(Pasted(s, Dusk)).Status);
+            Assert.Contains(SetupCopy.DesignDesktopOffNote, host.Model!.Warnings);
+        });
+    }
+
+    [Fact]
+    public void NoNoteWhenADesktopIsOnOrNoSetupWasMadeYet()
+    {
+        WithService((s, host) =>
+        {
+            Send(s, "n1", Dusk);   // no setup yet
+            Assert.DoesNotContain(SetupCopy.DesignDesktopOffNote, host.Model!.Warnings);
+            s.DismissReview();
+            _store.SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = true }));
+            Send(s, "n2", Dusk);
+            Assert.DoesNotContain(SetupCopy.DesignDesktopOffNote, host.Model!.Warnings);
+        });
+    }
+
     // ---- previewing: nothing is written ----
 
     [Fact]

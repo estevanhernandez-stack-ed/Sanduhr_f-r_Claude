@@ -66,10 +66,10 @@ public static class WelcomeTour
         Moved(ById("desk"), 1),
         Moved(ById("tray"), 2,
             "Right-click the hourglass in the tray for Settings and Arrange Desk; a click brings back the widget. Once you sign in it shows a percent of your limits."),
-        // Show me lands on the Widget page's usage-off section, where the Set up Sanduhr button is.
+        // Show me opens the Set up Sanduhr window itself (SettingsIndex.OpensSetup), where usage is ticked.
         new(3, new WhatsNewCard([], "usage", "Usage any time",
             "The Desk works without an account. Turn on usage in Set up Sanduhr whenever you want it, and the meters fill in on the desktop.",
-            "", WhatsNewPreview.None, SettingsPage.Widget) { Anchor = SettingsIndex.UsageOffSection }, ShowMeTitle: SetupCopy.Title),
+            "", WhatsNewPreview.None, SettingsPage.General) { Anchor = SettingsIndex.GeneralSetup }, ShowMeTitle: SetupCopy.Title),
     ]);
 
     private static TourCard ById(string id) => Table.Single(c => c.Id == id);

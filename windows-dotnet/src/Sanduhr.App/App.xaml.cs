@@ -127,6 +127,7 @@ public partial class App : Application
         _vm.ManualReauthRequested += RunManualReauthAsync;
         _vm.PasteKeyRequested += () => RunSignInAsync(embedded: false);
         _vm.SettingsRequested += () => ShowSettingsAsync();
+        _vm.SetupRequested += () => OpenSetup(firstRun: false);   // the widget's usage-off row
         // "<Page> settings…" from the tier card and the account menus lands on its section (spec, Menus table).
         _vm.SettingsPageRequested += page => ShowSettingsAsync(page, SettingsIndex.MenuAnchor(page));
         // Keep an open Settings window's account list in sync with quick-switches
@@ -1190,6 +1191,13 @@ public partial class App : Application
 
     private void ToggleWindow()
     {
+        // No setup yet (Not now, or still up): the tray's click brings back Set up Sanduhr, not the widget's first-run card. The tray's
+        // explicit Show item still shows the widget.
+        if (SetupLaunch.TrayClickOpensSetup(_vm?.SetupPending == true, _vm?.AccountStore.ListAccounts().Count > 0))   // streamer: key - a count, never drawn
+        {
+            OpenSetup(firstRun: true);
+            return;
+        }
         if (_window is null)
             return;
         if (_window.IsVisible)

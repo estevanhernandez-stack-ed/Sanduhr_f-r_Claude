@@ -14,6 +14,8 @@ internal interface ISetupHost
     int DrawerFiles { get; }
     bool AddOnsInstalled { get; }
     bool UsageOn { get; }
+    /// <summary>An account is saved (usage off keeps it, and says so only when there is one).</summary>
+    bool HasAccount { get; }
     /// <summary>Turns drawers off the way the Drawers page does (the count question, the review dismissed, the files returned).</summary>
     SetupDrawersOff TurnOffDrawers();
     /// <summary>Turns drawers on the way the Drawers page does.</summary>
@@ -40,7 +42,7 @@ internal sealed class SetupService(SettingsStore store, ISetupHost host)
     }
 
     public IReadOnlyList<string> Preview(SetupChoices after) =>
-        SetupChange.Lines(Current(), after, host.DrawerFiles, host.AddOnsInstalled);
+        SetupChange.Lines(Current(), after, host.DrawerFiles, host.AddOnsInstalled, host.HasAccount);
 
     public SetupResult Apply(SetupChoices after)
     {
@@ -103,6 +105,7 @@ internal sealed class AppSetupHost(Func<DrawerService?> drawers, Func<DrawerRevi
     public int DrawerFiles => drawers()?.ReturnPlan()?.Moves.Count ?? 0;
     public bool AddOnsInstalled => store.LoadMcpEnabled() || store.LoadStatuslineEnabled();
     public bool UsageOn => widget.UsageOn;
+    public bool HasAccount => widget.AccountStore.ListAccounts().Count > 0;   // streamer: key - a count, never drawn
 
     public SetupDrawersOff TurnOffDrawers()
     {

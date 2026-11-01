@@ -30,19 +30,30 @@ public class SetupSettingsTests
     }
 
     [Theory]
-    [InlineData(true, false, false, true, true, false, true)]    // an account: usage on, desktop = desk_enabled
-    [InlineData(true, false, false, false, false, false, true)]  // an account, Desk off: desktop off
-    [InlineData(false, true, true, false, true, true, false)]    // Just the Desk: usage off, desktop on, the reminder it silenced returns
-    [InlineData(true, true, false, true, true, false, true)]     // both: the account wins
+    [InlineData(true, false, false, true, true, false, true, true)]    // an account: usage on, desktop on, the Desk stays on
+    [InlineData(true, false, false, false, true, false, true, false)]  // an account, Desk off: desktop still on, the Desk stays off (a later Desk switch draws the whole Desk)
+    [InlineData(false, true, true, false, true, true, false, true)]    // Just the Desk: usage off, desktop on, Desk on, the reminder it silenced returns
+    [InlineData(false, true, false, false, true, false, false, true)]  // Just the Desk, reminder not silenced: it is not forced back
+    [InlineData(true, true, false, true, true, false, true, true)]     // both: the account wins
+    [InlineData(true, true, true, false, true, true, true, false)]     // both, silenced: the account wins, the silenced reminder returns, the Desk stays off
     public void Migration_maps_each_starting_case(bool account, bool jtd, bool silenced, bool deskOn,
-        bool wantDesktop, bool wantReminder, bool wantUsage)
+        bool wantDesktop, bool wantReminder, bool wantUsage, bool wantDeskOn)
     {
         var m = SetupMigration.From(account, jtd, silenced, deskOn);
         Assert.NotNull(m);
         Assert.Equal(wantDesktop, m!.Setup.Desktop);
         Assert.Equal(wantUsage, m.Setup.ClaudeUsage);
         Assert.Equal(wantReminder, m.ReminderOn);
-        if (jtd && !account) Assert.True(m.DeskOn);
+        Assert.Equal(wantDeskOn, m.DeskOn);
+    }
+
+    [Fact]
+    public void An_upgrader_with_the_Desk_off_shows_desktop_unticked_but_keeps_desktop_for_when_the_Desk_comes_on()
+    {
+        var m = SetupMigration.From(hasAccount: true, justTheDesk: false, silencedReminder: false, deskEnabled: false)!;
+        Assert.True(m.Setup.Desktop);
+        Assert.False(SetupChoices.Of(m.Setup, drawersOn: false, deskEnabled: false).Desktop);   // the screen shows the Desk's own switch
+        Assert.True(SetupChoices.Of(m.Setup, drawersOn: false, deskEnabled: true).Desktop);
     }
 
     [Fact]
@@ -50,6 +61,22 @@ public class SetupSettingsTests
     {
         Assert.Null(SetupMigration.From(false, false, false, false));
         Assert.True(SetupLaunch.OpensSetup(null));
+    }
+
+    [Fact]
+    public void A_tray_click_opens_the_setup_screen_only_while_no_setup_exists()
+    {
+        Assert.True(SetupLaunch.TrayClickOpensSetup(setupPending: true, hasAccount: false));
+        Assert.False(SetupLaunch.TrayClickOpensSetup(setupPending: true, hasAccount: true));   // signed in: the widget has meters
+        Assert.False(SetupLaunch.TrayClickOpensSetup(setupPending: false, hasAccount: false));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void No_setup_yet_starts_the_widget_hidden_whatever_the_Desk_says(bool deskOn)
+    {
+        Assert.True(SetupLaunch.WidgetStartsHidden(null, deskOn));
     }
 
     [Theory]

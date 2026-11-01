@@ -774,13 +774,13 @@ public static class SettingsIndex
             : link;
     }
 
+    /// <summary>The link whose Show me opens the Set up Sanduhr window rather than a Settings page.</summary>
+    public static bool OpensSetup(SettingsLink link) => link.Page == SettingsPage.General && link.Anchor == GeneralSetup;
+
     /// <summary>
     /// Whether a place means the widget itself rather than Settings (Settings v2, slice 5, decision 1): <see cref="SettingsPage.Widget"/>
     /// with no anchor is what cards, the tour and <c>--settings widget</c> have always meant; with an anchor it is the Widget page.
     /// </summary>
-    /// <summary>The link whose Show me opens the Set up Sanduhr window rather than a Settings page.</summary>
-    public static bool OpensSetup(SettingsLink link) => link.Page == SettingsPage.General && link.Anchor == GeneralSetup;
-
     public static bool ShowsTheWidget(SettingsLink link) => link.Page == SettingsPage.Widget && link.Anchor is null;
 
     /// <summary>

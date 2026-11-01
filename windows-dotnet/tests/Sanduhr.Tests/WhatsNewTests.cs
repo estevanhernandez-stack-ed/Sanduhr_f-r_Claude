@@ -170,7 +170,7 @@ public class WhatsNewTests
             .Concat(WelcomeTour.Table.Select(WelcomeTour.SignedOut).Select(t => t.Card));
         foreach (var card in cards)
         {
-            if (card.Destination == SettingsPage.Widget && card.Id != "usage")   // the Desk-only tour's usage card lands on the Widget page's usage-off section
+            if (card.Destination == SettingsPage.Widget)
             {
                 Assert.Null(card.Anchor);
                 continue;

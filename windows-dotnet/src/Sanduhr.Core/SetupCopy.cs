@@ -28,6 +28,9 @@ public static class SetupCopy
     public const string WhatChanges = "What changes";
     public const string WhatHappened = "What happened";
 
+    /// <summary>On the review bar of a Desk design (from the MCP or pasted) while A nicer desktop is off: Apply still saves it.</summary>
+    public const string DesignDesktopOffNote = "A nicer desktop is off, so Apply saves this for when you turn it on.";
+
     public const string ArrangeNeedsDesktop = "Turn on A nicer desktop in Set up Sanduhr to arrange the Desk.";
 
     // ---- Design it with an AI chat (spec 3): the window's copy. It says "any AI chat" and names no product, Claude included. ----
@@ -75,7 +78,7 @@ public static class SetupCopy
     public static IReadOnlyList<string> All { get; } =
     [
         Title, Intro, DesktopTitle, DesktopBody, DrawersTitle, DrawersBody, UsageTitle, UsageBody, ClaudeSource, ClaudeTrademark,
-        DesignWithChat, Continue, NotNow, Cancel, MenuItem, PickOne, SaveFailed, WhatChanges, WhatHappened, DesktopOffLine, UsageOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DrawersOffLine(2),
+        DesignWithChat, Continue, NotNow, Cancel, MenuItem, PickOne, SaveFailed, WhatChanges, WhatHappened, DesktopOffLine, UsageOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DesignDesktopOffNote, DrawersOffLine(2),
         ChatIntro, ChatCopyPrompt, ChatPasteName, ChatPastePlaceholder, ChatPreview, ChatUseRules, ChatClose, ChatFindingsName, ChatReady,
         ChatPromptCopied, ChatDeskShown, ChatRulesShown, ChatNoDeskService, ChatRulesSavedNothing, ChatUntitledDesign, ChatFixCount(1), ChatFixCount(2), ChatManyBlocks(2),
         ChatRulesLine(1, ["Photos"]), ChatRulesLine(2, ["Photos", "Receipts"]), ChatNotShown("the Desk is busy"),
@@ -88,14 +91,15 @@ public static class SetupCopy
 /// <summary>What a change says before Continue applies it (spec 4): one line per tick taken away.</summary>
 public static class SetupChange
 {
-    public static IReadOnlyList<string> Lines(SetupChoices before, SetupChoices after, int drawerFiles, bool addonsInstalled)
+    /// <param name="hasAccount">Whether an account is saved: "Your account stays saved" is said only when there is one to stay.</param>
+    public static IReadOnlyList<string> Lines(SetupChoices before, SetupChoices after, int drawerFiles, bool addonsInstalled, bool hasAccount)
     {
         var lines = new List<string>();
         if (before.Desktop && !after.Desktop) lines.Add(SetupCopy.DesktopOffLine);
         if (before.Drawers && !after.Drawers && drawerFiles > 0) lines.Add(SetupCopy.DrawersOffLine(drawerFiles));
         if (before.ClaudeUsage && !after.ClaudeUsage)
         {
-            lines.Add(SetupCopy.UsageOffLine);
+            if (hasAccount) lines.Add(SetupCopy.UsageOffLine);
             if (addonsInstalled) lines.Add(SetupCopy.AddOnsStayLine);
         }
         return lines;

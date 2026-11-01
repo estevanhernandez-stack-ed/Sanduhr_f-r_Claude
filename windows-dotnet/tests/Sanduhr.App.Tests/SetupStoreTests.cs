@@ -39,6 +39,30 @@ public sealed class SetupStoreTests : IDisposable
     }
 
     [Fact]
+    public void Migrating_an_account_with_the_Desk_off_keeps_desktop_on_and_the_Desk_off()
+    {
+        var store = Store();
+        Assert.False(store.LoadDesk().Enabled);
+        Assert.True(store.MigrateSetup(hasAccount: true));
+        var s = store.LoadSetup()!;
+        Assert.True(s.Desktop);              // turning the Desk on later in Settings draws the whole Desk
+        Assert.True(s.ClaudeUsage);
+        Assert.False(store.LoadDesk().Enabled);   // nothing changes on upgrade
+        Assert.False(SetupChoices.Of(s, drawersOn: false, deskEnabled: store.LoadDesk().Enabled).Desktop);   // the screen shows the Desk's own switch
+    }
+
+    [Fact]
+    public void An_unreadable_setup_entry_falls_back_to_desktop_on_even_with_the_Desk_off()
+    {
+        var paths = new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local"));
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.SettingsFile)!);
+        File.WriteAllText(paths.SettingsFile, "{\"setup\":{\"desktop\":\"yes\",\"usage\":{}}}");
+        var s = new SettingsStore(paths).LoadSetup()!;
+        Assert.True(s.Desktop);
+        Assert.True(s.ClaudeUsage);
+    }
+
+    [Fact]
     public void Migration_runs_once_and_never_on_a_first_run()
     {
         var store = Store();
