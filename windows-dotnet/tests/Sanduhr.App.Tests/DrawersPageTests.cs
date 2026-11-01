@@ -30,7 +30,7 @@ public sealed class DrawersPageTests : AppWindowFixture
             var tab = ((TabControl)window.FindName("Tabs")).Items.OfType<TabItem>().Single(t => (string)t.Tag == "Drawers");
             Assert.True(tab.IsSelected);
             foreach (var anchor in new[] { SettingsIndex.Drawers, SettingsIndex.DrawersFolder, SettingsIndex.DrawersSort, SettingsIndex.DrawersRules,
-                SettingsIndex.DrawersList, SettingsIndex.DrawersRecent })
+                SettingsIndex.DrawersList, SettingsIndex.DrawersRecent, SettingsIndex.DrawersLookSection })
                 Assert.NotNull(SettingsAnchor.Find((DependencyObject)tab.Content, anchor));
         }
         finally { window.Close(); }
@@ -71,7 +71,7 @@ public sealed class DrawersPageTests : AppWindowFixture
                 var use = Below<CheckBox>(content).First();
                 Assert.True(s.Settings.Enabled);
                 Assert.True(use.IsChecked);
-                var ruleBoxes = Below<CheckBox>(content).Skip(1).ToList();
+                var ruleBoxes = Below<CheckBox>(content).Where(c => c.DataContext is DrawerRuleRow).ToList();   // the look section has its own check boxes
                 Assert.NotEmpty(s.Settings.Rules);
                 Assert.Equal(s.Settings.Rules.Count, ruleBoxes.Count);
                 Assert.Equal(s.Settings.Rules.Count, svm.Drawers.Rules.Count);

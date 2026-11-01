@@ -1113,7 +1113,6 @@ public static class SettingsNames
     public const string DrawersList = "Your drawers";
     public const string DrawersShow = "Show drawers";
     public const string DrawersAddFolder = "Show a folder as a drawer…";
-    public const string DrawersPutBack = "Put drawers back top right";
     public const string DrawersRecent = "Recent moves";
     public const string DrawersNothingRecent = "Nothing has moved yet.";
     public const string DrawersStoreNote = "If you remove Sanduhr from the Microsoft Store, drawer files stay in the Drawers folder on your Desktop.";
@@ -1131,6 +1130,21 @@ public static class SettingsNames
     public const string DrawersRootUnsafe = "The Drawers folder can't be the Desktop or a folder that holds it.";
     public const string DrawersSortUnavailable = "Sorting is not available right now.";
     public const string DrawersDeskSaveFailed = "The Desk setting could not be saved, so drawers stay off.";
+
+    // ---- Drawer look and placement (look and placement spec, sections 1 and 2) ----
+    public const string DrawersLook = "Drawer look";
+    public static IReadOnlyList<string> DrawersLookWords { get; } = ["Solid", "Glass", "Outline", "Bare"];
+    public const string DrawersOpacity = "Opacity";
+    public const string DrawersSnap = "Snap drawers";
+    public const string DrawersSnapHint = "Hold Alt while dragging to place a drawer freely.";
+    public const string DrawersKeepClear = "Keep clear of desktop icons";
+    public const string DrawersTidy = "Tidy drawers";
+    public const string DrawersTidyCorner = "Corner";
+    public static IReadOnlyList<string> DrawersTidyCornerWords { get; } = ["Top left", "Top right", "Bottom left", "Bottom right"];
+    public const string DrawersTidyFlow = "Direction";
+    public static IReadOnlyList<string> DrawersTidyFlowWords { get; } = ["Column", "Row"];
+    public const string DrawerLookMenu = "Look";
+    public const string DrawerLookSame = "Same as the others";
 
     /// <summary>Watchers and Launcher: the section that holds the piece's status line.</summary>
     public const string WatchersPlace = "Where they show";

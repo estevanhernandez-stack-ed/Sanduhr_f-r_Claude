@@ -62,6 +62,23 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
     [ObservableProperty] private string _newRuleText = "";
     [ObservableProperty] private string _newRuleDrawer = "";
 
+    // ---- Drawer look and placement (look and placement spec, sections 1 and 2) ----
+    [ObservableProperty] private int _lookIndex;
+    [ObservableProperty] private int _opacity = DrawerStyle.DefaultOpacity;
+    [ObservableProperty] private bool _snap = true;
+    [ObservableProperty] private bool _keepClear = true;
+    [ObservableProperty] private int _tidyCornerIndex;
+    [ObservableProperty] private int _tidyFlowIndex;
+
+    /// <summary>Opacity shows only for the looks that draw a plate (Solid, Glass).</summary>
+    public bool ShowOpacity => LookIndex is >= 0 and <= (int)DrawerLookKind.Bare && DrawerStyle.HasFill((DrawerLookKind)LookIndex);
+
+    /// <summary>The slider's readout: "55%".</summary>
+    public string OpacityText => $"{Opacity}%";
+
+    /// <summary>Set by the app: lines the drawers up from the chosen corner and direction. Null when the Tidy bar opened, else the line to show.</summary>
+    public Func<DrawerTidy, string?>? TidyRequested { get; set; }
+
     public void Refresh()
     {
         if (_disposed) return;
@@ -71,6 +88,12 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
             if (_drawers is null) return;
             var s = _drawers.Settings;
             Enabled = s.Enabled;
+            LookIndex = (int)s.Look;
+            Opacity = s.Opacity;
+            Snap = s.Snap;
+            KeepClear = s.KeepClear;
+            TidyCornerIndex = (int)s.Tidy.Corner;
+            TidyFlowIndex = (int)s.Tidy.Flow;
             RootText = StreamerMode.Mask.Paths(s.RootOr(_drawers.Places.Desktop));   // streamer: masked - Mask.Paths hides the profile folder while on
             CanChangeRoot = !s.Drawers.Any(d => d.Owned);
             Rules.Clear();
@@ -195,12 +218,45 @@ public sealed partial class DrawersSettingsViewModel : ObservableObject, IDispos
     [RelayCommand]
     private void ShowDrawers() => _drawers?.ShowAll();
 
-    /// <summary>Drawers are free panels, so no saved place means "top right": clearing the places sends every drawer back there at the next render.</summary>
+    /// <summary>Tidy drawers, from the corner and direction the page shows.</summary>
     [RelayCommand]
-    private void ResetPlaces()
+    private void Tidy() =>
+        Status = TidyRequested?.Invoke(new DrawerTidy((DrawerCorner)TidyCornerIndex, (DrawerFlow)TidyFlowIndex)) ?? "";
+
+    private void SaveWith(Func<DrawerSettings, DrawerSettings> change)
     {
-        if (_drawers is null) return;
-        _drawers.Save(_drawers.Settings with { Places = new Dictionary<string, DrawerPlace>() });
+        if (_loading || _drawers is null) return;
+        _drawers.Save(change(_drawers.Settings));
+    }
+
+    partial void OnLookIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(ShowOpacity));
+        if (value is < 0 or > (int)DrawerLookKind.Bare) return;   // a cleared combo box: the next Refresh puts the saved look back
+        SaveWith(s => s with { Look = (DrawerLookKind)value });
+    }
+
+    partial void OnOpacityChanged(int value)
+    {
+        var clamped = Math.Clamp(value, DrawerStyle.MinOpacity, DrawerStyle.MaxOpacity);
+        if (clamped != value) { Opacity = clamped; return; }
+        OnPropertyChanged(nameof(OpacityText));
+        SaveWith(s => s with { Opacity = clamped });
+    }
+
+    partial void OnSnapChanged(bool value) => SaveWith(s => s with { Snap = value });
+    partial void OnKeepClearChanged(bool value) => SaveWith(s => s with { KeepClear = value });
+
+    partial void OnTidyCornerIndexChanged(int value)
+    {
+        if (value is < 0 or > (int)DrawerCorner.BottomRight) return;
+        SaveWith(s => s with { Tidy = s.Tidy with { Corner = (DrawerCorner)value } });
+    }
+
+    partial void OnTidyFlowIndexChanged(int value)
+    {
+        if (value is < 0 or > (int)DrawerFlow.Row) return;
+        SaveWith(s => s with { Tidy = s.Tidy with { Flow = (DrawerFlow)value } });
     }
 
     [RelayCommand]

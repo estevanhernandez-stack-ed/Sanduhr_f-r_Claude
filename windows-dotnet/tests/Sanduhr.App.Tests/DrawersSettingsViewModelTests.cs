@@ -121,18 +121,15 @@ public sealed class DrawersSettingsViewModelTests
     });
 
     [Fact]
-    public void Put_drawers_back_top_right_clears_the_places_and_Show_drawers_clears_hidden() => Sta.Run(() =>
+    public void Show_drawers_clears_hidden() => Sta.Run(() =>
     {
         using var box = new DrawerSandbox();
         var (vm, s, store) = Make(box, enabled: true);
         s.Save(s.Settings with
         {
             Drawers = [new DrawerDef("images", "Images", box.Dir(@"Desktop\Drawers\Images"), true)],
-            Places = new Dictionary<string, DrawerPlace> { ["images"] = new DrawerPlace("m", 10, 20) },
             Hidden = ["images"],
         });
-        vm.ResetPlacesCommand.Execute(null);
-        Assert.Empty(store.LoadDrawers().Places);
         Assert.Single(store.LoadDrawers().Hidden);
         vm.ShowDrawersCommand.Execute(null);
         Assert.Empty(store.LoadDrawers().Hidden);
