@@ -18,7 +18,8 @@ public static class DrawerRules
     private static readonly HashSet<string> ArchiveExt = Set(".zip", ".7z", ".rar", ".tar", ".gz", ".tgz", ".bz2", ".xz", ".iso");
     private static readonly HashSet<string> ShortcutExt = Set(".lnk", ".url");
 
-    /// <summary>The built-in set, in order. Shortcuts start off (most desktops keep their app shortcuts on purpose); old files go last,
+    /// <summary>The built-in set, in order. Every rule starts on, shortcuts included (a desktop is mostly shortcuts, and nothing moves until the user
+    /// applies the review; saved rule lists are never touched); old files go last,
     /// so they take only what the kind rules left.</summary>
     public static IReadOnlyList<DrawerRule> Defaults { get; } =
     [
@@ -27,7 +28,7 @@ public static class DrawerRules
         new(DrawerRuleKind.Documents, "documents"),
         new(DrawerRuleKind.Installers, "installers"),
         new(DrawerRuleKind.Archives, "archives"),
-        new(DrawerRuleKind.Shortcuts, "shortcuts", On: false),
+        new(DrawerRuleKind.Shortcuts, "shortcuts"),
         new(DrawerRuleKind.OlderThan, "older-files", Days: 30),
     ];
 
