@@ -91,6 +91,104 @@ public class PastedSetupTests
     }
 
     [Fact]
+    public void A_drawers_part_with_only_a_look_is_read_and_keeps_the_rules()
+    {
+        var r = PastedSetup.Read("""{"drawers":{"look":"glass","opacity":70,"arrange":{"corner":"bl","direction":"row"}}}""");
+        Assert.True(r.Ok);
+        Assert.Null(r.Rules);
+        Assert.Equal(DrawerLookKind.Glass, r.DrawerLook!.Look);
+        Assert.Equal(70, r.DrawerLook.Opacity);
+        Assert.Equal(new DrawerTidy(DrawerCorner.BottomLeft, DrawerFlow.Row), r.DrawerLook.Arrange);
+        Assert.True(r.DrawerLook.HasCorner);
+        Assert.True(r.DrawerLook.HasFlow);
+    }
+
+    [Fact]
+    public void Rules_and_a_look_in_one_drawers_part_are_both_read()
+    {
+        var r = PastedSetup.Read("""{"drawers":{"rules":[{"kind":"images","drawer":"Photos"}],"look":"bare"}}""");
+        Assert.True(r.Ok);
+        Assert.Single(r.Rules!);
+        Assert.Equal(DrawerLookKind.Bare, r.DrawerLook!.Look);
+        Assert.Null(r.DrawerLook.Opacity);
+        Assert.Null(r.DrawerLook.Arrange);
+    }
+
+    [Fact]
+    public void A_rules_only_paste_has_no_drawer_look()
+    {
+        var r = PastedSetup.Read("""{"drawers":{"rules":[{"kind":"images","drawer":"Photos"}]}}""");
+        Assert.True(r.Ok);
+        Assert.Null(r.DrawerLook);
+    }
+
+    [Fact]
+    public void An_arrange_with_one_part_says_which_part_it_named()
+    {
+        var corner = PastedSetup.Read("""{"drawers":{"arrange":{"corner":"tl"}}}""").DrawerLook!;
+        Assert.True(corner.HasCorner);
+        Assert.False(corner.HasFlow);
+        Assert.Equal(DrawerCorner.TopLeft, corner.Arrange!.Corner);
+        var flow = PastedSetup.Read("""{"drawers":{"arrange":{"direction":"row"}}}""").DrawerLook!;
+        Assert.False(flow.HasCorner);
+        Assert.True(flow.HasFlow);
+        Assert.Equal(DrawerFlow.Row, flow.Arrange!.Flow);
+    }
+
+    [Theory]
+    [InlineData("""{"drawers":{"look":"neon"}}""", "drawers.look")]
+    [InlineData("""{"drawers":{"look":3}}""", "drawers.look")]
+    [InlineData("""{"drawers":{"opacity":19}}""", "drawers.opacity")]
+    [InlineData("""{"drawers":{"opacity":101}}""", "drawers.opacity")]
+    [InlineData("""{"drawers":{"opacity":5}}""", "drawers.opacity")]
+    [InlineData("""{"drawers":{"opacity":70.5}}""", "drawers.opacity")]
+    [InlineData("""{"drawers":{"opacity":"70"}}""", "drawers.opacity")]
+    [InlineData("""{"drawers":{"arrange":{"corner":"middle"}}}""", "drawers.arrange.corner")]
+    [InlineData("""{"drawers":{"arrange":{"direction":"diagonal"}}}""", "drawers.arrange.direction")]
+    [InlineData("""{"drawers":{"arrange":{"speed":3,"corner":"tl"}}}""", "drawers.arrange.speed")]
+    [InlineData("""{"drawers":{"arrange":{}}}""", "drawers.arrange")]
+    [InlineData("""{"drawers":{"arrange":"tl"}}""", "drawers.arrange")]
+    [InlineData("""{"drawers":{"colour":"red"}}""", "drawers.colour")]
+    [InlineData("""{"drawers":{}}""", "drawers")]
+    public void Bad_drawer_settings_are_refused_by_field(string json, string field)
+    {
+        var r = PastedSetup.Read(json);
+        Assert.False(r.Ok);
+        Assert.Contains(r.Reasons, x => x.Field == field);
+        Assert.Null(r.DrawerLook);
+    }
+
+    [Fact]
+    public void The_opacity_edges_and_a_whole_float_are_read()
+    {
+        foreach (var (text, want) in new[] { ("20", 20), ("100", 100), ("70.0", 70) })
+            Assert.Equal(want, PastedSetup.Read("{\"drawers\":{\"opacity\":" + text + "}}").DrawerLook!.Opacity);
+    }
+
+    [Fact]
+    public void Nothing_applies_partly_a_bad_look_holds_back_the_good_rules_and_the_good_opacity()
+    {
+        var r = PastedSetup.Read("""{"drawers":{"rules":[{"kind":"images","drawer":"Photos"}],"look":"neon","opacity":70}}""");
+        Assert.False(r.Ok);
+        Assert.Null(r.Rules);
+        Assert.Null(r.DrawerLook);
+        Assert.Contains(r.Reasons, x => x.Field == "drawers.look");
+    }
+
+    [Fact]
+    public void A_bad_look_in_one_block_lets_the_next_good_block_through()
+    {
+        var r = PastedSetup.Read("""
+            {"drawers":{"look":"neon"}}
+            and then
+            {"drawers":{"look":"outline"}}
+            """);
+        Assert.True(r.Ok);
+        Assert.Equal(DrawerLookKind.Outline, r.DrawerLook!.Look);
+        Assert.Equal(2, r.Blocks);
+    }
+
+    [Fact]
     public void Days_must_be_a_whole_number_from_one_to_3650()
     {
         static string One(string days) => "{\"drawers\":{\"rules\":[{\"kind\":\"older_than\",\"drawer\":\"Old\",\"days\":" + days + "}]}}";

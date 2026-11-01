@@ -24,6 +24,18 @@ public sealed class ChatDesignTests : AppWindowFixture
         _ => verdict ?? Good,
         (rules, names) => { calls.Add("rules:" + rules.Count + ":" + string.Join("|", names)); return null; });
 
+    private static ChatDesignViewModel MakeWithDrawerSettings(List<string> calls, string? refusal = null) => new(
+        () => ["1920×1080, main"],
+        v => { calls.Add("preview"); return new DeskAnswer(DeskAnswer.Previewing); },
+        _ => Good,
+        (rules, names) => { calls.Add("rules:" + rules.Count); return null; },
+        look =>
+        {
+            calls.Add("drawer-settings:" + (look.Look is { } k ? DrawerStyle.Word(k) : "-") + ":" + (look.Opacity?.ToString() ?? "-")
+                + ":" + (look.Arrange is { } a ? DrawerStyle.Word(a.Corner) + "/" + DrawerStyle.Word(a.Flow) + $"/{look.HasCorner}/{look.HasFlow}" : "-"));
+            return refusal;
+        });
+
     [Fact]
     public void A_good_desk_part_enables_Preview_and_previews_through_the_review()
     {
@@ -133,6 +145,125 @@ public sealed class ChatDesignTests : AppWindowFixture
         Assert.Equal("Not shown: design finish the drawers review on your Desk first.", vm.Status);
     }
 
+    // ---- drawer settings ----
+
+    [Fact]
+    public void Drawer_settings_enable_their_button_and_apply_through_the_app()
+    {
+        var calls = new List<string>();
+        var vm = MakeWithDrawerSettings(calls);
+        vm.PasteText = """{"drawers":{"look":"outline","arrange":{"corner":"tl"}}}""";
+        Assert.True(vm.CanUseDrawerSettings);
+        Assert.False(vm.CanUseRules);
+        Assert.False(vm.CanPreview);
+        Assert.Equal(SetupCopy.ChatReady, vm.Summary);
+        Assert.Contains("outline", vm.DrawerSettingsLine);
+        Assert.Contains("top left", vm.DrawerSettingsLine);
+        vm.UseDrawerSettingsCommand.Execute(null);
+        Assert.Equal(["drawer-settings:outline:-:tl/column/True/False"], calls);
+        Assert.Equal(SetupCopy.ChatDrawerSettingsArranged, vm.Status);
+    }
+
+    [Fact]
+    public void A_look_without_an_arrangement_says_the_look_was_saved()
+    {
+        var calls = new List<string>();
+        var vm = MakeWithDrawerSettings(calls);
+        vm.PasteText = """{"drawers":{"look":"glass","opacity":70}}""";
+        Assert.Equal("Look: glass, 70%. Using it changes how your drawers look and sit right away.", vm.DrawerSettingsLine);
+        vm.UseDrawerSettingsCommand.Execute(null);
+        Assert.Equal(SetupCopy.ChatDrawerSettingsDone, vm.Status);
+    }
+
+    [Fact]
+    public void The_settings_line_names_only_the_parts_the_paste_gave()
+    {
+        var vm = MakeWithDrawerSettings([]);
+        vm.PasteText = """{"drawers":{"arrange":{"direction":"row"}}}""";
+        Assert.Equal("Lines drawers up from your usual corner, in a row. Using it changes how your drawers look and sit right away.", vm.DrawerSettingsLine);
+        vm.PasteText = """{"drawers":{"opacity":40}}""";
+        Assert.StartsWith("Opacity: 40%.", vm.DrawerSettingsLine);
+        vm.PasteText = """{"drawers":{"look":"bare","arrange":{"corner":"br","direction":"column"}}}""";
+        Assert.Equal("Look: bare. Lines drawers up from the bottom right, in a column. Using it changes how your drawers look and sit right away.", vm.DrawerSettingsLine);
+    }
+
+    [Fact]
+    public void A_refused_apply_is_the_status_line()
+    {
+        var vm = MakeWithDrawerSettings([], DrawerReview.Busy);
+        vm.PasteText = """{"drawers":{"look":"solid"}}""";
+        vm.UseDrawerSettingsCommand.Execute(null);
+        Assert.Equal(DrawerReview.Busy, vm.Status);
+    }
+
+    [Fact]
+    public void Rules_and_a_look_offer_both_buttons_and_each_runs_alone()
+    {
+        var calls = new List<string>();
+        var vm = MakeWithDrawerSettings(calls);
+        vm.PasteText = """{"drawers":{"rules":[{"kind":"images","drawer":"Photos"}],"look":"bare"}}""";
+        Assert.True(vm.CanUseRules);
+        Assert.True(vm.CanUseDrawerSettings);
+        vm.UseDrawerSettingsCommand.Execute(null);
+        Assert.Equal(["drawer-settings:bare:-:-"], calls);
+        vm.UseRulesCommand.Execute(null);
+        Assert.Equal(["drawer-settings:bare:-:-", "rules:1"], calls);
+    }
+
+    [Fact]
+    public void A_rules_only_paste_works_as_before_and_leaves_the_settings_button_off()
+    {
+        var calls = new List<string>();
+        var vm = MakeWithDrawerSettings(calls);
+        vm.PasteText = """{"drawers":{"rules":[{"kind":"images","drawer":"Photos"}]}}""";
+        Assert.True(vm.CanUseRules);
+        Assert.False(vm.CanUseDrawerSettings);
+        Assert.Equal("", vm.DrawerSettingsLine);
+        vm.UseDrawerSettingsCommand.Execute(null);   // nothing to use
+        Assert.Empty(calls);
+    }
+
+    [Fact]
+    public void Any_problem_disables_every_button_including_the_drawer_settings()
+    {
+        var calls = new List<string>();
+        var vm = MakeWithDrawerSettings(calls);
+        vm.PasteText = """{"desk":{"name":"A"},"drawers":{"look":"glass","opacity":500}}""";
+        Assert.False(vm.CanPreview);
+        Assert.False(vm.CanUseRules);
+        Assert.False(vm.CanUseDrawerSettings);
+        Assert.Equal("", vm.DrawerSettingsLine);
+        Assert.Contains(vm.Findings, f => f.Field == "drawers.opacity" && f.IsError);
+        vm.UseDrawerSettingsCommand.Execute(null);
+        Assert.Empty(calls);
+
+        // A desk problem alone also holds back a good look.
+        var bad = new DeskValidation(DeskDesignStatus.Rejected, [new DeskReason("layout.clock.anchor", "must be one of tl, tc")], [], [], null);
+        var vm2 = new ChatDesignViewModel(() => [], null, _ => bad, (_, _) => null, _ => null);
+        vm2.PasteText = """{"desk":{"layout":{"clock":{"anchor":"zz"}}},"drawers":{"look":"glass"}}""";
+        Assert.False(vm2.CanUseDrawerSettings);
+    }
+
+    [Fact]
+    public void Editing_the_paste_clears_the_drawer_settings()
+    {
+        var vm = MakeWithDrawerSettings([]);
+        vm.PasteText = """{"drawers":{"look":"glass"}}""";
+        Assert.True(vm.CanUseDrawerSettings);
+        vm.PasteText = "";
+        Assert.False(vm.CanUseDrawerSettings);
+        Assert.Equal("", vm.DrawerSettingsLine);
+    }
+
+    [Fact]
+    public void Without_the_app_wiring_the_drawer_button_says_there_is_nothing_to_apply_it_on()
+    {
+        var vm = new ChatDesignViewModel(() => [], null, _ => Good, (_, _) => null);
+        vm.PasteText = """{"drawers":{"look":"glass"}}""";
+        vm.UseDrawerSettingsCommand.Execute(null);
+        Assert.Equal(SetupCopy.ChatNoDeskService, vm.Status);
+    }
+
     // ---- a piece this build does not draw ----
 
     [Fact]
@@ -206,7 +337,7 @@ public sealed class ChatDesignTests : AppWindowFixture
             var names = NamesOf(w);
             Assert.Empty(LeaksIn(names));
             foreach (var expected in new[] { SetupCopy.DesignWithChat, SetupCopy.ChatCopyPrompt, SetupCopy.ChatPasteName, SetupCopy.ChatPreview,
-                SetupCopy.ChatUseRules, SetupCopy.ChatClose })
+                SetupCopy.ChatUseRules, SetupCopy.ChatUseDrawerSettings, SetupCopy.ChatClose })
                 Assert.Contains(names, n => n == expected);
             Assert.DoesNotContain(names, n => n.Contains("Claude"));
             var unnamed = Walk(UIElementAutomationPeer.CreatePeerForElement(w))
@@ -219,11 +350,14 @@ public sealed class ChatDesignTests : AppWindowFixture
             // Nothing pasted: Preview and Use are off; a good paste turns Preview on.
             Assert.False(((System.Windows.Controls.Button)w.FindName("PreviewButton")).IsEnabled);
             Assert.False(((System.Windows.Controls.Button)w.FindName("UseRulesButton")).IsEnabled);
-            vm.PasteText = "{\"desk\":{\"name\":\"A\"},\"drawers\":{\"rules\":[{\"kind\":\"images\",\"drawer\":\"Photos\"}]}}";
+            Assert.False(((System.Windows.Controls.Button)w.FindName("UseDrawerSettingsButton")).IsEnabled);
+            vm.PasteText = "{\"desk\":{\"name\":\"A\"},\"drawers\":{\"rules\":[{\"kind\":\"images\",\"drawer\":\"Photos\"}],\"look\":\"glass\"}}";
             w.UpdateLayout();
             Assert.True(((System.Windows.Controls.Button)w.FindName("PreviewButton")).IsEnabled);
             Assert.True(((System.Windows.Controls.Button)w.FindName("UseRulesButton")).IsEnabled);
+            Assert.True(((System.Windows.Controls.Button)w.FindName("UseDrawerSettingsButton")).IsEnabled);
             Assert.True(((System.Windows.Controls.TextBlock)w.FindName("RulesText")).IsVisible);
+            Assert.True(((System.Windows.Controls.TextBlock)w.FindName("DrawerSettingsText")).IsVisible);
         }
         finally { w.Close(); }
     });

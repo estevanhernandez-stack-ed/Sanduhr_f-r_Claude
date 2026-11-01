@@ -41,6 +41,7 @@ public static class SetupCopy
     public const string ChatPastePlaceholder = "{\"desk\": {...}, \"drawers\": {\"rules\": [...]}}";
     public const string ChatPreview = "Preview on my Desk";
     public const string ChatUseRules = "Use these drawer rules";
+    public const string ChatUseDrawerSettings = "Use these drawer settings";
     public const string ChatClose = "Close";
     public const string ChatFindingsName = "What to fix in the paste";
     public const string ChatReady = "Ready.";
@@ -63,6 +64,33 @@ public static class SetupCopy
         return $"{head}{into}. Using {them} replaces your drawer rules, turns drawers and your Desk on if they are off, then shows what {them} would sort. Nothing moves until you Apply.";
     }
 
+    /// <summary>The window's status once the drawer look is saved and no Tidy was asked for.</summary>
+    public const string ChatDrawerSettingsDone = "Drawer look saved.";
+
+    /// <summary>The window's status once a Tidy ran with the look: the result and its Undo are on the drawers bar.</summary>
+    public const string ChatDrawerSettingsArranged = "Drawer settings applied. Undo is on your Desk.";
+
+    /// <summary>The drawers bar line after the chat's settings ran a Tidy: what the look did, then what Tidy did.</summary>
+    public static string ChatDrawerSettingsResult(bool lookSaved, string tidyLine) =>
+        lookSaved ? ChatDrawerSettingsDone + " " + tidyLine : tidyLine;
+
+    /// <summary>One line saying what a pasted drawers look would do, for the window under the paste. <paramref name="corner"/> and
+    /// <paramref name="flow"/> are spoken words (never the short codes), and null where the paste left the part to the user's own Tidy.</summary>
+    public static string ChatDrawerSettingsLine(string? look, int? opacity, string? corner, string? flow)
+    {
+        var parts = new List<string>();
+        if (look is not null) parts.Add(opacity is { } o ? $"Look: {look}, {o}%." : $"Look: {look}.");
+        else if (opacity is { } o2) parts.Add($"Opacity: {o2}%.");
+        if (corner is not null || flow is not null)
+        {
+            string from = corner is null ? "your usual corner" : $"the {corner}";
+            string how = flow is null ? "" : $", in a {flow}";
+            parts.Add($"Lines drawers up from {from}{how}.");
+        }
+        parts.Add("Using it changes how your drawers look and sit right away.");
+        return string.Join(" ", parts);
+    }
+
     /// <summary>Rules that parse and check out but match nothing on the Desktop now are still saved.</summary>
     public const string ChatRulesSavedNothing = "The rules are saved, but nothing on your Desktop matches them yet.";
 
@@ -79,9 +107,12 @@ public static class SetupCopy
     [
         Title, Intro, DesktopTitle, DesktopBody, DrawersTitle, DrawersBody, UsageTitle, UsageBody, ClaudeSource, ClaudeTrademark,
         DesignWithChat, Continue, NotNow, Cancel, MenuItem, PickOne, SaveFailed, WhatChanges, WhatHappened, DesktopOffLine, UsageOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DesignDesktopOffNote, DrawersOffLine(2),
-        ChatIntro, ChatCopyPrompt, ChatPasteName, ChatPastePlaceholder, ChatPreview, ChatUseRules, ChatClose, ChatFindingsName, ChatReady,
+        ChatIntro, ChatCopyPrompt, ChatPasteName, ChatPastePlaceholder, ChatPreview, ChatUseRules, ChatUseDrawerSettings, ChatClose, ChatFindingsName, ChatReady,
         ChatPromptCopied, ChatDeskShown, ChatRulesShown, ChatNoDeskService, ChatRulesSavedNothing, ChatUntitledDesign, ChatFixCount(1), ChatFixCount(2), ChatManyBlocks(2),
         ChatRulesLine(1, ["Photos"]), ChatRulesLine(2, ["Photos", "Receipts"]), ChatNotShown("the Desk is busy"),
+        ChatDrawerSettingsDone, ChatDrawerSettingsArranged, ChatDrawerSettingsResult(true, "2 drawers lined up."), ChatDrawerSettingsResult(false, "2 drawers lined up."),
+        ChatDrawerSettingsLine("glass", 70, "bottom left", "row"), ChatDrawerSettingsLine("outline", null, null, null),
+        ChatDrawerSettingsLine(null, 40, "top right", null), ChatDrawerSettingsLine(null, null, null, "column"),
     ];
 
     /// <summary>The strings the AI chat window draws, which name no product at all.</summary>

@@ -1091,7 +1091,8 @@ public partial class App : Application
             () => Desk.DeskMonitorSource.Read().Select(m => m.Name).ToList(),
             design is null ? null : design.ProposePasted,
             node => design is null ? PastedSetup.RefuseUndrawn(DeskDesign.Validate(node, DeskDesignContext.Unknown)) : design.ValidatePasted(node),
-            UseChatRules);
+            UseChatRules,
+            UseChatDrawerSettings);
         var window = new ChatDesignWindow(model);
         _chatWindow = window;
         window.Closed += (_, _) => { if (ReferenceEquals(_chatWindow, window)) _chatWindow = null; };
@@ -1111,6 +1112,13 @@ public partial class App : Application
         });
         return said is null ? null : StreamerMode.Mask.Paths(said);   // streamer: masked - Mask.Paths hides the profile folder in a refused plan's line while on
     }
+
+    /// <summary>A chat's drawer settings (look and placement spec, section 3): see <see cref="Desk.ChatDrawerSettings.Apply"/>. Null when it was
+    /// done, otherwise the line to show.</summary>
+    private string? UseChatDrawerSettings(PastedDrawerLook look) =>
+        _quitting || _desk is null || _drawers is null || _drawerReview is null
+            ? SettingsNames.DrawersSortUnavailable
+            : Desk.ChatDrawerSettings.Apply(look, _drawers, _desk, _drawerReview);
 
     /// <summary>Tidy drawers (look and placement spec, section 2): lines the drawers on one monitor up from the remembered corner (or
     /// <paramref name="tidy"/>) and shows how many moved on the drawers bar with Undo. Moves panels only. Null when the bar opened,

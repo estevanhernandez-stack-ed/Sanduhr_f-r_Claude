@@ -6,12 +6,21 @@ namespace Sanduhr.Core;
 
 /// <summary>What a pasted AI chat answer held (setup spec, section 3): its Desk part (checked later by
 /// <see cref="DeskDesign.Validate(JsonNode?, DeskDesignContext)"/>, which needs this PC), its drawer rules, the names the rules gave their
-/// drawers, every problem by field, and how many Sanduhr blocks (JSON objects holding <c>desk</c> or <c>drawers</c>) the paste held.
-/// <see cref="Rules"/> is null when the paste had no drawers part, and never holds a rule that failed a check.</summary>
+/// drawers, the look the drawers part asked for, every problem by field, and how many Sanduhr blocks (JSON objects holding <c>desk</c> or
+/// <c>drawers</c>) the paste held. <see cref="Rules"/> is null when the paste had no rules, and never holds a rule that failed a check;
+/// <see cref="DrawerLook"/> is null when the paste had no look, opacity or arrange, and never holds one that failed a check.</summary>
 public sealed record PastedSetupRead(JsonNode? Desk, IReadOnlyList<DrawerRule>? Rules, IReadOnlyList<string> RuleDrawerNames,
-    IReadOnlyList<DeskReason> Reasons, int Blocks)
+    IReadOnlyList<DeskReason> Reasons, int Blocks, PastedDrawerLook? DrawerLook = null)
 {
-    public bool Ok => Reasons.Count == 0 && (Desk is not null || Rules is not null);
+    public bool Ok => Reasons.Count == 0 && (Desk is not null || Rules is not null || DrawerLook is not null);
+}
+
+/// <summary>What a pasted drawers part set besides rules: a look, an opacity, a Tidy arrangement, each optional and at least one present.
+/// <see cref="Arrange"/> carries a full Tidy, but only the parts the paste named count (<see cref="HasCorner"/>, <see cref="HasFlow"/>): the
+/// rest come from the user's own Tidy when it is applied.</summary>
+public sealed record PastedDrawerLook(DrawerLookKind? Look, int? Opacity, DrawerTidy? Arrange, bool HasCorner = true, bool HasFlow = true)
+{
+    public bool Any => Look is not null || Opacity is not null || Arrange is not null;
 }
 
 /// <summary>One line of the paste window's list: the field, what is wrong with it, and whether it blocks (an error) or only advises.</summary>
@@ -20,7 +29,7 @@ public sealed record PastedFinding(string Field, string Text, bool IsError);
 /// <summary>
 /// Reads a pasted AI chat answer. The answer is prose around one JSON block, often fenced; the reader scans balanced JSON objects
 /// (a brace inside a string does not count), takes the first one holding <c>desk</c> or <c>drawers</c>, and says how many there were.
-/// The only parts are <c>desk</c> and <c>drawers</c>; the drawers part holds rules and nothing else, so a chat can name no file and no path.
+/// The only parts are <c>desk</c> and <c>drawers</c>; the drawers part holds rules, look, opacity and arrange and nothing else, so a chat can name no file and no path.
 /// </summary>
 public static class PastedSetup
 {
@@ -146,17 +155,23 @@ public static class PastedSetup
         }
 
         List<DrawerRule>? rules = null;
+        PastedDrawerLook? drawerLook = null;
         var names = new List<string>();
         if (block.ContainsKey("drawers"))
         {
             if (block["drawers"] is not JsonObject dobj)
-                reasons.Add(new DeskReason("drawers", "must be { \"rules\": [ ... ] }"));
+                reasons.Add(new DeskReason("drawers", "must be { \"rules\": [ ... ], \"look\": ..., \"opacity\": ..., \"arrange\": { ... } }"));
+            else if (dobj.Count == 0)
+                reasons.Add(new DeskReason("drawers", "must hold rules, look, opacity or arrange; leave drawers out to change nothing"));
             else
             {
                 foreach (var (key, _) in dobj)
-                    if (key != "rules") reasons.Add(new DeskReason("drawers." + Clip(key, 24), "is not part of drawers; it holds rules only"));
-                if (dobj["rules"] is not JsonArray arr || arr.Count == 0)
-                    reasons.Add(new DeskReason("drawers.rules", $"must be a list of 1 to {MaxRules} rules; leave drawers out to keep the rules as they are"));
+                    if (key is not ("rules" or "look" or "opacity" or "arrange"))
+                        reasons.Add(new DeskReason("drawers." + Clip(key, 24), "is not part of drawers; it holds rules, look, opacity and arrange"));
+                drawerLook = ReadDrawerLook(dobj, reasons);
+                if (!dobj.ContainsKey("rules")) { /* rules are optional: a look alone is a good drawers part */ }
+                else if (dobj["rules"] is not JsonArray arr || arr.Count == 0)
+                    reasons.Add(new DeskReason("drawers.rules", $"must be a list of 1 to {MaxRules} rules; leave rules out to keep them as they are"));
                 else if (arr.Count > MaxRules)
                     reasons.Add(new DeskReason("drawers.rules", $"has {arr.Count} rules; at most {MaxRules}"));
                 else
@@ -178,8 +193,63 @@ public static class PastedSetup
         }
 
         // Nothing applies partly: a part that had a problem hands back nothing of itself.
-        if (reasons.Count > 0) rules = null;
-        return new(desk, rules, reasons.Count > 0 ? [] : names, [.. reasons.Take(40)], count);
+        if (reasons.Count > 0) { rules = null; drawerLook = null; }
+        return new(desk, rules, reasons.Count > 0 ? [] : names, [.. reasons.Take(40)], count, drawerLook);
+    }
+
+    /// <summary>The look, opacity and arrange members of a drawers part, each optional. A member that fails a check is named by field in
+    /// <paramref name="reasons"/>; null when the part held none of the three.</summary>
+    private static PastedDrawerLook? ReadDrawerLook(JsonObject d, List<DeskReason> reasons)
+    {
+        DrawerLookKind? look = null;
+        int? opacity = null;
+        DrawerTidy? arrange = null;
+        bool hasCorner = false, hasFlow = false;
+        if (d.ContainsKey("look"))
+        {
+            look = DrawerStyle.Look(Str(d["look"]));
+            if (look is null) reasons.Add(new DeskReason("drawers.look", "must be one of " + string.Join(", ", DrawerStyle.LookWords)));
+        }
+        if (d.ContainsKey("opacity"))
+        {
+            if (WholeNumber(d["opacity"]) is { } n && n >= DrawerStyle.MinOpacity && n <= DrawerStyle.MaxOpacity) opacity = n;
+            else reasons.Add(new DeskReason("drawers.opacity", $"must be a whole number from {DrawerStyle.MinOpacity} to {DrawerStyle.MaxOpacity}"));
+        }
+        if (d.ContainsKey("arrange"))
+        {
+            if (d["arrange"] is not JsonObject a || a.Count == 0)
+                reasons.Add(new DeskReason("drawers.arrange", "must be { \"corner\": ..., \"direction\": ... } with at least one of them"));
+            else
+            {
+                bool bad = false;
+                foreach (var (key, _) in a)
+                    if (key is not ("corner" or "direction"))
+                    {
+                        reasons.Add(new DeskReason("drawers.arrange." + Clip(key, 24), "is not part of arrange; it holds corner and direction"));
+                        bad = true;
+                    }
+                DrawerCorner? corner = null;
+                DrawerFlow? flow = null;
+                if (a.ContainsKey("corner") && (corner = DrawerStyle.Corner(Str(a["corner"]))) is null)
+                {
+                    reasons.Add(new DeskReason("drawers.arrange.corner", "must be one of " + string.Join(", ", DrawerStyle.CornerWords)));
+                    bad = true;
+                }
+                if (a.ContainsKey("direction") && (flow = DrawerStyle.Flow(Str(a["direction"]))) is null)
+                {
+                    reasons.Add(new DeskReason("drawers.arrange.direction", "must be one of " + string.Join(", ", DrawerStyle.FlowWords)));
+                    bad = true;
+                }
+                if (!bad)
+                {
+                    arrange = new DrawerTidy(corner ?? DrawerTidy.Default.Corner, flow ?? DrawerTidy.Default.Flow);
+                    hasCorner = corner is not null;
+                    hasFlow = flow is not null;
+                }
+            }
+        }
+        var result = new PastedDrawerLook(look, opacity, arrange, hasCorner, hasFlow);
+        return result.Any ? result : null;
     }
 
     private static (DrawerRule Rule, string Name)? Rule(JsonNode? node, string at, List<DeskReason> reasons, Func<string, string> idFor)
