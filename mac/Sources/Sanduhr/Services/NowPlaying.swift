@@ -251,6 +251,29 @@ struct NowPlayingSupervisor: Equatable {
     mutating func reset() { quickExits = 0 }
 }
 
+/// Why now playing is on the fallback (state.yaml `fallback_reason`, Settings' source line).
+enum NowPlayingFallbackReason: String, Equatable {
+    /// The adapter's self-test failed or timed out.
+    case testFailed = "test_failed"
+    /// The adapter or `/usr/bin/perl` is missing.
+    case adapterMissing = "adapter_missing"
+    /// The stream kept exiting (NowPlayingSupervisor).
+    case streamExits = "stream_exits"
+}
+
+/// While on the fallback, the adapter's self-test runs again, and a pass goes back to the stream.
+/// A test that failed once after a wake used to leave Music and Spotify alone until the next
+/// relaunch (seen 2026-11-01, 2.39.0).
+enum NowPlayingRetry {
+    static let first: TimeInterval = 60
+    static let every: TimeInterval = 300
+    /// After a wake, the check waits this long for the session to come back.
+    static let wakeDelay: TimeInterval = 5
+
+    /// One minute before the first retry, then five between the rest.
+    static func wait(attempt: Int) -> TimeInterval { attempt <= 1 ? first : every }
+}
+
 /// Runs the adapter under a small Perl watchdog, so it never outlives Sanduhr. A normal quit
 /// terminates it, but a crash or a force quit left the adapter running for good (seen
 /// 2026-10-05). The watchdog forks the adapter under `/usr/bin/perl` (MediaRemote still sees an
@@ -477,17 +500,26 @@ enum AutomationDenial {
 enum NowPlayingStatus {
     static let notPlaced = "Not placed anywhere"
 
+    static let fallback = "Fallback (Music and Spotify only)"
+
     static func text(source: NowPlayingSource, placed: Bool, deskRunning: Bool, checking: Bool,
-                     adapterFailed: Bool) -> String {
+                     reason: NowPlayingFallbackReason? = nil) -> String {
         if !placed { return notPlaced }
         if !deskRunning { return "Off (needs Desk)" }
         if checking { return "Checking…" }
         switch source {
         case .adapter: return "Adapter working"
         case .fallback:
-            return adapterFailed
-                ? "Fallback (Music and Spotify only): the system now playing isn't available on this macOS"
-                : "Fallback (Music and Spotify only)"
+            switch reason {
+            case .testFailed:
+                return fallback + ": the system now playing didn't answer. Sanduhr checks again every few minutes."
+            case .streamExits:
+                return fallback + ": the system now playing kept stopping. Sanduhr checks again every few minutes."
+            case .adapterMissing:
+                return fallback + ": the system now playing reader is missing from Sanduhr.app."
+            case nil:
+                return fallback
+            }
         case .off: return "Off"
         }
     }

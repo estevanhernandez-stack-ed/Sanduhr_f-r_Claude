@@ -364,7 +364,8 @@ enum DebugHooks {
         let np = NowPlayingController.shared
         // A `defaults write` from the smoke runner posts no change notice: read the places now.
         np.apply()
-        s.nowPlaying = NowPlayingDebug(enabled: np.active, placed: np.placed, source: np.source, state: np.state)
+        s.nowPlaying = NowPlayingDebug(enabled: np.active, placed: np.placed, source: np.source,
+                                       fallbackReason: np.fallbackReason, state: np.state)
         s.nowPlayingIdle = .saved(in: .desk)
         // A `defaults write` from the smoke runner posts no change notice: apply the indicators'
         // switches and places now (item 67).

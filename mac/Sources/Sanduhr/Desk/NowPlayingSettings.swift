@@ -44,7 +44,7 @@ private struct NowPlayingSourceRow: View {
         let c = NowPlayingController.shared
         LabeledContent("Source", value: NowPlayingStatus.text(
             source: c.source, placed: !c.placed.isEmpty, deskRunning: deskEnabled,
-            checking: c.checking, adapterFailed: c.adapterFailed))
+            checking: c.checking, reason: c.fallbackReason))
     }
 }
 
