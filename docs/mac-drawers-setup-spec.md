@@ -1,6 +1,6 @@
 # Drawers and Set up Sanduhr on the Mac (parity with Windows 4.5.0)
 
-Spec, 2026-11-01, a draft for the owner's calls at the end of this file. Dashboard task: "Mac: parity with
+Spec, 2026-11-01, with the owner's calls the same day (end of this file). Dashboard task: "Mac: parity with
 Windows 4.5.0 (Set up Sanduhr, Drawers)". Windows reference: 4.5.0 as built in `windows-dotnet/`
 (read it, never edit it), and its runs `docs/cart-runs/2026-10-31-setup-4-5/` and
 `docs/cart-runs/2026-11-01-drawers-look-4-5/`. Line references below are to `windows-dotnet/src/`.
@@ -31,7 +31,7 @@ Two releases. Drawers come first, because Set up's "Tidy my files" choice turns 
 | **2.41.0: Set up Sanduhr** | One screen of free choices replaces the welcome sheet, **Track my AI usage** off with the account kept, and **Copy prompt** with a paste-back block for any AI chat. | 4.5.0 Set up |
 
 Left out: **Keep clear of icons**. Windows reads Explorer's icon positions; on the Mac that needs
-AppleScript to Finder and its Automation prompt, for a nicety (owner call 3). Also left out, as on
+AppleScript to Finder and its Automation prompt, for a nicety (decided, item 3). Also left out, as on
 Windows: a `propose_drawers` MCP tool, and Claude seeing any file name.
 
 ---
@@ -296,16 +296,14 @@ The cards:
 
 ---
 
-## Owner calls (open)
+## Decided (the owner, 2026-11-01)
 
-1. **Two releases, Drawers first** (2.40.0, then 2.41.0)? Or one 2.40.0 with both, as Windows
-   shipped them? Recommended: two. Drawers is the risky half, and it should be live on a real
-   Desktop for a few days before Set up starts turning it on for new users.
-2. **Default root `~/Desktop/Drawers`,** as on Windows? It keeps moves on one volume and in one
-   iCloud container, and the folder is plainly visible on the Desktop. Recommended: yes.
-3. **Leave out Keep clear of icons** (it needs AppleScript to Finder and an Automation prompt)?
-   Recommended: yes, revisit if drawers land on top of icons in practice.
-4. **Command-Delete to the Trash** inside a drawer? Windows has Delete through Explorer. Recommended:
-   yes. It goes to the Trash with Put Back, and it is the only delete-like action anywhere.
-5. **Crash-safe journal** (written before the moves, section 5): the Mac's own improvement, to hand to
-   the Windows agent afterwards? Recommended: yes.
+1. **Two releases, Drawers first:** 2.40.0 Drawers, then 2.41.0 Set up Sanduhr. Drawers runs on a
+   real Desktop for a few days before Set up starts turning it on for new users.
+2. **The default root is `~/Desktop/Drawers`,** as on Windows: one volume, one iCloud container, a
+   folder plainly visible on the Desktop.
+3. **Keep clear of icons is left out.** Revisit if drawers land on top of icons in practice.
+4. **Command-Delete moves an item in a drawer to the Trash,** with Put Back. It is the only
+   delete-like action anywhere in Drawers.
+5. **The crash-safe journal** (section 5) is the Mac's design; it goes to the Windows agent as a
+   parity note once 2.40.0 ships.
