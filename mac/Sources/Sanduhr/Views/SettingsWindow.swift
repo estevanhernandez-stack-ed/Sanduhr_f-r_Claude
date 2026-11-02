@@ -11,7 +11,7 @@ import SwiftUI
 /// and `widgetLook` is Widget. The two retired pages parse as aliases (`resolve`).
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general, credentials, usage, alerts
-    case deskLayout, deskLook, message, notch, lockScreen, widgets, nowPlaying, weather, watchers
+    case deskLayout, deskLook, message, notch, lockScreen, widgets, nowPlaying, weather, watchers, drawers
     case integrations, mods
     case widgetLook, themes
     case updates, about
@@ -33,6 +33,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .nowPlaying: "Now Playing"
         case .weather: "Weather"
         case .watchers: "Watchers"
+        case .drawers: "Drawers"
         case .integrations: "Claude Code"
         case .mods: "Mods & Config"
         case .widgetLook: "Widget"
@@ -57,6 +58,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .nowPlaying: "music.note"
         case .weather: "cloud.sun"
         case .watchers: "eye"
+        case .drawers: "tray.2"
         case .integrations: "puzzlepiece.extension"
         case .mods: "cube"
         case .widgetLook: "textformat"
@@ -69,7 +71,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// Sidebar groups: a header (nil for the first) and its pages.
     static let groups: [(header: String?, sections: [SettingsSection])] = [
         (nil, [.general, .credentials, .usage, .alerts]),
-        ("Desktop", [.deskLayout, .deskLook, .message, .notch, .lockScreen, .widgets, .nowPlaying, .weather, .watchers]),
+        ("Desktop", [.deskLayout, .deskLook, .message, .notch, .lockScreen, .widgets, .nowPlaying, .weather, .watchers, .drawers]),
         ("Claude Code", [.integrations, .mods]),
         ("Widget", [.widgetLook, .themes]),
         ("Help", [.updates, .about]),
@@ -396,6 +398,7 @@ struct SettingsRoot: View {
         case .nowPlaying: NowPlayingSection().withPreview(.nowPlaying) { NowPlayingPreview(live: deskModel) }
         case .weather: WeatherSection().settingsViewport()
         case .watchers: WatchersSection().withPreview(.watchers) { WatchersPreview(live: deskModel) }
+        case .drawers: DrawersSettings().settingsViewport()
         case .updates: UpdatesSection(updates: updates).settingsViewport()
         case .about: AboutSection().settingsViewport()
         case .credentials: AccountsSettings(vm: vm, navigation: navigation).settingsViewport()

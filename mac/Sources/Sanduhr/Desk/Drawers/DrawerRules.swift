@@ -13,6 +13,11 @@ struct DrawerRule: Equatable, Codable, Sendable {
     var on: Bool = true
     var text: String? = nil
     var days: Int = DrawerRules.defaultDays
+    /// A custom rule's drawer name, so a drawer that does not exist yet is made on the first move.
+    var drawerName: String? = nil
+
+    /// A custom rule is one the user added (a name rule), and the only kind Settings removes.
+    var isCustom: Bool { kind == .nameContains || kind == .nameStartsWith }
 }
 
 /// The built-in sorter. Rules run top to bottom and the first match wins; whatever no rule takes
@@ -85,13 +90,17 @@ enum DrawerRules {
     }
 
     /// The rules' plan for a Desktop listing: each file goes to the drawer of the first rule that
-    /// matches it and names a known drawer (an existing one, or a default id, which is created
-    /// under `root` with its default name). The plan carries only the drawers it fills.
+    /// matches it and names a known drawer (an existing one, a default id, or a custom rule's
+    /// named drawer, which is created under `root` with its name). The plan carries only the drawers it fills.
     static func plan(facts: [DrawerItemFacts], rules: [DrawerRule], drawers: [DrawerDef],
                      desktop: String, root: String, now: Date) -> DrawerPlan {
         var known: [String: DrawerDef] = [:]
         for d in drawers where known[d.id] == nil { known[d.id] = d }
         for d in defaultDrawers(root: root) where known[d.id] == nil { known[d.id] = d }
+        for r in rules where known[r.drawer] == nil {
+            guard let n = r.drawerName, DrawerNames.isValid(n) else { continue }
+            known[r.drawer] = DrawerDef(id: r.drawer, name: n, home: DrawerPaths.join(root, n), owned: true)
+        }
         let desktopPath = DrawerPaths.normalize(desktop) ?? desktop
         // A drawer's folder (or the root) sitting on the Desktop is never a source, whatever its flags say.
         let ownFolders = Set((drawers.map(\.home) + [root]).compactMap { DrawerPaths.normalize($0) }

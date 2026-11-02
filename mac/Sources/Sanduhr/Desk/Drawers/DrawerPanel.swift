@@ -249,10 +249,8 @@ final class DrawerPanelView: NSView, NSCollectionViewDataSource, NSCollectionVie
     private var hovering = false
     let actions = DrawerPanelActions()
 
-    /// The menu's last item. Written with an escape because the Drawers page (item 6) is not in
-    /// `SettingsSection` yet, and SettingsNamesTests refuses a literal "<Page> Settings…" that names
-    /// no page. Item 6 turns this into a plain literal.
-    static let settingsItem = "Drawers Settings\u{2026}"
+    /// The menu's last item. It opens Settings, Drawers.
+    static let settingsItem = "Drawers Settings…"
 
     override var isFlipped: Bool { true }
 
