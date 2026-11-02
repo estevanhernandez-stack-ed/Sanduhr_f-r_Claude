@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.39.2-mac — 2026-11-02
 
 - **The lock screen line keeps up after an update.** After Sanduhr updated, macOS could stop running the small helper that puts the line on the lock screen while Settings still said On, so the lock screen kept showing an old line (often "Claude usage unavailable"). The helper now leaves a sign each time it runs; when that sign goes quiet, Sanduhr registers the helper again on its own (macOS may ask for your password), Settings, Lock Screen says Stopped with a button to do it by hand, and turning the switch off no longer waits on a helper that isn't running.
 
