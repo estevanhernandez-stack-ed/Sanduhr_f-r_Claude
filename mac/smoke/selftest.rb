@@ -173,7 +173,7 @@ class FakeApp
                            'pace' => 0.6, 'reset' => 'Today 5:00 PM', 'warning' => false }] if Array(s['meters']).empty?
         end
         # usage_rows counts the Usage page's charts as drawn: 0 until the page opens.
-        s['lock_line'] = { 'on' => false, 'text' => 'Claude 42% · resets 5:00 PM', 'length' => 27 }
+        s['lock_line'] = { 'on' => false, 'helper' => 'off', 'text' => 'Claude 42% · resets 5:00 PM', 'length' => 27 }
         s['demo'] = { 'active' => true, 'widget_tiers' => 3, 'desk_line' => true, 'notch_meters' => true,
                       'accounts' => 2, 'usage_rows' => 0 }
       elsif @before_demo
@@ -301,7 +301,7 @@ eq('oled care off in the fixture', state['oled_care'], false)
 # until it is. The `on` key is quoted in the fixture, so it reads as a key and not as true.
 eq('pill off in the fixture', state['notch_pill'], { 'on' => false, 'forced' => false, 'shown' => false, 'frame' => nil })
 # #137: the lock screen line is off in the fixture, its switch key quoted like the pill's.
-eq('lock line in the fixture', state['lock_line'].keys, %w[on text length])
+eq('lock line in the fixture', state['lock_line'].keys, %w[on helper text length])
 eq('lock line is off and as long as its text', [state['lock_line']['on'], state['lock_line']['length']],
    [false, state['lock_line']['text'].length])
 no_pieces = { 'desk_frames' => '/\A(?!.*(clock|message))/m' }

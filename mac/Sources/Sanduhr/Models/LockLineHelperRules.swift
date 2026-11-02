@@ -26,6 +26,11 @@ enum LockLineHelperRules {
     static let executable = "SanduhrLockLineHelper"
     /// The file the app writes, under the console user's home.
     static let relativePath = "Library/Application Support/Sanduhr/lock-line.txt"
+    /// The helper's own folder (root-owned).
+    static let stateDir = "/Library/Application Support/Sanduhr"
+    /// An empty, world-readable file the helper rewrites on every run, so the app can tell a helper
+    /// launchd still runs from one it no longer starts (2.39.2). Its date is the only signal.
+    static let heartbeatPath = stateDir + "/lockline-alive"
     /// The one preference the helper writes.
     static let domain = "com.apple.loginwindow"
     static let key = "LoginwindowText"

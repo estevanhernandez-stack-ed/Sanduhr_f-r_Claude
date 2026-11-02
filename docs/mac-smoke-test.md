@@ -2192,6 +2192,13 @@ release and `com.626labs.sanduhr.lockscreen.dev` for a dev build.
    switch still reads On. Turn it off and on: `launchctl print system/com.626labs.sanduhr.lockscreen`
    runs with exit code 0, and `launchctl print system/com.626labs.sanduhr.lockline` no longer finds
    the old job. The line stays on the lock screen throughout.
+10. After an update (2.39.2): with the switch on, `ls -l "/Library/Application Support/Sanduhr/lockline-alive"`
+    is under a minute old and `state.yaml` `lock_line.helper` is `on`. Update Sanduhr through Sparkle
+    (or install a newer signed build over it). If `launchctl print system/com.626labs.sanduhr.lockscreen`
+    shows `spawn failed`, within about 3 minutes of launch Settings, Lock Screen reads Stopped, then
+    Sanduhr registers the helper again on its own (macOS may ask for a password): the heartbeat is
+    fresh again, `last exit code = 0`, and `LoginwindowText` matches `lock-line.txt`. Note whether a
+    password was asked.
 
 ## 53. Plan label (2.34.0)
 

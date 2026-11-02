@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **The lock screen line keeps up after an update.** After Sanduhr updated, macOS could stop running the small helper that puts the line on the lock screen while Settings still said On, so the lock screen kept showing an old line (often "Claude usage unavailable"). The helper now leaves a sign each time it runs; when that sign goes quiet, Sanduhr registers the helper again on its own (macOS may ask for your password), Settings, Lock Screen says Stopped with a button to do it by hand, and turning the switch off no longer waits on a helper that isn't running.
+
 ## v2.39.1-mac — 2026-11-01
 
 - **Now playing finds its way back.** When the system now playing didn't answer once, often right after the Mac woke, Sanduhr stayed on Music and Spotify only until you relaunched it, and browser tracks and the live bars went quiet. It now checks again after a minute and then every five, and goes back as soon as it answers. The check after a wake also waits a few seconds for the Mac to settle. Settings, Now Playing says why it is on the fallback instead of blaming macOS.
