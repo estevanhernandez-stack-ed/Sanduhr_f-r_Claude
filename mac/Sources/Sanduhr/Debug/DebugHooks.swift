@@ -131,6 +131,14 @@ enum DebugHooks {
             DeskController.shared.applyPill()
         case .justTheDesk(let on):
             if on { app.chooseJustTheDesk() } else { app.endJustTheDesk() }
+        case .drawers(let step):
+            let service = DrawerService.shared
+            switch step {
+            case .on: service.turnOn()
+            case .sort: service.sort()
+            case .apply: service.apply()
+            case .off: service.confirmTurnOff()
+            }
         case .cameraLight(let on): CameraLightController.shared.setManual(on)
         case .glow: NotchGlowController.shared.fire()
         case .demo(let on):
@@ -415,6 +423,7 @@ enum DebugHooks {
                                    helper: LockLineDaemon.state.rawValue,
                                    text: LockLineController.line(vm: vm, now: Date()))
         s.justTheDesk = JustTheDesk.isOn()
+        s.drawers = DrawersDebug.of(DrawerService.shared)
         s.demo = DemoDebug(on: vm.demo, widgetTiers: vm.visibleTiers().count, deskLine: desk.model.claudeLine != nil,
                            notchMeters: desk.model.claudeCompact != nil, accounts: vm.accountLabels.count,
                            usageRows: vm.demo ? settings.usagePage.meterRows.count : 0)

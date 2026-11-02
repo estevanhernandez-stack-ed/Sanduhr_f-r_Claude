@@ -70,7 +70,7 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   and visible now, which it is not while the pointer is in the menu bar or the bar is hidden; `frame`, `[x, y, w, h]` in
   whole points from the primary screen's top left while the pill is up, null otherwise. The `on` key is quoted in
   the file, so YAML reads a key and not `true`; its window is kind `pill` in tree.yaml),
-  `lock_line` (#137, the lock screen line: `on`, Settings, Lock Screen's switch, desk suite key `lockLine`, quoted in the
+  `drawers` (Drawers: `on`, quoted; `drawers`, how many; `files`, the files in each as numbers in drawer order; `permission`, `unknown` until the Desktop Folder permission lands; `review_pending`; `journal_open`; never a name or a path), `lock_line` (#137, the lock screen line: `on`, Settings, Lock Screen's switch, desk suite key `lockLine`, quoted in the
   file like `notch_pill`'s; `text`, the line as the writer would compose it now from the live or demo numbers and the
   watchers waiting, the same string the page's preview draws, sanitized counts, percents and times only, so it may
   appear in snapshots; `length`, its character count),
@@ -121,7 +121,7 @@ pressed: the best match opened, scrolled to and lit; words that find nothing are
 `pulse [tier]` (`five_hour` by default; it glows the notch too), `tool deep-work|pacing|snake` (as the Tools menu: chosen
 again it closes), `desk on|off`, `notch on|off`, `notch-pill on|off|force` (issue #119: the top-center pill's switch,
 applied live; `force` also writes the override `notchPillForce`, so this notched Mac draws the pill for the smoke tools,
-and `off` clears both. A run puts the switch and the override back as they were), `just-the-desk on|off` (BACKLOG #4: `on` does what the welcome sheet's Just the Desk does, the Desk on and the sign-in reminder off, and offers the pending tour a second later; `off` ends it as a sign-in does, without a key. A run that turns it on turns it off again), `camera-light on|off` (the light by hand, as Tools, Camera Fill Light;
+and `off` clears both. A run puts the switch and the override back as they were), `drawers on|sort|apply|off` (Drawers: turn it on, read the Desktop into a review, apply the review, or put every file back and turn it off; `scenarios/drawers.yaml` needs a debug build started with `SANDUHR_DRAWERS_DESKTOP` pointing at a temp folder you filled with 3 + 2 files the default rules sort into two drawers, the harness makes no files; a run turns it off again), `just-the-desk on|off` (BACKLOG #4: `on` does what the welcome sheet's Just the Desk does, the Desk on and the sign-in reminder off, and offers the pending tour a second later; `off` ends it as a sign-in does, without a key. A run that turns it on turns it off again), `camera-light on|off` (the light by hand, as Tools, Camera Fill Light;
 its window is kind `camera` in tree.yaml, one node labeled `Camera fill light`), `glow [alert|meeting|camera|claude-waiting|claude-done]`
 (the notch glow once, whatever its switches; around the island while Desk runs with it on, else around
 the plain hardware notch on a notched screen, in a click-through window of kind `glow` labeled `Notch glow` that fades out after about three seconds),

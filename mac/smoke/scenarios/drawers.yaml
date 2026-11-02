@@ -1,0 +1,38 @@
+# Drawers (docs/mac-drawers-setup-spec.md, sections 8 and 9): turn Drawers on, sort a fixture
+# Desktop, apply the review and check the counts in state.yaml's `drawers` (counts and flags only,
+# never a name or a path).
+#
+# Pre-step, by hand: the harness sets no environment and makes no files, so before the run quit
+# Sanduhr and start a DEBUG build with SANDUHR_DEBUG_HOOKS=1 and SANDUHR_DRAWERS_DESKTOP pointing at a
+# temp folder you filled: 3 files the default rules put in one drawer and 2 they put in another
+# (for example 3 .png and 2 .pdf, none of them named like anything real). A release build ignores
+# the variable and would read the real Desktop, so never run this against one. The scenario never
+# touches a real Desktop folder.
+# The restore plan runs `drawers off` if the run turned Drawers on, which puts the files back.
+name: Drawers sorts a fixture Desktop and applies the review
+steps:
+  - expect_state:
+      drawers.on: false
+      drawers.review_pending: false
+  - do: drawers
+    arg: "on"
+  - expect_state:
+      drawers.on: true
+      drawers.drawers: 0
+  - do: drawers
+    arg: sort
+  - expect_state:
+      drawers.review_pending: true
+  - do: drawers
+    arg: apply
+  - expect_state:
+      drawers.review_pending: false
+      drawers.drawers: 2
+      drawers.files.0: 3
+      drawers.files.1: 2
+      drawers.journal_open: false
+  - do: drawers
+    arg: "off"
+  - expect_state:
+      drawers.on: false
+      drawers.drawers: 0
