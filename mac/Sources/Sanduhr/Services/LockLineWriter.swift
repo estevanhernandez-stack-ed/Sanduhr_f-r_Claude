@@ -1,4 +1,5 @@
 import AppKit
+import os
 import Foundation
 
 /// Keeps `~/Library/Application Support/Sanduhr/lock-line.txt` (#137) holding the composed lock
@@ -113,11 +114,15 @@ enum LockLineKeys {
 @MainActor
 final class LockLineController {
     static let shared = LockLineController()
+    private static let log = Logger(subsystem: "com.626labs.sanduhr", category: "lockline")
 
     private let writer = LockLineWriter()
     private weak var viewModel: UsageViewModel?
     private var timer: Timer?
     private var sessionActive = true
+    /// One automatic repair per launch, so a macOS that keeps refusing is not asked in a loop.
+    private var repairedThisLaunch = false
+    private var checkItem: DispatchWorkItem?
 
     func start(viewModel: UsageViewModel) {
         self.viewModel = viewModel
@@ -126,8 +131,39 @@ final class LockLineController {
                      NSWorkspace.sessionDidBecomeActiveNotification] {
             ws.addObserver(self, selector: #selector(sessionEvent(_:)), name: name, object: nil)
         }
+        ws.addObserver(self, selector: #selector(didWake), name: NSWorkspace.didWakeNotification, object: nil)
         refresh()
         sweepHelper()
+        scheduleHelperCheck()
+    }
+
+    /// A sleeping Mac runs no helper: the watch starts again on wake.
+    @objc private func didWake() {
+        LockLineDaemon.watchingSince = Date()
+        scheduleHelperCheck()
+    }
+
+    /// Once the app has watched long enough, a helper that is on but has stopped running (an older
+    /// build's registration after an update) is registered again, once per launch.
+    private func scheduleHelperCheck() {
+        checkItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.checkHelper() }
+        }
+        checkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + LockLineDaemon.judgeAfter + 5, execute: item)
+    }
+
+    private func checkHelper() {
+        guard UserDefaults.desk.bool(forKey: LockLineKeys.on), !repairedThisLaunch,
+              LockLineDaemon.state == .stalled else { return }
+        repairedThisLaunch = true
+        Self.log.notice("lock screen helper stalled: registering it again")
+        Task { @MainActor in
+            do { try await LockLineDaemon.repair() } catch {
+                Self.log.error("lock screen helper did not register again")
+            }
+        }
     }
 
     /// A helper registered while the switch is off (a reset, a crash mid-turn-off, defaults

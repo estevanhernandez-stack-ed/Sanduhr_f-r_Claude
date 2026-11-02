@@ -94,9 +94,33 @@ struct LockLineDaemonTests {
         #expect(LockLineDaemon.state(.requiresApproval) == .needsApproval)
         #expect(LockLineDaemon.state(.notFound) == .missing)
         #expect(LockLineDaemon.state(.notRegistered) == .off)
-        for s in [LockLineDaemon.State.on, .needsApproval, .missing, .off] {
+        for s in [LockLineDaemon.State.on, .needsApproval, .missing, .off, .stalled] {
             #expect(LockLineDaemon.caption(s).hasSuffix("."))
         }
+        #expect(LockLineDaemon.State.needsApproval.rawValue == "needs_approval")
+        #expect(LockLineDaemon.State.stalled.rawValue == "stalled")
+    }
+
+    /// 2.39.2: a registration from an older build stopped spawning after an update while macOS still
+    /// called it enabled. The helper's heartbeat tells the two apart.
+    @Test func aHelperWithoutARecentHeartbeatIsStalled() {
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        let judge = LockLineDaemon.judgeAfter, age = LockLineDaemon.heartbeatMaxAge
+        // Not judged before the app has watched long enough (launch, wake, registration).
+        #expect(!LockLineDaemon.stalled(heartbeat: nil, watchingSince: t0, now: t0.addingTimeInterval(judge - 1)))
+        // No heartbeat at all once judged: stalled (an old helper never writes one).
+        #expect(LockLineDaemon.stalled(heartbeat: nil, watchingSince: t0, now: t0.addingTimeInterval(judge)))
+        // A fresh one is fine, an old one is not.
+        let now = t0.addingTimeInterval(judge + 600)
+        #expect(!LockLineDaemon.stalled(heartbeat: now.addingTimeInterval(-60), watchingSince: t0, now: now))
+        #expect(LockLineDaemon.stalled(heartbeat: now.addingTimeInterval(-age - 1), watchingSince: t0, now: now))
+        // The helper runs every minute, well inside the age; the judge waits for more than one run.
+        #expect(age > 60 && judge > 60)
+    }
+
+    @Test func theHeartbeatSitsBesideTheHelpersOtherFiles() {
+        #expect(LockLineHelperRules.heartbeatPath == "/Library/Application Support/Sanduhr/lockline-alive")
+        #expect(LockLineHelperRules.heartbeatPath.hasPrefix(LockLineHelperRules.stateDir + "/"))
     }
 
     @Test func aBundleWithTheDevPlistRegistersTheDevLabel() {

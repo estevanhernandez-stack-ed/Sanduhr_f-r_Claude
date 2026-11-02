@@ -91,6 +91,17 @@ private struct LockLineSwitchSection: View {
             if state == .needsApproval {
                 Button("Open Login Items…") { LockLineDaemon.openLoginItems() }
             }
+            if state == .stalled {
+                Button("Register the Helper Again") {
+                    problem = nil
+                    Task { @MainActor in
+                        do { try await LockLineDaemon.repair() } catch {
+                            problem = LockLineDaemon.installProblem(error, after: LockLineDaemon.state)
+                        }
+                        state = LockLineDaemon.state
+                    }
+                }
+            }
             if let problem {
                 Text(problem)
                     .font(.caption).foregroundStyle(.orange)
@@ -107,15 +118,17 @@ private struct LockLineSwitchSection: View {
         problem = nil
         if on {
             LockLineController.shared.refresh(force: true)
-            do { try LockLineDaemon.install() } catch {
-                // register() also throws when macOS wants the Login Items OK first; the state is
-                // the truth, so only a helper that is neither on nor waiting for an OK failed.
-                problem = LockLineDaemon.installProblem(error, after: LockLineDaemon.state)
+            Task { @MainActor in
+                do { try await LockLineDaemon.install() } catch {
+                    // register() also throws when macOS wants the Login Items OK first; the state is
+                    // the truth, so only a helper that is neither on nor waiting for an OK failed.
+                    problem = LockLineDaemon.installProblem(error, after: LockLineDaemon.state)
+                }
+                state = LockLineDaemon.state
             }
-            state = LockLineDaemon.state
         } else {
             let shown = LockLineDaemon.currentLoginText() ?? ""
-            let wasOn = state == .on
+            let wasOn = state == .on || state == .stalled
             LockLineController.shared.refresh()
             guard wasOn else {
                 Task { @MainActor in

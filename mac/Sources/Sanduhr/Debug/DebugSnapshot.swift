@@ -198,6 +198,9 @@ struct NotchPillDebug: Equatable {
 /// character count.
 struct LockLineDebug: Equatable {
     var on = false
+    /// The helper as macOS and its heartbeat have it (LockLineDaemon.State): off, on, stalled,
+    /// needs_approval or missing.
+    var helper = "off"
     var text = ""
     var length: Int { text.count }
 }
@@ -394,7 +397,8 @@ enum DebugState {
 
     /// `lock_line:` (#137): the switch, the composed line and its length.
     static func lockLineYAML(_ l: LockLineDebug) -> YAMLNode {
-        .map([YAMLPair("on", .bool(l.on)), YAMLPair("text", .string(l.text)), YAMLPair("length", .int(l.length))])
+        .map([YAMLPair("on", .bool(l.on)), YAMLPair("helper", .string(l.helper)), YAMLPair("text", .string(l.text)),
+              YAMLPair("length", .int(l.length))])
     }
 
     /// `dock:` (item 56): side, auto-hide and the inset applied now.
