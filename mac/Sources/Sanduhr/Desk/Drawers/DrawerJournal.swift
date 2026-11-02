@@ -21,21 +21,27 @@ struct JournalMove: Equatable, Sendable, Codable {
     var to: String
     var isFolder: Bool
     var written: JournalWritten
+    /// The file's inode when the entry was written (before it moved). An extra key Windows ignores:
+    /// it lets crash recovery tell, with the file system in hand, that a move whose flag never
+    /// flipped did happen (docs/cart-runs D7). Nil on a journal from before it, or from Windows.
+    var inode: UInt64?
 
-    init(from: String, to: String, isFolder: Bool = false, written: JournalWritten) {
+    init(from: String, to: String, isFolder: Bool = false, written: JournalWritten, inode: UInt64? = nil) {
         self.from = from
         self.to = to
         self.isFolder = isFolder
         self.written = written
+        self.inode = inode
     }
 
-    private enum Keys: String, CodingKey { case from, to, folder, written }
+    private enum Keys: String, CodingKey { case from, to, folder, written, inode }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
         from = try c.decode(String.self, forKey: .from)
         to = try c.decode(String.self, forKey: .to)
         isFolder = (try? c.decode(Bool.self, forKey: .folder)) ?? false
+        inode = try? c.decode(UInt64.self, forKey: .inode)
         if let flag = try? c.decode(Bool.self, forKey: .written) {
             written = flag ? .done(modified: nil) : .pending
         } else if let text = try? c.decode(String.self, forKey: .written), let date = JournalTime.parse(text) {
@@ -50,6 +56,7 @@ struct JournalMove: Equatable, Sendable, Codable {
         try c.encode(from, forKey: .from)
         try c.encode(to, forKey: .to)
         try c.encode(isFolder, forKey: .folder)
+        try c.encodeIfPresent(inode, forKey: .inode)
         switch written {
         case .pending: try c.encode(false, forKey: .written)
         case .done(let date?): try c.encode(JournalTime.format(date), forKey: .written)
