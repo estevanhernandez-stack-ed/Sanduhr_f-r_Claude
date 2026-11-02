@@ -65,6 +65,8 @@ struct DebugStateInput {
     var justTheDesk = false
     /// Demo mode (slice 4): on, and what each surface shows, counts and flags only.
     var demo = DemoDebug()
+    /// Drawers (docs/mac-drawers-setup-spec.md, section 9): counts and flags only.
+    var drawers = DrawersDebug()
     /// The last `reset --dry-run` (Settings v2, slice 5): the plan in run order, kinds and counts
     /// only, never a path, a folder, a label or a domain's contents. Nil until one ran.
     var resetDryRun: Reset.Report?
@@ -203,6 +205,30 @@ struct LockLineDebug: Equatable {
     var helper = "off"
     var text = ""
     var length: Int { text.count }
+}
+
+/// state.yaml's `drawers:`: the switch (`on`, quoted like the other `on` keys), how many drawers
+/// there are, the files in each as a number in drawer order, the Desktop Folder permission
+/// (`unknown` until it is read, then `granted` or `denied`), and two flags. Never a drawer's
+/// name, id or path, never a file's name.
+struct DrawersDebug: Equatable {
+    var on = false
+    /// Files in each drawer, in drawer order. The drawer count is its length.
+    var files: [Int] = []
+    var permission = "unknown"
+    /// A sort is waiting for Apply, Edit or Dismiss.
+    var reviewPending = false
+    /// A run a crash left open is waiting to be undone.
+    var journalOpen = false
+
+    /// The service as state.yaml sees it: the drawer list's file counts from what the watcher
+    /// holds, and nothing that names anything.
+    @MainActor
+    static func of(_ service: DrawerService) -> DrawersDebug {
+        DrawersDebug(on: service.settings.enabled,
+                     files: service.settings.drawers.map { service.contents[$0.id]?.count ?? 0 },
+                     reviewPending: service.pending != nil, journalOpen: !service.recovered.isEmpty)
+    }
 }
 
 /// state.yaml's `dock:` (item 56): the Dock's side and auto-hide (its own settings, read only),
@@ -399,6 +425,14 @@ enum DebugState {
     static func lockLineYAML(_ l: LockLineDebug) -> YAMLNode {
         .map([YAMLPair("on", .bool(l.on)), YAMLPair("helper", .string(l.helper)), YAMLPair("text", .string(l.text)),
               YAMLPair("length", .int(l.length))])
+    }
+
+    /// `drawers:`: the switch, the drawer count, files per drawer, the permission and two flags.
+    static func drawersYAML(_ d: DrawersDebug) -> YAMLNode {
+        .map([YAMLPair("on", .bool(d.on)), YAMLPair("drawers", .int(d.files.count)),
+              YAMLPair("files", .list(d.files.map { YAMLNode.int($0) })),
+              YAMLPair("permission", .string(d.permission)),
+              YAMLPair("review_pending", .bool(d.reviewPending)), YAMLPair("journal_open", .bool(d.journalOpen))])
     }
 
     /// `dock:` (item 56): side, auto-hide and the inset applied now.
@@ -659,6 +693,7 @@ enum DebugState {
         pairs.append(("lock_line", lockLineYAML(s.lockLine)))
         pairs.append(("just_the_desk", .bool(s.justTheDesk)))
         pairs.append(("demo", demoYAML(s.demo)))
+        pairs.append(("drawers", drawersYAML(s.drawers)))
         pairs.append(("reset_dry_run", s.resetDryRun.map(resetDryRunYAML) ?? .null))
         return .object(pairs)
     }

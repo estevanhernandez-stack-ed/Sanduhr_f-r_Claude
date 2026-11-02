@@ -294,6 +294,8 @@ module Smoke
       # Just the Desk (BACKLOG #4) a scenario turned on goes off again; the Desk's own switch is
       # handled above.
       steps << ['just-the-desk', 'off'] if !before['just_the_desk'] && after['just_the_desk']
+      # Drawers a scenario turned on goes off again, putting every file back on the (temp) Desktop.
+      steps << ['drawers', 'off'] if !(before['drawers'].is_a?(Hash) && before['drawers']['on']) && after['drawers'].is_a?(Hash) && after['drawers']['on']
       # The camera light by hand, only when no camera was in use (a running camera lights it too).
       if !before['camera_in_use'] && !after['camera_in_use'] && !!before['camera_light'] != !!after['camera_light']
         steps << ['camera-light', before['camera_light'] ? 'on' : 'off']

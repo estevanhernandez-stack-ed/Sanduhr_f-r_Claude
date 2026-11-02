@@ -131,6 +131,20 @@ enum DebugHooks {
             DeskController.shared.applyPill()
         case .justTheDesk(let on):
             if on { app.chooseJustTheDesk() } else { app.endJustTheDesk() }
+        case .drawers(let step):
+            // Only against a stand-in Desktop: without the override a smoke run would sort, or
+            // put back, the real Desktop's files.
+            guard DebugDrawersGuard.allowed() else {
+                NSLog("Sanduhr debug: drawers action refused without %@", DrawerDesktop.overrideVariable)
+                break
+            }
+            let service = DrawerService.shared
+            switch step {
+            case .on: service.turnOn()
+            case .sort: service.sort()
+            case .apply: service.apply()
+            case .off: service.confirmTurnOff()
+            }
         case .cameraLight(let on): CameraLightController.shared.setManual(on)
         case .glow: NotchGlowController.shared.fire()
         case .demo(let on):
@@ -415,6 +429,7 @@ enum DebugHooks {
                                    helper: LockLineDaemon.state.rawValue,
                                    text: LockLineController.line(vm: vm, now: Date()))
         s.justTheDesk = JustTheDesk.isOn()
+        s.drawers = DrawersDebug.of(DrawerService.shared)
         s.demo = DemoDebug(on: vm.demo, widgetTiers: vm.visibleTiers().count, deskLine: desk.model.claudeLine != nil,
                            notchMeters: desk.model.claudeCompact != nil, accounts: vm.accountLabels.count,
                            usageRows: vm.demo ? settings.usagePage.meterRows.count : 0)
@@ -509,4 +524,21 @@ enum DebugHooks {
                                    intro: desk.model.watcherIntroUntil != nil)
         return s
     }
+}
+
+/// The `drawers` debug action runs only in a debug build whose `SANDUHR_DRAWERS_DESKTOP` names a
+/// stand-in Desktop. The hooks also answer in a release build, which ignores the override
+/// (DrawerDesktop), so there the action is always refused: it would act on the real Desktop.
+enum DebugDrawersGuard {
+    static func allowed(environment: [String: String] = ProcessInfo.processInfo.environment,
+                        debugBuild: Bool = isDebugBuild) -> Bool {
+        guard debugBuild, let p = environment[DrawerDesktop.overrideVariable] else { return false }
+        return DrawerPaths.normalize(p) != nil
+    }
+
+    #if DEBUG
+    static let isDebugBuild = true
+    #else
+    static let isDebugBuild = false
+    #endif
 }

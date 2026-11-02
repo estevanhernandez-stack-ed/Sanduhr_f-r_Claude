@@ -42,6 +42,16 @@ enum DebugAction: Equatable {
     /// sign-in does, without a key. Applied live.
     case justTheDesk(on: Bool)
 
+    /// Drawers (docs/mac-drawers-setup-spec.md, section 9): `on` turns it on (and the Desk), `sort`
+    /// reads the Desktop and holds the review, `apply` applies the pending review, `off` puts every
+    /// file back and turns it off. The smoke scenario points the Desktop at a temp folder with
+    /// SANDUHR_DRAWERS_DESKTOP, so a hook never reads a real one.
+    case drawers(DrawersStep)
+
+    enum DrawersStep: String, CaseIterable {
+        case on, sort, apply, off
+    }
+
     enum NotchPillMode: String, CaseIterable {
         case on, off, force
     }
@@ -121,7 +131,7 @@ enum DebugAction: Equatable {
     enum ModsSheet: Equatable { case export, exportSample, importSample }
 
     static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
-                        "test-alert", "pulse", "tool", "desk", "notch", "notch-pill", "just-the-desk", "camera-light", "glow",
+                        "test-alert", "pulse", "tool", "desk", "notch", "notch-pill", "just-the-desk", "drawers", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
                         "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
                         "desk-arrange", "hot-key", "reset", "mods-config"]
@@ -229,6 +239,11 @@ enum DebugLink {
             case "off": return .success(.justTheDesk(on: false))
             default: return bad("just-the-desk needs arg=on or off")
             }
+        case "drawers":
+            guard let step = arg.flatMap({ DebugAction.DrawersStep(rawValue: $0.lowercased()) }) else {
+                return bad("drawers needs arg=on, sort, apply or off")
+            }
+            return .success(.drawers(step))
         case "camera-light": return onOff(DebugAction.cameraLight)
         case "demo": return onOff(DebugAction.demo)
         case "glow":

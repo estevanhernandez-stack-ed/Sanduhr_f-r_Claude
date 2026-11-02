@@ -214,6 +214,18 @@ class FakeApp
                     { 'part' => 'desk_messages', 'kind' => 'desk_messages', 'count' => 1 },
                     { 'part' => 'settings', 'kind' => 'preferences', 'count' => 2 }]
       }
+    when 'drawers'
+      # Item 7: a fixture Desktop of 5 loose files sorts into 2 drawers (3 and 2 files); off puts it back.
+      d = (s['drawers'] ||= {})
+      case arg
+      when 'on' then d['on'] = true
+      when 'sort' then d['review_pending'] = true if d['on']
+      when 'apply'
+        if d['review_pending']
+          d.merge!('review_pending' => false, 'drawers' => 2, 'files' => [3, 2])
+        end
+      when 'off' then d.merge!('on' => false, 'review_pending' => false, 'drawers' => 0, 'files' => [])
+      end
     when 'watch-test'
       w = (s['watchers'] ||= { 'count' => 0, 'states' => [], 'placements' => [] })
       case arg
@@ -300,6 +312,9 @@ eq('oled care off in the fixture', state['oled_care'], false)
 # Issue #119: the top-center pill is off, not forced and not up in the fixture; its frame is null
 # until it is. The `on` key is quoted in the fixture, so it reads as a key and not as true.
 eq('pill off in the fixture', state['notch_pill'], { 'on' => false, 'forced' => false, 'shown' => false, 'frame' => nil })
+# Drawers: off in the fixture, counts and flags only (the `on` key is quoted); permission is the stub.
+eq('drawers in the fixture', state['drawers'],
+   { 'on' => false, 'drawers' => 0, 'files' => [], 'permission' => 'unknown', 'review_pending' => false, 'journal_open' => false })
 # #137: the lock screen line is off in the fixture, its switch key quoted like the pill's.
 eq('lock line in the fixture', state['lock_line'].keys, %w[on helper text length])
 eq('lock line is off and as long as its text', [state['lock_line']['on'], state['lock_line']['length']],
@@ -738,7 +753,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill just-the-desk camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config]
+    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill just-the-desk drawers camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end
