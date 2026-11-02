@@ -155,6 +155,22 @@ struct DrawerJournal: Equatable, Sendable, Codable {
     /// The journal without one entry (undone, or its files all gone). An unknown id changes nothing.
     func without(_ id: String) -> DrawerJournal { DrawerJournal(entries: entries.filter { $0.id != id }) }
 
+    /// The journal after a drawer's folder was renamed: every path in or under `old` now sits under
+    /// `new`. Pure; the file system is not read. Paths compare as the rest of the drawer code does.
+    func repointing(from old: String, to new: String) -> DrawerJournal {
+        guard let o = DrawerPaths.normalize(old), let n = DrawerPaths.normalize(new) else { return self }
+        func moved(_ path: String) -> String {
+            guard let p = DrawerPaths.normalize(path), DrawerPaths.isInside(p, o), p.count >= o.count,
+                  DrawerPaths.key(String(p.prefix(o.count))) == DrawerPaths.key(o) else { return path }
+            return n + String(p.dropFirst(o.count))
+        }
+        return DrawerJournal(entries: entries.map { e in
+            var e = e
+            e.moves = e.moves.map { m in var m = m; m.from = moved(m.from); m.to = moved(m.to); return m }
+            return e
+        })
+    }
+
     /// Entries a crash left open, found on load. Each is offered as Undo for its written moves.
     var openEntries: [JournalEntry] { entries.filter(\.isOpen) }
 
