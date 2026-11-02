@@ -148,6 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DeskController.shared.apply()
         // Drawers: closes a run a crash left open and starts the watcher. Does nothing while Drawers is off.
         DrawerService.shared.launch()
+        DrawerPanelController.shared.refresh()
         // The camera light watches the cameras while its switch is on, with or without Desk.
         CameraLightController.shared.apply()
         // The notch glow checks for meetings a minute out while its meetings switch is on.
