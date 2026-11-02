@@ -178,7 +178,7 @@ final class DrawerPanelController {
         a.hide = { [weak self] in self?.service.updateSettings { if !$0.hidden.contains(id) { $0.hidden.append(id) } } }
         a.setLook = { [weak self] look in self?.service.updateSettings { $0.looks[id] = look } }
         a.tidy = { [weak self] in self?.tidy() }
-        a.openSettings = { SettingsWindowController.shared.show(.deskLook) }
+        a.openSettings = { SettingsWindowController.shared.show(.drawers) }
     }
 
     private func toggleFold(_ id: String) {

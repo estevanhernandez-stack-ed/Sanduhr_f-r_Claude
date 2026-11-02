@@ -69,6 +69,12 @@ enum SettingsAnchor {
     static let cameraLight = "camera-light"
     static let size = "size"
     static let textColor = "text-color"
+    // Drawers
+    static let drawersSwitch = "drawers-switch"
+    static let drawersRules = "drawers-rules"
+    static let drawersView = "drawers-view"
+    static let drawersLook = "drawers-look"
+    static let drawersRuns = "drawers-runs"
     // Lock Screen
     static let lockLine = "lock-line"
     // Widgets
@@ -124,7 +130,7 @@ enum SettingsAnchor {
     static let advanced = "advanced"
 
     /// Every anchor in sidebar order, page by page, with its title and synonyms.
-    static let all: [SettingsEntry] = general + accountsAndAlerts + deskPages + notchPages + lockScreenPages + widgetsPages + claudeCodePages + widgetAndHelp
+    static let all: [SettingsEntry] = general + accountsAndAlerts + deskPages + notchPages + lockScreenPages + drawersPages + widgetsPages + claudeCodePages + widgetAndHelp
 
     private static let general: [SettingsEntry] = [
         SettingsEntry(title: "Surfaces", page: .general, anchor: surfaces, synonyms: ["status", "desk on", "notch on"]),
@@ -191,6 +197,18 @@ enum SettingsAnchor {
         SettingsEntry(title: "Show a line on the lock screen", page: .lockScreen, anchor: lockLine,
                       synonyms: ["lock screen", "login window", "loginwindow", "locked", "prefix", "Claude usage",
                                  "Reset time", "Watchers waiting for you"]),
+    ]
+
+    private static let drawersPages: [SettingsEntry] = [
+        SettingsEntry(title: "Drawers", page: .drawers, anchor: drawersSwitch,
+                      synonyms: ["desktop", "sort", "sort my desktop", "folders", "Put files back", "Drawers folder", "uninstall"]),
+        SettingsEntry(title: "Sorting rules", page: .drawers, anchor: drawersRules,
+                      synonyms: ["rules", "Older files", "days", "custom rule", "name contains", "starts with", "reorder"]),
+        SettingsEntry(title: "Folders to look at", page: .drawers, anchor: drawersView,
+                      synonyms: ["view drawer", "add a folder", "hidden drawers", "show a drawer", "unhide"]),
+        SettingsEntry(title: "How drawers look", page: .drawers, anchor: drawersLook,
+                      synonyms: ["Solid", "Glass", "Outline", "Bare", "opacity", "Tidy", "corner", "direction"]),
+        SettingsEntry(title: "Recent runs", page: .drawers, anchor: drawersRuns, synonyms: ["undo", "history", "journal"]),
     ]
 
     private static let widgetsPages: [SettingsEntry] = [
