@@ -28,10 +28,14 @@ enum LockLineDaemon {
     }
 
     /// What Settings says about the helper.
-    enum State: Equatable {
+    enum State: String, Equatable {
         case off
-        case needsApproval
+        case needsApproval = "needs_approval"
         case on
+        /// Registered and allowed, but launchd has not run it lately: a registration from an older
+        /// build that stopped spawning after an update ("spawn failed", "needs LWCR update", seen
+        /// 2026-11-01 on a registration from build 45). `repair()` registers it again.
+        case stalled
         case missing
     }
 
@@ -51,12 +55,50 @@ enum LockLineDaemon {
         return current == .off && legacy == .enabled ? .on : current
     }
 
-    static var state: State { state(service.status, legacy: legacy.status) }
+    static var state: State {
+        let base = state(service.status, legacy: legacy.status)
+        guard base == .on, stalled(heartbeat: heartbeat(), watchingSince: watchingSince, now: Date()) else { return base }
+        return .stalled
+    }
+
+    // MARK: Is launchd still running it?
+
+    /// The helper runs once a minute; a heartbeat older than this means it does not.
+    static let heartbeatMaxAge: TimeInterval = 5 * 60
+    /// How long the app watches (since launch, a wake or a registration) before it judges.
+    static let judgeAfter: TimeInterval = 3 * 60
+
+    /// Since when the helper could have run while the app watched: launch, the last wake, the last
+    /// registration. A sleeping Mac runs nothing, so a wake starts the count again.
+    static var watchingSince = Date()
+
+    /// Stalled: the app has watched long enough and the heartbeat is missing or old.
+    nonisolated static func stalled(heartbeat: Date?, watchingSince: Date, now: Date) -> Bool {
+        guard now.timeIntervalSince(watchingSince) >= judgeAfter else { return false }
+        guard let heartbeat else { return true }
+        return now.timeIntervalSince(heartbeat) > heartbeatMaxAge
+    }
+
+    /// The heartbeat's date (`LockLineHelperRules.heartbeatPath`), nil when there is none yet.
+    static func heartbeat() -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: LockLineHelperRules.heartbeatPath))?[.modificationDate] as? Date
+    }
+
+    /// Registers the helper again: out, then in, so launchd takes this build's signature. Unregister
+    /// does not wait for the line to clear here (a stalled helper would never clear it); the new
+    /// registration runs at once (RunAtLoad) and keeps or clears the line as the file says.
+    static func repair() async throws {
+        try? await service.unregister()
+        watchingSince = Date()
+        try service.register()
+        watchingSince = Date()
+    }
 
     /// One line under the switch for each state.
     static func caption(_ state: State) -> String {
         switch state {
         case .on: "On. The line shows the next time the screen locks; it follows the numbers within a few minutes."
+        case .stalled: "Stopped: macOS hasn't run the lock screen helper since Sanduhr updated, so the lock screen shows an old line. Sanduhr registers it again; macOS may ask for your password."
         case .needsApproval: "macOS needs your OK: System Settings, General, Login Items, allow Sanduhr in the background."
         case .missing: "This copy of Sanduhr has no lock screen helper in it."
         case .off: "Off. Turning it on asks for an administrator password once, to put the line on the lock screen."
@@ -67,10 +109,12 @@ enum LockLineDaemon {
     /// password), for Settings to show.
     /// A 2.33.0 helper goes once this one is registered: both run the same executable on the
     /// same files, so the line stays up through the swap.
-    static func install() throws {
+    static func install() async throws {
         defer { if service.status == .enabled { dropLegacy() } }
+        if state == .stalled { try await repair(); return }
         guard service.status != .enabled else { return }
         try service.register()
+        watchingSince = Date()
     }
 
     private static func dropLegacy() {
@@ -86,6 +130,8 @@ enum LockLineDaemon {
     /// runs out, the helper stays and the launch sweep tries again. True when removed.
     @discardableResult
     static func remove(lastLine: String) async -> Bool {
+        // A stalled helper would never take the line off: register it again first.
+        if state == .stalled { try? await repair() }
         let deadline = Date().addingTimeInterval(clearWait)
         while !lastLine.isEmpty, currentLoginText() == lastLine {
             guard Date() < deadline else { return false }
@@ -103,7 +149,7 @@ enum LockLineDaemon {
     static func installProblem(_ error: Error, after state: State) -> String? {
         switch state {
         case .on, .needsApproval: nil
-        case .off, .missing: "macOS did not install the lock screen helper: \(error.localizedDescription)"
+        case .off, .missing, .stalled: "macOS did not install the lock screen helper: \(error.localizedDescription)"
         }
     }
 

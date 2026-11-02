@@ -1514,6 +1514,19 @@ resetbtm`, which wipes every app's records. 2.33.1 split the labels; the bundle 
 2.33.0's plist so the app can unregister it, and a 2.33.0 helper still registered reads as On
 until the switch is turned off and on. An ad-hoc dev build's constraint pins the exact binary,
 so after a rebuild turn the switch off and on to register the new build.
+
+**After an update (2.39.2).** A signed release's registration can stop spawning after Sparkle
+replaces the app, too: on the owner's Mac a helper registered by build 45 failed every run after
+the next update (`spawn failed`, exit 78, `needs LWCR update`) while `SMAppService` still said
+`.enabled`, so Settings read On and the lock screen kept the last line it set for days. The helper
+now rewrites an empty, world-readable heartbeat, `/Library/Application Support/Sanduhr/lockline-alive`,
+on every run. `LockLineDaemon.state` reads `.stalled` when the switch's helper is enabled and the
+heartbeat is missing or over 5 minutes old, judged only after the app has watched for 3 minutes
+since launch, a wake or a registration. `LockLineController` then registers it again (unregister,
+register; `LockLineDaemon.repair()`), once per launch; Settings shows the state with **Register the
+Helper Again**, and turning the switch on or off repairs first, so a turn-off no longer waits on a
+helper that will never clear the line. `state.yaml` `lock_line.helper` is `off`, `on`, `stalled`,
+`needs_approval` or `missing`.
 ## Now playing
 
 Now playing (items 53, 53b) shows what plays on the Mac, in any app that publishes now playing

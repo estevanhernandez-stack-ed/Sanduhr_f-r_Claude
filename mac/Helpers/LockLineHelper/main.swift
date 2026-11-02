@@ -9,7 +9,7 @@ import os
 // arguments, one key. It logs what it did, never the text.
 
 let log = Logger(subsystem: "com.626labs.sanduhr", category: "lockline")
-let stateDir = "/Library/Application Support/Sanduhr"
+let stateDir = LockLineHelperRules.stateDir
 let lastPath = stateDir + "/lockline-last.txt"
 let originalPath = stateDir + "/lockline-original.txt"
 
@@ -65,6 +65,16 @@ func setText(_ value: String?) {
     CFPreferencesSynchronize(domain, kCFPreferencesAnyUser, kCFPreferencesAnyHost)
 }
 
+/// Every run, before anything else: the app reads this file's date to know launchd still runs
+/// the helper (a registration from an older build can stop spawning after an update).
+func beat() {
+    try? FileManager.default.createDirectory(atPath: stateDir, withIntermediateDirectories: true,
+                                             attributes: [.posixPermissions: 0o755])
+    FileManager.default.createFile(atPath: LockLineHelperRules.heartbeatPath, contents: Data(),
+                                   attributes: [.posixPermissions: 0o644])
+}
+
+beat()
 let user = consoleUser()
 let line = user.flatMap { readLine(uid: $0.uid, home: $0.home) }
 // At the login window there is no user file: leave whatever is there.

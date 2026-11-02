@@ -458,9 +458,9 @@ struct DebugStateTests {
         var s = DebugStateInput()
         s.lockLine = LockLineDebug(on: true, text: "Claude 42% · 1 waiting for you")
         let yaml = YAMLEmitter.emit(DebugState.yaml(s))
-        #expect(yaml.contains("lock_line:\n  \"on\": true\n  text: Claude 42% · 1 waiting for you\n  length: 30\njust_the_desk:"))
+        #expect(yaml.contains("lock_line:\n  \"on\": true\n  helper: \"off\"\n  text: Claude 42% · 1 waiting for you\n  length: 30\njust_the_desk:"))
         let rest = YAMLEmitter.emit(DebugState.yaml(DebugStateInput()))
-        #expect(rest.contains("lock_line:\n  \"on\": false\n  text: \"\"\n  length: 0\n"))
+        #expect(rest.contains("lock_line:\n  \"on\": false\n  helper: \"off\"\n  text: \"\"\n  length: 0\n"))
     }
 
     /// Item 56: the Dock's side and auto-hide, and the inset the Desk applies now.
