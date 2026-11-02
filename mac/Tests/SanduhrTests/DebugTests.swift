@@ -597,3 +597,15 @@ struct DebugStateTests {
         """)
     }
 }
+
+@Suite("Drawers debug action guard")
+struct DebugDrawersGuardTests {
+    /// Without a stand-in Desktop the action would sort the real one: it is refused.
+    @Test func theActionNeedsTheStandInDesktop() {
+        #expect(!DebugDrawersGuard.allowed(environment: [:]))
+        #expect(!DebugDrawersGuard.allowed(environment: [DrawerDesktop.overrideVariable: "relative/path"]))
+        #expect(DebugDrawersGuard.allowed(environment: [DrawerDesktop.overrideVariable: "/tmp/stand-in-desktop"], debugBuild: true))
+        // A release build ignores the override, so the action would reach the real Desktop.
+        #expect(!DebugDrawersGuard.allowed(environment: [DrawerDesktop.overrideVariable: "/tmp/stand-in-desktop"], debugBuild: false))
+    }
+}
