@@ -85,6 +85,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         if let previous, previous != enabled {
             MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.deskDidChange() }
         }
+        // The drawer panels come up and go down with the Desk.
+        MainActor.assumeIsolated { DrawerPanelController.shared.refresh() }
     }
 
     private func start() {
@@ -398,6 +400,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         // once the frames arrive (onHitAreasChange) it takes the mouse over a click area.
         updateMouseThrough()
         DispatchQueue.main.async { [weak self] in self?.updateMouseThrough() }
+        // A new screen: the drawer panels follow the Desk to it.
+        MainActor.assumeIsolated { DrawerPanelController.shared.refresh() }
     }
 
     /// A menu-bar-tall, click-through window over the notch, one level above the menu bar,

@@ -267,6 +267,13 @@ final class DrawerService {
 
     func dismissReview() { pending = nil }
 
+    /// The review after the user's edits (Edit unticks files and renames new drawers). Apply
+    /// still checks it again, against the facts the review showed.
+    func replacePending(_ plan: DrawerPlan) {
+        guard let p = pending else { return }
+        pending = DrawerReview(plan: plan, planned: p.planned)
+    }
+
     /// Applies the pending review. The mover checks it again, so what changed since is dropped and named.
     @discardableResult
     func apply() -> DrawerRunResult? {
@@ -298,7 +305,28 @@ final class DrawerService {
         return result
     }
 
+    // MARK: Items in a drawer
+
+    /// Renames one item inside a drawer's folder with the exclusive rename, so it never replaces
+    /// something there. Returns why it was refused, or nil.
+    @discardableResult
+    func renameItem(_ path: String, to newName: String) -> String? {
+        guard let found = DrawerItemGuard.entry(path, drawers: settings.drawers) else { return "That item isn't in a drawer." }
+        let name = newName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains(":") else {
+            return "\"\(newName)\" can't be a file name."
+        }
+        let dest = DrawerPaths.join(DrawerPaths.parent(found.path), name)
+        if DrawerFS.exists(dest) { return "Something named \"\(name)\" is already there." }
+        return mover.rename(found.path, dest) == 0 ? nil : "It couldn't be renamed."
+    }
+
+    /// Moves an item to the Trash, from the user's own command only (`DrawerTrash`).
+    @discardableResult
+    func trashItem(_ path: String) -> String? { DrawerTrash.trash(path, drawers: settings.drawers) }
+
     // MARK: Undo
+
 
     /// Reverses one run, by its journal id.
     @discardableResult
