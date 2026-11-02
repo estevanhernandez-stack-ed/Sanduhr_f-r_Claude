@@ -2168,6 +2168,73 @@ request.`
   stays until dismissed and glows the notch once). In memory only; demo mode hides them. In `band.json` a runner's
   card is `{source: automatic, kind: runner, state}` with no title, because a runner's name can name a private repo.
 
+## Drawers
+
+Settings, Drawers (2.40.0, spec `docs/mac-drawers-setup-spec.md`, Windows 4.5.0's rules): drawers on the Desk that each show a real folder,
+and a rule sorter that fills them after a review. Off by default. **Sanduhr never overwrites, copies across volumes or deletes a
+file**, and no file name is ever logged, sent or shown to Claude (`docs/PRIVACY.md` has the full statement).
+
+- **What a drawer is.** An owned drawer is a folder Sanduhr made, `<root>/<Name>`, default root `~/Desktop/Drawers` (so a move is a
+  rename on the Desktop's own volume). A view drawer is any folder you add to look at (Settings, Drawers, Folders to look at): its
+  files are never moved, emptied or put back. The root can change only while no owned drawer exists, and must be on the Desktop's
+  volume. Limits per plan: 24 drawers, 2,000 moves.
+- **The rules** (`DrawerRules`), first match wins, all on by default: Screenshots (the `kMDItemIsScreenCapture` flag, or an image named
+  "Screenshot" or "Screen Shot"), Images, Documents, Installers, Archives, Links (including Finder aliases) and Older files (30 days,
+  1 to 3,650). Custom rules match "name contains" or "name starts with" and may name a drawer, made on the first move
+  (`drawerName`). Folders, packages, hidden items, symlinks, iCloud items not downloaded and anything in a drawer never move by a rule.
+- **Consent.** Sort my desktop now reads the Desktop's top level and holds the plan as a review on the Desk (`DrawerBars`): "N files
+  into M drawers", with Apply, Edit (untick files, rename new drawers) and Dismiss. Apply checks every source again against what the
+  review showed (size and date) and drops what changed. There is no watcher on the Desktop and no auto-sort. A file dropped on a drawer
+  moves at once, journaled as the user's.
+- **Turning on** turns the Desk on too. **Turning off** asks "Put N files back on the Desktop?", then empties every owned drawer onto the
+  Desktop (rule moves and hand drops alike, with the journal not read), removes the folders that end up empty (the root too when it is
+  the default and empty) and keeps the rules. A folder that still holds something stays listed; turning off again finishes it.
+  **Reset Sanduhr…** runs that return first (`ResetSheet` calls `DrawerService.resetAll`), then removes `drawers.*` and the journal and
+  reports what stayed, in counts.
+- **Files, `Desk/Drawers/`.** Pure, no AppKit and no disk: `DrawerModel` (the value types), `DrawerRules` (the matcher and plan),
+  `DrawerPlanValidator` (paths, roots, limits, free names), `DrawerJournal` (the journal's shape, trim, recovery) and `DrawerUndoReturn`
+  (Undo's plan and the return's plan). Disk: `DrawerFacts` (`lstat`, `realpath`, the facts a rule reads, the dataless and
+  screen-capture checks), `DrawerMover` (the only code that moves a file, and the recovery), `DrawerJournalStore` (the 0600 atomic
+  file), `DrawerTrash` (`DrawerItemGuard` and the one `trashItem` call), `DrawerWatcher` (one FSEvents stream over the drawer folders).
+  Live: `DrawerService` (settings, review, apply, hand moves, Undo, turn on and off, reset), `DrawerSettings` (`DrawerPrefs`).
+  Drawn: `DrawerPanelController`, `DrawerPanel`, `DrawerPanelModel`, `DrawerPlacement`, `DrawerThumbnails` (Quick Look thumbnails,
+  cached by path and date), `DrawerBars`; and Settings: `DrawersSettings` with `DrawersSettingsModel`.
+- **The safety model.** One move is one `renamex_np(from, to, RENAME_EXCL)`: atomic on a volume, keeps every attribute, refuses an
+  existing file at the kernel. `EEXIST` tries the next free Finder-style name ("Report 2.pdf" up to 100); `EXDEV` (another volume) and
+  `ENOTSUP` (no exclusive rename) skip the file, never a copy. Each path is resolved and checked right before its move: a direct child
+  of the Desktop or a drawer, a regular file for a rule move. A view drawer is never filled. The journal entry is written **before** the
+  first move with every move `written: false` and the file's inode, flipped as moves land and saved every 25 moves and at the end; if
+  the journal can't be written nothing moves. At launch (Drawers on) `DrawerMover.recover` closes an entry a crash left open, counting a
+  pending move as done only when the file left its old place under the recorded inode and sits at its destination, and offers Undo
+  (`journal_open`). Undo per run reverses newest first: a file that is gone is skipped, one whose modification date changed (1 ms
+  tolerance) is skipped, a taken original place gets the next free name. The journal is `~/Library/Application Support/Sanduhr/drawers-journal.json`
+  (mode 0600; Windows' format, the `written` key is `false`, an ISO time or `true`, plus an optional `inode`), the last 50 runs and
+  hand moves for 30 days. The only removals in the drawer code are `rmdir` of an empty drawer folder (after unlinking a lone `.DS_Store`)
+  and the journal's own file; the only deletion of a user file is `DrawerTrash`'s `FileManager.trashItem`, from the user's Command-Delete
+  or Move to Trash, so Put Back works. `DrawerMoverTests` runs on temp folders and pins the invariant: after any sequence every
+  starting file exists once, at its start or in a drawer, with its bytes unchanged.
+- **The panels.** One borderless panel per drawer at the Desk's click-layer level (360 wide, 330 open, 42 folded), title "Name · count",
+  a thumbnail grid, folders first then Finder order, hidden items left out. Return opens, Space is Quick Look, Command-R reveals,
+  Command-Delete moves to the Trash; the menu has Open, Quick Look, Show in Finder, Rename, Move to Trash, Rename drawer…, Fold, Hide,
+  Look, Tidy drawers and Drawers Settings…. The four looks (Solid, Glass, Outline, Bare; opacity 20 to 100, default 55) are one for all
+  with per-drawer overrides. The first two new drawers arrive open, the rest folded. Panels snap within 12 points (Option-drag turns it
+  off); Tidy lines them up from the chosen corner and its result bar has Undo. Redraws come from the FSEvents stream, with no timer.
+- **Preferences,** `com.626labs.sanduhr.desk`, all under `drawers.`: `enabled`, `root`, `drawers` (JSON: id, name, home, owned), `rules`
+  (JSON), `look`, `opacity`, `looks`, `places` (JSON), `folded`, `hidden`, `tidy.corner`, `tidy.direction`. A missing key is its default.
+  The Desktop Folder permission is kept in memory only.
+- **The Desktop Folder permission.** The macOS prompt (`NSDesktopFolderUsageDescription`) comes at the first user-initiated read: turning
+  Drawers on (a names-only probe) or Sort, never at launch (`DrawerService.launch` reads no Desktop). A refusal (`EPERM` or `EACCES`) sets
+  `denied`; Settings, Drawers shows "Sanduhr can't see your Desktop." with **Open Files and Folders…**, and an empty drawer on the Desk
+  says the same. No private TCC call and no retry loop.
+- **state.yaml `drawers:`** (counts and flags, never a name, id or path): `on` (quoted), `drawers` (count), `files` (a number per drawer,
+  in drawer order), `permission` (`unknown`, `granted` or `denied`), `review_pending`, `journal_open`. `desk-state.json` and `get_desk`
+  carry no drawers and there is no MCP drawer tool.
+- **The smoke scenario** (`smoke/scenarios/drawers.yaml`) and the debug action `drawers` (`arg` is `on`, `sort`, `apply` or `off`, calling
+  the service like the Settings buttons). The action runs **only in a debug build started with `SANDUHR_DRAWERS_DESKTOP`** naming a
+  stand-in folder (`DebugDrawersGuard`); a release build ignores the variable and refuses the action, because it would act on the real
+  Desktop. `SANDUHR_DRAWERS_DESKTOP` overrides the Desktop's path in debug builds only (`DrawerDesktop`). The scenario's pre-step, the
+  3 .png and 2 .pdf fixture, is at the top of the file; `docs/mac-smoke-test.md` section 73 is the live check on a real Desktop.
+
 ## The companion
 
 The Desk's `companion` piece (default place bottom center; a sprite pack from Settings, Widgets picks the
@@ -2292,6 +2359,7 @@ refusal. `ResetShutdownTests` covers the gate (each writer a no-op inside
 - System piece (2.38.0) → nothing on disk; the readings live in memory
 - Weather (2.38.0) → the desk preference `desk_weather` (place, rounded coordinates, unit, and the nickname when set); the forecast is never written
 - CI runner cards (2.38.0) → the preference `watchersCiRunners` (off when absent); nothing on disk, the cards live in memory
+- Drawers (2.40.0) → the `drawers.*` preferences in `com.626labs.sanduhr.desk` and `~/Library/Application Support/Sanduhr/drawers-journal.json` (mode 0600, holds full paths, so file names); the folders themselves are real folders on the Mac, `~/Desktop/Drawers/<Name>` by default; Reset Sanduhr… puts the files back first and removes the preferences and the journal
 
 ## Controls
 
