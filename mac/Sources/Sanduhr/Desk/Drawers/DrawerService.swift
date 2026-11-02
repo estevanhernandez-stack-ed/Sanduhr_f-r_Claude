@@ -97,6 +97,9 @@ final class DrawerService {
     private(set) var recovered: [JournalEntry] = []
     /// Each drawer's contents by id, kept current by the watcher.
     private(set) var contents: [String: [DrawerEntry]] = [:]
+    /// The Desktop Folder permission as the last Desktop read showed it. Memory only: a new launch
+    /// starts unknown and the first user-initiated read settles it.
+    private(set) var desktopPermission: DesktopPermission = .unknown
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let desktop: String
@@ -104,7 +107,8 @@ final class DrawerService {
     @ObservationIgnored private let store: DrawerJournalStore
     @ObservationIgnored private let mover: DrawerMover
     @ObservationIgnored private let turnDeskOn: () -> Void
-    @ObservationIgnored private let readFacts: (String) -> [DrawerItemFacts]
+    @ObservationIgnored private let readFacts: (String) throws -> [DrawerItemFacts]
+    @ObservationIgnored private let probeDesktop: (String) throws -> Void
     @ObservationIgnored private let watchQueue: DispatchQueue
     @ObservationIgnored private var watcher: DrawerWatcher?
     @ObservationIgnored private var watched: [(key: String, id: String)] = []
@@ -112,7 +116,8 @@ final class DrawerService {
 
     init(defaults: UserDefaults, desktop: String, home: String, store: DrawerJournalStore,
          turnDeskOn: @escaping () -> Void,
-         readFacts: @escaping (String) -> [DrawerItemFacts] = DrawerFacts.list,
+         readFacts: @escaping (String) throws -> [DrawerItemFacts] = DrawerFacts.listing,
+         probeDesktop: @escaping (String) throws -> Void = DrawerFacts.probe,
          mover: DrawerMover? = nil,
          watchQueue: DispatchQueue = DispatchQueue(label: "sanduhr.drawers.watch")) {
         self.defaults = defaults
@@ -122,6 +127,7 @@ final class DrawerService {
         self.mover = mover ?? DrawerMover(store: store)
         self.turnDeskOn = turnDeskOn
         self.readFacts = readFacts
+        self.probeDesktop = probeDesktop
         self.watchQueue = watchQueue
         self.settings = DrawerPrefs.load(from: defaults)
     }
@@ -162,11 +168,14 @@ final class DrawerService {
 
     // MARK: On and off
 
-    /// Turns Drawers on, and the Desk with it. No file is read or moved until the first sort.
+    /// Turns Drawers on, and the Desk with it. The Desktop is listed once, by name only, so the
+    /// macOS prompt comes now, when the user asked, and a refusal shows at once. No file is moved
+    /// until the first sort.
     func turnOn() {
         guard !stoppedForReset else { return }
         update { $0.enabled = true }
         turnDeskOn()
+        settle { try probeDesktop(desktop) }
         refreshRuns()
         restartWatcher()
     }
@@ -252,17 +261,35 @@ final class DrawerService {
     // MARK: Sort, review, apply
 
     /// Reads the Desktop's top level and holds the rules' plan as the pending review. Nil when
-    /// Drawers is off or nothing matches. This is the only place the Desktop is listed.
+    /// Drawers is off, the Desktop can't be read (`desktopPermission` says why) or nothing matches.
+    /// With `turnOn`, the only place the Desktop is listed, and only on the user's command.
     @discardableResult
     func sort(now: Date = Date()) -> DrawerReview? {
         guard settings.enabled, !stoppedForReset else { return nil }
-        let facts = readFacts(desktop)
+        var read: [DrawerItemFacts] = []
+        guard settle({ read = try readFacts(desktop) }) else { pending = nil; return nil }
+        let facts = read
         let plan = DrawerRules.plan(facts: facts, rules: settings.rules, drawers: settings.drawers,
                                     desktop: desktop, root: effectiveRoot, now: now)
         guard !plan.moves.isEmpty else { pending = nil; return nil }
         let planned = Dictionary(facts.map { (DrawerPaths.join(desktop, $0.name), $0) }, uniquingKeysWith: { a, _ in a })
         pending = DrawerReview(plan: plan, planned: planned)
         return pending
+    }
+
+    /// Runs one Desktop read and records what it showed: a success is granted, a refusal is denied,
+    /// any other failure leaves the permission as it was. Returns whether the read worked. Never
+    /// retries; the next user-initiated read tries again.
+    @discardableResult
+    private func settle(_ read: () throws -> Void) -> Bool {
+        do {
+            try read()
+            desktopPermission = .granted
+            return true
+        } catch {
+            if DesktopPermission.isDenial(error) { desktopPermission = .denied }
+            return false
+        }
     }
 
     func dismissReview() { pending = nil }

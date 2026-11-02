@@ -67,6 +67,14 @@ private struct DrawersSwitchSection: View {
                     Spacer()
                 }
             }
+            if model.desktopDenied {
+                Text(DrawersSettingsModel.deniedLine).font(.callout.weight(.semibold)).foregroundStyle(.orange)
+                DrawersNote(DrawersSettingsModel.deniedDetail)
+                HStack {
+                    Button(DrawersSettingsModel.deniedButton) { model.openFilesAndFolders() }
+                    Spacer()
+                }
+            }
             DrawersNote("Sorts the top of your Desktop into folders you can see as drawers on the Desk. Nothing moves until you approve a review, and every move can be undone.")
             LabeledContent("Drawers folder", value: model.rootPath)
             HStack {

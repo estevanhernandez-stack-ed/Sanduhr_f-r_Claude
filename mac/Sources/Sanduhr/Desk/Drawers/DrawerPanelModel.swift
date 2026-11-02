@@ -44,6 +44,14 @@ struct DrawerLookValues: Equatable {
     }
 }
 
+/// The line a panel shows in place of an empty grid when the Desktop can't be read.
+enum DrawerPanelNote {
+    static let cantSeeDesktop = "Sanduhr can't see your Desktop."
+
+    /// The line to show, or nil: only when the permission is denied and the drawer has nothing to show.
+    static func text(denied: Bool, entries: Int) -> String? { denied && entries == 0 ? cantSeeDesktop : nil }
+}
+
 /// The words on a panel's title bar.
 enum DrawerTitle {
     /// "Screenshots · 14".
