@@ -71,6 +71,11 @@ internal sealed class InkLayer : IDisposable
     /// <summary>Accept injected presses too (the runner's self-test); off in the app.</summary>
     public bool AcceptInjected { get; init; }
 
+    private long _hookCalls;
+
+    /// <summary>How many mouse events the hook has seen (moves included).</summary>
+    public long HookCalls => Interlocked.Read(ref _hookCalls);
+
     /// <summary>The slowest hook call so far, in milliseconds.</summary>
     public double SlowestHookMs { get; private set; }
 
@@ -447,6 +452,11 @@ internal sealed class InkLayer : IDisposable
     private void InstallHook()
     {
         if (_hook != IntPtr.Zero) return;
+        // Compiled now, not on the first press: the first call would otherwise spend milliseconds in the JIT with the mouse waiting.
+        System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(typeof(InkLayer).GetMethod(nameof(HookCall),
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.MethodHandle);
+        System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(typeof(UnderIconsClick).GetMethod(nameof(UnderIconsClick.Decide))!.MethodHandle);
+        _ = UnderIconsClick.Decide(DeskButton.Right, default, false, [], [], false);
         _hookProc = HookCall;
         _hook = SetWindowsHookExW(WH_MOUSE_LL, _hookProc, GetModuleHandleW(null), 0);
         Log(_hook == IntPtr.Zero ? $"the mouse hook could not be installed (error {Marshal.GetLastWin32Error()})" : "mouse hook installed");
@@ -461,6 +471,7 @@ internal sealed class InkLayer : IDisposable
 
     private IntPtr HookCall(int code, IntPtr w, IntPtr l)
     {
+        Interlocked.Increment(ref _hookCalls);
         if (code < 0) return CallNextHookEx(_hook, code, w, l);
         int msg = (int)w;
         int button = msg is WM_LBUTTONDOWN or WM_LBUTTONUP ? 0 : msg is WM_RBUTTONDOWN or WM_RBUTTONUP ? 1 : -1;

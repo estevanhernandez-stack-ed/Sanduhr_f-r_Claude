@@ -100,8 +100,8 @@
   - [ ] Under-icons build (`spec.md > 5.0d`, branch `feat/desk-under-icons`), in order:
     - [x] U1 Check: a cloaked `HwndSource` keeps WPF rendering and animating (Neb: `Loaded`, `IsVisible`, 30 of 30 captures distinct mid-animation, text pixels identical to uncloaked), `RenderTargetBitmap` 1.0 ms median at 900x450; change detection must be a vectorized compare, not a byte hash
     - [x] U2 Core: `UnderIconsClick.Decide` and its table tests; `desk_under_icons` (absent = on) in `DeskSettings` and `SettingsStore`
-    - [ ] U3 App: the ink thread (message loop, `WorkerW` find with `0x052C`, child windows, the DComp device, `TaskbarCreated` rebuild), ported from the spike
-    - [ ] U4 App: the low-level hook on the ink thread, the icon reader (UI Automation, 2 s, background) and the snapshots
+    - [x] U3 App: the ink thread (message loop, `WorkerW` find with `0x052C`, child windows, the DComp device, `TaskbarCreated` rebuild), ported from the spike; live on Neb 23:16: 75 of 75 ramp samples blend under the icons
+    - [ ] U4 App: the low-level hook on the ink thread (done, live on Neb: a right press on ink taken as Menu, a left press on a clickable region taken as Click, a left press on plain ink passed), the icon reader (UI Automation, 2 s, background; to do) and the snapshots
     - [ ] U5 App: `DeskClickTarget` from `DeskClicks.Prepare`; the menu opened from the hook with the foreground guard and the menu-open pass
     - [ ] U6 App: `UnderIconsHost` (the split, the live cloaked windows, frames with the hash skip and adaptive cadence, coverage by rect from `Progman`, drift and dim), the controller's host choice and the V3 fallback
     - [ ] U7 Settings: the Desk Look switch and the fallback line; the What's New card
