@@ -348,6 +348,60 @@ Findings that bind the build:
 
 **Outcome:** the 5.0b blocker is gone. Under-icons can paint the Desk's soft, per-pixel ink through DirectComposition and keep exposed widget areas right-clickable without touching any other desktop behavior. Building it means a DComp paint path for widgets (WPF renders to a bitmap that becomes the surface) and the hook with the two fixes; a DPI change is the one check left, for the build's own live pass.
 
+### 5.0d Under the icons: the build (specced 2026-11-02)
+
+**Rulings (Este, 2026-11-02; dashboard `bOC8L7bZwUFMEDbTiAnB`, `3DYjTZ0NCdq18PUH8eHW`).** Under-icons is on by default, existing installs included. A Desk Look switch, **Keep the Desk under desktop icons** (the Mac's name, v2.27.0-mac), turns it off. Every widget goes under the icons. The hook takes a right press on a widget's exposed drawn pixels (the Desk menu) and a left press on an exposed clickable piece (now playing, the weather credit, and the clock, message and Claude line while they take clicks). The Launcher (hover glow, touch) and drawers stay V3, above the icons. Where the route cannot run, the Desk falls back to V3 without asking.
+
+**Shape.** `UnderIconsHost : IDeskHost` wraps a `DesktopLayerHost`. `Show` splits the islands. A drawer, or an island holding Launcher buttons, goes to the inner V3 host. Every other island becomes an **ink island**. `Coverage` merges both in island order, `ScreensChanged` forwards both hosts' and the ink thread's triggers, and `SetDrift` and `SetDim` reach both. The controller picks the host from the setting and the route's health. Nothing else changes.
+
+**An ink island is a live WPF window, cloaked, with a DirectComposition mirror.**
+- **The live window.** The island's content lives in a V3-style `HwndSource`, placed by the same code, so `Loaded` fires, `IsVisible` is true, animations tick and `DeskClicks`' layout math holds. It is cloaked (`DWMWA_CLOAK`) so it never draws on screen, and it is click-through and unowned. Build step 1 checks that a cloaked window keeps WPF rendering and animating; if it does not, the window parks off-screen instead.
+- **The mirror.** A child of `Progman`'s `WorkerW` (`WS_CHILD | WS_VISIBLE`, `WS_EX_NOREDIRECTIONBITMAP | WS_EX_TRANSPARENT`), the island's physical size at its place (drift included). It holds a DComp target, a visual and a premultiplied BGRA surface, as in the spike's `DCompPiece`.
+- **Frames.** A `RenderTargetBitmap` of the live window's root at physical size; when the pixels hash the same as the last frame, nothing is uploaded. Cadence adapts: a check at 4 Hz at rest, 30 Hz for 2 s after any change (animations cluster), and a frame at once after `Show` or a re-fit. A covered island and a hidden Desk render nothing. The idle dim stays in the root's opacity, so frames carry it.
+- **Cost budget,** measured on Neb in the build's live pass: under 1% of one core at rest summed over all ink islands, and under 5% while a message effect runs. Over budget, the animated rate drops to 20 Hz and the numbers go to Este.
+
+**Threads.** The `WorkerW` children, the DComp device and the low-level hook live on one dedicated **ink thread** with its own message loop, never the WPF UI thread. A child window under another process's window attaches its thread's input queue to Explorer's, and a low-level hook whose thread is busy stalls the mouse system-wide. The UI thread renders bitmaps and posts immutable frames. The hook reads immutable snapshots: each island's screen rect, alpha map and click regions in physical pixels, plus the icon rects.
+
+**The hook (`UnderIconsClick.Decide`, Core, pure and table-tested).** Inputs: the button, the point, whether `WindowFromPoint`'s root is the shell (`Progman`, or a `WorkerW` of the shell's process), the icon rects, the island snapshots and whether a Desk menu is open. Rules, in order:
+1. Not over the shell, or over an icon: pass.
+2. A Desk menu is open: pass, so the press closes it the normal way (the spike's nested-menu fix).
+3. A right press on an island pixel with alpha at least 8 of 255: take the press and its release, and open the Desk menu. On a clickable piece the menu carries that piece's own item (Message settings… on the message), as in V3.
+4. A left press on a clickable region: take the press and its release, and act on the release, as V3's `MouseLeftButtonUp` does. A drag starting there is lost, as in V3 today.
+5. Everything else passes: moves, the wheel, middle and X buttons, and every press elsewhere. A taken press is acted on by a message posted to the UI thread, and the hook itself returns in well under a millisecond (no UI Automation inside it).
+
+**Icons.** UI Automation reads the desktop list view's item rects (as the spike did), on a background thread, every 2 s while an ink island exists, and at once after Explorer restarts. A new icon dropped over a widget can open the Desk menu for up to 2 s; accepted.
+
+**The menu.** The same items as `DeskClicks.OpenMenu`, opened at the press point. Before it opens, the sentinel takes the foreground (the spike's second fix). The live pass checks that a menu opened while another app is in front stays open; if Windows refuses the foreground, the menu opens anyway and is logged. The hook reads "menu open" from the menu's `Opened` and `Closed`.
+
+**Clicks refactor.** `DeskClicks.Prepare` keeps wiring WPF events for V3 windows and also registers, per content, a `DeskClickTarget`: `HitAt(point)` in content DIPs, and `Act(kind, button)`. After each frame an ink island publishes its click regions in screen pixels from that target.
+
+**Coverage.** `DeskCoverageWatch` takes a rect and a z-order start per island instead of only a handle. For an ink island these are its screen rect and `Progman`, since everything above `Progman` covers it.
+
+**Show desktop.** The ink rises with `Progman` (5.0c), so ink islands need no lift. The Launcher and drawers keep V3's.
+
+**Route failures fall back to V3** for the session, logged once, and are tried again on the next Explorer restart or app start: no `WorkerW` under `Progman` after `0x052C` (10 tries, 500 ms apart), the D3D device or `CreateTargetForHwnd` failing, or a pre-24H2 layout (`SHELLDLL_DefView` not a child of `Progman`). Settings shows the reason under the switch: "Your PC can't draw the Desk under the icons, so it draws above them."
+
+**Explorer restart.** On `TaskbarCreated` the ink thread drops its children and targets and rebuilds on the new `WorkerW`, asking with `0x052C` when there is none. The live windows are unowned and survive.
+
+**DPI.** The `WorkerW` children are created in a per-monitor-v2 context (Explorer's own), sized in the screen's physical pixels; the surface matches. `WM_DPICHANGED` on a live window rebuilds, as V3 does.
+
+**Setting.** `desk_under_icons` in `settings.json`, absent = on, so existing installs get it; written only when off. `DeskSettings` gains `UnderIcons` (true). Desk Look gets the switch, with the line "Your icons and fences draw over the Desk. Right-click a bare part of a widget for the Desk menu." Changing it rebuilds on the other host.
+
+**What's New.** One card for the release: "The Desk now sits under your desktop icons", with the right-click line and where the switch lives.
+
+**Tests.** Core: the `Decide` table (each rule, the alpha threshold, menu open, not over the shell) and the setting's default. App: `UnderIconsHost.Show`'s split (Launcher and drawers inner, the rest ink) and the frame hash skip. Live checks with Este, required before merge:
+
+| # | Check |
+|---|---|
+| 1 | Soft ink under the icons on both monitors; icons and Fences draw over it |
+| 2 | Right-click on exposed ink opens the Desk menu; on an icon, Explorer's menu; a second right-click closes the menu |
+| 3 | Left-click on now playing plays or pauses; a rubber band starts from bare widget area |
+| 4 | A message effect animates smoothly, and the cost is within budget |
+| 5 | A real Explorer restart; Win+D |
+| 6 | A DPI change |
+| 7 | Switch off: V3 above the icons; switch on: back under |
+| 8 | The Launcher and drawers still work above the icons |
+
 ### 5.1 The Desk on V3 (deepened against the Mac and Rainmeter)
 
 What ships in S5, with the Mac's names: the layout string and its rules (`DeskArrangement.swift`, `DeskAnchorGeometry`), the clock and date, the Claude line and the meters (`DeskMeters.swift`), EsteFont, taskbar clearance (the Windows answer to `DockClearance.swift`), the layout map in Settings (`DeskLayoutMap.swift`). Not in S5: the message, meetings, now playing, watchers (S6), arrange by dragging, piece clicks, sign-in reminders as a switch (S7), and the notch (cut). The Mac draws its Desk on the main screen only; Windows draws it on every monitor, each laid out against its own work area.

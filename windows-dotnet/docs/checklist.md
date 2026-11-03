@@ -97,6 +97,15 @@
   - [x] Drawers spike (5.0 plan 1 task 0, Neb, 2026-10-30): PASS on all five plus a second monitor, with four changes (activate on click, z-order pin, Shell menu rules, dark menus); `spikes/drawer-island/VERDICT.md`.
   - [x] Drawer look spike: blur PASS via SetWindowCompositionAttribute accent 4 (acrylic) or 3 with AccentFlags 0, blur fills the whole window rect, DWMWCP_ROUND clips it (DWMSBT_TRANSIENTWINDOW FAIL: flat fill, the window never activates); icons PASS (49/49 match UIA, offset (-14,+3), same after an Explorer restart; auto-arrange and mixed DPI untested); coordinates list view client = screen here, map with MapWindowPoints anyway; spikes/drawer-look/
   - [x] Under-icons spike, revisited (Neb, 2026-11-02): per-pixel alpha below the icons PASS through DirectComposition in the `WorkerW`; icons and Fences draw over it; right-click on exposed widget areas PASS with a right-button-only `WH_MOUSE_LL` hook (two fixes noted); a real Explorer restart PASS (rebuild in about 3 s, hook intact); Show desktop PASS; DPI not tested. `spec.md > 5.0c`, `spikes/under-icons/`.
+  - [ ] Under-icons build (`spec.md > 5.0d`, branch `feat/desk-under-icons`), in order:
+    - [ ] U1 Check: a cloaked `HwndSource` keeps WPF rendering and animating, and `RenderTargetBitmap` of it matches; measure a frame's cost (spike folder)
+    - [ ] U2 Core: `UnderIconsClick.Decide` and its table tests; `desk_under_icons` (absent = on) in `DeskSettings` and `SettingsStore`
+    - [ ] U3 App: the ink thread (message loop, `WorkerW` find with `0x052C`, child windows, the DComp device, `TaskbarCreated` rebuild), ported from the spike
+    - [ ] U4 App: the low-level hook on the ink thread, the icon reader (UI Automation, 2 s, background) and the snapshots
+    - [ ] U5 App: `DeskClickTarget` from `DeskClicks.Prepare`; the menu opened from the hook with the foreground guard and the menu-open pass
+    - [ ] U6 App: `UnderIconsHost` (the split, the live cloaked windows, frames with the hash skip and adaptive cadence, coverage by rect from `Progman`, drift and dim), the controller's host choice and the V3 fallback
+    - [ ] U7 Settings: the Desk Look switch and the fallback line; the What's New card
+    - [ ] U8 Live checks 1 to 8 with Este, then the PR
   - [x] 12.3 Este rules on the window route: V3, Rainmeter's way; EsteFont bundling approved
   - [x] 12.4 Core: `DeskArrangement`, `DeskGeometry`, `TaskbarClearance`, `DeskMeters`, `DeskFont`, `DeskSettings`, font notices, with ported tests
   - [x] 12.5 App: `IDeskHost` and `DesktopLayerHost` (V3, island windows, Show-desktop watcher), `DeskView`, `DeskController`, the Desk page and its map, EsteFont resources, harness scenarios; (g) measured
