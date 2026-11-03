@@ -98,8 +98,8 @@
   - [x] Drawer look spike: blur PASS via SetWindowCompositionAttribute accent 4 (acrylic) or 3 with AccentFlags 0, blur fills the whole window rect, DWMWCP_ROUND clips it (DWMSBT_TRANSIENTWINDOW FAIL: flat fill, the window never activates); icons PASS (49/49 match UIA, offset (-14,+3), same after an Explorer restart; auto-arrange and mixed DPI untested); coordinates list view client = screen here, map with MapWindowPoints anyway; spikes/drawer-look/
   - [x] Under-icons spike, revisited (Neb, 2026-11-02): per-pixel alpha below the icons PASS through DirectComposition in the `WorkerW`; icons and Fences draw over it; right-click on exposed widget areas PASS with a right-button-only `WH_MOUSE_LL` hook (two fixes noted); a real Explorer restart PASS (rebuild in about 3 s, hook intact); Show desktop PASS; DPI not tested. `spec.md > 5.0c`, `spikes/under-icons/`.
   - [ ] Under-icons build (`spec.md > 5.0d`, branch `feat/desk-under-icons`), in order:
-    - [ ] U1 Check: a cloaked `HwndSource` keeps WPF rendering and animating, and `RenderTargetBitmap` of it matches; measure a frame's cost (spike folder)
-    - [ ] U2 Core: `UnderIconsClick.Decide` and its table tests; `desk_under_icons` (absent = on) in `DeskSettings` and `SettingsStore`
+    - [x] U1 Check: a cloaked `HwndSource` keeps WPF rendering and animating (Neb: `Loaded`, `IsVisible`, 30 of 30 captures distinct mid-animation, text pixels identical to uncloaked), `RenderTargetBitmap` 1.0 ms median at 900x450; change detection must be a vectorized compare, not a byte hash
+    - [x] U2 Core: `UnderIconsClick.Decide` and its table tests; `desk_under_icons` (absent = on) in `DeskSettings` and `SettingsStore`
     - [ ] U3 App: the ink thread (message loop, `WorkerW` find with `0x052C`, child windows, the DComp device, `TaskbarCreated` rebuild), ported from the spike
     - [ ] U4 App: the low-level hook on the ink thread, the icon reader (UI Automation, 2 s, background) and the snapshots
     - [ ] U5 App: `DeskClickTarget` from `DeskClicks.Prepare`; the menu opened from the hook with the foreground guard and the menu-open pass

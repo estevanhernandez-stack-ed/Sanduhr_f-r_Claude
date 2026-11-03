@@ -747,7 +747,8 @@ public sealed class SettingsStore
                 ReadDouble(m, "top", d.Margins.Top), ReadDouble(m, "bottom", d.Margins.Bottom)),
             font,
             ReadDouble(root, "desk_time_size", d.TimeSize),
-            DeskPlate.Read(root)).Normalized();
+            DeskPlate.Read(root),
+            DeskUnderIcons.Read(root)).Normalized();
     }
 
     public void SaveDesk(DeskSettings desk)
@@ -794,6 +795,16 @@ public sealed class SettingsStore
         // No buttons in a row is the same as absent: the key goes away rather than hold an empty shell.
         if (launcher.IsEmpty && launcher.Orientation == LauncherOrientation.Row) root.Remove("desk_launcher");
         else root["desk_launcher"] = launcher.ToJson();
+        Write(root);
+    }
+
+    /// <summary>"Keep the Desk under desktop icons": <c>desk_under_icons</c>, absent = on (<see cref="DeskUnderIcons"/>).</summary>
+    public bool LoadDeskUnderIcons() => DeskUnderIcons.Read(Read());
+
+    public void SaveDeskUnderIcons(bool on)
+    {
+        var root = Read();
+        DeskUnderIcons.Write(root, on);
         Write(root);
     }
 
