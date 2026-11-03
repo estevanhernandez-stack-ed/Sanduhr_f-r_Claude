@@ -20,9 +20,12 @@ namespace Sanduhr.App.Desk.UnderIcons;
 [SupportedOSPlatform("windows")]
 internal sealed class UnderIconsHost : IDeskHost
 {
-    private static readonly TimeSpan Rest = TimeSpan.FromMilliseconds(250);
+    /// <summary>The check at rest: a clock or a meter shows a change within a second, and an animation starts within one.</summary>
+    private static readonly TimeSpan Rest = TimeSpan.FromSeconds(1);
+    /// <summary>The check while frames keep changing (an animation runs).</summary>
     private static readonly TimeSpan Hot = TimeSpan.FromMilliseconds(33);
-    private static readonly TimeSpan HotFor = TimeSpan.FromSeconds(2);
+    /// <summary>Unchanged fast checks before going back to rest: a one-off change (a meter's tick) costs a few checks, not seconds of them.</summary>
+    private const int QuietBeforeRest = 3;
 
     /// <summary>Why the route could not run this session, for Settings; null while it runs or has not been tried.</summary>
     public static string? Unavailable { get; private set; }
@@ -38,7 +41,12 @@ internal sealed class UnderIconsHost : IDeskHost
     private InkLayer? _ink;
     private bool _inkReady;
     private bool _disposed;
-    private DateTime _hotUntil;
+    private int _quiet = QuietBeforeRest;
+    /// <summary>Per island: the capture bitmap and the buffer it is read into, reused while the island keeps its size.</summary>
+    private readonly Dictionary<int, (RenderTargetBitmap Rtb, byte[] Scratch)> _canvas = [];
+    private int _ticks, _sent;
+    private double _shootMs;
+    private DateTime _statsSince = DateTime.UtcNow;
     /// <summary>The islands of the last <see cref="Show"/>, in island order (the V3 host's window order).</summary>
     private List<DeskIsland> _islands = [];
     /// <summary>The island index of each entry in the snapshot the hook decides on.</summary>
@@ -88,6 +96,7 @@ internal sealed class UnderIconsHost : IDeskHost
                 {
                     ink.Remove(id);
                     _shots.Remove(id);
+                    _canvas.Remove(id);
                 }
         }
         if (_islands.Any(i => i.UnderIcons))
@@ -111,6 +120,7 @@ internal sealed class UnderIconsHost : IDeskHost
         _above.Hide();
         _ink?.Clear();
         _shots.Clear();
+        _canvas.Clear();
         _islands = [];
         Publish();
     }
@@ -154,6 +164,7 @@ internal sealed class UnderIconsHost : IDeskHost
         _inkReady = false;
         _ink?.Clear();
         _shots.Clear();
+        _canvas.Clear();
         UnavailableChanged?.Invoke();
         ScreensChanged?.Invoke();   // the controller redraws, and nothing is flagged any more
     }
@@ -176,32 +187,49 @@ internal sealed class UnderIconsHost : IDeskHost
             if (DeskNative.RectPx(src.Handle) is not { Width: > 0, Height: > 0 } rect) continue;
             try
             {
+                long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 if (Shoot(i, src, root, rect, force)) changed = true;
+                _shootMs += System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
             }
             catch (Exception e) when (e is OutOfMemoryException or InvalidOperationException or ArgumentException or COMException)
             {
                 Log($"an ink frame was not captured: {e.GetType().Name}");
             }
         }
+        _ticks++;
         if (changed)
         {
-            _hotUntil = DateTime.UtcNow + HotFor;
+            _sent++;
+            _quiet = 0;
             Publish();
         }
-        _frames.Interval = DateTime.UtcNow < _hotUntil ? Hot : Rest;
+        if (DateTime.UtcNow - _statsSince >= TimeSpan.FromMinutes(10))
+        {
+            Log($"frames: {_ticks} checks, {_sent} sent, {_shootMs:F0} ms capturing in {(DateTime.UtcNow - _statsSince).TotalSeconds:F0} s");
+            _ticks = _sent = 0;
+            _shootMs = 0;
+            _statsSince = DateTime.UtcNow;
+        }
+        else if (_quiet < QuietBeforeRest) _quiet++;
+        _frames.Interval = _quiet < QuietBeforeRest ? Hot : Rest;
     }
 
     /// <summary>One island's frame: true when it changed and was sent.</summary>
     private bool Shoot(int id, HwndSource src, FrameworkElement root, PxRect rect, bool force)
     {
         double wpf = src.CompositionTarget?.TransformToDevice.M11 is > 0 and var t ? t : 1.0;
-        var rtb = new RenderTargetBitmap(rect.Width, rect.Height, 96 * wpf, 96 * wpf, PixelFormats.Pbgra32);
-        rtb.Render(root);
-        var px = new byte[rect.Width * rect.Height * 4];
-        rtb.CopyPixels(px, rect.Width * 4, 0);
+        if (!_canvas.TryGetValue(id, out var canvas) || canvas.Rtb.PixelWidth != rect.Width || canvas.Rtb.PixelHeight != rect.Height
+            || Math.Abs(canvas.Rtb.DpiX - 96 * wpf) > 0.01)
+            _canvas[id] = canvas = (new RenderTargetBitmap(rect.Width, rect.Height, 96 * wpf, 96 * wpf, PixelFormats.Pbgra32),
+                new byte[rect.Width * rect.Height * 4]);
+        canvas.Rtb.Clear();
+        canvas.Rtb.Render(root);
+        canvas.Rtb.CopyPixels(canvas.Scratch, rect.Width * 4, 0);
         _shots.TryGetValue(id, out var last);
         bool moved = last is null || last.Rect != rect;
-        if (!force && !moved && last!.Pixels.AsSpan().SequenceEqual(px)) return false;
+        if (!force && !moved && last!.Pixels.AsSpan().SequenceEqual(canvas.Scratch)) return false;
+        // A frame that is sent gets its own array: the ink thread reads it after this returns, and the scratch is drawn over next check.
+        var px = canvas.Scratch.ToArray();
         if (moved) _ink!.Place(id, rect);
         _ink!.Frame(id, rect.Width, rect.Height, px);
         var alpha = new byte[rect.Width * rect.Height];
