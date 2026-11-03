@@ -92,6 +92,9 @@ public sealed class WidgetLimitsTests : AppWindowFixture
             Assert.NotEmpty(widget.ShownLimitOrder);
             int raised = 0;
             widget.LimitsChanged += () => raised++;
+            // Usage off, so the sign-out fetches nothing for "Other": with usage on it awaits a real WebView2 fetch to claude.ai, which a
+            // CI runner does not finish in the 10 s below (red on main from 2026-11-03). The order and the event come before any fetch.
+            widget.UsageOn = false;
 
             // The sign-out continues on this dispatcher thread: pump it rather than block on the task.
             var signOut = widget.SignOutAccountAsync("Personal");
