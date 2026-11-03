@@ -217,13 +217,26 @@ internal sealed class UnderIconsHost : IDeskHost
     /// <summary>One island's frame: true when it changed and was sent.</summary>
     private bool Shoot(int id, HwndSource src, FrameworkElement root, PxRect rect, bool force)
     {
-        double wpf = src.CompositionTarget?.TransformToDevice.M11 is > 0 and var t ? t : 1.0;
-        if (!_canvas.TryGetValue(id, out var canvas) || canvas.Rtb.PixelWidth != rect.Width || canvas.Rtb.PixelHeight != rect.Height
-            || Math.Abs(canvas.Rtb.DpiX - 96 * wpf) > 0.01)
-            _canvas[id] = canvas = (new RenderTargetBitmap(rect.Width, rect.Height, 96 * wpf, 96 * wpf, PixelFormats.Pbgra32),
+        if (root.ActualWidth <= 0 || root.ActualHeight <= 0) return false;
+        if (!_canvas.TryGetValue(id, out var canvas) || canvas.Rtb.PixelWidth != rect.Width || canvas.Rtb.PixelHeight != rect.Height)
+        {
+            _canvas[id] = canvas = (new RenderTargetBitmap(rect.Width, rect.Height, 96, 96, PixelFormats.Pbgra32),
                 new byte[rect.Width * rect.Height * 4]);
+            double wpf = src.CompositionTarget?.TransformToDevice.M11 ?? 0;
+            Log($"island {id}: window {rect.Width}x{rect.Height} px, root {root.ActualWidth:F0}x{root.ActualHeight:F0} DIPs, WPF scale {wpf:F2}");
+        }
+        // The root's own box, stretched onto exactly the window's physical pixels: right at any DPI, whatever mix of the window's DPI
+        // and the Desk's own scale (the root's LayoutTransform) WPF applies. Rendering the root directly drew 1.25x too big at 125%.
+        var brush = new VisualBrush(root)
+        {
+            Stretch = Stretch.Fill,
+            ViewboxUnits = BrushMappingMode.Absolute,
+            Viewbox = new Rect(0, 0, root.ActualWidth, root.ActualHeight),
+        };
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen()) dc.DrawRectangle(brush, null, new Rect(0, 0, rect.Width, rect.Height));
         canvas.Rtb.Clear();
-        canvas.Rtb.Render(root);
+        canvas.Rtb.Render(dv);
         canvas.Rtb.CopyPixels(canvas.Scratch, rect.Width * 4, 0);
         _shots.TryGetValue(id, out var last);
         bool moved = last is null || last.Rect != rect;
