@@ -68,6 +68,27 @@ enum DrawerFS {
     }
 }
 
+/// The Desktop Folder permission as Sanduhr can know it without private TCC calls
+/// (docs/mac-drawers-setup-spec.md, section 6). It is read off the result of listing the Desktop:
+/// a listing that works means granted, one refused with EPERM or EACCES means denied, and until
+/// the Desktop has been read it is unknown. Kept in memory only; nothing about it is saved.
+enum DesktopPermission: String, Equatable, Sendable {
+    case unknown, granted, denied
+
+    /// The Files and Folders pane of Privacy & Security, in the style the other panes use.
+    static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders")!
+
+    /// True when a failed read was the system refusing access: EPERM or EACCES, as a POSIX error,
+    /// as Foundation's "no permission to read" (257), or behind an underlying error of either.
+    static func isDenial(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == NSPOSIXErrorDomain, ns.code == Int(EPERM) || ns.code == Int(EACCES) { return true }
+        if ns.domain == NSCocoaErrorDomain, ns.code == NSFileReadNoPermissionError { return true }
+        if let under = ns.userInfo[NSUnderlyingErrorKey] as? Error { return isDenial(under) }
+        return false
+    }
+}
+
 /// Reads the facts the rules look at (`DrawerItemFacts`) for real entries. The caller names the
 /// folder; nothing here knows where the Desktop is.
 enum DrawerFacts {
@@ -98,7 +119,19 @@ enum DrawerFacts {
 
     /// Facts for every entry in `dir`, hidden ones too (the rules decide what to skip), by name.
     static func list(_ dir: String) -> [DrawerItemFacts] {
-        (DrawerFS.names(in: dir) ?? []).sorted().compactMap { read(DrawerPaths.join(dir, $0)) }
+        (try? listing(dir)) ?? []
+    }
+
+    /// The same, but a folder that can't be listed throws, so the caller can tell a refusal
+    /// (`DesktopPermission.isDenial`) from an empty folder.
+    static func listing(_ dir: String) throws -> [DrawerItemFacts] {
+        try FileManager.default.contentsOfDirectory(atPath: dir).sorted().compactMap { read(DrawerPaths.join(dir, $0)) }
+    }
+
+    /// Lists a folder's names and drops them: the cheapest read that raises the Desktop prompt or
+    /// shows a denial. Used when Drawers is turned on.
+    static func probe(_ dir: String) throws {
+        _ = try FileManager.default.contentsOfDirectory(atPath: dir)
     }
 
     /// An iCloud placeholder: the stat flag, or a ubiquitous item that is not fully downloaded.

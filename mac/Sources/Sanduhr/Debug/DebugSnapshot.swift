@@ -227,6 +227,7 @@ struct DrawersDebug: Equatable {
     static func of(_ service: DrawerService) -> DrawersDebug {
         DrawersDebug(on: service.settings.enabled,
                      files: service.settings.drawers.map { service.contents[$0.id]?.count ?? 0 },
+                     permission: service.desktopPermission.rawValue,
                      reviewPending: service.pending != nil, journalOpen: !service.recovered.isEmpty)
     }
 }

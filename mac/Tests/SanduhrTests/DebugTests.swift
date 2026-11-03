@@ -463,7 +463,7 @@ struct DebugStateTests {
         #expect(rest.contains("lock_line:\n  \"on\": false\n  helper: \"off\"\n  text: \"\"\n  length: 0\n"))
     }
 
-    /// Drawers: the switch (quoted), the count, files per drawer as numbers, the permission stub
+    /// Drawers: the switch (quoted), the count, files per drawer as numbers, the permission
     /// and the two flags, in this order.
     @Test func drawersReportCountsAndFlags() {
         var s = DebugStateInput()
@@ -490,11 +490,11 @@ struct DebugStateTests {
         var s = DebugStateInput()
         s.drawers = DrawersDebug.of(service)
         var yaml = YAMLEmitter.emit(DebugState.yaml(s))
-        #expect(yaml.contains("drawers:\n  \"on\": true\n  drawers: 1\n  files: [1]\n  permission: unknown\n  review_pending: true\n  journal_open: false\n"))
+        #expect(yaml.contains("drawers:\n  \"on\": true\n  drawers: 1\n  files: [1]\n  permission: granted\n  review_pending: true\n  journal_open: false\n"))
         service.apply()
         s.drawers = DrawersDebug.of(service)
         yaml = YAMLEmitter.emit(DebugState.yaml(s))
-        #expect(yaml.contains("  drawers: 2\n  files: [1, 1]\n  permission: unknown\n  review_pending: false\n"))
+        #expect(yaml.contains("  drawers: 2\n  files: [1, 1]\n  permission: granted\n  review_pending: false\n"))
         for word in ["sk-ant", "SECRET", "Private", "Stuff", ".pdf", ".txt", "Documents", "documents", "Drawers", fx.base.path, fx.home] {
             #expect(!yaml.contains(word), "leaked \(word)")
         }

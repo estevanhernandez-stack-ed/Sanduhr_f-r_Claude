@@ -70,7 +70,7 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   and visible now, which it is not while the pointer is in the menu bar or the bar is hidden; `frame`, `[x, y, w, h]` in
   whole points from the primary screen's top left while the pill is up, null otherwise. The `on` key is quoted in
   the file, so YAML reads a key and not `true`; its window is kind `pill` in tree.yaml),
-  `drawers` (Drawers: `on`, quoted; `drawers`, how many; `files`, the files in each as numbers in drawer order; `permission`, `unknown` until the Desktop Folder permission lands; `review_pending`; `journal_open`; never a name or a path), `lock_line` (#137, the lock screen line: `on`, Settings, Lock Screen's switch, desk suite key `lockLine`, quoted in the
+  `drawers` (Drawers: `on`, quoted; `drawers`, how many; `files`, the files in each as numbers in drawer order; `permission`, the Desktop Folder permission: `unknown` until the Desktop is read, then `granted` or `denied`; `review_pending`; `journal_open`; never a name or a path), `lock_line` (#137, the lock screen line: `on`, Settings, Lock Screen's switch, desk suite key `lockLine`, quoted in the
   file like `notch_pill`'s; `text`, the line as the writer would compose it now from the live or demo numbers and the
   watchers waiting, the same string the page's preview draws, sanitized counts, percents and times only, so it may
   appear in snapshots; `length`, its character count),

@@ -14,6 +14,8 @@ struct DrawerPanelState: Equatable {
     var showAllExtensions: Bool
     /// The look Look ▸ marks: this drawer's own, or nil for "same as all".
     var ownLook: DrawerLook?
+    /// The Desktop Folder permission is denied (`DesktopPermission`).
+    var desktopDenied = false
 }
 
 /// What a panel asks its controller to do. Plain closures so the panel holds no service.
@@ -245,6 +247,7 @@ final class DrawerPanelView: NSView, NSCollectionViewDataSource, NSCollectionVie
     private let titleBar = DrawerTitleBar(frame: .zero)
     private let scroll = NSScrollView()
     private let grid = DrawerCollectionView()
+    private let note = NSTextField(labelWithString: "")
     private(set) var state: DrawerPanelState?
     private var hovering = false
     let actions = DrawerPanelActions()
@@ -301,6 +304,11 @@ final class DrawerPanelView: NSView, NSCollectionViewDataSource, NSCollectionVie
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
         addSubview(scroll)
+        note.font = .systemFont(ofSize: 12)
+        note.textColor = .secondaryLabelColor
+        note.alignment = .center
+        note.isHidden = true
+        addSubview(note)
     }
 
     func focusGrid() { window?.makeFirstResponder(grid) }
@@ -314,6 +322,7 @@ final class DrawerPanelView: NSView, NSCollectionViewDataSource, NSCollectionVie
         plate.frame = b
         titleBar.frame = NSRect(x: 0, y: 0, width: b.width, height: DrawerPlacement.foldedHeight)
         scroll.frame = NSRect(x: 0, y: DrawerPlacement.foldedHeight, width: b.width, height: max(0, b.height - DrawerPlacement.foldedHeight))
+        note.frame = NSRect(x: 8, y: DrawerPlacement.foldedHeight + 12, width: max(0, b.width - 16), height: 18)
     }
 
     private func restyle() {
@@ -342,6 +351,9 @@ final class DrawerPanelView: NSView, NSCollectionViewDataSource, NSCollectionVie
         if old?.entries != new.entries || old?.showAllExtensions != new.showAllExtensions { grid.reloadData() }
         titleBar.title = DrawerTitle.text(name: new.name, count: new.entries.count)
         scroll.isHidden = new.folded
+        let line = DrawerPanelNote.text(denied: new.desktopDenied, entries: new.entries.count)
+        note.stringValue = line ?? ""
+        note.isHidden = new.folded || line == nil
         if old?.look != new.look || old?.opacity != new.opacity { restyle() }
         if old == nil { restyle() }
         needsLayout = true

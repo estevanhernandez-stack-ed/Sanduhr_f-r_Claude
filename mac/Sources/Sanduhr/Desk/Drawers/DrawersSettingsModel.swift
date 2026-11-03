@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import Observation
 
 /// One row of the rules list.
@@ -36,10 +37,13 @@ final class DrawersSettingsModel {
 
     @ObservationIgnored private let service: DrawerService
     @ObservationIgnored private let tidyAction: @MainActor () -> Void
+    @ObservationIgnored private let openURL: (URL) -> Void
 
-    init(service: DrawerService, tidy: @escaping @MainActor () -> Void = { DrawerPanelController.shared.tidy() }) {
+    init(service: DrawerService, tidy: @escaping @MainActor () -> Void = { DrawerPanelController.shared.tidy() },
+         openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) }) {
         self.service = service
         self.tidyAction = tidy
+        self.openURL = openURL
     }
 
     var settings: DrawerSettings { service.settings }
@@ -47,6 +51,15 @@ final class DrawersSettingsModel {
     // MARK: The switch, the root and Sort
 
     var enabled: Bool { settings.enabled }
+
+    /// The Desktop Folder permission is denied: the row below the switch shows, with its button.
+    var desktopDenied: Bool { service.desktopPermission == .denied }
+    static let deniedLine = "Sanduhr can't see your Desktop."
+    static let deniedDetail = "Allow Sanduhr under Files and Folders in Privacy & Security, then press Sort my desktop now."
+    static let deniedButton = "Open Files and Folders…"
+
+    /// Opens Privacy & Security, Files and Folders.
+    func openFilesAndFolders() { openURL(DesktopPermission.settingsURL) }
 
     /// The switch: on at once. Off asks first only when a drawer holds something to put back;
     /// with nothing to move there is no question and no result line, it just goes off.
@@ -84,7 +97,9 @@ final class DrawersSettingsModel {
     /// Sort my desktop now: the review opens on the Desk. Nothing moves until Apply there.
     func sort() {
         guard enabled else { message = "Turn Drawers on first."; return }
-        message = service.sort() == nil ? "Nothing on the Desktop matches a rule." : "The review is on your Desk."
+        let review = service.sort()
+        if desktopDenied { message = nil; return }
+        message = review == nil ? "Nothing on the Desktop matches a rule." : "The review is on your Desk."
     }
 
     /// "12 put back on the Desktop." with what stayed behind, in counts.

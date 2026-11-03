@@ -46,6 +46,7 @@ final class DrawerPanelController {
             _ = service.settings
             _ = service.contents
             _ = service.pending
+            _ = service.desktopPermission
             _ = bar.editing
             _ = bar.result
         } onChange: { [weak self] in
@@ -97,7 +98,7 @@ final class DrawerPanelController {
         return DrawerPanelState(id: d.id, name: d.name, entries: service.contents[d.id] ?? [],
                                 folded: s.folded.contains(d.id), look: s.lookFor(d.id), opacity: s.opacity,
                                 showAllExtensions: UserDefaults.standard.bool(forKey: "AppleShowAllExtensions"),
-                                ownLook: s.looks[d.id])
+                                ownLook: s.looks[d.id], desktopDenied: service.desktopPermission == .denied)
     }
 
     // MARK: Placement

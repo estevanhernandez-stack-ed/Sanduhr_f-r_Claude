@@ -312,7 +312,7 @@ eq('oled care off in the fixture', state['oled_care'], false)
 # Issue #119: the top-center pill is off, not forced and not up in the fixture; its frame is null
 # until it is. The `on` key is quoted in the fixture, so it reads as a key and not as true.
 eq('pill off in the fixture', state['notch_pill'], { 'on' => false, 'forced' => false, 'shown' => false, 'frame' => nil })
-# Drawers: off in the fixture, counts and flags only (the `on` key is quoted); permission is the stub.
+# Drawers: off in the fixture, counts and flags only (the `on` key is quoted); permission is unknown until the Desktop is read.
 eq('drawers in the fixture', state['drawers'],
    { 'on' => false, 'drawers' => 0, 'files' => [], 'permission' => 'unknown', 'review_pending' => false, 'journal_open' => false })
 # #137: the lock screen line is off in the fixture, its switch key quoted like the pill's.
