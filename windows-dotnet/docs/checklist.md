@@ -104,7 +104,7 @@
     - [x] U4 App: the low-level hook on the ink thread (done, live on Neb: a right press on ink taken as Menu, a left press on a clickable region taken as Click, a left press on plain ink passed), the icon reader (`IconRects` over the existing `DesktopIcons.Read`, 2 s, pool thread) and the snapshots
     - [x] U5 App: `DeskClickTarget` from `DeskClicks.Prepare`; the menu opened from the hook with the foreground guard and the menu-open pass
     - [x] U6 App: `UnderIconsHost` (the split, the live cloaked windows, frames with the hash skip and adaptive cadence, coverage by rect from `Progman`, drift and dim), the controller's host choice and the V3 fallback
-    - [ ] U7 Settings: the Desk Look switch and the fallback line; the What's New card
+    - [x] U7 Settings: the Desk Look switch ("Desktop icons" section, search entry, the fallback line under it). The What's New card lands with the version bump, as release cards do. Draft: "The Desk now sits under your desktop icons" / "Your icons and fences draw over it. Right-click a bare part of a widget for the Desk menu; switch it off in Settings, Desk Look." (Desk Look, no preview)
     - [ ] U8 Live checks 1 to 8 with Este, then the PR
   - [x] 12.3 Este rules on the window route: V3, Rainmeter's way; EsteFont bundling approved
   - [x] 12.4 Core: `DeskArrangement`, `DeskGeometry`, `TaskbarClearance`, `DeskMeters`, `DeskFont`, `DeskSettings`, font notices, with ported tests

@@ -100,6 +100,7 @@ public static class SettingsIndex
     public const string DeskDesignWithChat = "design-with-chat";
     public const string DeskClicks = "desk-clicks";
     public const string DeskPlate = "desk-plate";
+    public const string DeskUnderIcons = "desk-under-icons";
     public const string DeskWatchers = "desk-watchers";
     // Watchers (slice 3)
     public const string Watchers = "watchers";
@@ -307,6 +308,8 @@ public static class SettingsIndex
              "shadow", "gradient", "hex", "palette", "presets", SettingsNames.MessageColor, SettingsNames.GlowAroundMessage, SettingsNames.UseThemeColors, "theme colors", "same look", "colored lines"]),
         E(SettingsNames.BackPlate, SettingsPage.DeskLook, DeskPlate,
             [SettingsNames.DeskPlateSwitch, "plate", "backdrop", "background", "contrast", "readable", "desktop icons", "files", "dark plate", "behind the text"]),
+        E(SettingsNames.DesktopIconsSection, SettingsPage.DeskLook, DeskUnderIcons,
+            [SettingsNames.DeskUnderIconsSwitch, "under the icons", "below the icons", "icons", "fences", "behind icons", "layer", "right-click", "Desk menu"]),
 
         E("Claude's suggestion", SettingsPage.DeskMessage, MessageSuggestion,
             ["suggestion", "suggested", "Claude", "agent", "review", "dismiss", "propose"]),
@@ -413,6 +416,7 @@ public static class SettingsIndex
         [SetupCopy.DesignWithChat] = DeskDesignWithChat,
         [SettingsNames.DeskPieceClicksSwitch] = DeskClicks,
         [SettingsNames.DeskPlateSwitch] = DeskPlate,
+        [SettingsNames.DeskUnderIconsSwitch] = DeskUnderIcons,
         [SettingsNames.WatchersSwitch] = Watchers,
         [SettingsNames.CiRunnersSwitch] = CiRunners,
         [SettingsNames.DeskDirectSwitch] = DeskDesigns,
