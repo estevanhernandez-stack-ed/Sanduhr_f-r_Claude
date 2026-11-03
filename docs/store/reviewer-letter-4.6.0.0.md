@@ -18,39 +18,31 @@ This updates v4.5.0.0: same Identity (626LabsLLC.SanduhrfrClaude),
 Publisher CN and listing. The only capability is still runFullTrust; the
 manifest changes only its version. No telemetry.
 
-What's new in 4.6.0.0:
+New in 4.6.0.0: the optional Desk (clock, meters and pieces the user
+places) draws below the desktop icons. Two things you may see in a
+process monitor:
 
-1. The Desk under the desktop icons. The optional desktop layer (the
-   clock, meters and pieces the user places) now draws below the desktop
-   icons. To do that, the app creates its own child windows inside
-   Explorer's desktop window (Progman's WorkerW) and draws into them with
-   DirectComposition. It is on by default and turns off in Settings >
-   Desk Look > Desktop icons > "Keep the Desk under desktop icons".
+1. Child windows inside Explorer's desktop window (Progman's WorkerW),
+   drawn with DirectComposition. On by default; Settings > Desk Look >
+   "Keep the Desk under desktop icons" turns it off.
 
 2. A low-level mouse hook (WH_MOUSE_LL), so the Desk stays clickable
-   under the icons: a right-click on a drawn part of a widget opens the
-   app's Desk menu, and a left-click on its now-playing line plays or
-   pauses. The hook acts only on a left or right button press over a
-   drawn part of a Desk widget; every other press and every move passes
-   to Windows untouched. It never records a press, a position or a move,
-   never reads the keyboard, and sends nothing. To leave presses on
-   desktop icons to Explorer it reads where the icons sit (read-only, the
-   same reading drawers use since 4.5) and which window is under the
-   pointer, never its title or content. The hook exists only while the
-   Desk is shown under the icons; turning the switch or the Desk off
-   removes it.
+   under the icons: a right-click on a widget opens the Desk menu, a
+   left-click on now playing plays or pauses. It acts only on a left or
+   right press over a drawn part of a Desk widget; everything else
+   passes untouched. It records nothing, never reads the keyboard and
+   sends nothing. It reads where desktop icons sit (read-only) and which
+   window is under the pointer, never its title or content. It exists
+   only while the Desk is shown under the icons.
 
-To review: Settings > Desk > tick "Desk", then right-click a bare part of
-the clock on the desktop.
+To review: Settings > Desk > tick "Desk", then right-click the clock on
+the desktop.
 
-No new network destination, no new capability. Settings > Privacy lists
-every destination, unchanged from 4.0. The privacy policy gains a row
-for the Desk under the icons.
+No new network destination. The privacy policy gains a row for this.
 
-Everything from 4.0 is preserved (10.1.4.4): the trademark disclaimer on
-every surface naming Claude, burn-rate projection and pacing, the
-Privacy page, tool-strip navigation with accessible names, and dialogs
-legible in light and dark mode.
+Everything from 4.0 is preserved (10.1.4.4): the trademark disclaimer,
+burn-rate projection and pacing, the Privacy page, tool-strip navigation
+with accessible names, and dialogs legible in light and dark mode.
 
 "Claude" and "claude.ai" are trademarks of Anthropic PBC, used
 nominatively. Sanduhr für Claude is an independent third-party tool, not
@@ -71,6 +63,7 @@ Estevan Hernandez
 - [ ] The hosted privacy policy (626labs.dev/privacy.html#privacy-sanduhr) carries the "Desk under your desktop icons" row from `docs/PRIVACY.md` before commit
 - [ ] Store "What's new" keeps the 0x80073D02 line until the restart-to-update check passes (dashboard a36UEAoiqo1OKKBCDyCy)
 - [ ] `dotnet test windows-dotnet` green
+- [ ] The paste block is under Partner Center's 2000-character cap for Notes for certification
 
 ## Source
 
