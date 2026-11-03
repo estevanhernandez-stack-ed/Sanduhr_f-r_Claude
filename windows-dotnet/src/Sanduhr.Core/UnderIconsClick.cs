@@ -53,7 +53,8 @@ public sealed record UnderIconsIsland(PxRect Rect, ReadOnlyMemory<byte> Alpha, I
 
 /// <summary>
 /// The under-icons hook's decision (spec 5.0d): pure, so the table is tested and the hook thread runs it on frozen snapshots in well
-/// under a millisecond. Rules, in order: not over the shell or over an icon, pass; a Desk menu open, pass (the press closes it); a right
+/// under a millisecond. Rules, in order: not over the shell or over an icon, pass; a Desk menu open, a left press passes (it closes the
+/// menu) and a right press is decided as below (the host closes the open menu first); a right
 /// press on a drawn pixel of an island, the Desk menu; a left press on a clickable piece, a click; anything else, pass.
 /// </summary>
 public static class UnderIconsClick
@@ -71,7 +72,9 @@ public static class UnderIconsClick
     public static UnderIconsDecision Decide(DeskButton button, PxPoint point, bool overShell, IReadOnlyList<PxRect> icons,
         IReadOnlyList<UnderIconsIsland> islands, bool menuOpen)
     {
-        if (!overShell || menuOpen) return UnderIconsDecision.Pass;
+        // An open Desk menu: a left press passes and closes it the normal way; a right press is decided as usual, so on ink it opens the
+        // menu again where it landed (the host closes the open one) and anywhere else Explorer's own menu opens, as Windows does.
+        if (!overShell || (menuOpen && button == DeskButton.Left)) return UnderIconsDecision.Pass;
         foreach (var icon in icons)
             if (UnderIconsIsland.Contains(icon, point)) return UnderIconsDecision.Pass;
         for (int i = islands.Count - 1; i >= 0; i--)

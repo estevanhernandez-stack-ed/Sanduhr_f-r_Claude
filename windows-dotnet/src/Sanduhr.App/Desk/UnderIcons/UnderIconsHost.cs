@@ -122,6 +122,7 @@ internal sealed class UnderIconsHost : IDeskHost
         _disposed = true;
         _icons.Dispose();
         _ink?.Dispose();
+        _menuHost?.Dispose();
         _above.Dispose();
     }
 
@@ -248,14 +249,51 @@ internal sealed class UnderIconsHost : IDeskHost
             return;
         }
         if (Actions is not { } actions) return;
-        var anchor = d.Kind is { } k && target is not null ? target.ElementOf(k) : island.Content;
-        var menu = DeskClicks.OpenDeskMenu(anchor, d.Kind, actions);
-        _ink!.MenuOpen = true;
-        menu.Closed += (_, _) => { if (_ink is { } ink) ink.MenuOpen = false; };
-        // The press that opened it was taken from Explorer, so take the foreground for the menu: without it a menu opened over
-        // another app can close at once (the spike's second fix).
-        if (PresentationSource.FromVisual(menu) is HwndSource popup) InkNative.SetForegroundWindow(popup.Handle);
-        Log($"Desk menu at ({at.X},{at.Y}){(d.Kind is { } piece ? $" on {piece}" : "")}");
+        // The press that opens the menu was taken from Explorer, so Sanduhr is not the foreground app: a menu opened as it is closes at
+        // once, or never shows. Take the foreground first, on a 1x1 invisible window at the press, and open the menu from it (the
+        // pattern tray menus use; the spike's second fix).
+        // A right press on ink while a Desk menu is open: that menu closes and this one opens where the press landed.
+        if (_menu is { IsOpen: true } open) open.IsOpen = false;
+        var host = MenuHost(at);
+        bool foreground = InkNative.SetForegroundWindow(host.Handle);
+        var menu = DeskClicks.OpenDeskMenu((FrameworkElement)host.RootVisual, d.Kind, actions);
+        _menu = menu;
+        _ink!.MenuOpen = menu.IsOpen;
+        menu.Closed += (_, _) =>
+        {
+            if (!ReferenceEquals(_menu, menu)) return;   // replaced by a newer menu, which owns the flag and the host now
+            if (_ink is { } ink) ink.MenuOpen = false;
+            if (!host.IsDisposed) InkNative.ShowWindow(host.Handle, 0);
+        };
+        // Never leave the hook passing presses for a menu that is not up.
+        _ui.BeginInvoke(DispatcherPriority.Background, () => { if (!menu.IsOpen && _ink is { } ink) ink.MenuOpen = false; });
+        Log($"Desk menu at ({at.X},{at.Y}){(d.Kind is { } piece ? $" on {piece}" : "")}{(foreground ? "" : ", foreground refused")}{(menu.IsOpen ? "" : ", not open")}");
+    }
+
+    private HwndSource? _menuHost;
+    private System.Windows.Controls.ContextMenu? _menu;
+
+    /// <summary>The menu's owner: a 1x1 fully transparent tool window, moved to the press and shown, so it can take the foreground.</summary>
+    private HwndSource MenuHost(PxPoint at)
+    {
+        if (_menuHost is null || _menuHost.IsDisposed)
+        {
+            _menuHost = DeskNative.PerMonitor(() => new HwndSource(new HwndSourceParameters("SanduhrDeskMenu")
+            {
+                WindowStyle = DeskNative.WS_POPUP,
+                ExtendedWindowStyle = DeskNative.WS_EX_TOOLWINDOW,
+                UsesPerPixelTransparency = true,
+                PositionX = at.X,
+                PositionY = at.Y,
+                Width = 1,
+                Height = 1,
+            }));
+            _menuHost.RootVisual = new System.Windows.Controls.Border { Width = 1, Height = 1, Background = Brushes.Transparent };
+        }
+        var h = _menuHost.Handle;
+        DeskNative.PerMonitor(() => InkNative.SetWindowPos(h, IntPtr.Zero, at.X, at.Y, 1, 1, InkNative.SWP_NOZORDER | InkNative.SWP_NOACTIVATE));
+        InkNative.ShowWindow(h, 5);
+        return _menuHost;
     }
 
     private void Log(string message) => Trace?.Invoke(message);

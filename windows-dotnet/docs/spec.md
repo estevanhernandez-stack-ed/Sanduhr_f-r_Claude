@@ -364,7 +364,7 @@ Findings that bind the build:
 
 **The hook (`UnderIconsClick.Decide`, Core, pure and table-tested).** Inputs: the button, the point, whether `WindowFromPoint`'s root is the shell (`Progman`, or a `WorkerW` of the shell's process), the icon rects, the island snapshots and whether a Desk menu is open. Rules, in order:
 1. Not over the shell, or over an icon: pass.
-2. A Desk menu is open: pass, so the press closes it the normal way (the spike's nested-menu fix).
+2. A Desk menu is open: a left press passes and closes it the normal way. A right press is decided by the rules below, so on ink the open menu closes and the Desk menu opens where the press landed, and anywhere else Explorer's menu opens, as Windows does. (The spike's nested-menu fix, amended in the 2026-11-03 live check: passing every press made a quick second right-click open Explorer's menu over the ink.)
 3. A right press on an island pixel with alpha at least 8 of 255: take the press and its release, and open the Desk menu. On a clickable piece the menu carries that piece's own item (Message settings… on the message), as in V3.
 4. A left press on a clickable region: take the press and its release, and act on the release, as V3's `MouseLeftButtonUp` does. A drag starting there is lost, as in V3 today.
 5. Everything else passes: moves, the wheel, middle and X buttons, and every press elsewhere. A taken press is acted on by a message posted to the UI thread, and the hook itself returns in well under a millisecond (no UI Automation inside it).

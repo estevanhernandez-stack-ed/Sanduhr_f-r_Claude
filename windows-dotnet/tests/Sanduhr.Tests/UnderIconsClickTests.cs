@@ -48,11 +48,12 @@ public class UnderIconsClickTests
     }
 
     [Fact]
-    public void AnOpenMenuLetsEveryPressThroughSoItCloses()
+    public void AnOpenMenuPassesLeftPressesAndReopensOnARightPressOverInk()
     {
         var island = Island(new UnderIconsRegion(DeskElementKind.NowPlaying, new PxRect(100, 100, 10, 10)));
-        Assert.Equal(UnderIconsDecision.Pass, Decide(DeskButton.Right, Drawn, island, menuOpen: true));
         Assert.Equal(UnderIconsDecision.Pass, Decide(DeskButton.Left, Drawn, island, menuOpen: true));
+        Assert.Equal(UnderIconsAct.Menu, Decide(DeskButton.Right, Drawn, island, menuOpen: true).Act);
+        Assert.Equal(UnderIconsDecision.Pass, Decide(DeskButton.Right, Outside, island, menuOpen: true));
     }
 
     [Fact]
