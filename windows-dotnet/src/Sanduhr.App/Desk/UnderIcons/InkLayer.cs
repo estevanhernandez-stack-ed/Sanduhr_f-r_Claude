@@ -202,7 +202,7 @@ internal sealed class InkLayer : IDisposable
         }
         // Nothing may escape the loop: the hook lives on this thread, and a dead thread would leave the mouse waiting on it.
         try { Present(); }
-        catch (Exception e) { Log($"present failed: {e.GetType().Name}: {e.Message}"); }
+        catch (Exception e) { Log($"present failed: {e.GetType().Name}"); }
     }
 
     private void RegisterClasses()

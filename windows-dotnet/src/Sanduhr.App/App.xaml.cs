@@ -700,7 +700,8 @@ public partial class App : Application
         _drawers = new Desk.DrawerService(store, paths, Desk.DrawerPlaces.ForThisUser());
         Desk.DrawerService.Current = _drawers;
         _drawers.SettingsRequested += () => _ = ShowSettingsAsync(SettingsPage.Drawers, SettingsIndex.MenuAnchor(SettingsPage.Drawers));
-        _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
+        _desk = new Desk.DeskController(store,
+            () => store.LoadDeskUnderIcons() ? new Desk.UnderIcons.UnderIconsHost() : new Desk.DesktopLayerHost(),
             () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers, paths, _launcherApps, looks: _looks, drawers: _drawers)
         {
             ThemeText = ThemeTextHex,

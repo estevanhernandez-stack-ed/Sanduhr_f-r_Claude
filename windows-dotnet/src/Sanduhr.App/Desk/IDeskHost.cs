@@ -53,6 +53,10 @@ internal sealed record DeskIsland(FrameworkElement Content, Point Anchor, Horizo
     /// Never called when the blur was refused (the tinted plate keeps its rounded corners in a transparent window).</summary>
     public Action<bool>? GlassCorners { get; init; }
 
+    /// <summary>The island draws under the desktop icons (spec 5.0d): its window is cloaked and click-through, and
+    /// <see cref="UnderIcons.UnderIconsHost"/> mirrors it into the ink below the icons. Set only by that host.</summary>
+    public bool UnderIcons { get; init; }
+
     /// <summary>A roaming island (the companion walking its edges): the host keeps the window's aligned edge on the motion's
     /// anchor as it moves, without laying the island out again. Null for an island that stays where it hangs.</summary>
     public DeskIslandMotion? Motion { get; init; }
