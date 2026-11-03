@@ -118,6 +118,22 @@ struct LockLineDaemonTests {
         #expect(age > 60 && judge > 60)
     }
 
+    /// 2.39.3: a stalled helper and a refused registration both lead to the Login Items steps that
+    /// brought it back on 2026-11-02, never to Sanduhr re-registering on its own.
+    @Test func aStalledOrRefusedHelperGetsTheLoginItemsSteps() {
+        #expect(LockLineDaemon.caption(.stalled).contains("Login Items"))
+        #expect(LockLineDaemon.caption(.stalled).contains("turn this switch off"))
+        let eperm = NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM))
+        #expect(LockLineDaemon.refused(eperm))
+        #expect(LockLineDaemon.installProblem(eperm, after: .off)?.contains("Login Items") == true)
+        struct Other: LocalizedError { var errorDescription: String? { "The disk is full." } }
+        #expect(!LockLineDaemon.refused(Other()))
+        #expect(LockLineDaemon.installProblem(Other(), after: .off) == "macOS did not install the lock screen helper: The disk is full.")
+        #expect(LockLineDaemon.installProblem(eperm, after: .on) == nil)
+        #expect(LockLineDaemon.stalledOff.contains("old line"))
+        #expect(LockLineDaemon.stalledOff.hasSuffix("."))
+    }
+
     @Test func theHeartbeatSitsBesideTheHelpersOtherFiles() {
         #expect(LockLineHelperRules.heartbeatPath == "/Library/Application Support/Sanduhr/lockline-alive")
         #expect(LockLineHelperRules.heartbeatPath.hasPrefix(LockLineHelperRules.stateDir + "/"))
@@ -144,6 +160,7 @@ struct LockLineDaemonTests {
         struct E: LocalizedError { var errorDescription: String? { "Operation not permitted" } }
         #expect(LockLineDaemon.installProblem(E(), after: .on) == nil)
         #expect(LockLineDaemon.installProblem(E(), after: .needsApproval) == nil)
-        #expect(LockLineDaemon.installProblem(E(), after: .off)?.contains("Operation not permitted") == true)
+        // A refusal says what to do in Login Items rather than repeating macOS (2.39.3).
+        #expect(LockLineDaemon.installProblem(E(), after: .off)?.contains("Login Items") == true)
     }
 }
