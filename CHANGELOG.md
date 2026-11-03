@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased (windows)
+
+### Fixes
+
+- **Sanduhr stays light while a long Claude Code session runs.** Every 30 seconds the widget counts the tokens burned since its last fetch, and it did that by reading every session log changed since then from the first line, a long session's log included (one ran to 650 MB). It now reads each log once and after that only what was added, and takes each log's time from the folder listing instead of asking for every file, of thousands, on its own. On that session the app went from about 10% of one CPU core to about 2%.
+
 ## v4.6.0 — 2026-11-03
 
 **Platform:** Windows (.NET 10 / WPF). The Desk sits under your desktop icons now. `Sanduhr.Mcp` to 4.6.0. No new outbound destination and no new capability: the manifest changes only its version.

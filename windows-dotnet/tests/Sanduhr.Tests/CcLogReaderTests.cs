@@ -169,6 +169,88 @@ public class CcLogReaderTests
     }
 
     [Fact]
+    public void Tokens_since_counts_lines_appended_after_a_scan()
+    {
+        using var temp = new TempDir();
+        var baseTime = new DateTimeOffset(2026, 5, 5, 10, 0, 0, TimeSpan.Zero);
+        var f = WriteSession(temp.Path, ".claude", "P", "s",
+            AssistantEvent(Iso(baseTime.AddMinutes(1)), "claude-opus-4-7", 100, 200));
+        var reader = new CcLogReader(temp.Path);
+        Assert.Equal(300, reader.TokensSince(baseTime)["claude-opus-4-7"]);
+
+        File.AppendAllText(f, AssistantEvent(Iso(baseTime.AddMinutes(2)), "claude-opus-4-7", 10, 20) + "\n");
+        Assert.Equal(330, reader.TokensSince(baseTime)["claude-opus-4-7"]);
+    }
+
+    [Fact]
+    public void Tokens_since_reads_only_the_appended_tail()
+    {
+        using var temp = new TempDir();
+        var baseTime = new DateTimeOffset(2026, 5, 5, 10, 0, 0, TimeSpan.Zero);
+        var f = WriteSession(temp.Path, ".claude", "P", "s",
+            AssistantEvent(Iso(baseTime.AddMinutes(1)), "claude-opus-4-7", 100, 200));
+        var reader = new CcLogReader(temp.Path);
+        reader.TokensSince(baseTime);
+        long first = reader.SinceBytesRead;
+        Assert.Equal(new FileInfo(f).Length, first);
+
+        var added = AssistantEvent(Iso(baseTime.AddMinutes(2)), "claude-opus-4-7", 10, 20) + "\n";
+        File.AppendAllText(f, added);
+        reader.TokensSince(baseTime);
+        Assert.Equal(first + System.Text.Encoding.UTF8.GetByteCount(added), reader.SinceBytesRead);
+
+        // Nothing new: no bytes read at all.
+        reader.TokensSince(baseTime);
+        Assert.Equal(first + System.Text.Encoding.UTF8.GetByteCount(added), reader.SinceBytesRead);
+    }
+
+    [Fact]
+    public void Tokens_since_rereads_a_file_rewritten_shorter()
+    {
+        using var temp = new TempDir();
+        var baseTime = new DateTimeOffset(2026, 5, 5, 10, 0, 0, TimeSpan.Zero);
+        var f = WriteSession(temp.Path, ".claude", "P", "s",
+            AssistantEvent(Iso(baseTime.AddMinutes(1)), "claude-opus-4-7", 100, 200),
+            AssistantEvent(Iso(baseTime.AddMinutes(2)), "claude-opus-4-7", 100, 200));
+        var reader = new CcLogReader(temp.Path);
+        Assert.Equal(600, reader.TokensSince(baseTime)["claude-opus-4-7"]);
+
+        WriteSession(temp.Path, ".claude", "P", "s",
+            AssistantEvent(Iso(baseTime.AddMinutes(3)), "claude-opus-4-7", 1, 2));
+        Assert.Equal(3, reader.TokensSince(baseTime)["claude-opus-4-7"]);
+    }
+
+    [Fact]
+    public void Tokens_since_recounts_for_an_earlier_cutoff()
+    {
+        using var temp = new TempDir();
+        var baseTime = new DateTimeOffset(2026, 5, 5, 10, 0, 0, TimeSpan.Zero);
+        WriteSession(temp.Path, ".claude", "P", "s",
+            AssistantEvent(Iso(baseTime.AddMinutes(-30)), "claude-opus-4-7", 1000, 0),
+            AssistantEvent(Iso(baseTime.AddMinutes(1)), "claude-opus-4-7", 100, 200));
+        var reader = new CcLogReader(temp.Path);
+        Assert.Equal(300, reader.TokensSince(baseTime)["claude-opus-4-7"]);
+        Assert.Equal(1300, reader.TokensSince(baseTime.AddHours(-1))["claude-opus-4-7"]);
+        Assert.Equal(300, reader.TokensSince(baseTime)["claude-opus-4-7"]);
+    }
+
+    [Fact]
+    public void Tokens_since_counts_a_torn_line_once_it_completes()
+    {
+        using var temp = new TempDir();
+        var baseTime = new DateTimeOffset(2026, 5, 5, 10, 0, 0, TimeSpan.Zero);
+        var f = WriteSession(temp.Path, ".claude", "P", "s",
+            AssistantEvent(Iso(baseTime.AddMinutes(1)), "claude-opus-4-7", 100, 200));
+        var line = AssistantEvent(Iso(baseTime.AddMinutes(2)), "claude-opus-4-7", 10, 20);
+        File.AppendAllText(f, line[..20]);
+        var reader = new CcLogReader(temp.Path);
+        Assert.Equal(300, reader.TokensSince(baseTime)["claude-opus-4-7"]);
+
+        File.AppendAllText(f, line[20..] + "\n");
+        Assert.Equal(330, reader.TokensSince(baseTime)["claude-opus-4-7"]);
+    }
+
+    [Fact]
     public void Model_to_tier_key_maps_known_prefixes()
     {
         var reader = new CcLogReader();

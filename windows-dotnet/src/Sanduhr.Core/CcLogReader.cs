@@ -126,6 +126,33 @@ public sealed class CcLogReader
         return files;
     }
 
+    /// <summary><see cref="DiscoverLogFiles"/> with each file's last write (UTC),
+    /// taken from the directory walk itself: no stat per file, which on thousands
+    /// of logs cost more than the reading.</summary>
+    private IEnumerable<(string Path, DateTime WrittenUtc)> DiscoverLogFilesWithTimes()
+    {
+        foreach (var root in SearchRoots())
+        {
+            var projects = new DirectoryInfo(Path.Combine(root, "projects"));
+            if (!projects.Exists)
+                continue;
+            foreach (var projectDir in projects.EnumerateDirectories())
+            {
+                IEnumerable<FileInfo> files;
+                try
+                {
+                    files = projectDir.EnumerateFiles("*.jsonl", SearchOption.AllDirectories).ToList();
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    continue;
+                }
+                foreach (var f in files)
+                    yield return (f.FullName, f.LastWriteTimeUtc);
+            }
+        }
+    }
+
     /// <summary>Stream <see cref="UsageEvent"/> records for every
     /// <c>type=assistant</c> event in a single session JSONL. Malformed lines
     /// are skipped silently; an unreadable file yields nothing.</summary>
@@ -150,59 +177,172 @@ public sealed class CcLogReader
             string? rawLine;
             while ((rawLine = reader.ReadLine()) is not null)
             {
-                var line = rawLine.Trim();
-                if (line.Length == 0)
-                    continue;
-                JsonNode? node;
-                try
-                {
-                    node = JsonNode.Parse(line);
-                }
-                catch (JsonException)
-                {
-                    continue;
-                }
-                if (node is not JsonObject d)
-                    continue;
-                if (Str(d, "type") != "assistant")
-                    continue;
-                if (d["message"] is not JsonObject msg)
-                    continue;
-                if (msg["usage"] is not JsonObject usage)
-                    continue;
-                yield return new UsageEvent(
-                    ParseIso(Str(d, "timestamp")),
-                    Str(msg, "model"),
-                    new TokenUsage(Num(usage, "input_tokens"), Num(usage, "output_tokens")),
-                    Str(d, "cwd"),
-                    Str(d, "attributionSkill"));
+                if (ParseLine(rawLine) is { } ev)
+                    yield return ev;
             }
         }
     }
 
+    /// <summary>One session-log line as a usage event, or null for anything that
+    /// is not a well-formed assistant event carrying usage.</summary>
+    private static UsageEvent? ParseLine(string rawLine)
+    {
+        var line = rawLine.Trim();
+        if (line.Length == 0)
+            return null;
+        // Perf prefilter only (VaultIngester uses the same one): most lines are
+        // user turns and tool results, and parsing them is the cost. Looser than
+        // "type":"assistant" on purpose so formatting drift never drops events.
+        if (!line.Contains("\"assistant\"", StringComparison.Ordinal))
+            return null;
+        JsonNode? node;
+        try
+        {
+            node = JsonNode.Parse(line);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        if (node is not JsonObject d)
+            return null;
+        if (Str(d, "type") != "assistant")
+            return null;
+        if (d["message"] is not JsonObject msg)
+            return null;
+        if (msg["usage"] is not JsonObject usage)
+            return null;
+        return new UsageEvent(
+            ParseIso(Str(d, "timestamp")),
+            Str(msg, "model"),
+            new TokenUsage(Num(usage, "input_tokens"), Num(usage, "output_tokens")),
+            Str(d, "cwd"),
+            Str(d, "attributionSkill"));
+    }
+
+    // TokensSince's incremental state. The widget asks every 30 s and an active
+    // session log runs to hundreds of MB, so each file is read once and after
+    // that only from where the last call stopped.
+    private readonly object _sinceLock = new();
+    private readonly Dictionary<string, SinceTail> _sinceTails = new(StringComparer.OrdinalIgnoreCase);
+    private DateTimeOffset _sinceFloor = DateTimeOffset.MaxValue;
+
+    /// <summary>Bytes <see cref="TokensSince"/> has read from session logs, for tests.</summary>
+    internal long SinceBytesRead { get; private set; }
+
+    private sealed class SinceTail
+    {
+        /// <summary>Byte offset after the last complete line read.</summary>
+        public long Offset;
+        /// <summary>Counted events at or after the floor the file was last read against.</summary>
+        public readonly List<(DateTimeOffset At, string Model, long Tokens)> Events = new();
+    }
+
     /// <summary><c>{model_name: total_tokens}</c> across ALL session files,
     /// considering only events with timestamp &gt;= <paramref name="cutoff"/>.
-    /// Models with zero new tokens are omitted.</summary>
+    /// Models with zero new tokens are omitted. Incremental: a file already read
+    /// is read again only from where the last call stopped; a cutoff earlier
+    /// than the last one, or a file rewritten shorter, reads from the start.</summary>
     public Dictionary<string, long> TokensSince(DateTimeOffset cutoff)
     {
-        var totals = new Dictionary<string, long>();
-        foreach (var path in DiscoverLogFiles())
+        lock (_sinceLock)
         {
-            if (!FileMtimeAfter(path, cutoff))
-                continue;
-            foreach (var ev in IterUsageEvents(path))
+            // Events below the last cutoff were dropped; an earlier cutoff needs them back.
+            if (cutoff < _sinceFloor)
+                _sinceTails.Clear();
+            _sinceFloor = cutoff;
+            var totals = new Dictionary<string, long>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (path, writtenUtc) in DiscoverLogFilesWithTimes())
             {
-                if (ev.Timestamp is null || ev.Model is null)
+                if (writtenUtc < cutoff.UtcDateTime)
                     continue;
-                if (ev.Timestamp.Value < cutoff)
-                    continue;
-                var tokens = Tokens(ev);
-                if (tokens <= 0)
-                    continue;
-                totals[ev.Model] = totals.GetValueOrDefault(ev.Model) + tokens;
+                seen.Add(path);
+                if (!_sinceTails.TryGetValue(path, out var tail))
+                    _sinceTails[path] = tail = new SinceTail();
+                ReadTail(path, tail, cutoff);
+                tail.Events.RemoveAll(e => e.At < cutoff);
+                foreach (var (_, model, tokens) in tail.Events)
+                    totals[model] = totals.GetValueOrDefault(model) + tokens;
             }
+            foreach (var gone in _sinceTails.Keys.Where(k => !seen.Contains(k)).ToList())
+                _sinceTails.Remove(gone);
+            return totals;
         }
-        return totals;
+    }
+
+    private void ReadTail(string path, SinceTail tail, DateTimeOffset cutoff)
+    {
+        try
+        {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            // Shorter than the offset, or no line end just before it: the file was rewritten.
+            if (fs.Length < tail.Offset || (tail.Offset > 0 && ByteBefore(fs, tail.Offset) != '\n'))
+            {
+                tail.Offset = 0;
+                tail.Events.Clear();
+            }
+            if (fs.Length == tail.Offset)
+                return;
+            tail.Offset = ReadLines(fs, tail.Offset, line =>
+            {
+                if (ParseLine(line) is not { Timestamp: { } at, Model: { } model } ev || at < cutoff)
+                    return;
+                var tokens = Tokens(ev);
+                if (tokens > 0)
+                    tail.Events.Add((at, model, tokens));
+            });
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private static int ByteBefore(FileStream fs, long offset)
+    {
+        fs.Seek(offset - 1, SeekOrigin.Begin);
+        return fs.ReadByte();
+    }
+
+    /// <summary>Hands each complete line from <paramref name="start"/> to
+    /// <paramref name="onLine"/>; returns the offset after the last '\n'. A torn
+    /// trailing line is left for the next call (VaultIngester.ParseLines' rule).</summary>
+    private long ReadLines(FileStream fs, long start, Action<string> onLine)
+    {
+        fs.Seek(start, SeekOrigin.Begin);
+        var buf = new byte[64 * 1024];
+        using var pending = new MemoryStream();
+        long pos = start;
+        long consumed = start;
+        int read;
+        while ((read = fs.Read(buf, 0, buf.Length)) > 0)
+        {
+            SinceBytesRead += read;
+            int lineStart = 0;
+            for (int i = 0; i < read; i++)
+            {
+                if (buf[i] != (byte)'\n')
+                    continue;
+                string line;
+                if (pending.Length > 0)
+                {
+                    pending.Write(buf, lineStart, i - lineStart);
+                    line = Encoding.UTF8.GetString(pending.GetBuffer(), 0, (int)pending.Length);
+                    pending.SetLength(0);
+                }
+                else
+                {
+                    line = Encoding.UTF8.GetString(buf, lineStart, i - lineStart);
+                }
+                onLine(line);
+                consumed = pos + i + 1;
+                lineStart = i + 1;
+            }
+            if (lineStart < read)
+                pending.Write(buf, lineStart, read - lineStart);
+            pos += read;
+        }
+        return consumed;
     }
 
     /// <summary>Tokens grouped by LOCAL calendar date for the trailing
