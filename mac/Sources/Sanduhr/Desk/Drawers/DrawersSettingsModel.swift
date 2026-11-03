@@ -48,14 +48,20 @@ final class DrawersSettingsModel {
 
     var enabled: Bool { settings.enabled }
 
-    /// The switch: on at once, off only after the question.
+    /// The switch: on at once. Off asks first only when a drawer holds something to put back;
+    /// with nothing to move there is no question and no result line, it just goes off.
     func setEnabled(_ on: Bool) {
         message = nil
         if on {
             offQuestion = nil
             service.turnOn()
         } else if enabled {
-            offQuestion = service.offPrompt()
+            if service.offCount() == 0 {
+                offQuestion = nil
+                service.confirmTurnOff()
+            } else {
+                offQuestion = service.offPrompt()
+            }
         }
     }
 

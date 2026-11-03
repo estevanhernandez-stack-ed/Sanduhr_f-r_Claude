@@ -64,13 +64,13 @@ struct DrawersSettingsModelTests {
         #expect(p.model.rules.count == DrawerRules.defaults.count, "rules are kept")
     }
 
-    @Test("off with nothing sorted asks about 0 files, and the return line says counts only")
+    @Test("off with nothing to put back asks nothing and says nothing, and the return line says counts only")
     func offWithNothing() {
         let p = Page(enabled: true)
         p.model.setEnabled(false)
-        #expect(p.model.offQuestion == "Put 0 files back on the Desktop?")
-        p.model.confirmOff()
-        #expect(p.model.message == "0 files put back on the Desktop.")
+        #expect(p.model.offQuestion == nil, "no question when no file would move")
+        #expect(p.model.message == nil)
+        #expect(!p.model.enabled)
         var r = DrawerRunResult()
         r.refusal = "Nope."
         #expect(DrawersSettingsModel.returnLine(r) == "Nope.")
