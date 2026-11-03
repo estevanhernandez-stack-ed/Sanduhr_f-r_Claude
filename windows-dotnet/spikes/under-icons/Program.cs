@@ -13,11 +13,25 @@ namespace UnderIcons;
 /// on 24H2+), and a separate V3-style click layer (top-level, owned by Progman, bottom of the normal
 /// band, alpha 1, sized to the piece only) logs every click it receives. Everything runs on one thread.
 ///
-/// Options: --piece-mode ulw|attr|plain  --seconds N (default 180)  --log PATH  --shot PATH  --x PX --y PX  --simulate-restart
+/// dcomp (2026-11-02): a plain child of the WorkerW carrying a DirectComposition visual with a premultiplied
+/// alpha ramp (magenta, alpha 0 at the left edge to 1 at the right); the shot compares the screen with a baseline
+/// taken before the piece existed, so per-pixel alpha reads as a blend of the wallpaper and the ink.
+/// Options: --piece-mode ulw|attr|plain|dcomp  --seconds N (default 180)  --log PATH  --shot PATH  --x PX --y PX  --simulate-restart
 /// </summary>
 internal static class Program
 {
-    private const uint T_QUIT = 1, T_HEART = 2, T_REBUILD = 3, T_SHOT = 4, T_SIM = 5, T_SETTLE = 6;
+    private const uint T_QUIT = 1, T_HEART = 2, T_REBUILD = 3, T_SHOT = 4, T_SIM = 5, T_SETTLE = 6, T_ICONS = 7;
+    /// <summary>--shape (2026-11-02 part 2): the click layer covers the whole piece minus the icons, and a right-click on it opens a stand-in Desk menu.</summary>
+    private static bool _shape;
+    /// <summary>--hook (part 2b): no click layer; RightHook takes right presses on exposed parts of the piece. --selftest injects clicks.</summary>
+    private static bool _hook, _selftest;
+    private static int _shotAt = 7000, _selfAt = 2500;   // --shot-at / --self-at in ms
+    private static List<Rectangle> _icons = new();
+    private const uint WM_APP_MENU = 0x8001;
+    private const uint T_SELF = 8, T_ESC = 9, T_SELF2 = 10, T_ESC2 = 11;
+    private static (int X, int Y) _openPt, _iconPt;
+    private static string _iconKey = "";
+    private static List<Rectangle> _cut = new();
 
     private static readonly N.WndProc SentinelProcRef = SentinelProc;
     private static readonly N.WndProc PieceProcRef = PieceProc;
@@ -39,6 +53,8 @@ internal static class Program
     /// <summary>attr (default): layered child, SetLayeredWindowAttributes 255, WM_PAINT; the only mode whose pixels
     /// showed on Neb (2026-10-21). ulw: UpdateLayeredWindow per-pixel alpha (drew nothing on Neb); plain: not layered (drew nothing).</summary>
     private static string _mode = "attr";
+    private static DCompPiece? _dcomp;
+    private static Bitmap? _baseline;
 
     private static int Main(string[] args)
     {
@@ -57,8 +73,15 @@ internal static class Program
                 case "--y" when next != null: oy = int.Parse(next, CultureInfo.InvariantCulture); i++; break;
                 case "--piece-mode" when next != null: _mode = next; i++; break;
                 case "--simulate-restart": _simulateRestart = true; break;
+                case "--shape": _shape = true; break;
+                case "--hook": _hook = true; break;
+                case "--selftest": _selftest = true; break;
+                case "--shot-at" when next != null: _shotAt = int.Parse(next, CultureInfo.InvariantCulture); i++; break;
+                case "--self-at" when next != null: _selfAt = int.Parse(next, CultureInfo.InvariantCulture); i++; break;
             }
         }
+        if (args.Contains("--w")) _pw = int.Parse(args[Array.IndexOf(args, "--w") + 1], CultureInfo.InvariantCulture);
+        if (args.Contains("--h")) _ph = int.Parse(args[Array.IndexOf(args, "--h") + 1], CultureInfo.InvariantCulture);
         _log = new StreamWriter(logPath, append: false, new UTF8Encoding(false)) { AutoFlush = true };
         Log($"under-icons spike starting, pid {Environment.ProcessId}, {_seconds}s, log {Path.GetFullPath(logPath)}");
         Log($"OS {Environment.OSVersion.Version}, process DPI awareness via manifest (PerMonitorV2)");
@@ -83,6 +106,7 @@ internal static class Program
 
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; N.PostMessageW(_sentinel, N.WM_CLOSE, IntPtr.Zero, IntPtr.Zero); };
 
+        if (_mode.StartsWith("dcomp")) _baseline = Capture(_px, _py, _pw, _ph);
         if (!Build())
         {
             if (_exit == 2) { Log("RESULT: not applicable on this layout; exiting"); Cleanup(); return 2; }
@@ -97,7 +121,20 @@ internal static class Program
 
         N.SetTimer(_sentinel, T_QUIT, (uint)(_seconds * 1000), IntPtr.Zero);
         N.SetTimer(_sentinel, T_HEART, 10000, IntPtr.Zero);
-        if (_shotPath != null) N.SetTimer(_sentinel, T_SHOT, 4000, IntPtr.Zero);
+        if (_shape || _hook) N.SetTimer(_sentinel, T_ICONS, 2000, IntPtr.Zero);
+        if (_hook)
+        {
+            _icons = ClickShape.IconRects(out string note);
+            Log($"icons: {note}");
+            RightHook.Piece = () => new Rectangle(_px, _py, _pw, _ph);
+            RightHook.Icons = () => _icons;
+            RightHook.AcceptInjected = _selftest;
+            RightHook.Log = Log;
+            RightHook.OnMenu = (x, y) => N.PostMessageW(_sentinel, WM_APP_MENU, (IntPtr)x, (IntPtr)y);
+            Log(RightHook.Install() ? "hook: WH_MOUSE_LL installed (right button only)" : $"hook: install FAILED, error {N.GetLastError()}");
+            if (_selftest) N.SetTimer(_sentinel, T_SELF, (uint)_selfAt, IntPtr.Zero);
+        }
+        if (_shotPath != null) N.SetTimer(_sentinel, T_SHOT, (uint)_shotAt, IntPtr.Zero);
         if (_simulateRestart) N.SetTimer(_sentinel, T_SIM, 8000, IntPtr.Zero);
 
         while (N.GetMessageW(out var msg, IntPtr.Zero, 0, 0) > 0)
@@ -163,16 +200,25 @@ internal static class Program
         var pc = new N.POINT { X = _px, Y = _py };
         N.ScreenToClient(ww, ref pc);
         _pieceLayered = _mode == "ulw";
-        _piece = N.CreateWindowExW(_mode == "plain" ? 0 : N.WS_EX_LAYERED, "UnderIconsPiece", "UNDER-ICONS SPIKE", N.WS_CHILD | N.WS_VISIBLE,
+        // dcomp-plain: no layered style; dcomp-attr: layered at alpha 255 (the style that showed in 5.0b); dcomp-nrb: WS_EX_NOREDIRECTIONBITMAP.
+        uint exStyle = _mode switch { "plain" or "dcomp-plain" => 0u, "dcomp-nrb" => 0x00200000u, _ => N.WS_EX_LAYERED };
+        _piece = N.CreateWindowExW(exStyle, "UnderIconsPiece", "UNDER-ICONS SPIKE", N.WS_CHILD | N.WS_VISIBLE,
             pc.X, pc.Y, _pw, _ph, ww, IntPtr.Zero, inst, IntPtr.Zero);
         if (_piece == IntPtr.Zero)
         {
             Log($"piece: layered child create failed, Win32 error {N.GetLastError()}; falling back to a plain child painted in WM_PAINT");
             _pieceLayered = false;
         }
-        else if (_mode == "attr")
+        else if (_mode is "attr" or "dcomp-attr")
         {
             if (!N.SetLayeredWindowAttributes(_piece, 0, 255, N.LWA_ALPHA)) Log($"piece: SetLayeredWindowAttributes failed, error {N.GetLastError()}");
+        }
+        if (_piece != IntPtr.Zero && _mode.StartsWith("dcomp"))
+        {
+            _dcomp?.Dispose();
+            _dcomp = new DCompPiece();
+            string? err = _dcomp.Attach(_piece, _pw, _ph, RampPixels(_pw, _ph));
+            Log(err == null ? "piece: DirectComposition visual committed (premultiplied alpha ramp)" : $"piece: DirectComposition FAILED at {err}");
         }
         else if (_mode == "ulw" && !PushLayered())
         {
@@ -190,6 +236,8 @@ internal static class Program
         Log($"piece: created {N.Hex(_piece)} {(_pieceLayered ? "layered (per-pixel alpha)" : "WM_PAINT")} (mode {_mode}), rect {N.RectStr(_piece)}, parent {N.Desc(N.GetParent(_piece))}, visible {N.IsWindowVisible(_piece)}");
         N.SetWindowPos(_piece, IntPtr.Zero, 0, 0, 0, 0, N.SWP_NOMOVE | N.SWP_NOSIZE | N.SWP_NOZORDER | N.SWP_NOACTIVATE | N.SWP_SHOWWINDOW);
 
+        if (_hook) return true;
+
         // 2. The click layer: V3 shape, top-level, owned by Progman, bottom of the normal band, alpha 1.
         _click = N.CreateWindowExW(N.WS_EX_TOOLWINDOW | N.WS_EX_NOACTIVATE | N.WS_EX_LAYERED, "UnderIconsClick", "", N.WS_POPUP,
             _px, _py, _pw, _ph, shell, IntPtr.Zero, inst, IntPtr.Zero);
@@ -197,6 +245,7 @@ internal static class Program
         if (!N.SetLayeredWindowAttributes(_click, 0, 1, N.LWA_ALPHA)) Log($"click layer: SetLayeredWindowAttributes failed, error {N.GetLastError()}");
         N.ShowWindow(_click, N.SW_SHOWNOACTIVATE);
         N.SetWindowPos(_click, N.HWND_BOTTOM, 0, 0, 0, 0, N.SWP_NOMOVE | N.SWP_NOSIZE | N.SWP_NOACTIVATE);
+        if (_shape) { _iconKey = ""; Reshape("build"); }
         Log($"click layer: created {N.Hex(_click)} rect {N.RectStr(_click)}, owner {N.Desc(N.GetWindow(_click, N.GW_OWNER))}, exstyle 0x{N.GetWindowLong(_click, N.GWL_EXSTYLE):X}, visible {N.IsWindowVisible(_click)}");
         return true;
     }
@@ -271,11 +320,14 @@ internal static class Program
         if (_piece != IntPtr.Zero && N.IsWindow(_piece)) N.DestroyWindow(_piece);
         if (_click != IntPtr.Zero && N.IsWindow(_click)) N.DestroyWindow(_click);
         _piece = _click = IntPtr.Zero;
+        _dcomp?.Dispose();
+        _dcomp = null;
     }
 
     private static void Cleanup()
     {
         DestroyWindows();
+        if (_hook) { RightHook.Uninstall(); Log($"hook: removed; {RightHook.Calls} right-button events, slowest {RightHook.MaxTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency:0.00} ms"); }
         if (_sentinel != IntPtr.Zero && N.IsWindow(_sentinel)) N.DestroyWindow(_sentinel);
         if (_dib != IntPtr.Zero) N.DeleteObject(_dib);
         if (_memDc != IntPtr.Zero) N.DeleteDC(_memDc);
@@ -287,6 +339,17 @@ internal static class Program
 
     private static IntPtr SentinelProc(IntPtr h, uint msg, IntPtr w, IntPtr l)
     {
+        if (msg == WM_APP_MENU)
+        {
+            int x = (int)w, y = (int)l;
+            Log($"Desk menu requested at ({x},{y}); opening");
+            if (_selftest) N.SetTimer(_sentinel, T_ESC, 1200, IntPtr.Zero);
+            string? pick = ClickShape.ShowMenu(_sentinel, x, y);
+            Log($"Desk menu: {pick ?? "dismissed"}; foreground now {N.Desc(N.GetForegroundWindow())}");
+            if (pick?.StartsWith("Done") == true) N.PostMessageW(_sentinel, N.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+            if (_selftest) N.SetTimer(_sentinel, T_SELF2, 800, IntPtr.Zero);
+            return IntPtr.Zero;
+        }
         if (_taskbarCreated != 0 && msg == _taskbarCreated)
         {
             _rebuilds++;
@@ -323,6 +386,27 @@ internal static class Program
             case T_HEART:
                 Heartbeat();
                 break;
+            case T_ICONS:
+                if (_click != IntPtr.Zero) Reshape("timer");
+                if (_hook) _icons = ClickShape.IconRects(out _);
+                break;
+            case T_SELF:
+                N.KillTimer(_sentinel, T_SELF);
+                SelfTestStart();
+                break;
+            case T_ESC:
+                N.KillTimer(_sentinel, T_ESC);
+                Task.Run(Inject.Escape);
+                break;
+            case T_SELF2:
+                N.KillTimer(_sentinel, T_SELF2);
+                if (_iconPt.X >= 0) { Log($"selftest: injected right-click ON AN ICON at ({_iconPt.X},{_iconPt.Y}); Explorer's own menu should open"); var ip = _iconPt; Task.Run(() => Inject.RightClick(ip.X, ip.Y)); N.SetTimer(_sentinel, T_ESC2, 1200, IntPtr.Zero); }
+                break;
+            case T_ESC2:
+                N.KillTimer(_sentinel, T_ESC2);
+                Log($"selftest: foreground before Escape is {N.Desc(N.GetForegroundWindow())}");
+                Task.Run(Inject.Escape);
+                break;
             case T_SETTLE:
                 N.KillTimer(_sentinel, T_SETTLE);
                 if (_piece != IntPtr.Zero) LogStructure("after 2s settle");
@@ -357,6 +441,8 @@ internal static class Program
         {
             N.KillTimer(_sentinel, T_REBUILD);
             Log($"rebuild ok after {_rebuildAttempts} attempt(s)");
+            if (_shotPath != null) N.SetTimer(_sentinel, T_SHOT, 3000, IntPtr.Zero);   // re-probe the pixels under the new Explorer
+            if (_selftest) N.SetTimer(_sentinel, T_SELF, 5000, IntPtr.Zero);       // and the hook
             LogStructure("after rebuild");
         }
         else if (_exit == 2 || _rebuildAttempts >= 40)
@@ -379,7 +465,7 @@ internal static class Program
             case N.WM_PAINT:
                 {
                     var dc = N.BeginPaint(h, out var ps);
-                    if (!_pieceLayered && _memDc != IntPtr.Zero) N.BitBlt(dc, 0, 0, _pw, _ph, _memDc, 0, 0, 0x00CC0020);
+                    if (!_pieceLayered && !_mode.StartsWith("dcomp") && _memDc != IntPtr.Zero) N.BitBlt(dc, 0, 0, _pw, _ph, _memDc, 0, 0, 0x00CC0020);
                     N.EndPaint(h, ref ps);
                     return IntPtr.Zero;
                 }
@@ -413,6 +499,12 @@ internal static class Program
                     };
                     if (msg is N.WM_LBUTTONDOWN or N.WM_RBUTTONDOWN or N.WM_MBUTTONDOWN or N.WM_LBUTTONDBLCLK) _clicksOnClickLayer++;
                     N.GetCursorPos(out var cur);
+                    if (_shape && msg == N.WM_RBUTTONUP)
+                    {
+                        Log($"CLICK RBUTTONUP on the shaped click layer at screen ({cur.X},{cur.Y}); opening the stand-in Desk menu");
+                        Log($"Desk menu: {ClickShape.ShowMenu(_sentinel, cur.X, cur.Y) ?? "dismissed"}");
+                        return IntPtr.Zero;
+                    }
                     if (msg != N.WM_MOUSEWHEEL)
                     {
                         long lp = l.ToInt64();
@@ -489,6 +581,8 @@ internal static class Program
             Log($"z-order around click layer: {span}");
         }
 
+        if (_shape) ShapeSweep();
+
         // Hit tests.
         int cxs = _px + _pw / 2, cys = _py + _ph / 2;
         HitTest("piece centre", cxs, cys, shell, def);
@@ -543,12 +637,110 @@ internal static class Program
                 }
             var centre = new N.POINT { X = _px + _pw / 2, Y = _py + _ph / 2 };
             var top = N.WindowFromPoint(centre);
+            if (_mode.StartsWith("dcomp")) RampProbe(bmp, vx, vy);
             Log($"screenshot {Path.GetFullPath(path)} ({vw}x{vh} at {vx},{vy}); magenta samples in the piece rect {magenta}/{total}; topmost window at piece centre: {N.Desc(N.GetAncestor(top, N.GA_ROOT))}");
             Log(magenta == 0 && total > 0
                 ? "screenshot: NO magenta pixels in the piece rect (covered by an app window, or the WorkerW child draws nothing visible)"
                 : "screenshot: magenta pixels ARE present in the piece rect");
         }
         catch (Exception e) { Log($"screenshot failed: {e.GetType().Name}: {e.Message}"); }
+    }
+
+    /// <summary>Magenta whose alpha climbs from 0 at the left edge to 1 at the right, premultiplied BGRA, top-down.</summary>
+    private static byte[] RampPixels(int w, int h)
+    {
+        var buf = new byte[w * h * 4];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                byte a = (byte)Math.Round(255.0 * x / (w - 1));
+                int i = (y * w + x) * 4;
+                buf[i] = a; buf[i + 1] = 0; buf[i + 2] = a; buf[i + 3] = a;   // B G R A, premultiplied magenta
+            }
+        return buf;
+    }
+
+    private static Bitmap Capture(int x, int y, int w, int h)
+    {
+        var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
+        using var g = Graphics.FromImage(bmp);
+        g.CopyFromScreen(x, y, 0, 0, new Size(w, h));
+        return bmp;
+    }
+
+    /// <summary>Per sample: expected = baseline * (1 - a) + magenta * a. "blend" means within 20 per channel of that
+    /// and, for 0.2 &lt; a &lt; 0.8, clearly unlike both the baseline and opaque magenta: only real per-pixel alpha
+    /// gives that. Rows at a quarter, half and three quarters of the height, every 8 px.</summary>
+    private static void RampProbe(Bitmap shot, int vx, int vy)
+    {
+        if (_baseline == null) { Log("ramp probe: no baseline"); return; }
+        int match = 0, mid = 0, midBlend = 0, unchanged = 0, opaque = 0, total = 0;
+        var sb = new StringBuilder();
+        foreach (int ry in new[] { _ph / 4, _ph / 2, _ph * 3 / 4 })
+            for (int rx = 0; rx < _pw; rx += 8)
+            {
+                double a = (double)rx / (_pw - 1);
+                var b = _baseline.GetPixel(rx, ry);
+                var s = shot.GetPixel(_px + rx - vx, _py + ry - vy);
+                double er = b.R * (1 - a) + 255 * a, eg = b.G * (1 - a), eb = b.B * (1 - a) + 255 * a;
+                double d = Math.Max(Math.Abs(s.R - er), Math.Max(Math.Abs(s.G - eg), Math.Abs(s.B - eb)));
+                int db = Math.Max(Math.Abs(s.R - b.R), Math.Max(Math.Abs(s.G - b.G), Math.Abs(s.B - b.B)));
+                int dm = Math.Max(Math.Abs(s.R - 255), Math.Max(s.G, Math.Abs(s.B - 255)));
+                total++;
+                if (d <= 20) match++;
+                if (db <= 6) unchanged++;
+                if (dm <= 12) opaque++;
+                if (a > 0.2 && a < 0.8) { mid++; if (d <= 20 && db > 20 && dm > 20) midBlend++; }
+                if (ry == _ph / 2 && rx % 64 == 0) sb.Append($" a={a:0.00} base=({b.R},{b.G},{b.B}) screen=({s.R},{s.G},{s.B}) want=({er:0},{eg:0},{eb:0});");
+            }
+        Log($"ramp probe: {match}/{total} samples match the alpha blend; mid-ramp true blends {midBlend}/{mid}; unchanged from baseline {unchanged}/{total}; opaque magenta {opaque}/{total}");
+        Log($"ramp probe, middle row:{sb}");
+        Log(midBlend * 10 >= mid * 8 ? "VERDICT: per-pixel alpha SHOWS below the icons" : unchanged * 10 >= total * 8 ? "VERDICT: the piece draws NOTHING below the icons" : "VERDICT: mixed, read the samples");
+    }
+
+    private static void SelfTestStart()
+    {
+        var piece = new Rectangle(_px, _py, _pw, _ph);
+        _openPt = (-1, -1); _iconPt = (-1, -1);
+        var ic = _icons.FirstOrDefault(r => piece.Contains(r.X + r.Width / 2, r.Y + r.Height / 2));
+        if (!ic.IsEmpty) _iconPt = (ic.X + ic.Width / 2, ic.Y + ic.Height / 2);
+        for (int y = _py + 10; y < _py + _ph && _openPt.X < 0; y += 15)
+            for (int x = _px + 10; x < _px + _pw && _openPt.X < 0; x += 15)
+                if (RightHook.Decide(x, y) == "") _openPt = (x, y);
+        Log($"selftest: Decide(open point {_openPt}) '{(_openPt.X < 0 ? "none found" : RightHook.Decide(_openPt.X, _openPt.Y))}', Decide(icon {_iconPt}) '{(_iconPt.X < 0 ? "no icon" : RightHook.Decide(_iconPt.X, _iconPt.Y))}', Decide(outside) '{RightHook.Decide(_px + _pw + 50, _py + 10)}'");
+        if (_openPt.X >= 0) { Log($"selftest: injected right-click on an exposed point {_openPt}"); var op = _openPt; Task.Run(() => Inject.RightClick(op.X, op.Y)); }
+    }
+
+    private static void Reshape(string why)
+    {
+        var icons = ClickShape.IconRects(out string note);
+        string key = string.Join(";", icons.Select(r => $"{r.X},{r.Y},{r.Width},{r.Height}"));
+        if (key == _iconKey) return;
+        _iconKey = key;
+        _cut = ClickShape.Apply(_click, new Rectangle(_px, _py, _pw, _ph), icons);
+        Log($"click layer shaped ({why}): {note}; {_cut.Count} cut out of the piece");
+    }
+
+    /// <summary>Every 20 px over the piece: which top-level window takes a click there. An icon point must never
+    /// reach the click layer; an exposed point should, unless another app's window (Fences, say) is in front.</summary>
+    private static void ShapeSweep()
+    {
+        int iconPts = 0, iconOnLayer = 0, openPts = 0, openOnLayer = 0;
+        var others = new Dictionary<string, int>();
+        for (int y = _py + 5; y < _py + _ph; y += 20)
+            for (int x = _px + 5; x < _px + _pw; x += 20)
+            {
+                var hit = N.WindowFromPoint(new N.POINT { X = x, Y = y });
+                var root = N.GetAncestor(hit, N.GA_ROOT);
+                bool onLayer = root == _click;
+                bool onIcon = _cut.Any(r => Rectangle.Inflate(r, 2, 2).Contains(x, y));
+                if (onIcon) { iconPts++; if (onLayer) iconOnLayer++; continue; }
+                openPts++;
+                if (onLayer) { openOnLayer++; continue; }
+                string k = $"{N.Class(hit)} in {N.Class(root)}";
+                others[k] = others.GetValueOrDefault(k) + 1;
+            }
+        Log($"shape sweep: icon points {iconPts}, of them on the click layer {iconOnLayer} (want 0); exposed points {openPts}, on the click layer {openOnLayer}; elsewhere: {string.Join(", ", others.Select(kv => $"{kv.Key} x{kv.Value}"))}");
     }
 
     private static void Log(string line)
