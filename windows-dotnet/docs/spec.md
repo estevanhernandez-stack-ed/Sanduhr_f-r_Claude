@@ -402,6 +402,8 @@ Findings that bind the build:
 | 7 | Switch off: V3 above the icons; switch on: back under |
 | 8 | The Launcher and drawers still work above the icons |
 
+**Live checks, run 2026-11-03 on Neb with Este: all pass**, after four fixes they found. (2) A menu opened from a taken press closed at once, because Sanduhr was not the foreground app: it now opens from a 1x1 transparent host that takes the foreground first, and a quick second right-click on ink replaces it (rule 2, amended). (4) The 2 s fast window after any change kept capture at about 12 checks a second, each about 10 ms (the drop shadows render in software): it now rests at 1 Hz and runs fast only while frames keep changing, for +1.05% of a core in Release (7.6% off, 8.65% on). (6) At 125% the frame drew 1.25x too big: the root's box is now stretched onto the window's physical pixels. (7) Turning the switch off and on crashed: the window classes' callbacks belonged to the first ink layer and were collected; they now live for the process. Drawers above the icons were not exercised (none on Neb's Desk).
+
 ### 5.1 The Desk on V3 (deepened against the Mac and Rainmeter)
 
 What ships in S5, with the Mac's names: the layout string and its rules (`DeskArrangement.swift`, `DeskAnchorGeometry`), the clock and date, the Claude line and the meters (`DeskMeters.swift`), EsteFont, taskbar clearance (the Windows answer to `DockClearance.swift`), the layout map in Settings (`DeskLayoutMap.swift`). Not in S5: the message, meetings, now playing, watchers (S6), arrange by dragging, piece clicks, sign-in reminders as a switch (S7), and the notch (cut). The Mac draws its Desk on the main screen only; Windows draws it on every monitor, each laid out against its own work area.

@@ -45,7 +45,14 @@ internal sealed class InkLayer : IDisposable
     private IntPtr _sentinel;
     private uint _taskbarCreated;
     private IntPtr _hook;
-    private WndProc? _childProc, _sentinelProc;
+    // The window classes are registered once per process, and Windows keeps calling the procedure it was given: these delegates live
+    // as long as the process, and each call goes to the ink layer that owns the calling thread. (A per-instance delegate was collected
+    // when the switch replaced the layer, and the next window message failed fast; the 2026-11-03 live check.)
+    private static readonly WndProc ChildProcShared = (h, m, w, l) => _onThread?.ChildProc(h, m, w, l) ?? DefWindowProcW(h, m, w, l);
+    private static readonly WndProc SentinelProcShared = (h, m, w, l) => _onThread?.SentinelProc(h, m, w, l) ?? DefWindowProcW(h, m, w, l);
+    private static readonly object ClassLock = new();
+    private static bool _classesRegistered;
+    [ThreadStatic] private static InkLayer? _onThread;
     private HookProc? _hookProc;
     private ID3D11Device? _d3d;
     private ID3D11DeviceContext? _ctx;
@@ -158,6 +165,7 @@ internal sealed class InkLayer : IDisposable
         SetThreadDpiAwarenessContext(PerMonitorV2);
         try
         {
+            _onThread = this;
             RegisterClasses();
             _taskbarCreated = RegisterWindowMessageW("TaskbarCreated");
             _sentinel = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, "SanduhrInkSentinel", null, WS_POPUP, 0, 0, 0, 0,
@@ -208,17 +216,20 @@ internal sealed class InkLayer : IDisposable
     private void RegisterClasses()
     {
         var inst = GetModuleHandleW(null);
-        _childProc = ChildProc;
-        _sentinelProc = SentinelProc;
+        lock (ClassLock)
+        {
+            if (_classesRegistered) return;
+            _classesRegistered = true;
+        }
         var child = new WNDCLASSEX
         {
             cbSize = (uint)Marshal.SizeOf<WNDCLASSEX>(),
-            lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_childProc),
+            lpfnWndProc = Marshal.GetFunctionPointerForDelegate(ChildProcShared),
             hInstance = inst,
             lpszClassName = "SanduhrInk",
         };
         RegisterClassExW(ref child);
-        var sentinel = child with { lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_sentinelProc), lpszClassName = "SanduhrInkSentinel" };
+        var sentinel = child with { lpfnWndProc = Marshal.GetFunctionPointerForDelegate(SentinelProcShared), lpszClassName = "SanduhrInkSentinel" };
         RegisterClassExW(ref sentinel);
     }
 
