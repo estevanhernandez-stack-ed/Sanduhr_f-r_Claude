@@ -11,6 +11,12 @@ namespace Sanduhr.App.Tests;
 /// </summary>
 public class SingleInstanceTests
 {
+    /// <summary>The hand-off deadline for the tests that time a launch: a launch stuck on a wait runs all of it.</summary>
+    private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(30);
+
+    /// <summary>Quick enough: a third of <see cref="Deadline"/>, so a stuck launch fails and a slow pool answer does not.</summary>
+    private static readonly TimeSpan QuickBound = TimeSpan.FromSeconds(10);
+
     private static string Folder() => Path.Combine(Path.GetTempPath(), "sanduhr-instance-" + Guid.NewGuid().ToString("N")[..10]);
 
     /// <summary>Claims on a thread of its own and holds the claim until <paramref name="release"/> is set.</summary>
@@ -66,7 +72,10 @@ public class SingleInstanceTests
         var first = await claimed;
         first.StopAnswering(); // quitting: waiting for its browser processes
 
-        _ = Task.Delay(300).ContinueWith(_ => release.Set());
+        // The quit finishes on a thread of its own: a Task.Delay continuation waits on the thread pool, which a busy CI
+        // runner starved past the whole 10 s hand-off twice.
+        var quit = new Thread(() => { Thread.Sleep(300); release.Set(); }) { IsBackground = true };
+        quit.Start();
         using var second = SingleInstance.Claim(dir, TimeSpan.FromSeconds(10));
 
         Assert.True(second.IsPrimary);
@@ -199,11 +208,11 @@ public class SingleInstanceTests
             Assert.True((await claimed).IsPrimary, "a primary that cannot set up its mailbox still runs");
 
             var clock = System.Diagnostics.Stopwatch.StartNew();
-            using var second = SingleInstance.Claim(dir, TimeSpan.FromSeconds(10), "desk#pieces");
+            using var second = SingleInstance.Claim(dir, Deadline, "desk#pieces");
 
             Assert.False(second.IsPrimary);
-            Assert.Null(await got.Task.WaitAsync(TimeSpan.FromSeconds(2))); // the plain show, no link
-            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(3), $"the fall-back took {clock.Elapsed}");
+            Assert.Null(await got.Task.WaitAsync(TimeSpan.FromSeconds(5))); // the plain show, no link
+            Assert.True(clock.Elapsed < QuickBound, $"the fall-back took {clock.Elapsed}");
         }
         finally
         {
@@ -227,12 +236,14 @@ public class SingleInstanceTests
 
         using var held = HoldPostMutex(dir);
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        using var second = SingleInstance.Claim(dir, TimeSpan.FromSeconds(10), "desk#pieces");
+        // A launch that waited on the held .Post would wait out the whole 30 s; the answer itself comes from the thread pool,
+        // which a busy CI runner has delayed by seconds, so the bound sits well between the two.
+        using var second = SingleInstance.Claim(dir, Deadline, "desk#pieces");
         var took = clock.Elapsed;
 
         Assert.False(second.IsPrimary);
-        Assert.Null(await got.Task.WaitAsync(TimeSpan.FromSeconds(2))); // asked plainly, the link was not posted
-        Assert.True(took < TimeSpan.FromSeconds(3), $"a busy .Post mutex held the launch for {took}");
+        Assert.Null(await got.Task.WaitAsync(TimeSpan.FromSeconds(5))); // asked plainly, the link was not posted
+        Assert.True(took < QuickBound, $"a busy .Post mutex held the launch for {took}");
         release.Set();
         thread.Join();
     }
