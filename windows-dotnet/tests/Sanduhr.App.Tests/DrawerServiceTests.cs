@@ -6,7 +6,9 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.Tests;
 
-/// <summary>Drawer state across redraws, listings, watchers, hand moves and holds, in a sandbox (drawers plan 2, Task 6).</summary>
+/// <summary>Drawer state across redraws, listings, watchers, hand moves and holds, in a sandbox (drawers plan 2, Task 6).
+/// In the SettingsWindow collection because spoken names read the static StreamerMode mask, which the streamer tests there turn on.</summary>
+[Collection("SettingsWindow")]
 public sealed class DrawerServiceTests
 {
     private static (DrawerService Service, SettingsStore Store) Make(DrawerSandbox box, params string[] drawers)
