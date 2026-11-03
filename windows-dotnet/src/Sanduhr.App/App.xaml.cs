@@ -700,7 +700,8 @@ public partial class App : Application
         _drawers = new Desk.DrawerService(store, paths, Desk.DrawerPlaces.ForThisUser());
         Desk.DrawerService.Current = _drawers;
         _drawers.SettingsRequested += () => _ = ShowSettingsAsync(SettingsPage.Drawers, SettingsIndex.MenuAnchor(SettingsPage.Drawers));
-        _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
+        _desk = new Desk.DeskController(store,
+            () => store.LoadDeskUnderIcons() ? UnderIconsHost(paths) : new Desk.DesktopLayerHost(),
             () => vm.CurrentDeskUsage, _nowPlaying, _messages, _watchers, paths, _launcherApps, looks: _looks, drawers: _drawers)
         {
             ThemeText = ThemeTextHex,
@@ -1445,5 +1446,17 @@ public partial class App : Application
         try { BrowserProcessGuard.Current.WaitForExit(TimeSpan.FromSeconds(2)); }
         catch { /* the job still ends them when the process exits */ }
         base.OnExit(e);
+    }
+
+    /// <summary>The Desk under the desktop icons (spec 5.0d), its route events in the app log: coordinates and reasons, never window text.</summary>
+    private static Desk.UnderIcons.UnderIconsHost UnderIconsHost(Sanduhr.Core.Paths paths)
+    {
+        var host = new Desk.UnderIcons.UnderIconsHost();
+        host.Trace += m =>
+        {
+            try { System.IO.File.AppendAllText(paths.LogFile, $"{DateTime.UtcNow:o} under-icons: {m}{Environment.NewLine}"); }
+            catch (System.IO.IOException) { }
+        };
+        return host;
     }
 }

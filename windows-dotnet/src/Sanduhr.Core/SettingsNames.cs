@@ -254,6 +254,7 @@ public static class SettingsNames
     public const string OledCareSwitch = OledCare.Title;
     /// <summary>Desk Look, Back plate: a soft plate behind each piece.</summary>
     public const string DeskPlateSwitch = DeskPlate.Title;
+    public const string DeskUnderIconsSwitch = DeskUnderIcons.Title;
     /// <summary>The name a Desk piece goes by on the layout map and in Arrange mode; an unknown piece goes by its key.</summary>
     public static string DeskPieceName(string widget) => widget switch
     {
@@ -1028,6 +1029,7 @@ public static class SettingsNames
     public const string SizesSection = "Sizes";
     public const string InkAndColor = "Ink and color";
     public const string BackPlate = "Back plate";
+    public const string DesktopIconsSection = "Desktop icons";
     /// <summary>Desk Look's controls whose labels were literals.</summary>
     public const string ClockSize = "Clock size";
     public const string MessageSize = "Message size";

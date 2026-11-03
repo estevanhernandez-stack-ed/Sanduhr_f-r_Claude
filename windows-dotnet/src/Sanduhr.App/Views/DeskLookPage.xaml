@@ -239,6 +239,26 @@
 
                 <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
+                <!-- Desktop icons: the Desk's widgets under the icons and Fences (spec 5.0d). -->
+                <StackPanel views:SettingsAnchor.Id="desk-under-icons" DataContext="{Binding Desk}">
+                    <TextBlock Text="{x:Static core:SettingsNames.DesktopIconsSection}" FontSize="13" FontWeight="SemiBold"
+                               AutomationProperties.HeadingLevel="Level2"
+                               Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                    <CheckBox Style="{DynamicResource ThemedCheckBox}"
+                              Content="{x:Static core:SettingsNames.DeskUnderIconsSwitch}"
+                              IsChecked="{Binding UnderIcons, Mode=TwoWay}"
+                              AutomationProperties.Name="{x:Static core:SettingsNames.DeskUnderIconsSwitch}"
+                              AutomationProperties.HelpText="{x:Static core:DeskUnderIcons.Caption}" />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                               Text="{x:Static core:DeskUnderIcons.Caption}" />
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                               Text="{Binding UnderIconsNote}" Visibility="{Binding UnderIconsNote, Converter={StaticResource StrVis}}" />
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
                 <views:TrademarkFooter />
             </StackPanel>
         </ScrollViewer>

@@ -166,6 +166,30 @@ internal static class DeskClicks
         }
         DeskElement? Hit(MouseEventArgs e) => HitAt(e.GetPosition(content));
 
+        // Under the icons no mouse event reaches the content: the hook asks for the click areas and acts through this (spec 5.0d).
+        Targets.AddOrUpdate(content, new DeskClickTarget(
+            () =>
+            {
+                var areas = new List<(DeskElementKind, Rect)>(targets.Count);
+                foreach (var (kind, fe) in targets)
+                {
+                    if (kind == DeskElementKind.LauncherButton || !fe.IsVisible || fe.RenderSize.Width <= 0) continue;
+                    var r = fe.TransformToAncestor(content).TransformBounds(new Rect(fe.RenderSize));
+                    var a = DeskHitTest.Area(new DeskElement(kind, null, new DeskRect(r.X, r.Y, r.Width, r.Height)));
+                    areas.Add((kind, new Rect(a.X, a.Y, a.Width, a.Height)));
+                }
+                return areas;
+            },
+            kind =>
+            {
+                switch (kind)
+                {
+                    case DeskElementKind.NowPlaying: actions.PlayPause(); break;
+                    case DeskElementKind.WeatherCredit: actions.OpenWeatherCredit(); break;
+                }
+            },
+            kind => targets.FirstOrDefault(t => t.Kind == kind).Element ?? content));
+
         var launcher = targets.Where(t => t.Kind == DeskElementKind.LauncherButton).Select(t => (LauncherButtonVisual)t.Element).ToList();
         var pointer = new LauncherPointer();
         static int? ButtonAt(DeskElement? hit) =>
@@ -272,7 +296,11 @@ internal static class DeskClicks
     }
 
     /// <summary>The Desk menu: the piece's own item (Message settings… on the message), then the shared ones.</summary>
-    private static void OpenMenu(FrameworkElement target, DeskElementKind kind, IDeskClickActions actions)
+    private static void OpenMenu(FrameworkElement target, DeskElementKind kind, IDeskClickActions actions) => OpenDeskMenu(target, kind, actions);
+
+    /// <summary>Opens the Desk menu at the mouse over <paramref name="target"/>: the piece's own item first when <paramref name="kind"/>
+    /// has one, then the shared items. Returned open, so the under-icons host can follow it.</summary>
+    public static ContextMenu OpenDeskMenu(FrameworkElement target, DeskElementKind? kind, IDeskClickActions actions)
     {
         var menu = new ContextMenu { PlacementTarget = target, Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint };
         AutomationProperties.SetName(menu, "Desk");
@@ -291,5 +319,18 @@ internal static class DeskClicks
         menu.Items.Add(new Separator());
         Add(TurnOffDesk, DeskMenuAction.TurnOffDesk);
         menu.IsOpen = true;
+        return menu;
     }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<FrameworkElement, DeskClickTarget> Targets = new();
+
+    /// <summary>The click target <see cref="Prepare"/> wired for an island's content; null for an island with no clickable piece.</summary>
+    public static DeskClickTarget? TargetOf(FrameworkElement content) => Targets.TryGetValue(content, out var t) ? t : null;
+}
+
+/// <summary>An island's clicks as the under-icons hook reaches them (spec 5.0d): the clickable pieces' click areas in the content's DIPs
+/// (the Launcher left out: it stays above the icons), a left click on a piece, and the element a piece's menu hangs from.</summary>
+internal sealed record DeskClickTarget(Func<IReadOnlyList<(DeskElementKind Kind, Rect Area)>> Areas, Action<DeskElementKind> Click,
+    Func<DeskElementKind, FrameworkElement> ElementOf)
+{
 }

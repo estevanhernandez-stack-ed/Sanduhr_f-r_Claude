@@ -456,6 +456,23 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         }
     }
 
+    /// <summary>"Keep the Desk under desktop icons" (Desk Look, spec 5.0d): saved at once, and the Desk moves to the other layer.</summary>
+    public bool UnderIcons
+    {
+        get => _store.LoadDeskUnderIcons();
+        set
+        {
+            if (value == UnderIcons) return;
+            _store.SaveDeskUnderIcons(value);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(UnderIconsNote));
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>Under the switch while it is on and the route could not run this session; null otherwise.</summary>
+    public string? UnderIconsNote => UnderIcons && Sanduhr.App.Desk.UnderIcons.UnderIconsHost.Unavailable is not null ? DeskUnderIcons.Unavailable : null;
+
     private void LoadInk()
     {
         _loadingInk = true;

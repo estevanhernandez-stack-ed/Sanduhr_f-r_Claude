@@ -1,1 +1,13 @@
 SHQueryUserNotificationState
+D3D11CreateDevice
+D3D11_SDK_VERSION
+DCompositionCreateDevice
+IDCompositionDevice
+IDCompositionTarget
+IDCompositionVisual
+IDCompositionSurface
+ID3D11Texture2D
+ID3D11DeviceContext
+IDXGIDevice
+DWMWINDOWATTRIBUTE
+DwmSetWindowAttribute
