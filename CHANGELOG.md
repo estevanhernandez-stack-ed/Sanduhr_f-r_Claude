@@ -4,6 +4,30 @@
 
 - **Drawers for your Desktop.** Settings, Drawers, **Drawers on the Desk**, off by default. Drawers are folders that sit on the Desk as panels, each showing a real folder: Sanduhr makes them in `~/Desktop/Drawers` as files first go in (seven by default: Screenshots, Images, Documents, Installers, Archives, Links, Older files), and you can add any folder to look at. **Sort my desktop now** builds a review on the Desk ("N files into M drawers", with Apply, Edit and Dismiss) and nothing moves until you press Apply; a file you drop on a drawer moves at once. The rules run top to bottom, the first match wins, and you can turn them off, reorder them, set Older files' days and add your own by name. Every move is one rename that refuses to replace anything (a clash gets "Report 2.pdf"), so Sanduhr never overwrites, copies across disks or deletes a file; Undo reverses a run from the result bar or from Recent runs, and skips a file that changed since. In a drawer, Return opens, Space shows Quick Look, Command-R reveals, Command-Delete moves to the Trash (the Finder's Put Back works), and the menu renames, folds, hides and sets the look (Solid, Glass, Outline or Bare). Turning Drawers off asks "Put N files back on the Desktop?" and puts every file in the drawers Sanduhr made back; Reset Sanduhr… does the same first. macOS asks once for access to your Desktop folder when you turn Drawers on or press Sort, never at launch; if you say no, Settings, Drawers says so and opens Privacy & Security, Files and Folders. Sanduhr keeps a journal of moves at `~/Library/Application Support/Sanduhr/drawers-journal.json` (owner-only, full paths, the last 50 runs and hand moves for 30 days). No file name is logged, sent or shown to Claude, and the MCP server gains no drawer tool.
 
+## Unreleased (windows)
+
+### Fixes
+
+- **Sanduhr stays light while a long Claude Code session runs.** Every 30 seconds the widget counts the tokens burned since its last fetch, and it did that by reading every session log changed since then from the first line, a long session's log included (one ran to 650 MB). It now reads each log once and after that only what was added, and takes each log's time from the folder listing instead of asking for every file, of thousands, on its own. On that session the app went from about 10% of one CPU core to about 2%.
+
+## v4.6.0 — 2026-11-03
+
+**Platform:** Windows (.NET 10 / WPF). The Desk sits under your desktop icons now. `Sanduhr.Mcp` to 4.6.0. No new outbound destination and no new capability: the manifest changes only its version.
+
+### The Desk under your desktop icons
+
+- **Your icons and fences draw over the Desk.** The clock, meters, message, now playing, weather and the rest draw below the desktop icons and Fences, with the same soft edges as before. On by default, for existing installs too. **Settings, Desk Look, Desktop icons, Keep the Desk under desktop icons** turns it off and the Desk draws above the icons as it did.
+- **Right-click a bare part of a widget for the Desk menu.** A second right-click on a widget opens the menu where you clicked; on an icon or empty desktop you get Explorer's own menu. A left click on now playing still plays or pauses, the weather credit still opens its link, and a drag from a widget starts a selection as on empty desktop.
+- **The Launcher and drawers stay above the icons**, so their hover glow, touch and dragging work as before.
+- **How it works.** Each widget is drawn into a layer Windows keeps below the icons (DirectComposition under Explorer's desktop window), and a mouse hook watches for left and right presses over the Desk. The hook acts only on a press over a drawn part of a widget; every other press, every move and every key goes on untouched, and nothing is recorded. Where Windows can't host the layer, Sanduhr draws the Desk above the icons and Settings says why.
+- **The cost** is about 1% of one CPU core at rest: the Desk is copied into the layer once a second, and every frame while something on it animates.
+
+### Fixes
+
+- A test that signed out the active account waited on a real fetch to claude.ai; it now runs with usage off.
+
+## v2.39.2-mac — 2026-11-02
+
 - **The lock screen line keeps up after an update.** After Sanduhr updated, macOS could stop running the small helper that puts the line on the lock screen while Settings still said On, so the lock screen kept showing an old line (often "Claude usage unavailable"). The helper now leaves a sign each time it runs; when that sign goes quiet, Sanduhr registers the helper again on its own (macOS may ask for your password), Settings, Lock Screen says Stopped with a button to do it by hand, and turning the switch off no longer waits on a helper that isn't running.
 
 ## v2.39.1-mac — 2026-11-01

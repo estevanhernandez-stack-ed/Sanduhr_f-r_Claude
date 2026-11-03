@@ -204,12 +204,14 @@ public class SettingsDeskSplitIndexTests
     }
 
     [Fact]
-    public void Desk_Look_holds_five_sections_and_the_old_links_land_there()
+    public void Desk_Look_holds_six_sections_and_the_old_links_land_there()
     {
-        // Theme match put "Match the widget theme" first.
-        Assert.Equal([SettingsIndex.DeskThemeMatch, SettingsIndex.DeskLook, SettingsIndex.DeskSizes, SettingsIndex.DeskInk, SettingsIndex.DeskPlate],
+        // Theme match put "Match the widget theme" first; the under-icons switch (spec 5.0d) came last.
+        Assert.Equal([SettingsIndex.DeskThemeMatch, SettingsIndex.DeskLook, SettingsIndex.DeskSizes, SettingsIndex.DeskInk, SettingsIndex.DeskPlate,
+            SettingsIndex.DeskUnderIcons],
             SettingsIndex.EntriesOn(SettingsPage.DeskLook).Select(e => e.Anchor));
-        Assert.Equal([SettingsNames.ThemeMatchSection, SettingsNames.FontsSection, SettingsNames.SizesSection, SettingsNames.InkAndColor, SettingsNames.BackPlate],
+        Assert.Equal([SettingsNames.ThemeMatchSection, SettingsNames.FontsSection, SettingsNames.SizesSection, SettingsNames.InkAndColor, SettingsNames.BackPlate,
+            SettingsNames.DesktopIconsSection],
             SettingsIndex.EntriesOn(SettingsPage.DeskLook).Select(e => e.Title));
         foreach (var (from, anchor, to) in new[]
         {

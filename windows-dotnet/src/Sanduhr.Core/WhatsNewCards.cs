@@ -7,7 +7,16 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class WhatsNewCards
 {
-    public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release450(), .. Release400(), .. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
+    public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release460(), .. Release450(), .. Release400(), .. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
+
+    // 4.6.0 (spec 5.0d): the Desk draws under the desktop icons, on by default; Show me lands on Desk Look's Desktop icons switch.
+    private static WhatsNewCard[] Release460() =>
+    [
+        WhatsNewCard.Of("4.6.0", "desk-under-icons", "The Desk now sits under your desktop icons",
+            "Your icons and fences draw over it. Right-click a bare part of a widget for the Desk menu, or turn it off in Settings, Desk Look.",
+            "", // MapLayers
+            WhatsNewPreview.None, SettingsPage.DeskLook),
+    ];
 
     // 4.5.0 (setup spec): Set up Sanduhr, one screen of free choices. Show me opens the setup window itself (App.ShowMe).
     private static WhatsNewCard[] Release450() =>
@@ -190,6 +199,7 @@ public static class WhatsNewCards
     /// </summary>
     private static string? AnchorFor(string id) => id switch
     {
+        "desk-under-icons" => SettingsIndex.DeskUnderIcons,
         "choose-what-shows" => SettingsIndex.GeneralSetup,
         "settings-rearranged" => SettingsIndex.Network,
         "one-theme" => SettingsIndex.DeskThemeMatch,

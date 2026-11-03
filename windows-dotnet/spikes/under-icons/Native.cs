@@ -84,6 +84,7 @@ internal static class N
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
     [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h);
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern int GetMessageW(out MSG m, IntPtr h, uint min, uint max);
     [DllImport("user32.dll")] public static extern bool TranslateMessage(ref MSG m);
     [DllImport("user32.dll")] public static extern IntPtr DispatchMessageW(ref MSG m);

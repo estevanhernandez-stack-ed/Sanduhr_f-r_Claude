@@ -39,6 +39,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     private readonly WeatherService _weather = new();
     private readonly WallpaperInk _wallpaper = new();
     private IDeskHost? _host;
+    /// <summary>The switch's value when <see cref="_host"/> was made.</summary>
+    private bool _hostUnderIcons;
     private DeskFonts? _fonts;
     private DeskSettings _settings = DeskSettings.Default;
     private DeskInkSettings _ink = DeskInkSettings.Default;
@@ -408,9 +410,14 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
             StopHost(); // ends Arrange mode too, as Cancel
             return;
         }
+        // "Keep the Desk under desktop icons" changed: the other host draws from here on (the factory reads the switch).
+        bool underIcons = _store.LoadDeskUnderIcons();
+        if (_host is not null && _hostUnderIcons != underIcons) StopHost();
         if (_host is null)
         {
             _host = _hostFactory();
+            _hostUnderIcons = underIcons;
+            if (_host is UnderIcons.UnderIconsHost under) under.Actions = this;
             _host.ScreensChanged += OnScreensChanged;
             _host.CoverageChanged += OnCoverageChanged;
             if (_oled.Dimmed) _host.SetDim(OledIdle.DeskDimmedOpacity, TimeSpan.Zero);

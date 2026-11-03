@@ -55,6 +55,7 @@ internal sealed class DesktopLayerHost : IDeskHost
     /// <summary>What was asked of Windows for each Glass drawer window (a window absent here has no blur asked): the tint, and whether the
     /// blur and the round corners took. Kept even when refused, so a refusal is not retried on every redraw.</summary>
     private readonly Dictionary<HwndSource, (int Tint, bool Blurred, bool Rounded)> _blur = [];
+    private readonly HashSet<HwndSource> _cloaked = [];
     private readonly HwndSource _sentinel;
     private readonly uint _taskbarCreated;
     private readonly DispatcherTimer _coalesce;
@@ -113,6 +114,9 @@ internal sealed class DesktopLayerHost : IDeskHost
 
     /// <summary>The Desk windows' handles, in island order (the runner queries them).</summary>
     public IReadOnlyList<IntPtr> Handles => [.. _windows.Select(w => w.Handle)];
+
+    /// <summary>The island windows in island order (the under-icons host captures the cloaked ones).</summary>
+    internal IReadOnlyList<HwndSource> Sources => _windows;
 
     /// <summary>The sentinel's handle (the runner checks its z-order).</summary>
     public IntPtr SentinelHandle => _sentinel.Handle;
@@ -248,8 +252,10 @@ internal sealed class DesktopLayerHost : IDeskHost
         var (left, top) = Origin(island, island.Motion?.Anchor ?? island.Anchor, cw, ch, pad);
         double w = cw + 2 * pad, h = ch + 2 * pad;
         if (island.Motion is { } motion) Follow(src, screen, island, motion, cw, ch);
-        bool through = ClickThrough && !island.TakesClicks;
+        // An island under the icons draws nothing here and takes no mouse: the ink below the icons shows it (spec 5.0d).
+        bool through = (ClickThrough && !island.TakesClicks) || island.UnderIcons;
         SetClickThrough(src.Handle, through);
+        SyncCloak(src, island.UnderIcons);
         // The minute's in-place tick hands the same content back (spec 6.10): keep its frame and only
         // re-fit it, so nothing else in the island is rebuilt.
         if (src.RootVisual is Border same && ReferenceEquals(same.Child, content))
@@ -282,6 +288,15 @@ internal sealed class DesktopLayerHost : IDeskHost
         src.RootVisual = root;
         Fit(src, screen, left, top, w, h, first);
         SyncBackdrop(src, island);
+    }
+
+    /// <summary>Cloaks or uncloaks an island's window (DWM keeps rendering a cloaked window, so its content can still be captured).</summary>
+    private void SyncCloak(HwndSource src, bool cloak)
+    {
+        if (src.IsDisposed || (cloak ? !_cloaked.Add(src) : !_cloaked.Remove(src))) return;
+        int on = cloak ? 1 : 0;
+        Windows.Win32.PInvoke.DwmSetWindowAttribute(new Windows.Win32.Foundation.HWND(src.Handle),
+            Windows.Win32.Graphics.Dwm.DWMWINDOWATTRIBUTE.DWMWA_CLOAK, BitConverter.GetBytes(on));
     }
 
     /// <summary>A Glass drawer's window gets the wallpaper blur and DWM's round corners; a window whose drawer is no longer Glass has them
@@ -459,6 +474,7 @@ internal sealed class DesktopLayerHost : IDeskHost
             _drawers.Clear();
             _homes.Clear();
             _blur.Clear();
+            _cloaked.Clear();
         }
         finally { _closing = false; }
     }

@@ -12,7 +12,8 @@ public class WhatsNewCardsTests
     public void Table_HasEveryReleaseNewestFirst()
     {
         Assert.Equal(
-            ["choose-what-shows", "settings-rearranged", "one-theme", "streamer-mode",
+            ["desk-under-icons",
+             "choose-what-shows", "settings-rearranged", "one-theme", "streamer-mode",
              "ci-runners",
              "widgets", "companion", "claude-widgets", "restart-to-update", "desk-fold", "weather-nickname", "livelier-bars", "meter-styles",
              "desk-design", "launcher", "per-monitor", "song-looks", "oled-care", "saved-designs",
@@ -20,6 +21,17 @@ public class WhatsNewCardsTests
              "desk", "settings-redesigned", "claude-code-page",
              "shortcut-keys", "tray-shows", "limits-come-and-go", "every-folder", "steady-sparklines", "whats-new"],
             Table.Select(c => c.Id));
+    }
+
+    [Fact]
+    public void Release460_ShowsTheUnderIconsCard()
+    {
+        var cards = WhatsNew.Cards("4.5.0", "4.6.0");
+        var card = Assert.Single(cards);
+        Assert.Equal("desk-under-icons", card.Id);
+        Assert.Equal("The Desk now sits under your desktop icons", card.Title);
+        Assert.Equal(SettingsPage.DeskLook, card.Destination);
+        Assert.Equal(SettingsIndex.DeskUnderIcons, card.Anchor);
     }
 
     [Fact]
