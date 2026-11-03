@@ -336,7 +336,7 @@ The revisit 5.0b named. Este's ask (2026-10-30): Desk widgets bottommost, under 
 | Right-click on an exposed widget area | **PASS, with two fixes** | A `WH_MOUSE_LL` hook that acts on the right button only. A press inside the widget, where `WindowFromPoint`'s root is the shell window and no icon is under it, is swallowed (down and up) and the menu opens from a posted message. Este's live run: an exposed point opened the Desk menu, a pick from it was received, a press on an icon passed to Explorer, 12 right-button events, slowest 2.78 ms in the hook. Fixes for the build: while a Desk menu is open, pass right presses through (they close it) and never open a menu inside the menu's modal loop; the live run nested three menus that way. |
 | Left clicks, rubber band, drops, Fences | **PASS, by construction** | The hook returns every other event untouched. Este's live check: fences over the widget still drag and scroll. |
 | Explorer restart | **PASS** | A real restart (`taskkill /f /im explorer.exe`, then `explorer.exe`) at 22:44:26. `TaskbarCreated` arrived about 3 s later, with the shell now a new `Progman`. The new `Progman` had no `WorkerW` until the fifth retry sent `0x052C`, then the piece rebuilt under it (6 attempts, about 3 s). After the rebuild: 225 of 225 ramp samples, 135 of 135 mid-ramp blends. The hook survived untouched: an injected press on an exposed point was taken and opened the menu, and a press on an icon passed. The probe before the restart read "mixed" only because Explorer's icon menu from the self-test was still on screen over the piece. |
-| Show desktop | **Not run yet** | The ink is in `Progman`'s own tree, so raising `Progman` should carry it; to confirm with Win+D. |
+| Show desktop | **PASS** | Win+D at 22:54:41, with `Progman` foreground (raised): the ramp probe read 219 of 225, 135 of 135 mid-ramp blends, so the ink in `Progman`'s own tree rises with it. In the same state the hook took a press on an exposed point (Desk menu opened) and passed one on an icon. A second Win+D restored the windows. |
 | DPI change | **Not tested** | Per-monitor sizing is the shipped Desk's; only the DComp surface resizes. |
 
 Findings that bind the build:
@@ -346,7 +346,7 @@ Findings that bind the build:
 - **A `WS_EX_LAYERED` child with neither `SetLayeredWindowAttributes` nor `UpdateLayeredWindow` never draws**: the first DComp run read "draws nothing" for that reason alone.
 - **A self-test that injects clicks must inject from another thread**: the hook runs on the thread that installed it, so `SendInput` from that thread times the hook out.
 
-**Outcome:** the 5.0b blocker is gone. Under-icons can paint the Desk's soft, per-pixel ink through DirectComposition and keep exposed widget areas right-clickable without touching any other desktop behavior. Building it means a DComp paint path for widgets (WPF renders to a bitmap that becomes the surface), the hook with the two fixes, and the restart and Show-desktop checks above.
+**Outcome:** the 5.0b blocker is gone. Under-icons can paint the Desk's soft, per-pixel ink through DirectComposition and keep exposed widget areas right-clickable without touching any other desktop behavior. Building it means a DComp paint path for widgets (WPF renders to a bitmap that becomes the surface) and the hook with the two fixes; a DPI change is the one check left, for the build's own live pass.
 
 ### 5.1 The Desk on V3 (deepened against the Mac and Rainmeter)
 

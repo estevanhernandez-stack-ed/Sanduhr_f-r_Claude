@@ -25,6 +25,7 @@ internal static class Program
     private static bool _shape;
     /// <summary>--hook (part 2b): no click layer; RightHook takes right presses on exposed parts of the piece. --selftest injects clicks.</summary>
     private static bool _hook, _selftest;
+    private static int _shotAt = 7000, _selfAt = 2500;   // --shot-at / --self-at in ms
     private static List<Rectangle> _icons = new();
     private const uint WM_APP_MENU = 0x8001;
     private const uint T_SELF = 8, T_ESC = 9, T_SELF2 = 10, T_ESC2 = 11;
@@ -75,6 +76,8 @@ internal static class Program
                 case "--shape": _shape = true; break;
                 case "--hook": _hook = true; break;
                 case "--selftest": _selftest = true; break;
+                case "--shot-at" when next != null: _shotAt = int.Parse(next, CultureInfo.InvariantCulture); i++; break;
+                case "--self-at" when next != null: _selfAt = int.Parse(next, CultureInfo.InvariantCulture); i++; break;
             }
         }
         if (args.Contains("--w")) _pw = int.Parse(args[Array.IndexOf(args, "--w") + 1], CultureInfo.InvariantCulture);
@@ -129,9 +132,9 @@ internal static class Program
             RightHook.Log = Log;
             RightHook.OnMenu = (x, y) => N.PostMessageW(_sentinel, WM_APP_MENU, (IntPtr)x, (IntPtr)y);
             Log(RightHook.Install() ? "hook: WH_MOUSE_LL installed (right button only)" : $"hook: install FAILED, error {N.GetLastError()}");
-            if (_selftest) N.SetTimer(_sentinel, T_SELF, 2500, IntPtr.Zero);
+            if (_selftest) N.SetTimer(_sentinel, T_SELF, (uint)_selfAt, IntPtr.Zero);
         }
-        if (_shotPath != null) N.SetTimer(_sentinel, T_SHOT, 7000, IntPtr.Zero);
+        if (_shotPath != null) N.SetTimer(_sentinel, T_SHOT, (uint)_shotAt, IntPtr.Zero);
         if (_simulateRestart) N.SetTimer(_sentinel, T_SIM, 8000, IntPtr.Zero);
 
         while (N.GetMessageW(out var msg, IntPtr.Zero, 0, 0) > 0)
