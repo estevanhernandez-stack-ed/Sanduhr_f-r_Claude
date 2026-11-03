@@ -1,5 +1,21 @@
 # Changelog
 
+## v4.6.0 — 2026-11-03
+
+**Platform:** Windows (.NET 10 / WPF). The Desk sits under your desktop icons now. `Sanduhr.Mcp` to 4.6.0. No new outbound destination and no new capability: the manifest changes only its version.
+
+### The Desk under your desktop icons
+
+- **Your icons and fences draw over the Desk.** The clock, meters, message, now playing, weather and the rest draw below the desktop icons and Fences, with the same soft edges as before. On by default, for existing installs too. **Settings, Desk Look, Desktop icons, Keep the Desk under desktop icons** turns it off and the Desk draws above the icons as it did.
+- **Right-click a bare part of a widget for the Desk menu.** A second right-click on a widget opens the menu where you clicked; on an icon or empty desktop you get Explorer's own menu. A left click on now playing still plays or pauses, the weather credit still opens its link, and a drag from a widget starts a selection as on empty desktop.
+- **The Launcher and drawers stay above the icons**, so their hover glow, touch and dragging work as before.
+- **How it works.** Each widget is drawn into a layer Windows keeps below the icons (DirectComposition under Explorer's desktop window), and a mouse hook watches for left and right presses over the Desk. The hook acts only on a press over a drawn part of a widget; every other press, every move and every key goes on untouched, and nothing is recorded. Where Windows can't host the layer, Sanduhr draws the Desk above the icons and Settings says why.
+- **The cost** is about 1% of one CPU core at rest: the Desk is copied into the layer once a second, and every frame while something on it animates.
+
+### Fixes
+
+- A test that signed out the active account waited on a real fetch to claude.ai; it now runs with usage off.
+
 ## v2.39.2-mac — 2026-11-02
 
 - **The lock screen line keeps up after an update.** After Sanduhr updated, macOS could stop running the small helper that puts the line on the lock screen while Settings still said On, so the lock screen kept showing an old line (often "Claude usage unavailable"). The helper now leaves a sign each time it runs; when that sign goes quiet, Sanduhr registers the helper again on its own (macOS may ask for your password), Settings, Lock Screen says Stopped with a button to do it by hand, and turning the switch off no longer waits on a helper that isn't running.
