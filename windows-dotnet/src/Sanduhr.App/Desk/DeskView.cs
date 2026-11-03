@@ -607,6 +607,7 @@ internal sealed partial class DeskView : Grid, IDisposable
             Timeline.SetDesiredFrameRate(fade, 30);
             pill.BeginAnimation(UIElement.OpacityProperty, fade);
         }
+        UnderIcons.InkWake.Now(1.5);   // an opacity fade: no layout pass, so the copy under the icons is told
         return true;
     }
 

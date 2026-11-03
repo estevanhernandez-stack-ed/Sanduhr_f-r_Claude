@@ -16,7 +16,12 @@ internal static class CareOpacity
         double from = element.Opacity;
         element.BeginAnimation(UIElement.OpacityProperty, null);
         element.Opacity = to;
-        if (ease <= TimeSpan.Zero || Math.Abs(from - to) < 0.001) return;
+        if (ease <= TimeSpan.Zero || Math.Abs(from - to) < 0.001)
+        {
+            UnderIcons.InkWake.Now();
+            return;
+        }
+        UnderIcons.InkWake.Now(ease);
         element.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(from, to, ease)
         {
             FillBehavior = FillBehavior.Stop,

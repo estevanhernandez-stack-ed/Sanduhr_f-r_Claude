@@ -20,13 +20,6 @@ namespace Sanduhr.App.Desk.UnderIcons;
 [SupportedOSPlatform("windows")]
 internal sealed class UnderIconsHost : IDeskHost
 {
-    /// <summary>The check at rest: a clock or a meter shows a change within a second, and an animation starts within one.</summary>
-    private static readonly TimeSpan Rest = TimeSpan.FromSeconds(1);
-    /// <summary>The check while frames keep changing (an animation runs).</summary>
-    private static readonly TimeSpan Hot = TimeSpan.FromMilliseconds(33);
-    /// <summary>Unchanged fast checks before going back to rest: a one-off change (a meter's tick) costs a few checks, not seconds of them.</summary>
-    private const int QuietBeforeRest = 3;
-
     /// <summary>Why the route could not run this session, for Settings; null while it runs or has not been tried.</summary>
     public static string? Unavailable { get; private set; }
 
@@ -41,7 +34,13 @@ internal sealed class UnderIconsHost : IDeskHost
     private InkLayer? _ink;
     private bool _inkReady;
     private bool _disposed;
-    private int _quiet = QuietBeforeRest;
+    /// <summary>When the next copy runs: on a change, not on the clock (<see cref="InkCadence"/>).</summary>
+    private readonly InkCadence _cadence = new();
+    /// <summary>True while <see cref="Capture"/> runs: a layout pass it causes itself is no wake.</summary>
+    private bool _capturing;
+    /// <summary>The island roots whose layout passes wake the copy.</summary>
+    private readonly List<FrameworkElement> _watched = [];
+    private int _wakes;
     /// <summary>Per island: the capture bitmap and the buffer it is read into, reused while the island keeps its size.</summary>
     private readonly Dictionary<int, (RenderTargetBitmap Rtb, byte[] Scratch)> _canvas = [];
     private int _ticks, _sent;
@@ -61,10 +60,11 @@ internal sealed class UnderIconsHost : IDeskHost
     public UnderIconsHost()
     {
         _above.ScreensChanged += () => ScreensChanged?.Invoke();
-        _above.CoverageChanged += () => CoverageChanged?.Invoke();
-        _frames = new DispatcherTimer(DispatcherPriority.Background) { Interval = Rest };
+        _above.CoverageChanged += () => { Wake(TimeSpan.Zero); CoverageChanged?.Invoke(); };
+        _frames = new DispatcherTimer(DispatcherPriority.Background) { Interval = InkCadence.Rest };
         _frames.Tick += (_, _) => Capture(force: false);
         _icons = new IconRects(icons => _ink?.SetIcons(icons));
+        InkWake.Woken += Wake;
         StartInk();
     }
 
@@ -73,8 +73,17 @@ internal sealed class UnderIconsHost : IDeskHost
     public bool IsShowing => _above.IsShowing;
     public IReadOnlyList<bool> Coverage => _above.Coverage;
     public IReadOnlyList<DeskScreen> Screens() => _above.Screens();
-    public void SetDrift(int? step) => _above.SetDrift(step);
-    public void SetDim(double opacity, TimeSpan ease) => _above.SetDim(opacity, ease);
+    public void SetDrift(int? step)
+    {
+        _above.SetDrift(step);
+        Wake(TimeSpan.Zero);
+    }
+
+    public void SetDim(double opacity, TimeSpan ease)
+    {
+        _above.SetDim(opacity, ease);
+        Wake(ease);
+    }
 
     /// <summary>A widget island goes under the icons; a drawer and the Launcher (hover glow, touch) stay above them.</summary>
     internal static bool Eligible(DeskIsland island) => !island.Drawer && !island.Widgets.Contains("launcher");
@@ -89,6 +98,7 @@ internal sealed class UnderIconsHost : IDeskHost
         }).ToList();
         _above.Show(mapped);
         _islands = [.. mapped.SelectMany(s => s.Islands)];
+        WatchLayout();
         if (_ink is { } ink)
         {
             foreach (var id in _shots.Keys.ToList())
@@ -115,6 +125,7 @@ internal sealed class UnderIconsHost : IDeskHost
 
     public void Hide()
     {
+        Unwatch();
         _frames.Stop();
         _icons.Stop();
         _above.Hide();
@@ -130,6 +141,7 @@ internal sealed class UnderIconsHost : IDeskHost
         if (_disposed) return;
         Hide();
         _disposed = true;
+        InkWake.Woken -= Wake;
         _icons.Dispose();
         _ink?.Dispose();
         _menuHost?.Dispose();
@@ -171,10 +183,46 @@ internal sealed class UnderIconsHost : IDeskHost
 
     // ---- frames ----
 
+    /// <summary>Something on the Desk may have changed: book a copy soon, or keep copying through an animation of <paramref name="animates"/>.</summary>
+    private void Wake(TimeSpan animates)
+    {
+        if (_disposed || _capturing || !_frames.IsEnabled) return;
+        _wakes++;
+        if (_cadence.Wake(DateTime.UtcNow, animates) is { } next) _frames.Interval = next;
+    }
+
+    /// <summary>Layout on an island root wakes the copy: a clock's minute, a meter, a progress bar, a new frame of the companion.</summary>
+    private void WatchLayout()
+    {
+        Unwatch();
+        var sources = _above.Sources;
+        for (int i = 0; i < _islands.Count && i < sources.Count; i++)
+            if (_islands[i].UnderIcons && !sources[i].IsDisposed && sources[i].RootVisual is FrameworkElement root)
+            {
+                root.LayoutUpdated += OnLayout;
+                _watched.Add(root);
+            }
+    }
+
+    private void Unwatch()
+    {
+        foreach (var root in _watched) root.LayoutUpdated -= OnLayout;
+        _watched.Clear();
+    }
+
+    private void OnLayout(object? sender, EventArgs e) => Wake(TimeSpan.Zero);
+
     /// <summary>Captures each visible ink island's window and sends a frame where its pixels or place changed.</summary>
     private void Capture(bool force)
     {
-        if (_ink is not { } ink || !_inkReady) return;
+        if (_ink is null || !_inkReady) return;
+        _capturing = true;
+        try { CaptureCore(force); }
+        finally { _capturing = false; }
+    }
+
+    private void CaptureCore(bool force)
+    {
         var sources = _above.Sources;
         var covered = _above.Coverage;
         bool changed = false;
@@ -200,18 +248,16 @@ internal sealed class UnderIconsHost : IDeskHost
         if (changed)
         {
             _sent++;
-            _quiet = 0;
             Publish();
         }
         if (DateTime.UtcNow - _statsSince >= TimeSpan.FromMinutes(10))
         {
-            Log($"frames: {_ticks} checks, {_sent} sent, {_shootMs:F0} ms capturing in {(DateTime.UtcNow - _statsSince).TotalSeconds:F0} s");
-            _ticks = _sent = 0;
+            Log($"frames: {_ticks} checks, {_sent} sent, {_wakes} wakes, {_shootMs:F0} ms capturing in {(DateTime.UtcNow - _statsSince).TotalSeconds:F0} s");
+            _ticks = _sent = _wakes = 0;
             _shootMs = 0;
             _statsSince = DateTime.UtcNow;
         }
-        else if (_quiet < QuietBeforeRest) _quiet++;
-        _frames.Interval = _quiet < QuietBeforeRest ? Hot : Rest;
+        _frames.Interval = _cadence.Checked(DateTime.UtcNow, changed);
     }
 
     /// <summary>One island's frame: true when it changed and was sent.</summary>

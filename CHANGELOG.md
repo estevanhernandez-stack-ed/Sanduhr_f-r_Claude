@@ -5,6 +5,7 @@
 ### Fixes
 
 - **Sanduhr stays light while a long Claude Code session runs.** Every 30 seconds the widget counts the tokens burned since its last fetch, and it did that by reading every session log changed since then from the first line, a long session's log included (one ran to 650 MB). It now reads each log once and after that only what was added, and takes each log's time from the folder listing instead of asking for every file, of thousands, on its own. On that session the app went from about 10% of one CPU core to about 2%.
+- **The Desk under your icons is copied when it changes, not every second.** 4.6.0 copied each widget into the layer below the icons once a second whether or not anything on it had changed, which cost about 2% of one core at rest, twice the 1% the notes said. It now copies right after something on the Desk changes (the clock's minute, a meter, a CPU reading, now playing) and through every frame of an animation, with a check every 5 seconds to catch anything else. At rest the whole app now uses under 1% of one core.
 
 ## v4.6.0 — 2026-11-03
 
