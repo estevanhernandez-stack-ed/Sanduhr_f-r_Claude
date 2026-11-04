@@ -34,7 +34,8 @@ enum LockLineDaemon {
         case on
         /// Registered and allowed, but launchd has not run it lately: a registration from an older
         /// build that stopped spawning after an update ("spawn failed", "needs LWCR update", seen
-        /// 2026-11-01 on a registration from build 45). `repair()` registers it again.
+        /// 2026-11-01 on a registration from build 45). Only the user can bring it back: see
+        /// `restartSteps` (2.39.3).
         case stalled
         case missing
     }
@@ -84,21 +85,17 @@ enum LockLineDaemon {
         (try? FileManager.default.attributesOfItem(atPath: LockLineHelperRules.heartbeatPath))?[.modificationDate] as? Date
     }
 
-    /// Registers the helper again: out, then in, so launchd takes this build's signature. Unregister
-    /// does not wait for the line to clear here (a stalled helper would never clear it); the new
-    /// registration runs at once (RunAtLoad) and keeps or clears the line as the file says.
-    static func repair() async throws {
-        try? await service.unregister()
-        watchingSince = Date()
-        try service.register()
-        watchingSince = Date()
-    }
+    /// How a stalled helper comes back. 2.39.2 unregistered and registered it on its own, and
+    /// macOS then refused the registration ("Operation not permitted", no prompt) until Sanduhr
+    /// was switched off and on under Login Items, Allow in the Background, with an administrator
+    /// password (seen 2026-11-02). Only the user can give that OK, so Sanduhr says how instead.
+    static let restartSteps = "To restart it, turn this switch off, then in Login Items switch Sanduhr off and on under Allow in the Background (macOS asks for your password), then turn this switch on."
 
     /// One line under the switch for each state.
     static func caption(_ state: State) -> String {
         switch state {
         case .on: "On. The line shows the next time the screen locks; it follows the numbers within a few minutes."
-        case .stalled: "Stopped: macOS hasn't run the lock screen helper since Sanduhr updated, so the lock screen shows an old line. Sanduhr registers it again; macOS may ask for your password."
+        case .stalled: "Stopped: macOS hasn't run the lock screen helper lately, so the lock screen shows an old line. " + restartSteps
         case .needsApproval: "macOS needs your OK: System Settings, General, Login Items, allow Sanduhr in the background."
         case .missing: "This copy of Sanduhr has no lock screen helper in it."
         case .off: "Off. Turning it on asks for an administrator password once, to put the line on the lock screen."
@@ -111,7 +108,6 @@ enum LockLineDaemon {
     /// same files, so the line stays up through the swap.
     static func install() async throws {
         defer { if service.status == .enabled { dropLegacy() } }
-        if state == .stalled { try await repair(); return }
         guard service.status != .enabled else { return }
         try service.register()
         watchingSince = Date()
@@ -130,8 +126,12 @@ enum LockLineDaemon {
     /// runs out, the helper stays and the launch sweep tries again. True when removed.
     @discardableResult
     static func remove(lastLine: String) async -> Bool {
-        // A stalled helper would never take the line off: register it again first.
-        if state == .stalled { try? await repair() }
+        // A stalled helper would never take the line off, so waiting is pointless: it goes now,
+        // and the old line stays until a running helper clears it (stalledOff says so).
+        if state == .stalled {
+            try? await service.unregister()
+            return true
+        }
         let deadline = Date().addingTimeInterval(clearWait)
         while !lastLine.isEmpty, currentLoginText() == lastLine {
             guard Date() < deadline else { return false }
@@ -145,13 +145,28 @@ enum LockLineDaemon {
     static let clearWait: TimeInterval = 10 * 60
 
     /// What Settings says when `register()` threw: nothing when the helper ended up on or is only
-    /// waiting for the Login Items OK (macOS throws in both cases on 26), else macOS's reason.
+    /// waiting for the Login Items OK (macOS throws in both cases on 26). A refusal ("Operation not
+    /// permitted", seen after an unregister) needs Sanduhr allowed again in Login Items, so it gets
+    /// the steps; anything else, macOS's reason.
     static func installProblem(_ error: Error, after state: State) -> String? {
         switch state {
         case .on, .needsApproval: nil
-        case .off, .missing, .stalled: "macOS did not install the lock screen helper: \(error.localizedDescription)"
+        case .off, .missing, .stalled:
+            refused(error)
+                ? "macOS didn't let Sanduhr start the lock screen helper. In Login Items, switch Sanduhr off and on under Allow in the Background (macOS asks for your password), then turn this switch off and on."
+                : "macOS did not install the lock screen helper: \(error.localizedDescription)"
         }
     }
+
+    /// "Operation not permitted": EPERM, as macOS reports a registration it won't allow.
+    nonisolated static func refused(_ error: Error) -> Bool {
+        let e = error as NSError
+        if e.domain == NSPOSIXErrorDomain, e.code == Int(EPERM) { return true }
+        return e.localizedDescription.localizedCaseInsensitiveContains("operation not permitted")
+    }
+
+    /// After turning off a stalled helper: it is gone, but the last line it set stays.
+    static let stalledOff = "The helper is off, but the lock screen keeps its old line until a running helper clears it. " + restartSteps + " Then turn it off again if you want the line gone."
 
     /// `LoginwindowText` as macOS has it now (world-readable, so no privilege needed).
     static func currentLoginText() -> String? {

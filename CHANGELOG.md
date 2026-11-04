@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (mac)
+
+- **The lock screen line's restart is in your hands.** 2.39.2 tried to restart a stopped lock screen helper on its own, and macOS refused it until Sanduhr was allowed again in Login Items, so the lock screen kept an old line. Now Settings, Lock Screen says the helper stopped and lists the steps (switch it off, switch Sanduhr off and on under Login Items, Allow in the Background, which asks for your password, then switch it on), with a button to Login Items. Switching a stopped helper off no longer waits ten minutes, and a refused start shows the same steps instead of "Operation not permitted".
+
 ## Unreleased (windows)
 
 ### Fixes
