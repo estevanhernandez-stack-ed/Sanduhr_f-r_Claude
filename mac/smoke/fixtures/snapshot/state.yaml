@@ -255,4 +255,11 @@ demo:
   notch_meters: true
   accounts: 2
   usage_rows: 0
+drawers:
+  "on": false
+  drawers: 0
+  files: []
+  permission: unknown
+  review_pending: false
+  journal_open: false
 reset_dry_run: null

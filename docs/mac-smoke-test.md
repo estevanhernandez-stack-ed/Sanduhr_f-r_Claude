@@ -2701,3 +2701,60 @@ Quit the release app and keep a backup, as above.
    `0600`). Start Sanduhr within ten minutes: the banner appears and the file is gone. One left over ten minutes
    is deleted unanswered when Sanduhr starts.
 9. Reset Sanduhr… removes `sprite-motion-request.json`, `sprite-motion-result.json` and `desk-state.json`.
+
+## 73. Drawers on a real Desktop (2.40.0)
+
+Live, on a real Desktop, by hand: this section moves real files, so use a Mac whose Desktop you can spare for ten minutes. Quit the
+release app and back up `~/Library/Application Support/Sanduhr` and the desk preferences (section 45). Put on the Desktop, made up
+and none named like anything real: 4 screenshots (press Command-Shift-3 or 4 twice, or keep ones you can lose), 3 `.png`, 2 `.pdf`, 1
+`.zip`, 1 `.dat` file that you set to look 40 days old (`touch -t` with an older date) and 1 `.app` copy or any folder. Note the Desktop's
+file list first (`ls -la ~/Desktop > ~/sanduhr-smoke/desktop-before.txt`). For the Desktop Folder prompt in step 1, run this on a Mac
+where Sanduhr has not been allowed Desktop access (`tccutil reset SystemPolicyDesktopFolder com.626labs.sanduhr` clears it).
+
+1. Launch Sanduhr with Drawers off (the default). macOS shows no Desktop prompt at launch. Settings, Drawers: the switch is off and
+   **Sort my desktop now** is disabled. Turn **Drawers on the Desk** on: the Desk turns on with it, and macOS asks to access files in the
+   Desktop folder with "Sanduhr looks at the files on your Desktop to sort them into drawers, only when you ask it to." Choose Don't
+   Allow: Settings, Drawers says "Sanduhr can't see your Desktop." with **Open Files and Folders…**, which opens Privacy & Security,
+   Files and Folders. Press **Sort my desktop now**: no review appears and nothing is retried. Allow Sanduhr there (Desktop Folder),
+   press Sort again.
+2. Sort: the review bar on the Desk reads "N files into M drawers", each drawer with up to three names, and Apply, Edit and Dismiss.
+   Nothing has moved yet (`ls ~/Desktop` is as it was). The `.app` or folder is not in the plan. The `.dat` is, under Older files,
+   because no kind rule takes it. Dismiss, then Sort again: the same plan.
+3. Edit: untick one `.png` and rename a new drawer; the count follows. **Done editing**, then Apply. The result bar says "N moved". The
+   drawers appear on the Desk as panels (the first two open, the rest folded), titled "Name · count"; `~/Desktop/Drawers/` holds
+   one folder per drawer with the files in it, and the Desktop keeps the unticked `.png` and the `.app`. A screenshot is in Screenshots
+   even though it is an image.
+4. Undo from the result bar: every file is back on the Desktop, `ls -la ~/Desktop` matches the file list from before (plus the
+   `Drawers` folder), and the empty drawer folders stay. The run is gone from Settings, Drawers, Recent runs. Sort and Apply again,
+   then Undo from Recent runs instead.
+5. A hand drop: drag one Desktop file onto a drawer's panel. It moves at once and shows in the grid. Create a file on the Desktop with
+   the same name as one already in that drawer and drop it too: it lands as "Name 2.ext" and the first is untouched. Edit a file that
+   is in a drawer (append to it), then Undo the earlier run from Recent runs: that file is skipped and the result line says it changed since; the rest come back.
+6. In a drawer: Return opens a file, Space shows Quick Look, Command-R reveals it in Finder. The context menu lists Open, Quick Look,
+   Show in Finder, Rename, Move to Trash, Rename drawer…, Fold, Hide, Look, Tidy drawers and Drawers Settings…. Rename a file to a
+   name that is taken: it is refused with a sentence. Select a file and press Command-Delete: it is in the Trash, and in the Trash the
+   Finder's **Put Back** returns it to the drawer's folder. Move to Trash on a second file from the menu does the same.
+7. Look and place: Look, Glass then Outline then Bare then Solid change every drawer; a per-drawer Look overrides it; Opacity at 20
+   and 100 is visible. Drag a panel by its title: it snaps to the others, and Option-drag does not snap. Fold and open by clicking the
+   title. **Tidy** (Settings, Drawers, or the menu) lines the panels up from the chosen corner and its result bar has **Undo**.
+   Quit and relaunch Sanduhr: panels, folds, looks and places are as left, and the Desktop is not read at launch (the Files and Folders
+   pane shows no new prompt, and with Drawers on, `state.yaml` `drawers.permission` is `unknown` until Sort).
+8. Add a view drawer: Settings, Drawers, **Add a Folder…**, a folder of made-up files. It shows as a panel, Sort never puts anything in
+   it, and turning Drawers off leaves its files where they are. Choose the Desktop or its parent as the folder: refused.
+9. Off with everything back: turn **Drawers on the Desk** off. The question reads "Put N files back on the Desktop?", where N counts every
+   file in the owned drawers, the hand drops too. **Put Them Back**: every file is on the Desktop, any name clash got the next free
+   name, the panels are gone, `~/Desktop/Drawers` is removed when empty, and the rules are kept (turn it on again: they are as left).
+   Cancel on the question leaves everything as it was. A file you put in a drawer folder by hand with Finder before this comes back too.
+10. Reset: with some files in drawers, About, Reset Sanduhr…: the drawers' files are on the Desktop first, `drawers-journal.json` and the
+    `drawers.*` keys are gone afterwards, and the sheet says if anything stayed.
+11. Journal: after a run, `ls -l ~/Library/Application\ Support/Sanduhr/drawers-journal.json` shows `-rw-------`. Sanduhr's log
+    (`log show --last 10m --predicate 'process == "Sanduhr"'`) holds no file name from this section.
+12. state.yaml (a debug build): `drawers:` holds `on`, `drawers`, `files`, `permission`, `review_pending` and `journal_open` and no name or
+    path. `get_desk` (with the MCP server installed) lists no drawers.
+
+The scripted version runs on a stand-in Desktop: quit Sanduhr, make a folder with 3 `.png` and 2 `.pdf` (made-up names), start a
+**debug** build with `SANDUHR_DEBUG_HOOKS=1 SANDUHR_DRAWERS_DESKTOP=<that folder>`, and `mac/smoke/smoke run drawers`. Steps: Drawers
+is off with no review pending; `do: drawers on` gives `on: true` and 0 drawers; `drawers sort` gives `review_pending: true`; `drawers
+apply` gives 2 drawers, `files` of 3 and 2, no review and `journal_open: false`; `drawers off` gives `on: false` and 0 drawers with the
+files back in the folder. A release build, or a debug build without the variable, refuses the action and the run fails at the first
+`drawers on`, which is correct: it would have acted on the real Desktop.

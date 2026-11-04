@@ -16,6 +16,8 @@ final class ResetSheetModel: ObservableObject {
     @Published var folders: [(folder: String, kinds: [IntegrationKind])] = []
     @Published var checkedFolders: Set<String> = []
     @Published var results: [ResetResult]?
+    /// What Reset did about the drawers when something stayed behind (counts only), nil otherwise.
+    @Published var drawersLine: String?
 
     /// The dev build note for the accounts part, nil on a build that clears the Keychain.
     @Published var keysNote: String?
@@ -66,6 +68,9 @@ final class ResetSheetModel: ObservableObject {
         let env = env ?? .standard
         let parts = parts
         let steps = Reset.plan(parts, folders: checkedFolders, in: env)
+        // The drawers go first: every owned drawer is emptied onto the Desktop before its
+        // preferences and journal are removed (docs/mac-drawers-setup-spec.md, section 5).
+        drawersLine = DrawerService.shared.resetAll().line
         // Writers off and everything that runs on its own stopped before anything is removed,
         // so nothing writes back and no removed account's key stays in memory.
         ResetGate.begin()

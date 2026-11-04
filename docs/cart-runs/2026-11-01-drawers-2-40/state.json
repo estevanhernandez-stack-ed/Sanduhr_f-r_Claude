@@ -1,0 +1,175 @@
+{
+  "run": "drawers-2-40",
+  "repo": "~/.cwt/sanduhr-2-40-spec",
+  "base_commit": "e0402e7bb4666cedf65cc8be4fd1f70119d55af5",
+  "integration_branch": "cart/drawers-2-40",
+  "integration_worktree": "~/.cwt/sanduhr-2-40-spe-drawers-2-40/int",
+  "worktree_root": "~/.cwt/sanduhr-2-40-spe-drawers-2-40",
+  "builder_branch": "docs/mac-2-40-spec",
+  "uncommitted_at_start": [],
+  "started_at": "2026-11-02T04:02:56.937Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "drawer-rules",
+      "title": "Drawer rules and plans (pure)",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-2-40--01-drawer-rules",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "journal-undo-return",
+      "title": "Journal, Undo and the return (pure)",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-2-40--02-journal-undo-return",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "mover-safety-suite",
+      "title": "The mover and the file-safety suite",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-2-40--03-mover-safety-suite",
+      "worktree": "",
+      "on": 2,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh (plus a delete/overwrite and real-path audit)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "drawer-service",
+      "title": "Drawer settings and the service",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-2-40--04-drawer-service",
+      "worktree": "",
+      "on": 3,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh (plus launch and removal audit)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "drawer-panels",
+      "title": "The drawer panels, looks and placement",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-2-40--05-drawer-panels",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh (plus file-operation audit)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "drawers-settings",
+      "title": "Settings, Drawers",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-2-40--06-drawers-settings",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 7,
+      "slug": "drawers-state-smoke",
+      "title": "state.yaml and the smoke scenario",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-2-40--07-drawers-state-smoke",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb (after the integrator's guard)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 8,
+      "slug": "desktop-permission",
+      "title": "The Desktop Folder permission",
+      "stop_class": "hold",
+      "status": "held",
+      "branch": "cart/drawers-2-40--08-desktop-permission",
+      "worktree": "~/.cwt/sanduhr-2-40-spe-drawers-2-40/08",
+      "on": 6,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": "Permissions surface: adds NSDesktopFolderUsageDescription to Info.plist and the denied state. turnOn probes the Desktop (names only), so the macOS prompt appears when Drawers is switched on. Walk it live: switch on, see the prompt and its text, deny it once to see the Settings row and the panel line, then allow it."
+    },
+    {
+      "n": 9,
+      "slug": "drawers-docs",
+      "title": "Docs, What's New card, CHANGELOG",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/drawers-2-40--09-drawers-docs",
+      "worktree": "",
+      "on": 7,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}
