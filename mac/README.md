@@ -1522,11 +1522,20 @@ the next update (`spawn failed`, exit 78, `needs LWCR update`) while `SMAppServi
 now rewrites an empty, world-readable heartbeat, `/Library/Application Support/Sanduhr/lockline-alive`,
 on every run. `LockLineDaemon.state` reads `.stalled` when the switch's helper is enabled and the
 heartbeat is missing or over 5 minutes old, judged only after the app has watched for 3 minutes
-since launch, a wake or a registration. `LockLineController` then registers it again (unregister,
-register; `LockLineDaemon.repair()`), once per launch; Settings shows the state with **Register the
-Helper Again**, and turning the switch on or off repairs first, so a turn-off no longer waits on a
-helper that will never clear the line. `state.yaml` `lock_line.helper` is `off`, `on`, `stalled`,
+since launch, a wake or a registration. `state.yaml` `lock_line.helper` is `off`, `on`, `stalled`,
 `needs_approval` or `missing`.
+
+**Only the user can restart it (2.39.3).** 2.39.2 then registered a stalled helper again on its own
+(unregister, register). On the owner's Mac the unregister worked and the register was refused,
+"Operation not permitted" with no prompt, from the app and from the switch alike, until Sanduhr was
+switched off and on under Login Items, Allow in the Background (three administrator password
+prompts); then the switch registered it with no password. So Sanduhr no longer re-registers on its
+own. A stalled helper reads **Stopped** in Settings, Lock Screen with the steps
+(`LockLineDaemon.restartSteps`: switch off, Login Items off and on, switch on) and **Open Login
+Items…**. Turning a stalled helper off unregisters it at once instead of waiting on a helper that
+will never clear the line, and says the old line stays until a running helper clears it
+(`stalledOff`). A refused registration (`EPERM`) gets the same Login Items steps instead of
+macOS's sentence.
 ## Now playing
 
 Now playing (items 53, 53b) shows what plays on the Mac, in any app that publishes now playing

@@ -88,19 +88,8 @@ private struct LockLineSwitchSection: View {
             Text(removing ? LockLineDaemon.removingCaption : LockLineDaemon.caption(state))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            if state == .needsApproval {
+            if state == .needsApproval || state == .stalled || problem != nil {
                 Button("Open Login Items…") { LockLineDaemon.openLoginItems() }
-            }
-            if state == .stalled {
-                Button("Register the Helper Again") {
-                    problem = nil
-                    Task { @MainActor in
-                        do { try await LockLineDaemon.repair() } catch {
-                            problem = LockLineDaemon.installProblem(error, after: LockLineDaemon.state)
-                        }
-                        state = LockLineDaemon.state
-                    }
-                }
             }
             if let problem {
                 Text(problem)
@@ -128,8 +117,17 @@ private struct LockLineSwitchSection: View {
             }
         } else {
             let shown = LockLineDaemon.currentLoginText() ?? ""
-            let wasOn = state == .on || state == .stalled
+            let wasOn = state == .on
+            let wasStalled = state == .stalled
             LockLineController.shared.refresh()
+            if wasStalled {
+                Task { @MainActor in
+                    await LockLineDaemon.remove(lastLine: shown)
+                    state = LockLineDaemon.state
+                    problem = LockLineDaemon.stalledOff
+                }
+                return
+            }
             guard wasOn else {
                 Task { @MainActor in
                     await LockLineDaemon.remove(lastLine: "")
