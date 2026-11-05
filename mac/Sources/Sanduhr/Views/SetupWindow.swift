@@ -26,6 +26,7 @@ final class SetupWindowController: NSObject, NSWindowDelegate {
                                    hasAccount: { !app.viewModel.accountLabels.isEmpty })
         model.onApplied = { [weak app] result in app?.afterSetup(result) }
         model.onClose = { [weak self] in self?.close() }
+        model.onDesignWithChat = { ChatDesignWindowController.shared.show() }
         self.model = model
 
         let w = window ?? NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 520),

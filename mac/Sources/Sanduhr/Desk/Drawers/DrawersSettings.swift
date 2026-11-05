@@ -15,6 +15,7 @@ struct DrawersSettings: View {
             DrawersSwitchSection(model: model)
             DrawersRulesSection(model: model)
             DrawersViewSection(model: model)
+            DrawersChatSection()
             DrawersLookSection(model: model)
             DrawersRunsSection(model: model)
             Section {
@@ -251,6 +252,17 @@ private struct DrawersRunsSection: View {
             }
         } header: {
             Text("Recent runs").settingsAnchor(SettingsAnchor.drawersRuns)
+        }
+    }
+}
+
+/// Design it with an AI chat, from Settings, Drawers: the same window Set up Sanduhr opens.
+private struct DrawersChatSection: View {
+    var body: some View {
+        Section {
+            Button(SetupCopy.designButton) { ChatDesignWindowController.shared.show() }
+                .accessibilityHint(SetupCopy.designCaption)
+            DrawersNote(SetupCopy.designCaption)
         }
     }
 }
