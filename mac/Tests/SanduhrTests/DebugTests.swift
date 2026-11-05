@@ -343,7 +343,7 @@ struct DebugStateTests {
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "desk_piece_clicks", "desk_plate", "desk_under_icons", "oled_care", "dock", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "glow_claude_waiting", "glow_claude_done", "theme", "menu", "menu_submenus", "credentials_store", "account_ref", "accounts_count", "plan", "history_days", "data",
-                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "snapshots", "seats", "version", "build", "whats_new", "tour", "watchers", "av_indicators", "settings_preview", "settings_preview_folded", "mods_page", "mods_config", "message_editor", "hot_keys", "meter_history", "lock_line", "just_the_desk", "demo", "drawers", "reset_dry_run"])
+                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "snapshots", "seats", "version", "build", "whats_new", "tour", "watchers", "av_indicators", "settings_preview", "settings_preview_folded", "mods_page", "mods_config", "message_editor", "hot_keys", "meter_history", "lock_line", "just_the_desk", "demo", "drawers", "setup", "reset_dry_run"])
         #expect(yaml.contains("just_the_desk: false\ndemo:\n"))
         #expect(yaml.hasSuffix("\nreset_dry_run: null\n"))
         #expect(yaml.contains("settings_section: notch\nsettings_anchor: null\nsettings_anchor_visible: null\nusage_page:\n  open: false\n  tab: overview\nmeters:"))
@@ -470,7 +470,7 @@ struct DebugStateTests {
         s.drawers = DrawersDebug(on: true, files: [3, 0, 12], permission: "unknown", reviewPending: true, journalOpen: false)
         let yaml = YAMLEmitter.emit(DebugState.yaml(s))
         #expect(yaml.contains("demo:\n"))
-        #expect(yaml.contains("drawers:\n  \"on\": true\n  drawers: 3\n  files: [3, 0, 12]\n  permission: unknown\n  review_pending: true\n  journal_open: false\nreset_dry_run:"))
+        #expect(yaml.contains("drawers:\n  \"on\": true\n  drawers: 3\n  files: [3, 0, 12]\n  permission: unknown\n  review_pending: true\n  journal_open: false\nsetup:"))
         let rest = YAMLEmitter.emit(DebugState.yaml(DebugStateInput()))
         #expect(rest.contains("drawers:\n  \"on\": false\n  drawers: 0\n  files: []\n  permission: unknown\n  review_pending: false\n  journal_open: false\n"))
     }
@@ -510,6 +510,46 @@ struct DebugStateTests {
             if case .success = DebugLink.action("drawers", arg: arg) { Issue.record("accepted \(arg ?? "nil")") }
         }
         #expect(DebugAction.names.contains("drawers"))
+    }
+
+    /// Set up Sanduhr: five booleans, in this order, from the stored setup and the live switches.
+    @Test func setupReportsFiveBooleans() {
+        var s = DebugStateInput()
+        s.setup = SetupDebug(desktop: true, drawers: false, usage: true, migrated: true, pending: false)
+        let yaml = YAMLEmitter.emit(DebugState.yaml(s))
+        #expect(yaml.contains("setup:\n  desktop: true\n  drawers: false\n  usage: true\n  migrated: true\n  pending: false\nreset_dry_run:"))
+        let rest = YAMLEmitter.emit(DebugState.yaml(DebugStateInput()))
+        #expect(rest.contains("setup:\n  desktop: false\n  drawers: false\n  usage: false\n  migrated: false\n  pending: false\n"))
+    }
+
+    @Test func setupDebugReadsTheStoredSetup() {
+        // No stored setup: a first run's ticks (desktop and drawers, no usage), and the screen is due.
+        #expect(SetupDebug.of(stored: nil, drawersOn: false, deskEnabled: true, migrated: false)
+                == SetupDebug(desktop: true, drawers: false, usage: false, migrated: false, pending: true))
+        // Desktop reads ticked only while the Desk runs; usage follows the stored Claude entry.
+        let stored = SetupSettings(desktop: true, usage: [SetupSettings.claude: true])
+        #expect(SetupDebug.of(stored: stored, drawersOn: true, deskEnabled: false, migrated: true)
+                == SetupDebug(desktop: false, drawers: true, usage: true, migrated: true, pending: false))
+        #expect(SetupDebug.of(stored: stored.withClaude(false), drawersOn: false, deskEnabled: true, migrated: true).usage == false)
+    }
+
+    /// The `setup` action takes desktop and usage, on or off, and refuses drawers and anything else.
+    @Test func theSetupActionParses() {
+        func parsed(_ arg: String?) -> DebugAction? {
+            if case .success(let a) = DebugLink.action("setup", arg: arg) { return a }
+            return nil
+        }
+        #expect(parsed("desktop=on usage=off") == .setup(desktop: true, usage: false))
+        #expect(parsed("usage=on") == .setup(desktop: nil, usage: true))
+        #expect(parsed("DESKTOP=OFF") == .setup(desktop: false, usage: nil))
+        for arg in [nil, "", "drawers=on", "desktop=on drawers=off", "desktop", "desktop=maybe", "usage=on usage=off",
+                    "claude=on", "desktop=true", "on", "Private Stuff"] {
+            #expect(parsed(arg) == nil, "accepted \(arg ?? "nil")")
+        }
+        if case .failure(let e) = DebugLink.action("setup", arg: "drawers=on") {
+            #expect(e.message == "setup does not set drawers; use the drawers action")
+        } else { Issue.record("drawers accepted") }
+        #expect(DebugAction.names.contains("setup"))
     }
 
     /// Item 56: the Dock's side and auto-hide, and the inset the Desk applies now.

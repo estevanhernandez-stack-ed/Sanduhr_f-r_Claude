@@ -262,4 +262,10 @@ drawers:
   permission: unknown
   review_pending: false
   journal_open: false
+setup:
+  desktop: true
+  drawers: false
+  usage: true
+  migrated: true
+  pending: false
 reset_dry_run: null

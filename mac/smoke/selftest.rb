@@ -214,6 +214,15 @@ class FakeApp
                     { 'part' => 'desk_messages', 'kind' => 'desk_messages', 'count' => 1 },
                     { 'part' => 'settings', 'kind' => 'preferences', 'count' => 2 }]
       }
+    when 'setup'
+      # Set up Sanduhr: desktop and usage ticks only; drawers are left as they are.
+      st = (s['setup'] ||= {})
+      arg.to_s.split.each do |w|
+        k, v = w.split('=')
+        st[k] = (v == 'on') if %w[desktop usage].include?(k)
+      end
+      st['pending'] = false
+      s['desk_enabled'] = s['desk_running'] = st['desktop'] || st['drawers']
     when 'drawers'
       # Item 7: a fixture Desktop of 5 loose files sorts into 2 drawers (3 and 2 files); off puts it back.
       d = (s['drawers'] ||= {})
@@ -315,6 +324,9 @@ eq('pill off in the fixture', state['notch_pill'], { 'on' => false, 'forced' => 
 # Drawers: off in the fixture, counts and flags only (the `on` key is quoted); permission is unknown until the Desktop is read.
 eq('drawers in the fixture', state['drawers'],
    { 'on' => false, 'drawers' => 0, 'files' => [], 'permission' => 'unknown', 'review_pending' => false, 'journal_open' => false })
+# Set up Sanduhr: five booleans, nothing else. The fixture is an upgrade that kept its meters.
+eq('setup in the fixture', state['setup'],
+   { 'desktop' => true, 'drawers' => false, 'usage' => true, 'migrated' => true, 'pending' => false })
 # #137: the lock screen line is off in the fixture, its switch key quoted like the pill's.
 eq('lock line in the fixture', state['lock_line'].keys, %w[on helper text length])
 eq('lock line is off and as long as its text', [state['lock_line']['on'], state['lock_line']['length']],
@@ -753,7 +765,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill just-the-desk drawers camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config]
+    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill just-the-desk setup drawers camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end
