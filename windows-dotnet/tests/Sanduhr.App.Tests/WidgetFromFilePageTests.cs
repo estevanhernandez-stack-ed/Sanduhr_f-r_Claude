@@ -6,6 +6,7 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Tests;
 
 /// <summary>Settings ▸ Mods &amp; Widgets ▸ Install widget from file… (#408): the picked zip installs, refuses or is cancelled, and says so.</summary>
+[Collection("SettingsWindow")]
 public sealed class WidgetFromFilePageTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "sanduhr-wfpage-" + Guid.NewGuid().ToString("N")[..8]);
@@ -50,6 +51,29 @@ public sealed class WidgetFromFilePageTests : IDisposable
             Assert.Equal(1, changed);
             Assert.Equal(WidgetSource.Local, Installed.Load().Find("good-palette")!.Source);
             Assert.Contains(page.Installed, r => r.Id == "good-palette");
+        });
+    }
+
+    [Fact]
+    public void Streamer_mode_shows_the_rows_codename_in_the_status_line_not_the_packs_name()
+    {
+        Sta.Run(() =>
+        {
+            try
+            {
+                StreamerMode.Use(new StreamerMask(true, CodenameBook.New(), _root));
+                string zip = ZipFile("palette.zip", WidgetKit.Pack("good-palette"));
+                var page = new ModsPageViewModel(() => new WidgetCatalogService(_paths), _store);
+                page.PickZip = () => zip;
+
+                page.InstallFromFileCommand.Execute(null);
+
+                string codename = StreamerMode.Mask.Name(CodenameCategory.AddOn, "Fixture palette");
+                Assert.NotEqual("Fixture palette", codename);
+                Assert.DoesNotContain("Fixture palette", page.Status);
+                Assert.Equal($"{codename} is installed from your file. It stays on this PC.", page.Status);
+            }
+            finally { StreamerMode.Reset(); }
         });
     }
 

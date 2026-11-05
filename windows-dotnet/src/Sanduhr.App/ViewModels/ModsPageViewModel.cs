@@ -806,7 +806,8 @@ public sealed partial class ModsPageViewModel : ObservableObject
             Status = SettingsNames.FileUnreadable;
             return Task.CompletedTask;
         }
-        var result = WidgetFileInstall.Install(zip, Service.Store, Service.Client.Running);
+        var result = WidgetFileInstall.Install(zip, Service.Store, Service.Client.Running,
+            name => StreamerMode.Mask.Name(CodenameCategory.AddOn, name));   // streamer: masked - the codename the Installed row shows for a pack made here
         Status = Short(result.Message, SettingsNames.WidgetInstallFailed);   // streamer: masked - via Short: Mask.Paths or FoldersIn (CP 8); a store error can name the widgets folder
         Rebuild();
         if (result.Ok) Notify();

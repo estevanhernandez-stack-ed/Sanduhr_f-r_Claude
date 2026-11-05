@@ -19,8 +19,11 @@ public static class WidgetFileInstall
     /// <summary>The validator's errors shown in the status line; the rest are counted.</summary>
     public const int ErrorsShown = 3;
 
-    public static WidgetFileResult Install(byte[] zip, WidgetStore store, Version running)
+    /// <param name="showName">How the pack's name is drawn in the line: Settings passes the streamer mask, so a stream shows the
+    /// same codename the Installed row does. Defaults to the name itself.</param>
+    public static WidgetFileResult Install(byte[] zip, WidgetStore store, Version running, Func<string, string>? showName = null)
     {
+        showName ??= static name => name;
         var files = WidgetZip.Read(zip, out var zipError);
         if (files is null)
             return new(false, SettingsNames.FileZipUnsafe(zipError));
@@ -29,15 +32,15 @@ public static class WidgetFileInstall
         if (!verdict.Ok || verdict.Manifest is not { } manifest)
             return new(false, SettingsNames.FilePackRejected(Errors(verdict.Errors)));
         if (!WidgetCatalog.MeetsMinimum(manifest.SanduhrMin, running))
-            return new(false, SettingsNames.FilePackTooNew(manifest.Name, manifest.SanduhrMin));
+            return new(false, SettingsNames.FilePackTooNew(showName(manifest.Name), manifest.SanduhrMin));
 
         bool replacing = store.Load().Find(manifest.Id) is { MadeHere: true };
         var installed = store.Install(files, manifest, WidgetSource.Local, replaceMadeHere: true);
         if (!installed.Ok)
             return new(false, installed.Error ?? SettingsNames.WidgetInstallFailed);
         return new(true, replacing
-            ? SettingsNames.FilePackUpdated(manifest.Name, manifest.Version)
-            : SettingsNames.FilePackInstalled(manifest.Name));
+            ? SettingsNames.FilePackUpdated(showName(manifest.Name), manifest.Version)
+            : SettingsNames.FilePackInstalled(showName(manifest.Name)));
     }
 
     /// <summary>The first <see cref="ErrorsShown"/> errors, and how many more there are.</summary>
