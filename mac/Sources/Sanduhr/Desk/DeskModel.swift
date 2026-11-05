@@ -262,6 +262,9 @@ final class DeskModel {
 
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
     @ObservationIgnored var onHitAreasChange: (() -> Void)?
+    /// "A nicer desktop" (setup spec, section 10): off, the Desk draws none of its pieces and the saved
+    /// layout is left alone. Set from the stored setup at start and on `.sanduhrSetupDidChange`.
+    var desktopOn = true
     /// Arrange mode (item 60): the layout being edited on the desktop, nil-session outside it.
     let arrange = DeskArrangeMode()
     /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
@@ -683,7 +686,7 @@ final class DeskModel {
             DeskDesignPreview.shared.layoutString(saved: desk.string(forKey: "layout") ?? DeskLayout.standard)
         }
         var input = DeskElements.Input()
-        input.placed = DeskLayout.placed(layoutWords,
+        input.placed = DeskLayout.placed(SetupDesk.visibleWords(layoutWords, desktop: desktopOn),
                                          showMeetings: desk.object(forKey: "showMeetings") as? Bool ?? true)
         input.meterTiers = meters.map(\.tier)
         input.signInNeeded = signInNeeded && signInReminder

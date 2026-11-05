@@ -41,6 +41,11 @@ struct DeskDesignReviewModel: Equatable {
     let missingFonts: [DeskReviewFont]
     let deskOff: Bool
     let previewing: Bool
+    /// A nicer desktop is off: Apply still saves the design, for when it is turned on.
+    var desktopOff = false
+
+    /// The line under the heading while desktop is off, else nil.
+    var applyNote: String? { SetupDesk.designNote(desktop: !desktopOff) }
 
     /// Apply is available once every font the design names is installed.
     var canApply: Bool { missingFonts.isEmpty }
@@ -246,7 +251,8 @@ final class DeskDesignProposalHandoff {
             id: p.id, heading: DeskDesignReviewCopy.heading, name: name, note: p.design.note,
             changesTitle: DeskDesignReviewCopy.changesTitle, changes: lines,
             missingFonts: missing(p).map { DeskReviewFont(family: $0.family, link: DeskDesignReviewModel.safeLink($0.link)) },
-            deskOff: !(host?.deskRunning ?? false), previewing: previewing)
+            deskOff: !(host?.deskRunning ?? false), previewing: previewing,
+            desktopOff: !SetupDesk.desktopOn())
     }
 
     /// The state a preview draws: only the fields the design sets. A font this Mac lacks previews in the nearest look
