@@ -213,4 +213,11 @@ struct UsageOffTests {
         #expect(SignedOut.usageState(label: "Work", demo: false) == .account("Work"))
         #expect(SignedOut.usageState(label: nil, demo: false) == .signedOut)
     }
+
+    @Test("a Save turns usage on only when it puts a non-empty session key in")
+    func saveTurnsUsageOnOnlyWithAKey() {
+        #expect(UsageViewModel.savesKey("sk-abc"))
+        #expect(!UsageViewModel.savesKey(nil))
+        #expect(!UsageViewModel.savesKey(""))
+    }
 }

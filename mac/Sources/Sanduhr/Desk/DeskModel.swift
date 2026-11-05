@@ -331,8 +331,14 @@ final class DeskModel {
     /// there is no timer while the Desk is hidden or the piece is not placed. Cheap when the layout is
     /// unchanged, which is what most defaults changes are.
     func syncTelemetry() {
-        applyTelemetry(running: timer != nil,
-                       layout: UserDefaults.desk.string(forKey: "layout") ?? DeskLayout.standard)
+        applyTelemetry(running: timer != nil, layout: syncLayout())
+    }
+
+    /// The layout the polling pieces decide from: the saved words filtered by "A nicer desktop", so
+    /// with it off nothing is placed and no sampler or weather request runs (setup D7).
+    func syncLayout(saved: String? = nil) -> String {
+        SetupDesk.visibleWords(saved ?? UserDefaults.desk.string(forKey: "layout") ?? DeskLayout.standard,
+                               desktop: desktopOn)
     }
 
     /// `syncTelemetry` with its inputs given, so the rule tests without a running Desk.
@@ -349,8 +355,7 @@ final class DeskModel {
     /// or stops the service to match, so there is no timer while the Desk is hidden or the piece is not
     /// placed. Called wherever `syncTelemetry` is, and when Settings, Weather changes.
     func syncWeather() {
-        applyWeather(running: timer != nil,
-                     layout: UserDefaults.desk.string(forKey: "layout") ?? DeskLayout.standard)
+        applyWeather(running: timer != nil, layout: syncLayout())
     }
 
     /// `syncWeather` with its inputs given, so the rule tests without a running Desk.

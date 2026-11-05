@@ -415,11 +415,12 @@ final class UsageViewModel {
     }
 
     /// Called after the user saves new credentials: rebuilds the API client and refreshes.
-    func credentialsChanged() {
+    /// `turnsUsageOn` is false for a Save that did not put a key in (cf_clearance only, or a clear).
+    func credentialsChanged(turnsUsageOn: Bool = true) {
         reloadAccounts()
         // Saving a key turns usage on (Windows does the same): the switch saves and resumes the side
         // fetchers, and this connects and fetches right below.
-        usageSwitch.set(true, fetchNow: false)
+        if turnsUsageOn { usageSwitch.set(true, fetchNow: false) }
         guard connect() else {
             if status == .connecting { status = .notSignedIn }
             return
@@ -630,7 +631,7 @@ final class UsageViewModel {
     /// returned or logged.
     func suggestedFolder(for label: String, among folders: [ClaudeCodeFolders.Folder],
                          home: String) async -> ClaudeCodeFolders.Folder? {
-        guard !folders.isEmpty else { return nil }
+        guard usageOn, !folders.isEmpty else { return nil }
         let defaults = KeychainStore.accounts.defaults
         let elsewhere = Set(folders.filter { f in
             AccountData.account(linkedTo: f.path, in: defaults).map { $0 != label } ?? false
@@ -673,11 +674,16 @@ final class UsageViewModel {
         }
     }
 
+    /// A Save puts a key in only when it carries a non-empty session key.
+    nonisolated static func savesKey(_ sessionKey: String?) -> Bool { !(sessionKey ?? "").isEmpty }
+
     /// Settings, Accounts, Save for one account: a value replaces, nil keeps, "" deletes. Saving
     /// the active account's key fetches with it at once.
     func saveCredentials(_ label: String, sessionKey: String?, cfClearance: String?) throws {
         try KeychainStore.accounts.save(label, sessionKey: sessionKey, cfClearance: cfClearance)
-        if label == KeychainStore.accounts.active { credentialsChanged() } else { reloadAccounts() }
+        if label == KeychainStore.accounts.active {
+            credentialsChanged(turnsUsageOn: Self.savesKey(sessionKey))
+        } else { reloadAccounts() }
     }
 
     /// Re-reads the account list and the active label from the registry. Assigns only on a

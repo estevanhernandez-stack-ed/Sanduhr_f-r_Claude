@@ -1748,13 +1748,13 @@ the Claude Code add-ons stay installed.
   timers, Follow the account I'm using and the per-seat meters), drops the numbers, sets the status line to "Usage tracking is off. Turn
   it on in Set up Sanduhr." on the Usage, Alerts and Claude Code pages, and deletes `snapshot.json` (at the switch and at each launch
   while off). The account, its Keychain item, history and settings stay: nothing signs out. Sign-out, an account switch and Refresh
-  keep it off and write no snapshot. A sign-in, an added account or a saved key turns it on and fetches. An absent setup, or one with
+  keep it off and write no snapshot. A sign-in, an added account or a saved session key turns it on and fetches; a Save that only changes cf_clearance or clears the key does not. Nothing reaches claude.ai with usage off except a sign-in you start (`suggestedFolder`'s organization request is guarded on usage on). An absent setup, or one with
   no Claude entry, reads as on. The widget starts hidden with usage off and the Desk running (the menu bar item is the way back), and
   the welcome tour takes its Desk-only steps plus a last card, "Usage when you want it", that opens Set up Sanduhr.
 - **Desktop off** (`Models/SetupDesk.swift`). Every Desk piece is a layout piece on the Mac, so off hides all of them at draw time and
   in the hit-test layout and the saved layout is never rewritten. The drawer panels are their own windows and keep showing; the notch
   is not a layout piece. Desk Layout's **Arrange the Desk** refuses with "Turn on A nicer desktop in Set up Sanduhr to arrange the
-  Desk.", and a Desk design review says Apply saves it for when desktop is on. The Desk reloads on `.sanduhrSetupDidChange`.
+  Desk.", and a Desk design review says Apply saves it for when desktop is on. The Desk reloads on `.sanduhrSetupDidChange`. The weather service and the system sampler decide from the filtered layout (`DeskModel.syncLayout`), so with desktop off the weather piece makes no request and neither polls; they resume when desktop is on.
 - **Design it with an AI chat** (`Views/ChatDesignWindow.swift`, `Models/ChatDesignViewModel.swift`, `PastedSetup.swift`,
   `SetupPrompt.swift`). A button on the window and on Settings, Drawers. **Copy prompt** puts the prompt on the pasteboard
   (`SetupPrompt.build`, built only from constants and the Desk's vocabulary: no file name, path or usage number, no product named). The

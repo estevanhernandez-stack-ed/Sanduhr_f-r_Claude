@@ -237,6 +237,25 @@ struct TelemetryTests {
         #expect(clock.cancelled == 2)
     }
 
+    @MainActor @Test func desktopOffStopsTheSamplerAndDesktopOnResumesIt() {
+        let clock = FakeClock()
+        let m = model(clock)
+        let saved = "message:tl telemetry:tr weather:mr"
+        m.applyTelemetry(running: true, layout: m.syncLayout(saved: saved))
+        #expect(m.telemetrySampler.isRunning)
+
+        m.desktopOn = false
+        #expect(!DeskArrangement(m.syncLayout(saved: saved)).pieces.contains { $0.widget == "telemetry" })
+        #expect(!WeatherService.isPlaced(layout: m.syncLayout(saved: saved)))
+        m.applyTelemetry(running: true, layout: m.syncLayout(saved: saved))
+        #expect(!m.telemetrySampler.isRunning)
+
+        m.desktopOn = true
+        m.applyTelemetry(running: true, layout: m.syncLayout(saved: saved))
+        #expect(m.telemetrySampler.isRunning)
+        #expect(WeatherService.isPlaced(layout: m.syncLayout(saved: saved)))
+    }
+
     @Test func aDeskWithoutThePieceNeverStartsASampler() {
         let clock = FakeClock()
         let m = model(clock)

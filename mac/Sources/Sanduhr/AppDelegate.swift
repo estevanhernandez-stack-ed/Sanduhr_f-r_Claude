@@ -352,6 +352,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyWidgetVisibility(.usageChanged)
         DeskController.shared.model.refreshClaude()
         renderStatusItem()
+        // Usage ticked and no key: the sign-in sheet opens now, not at the next launch.
+        if SetupLaunch.showsSignIn(result.now.toSettings(before: SetupStore.load()), hasSessionKey: hasKey, notNow: false) {
+            NotificationCenter.default.post(name: .sanduhrSetupSignInDue, object: nil)
+        }
         guard !result.now.claudeUsage,
               WelcomeTour.showsAfterSetup(state: WelcomeTour.state(), offeredThisLaunch: tourOffered) else { return }
         tourOffered = true

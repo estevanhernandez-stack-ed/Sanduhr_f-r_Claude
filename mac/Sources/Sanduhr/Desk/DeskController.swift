@@ -96,6 +96,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         guard on != model.desktopOn else { return }
         if !on { endArrange(keep: false) }
         model.desktopOn = on
+        model.syncTelemetry()
+        model.syncWeather()
         MainActor.assumeIsolated { RunnerWatchController.shared.refresh() }
     }
 
