@@ -6,6 +6,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using Sanduhr.App.Services;
+using Sanduhr.App.Desk.UnderIcons;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.Desk;
@@ -212,6 +213,7 @@ internal static class DeskMessagePiece
                 built[i].Opacity = i == shown ? 1 : 0;
                 if (built[i].RenderTransform is TranslateTransform t) t.Y = 0;
             }
+            InkWake.Now();
             Schedule();
             timer.Start();
         }
@@ -241,6 +243,7 @@ internal static class DeskMessagePiece
             default:
                 from.Opacity = 0;
                 to.Opacity = 1;
+                InkWake.Now();
                 break;
         }
     }
@@ -255,6 +258,7 @@ internal static class DeskMessagePiece
             done?.Invoke();
         };
         target.BeginAnimation(dp, a);
+        InkWake.Now(seconds);
     }
 
     /// <summary>One line with its effects. A line that is nothing but tags draws as written.</summary>
@@ -348,6 +352,7 @@ internal static class DeskMessagePiece
         a.Completed += (_, _) => block.OpacityMask = null;
         edge.BeginAnimation(GradientStop.OffsetProperty, a);
         after.BeginAnimation(GradientStop.OffsetProperty, b);
+        InkWake.Now(MessageMotion.WriteDuration);
     }
 
     /// <summary>
@@ -396,6 +401,7 @@ internal static class DeskMessagePiece
             Go(lead, -half);
             Go(mid, 0);
             Go(tail, half);
+            InkWake.Now(run);
             if (every is { } period)
             {
                 timer.Interval = TimeSpan.FromSeconds(Math.Max(run, period));
