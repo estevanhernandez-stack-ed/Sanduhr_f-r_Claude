@@ -120,13 +120,16 @@ public sealed class StreamerServiceTests : AppWindowFixture
         service.Load();
         service.SetOn(true);
         var folder = Path.Combine(Profile, ".claude-qxwork");
-        var before = StreamerMode.Mask.Folder(folder);
+        // A new salt can draw the same one of 196 names for any one folder, so a single folder failed about one run in 196.
+        // Eight folders that all keep their names by chance is about one in 10^18.
+        var folders = Enumerable.Range(0, 8).Select(i => Path.Combine(Profile, $".claude-qxwork{i}")).Prepend(folder).ToArray();
+        var before = folders.Select(StreamerMode.Mask.Folder).ToArray();
         service.SetShown(CodenameCategory.Account, "Personal", true);
         int changed = 0;
         service.Changed += () => changed++;
         service.Shuffle();
         Assert.Equal(1, changed);
-        Assert.NotEqual(before, StreamerMode.Mask.Folder(folder));
+        Assert.NotEqual(before, folders.Select(StreamerMode.Mask.Folder).ToArray());
         Assert.Equal("Personal", StreamerMode.Mask.Name(CodenameCategory.Account, "Personal"));
         var json = JsonNode.Parse(File.ReadAllText(paths.StreamerStateFile))!;
         Assert.Equal(StreamerMode.Mask.Folder(folder), (string?)json["folders"]![StreamerFile.FolderRef(folder)]);
