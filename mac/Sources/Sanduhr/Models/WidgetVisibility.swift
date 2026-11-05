@@ -44,9 +44,6 @@ enum WidgetVisibilityEvent: Equatable {
     case signedOut
     /// The choice itself was changed in Settings.
     case choiceChanged
-    /// Just the Desk on the welcome sheet: no sign-in to wait for, so the widget follows the
-    /// choice as after a sign-in (an "Always shown" widget stays as it is).
-    case justTheDesk
     /// Claude usage went off or on (Set up Sanduhr). Off hides the widget while the Desk runs; on
     /// brings it back (an "Always shown" widget included) or leaves it to the other choices.
     case usageChanged

@@ -2,97 +2,22 @@ import Foundation
 import Testing
 @testable import Sanduhr
 
-/// "Just the Desk" (BACKLOG #4): chosen on the welcome sheet by someone without a Claude account,
-/// ended by their first successful sign-in. Every test uses in-memory stores.
-@Suite("Just the Desk")
+/// "Just the Desk" (BACKLOG #4) folded into Set up Sanduhr in 2.41.0: the type is only the reader of
+/// the two keys an older install wrote, and nothing else in the app chooses, ends or settles around it.
+@Suite("Just the Desk, folded into Set up Sanduhr")
 struct JustTheDeskTests {
-    @Test func offUntilChosen() {
+    @Test func offUntilAnOlderInstallSetIt() {
         let s = MemoryDefaults()
         #expect(!JustTheDesk.isOn(in: s))
-        #expect(JustTheDesk.showsWelcome(hasSessionKey: false, in: s))
-        #expect(!JustTheDesk.showsWelcome(hasSessionKey: true, in: s))
-        #expect(!JustTheDesk.signInSettled(awaitingSignIn: true, hasSessionKey: false, in: s))
-        #expect(JustTheDesk.signInSettled(awaitingSignIn: false, hasSessionKey: true, in: s))
-    }
-
-    @Test func choosingTurnsTheDeskOnAndTheReminderOff() {
-        let s = MemoryDefaults(), d = MemoryDefaults()
-        JustTheDesk.choose(standard: s, desk: d)
+        s.set(true, forKey: JustTheDesk.key)
         #expect(JustTheDesk.isOn(in: s))
-        #expect(d.values[DeskController.enabledKey] as? Bool == true)
-        #expect(!SignInReminder.isOn(in: d))
-        #expect(s.values[JustTheDesk.silencedKey] as? Bool == true)
-        // No welcome sheet, and the widget no longer waits for a sign-in.
-        #expect(!JustTheDesk.showsWelcome(hasSessionKey: false, in: s))
-        #expect(JustTheDesk.signInSettled(awaitingSignIn: true, hasSessionKey: false, in: s))
-    }
-
-    @Test func aSavedKeyThatHasntFetchedWaitsForSignInEvenBeforeItEnds() {
-        // Review 2026-10-11: a key saved after Just the Desk that never fetches must still get the
-        // sign-in flow, so the override holds only while there is no key.
-        let s = MemoryDefaults(), d = MemoryDefaults()
-        JustTheDesk.choose(standard: s, desk: d)
-        let settled = JustTheDesk.signInSettled(awaitingSignIn: true, hasSessionKey: true, in: s)
-        #expect(!settled)
-        #expect(WidgetVisibilityRule.shouldShow(setting: .whileDeskOff, deskOn: true, hasSessionKey: settled,
-                                                event: .launch) == true)
-    }
-
-    @Test func signingInEndsItAndBringsTheReminderBack() {
-        let s = MemoryDefaults(), d = MemoryDefaults()
-        JustTheDesk.choose(standard: s, desk: d)
-        #expect(JustTheDesk.endBySignIn(standard: s, desk: d))
+        s.set("yes", forKey: JustTheDesk.key)
         #expect(!JustTheDesk.isOn(in: s))
-        #expect(SignInReminder.isOn(in: d))
-        #expect(s.values[JustTheDesk.key] == nil && s.values[JustTheDesk.silencedKey] == nil)
-        // Once only.
-        #expect(!JustTheDesk.endBySignIn(standard: s, desk: d))
-        #expect(d.values[DeskController.enabledKey] as? Bool == true)      // the Desk stays on
     }
 
-    @Test func aReminderTheyHadTurnedOffStaysOff() {
-        let s = MemoryDefaults(), d = MemoryDefaults()
-        SignInReminder.set(false, in: d)
-        JustTheDesk.choose(standard: s, desk: d)
-        #expect(s.values[JustTheDesk.silencedKey] == nil)
-        JustTheDesk.endBySignIn(standard: s, desk: d)
-        #expect(!SignInReminder.isOn(in: d))
-    }
-
-    @Test func endClearsBothKeysAndBringsTheReminderBack() {
-        let s = MemoryDefaults(), d = MemoryDefaults()
-        JustTheDesk.choose(standard: s, desk: d)
-        JustTheDesk.end(standard: s, desk: d)
-        #expect(!JustTheDesk.isOn(in: s))
-        #expect(s.values[JustTheDesk.key] == nil && s.values[JustTheDesk.silencedKey] == nil)
-        #expect(SignInReminder.isOn(in: d))
-        #expect(d.values[DeskController.enabledKey] as? Bool == true)
-    }
-
-    @Test func endLeavesAReminderTheyHadTurnedOffOff() {
-        let s = MemoryDefaults(), d = MemoryDefaults()
-        SignInReminder.set(false, in: d)
-        JustTheDesk.choose(standard: s, desk: d)
-        JustTheDesk.end(standard: s, desk: d)
-        #expect(!JustTheDesk.isOn(in: s))
-        #expect(!SignInReminder.isOn(in: d))
-    }
-
-    @Test func theWidgetFollowsItsChoiceInsteadOfWaitingForSignIn() {
-        // A fresh install's choice is Hidden while Desk is on; Just the Desk turns the Desk on.
-        let settled = JustTheDesk.signInSettled(awaitingSignIn: true, hasSessionKey: false, in: {
-            let s = MemoryDefaults(); s.set(true, forKey: JustTheDesk.key); return s
-        }())
-        #expect(WidgetVisibilityRule.shouldShow(setting: .whileDeskOff, deskOn: true, hasSessionKey: settled,
-                                                event: .justTheDesk) == false)
-        #expect(WidgetVisibilityRule.shouldShow(setting: .onRequest, deskOn: true, hasSessionKey: settled,
-                                                event: .launch) == false)
-        // "Always shown" is left as it is.
-        #expect(WidgetVisibilityRule.shouldShow(setting: .always, deskOn: true, hasSessionKey: settled,
-                                                event: .justTheDesk) == nil)
-        // Without Just the Desk the widget still shows for sign-in.
-        #expect(WidgetVisibilityRule.shouldShow(setting: .whileDeskOff, deskOn: true, hasSessionKey: false,
-                                                event: .launch) == true)
+    @Test func theKeysKeepTheirNames() {
+        #expect(JustTheDesk.key == "justTheDesk")
+        #expect(JustTheDesk.silencedKey == "justTheDeskSilencedReminder")
     }
 
     @Test func theDeskDrawsNoSignInLine() {
@@ -104,9 +29,30 @@ struct JustTheDeskTests {
         #expect(DeskClaudeText.compact(u) == nil)
     }
 
-    @Test func copy() {
-        #expect(JustTheDesk.buttonTitle == "Just the Desk")
-        #expect(JustTheDesk.caption.contains("Sign in any time from Settings, Accounts."))
+    /// The welcome sheet's Just the Desk button and sheet path are gone: no source file calls the
+    /// removed entry points, and the sheet no longer carries the button or its caption.
+    @Test func noCallerOfTheRemovedButtonPathRemains() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/Sanduhr")
+        let files = try #require(FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
+            .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }
+        #expect(files.count > 50)
+        let removed = ["chooseJustTheDesk", "endJustTheDesk", "JustTheDesk.choose", "JustTheDesk.end",
+                       "JustTheDesk.endBySignIn", "JustTheDesk.showsWelcome", "JustTheDesk.signInSettled",
+                       "JustTheDesk.buttonTitle", "JustTheDesk.caption", "onJustTheDesk", "showsForJustTheDesk",
+                       "event: .justTheDesk", "[.justTheDesk"]
+        var found: [String] = []
+        for file in files {
+            for (n, line) in try String(contentsOf: file, encoding: .utf8).components(separatedBy: "\n").enumerated() {
+                if line.trimmingCharacters(in: .whitespaces).hasPrefix("//") { continue }
+                for name in removed where line.contains(name) { found.append("\(file.lastPathComponent):\(n + 1): \(name)") }
+            }
+        }
+        #expect(found.isEmpty, "\(found)")
+        // The type itself reads the keys and does nothing else.
+        let source = try String(contentsOf: root.appendingPathComponent("Models/JustTheDesk.swift"), encoding: .utf8)
+        #expect(!source.contains("static func choose") && !source.contains("static func end"))
     }
 }
 

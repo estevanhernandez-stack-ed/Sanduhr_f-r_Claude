@@ -24,21 +24,26 @@ struct WhatsNewCard: Equatable, Identifiable {
     let art: WhatsNewArt
     /// The Settings page "Show me" opens.
     let destination: SettingsSection
+    /// "Show me" opens the Set up Sanduhr window instead (its `destination` is the page that
+    /// carries the same button, Settings, General).
+    let opensSetup: Bool
 
     init(versions: [String], id: String, title: String, body: String, art: WhatsNewArt,
-         destination: SettingsSection) {
+         destination: SettingsSection, opensSetup: Bool = false) {
         self.versions = versions.sorted { WhatsNew.compare($0, $1) == .orderedDescending }
         self.id = id
         self.title = title
         self.body = body
         self.art = art
         self.destination = destination
+        self.opensSetup = opensSetup
     }
 
     /// A card of one release.
     init(version: String, id: String, title: String, body: String, art: WhatsNewArt,
-         destination: SettingsSection) {
-        self.init(versions: [version], id: id, title: title, body: body, art: art, destination: destination)
+         destination: SettingsSection, opensSetup: Bool = false) {
+        self.init(versions: [version], id: id, title: title, body: body, art: art, destination: destination,
+                  opensSetup: opensSetup)
     }
 
     /// The newest release it covers.

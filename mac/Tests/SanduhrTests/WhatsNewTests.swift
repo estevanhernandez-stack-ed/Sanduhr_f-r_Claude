@@ -156,12 +156,13 @@ struct WhatsNewTableTests {
     }
 
     @Test func releasesSinceTwoFour() {
-        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0", "2.9.0", "2.10.0", "2.11.0", "2.12.0", "2.13.0", "2.14.0", "2.15.0", "2.16.0", "2.17.0", "2.18.0", "2.19.0", "2.20.0", "2.21.0", "2.22.0", "2.23.0", "2.24.0", "2.25.0", "2.26.0", "2.27.0", "2.28.0", "2.29.0", "2.30.0", "2.31.0", "2.32.0", "2.33.0", "2.34.0", "2.35.0", "2.36.0", "2.37.0", "2.38.0", "2.39.0", "2.40.0"]
+        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0", "2.9.0", "2.10.0", "2.11.0", "2.12.0", "2.13.0", "2.14.0", "2.15.0", "2.16.0", "2.17.0", "2.18.0", "2.19.0", "2.20.0", "2.21.0", "2.22.0", "2.23.0", "2.24.0", "2.25.0", "2.26.0", "2.27.0", "2.28.0", "2.29.0", "2.30.0", "2.31.0", "2.32.0", "2.33.0", "2.34.0", "2.35.0", "2.36.0", "2.37.0", "2.38.0", "2.39.0", "2.40.0", "2.41.0"]
         #expect(Set(table.map(\.version)) == releases)
-        #expect(table.count == 79)
+        #expect(table.count == 80)
         #expect(table.filter { $0.version == "2.23.0" }.map(\.id) == ["watch-words"])
         #expect(table.filter { $0.version == "2.24.0" }.map(\.id) == ["marketplace"])
         #expect(table.filter { $0.version == "2.25.0" }.map(\.id) == ["typed-name-blue"])
+        #expect(table.filter { $0.version == "2.41.0" }.map(\.id) == ["choose-what-shows"])
         #expect(table.filter { $0.version == "2.40.0" }.map(\.id) == ["drawers"])
         #expect(table.filter { $0.version == "2.39.0" }.map(\.id) == ["new-sprite", "sprite-motion", "live-bars"])
         #expect(table.filter { $0.version == "2.38.0" }.map(\.id) == ["system-piece", "weather-piece", "ci-runners"])
@@ -223,9 +224,19 @@ struct WhatsNewTableTests {
         }
     }
 
+    @Test func onlyTheSetupCardOpensTheSetupWindow() {
+        #expect(table.filter(\.opensSetup).map(\.id) == ["choose-what-shows"])
+        let card = table.first { $0.id == "choose-what-shows" }!
+        #expect(card.title == "Choose what Sanduhr shows" && card.version == "2.41.0" && card.art == .symbol("checklist"))
+        // Its page is the one that carries the same button.
+        #expect(card.destination == .general)
+        #expect(SettingsAnchor.exists(SettingsAnchor.setup, on: card.destination))
+    }
+
     @Test func showMeLandsOnTheRightPage() {
         let dest = Dictionary(uniqueKeysWithValues: table.map { ($0.id, $0.destination) })
         #expect(dest == [
+            "choose-what-shows": .general,
             "drawers": .drawers,
             "new-sprite": .widgets, "sprite-motion": .widgets, "live-bars": .nowPlaying,
             "system-piece": .deskLayout, "weather-piece": .weather, "ci-runners": .watchers,

@@ -36,7 +36,7 @@ final class WelcomeTourWindowController: NSObject, NSWindowDelegate {
     func show(step: Int = 0) {
         navigation.steps = WelcomeTour.steps(features: Self.features(),
                                               signedIn: KeychainStore.exists(account: KeychainAccount.sessionKey),
-                                              justTheDesk: JustTheDesk.isOn())
+                                              usageOff: !SetupStore.claudeUsageOn())
         navigation.index = max(0, min(step, navigation.count - 1))
         if window == nil {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 600),
@@ -91,6 +91,7 @@ final class WelcomeTourWindowController: NSObject, NSWindowDelegate {
         switch card.showMe {
         case .widget: (NSApp.delegate as? AppDelegate)?.showPanel()
         case .settings(let section): SettingsWindowController.shared.show(section)
+        case .setup: SetupWindowController.shared.show()
         }
     }
 }
@@ -206,6 +207,7 @@ struct TourCardView: View {
         switch destination {
         case .widget: "Shows the widget"
         case .settings(let section): "Opens Settings, \(section.title)"
+        case .setup: "Opens \(SetupCopy.title)"
         }
     }
 }

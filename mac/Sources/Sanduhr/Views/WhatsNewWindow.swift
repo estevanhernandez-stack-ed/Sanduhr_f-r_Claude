@@ -51,7 +51,11 @@ final class WhatsNewWindowController {
     /// "Show me": Settings at the card's page, and this window goes.
     func showMe(_ card: WhatsNewCard) {
         close()
-        SettingsWindowController.shared.show(card.destination)
+        if card.opensSetup {
+            SetupWindowController.shared.show()
+        } else {
+            SettingsWindowController.shared.show(card.destination)
+        }
     }
 }
 
@@ -145,7 +149,7 @@ struct WhatsNewCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             Button("Show me", action: showMe)
-                .help("Opens Settings, \(card.destination.title)")
+                .help(card.opensSetup ? "Opens \(SetupCopy.title)" : "Opens Settings, \(card.destination.title)")
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
