@@ -98,7 +98,9 @@ enum MenuBarText {
     /// The reading for `mode`, nil with neither the session nor the weekly limit (the menu bar
     /// then shows the hourglass alone). A chosen limit that is missing falls back to the other.
     /// `step` counts Rotate's turns: even shows the session, odd the weekly limit.
-    static func reading(_ usage: UsageResponse?, mode: MenuBarMode, step: Int) -> MenuBarReading? {
+    /// With Claude usage off there is no reading whatever numbers are held: the hourglass alone.
+    static func reading(_ usage: UsageResponse?, mode: MenuBarMode, step: Int, usageOn: Bool = true) -> MenuBarReading? {
+        guard usageOn else { return nil }
         let session = usage?.tiers[.fiveHour]?.utilization
         let weekly = usage?.tiers[.sevenDay]?.utilization
         let pick: Tier?

@@ -99,13 +99,18 @@ struct RootView: View {
         .sheet(isPresented: $showOnboarding) {
             onboarding
         }
+        .onReceive(NotificationCenter.default.publisher(for: .sanduhrSetupSignInDue)) { _ in
+            showOnboarding = true
+        }
         .onAppear {
             // `exists()` never prompts (no access control on the Keychain
             // items) — safe to call on every view appearance.
-            // Not after Just the Desk: that person has no account to sign in to (JustTheDesk).
-            // Nor after Not Now, for the rest of this launch (WelcomeNotNow).
-            if JustTheDesk.showsWelcome(hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey),
-                                        notNow: WelcomeNotNow.chosen) {
+            // Only with Track my AI usage ticked: Set up Sanduhr is the welcome, and a Mac that turned
+            // usage off has no account to sign in to. Not after Not Now, for the rest of this
+            // launch (WelcomeNotNow).
+            if SetupLaunch.showsSignIn(SetupStore.load(),
+                                       hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey),
+                                       notNow: WelcomeNotNow.chosen) {
                 showOnboarding = true
             }
         }
@@ -130,9 +135,6 @@ struct RootView: View {
         }, onPaste: {
             showOnboarding = false
             SettingsWindowController.shared.showPasteKey()
-        }, onJustTheDesk: {
-            showOnboarding = false
-            (NSApp.delegate as? AppDelegate)?.chooseJustTheDesk()
         }, onNotNow: {
             WelcomeNotNow.choose()
             showOnboarding = false

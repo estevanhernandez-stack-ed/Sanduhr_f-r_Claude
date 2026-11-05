@@ -21,6 +21,8 @@ module Smoke
                             notch-pill on|off|force (the top-center pill; force draws it on a
                             notched Mac too, off clears that),
                             just-the-desk on|off (the welcome sheet's button; off ends it),
+                            setup desktop=on|off usage=on|off (Set up Sanduhr's ticks, either or both;
+                            never drawers),
                             camera-light on|off,
                             glow [alert|meeting|camera],
                             demo on|off (sample data on every surface, in memory),

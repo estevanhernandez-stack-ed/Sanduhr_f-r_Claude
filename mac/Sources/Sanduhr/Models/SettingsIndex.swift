@@ -22,6 +22,8 @@ struct SettingsEntry: Equatable {
 enum SettingsAnchor {
     // General
     static let surfaces = "surfaces"
+    /// General, the Set up Sanduhr… button at the top.
+    static let setup = "setup"
     static let menuBarShows = "menu-bar-shows"
     static let menuBarItem = "menu-bar-item"
     static let meetingsMenu = "meetings-menu"
@@ -133,6 +135,9 @@ enum SettingsAnchor {
     static let all: [SettingsEntry] = general + accountsAndAlerts + deskPages + notchPages + lockScreenPages + drawersPages + widgetsPages + claudeCodePages + widgetAndHelp
 
     private static let general: [SettingsEntry] = [
+        SettingsEntry(title: SetupCopy.menuItem, page: .general, anchor: setup,
+                      synonyms: ["Set up Sanduhr", "choose what Sanduhr shows", "first run", "welcome", "A nicer desktop",
+                                 "Tidy my files", "Track my AI usage", "usage off", "turn off usage", "just the desk", "without a Claude account"]),
         SettingsEntry(title: "Surfaces", page: .general, anchor: surfaces, synonyms: ["status", "desk on", "notch on"]),
         SettingsEntry(title: "Menu bar", page: .general, anchor: menuBarShows),
         SettingsEntry(title: SettingsNames.menuBarShows, page: .general, anchor: menuBarShows,

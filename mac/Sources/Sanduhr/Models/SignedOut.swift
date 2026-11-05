@@ -73,6 +73,8 @@ enum SignedOut {
         case signedOut
         /// Demo mode: the sample accounts' meter history.
         case demo
+        /// Claude usage is off in Set up Sanduhr: the usage-off line in place of the sign-in line.
+        case usageOff
         /// An account's pages.
         case account(String)
     }
@@ -85,8 +87,9 @@ enum SignedOut {
     static let savedHistoryTitle = "Signed out on this Mac"
     static let savedHistoryDetail = "The numbers below are saved history. Sign in again in Accounts to see live usage."
 
-    static func usageState(label: String?, demo: Bool) -> UsageState {
+    static func usageState(label: String?, demo: Bool, usageOff: Bool = false) -> UsageState {
         if demo { return .demo }
+        if usageOff { return .usageOff }
         guard let label else { return .signedOut }
         return .account(label)
     }

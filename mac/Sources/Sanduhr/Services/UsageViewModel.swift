@@ -208,7 +208,7 @@ final class UsageViewModel {
         didSet {
             guard followEnabled != oldValue else { return }
             UserDefaults.standard.set(followEnabled, forKey: AccountFollower.enabledKey)
-            follower.apply(enabled: followEnabled)
+            follower.apply(enabled: followEnabled && usageOn)
             refreshInUse()
         }
     }
@@ -258,6 +258,9 @@ final class UsageViewModel {
         case switching
         /// No session key yet (a fresh install, or none saved): the welcome sheet or Accounts signs in.
         case notSignedIn
+        /// Claude usage is switched off in Set up Sanduhr: nothing is fetched, the account is kept.
+        /// Not a sign-in state: no surface asks to sign in while it holds.
+        case usageOff
 
         var text: String {
             switch self {
@@ -268,6 +271,7 @@ final class UsageViewModel {
             case .signedOut:            return "Signed out — sign in"
             case .switching:            return "Switching account…"
             case .notSignedIn:          return "Not signed in — sign in"
+            case .usageOff:             return SetupCopy.usageOffSettingsLine
             }
         }
         var isError: Bool {
@@ -285,6 +289,42 @@ final class UsageViewModel {
     }
 
     // MARK: Private
+
+    /// Claude usage on or off (setup spec, section 11), wired to this model's own pieces in `init`.
+    @ObservationIgnored private(set) lazy var usageSwitch = makeUsageSwitch()
+
+    /// Claude usage is on: read from the stored setup, absent meaning on.
+    var usageOn: Bool { usageSwitch.isOn }
+
+    /// Set up Sanduhr's Track my AI usage. Off stops fetching and deletes snapshot.json, keeping the
+    /// account, its key, history and settings; on fetches at once when a key exists.
+    func setUsageOn(_ on: Bool) { usageSwitch.set(on) }
+
+    private func makeUsageSwitch() -> UsageSwitch {
+        UsageSwitch(effects: UsageSwitch.Effects(
+            stopFetching: { [weak self] in self?.stopFetching() },
+            deleteSnapshot: { SnapshotWriter.delete() },
+            setStatus: { [weak self] in self?.status = $0 },
+            hasKey: { KeychainStore.exists(account: KeychainAccount.sessionKey) },
+            beginFetching: { [weak self] in self?.beginFetching() ?? false },
+            pauseSides: { [weak self] paused in self?.pauseSideFetchers(paused) },
+            announce: { [weak self] in self?.onUsageUpdate?() }))
+    }
+
+    /// A client from the saved key, a fetch at once and the timers. False when there is no key.
+    private func beginFetching() -> Bool {
+        guard connect() else { return false }
+        Task { await refresh() }
+        startTimers()
+        return true
+    }
+
+    /// Account following and the per-seat meters fetch on their own: they pause with usage off
+    /// (and with demo mode) and resume as their own switches say.
+    private func pauseSideFetchers(_ paused: Bool) {
+        seatMeters.paused = paused || demo
+        follower.apply(enabled: followEnabled && !paused && !demo)
+    }
 
     private var api: ClaudeAPI?
     /// The account `api` was built for (nil while a launch runs on the legacy key): history and
@@ -333,7 +373,7 @@ final class UsageViewModel {
         seatMeters.planFor = { AccountPlans.plan(for: $0, in: KeychainStore.accounts.defaults) }
         follower.onResult = { [weak self] label, result in self?.seatMeters.followerAnswered(label, result) }
         seatMeters.context = { [weak self] in self?.seatContext() ?? SeatMeters.Context() }
-        follower.apply(enabled: followEnabled)
+        follower.apply(enabled: followEnabled && usageOn)
         vault.onCycleEnd = { [weak self] in
             Task { @MainActor in self?.vaultCycles += 1 }
         }
@@ -346,6 +386,8 @@ final class UsageViewModel {
         vault.trigger()
         // The access file as this launch's choices say, before any tool call can read it.
         reloadAccounts()
+        // Usage off: nothing fetches and no snapshot is written (UsageSwitch.launch).
+        guard usageSwitch.launch() else { return }
         guard KeychainStore.exists(account: KeychainAccount.sessionKey) else {
             status = .notSignedIn    // onboarding sheet will drive the next step
             // The Desk and the notch hear it too: without this they waited for a first fetch
@@ -373,9 +415,16 @@ final class UsageViewModel {
     }
 
     /// Called after the user saves new credentials: rebuilds the API client and refreshes.
-    func credentialsChanged() {
+    /// `turnsUsageOn` is false for a Save that did not put a key in (cf_clearance only, or a clear).
+    func credentialsChanged(turnsUsageOn: Bool = true) {
         reloadAccounts()
-        guard connect() else { return }
+        // Saving a key turns usage on (Windows does the same): the switch saves and resumes the side
+        // fetchers, and this connects and fetches right below.
+        if turnsUsageOn { usageSwitch.set(true, fetchNow: false) }
+        guard connect() else {
+            if status == .connecting { status = .notSignedIn }
+            return
+        }
         // The first key saved creates Personal, whose history may be the upgrade's.
         history = HistoryStore.sparklines(HistoryStore.load(account: apiAccount))
         Task { await refresh() }
@@ -402,8 +451,11 @@ final class UsageViewModel {
         let active = KeychainStore.accounts.active
         let result = KeychainStore.signOut(label: active)
         stopFetching()
-        status = .signedOut
-        SnapshotWriter.writeSignedOut(accountRef: AccountRef.of(active))
+        // With usage off the status stays `usageOff` and no snapshot is written.
+        if usageOn {
+            status = .signedOut
+            SnapshotWriter.writeSignedOut(accountRef: AccountRef.of(active))
+        }
         reloadAccounts()
         onUsageUpdate?()
         return result
@@ -579,7 +631,7 @@ final class UsageViewModel {
     /// returned or logged.
     func suggestedFolder(for label: String, among folders: [ClaudeCodeFolders.Folder],
                          home: String) async -> ClaudeCodeFolders.Folder? {
-        guard !folders.isEmpty else { return nil }
+        guard usageOn, !folders.isEmpty else { return nil }
         let defaults = KeychainStore.accounts.defaults
         let elsewhere = Set(folders.filter { f in
             AccountData.account(linkedTo: f.path, in: defaults).map { $0 != label } ?? false
@@ -608,6 +660,8 @@ final class UsageViewModel {
         let accounts = KeychainStore.accounts
         let wasEmpty = accounts.labels.isEmpty
         try accounts.add(label, sessionKey: sessionKey, cfClearance: cfClearance)
+        // A sign-in turns usage on; the fetch below (or the switch's) follows.
+        if wasEmpty || makeActive { usageSwitch.set(true, fetchNow: false) }
         if wasEmpty {
             // The first account: no legacy copy may outlive it (KeychainStore.set does the same).
             accounts.dropLegacy()
@@ -620,11 +674,16 @@ final class UsageViewModel {
         }
     }
 
+    /// A Save puts a key in only when it carries a non-empty session key.
+    nonisolated static func savesKey(_ sessionKey: String?) -> Bool { !(sessionKey ?? "").isEmpty }
+
     /// Settings, Accounts, Save for one account: a value replaces, nil keeps, "" deletes. Saving
     /// the active account's key fetches with it at once.
     func saveCredentials(_ label: String, sessionKey: String?, cfClearance: String?) throws {
         try KeychainStore.accounts.save(label, sessionKey: sessionKey, cfClearance: cfClearance)
-        if label == KeychainStore.accounts.active { credentialsChanged() } else { reloadAccounts() }
+        if label == KeychainStore.accounts.active {
+            credentialsChanged(turnsUsageOn: Self.savesKey(sessionKey))
+        } else { reloadAccounts() }
     }
 
     /// Re-reads the account list and the active label from the registry. Assigns only on a
@@ -725,7 +784,7 @@ final class UsageViewModel {
         let accounts = KeychainStore.accounts
         var s = AccountFollow.State()
         // Demo mode pauses following: no check, no fetch, no switch.
-        s.enabled = followEnabled && !demo
+        s.enabled = followEnabled && !demo && usageOn
         s.active = accounts.active
         s.signedIn = Self.signedIn(accounts)
         s.activeSignedOut = status == .signedOut || api == nil
@@ -817,7 +876,7 @@ final class UsageViewModel {
         }
         guard let real = demoSession.end() else { return }
         demo = false
-        seatMeters.paused = false
+        seatMeters.paused = !usageOn
         apply(real)
         reloadAccounts()
         refreshLocalBurn()
@@ -856,7 +915,11 @@ final class UsageViewModel {
             reloadAccounts()
             let active = KeychainStore.accounts.active
             history = active.map { HistoryStore.sparklines(HistoryStore.load(account: $0)) } ?? [:]
-            if connect() {
+            if !usageOn {
+                // Usage off: the account switches, nothing is fetched or written.
+                status = .usageOff
+                onUsageUpdate?()
+            } else if connect() {
                 status = .switching
                 onUsageUpdate?()
                 Task { await refresh() }
@@ -994,7 +1057,7 @@ final class UsageViewModel {
 
     func refresh() async {
         // Demo mode's samples stay until it ends; off fetches at once.
-        guard let api, !demo else { return }
+        guard let api, !demo, usageOn else { return }
         let account = apiAccount
         let ref = AccountRef.of(account)
         // "Switching account…" stays up until the new account's first answer.

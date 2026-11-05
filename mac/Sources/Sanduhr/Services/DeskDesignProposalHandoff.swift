@@ -5,6 +5,8 @@ import Observation
 /// The words of the Desk design review (Windows' `DeskReviewCopy`, with the Mac's own places).
 enum DeskDesignReviewCopy {
     static let heading = "Claude suggests a Desk design"
+    /// The heading of a design pasted from an AI chat in Set up Sanduhr: it names no product.
+    static let pastedHeading = "An AI chat suggests a Desk design"
     static let changesTitle = "What changed"
     static let fontsTitle = "Fonts to install"
     static let nothingChanges = "This design leaves your Desk as it is."
@@ -41,6 +43,11 @@ struct DeskDesignReviewModel: Equatable {
     let missingFonts: [DeskReviewFont]
     let deskOff: Bool
     let previewing: Bool
+    /// A nicer desktop is off: Apply still saves the design, for when it is turned on.
+    var desktopOff = false
+
+    /// The line under the heading while desktop is off, else nil.
+    var applyNote: String? { SetupDesk.designNote(desktop: !desktopOff) }
 
     /// Apply is available once every font the design names is installed.
     var canApply: Bool { missingFonts.isEmpty }
@@ -119,6 +126,8 @@ final class DeskDesignProposalHandoff {
         let id: String
         let design: DeskDesign
         let fonts: [MissingFont]
+        /// Pasted from the AI chat window: held in memory only, no notification and no result file.
+        var pasted = false
     }
 
     /// The design waiting for the user, if any. In memory only: quitting Sanduhr drops it.
@@ -219,11 +228,36 @@ final class DeskDesignProposalHandoff {
         return DeskAnswer(DeskAnswer.previewing, fonts: fonts.isEmpty ? nil : fonts, changes: changes.isEmpty ? nil : changes)
     }
 
+    /// The Desk's rules for a pasted design, with this Mac's fonts: `propose_desk`'s own validator, unchanged.
+    func validatePasted(_ node: PackValue) -> DeskValidation {
+        DeskDesign.validate(node, context: DeskDesignContext(installedFonts: installedFamilies()))
+    }
+
+    /// A design pasted from the AI chat window that passed `validatePasted`: held for the review like a proposal, in memory
+    /// only, with a neutral heading. No result file is written and no notification is raised; Apply, Dismiss and a newer
+    /// design behave as for a proposal. While desktop is off the review says Apply saves it for later.
+    func proposePasted(_ validation: DeskValidation) -> DeskAnswer {
+        guard !ResetGate.isOn, host != nil, let design = validation.design else { return .notReady }
+        if host?.deskBusy == true {
+            return DeskAnswer(DeskAnswer.rejected, reason: "busy",
+                reasons: [DeskReason("design", "the Desk is busy (its layout is being arranged); finish arranging, then try again")])
+        }
+        replacePending()
+        let fonts = validation.fonts.filter { !fontInstalled($0.family) }
+        var review = Review(id: "paste", design: design, fonts: fonts)
+        review.pasted = true
+        pending = review
+        previewNote = nil
+        let changes = changeLines(for: review)
+        return DeskAnswer(DeskAnswer.previewing, fonts: fonts.isEmpty ? nil : fonts, changes: changes.isEmpty ? nil : changes)
+    }
+
     /// A newer design takes the place of the one waiting: the older one is answered `replaced`.
     private func replacePending() {
         guard let old = pending else { return }
         pending = nil
         endPreview()
+        if old.pasted { return }
         onDecided?(old.id)
         answer(old.id, DeskAnswer(DeskAnswer.rejected, reason: "replaced",
                                   reasons: [DeskReason("design", "replaced by a newer proposal")]))
@@ -243,10 +277,11 @@ final class DeskDesignProposalHandoff {
         if lines.isEmpty { lines = [DeskDesignReviewCopy.nothingChanges] }
         let name = p.design.name ?? DeskDesignReviewCopy.untitled
         return DeskDesignReviewModel(
-            id: p.id, heading: DeskDesignReviewCopy.heading, name: name, note: p.design.note,
+            id: p.id, heading: p.pasted ? DeskDesignReviewCopy.pastedHeading : DeskDesignReviewCopy.heading, name: name, note: p.design.note,
             changesTitle: DeskDesignReviewCopy.changesTitle, changes: lines,
             missingFonts: missing(p).map { DeskReviewFont(family: $0.family, link: DeskDesignReviewModel.safeLink($0.link)) },
-            deskOff: !(host?.deskRunning ?? false), previewing: previewing)
+            deskOff: !(host?.deskRunning ?? false), previewing: previewing,
+            desktopOff: !SetupDesk.desktopOn())
     }
 
     /// The state a preview draws: only the fields the design sets. A font this Mac lacks previews in the nearest look
@@ -296,6 +331,7 @@ final class DeskDesignProposalHandoff {
         pending = nil
         endPreview()
         previewNote = nil
+        if p.pasted { return }
         onDecided?(p.id)
         answer(p.id, DeskAnswer(DeskAnswer.rejected, reason: "dismissed",
                                 reasons: [DeskReason("design", "dismissed by the user")]))
@@ -313,6 +349,7 @@ final class DeskDesignProposalHandoff {
         DeskDesignApply.recordBefore(next, over: current, name: p.design.name, now: now(), in: defaults)
         DeskDesignApply.write(next, over: current, to: defaults)
         endPreview()   // the preview gives way to what was written
+        if p.pasted { return }
         onDecided?(p.id)
         answer(p.id, DeskAnswer(DeskAnswer.applied, changes: changes.isEmpty ? nil : changes))
     }

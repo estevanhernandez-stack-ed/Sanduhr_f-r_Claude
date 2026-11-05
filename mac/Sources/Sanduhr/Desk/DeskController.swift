@@ -89,6 +89,20 @@ final class DeskController: NSObject, NSMenuDelegate {
         MainActor.assumeIsolated { DrawerPanelController.shared.refresh() }
     }
 
+    /// Reads the stored setup's desktop flag into the Desk (the setup service calls this after it saves).
+    /// Off, the pieces stop drawing at once and an Arrange in progress ends untouched.
+    func reloadSetup() {
+        let on = SetupDesk.desktopOn()
+        guard on != model.desktopOn else { return }
+        if !on { endArrange(keep: false) }
+        model.desktopOn = on
+        model.syncTelemetry()
+        model.syncWeather()
+        MainActor.assumeIsolated { RunnerWatchController.shared.refresh() }
+    }
+
+    @objc private func setupChanged() { reloadSetup() }
+
     private func start() {
         running = true
         // The standalone Desk and Sanduhr Desk apps did this job before; one desk is enough.
@@ -119,6 +133,9 @@ final class DeskController: NSObject, NSMenuDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(otherAppActivated),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
+        reloadSetup()
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(setupChanged), name: .sanduhrSetupDidChange, object: nil)
         watchVisibility()
         // CI watchers follow runners only while the Desk shows.
         MainActor.assumeIsolated { RunnerWatchController.shared.refresh() }
@@ -954,7 +971,7 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// Escape is Cancel, wherever the key focus is in Sanduhr. Nothing is saved until Done. While
     /// Desk is off, or already arranging, nothing happens.
     func arrangeDesk() {
-        guard running, !model.arrange.active, let w = window as? DeskWindow else { return }
+        guard running, model.desktopOn, !model.arrange.active, let w = window as? DeskWindow else { return }
         model.arrange.begin()
         w.takesKey = true
         // Under the icons (DeskLayer) the window comes up for the edit, and the click layer rests.

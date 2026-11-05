@@ -67,6 +67,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let tour = WelcomeTour.atLaunch(
             fresh: firstRun == .fresh, hasKey: KeychainStore.exists(account: KeychainAccount.sessionKey),
             accounts: KeychainStore.accounts.labels.count, lastSeen: WhatsNew.lastSeen())
+        // Set up Sanduhr's migration, once, before anything can fetch or place the widget: an account
+        // keeps usage on, Just the Desk alone leaves it off (SetupMigration).
+        Self.runSetupMigration()
+        lastUsageOn = viewModel.usageOn
 
         // Build widget panel.
         let hosting = NSHostingController(rootView: RootView(vm: viewModel))
@@ -94,10 +98,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let wasShowing = !UserDefaults.standard.bool(forKey: Self.panelHiddenKey)
         let show = WidgetVisibilityRule.resolve(
             showing: wasShowing, setting: .saved(), deskOn: DeskController.shared.enabled,
-            hasSessionKey: JustTheDesk.signInSettled(awaitingSignIn: awaitingSignIn,
-                                                     hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey)), event: .launch)
-        if show != wasShowing { UserDefaults.standard.set(!show, forKey: Self.panelHiddenKey) }
-        if show {
+            hasSessionKey: !awaitingSignIn, event: .launch,
+            usageOn: viewModel.usageOn)
+        // Before any setup the Set up Sanduhr window is what shows: the widget waits behind it, and
+        // Continue brings it back as the choices say (SetupLaunch).
+        let setupPending = SetupLaunch.opensSetup(SetupStore.load())
+        let held = setupPending && SetupLaunch.widgetStartsHidden(SetupStore.load(), deskEnabled: DeskController.shared.enabled)
+        if held { awaitingSignIn = false }
+        let showNow = show && !held
+        if show != wasShowing && !held { UserDefaults.standard.set(!show, forKey: Self.panelHiddenKey) }
+        if showNow {
             panel.makeKeyAndOrderFront(nil)
         }
         fitPanelToContent()
@@ -124,7 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 usage: vm.shownUsage, fetchedAt: vm.lastUpdated, signInNeeded: vm.status.needsSignIn,
                 firstSignIn: vm.status == .notSignedIn,
                 account: vm.shownAccountLabel, veiled: vm.switchVeil, switchNote: vm.switchNote,
-                keyPresent: vm.canFetch))
+                keyPresent: vm.canFetch, usageOff: vm.status == .usageOff))
         }
 
         // When the user toggles compact mode, resize the panel to fit the
@@ -190,9 +200,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // replace the last one's (a new stamped folder, the link swapped). No install, no write.
         Task.detached(priority: .utility) { IntegrationScripts.standard.refreshIfInstalled() }
         showWhatsNewIfUpdated(fresh: firstRun == .fresh, tourPending: tour == .pending)
+        openSetupIfPending()
     }
 
-    /// What a refresh's answer means for sign-in: the launch gate, the tour, Just the Desk and the
+    /// What a refresh's answer means for sign-in: the launch gate, the tour and the
     /// widget waiting for numbers. Skipped under demo mode, whose samples are no sign-in.
     private func afterUsageUpdate(_ vm: UsageViewModel) {
         let fetched = vm.usage != nil && (vm.status == .idle || vm.status == .noTiers)
@@ -201,17 +212,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                           account: KeychainStore.accounts.active, in: UserDefaults.standard)
         // A fresh install's welcome tour, once the first fetch has the user's own numbers.
         offerTourIfPending(fetched: fetched)
-        // Just the Desk ends once a key is saved (a failed one included): the sign-in reminder it
-        // turned off comes back on, and the widget waits for that key like any other.
-        if KeychainStore.exists(account: KeychainAccount.sessionKey), JustTheDesk.endBySignIn() {
-            DeskController.shared.model.refreshClaude()
-            // Not fetched yet: the widget comes up for this key's sign-in, as for any other.
-            if !fetched { applyWidgetVisibility(.justTheDesk) }
-        }
         // The widget showed for sign-in; once the numbers arrive the choice takes over.
         if awaitingSignIn, fetched {
             awaitingSignIn = false
             applyWidgetVisibility(.signedIn)
+        }
+        // Usage went off or on (Set up Sanduhr): off puts the widget away; on brings it up until the
+        // first fetch answers, as a launch does, then the choice takes over.
+        if vm.usageOn != lastUsageOn {
+            lastUsageOn = vm.usageOn
+            if vm.usageOn { awaitingSignIn = true }
+            applyWidgetVisibility(.usageChanged)
         }
         // Signed out (Settings, Credentials): the widget shows for sign-in again, as at a
         // launch without a key, until the next successful fetch.
@@ -219,6 +230,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             awaitingSignIn = true
             applyWidgetVisibility(.signedOut)
         }
+    }
+
+    /// Claude usage as the last update saw it, to tell a switch from an ordinary refresh.
+    private var lastUsageOn = true
+
+    /// Runs Set up Sanduhr's migration once and applies what it decided. The Desk switch and the
+    /// sign-in reminder are the only things it touches; usage itself is read from the stored setup.
+    private static func runSetupMigration() {
+        let desk = UserDefaults.desk
+        let deskEnabled = DeskController.shared.enabled
+        guard let result = SetupMigration.runOnce(
+            hasAccount: KeychainStore.exists(account: KeychainAccount.sessionKey),
+            justTheDesk: JustTheDesk.isOn(),
+            silencedReminder: UserDefaults.standard.object(forKey: JustTheDesk.silencedKey) as? Bool == true,
+            deskEnabled: deskEnabled) else { return }
+        if result.deskOn != deskEnabled { desk.set(result.deskOn, forKey: DeskController.enabledKey) }
+        if result.reminderOn { SignInReminder.set(true, in: desk) }
     }
 
     /// The welcome tour has been offered in this launch.
@@ -245,7 +273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let lastSeen = WhatsNew.lastSeen()
         let decision = WhatsNew.atLaunch(
             lastSeen: lastSeen, current: current, fresh: fresh,
-            onboarding: JustTheDesk.showsWelcome(hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey)),
+            onboarding: Self.welcomePending(),
             hidden: WhatsNew.hidden(),
             tour: tourPending)
         if decision.record { WhatsNew.record(current) }
@@ -293,28 +321,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The When the widget shows picker changed (Settings, General, Surfaces).
     func widgetVisibilityDidChange() { applyWidgetVisibility(.choiceChanged) }
 
-    /// The welcome sheet's Just the Desk: the Desk on, the sign-in line gone, and the widget out of
-    /// the way as its When the widget shows choice says. A pending tour opens a moment later, as
-    /// its Desk-only steps (no fetch is coming to offer it).
-    func chooseJustTheDesk() {
-        JustTheDesk.choose()
-        DeskController.shared.apply()
+    /// The welcome has not been dealt with: the Set up Sanduhr window is due (no setup yet), or usage
+    /// is ticked with no key and the sign-in sheet is due. What's New waits for it.
+    static func welcomePending(notNow: Bool = false) -> Bool {
+        let setup = SetupStore.load()
+        return SetupLaunch.opensSetup(setup)
+            || SetupLaunch.showsSignIn(setup, hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey), notNow: notNow)
+    }
+
+    /// Opens Set up Sanduhr a moment after launch while no setup exists (a new install, or an upgrade
+    /// with no account that never chose Just the Desk). Closing it saves nothing, so it asks again at
+    /// the next launch.
+    private func openSetupIfPending() {
+        guard SetupLaunch.opensSetup(SetupStore.load()) else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            MainActor.assumeIsolated { SetupWindowController.shared.show() }
+        }
+    }
+
+    /// Set up Sanduhr's Continue saved: the widget follows the new choices, the menu bar item redraws,
+    /// and a pending welcome tour opens for what was turned on (with usage ticked it waits for the
+    /// first fetch, as before; without it no fetch is coming, so it opens now, Desk-only).
+    func afterSetup(_ result: SetupResult) {
+        let hasKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
+        if result.now.claudeUsage {
+            // On from a first run with no key: the widget comes up for sign-in, as a launch does.
+            awaitingSignIn = !SignInGate.fetched(KeychainStore.accounts.active, in: UserDefaults.standard) || !hasKey
+        }
+        lastUsageOn = viewModel.usageOn
+        applyWidgetVisibility(.usageChanged)
         DeskController.shared.model.refreshClaude()
-        applyWidgetVisibility(.justTheDesk)
         renderStatusItem()
-        guard WelcomeTour.showsForJustTheDesk(state: WelcomeTour.state(), offeredThisLaunch: tourOffered) else { return }
+        // Usage ticked and no key: the sign-in sheet opens now, not at the next launch.
+        if SetupLaunch.showsSignIn(result.now.toSettings(before: SetupStore.load()), hasSessionKey: hasKey, notNow: false) {
+            NotificationCenter.default.post(name: .sanduhrSetupSignInDue, object: nil)
+        }
+        guard !result.now.claudeUsage,
+              WelcomeTour.showsAfterSetup(state: WelcomeTour.state(), offeredThisLaunch: tourOffered) else { return }
         tourOffered = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             MainActor.assumeIsolated { WelcomeTourWindowController.shared.show() }
         }
     }
 
-    /// Ends Just the Desk without a key (the smoke hook's off): the keys cleared, the Claude pieces
-    /// and the menu bar item redrawn.
-    func endJustTheDesk() {
-        JustTheDesk.end()
-        DeskController.shared.model.refreshClaude()
-        renderStatusItem()
+    /// The smoke hook's `just-the-desk`: Set up Sanduhr with usage ticked off (on) or back on (off),
+    /// the other two ticks as they are, applied the way Continue applies them.
+    func setUsageForSmoke(_ on: Bool) {
+        applySetupForSmoke(desktop: on ? nil : true, usage: on)
+    }
+
+    /// The smoke hook's `setup`: the desktop and usage ticks it names, applied the way Continue
+    /// applies them. Drawers stay as they are, so a hook never moves a file.
+    func applySetupForSmoke(desktop: Bool?, usage: Bool?) {
+        let host = AppSetupHost(usage: viewModel, confirm: { _ in true })
+        let service = SetupService(storage: .defaults(setup: UserDefaults.standard, desk: UserDefaults.desk), host: host)
+        var choices = service.current()
+        if let desktop { choices.desktop = desktop }
+        if let usage { choices.claudeUsage = usage }
+        afterSetup(service.apply(choices))
     }
 
     /// Shows or hides the widget as WidgetVisibilityRule says for `event`; leaves it alone when
@@ -322,8 +386,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func applyWidgetVisibility(_ event: WidgetVisibilityEvent) {
         guard let show = WidgetVisibilityRule.shouldShow(
             setting: .saved(), deskOn: DeskController.shared.enabled,
-            hasSessionKey: JustTheDesk.signInSettled(awaitingSignIn: awaitingSignIn,
-                                                     hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey)), event: event) else { return }
+            hasSessionKey: !awaitingSignIn, event: event,
+            usageOn: viewModel.usageOn) else { return }
         if !show { hidePanel(); return }
         guard let panel, !panel.isVisible else { return }
         // Comes back without taking focus from whatever flipped Desk (the Settings window).
@@ -434,7 +498,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// (MenuBarText: the session, the weekly limit, the higher of the two, or both in turn).
     func renderStatusItem() {
         guard let button = statusItem?.button else { return }
-        let reading = MenuBarText.reading(viewModel.usage, mode: .saved(), step: menuBarStep)
+        let reading = MenuBarText.reading(viewModel.usage, mode: .saved(), step: menuBarStep,
+                                          usageOn: viewModel.usageOn)
 
         if let reading {
             let look = MenuBarItemLook(reading)
@@ -474,6 +539,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if rightClick {
             showStatusMenu(from: sender)
+        } else if SetupLaunch.menuBarClickOpensSetup(setupPending: SetupLaunch.opensSetup(SetupStore.load()),
+                                                     hasAccount: KeychainStore.exists(account: KeychainAccount.sessionKey)) {
+            SetupWindowController.shared.show()
         } else {
             togglePanel()
         }
@@ -693,6 +761,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // After the menu has closed, so nothing is tracking when the bar's panel takes the key.
         case .arrangeDesk: DispatchQueue.main.async { DeskController.shared.arrangeDesk() }
         case .checkForUpdates: updaterController.checkForUpdates(nil)
+        case .setup: SetupWindowController.shared.show()
         case .whatsNew: WhatsNewWindowController.shared.show()
         case .tour: WelcomeTourWindowController.shared.show()
         case .quit: AppQuit.now()

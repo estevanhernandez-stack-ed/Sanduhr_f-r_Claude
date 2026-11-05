@@ -27,6 +27,9 @@ struct DeskUsage {
     /// (UsageViewModel.canFetch); false when there is none to fetch with (a dev build's empty file
     /// store, a missing or unreadable Keychain item); nil before the widget has said.
     var keyPresent: Bool? = nil
+    /// Claude usage is off (Set up Sanduhr): the Claude pieces and the notch's meters draw nothing,
+    /// no sign-in line included, as with the reminder off and no numbers. Never a sign-in state.
+    var usageOff = false
 
     /// Numbers older than this are drawn dimmed, and the notch drops them.
     static let staleAfter: TimeInterval = 15 * 60
@@ -40,6 +43,14 @@ struct DeskUsage {
     /// while Sign-in reminders are on, and stay empty, the wing folded, while they are off.
     var settled: DeskUsage {
         var u = self
+        if usageOff {
+            u.usage = nil
+            u.fetchedAt = nil
+            u.signInNeeded = false
+            u.veiled = false
+            u.switchNote = false
+            return u
+        }
         if keyPresent == false, usage == nil, !veiled { u.signInNeeded = true }
         return u
     }
@@ -48,6 +59,7 @@ struct DeskUsage {
     /// switch's fade veils the old numbers, or a key that can fetch waits for its first answer, for
     /// at most `firstFetchWait` from `waitingSince`. Never with no key, never once sign-in is needed.
     func metersPending(waitingSince: Date?, now: Date) -> Bool {
+        if usageOff { return false }
         if veiled { return true }
         guard !signInNeeded, fetchedAt == nil, keyPresent != false else { return false }
         guard let waitingSince else { return true }

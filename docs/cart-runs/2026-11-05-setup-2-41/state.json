@@ -1,0 +1,193 @@
+{
+  "run": "setup-2-41",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "d1686977eaa0b59c60168b325a08eb3172c53134",
+  "integration_branch": "cart/setup-2-41",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-setup-2-41/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-setup-2-41",
+  "builder_branch": "main",
+  "uncommitted_at_start": [],
+  "started_at": "2026-11-05T14:16:58.727Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "setup-model",
+      "title": "The stored setup, its migration and the launch rules",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-2-41--01-setup-model",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "usage-off",
+      "title": "Usage off with the account kept",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-2-41--02-usage-off",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "desktop-off",
+      "title": "A nicer desktop off leaves only the drawers",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-2-41--03-desktop-off",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "setup-service",
+      "title": "The setup service applies a change",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-2-41--04-setup-service",
+      "worktree": "",
+      "on": 3,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "setup-window",
+      "title": "The Set up Sanduhr window, where it opens, and the 2.41.0 card",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-2-41--05-setup-window",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "chat-reader",
+      "title": "The AI chat prompt and the pasted-answer reader",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-2-41--06-chat-reader",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 7,
+      "slug": "chat-window",
+      "title": "Design it with an AI chat in the app",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-2-41--07-chat-window",
+      "worktree": "",
+      "on": 6,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 8,
+      "slug": "smoke-setup",
+      "title": "state.yaml and the smoke scenario",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-2-41--08-smoke-setup",
+      "worktree": "",
+      "on": 5,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 9,
+      "slug": "docs-2-41",
+      "title": "PRIVACY, README, smoke doc and CHANGELOG",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-2-41--09-docs-2-41",
+      "worktree": "",
+      "on": 7,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 10,
+      "slug": "review-fixes",
+      "title": "Whole-branch review fixes",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/setup-2-41--10-review-fixes",
+      "worktree": "",
+      "on": 9,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}

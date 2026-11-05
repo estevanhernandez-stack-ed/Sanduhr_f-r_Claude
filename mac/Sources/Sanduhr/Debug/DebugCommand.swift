@@ -38,9 +38,12 @@ enum DebugAction: Equatable {
     /// the debug override too); `force` writes the switch and the override, so a notched Mac
     /// draws the pill for the smoke tools. Applied live.
     case notchPill(NotchPillMode)
-    /// Just the Desk (BACKLOG #4): `on` does what the welcome sheet's button does; `off` ends it as a
-    /// sign-in does, without a key. Applied live.
+    /// Just the Desk, as Set up Sanduhr has it since 2.41.0 (desktop on, Track my AI usage off): `on`
+    /// applies that the way Continue does; `off` ticks usage again. Applied live.
     case justTheDesk(on: Bool)
+    /// Set up Sanduhr's ticks, applied through the setup service as Continue applies them: desktop
+    /// and Track my AI usage, either or both (nil leaves it as it is). Drawers are never touched here.
+    case setup(desktop: Bool?, usage: Bool?)
 
     /// Drawers (docs/mac-drawers-setup-spec.md, section 9): `on` turns it on (and the Desk), `sort`
     /// reads the Desktop and holds the review, `apply` applies the pending review, `off` puts every
@@ -131,7 +134,7 @@ enum DebugAction: Equatable {
     enum ModsSheet: Equatable { case export, exportSample, importSample }
 
     static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
-                        "test-alert", "pulse", "tool", "desk", "notch", "notch-pill", "just-the-desk", "drawers", "camera-light", "glow",
+                        "test-alert", "pulse", "tool", "desk", "notch", "notch-pill", "just-the-desk", "setup", "drawers", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
                         "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
                         "desk-arrange", "hot-key", "reset", "mods-config"]
@@ -239,6 +242,8 @@ enum DebugLink {
             case "off": return .success(.justTheDesk(on: false))
             default: return bad("just-the-desk needs arg=on or off")
             }
+        case "setup":
+            return setupAction(arg)
         case "drawers":
             guard let step = arg.flatMap({ DebugAction.DrawersStep(rawValue: $0.lowercased()) }) else {
                 return bad("drawers needs arg=on, sort, apply or off")
@@ -327,6 +332,29 @@ enum DebugLink {
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }
+    }
+
+    /// `setup desktop=on usage=off`: words of key=value, each key once. Only desktop and usage can be
+    /// set; drawers has its own action and its own guard, and any other word is refused.
+    static func setupAction(_ arg: String?) -> Result<DebugAction, Failure> {
+        func bad(_ why: String) -> Result<DebugAction, Failure> { .failure(Failure(message: why)) }
+        let usage = "setup needs arg=desktop=on|off and/or usage=on|off"
+        let words = (arg ?? "").lowercased().split(whereSeparator: { $0 == " " || $0 == "," }).map(String.init)
+        guard !words.isEmpty else { return bad(usage) }
+        var desktop: Bool?
+        var usageOn: Bool?
+        for word in words {
+            let parts = word.split(separator: "=", omittingEmptySubsequences: false).map(String.init)
+            guard parts.count == 2 else { return bad(usage) }
+            if parts[0] == "drawers" { return bad("setup does not set drawers; use the drawers action") }
+            guard let on = ["on": true, "off": false][parts[1]] else { return bad(usage) }
+            switch parts[0] {
+            case "desktop" where desktop == nil: desktop = on
+            case "usage" where usageOn == nil: usageOn = on
+            default: return bad(usage)
+            }
+        }
+        return .success(.setup(desktop: desktop, usage: usageOn))
     }
 
     /// A section by its raw value, ignoring case and dashes ("desk-layout" is deskLayout).

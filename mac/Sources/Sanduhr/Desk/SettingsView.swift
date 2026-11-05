@@ -23,6 +23,7 @@ struct DeskLayoutSection: View {
                 Toggle(SettingsNames.deskSwitch, isOn: $deskOn)
                     .onChange(of: deskOn) { _, _ in DeskController.shared.apply() }
                     .settingsAnchor(SettingsAnchor.desk)
+                DeskHiddenRow(deskOn: deskOn)
                 DeskArrangeRow(deskOn: deskOn, arranging: arranging,
                                placesNothing: DeskArrangement(layout).placesNothing)
                     .settingsAnchor(SettingsAnchor.arrange)
@@ -310,15 +311,33 @@ struct NeedsDeskRow: View {
 /// Desk's Arrange Desk… button (item 60). While arranging, the places and the order here wait:
 /// Done on the desktop writes the layout, so an edit here would be overwritten. With nothing
 /// placed there is nothing to drag, so the button waits for a piece.
+/// Under the Desk switch while A nicer desktop is off: the switch is on, but the Desk draws nothing. Says so, with the way back.
+private struct DeskHiddenRow: View {
+    let deskOn: Bool
+    var desktopOn: Bool = SetupDesk.desktopOn()
+
+    var body: some View {
+        if let line = SetupDesk.hiddenNote(desktop: desktopOn, deskOn: deskOn) {
+            LabeledContent {
+                Button(SetupCopy.menuItem) { SetupWindowController.shared.show() }
+            } label: {
+                Text(line).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
 private struct DeskArrangeRow: View {
     let deskOn: Bool
     let arranging: Bool
     var placesNothing = false
+    /// A nicer desktop (setup): off, the Desk draws no pieces, so there is nothing to arrange.
+    var desktopOn: Bool = SetupDesk.desktopOn()
 
     var body: some View {
         LabeledContent {
             Button(DeskArrangeCopy.settingsButton) { DeskController.shared.arrangeDesk() }
-                .disabled(!deskOn || arranging || placesNothing)
+                .disabled(!deskOn || !desktopOn || arranging || placesNothing)
         } label: {
             Text(note)
                 .font(.callout)
@@ -329,6 +348,7 @@ private struct DeskArrangeRow: View {
     private var note: String {
         if arranging { return DeskArrangeCopy.settingsArranging }
         if !deskOn { return DeskArrangeCopy.settingsDeskOff }
+        if let off = SetupDesk.arrangeNote(desktop: desktopOn) { return off }
         if placesNothing { return DeskArrangeCopy.settingsNothingPlaced }
         return DeskArrangeCopy.settingsNote
     }
@@ -1270,6 +1290,7 @@ struct GeneralSection: View {
 
     var body: some View {
         Form {
+            setupSection
             SurfacesStatusSection()
             Section("Startup") {
                 Toggle("Open Sanduhr at login", isOn: $atLogin)
@@ -1294,6 +1315,17 @@ struct GeneralSection: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// Set up Sanduhr…: the screen that chooses the Desk's pieces, Drawers and usage tracking.
+    private var setupSection: some View {
+        Section {
+            LabeledContent("Choose what Sanduhr shows: a nicer desktop, your files in drawers, your AI usage.") {
+                Button(SetupCopy.menuItem) { SetupWindowController.shared.show() }
+                    .accessibilityLabel(SetupCopy.title)
+            }
+            .settingsAnchor(SettingsAnchor.setup)
+        }
     }
 
     /// The hourglass itself, Menu Bar Shows (the percent beside it) and the meetings menu's item.

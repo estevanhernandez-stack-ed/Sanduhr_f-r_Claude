@@ -67,7 +67,7 @@ struct DeskView: View {
         if model.widgetPreviewsCompanion, arrangement.placement("companion") == nil {
             arrangement.pieces.append(DeskPlacement(widget: "companion", anchor: DeskArrangement.defaultAnchor("companion")))
         }
-        return arrangement.stacks(showMeetings: showMeetings)
+        return SetupDesk.visible(arrangement, desktop: model.desktopOn).stacks(showMeetings: showMeetings)
     }
 
     var body: some View {

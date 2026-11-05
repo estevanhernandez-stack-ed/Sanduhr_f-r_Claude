@@ -18,6 +18,7 @@ struct DeskDesignBanner: View {
             header
             DeskDesignDetails(model: model)
             hint
+            applyNote
             DeskDesignButtons(model: model, preview: preview, endPreview: endPreview, apply: apply, dismiss: dismiss)
         }
         .padding(10)
@@ -30,6 +31,14 @@ struct DeskDesignBanner: View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "sparkles").foregroundStyle(.tint)
             Text(model.heading).font(.headline)
+        }
+    }
+
+    @ViewBuilder
+    private var applyNote: some View {
+        if let text = model.applyNote {
+            Text(text).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

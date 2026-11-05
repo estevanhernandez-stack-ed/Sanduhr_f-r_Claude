@@ -1,0 +1,33 @@
+# Set up Sanduhr (docs/mac-smoke-test.md section 74): turn usage off and on, then the desktop off and
+# on, checking state.yaml's `setup` after each. The hook applies the ticks through the setup service as
+# Continue does and never touches drawers. The args are quoted: a bare on or off is a YAML boolean and
+# the hook refuses it.
+#
+# Starts from desktop on and usage on (an install that kept its meters) and leaves it that way, so
+# the run changes nothing. Desktop off needs usage on: with nothing ticked the screen refuses it.
+name: Set up Sanduhr usage and desktop off and on
+steps:
+  - expect_state:
+      setup.desktop: true
+      setup.usage: true
+      setup.pending: false
+  - do: setup
+    arg: "usage=off"
+  - expect_state:
+      setup.usage: false
+      setup.desktop: true
+  - do: setup
+    arg: "usage=on"
+  - expect_state:
+      setup.usage: true
+      setup.desktop: true
+  - do: setup
+    arg: "desktop=off"
+  - expect_state:
+      setup.desktop: false
+      setup.usage: true
+  - do: setup
+    arg: "desktop=on"
+  - expect_state:
+      setup.desktop: true
+      setup.usage: true

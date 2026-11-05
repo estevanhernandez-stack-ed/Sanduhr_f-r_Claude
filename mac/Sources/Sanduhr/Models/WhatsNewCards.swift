@@ -7,8 +7,16 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2400 + release2390 + release2380 + release2370 + release2360 + release2350 + release2340 + release2330 + release2320 + release2310 + release2300 + release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2410 + release2400 + release2390 + release2380 + release2370 + release2360 + release2350 + release2340 + release2330 + release2320 + release2310 + release2300 + release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2410: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.41.0", id: "choose-what-shows",
+            title: "Choose what Sanduhr shows",
+            body: "Set up Sanduhr turns the Desk's pieces, Drawers and usage tracking on or off in one place. Open it from the menu bar item or Settings, General.",
+            art: .symbol("checklist"), destination: .general, opensSetup: true),
+    ]
 
     static let release2400: [WhatsNewCard] = [
         WhatsNewCard(

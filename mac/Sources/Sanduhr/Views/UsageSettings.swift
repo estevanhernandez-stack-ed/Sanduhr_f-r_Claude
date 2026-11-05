@@ -219,7 +219,8 @@ struct UsageSettings: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            switch SignedOut.usageState(label: navigation.usagePage.label(vm), demo: vm.demo) {
+            switch SignedOut.usageState(label: navigation.usagePage.label(vm), demo: vm.demo,
+                                        usageOff: vm.status == .usageOff) {
             case .account(let label):
                 UsageHeader(vm: vm, page: navigation.usagePage, navigation: navigation, label: label)
                 UsageTabContent(vm: vm, page: navigation.usagePage, navigation: navigation,
@@ -228,6 +229,8 @@ struct UsageSettings: View {
                 UsageDemo(vm: vm, page: navigation.usagePage, accent: theme.accent)
             case .signedOut:
                 UsageSignedOut()
+            case .usageOff:
+                UsageOffNote()
             }
         }
         .padding(20)
@@ -252,6 +255,24 @@ private struct UsageSignedOut: View {
             Button(SettingsSection.credentials.linkTitle) { SettingsWindowController.shared.show(.credentials) }
             Spacer(minLength: 0)
         }
+    }
+}
+
+/// Claude usage is off (Set up Sanduhr): the one line, in place of the sign-in line. The account,
+/// its history and its settings are kept.
+private struct UsageOffNote: View {
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: "pause.circle")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            Text(SetupCopy.usageOffSettingsLine)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 

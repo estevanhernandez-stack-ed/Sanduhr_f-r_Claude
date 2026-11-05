@@ -37,6 +37,8 @@ struct DrawerSettings: Equatable, Sendable {
     var hidden: [String] = []
     var tidyCorner: DrawerCorner = .topRight
     var tidyFlow: DrawerFlow = .column
+    /// A rules review was applied once: Set up Sanduhr opens its first review only before that.
+    var everSorted = false
 
     func lookFor(_ id: String) -> DrawerLook { looks[id] ?? look }
 }
@@ -58,6 +60,7 @@ enum DrawerPrefs {
         static let hidden = prefix + "hidden"
         static let tidyCorner = prefix + "tidy.corner"
         static let tidyFlow = prefix + "tidy.direction"
+        static let everSorted = prefix + "everSorted"
     }
 
     static func load(from d: UserDefaults) -> DrawerSettings {
@@ -81,6 +84,7 @@ enum DrawerPrefs {
         s.hidden = ids(d.stringArray(forKey: Key.hidden))
         s.tidyCorner = d.string(forKey: Key.tidyCorner).flatMap(DrawerCorner.init(rawValue:)) ?? .topRight
         s.tidyFlow = d.string(forKey: Key.tidyFlow).flatMap(DrawerFlow.init(rawValue:)) ?? .column
+        s.everSorted = d.bool(forKey: Key.everSorted)
         return s
     }
 
@@ -97,6 +101,7 @@ enum DrawerPrefs {
         d.set(s.hidden, forKey: Key.hidden)
         d.set(s.tidyCorner.rawValue, forKey: Key.tidyCorner)
         d.set(s.tidyFlow.rawValue, forKey: Key.tidyFlow)
+        d.set(s.everSorted, forKey: Key.everSorted)
     }
 
     /// Removes every `drawers.*` key. Returns true when none is left.

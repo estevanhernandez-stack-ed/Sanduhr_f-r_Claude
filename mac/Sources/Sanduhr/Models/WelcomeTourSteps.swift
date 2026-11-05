@@ -7,8 +7,8 @@ import Foundation
 extension WelcomeTour {
     static var table: [TourCard] { yourNumbers + aroundTheMac + beyondTheWidget }
 
-    /// The tour for someone who chose Just the Desk: three steps with no meters, accounts or
-    /// Claude Code in them. The desk, menu-bar and notch cards are the table's, moved up a step
+    /// The tour for a Mac with Track my AI usage unticked in Set up Sanduhr (what Just the Desk was):
+    /// three steps with no meters, accounts or Claude Code in them. The desk, menu-bar and notch cards are the table's, moved up a step
     /// (the menu-bar body is rewritten for a Mac with no numbers); a last card says the Desk
     /// stands alone and where sign-in lives.
     static var deskOnly: [TourCard] {
@@ -16,14 +16,14 @@ extension WelcomeTour {
         return [
             moved(byID["desk"]!, to: 1),
             moved(byID["menu-bar"]!, to: 2,
-                  body: "The hourglass in the menu bar opens Settings and the Desk's pages. Once you sign in it shows a percent of your limits."),
+                  body: "The hourglass in the menu bar opens Settings and the Desk's pages. Once you turn on usage it shows a percent of your limits."),
             moved(byID["notch"]!, to: 2),
             TourCard(
-                id: "sign-in", step: 3,
-                title: "Sign in any time",
-                body: "The Desk works without a Claude account. Sign in from Settings, Accounts whenever you have one, and the meters fill in on the desktop and the notch.",
-                art: .preview(.meters), showMe: .settings(.credentials),
-                showMeTitle: "Accounts"),
+                id: "usage", step: 3,
+                title: "Usage when you want it",
+                body: "The Desk works without tracking usage. Turn on Track my AI usage in Set up Sanduhr whenever you like, and the meters fill in on the desktop and the notch.",
+                art: .preview(.meters), showMe: .setup,
+                showMeTitle: SetupCopy.title),
         ]
     }
 

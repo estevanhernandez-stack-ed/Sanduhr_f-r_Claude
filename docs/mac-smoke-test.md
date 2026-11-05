@@ -1912,36 +1912,34 @@ the default 680 pt window shows full previews, `settings_preview_folded: false`)
    under the switch says where the height lives. Set it back to 0: the hint says nothing shows under
    the camera. Put your values back.
 
-## 45. Just the Desk (BACKLOG #4)
+## 45. Just the Desk (BACKLOG #4), since 2.41.0 Set up Sanduhr with usage off
+
+The welcome sheet's Just the Desk button is gone: Set up Sanduhr's "desktop on, **Track my AI usage** off" is the same state, and
+`state.yaml`'s `just_the_desk` now reads as that (usage off). Section 74 walks the window; this section keeps the Desk-only checks.
 
 On a scratch macOS user (or `defaults delete com.626labs.sanduhr; defaults delete
 com.626labs.sanduhr.desk` on a throwaway profile with no Sanduhr Keychain item), never on your own.
 
-1. Open Sanduhr: the welcome sheet has **Just the Desk** at the bottom with its caption. Click it:
-   the sheet goes, the widget hides (When the widget shows is "Hidden while Desk is on" on a fresh
+1. Open Sanduhr: Set up Sanduhr opens (**A nicer desktop** and **Tidy my files** ticked, **Track my AI usage** not). Press
+   **Continue** with usage unticked: the window goes, the widget hides (When the widget shows is "Hidden while Desk is on" on a fresh
    install), and the Desk shows the clock, the message and meetings with no "sign in to Sanduhr"
    line; the notch's Claude meters wing is empty. `smoke/smoke state` shows `just_the_desk: true`,
-   `desk_enabled: true`, and Settings, Alerts has **Sign-in reminders on the Desk and notch** off.
-   The menu bar item is the icon alone.
-   Settings, Alerts and Claude Code open with "…once you sign in" and **Accounts Settings…**, which
-   opens Accounts; the line is gone once signed in.
+   `desk_enabled: true`, `setup.usage: false`. The menu bar item is the icon alone.
+   Settings, Usage, Alerts and Claude Code open with "Usage tracking is off. Turn it on in Set up Sanduhr."
 1b. A second later, if the welcome tour was still pending, the Desk-only tour opens: three steps, On
-   your desktop, At a glance (with Around the notch on a Mac that has one), and Sign in any time,
-   whose Accounts button opens Accounts. A hook drives the same path:
-   `smoke/smoke do just-the-desk on` (and `off` to end it), or
+   your desktop, At a glance (with Around the notch on a Mac that has one), and Usage when you want it,
+   whose button opens Set up Sanduhr. A hook drives the same path:
+   `smoke/smoke do just-the-desk on` (and `off` to turn usage on again), or
    `smoke/smoke run smoke/scenarios/just-the-desk.yaml` (run from `mac/`).
-2. Quit and open again: no welcome sheet, the widget stays hidden, the Desk comes back. Show
-   Widget from the menu bar: it reads "Not signed in — sign in"; a click opens Accounts.
+2. Quit and open again: no Set up window, the widget stays hidden, the Desk comes back. Show
+   Widget from the menu bar: it reads that usage tracking is off.
 3. After an update (`defaults write com.626labs.sanduhr whatsNewLastSeen 2.13.0`, relaunch):
    What's New shows, though there is no key.
-4. Sign in from Settings, Accounts: the first numbers fill the Desk's meters and the notch wing;
-   `just_the_desk: false`, and the sign-in reminder switch is on again. Had you turned that switch
-   off yourself before choosing Just the Desk, it stays off.
-4b. Choose Just the Desk again on a fresh profile, then paste a made-up key in Settings, Accounts:
-   `just_the_desk: false` at once, the widget comes up reading the refusal, the Desk says "sign in
-   again in Sanduhr", and a relaunch keeps the widget up until a key works.
-5. Without Just the Desk (a fresh profile, sign in or close the sheet): the sheet comes back at each
-   launch until a key is saved, as before.
+4. Sign in from Settings, Accounts: usage turns on at once and the first numbers fill the Desk's meters and the notch wing;
+   `just_the_desk: false` and `setup.usage: true`.
+4b. Turn usage off again in Set up Sanduhr, then paste a made-up key in Settings, Accounts: usage is on at once, the widget comes up
+   reading the refusal, and the Desk says "sign in again in Sanduhr".
+5. A fresh profile, then **Not now** on Set up Sanduhr: nothing is saved, and it opens again at each launch until you press Continue.
 
 ## 46. Per-seat meters (item 74)
 
@@ -2758,3 +2756,69 @@ is off with no review pending; `do: drawers on` gives `on: true` and 0 drawers; 
 apply` gives 2 drawers, `files` of 3 and 2, no review and `journal_open: false`; `drawers off` gives `on: false` and 0 drawers with the
 files back in the folder. A release build, or a debug build without the variable, refuses the action and the run fails at the first
 `drawers on`, which is correct: it would have acted on the real Desktop.
+
+## 74. Set up Sanduhr (2.41.0)
+
+Live, by hand, on a scratch macOS user or a Mac you can reset: this section changes real settings, and steps 6 to 8 can save drawer rules.
+Before you start, quit `/Applications/Sanduhr.app`, back up `~/Library/Application Support/Sanduhr` and both preferences domains, and use
+a dev build (`cd mac && ./build.sh --debug`, signed out, file store) for the new-install and migration steps; never sign in or remove an
+account in a dev build. Paste only made-up JSON. Put made-up files on the Desktop only if you walk step 8.
+
+1. New install: `defaults delete com.626labs.sanduhr; defaults delete com.626labs.sanduhr.desk`, then launch. About half a second later
+   **Set up Sanduhr** opens, with no welcome sheet: **A nicer desktop** and **Tidy my files** ticked, **Track my AI usage** (Claude)
+   not, the line "Pick what you want. You can change this any time from the menu bar or Settings, General.", **Design it with an AI
+   chat** under its caption, and **Not now** and **Continue**. Untick the two ticked choices: Continue is off and says "Pick at least one, or Sanduhr
+   has nothing to show." Press **Not now**, relaunch: it opens again (nothing was saved; `state.yaml` `setup.pending: true`). Press
+   **Continue** with the first two ticked: a drawers first-review may open on the Desk if your Desktop has files a rule matches (it
+   needs the Desktop Folder permission, section 73); nothing moves before Apply. `setup.pending: false`, `setup.migrated: true`.
+2. Upgrade with an account (a release or dev profile that already has a saved key, and no `setup` key: `defaults delete
+   com.626labs.sanduhr setup; defaults delete com.626labs.sanduhr setupMigrated`): launch. No Set up window. `state.yaml` `setup.usage:
+   true`, `setup.desktop: true`, `setup.migrated: true`, the Desk's own switch as you left it, and the meters fetch as before.
+3. Upgrade from Just the Desk (clear `setup` and `setupMigrated`, then `defaults write com.626labs.sanduhr justTheDesk -bool true` on a
+   profile with no key): launch. No window; `setup.usage: false`, `setup.desktop: true`, the Desk on, the widget hidden. A relaunch
+   changes nothing.
+4. Usage off. With an account and the statusline and the meters mod installed, open Set up Sanduhr (menu bar item, **Set up
+   Sanduhr…**), untick **Track my AI usage**: "What changes" says "Your account stays saved. Remove it in Settings, Accounts." (and that
+   the Claude Code add-ons stay installed). Continue. `~/Library/Application Support/Sanduhr/snapshot.json` is gone and stays gone
+   after a minute and a relaunch; Settings, Accounts still lists the account and Keychain Access still has its item; Settings, Usage
+   says "Usage tracking is off. Turn it on in Set up Sanduhr." In a Claude Code session the statusline prints no Sanduhr numbers and
+   the meters mod shows no snapshot; `get_usage` (the Sanduhr MCP tool) answers no data with reason `missing`. With Little Snitch or
+   `nettop -p <pid>` watching Sanduhr, no request to claude.ai goes out over a few minutes (Settings, Accounts, then an account's Claude
+   Code folder, can send the one organization lookup, which is expected). Quit and relaunch: nothing fetches and no snapshot comes back.
+5. Usage on. Open Set up Sanduhr, tick **Track my AI usage**, Continue: the status reads connecting, the numbers fetch at once, and
+   `snapshot.json` is written again; the statusline, mods and `get_usage` read it. Turn it off again and save a key in Settings,
+   Accounts: usage is on and fetches (saving a key turns it on).
+6. Desktop off with drawers on: with **Tidy my files** on and some drawers showing, open Set up Sanduhr, untick **A nicer desktop**,
+   Continue. "What changes" said "The clock, message and weather hide. Your layout is kept." The Desk's clock, message and every other
+   piece are gone, the drawer panels stay, and Settings, Desk, Layout's Arrange says "Turn on A nicer desktop in Set up Sanduhr to arrange
+   the Desk." Under the Desk switch, "Hidden while A nicer desktop is off. Your places and order are kept." sits beside a **Set up
+   Sanduhr…** button, and the page's preview is dimmed. Tick it again: every piece is back where it was.
+7. Design it with an AI chat. Press **Design it with an AI chat** (also in Settings, Drawers). **Copy prompt**: the status line reads
+   "Prompt copied. Paste it into any AI chat, answer its questions, then paste its answer here." Paste into a text editor: it names no
+   file, path or number of your usage and no product, and holds the Desk's piece names. Paste this one bad block into the box:
+   `{"drawers": {"rules": [{"kind": "name_contains", "drawer": "Photos", "text": "holiday"}, {"kind": "older_than", "drawer": "Old", "days": 0}], "look": "glass"}}`
+   The list under "What to fix in the paste" names the field, `drawers.rules[1].days` ("must be a whole number from 1 to 3650"), the summary says "1 thing to fix before this can be
+   used.", and **Preview on my Desk**, **Use these drawer rules** and **Use these drawer settings** are all disabled: one bad field
+   rejects everything, `look` included. Fix `days` to 90: "Ready.", and the rules line reads "2 drawer rules into Photos, Old. Using them
+   replaces your drawer rules, turns drawers on if they are off, then shows what they would sort. Nothing moves until you Apply."
+8. The three buttons, on a good paste with a `desk` half too, for example
+   `{"desk": {"name": "Calm", "layout": {"clock": {"anchor": "tr"}}}, "drawers": {"rules": [{"kind": "name_contains", "drawer": "Photos", "text": "holiday"}], "look": "glass", "opacity": 60, "arrange": {"corner": "br", "direction": "column"}}}`
+   - **Preview on my Desk**: Settings, Desk opens with the review banner headed "An AI chat suggests a Desk design", the Desk shows the
+     preview, and `~/Library/Application Support/Sanduhr` gains no `desk-result.json` and no notification appears. Dismiss it: nothing saved.
+   - **Use these drawer rules**: your drawer rules are replaced, drawers turn on, and if a file on the Desktop contains "holiday" a rules
+     review opens on the Desk ("N files into 1 drawers"); `ls ~/Desktop` is unchanged until you press Apply. Under the button,
+     "Saved 1 drawer rule into Photos." and what happened next stay put through the other buttons, with **See them in Settings,
+     Drawers** beside it; with no match it reads "…The rules are saved, but nothing on your Desktop matches them yet."
+   - **Use these drawer settings**: the drawers go Glass at 60 percent and line up in a column from the bottom right; the status says
+     "Your drawers look different and are lined up. Undo puts them back." Press **Undo** (it is beside the button): the look, opacity,
+     Tidy corner and flow and every drawer's place are as before.
+   Close the window and open it again: the paste box is empty.
+9. Where it opens: the menu bar item's **Set up Sanduhr…** (the Sanduhr menu, near Settings); Settings, General, **Set up Sanduhr…**
+   (also found by searching "Set up" in Settings); the What's New card **Choose what Sanduhr shows** (it shows only on a build stamped 2.41.0
+   or later: `defaults write com.626labs.sanduhr whatsNewLastSeen 2.40.0`, relaunch; its Show me opens the window, not a Settings page); the sign-in sheet's
+   **Set up Sanduhr…**. Opening it twice brings the open one forward.
+
+The scripted version: `cd mac && smoke/smoke run smoke/scenarios/setup.yaml` against a debug build started with `SANDUHR_DEBUG_HOOKS=1`
+(`smoke/smoke enable` first), on a profile that already has usage and the desktop on. It turns usage off and on, then the desktop off and
+on, checking `state.yaml`'s `setup` after each, and never touches drawers. `smoke/smoke do setup usage=off` and `desktop=on` drive the
+same ticks by hand, and `ruby smoke/selftest.rb` runs the harness against its fixtures.

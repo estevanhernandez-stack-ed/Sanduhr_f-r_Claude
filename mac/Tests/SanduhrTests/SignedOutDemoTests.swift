@@ -61,8 +61,9 @@ struct SignedOutTests {
 
     @Test func notNowPutsTheWelcomeSheetAwayForThisLaunch() {
         let s = MemoryDefaults()
-        #expect(JustTheDesk.showsWelcome(hasSessionKey: false, in: s))
-        #expect(!JustTheDesk.showsWelcome(hasSessionKey: false, notNow: true, in: s))
+        let on = SetupSettings(desktop: true, usage: ["claude": true])
+        #expect(SetupLaunch.showsSignIn(on, hasSessionKey: false, notNow: false))
+        #expect(!SetupLaunch.showsSignIn(on, hasSessionKey: false, notNow: true))
         // Not Now writes nothing: the next launch (a fresh flag) asks again.
         #expect(s.values.isEmpty)
         #expect(WelcomeNotNow.title == "Not Now")

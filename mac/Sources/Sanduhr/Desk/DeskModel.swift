@@ -262,6 +262,9 @@ final class DeskModel {
 
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
     @ObservationIgnored var onHitAreasChange: (() -> Void)?
+    /// "A nicer desktop" (setup spec, section 10): off, the Desk draws none of its pieces and the saved
+    /// layout is left alone. Set from the stored setup at start and on `.sanduhrSetupDidChange`.
+    var desktopOn = true
     /// Arrange mode (item 60): the layout being edited on the desktop, nil-session outside it.
     let arrange = DeskArrangeMode()
     /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
@@ -328,8 +331,14 @@ final class DeskModel {
     /// there is no timer while the Desk is hidden or the piece is not placed. Cheap when the layout is
     /// unchanged, which is what most defaults changes are.
     func syncTelemetry() {
-        applyTelemetry(running: timer != nil,
-                       layout: UserDefaults.desk.string(forKey: "layout") ?? DeskLayout.standard)
+        applyTelemetry(running: timer != nil, layout: syncLayout())
+    }
+
+    /// The layout the polling pieces decide from: the saved words filtered by "A nicer desktop", so
+    /// with it off nothing is placed and no sampler or weather request runs (setup D7).
+    func syncLayout(saved: String? = nil) -> String {
+        SetupDesk.visibleWords(saved ?? UserDefaults.desk.string(forKey: "layout") ?? DeskLayout.standard,
+                               desktop: desktopOn)
     }
 
     /// `syncTelemetry` with its inputs given, so the rule tests without a running Desk.
@@ -346,8 +355,7 @@ final class DeskModel {
     /// or stops the service to match, so there is no timer while the Desk is hidden or the piece is not
     /// placed. Called wherever `syncTelemetry` is, and when Settings, Weather changes.
     func syncWeather() {
-        applyWeather(running: timer != nil,
-                     layout: UserDefaults.desk.string(forKey: "layout") ?? DeskLayout.standard)
+        applyWeather(running: timer != nil, layout: syncLayout())
     }
 
     /// `syncWeather` with its inputs given, so the rule tests without a running Desk.
@@ -683,7 +691,7 @@ final class DeskModel {
             DeskDesignPreview.shared.layoutString(saved: desk.string(forKey: "layout") ?? DeskLayout.standard)
         }
         var input = DeskElements.Input()
-        input.placed = DeskLayout.placed(layoutWords,
+        input.placed = DeskLayout.placed(SetupDesk.visibleWords(layoutWords, desktop: desktopOn),
                                          showMeetings: desk.object(forKey: "showMeetings") as? Bool ?? true)
         input.meterTiers = meters.map(\.tier)
         input.signInNeeded = signInNeeded && signInReminder

@@ -1,7 +1,7 @@
 # docs/mac-smoke-test.md section 45: Just the Desk. `on` changes the shared defaults the way the
 # welcome sheet's button does (the Desk on, the sign-in reminder off, the tour offered if pending)
 # and `off` undoes it. The tour has three steps on every Mac (the notch card shares step 2), and
-# tour-step clamps past the end, so step 3 is the last everywhere.
+# tour-step clamps past the end, so step 3 (Usage when you want it) is the last everywhere.
 name: Just the Desk
 steps:
   - do: just-the-desk
@@ -28,10 +28,10 @@ steps:
     arg: 3
   - expect:
       window: welcome-tour
-      contains: { text: "/Sign in any time/" }
+      contains: { text: "/Usage when you want it/" }
   - expect:
       window: welcome-tour
-      contains: { text: "/Accounts/" }
+      contains: { text: "/Track my AI usage/" }
   - expect:
       window: welcome-tour
       contains: { text: "/take the tour again/" }
