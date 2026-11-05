@@ -140,8 +140,10 @@ private struct DrawersDaysRow: View {
         LabeledContent("Older files, days") {
             HStack {
                 TextField("Days", value: days, format: .number).frame(width: 64).multilineTextAlignment(.trailing)
-                Stepper("Days", value: days, in: DrawerRules.daysRange).labelsHidden()
+                Stepper("Days", value: days, in: DrawerRules.daysRange)
             }
+            // In a Form a field's title shows beside it and wrapped ("Day s"); VoiceOver still reads it.
+            .labelsHidden()
         }
     }
 }
@@ -159,8 +161,9 @@ private struct DrawersAddRule: View {
                 Text("starts with").tag(true)
             }
             .fixedSize()
-            TextField("Words", text: $text, prompt: Text("invoice"))
-            TextField("Drawer", text: $drawer, prompt: Text("Drawer name"))
+            // Titles hidden for the same wrap as the days row; the prompts say what goes in.
+            TextField("Words", text: $text, prompt: Text("invoice")).labelsHidden().frame(minWidth: 90)
+            TextField("Drawer", text: $drawer, prompt: Text("Drawer name")).labelsHidden().frame(minWidth: 110)
             Button("Add Rule") {
                 if model.addCustomRule(startsWith: startsWith, text: text, drawer: drawer) == nil { text = ""; drawer = "" }
             }

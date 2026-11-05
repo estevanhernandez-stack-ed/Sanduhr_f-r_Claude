@@ -177,8 +177,10 @@ struct DrawerResultBar: View {
     }
 }
 
-/// The bar's window: a non-activating panel at the Desk's level, top center of the Desk's screen,
-/// that takes the key so the Edit name fields can type.
+/// The bar's window: a non-activating panel at the top center of the Desk's screen that takes the
+/// key so the Edit name fields can type. It sits at the normal window level, not the Desk's: at the
+/// Desk's level the review hid under Settings, the window the Sort was pressed in. It comes to the
+/// front when it appears and after that stacks like any window.
 final class DrawerBarWindow: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
@@ -187,7 +189,7 @@ final class DrawerBarWindow: NSPanel {
         super.init(contentRect: NSRect(x: 0, y: 0, width: DrawerBarMetrics.width, height: 120),
                    styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isReleasedWhenClosed = false
-        level = DeskClickLayer.level
+        level = .normal
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         isOpaque = false
         backgroundColor = .clear

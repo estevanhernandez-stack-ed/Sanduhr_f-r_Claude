@@ -310,7 +310,7 @@ final class DrawerPanelController {
         let v = screen.visibleFrame
         w.setFrame(NSRect(x: v.midX - size.width / 2, y: v.maxY - size.height - DrawerPlacement.margin,
                           width: size.width, height: size.height), display: true)
-        if !w.isVisible { w.orderFront(nil) }
+        if !w.isVisible { w.orderFrontRegardless() }
         // The hosted view lays out after this pass, so the height is read once more then.
         DispatchQueue.main.async { [weak self] in self?.fitBar(on: screen) }
     }
