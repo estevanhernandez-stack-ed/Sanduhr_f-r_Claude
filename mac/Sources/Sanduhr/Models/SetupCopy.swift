@@ -22,6 +22,8 @@ enum SetupCopy {
     static let addOnsStayLine = "The Claude Code add-ons stay installed. Remove them on the Claude Code page."
     static let arrangeNeedsDesktop = "Turn on A nicer desktop in Set up Sanduhr to arrange the Desk."
     static let designDesktopOffNote = "A nicer desktop is off, so Apply saves this for when you turn it on."
+    static let drawersFirstOnLine = "Drawer files live in the Drawers folder on your Desktop."
+    static let nothingToSort = "Nothing on the Desktop matches a rule."
     static let whatChanges = "What changes"
     static let whatHappened = "What happened"
     /// Usage, Alerts and Claude Code pages while usage tracking is off, in place of the sign-in line.
@@ -36,7 +38,7 @@ enum SetupCopy {
         [title, intro, desktopTitle, desktopBody, drawersTitle, drawersBody, usageTitle, usageBody,
          claudeSource, continueTitle, notNow, cancel, menuItem, pickOne, saveFailed, desktopOffLine,
          usageOffLine, addOnsStayLine, whatChanges, whatHappened, usageOffSettingsLine,
-         arrangeNeedsDesktop, designDesktopOffNote, drawersOffLine(1), drawersOffLine(2)]
+         arrangeNeedsDesktop, designDesktopOffNote, drawersFirstOnLine, nothingToSort, drawersOffLine(1), drawersOffLine(2)]
     }
 }
 
