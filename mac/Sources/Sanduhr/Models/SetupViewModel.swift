@@ -37,7 +37,7 @@ final class SetupViewModel {
     var onApplied: (SetupResult) -> Void = { _ in }
     /// The window should close: Not now, Cancel, or Continue with nothing to say.
     var onClose: () -> Void = {}
-    /// Design it with an AI chat. Item 7 fills it; until then it is nil and the button stays hidden.
+    /// Design it with an AI chat: the window sets it; nil hides the button.
     var onDesignWithChat: (() -> Void)?
 
     private let service: SetupService
