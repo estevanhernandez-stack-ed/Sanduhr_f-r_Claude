@@ -99,6 +99,9 @@ struct RootView: View {
         .sheet(isPresented: $showOnboarding) {
             onboarding
         }
+        .onReceive(NotificationCenter.default.publisher(for: .sanduhrSetupSignInDue)) { _ in
+            showOnboarding = true
+        }
         .onAppear {
             // `exists()` never prompts (no access control on the Keychain
             // items) — safe to call on every view appearance.

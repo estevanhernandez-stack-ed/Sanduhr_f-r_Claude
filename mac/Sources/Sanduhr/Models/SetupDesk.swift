@@ -3,6 +3,8 @@ import Foundation
 extension Notification.Name {
     /// Posted when the stored setup changes (the setup service, item 4): the Desk reloads its pieces.
     static let sanduhrSetupDidChange = Notification.Name("sanduhrSetupDidChange")
+    /// Posted when Set up's Continue left usage ticked with no session key: the widget opens its sign-in sheet.
+    static let sanduhrSetupSignInDue = Notification.Name("sanduhrSetupSignInDue")
 }
 
 /// "A nicer desktop" off (setup spec, section 10): the Desk draws none of its pieces. Drawer panels

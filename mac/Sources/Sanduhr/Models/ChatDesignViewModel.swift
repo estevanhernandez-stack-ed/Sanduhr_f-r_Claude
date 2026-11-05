@@ -27,8 +27,10 @@ final class ChatDrawerApplier {
     var canUndo: Bool { before != nil }
 
     /// Replaces the drawer rules with the chat's, turns drawers on if they are off, and opens a rules review (Sort). Nothing
-    /// moves: the review waits for Apply. Returns the line to show when no review opened, nil when one did.
+    /// moves: the review waits for Apply. Refused with a line while a drawers review is pending. Returns the line to show when no review opened, nil when one did.
     func useRules(_ rules: [DrawerRule]) -> String? {
+        // A review is waiting: replacing the rules under it would change what Apply moves.
+        if service.pending != nil { return SetupCopy.chatRulesReviewPending }
         service.updateSettings { $0.rules = rules }
         if !service.settings.enabled { service.turnOn() }
         if service.sort() != nil { return nil }

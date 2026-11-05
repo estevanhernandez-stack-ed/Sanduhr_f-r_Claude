@@ -1,8 +1,8 @@
 import Foundation
 
 /// Claude usage on or off (setup spec, section 11). Off stops every Claude fetch, drops the shown
-/// numbers and deletes snapshot.json, so the statusline, the meters mod and the MCP's `get_usage`
-/// read their signed-out state. The account, its Keychain item, its history and every setting stay:
+/// numbers and deletes snapshot.json, so readers find no snapshot: the statusline prints nothing and
+/// the MCP's `get_usage` answers no_data (missing). The account, its Keychain item, its history and every setting stay:
 /// nothing here signs out, removes or edits an account (that is `UsageViewModel.signOut`, which this
 /// type never reaches). On fetches at once when a key exists.
 ///

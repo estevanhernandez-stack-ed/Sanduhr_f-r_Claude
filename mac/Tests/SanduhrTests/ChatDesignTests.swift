@@ -168,6 +168,21 @@ struct ChatDesignTests {
         #expect(!FileManager.default.fileExists(atPath: c.fx.desk("a.pdf")))
     }
 
+    @Test("Use these drawer rules is refused with a line while a drawers review is pending")
+    func rulesRefusedWhilePending() throws {
+        let c = Chat(enabled: true)
+        c.fx.write("Home/Desktop/a.pdf")
+        c.paste(rulesOnly)
+        c.model.useRules()
+        let first = try #require(c.service.pending)
+        c.paste(#"{"drawers":{"rules":[{"kind":"images","drawer":"Pics"}]}}"#)
+        c.model.useRules()
+        #expect(c.model.status == SetupCopy.chatRulesReviewPending)
+        #expect(!SetupCopy.chatRulesReviewPending.contains("\u{2014}"))
+        #expect(c.service.settings.rules.count == 1 && c.service.settings.rules[0].kind == .documents)
+        #expect(c.service.pending?.fileCount == first.fileCount)
+    }
+
     @Test("rules that match nothing are saved and say so, with drawers left on")
     func rulesMatchNothing() {
         let c = Chat(enabled: true)

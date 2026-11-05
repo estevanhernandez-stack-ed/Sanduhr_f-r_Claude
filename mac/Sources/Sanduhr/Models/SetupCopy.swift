@@ -52,6 +52,7 @@ enum SetupCopy {
     static let chatRulesShown = "Showing what the rules would sort on your Desktop. Nothing moves until you Apply."
     static let chatNoDeskService = "The Desk is not running, so there is nothing to preview on."
     static let chatRulesSavedNothing = "The rules are saved, but nothing on your Desktop matches them yet."
+    static let chatRulesReviewPending = "A drawers review is waiting. Apply or cancel it first, then use these rules."
     static let chatUntitledDesign = "Your AI chat's design"
 
     static func chatFixCount(_ n: Int) -> String { n == 1 ? "1 thing to fix before this can be used." : "\(n) things to fix before this can be used." }
@@ -84,7 +85,7 @@ enum SetupCopy {
     static var chatAll: [String] {
         [chatIntro, chatCopyPrompt, chatPasteName, chatPastePlaceholder, chatPreview, chatUseRules, chatUseDrawerSettings, chatClose,
          chatFindingsName, chatReady, chatPromptCopied, chatDeskShown, chatRulesShown, chatNoDeskService, chatRulesSavedNothing,
-         chatUntitledDesign, chatFixCount(1), chatFixCount(2), chatManyBlocks(2), chatNotShown("the Desk is busy"),
+         chatRulesReviewPending, chatUntitledDesign, chatFixCount(1), chatFixCount(2), chatManyBlocks(2), chatNotShown("the Desk is busy"),
          chatRulesLine(rules: 1, drawerNames: ["Photos"]), chatRulesLine(rules: 2, drawerNames: ["Photos", "Receipts"]),
          chatDrawerSettingsLine(look: "glass", opacity: 70, corner: "bottom left", flow: "row"),
          chatDrawerSettingsLine(look: nil, opacity: 40, corner: nil, flow: "column")]
