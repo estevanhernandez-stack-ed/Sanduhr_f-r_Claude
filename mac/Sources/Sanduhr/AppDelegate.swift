@@ -363,11 +363,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The smoke hook's `just-the-desk`: Set up Sanduhr with usage ticked off (on) or back on (off),
     /// the other two ticks as they are, applied the way Continue applies them.
     func setUsageForSmoke(_ on: Bool) {
+        applySetupForSmoke(desktop: on ? nil : true, usage: on)
+    }
+
+    /// The smoke hook's `setup`: the desktop and usage ticks it names, applied the way Continue
+    /// applies them. Drawers stay as they are, so a hook never moves a file.
+    func applySetupForSmoke(desktop: Bool?, usage: Bool?) {
         let host = AppSetupHost(usage: viewModel, confirm: { _ in true })
         let service = SetupService(storage: .defaults(setup: UserDefaults.standard, desk: UserDefaults.desk), host: host)
         var choices = service.current()
-        choices.claudeUsage = on
-        if on == false { choices.desktop = true }
+        if let desktop { choices.desktop = desktop }
+        if let usage { choices.claudeUsage = usage }
         afterSetup(service.apply(choices))
     }
 

@@ -67,6 +67,8 @@ struct DebugStateInput {
     var demo = DemoDebug()
     /// Drawers (docs/mac-drawers-setup-spec.md, section 9): counts and flags only.
     var drawers = DrawersDebug()
+    /// Set up Sanduhr (2.41.0): the three ticks, whether the migration ran, whether the screen is due.
+    var setup = SetupDebug()
     /// The last `reset --dry-run` (Settings v2, slice 5): the plan in run order, kinds and counts
     /// only, never a path, a folder, a label or a domain's contents. Nil until one ran.
     var resetDryRun: Reset.Report?
@@ -229,6 +231,24 @@ struct DrawersDebug: Equatable {
                      files: service.settings.drawers.map { service.contents[$0.id]?.count ?? 0 },
                      permission: service.desktopPermission.rawValue,
                      reviewPending: service.pending != nil, journalOpen: !service.recovered.isEmpty)
+    }
+}
+
+/// state.yaml's `setup:`: the three ticks as the setup screen would show them, whether the first-launch
+/// migration has run, and whether the screen would open. Booleans only: no name, path or number.
+struct SetupDebug: Equatable {
+    var desktop = false
+    var drawers = false
+    var usage = false
+    var migrated = false
+    var pending = false
+
+    static func of(stored: SetupSettings?, drawersOn: Bool, deskEnabled: Bool, migrated: Bool) -> SetupDebug {
+        // The same fallback the setup service reads: no stored setup shows a first run's ticks.
+        let settings = stored ?? SetupChoices.firstRun.toSettings(before: nil)
+        let ticks = SetupChoices.of(settings, drawersOn: drawersOn, deskEnabled: deskEnabled)
+        return SetupDebug(desktop: ticks.desktop, drawers: ticks.drawers, usage: ticks.claudeUsage,
+                          migrated: migrated, pending: SetupLaunch.opensSetup(stored))
     }
 }
 
@@ -434,6 +454,13 @@ enum DebugState {
               YAMLPair("files", .list(d.files.map { YAMLNode.int($0) })),
               YAMLPair("permission", .string(d.permission)),
               YAMLPair("review_pending", .bool(d.reviewPending)), YAMLPair("journal_open", .bool(d.journalOpen))])
+    }
+
+    /// `setup:`: the ticks, the migration flag and whether the setup screen would open.
+    static func setupYAML(_ d: SetupDebug) -> YAMLNode {
+        .map([YAMLPair("desktop", .bool(d.desktop)), YAMLPair("drawers", .bool(d.drawers)),
+              YAMLPair("usage", .bool(d.usage)), YAMLPair("migrated", .bool(d.migrated)),
+              YAMLPair("pending", .bool(d.pending))])
     }
 
     /// `dock:` (item 56): side, auto-hide and the inset applied now.
@@ -695,6 +722,7 @@ enum DebugState {
         pairs.append(("just_the_desk", .bool(s.justTheDesk)))
         pairs.append(("demo", demoYAML(s.demo)))
         pairs.append(("drawers", drawersYAML(s.drawers)))
+        pairs.append(("setup", setupYAML(s.setup)))
         pairs.append(("reset_dry_run", s.resetDryRun.map(resetDryRunYAML) ?? .null))
         return .object(pairs)
     }
