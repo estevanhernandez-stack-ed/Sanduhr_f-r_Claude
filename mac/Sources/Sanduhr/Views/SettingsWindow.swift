@@ -389,7 +389,7 @@ struct SettingsRoot: View {
         // its own, which needs the page's model. A page without a preview is its own viewport.
         switch navigation.selection {
         case .general: GeneralSection().withPreview(.general) { MenuBarPreview(vm: vm) }
-        case .deskLayout: DeskLayoutSection().withPreview(.deskLayout) { DeskLayoutPreview(live: deskModel) }
+        case .deskLayout: DeskLayoutSection().withPreview(.deskLayout) { DeskLayoutPreview(live: deskModel).opacity(SetupDesk.desktopOn() ? 1 : 0.4) }
         case .deskLook: DeskLookSection().withPreview(.deskLook) { DeskLookPreview(live: deskModel) }
         case .message: DeskMessageSection(model: deskModel, editor: navigation.messageEditor).withPreview(.message) { DeskMessagePreview(live: deskModel) }
         case .notch: DeskNotchSection().withPreview(.notch) { NotchPreview(live: deskModel) }

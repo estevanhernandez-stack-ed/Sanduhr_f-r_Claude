@@ -2791,7 +2791,8 @@ account in a dev build. Paste only made-up JSON. Put made-up files on the Deskto
 6. Desktop off with drawers on: with **Tidy my files** on and some drawers showing, open Set up Sanduhr, untick **A nicer desktop**,
    Continue. "What changes" said "The clock, message and weather hide. Your layout is kept." The Desk's clock, message and every other
    piece are gone, the drawer panels stay, and Settings, Desk, Layout's Arrange says "Turn on A nicer desktop in Set up Sanduhr to arrange
-   the Desk." Tick it again: every piece is back where it was.
+   the Desk." Under the Desk switch, "Hidden while A nicer desktop is off. Your places and order are kept." sits beside a **Set up
+   Sanduhr…** button, and the page's preview is dimmed. Tick it again: every piece is back where it was.
 7. Design it with an AI chat. Press **Design it with an AI chat** (also in Settings, Drawers). **Copy prompt**: the status line reads
    "Prompt copied. Paste it into any AI chat, answer its questions, then paste its answer here." Paste into a text editor: it names no
    file, path or number of your usage and no product, and holds the Desk's piece names. Paste this one bad block into the box:
@@ -2805,15 +2806,16 @@ account in a dev build. Paste only made-up JSON. Put made-up files on the Deskto
    - **Preview on my Desk**: Settings, Desk opens with the review banner headed "An AI chat suggests a Desk design", the Desk shows the
      preview, and `~/Library/Application Support/Sanduhr` gains no `desk-result.json` and no notification appears. Dismiss it: nothing saved.
    - **Use these drawer rules**: your drawer rules are replaced, drawers turn on, and if a file on the Desktop contains "holiday" a rules
-     review opens on the Desk ("N files into 1 drawers"); `ls ~/Desktop` is unchanged until you press Apply. With no match the status
-     says "The rules are saved, but nothing on your Desktop matches them yet."
+     review opens on the Desk ("N files into 1 drawers"); `ls ~/Desktop` is unchanged until you press Apply. Under the button,
+     "Saved 1 drawer rule into Photos." and what happened next stay put through the other buttons, with **See them in Settings,
+     Drawers** beside it; with no match it reads "…The rules are saved, but nothing on your Desktop matches them yet."
    - **Use these drawer settings**: the drawers go Glass at 60 percent and line up in a column from the bottom right; the status says
      "Your drawers look different and are lined up. Undo puts them back." Press **Undo** (it is beside the button): the look, opacity,
      Tidy corner and flow and every drawer's place are as before.
    Close the window and open it again: the paste box is empty.
 9. Where it opens: the menu bar item's **Set up Sanduhr…** (the Sanduhr menu, near Settings); Settings, General, **Set up Sanduhr…**
-   (also found by searching "Set up" in Settings); the What's New card **Choose what Sanduhr shows** (`defaults write
-   com.626labs.sanduhr whatsNewLastSeen 2.40.0`, relaunch; its Show me opens the window, not a Settings page); the sign-in sheet's
+   (also found by searching "Set up" in Settings); the What's New card **Choose what Sanduhr shows** (it shows only on a build stamped 2.41.0
+   or later: `defaults write com.626labs.sanduhr whatsNewLastSeen 2.40.0`, relaunch; its Show me opens the window, not a Settings page); the sign-in sheet's
    **Set up Sanduhr…**. Opening it twice brings the open one forward.
 
 The scripted version: `cd mac && smoke/smoke run smoke/scenarios/setup.yaml` against a debug build started with `SANDUHR_DEBUG_HOOKS=1`

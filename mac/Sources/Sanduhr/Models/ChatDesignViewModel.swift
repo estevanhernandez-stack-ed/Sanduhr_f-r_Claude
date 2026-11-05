@@ -27,14 +27,20 @@ final class ChatDrawerApplier {
     var canUndo: Bool { before != nil }
 
     /// Replaces the drawer rules with the chat's, turns drawers on if they are off, and opens a rules review (Sort). Nothing
-    /// moves: the review waits for Apply. Refused with a line while a drawers review is pending. Returns the line to show when no review opened, nil when one did.
-    func useRules(_ rules: [DrawerRule]) -> String? {
+    /// moves: the review waits for Apply. Refused with a line while a drawers review is pending, saving nothing.
+    func useRules(_ rules: [DrawerRule]) -> RulesOutcome {
         // A review is waiting: replacing the rules under it would change what Apply moves.
-        if service.pending != nil { return SetupCopy.chatRulesReviewPending }
+        if service.pending != nil { return .refused(SetupCopy.chatRulesReviewPending) }
         service.updateSettings { $0.rules = rules }
         if !service.settings.enabled { service.turnOn() }
-        if service.sort() != nil { return nil }
-        return service.desktopPermission == .denied ? DrawersSettingsModel.deniedLine : SetupCopy.chatRulesSavedNothing
+        if service.sort() != nil { return .saved(SetupCopy.chatRulesShown) }
+        return .saved(service.desktopPermission == .denied ? DrawersSettingsModel.deniedLine : SetupCopy.chatRulesSavedNothing)
+    }
+
+    /// What Use these drawer rules did: saved the rules, then `then` happened; or refused with a line, saving nothing.
+    enum RulesOutcome: Equatable {
+        case saved(String)
+        case refused(String)
     }
 
     /// Saves the look, the opacity and the named Tidy parts, then Tidy lines the drawers up while drawers are on. Only the parts
@@ -82,6 +88,10 @@ final class ChatDesignViewModel {
     private(set) var findings: [PastedFinding] = []
     private(set) var summary = ""
     private(set) var rulesLine = ""
+    /// What Use these drawer rules did, kept under its button until the paste changes (the status line below is shared).
+    private(set) var rulesResult = ""
+    /// The rules were saved: the window offers Settings, Drawers.
+    private(set) var rulesSaved = false
     private(set) var drawerSettingsLine = ""
     private(set) var status = ""
     private(set) var canPreview = false
@@ -93,6 +103,8 @@ final class ChatDesignViewModel {
     @ObservationIgnored var onClose: () -> Void = {}
     /// The Desk review is up: the window shows Settings, Desk, where the review banner is.
     @ObservationIgnored var onReviewShown: () -> Void = {}
+    /// See them in Settings, Drawers.
+    @ObservationIgnored var onShowRules: () -> Void = {}
 
     @ObservationIgnored private let copy: (String) -> Bool
     @ObservationIgnored private let validate: (PackValue) -> DeskValidation
@@ -100,6 +112,7 @@ final class ChatDesignViewModel {
     @ObservationIgnored private let drawers: ChatDrawerApplier
     @ObservationIgnored private var desk: DeskValidation?
     @ObservationIgnored private var rules: [DrawerRule]?
+    @ObservationIgnored private var rulesDrawerNames: [String] = []
     @ObservationIgnored private var look: PastedDrawerLook?
 
     /// - Parameters:
@@ -121,7 +134,7 @@ final class ChatDesignViewModel {
 
     private func check(_ raw: String) {
         desk = nil; rules = nil; look = nil
-        findings = []; summary = ""; rulesLine = ""; drawerSettingsLine = ""; status = ""
+        findings = []; summary = ""; rulesLine = ""; rulesResult = ""; rulesSaved = false; drawerSettingsLine = ""; status = ""
         canPreview = false; canUseRules = false; canUseDrawerSettings = false
         if raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return }
 
@@ -141,7 +154,8 @@ final class ChatDesignViewModel {
         if let r = read.rules, !r.isEmpty {
             rules = r
             canUseRules = true
-            rulesLine = SetupCopy.chatRulesLine(rules: r.count, drawerNames: uniqueNames(read.ruleDrawerNames))
+            rulesDrawerNames = uniqueNames(read.ruleDrawerNames)
+            rulesLine = SetupCopy.chatRulesLine(rules: r.count, drawerNames: rulesDrawerNames)
         }
         if let l = read.drawerLook, l.any {
             look = l
@@ -190,8 +204,17 @@ final class ChatDesignViewModel {
 
     func useRules() {
         guard let r = rules else { return }
-        status = drawers.useRules(r) ?? SetupCopy.chatRulesShown
+        switch drawers.useRules(r) {
+        case .refused(let line):
+            rulesResult = line
+            rulesSaved = false
+        case .saved(let then):
+            rulesResult = SetupCopy.chatRulesSaved(rules: r.count, drawerNames: rulesDrawerNames, then: then)
+            rulesSaved = true
+        }
     }
+
+    func showRules() { onShowRules() }
 
     func useDrawerSettings() {
         guard let l = look else { return }

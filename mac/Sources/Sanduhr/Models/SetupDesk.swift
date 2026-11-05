@@ -35,6 +35,9 @@ enum SetupDesk {
     /// Desk Layout's Arrange line while desktop is off, else nil.
     static func arrangeNote(desktop: Bool) -> String? { desktop ? nil : SetupCopy.arrangeNeedsDesktop }
 
+    /// Settings, Desk's line under the Desk switch: the switch is on but A nicer desktop is off, so nothing shows. Else nil.
+    static func hiddenNote(desktop: Bool, deskOn: Bool) -> String? { deskOn && !desktop ? SetupCopy.deskHiddenLine : nil }
+
     /// A Desk design review's line while desktop is off, else nil. Apply still saves the design.
     static func designNote(desktop: Bool) -> String? { desktop ? nil : SetupCopy.designDesktopOffNote }
 }

@@ -18,6 +18,7 @@ final class ChatDesignWindowController: NSObject, NSWindowDelegate {
         let model = Self.makeModel()
         model.onClose = { [weak self] in self?.window?.close() }
         model.onReviewShown = { SettingsWindowController.shared.show(.deskLayout) }
+        model.onShowRules = { SettingsWindowController.shared.show(.drawers) }
         let w = window ?? NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 560),
                                    styleMask: [.titled, .closable, .resizable],
                                    backing: .buffered, defer: false)
@@ -115,7 +116,12 @@ private struct ChatActions: View {
         VStack(alignment: .leading, spacing: 8) {
             Button(SetupCopy.chatPreview) { model.preview() }.disabled(!model.canPreview)
             Button(SetupCopy.chatUseRules) { model.useRules() }.disabled(!model.canUseRules)
-            if !model.rulesLine.isEmpty { caption(model.rulesLine) }
+            if !model.rulesResult.isEmpty {
+                Text(model.rulesResult).font(.callout).fixedSize(horizontal: false, vertical: true)
+                if model.rulesSaved { Button(SetupCopy.chatSeeRules) { model.showRules() }.buttonStyle(.link) }
+            } else if !model.rulesLine.isEmpty {
+                caption(model.rulesLine)
+            }
             HStack {
                 Button(SetupCopy.chatUseDrawerSettings) { model.useDrawerSettings() }.disabled(!model.canUseDrawerSettings)
                 if model.canUndo { Button(ChatDesignViewModel.undoTitle) { model.undoDrawerSettings() } }

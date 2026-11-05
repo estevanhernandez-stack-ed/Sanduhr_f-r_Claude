@@ -23,6 +23,7 @@ struct DeskLayoutSection: View {
                 Toggle(SettingsNames.deskSwitch, isOn: $deskOn)
                     .onChange(of: deskOn) { _, _ in DeskController.shared.apply() }
                     .settingsAnchor(SettingsAnchor.desk)
+                DeskHiddenRow(deskOn: deskOn)
                 DeskArrangeRow(deskOn: deskOn, arranging: arranging,
                                placesNothing: DeskArrangement(layout).placesNothing)
                     .settingsAnchor(SettingsAnchor.arrange)
@@ -310,6 +311,22 @@ struct NeedsDeskRow: View {
 /// Desk's Arrange Desk… button (item 60). While arranging, the places and the order here wait:
 /// Done on the desktop writes the layout, so an edit here would be overwritten. With nothing
 /// placed there is nothing to drag, so the button waits for a piece.
+/// Under the Desk switch while A nicer desktop is off: the switch is on, but the Desk draws nothing. Says so, with the way back.
+private struct DeskHiddenRow: View {
+    let deskOn: Bool
+    var desktopOn: Bool = SetupDesk.desktopOn()
+
+    var body: some View {
+        if let line = SetupDesk.hiddenNote(desktop: desktopOn, deskOn: deskOn) {
+            LabeledContent {
+                Button(SetupCopy.menuItem) { SetupWindowController.shared.show() }
+            } label: {
+                Text(line).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
 private struct DeskArrangeRow: View {
     let deskOn: Bool
     let arranging: Bool

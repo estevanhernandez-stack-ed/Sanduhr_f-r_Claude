@@ -158,7 +158,8 @@ struct ChatDesignTests {
         c.fx.write("Home/Desktop/a.pdf")
         c.paste(rulesOnly)
         c.model.useRules()
-        #expect(c.model.status == SetupCopy.chatRulesShown)
+        #expect(c.model.rulesResult == SetupCopy.chatRulesSaved(rules: 1, drawerNames: ["Papers"], then: SetupCopy.chatRulesShown))
+        #expect(c.model.rulesSaved)
         #expect(c.service.settings.enabled)
         #expect(c.service.settings.rules.count == 1 && c.service.settings.rules[0].kind == .documents)
         let review = try #require(c.service.pending)
@@ -177,7 +178,8 @@ struct ChatDesignTests {
         let first = try #require(c.service.pending)
         c.paste(#"{"drawers":{"rules":[{"kind":"images","drawer":"Pics"}]}}"#)
         c.model.useRules()
-        #expect(c.model.status == SetupCopy.chatRulesReviewPending)
+        #expect(c.model.rulesResult == SetupCopy.chatRulesReviewPending)
+        #expect(!c.model.rulesSaved, "a refusal offers no Settings link")
         #expect(!SetupCopy.chatRulesReviewPending.contains("\u{2014}"))
         #expect(c.service.settings.rules.count == 1 && c.service.settings.rules[0].kind == .documents)
         #expect(c.service.pending?.fileCount == first.fileCount)
@@ -188,9 +190,27 @@ struct ChatDesignTests {
         let c = Chat(enabled: true)
         c.paste(rulesOnly)
         c.model.useRules()
-        #expect(c.model.status == SetupCopy.chatRulesSavedNothing)
+        #expect(c.model.rulesResult.hasPrefix("Saved 1 drawer rule into Papers. "))
+        #expect(c.model.rulesResult.hasSuffix(SetupCopy.chatRulesSavedNothing))
+        #expect(c.model.rulesSaved)
         #expect(c.service.pending == nil)
         #expect(c.service.settings.rules.count == 1)
+    }
+
+    @Test("the rules result stays under its button through later actions, clears with a new paste, and its link opens Settings, Drawers")
+    func rulesResultStays() {
+        let c = Chat(enabled: true)
+        var shown = 0
+        c.model.onShowRules = { shown += 1 }
+        c.paste(rulesOnly)
+        c.model.useRules()
+        let saved = c.model.rulesResult
+        c.model.copyPrompt()
+        #expect(c.model.rulesResult == saved, "the shared status line no longer carries the rules result")
+        c.model.showRules()
+        #expect(shown == 1)
+        c.paste(#"{"drawers":{"look":"glass"}}"#)
+        #expect(c.model.rulesResult.isEmpty && !c.model.rulesSaved)
     }
 
     @Test("Use these drawer settings applies only the named parts, tidies, and Undo restores the old ones")

@@ -24,6 +24,8 @@ enum SetupCopy {
     static let usageOffLine = "Your account stays saved. Remove it in Settings, Accounts."
     static let addOnsStayLine = "The Claude Code add-ons stay installed. Remove them on the Claude Code page."
     static let arrangeNeedsDesktop = "Turn on A nicer desktop in Set up Sanduhr to arrange the Desk."
+    /// Settings, Desk, under the Desk switch while A nicer desktop is off.
+    static let deskHiddenLine = "Hidden while A nicer desktop is off. Your places and order are kept."
     static let designDesktopOffNote = "A nicer desktop is off, so Apply saves this for when you turn it on."
     static let drawersFirstOnLine = "Drawer files live in the Drawers folder on your Desktop."
     static let nothingToSort = "Nothing on the Desktop matches a rule."
@@ -52,6 +54,7 @@ enum SetupCopy {
     static let chatRulesShown = "Showing what the rules would sort on your Desktop. Nothing moves until you Apply."
     static let chatNoDeskService = "The Desk is not running, so there is nothing to preview on."
     static let chatRulesSavedNothing = "The rules are saved, but nothing on your Desktop matches them yet."
+    static let chatSeeRules = "See them in Settings, Drawers"
     static let chatRulesReviewPending = "A drawers review is waiting. Apply or cancel it first, then use these rules."
     static let chatUntitledDesign = "Your AI chat's design"
 
@@ -65,6 +68,13 @@ enum SetupCopy {
         let into = drawerNames.isEmpty ? "" : " into " + drawerNames.joined(separator: ", ")
         let them = rules == 1 ? "it" : "them"
         return "\(head)\(into). Using \(them) replaces your drawer rules, turns drawers on if they are off, then shows what \(them) would sort. Nothing moves until you Apply."
+    }
+
+    /// What Use these drawer rules saved, said before what happened next (`then`).
+    static func chatRulesSaved(rules: Int, drawerNames: [String], then: String) -> String {
+        let head = rules == 1 ? "Saved 1 drawer rule" : "Saved \(rules) drawer rules"
+        let into = drawerNames.isEmpty ? "" : " into " + drawerNames.joined(separator: ", ")
+        return "\(head)\(into). \(then)"
     }
 
     /// One line saying what a pasted drawers look would do. `corner` and `flow` are spoken words, nil where the paste left the part to the user's own Tidy.
@@ -84,7 +94,8 @@ enum SetupCopy {
     /// The chat window's strings, for the copy tests.
     static var chatAll: [String] {
         [chatIntro, chatCopyPrompt, chatPasteName, chatPastePlaceholder, chatPreview, chatUseRules, chatUseDrawerSettings, chatClose,
-         chatFindingsName, chatReady, chatPromptCopied, chatDeskShown, chatRulesShown, chatNoDeskService, chatRulesSavedNothing,
+         chatFindingsName, chatReady, chatPromptCopied, chatDeskShown, chatRulesShown, chatNoDeskService, chatRulesSavedNothing, chatSeeRules,
+         chatRulesSaved(rules: 1, drawerNames: ["Photos"], then: chatRulesSavedNothing),
          chatRulesReviewPending, chatUntitledDesign, chatFixCount(1), chatFixCount(2), chatManyBlocks(2), chatNotShown("the Desk is busy"),
          chatRulesLine(rules: 1, drawerNames: ["Photos"]), chatRulesLine(rules: 2, drawerNames: ["Photos", "Receipts"]),
          chatDrawerSettingsLine(look: "glass", opacity: 70, corner: "bottom left", flow: "row"),
@@ -96,7 +107,7 @@ enum SetupCopy {
         [title, intro, desktopTitle, desktopBody, drawersTitle, drawersBody, usageTitle, usageBody,
          claudeSource, continueTitle, notNow, cancel, done, designButton, designCaption, menuItem, pickOne, saveFailed, desktopOffLine,
          usageOffLine, addOnsStayLine, whatChanges, whatHappened, usageOffSettingsLine,
-         arrangeNeedsDesktop, designDesktopOffNote, drawersFirstOnLine, nothingToSort, drawersOffLine(1), drawersOffLine(2)]
+         arrangeNeedsDesktop, deskHiddenLine, designDesktopOffNote, drawersFirstOnLine, nothingToSort, drawersOffLine(1), drawersOffLine(2)]
     }
 }
 

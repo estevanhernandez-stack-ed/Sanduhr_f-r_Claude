@@ -41,6 +41,9 @@ struct SetupDeskTests {
     @Test func theLinesAppearOnlyWhileDesktopIsOff() {
         #expect(SetupDesk.arrangeNote(desktop: true) == nil)
         #expect(SetupDesk.arrangeNote(desktop: false) == "Turn on A nicer desktop in Set up Sanduhr to arrange the Desk.")
+        #expect(SetupDesk.hiddenNote(desktop: false, deskOn: true) == "Hidden while A nicer desktop is off. Your places and order are kept.")
+        #expect(SetupDesk.hiddenNote(desktop: true, deskOn: true) == nil)
+        #expect(SetupDesk.hiddenNote(desktop: false, deskOn: false) == nil, "a Desk switched off says so itself")
         #expect(SetupDesk.designNote(desktop: true) == nil)
         #expect(SetupDesk.designNote(desktop: false) == "A nicer desktop is off, so Apply saves this for when you turn it on.")
     }
