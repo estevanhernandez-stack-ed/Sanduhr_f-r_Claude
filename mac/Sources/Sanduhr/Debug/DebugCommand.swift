@@ -38,8 +38,8 @@ enum DebugAction: Equatable {
     /// the debug override too); `force` writes the switch and the override, so a notched Mac
     /// draws the pill for the smoke tools. Applied live.
     case notchPill(NotchPillMode)
-    /// Just the Desk (BACKLOG #4): `on` does what the welcome sheet's button does; `off` ends it as a
-    /// sign-in does, without a key. Applied live.
+    /// Just the Desk, as Set up Sanduhr has it since 2.41.0 (desktop on, Track my AI usage off): `on`
+    /// applies that the way Continue does; `off` ticks usage again. Applied live.
     case justTheDesk(on: Bool)
 
     /// Drawers (docs/mac-drawers-setup-spec.md, section 9): `on` turns it on (and the Desk), `sort`

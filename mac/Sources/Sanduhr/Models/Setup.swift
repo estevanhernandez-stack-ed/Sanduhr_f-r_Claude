@@ -147,6 +147,14 @@ enum SetupLaunch {
         return !setup.usageOn && deskEnabled
     }
 
+    /// The sign-in sheet (the welcome sheet's one remaining job): a setup with Track my AI usage ticked
+    /// and no session key, not put off for this launch with Not Now. No setup yet means the setup
+    /// screen is due instead.
+    static func showsSignIn(_ setup: SetupSettings?, hasSessionKey: Bool, notNow: Bool) -> Bool {
+        guard let setup else { return false }
+        return setup.claudeUsage && !hasSessionKey && !notNow
+    }
+
     /// A menu bar click while no setup exists yet and no account is signed in opens the setup
     /// screen. With an account the widget has meters to show, so the click toggles it as usual.
     static func menuBarClickOpensSetup(setupPending: Bool, hasAccount: Bool) -> Bool {

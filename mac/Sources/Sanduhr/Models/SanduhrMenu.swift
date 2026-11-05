@@ -4,7 +4,7 @@ import Foundation
 /// clock menu all hand these to AppDelegate.perform, so one choice does the same thing from
 /// any of them.
 enum MenuCommand: Int, CaseIterable {
-    case showHide, deepWork, pacing, snake, cameraLight, usage, refresh, settings, arrangeDesk, checkForUpdates, whatsNew, tour, quit
+    case showHide, deepWork, pacing, snake, cameraLight, usage, refresh, settings, setup, arrangeDesk, checkForUpdates, whatsNew, tour, quit
 }
 
 /// One item: its title, its Command-key equivalent ("" for none), whether it shows a checkmark,
@@ -34,7 +34,7 @@ enum SanduhrMenu {
     /// `widgetVisible` picks Show or Hide; `deepWork`, `pacing` and `snake` are the tools'
     /// checkmarks (Deep Work or Cooldown Snake open on the widget, the pacing calculators pinned);
     /// `cameraLight` is the camera light switched on by hand. Claude Usage… opens Settings at the
-    /// Claude Usage page (item 48). What's New… (item 57) reopens the release highlights, Take the Tour… (item 61) the welcome tour.
+    /// Claude Usage page (item 48). What's New… (item 57) reopens the release highlights, Take the Tour… (item 61) the welcome tour. Set up Sanduhr… (2.41.0) opens the setup window.
     /// Arrange Desk… (item 60) starts Arrange mode on the desktop; with `deskOn` false it is off,
     /// and says why. `allSettings` names Settings… "All Settings…", for a menu that also has a
     /// page's own Settings item (the Desk clock's and message's menus, the meter menus).
@@ -55,6 +55,7 @@ enum SanduhrMenu {
             MenuGroup(entries: [
                 MenuEntry(command: .refresh, title: "Refresh", key: "r"),
                 MenuEntry(command: .settings, title: allSettings ? allSettingsTitle : settingsTitle, key: ","),
+                MenuEntry(command: .setup, title: SetupCopy.menuItem),
                 MenuEntry(command: .arrangeDesk, title: DeskArrangeCopy.menuItem, enabled: deskOn,
                           note: deskOn ? nil : DeskArrangeCopy.settingsDeskOff),
                 MenuEntry(command: .checkForUpdates, title: SettingsNames.checkForUpdates),

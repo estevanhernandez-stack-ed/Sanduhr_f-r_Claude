@@ -18,6 +18,8 @@ enum TourDestination: Equatable {
     /// The widget, shown and brought forward.
     case widget
     case settings(SettingsSection)
+    /// The Set up Sanduhr window.
+    case setup
 }
 
 /// A real setting a card lets you change in place, written the moment it is chosen.
@@ -84,13 +86,14 @@ enum WelcomeTour {
     }
 
     /// The steps that have a card showing, in order, each with its cards. `table` is the signed-in
-    /// table unless given; `justTheDesk` picks `deskOnly` in its place when no table is given, and
-    /// skips `signedOut` (its last card already says how to sign in).
+    /// table unless given; `usageOff` (Track my AI usage unticked in Set up Sanduhr) picks `deskOnly`
+    /// in its place when no table is given, and skips `signedOut` (its last card already says how
+    /// to sign in).
     static func steps(features: Set<TourFeature>, table: [TourCard]? = nil,
-                      signedIn: Bool = true, justTheDesk: Bool = false) -> [[TourCard]] {
+                      signedIn: Bool = true, usageOff: Bool = false) -> [[TourCard]] {
         var out: [[TourCard]] = []
-        let base = table ?? (justTheDesk ? deskOnly : WelcomeTour.table)
-        let adapt: (TourCard) -> TourCard = { signedIn || justTheDesk ? $0 : signedOut($0) }
+        let base = table ?? (usageOff ? deskOnly : WelcomeTour.table)
+        let adapt: (TourCard) -> TourCard = { signedIn || usageOff ? $0 : signedOut($0) }
         for card in cards(features: features, table: base).map(adapt) {
             if let last = out.last?.first, last.step == card.step {
                 out[out.count - 1].append(card)
@@ -153,9 +156,10 @@ enum WelcomeTour {
         state == .pending && fetched && !offeredThisLaunch
     }
 
-    /// After choosing Just the Desk: show the tour now? Only while pending, once a launch. It
-    /// takes the Desk-only steps, since the person has no account to show meters for.
-    static func showsForJustTheDesk(state: State?, offeredThisLaunch: Bool) -> Bool {
+    /// After Set up Sanduhr's Continue with Track my AI usage unticked: show the tour now? Only
+    /// while pending, once a launch. It takes the Desk-only steps, since no fetch is coming to
+    /// offer it. With usage ticked the tour waits for the first fetch (`showsAfterFetch`).
+    static func showsAfterSetup(state: State?, offeredThisLaunch: Bool) -> Bool {
         state == .pending && !offeredThisLaunch
     }
 

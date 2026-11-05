@@ -56,6 +56,17 @@ final class UsageSwitch {
         let before = SetupStore.load(from: defaults)
         let setup = (before ?? SetupChoices.firstRun.toSettings(before: nil)).withClaude(on)
         SetupStore.save(setup, to: defaults)
+        enter(on, fetchNow: fetchNow)
+    }
+
+    /// The stored setup already says usage is on or off (the setup service saved it with the rest
+    /// of the screen's choices): runs what that means, without the early return `set` has for an
+    /// unchanged value.
+    func applySaved(fetchNow: Bool = true) {
+        enter(isOn, fetchNow: fetchNow)
+    }
+
+    private func enter(_ on: Bool, fetchNow: Bool) {
         if !on { hold(); return }
         effects.pauseSides(false)
         effects.setStatus(.connecting)

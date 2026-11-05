@@ -150,7 +150,7 @@ struct UsageOffTests {
 
     @Test func theWidgetHidesWhileTheDeskRunsAndStaysWhenItDoesNot() {
         for setting in WidgetVisibility.allCases {
-            for event in [WidgetVisibilityEvent.launch, .deskChanged, .signedIn, .signedOut, .justTheDesk, .usageChanged] {
+            for event in [WidgetVisibilityEvent.launch, .deskChanged, .signedIn, .signedOut, .usageChanged] {
                 #expect(WidgetVisibilityRule.shouldShow(setting: setting, deskOn: true, hasSessionKey: false,
                                                         event: event, usageOn: false) == false)
             }

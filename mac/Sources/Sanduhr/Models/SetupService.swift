@@ -93,6 +93,9 @@ final class SetupService {
 
         var now = after
         now.drawers = drawers
+        // Read before the save: the app's usage switch reads the stored setup, so after the save it
+        // already says the new value and the change would look like no change at all.
+        let usageBefore = host.usageOn
         do {
             try storage.save(now.toSettings(before: storage.loadSetup()), now.deskRuns)
         } catch {
@@ -101,7 +104,7 @@ final class SetupService {
             return SetupResult(now: current(), lines: lines, reviewOpened: false)
         }
 
-        if host.usageOn != now.claudeUsage { host.setUsage(now.claudeUsage) }
+        if usageBefore != now.claudeUsage { host.setUsage(now.claudeUsage) }
         let turnedOn = now.drawers && !host.drawersOn
         if turnedOn {
             host.turnOnDrawers()
@@ -162,7 +165,8 @@ final class AppSetupHost: SetupHost {
         return drawers.desktopPermission == .denied ? DrawersSettingsModel.deniedLine : SetupCopy.nothingToSort
     }
 
-    func setUsage(_ on: Bool) { usage.setUsageOn(on) }
+    /// The setup is already saved with usage `on`: starts or stops what follows from it.
+    func setUsage(_ on: Bool) { usage.usageSwitch.applySaved() }
 
     func reloadDesk() {
         DeskController.shared.apply()

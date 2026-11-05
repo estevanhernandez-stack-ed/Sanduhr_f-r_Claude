@@ -1273,6 +1273,7 @@ struct GeneralSection: View {
 
     var body: some View {
         Form {
+            setupSection
             SurfacesStatusSection()
             Section("Startup") {
                 Toggle("Open Sanduhr at login", isOn: $atLogin)
@@ -1297,6 +1298,17 @@ struct GeneralSection: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// Set up Sanduhr…: the screen that chooses the Desk's pieces, Drawers and usage tracking.
+    private var setupSection: some View {
+        Section {
+            LabeledContent("Choose what Sanduhr shows: a nicer desktop, your files in drawers, your AI usage.") {
+                Button(SetupCopy.menuItem) { SetupWindowController.shared.show() }
+                    .accessibilityLabel(SetupCopy.title)
+            }
+            .settingsAnchor(SettingsAnchor.setup)
+        }
     }
 
     /// The hourglass itself, Menu Bar Shows (the percent beside it) and the meetings menu's item.

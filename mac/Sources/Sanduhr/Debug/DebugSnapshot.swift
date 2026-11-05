@@ -61,7 +61,7 @@ struct DebugStateInput {
     var meterHistory = MeterHistoryDebug()
     /// The lock screen line (#137): its switch and the line as composed now.
     var lockLine = LockLineDebug()
-    /// Just the Desk (BACKLOG #4): chosen on the welcome sheet and not yet ended by a sign-in.
+    /// Just the Desk, as Set up Sanduhr has it: a setup is stored with Track my AI usage off.
     var justTheDesk = false
     /// Demo mode (slice 4): on, and what each surface shows, counts and flags only.
     var demo = DemoDebug()

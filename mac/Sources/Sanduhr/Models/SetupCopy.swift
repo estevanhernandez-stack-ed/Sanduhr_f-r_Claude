@@ -14,6 +14,9 @@ enum SetupCopy {
     static let continueTitle = "Continue"
     static let notNow = "Not now"
     static let cancel = "Cancel"
+    static let done = "Done"
+    static let designButton = "Design it with an AI chat"
+    static let designCaption = "Copy a prompt into any AI chat, then paste its answer back here."
     static let menuItem = "Set up Sanduhr…"
     static let pickOne = "Pick at least one, or Sanduhr has nothing to show."
     static let saveFailed = "Your choices could not be saved."
@@ -36,7 +39,7 @@ enum SetupCopy {
     /// For the copy tests.
     static var all: [String] {
         [title, intro, desktopTitle, desktopBody, drawersTitle, drawersBody, usageTitle, usageBody,
-         claudeSource, continueTitle, notNow, cancel, menuItem, pickOne, saveFailed, desktopOffLine,
+         claudeSource, continueTitle, notNow, cancel, done, designButton, designCaption, menuItem, pickOne, saveFailed, desktopOffLine,
          usageOffLine, addOnsStayLine, whatChanges, whatHappened, usageOffSettingsLine,
          arrangeNeedsDesktop, designDesktopOffNote, drawersFirstOnLine, nothingToSort, drawersOffLine(1), drawersOffLine(2)]
     }

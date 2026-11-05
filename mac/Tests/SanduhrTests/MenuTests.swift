@@ -21,7 +21,7 @@ struct SanduhrMenuTests {
         #expect(flat(menu()) == [
             "Hide Widget", "-",
             "Deep Work", "Pacing Calculators", "Cooldown Snake", "Camera Fill Light", "Claude Usage…", "-",
-            "Refresh", "Settings…", "Arrange Desk…", "Check for Updates…", "What's New…", "Take the Tour…", "-",
+            "Refresh", "Settings…", "Set up Sanduhr…", "Arrange Desk…", "Check for Updates…", "What's New…", "Take the Tour…", "-",
             "Quit Sanduhr für Claude",
         ])
         #expect(menu().map(\.header) == [nil, "Tools", nil, nil])
@@ -62,7 +62,7 @@ struct SanduhrMenuTests {
     @Test func keyEquivalents() {
         let keys = Dictionary(uniqueKeysWithValues: menu().flatMap(\.entries).map { ($0.command, $0.key) })
         #expect(keys == [.showHide: "", .deepWork: "p", .pacing: "", .snake: "", .cameraLight: "", .usage: "",
-                         .refresh: "r", .settings: ",", .arrangeDesk: "", .checkForUpdates: "", .whatsNew: "", .tour: "",
+                         .refresh: "r", .settings: ",", .setup: "", .arrangeDesk: "", .checkForUpdates: "", .whatsNew: "", .tour: "",
                          .quit: "q"])
     }
 

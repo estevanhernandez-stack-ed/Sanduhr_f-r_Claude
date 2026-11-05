@@ -130,7 +130,7 @@ enum DebugHooks {
             }
             DeskController.shared.applyPill()
         case .justTheDesk(let on):
-            if on { app.chooseJustTheDesk() } else { app.endJustTheDesk() }
+            app.setUsageForSmoke(!on)
         case .drawers(let step):
             // Only against a stand-in Desktop: without the override a smoke run would sort, or
             // put back, the real Desktop's files.
@@ -428,7 +428,7 @@ enum DebugHooks {
         s.lockLine = LockLineDebug(on: UserDefaults.desk.bool(forKey: LockLineKeys.on),
                                    helper: LockLineDaemon.state.rawValue,
                                    text: LockLineController.line(vm: vm, now: Date()))
-        s.justTheDesk = JustTheDesk.isOn()
+        s.justTheDesk = SetupStore.load().map { !$0.claudeUsage } ?? false
         s.drawers = DrawersDebug.of(DrawerService.shared)
         s.demo = DemoDebug(on: vm.demo, widgetTiers: vm.visibleTiers().count, deskLine: desk.model.claudeLine != nil,
                            notchMeters: desk.model.claudeCompact != nil, accounts: vm.accountLabels.count,
@@ -513,7 +513,7 @@ enum DebugHooks {
         let tour = WelcomeTourWindowController.shared
         s.tour = TourDebug(open: tour.isOpen, step: tour.isOpen ? tour.navigation.index + 1 : 0,
                            stepsShown: WelcomeTour.steps(features: WelcomeTourWindowController.features(),
-                                                     justTheDesk: JustTheDesk.isOn()).count,
+                                                     usageOff: !SetupStore.claudeUsageOn()).count,
                            done: WelcomeTour.done(), pending: WelcomeTour.state() == .pending)
         s.build = info["CFBundleVersion"] as? String ?? ""
         let shown = desk.model.watchers
