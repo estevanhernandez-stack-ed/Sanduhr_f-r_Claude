@@ -344,6 +344,11 @@
                     <!-- What a switch, an Uninstall, an Install or Use my own art did (P9: the catalog's own fetch line is in the Catalog). -->
                     <TextBlock x:Name="StatusLine" Text="{Binding Status}" Style="{StaticResource Status}" Margin="0,6,0,0"
                                Visibility="{Binding Status, Converter={StaticResource StrVis}}" />
+                    <!-- A companion from a file that stops short of the desk: one click turns the Desk on or shows the piece. -->
+                    <Button x:Name="CompanionFixButton" Style="{DynamicResource FlatButton}" Margin="0,6,0,0" HorizontalAlignment="Left"
+                            Content="{Binding CompanionFix}" Command="{Binding FixCompanionCommand}"
+                            AutomationProperties.Name="{Binding CompanionFix}"
+                            Visibility="{Binding CompanionFix, Converter={StaticResource StrVis}}" />
                     <TextBlock Text="{x:Static core:SettingsNames.InstalledPacksNote}" Style="{StaticResource Dim}" Margin="0,6,0,0" />
                 </StackPanel>
 

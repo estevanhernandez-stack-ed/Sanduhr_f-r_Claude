@@ -811,7 +811,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
             name => StreamerMode.Mask.Name(CodenameCategory.AddOn, name));   // streamer: masked - the codename the Installed row shows for a pack made here
         Status = Short(result.Message, SettingsNames.WidgetInstallFailed);   // streamer: masked - via Short: Mask.Paths or FoldersIn (CP 8); a store error can name the widgets folder
         if (result is { Ok: true, Kind: "sprite", PackId: { } id })
-            Status = Short(MakeCompanion(id, result), SettingsNames.WidgetInstallFailed);   // streamer: masked - ShownName is the mask's codename; via Short as above
+            SetCompanionStatus(MakeCompanion(id, result));
         Rebuild();
         if (result.Ok) Notify();
         return Task.CompletedTask;
@@ -826,11 +826,70 @@ public sealed partial class ModsPageViewModel : ObservableObject
         try
         {
             Prefs.SaveCompanion(Prefs.LoadCompanion() with { Pack = packId });
-            var desk = Prefs.LoadDesk();
-            bool placed = new DeskArrangement(desk.Layout).Placement(CompanionSettings.Widget) is not null;
-            return WidgetFileInstall.CompanionLine(result, desk.Enabled, placed);
+            return CompanionStatus(result);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return result.Message; }   // streamer: notname - result.Message carries the masked name; the caller passes it through Short
+    }
+
+    /// <summary>The companion's line from the Desk as saved now; remembers what blocks it, for the button.</summary>
+    private string CompanionStatus(WidgetFileResult result)
+    {
+        var desk = Prefs.LoadDesk();
+        bool placed = new DeskArrangement(desk.Layout).Placement(CompanionSettings.Widget) is not null;
+        _companionResult = result;
+        _companionBlock = WidgetFileInstall.Blocked(desk.Enabled, placed);
+        return WidgetFileInstall.CompanionLine(result, desk.Enabled, placed);
+    }
+
+    private WidgetFileResult? _companionResult;
+    private CompanionBlock _companionBlock;
+    private bool _settingCompanion;
+
+    /// <summary>The button beside a companion line that stops short of the desk: "Turn on the Desk" or "Show it on the Desk". Empty hides it.</summary>
+    [ObservableProperty] private string _companionFix = "";
+
+    // Any other status line takes the button away; only a companion line brings it.
+    partial void OnStatusChanged(string value) => CompanionFix = _settingCompanion ? WidgetFileInstall.FixLabel(_companionBlock) : "";
+
+    private void SetCompanionStatus(string line)
+    {
+        _settingCompanion = true;
+        try { Status = Short(line, SettingsNames.WidgetInstallFailed); }   // streamer: masked - ShownName is the mask's codename; via Short
+        finally { _settingCompanion = false; }
+    }
+
+    /// <summary>Set by Settings: turns the Desk on through the Desk tab, so its open copy saves it and the Desk starts.</summary>
+    internal Action? TurnOnDesk { get; set; }
+
+    /// <summary>Set by Settings: shows the companion piece through the Desk tab.</summary>
+    internal Action? ShowCompanionPiece { get; set; }
+
+    /// <summary>The companion line's button: clears what keeps the new companion off the desk, then says where it is now.</summary>
+    [RelayCommand]
+    private void FixCompanion()
+    {
+        if (_companionResult is not { } result) return;
+        try
+        {
+            if (_companionBlock == CompanionBlock.DeskOff)
+            {
+                if (TurnOnDesk is { } on) on();
+                else Prefs.SaveDesk(Prefs.LoadDesk() with { Enabled = true });
+            }
+            else if (_companionBlock == CompanionBlock.PieceHidden)
+            {
+                if (ShowCompanionPiece is { } show) show();
+                else
+                {
+                    var desk = Prefs.LoadDesk();
+                    var layout = new DeskArrangement(desk.Layout);
+                    if (layout.PlaceAtDefault(CompanionSettings.Widget) is not null) Prefs.SaveDesk(desk with { Layout = layout.Layout });
+                }
+            }
+            SetCompanionStatus(CompanionStatus(result));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Status = SettingsNames.WidgetInstallFailed; }
+        Changed?.Invoke();
     }
 
     /// <summary>settings.json, for the companion a sprite from a file makes. Tests pass their own store.</summary>

@@ -78,10 +78,10 @@ public sealed class WidgetFromFilePageTests : IDisposable
     }
 
     [Theory]
-    [InlineData(true, "companion:bl", "Fixture sprite is on your desk now. It came from your file and stays on this PC.")]
-    [InlineData(false, "companion:bl", "Fixture sprite is your companion now. Turn the Desk on in Settings, Desk to see it.")]
-    [InlineData(true, "clock:bl", "Fixture sprite is your companion now. It is hidden; tick Companion in Settings, Desk to show it.")]
-    public void A_sprite_from_a_file_becomes_the_companion_and_the_line_says_where_it_went(bool deskOn, string layout, string expected)
+    [InlineData(true, "companion:bl", "Fixture sprite is on your desk now. It came from your file and stays on this PC.", "")]
+    [InlineData(false, "companion:bl", "Fixture sprite is your companion now. It lives on the Desk, the layer Sanduhr draws on your desktop, and the Desk is off.", "Turn on the Desk")]
+    [InlineData(true, "clock:bl", "Fixture sprite is your companion now, but the Companion piece is hidden on the Desk.", "Show it on the Desk")]
+    public void A_sprite_from_a_file_becomes_the_companion_and_the_line_says_where_it_went(bool deskOn, string layout, string expected, string fix)
     {
         Sta.Run(() =>
         {
@@ -94,8 +94,61 @@ public sealed class WidgetFromFilePageTests : IDisposable
             page.InstallFromFileCommand.Execute(null);
 
             Assert.Equal(expected, page.Status);
+            Assert.Equal(fix, page.CompanionFix);
             Assert.Equal(new CompanionSettings("good-sprite", Roam: false), _store.LoadCompanion());
             Assert.Equal(layout, _store.LoadDesk().Layout);   // the choice is written, the layout is left to the Desk tab
+        });
+    }
+
+    [Fact]
+    public void The_companion_button_turns_the_Desk_on_then_shows_the_piece_then_goes()
+    {
+        Sta.Run(() =>
+        {
+            _store.SaveDesk(DeskSettings.Default with { Enabled = false, Layout = "clock:bl" });
+            string zip = ZipFile("sprite.zip", WidgetKit.Pack("good-sprite"));
+            var page = new ModsPageViewModel(() => new WidgetCatalogService(_paths), _store);
+            page.PickZip = () => zip;
+            page.InstallFromFileCommand.Execute(null);
+            Assert.Equal("Turn on the Desk", page.CompanionFix);
+
+            page.FixCompanionCommand.Execute(null);
+            Assert.True(_store.LoadDesk().Enabled);
+            Assert.Equal("Fixture sprite is your companion now, but the Companion piece is hidden on the Desk.", page.Status);
+            Assert.Equal("Show it on the Desk", page.CompanionFix);
+
+            page.FixCompanionCommand.Execute(null);
+            Assert.NotNull(new DeskArrangement(_store.LoadDesk().Layout).Placement(CompanionSettings.Widget));
+            Assert.Equal("Fixture sprite is on your desk now. It came from your file and stays on this PC.", page.Status);
+            Assert.Equal("", page.CompanionFix);
+
+            // Any other line takes the button away.
+            _store.SaveDesk(DeskSettings.Default with { Enabled = false, Layout = "clock:bl" });
+            page.InstallFromFileCommand.Execute(null);
+            Assert.Equal("Turn on the Desk", page.CompanionFix);
+            page.PickZip = () => null;
+            page.InstallFromFileCommand.Execute(null);
+            Assert.Equal("", page.CompanionFix);
+        });
+    }
+
+    [Fact]
+    public void Settings_routes_the_button_through_its_Desk_tab()
+    {
+        Sta.Run(() =>
+        {
+            _store.SaveDesk(DeskSettings.Default with { Enabled = false, Layout = "clock:bl" });
+            string zip = ZipFile("sprite.zip", WidgetKit.Pack("good-sprite"));
+            var page = new ModsPageViewModel(() => new WidgetCatalogService(_paths), _store);
+            int on = 0;
+            page.TurnOnDesk = () => { on++; _store.SaveDesk(_store.LoadDesk() with { Enabled = true }); };
+            page.PickZip = () => zip;
+            page.InstallFromFileCommand.Execute(null);
+
+            page.FixCompanionCommand.Execute(null);
+
+            Assert.Equal(1, on);
+            Assert.Equal("Show it on the Desk", page.CompanionFix);
         });
     }
 

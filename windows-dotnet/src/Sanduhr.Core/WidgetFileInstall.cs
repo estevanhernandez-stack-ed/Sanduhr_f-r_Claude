@@ -18,6 +18,9 @@ public sealed record WidgetFileResult(bool Ok, string Message, string? PackId = 
 /// </para>
 /// Pure apart from the store: bytes in, result out. The file dialog and reading the file are the caller's.
 /// </summary>
+/// <summary>What keeps a companion installed from a file off the desk (<see cref="WidgetFileInstall.Blocked"/>).</summary>
+public enum CompanionBlock { None, DeskOff, PieceHidden }
+
 public static class WidgetFileInstall
 {
     /// <summary>The validator's errors shown in the status line; the rest are counted.</summary>
@@ -55,12 +58,27 @@ public static class WidgetFileInstall
     public static string CompanionLine(WidgetFileResult result, bool deskOn, bool piecePlaced)
     {
         string name = result.ShownName ?? "";
-        if (!deskOn) return SettingsNames.FileCompanionDeskOff(name);
-        if (!piecePlaced) return SettingsNames.FileCompanionHidden(name);
+        switch (Blocked(deskOn, piecePlaced))
+        {
+            case CompanionBlock.DeskOff: return SettingsNames.FileCompanionDeskOff(name);
+            case CompanionBlock.PieceHidden: return SettingsNames.FileCompanionHidden(name);
+        }
         return result.Updated
             ? SettingsNames.FileCompanionUpdatedOnDesk(name, result.Version ?? "")
             : SettingsNames.FileCompanionOnDesk(name);
     }
+
+    /// <summary>What stands between a new companion and the desk: nothing, the Desk being off, or its piece being hidden.</summary>
+    public static CompanionBlock Blocked(bool deskOn, bool piecePlaced) =>
+        !deskOn ? CompanionBlock.DeskOff : !piecePlaced ? CompanionBlock.PieceHidden : CompanionBlock.None;
+
+    /// <summary>The label of the button that clears <paramref name="block"/>; empty when nothing blocks.</summary>
+    public static string FixLabel(CompanionBlock block) => block switch
+    {
+        CompanionBlock.DeskOff => SettingsNames.FileCompanionTurnOnDesk,
+        CompanionBlock.PieceHidden => SettingsNames.FileCompanionShowPiece,
+        _ => "",
+    };
 
     /// <summary>The first <see cref="ErrorsShown"/> errors, and how many more there are.</summary>
     internal static string Errors(IReadOnlyList<string> errors)

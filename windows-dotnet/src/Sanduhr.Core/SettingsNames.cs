@@ -534,8 +534,11 @@ public static class SettingsNames
     // A sprite from a file becomes the companion (#408, persona panel round 2): the line says where it went.
     public static string FileCompanionOnDesk(string pack) => $"{pack} is on your desk now. It came from your file and stays on this PC.";
     public static string FileCompanionUpdatedOnDesk(string pack, string version) => $"{pack} is updated to {version} and on your desk now. It stays on this PC.";
-    public static string FileCompanionDeskOff(string pack) => $"{pack} is your companion now. Turn the Desk on in Settings, Desk to see it.";
-    public static string FileCompanionHidden(string pack) => $"{pack} is your companion now. It is hidden; tick {DeskCompanion} in Settings, Desk to show it.";
+    // The two lines that stop short of the desk carry a button that clears the way (persona panel round 3: say what the Desk is, and do it).
+    public static string FileCompanionDeskOff(string pack) => $"{pack} is your companion now. It lives on the Desk, the layer Sanduhr draws on your desktop, and the Desk is off.";
+    public static string FileCompanionHidden(string pack) => $"{pack} is your companion now, but the {DeskCompanion} piece is hidden on the Desk.";
+    public const string FileCompanionTurnOnDesk = "Turn on the Desk";
+    public const string FileCompanionShowPiece = "Show it on the Desk";
 
     // ---- Copy for the Claude Code folder cards and Mods & Widgets (Task 12, P13): a card's "What this folder holds" and the meters rows ----
 

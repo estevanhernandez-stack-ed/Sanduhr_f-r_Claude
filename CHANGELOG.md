@@ -16,7 +16,7 @@
 
 ### New
 
-- **Install a widget pack from a zip.** Settings ▸ Mods & Widgets has **Install widget from file…** under the installed list, for packs made with a pack maker such as SpriteForge or by hand. The zip gets the same checks as a catalog download (safe to open, every pack rule, the Sanduhr version it needs), and a pack that fails installs nothing and says why. It installs as your own, listed as made here, and installing the same pack again updates it. A pack of the same id from the catalog is never replaced. The file is only read: nothing is sent anywhere. A companion sprite from a file becomes your companion right away, and the line says where it went: on your desk now, or how to turn the Desk on or show the companion piece. While streamer mode is on, the line shows the pack's codename, as the installed list does.
+- **Install a widget pack from a zip.** Settings ▸ Mods & Widgets has **Install widget from file…** under the installed list, for packs made with a pack maker such as SpriteForge or by hand. The zip gets the same checks as a catalog download (safe to open, every pack rule, the Sanduhr version it needs), and a pack that fails installs nothing and says why. It installs as your own, listed as made here, and installing the same pack again updates it. A pack of the same id from the catalog is never replaced. The file is only read: nothing is sent anywhere. A companion sprite from a file becomes your companion right away, and the line says where it went: on your desk now, or, when the Desk is off or the companion piece is hidden, a line that says so with a button that turns the Desk on or shows the piece in one click. While streamer mode is on, the line shows the pack's codename, as the installed list does.
 
 ### Fixes
 
