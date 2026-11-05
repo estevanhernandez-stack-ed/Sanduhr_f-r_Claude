@@ -84,6 +84,14 @@ enum SetupStore {
     static func save(_ setup: SetupSettings, to store: DefaultsStore = UserDefaults.standard) {
         store.set(setup.encode(), forKey: SetupSettings.key)
     }
+
+    /// Claude usage is on. No stored setup reads as on (an upgrade before the migration has run
+    /// keeps its meters); a stored setup without a Claude entry reads as on too, so damage never
+    /// turns the account's meters off.
+    static func claudeUsageOn(from store: DefaultsStore = UserDefaults.standard) -> Bool {
+        guard let setup = load(from: store) else { return true }
+        return setup.usage[SetupSettings.claude] ?? true
+    }
 }
 
 /// What the first launch of a setup build makes of an older install.

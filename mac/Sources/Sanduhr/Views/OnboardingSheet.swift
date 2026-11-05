@@ -68,10 +68,20 @@ struct NeedsAccountNote: View {
     var vm: UsageViewModel
     let text: String
 
-    /// Not signed in yet, or signed out: no numbers will come until a sign-in.
+    /// Not signed in yet, signed out, or usage switched off: no numbers will come until a sign-in or
+    /// until usage is turned on.
     static func shows(_ status: UsageViewModel.StatusMessage) -> Bool {
-        status == .notSignedIn || status == .signedOut
+        status == .notSignedIn || status == .signedOut || status == .usageOff
     }
+
+    /// The line the note says: the page's own sign-in line, or with usage off the usage-off line
+    /// in its place.
+    static func line(_ status: UsageViewModel.StatusMessage, signIn text: String) -> String {
+        status == .usageOff ? SetupCopy.usageOffSettingsLine : text
+    }
+
+    /// The way to Accounts goes with the sign-in line only.
+    static func linksToAccounts(_ status: UsageViewModel.StatusMessage) -> Bool { status != .usageOff }
 
     static let alerts = "Alerts are about your Claude limits, so they start once you sign in. You can set them up now."
     static let claudeCode = "The statusline, the meters above the prompt and the MCP server report your Claude usage. They show numbers once you sign in."
@@ -82,12 +92,14 @@ struct NeedsAccountNote: View {
                 Image(systemName: "person.crop.circle.badge.questionmark")
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
-                Text(text)
+                Text(Self.line(vm.status, signIn: text))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                Button(SettingsSection.credentials.linkTitle) { SettingsWindowController.shared.show(.credentials) }
+                if Self.linksToAccounts(vm.status) {
+                    Button(SettingsSection.credentials.linkTitle) { SettingsWindowController.shared.show(.credentials) }
+                }
             }
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))

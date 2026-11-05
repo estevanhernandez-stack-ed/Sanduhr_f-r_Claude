@@ -47,6 +47,9 @@ enum WidgetVisibilityEvent: Equatable {
     /// Just the Desk on the welcome sheet: no sign-in to wait for, so the widget follows the
     /// choice as after a sign-in (an "Always shown" widget stays as it is).
     case justTheDesk
+    /// Claude usage went off or on (Set up Sanduhr). Off hides the widget while the Desk runs; on
+    /// brings it back (an "Always shown" widget included) or leaves it to the other choices.
+    case usageChanged
 }
 
 /// Whether this Mac is still signing in: the widget shows for sign-in until the active
@@ -133,8 +136,12 @@ enum WidgetVisibilityRule {
     /// it when it is chosen, so a widget an earlier choice hid comes back; after that it never
     /// moves it (at launch `panelHidden` decides, as before). Without a session key the other
     /// choices always show it, so sign-in can run.
+    /// With Claude usage off and the Desk running the widget has nothing to show and is hidden (the
+    /// menu bar is the way back); with the Desk off as well it stays, so nothing is ever left empty.
     static func shouldShow(setting: WidgetVisibility, deskOn: Bool, hasSessionKey: Bool,
-                           event: WidgetVisibilityEvent) -> Bool? {
+                           event: WidgetVisibilityEvent, usageOn: Bool = true) -> Bool? {
+        if !usageOn, deskOn { return event == .choiceChanged ? nil : false }
+        if event == .usageChanged, setting == .always { return true }
         switch setting {
         case .always: return event == .choiceChanged ? true : nil
         case _ where !hasSessionKey: return true
@@ -146,7 +153,8 @@ enum WidgetVisibilityRule {
     /// The widget's state after `event`, given whether it shows now (a manual show or hide
     /// included).
     static func resolve(showing: Bool, setting: WidgetVisibility, deskOn: Bool,
-                        hasSessionKey: Bool, event: WidgetVisibilityEvent) -> Bool {
-        shouldShow(setting: setting, deskOn: deskOn, hasSessionKey: hasSessionKey, event: event) ?? showing
+                        hasSessionKey: Bool, event: WidgetVisibilityEvent, usageOn: Bool = true) -> Bool {
+        shouldShow(setting: setting, deskOn: deskOn, hasSessionKey: hasSessionKey, event: event,
+                   usageOn: usageOn) ?? showing
     }
 }

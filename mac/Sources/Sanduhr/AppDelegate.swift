@@ -67,6 +67,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let tour = WelcomeTour.atLaunch(
             fresh: firstRun == .fresh, hasKey: KeychainStore.exists(account: KeychainAccount.sessionKey),
             accounts: KeychainStore.accounts.labels.count, lastSeen: WhatsNew.lastSeen())
+        // Set up Sanduhr's migration, once, before anything can fetch or place the widget: an account
+        // keeps usage on, Just the Desk alone leaves it off (SetupMigration).
+        Self.runSetupMigration()
+        lastUsageOn = viewModel.usageOn
 
         // Build widget panel.
         let hosting = NSHostingController(rootView: RootView(vm: viewModel))
@@ -95,7 +99,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let show = WidgetVisibilityRule.resolve(
             showing: wasShowing, setting: .saved(), deskOn: DeskController.shared.enabled,
             hasSessionKey: JustTheDesk.signInSettled(awaitingSignIn: awaitingSignIn,
-                                                     hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey)), event: .launch)
+                                                     hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey)), event: .launch,
+            usageOn: viewModel.usageOn)
         if show != wasShowing { UserDefaults.standard.set(!show, forKey: Self.panelHiddenKey) }
         if show {
             panel.makeKeyAndOrderFront(nil)
@@ -124,7 +129,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 usage: vm.shownUsage, fetchedAt: vm.lastUpdated, signInNeeded: vm.status.needsSignIn,
                 firstSignIn: vm.status == .notSignedIn,
                 account: vm.shownAccountLabel, veiled: vm.switchVeil, switchNote: vm.switchNote,
-                keyPresent: vm.canFetch))
+                keyPresent: vm.canFetch, usageOff: vm.status == .usageOff))
         }
 
         // When the user toggles compact mode, resize the panel to fit the
@@ -213,12 +218,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             awaitingSignIn = false
             applyWidgetVisibility(.signedIn)
         }
+        // Usage went off or on (Set up Sanduhr): off puts the widget away; on brings it up until the
+        // first fetch answers, as a launch does, then the choice takes over.
+        if vm.usageOn != lastUsageOn {
+            lastUsageOn = vm.usageOn
+            if vm.usageOn { awaitingSignIn = true }
+            applyWidgetVisibility(.usageChanged)
+        }
         // Signed out (Settings, Credentials): the widget shows for sign-in again, as at a
         // launch without a key, until the next successful fetch.
         if vm.status == .signedOut, !awaitingSignIn {
             awaitingSignIn = true
             applyWidgetVisibility(.signedOut)
         }
+    }
+
+    /// Claude usage as the last update saw it, to tell a switch from an ordinary refresh.
+    private var lastUsageOn = true
+
+    /// Runs Set up Sanduhr's migration once and applies what it decided. The Desk switch and the
+    /// sign-in reminder are the only things it touches; usage itself is read from the stored setup.
+    private static func runSetupMigration() {
+        let desk = UserDefaults.desk
+        let deskEnabled = DeskController.shared.enabled
+        guard let result = SetupMigration.runOnce(
+            hasAccount: KeychainStore.exists(account: KeychainAccount.sessionKey),
+            justTheDesk: JustTheDesk.isOn(),
+            silencedReminder: UserDefaults.standard.object(forKey: JustTheDesk.silencedKey) as? Bool == true,
+            deskEnabled: deskEnabled) else { return }
+        if result.deskOn != deskEnabled { desk.set(result.deskOn, forKey: DeskController.enabledKey) }
+        if result.reminderOn { SignInReminder.set(true, in: desk) }
     }
 
     /// The welcome tour has been offered in this launch.
@@ -323,7 +352,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let show = WidgetVisibilityRule.shouldShow(
             setting: .saved(), deskOn: DeskController.shared.enabled,
             hasSessionKey: JustTheDesk.signInSettled(awaitingSignIn: awaitingSignIn,
-                                                     hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey)), event: event) else { return }
+                                                     hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey)), event: event,
+            usageOn: viewModel.usageOn) else { return }
         if !show { hidePanel(); return }
         guard let panel, !panel.isVisible else { return }
         // Comes back without taking focus from whatever flipped Desk (the Settings window).
@@ -434,7 +464,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// (MenuBarText: the session, the weekly limit, the higher of the two, or both in turn).
     func renderStatusItem() {
         guard let button = statusItem?.button else { return }
-        let reading = MenuBarText.reading(viewModel.usage, mode: .saved(), step: menuBarStep)
+        let reading = MenuBarText.reading(viewModel.usage, mode: .saved(), step: menuBarStep,
+                                          usageOn: viewModel.usageOn)
 
         if let reading {
             let look = MenuBarItemLook(reading)
