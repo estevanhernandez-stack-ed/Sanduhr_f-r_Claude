@@ -306,6 +306,7 @@ final class DrawerService {
     func apply() -> DrawerRunResult? {
         guard let review = pending else { return nil }
         pending = nil
+        if review.plan.source == .rules, !settings.everSorted { update { $0.everSorted = true } }
         return run(review.plan, planned: review.planned)
     }
 

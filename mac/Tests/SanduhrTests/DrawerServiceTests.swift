@@ -94,10 +94,11 @@ struct DrawerSettingsTests {
         v.hidden = ["pics"]
         v.tidyCorner = .bottomLeft
         v.tidyFlow = .row
+        v.everSorted = true
         DrawerPrefs.save(v, to: s.defaults)
         #expect(DrawerPrefs.load(from: s.defaults) == v)
         let keys = s.defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("drawers.") }
-        #expect(keys.count == 12)
+        #expect(keys.count == 13)
         #expect(DrawerPrefs.clear(s.defaults))
         #expect(DrawerPrefs.load(from: s.defaults) == DrawerSettings())
     }
