@@ -773,6 +773,58 @@ public sealed partial class ModsPageViewModel : ObservableObject
         return Task.CompletedTask;
     }
 
+    /// <summary>Picks the pack zip for Install widget from file…: the chosen file's path, or null when cancelled. Tests pass their own.</summary>
+    internal Func<string?> PickZip { get; set; } = DefaultPickZip;
+
+    /// <summary>
+    /// "Install widget from file…" (#408): a pack zip from this PC, read with the catalog's zip reader, validated strictly and
+    /// installed as the user's own (see <see cref="WidgetFileInstall"/>). The file is only read; nothing is sent anywhere.
+    /// </summary>
+    [RelayCommand]
+    private Task InstallFromFile()
+    {
+        if (Busy) return Task.CompletedTask;
+        Status = "";   // a repeated outcome is still announced
+        if (PickZip() is not { } path)
+        {
+            Status = SettingsNames.FileNoneChosen;
+            return Task.CompletedTask;
+        }
+        byte[] zip;
+        try
+        {
+            // Measured before it is read: a huge file is refused without loading it.
+            if (new FileInfo(path).Length > WidgetCatalog.MaxZipBytes)
+            {
+                Status = SettingsNames.FileTooLarge;
+                return Task.CompletedTask;
+            }
+            zip = File.ReadAllBytes(path);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            Status = SettingsNames.FileUnreadable;
+            return Task.CompletedTask;
+        }
+        var result = WidgetFileInstall.Install(zip, Service.Store, Service.Client.Running);
+        Status = Short(result.Message, SettingsNames.WidgetInstallFailed);   // streamer: masked - via Short: Mask.Paths or FoldersIn (CP 8); a store error can name the widgets folder
+        Rebuild();
+        if (result.Ok) Notify();
+        return Task.CompletedTask;
+    }
+
+    private static string? DefaultPickZip()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = SettingsNames.InstallFromFilePickTitle,
+            Filter = SettingsNames.InstallFromFileFilter,
+            CheckFileExists = true,
+            Multiselect = false,
+        };
+        return dialog.ShowDialog() == true ? dialog.FileName : null;   // streamer: key - the picked pack path is read, never drawn
+    }
+
     private static string? DefaultPickImage(string title)
     {
         var dialog = new Microsoft.Win32.OpenFileDialog

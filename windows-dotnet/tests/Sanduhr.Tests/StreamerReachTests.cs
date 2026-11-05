@@ -197,8 +197,8 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/LauncherSettingsViewModel.cs", "notname", 1),
         ("Sanduhr.App/ViewModels/LocalCcViewModel.cs", "key", 6),
         ("Sanduhr.App/ViewModels/LocalCcViewModel.cs", "masked", 6),   // streamer smoke: archive folder names redraw on the switch
-        ("Sanduhr.App/ViewModels/ModsPageViewModel.cs", "key", 1),
-        ("Sanduhr.App/ViewModels/ModsPageViewModel.cs", "masked", 5),
+        ("Sanduhr.App/ViewModels/ModsPageViewModel.cs", "key", 2),
+        ("Sanduhr.App/ViewModels/ModsPageViewModel.cs", "masked", 6),
         ("Sanduhr.App/ViewModels/ModsPageViewModel.cs", "notname", 1),
         ("Sanduhr.App/ViewModels/PrivacyViewModel.cs", "key", 1),
         ("Sanduhr.App/ViewModels/PrivacyViewModel.cs", "masked", 1),
