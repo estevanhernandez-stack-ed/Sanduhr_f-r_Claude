@@ -333,6 +333,14 @@
                         </ListBox.Template>
                     </ListBox>
                     <TextBlock Text="{Binding Note}" Style="{StaticResource Dim}" Margin="0,4,0,0" Visibility="{Binding Note, Converter={StaticResource StrVis}}" />
+                    <!-- Install widget from file… (#408): a pack zip from this PC. Out here, not in the Catalog: opening the
+                         Catalog asks GitHub, and a local install never should. Its outcome lands on the status line below. -->
+                    <Button Style="{DynamicResource FlatButton}" Margin="0,8,0,0" HorizontalAlignment="Left"
+                            Content="{x:Static core:SettingsNames.InstallFromFile}" Command="{Binding InstallFromFileCommand}"
+                            IsEnabled="{Binding Busy, Converter={x:Static conv:Bools.Not}}"
+                            ToolTip="{x:Static core:SettingsNames.InstallFromFileHelp}"
+                            AutomationProperties.Name="{x:Static core:SettingsNames.InstallFromFile}"
+                            AutomationProperties.HelpText="{x:Static core:SettingsNames.InstallFromFileHelp}" />
                     <!-- What a switch, an Uninstall, an Install or Use my own art did (P9: the catalog's own fetch line is in the Catalog). -->
                     <TextBlock x:Name="StatusLine" Text="{Binding Status}" Style="{StaticResource Status}" Margin="0,6,0,0"
                                Visibility="{Binding Status, Converter={StaticResource StrVis}}" />

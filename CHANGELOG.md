@@ -10,6 +10,10 @@
 
 ## Unreleased (windows)
 
+### New
+
+- **Install a widget pack from a zip.** Settings ▸ Mods & Widgets has **Install widget from file…** under the installed list, for packs made with a pack maker such as SpriteForge or by hand. The zip gets the same checks as a catalog download (safe to open, every pack rule, the Sanduhr version it needs), and a pack that fails installs nothing and says why. It installs as your own, listed as made here, and installing the same pack again updates it. A pack of the same id from the catalog is never replaced. The file is only read: nothing is sent anywhere.
+
 ### Fixes
 
 - **Sanduhr stays light while a long Claude Code session runs.** Every 30 seconds the widget counts the tokens burned since its last fetch, and it did that by reading every session log changed since then from the first line, a long session's log included (one ran to 650 MB). It now reads each log once and after that only what was added, and takes each log's time from the folder listing instead of asking for every file, of thousands, on its own. On that session the app went from about 10% of one CPU core to about 2%.

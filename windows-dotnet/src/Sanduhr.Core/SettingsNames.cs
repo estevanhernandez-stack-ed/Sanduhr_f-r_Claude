@@ -516,6 +516,22 @@ public static class SettingsNames
     public static string OwnArtChangeFailed(string pack) => $"{pack} couldn't be changed.";
     public const string OwnArtFileFilter = "PNG sprite sheet (*.png)|*.png";
 
+    // ---- Install widget from file… (#408): a pack zip from disk, installed as the user's own ----
+
+    public const string InstallFromFile = "Install widget from file…";
+    public const string InstallFromFileHelp = "Installs a widget pack zip from this PC, checked like a catalog pack. It stays on this PC.";
+    public const string InstallFromFilePickTitle = "Install a widget pack";
+    public const string InstallFromFileFilter = "Widget pack (*.zip)|*.zip";
+    public const string FileNoneChosen = "No file was chosen, so nothing was installed.";
+    public const string FileUnreadable = "That file couldn't be read, so nothing was installed.";
+    public const string FileTooLarge = "That zip is larger than a widget pack may be (10 MB), so nothing was installed.";
+    public static string FileZipUnsafe(string why) => $"Nothing was installed: the zip isn't safe to open ({why}).";
+    public static string FilePackRejected(string errors) => $"Nothing was installed: the pack didn't pass Sanduhr's checks. {errors}";
+    public static string FileMoreErrors(string shown, int more) => more == 1 ? $"{shown}; and 1 more." : $"{shown}; and {more} more.";
+    public static string FilePackTooNew(string pack, string min) => $"{pack} needs Sanduhr {min} or later, so nothing was installed.";
+    public static string FilePackInstalled(string pack) => $"{pack} is installed from your file. It stays on this PC.";
+    public static string FilePackUpdated(string pack, string version) => $"{pack} is updated to {version} from your file. It stays on this PC.";
+
     // ---- Copy for the Claude Code folder cards and Mods & Widgets (Task 12, P13): a card's "What this folder holds" and the meters rows ----
 
     public const string HoldsCantRead = "Couldn't read this folder.";
