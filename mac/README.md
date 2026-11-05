@@ -47,7 +47,7 @@ alias — drag across to install, eject the DMG, done. Uses only `hdiutil` +
 
 ## First run
 
-Click **Sign In to Claude…** on the welcome sheet. Sanduhr opens claude.ai's own sign-in in a
+A new install opens **Set up Sanduhr** first (see that section). With **Track my AI usage** ticked and no key saved, the sign-in sheet follows: click **Sign In to Claude…** on it. Sanduhr opens claude.ai's own sign-in in a
 window of its own; once you're signed in, it keeps the session key and closes the window. The
 window's web view stores nothing: its cookies live in memory for that one sign-in and are gone
 when it closes, and no key, cookie or page is logged.
@@ -1717,17 +1717,58 @@ adds its own array and nothing else changes. Related features share a card, whic
 newest release it covers and lists every release it spans; it shows when any of them is new. The last version seen is the `whatsNewLastSeen`
 default (`defaults write com.626labs.sanduhr whatsNewLastSeen 2.3.4` fakes an update).
 
-## Just the Desk
+## Set up Sanduhr
 
-The welcome sheet's **Just the Desk** (`Models/JustTheDesk.swift`, BACKLOG #4) is for someone without a
-Claude account. It sets `justTheDesk` (standard defaults), turns the Desk on and the sign-in reminder
-off (`justTheDeskSilencedReminder` remembers that it did), and lets the widget follow When the widget
-shows instead of staying up for sign-in (`JustTheDesk.signInSettled`). The sheet stops showing at
-launch and What's New no longer waits for a key. Saving a key ends it at once, before any fetch
-(`JustTheDesk.endBySignIn`), turning the reminder back on only if Just the Desk had turned it off, so a
-key that then fails gets the usual sign-in flow (the widget up for it, the Desk's sign-in line).
-A pending welcome tour opens a second after the choice, once a launch, as its Desk-only variant (see
-Welcome tour). `smoke/smoke do just-the-desk on|off` drives both ends. state.yaml: `just_the_desk`.
+One window of free choices (2.41.0, `docs/mac-drawers-setup-spec.md` sections 10 to 12, Windows 4.5.0's screen) replaces the welcome
+sheet's choosing. **A nicer desktop** (`SetupSettings.desktop`) turns the Desk's pieces on or off, **Tidy my files** is the Drawers
+switch, and **Track my AI usage** (Claude) turns usage tracking on or off. **Continue** applies them; **Not now** (a first run) and
+**Cancel** save nothing, as does the close button. With nothing ticked Continue is off and says "Pick at least one, or Sanduhr has
+nothing to show." Unticking something says what it will do first (under **What changes**): the desktop's clock, message and weather
+hide with the layout kept; N drawer files go back to the Desktop; "Your account stays saved. Remove it in Settings, Accounts."; and that
+the Claude Code add-ons stay installed.
+
+- **Where it opens.** On a new install (a Mac with no stored setup, half a second after launch, so closing it with Not now asks again
+  at the next launch), from the menu bar item's **Set up Sanduhr…**, from Settings, General (**Set up Sanduhr…**, found by Settings
+  search), from the What's New card **Choose what Sanduhr shows**, from the sign-in sheet's **Set up Sanduhr…** button, from the last
+  Desk-only tour card, and from a menu bar click while no setup exists and no account is signed in
+  (`SetupLaunch.menuBarClickOpensSetup`). The window is `Views/SetupWindow.swift`; its model, copy and service are
+  `Models/SetupViewModel.swift`, `SetupCopy.swift` and `SetupService.swift`, with `SetupHost` as the test seam.
+- **Stored.** `setup` in standard defaults as `{desktop, usage: {claude}}` (Windows' shape, so another usage source can join), and
+  `setupMigrated` once the first-launch migration has looked at the install. Drawers keep their own `drawers.*` keys, plus
+  `drawers.everSorted`, set when a rules review is applied (a rules run in the journal counts too).
+- **Migration** (`SetupMigration`, once). A Mac with an account gets desktop on and usage on, and the Desk's own switch is left as it
+  was. A Mac that chose Just the Desk (`justTheDesk`, read only here) gets desktop on, the Desk on and usage off, and the sign-in
+  reminder comes back where Just the Desk had silenced it. A Mac with neither stores nothing and opens the window. A stored setup is
+  never overwritten, and an upgrade never comes out with usage off for someone signed in. The welcome sheet's Just the Desk button is
+  gone: the window's "desktop on, usage off" is the same state.
+- **Order of Continue.** Drawers off first (it can be refused by a no to the put-back question, which leaves drawers on while the rest
+  still applies), then one save of the setup and the Desk switch, then usage, drawers on, one Desk reload, and last the first drawers
+  review (only for drawers just turned on and only while no rules review was ever applied).
+- **Usage off** (`Services/UsageSwitch.swift`, the guards in `UsageViewModel`). Stops every Claude usage fetch (the refresh, the
+  timers, Follow the account I'm using and the per-seat meters), drops the numbers, sets the status line to "Usage tracking is off. Turn
+  it on in Set up Sanduhr." on the Usage, Alerts and Claude Code pages, and deletes `snapshot.json` (at the switch and at each launch
+  while off). The account, its Keychain item, history and settings stay: nothing signs out. Sign-out, an account switch and Refresh
+  keep it off and write no snapshot. A sign-in, an added account or a saved key turns it on and fetches. An absent setup, or one with
+  no Claude entry, reads as on. The widget starts hidden with usage off and the Desk running (the menu bar item is the way back), and
+  the welcome tour takes its Desk-only steps plus a last card, "Usage when you want it", that opens Set up Sanduhr.
+- **Desktop off** (`Models/SetupDesk.swift`). Every Desk piece is a layout piece on the Mac, so off hides all of them at draw time and
+  in the hit-test layout and the saved layout is never rewritten. The drawer panels are their own windows and keep showing; the notch
+  is not a layout piece. Desk Layout's **Arrange the Desk** refuses with "Turn on A nicer desktop in Set up Sanduhr to arrange the
+  Desk.", and a Desk design review says Apply saves it for when desktop is on. The Desk reloads on `.sanduhrSetupDidChange`.
+- **Design it with an AI chat** (`Views/ChatDesignWindow.swift`, `Models/ChatDesignViewModel.swift`, `PastedSetup.swift`,
+  `SetupPrompt.swift`). A button on the window and on Settings, Drawers. **Copy prompt** puts the prompt on the pasteboard
+  (`SetupPrompt.build`, built only from constants and the Desk's vocabulary: no file name, path or usage number, no product named). The
+  answer goes in the paste box; `PastedSetup.read` takes the first balanced JSON block holding `desk` or `drawers` (Windows' shape, so
+  one answer reads on either platform; `shortcuts` is the Mac's `links` rule), refuses a paste over 200,000 characters, and one bad
+  field rejects the whole paste and is named in the list under "What to fix in the paste". **Preview on my Desk** holds the `desk` half
+  as a Desk review (`DeskDesignProposalHandoff.proposePasted`, `propose_desk`'s own validator, heading "An AI chat suggests a Desk
+  design") and shows Settings, Desk: held in memory, no result file, no notification, never shown to the MCP. **Use these drawer rules**
+  replaces the drawer rules, turns drawers on and opens a rules review (nothing moves before Apply). **Use these drawer settings** saves
+  the look, opacity and Tidy corner and flow the paste named, with an **Undo** in the window that restores them and every place. The
+  window and its paste clear on close.
+- **Smoke.** `smoke/smoke do setup desktop=on|off usage=on|off`, `just-the-desk on|off` (now Set up with usage off or on), state.yaml's
+  `setup:` block (`desktop`, `drawers`, `usage`, `migrated`, `pending`: booleans only) and `smoke/scenarios/setup.yaml`. The hook never
+  touches drawers.
 
 ## Signed out and demo mode
 
@@ -1747,7 +1788,7 @@ Settings v2, slice 4 (item 72; `Models/SignedOut.swift`, `Models/DemoMode.swift`
   never empty charts (`SignedOut.usageState`).
 - **The welcome sheet** is 340 pt wide, the widget's narrowest, and has **Not Now** (Escape): the
   sheet goes for this launch (`WelcomeNotNow`, in memory) and the widget's "Not signed in — sign in"
-  line stays the way in. Just the Desk stays the lasting choice.
+  line stays the way in. Set up Sanduhr's Track my AI usage off is the lasting choice.
 - **Empty notch wings collapse** (`NotchWingsView.collapses`): with Text beside the camera on, a
   wing whose content has nothing to show is 0 wide, so no black slab and the island shrinks to the
   camera on that side; Extra width each side comes back with the content. Nothing (a black wing
@@ -1785,10 +1826,10 @@ the real settings, written as you make them; Show me opens the widget or the rig
 and leaves the tour open. Next and Return move on, Back goes back, Skip the Tour (or Escape) closes
 it with every setting as it is, and the last step's Finish ends it. It never installs anything.
 
-Someone who chose Just the Desk gets a three-step variant (`WelcomeTour.deskOnly`): the Desk, the
-menu bar and the notch (a Mac with one), then Sign in any time, whose button opens Accounts. It is
-offered once, a second after the choice, while the tour is pending (`showsForJustTheDesk`), and
-Take the Tour… shows it for as long as Just the Desk is on. Finishing or skipping records the same
+Someone who turned Track my AI usage off in Set up Sanduhr gets a Desk-only variant (`WelcomeTour.deskOnly`): the Desk, the
+menu bar and the notch (a Mac with one), then Usage when you want it, whose button opens Set up Sanduhr. It is
+offered once, a second after Continue, while the tour is pending (`showsAfterSetup`), and
+Take the Tour… shows it for as long as usage is off. Finishing or skipping records the same
 state as the full tour.
 
 It shows once: never after an update, never on a Mac that already had a key, accounts or a What's
@@ -2318,7 +2359,7 @@ and is no longer JSON Sanduhr can edit, say) leaves that file and its receipt as
 rest still run. An unchecked folder, or a failed one, keeps its receipt, so `integrations/` stays
 and its entries keep working and can be removed from Settings, Claude Code after the next launch;
 the sheet warns when a folder is unchecked. The sheet ends with every step's result and **Quit
-Sanduhr**. With no account and no preferences, the next launch shows the welcome sheet.
+Sanduhr**. With no account and no preferences, the next launch opens Set up Sanduhr.
 
 **Nothing writes back.** Reset and Quit first calls `ResetGate.begin()` and
 `AppDelegate.shutDownForReset()` (`Services/ResetShutdown.swift`): refresh and countdown timers
