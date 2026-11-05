@@ -1,7 +1,11 @@
 namespace Sanduhr.Core;
 
-/// <summary>What an install from a file did: the line Settings shows, and whether anything changed.</summary>
-public sealed record WidgetFileResult(bool Ok, string Message);
+/// <summary>
+/// What an install from a file did: the line Settings shows, and whether anything changed. On success it also names the pack
+/// (its id, kind, version, and its name as the line drew it) so Settings can make a sprite the companion and say so.
+/// </summary>
+public sealed record WidgetFileResult(bool Ok, string Message, string? PackId = null, string? Kind = null, string? ShownName = null,
+    string? Version = null, bool Updated = false);
 
 /// <summary>
 /// "Install widget from file…" (#408): a pack zip from disk, made by the user or a pack maker such as SpriteForge. It passes
@@ -38,9 +42,24 @@ public static class WidgetFileInstall
         var installed = store.Install(files, manifest, WidgetSource.Local, replaceMadeHere: true);
         if (!installed.Ok)
             return new(false, installed.Error ?? SettingsNames.WidgetInstallFailed);
+        string shown = showName(manifest.Name);
         return new(true, replacing
-            ? SettingsNames.FilePackUpdated(showName(manifest.Name), manifest.Version)
-            : SettingsNames.FilePackInstalled(showName(manifest.Name)));
+            ? SettingsNames.FilePackUpdated(shown, manifest.Version)
+            : SettingsNames.FilePackInstalled(shown), manifest.Id, manifest.Kind, shown, manifest.Version, replacing);
+    }
+
+    /// <summary>
+    /// The line after a sprite from a file became the companion: on the Desk now, or what still stands between it and the Desk
+    /// (the Desk is off, or its companion piece is hidden). The setting itself is the caller's.
+    /// </summary>
+    public static string CompanionLine(WidgetFileResult result, bool deskOn, bool piecePlaced)
+    {
+        string name = result.ShownName ?? "";
+        if (!deskOn) return SettingsNames.FileCompanionDeskOff(name);
+        if (!piecePlaced) return SettingsNames.FileCompanionHidden(name);
+        return result.Updated
+            ? SettingsNames.FileCompanionUpdatedOnDesk(name, result.Version ?? "")
+            : SettingsNames.FileCompanionOnDesk(name);
     }
 
     /// <summary>The first <see cref="ErrorsShown"/> errors, and how many more there are.</summary>

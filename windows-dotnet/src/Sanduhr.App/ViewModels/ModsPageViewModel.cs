@@ -308,8 +308,9 @@ public sealed partial class ModsPageViewModel : ObservableObject
     {
         _service = new Lazy<WidgetCatalogService>(service ?? (() => new WidgetCatalogService()));
         _host = host;
+        Prefs = store ?? new SettingsStore(new Paths());
         Confirm = (question, detail) => ThemedDialog.ShowConfirm(_window, question, detail, SettingsNames.UninstallConfirm, SettingsNames.UninstallCancel);
-        // settings.json is not read here; the store parameter stays for callers.
+        // settings.json is read only for the companion a sprite from a file makes (Prefs).
         AskMetersConsent = folder => IntegrationConsentDialog.Ask(_window, new ConsentSpec(
             SettingsNames.MetersConsentTitle, SettingsNames.MetersConsentIntro, folder, SettingsNames.MetersConsentDetails,
             SettingsNames.MetersConsentInstall)) is not null;
@@ -809,10 +810,31 @@ public sealed partial class ModsPageViewModel : ObservableObject
         var result = WidgetFileInstall.Install(zip, Service.Store, Service.Client.Running,
             name => StreamerMode.Mask.Name(CodenameCategory.AddOn, name));   // streamer: masked - the codename the Installed row shows for a pack made here
         Status = Short(result.Message, SettingsNames.WidgetInstallFailed);   // streamer: masked - via Short: Mask.Paths or FoldersIn (CP 8); a store error can name the widgets folder
+        if (result is { Ok: true, Kind: "sprite", PackId: { } id })
+            Status = Short(MakeCompanion(id, result), SettingsNames.WidgetInstallFailed);   // streamer: masked - ShownName is the mask's codename; via Short as above
         Rebuild();
         if (result.Ok) Notify();
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// A sprite installed from a file becomes the companion (persona panel round 2: the user expects to see it). Only the choice
+    /// is written; the Desk layout is left to the Desk tab, which holds its own copy while Settings is open.
+    /// </summary>
+    private string MakeCompanion(string packId, WidgetFileResult result)
+    {
+        try
+        {
+            Prefs.SaveCompanion(Prefs.LoadCompanion() with { Pack = packId });
+            var desk = Prefs.LoadDesk();
+            bool placed = new DeskArrangement(desk.Layout).Placement(CompanionSettings.Widget) is not null;
+            return WidgetFileInstall.CompanionLine(result, desk.Enabled, placed);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return result.Message; }   // streamer: notname - result.Message carries the masked name; the caller passes it through Short
+    }
+
+    /// <summary>settings.json, for the companion a sprite from a file makes. Tests pass their own store.</summary>
+    internal SettingsStore Prefs { get; }
 
     private static string? DefaultPickZip()
     {

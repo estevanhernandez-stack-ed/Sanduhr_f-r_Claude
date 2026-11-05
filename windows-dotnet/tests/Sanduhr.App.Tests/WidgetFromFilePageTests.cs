@@ -77,6 +77,55 @@ public sealed class WidgetFromFilePageTests : IDisposable
         });
     }
 
+    [Theory]
+    [InlineData(true, "companion:bl", "Fixture sprite is on your desk now. It came from your file and stays on this PC.")]
+    [InlineData(false, "companion:bl", "Fixture sprite is your companion now. Turn the Desk on in Settings, Desk to see it.")]
+    [InlineData(true, "clock:bl", "Fixture sprite is your companion now. It is hidden; tick Companion in Settings, Desk to show it.")]
+    public void A_sprite_from_a_file_becomes_the_companion_and_the_line_says_where_it_went(bool deskOn, string layout, string expected)
+    {
+        Sta.Run(() =>
+        {
+            _store.SaveDesk(DeskSettings.Default with { Enabled = deskOn, Layout = layout });
+            _store.SaveCompanion(new CompanionSettings("an-older-pick", Roam: false));
+            string zip = ZipFile("sprite.zip", WidgetKit.Pack("good-sprite"));
+            var page = new ModsPageViewModel(() => new WidgetCatalogService(_paths), _store);
+            page.PickZip = () => zip;
+
+            page.InstallFromFileCommand.Execute(null);
+
+            Assert.Equal(expected, page.Status);
+            Assert.Equal(new CompanionSettings("good-sprite", Roam: false), _store.LoadCompanion());
+            Assert.Equal(layout, _store.LoadDesk().Layout);   // the choice is written, the layout is left to the Desk tab
+        });
+    }
+
+    [Fact]
+    public void An_updated_sprite_says_its_version_and_a_palette_leaves_the_companion_alone()
+    {
+        Sta.Run(() =>
+        {
+            _store.SaveDesk(DeskSettings.Default with { Enabled = true, Layout = "companion:bl" });
+            var page = new ModsPageViewModel(() => new WidgetCatalogService(_paths), _store);
+            var sprite = WidgetKit.Pack("good-sprite");
+            string first = ZipFile("sprite.zip", sprite);
+            page.PickZip = () => first;
+            page.InstallFromFileCommand.Execute(null);
+
+            var newer = new Dictionary<string, byte[]>(sprite, StringComparer.Ordinal);
+            newer["pack.json"] = System.Text.Encoding.UTF8.GetBytes(System.Text.Encoding.UTF8.GetString(sprite["pack.json"]).Replace("\"1.0.0\"", "\"1.1.0\""));
+            string second = ZipFile("sprite-1.1.zip", newer);
+            page.PickZip = () => second;
+            page.InstallFromFileCommand.Execute(null);
+            Assert.Equal("Fixture sprite is updated to 1.1.0 and on your desk now. It stays on this PC.", page.Status);
+
+            string palette = ZipFile("palette.zip", WidgetKit.Pack("good-palette"));
+            page.PickZip = () => palette;
+            page.InstallFromFileCommand.Execute(null);
+            Assert.Equal("Fixture palette is installed from your file. It stays on this PC.", page.Status);
+            Assert.Equal("good-sprite", _store.LoadCompanion().Pack);
+        });
+    }
+
     [Fact]
     public void A_broken_pack_cancel_or_missing_file_installs_nothing_and_says_why()
     {
