@@ -314,11 +314,13 @@ private struct DeskArrangeRow: View {
     let deskOn: Bool
     let arranging: Bool
     var placesNothing = false
+    /// A nicer desktop (setup): off, the Desk draws no pieces, so there is nothing to arrange.
+    var desktopOn: Bool = SetupDesk.desktopOn()
 
     var body: some View {
         LabeledContent {
             Button(DeskArrangeCopy.settingsButton) { DeskController.shared.arrangeDesk() }
-                .disabled(!deskOn || arranging || placesNothing)
+                .disabled(!deskOn || !desktopOn || arranging || placesNothing)
         } label: {
             Text(note)
                 .font(.callout)
@@ -329,6 +331,7 @@ private struct DeskArrangeRow: View {
     private var note: String {
         if arranging { return DeskArrangeCopy.settingsArranging }
         if !deskOn { return DeskArrangeCopy.settingsDeskOff }
+        if let off = SetupDesk.arrangeNote(desktop: desktopOn) { return off }
         if placesNothing { return DeskArrangeCopy.settingsNothingPlaced }
         return DeskArrangeCopy.settingsNote
     }
