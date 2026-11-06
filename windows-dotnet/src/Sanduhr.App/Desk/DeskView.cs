@@ -106,7 +106,7 @@ internal sealed partial class DeskView : Grid, IDisposable
     private DeskInkMap _inks = DeskInkMap.Light;
     private ResolvedInk _ink = DeskInkMap.Light.Default;
     private readonly Dictionary<string, FrameworkElement> _pieces = new(StringComparer.Ordinal);
-    private readonly List<(Rectangle Pill, RadialGradientBrush Brush)> _glows = [];
+    private readonly List<Rectangle> _glows = [];
     /// <summary>The now-playing pieces whose size follows the presence (one per view), and what else
     /// follows it (a plate that would be left behind as an empty blur).</summary>
     private readonly List<ReflowHost> _hosts = [];
@@ -305,7 +305,7 @@ internal sealed partial class DeskView : Grid, IDisposable
     public void Dispose()
     {
         _ticks.Clear();
-        foreach (var (pill, _) in _glows) pill.BeginAnimation(UIElement.OpacityProperty, null);
+        foreach (var pill in _glows) pill.BeginAnimation(UIElement.OpacityProperty, null);
         foreach (var d in _live) d.Dispose();
         _live.Clear();
     }
@@ -568,16 +568,23 @@ internal sealed partial class DeskView : Grid, IDisposable
     {
         double width = ts * 2.2, height = ts * 0.42;
         var slot = new Grid { Width = width, Height = height };
-        var brush = new RadialGradientBrush { Center = new Point(0.5, 0.5), GradientOrigin = new Point(0.5, 0.5), RadiusX = 0.5, RadiusY = 0.5 };
-        brush.GradientStops.Add(new GradientStop(Colors.White, 0));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x99, 255, 255, 255), 0.45));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 255, 255, 255), 1));
-        var pill = new Rectangle { RadiusX = height / 2, RadiusY = height / 2, Fill = brush, Opacity = 0, IsHitTestVisible = false };
+        var pill = new Rectangle { RadiusX = height / 2, RadiusY = height / 2, Fill = PillWash(Colors.White), Opacity = 0, IsHitTestVisible = false };
         slot.Children.Add(pill);
-        _glows.Add((pill, brush));
+        _glows.Add(pill);
         if (Arranging)
             slot.Children.Add(Centered(Text(SettingsNames.DeskGlow, ts * 0.17, 0.75, alignment: TextAlignment.Center)));
         return slot;
+    }
+
+    /// <summary>The pill's radial wash in <paramref name="color"/>: solid at the center, 60% at 0.45, clear at the edge. Frozen.</summary>
+    private static RadialGradientBrush PillWash(Color color)
+    {
+        var brush = new RadialGradientBrush { Center = new Point(0.5, 0.5), GradientOrigin = new Point(0.5, 0.5), RadiusX = 0.5, RadiusY = 0.5 };
+        brush.GradientStops.Add(new GradientStop(color, 0));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x99, color.R, color.G, color.B), 0.45));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, color.R, color.G, color.B), 1));
+        brush.Freeze();
+        return brush;
     }
 
     private static TextBlock Centered(TextBlock t)
@@ -594,11 +601,11 @@ internal sealed partial class DeskView : Grid, IDisposable
     public bool Glow(Color color)
     {
         if (_glows.Count == 0) return false;
-        foreach (var (pill, brush) in _glows)
+        foreach (var pill in _glows)
         {
-            brush.GradientStops[0].Color = color;
-            brush.GradientStops[1].Color = Color.FromArgb(0x99, color.R, color.G, color.B);
-            brush.GradientStops[2].Color = Color.FromArgb(0, color.R, color.G, color.B);
+            // A new brush, not new stop colors on the old one: the copy under the icons renders the pill through a VisualBrush, and
+            // that render kept the stops it first saw, so every glow under the icons came out white (seen live 2026-11-05).
+            pill.Fill = PillWash(color);
             var fade = new DoubleAnimationUsingKeyFrames { FillBehavior = FillBehavior.Stop };
             fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
             fade.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0.2))));
