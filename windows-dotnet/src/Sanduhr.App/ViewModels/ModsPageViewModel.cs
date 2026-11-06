@@ -907,6 +907,9 @@ public sealed partial class ModsPageViewModel : ObservableObject
             CheckFileExists = true,
             Multiselect = false,
         };
+        // Opens in Downloads, where an emailed or Quick Shared pack lands (persona panel round 5: the picker started anywhere).
+        string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");   // streamer: key - a folder the OS dialog opens in, never drawn by Sanduhr
+        if (Directory.Exists(downloads)) dialog.InitialDirectory = downloads;
         return dialog.ShowDialog() == true ? dialog.FileName : null;   // streamer: key - the picked pack path is read, never drawn
     }
 
