@@ -72,9 +72,13 @@ public static class WidgetFileInstall
     public static CompanionBlock Blocked(bool deskOn, bool piecePlaced) =>
         !deskOn ? CompanionBlock.DeskOff : !piecePlaced ? CompanionBlock.PieceHidden : CompanionBlock.None;
 
-    /// <summary>The label of the button that clears <paramref name="block"/>; empty when nothing blocks.</summary>
-    public static string FixLabel(CompanionBlock block) => block switch
+    /// <summary>
+    /// The label of the button that clears <paramref name="block"/>; empty when nothing blocks. One click clears every block, so with
+    /// the Desk off and the piece hidden too the label says both (persona panel round 4: it took two clicks).
+    /// </summary>
+    public static string FixLabel(CompanionBlock block, bool piecePlaced = true) => block switch
     {
+        CompanionBlock.DeskOff when !piecePlaced => SettingsNames.FileCompanionTurnOnDeskAndShow,
         CompanionBlock.DeskOff => SettingsNames.FileCompanionTurnOnDesk,
         CompanionBlock.PieceHidden => SettingsNames.FileCompanionShowPiece,
         _ => "",

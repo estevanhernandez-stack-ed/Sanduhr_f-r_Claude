@@ -101,7 +101,7 @@ public sealed class WidgetFromFilePageTests : IDisposable
     }
 
     [Fact]
-    public void The_companion_button_turns_the_Desk_on_then_shows_the_piece_then_goes()
+    public void One_click_turns_the_Desk_on_and_shows_the_piece_then_the_button_goes()
     {
         Sta.Run(() =>
         {
@@ -110,14 +110,10 @@ public sealed class WidgetFromFilePageTests : IDisposable
             var page = new ModsPageViewModel(() => new WidgetCatalogService(_paths), _store);
             page.PickZip = () => zip;
             page.InstallFromFileCommand.Execute(null);
-            Assert.Equal("Turn on the Desk", page.CompanionFix);
+            Assert.Equal("Turn on the Desk and show it", page.CompanionFix);
 
             page.FixCompanionCommand.Execute(null);
             Assert.True(_store.LoadDesk().Enabled);
-            Assert.Equal("Fixture sprite is your companion now, but the Companion piece is hidden on the Desk.", page.Status);
-            Assert.Equal("Show it on the Desk", page.CompanionFix);
-
-            page.FixCompanionCommand.Execute(null);
             Assert.NotNull(new DeskArrangement(_store.LoadDesk().Layout).Placement(CompanionSettings.Widget));
             Assert.Equal("Fixture sprite is on your desk now. It came from your file and stays on this PC.", page.Status);
             Assert.Equal("", page.CompanionFix);
@@ -125,7 +121,7 @@ public sealed class WidgetFromFilePageTests : IDisposable
             // Any other line takes the button away.
             _store.SaveDesk(DeskSettings.Default with { Enabled = false, Layout = "clock:bl" });
             page.InstallFromFileCommand.Execute(null);
-            Assert.Equal("Turn on the Desk", page.CompanionFix);
+            Assert.Equal("Turn on the Desk and show it", page.CompanionFix);
             page.PickZip = () => null;
             page.InstallFromFileCommand.Execute(null);
             Assert.Equal("", page.CompanionFix);
@@ -145,10 +141,20 @@ public sealed class WidgetFromFilePageTests : IDisposable
             page.PickZip = () => zip;
             page.InstallFromFileCommand.Execute(null);
 
+            int shown = 0;
+            page.ShowCompanionPiece = () =>
+            {
+                shown++;
+                var desk = _store.LoadDesk();
+                var layout = new DeskArrangement(desk.Layout);
+                layout.PlaceAtDefault(CompanionSettings.Widget);
+                _store.SaveDesk(desk with { Layout = layout.Layout });
+            };
             page.FixCompanionCommand.Execute(null);
 
             Assert.Equal(1, on);
-            Assert.Equal("Show it on the Desk", page.CompanionFix);
+            Assert.Equal(1, shown);
+            Assert.Equal("", page.CompanionFix);
         });
     }
 

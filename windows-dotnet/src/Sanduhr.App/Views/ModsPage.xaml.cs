@@ -1,4 +1,6 @@
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Sanduhr.App.ViewModels;
 
 namespace Sanduhr.App.Views;
@@ -25,4 +27,15 @@ public partial class ModsPage : UserControl
     }
 
     private void Activate() => _ = (DataContext as ModsPageViewModel)?.Activate();
+
+    /// <summary>
+    /// The companion's fix button hides itself once the companion is on the desk; keyboard focus would go with it, so it lands on
+    /// Install widget from file… next to the line that now says where the companion is (persona panel round 4). The command has run
+    /// by the time this queued step does.
+    /// </summary>
+    private void CompanionFix_Click(object sender, RoutedEventArgs e) =>
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+        {
+            if (!CompanionFixButton.IsVisible) InstallFromFileButton.Focus();
+        });
 }

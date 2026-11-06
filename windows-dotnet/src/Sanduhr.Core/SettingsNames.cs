@@ -538,6 +538,7 @@ public static class SettingsNames
     public static string FileCompanionDeskOff(string pack) => $"{pack} is your companion now. It lives on the Desk, the layer Sanduhr draws on your desktop, and the Desk is off.";
     public static string FileCompanionHidden(string pack) => $"{pack} is your companion now, but the {DeskCompanion} piece is hidden on the Desk.";
     public const string FileCompanionTurnOnDesk = "Turn on the Desk";
+    public const string FileCompanionTurnOnDeskAndShow = "Turn on the Desk and show it";
     public const string FileCompanionShowPiece = "Show it on the Desk";
 
     // ---- Copy for the Claude Code folder cards and Mods & Widgets (Task 12, P13): a card's "What this folder holds" and the meters rows ----

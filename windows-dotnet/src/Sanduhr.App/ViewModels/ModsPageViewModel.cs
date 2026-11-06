@@ -837,19 +837,21 @@ public sealed partial class ModsPageViewModel : ObservableObject
         var desk = Prefs.LoadDesk();
         bool placed = new DeskArrangement(desk.Layout).Placement(CompanionSettings.Widget) is not null;
         _companionResult = result;
+        _companionPlaced = placed;
         _companionBlock = WidgetFileInstall.Blocked(desk.Enabled, placed);
         return WidgetFileInstall.CompanionLine(result, desk.Enabled, placed);
     }
 
     private WidgetFileResult? _companionResult;
     private CompanionBlock _companionBlock;
+    private bool _companionPlaced;
     private bool _settingCompanion;
 
     /// <summary>The button beside a companion line that stops short of the desk: "Turn on the Desk" or "Show it on the Desk". Empty hides it.</summary>
     [ObservableProperty] private string _companionFix = "";
 
     // Any other status line takes the button away; only a companion line brings it.
-    partial void OnStatusChanged(string value) => CompanionFix = _settingCompanion ? WidgetFileInstall.FixLabel(_companionBlock) : "";
+    partial void OnStatusChanged(string value) => CompanionFix = _settingCompanion ? WidgetFileInstall.FixLabel(_companionBlock, _companionPlaced) : "";
 
     private void SetCompanionStatus(string line)
     {
@@ -864,7 +866,8 @@ public sealed partial class ModsPageViewModel : ObservableObject
     /// <summary>Set by Settings: shows the companion piece through the Desk tab.</summary>
     internal Action? ShowCompanionPiece { get; set; }
 
-    /// <summary>The companion line's button: clears what keeps the new companion off the desk, then says where it is now.</summary>
+    /// <summary>The companion line's button: clears everything that keeps the new companion off the desk (the Desk being off, then
+    /// its piece being hidden), then says where it is now.</summary>
     [RelayCommand]
     private void FixCompanion()
     {
@@ -876,7 +879,7 @@ public sealed partial class ModsPageViewModel : ObservableObject
                 if (TurnOnDesk is { } on) on();
                 else Prefs.SaveDesk(Prefs.LoadDesk() with { Enabled = true });
             }
-            else if (_companionBlock == CompanionBlock.PieceHidden)
+            if (!_companionPlaced)
             {
                 if (ShowCompanionPiece is { } show) show();
                 else
