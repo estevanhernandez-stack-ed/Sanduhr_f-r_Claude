@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased (mac)
+
+### New
+
+- **Install a widget pack from a zip.** Settings ▸ Widgets has **Install widget from file…**, for packs made with a pack maker such as SpriteForge or by hand. The zip gets the same checks as a catalog download (safe to open, every pack rule, the Sanduhr version it needs), and a pack that fails installs nothing and says why. It installs as your own, listed as made here, and installing the same pack again updates it. A pack of the same id from the catalog is never replaced. A sprite from a file becomes your Desk companion, and the line under the button says where it went. The file is only read: nothing is sent anywhere.
+
 ## v2.41.0-mac — 2026-11-05
 
 - **Set up Sanduhr.** One window replaces the welcome sheet's Just the Desk: **A nicer desktop**, **Tidy my files** and **Track my AI usage** are three free choices, shown on a new install and any time from the menu bar item's **Set up Sanduhr…**, Settings, General or the What's New card, and **Continue** applies them (**Not now** and **Cancel** save nothing). Unticking something says what it will do first. **Track my AI usage** off stops every usage request, deletes `snapshot.json` (so the statusline, meters mod and `get_usage` have nothing to read) and keeps your account, its Keychain item and its history; saving a key or signing in turns it back on. **A nicer desktop** off hides the Desk's pieces and leaves the drawer panels showing, with your layout kept. An upgrade keeps what you had: a Mac with an account stays on with usage on, a Mac that chose Just the Desk gets usage off, and only a Mac with neither sees the window. **Design it with an AI chat** (also in Settings, Drawers) copies a prompt that holds no file name, path or usage number, and reads the answer you paste back on this Mac only: one bad field rejects the whole paste and names it, **Preview on my Desk** shows the Desk design as a review, **Use these drawer rules** opens a rules review (nothing moves before Apply), and **Use these drawer settings** applies the look and Tidy choices with an **Undo**. The answer reads on Windows too. For the smoke harness, `setup desktop=on|off usage=on|off` and a `setup:` block in `state.yaml`.

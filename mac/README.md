@@ -2071,6 +2071,20 @@ installed bytes. Answers: `applied`; `rejected` with `dismissed` (Decline), `rep
 minutes is dropped unanswered; there is no `expired` status. `SpriteMotionReview` holds the logic behind a
 `SpriteMotionStoring` seam.
 
+### Install widget from file (2.42.0)
+
+Settings, Widgets, **Install widget from file…** (`WidgetFilePicker`, row in `WidgetsSettings.swift`) opens a file
+panel for one `.zip`, read once and no further than a byte past the catalog's cap. `WidgetFileInstall` is the pure
+core and runs the catalog's gates in its order: the byte cap, `WidgetZip.read` (paths, sizes, file count, no links),
+the `sanduhr_min` floor, then `PackValidator` strict. A refusal installs nothing and its sentence (the first three
+validator messages, then "and N more.") is the status under the button. A pack that passes goes through
+`WidgetsModel.installFromFile` as the user's own (`.local` with `replaceMadeHere`, listed as made here), so the same
+id again updates it and a catalog pack of that id is never replaced (the store refuses with its own sentence). A
+pack with a `sprite.json` also becomes the companion: only the companion choice is written, never the Desk's
+layout, and the status says where it went (Desk off, Companion hidden or on the Desk). The file is only read; the
+zip is not kept and nothing is sent. Smoke hooks: `widget-from-file` (`arg=<absolute path to a .zip>`) and
+`widget-remove` (`arg=<pack id>`); the scenario is `smoke/scenarios/widget-from-file.yaml`.
+
 ## The Desk for Claude
 
 With the MCP server installed, Claude can read how your Desk is set up and suggest a whole look for it
