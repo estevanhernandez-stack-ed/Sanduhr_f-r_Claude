@@ -2842,7 +2842,8 @@ here needs real art or a real name. Make a third zip by hand for step 5, or skip
    - Companion piece hidden (Settings, Desk, Layout): "Fixture sprite is your companion now. It is hidden; tick Companion in Settings,
      Desk to show it." The Desk's layout is as it was; tick Companion and the sprite appears.
 3. Choose the same zip again: one row, not two, and the sentence says "updated" in place of "installed" where the pack is not a sprite
-   (a sprite keeps its "on your Desk now" line). Close Settings and reopen the page: the sentence is gone.
+   (a sprite keeps its "on your Desk now" line). The sentence stays while Settings is open, and closing and reopening the page keeps
+   it; it clears the moment the file panel opens again.
 4. Choose `bad-no-license.zip`: the sentence is "LICENSE is missing; every pack carries its own license text." No new row, no folder under
    `widgets/`, and the companion is still Fixture sprite. Choose a text file renamed `.zip`: the zip reader's sentence shows and nothing is installed. Choose a zip over the catalog's size cap: "The file is larger than a widget pack can be, so nothing was installed."
 5. A pack whose id matches an installed catalog pack is refused with the store's sentence and the catalog pack is unchanged. A pack whose
