@@ -414,6 +414,69 @@ from nothing.
   `sprite.json`, bumps the patch version and reinstalls. Same statuses and limits as section 6.
 - The image boundary holds: Claude never supplies or reads an image (BACKLOG #8 gap 3).
 
+## Release 2.42.0
+
+Added 2026-11-06. Issue #408, the Mac half; Windows shipped its half in #437 and #440 (4.7.0). The
+building blocks exist and the Windows behaviour is the reference, so this is an entry point plus
+glue, and the sentences.
+
+## 20. Install a widget pack from a file
+
+A pack made outside Sanduhr (SpriteForge's companion export, the logo script, a zip packed by hand)
+passes `validate.py --strict` today and still has no way in: zips come only from the catalog, own
+art only swaps the sheets of a pack already installed, and `propose_widget` refuses PNG sheets by
+design.
+
+- Settings ▸ Widgets ▸ **Install widget from file…**, beside **New sprite from an image…**: an
+  `NSOpenPanel` for one `.zip`. The file is read once, with the catalog download's byte cap, and
+  nothing else on disk is touched.
+- **Read** with `WidgetZip.read`, so the catalog's limits apply unchanged: paths, sizes, file
+  count, no links. A zip it refuses installs nothing; the status line carries its sentence.
+- **Version** before validation: `WidgetCatalog.meetsMinimum(manifest.sanduhrMin)` with the
+  catalog's own sentence, "<Name> needs a newer Sanduhr (it asks for widget format <v>)."
+- **Validate** with `PackValidator.validate(files, folderName: manifest.id, strict: true)`. On
+  failure the status line shows the validator's sentences (the first three, then "and N more") and
+  nothing is written.
+- **Install** with `WidgetStore.install(files, manifest, source: .local, replaceMadeHere: true)`.
+  The pack lists as made here, with Uninstall and Use my own art like any local pack. Installing the
+  same id again updates it (the store swaps same-source installs atomically). A catalog pack of the
+  same id is never replaced: the store's refusal sentence shows and nothing changes. Settled by the
+  Windows half; no suffixed ids.
+- **A sprite becomes the companion** (parity with #440). Only the companion choice is written,
+  through `CompanionSettings`; the layout is left alone. The line says where it went:
+  - "<Name> is on your Desk now. It came from your file and stays on this Mac."
+  - Desk off: "<Name> is your companion now. Turn the Desk on in Settings, Desk to see it."
+  - Companion piece hidden: "<Name> is your companion now. It is hidden; tick Companion in
+    Settings, Desk to show it."
+  A palette or effects pack leaves the companion as it was: "<Name> is installed from your file. It
+  stays on this Mac." An update says "updated" in place of "installed".
+- The status line is `WidgetsModel.fileInstallStatus`, beside `ownArtStatus`, cleared when the
+  panel opens; the sheet never blocks on a sentence.
+- No streamer mode on the Mac, so the #440 name mask has no Mac counterpart.
+- **Privacy.** Sanduhr reads only the file you pick, copies the pack into `widgets/<id>/`, sends
+  nothing anywhere, and never shows the file to Claude. PRIVACY.md's Mac paragraph (the one that
+  starts "On the Mac from 2.36.0") gains the sentence, and the On the Mac table's own-art row gains
+  the zip. The seat report and `get_widgets` show the pack as `local`, as they do own art.
+- **Not in 2.42.0:** drag and drop onto the Widgets page (#408 calls it nice to have), anything in
+  the catalog, the Windows half.
+
+Tests (`WidgetFileInstallTests`; the zips are built in the test the way `WidgetZipTests` builds
+its `ZipSpec`s, from the `WidgetPackFixtures` good and bad packs):
+- a good pack installs, lists as made here with source `local`, and its files match the zip;
+- a bad pack (missing `LICENSE`, a blocked word in the name, a sheet over 4096 px) installs
+  nothing and the status line carries the validator's sentence;
+- the same id installed twice ends as one pack with the second zip's files;
+- a zip whose id matches an installed catalog pack is refused and the catalog pack is unchanged;
+- a `sanduhr_min` above the supported format is refused before validation;
+- a sprite pack becomes the companion and a palette does not, with the three Desk states' lines;
+- a zip `WidgetZip` refuses (a link, an oversize entry) installs nothing.
+
+Release: `mac/Info.plist` 2.42.0, build 57. A What's New card (`version: "2.42.0"`, id
+`widget-from-file`, destination `.widgets`) with its `WhatsNewTests` lines. CHANGELOG under
+`## Unreleased (mac)` ▸ New. Smoke section 75 with a scenario that installs the reference pack
+from a zip and checks the Desk. Done when a SpriteForge export that passes `validate.py --strict`
+installs on the Mac and walks on the Desk.
+
 ---
 
 ## 16. Privacy, docs and release (every release)
