@@ -137,14 +137,29 @@ public sealed class McpConfig
 
     public static McpConfig Resolve()
     {
-        string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return Resolve(
+        var (external, appDataSanduhr, localAppData) = Folders(
             home,
-            Path.Combine(home, ".sanduhr"),
-            Path.Combine(appData, "Sanduhr"),
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            Environment.GetEnvironmentVariable);
+            Environment.GetEnvironmentVariable("SANDUHR_DEV_PROFILE"));
+        return Resolve(home, external, appDataSanduhr, localAppData, Environment.GetEnvironmentVariable);
+    }
+
+    /// <summary>The folders the server reads and writes, mirroring Core's <c>Paths</c> (which this
+    /// project cannot link). With <c>SANDUHR_DEV_PROFILE</c> set (dev tier, never shipped config)
+    /// the external folder is <c>&lt;profile&gt;\external</c>, AppData is <c>&lt;profile&gt;\roaming</c>
+    /// and LocalAppData is <c>&lt;profile&gt;\local</c>, so a dev server beside a dev build never
+    /// writes handoff files where the installed widget would pick them up (#340). The home folder
+    /// stays real, as in <c>Paths</c>, so Claude Code homes are still discovered.</summary>
+    public static (string External, string AppDataSanduhr, string LocalAppData) Folders(
+        string home, string appData, string localAppData, string? devProfile)
+    {
+        if (string.IsNullOrWhiteSpace(devProfile))
+            return (Path.Combine(home, ".sanduhr"), Path.Combine(appData, "Sanduhr"), localAppData);
+        return (Path.Combine(devProfile, "external"),
+            Path.Combine(devProfile, "roaming", "Sanduhr"),
+            Path.Combine(devProfile, "local"));
     }
 
     /// <summary>Testable core of <see cref="Resolve()"/>: every machine-specific input is a
