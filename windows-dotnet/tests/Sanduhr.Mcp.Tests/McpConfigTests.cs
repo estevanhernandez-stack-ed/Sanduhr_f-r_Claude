@@ -198,4 +198,31 @@ public sealed class McpConfigTests : IDisposable
         Assert.Equal(new[] { fixture }, over.VaultDirs);
         Assert.Equal(fixture, over.VaultDir);
     }
+
+    [Fact]
+    public void Without_a_dev_profile_the_folders_are_the_real_ones()
+    {
+        var (external, appDataSanduhr, local) = McpConfig.Folders(@"C:\home", @"C:\roam", @"C:\loc", devProfile: null);
+        Assert.Equal(Path.Combine(@"C:\home", ".sanduhr"), external);
+        Assert.Equal(Path.Combine(@"C:\roam", "Sanduhr"), appDataSanduhr);
+        Assert.Equal(@"C:\loc", local);
+
+        Assert.Equal(external, McpConfig.Folders(@"C:\home", @"C:\roam", @"C:\loc", "  ").External);
+    }
+
+    [Fact]
+    public void A_dev_profile_moves_every_folder_into_the_profile_as_Paths_does()
+    {
+        // #340: Core's Paths maps SANDUHR_DEV_PROFILE to <profile>\external, \roaming and \local;
+        // the server must agree, or its handoff files land where the installed widget reads.
+        var (external, appDataSanduhr, local) = McpConfig.Folders(@"C:\home", @"C:\roam", @"C:\loc", @"D:\dev");
+        Assert.Equal(Path.Combine(@"D:\dev", "external"), external);
+        Assert.Equal(Path.Combine(@"D:\dev", "roaming", "Sanduhr"), appDataSanduhr);
+        Assert.Equal(Path.Combine(@"D:\dev", "local"), local);
+
+        var cfg = McpConfig.Resolve(Home, external, appDataSanduhr, local, _ => null);
+        Assert.Equal(Path.Combine(external, "widget-request.json"), cfg.WidgetRequestPath);
+        Assert.Equal(Path.Combine(external, "snapshot.json"), cfg.SnapshotPath);
+        Assert.DoesNotContain(".sanduhr", cfg.WidgetRequestPath);
+    }
 }
