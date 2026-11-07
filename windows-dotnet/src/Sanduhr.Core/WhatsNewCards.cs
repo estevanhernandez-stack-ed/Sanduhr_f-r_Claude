@@ -7,7 +7,16 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class WhatsNewCards
 {
-    public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release460(), .. Release450(), .. Release400(), .. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
+    public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release470(), .. Release460(), .. Release450(), .. Release400(), .. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
+
+    // 4.7.0 (#408): Install widget from file on Mods & Widgets; Show me lands on the installed list, where the button sits.
+    private static WhatsNewCard[] Release470() =>
+    [
+        WhatsNewCard.Of("4.7.0", "widget-from-file", "Install a widget from a file",
+            "A pack you made in SpriteForge or by hand installs from its zip in Settings, Mods & Widgets. A companion goes straight onto your Desk.",
+            "", // Download
+            WhatsNewPreview.None, SettingsPage.Mods),
+    ];
 
     // 4.6.0 (spec 5.0d): the Desk draws under the desktop icons, on by default; Show me lands on Desk Look's Desktop icons switch.
     private static WhatsNewCard[] Release460() =>
@@ -199,6 +208,7 @@ public static class WhatsNewCards
     /// </summary>
     private static string? AnchorFor(string id) => id switch
     {
+        "widget-from-file" => SettingsIndex.ModList,
         "desk-under-icons" => SettingsIndex.DeskUnderIcons,
         "choose-what-shows" => SettingsIndex.GeneralSetup,
         "settings-rearranged" => SettingsIndex.Network,

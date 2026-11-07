@@ -3,7 +3,7 @@
 <!-- 3.8 (Windows): the widget catalog fetch from GitHub releases is a new network destination. The hosted privacy
      page (hub issue) and the 3.8.0.0 reviewer letter must say so too before the 3.8 Store submission. -->
 
-**Last updated:** 2026-11-05
+**Last updated:** 2026-11-07
 **Publisher:** 626Labs LLC
 **Contact:** [GitHub Issues](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/issues)
 
@@ -22,6 +22,8 @@ On the Mac from 2.35.0, **Settings ▸ Widgets** does the same and nothing more:
 On the Mac from 2.36.0, **Claude-made widgets** and **Use my own art** add no network request. With the MCP server installed, Claude can hand Sanduhr a pixel-art sprite, a palette or effects presets as text; nothing is installed until you press Apply, and a picture you choose yourself, for **Use my own art** or **New sprite from an image**, is copied into the widget's folder on this Mac and never sent anywhere or shown to Claude. From 2.39.0 Claude can also propose a sprite's motion, as text, which waits for Apply. The files and the temporary folder involved are listed under On the Mac below.
 
 On the Mac from 2.42.0, **Install widget from file** adds no network request. The zip you pick is read once, its pack is copied into the widget's folder on this Mac, and it is never sent anywhere or shown to Claude.
+
+On Windows from 4.7.0, **Install widget from file…** on Settings ▸ Mods & Widgets adds no network request either. The zip you pick is read once, only after you choose it, and checked with the catalog's rules; a pack that passes is copied into its own folder under `%LOCALAPPDATA%\Sanduhr\widgets\` and listed in `widgets.json` as made here (source `local`). A companion sprite also becomes your Desk companion, which writes only the companion choice in `settings.json`. The zip itself is not kept, never sent anywhere and never shown to Claude.
 
 On the Mac from 2.37.0, **the Desk for Claude** adds no network request. With the MCP server installed, Claude can read how your Desk is set up (`get_desk`) and suggest a whole look for it (`propose_desk`); nothing is changed until you press Apply. Sanduhr keeps a small note of your Desk settings in its own folder for that, with no usage, message text, path or account name in it. **Font packs** from the widget catalog are loaded for Sanduhr only: never installed on the Mac, and gone when Sanduhr quits. The slant (the fold) and the meter styles are two more words in the Desk's existing layout setting and add no file. The files involved are listed under On the Mac below.
 
