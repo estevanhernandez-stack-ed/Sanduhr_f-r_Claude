@@ -19,8 +19,12 @@ The retired Python apps live at tag `legacy/python-v2.3.0`; nothing current depe
 
 Personal 626 Labs estate, public repo. Company styling is `626Labs LLC`. Nothing committed names a
 home path on this Mac, an employer or a person; screenshots and fixtures show made-up data only.
-Dashboard project: **Sanduhr für Claude (Windows)**. Log decisions there; when the dashboard MCP is
-not connected, append to `docs/decisions/_pending-dashboard-log.md` and let the next session flush.
+Two dashboard projects link this repo, and `findByRepo` returns both as exact matches. Bind by the
+surface in front of you, don't ask: **Sanduhr (macOS)** for `mac/` work and Mac releases,
+**Sanduhr für Claude (Windows)** for `windows-dotnet/` and everything else. Mac tasks filed before
+the split (late October 2026) still sit on the Windows project, so a Mac session pulls both task
+lists. Log decisions to the project you bound; when the dashboard MCP is not connected, append to
+`docs/decisions/_pending-dashboard-log.md` and let the next session flush.
 
 ## Gotchas, every surface
 
