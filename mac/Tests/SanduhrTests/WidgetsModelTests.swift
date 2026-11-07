@@ -309,11 +309,17 @@ struct WidgetsModelTests {
         #expect(m.activeCompanion == "good-sprite-pixel")
         #expect(scratch.defaults.string(forKey: "deskCompanionPack") == "good-sprite-pixel")
 
-        // A fresh model reads the pick back; removing it falls back to the first sprite.
+        // A fresh model reads the pick back. Uninstalling another pack leaves the pick alone;
+        // uninstalling the picked pack clears it, so the first sprite takes over by rule and no
+        // dangling id stays in the Desk suite.
         let again = model(Box(publish()), root, scratch)
+        #expect(again.companion == CompanionSettings(pack: "good-sprite-pixel"))
+        again.uninstall("good-theme")
         #expect(again.companion == CompanionSettings(pack: "good-sprite-pixel"))
         again.uninstall("good-sprite-pixel")
         #expect(again.activeCompanion == "good-sprite")
+        #expect(again.companion == CompanionSettings(pack: nil))
+        #expect(scratch.defaults.string(forKey: "deskCompanionPack") == nil)
     }
 
     @Test func effectsPacksAreListedWithTheNoteAndNothingElse() {
