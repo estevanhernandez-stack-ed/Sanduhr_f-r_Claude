@@ -12,7 +12,8 @@ public class WhatsNewCardsTests
     public void Table_HasEveryReleaseNewestFirst()
     {
         Assert.Equal(
-            ["desk-under-icons",
+            ["widget-from-file",
+             "desk-under-icons",
              "choose-what-shows", "settings-rearranged", "one-theme", "streamer-mode",
              "ci-runners",
              "widgets", "companion", "claude-widgets", "restart-to-update", "desk-fold", "weather-nickname", "livelier-bars", "meter-styles",
@@ -21,6 +22,17 @@ public class WhatsNewCardsTests
              "desk", "settings-redesigned", "claude-code-page",
              "shortcut-keys", "tray-shows", "limits-come-and-go", "every-folder", "steady-sparklines", "whats-new"],
             Table.Select(c => c.Id));
+    }
+
+    [Fact]
+    public void Release470_ShowsTheFromFileCard()
+    {
+        var cards = WhatsNew.Cards("4.6.0", "4.7.0");
+        var card = Assert.Single(cards);
+        Assert.Equal("widget-from-file", card.Id);
+        Assert.Equal("Install a widget from a file", card.Title);
+        Assert.Equal(SettingsPage.Mods, card.Destination);
+        Assert.Equal(SettingsIndex.ModList, card.Anchor);
     }
 
     [Fact]
