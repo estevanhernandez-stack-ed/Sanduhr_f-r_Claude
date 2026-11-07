@@ -59,7 +59,7 @@ struct WidgetFileInstallTests {
         let why = Self.refusal(WidgetFileInstall.install(zip: Self.zip(files), store: store))
         #expect(why == WidgetFileInstall.rejected(verdict.errors))
         #expect(why.hasSuffix(" and \(verdict.errors.count - 3) more."), "\(why)")
-        #expect(why.hasPrefix(verdict.errors.prefix(3).joined(separator: " ")))
+        #expect(why.hasPrefix(verdict.errors[0]))
         #expect(store.load().packs.isEmpty)
     }
 
@@ -68,6 +68,8 @@ struct WidgetFileInstallTests {
         #expect(WidgetFileInstall.rejected(five) == "A. B. C. and 2 more.")
         #expect(WidgetFileInstall.rejected(Array(five.prefix(3))) == "A. B. C.")
         #expect(WidgetFileInstall.rejected(Array(five.prefix(2))) == "A. B.")
+        // The validator's own messages have no closing period; the status line adds one.
+        #expect(WidgetFileInstall.rejected(["No period", "Has one."]) == "No period. Has one.")
     }
 
     @Test func theSameIdTwiceEndsAsOnePackWithTheSecondZipsFiles() {
