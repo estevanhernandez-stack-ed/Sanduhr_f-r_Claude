@@ -2822,3 +2822,43 @@ The scripted version: `cd mac && smoke/smoke run smoke/scenarios/setup.yaml` aga
 (`smoke/smoke enable` first), on a profile that already has usage and the desktop on. It turns usage off and on, then the desktop off and
 on, checking `state.yaml`'s `setup` after each, and never touches drawers. `smoke/smoke do setup usage=off` and `desktop=on` drive the
 same ticks by hand, and `ruby smoke/selftest.rb` runs the harness against its fixtures.
+
+## 75. Install a widget pack from a file (2.42.0)
+
+Back up `~/Library/Application Support/Sanduhr` first (section 45) and quit the release app. Use a dev build (signed out, file store)
+and a made-up pack: `python3 mac/smoke/fixtures/widget-packs/build.py` writes two small zips from the validator's fixture packs,
+`good-sprite.zip` (a sprite named "Fixture sprite", 1x1 art, id `good-sprite`) and `bad-no-license.zip` (a palette with no LICENSE). Nothing
+here needs real art or a real name. Make a third zip by hand for step 5, or skip that step.
+
+1. Settings, Widgets: **Install widget from file…** sits beside **New sprite from an image…**, with the line "Install a widget pack
+   from a .zip file. It is checked like a catalog download and stays on this Mac." Settings search finds it. Choose **Cancel** in the
+   file panel: nothing changes and no sentence appears.
+2. Choose `good-sprite.zip`. The row "Fixture sprite" is in the installed list and reads **made here**, with Uninstall and Use my own art.
+   `widgets/good-sprite/` holds the zip's files byte for byte, and `widgets.json` lists the pack as `local`. The status sentence under
+   the button says where it went:
+   - Desk on, Companion piece placed: "Fixture sprite is on your Desk now. It came from your file and stays on this Mac." The sprite walks
+     and rests on the Desk, and Settings, Desk, Companion shows it picked.
+   - Desk off: "Fixture sprite is your companion now. Turn the Desk on in Settings, Desk to see it." Turn the Desk on: it walks.
+   - Companion piece hidden (Settings, Desk, Layout): "Fixture sprite is your companion now. It is hidden; tick Companion in Settings,
+     Desk to show it." The Desk's layout is as it was; tick Companion and the sprite appears.
+3. Choose the same zip again: one row, not two, and the sentence says "updated" in place of "installed" where the pack is not a sprite
+   (a sprite keeps its "on your Desk now" line). The sentence stays while Settings is open, and closing and reopening the page keeps
+   it; it clears the moment the file panel opens again.
+4. Choose `bad-no-license.zip`: the sentence is "LICENSE is missing; every pack carries its own license text." No new row, no folder under
+   `widgets/`, and the companion is still Fixture sprite. Choose a text file renamed `.zip`: the zip reader's sentence shows and nothing is installed. Choose a zip over the catalog's size cap: "The file is larger than a widget pack can be, so nothing was installed."
+5. A pack whose id matches an installed catalog pack is refused with the store's sentence and the catalog pack is unchanged. A pack whose
+   `sanduhr_min` is above the supported widget format says "<Name> needs a newer Sanduhr (it asks for widget format <v>)." and installs nothing.
+6. A palette or effects zip (any pack that is not a sprite) installs as made here and leaves the companion as it was: "<Name> is installed
+   from your file. It stays on this Mac."
+7. Uninstall Fixture sprite: the folder and the row are gone, and the companion falls back to the first installed sprite.
+8. A network monitor shows no request during any of this. Only the zip you pick is read, and the app never shows it to Claude.
+
+The scripted version: `cd mac && smoke/smoke run widget-from-file` against a debug build (`smoke/smoke enable` first). The hook
+`widget-from-file <zip>` reads the file at that path and calls the same `WidgetsModel.installFromFile` the panel calls, so the file panel
+is the one part a person walks; `smoke/smoke do widget-from-file ~/path/to/pack.zip` drives it by hand, and a scenario names its zips
+relative to `mac/smoke/fixtures`. The scenario sets a made-up companion pick, installs `good-sprite.zip` and checks `state.yaml`:
+`widgets.installed` has `good-sprite` with kind `sprite` and source `local`, `widgets.companion_pick` and `companion_active` are
+`good-sprite`, and `widgets.file_install` is one of the three sentences in step 2. It then installs `bad-no-license.zip` and checks the
+refusal sentence, that `bad-no-license` is not installed and that the pick is unchanged. A run takes the pack out again
+(`widget-remove good-sprite`, by the restore plan) and puts the companion pick back. The hooks only touch packs made here: `widget-remove`
+refuses a catalog pack. `ruby smoke/selftest.rb` runs the scenario against its fixtures.

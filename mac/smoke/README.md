@@ -81,7 +81,7 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `enabled`, running (placed somewhere and Desk on); `placed`, a list of `wing_left`, `wing_right`,
   `strip` and `desk`; `source`, `adapter`, `fallback` or `off`; `state`, `playing`, `paused` or
   `none`; never a title, an artist or an app),
-  `widget_visible`, `widget_visibility` (When the widget shows: `always`, `whileDeskOff` or
+  `widgets` (spec 20: `installed`, each installed pack as `id`, `kind` and `source` (`catalog`, `local` or `claude`); `companion_pick`, the saved choice or null; `companion_active`, the sprite the companion draws or null; `file_install`, the last "Install widget from file…" sentence or null before one and after the panel opens. The sentence names the pack, so read a real Mac's, never paste it), `widget_visible`, `widget_visibility` (When the widget shows: `always`, `whileDeskOff` or
   `onRequest`; `always` when unset), `settings_open`, `settings_section`, `settings_anchor` (item 72: the
   section the page was opened at, such as `glow` on `notch`; null for the page's top), `settings_anchor_visible`
   (item 72, slice 3: that section's top line is inside the page's scrolling area; null with no anchor),
@@ -133,7 +133,7 @@ signs out or removes an account, and no scenario switches one: a smoke run works
 opens it; window kind `whats-new`. Nothing is recorded as seen), `tour`, `tour-step <n>` and `close-tour` (the
 welcome tour, item 61, at step 1 or step n, as Take the Tour… opens it; window kind `welcome-tour`. Nothing is
 recorded: the tour's state and What's New's last-seen version stay as they were),
-`message-editor add|revert` (item 69: Settings, Message's editor; add opens it and adds the smoke's own line,
+`widget-from-file <zip>` (spec 20: the zip at that path through `WidgetsModel.installFromFile`, as Settings, Widgets, Install widget from file… does after its file panel; the app takes an absolute path and the CLI and a scenario resolve a relative one, a scenario's against `smoke/fixtures`. The sentence it leaves is `widgets.file_install`. `fixtures/widget-packs/build.py` builds the two fixture zips, and `scenarios/widget-from-file.yaml` installs both) and `widget-remove <id>` (a made-here pack out again through `WidgetsModel.uninstall`, refused for a catalog pack or an id that isn't installed; the restore plan runs it for packs a run installed), `message-editor add|revert` (item 69: Settings, Message's editor; add opens it and adds the smoke's own line,
 Fridays, "ship it." in a sunset gradient in script with a sweep, as the controls write it; revert drops
 unsaved edits. Neither saves, so `messages.txt` is never written; a run reverts what it added),
 `desk-arrange start|test|hide|show|done|cancel` (item 60: Arrange mode on the Desk, as Arrange Desk… enters

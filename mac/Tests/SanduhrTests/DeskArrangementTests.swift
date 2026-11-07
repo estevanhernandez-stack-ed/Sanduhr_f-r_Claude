@@ -402,6 +402,11 @@ struct DeskArrangementFrameTests {
             order: 0
             scale: 1
         companion: null
+        widgets:
+          installed: []
+          companion_pick: null
+          companion_active: null
+          file_install: null
         desk_arrange:
         """))
         #expect(YAMLEmitter.emit(DebugState.yaml(DebugStateInput())).contains("desk_pieces: []\n"))

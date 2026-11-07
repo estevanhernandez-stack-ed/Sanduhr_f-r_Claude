@@ -1,0 +1,118 @@
+{
+  "run": "widget-from-file-2-42",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "906f7feb00fc2d2db8dd7bb3ce3368c878c39d42",
+  "integration_branch": "cart/widget-from-file-2-42",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-widget-from-file-2-42/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-widget-from-file-2-42",
+  "builder_branch": "main",
+  "uncommitted_at_start": [],
+  "started_at": "2026-11-07T12:54:41.094Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "widget-file-install",
+      "title": "WidgetFileInstall (pure)",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widget-from-file-2-42--01-widget-file-install",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh (3063 tests, 338 suites)",
+          "result": "pass"
+        },
+        {
+          "attempt": 2,
+          "command": "cd mac && ./test.sh --filter WidgetFileInstall (11 tests)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "settings-model-companion",
+      "title": "The Settings entry, the model, and the companion",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widget-from-file-2-42--02-settings-model-companion",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh (3074 tests, 340 suites)",
+          "result": "pass"
+        },
+        {
+          "attempt": 2,
+          "command": "cd mac && ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "smoke-75",
+      "title": "Smoke section 75",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widget-from-file-2-42--03-smoke-75",
+      "worktree": "",
+      "on": 2,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ruby smoke/selftest.rb (1090 checks)",
+          "result": "pass"
+        },
+        {
+          "attempt": 2,
+          "command": "cd mac && ./test.sh (3078 tests, 342 suites)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "release-docs",
+      "title": "Release lockstep, card, CHANGELOG, PRIVACY, README",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widget-from-file-2-42--04-release-docs",
+      "worktree": "",
+      "on": 2,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "plutil -lint mac/Info.plist; cd mac && ./test.sh --filter WhatsNew (55 tests)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "review-fixes",
+      "title": "Whole-branch review fixes",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/widget-from-file-2-42--05-review-fixes",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh (3078/342); ruby smoke/selftest.rb (1090); pytest integrations (310); band-fixtures --check (32); ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}

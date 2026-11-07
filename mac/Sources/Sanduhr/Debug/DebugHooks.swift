@@ -59,9 +59,16 @@ enum DebugHooks {
         case .action(.hotKey(let s, let combo, _), _)
             where SanduhrHotKeys.check(combo ?? s.defaultCombo, for: s) != nil:
             finish(dir, error: "hot-key refused: \(SanduhrHotKeys.check(combo ?? s.defaultCombo, for: s)!.note)")
+        case .action(.widgetRemove(let id), _) where !removable(id):
+            finish(dir, error: "widget-remove: \(id) is not an installed made-here pack")
         case .action(let action, _):
             perform(action, app: app) { finish(dir) }
         }
+    }
+
+    /// A made-here pack by this id is installed (a catalog pack is never removed by a hook).
+    private static func removable(_ id: String) -> Bool {
+        SettingsWindowController.shared.widgetsPage.installed.contains { $0.id == id && $0.madeHere }
     }
 
     /// The last `reset --dry-run` plan, for state.yaml's `reset_dry_run` (nil until one ran).
@@ -199,6 +206,11 @@ enum DebugHooks {
                     mods.configImport = SampleConfigPack.state(seat: SampleConfigPack.seat)
                 }
             }
+        case .widgetFromFile(let path):
+            // The same call the panel makes; nil data is the "couldn't be read" sentence.
+            SettingsWindowController.shared.widgetsPage.installFromFile(FileManager.default.contents(atPath: path))
+        case .widgetRemove(let id):
+            SettingsWindowController.shared.widgetsPage.uninstall(id)
         case .resetDryRun:
             // Reads the plan only: no step runs (Reset.perform is the sheet's alone).
             resetDryRun = Reset.dryRun(in: .standard)
@@ -360,6 +372,7 @@ enum DebugHooks {
         s.deskRunning = desk.running
         s.layout = UserDefaults.desk.string(forKey: "layout")
         s.companion = desk.model.companion.debug
+        s.widgets = WidgetsDebug.make(SettingsWindowController.shared.widgetsPage)
         s.deskPieces = DeskArrangement(s.layout ?? DeskLayout.standard).shown(
             showMeetings: UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true)
         let arrange = desk.model.arrange

@@ -1,0 +1,34 @@
+# docs/mac-smoke-test.md section 75: Settings, Widgets, "Install widget from file..." (spec 20, 2.42.0). The hook
+# reads the zip and calls the same WidgetsModel.installFromFile the panel calls, so the file panel is the only
+# part a person walks. A good sprite zip installs as made here, becomes the companion and says where it went; a
+# zip the validator refuses installs nothing and its sentence shows. fixtures/widget-packs/build.py makes both
+# zips from the validator's fixture packs (invented names, 1x1 art). A run takes the pack out again
+# (widget-remove, by the restore plan) and puts the companion pick back (the defaults step).
+name: Install a widget pack from a file
+steps:
+  # The companion's saved pick, restored after the run.
+  - defaults: { domain: desk, key: deskCompanionPack, type: string, value: smoke-before }
+  - do: settings
+    arg: widgets
+  - expect_state: { settings_open: true, settings_section: widgets }
+  - do: widget-from-file
+    arg: widget-packs/good-sprite.zip
+  # Listed as made here (source local), a sprite, and the companion's pick.
+  - expect_state:
+      widgets.installed[id=good-sprite].source: local
+      widgets.installed[id=good-sprite].kind: sprite
+      widgets.companion_pick: good-sprite
+      widgets.companion_active: good-sprite
+  # Where it went depends on the Desk and the companion piece: the three sentences in spec 20.
+  - expect_state: { widgets.file_install: "/^Fixture sprite is (on your Desk now\\. It came from your file and stays on this Mac|your companion now\\. (Turn the Desk on in Settings, Desk to see it|It is hidden; tick Companion in Settings, Desk to show it))\\.$/" }
+  - snap: widgets-installed
+  # A zip the validator refuses (a palette with no LICENSE): nothing is installed, the companion stays, the
+  # status line carries the validator's sentence.
+  - do: widget-from-file
+    arg: widget-packs/bad-no-license.zip
+  - expect_state:
+      widgets.file_install: "/^LICENSE is missing; every pack carries its own license text\\.$/"
+      widgets.installed: "/\\A(?!.*bad-no-license)/"
+      widgets.installed[id=good-sprite].source: local
+      widgets.companion_pick: good-sprite
+  - snap: widgets-refused

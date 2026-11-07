@@ -184,6 +184,7 @@ private struct WidgetsNewSpriteSection: View {
                 Button("New sprite from an image\u{2026}") { open() }
                     .settingsAnchor(SettingsAnchor.newSprite)
             }
+            WidgetsFromFileRow(model: model)
         }
         .sheet(isPresented: Binding(get: { sprite != nil }, set: { if !$0 { sprite = nil } })) {
             if let sprite { NewSpriteSheet(model: sprite, close: { self.sprite = nil }) }
@@ -193,6 +194,56 @@ private struct WidgetsNewSpriteSection: View {
     private func open() {
         guard let png = NewSpritePicker.pick() else { return }
         sprite = NewSpriteModel(png: png, install: { model.installNewSprite($0) })
+    }
+}
+
+/// "Install widget from file...": a pack zip made outside Sanduhr, through the same checks as the catalog's.
+private struct WidgetsFromFileRow: View {
+    let model: WidgetsModel
+
+    var body: some View {
+        HStack {
+            Text("Install a widget pack from a .zip file. It is checked like a catalog download and stays on this Mac.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            Button("Install widget from file\u{2026}") { WidgetFilePicker.run(model: model) }
+                .accessibilityLabel("Install widget from file")
+        }
+        if let status = model.fileInstallStatus {
+            Text(status).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// The panel for "Install widget from file...": one `.zip`, read once, at most one byte past the catalog's cap so a
+/// file over it is refused by `WidgetFileInstall` without being read whole. The panel is only the source of bytes;
+/// the checks, the install and the companion choice are `WidgetsModel`'s. Nothing else on disk is touched.
+@MainActor
+private enum WidgetFilePicker {
+    static func run(model: WidgetsModel) {
+        model.clearFileInstallStatus()
+        guard let url = pick() else { return }
+        model.installFromFile(read(url))
+    }
+
+    private static func pick() -> URL? {
+        let panel = NSOpenPanel()
+        panel.title = "Install widget from file"
+        panel.message = "Choose a widget pack (.zip)."
+        panel.allowedContentTypes = [UTType.zip]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.canCreateDirectories = false
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    private static func read(_ url: URL) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        return try? handle.read(upToCount: WidgetZip.maxZipBytes + 1)
     }
 }
 

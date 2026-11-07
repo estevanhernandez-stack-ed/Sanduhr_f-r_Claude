@@ -115,6 +115,8 @@ final class SettingsWindowController {
     var modsPage: ModsPageModel { navigation.modsPage }
     /// Settings, Message's editor (state.yaml `message_editor`, the debug hooks' `message-editor`).
     var messageEditor: MessageEditorModel { navigation.messageEditor }
+    /// Settings, Widgets (state.yaml `widgets`, the debug hooks' `widget-from-file` and `widget-remove`).
+    var widgetsPage: WidgetsModel { navigation.widgetsPage }
 
     func close() { window?.close() }
 

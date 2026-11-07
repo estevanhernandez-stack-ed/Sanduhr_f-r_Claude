@@ -104,6 +104,27 @@ class FakeApp
         e.merge!('rows' => e['rows'].to_i - 1, 'styled' => e['styled'].to_i - 1, 'unsaved' => false, 'added' => nil)
       end
     when 'close-settings' then s['settings_open'] = false
+    when 'widget-from-file'
+      # Spec 20: the hook reads the zip at an absolute path and installs it as the panel does. Two fixture zips:
+      # a good sprite (made here, the companion's pick) and a palette the validator refuses (nothing changes).
+      raise Smoke::Failure, 'widget-from-file needs an absolute .zip path' unless arg.to_s.start_with?('/') && arg.end_with?('.zip')
+      w = (s['widgets'] ||= { 'installed' => [], 'companion_pick' => nil, 'companion_active' => nil, 'file_install' => nil })
+      case File.basename(arg)
+      when 'good-sprite.zip'
+        w['installed'].reject! { |p| p['id'] == 'good-sprite' }
+        w['installed'] << { 'id' => 'good-sprite', 'kind' => 'sprite', 'source' => 'local' }
+        w['companion_pick'] = w['companion_active'] = 'good-sprite'
+        w['file_install'] = 'Fixture sprite is your companion now. Turn the Desk on in Settings, Desk to see it.'
+      when 'bad-no-license.zip'
+        w['file_install'] = 'LICENSE is missing; every pack carries its own license text.'
+      else
+        w['file_install'] = "The file couldn't be read, so nothing was installed."
+      end
+    when 'widget-remove'
+      w = s['widgets']
+      ok = w.is_a?(Hash) && w['installed'].any? { |p| p['id'] == arg && p['source'] == 'local' }
+      raise Smoke::Failure, "widget-remove: #{arg} is not an installed made-here pack" unless ok
+      w['installed'].reject! { |p| p['id'] == arg }
     when 'hot-key'
       which, keys = arg.split(' ', 2)
       anyway = keys.end_with?(' anyway')
@@ -754,6 +775,38 @@ eq('skip scenario skips with a reason', [r['status'], r['reason']], ['skip', 'no
 eq('skip runs nothing', app3.actions, [])
 eq('summary', runner.report['summary'], { 'pass' => 1, 'fail' => 0, 'skip' => 0 })
 
+# --- Install a widget pack from a file (spec 20, section 75) ----------------------------------
+
+wff = File.join(Smoke::SCENARIOS, 'widget-from-file.yaml')
+mem_wff = MemoryDefaults.new
+mem_wff.write('com.626labs.sanduhr.desk', 'deskCompanionPack', 'string', 'earlier-pick')
+app_wff = FakeApp.new
+r = Runner.new(app_wff, mem_wff, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(wff)
+eq('widget-from-file scenario passes', r['status'], 'pass')
+eq('widget-from-file names its zips from smoke/fixtures, absolute',
+   app_wff.actions.grep(/\Awidget-from-file/),
+   ["widget-from-file #{File.join(Smoke::FIXTURE_FILES, 'widget-packs/good-sprite.zip')}",
+    "widget-from-file #{File.join(Smoke::FIXTURE_FILES, 'widget-packs/bad-no-license.zip')}"])
+%w[good-sprite bad-no-license].each { |n| check("fixture zip #{n} is committed and small", File.size?(File.join(Smoke::FIXTURE_FILES, 'widget-packs', "#{n}.zip")).to_i.between?(1, 8192)) }
+eq('the run takes the pack it installed out again', app_wff.actions.grep(/\Awidget-remove/), ['widget-remove good-sprite'])
+eq('no pack left behind', app_wff.state_now['widgets']['installed'], [])
+eq('the companion pick goes back', mem_wff.read('com.626labs.sanduhr.desk', 'deskCompanionPack'), %w[string earlier-pick])
+eq('relative paths resolve for widget-from-file only', [Runner.resolve_arg('widget-from-file', 'x/a.zip'), Runner.resolve_arg('theme', 'x/a.zip')],
+   [File.join(Smoke::FIXTURE_FILES, 'x/a.zip'), 'x/a.zip'])
+eq('an absolute path is left alone', Runner.resolve_arg('widget-from-file', '/tmp/a.zip'), '/tmp/a.zip')
+with_pack = base.merge('widgets' => { 'installed' => [{ 'id' => 'a', 'kind' => 'sprite', 'source' => 'local' },
+                                                      { 'id' => 'b', 'kind' => 'theme', 'source' => 'catalog' }] })
+eq('restore removes only made-here packs that are new', Restore.plan(base.merge('widgets' => { 'installed' => [] }), with_pack), [['widget-remove', 'a']])
+eq('restore leaves packs that were there before', Restore.plan(with_pack, with_pack), [])
+eq('restore with no widgets section is quiet', Restore.plan(base, base), [])
+refused_wff = [['widget-from-file', 'pack.zip'], ['widget-from-file', '/tmp/pack.png'], ['widget-remove', 'not-there']].map do |name, arg|
+  FakeApp.new.action(name, arg)
+  false
+rescue Smoke::Failure
+  true
+end
+eq('the hooks refuse a relative path, a non-zip and an id that is not installed', refused_wff, [true, true, true])
+
 # --- Shipped scenarios parse and use known steps -----------------------------------------------
 
 Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
@@ -765,7 +818,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill just-the-desk setup drawers camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config]
+    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill just-the-desk setup drawers camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config widget-from-file widget-remove]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

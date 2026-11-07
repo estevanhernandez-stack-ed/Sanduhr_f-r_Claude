@@ -19,6 +19,11 @@ desk_pieces:
     order: 2
     scale: 1
 companion: null
+widgets:
+  installed: []
+  companion_pick: null
+  companion_active: null
+  file_install: null
 desk_arrange:
   active: false
   changed: false
