@@ -687,10 +687,8 @@ internal sealed class DesktopLayerHost : IDeskHost
         }
         else if (msg == DeskNative.WM_DISPLAYCHANGE)
             Schedule("display changed");
-        else if (msg == DeskNative.WM_SETTINGCHANGE && wParam.ToInt64() == DeskNative.SPI_SETWORKAREA)
-            Schedule("work area changed");
-        else if (msg == DeskNative.WM_SETTINGCHANGE && wParam.ToInt64() == DeskNative.SPI_SETDESKWALLPAPER)
-            Schedule("wallpaper changed"); // Automatic ink samples the new wallpaper (spec 6.7)
+        else if (msg == DeskNative.WM_SETTINGCHANGE && SettingChangeRebuild(wParam.ToInt64()) is { } why)
+            Schedule(why);
         return IntPtr.Zero;
     }
 
@@ -715,6 +713,17 @@ internal sealed class DesktopLayerHost : IDeskHost
         pos.flags |= DeskNative.SWP_NOZORDER;
         Marshal.StructureToPtr(pos, lParam, false);
     }
+
+    /// <summary>The WM_SETTINGCHANGE settings that rebuild the Desk, with the reason logged; null for any other. The work area
+    /// moves the windows; the wallpaper is what Automatic ink samples (spec 6.7); Windows' animation effects decide at build
+    /// time whether the companion roams and the message shimmers, so turning them on or off must rebuild, not wait for a restart.</summary>
+    internal static string? SettingChangeRebuild(long setting) => setting switch
+    {
+        DeskNative.SPI_SETWORKAREA => "work area changed",
+        DeskNative.SPI_SETDESKWALLPAPER => "wallpaper changed",
+        DeskNative.SPI_SETCLIENTAREAANIMATION or DeskNative.SPI_SETUIEFFECTS or DeskNative.SPI_SETANIMATION => "animation effects changed",
+        _ => null,
+    };
 
     private void Schedule(string why)
     {
