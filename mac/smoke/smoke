@@ -213,6 +213,8 @@ module Smoke
       raise Failure, 'usage: smoke do <action> [arg]' if argv.empty?
       # Words after the action are one argument: `smoke do av-test camera on`.
       arg = argv[1..].join(' ')
+      # A file the app opens is named from here: `smoke do widget-from-file pack.zip`.
+      arg = File.expand_path(arg) if argv[0] == 'widget-from-file' && !arg.empty?
       LiveApp.new.action(argv[0], arg.empty? ? nil : arg)
       puts 'ok'
     end

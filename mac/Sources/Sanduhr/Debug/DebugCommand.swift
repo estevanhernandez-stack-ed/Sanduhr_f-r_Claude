@@ -133,11 +133,19 @@ enum DebugAction: Equatable {
 
     enum ModsSheet: Equatable { case export, exportSample, importSample }
 
+    /// Settings, Widgets, "Install widget from file..." (spec 20) with the zip at an absolute path: the file is
+    /// read here and handed to `WidgetsModel.installFromFile`, the panel's own path. The sentence it leaves is
+    /// state.yaml `widgets.file_install`. A file that can't be read is the model's "couldn't be read" line, not an error.
+    case widgetFromFile(path: String)
+    /// Takes a made-here pack back out through `WidgetsModel.uninstall`, so a run can clean up what it installed.
+    /// Refused for a pack from the catalog, and for an id that isn't installed.
+    case widgetRemove(id: String)
+
     static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "notch-pill", "just-the-desk", "setup", "drawers", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
                         "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
-                        "desk-arrange", "hot-key", "reset", "mods-config"]
+                        "desk-arrange", "hot-key", "reset", "mods-config", "widget-from-file", "widget-remove"]
 }
 
 enum DebugCommand: Equatable {
@@ -329,6 +337,17 @@ enum DebugLink {
             case "import-sample" where words.count == 1: return .success(.modsSheet(.importSample))
             default: return bad("mods-config needs arg=catalog, compare, export, export-sample, import-sample, seat or seat <n> (from 1)")
             }
+        case "widget-from-file":
+            // The harness expands a scenario's relative path before it gets here; the app takes only an absolute .zip.
+            guard let arg, arg.hasPrefix("/"), arg.lowercased().hasSuffix(".zip") else {
+                return bad("widget-from-file needs arg=<absolute path to a .zip>")
+            }
+            return .success(.widgetFromFile(path: arg))
+        case "widget-remove":
+            guard let arg, !arg.isEmpty, arg.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" }) else {
+                return bad("widget-remove needs arg=<pack id>")
+            }
+            return .success(.widgetRemove(id: arg))
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }

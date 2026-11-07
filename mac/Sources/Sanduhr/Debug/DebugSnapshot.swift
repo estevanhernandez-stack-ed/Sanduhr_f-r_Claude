@@ -11,6 +11,8 @@ struct DebugStateInput {
     var deskPieces: [DeskPlacement] = []
     /// The companion piece while it shows (CompanionDriver.debug), nil otherwise.
     var companion: CompanionDebug?
+    /// Settings, Widgets: the installed packs, the companion's pick and the file install's last sentence.
+    var widgets = WidgetsDebug()
     /// Arrange mode (item 60): on or off, an unsaved change, the layout being edited, and whether
     /// the Desk window takes clicks over its whole frame or only where it draws.
     var deskArrange = DeskArrangeDebug()
@@ -631,6 +633,7 @@ enum DebugState {
         pairs.append(("layout", s.layout.map(YAMLNode.string) ?? .null))
         pairs.append(("desk_pieces", deskPiecesYAML(s.deskPieces)))
         pairs.append(("companion", CompanionDebug.yaml(s.companion)))
+        pairs.append(("widgets", WidgetsDebug.yaml(s.widgets)))
         pairs.append(("desk_arrange", deskArrangeYAML(s.deskArrange)))
         pairs.append(("notch", .bool(s.notch)))
         pairs.append(("has_notch", .bool(s.hasNotch)))
@@ -875,4 +878,41 @@ struct MeterHistoryDebug: Equatable {
     var window = MeterHistoryChart.Window.week.rawValue
     var rows = 0
     var series = 0
+}
+
+/// state.yaml's `widgets:` (spec 20): the installed packs as ids, kinds and sources, the companion's saved pick and the
+/// pack it draws, and the last "Install widget from file..." sentence. The sentence carries the pack's name, which
+/// is the user's own for a real file: read it, never paste a snapshot of a real Mac.
+struct WidgetsDebug: Equatable {
+    struct Pack: Equatable {
+        var id: String
+        var kind: String
+        /// `catalog`, `local` or `claude` (WidgetSource).
+        var source: String
+    }
+
+    var installed: [Pack] = []
+    /// The saved pick (`deskCompanionPack`), nil when never chosen.
+    var companionPick: String?
+    /// The sprite the companion draws now, nil with no sprite installed.
+    var companionActive: String?
+    /// WidgetsModel.fileInstallStatus, nil before one and after the panel opens.
+    var fileInstall: String?
+
+    @MainActor
+    static func make(_ model: WidgetsModel) -> WidgetsDebug {
+        let kinds = Dictionary(model.installed.map { ($0.id, $0.kind) }, uniquingKeysWith: { a, _ in a })
+        let packs = model.store.load().packs.map { Pack(id: $0.id, kind: kinds[$0.id] ?? "unknown", source: $0.source.rawValue) }
+        return WidgetsDebug(installed: packs, companionPick: model.companion.pack,
+                            companionActive: model.activeCompanion, fileInstall: model.fileInstallStatus)
+    }
+
+    static func yaml(_ w: WidgetsDebug) -> YAMLNode {
+        func opt(_ s: String?) -> YAMLNode { s.map(YAMLNode.string) ?? .null }
+        let packs: [YAMLNode] = w.installed.map {
+            .map([YAMLPair("id", .string($0.id)), YAMLPair("kind", .string($0.kind)), YAMLPair("source", .string($0.source))])
+        }
+        return .map([YAMLPair("installed", .list(packs)), YAMLPair("companion_pick", opt(w.companionPick)),
+                     YAMLPair("companion_active", opt(w.companionActive)), YAMLPair("file_install", opt(w.fileInstall))])
+    }
 }

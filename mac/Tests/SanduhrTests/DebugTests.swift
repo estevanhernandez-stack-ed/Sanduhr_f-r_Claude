@@ -337,7 +337,7 @@ struct DebugStateTests {
         let yaml = YAMLEmitter.emit(DebugState.yaml(s))
         let keys = yaml.split(separator: "\n").filter { !$0.hasPrefix(" ") && !$0.hasPrefix("-") }
             .map { String($0.split(separator: ":")[0]) }
-        #expect(keys == ["desk_enabled", "desk_running", "layout", "desk_pieces", "companion", "desk_arrange", "notch", "has_notch",
+        #expect(keys == ["desk_enabled", "desk_running", "layout", "desk_pieces", "companion", "widgets", "desk_arrange", "notch", "has_notch",
                          "notch_pill", "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "now_playing", "now_playing_idle", "notch_shows", "widget_visible", "widget_visibility",
                          "menu_bar", "menu_bar_item", "settings_open", "settings_section", "settings_anchor", "settings_anchor_visible", "usage_page", "meters", "widget_warnings", "hidden_limits",
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "desk_piece_clicks", "desk_plate", "desk_under_icons", "oled_care", "dock", "alerts",
@@ -647,5 +647,65 @@ struct DebugDrawersGuardTests {
         #expect(DebugDrawersGuard.allowed(environment: [DrawerDesktop.overrideVariable: "/tmp/stand-in-desktop"], debugBuild: true))
         // A release build ignores the override, so the action would reach the real Desktop.
         #expect(!DebugDrawersGuard.allowed(environment: [DrawerDesktop.overrideVariable: "/tmp/stand-in-desktop"], debugBuild: false))
+    }
+}
+
+@Suite("Widget file install debug hooks")
+struct DebugWidgetFromFileTests {
+    @Test func widgetFromFileTakesAnAbsoluteZipPath() {
+        guard case .success(let a) = DebugLink.action("widget-from-file", arg: "/tmp/pack.zip") else { Issue.record("refused"); return }
+        #expect(a == .widgetFromFile(path: "/tmp/pack.zip"))
+        for arg in [nil, "", "pack.zip", "/tmp/pack.png", "fixtures/pack.zip"] {
+            if case .success = DebugLink.action("widget-from-file", arg: arg) { Issue.record("accepted \(arg ?? "nil")") }
+        }
+        #expect(DebugAction.names.contains("widget-from-file"))
+    }
+
+    @Test func widgetRemoveTakesAPackId() {
+        guard case .success(let a) = DebugLink.action("widget-remove", arg: "good-sprite") else { Issue.record("refused"); return }
+        #expect(a == .widgetRemove(id: "good-sprite"))
+        for arg in [nil, "", "../escape", "a/b", "two words"] {
+            if case .success = DebugLink.action("widget-remove", arg: arg) { Issue.record("accepted \(arg ?? "nil")") }
+        }
+        #expect(DebugAction.names.contains("widget-remove"))
+    }
+
+    @Test func theWidgetsSectionWritesPacksPickAndSentence() {
+        let w = WidgetsDebug(installed: [.init(id: "good-sprite", kind: "sprite", source: "local")],
+                             companionPick: "good-sprite", companionActive: "good-sprite", fileInstall: "Fixture sprite is on your Desk now.")
+        #expect(YAMLEmitter.emit(WidgetsDebug.yaml(w)) == """
+        installed:
+          - id: good-sprite
+            kind: sprite
+            source: local
+        companion_pick: good-sprite
+        companion_active: good-sprite
+        file_install: Fixture sprite is on your Desk now.
+
+        """)
+        #expect(YAMLEmitter.emit(WidgetsDebug.yaml(WidgetsDebug())).contains("installed: []\ncompanion_pick: null\ncompanion_active: null\nfile_install: null"))
+    }
+}
+
+@Suite("Smoke fixture zips")
+struct DebugSmokeFixtureZipTests {
+    private static func zip(_ name: String) -> Data? {
+        let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("../../smoke/fixtures/widget-packs").standardized
+        return try? Data(contentsOf: dir.appendingPathComponent(name + ".zip"))
+    }
+
+    /// scenarios/widget-from-file.yaml installs these two committed zips: the good one is a sprite the store takes as
+    /// made here, the other is refused with the sentence the scenario matches. A rebuild with build.py keeps both true.
+    @Test func theCommittedZipsDoWhatTheScenarioExpects() {
+        guard let good = Self.zip("good-sprite"), let bad = Self.zip("bad-no-license") else { Issue.record("zips missing"); return }
+        #expect(good.count < 8192 && bad.count < 8192)
+        let root = WidgetTestRoot(), store = root.store()
+        guard case .refused(let why) = WidgetFileInstall.install(zip: bad, store: store) else { Issue.record("bad zip installed"); return }
+        #expect(why.contains("LICENSE is missing; every pack carries its own license text"))
+        #expect(store.load().packs.isEmpty)
+        guard case .installed(let m, _) = WidgetFileInstall.install(zip: good, store: store) else { Issue.record("good zip refused"); return }
+        #expect(m.id == "good-sprite" && m.name == "Fixture sprite")
+        #expect(store.load().find("good-sprite")?.source == .local)
     }
 }
