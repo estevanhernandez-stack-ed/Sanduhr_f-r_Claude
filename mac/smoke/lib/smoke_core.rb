@@ -10,6 +10,7 @@ module Smoke
   ROOT = File.expand_path('..', __dir__)
   OUT = File.join(ROOT, 'out')
   SCENARIOS = File.join(ROOT, 'scenarios')
+  FIXTURE_FILES = File.join(ROOT, 'fixtures')
   DOMAIN = 'com.626labs.sanduhr'.freeze
   DESK_DOMAIN = 'com.626labs.sanduhr.desk'.freeze
 
@@ -304,6 +305,9 @@ module Smoke
       if before['theme'] && before['theme'] != after['theme']
         steps << ['theme', before['theme']]
       end
+      # Packs a scenario installed from a file go again (made-here ids the Mac did not have before). Their
+      # companion pick is the defaults step's to put back; the removal makes the app read it again.
+      (made_here_ids(after) - made_here_ids(before)).each { |id| steps << ['widget-remove', id] }
       if before['settings_open']
         if !after['settings_open'] || before['settings_section'] != after['settings_section']
           steps << ['settings', before['settings_section']]
@@ -358,6 +362,13 @@ module Smoke
 
     def arranging(state)
       state['desk_arrange'].is_a?(Hash) && state['desk_arrange']['active'] == true
+    end
+
+    # Ids of the installed widget packs made on this Mac (`widgets.installed`, source `local`).
+    def made_here_ids(state)
+      w = state['widgets']
+      return [] unless w.is_a?(Hash) && w['installed'].is_a?(Array)
+      w['installed'].select { |p| p.is_a?(Hash) && p['source'] == 'local' }.map { |p| p['id'] }
     end
 
     def av_flag(state, which)
@@ -526,6 +537,13 @@ module Smoke
       @results = []
     end
 
+    # `widget-from-file` takes an absolute path in the app; a scenario names its zip relative to
+    # smoke/fixtures, and this is where it becomes absolute.
+    def self.resolve_arg(name, arg)
+      return arg unless name == 'widget-from-file' && arg && !arg.start_with?('/')
+      File.expand_path(arg, FIXTURE_FILES)
+    end
+
     def load(path)
       doc = YAML.safe_load(File.read(path))
       raise Failure, "#{path}: not a scenario (needs name and steps)" unless doc.is_a?(Hash) && doc['steps'].is_a?(Array)
@@ -606,7 +624,7 @@ module Smoke
       raise Failure, "step #{n}: unknown step (#{step.keys.join(', ')})" unless kind
       case kind
       when 'do'
-        @app.action(step['do'].to_s, step['arg']&.to_s)
+        @app.action(step['do'].to_s, self.class.resolve_arg(step['do'].to_s, step['arg']&.to_s))
         sleep(@settle) unless @settle.zero?
         [true, nil]
       when 'defaults'
