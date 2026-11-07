@@ -51,15 +51,23 @@ struct WidgetFileInstallTests {
         files["extra.txt"] = Data("x".utf8)
         files["extra2.txt"] = Data("x".utf8)
         files["extra3.txt"] = Data("x".utf8)
+        files["pack.json"] = Data(Self.text(files["pack.json"]!)
+            .replacingOccurrences(of: "Fixture palette", with: "Claude palette").utf8)
         let root = WidgetTestRoot(), store = root.store()
         let verdict = PackValidator.validate(files, folderName: "good-palette", strict: true)
+        #expect(verdict.errors.count > 3, "\(verdict.errors)")
         let why = Self.refusal(WidgetFileInstall.install(zip: Self.zip(files), store: store))
-        if verdict.errors.count > 3 {
-            #expect(why.hasSuffix("and \(verdict.errors.count - 3) more."), "\(why)")
-        } else {
-            #expect(why.contains(verdict.errors[0]))
-        }
+        #expect(why == WidgetFileInstall.rejected(verdict.errors))
+        #expect(why.hasSuffix(" and \(verdict.errors.count - 3) more."), "\(why)")
+        #expect(why.hasPrefix(verdict.errors.prefix(3).joined(separator: " ")))
         #expect(store.load().packs.isEmpty)
+    }
+
+    @Test func theJoinShowsThreeAndCountsTheRest() {
+        let five = ["A.", "B.", "C.", "D.", "E."]
+        #expect(WidgetFileInstall.rejected(five) == "A. B. C. and 2 more.")
+        #expect(WidgetFileInstall.rejected(Array(five.prefix(3))) == "A. B. C.")
+        #expect(WidgetFileInstall.rejected(Array(five.prefix(2))) == "A. B.")
     }
 
     @Test func theSameIdTwiceEndsAsOnePackWithTheSecondZipsFiles() {

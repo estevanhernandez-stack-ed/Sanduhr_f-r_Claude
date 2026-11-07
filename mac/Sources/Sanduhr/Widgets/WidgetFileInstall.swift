@@ -72,7 +72,7 @@ enum WidgetFileInstall {
     }
 
     /// The first `errorsShown` sentences joined, then "and N more." when there are more.
-    private static func rejected(_ errors: [String]) -> String {
+    static func rejected(_ errors: [String]) -> String {
         guard !errors.isEmpty else { return "The pack didn't pass Sanduhr's checks, so nothing was installed." }
         let shown = errors.prefix(errorsShown).joined(separator: " ")
         let more = errors.count - errorsShown
