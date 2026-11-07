@@ -35,8 +35,11 @@ jobs:
   build-test-release:
     # Full Xcode (Swift 6, swift-testing built in), so plain swift build and swift test work.
     runs-on: macos-15
-    # Normal runs take about 3 minutes; a hung macOS job is the expensive kind.
-    timeout-minutes: 20
+    # A normal run takes 14 to 19 minutes on macos-15 (2026-11-06: swift test 5 to 6.5, the
+    # universal release build 10 to 12, both compiling the app from scratch), so 20 left under
+    # a minute of headroom. 35 is about twice a normal run: a hung macOS job is the expensive
+    # kind, but a sound run cancelled at the cap costs the whole run and ships nothing.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Toolchain
