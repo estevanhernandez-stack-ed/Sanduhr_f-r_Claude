@@ -44,6 +44,8 @@ final class WidgetsModel {
     private(set) var companion: CompanionSettings
     /// The last "Use my own art..." outcome in a sentence (a check that failed, or the success line), nil before one.
     private(set) var ownArtStatus: String?
+    /// The last "Install widget from file..." outcome in a sentence, nil before one and after the panel opens.
+    private(set) var fileInstallStatus: String?
 
     let store: WidgetStore
     private let defaults: UserDefaults
@@ -293,6 +295,52 @@ final class WidgetsModel {
         if r.ok { ownArtStatus = "\(manifest.name) is made. It stays on this Mac." }
         packsChanged(posting: r.ok)
         return r.ok ? [] : [r.error ?? "\(manifest.name) couldn't be installed."]
+    }
+
+    // MARK: Install widget from file
+
+    static let fileUnreadable = "The file couldn't be read, so nothing was installed."
+
+    /// The panel is about to open: the last sentence goes.
+    func clearFileInstallStatus() { fileInstallStatus = nil }
+
+    /// "Install widget from file..." (spec 20): the picked zip's bytes, or nil when the file couldn't be read. The
+    /// checks and the install are `WidgetFileInstall`'s; a refusal changes nothing and its sentence is the status. A
+    /// sprite also becomes the companion: only the companion choice is written (`CompanionSettings`), never the
+    /// Desk's layout, and the pack-change notification lets the Desk reload. Nothing leaves this Mac.
+    func installFromFile(_ data: Data?) {
+        fileInstallStatus = nil
+        guard let data else {
+            fileInstallStatus = Self.fileUnreadable
+            return
+        }
+        switch WidgetFileInstall.install(zip: data, store: store) {
+        case .refused(let why):
+            fileInstallStatus = why
+        case .installed(let manifest, let wasUpdate):
+            fonts.release(manifest.id)
+            let sprite = Self.zipIsSprite(data)
+            if sprite {
+                companion.pack = manifest.id
+                companion.save(defaults)
+            }
+            packsChanged(posting: true)
+            fileInstallStatus = WidgetFileInstall.line(
+                for: manifest, wasUpdate: wasUpdate, isSprite: sprite,
+                deskOn: defaults.bool(forKey: DeskController.enabledKey), companionShown: companionPieceShown)
+        }
+    }
+
+    /// The zip's own files (already read once by the install, so this one succeeds) hold a `sprite.json`.
+    private static func zipIsSprite(_ zip: Data) -> Bool {
+        guard case .success(let files) = WidgetZip.read(zip) else { return false }
+        return WidgetFileInstall.isSprite(files)
+    }
+
+    /// The Companion piece is placed in the Desk's saved layout. Read only.
+    private var companionPieceShown: Bool {
+        let layout = defaults.string(forKey: DeskArrangeMode.layoutKey) ?? DeskLayout.standard
+        return DeskArrangement(layout).placement("companion") != nil
     }
 
     /// The sentence under a font pack's row when CoreText refused one of its faces, nil otherwise.
