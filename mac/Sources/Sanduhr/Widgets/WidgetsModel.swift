@@ -155,6 +155,9 @@ final class WidgetsModel {
         fonts.release(id)
         let r = store.uninstall(id)
         notice = r.error
+        // The pick leaves with its pack, so the first installed sprite takes over by rule rather than
+        // by a dangling id in the Desk suite that names a pack no longer on disk.
+        if r.error == nil, companion.pack == id { pickCompanion(nil) }
         packsChanged(posting: r.error == nil)
     }
 
