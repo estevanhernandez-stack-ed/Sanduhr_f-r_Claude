@@ -71,12 +71,18 @@ enum WidgetFileInstall {
         "That file isn't a widget pack Sanduhr can open (\(why)), so nothing was installed."
     }
 
-    /// The first `errorsShown` sentences joined, then "and N more." when there are more.
+    /// The first `errorsShown` sentences joined, then "and N more." when there are more. The validator's messages
+    /// carry no closing period, so each gets one here (a status line of run-together clauses isn't a sentence).
     static func rejected(_ errors: [String]) -> String {
         guard !errors.isEmpty else { return "The pack didn't pass Sanduhr's checks, so nothing was installed." }
-        let shown = errors.prefix(errorsShown).joined(separator: " ")
+        let shown = errors.prefix(errorsShown).map(sentence).joined(separator: " ")
         let more = errors.count - errorsShown
         return more > 0 ? "\(shown) and \(more) more." : shown
+    }
+
+    private static func sentence(_ message: String) -> String {
+        guard let last = message.last, !".!?".contains(last) else { return message }
+        return message + "."
     }
 
     /// `id`, `name` and `sanduhr_min` from `pack.json`, or nil when any is missing or unreadable (the

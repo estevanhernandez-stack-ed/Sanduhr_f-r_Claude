@@ -27,7 +27,7 @@ steps:
   - do: widget-from-file
     arg: widget-packs/bad-no-license.zip
   - expect_state:
-      widgets.file_install: "/^LICENSE is missing; every pack carries its own license text\\.?$/"
+      widgets.file_install: "/^LICENSE is missing; every pack carries its own license text\\.$/"
       widgets.installed: "/\\A(?!.*bad-no-license)/"
       widgets.installed[id=good-sprite].source: local
       widgets.companion_pick: good-sprite
