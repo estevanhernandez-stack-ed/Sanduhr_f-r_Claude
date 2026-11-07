@@ -65,6 +65,9 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
         {
             _modsPage = value;
             value.SettingsChanged = PacksChanged;
+            // A companion installed from a file: its line's button goes through the Desk tab, which owns the open copy of the Desk.
+            value.TurnOnDesk = () => Desk.Enabled = true;
+            value.ShowCompanionPiece = () => Desk.PlaceIfHidden(CompanionSettings.Widget);
             value.MetersChanged = installed => ClaudeCodePage.AfterMetersChange(installed);
             value.ShowRealName = names =>
             {

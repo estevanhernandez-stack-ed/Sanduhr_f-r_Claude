@@ -308,8 +308,9 @@ public sealed partial class ModsPageViewModel : ObservableObject
     {
         _service = new Lazy<WidgetCatalogService>(service ?? (() => new WidgetCatalogService()));
         _host = host;
+        Prefs = store ?? new SettingsStore(new Paths());
         Confirm = (question, detail) => ThemedDialog.ShowConfirm(_window, question, detail, SettingsNames.UninstallConfirm, SettingsNames.UninstallCancel);
-        // settings.json is not read here; the store parameter stays for callers.
+        // settings.json is read only for the companion a sprite from a file makes (Prefs).
         AskMetersConsent = folder => IntegrationConsentDialog.Ask(_window, new ConsentSpec(
             SettingsNames.MetersConsentTitle, SettingsNames.MetersConsentIntro, folder, SettingsNames.MetersConsentDetails,
             SettingsNames.MetersConsentInstall)) is not null;
@@ -806,12 +807,96 @@ public sealed partial class ModsPageViewModel : ObservableObject
             Status = SettingsNames.FileUnreadable;
             return Task.CompletedTask;
         }
-        var result = WidgetFileInstall.Install(zip, Service.Store, Service.Client.Running);
+        var result = WidgetFileInstall.Install(zip, Service.Store, Service.Client.Running,
+            name => StreamerMode.Mask.Name(CodenameCategory.AddOn, name));   // streamer: masked - the codename the Installed row shows for a pack made here
         Status = Short(result.Message, SettingsNames.WidgetInstallFailed);   // streamer: masked - via Short: Mask.Paths or FoldersIn (CP 8); a store error can name the widgets folder
+        if (result is { Ok: true, Kind: "sprite", PackId: { } id })
+            SetCompanionStatus(MakeCompanion(id, result));
         Rebuild();
         if (result.Ok) Notify();
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// A sprite installed from a file becomes the companion (persona panel round 2: the user expects to see it). Only the choice
+    /// is written; the Desk layout is left to the Desk tab, which holds its own copy while Settings is open.
+    /// </summary>
+    private string MakeCompanion(string packId, WidgetFileResult result)
+    {
+        try
+        {
+            Prefs.SaveCompanion(Prefs.LoadCompanion() with { Pack = packId });
+            return CompanionStatus(result);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return result.Message; }   // streamer: notname - result.Message carries the masked name; the caller passes it through Short
+    }
+
+    /// <summary>The companion's line from the Desk as saved now; remembers what blocks it, for the button.</summary>
+    private string CompanionStatus(WidgetFileResult result)
+    {
+        var desk = Prefs.LoadDesk();
+        bool placed = new DeskArrangement(desk.Layout).Placement(CompanionSettings.Widget) is not null;
+        _companionResult = result;
+        _companionPlaced = placed;
+        _companionBlock = WidgetFileInstall.Blocked(desk.Enabled, placed);
+        return WidgetFileInstall.CompanionLine(result, desk.Enabled, placed);
+    }
+
+    private WidgetFileResult? _companionResult;
+    private CompanionBlock _companionBlock;
+    private bool _companionPlaced;
+    private bool _settingCompanion;
+
+    /// <summary>The button beside a companion line that stops short of the desk: "Turn on the Desk" or "Show it on the Desk". Empty hides it.</summary>
+    [ObservableProperty] private string _companionFix = "";
+
+    // Any other status line takes the button away; only a companion line brings it.
+    partial void OnStatusChanged(string value) => CompanionFix = _settingCompanion ? WidgetFileInstall.FixLabel(_companionBlock, _companionPlaced) : "";
+
+    private void SetCompanionStatus(string line)
+    {
+        _settingCompanion = true;
+        try { Status = Short(line, SettingsNames.WidgetInstallFailed); }   // streamer: masked - ShownName is the mask's codename; via Short
+        finally { _settingCompanion = false; }
+    }
+
+    /// <summary>Set by Settings: turns the Desk on through the Desk tab, so its open copy saves it and the Desk starts.</summary>
+    internal Action? TurnOnDesk { get; set; }
+
+    /// <summary>Set by Settings: shows the companion piece through the Desk tab.</summary>
+    internal Action? ShowCompanionPiece { get; set; }
+
+    /// <summary>The companion line's button: clears everything that keeps the new companion off the desk (the Desk being off, then
+    /// its piece being hidden), then says where it is now.</summary>
+    [RelayCommand]
+    private void FixCompanion()
+    {
+        if (_companionResult is not { } result) return;
+        try
+        {
+            if (_companionBlock == CompanionBlock.DeskOff)
+            {
+                if (TurnOnDesk is { } on) on();
+                else Prefs.SaveDesk(Prefs.LoadDesk() with { Enabled = true });
+            }
+            if (!_companionPlaced)
+            {
+                if (ShowCompanionPiece is { } show) show();
+                else
+                {
+                    var desk = Prefs.LoadDesk();
+                    var layout = new DeskArrangement(desk.Layout);
+                    if (layout.PlaceAtDefault(CompanionSettings.Widget) is not null) Prefs.SaveDesk(desk with { Layout = layout.Layout });
+                }
+            }
+            SetCompanionStatus(CompanionStatus(result));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Status = SettingsNames.WidgetInstallFailed; }
+        Changed?.Invoke();
+    }
+
+    /// <summary>settings.json, for the companion a sprite from a file makes. Tests pass their own store.</summary>
+    internal SettingsStore Prefs { get; }
 
     private static string? DefaultPickZip()
     {
@@ -822,6 +907,9 @@ public sealed partial class ModsPageViewModel : ObservableObject
             CheckFileExists = true,
             Multiselect = false,
         };
+        // Opens in Downloads, where an emailed or Quick Shared pack lands (persona panel round 5: the picker started anywhere).
+        string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");   // streamer: key - a folder the OS dialog opens in, never drawn by Sanduhr
+        if (Directory.Exists(downloads)) dialog.InitialDirectory = downloads;
         return dialog.ShowDialog() == true ? dialog.FileName : null;   // streamer: key - the picked pack path is read, never drawn
     }
 

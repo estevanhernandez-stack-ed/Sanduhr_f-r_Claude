@@ -1,7 +1,11 @@
 namespace Sanduhr.Core;
 
-/// <summary>What an install from a file did: the line Settings shows, and whether anything changed.</summary>
-public sealed record WidgetFileResult(bool Ok, string Message);
+/// <summary>
+/// What an install from a file did: the line Settings shows, and whether anything changed. On success it also names the pack
+/// (its id, kind, version, and its name as the line drew it) so Settings can make a sprite the companion and say so.
+/// </summary>
+public sealed record WidgetFileResult(bool Ok, string Message, string? PackId = null, string? Kind = null, string? ShownName = null,
+    string? Version = null, bool Updated = false);
 
 /// <summary>
 /// "Install widget from file…" (#408): a pack zip from disk, made by the user or a pack maker such as SpriteForge. It passes
@@ -14,13 +18,19 @@ public sealed record WidgetFileResult(bool Ok, string Message);
 /// </para>
 /// Pure apart from the store: bytes in, result out. The file dialog and reading the file are the caller's.
 /// </summary>
+/// <summary>What keeps a companion installed from a file off the desk (<see cref="WidgetFileInstall.Blocked"/>).</summary>
+public enum CompanionBlock { None, DeskOff, PieceHidden }
+
 public static class WidgetFileInstall
 {
     /// <summary>The validator's errors shown in the status line; the rest are counted.</summary>
     public const int ErrorsShown = 3;
 
-    public static WidgetFileResult Install(byte[] zip, WidgetStore store, Version running)
+    /// <param name="showName">How the pack's name is drawn in the line: Settings passes the streamer mask, so a stream shows the
+    /// same codename the Installed row does. Defaults to the name itself.</param>
+    public static WidgetFileResult Install(byte[] zip, WidgetStore store, Version running, Func<string, string>? showName = null)
     {
+        showName ??= static name => name;
         var files = WidgetZip.Read(zip, out var zipError);
         if (files is null)
             return new(false, SettingsNames.FileZipUnsafe(zipError));
@@ -29,16 +39,50 @@ public static class WidgetFileInstall
         if (!verdict.Ok || verdict.Manifest is not { } manifest)
             return new(false, SettingsNames.FilePackRejected(Errors(verdict.Errors)));
         if (!WidgetCatalog.MeetsMinimum(manifest.SanduhrMin, running))
-            return new(false, SettingsNames.FilePackTooNew(manifest.Name, manifest.SanduhrMin));
+            return new(false, SettingsNames.FilePackTooNew(showName(manifest.Name), manifest.SanduhrMin));
 
         bool replacing = store.Load().Find(manifest.Id) is { MadeHere: true };
         var installed = store.Install(files, manifest, WidgetSource.Local, replaceMadeHere: true);
         if (!installed.Ok)
             return new(false, installed.Error ?? SettingsNames.WidgetInstallFailed);
+        string shown = showName(manifest.Name);
         return new(true, replacing
-            ? SettingsNames.FilePackUpdated(manifest.Name, manifest.Version)
-            : SettingsNames.FilePackInstalled(manifest.Name));
+            ? SettingsNames.FilePackUpdated(shown, manifest.Version)
+            : SettingsNames.FilePackInstalled(shown), manifest.Id, manifest.Kind, shown, manifest.Version, replacing);
     }
+
+    /// <summary>
+    /// The line after a sprite from a file became the companion: on the Desk now, or what still stands between it and the Desk
+    /// (the Desk is off, or its companion piece is hidden). The setting itself is the caller's.
+    /// </summary>
+    public static string CompanionLine(WidgetFileResult result, bool deskOn, bool piecePlaced)
+    {
+        string name = result.ShownName ?? "";
+        switch (Blocked(deskOn, piecePlaced))
+        {
+            case CompanionBlock.DeskOff: return SettingsNames.FileCompanionDeskOff(name);
+            case CompanionBlock.PieceHidden: return SettingsNames.FileCompanionHidden(name);
+        }
+        return result.Updated
+            ? SettingsNames.FileCompanionUpdatedOnDesk(name, result.Version ?? "")
+            : SettingsNames.FileCompanionOnDesk(name);
+    }
+
+    /// <summary>What stands between a new companion and the desk: nothing, the Desk being off, or its piece being hidden.</summary>
+    public static CompanionBlock Blocked(bool deskOn, bool piecePlaced) =>
+        !deskOn ? CompanionBlock.DeskOff : !piecePlaced ? CompanionBlock.PieceHidden : CompanionBlock.None;
+
+    /// <summary>
+    /// The label of the button that clears <paramref name="block"/>; empty when nothing blocks. One click clears every block, so with
+    /// the Desk off and the piece hidden too the label says both (persona panel round 4: it took two clicks).
+    /// </summary>
+    public static string FixLabel(CompanionBlock block, bool piecePlaced = true) => block switch
+    {
+        CompanionBlock.DeskOff when !piecePlaced => SettingsNames.FileCompanionTurnOnDeskAndShow,
+        CompanionBlock.DeskOff => SettingsNames.FileCompanionTurnOnDesk,
+        CompanionBlock.PieceHidden => SettingsNames.FileCompanionShowPiece,
+        _ => "",
+    };
 
     /// <summary>The first <see cref="ErrorsShown"/> errors, and how many more there are.</summary>
     internal static string Errors(IReadOnlyList<string> errors)
