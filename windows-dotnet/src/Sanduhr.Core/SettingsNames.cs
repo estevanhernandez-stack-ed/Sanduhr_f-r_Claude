@@ -832,6 +832,24 @@ public static class SettingsNames
     // What Claude can change (AgentConsents.All).
     /// <summary>The spec's line, with "in a folder" dropped: a server set up by hand outside Claude Code folders works too (decision 11).</summary>
     public const string AgentsIntro = "Claude means any agent that uses Sanduhr's MCP server. Claude reaches these through that server, and each needs it installed.";
+    // After an install, the launcher is started the way Claude Code starts it and asked one initialize (#144). No path in any
+    // of these: they show in the status line, which streamer mode does not mask.
+    public const string McpInstalledChecking = "MCP server installed. Checking that it starts…";
+    public static string McpInstalledAnswering(string? version) => version is { Length: > 0 }
+        ? $"MCP server installed and answering (version {version}). New Claude Code sessions pick it up."
+        : "MCP server installed and answering. New Claude Code sessions pick it up.";
+    /// <summary>The install's files and registration are in place, but Claude Code would get no server: say so now, since
+    /// Claude Code itself shows a command that can't start as no server at all, not as a failed one.</summary>
+    public static string McpInstalledNotAnswering(string reason) =>
+        $"MCP server installed, but it doesn't start: {reason}. Claude Code won't see it until this is fixed. Try Update…, or reinstall Sanduhr.";
+    public const string McpProbeNoLauncher = "its launcher file is missing";
+    public const string McpProbeDidNotStart = "Windows couldn't run its launcher";
+    public const string McpProbeTargetMissing = "the server file its launcher points to is missing";
+    public static string McpProbeExited(int? code) => code is { } c ? $"it stopped at once (exit code {c})" : "it stopped at once";
+    public static string McpProbeNoAnswer(TimeSpan waited) => $"it didn't answer within {(int)waited.TotalSeconds} seconds";
+    public const string McpProbeNotJson = "it answered with something that isn't MCP";
+    public const string McpProbeWrongAnswer = "a different server answered";
+
     /// <summary>The install status, counted the way the Claude Code cards count it (decision 11).</summary>
     public static string McpInstalledStatus(int installed, int folders) =>
         folders == 0 ? "Sanduhr found no Claude Code folder, so its MCP server isn't installed in one."

@@ -109,6 +109,7 @@ public class NetworkDisclosureTests
         ("Sanduhr.App/App.xaml.cs", "local", 1),
         ("Sanduhr.App/Interop/LauncherApps.cs", "local", 1),
         ("Sanduhr.App/Interop/ShellFiles.cs", "local", 1),
+        ("Sanduhr.App/Services/McpLaunchProbe.cs", "local", 1),
         ("Sanduhr.App/Services/VaultService.cs", "local", 1),
         ("Sanduhr.App/ViewModels/SettingsViewModel.cs", "local", 1),
         ("Sanduhr.App/ViewModels/ThemesViewModel.cs", "local", 1),
@@ -132,6 +133,7 @@ public class NetworkDisclosureTests
         ("Sanduhr.App/Interop/LauncherApps.cs", 2),
         ("Sanduhr.App/Interop/ShellFiles.cs", 1),
         ("Sanduhr.App/Modals/WebView2NotInstalledWindow.xaml.cs", 1),
+        ("Sanduhr.App/Services/McpLaunchProbe.cs", 1),
         ("Sanduhr.App/Services/StoreUpdateService.cs", 3),
         ("Sanduhr.App/Services/VaultService.cs", 1),
         ("Sanduhr.App/Services/WebView2ApiClient.cs", 2),
@@ -146,8 +148,8 @@ public class NetworkDisclosureTests
         ("Sanduhr.Core/UsagePublisher.cs", 2),
     ];
 
-    /// <summary>Lines the scan must find: 25 calls Sanduhr makes, 6 browser hand-offs, 10 local.</summary>
-    private const int KnownSites = 41;
+    /// <summary>Lines the scan must find: 25 calls Sanduhr makes, 6 browser hand-offs, 11 local (the 11th: #144's MCP launch check).</summary>
+    private const int KnownSites = 42;
     private const int KnownOutboundSites = 25;
 
     private static HashSet<string> Allowed() =>
