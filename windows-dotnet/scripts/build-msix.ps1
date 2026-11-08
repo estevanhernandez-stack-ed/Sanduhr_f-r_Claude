@@ -133,8 +133,18 @@ $publishDir = Join-Path $outDir 'publish'
 if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
 New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
 
+# Restore as its own process first, then publish without one, so what the publish reads is exactly this restore.
+# RuntimeIdentifier (singular) on purpose, NOT `-r`: `dotnet restore -r` sets RuntimeIdentifiers (plural), and
+# Sanduhr.Mcp.csproj only turns trimming on when RuntimeIdentifier is set, so `-r` restores the server without the
+# ILLink package. Its trim step is then the SDK's empty stub and it ships untrimmed (74 MB, 4.7.0; the App csproj's
+# 30 MB gate fails that). The restore also takes the publish's pack-pulling properties (ReadyToRun).
+Write-Host "[build-msix] Restoring ($Runtime)..." -ForegroundColor Cyan
+& dotnet restore $appProject /p:RuntimeIdentifier=$Runtime /p:SelfContained=true /p:PublishReadyToRun=true
+if ($LASTEXITCODE -ne 0) { Write-Host '[build-msix] dotnet restore FAILED.' -ForegroundColor Red; exit $LASTEXITCODE }
+
 Write-Host "[build-msix] Publishing..." -ForegroundColor Cyan
 & dotnet publish $appProject `
+    --no-restore `
     -c $Configuration `
     -r $Runtime `
     --self-contained true `
