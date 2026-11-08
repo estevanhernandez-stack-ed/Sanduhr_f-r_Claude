@@ -14,7 +14,7 @@ extension WhatsNew {
         WhatsNewCard(
             version: "2.42.0", id: "widget-from-file",
             title: "Install a widget from a file",
-            body: "A widget pack made with SpriteForge or by hand installs from its zip, and a sprite becomes your companion. Open Settings, Widgets and choose Install widget from file.",
+            body: "A widget pack from a pack maker such as SpriteForge installs from its zip, and a sprite becomes your companion. Open Settings, Widgets and choose Install widget from file.",
             art: .symbol("shippingbox"), destination: .widgets),
     ]
 

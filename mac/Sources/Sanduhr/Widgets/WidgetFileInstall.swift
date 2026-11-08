@@ -67,8 +67,14 @@ enum WidgetFileInstall {
 
     // MARK: Sentences
 
-    private static func unsafeZip(_ why: String) -> String {
-        "That file isn't a widget pack Sanduhr can open (\(why)), so nothing was installed."
+    /// Pack zips are stored, with no folders and no data descriptors. Finder's Compress, `zip -r` and most
+    /// libraries write the opposite by default, so a refusal for one of those reasons says how to make one.
+    static let zipFormatHint = "Pack zips are uncompressed: export one from a pack maker, or run zip -0 -r -D in the pack's folder."
+
+    static func unsafeZip(_ why: String) -> String {
+        let format = ["compressed entries", "data descriptors", "directory entries"].contains { why.contains($0) }
+        let line = "That file isn't a widget pack Sanduhr can open (\(why)), so nothing was installed."
+        return format ? line + " " + zipFormatHint : line
     }
 
     /// The first `errorsShown` sentences joined, then "and N more." when there are more. The validator's messages

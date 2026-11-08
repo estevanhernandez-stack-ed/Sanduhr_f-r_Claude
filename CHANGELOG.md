@@ -4,7 +4,7 @@
 
 ### New
 
-- **Install a widget pack from a zip.** Settings ▸ Widgets has **Install widget from file…**, for packs made with a pack maker such as SpriteForge or by hand. The zip gets the same checks as a catalog download (safe to open, the Sanduhr version it needs, every pack rule), and a pack that fails installs nothing and says why. It installs as your own, listed as made here, and installing the same pack again updates it. A pack of the same id from the catalog is never replaced. A sprite from a file becomes your Desk companion, and the line under the button says where it went. The file is only read: nothing is sent anywhere.
+- **Install a widget pack from a zip.** Settings ▸ Widgets has **Install widget from file…**, for packs from a pack maker such as SpriteForge. The zip is the catalog's format, uncompressed: a zip from Finder's Compress is refused, and the sentence says how to make one (`zip -0 -r -D` in the pack's folder). The zip gets the same checks as a catalog download (safe to open, the Sanduhr version it needs, every pack rule), and a pack that fails installs nothing and says why. It installs as your own, listed as made here, and installing the same pack again updates it. A pack of the same id from the catalog is never replaced. A sprite from a file becomes your Desk companion, and the line under the button says where it went. The file is only read: nothing is sent anywhere.
 
 ### Fixes
 

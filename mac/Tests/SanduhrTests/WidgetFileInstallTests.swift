@@ -115,7 +115,28 @@ struct WidgetFileInstallTests {
         for specs in [link, big] {
             let why = Self.refusal(WidgetFileInstall.install(zip: WidgetTestKit.zip(specs), store: store))
             #expect(!why.isEmpty)
+            // Not a format problem, so no "how to make one" hint.
+            #expect(!why.contains(WidgetFileInstall.zipFormatHint))
         }
+        #expect(store.load().packs.isEmpty)
+    }
+
+    /// Finder's Compress writes deflate entries with data descriptors and folder entries; each of those refusals
+    /// ends with how to make a pack zip.
+    @Test func aFinderStyleZipIsRefusedWithHowToMakeOne() {
+        let root = WidgetTestRoot(), store = root.store()
+        let files = WidgetPackFixtures.load("good", "good-palette")
+        let plain = PackValidator.ordinalSorted(Array(files.keys)).map { ZipSpec($0, [UInt8](files[$0]!)) }
+        var descriptor = plain; descriptor[0].flags = 0x0008
+        var deflated = plain; deflated[0].method = 8
+        let folder = [ZipSpec("art/", [])] + plain
+        for specs in [descriptor, deflated, folder] {
+            let why = Self.refusal(WidgetFileInstall.install(zip: WidgetTestKit.zip(specs), store: store))
+            #expect(why.hasPrefix("That file isn't a widget pack Sanduhr can open ("), "\(why)")
+            #expect(why.hasSuffix(" " + WidgetFileInstall.zipFormatHint), "\(why)")
+        }
+        #expect(WidgetFileInstall.zipFormatHint.contains("zip -0 -r -D"))
+        #expect(!WidgetFileInstall.zipFormatHint.contains("\u{2014}"))
         #expect(store.load().packs.isEmpty)
     }
 
