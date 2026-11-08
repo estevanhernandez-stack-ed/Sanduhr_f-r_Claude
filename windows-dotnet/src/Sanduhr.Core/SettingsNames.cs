@@ -525,19 +525,10 @@ public static class SettingsNames
     public const string FileNoneChosen = "No file was chosen, so nothing was installed.";
     public const string FileUnreadable = "That file couldn't be read, so nothing was installed.";
     public const string FileTooLarge = "That zip is larger than a widget pack may be (10 MB), so nothing was installed.";
-    /// <summary>Pack zips are stored, with no folders and no data descriptors. Explorer's Send to, Compressed folder and most tools
-    /// write the opposite, and Windows has no built-in way to make a stored zip, so a refusal for one of those reasons says where a
-    /// good one comes from (#459; the Mac's line adds its zip -0 -r -D command, which has no Windows equivalent).</summary>
-    public const string FileZipFormatHint = "Pack zips are uncompressed, with no folders inside: export one from a pack maker such as SpriteForge.";
-
-    public static string FileZipUnsafe(string why)
-    {
-        string line = $"Nothing was installed: the zip isn't safe to open ({why}).";
-        bool format = why.Contains("compressed entries", StringComparison.Ordinal)
-            || why.Contains("data descriptors", StringComparison.Ordinal)
-            || why.Contains("directory entries", StringComparison.Ordinal);
-        return format ? line + " " + FileZipFormatHint : line;
-    }
+    /// <summary>A zip the reader refused. Since #459 part 2 a zip from Explorer, Finder or a zip tool installs (the file path reads
+    /// deflate, data descriptors and a folder compressed whole), so no refusal here is about the format a person chose; the
+    /// "pack zips are uncompressed" hint of #468 has nothing left to explain and is gone.</summary>
+    public static string FileZipUnsafe(string why) => $"Nothing was installed: the zip isn't safe to open ({why}).";
     public static string FilePackRejected(string errors) => $"Nothing was installed: the pack didn't pass Sanduhr's checks. {errors}";
     public static string FileMoreErrors(string shown, int more) => more == 1 ? $"{shown}; and 1 more." : $"{shown}; and {more} more.";
     public static string FilePackTooNew(string pack, string min) => $"{pack} needs Sanduhr {min} or later, so nothing was installed.";

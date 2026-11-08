@@ -31,7 +31,7 @@ public static class WidgetFileInstall
     public static WidgetFileResult Install(byte[] zip, WidgetStore store, Version running, Func<string, string>? showName = null)
     {
         showName ??= static name => name;
-        var files = WidgetZip.Read(zip, out var zipError);
+        var files = WidgetZip.Read(zip, out var zipError, fromUser: true);   // a zip from Explorer, Finder or a zip tool installs too (#459)
         if (files is null)
             return new(false, SettingsNames.FileZipUnsafe(zipError));
 

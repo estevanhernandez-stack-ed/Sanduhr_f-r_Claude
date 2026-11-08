@@ -15,6 +15,9 @@ internal sealed record ZipSpec(string Name, byte[] Data)
     /// <summary>A regular file, mode 0644, as build_catalog.py writes.</summary>
     public uint External { get; init; } = 0x81A4u << 16;
     public uint? DeclaredSize { get; init; }
+    /// <summary>A deflated entry: the compressed size written is the data's own length, and <see cref="DeclaredSize"/> is the
+    /// uncompressed size only (#459). Off, both size fields carry the same number, as for a stored entry.</summary>
+    public bool CompressedIsData { get; init; }
     public uint? LocalDeclaredSize { get; init; }
     public uint? Crc { get; init; }
     public string? LocalName { get; init; }
@@ -43,7 +46,7 @@ internal static class WidgetTestKit
             uint size = s.LocalDeclaredSize ?? s.DeclaredSize ?? (uint)s.Data.Length;
             var h = new byte[30];
             U32(h, 0, 0x04034b50); U16(h, 4, 20); U16(h, 6, s.Flags); U16(h, 8, s.Method);
-            U16(h, 10, 0); U16(h, 12, 0x21); U32(h, 14, crc); U32(h, 18, size); U32(h, 22, size);
+            U16(h, 10, 0); U16(h, 12, 0x21); U32(h, 14, crc); U32(h, 18, s.CompressedIsData ? (uint)s.Data.Length : size); U32(h, 22, size);
             U16(h, 26, (ushort)name.Length); U16(h, 28, 0);
             body.Write(h); body.Write(name); body.Write(s.Data);
         }
@@ -56,7 +59,7 @@ internal static class WidgetTestKit
             uint size = s.DeclaredSize ?? (uint)s.Data.Length;
             var c = new byte[46];
             U32(c, 0, 0x02014b50); U16(c, 4, s.MadeBy); U16(c, 6, 20); U16(c, 8, s.Flags); U16(c, 10, s.Method);
-            U16(c, 12, 0); U16(c, 14, 0x21); U32(c, 16, crc); U32(c, 20, size); U32(c, 24, size);
+            U16(c, 12, 0); U16(c, 14, 0x21); U32(c, 16, crc); U32(c, 20, s.CompressedIsData ? (uint)s.Data.Length : size); U32(c, 24, size);
             U16(c, 28, (ushort)name.Length); U16(c, 30, 0); U16(c, 32, 0); U16(c, 34, 0); U16(c, 36, 0);
             U32(c, 38, s.External); U32(c, 42, s.SharesLocalOf is { } j ? offsets[j] : offsets[i]);
             body.Write(c); body.Write(name);
