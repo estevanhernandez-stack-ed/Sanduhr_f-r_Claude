@@ -1,0 +1,88 @@
+name: Sanduhr Time Release
+
+# Pushing a tag v<version>-time (for example v0.4.0-time) builds the extension's VSIX from that
+# commit, runs the same checks as VS Code extension CI, and publishes a GitHub Release with the
+# VSIX attached and notes taken from that version's section of vscode/CHANGELOG.md. The tag is the
+# human step: bump vscode/package.json and add the CHANGELOG section first, merge, then tag main.
+#
+# Only this workflow matches *-time tags: windows-dotnet-release.yml takes v<n>.<n>.<n>[.<n>] and
+# mac-release.yml runs by hand.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+-time"
+
+permissions:
+  contents: read
+
+concurrency: vscode-release
+
+defaults:
+  run:
+    working-directory: vscode
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0   # the full history, so the tag can be checked against main
+
+      - name: Check tag, version and changelog
+        run: |
+          VERSION="${TAG#v}"; VERSION="${VERSION%-time}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          [[ "$PKG_VERSION" == "$VERSION" ]] || { echo "::error::package.json says $PKG_VERSION, the tag says $VERSION"; exit 1; }
+          grep -qxF "## [$VERSION]" CHANGELOG.md || { echo "::error::vscode/CHANGELOG.md has no '## [$VERSION]' section"; exit 1; }
+          if gh release view "$TAG" >/dev/null 2>&1; then echo "::error::Release $TAG already exists"; exit 1; fi
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::$TAG is not on main"; exit 1; }
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Releasing Sanduhr Time $VERSION as $TAG"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm test
+      - name: Public-repo check
+        run: node scripts/check-public.mjs
+      - name: Package
+        run: |
+          npx @vscode/vsce@4.0.0 package --no-dependencies
+          test -f "sanduhr-time-$VERSION.vsix" || { echo "::error::sanduhr-time-$VERSION.vsix was not produced"; exit 1; }
+
+      - name: Release notes from the changelog
+        run: |
+          {
+            echo "Sanduhr Time $VERSION, the VS Code extension that splits your coding day into you, agents and both. It ships as a VSIX: install it with \`code --install-extension sanduhr-time-$VERSION.vsix\`."
+            echo
+            echo "## What's new"
+            echo
+            # The lines under "## [VERSION]" up to the next "## " heading.
+            awk -v h="## [$VERSION]" '$0 == h { on = 1; next } on && /^## / { exit } on' CHANGELOG.md
+            echo
+            echo "**Changelog**: https://github.com/${{ github.repository }}/blob/$TAG/vscode/CHANGELOG.md"
+          } > "$RUNNER_TEMP/notes.md"
+          # Never publish a release with no notes: the 626 Discord feed announces from this body.
+          grep -q '^- ' "$RUNNER_TEMP/notes.md" || { echo "::error::The $VERSION section has no bullet lines"; exit 1; }
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Publish the release
+        run: |
+          gh release create "$TAG" "sanduhr-time-$VERSION.vsix" \
+            --title "Sanduhr Time $VERSION" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
