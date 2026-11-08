@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.42.0-mac — 2026-11-07
 
 ### New
 
