@@ -128,7 +128,7 @@ public sealed class Slice5PagesTests : AppWindowFixture
     });
 
     /// <summary>A landing on Each limit puts the keyboard on the first limit's Warn box; on the Widget page, on Compact mode.</summary>
-    [DesktopFact]
+    [SkippableFact]
     public void A_landing_puts_the_keyboard_on_the_sections_first_control() => AppHost.Run(() =>
     {
         var (window, svm, _, guard) = Open();
