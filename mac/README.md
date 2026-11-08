@@ -292,7 +292,11 @@ library only, and the `sanduhr-meters` Claude Code mod. The statusline and the m
 (`ClaudeCodeFolders.discover`, the accounts' linked folders, folders installed into, and Add
 Folder…) with Install, Update or Remove for each integration, behind a consent sheet. No `claude`
 CLI: `IntegrationInstaller` writes the entries itself, the way Windows' `McpIntegrationInstaller`
-and `StatuslineInstaller` do:
+and `StatuslineInstaller` do. After an MCP install (2.42.2, #144, Windows #470) `McpLaunchProbe` runs the registered
+`command` and `args` (`IntegrationInstaller.mcpLaunch`) through `ProcessRunner` with one `initialize` on stdin and a 15 s
+timeout, and the status line says the server is answering (with its version) or why not: python3 missing, the script
+missing, couldn't start, stopped at once with its exit code, no answer in time, not MCP, or a different server. stderr is
+never shown. A registration alone proves nothing: a command that can't start is listed by Claude Code as no server, not a failed one:
 
 ```jsonc
 // <folder>/.claude.json, or for ~/.claude the placement rule's file (see Mods)

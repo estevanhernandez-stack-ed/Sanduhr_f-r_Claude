@@ -221,13 +221,19 @@ struct IntegrationInstaller {
     }
 
     /// The entry Install writes.
+    /// The command and arguments the `sanduhr` MCP entry registers: what Claude Code runs, and what the install check runs.
+    func mcpLaunch(python: String) -> (command: String, args: [String]) {
+        (python, [scripts.installedPath(IntegrationScripts.mcpScript)])
+    }
+
     func entry(_ kind: IntegrationKind, python: String) -> JSONEdit.Value {
         switch kind {
         case .mcp:
+            let launch = mcpLaunch(python: python)
             return .object([
                 JSONEdit.Pair("type", .string("stdio")),
-                JSONEdit.Pair("command", .string(python)),
-                JSONEdit.Pair("args", .array([.string(scripts.installedPath(IntegrationScripts.mcpScript))])),
+                JSONEdit.Pair("command", .string(launch.command)),
+                JSONEdit.Pair("args", .array(launch.args.map { .string($0) })),
             ])
         case .statusline:
             return statuslineEntry(python: python, chain: nil, join: .line, siblings: [])
