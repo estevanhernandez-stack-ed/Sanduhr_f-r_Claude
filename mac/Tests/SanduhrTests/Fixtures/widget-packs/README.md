@@ -1,7 +1,9 @@
 # Widget pack fixtures (copied from sanduhr-widgets)
 
 Source: `626Labs-LLC/sanduhr-widgets` at commit **61b4247** (main, PR #3 merged: literal-null JSON,
-trailing-newline and wrong-type rejections).
+trailing-newline and wrong-type rejections). The vendored `validate.py` is at **d68a788** (PR #4, a
+`.zip` mode that applies the app's zip reader rules); the fixtures and packs did not change there, and
+`python-expected.tsv` regenerates identically.
 
 | Folder here | Source path | What it is |
 |---|---|---|
