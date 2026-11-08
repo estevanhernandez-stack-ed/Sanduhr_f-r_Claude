@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased (windows)
+
+### Fixes
+
+- **A widget pack zip you made yourself installs.** Install widget from file… now reads the zips Explorer's Send to, Compressed folder, Finder's Compress and zip tools make: compressed, with the pack's folder inside, or with a Mac's hidden `__MACOSX` and `.DS_Store` files, which are skipped. It still holds every file to the same size limits while unpacking, checks each one's checksum, and runs every pack rule, so a zip that fails installs nothing and says why. Packs from the catalog keep their own stricter format (#459).
+
 ## v2.42.0-mac — 2026-11-07
 
 ### New

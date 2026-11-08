@@ -234,4 +234,156 @@ public class WidgetZipTests
             _ = WidgetZip.Read(bad, out _);
         }
     }
+
+    // ---- a zip the user picked (#459 part 2): what Explorer, Finder and zip tools write ----------------------------------------
+
+    /// <summary>Hides Seek and Length, so ZipArchive writes data descriptors (bit 3) the way a streaming zip tool does.</summary>
+    private sealed class ForwardOnly(Stream inner) : Stream
+    {
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() => inner.Flush();
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => inner.Write(buffer, offset, count);
+    }
+
+    /// <param name="folder">Compress the pack's folder whole: a folder entry, every file under it, and Finder's extras.</param>
+    private static byte[] ToolZip(Dictionary<string, byte[]> files, string? folder = null, bool streamed = false)
+    {
+        var ms = new MemoryStream();
+        using (var z = new ZipArchive(streamed ? new ForwardOnly(ms) : ms, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            string prefix = folder is null ? "" : folder + "/";
+            if (folder is not null)
+            {
+                z.CreateEntry(prefix);
+                using (var s = z.CreateEntry(prefix + ".DS_Store").Open()) s.Write(B("finder view"));
+                using (var s = z.CreateEntry("__MACOSX/" + prefix + "._pack.json").Open()) s.Write(B("resource fork"));
+            }
+            foreach (var (k, v) in files)
+            {
+                using var s = z.CreateEntry(prefix + k, CompressionLevel.Optimal).Open();
+                s.Write(v);
+            }
+        }
+        return ms.ToArray();
+    }
+
+    private static void ReadsAsThePalette(byte[] zip)
+    {
+        var files = WidgetZip.Read(zip, out var error, fromUser: true);
+        Assert.True(files is not null, error);
+        Assert.Equal(Palette().Keys.Order(StringComparer.Ordinal), files!.Keys.Order(StringComparer.Ordinal));
+        foreach (var (k, v) in Palette()) Assert.Equal(v, files[k]);
+        Assert.True(PackValidator.Validate(new Dictionary<string, byte[]>(files), "good-palette", strict: true).Ok);
+    }
+
+    [Fact]
+    public void A_users_deflated_zip_reads_back_byte_for_byte() => ReadsAsThePalette(ToolZip(Palette()));
+
+    [Fact]
+    public void A_users_zip_with_data_descriptors_reads_back() => ReadsAsThePalette(ToolZip(Palette(), streamed: true));
+
+    [Fact]
+    public void A_folder_compressed_whole_reads_as_its_files_without_the_folder_or_Finders_extras() =>
+        ReadsAsThePalette(ToolZip(Palette(), folder: "good-palette", streamed: true));
+
+    [Fact]
+    public void The_catalog_path_still_refuses_what_a_user_may_pick()
+    {
+        Assert.Contains("compressed", Refused(ToolZip(Palette())));
+        Refused(ToolZip(Palette(), folder: "good-palette"));
+    }
+
+    private static ZipSpec Deflated(string name, byte[] raw, uint? declared = null, uint? crc = null)
+    {
+        var deflated = new MemoryStream();
+        using (var d = new DeflateStream(deflated, CompressionLevel.Optimal, leaveOpen: true)) d.Write(raw);
+        return new ZipSpec(name, deflated.ToArray()) { Method = 8, CompressedIsData = true, DeclaredSize = declared ?? (uint)raw.Length, Crc = crc ?? PackValidator.Crc32(raw, 0, raw.Length) };
+    }
+
+    private static string RefusedFromUser(byte[] zip)
+    {
+        var files = WidgetZip.Read(zip, out var error, fromUser: true);
+        Assert.Null(files);
+        Assert.False(string.IsNullOrEmpty(error));
+        return error;
+    }
+
+    [Fact]
+    public void An_entry_that_inflates_past_its_declared_size_is_refused_and_never_grows_past_it()
+    {
+        // 4 MB of zeros deflates to a few KB; the directory claims 100 bytes. The reader fills 100 and stops.
+        var bomb = Deflated("bomb.json", new byte[4 * 1024 * 1024], declared: 100, crc: 0);
+        Assert.Contains("not the size it declares", RefusedFromUser(WidgetTestKit.Zip(PaletteSpecs().Append(bomb))));
+    }
+
+    [Fact]
+    public void An_entry_declared_over_5_MB_is_refused_before_inflating()
+    {
+        var big = Deflated("big.json", B("{}"), declared: (uint)WidgetZip.MaxEntryBytes + 1);
+        Assert.Contains("5 MB", RefusedFromUser(WidgetTestKit.Zip(PaletteSpecs().Append(big))));
+    }
+
+    [Fact]
+    public void An_entry_that_inflates_short_of_its_declared_size_is_refused()
+    {
+        var shortOne = Deflated("short.json", B("{ }"), declared: 50);
+        Assert.Contains("not the size it declares", RefusedFromUser(WidgetTestKit.Zip(PaletteSpecs().Append(shortOne))));
+    }
+
+    [Fact]
+    public void A_crc_mismatch_after_inflating_is_refused()
+    {
+        var specs = PaletteSpecs();
+        specs[0] = Deflated(specs[0].Name, specs[0].Data, crc: 0xDEADBEEF);
+        Assert.Contains("CRC", RefusedFromUser(WidgetTestKit.Zip(specs)));
+    }
+
+    [Fact]
+    public void Damaged_deflate_data_is_refused()
+    {
+        var specs = PaletteSpecs();
+        var good = Deflated(specs[0].Name, specs[0].Data);
+        specs[0] = good with { Data = [0xFF, 0xFF, 0xFF, 0xFF, .. good.Data] };
+        RefusedFromUser(WidgetTestKit.Zip(specs));
+    }
+
+    [Theory]
+    [InlineData(0x0001)]   // encrypted
+    [InlineData(0x0040)]   // strong encryption
+    public void A_users_zip_still_may_not_be_encrypted(ushort flag)
+    {
+        var specs = PaletteSpecs();
+        specs[0] = specs[0] with { Flags = flag };
+        Assert.Contains("encrypted", RefusedFromUser(WidgetTestKit.Zip(specs)));
+    }
+
+    [Fact]
+    public void Two_folders_at_the_top_are_kept_as_folders_and_then_judged_by_the_validator()
+    {
+        // Only one shared top folder is dropped; two are the pack's own layout (and the validator decides).
+        var files = Palette().ToDictionary(f => (f.Key == "pack.json" ? "a/" : "b/") + f.Key, f => f.Value);
+        var read = WidgetZip.Read(ToolZip(files), out var error, fromUser: true);
+        Assert.True(read is not null, error);
+        Assert.Contains("a/pack.json", read!.Keys);
+    }
+
+    [Fact]
+    public void Reading_a_users_zip_never_throws_on_random_bytes()
+    {
+        var rng = new Random(459);
+        var good = ToolZip(Palette(), folder: "good-palette", streamed: true);
+        for (int i = 0; i < 300; i++)
+        {
+            var bad = (byte[])good.Clone();
+            for (int j = 0; j < 4; j++) bad[rng.Next(bad.Length)] = (byte)rng.Next(256);
+            _ = WidgetZip.Read(bad, out _, fromUser: true);
+        }
+    }
 }

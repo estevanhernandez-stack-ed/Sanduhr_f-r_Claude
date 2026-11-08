@@ -15,9 +15,23 @@ namespace Sanduhr.Core;
 /// (<c>Sprite.json</c> and <c>sprite.json</c>), more than 67 entries (64 listed files plus <c>pack.json</c>,
 /// <c>LICENSE</c> and the preview), an entry over 5 MB (the largest file FORMAT allows, a font) or a total over 10 MB,
 /// and entries whose data overlap. The validator then applies the precise per-kind rules. Pure: bytes in, map out.
+///
+/// A zip the user picks (<c>fromUser</c>, Install widget from file, #459) may also be what Explorer's Send to,
+/// Compressed folder, Finder's Compress and zip tools write: deflated entries (inflated here, never past the declared
+/// size, which the 5 MB and 10 MB limits bound before any inflating, then CRC-checked), data descriptors, folder entries,
+/// <c>__MACOSX/</c> and <c>.DS_Store</c> (skipped), and the pack's files under one shared top folder (that folder is
+/// dropped). The catalog's own zips stay on the strict path: they are signed artifacts in FORMAT 7's form.
 /// </summary>
 public static class WidgetZip
 {
+    /// <summary>Raw entries a user's zip may list: Finder adds a <c>__MACOSX/</c> twin per file and a folder entry per folder,
+    /// so the kept files (still at most <see cref="MaxEntries"/>) can come with as many again of entries that are skipped.</summary>
+    public const int MaxUserRawEntries = MaxEntries * 4;
+
+    private const ushort DescriptorFlag = 0x0008;
+    private const ushort DeflateOptionFlags = 0x0006;
+    private const ushort Deflate = 8;
+
     /// <summary>64 files in <c>files</c> plus pack.json, LICENSE and the preview.</summary>
     public const int MaxEntries = PackValidator.MaxFiles + 3;
 
@@ -35,14 +49,19 @@ public static class WidgetZip
     private const int LocalSize = 30;
     private const ushort Utf8NameFlag = 0x0800;
 
-    private sealed record Entry(string Name, uint Crc, long Size, long LocalOffset);
+    private sealed record Entry(string RawName, uint Crc, long Size, long CompressedSize, ushort Method, long LocalOffset)
+    {
+        public string Name { get; set; } = RawName;
+    }
 
     /// <summary>The pack's files, or null and the reason. Never throws on bad input.</summary>
-    public static IReadOnlyDictionary<string, byte[]>? Read(byte[] zip, out string error)
+    /// <param name="fromUser">A zip the user picked from disk: also accept what ordinary zip tools write (see the class
+    /// summary). False, the catalog path, keeps FORMAT 7's stored-only form.</param>
+    public static IReadOnlyDictionary<string, byte[]>? Read(byte[] zip, out string error, bool fromUser = false)
     {
         try
         {
-            return ReadCore(zip, out error);
+            return ReadCore(zip, out error, fromUser);
         }
         catch (Exception e) when (e is ArgumentException or IndexOutOfRangeException or OverflowException)
         {
@@ -51,7 +70,12 @@ public static class WidgetZip
         }
     }
 
-    private static IReadOnlyDictionary<string, byte[]>? ReadCore(byte[] zip, out string error)
+    /// <summary>An entry a user's zip may carry that is not a pack file: folders, Finder's resource forks and its folder view file.</summary>
+    private static bool Skippable(string name) =>
+        name.EndsWith('/') || name.StartsWith("__MACOSX/", StringComparison.Ordinal)
+        || name == ".DS_Store" || name.EndsWith("/.DS_Store", StringComparison.Ordinal);
+
+    private static IReadOnlyDictionary<string, byte[]>? ReadCore(byte[] zip, out string error, bool fromUser)
     {
         error = "";
         if (zip is null || zip.Length < EocdSize)
@@ -80,14 +104,14 @@ public static class WidgetZip
             return Fail(out error, "multi-disk zips are not packs");
         if (total == 0xFFFF || cdSize == 0xFFFFFFFF || cdOffset == 0xFFFFFFFF)
             return Fail(out error, "ZIP64 archives are not packs");
-        if (total > MaxEntries)
+        if (total > (fromUser ? MaxUserRawEntries : MaxEntries))
             return Fail(out error, $"the zip has {total} entries, a pack has at most {MaxEntries} files");
         if ((long)cdOffset + cdSize != eocd)
             return Fail(out error, "the zip's directory is not where its end record says");
 
         // -- central directory: every check that needs no data, before any data is read --------------------------------
         var entries = new List<Entry>(total);
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        ushort allowedFlags = (ushort)(Utf8NameFlag | (fromUser ? DescriptorFlag | DeflateOptionFlags : 0));
         long sum = 0;
         int p = (int)cdOffset;
         for (int i = 0; i < total; i++)
@@ -107,15 +131,24 @@ public static class WidgetZip
             string? name = Name(zip, p + CentralSize, nameLen);
             if (name is null)
                 return Fail(out error, $"entry {i} has a name that is not plain ASCII");
+            if (fromUser && Skippable(name))
+            {
+                p = next;   // a folder, a resource fork or a folder view file: not part of the pack, never read
+                continue;
+            }
             if (name.EndsWith('/'))
                 return Fail(out error, $"{name}: directory entries are not allowed in a pack zip");
             if (UnsafeName(name) is { } why)
                 return Fail(out error, $"{name}: {why}");
-            if ((flags & ~Utf8NameFlag) != 0)
+            if ((flags & 0x0001) != 0)
+                return Fail(out error, $"{name}: encrypted entries are not allowed");
+            if ((flags & ~allowedFlags) != 0)
                 return Fail(out error, $"{name}: encrypted entries and data descriptors are not allowed");
-            if (method != 0)
-                return Fail(out error, $"{name}: compressed entries are not allowed (pack zips are stored)");
-            if (csize != usize)
+            if (method != 0 && !(fromUser && method == Deflate))
+                return Fail(out error, fromUser
+                    ? $"{name}: the entry is compressed in a way Sanduhr can't read (only deflate)"
+                    : $"{name}: compressed entries are not allowed (pack zips are stored)");
+            if (method == 0 && csize != usize)
                 return Fail(out error, $"{name}: a stored entry's sizes must agree");
             if (startDisk != 0)
                 return Fail(out error, $"{name}: multi-disk zips are not packs");
@@ -126,13 +159,27 @@ public static class WidgetZip
             sum += usize;
             if (sum > MaxTotalBytes)
                 return Fail(out error, "the zip's files add up to more than the 10 MB a pack may be");
-            if (!seen.Add(name))
-                return Fail(out error, $"{name}: the zip has this name twice (names may not differ only in case)");
-            entries.Add(new Entry(name, crc, usize, local));
+            entries.Add(new Entry(name, crc, usize, csize, method, local));
             p = next;
         }
         if (p != eocd)
             return Fail(out error, "the zip's directory is malformed");
+        if (entries.Count > MaxEntries)
+            return Fail(out error, $"the zip has {entries.Count} files, a pack has at most {MaxEntries}");
+
+        // A folder compressed whole (Explorer's Send to, Compressed folder; Finder's Compress) puts every file under it.
+        if (fromUser && entries.Count > 0 && entries[0].Name.IndexOf('/') is var slash and > 0)
+        {
+            string top = entries[0].Name[..(slash + 1)];
+            if (entries.All(e => e.Name.StartsWith(top, StringComparison.Ordinal) && e.Name.Length > top.Length))
+                foreach (var e in entries) e.Name = e.Name[top.Length..];
+        }
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var e in entries)
+        {
+            if (!seen.Add(e.Name))
+                return Fail(out error, $"{e.Name}: the zip has this name twice (names may not differ only in case)");
+        }
 
         // -- the data: each local header agrees with its central entry, no two entries overlap, CRCs match ---------------
         var files = new Dictionary<string, byte[]>(StringComparer.Ordinal);
@@ -147,13 +194,21 @@ public static class WidgetZip
             uint crc = U32(zip, a + 14), csize = U32(zip, a + 18), usize = U32(zip, a + 22);
             ushort nameLen = U16(zip, a + 26), extraLen = U16(zip, a + 28);
             string? name = Name(zip, a + LocalSize, nameLen);
-            if (name != e.Name || (flags & ~Utf8NameFlag) != 0 || method != 0 || crc != e.Crc || csize != e.Size || usize != e.Size)
+            // With a data descriptor the local header's CRC and sizes may be zero: the central directory's, checked
+            // above, are the ones that count, and the data is checked against them below.
+            bool descriptor = (flags & DescriptorFlag) != 0;
+            if (name != e.RawName || (flags & ~allowedFlags) != 0 || method != e.Method
+                || (!descriptor && (crc != e.Crc || csize != e.CompressedSize || usize != e.Size)))
                 return Fail(out error, $"{e.Name}: the entry's header disagrees with the zip's directory");
             long start = at + LocalSize + nameLen + extraLen;
-            long end = start + e.Size;
+            long end = start + e.CompressedSize;
             if (end > cdOffset)
                 return Fail(out error, $"{e.Name}: the entry runs past the end of the data");
-            var data = zip.AsSpan((int)start, (int)e.Size).ToArray();
+            byte[]? data = e.Method == Deflate
+                ? Inflate(zip, (int)start, (int)e.CompressedSize, (int)e.Size)
+                : zip.AsSpan((int)start, (int)e.Size).ToArray();
+            if (data is null)
+                return Fail(out error, $"{e.Name}: the entry's compressed data is damaged or not the size it declares");
             if (data.LongLength != e.Size || data.LongLength > MaxEntryBytes)
                 return Fail(out error, $"{e.Name}: the entry's size is wrong");
             if (PackValidator.Crc32(data, 0, data.Length) != e.Crc)
@@ -164,6 +219,33 @@ public static class WidgetZip
         if (files.Values.Sum(b => (long)b.Length) > MaxTotalBytes)
             return Fail(out error, "the zip's files add up to more than the 10 MB a pack may be");
         return files;
+    }
+
+    /// <summary>
+    /// The entry's bytes, inflated into a buffer of exactly the declared size (already held to the 5 MB limit), or null when
+    /// the data is damaged, ends early or would run past that size. Nothing is ever inflated beyond what was declared, so a
+    /// small zip can't expand without bound.
+    /// </summary>
+    private static byte[]? Inflate(byte[] zip, int start, int compressedSize, int size)
+    {
+        try
+        {
+            using var deflate = new System.IO.Compression.DeflateStream(
+                new MemoryStream(zip, start, compressedSize, writable: false), System.IO.Compression.CompressionMode.Decompress);
+            var data = new byte[size];
+            int filled = 0;
+            while (filled < size)
+            {
+                int n = deflate.Read(data, filled, size - filled);
+                if (n == 0) return null;   // ends before the declared size
+                filled += n;
+            }
+            return deflate.Read(new byte[1], 0, 1) == 0 ? data : null;   // more than declared: refused
+        }
+        catch (InvalidDataException)
+        {
+            return null;
+        }
     }
 
     /// <summary>Why a zip entry name is unsafe, or null. The validator's own path rule (FORMAT 3.5) runs after this.</summary>
