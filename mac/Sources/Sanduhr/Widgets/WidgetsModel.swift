@@ -336,7 +336,7 @@ final class WidgetsModel {
 
     /// The zip's own files (already read once by the install, so this one succeeds) hold a `sprite.json`.
     private static func zipIsSprite(_ zip: Data) -> Bool {
-        guard case .success(let files) = WidgetZip.read(zip) else { return false }
+        guard case .success(let files) = WidgetZip.read(zip, fromUser: true) else { return false }
         return WidgetFileInstall.isSprite(files)
     }
 

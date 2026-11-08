@@ -1,8 +1,8 @@
 import Foundation
 
 /// "Install widget from file..." (spec 20), the pure core: a pack zip's bytes in, an outcome out.
-/// The gates run in the catalog's order: the byte cap, `WidgetZip.read` (paths, sizes, file count, no
-/// links), the `sanduhr_min` floor, `PackValidator` in strict mode, then the store as the user's own
+/// The gates run in the catalog's order: the byte cap, `WidgetZip.read` on its user path (paths, sizes, file count,
+/// no links; a zip from Finder, Explorer or a zip tool reads too, #459), the `sanduhr_min` floor, `PackValidator` in strict mode, then the store as the user's own
 /// (`.local`, listed as made here). Installing the same id again updates it; a catalog pack of that id
 /// is never replaced, the store refuses with its own sentence. The file panel, reading the file and the
 /// companion choice are the caller's. Nothing is sent anywhere.
@@ -21,7 +21,7 @@ enum WidgetFileInstall {
         guard zip.count <= WidgetZip.maxZipBytes else { return .refused(tooLarge) }
 
         let files: [String: Data]
-        switch WidgetZip.read(zip) {
+        switch WidgetZip.read(zip, fromUser: true) {   // a zip from Finder, Explorer or a zip tool installs too (#459)
         case .failure(let e): return .refused(unsafeZip(e.message))
         case .success(let f): files = f
         }
@@ -67,14 +67,11 @@ enum WidgetFileInstall {
 
     // MARK: Sentences
 
-    /// Pack zips are stored, with no folders and no data descriptors. Finder's Compress, `zip -r` and most
-    /// libraries write the opposite by default, so a refusal for one of those reasons says how to make one.
-    static let zipFormatHint = "Pack zips are uncompressed: export one from a pack maker, or run zip -0 -r -D in the pack's folder."
-
+    /// A zip the reader refused. Since #459 a zip from Finder, Explorer or a zip tool installs (the user path reads
+    /// deflate, data descriptors and a folder compressed whole), so no refusal here is about the format a person chose,
+    /// and the "pack zips are uncompressed" hint 2.42.0 carried is gone.
     static func unsafeZip(_ why: String) -> String {
-        let format = ["compressed entries", "data descriptors", "directory entries"].contains { why.contains($0) }
-        let line = "That file isn't a widget pack Sanduhr can open (\(why)), so nothing was installed."
-        return format ? line + " " + zipFormatHint : line
+        "That file isn't a widget pack Sanduhr can open (\(why)), so nothing was installed."
     }
 
     /// The first `errorsShown` sentences joined, then "and N more." when there are more. The validator's messages

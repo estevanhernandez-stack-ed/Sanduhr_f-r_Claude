@@ -2082,10 +2082,12 @@ validator messages, then "and N more.") is the status under the button. A pack t
 id again updates it and a catalog pack of that id is never replaced (the store refuses with its own sentence). A
 pack with a `sprite.json` also becomes the companion: only the companion choice is written, never the Desk's
 layout, and the status says where it went (Desk off, Companion hidden or on the Desk). The file is only read; the
-zip is not kept and nothing is sent. The zip must be the catalog's format: stored entries, no directory entries,
-no data descriptors. Finder's Compress and plain `zip -r` produce none of that, so a refusal for compression,
-descriptors or folders appends `WidgetFileInstall.zipFormatHint` (`zip -0 -r -D` in the pack's folder, or a pack
-maker's export). Widening the reader to accept deflate is a cross-platform contract change. Smoke hooks: `widget-from-file` (`arg=<absolute path to a .zip>`) and
+zip is not kept and nothing is sent. Since 2.42.1 (#459, the Mac port of Windows #469) the file install reads
+`WidgetZip.read(_, fromUser: true)`: deflated entries (inflated into a buffer one byte past the declared size, which
+the 5 MB and 10 MB limits bound first, so nothing grows past it; then CRC-32), data descriptors, folder entries,
+`__MACOSX/` and `.DS_Store` (skipped, and up to 4x the 67-entry cap of them), one shared top folder (dropped), and a
+space in a raw name (the folder; every kept name still meets the validator's path rule). The catalog client keeps
+FORMAT 7's stored-only path, and so does `validate.py --zip`. Smoke hooks: `widget-from-file` (`arg=<absolute path to a .zip>`) and
 `widget-remove` (`arg=<pack id>`); the scenario is `smoke/scenarios/widget-from-file.yaml`.
 
 ## The Desk for Claude
