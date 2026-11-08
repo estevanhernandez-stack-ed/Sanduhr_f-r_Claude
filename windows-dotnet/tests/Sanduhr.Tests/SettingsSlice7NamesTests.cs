@@ -14,7 +14,7 @@ public class SettingsSlice7NamesTests
         Assert.Equal("Live numbers stay. Names become codenames until you choose to show one.", SettingsNames.StreamerCaption);
         Assert.Equal("Claude Code's own screen isn't covered. Check what it shows before you share it.", SettingsNames.StreamerCantReach);
         Assert.Equal("Shuffle codenames…", SettingsNames.ShuffleCodenames);
-        Assert.Equal("Every codename changes. Viewers following a name will lose it.", SettingsNames.ShuffleDetail);
+        Assert.Equal("Every codename you didn't name changes. Viewers following one will lose it.", SettingsNames.ShuffleDetail);
         Assert.Equal("Shuffle", SettingsNames.ShuffleConfirm);
         Assert.Equal("Cancel", SettingsNames.ShuffleCancel);
         Assert.Equal("New codenames drawn.", SettingsNames.ShuffleDone);

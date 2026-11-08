@@ -15,8 +15,12 @@ namespace Sanduhr.Core;
 /// </summary>
 public enum CodenameCategory { Account, Email, Folder, Project, Skill, Repo, Runner, Host, City, AddOn }
 
-/// <summary>One name in the book, for the allowlist list: its codename (null for a shown name never masked) and whether it is shown.</summary>
-public sealed record CodenameEntry(CodenameCategory Category, string Real, string? Codename, bool Shown);
+/// <summary>One name in the book, for the allowlist list: its codename (null for a shown name never masked), whether it is shown, and
+/// whether the person picked the codename (Rename…) rather than the pool drawing it.</summary>
+public sealed record CodenameEntry(CodenameCategory Category, string Real, string? Codename, bool Shown, bool Chosen = false);
+
+/// <summary>What <see cref="CodenameBook.Rename"/> made of a picked codename. Anything but <see cref="Ok"/> and <see cref="Cleared"/> left the book as it was.</summary>
+public enum CodenameRename { Ok, Cleared, TooLong, BadCharacter, Taken, RealName }
 
 /// <summary>
 /// The salt, the map per category (real name → codename) and the allowlist: <c>%APPDATA%\Sanduhr\codenames.json</c> (spec). First-seen and
@@ -28,6 +32,8 @@ public sealed class CodenameBook
     private readonly Dictionary<CodenameCategory, Dictionary<string, string>> _maps = [];
     private readonly HashSet<string> _used = new(StringComparer.Ordinal);
     private readonly HashSet<(CodenameCategory, string)> _shown = [];
+    /// <summary>Names whose codename the person picked: kept through <see cref="Shuffle"/>, saved under <c>chosen</c>.</summary>
+    private readonly HashSet<(CodenameCategory, string)> _chosen = [];
 
     /// <param name="withDefaults">Starts the allowlist with <see cref="Codenames.DefaultShown"/>. A loaded book takes the file's list instead.</param>
     public CodenameBook(byte[] salt, bool withDefaults = true)
@@ -78,20 +84,69 @@ public sealed class CodenameBook
 
     public bool IsShown(CodenameCategory category, string real) => _shown.Contains((category, real));
 
+    public bool IsChosen(CodenameCategory category, string real) => _chosen.Contains((category, real));
+
+    /// <summary>
+    /// Rename… on a row of Show the real name: <paramref name="name"/> becomes the name's codename and stays through Shuffle. Blank gives
+    /// the name back to the pool (its next use draws one). Refused, and nothing changes, when it is longer than
+    /// <see cref="Codenames.MaxChosenLength"/>, carries a control or formatting character, is already another name's codename in any
+    /// category, or equals a real name in the book (ignoring case; a folder's leaf counts).
+    /// </summary>
+    public CodenameRename Rename(CodenameCategory category, string real, string? name)
+    {
+        var text = (name ?? "").Trim();
+        TryGet(category, real, out var current);
+        if (text.Length == 0)
+        {
+            if (current.Length > 0)
+            {
+                Map(category).Remove(real);
+                _used.Remove(current);
+            }
+            _chosen.Remove((category, real));
+            return CodenameRename.Cleared;
+        }
+        var verdict = Codenames.CheckChosen(text);
+        if (verdict != CodenameRename.Ok)
+            return verdict;
+        if (_used.Any(u => u != current && string.Equals(u, text, StringComparison.OrdinalIgnoreCase)))
+            return CodenameRename.Taken;
+        if (RealNames().Any(r => Codenames.MatchesReal(text, r.Item1, r.Item2)) || Codenames.MatchesReal(text, category, real))
+            return CodenameRename.RealName;
+        if (current.Length > 0)
+            _used.Remove(current);
+        Map(category)[real] = text;
+        _used.Add(text);
+        _chosen.Add((category, real));
+        return CodenameRename.Ok;
+    }
+
+    private IEnumerable<(CodenameCategory, string)> RealNames() =>
+        _maps.SelectMany(m => m.Value.Keys.Select(real => (m.Key, real))).Concat(_shown);
+
     public void SetShown(CodenameCategory category, string real, bool shown)
     {
         if (shown) _shown.Add((category, real));
         else _shown.Remove((category, real));
     }
 
-    /// <summary>Shuffle codenames… (spec): a new salt and an empty map. The allowlist is kept.</summary>
+    /// <summary>Shuffle codenames… (spec): a new salt and an empty map. The allowlist is kept, and so is every codename the person
+    /// picked (Rename…): they named it on purpose.</summary>
     public void Shuffle(byte[] salt)
     {
         if (salt is null || salt.Length < Codenames.MinSaltBytes)
             throw new ArgumentException("The salt is too short.", nameof(salt));
+        var kept = _chosen.Select(c => (c.Item1, c.Item2, TryGet(c.Item1, c.Item2, out var code) ? code : "")).ToList();
         Salt = (byte[])salt.Clone();
         _maps.Clear();
         _used.Clear();
+        foreach (var (category, real, code) in kept)
+        {
+            if (code.Length == 0)
+                continue;
+            Map(category)[real] = code;
+            _used.Add(code);
+        }
     }
 
     /// <summary>Every mapped or shown name, by category in enum order, then by real name (ordinal, ignoring case).</summary>
@@ -103,18 +158,23 @@ public sealed class CodenameBook
                 keys.Add((category, real));
         return [.. keys
             .OrderBy(k => k.Item1).ThenBy(k => k.Item2, StringComparer.OrdinalIgnoreCase).ThenBy(k => k.Item2, StringComparer.Ordinal)
-            .Select(k => new CodenameEntry(k.Item1, k.Item2, TryGet(k.Item1, k.Item2, out var c) ? c : null, _shown.Contains(k)))];
+            .Select(k => new CodenameEntry(k.Item1, k.Item2, TryGet(k.Item1, k.Item2, out var c) ? c : null, _shown.Contains(k), _chosen.Contains(k)))];
     }
 
     public JsonObject ToJson()
     {
+        // A picked codename goes under "chosen", never "maps": a build before Rename… drops a non-pool codename from maps but keeps
+        // the rest of the file, and ignores "chosen" (it draws a pool name for that row instead).
         var maps = new JsonObject();
+        var chosen = new JsonObject();
         foreach (var (category, map) in _maps.OrderBy(m => m.Key))
         {
             var o = new JsonObject();
+            var c = new JsonObject();
             foreach (var (real, code) in map.OrderBy(p => p.Key, StringComparer.Ordinal))
-                o[real] = code;
-            maps[Codenames.Id(category)] = o;
+                (_chosen.Contains((category, real)) ? c : o)[real] = code;
+            if (o.Count > 0) maps[Codenames.Id(category)] = o;
+            if (c.Count > 0) chosen[Codenames.Id(category)] = c;
         }
         var shown = new JsonObject();
         foreach (var group in _shown.GroupBy(s => s.Item1).OrderBy(g => g.Key))
@@ -124,6 +184,7 @@ public sealed class CodenameBook
             ["schema_version"] = Codenames.SchemaVersion,
             ["salt"] = Convert.ToBase64String(Salt),
             ["maps"] = maps,
+            ["chosen"] = chosen,
             ["shown"] = shown,
         };
     }
@@ -131,7 +192,8 @@ public sealed class CodenameBook
     /// <summary>
     /// A book from <c>codenames.json</c>, or null when the file can't be trusted at all (another schema, no salt, a salt under 16 bytes).
     /// Entries it can't trust are dropped one by one: an unknown category, a codename that is not a pool name (or its numbered form), a
-    /// codename equal to its real name, and every holder of a codename after the first.
+    /// codename equal to its real name, and every holder of a codename after the first. A picked codename (<c>chosen</c>) is read first, so
+    /// it wins a clash with a drawn one, and dropped when it fails <see cref="Codenames.CheckChosen"/> or equals any real name in the file.
     /// </summary>
     public static CodenameBook? FromJson(JsonNode? node)
     {
@@ -146,23 +208,8 @@ public sealed class CodenameBook
             return null;
 
         var book = new CodenameBook(salt, withDefaults: root["shown"] is not JsonObject);
-        if (root["maps"] is JsonObject maps)
-        {
-            foreach (var (id, value) in maps)
-            {
-                if (!Codenames.TryParseId(id, out var category) || value is not JsonObject map)
-                    continue;
-                foreach (var (real, codeNode) in map)
-                {
-                    if (codeNode is not JsonValue cv || !cv.TryGetValue(out string? code) || code is null)
-                        continue;
-                    if (real.Length == 0 || !Codenames.IsCodename(code) || code == real || book._used.Contains(code))
-                        continue;
-                    book.Map(category)[real] = code;
-                    book._used.Add(code);
-                }
-            }
-        }
+        var chosen = Pairs(root["chosen"]);
+        var drawn = Pairs(root["maps"]);
         if (root["shown"] is JsonObject shown)
         {
             foreach (var (id, value) in shown)
@@ -174,7 +221,41 @@ public sealed class CodenameBook
                         book._shown.Add((category, real));
             }
         }
+        var reals = chosen.Concat(drawn).Select(p => (p.Category, p.Real)).Concat(book._shown).ToList();
+        foreach (var (category, real, code) in chosen)
+        {
+            if (Codenames.CheckChosen(code) != CodenameRename.Ok || book._used.Contains(code, StringComparer.OrdinalIgnoreCase)
+                || reals.Any(r => Codenames.MatchesReal(code, r.Item1, r.Item2)) || book.TryGet(category, real, out _))
+                continue;
+            book.Map(category)[real] = code;
+            book._used.Add(code);
+            book._chosen.Add((category, real));
+        }
+        foreach (var (category, real, code) in drawn)
+        {
+            if (!Codenames.IsCodename(code) || code == real || book._used.Contains(code) || book.TryGet(category, real, out _))
+                continue;
+            book.Map(category)[real] = code;
+            book._used.Add(code);
+        }
         return book;
+    }
+
+    /// <summary>The (category, real name, codename) triples of a <c>maps</c> or <c>chosen</c> object, unknown categories and non-strings left out.</summary>
+    private static List<(CodenameCategory Category, string Real, string Code)> Pairs(JsonNode? node)
+    {
+        var list = new List<(CodenameCategory, string, string)>();
+        if (node is not JsonObject maps)
+            return list;
+        foreach (var (id, value) in maps)
+        {
+            if (!Codenames.TryParseId(id, out var category) || value is not JsonObject map)
+                continue;
+            foreach (var (real, codeNode) in map)
+                if (real.Length > 0 && codeNode is JsonValue cv && cv.TryGetValue(out string? code) && code is not null)
+                    list.Add((category, real, code));
+        }
+        return list;
     }
 
     private Dictionary<string, string> Map(CodenameCategory category)
@@ -196,6 +277,8 @@ public static partial class Codenames
     public const int SchemaVersion = 1;
     public const string FileName = "codenames.json";
     public const int MaxFileBytes = 4 * 1024 * 1024;
+    /// <summary>The longest codename Rename… takes: two pool words with a numeral are under 20, and a line on stream has little room.</summary>
+    public const int MaxChosenLength = 32;
 
     public static IReadOnlyList<string> FirstWords { get; } =
         ["Dune", "Amber", "Mesa", "Dusk", "Ember", "Quartz", "Ochre", "Mirage", "Saffron", "Drift", "Tawny", "Opal", "Cinder", "Zenith"];
@@ -263,6 +346,57 @@ public static partial class Codenames
     /// <summary>A pool pair, or a pool pair with a numeral from 2.</summary>
     public static bool IsCodename(string text) =>
         CodenameShape().Match(text ?? "") is { Success: true } m && PoolSet.Contains(m.Groups["pair"].Value);
+
+    /// <summary>
+    /// The shape rules for a codename the person picks (Rename…), before uniqueness and real names: trimmed, 1 to
+    /// <see cref="MaxChosenLength"/> characters, and no control, formatting (bidi overrides, zero-width), separator-line or lone surrogate
+    /// characters, which would let a codename hide text or reorder a line on stream. Letters of any script, digits, spaces and punctuation are fine.
+    /// </summary>
+    public static CodenameRename CheckChosen(string text)
+    {
+        if (text.Length == 0 || text != text.Trim())
+            return CodenameRename.BadCharacter;
+        if (text.Length > MaxChosenLength)
+            return CodenameRename.TooLong;
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+            {
+                i++;
+                continue;
+            }
+            var kind = CharUnicodeInfo.GetUnicodeCategory(c);
+            if (kind is UnicodeCategory.Control or UnicodeCategory.Format or UnicodeCategory.LineSeparator
+                or UnicodeCategory.ParagraphSeparator or UnicodeCategory.Surrogate or UnicodeCategory.PrivateUse or UnicodeCategory.OtherNotAssigned)
+                return CodenameRename.BadCharacter;
+            if (char.IsWhiteSpace(c) && c != ' ')
+                return CodenameRename.BadCharacter;
+        }
+        return CodenameRename.Ok;
+    }
+
+    /// <summary>
+    /// Whether a picked codename would show a real name: equal to it, ignoring case and surrounding spaces. A folder's key is its full
+    /// lower-cased path, so its last segment counts too, with and without a leading dot (<c>.claude-work</c> and <c>claude-work</c>); an
+    /// email's part before the @ counts as well.
+    /// </summary>
+    public static bool MatchesReal(string codename, CodenameCategory category, string real)
+    {
+        static bool Same(string a, string b) => b.Length > 0 && string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
+        if (Same(codename, real))
+            return true;
+        if (category == CodenameCategory.Folder)
+        {
+            var leaf = real.TrimEnd('\\', '/');
+            int cut = leaf.LastIndexOfAny(['\\', '/']);
+            leaf = cut >= 0 ? leaf[(cut + 1)..] : leaf;
+            return Same(codename, leaf) || Same(codename, leaf.TrimStart('.'));
+        }
+        if (category == CodenameCategory.Email && real.IndexOf('@') is > 0 and var at)
+            return Same(codename, real[..at]);
+        return false;
+    }
 
     /// <summary>The book in <paramref name="path"/>; null when the file is missing, too large, not JSON or not a book.</summary>
     public static CodenameBook? Load(string path)
