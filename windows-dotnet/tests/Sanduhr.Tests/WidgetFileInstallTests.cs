@@ -118,6 +118,38 @@ public sealed class WidgetFileInstallTests : IDisposable
 
         Assert.False(result.Ok);
         Assert.StartsWith("Nothing was installed: the zip isn't safe to open (", result.Message);
+        Assert.DoesNotContain(SettingsNames.FileZipFormatHint, result.Message);   // not a format problem: no hint
+        Assert.Empty(_store.Load().Packs);
+    }
+
+    /// <summary>A zip as Explorer's Send to, Compressed folder and most tools write it: deflated, optionally with the pack's folder
+    /// as an entry. Refused, and the line says where a good one comes from (#459).</summary>
+    private static byte[] ToolZip(Dictionary<string, byte[]> files, bool folderEntry)
+    {
+        using var ms = new MemoryStream();
+        using (var zip = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+        {
+            if (folderEntry) zip.CreateEntry("pack/");
+            foreach (var (name, bytes) in files)
+            {
+                var entry = zip.CreateEntry((folderEntry ? "pack/" : "") + name, System.IO.Compression.CompressionLevel.Optimal);
+                using var s = entry.Open();
+                s.Write(bytes);
+            }
+        }
+        return ms.ToArray();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_zip_from_Explorer_or_a_zip_tool_is_refused_and_says_where_a_pack_zip_comes_from(bool folderEntry)
+    {
+        var result = WidgetFileInstall.Install(ToolZip(Good("good-palette"), folderEntry), _store, WidgetTestKit.V380);
+
+        Assert.False(result.Ok);
+        Assert.StartsWith("Nothing was installed: the zip isn't safe to open (", result.Message);
+        Assert.EndsWith(SettingsNames.FileZipFormatHint, result.Message);
         Assert.Empty(_store.Load().Packs);
     }
 
