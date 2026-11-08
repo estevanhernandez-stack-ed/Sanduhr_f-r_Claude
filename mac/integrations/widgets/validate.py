@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Vendored, unchanged below this header, from 626Labs-LLC/sanduhr-widgets at commit 61b4247:
-#   tools/validate.py  (https://github.com/626Labs-LLC/sanduhr-widgets/blob/61b4247/tools/validate.py)
+# Vendored, unchanged below this header, from 626Labs-LLC/sanduhr-widgets at commit d68a788:
+#   tools/validate.py  (https://github.com/626Labs-LLC/sanduhr-widgets/blob/d68a788/tools/validate.py)
 # It imports only the standard library, so no other module came with it. The Swift port
 # (mac/Sources/Sanduhr/Widgets/PackValidator.swift) matches its messages; mac/integrations/tests/
 # test_widget_validate.py runs it on the same fixtures as the Swift tests. To update, re-copy the
@@ -14,6 +14,7 @@ Python 3, standard library only. Schemas are checked by hand-written logic so CI
     python tools/validate.py packs/hourglass # one pack
     python tools/validate.py path/to/packs   # a folder of packs
     python tools/validate.py --strict        # theme design-rule warnings fail too
+    python tools/validate.py my-pack-1.0.0.zip  # a release zip: Sanduhr's zip rules, then the pack's
 
 One line per finding on stdout: `ERROR <pack>: <message>` or `WARN  <pack>: <message>`.
 Exit status is 1 when any error was found (or any warning under --strict), else 0.
@@ -1121,12 +1122,213 @@ def validate_pack(pack_dir, label=None):
     return rep
 
 
+# ---- release zips (FORMAT 7) -------------------------------------------------------------
+# A port of Sanduhr's reader (WidgetZip.swift / WidgetZip.cs), with the same messages, so a pack
+# maker can check the archive they ship and see the sentence a user would. The reader never
+# inflates: entries are stored, so every size is checked before any data is read.
+MAX_ZIP_ENTRIES = MAX_FILES + 3                  # the listed files plus pack.json, LICENSE, preview
+MAX_ZIP_BYTES = MAX_PACK_BYTES + 256 * 1024      # the catalog's limit on a pack zip's size
+_EOCD, _CENTRAL, _LOCAL, _ZIP64_LOCATOR = 0x06054B50, 0x02014B50, 0x04034B50, 0x07064B50
+_UTF8_NAME_FLAG = 0x0800
+
+
+class ZipRefusal(Exception):
+    pass
+
+
+def _u16(b, at):
+    if at < 0 or at + 2 > len(b):
+        raise ZipRefusal("the zip is malformed")
+    return b[at] | b[at + 1] << 8
+
+
+def _u32(b, at):
+    if at < 0 or at + 4 > len(b):
+        raise ZipRefusal("the zip is malformed")
+    return b[at] | b[at + 1] << 8 | b[at + 2] << 16 | b[at + 3] << 24
+
+
+def _zip_name(b, at, length):
+    """Plain printable ASCII only; None otherwise, or when it runs off the end."""
+    if length == 0:
+        return ""
+    if at < 0 or at + length > len(b):
+        return None
+    raw = b[at:at + length]
+    if any(c < 0x21 or c > 0x7E for c in raw):
+        return None
+    return raw.decode("ascii")
+
+
+def unsafe_zip_name(name):
+    """Why a zip entry name is unsafe, or None. The pack path rule (FORMAT 3.5) runs after this."""
+    if not name:
+        return "an empty name"
+    if name.startswith("/"):
+        return "absolute paths are not allowed"
+    if "\\" in name:
+        return "backslashes are not allowed"
+    if ":" in name:
+        return "drive letters and colons are not allowed"
+    if any(seg in ("", ".", "..") for seg in name.split("/")):
+        return "empty, . and .. path segments are not allowed"
+    return None
+
+
+def _regular_file(made_by, external):
+    if external & 0x10:
+        return False
+    if made_by >> 8 == 3:
+        mode = external >> 16
+        if mode and mode & 0xF000 != 0x8000:
+            return False
+    return True
+
+
+def read_zip(data):
+    """The pack's files as {relative path: bytes}, or raise ZipRefusal with the reason."""
+    z = bytes(data)
+    if len(z) < 22:
+        raise ZipRefusal("the file is not a zip")
+    if len(z) > MAX_ZIP_BYTES:
+        raise ZipRefusal("the zip is larger than a pack may be")
+    eocd, at, lowest = -1, len(z) - 22, len(z) - 22 - 0xFFFF
+    while at >= 0 and at >= lowest:
+        if _u32(z, at) == _EOCD and at + 22 + _u16(z, at + 20) == len(z):
+            eocd = at
+            break
+        at -= 1
+    if eocd < 0:
+        raise ZipRefusal("the zip has no end-of-directory record")
+    if eocd >= 20 and _u32(z, eocd - 20) == _ZIP64_LOCATOR:
+        raise ZipRefusal("ZIP64 archives are not packs")
+    disk, cd_disk = _u16(z, eocd + 4), _u16(z, eocd + 6)
+    on_disk, total = _u16(z, eocd + 8), _u16(z, eocd + 10)
+    cd_size, cd_offset = _u32(z, eocd + 12), _u32(z, eocd + 16)
+    if disk or cd_disk or on_disk != total:
+        raise ZipRefusal("multi-disk zips are not packs")
+    if total == 0xFFFF or cd_size == 0xFFFFFFFF or cd_offset == 0xFFFFFFFF:
+        raise ZipRefusal("ZIP64 archives are not packs")
+    if total > MAX_ZIP_ENTRIES:
+        raise ZipRefusal("the zip has %d entries, a pack has at most %d files" % (total, MAX_ZIP_ENTRIES))
+    if cd_offset + cd_size != eocd:
+        raise ZipRefusal("the zip's directory is not where its end record says")
+
+    entries, seen, total_bytes, p = [], set(), 0, cd_offset
+    for i in range(total):
+        if p + 46 > eocd or _u32(z, p) != _CENTRAL:
+            raise ZipRefusal("the zip's directory is malformed")
+        made_by, flags, method = _u16(z, p + 4), _u16(z, p + 8), _u16(z, p + 10)
+        crc, csize, usize = _u32(z, p + 16), _u32(z, p + 20), _u32(z, p + 24)
+        name_len, extra_len, comment_len = _u16(z, p + 28), _u16(z, p + 30), _u16(z, p + 32)
+        start_disk, external, local = _u16(z, p + 34), _u32(z, p + 38), _u32(z, p + 42)
+        nxt = p + 46 + name_len + extra_len + comment_len
+        if nxt > eocd:
+            raise ZipRefusal("the zip's directory is malformed")
+        name = _zip_name(z, p + 46, name_len)
+        if name is None:
+            raise ZipRefusal("entry %d has a name that is not plain ASCII" % i)
+        if name.endswith("/"):
+            raise ZipRefusal("%s: directory entries are not allowed in a pack zip" % name)
+        why = unsafe_zip_name(name)
+        if why:
+            raise ZipRefusal("%s: %s" % (name, why))
+        if flags & ~_UTF8_NAME_FLAG:
+            raise ZipRefusal("%s: encrypted entries and data descriptors are not allowed" % name)
+        if method != 0:
+            raise ZipRefusal("%s: compressed entries are not allowed (pack zips are stored)" % name)
+        if csize != usize:
+            raise ZipRefusal("%s: a stored entry's sizes must agree" % name)
+        if start_disk:
+            raise ZipRefusal("%s: multi-disk zips are not packs" % name)
+        if not _regular_file(made_by, external):
+            raise ZipRefusal("%s: only regular files are allowed (no links or folders)" % name)
+        if usize > MAX_FONT_BYTES:
+            raise ZipRefusal("%s: %d bytes is over the 5 MB a pack file may be" % (name, usize))
+        total_bytes += usize
+        if total_bytes > MAX_PACK_BYTES:
+            raise ZipRefusal("the zip's files add up to more than the 10 MB a pack may be")
+        if name.lower() in seen:
+            raise ZipRefusal("%s: the zip has this name twice (names may not differ only in case)" % name)
+        seen.add(name.lower())
+        entries.append((i, name, crc, usize, local))
+        p = nxt
+    if p != eocd:
+        raise ZipRefusal("the zip's directory is malformed")
+
+    files, previous_end = {}, 0
+    for _i, name, crc, size, a in sorted(entries, key=lambda e: (e[4], e[0])):
+        if a < previous_end or a + 30 > cd_offset or _u32(z, a) != _LOCAL:
+            raise ZipRefusal("%s: the entry's header is missing or overlaps another" % name)
+        l_flags, l_method = _u16(z, a + 6), _u16(z, a + 8)
+        l_crc, l_csize, l_usize = _u32(z, a + 14), _u32(z, a + 18), _u32(z, a + 22)
+        l_name_len, l_extra_len = _u16(z, a + 26), _u16(z, a + 28)
+        if (_zip_name(z, a + 30, l_name_len) != name or l_flags & ~_UTF8_NAME_FLAG or l_method
+                or l_crc != crc or l_csize != size or l_usize != size):
+            raise ZipRefusal("%s: the entry's header disagrees with the zip's directory" % name)
+        start = a + 30 + l_name_len + l_extra_len
+        end = start + size
+        if end > cd_offset or end > len(z):
+            raise ZipRefusal("%s: the entry runs past the end of the data" % name)
+        body = z[start:end]
+        if zlib.crc32(body) & 0xFFFFFFFF != crc:
+            raise ZipRefusal("%s: CRC-32 mismatch" % name)
+        files[name] = body
+        previous_end = end
+    return files
+
+
+def is_zip_path(p):
+    p = Path(p)
+    return p.suffix.lower() == ".zip" and not p.is_dir()
+
+
+def validate_zip(zip_path, label=None):
+    """Check a release zip as Sanduhr reads it, then the pack inside it as validate_pack does."""
+    import tempfile
+    zip_path = Path(zip_path)
+    label = label or zip_path.name
+    rep = Report(label)
+    try:
+        size = zip_path.stat().st_size
+    except OSError as e:
+        rep.err("zip: cannot read the file (%s)" % e.strerror)
+        return rep
+    if size > MAX_ZIP_BYTES:
+        rep.err("zip: the zip is larger than a pack may be")
+        return rep
+    try:
+        files = read_zip(zip_path.read_bytes())
+    except ZipRefusal as r:
+        rep.err("zip: %s" % r)
+        return rep
+    # The folder is named for the pack's id, as Sanduhr passes the manifest id for the folder check.
+    folder = "pack"
+    try:
+        pid = json.loads(files.get("pack.json", b"").decode("utf-8")).get("id")
+        if isinstance(pid, str) and ID_RE.fullmatch(pid):
+            folder = pid
+    except (ValueError, UnicodeDecodeError, AttributeError, RecursionError):
+        pass
+    with tempfile.TemporaryDirectory(prefix="sanduhr-zip-") as tmp:
+        root = Path(tmp) / folder
+        for rel, body in files.items():
+            dest = root / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(body)
+        root.mkdir(exist_ok=True)
+        inner = validate_pack(root, label)
+    return inner
+
+
 def find_packs(paths):
     """Expand CLI paths into pack folders. A folder with pack.json is a pack, else a folder of packs."""
     packs = []
     for p in paths:
         p = Path(p)
-        if (p / "pack.json").exists():
+        if is_zip_path(p):
+            packs.append(p)
+        elif (p / "pack.json").exists():
             packs.append(p)
         elif p.is_dir():
             packs.extend(sorted(d for d in p.iterdir() if d.is_dir() and not d.name.startswith(".")))
@@ -1136,7 +1338,7 @@ def find_packs(paths):
 
 
 def validate_paths(paths):
-    reports = [validate_pack(p) for p in find_packs(paths)]
+    reports = [validate_zip(p) if is_zip_path(p) else validate_pack(p) for p in find_packs(paths)]
     # ids must be unique across packs
     seen = {}
     for rep, p in zip(reports, find_packs(paths)):
@@ -1155,7 +1357,7 @@ def validate_paths(paths):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Validate Sanduhr widget packs (format v1).")
-    ap.add_argument("paths", nargs="*", help="a pack folder or a folder of packs (default: packs/)")
+    ap.add_argument("paths", nargs="*", help="a pack folder, a folder of packs, or a pack .zip (default: packs/)")
     ap.add_argument("--strict", action="store_true", help="treat warnings as errors")
     args = ap.parse_args(argv)
     paths = args.paths or [str(REPO / "packs")]

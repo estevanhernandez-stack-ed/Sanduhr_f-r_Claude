@@ -1,6 +1,7 @@
 """The vendored widget pack validator (mac/integrations/widgets/validate.py, from sanduhr-widgets at
-61b4247) run on the Mac fixture corpus: every finding must match python-expected.tsv, the file the
-Swift PackValidator tests are held to. Standard library only:
+d68a788) run on the Mac fixture corpus: every finding must match python-expected.tsv, the file the
+Swift PackValidator tests are held to; and its zip mode, which must refuse a zip in the same words as
+WidgetZip.swift. Standard library only:
 
     python3 -m unittest discover -s mac/integrations/tests
 """
@@ -72,3 +73,29 @@ class FixtureCorpus(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ZipModeMatchesTheAppsReader(unittest.TestCase):
+    """validate.py on a .zip says what WidgetZip.swift says (Sources/Sanduhr/Widgets/WidgetZip.swift).
+    The smoke fixtures are zips the app installs (good-sprite) or refuses as a pack (bad-no-license)."""
+
+    SMOKE = os.path.join(os.path.dirname(INTEGRATIONS), "smoke", "fixtures", "widget-packs")
+    SWIFT = os.path.join(os.path.dirname(INTEGRATIONS), "Sources", "Sanduhr", "Widgets", "WidgetZip.swift")
+
+    def test_the_smoke_zips_read_as_the_app_reads_them(self):
+        self.assertEqual(validate.validate_zip(os.path.join(self.SMOKE, "good-sprite.zip")).errors, [])
+        errs = validate.validate_zip(os.path.join(self.SMOKE, "bad-no-license.zip")).errors
+        self.assertTrue(errs and not any(e.startswith("zip:") for e in errs), errs)
+        self.assertTrue(any("LICENSE is missing" in e for e in errs), errs)
+
+    def test_every_refusal_sentence_is_one_the_swift_reader_has(self):
+        # The fixed parts of each Python message must appear in WidgetZip.swift, so the two can't drift apart.
+        with open(VALIDATE, encoding="utf-8") as f:
+            py = f.read()
+        with open(self.SWIFT, encoding="utf-8") as f:
+            swift = f.read()
+        import re
+        fixed = set(re.findall(r'ZipRefusal\("(?:%s: )?([^"%]+)"', py))
+        self.assertGreater(len(fixed), 15)
+        missing = sorted(m for m in fixed if m not in swift)
+        self.assertEqual(missing, [], "validate.py zip messages not in WidgetZip.swift")
