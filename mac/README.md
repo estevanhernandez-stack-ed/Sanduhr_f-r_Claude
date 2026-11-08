@@ -2082,7 +2082,10 @@ validator messages, then "and N more.") is the status under the button. A pack t
 id again updates it and a catalog pack of that id is never replaced (the store refuses with its own sentence). A
 pack with a `sprite.json` also becomes the companion: only the companion choice is written, never the Desk's
 layout, and the status says where it went (Desk off, Companion hidden or on the Desk). The file is only read; the
-zip is not kept and nothing is sent. Smoke hooks: `widget-from-file` (`arg=<absolute path to a .zip>`) and
+zip is not kept and nothing is sent. The zip must be the catalog's format: stored entries, no directory entries,
+no data descriptors. Finder's Compress and plain `zip -r` produce none of that, so a refusal for compression,
+descriptors or folders appends `WidgetFileInstall.zipFormatHint` (`zip -0 -r -D` in the pack's folder, or a pack
+maker's export). Widening the reader to accept deflate is a cross-platform contract change. Smoke hooks: `widget-from-file` (`arg=<absolute path to a .zip>`) and
 `widget-remove` (`arg=<pack id>`); the scenario is `smoke/scenarios/widget-from-file.yaml`.
 
 ## The Desk for Claude
