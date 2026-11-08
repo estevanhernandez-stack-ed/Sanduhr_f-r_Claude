@@ -123,7 +123,7 @@ public sealed class ThemeStudioDeskTests : AppWindowFixture
         Assert.Equal(SettingsNames.ThemeDefaultFont, studio.Font);
     });
 
-    [DesktopFact]
+    [SkippableFact]
     public void The_hosted_editor_and_the_font_picker_wear_the_themed_styles() => AppHost.Run(() =>
     {
         var (widget, _) = ScratchWidget("Personal");

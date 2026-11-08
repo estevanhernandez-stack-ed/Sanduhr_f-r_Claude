@@ -11,8 +11,8 @@ namespace Sanduhr.App.Tests;
 /// <summary>
 /// A control repeated on every row of a list is named for its row. Every folder's account combo on Settings, Claude
 /// Code read "Linked account for this folder", and every message line's buttons read "Remove this line": a screen
-/// reader could not tell one row's control from the next. The facts read the names set on the realized controls (GitHub's
-/// runner gives list content no automation names, see DesktopFact); the desktop fact reads them the way Narrator does.
+/// reader could not tell one row's control from the next. The facts read the names set on the realized controls; the last
+/// fact reads them the way Narrator does (it was desktop-only until #313 found the hosted runner names list items too).
 /// </summary>
 [Collection("SettingsWindow")]
 public sealed class RowControlNamesTests : AppWindowFixture
@@ -62,7 +62,7 @@ public sealed class RowControlNamesTests : AppWindowFixture
         finally { window.Close(); }
     });
 
-    [DesktopFact]
+    [SkippableFact]
     public void A_screen_reader_tells_the_folder_combos_apart() => AppHost.Run(() =>
     {
         Directory.CreateDirectory(Path.Combine(Profile, ".claude-personal", "projects"));
