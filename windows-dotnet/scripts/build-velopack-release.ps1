@@ -86,8 +86,17 @@ if (-not $SkipIco) {
 # ----- 3. dotnet publish (self-contained; single-file OFF so Velopack can delta per-file) ------
 if (-not $SkipPublish) {
     if (Test-Path $publishDir) { Remove-Item -Recurse -Force $publishDir }
+    # Restore as its own process first, then publish without one, so what the publish reads is exactly this restore.
+    # RuntimeIdentifier (singular) on purpose, NOT `-r`: `dotnet restore -r` sets RuntimeIdentifiers (plural), and
+    # Sanduhr.Mcp.csproj only turns trimming on when RuntimeIdentifier is set, so `-r` restores the server without the
+    # ILLink package. Its trim step is then the SDK's empty stub and it ships untrimmed (74 MB, 4.7.0; the App csproj's
+    # 30 MB gate fails that).
+    Write-Host "[restore] dotnet restore ($Runtime)..." -ForegroundColor Cyan
+    & dotnet restore $appProject /p:RuntimeIdentifier=$Runtime /p:SelfContained=true
+    if ($LASTEXITCODE -ne 0) { throw "dotnet restore failed (exit $LASTEXITCODE)" }
     Write-Host "[publish] dotnet publish ($Runtime, self-contained)..." -ForegroundColor Cyan
     & dotnet publish $appProject `
+        --no-restore `
         -c $Configuration `
         -r $Runtime `
         --self-contained true `
