@@ -13,7 +13,7 @@ public static class WhatsNewCards
     private static WhatsNewCard[] Release470() =>
     [
         WhatsNewCard.Of("4.7.0", "widget-from-file", "Install a widget from a file",
-            "A pack you made in SpriteForge or by hand installs from its zip in Settings, Mods & Widgets. A companion goes straight onto your Desk.",
+            "A pack from a pack maker such as SpriteForge installs from its zip in Settings, Mods & Widgets. A companion goes straight onto your Desk.",
             "", // Download
             WhatsNewPreview.None, SettingsPage.Mods),
     ];
