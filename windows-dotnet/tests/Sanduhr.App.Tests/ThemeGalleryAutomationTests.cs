@@ -38,7 +38,7 @@ public sealed class ThemeGalleryAutomationTests : AppWindowFixture
             var gallery = (ListBox)window.FindName("ThemeGallery");
 
             var target = widget.Themes.First(t => !t.IsActive);
-            // Found by its item, not its name: GitHub's runner gives list items no names (see DesktopFact).
+            // Found by its item, not its name (written when the hosted runner gave list items no names, #313).
             var peer = ThemeItems(gallery).OfType<ItemAutomationPeer>().Single(p => ReferenceEquals(p.Item, target));
             Assert.Equal(AutomationControlType.ListItem, peer.GetAutomationControlType());
             var item = Assert.IsAssignableFrom<ISelectionItemProvider>(peer.GetPattern(PatternInterface.SelectionItem));
@@ -85,7 +85,7 @@ public sealed class ThemeGalleryAutomationTests : AppWindowFixture
         finally { window.Close(); }
     });
 
-    [DesktopFact]
+    [SkippableFact]
     public void Each_theme_item_is_named_for_its_theme() => AppHost.Run(() =>
     {
         var widget = DemoWidget();
