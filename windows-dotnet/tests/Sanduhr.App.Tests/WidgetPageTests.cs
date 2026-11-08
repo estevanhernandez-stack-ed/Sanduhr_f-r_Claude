@@ -191,7 +191,7 @@ public sealed class WidgetPageTests : AppWindowFixture
     });
 
     /// <summary>P13: after a Move the keyboard stays on the moved row's same button, or its other one when that button collapsed.</summary>
-    [DesktopFact]
+    [SkippableFact]
     public void After_a_move_the_keyboard_stays_on_the_moved_limit() => AppHost.Run(() =>
     {
         var (widget, _) = ScratchWidget("Personal");

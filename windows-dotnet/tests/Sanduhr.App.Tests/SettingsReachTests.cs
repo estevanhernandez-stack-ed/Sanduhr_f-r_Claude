@@ -232,7 +232,7 @@ public sealed class SettingsReachTests : AppWindowFixture
 
     /// <summary>WF33: one Tab past a page's last control used to land on Quit. Keyboard focus is routed inside the
     /// never-activating window, as the harness does; on GitHub's runner this is skipped. Written, deferred to Tier 2.</summary>
-    [DesktopFact]
+    [SkippableFact]
     public void Tab_from_the_end_of_every_page_goes_to_the_search_box_never_to_Quit() => AppHost.Run(() =>
     {
         var (window, _, guard) = Open("Personal");

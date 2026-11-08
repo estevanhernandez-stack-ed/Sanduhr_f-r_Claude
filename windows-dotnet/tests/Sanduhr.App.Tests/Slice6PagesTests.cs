@@ -175,7 +175,7 @@ public sealed class Slice6PagesTests : AppWindowFixture
     });
 
     /// <summary>A landing on What leaves this PC puts the keyboard on the first row's link; on About, Updates, on the switch.</summary>
-    [DesktopFact]
+    [SkippableFact]
     public void A_landing_puts_the_keyboard_on_the_sections_first_control() => AppHost.Run(() =>
     {
         var (window, _, widget, guard) = Open();

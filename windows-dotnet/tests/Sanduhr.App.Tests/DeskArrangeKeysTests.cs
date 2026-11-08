@@ -42,7 +42,7 @@ public sealed class DeskArrangeKeysTests : AppWindowFixture
 
     /// <summary>The key press itself: the Hide button of a piece holds the keyboard, an arrow reaches it as a PreviewKeyDown, and the
     /// event is handled only when the arrow changed something. The modifier is injected (Keyboard.Modifiers reads the real keys).</summary>
-    [DesktopFact]
+    [SkippableFact]
     public void An_arrow_press_on_a_focused_piece_acts_and_is_handled_only_when_it_acted() => AppHost.Run(() =>
     {
         var settings = (DeskSettings.Default with { Enabled = true, Layout = "clock:bl claude:bl" }).Normalized();

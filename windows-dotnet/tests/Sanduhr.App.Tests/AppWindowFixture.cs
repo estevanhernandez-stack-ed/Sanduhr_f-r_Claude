@@ -8,17 +8,17 @@ using Sanduhr.App.ViewModels;
 namespace Sanduhr.App.Tests;
 
 /// <summary>
-/// A fact that is skipped, with a message, on GitHub's hosted runner: the keyboard-focus tests and the live-browser ones.
-/// The list-item name tests it once held (#313: list items read with no names there) run on the runner again since
-/// 2026-11-08, when a diagnostic showed it names them as a desktop does. Skippable too: a focus test that meets an outside
-/// app taking the foreground ends as a skip (see <see cref="AppHost.Run"/>).
+/// A fact that is skipped, with a message, on GitHub's hosted runner: the live-browser tests (a real WebView2 browser
+/// process). It once also held the list-item name tests (#313) and the keyboard-focus tests; both run on the runner again
+/// since 2026-11-08, as [SkippableFact] so a focus test that meets an outside app taking the foreground still ends as a skip
+/// (see <see cref="AppHost.Run"/>).
 /// </summary>
 public sealed class DesktopFactAttribute : SkippableFactAttribute
 {
     public DesktopFactAttribute()
     {
         if (Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true")
-            Skip = "Needs a desktop session (keyboard focus or a live browser); skipped on the hosted runner.";
+            Skip = "Needs a live WebView2 browser process; skipped on the hosted runner.";
     }
 }
 

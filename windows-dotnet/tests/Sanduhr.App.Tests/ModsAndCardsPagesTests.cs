@@ -106,7 +106,7 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
         return false;
     }
 
-    [DesktopFact]
+    [SkippableFact]
     public void A_folder_config_landing_puts_keyboard_focus_in_the_opened_card() => AppHost.Run(() =>
     {
         // P7: the page's anchor is the whole cards list, so the first card's first control took focus. The opened card's report header
@@ -644,7 +644,7 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
     });
 
     /// <summary>A landing on Meters above the prompt puts the keyboard on the first folder's row (task 4: the row is the stop, its switch is one Tab on).</summary>
-    [DesktopFact]
+    [SkippableFact]
     public void A_landing_on_meters_focuses_the_first_folders_row() => AppHost.Run(() =>
     {
         var (window, svm, guard) = Open("Personal");
@@ -662,7 +662,7 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
     });
 
     /// <summary>A landing on the Installed list puts the keyboard inside that section, never above it or on the page's top.</summary>
-    [DesktopFact]
+    [SkippableFact]
     public void A_landing_on_the_installed_list_focuses_inside_the_section() => AppHost.Run(() =>
     {
         InstalledPackKit.Install(new Paths(), "good-palette");

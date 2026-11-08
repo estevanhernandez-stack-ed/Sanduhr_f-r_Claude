@@ -199,7 +199,7 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
 
     /// <summary>Review I2: "Place it on the Desk" collapses while it holds the keyboard; focus moves to the "Desk settings…" link
     /// that takes its spot instead of falling to the top of the window.</summary>
-    [DesktopFact]
+    [SkippableFact]
     public void Placing_a_piece_from_its_page_keeps_the_keyboard_on_Desk_settings() => AppHost.Run(() =>
     {
         var (window, _, guard) = Open("Personal");
@@ -617,7 +617,7 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
 
     /// <summary>Done (spec, slice 3): the Desk page reaches Pieces in under 10 Tab stops. Keyboard focus is routed inside the
     /// never-activating window, as slice 2's Tab walk does.</summary>
-    [DesktopFact]
+    [SkippableFact]
     public void From_the_Desk_pages_first_stop_Tab_reaches_Pieces_in_under_10() => AppHost.Run(() =>
     {
         var (window, svm, guard) = Open("Personal");
@@ -772,7 +772,7 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
 
     /// <summary>Done (spec, slice 3): two pieces in one corner reorder by keyboard (WF5). Keyboard focus is routed inside the
     /// never-activating window; Space on the focused Move down button presses it.</summary>
-    [DesktopFact]
+    [SkippableFact]
     public void Two_pieces_in_one_place_reorder_from_the_keyboard() => AppHost.Run(() =>
     {
         var store = Store();

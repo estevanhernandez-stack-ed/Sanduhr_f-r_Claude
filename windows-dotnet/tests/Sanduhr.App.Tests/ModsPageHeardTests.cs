@@ -218,7 +218,7 @@ public sealed class ModsPageHeardTests : AppWindowFixture
     });
 
     /// <summary>A meters row is one stop; its switch is the next Tab.</summary>
-    [DesktopFact]
+    [SkippableFact]
     public void The_meters_switch_is_one_Tab_past_its_row() => AppHost.Run(() =>
     {
         Home(".claude", "{}");
