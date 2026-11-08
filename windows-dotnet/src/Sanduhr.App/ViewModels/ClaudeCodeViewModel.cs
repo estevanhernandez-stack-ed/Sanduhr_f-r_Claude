@@ -742,7 +742,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
 
     // ------------------------------------------------------------------ MCP server
 
-    private void InstallMcp(CcFolderRowViewModel row)
+    private async void InstallMcp(CcFolderRowViewModel row)
     {
         if (!row.Discovered) return;
         try
@@ -778,7 +778,12 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             _widget.SaveMcpRoots(map);
             _widget.SaveMcpEnabled(true);
             Reload();
-            Done("MCP server installed. New Claude Code sessions pick it up.");
+            // #144: the registration being present proves nothing; start the launcher as Claude Code will and hear it answer.
+            Say(SettingsNames.McpInstalledChecking);
+            var probe = await McpLaunchProbe.CheckAsync(installer.LauncherPath);
+            Done(probe.Ok
+                ? SettingsNames.McpInstalledAnswering(probe.Version)
+                : SettingsNames.McpInstalledNotAnswering(probe.Reason ?? SettingsNames.McpProbeDidNotStart), ok: probe.Ok);
         }
         catch (Exception)
         {
