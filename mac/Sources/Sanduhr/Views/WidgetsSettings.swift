@@ -203,7 +203,7 @@ private struct WidgetsFromFileRow: View {
 
     var body: some View {
         HStack {
-            Text("Install a widget pack a pack maker exported as a .zip. It is checked like a catalog download and stays on this Mac.")
+            Text("Install a widget pack from a .zip, from a pack maker or compressed in Finder. It is checked like a catalog download and stays on this Mac.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()

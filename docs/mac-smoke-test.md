@@ -2828,10 +2828,10 @@ same ticks by hand, and `ruby smoke/selftest.rb` runs the harness against its fi
 Back up `~/Library/Application Support/Sanduhr` first (section 45) and quit the release app. Use a dev build (signed out, file store)
 and a made-up pack: `python3 mac/smoke/fixtures/widget-packs/build.py` writes two small zips from the validator's fixture packs,
 `good-sprite.zip` (a sprite named "Fixture sprite", 1x1 art, id `good-sprite`) and `bad-no-license.zip` (a palette with no LICENSE). Nothing
-here needs real art or a real name. Make a third zip for step 5 with `zip -0 -r -D` in a pack's folder, or skip that step.
+here needs real art or a real name. Make a third zip for step 5 by compressing a pack's folder in Finder, or skip that step.
 
 1. Settings, Widgets: **Install widget from file…** sits beside **New sprite from an image…**, with the line "Install a widget pack
-   a pack maker exported as a .zip. It is checked like a catalog download and stays on this Mac." Settings search finds it. Choose **Cancel** in the
+   from a .zip, from a pack maker or compressed in Finder. It is checked like a catalog download and stays on this Mac." Settings search finds it. Choose **Cancel** in the
    file panel: nothing changes and no sentence appears.
 2. Choose `good-sprite.zip`. The row "Fixture sprite" is in the installed list and reads **made here**, with Uninstall and Use my own art.
    `widgets/good-sprite/` holds the zip's files byte for byte, and `widgets.json` lists the pack as `local`. The status sentence under
@@ -2845,7 +2845,7 @@ here needs real art or a real name. Make a third zip for step 5 with `zip -0 -r 
    (a sprite keeps its "on your Desk now" line). The sentence stays while Settings is open, and closing and reopening the page keeps
    it; it clears the moment the file panel opens again.
 4. Choose `bad-no-license.zip`: the sentence is "LICENSE is missing; every pack carries its own license text." No new row, no folder under
-   `widgets/`, and the companion is still Fixture sprite. Choose a text file renamed `.zip`: the zip reader's sentence shows and nothing is installed. Compress a pack folder with Finder and choose that: refused, and the sentence ends "Pack zips are uncompressed: export one from a pack maker, or run zip -0 -r -D in the pack's folder." Choose a zip over the catalog's size cap: "The file is larger than a widget pack can be, so nothing was installed."
+   `widgets/`, and the companion is still Fixture sprite. Choose a text file renamed `.zip`: the zip reader's sentence shows and nothing is installed. Compress a pack folder with Finder (2.42.1), under a name with a space such as "My Companion", and choose that: it installs as its files, with the folder, `__MACOSX` and `.DS_Store` gone. Choose a zip over the catalog's size cap: "The file is larger than a widget pack can be, so nothing was installed."
 5. A pack whose id matches an installed catalog pack is refused with the store's sentence and the catalog pack is unchanged. A pack whose
    `sanduhr_min` is above the supported widget format says "<Name> needs a newer Sanduhr (it asks for widget format <v>)." and installs nothing.
 6. A palette or effects zip (any pack that is not a sprite) installs as made here and leaves the companion as it was: "<Name> is installed
