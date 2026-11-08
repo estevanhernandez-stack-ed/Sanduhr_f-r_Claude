@@ -97,6 +97,14 @@ npx @vscode/vsce@4.0.0 package --no-dependencies
 
 The last command produces a `.vsix` you can install with `code --install-extension`.
 
+## Release
+
+Bump `version` in `package.json`, add a `## [x.y.z]` section to `CHANGELOG.md`, merge, then tag main:
+`git tag -a vx.y.z-time -m "Sanduhr Time x.y.z" && git push origin vx.y.z-time`. The Sanduhr Time Release
+workflow (`.github/workflows/vscode-release.yml`) checks that the tag, `package.json` and the changelog
+agree and that the tag is on main, runs the checks above, and publishes a GitHub Release with the VSIX
+attached and that version's changelog section as its notes.
+
 ## Not affiliated
 
 Claude is a trademark of Anthropic. Codex is a trademark of OpenAI. Sanduhr Time is not affiliated with or endorsed by Anthropic or OpenAI.
