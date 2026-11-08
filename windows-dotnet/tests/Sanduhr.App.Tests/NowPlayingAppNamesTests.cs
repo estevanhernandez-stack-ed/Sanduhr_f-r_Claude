@@ -56,8 +56,7 @@ public class NowPlayingAppNamesTests
     {
         var catalog = new Catalog(new LauncherAppInfo("YouTube Music", YouTubeMusic));
         using var cache = new LauncherAppCache(() => catalog);
-        cache.Refresh([], force: true);
-        for (int i = 0; i < 200 && !cache.Known; i++) Thread.Sleep(25);
+        Assert.True(cache.Refresh([], force: true).Wait(TimeSpan.FromSeconds(30)), "the Start menu list never finished reading");
         Assert.True(cache.Known);
 
         Assert.Equal("YouTube Music", cache.StartMenuName(YouTubeMusic.ToUpperInvariant()));
