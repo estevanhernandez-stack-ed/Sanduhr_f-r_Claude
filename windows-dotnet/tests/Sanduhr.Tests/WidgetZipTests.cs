@@ -298,6 +298,23 @@ public class WidgetZipTests
     {
         Assert.Contains("compressed", Refused(ToolZip(Palette())));
         Refused(ToolZip(Palette(), folder: "good-palette"));
+        Refused(ToolZip(Palette(), folder: "My Companion"));
+    }
+
+    /// <summary>#459, from the Mac's #471: Finder and Explorer keep the folder's own name, spaces and all ("My Companion").</summary>
+    [Fact]
+    public void A_folder_with_a_space_in_its_name_reads_as_its_files() =>
+        ReadsAsThePalette(ToolZip(Palette(), folder: "My Companion", streamed: true));
+
+    [Fact]
+    public void A_kept_file_with_a_space_is_still_refused_by_the_pack_rules()
+    {
+        var files = Palette();
+        files["my file.json"] = B("{}");
+        var read = WidgetZip.Read(ToolZip(files, folder: "My Companion"), out var error, fromUser: true);
+        Assert.True(read is not null, error);
+        Assert.Contains("my file.json", read!.Keys);
+        Assert.False(PackValidator.Validate(new Dictionary<string, byte[]>(read), "good-palette", strict: true).Ok);
     }
 
     private static ZipSpec Deflated(string name, byte[] raw, uint? declared = null, uint? crc = null)

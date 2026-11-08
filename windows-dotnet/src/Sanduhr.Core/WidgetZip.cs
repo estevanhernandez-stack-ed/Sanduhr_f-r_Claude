@@ -128,7 +128,7 @@ public static class WidgetZip
             if (next > eocd)
                 return Fail(out error, "the zip's directory is malformed");
 
-            string? name = Name(zip, p + CentralSize, nameLen);
+            string? name = Name(zip, p + CentralSize, nameLen, allowSpace: fromUser);
             if (name is null)
                 return Fail(out error, $"entry {i} has a name that is not plain ASCII");
             if (fromUser && Skippable(name))
@@ -193,7 +193,7 @@ public static class WidgetZip
             ushort flags = U16(zip, a + 6), method = U16(zip, a + 8);
             uint crc = U32(zip, a + 14), csize = U32(zip, a + 18), usize = U32(zip, a + 22);
             ushort nameLen = U16(zip, a + 26), extraLen = U16(zip, a + 28);
-            string? name = Name(zip, a + LocalSize, nameLen);
+            string? name = Name(zip, a + LocalSize, nameLen, allowSpace: fromUser);
             // With a data descriptor the local header's CRC and sizes may be zero: the central directory's, checked
             // above, are the ones that count, and the data is checked against them below.
             bool descriptor = (flags & DescriptorFlag) != 0;
@@ -285,7 +285,11 @@ public static class WidgetZip
         return true;
     }
 
-    private static string? Name(byte[] zip, int at, int length)
+    /// <param name="allowSpace">A zip the user picked: Finder and Explorer name the folder inside as the person named it ("My
+    /// Companion/"), so a raw name may carry a space. That folder is dropped and Finder's extras skipped; every kept name still
+    /// meets the validator's path rule (FORMAT 3.5), which allows no space, so "my file.json" is still refused, by the pack rules.
+    /// The Mac reader does the same (#471).</param>
+    private static string? Name(byte[] zip, int at, int length, bool allowSpace = false)
     {
         if (length == 0 || at + length > zip.Length)
             return length == 0 ? "" : null;
@@ -293,7 +297,7 @@ public static class WidgetZip
         for (int i = 0; i < length; i++)
         {
             byte b = zip[at + i];
-            if (b < 0x21 || b > 0x7e)
+            if ((b < 0x21 && !(allowSpace && b == 0x20)) || b > 0x7e)
                 return null;
             chars[i] = (char)b;
         }
