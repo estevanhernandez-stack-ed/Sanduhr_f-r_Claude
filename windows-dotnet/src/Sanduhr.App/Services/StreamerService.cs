@@ -98,6 +98,22 @@ public sealed class StreamerService : IDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>Rename… (Show the real name): the person's own codename for a name, or blank to draw one again. Saved now, and every
+    /// masked page builds again through <see cref="Changed"/>; a folder's new codename reaches the statusline through streamer.json.</summary>
+    public CodenameRename Rename(CodenameCategory category, string real, string? name)
+    {
+        var book = EnsureBook();
+        CodenameRename verdict;
+        lock (book) verdict = book.Rename(category, real, name);   // streamer: key - the book's key for the row, never drawn
+        if (verdict is not (CodenameRename.Ok or CodenameRename.Cleared))
+            return verdict;
+        _dirty = true;
+        _foldersDirty |= category == CodenameCategory.Folder;
+        Flush();
+        Changed?.Invoke();
+        return verdict;
+    }
+
     /// <summary>Every mapped or shown name, for the allowlist list.</summary>
     public IReadOnlyList<CodenameEntry> Entries()
     {

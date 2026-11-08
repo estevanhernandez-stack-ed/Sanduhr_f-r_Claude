@@ -28,6 +28,22 @@ public sealed partial class CodenameRow : ObservableObject
     /// <summary>The first row of its category: its heading shows above it.</summary>
     [ObservableProperty] private bool _startsCategory;
     [ObservableProperty] private bool _shown;
+    /// <summary>The person named this codename (Rename…): the row says so, and Shuffle keeps it.</summary>
+    [ObservableProperty] private bool _chosen;
+    /// <summary>The Rename button's spoken name, the row's own words: "Rename the codename, Dune Fox".</summary>
+    [ObservableProperty] private string _renameName = "";
+
+    /// <summary>The rename box is open under the row.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NotEditing))]
+    private bool _editing;
+    public bool NotEditing => !Editing;
+    [ObservableProperty] private string _draft = "";
+    /// <summary>Why the last Save was refused; empty when it wasn't. Shown through a live region.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRenameError))]
+    private string _renameError = "";
+    public bool HasRenameError => RenameError.Length > 0;
 
     internal CodenameRow(StreamerService service, CodenameEntry entry)
     {
@@ -44,7 +60,41 @@ public sealed partial class CodenameRow : ObservableObject
         Name = SettingsNames.AllowlistRowName(on ? Codename : Text);
         StartsCategory = startsCategory;
         Shown = entry.Shown;
+        Chosen = entry.Chosen && entry.Codename is not null;
+        RenameName = SettingsNames.RenameCodenameName(on ? Codename : Text);
         _loading = false;
+    }
+
+    [RelayCommand]
+    private void Rename()
+    {
+        Draft = Codename;
+        RenameError = "";
+        Editing = true;
+    }
+
+    /// <summary>Saves the box: a blank one draws a codename again. A refusal keeps the box open with the reason.</summary>
+    [RelayCommand]
+    private void SaveRename()
+    {
+        var verdict = _service.Rename(Category, Real, Draft);
+        if (verdict is CodenameRename.Ok or CodenameRename.Cleared)
+        {
+            RenameError = "";
+            Editing = false;
+        }
+        else
+        {
+            RenameError = "";   // the same refusal twice is announced twice
+            RenameError = SettingsNames.RenameRefused(verdict);
+        }
+    }
+
+    [RelayCommand]
+    private void CancelRename()
+    {
+        RenameError = "";
+        Editing = false;
     }
 
     partial void OnShownChanged(bool value)

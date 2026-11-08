@@ -2,6 +2,10 @@
 
 ## Unreleased (windows)
 
+### New
+
+- **Name your own codenames.** In Settings ▸ Privacy ▸ Show the real name, each row has **Rename…**: type the codename you want and press Enter. It has to be unique, up to 32 characters, and never a real name Sanduhr hides (a folder's name counts, with or without its dot). Shuffle keeps the codenames you named and redraws the rest, and a blank name draws one again. A named codename shows everywhere the drawn one did, including the Claude Code statusline. It's saved on this PC in codenames.json and never sent anywhere.
+
 ### Fixes
 
 - **A widget pack zip you made yourself installs.** Install widget from file… now reads the zips Explorer's Send to, Compressed folder, Finder's Compress and zip tools make: compressed, with the pack's folder inside, or with a Mac's hidden `__MACOSX` and `.DS_Store` files, which are skipped. It still holds every file to the same size limits while unpacking, checks each one's checksum, and runs every pack rule, so a zip that fails installs nothing and says why. Packs from the catalog keep their own stricter format (#459).

@@ -206,3 +206,32 @@ public static class LiveRegion
         }));
     }
 }
+
+/// <summary>
+/// Moves keyboard focus to an element when the bound value turns true on a loaded element: <c>views:FocusWhenShown.Enabled="{Binding Editing}"</c>.
+/// For an inline editor that opens in place (Rename… on Show the real name): the box takes focus when it opens, and the button that
+/// opened it takes it back when it closes, so focus never falls to the window. The page's first state moves nothing (the element
+/// isn't loaded yet), only a change after it. Focus moves once layout has shown the element.
+/// </summary>
+public static class FocusWhenShown
+{
+    public static readonly DependencyProperty EnabledProperty = DependencyProperty.RegisterAttached(
+        "Enabled", typeof(bool), typeof(FocusWhenShown), new PropertyMetadata(false, OnEnabledChanged));
+
+    public static bool GetEnabled(DependencyObject d) => (bool)d.GetValue(EnabledProperty);
+    public static void SetEnabled(DependencyObject d, bool value) => d.SetValue(EnabledProperty, value);
+
+    private static void OnEnabledChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not FrameworkElement el || e.NewValue is not true || !el.IsLoaded)
+            return;
+        el.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        {
+            if (!el.IsVisible || !GetEnabled(el))
+                return;
+            el.Focus();
+            if (el is TextBox box)
+                box.SelectAll();
+        }));
+    }
+}

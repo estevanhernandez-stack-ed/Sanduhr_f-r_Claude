@@ -188,7 +188,9 @@ public sealed class PrivacyPageTests : AppWindowFixture
 
             Assert.Equal("", svm.Privacy.McpStatus);
             var blank = blocks.Where(t => t.Text == "" && t.Inlines.Count == 0).ToList();
-            Assert.Single(blank);   // the MCP status, still empty
+            // A codename row's refusal line is blank until a Save is refused; it shows only then (StreamerRenameTests).
+            var outsideRows = blank.Where(t => t.DataContext is not Sanduhr.App.ViewModels.CodenameRow).ToList();
+            Assert.Single(outsideRows);   // the MCP status, still empty
             Assert.All(blank, t => Assert.Equal(Visibility.Collapsed, t.Visibility));
             foreach (var row in NetworkDisclosure.All)
             {

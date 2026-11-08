@@ -77,6 +77,44 @@
                                               AutomationProperties.Name="{Binding Name, Mode=OneWay}">
                                         <TextBlock Text="{Binding Text, Mode=OneWay}" FontSize="11.5" TextWrapping="Wrap" />
                                     </CheckBox>
+                                    <!-- Rename… (the person's own codename): inline under the row, Enter saves, Escape cancels. -->
+                                    <StackPanel Orientation="Horizontal" Margin="22,0,0,4"
+                                                Visibility="{Binding NotEditing, Converter={StaticResource BoolVis}}">
+                                        <Button Style="{DynamicResource FlatButton}" Padding="8,2" FontSize="11"
+                                                Content="{x:Static core:SettingsNames.RenameCodename}" Command="{Binding RenameCommand}"
+                                                views:FocusWhenShown.Enabled="{Binding NotEditing}"
+                                                AutomationProperties.Name="{Binding RenameName, Mode=OneWay}" />
+                                        <TextBlock Text="{x:Static core:SettingsNames.RenameChosenTag}" FontSize="11" Margin="8,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="{Binding Chosen, Converter={StaticResource BoolVis}}"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                    </StackPanel>
+                                    <StackPanel Margin="22,0,0,8" Visibility="{Binding Editing, Converter={StaticResource BoolVis}}">
+                                        <TextBox Style="{DynamicResource Input}" Width="240" HorizontalAlignment="Left"
+                                                 Text="{Binding Draft, UpdateSourceTrigger=PropertyChanged}"
+                                                 views:FocusWhenShown.Enabled="{Binding Editing}"
+                                                 AutomationProperties.Name="{x:Static core:SettingsNames.RenameField}"
+                                                 AutomationProperties.HelpText="{x:Static core:SettingsNames.RenameCaption}">
+                                            <TextBox.InputBindings>
+                                                <KeyBinding Key="Return" Command="{Binding SaveRenameCommand}" />
+                                                <KeyBinding Key="Escape" Command="{Binding CancelRenameCommand}" />
+                                            </TextBox.InputBindings>
+                                        </TextBox>
+                                        <TextBlock Text="{x:Static core:SettingsNames.RenameCaption}" FontSize="11" TextWrapping="Wrap" Margin="0,3,0,0"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                        <TextBlock Text="{Binding RenameError, Mode=OneWay}" FontSize="11" TextWrapping="Wrap" Margin="0,3,0,0"
+                                                   Visibility="{Binding HasRenameError, Converter={StaticResource BoolVis}}"
+                                                   views:LiveRegion.Announces="True"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <Button Style="{DynamicResource FlatButton}" Padding="10,3" FontSize="11"
+                                                    Content="{x:Static core:SettingsNames.RenameSave}" Command="{Binding SaveRenameCommand}"
+                                                    AutomationProperties.Name="{x:Static core:SettingsNames.RenameSave}" />
+                                            <Button Style="{DynamicResource FlatButton}" Padding="10,3" FontSize="11" Margin="6,0,0,0"
+                                                    Content="{x:Static core:SettingsNames.RenameCancel}" Command="{Binding CancelRenameCommand}"
+                                                    AutomationProperties.Name="{x:Static core:SettingsNames.RenameCancel}" />
+                                        </StackPanel>
+                                    </StackPanel>
                                 </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

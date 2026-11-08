@@ -937,9 +937,9 @@ public static class SettingsNames
     public const string StreamerDemoLine =
         "Demo mode is separate: it swaps in sample numbers and accounts, and starts only when Sanduhr is started with --demo or SANDUHR_DEMO=1.";
     public const string ShuffleCodenames = "Shuffle codenames…";
-    public const string ShuffleCaption = "Draws new codenames for everything. Names you chose to show stay shown.";
+    public const string ShuffleCaption = "Draws new codenames for everything except the ones you named. Names you chose to show stay shown.";
     public const string ShuffleQuestion = "Shuffle codenames?";
-    public const string ShuffleDetail = "Every codename changes. Viewers following a name will lose it.";
+    public const string ShuffleDetail = "Every codename you didn't name changes. Viewers following one will lose it.";
     public const string ShuffleConfirm = "Shuffle";
     public const string ShuffleCancel = "Cancel";
     /// <summary>The status line after a confirmed Shuffle, shown through a live region (preflight P14).</summary>
@@ -955,6 +955,28 @@ public static class SettingsNames
     public const string AllowlistEmpty = "Nothing has a codename yet. A name gets one the first time streamer mode hides it.";
     public static string AllowlistRowName(string shown) => $"{ShowRealNameOnStream}, {shown}";
     public static string AllowlistRowOff(string codename, string real) => $"{codename} · {real}";
+
+    // Rename… on a row of Show the real name (dashboard task "let people name their own codenames", 2026-10-27).
+    public const string RenameCodename = "Rename…";
+    /// <summary>The button's spoken name: "Rename the codename, Dune Fox". The row's own words, so it reads like its checkbox.</summary>
+    public static string RenameCodenameName(string shown) => $"Rename the codename, {shown}";
+    public const string RenameField = "New codename";
+    public const string RenameCaption = "Up to 32 characters, unique, and never a real name. Shuffle keeps the codenames you name. Leave it blank to draw one again.";
+    public const string RenameSave = "Save";
+    public const string RenameCancel = "Cancel";
+    public const string RenameChosenTag = "named by you";
+    public const string RenameTooLong = "That's longer than 32 characters.";
+    public const string RenameBadCharacter = "That has a character that can't show on stream, such as a tab or an invisible mark.";
+    public const string RenameTaken = "Another name already has that codename.";
+    public const string RenameRealName = "That's a real name Sanduhr hides, so it can't be a codename.";
+    public static string RenameRefused(CodenameRename verdict) => verdict switch
+    {
+        CodenameRename.TooLong => RenameTooLong,
+        CodenameRename.BadCharacter => RenameBadCharacter,
+        CodenameRename.Taken => RenameTaken,
+        CodenameRename.RealName => RenameRealName,
+        _ => "",
+    };
     public static string CodenameCategoryTitle(CodenameCategory category) => category switch
     {
         CodenameCategory.Account => "Accounts",
