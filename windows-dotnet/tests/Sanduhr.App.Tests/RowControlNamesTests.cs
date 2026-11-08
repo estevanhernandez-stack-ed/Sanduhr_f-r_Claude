@@ -62,7 +62,7 @@ public sealed class RowControlNamesTests : AppWindowFixture
         finally { window.Close(); }
     });
 
-    [DesktopFact]
+    [SkippableFact]
     public void A_screen_reader_tells_the_folder_combos_apart() => AppHost.Run(() =>
     {
         Directory.CreateDirectory(Path.Combine(Profile, ".claude-personal", "projects"));

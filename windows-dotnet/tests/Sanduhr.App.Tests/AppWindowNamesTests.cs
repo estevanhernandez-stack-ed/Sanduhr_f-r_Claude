@@ -72,7 +72,7 @@ public sealed class AppWindowNamesTests : AppWindowFixture
         finally { CloseEveryWhatsNew(); }
     });
 
-    [DesktopFact]
+    [SkippableFact]
     public void TheWelcomeTourNamesItsCardsAndMeterRows() => AppHost.Run(() =>
     {
         var widget = DemoWidget();

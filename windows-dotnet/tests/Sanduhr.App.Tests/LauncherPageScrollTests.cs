@@ -62,7 +62,7 @@ public sealed class LauncherPageScrollTests : AppWindowFixture
             $"row {index} lies at {top}, viewport {scroller.ViewportHeight}, row height {container.ActualHeight}, offset {scroller.VerticalOffset}");
     }
 
-    [DesktopFact]
+    [SkippableFact]
     public void A_selected_row_on_the_open_page_scrolls_into_view() => AppHost.Run(() =>
     {
         var (window, svm, guard) = Open();
@@ -78,7 +78,7 @@ public sealed class LauncherPageScrollTests : AppWindowFixture
         finally { window.Close(); }
     });
 
-    [DesktopFact]
+    [SkippableFact]
     public void A_row_selected_before_the_page_opens_scrolls_into_view_when_it_does() => AppHost.Run(() =>
     {
         var (window, svm, guard) = Open();

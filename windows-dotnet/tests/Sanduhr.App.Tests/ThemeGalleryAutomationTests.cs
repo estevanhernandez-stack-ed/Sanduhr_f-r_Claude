@@ -85,7 +85,7 @@ public sealed class ThemeGalleryAutomationTests : AppWindowFixture
         finally { window.Close(); }
     });
 
-    [DesktopFact]
+    [SkippableFact]
     public void Each_theme_item_is_named_for_its_theme() => AppHost.Run(() =>
     {
         var widget = DemoWidget();

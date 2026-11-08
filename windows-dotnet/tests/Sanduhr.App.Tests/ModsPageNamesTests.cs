@@ -186,7 +186,7 @@ public sealed class ModsPageNamesTests : AppWindowFixture
         finally { window.Close(); }
     });
 
-    [DesktopFact]
+    [SkippableFact]
     public void Every_installed_row_read_only_ones_too_is_one_named_stop_that_says_so() => AppHost.Run(() =>
     {
         var home = Home(".claude", "{\"enabledPlugins\":{\"alpha@m\":true}}");
