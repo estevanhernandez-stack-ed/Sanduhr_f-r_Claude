@@ -127,17 +127,19 @@ internal sealed class LauncherAppCache : IDisposable
     /// <summary>
     /// Reads the list in the background when there is none or it is older than <see cref="MaxAge"/> (or
     /// <paramref name="force"/>). <paramref name="wanted"/> are the IDs the caller cares about: any the list lacks is
-    /// asked of the shell one by one before it is called missing.
+    /// asked of the shell one by one before it is called missing. Returns the background read, already complete when
+    /// none was started (fresh list, one already running, disposed); callers in the app ignore it, tests wait on it
+    /// rather than polling <see cref="Known"/>, which a busy thread pool made flaky on the CI runner.
     /// </summary>
-    public void Refresh(IReadOnlyCollection<string> wanted, bool force = false)
+    public Task Refresh(IReadOnlyCollection<string> wanted, bool force = false)
     {
         lock (_gate)
         {
-            if (_disposed || _refreshing) return;
-            if (!force && _apps is not null && DateTimeOffset.UtcNow - _listedAt < MaxAge) return;
+            if (_disposed || _refreshing) return Task.CompletedTask;
+            if (!force && _apps is not null && DateTimeOffset.UtcNow - _listedAt < MaxAge) return Task.CompletedTask;
             _refreshing = true;
         }
-        Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {

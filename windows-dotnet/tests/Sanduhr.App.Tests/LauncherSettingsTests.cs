@@ -119,8 +119,7 @@ public sealed class LauncherSettingsTests : IDisposable
         LauncherAppCache.Current = cache;
         try
         {
-            cache.Refresh([], force: true);
-            for (int i = 0; i < 200 && !cache.Known; i++) Thread.Sleep(25);
+            Assert.True(cache.Refresh([], force: true).Wait(TimeSpan.FromSeconds(30)), "the Start menu list never finished reading");
             Assert.True(cache.Known);
             body();
         }
