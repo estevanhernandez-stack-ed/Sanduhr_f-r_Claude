@@ -135,7 +135,33 @@
              RemoveProperties="OutDir;TargetFramework;SelfContained;PublishSingleFile;PublishTrimmed" />
     <Error Condition="!Exists('$(_McpPublishDir)sanduhr-mcp.exe')"
            Text="sanduhr-mcp.exe missing from $(_McpPublishDir): the MCP server did not publish into the app payload." />
-    <Message Importance="high" Text="sanduhr-mcp published self-contained into $(_McpPublishDir)" />
+    <!-- Size gate. The trimmed server is about 14 MB; an untrimmed one is about 74 MB
+         (4.7.0, 2026-11-07: a publish where PublishTrimmed did not apply shipped that far
+         into the release run before anyone noticed). Both release scripts (Velopack and
+         MSIX) publish through this target, so the cap fails either build. Raise
+         McpMaxSizeMB only for a measured, intended growth. -->
+    <PropertyGroup>
+      <McpMaxSizeMB Condition="'$(McpMaxSizeMB)' == ''">30</McpMaxSizeMB>
+    </PropertyGroup>
+    <SanduhrGetFileSize Path="$(_McpPublishDir)sanduhr-mcp.exe">
+      <Output TaskParameter="Bytes" PropertyName="_McpBytes" />
+    </SanduhrGetFileSize>
+    <PropertyGroup>
+      <_McpMB>$([System.Math]::Round($([MSBuild]::Divide($(_McpBytes), 1048576.0)), 1))</_McpMB>
+    </PropertyGroup>
+    <Error Condition="$(_McpBytes) &gt; $([MSBuild]::Multiply($(McpMaxSizeMB), 1048576))"
+           Text="sanduhr-mcp.exe is $(_McpMB) MB, over the $(McpMaxSizeMB) MB cap. The server likely published untrimmed (expected about 14 MB): check PublishTrimmed/SelfContained in Sanduhr.Mcp.csproj." />
+    <Message Importance="high" Text="sanduhr-mcp published self-contained into $(_McpPublishDir) ($(_McpMB) MB, cap $(McpMaxSizeMB) MB)" />
   </Target>
+  <UsingTask TaskName="SanduhrGetFileSize" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Path ParameterType="System.String" Required="true" />
+      <Bytes ParameterType="System.Int64" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs">Bytes = new System.IO.FileInfo(Path).Length;</Code>
+    </Task>
+  </UsingTask>
 
 </Project>
