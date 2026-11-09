@@ -156,6 +156,26 @@ public sealed class StreamerRenameTests : AppWindowFixture
     });
 
     [Fact]
+    public void A_real_name_arriving_later_rewrites_the_folders_label_in_streamer_json()
+    {
+        var (service, paths) = Make();
+        service.Load();
+        service.SetOn(true);
+        var folder = Path.Combine(Profile, ".claude-qxwork");
+        Assert.Equal(CodenameRename.Ok, service.Rename(CodenameCategory.Folder, StreamerMask.FolderKey(folder), "Lantern"));
+        var before = JsonNode.Parse(File.ReadAllText(paths.StreamerStateFile))!;
+        Assert.Equal("Lantern", (string?)before["folders"]![StreamerFile.FolderRef(folder)]);
+
+        StreamerMode.Mask.Name(CodenameCategory.Account, "Lantern");   // an account labelled Lantern arrives
+        service.Flush();
+
+        var json = JsonNode.Parse(File.ReadAllText(paths.StreamerStateFile))!;
+        var label = (string?)json["folders"]![StreamerFile.FolderRef(folder)];
+        Assert.NotEqual("Lantern", label);
+        Assert.True(Codenames.IsCodename(label ?? ""), label);
+    }
+
+    [Fact]
     public void Clearing_a_folders_name_keeps_its_label_in_streamer_json()
     {
         var (service, paths) = Make();

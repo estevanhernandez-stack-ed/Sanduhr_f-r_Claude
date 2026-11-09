@@ -139,6 +139,10 @@ public sealed class CodenameBook
         else _shown.Remove((category, real));
     }
 
+    /// <summary>A picked codename went back to a drawn one because a real name that matches it arrived (the row's category). The owner saves
+    /// the book, and rewrites streamer.json when it is a folder: the old label there now equals a real name.</summary>
+    public event Action<CodenameCategory>? Demoted;
+
     /// <summary>A real name just entered the book (drawn for, or shown): a picked codename that equals it would now stand for two names,
     /// so that row goes back to a drawn codename, the same rule <see cref="FromJson"/> applies on load.</summary>
     private void DemoteMatching(CodenameCategory category, string real)
@@ -151,6 +155,7 @@ public sealed class CodenameBook
             _maps[cat].Remove(name);
             _chosen.Remove((cat, name));
             Assign(cat, name);
+            Demoted?.Invoke(cat);
         }
     }
 
