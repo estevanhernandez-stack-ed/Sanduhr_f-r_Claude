@@ -36,6 +36,9 @@ final class IntegrationsModel {
     /// A folder or action in progress.
     private(set) var busy: String?
     var note: (text: String, isError: Bool)?
+    /// The folder `note` is about: it shows inside that folder's box, beside the button that was clicked, not under the
+    /// whole list, where a second folder pushes it out of sight (2.42.3). Nil shows it under the list.
+    private(set) var noteFolder: String?
     /// Folders picked with Choose… this time Settings is open.
     private var chosen: [String] = []
 
@@ -148,6 +151,7 @@ final class IntegrationsModel {
         panel.message = "Choose a Claude Code folder (one with a projects folder or a .claude.json)."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         guard ClaudeCodeFolders.looksLikeHome(url.path, home: home) else {
+            noteFolder = nil
             note = ("That folder doesn't look like a Claude Code folder: it has no projects folder and no .claude.json.", true)
             return
         }
@@ -163,6 +167,7 @@ final class IntegrationsModel {
         // The mod and the hooks run inside Claude Code: no python3 needed.
         guard let python = kind.needsPython ? pythonPath : (pythonPath ?? "") else { return nil }
         busy = folder
+        noteFolder = folder
         defer { busy = nil }
         let outcome = await Task.detached(priority: .userInitiated) { () -> Result<IntegrationInstaller.Outcome, IntegrationInstaller.Failure> in
             do {
@@ -202,6 +207,7 @@ final class IntegrationsModel {
     /// server that can't start is said now: Claude Code itself shows it as no server at all, not as a failed one.
     func checkMCPStarts(folder: String, python: String) async {
         let place = display(folder)
+        noteFolder = folder
         note = (McpLaunchProbe.checking(place), false)
         let launch = IntegrationInstaller.standard.mcpLaunch(python: python)
         let probe = await Task.detached(priority: .userInitiated) {
@@ -221,6 +227,7 @@ final class IntegrationsModel {
         let place = display(folder)
         busy = folder
         defer { busy = nil }
+        noteFolder = folder
         note = (McpLaunchProbe.checkingInstalled(place), false)
         let installer = checkInstaller
         let read = await Task.detached(priority: .userInitiated) {
@@ -278,6 +285,7 @@ final class IntegrationsModel {
             }
         }.value
         await load(linked: linked)
+        noteFolder = folder
         note = failure.map { (message($0), true) }
             ?? ("\(kind.title) removed from \(display(folder)).", false)
     }
@@ -337,11 +345,8 @@ struct IntegrationsSettings: View {
                 .settingsAnchor(SettingsAnchor.folders)
                 folderList
                 GlowHint()
-                if let note = model.note {
-                    Text(note.text)
-                        .font(.caption)
-                        .foregroundStyle(Color.hex(note.isError ? "f87171" : "4ade80"))
-                        .fixedSize(horizontal: false, vertical: true)
+                if let note = model.note, model.noteFolder == nil {
+                    IntegrationNote(text: note.text, isError: note.isError)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -515,11 +520,27 @@ private struct IntegrationFolderBox: View {
                                    check: kind == .mcp ? check : nil)
                 }
                 MetersModLine(text: meters)
+                if let note = model.note, model.noteFolder == folder.path {
+                    IntegrationNote(text: note.text, isError: note.isError)
+                }
             }
             .padding(4)
         } label: {
             Text(model.display(folder.path)).font(.body.monospaced())
         }
+    }
+}
+
+/// The line saying what the last action did: green, or red for an error.
+private struct IntegrationNote: View {
+    let text: String
+    let isError: Bool
+
+    var body: some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(Color.hex(isError ? "f87171" : "4ade80"))
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

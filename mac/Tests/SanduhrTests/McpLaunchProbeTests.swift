@@ -226,6 +226,8 @@ struct McpLaunchProbeTests {
         #expect(model.busy == nil)
         #expect(model.note?.isError == false)
         #expect(model.note?.text.contains("starts and answers (version 0.5.0-mac)") == true)
+        // The sentence shows in this folder's box, where Check was clicked, not under the whole list.
+        #expect(model.noteFolder == folder)
 
         McpLaunchProbe.override = { _, _ in .failed(McpLaunchProbe.exited(3)) }
         await model.checkMCP(folder: folder, linked: [])
