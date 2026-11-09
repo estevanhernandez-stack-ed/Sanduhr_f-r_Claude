@@ -182,6 +182,10 @@ final class IntegrationsModel {
             if kind == .statusline, replaceOther || combine != nil {
                 BandFileWriter.shared.setMeterStyles(combine != nil ? selection.theirs?.ours : nil)
             }
+            if kind == .mcp {
+                await checkMCPStarts(folder: folder, python: python)
+                return nil
+            }
             let what = combine != nil && kind == .statusline
                 ? "Statusline combined with yours" : "\(kind.title) installed"
             note = ("\(what) for \(display(folder)). Claude Code sessions started from now on use it.", false)
@@ -192,6 +196,20 @@ final class IntegrationsModel {
             note = (message(f), true)
             return nil
         }
+    }
+
+    /// #144: the registration being present proves nothing. Start the server as Claude Code will and hear it answer, so a
+    /// server that can't start is said now: Claude Code itself shows it as no server at all, not as a failed one.
+    func checkMCPStarts(folder: String, python: String) async {
+        let place = display(folder)
+        note = (McpLaunchProbe.checking(place), false)
+        let launch = IntegrationInstaller.standard.mcpLaunch(python: python)
+        let probe = await Task.detached(priority: .userInitiated) {
+            McpLaunchProbe.check(command: launch.command, args: launch.args)
+        }.value
+        note = probe.ok
+            ? (McpLaunchProbe.answering(place, version: probe.version), false)
+            : (McpLaunchProbe.notAnswering(place, reason: probe.reason ?? McpLaunchProbe.didNotStart), true)
     }
 
     /// Mods & Config, By Seat's Statusline (item 71, slice 1e): new picks for Sanduhr's own
