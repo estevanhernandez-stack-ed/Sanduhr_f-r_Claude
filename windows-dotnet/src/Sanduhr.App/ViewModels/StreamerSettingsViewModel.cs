@@ -73,10 +73,19 @@ public sealed partial class CodenameRow : ObservableObject
         Editing = true;
     }
 
-    /// <summary>Saves the box: a blank one draws a codename again. A refusal keeps the box open with the reason.</summary>
+    /// <summary>Saves the box: a blank one draws a codename again. An unchanged draft saves nothing. A refusal keeps the box open with the reason.</summary>
     [RelayCommand]
     private void SaveRename()
     {
+        // Nothing to save: the draft is the codename as it stands (saving it would mark a drawn name as named), or blank on a row that
+        // has no named codename to give back. Close the box without a write or a rebuild of every masked page.
+        var text = Draft.Trim();
+        if (text == Codename || (text.Length == 0 && (Codename.Length == 0 || !Chosen)))
+        {
+            RenameError = "";
+            Editing = false;
+            return;
+        }
         var verdict = _service.Rename(Category, Real, Draft);
         if (verdict is CodenameRename.Ok or CodenameRename.Cleared)
         {

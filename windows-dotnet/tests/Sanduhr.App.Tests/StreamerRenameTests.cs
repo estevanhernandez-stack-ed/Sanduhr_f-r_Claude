@@ -155,6 +155,92 @@ public sealed class StreamerRenameTests : AppWindowFixture
         finally { widget.Dispose(); }
     });
 
+    [Fact]
+    public void A_real_name_arriving_later_rewrites_the_folders_label_in_streamer_json()
+    {
+        var (service, paths) = Make();
+        service.Load();
+        service.SetOn(true);
+        var folder = Path.Combine(Profile, ".claude-qxwork");
+        Assert.Equal(CodenameRename.Ok, service.Rename(CodenameCategory.Folder, StreamerMask.FolderKey(folder), "Lantern"));
+        var before = JsonNode.Parse(File.ReadAllText(paths.StreamerStateFile))!;
+        Assert.Equal("Lantern", (string?)before["folders"]![StreamerFile.FolderRef(folder)]);
+
+        StreamerMode.Mask.Name(CodenameCategory.Account, "Lantern");   // an account labelled Lantern arrives
+        service.Flush();
+
+        var json = JsonNode.Parse(File.ReadAllText(paths.StreamerStateFile))!;
+        var label = (string?)json["folders"]![StreamerFile.FolderRef(folder)];
+        Assert.NotEqual("Lantern", label);
+        Assert.True(Codenames.IsCodename(label ?? ""), label);
+    }
+
+    [Fact]
+    public void Clearing_a_folders_name_keeps_its_label_in_streamer_json()
+    {
+        var (service, paths) = Make();
+        service.Load();
+        service.SetOn(true);
+        var folder = Path.Combine(Profile, ".claude-qxwork");
+        var key = StreamerMask.FolderKey(folder);
+        Assert.Equal(CodenameRename.Ok, service.Rename(CodenameCategory.Folder, key, "Work Bench"));
+
+        Assert.Equal(CodenameRename.Cleared, service.Rename(CodenameCategory.Folder, key, ""));
+
+        var json = JsonNode.Parse(File.ReadAllText(paths.StreamerStateFile))!;
+        var label = (string?)json["folders"]![StreamerFile.FolderRef(folder)];
+        Assert.True(Codenames.IsCodename(label ?? ""), label);
+        Assert.Contains(service.Entries(), e => e.Real == key && e.Codename == label && !e.Chosen);
+    }
+
+    [Fact]
+    public void Saving_an_unchanged_draft_or_a_blank_on_an_unnamed_row_writes_nothing() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Qxalpha");
+        try
+        {
+            widget.Streamer.SetOn(true);
+            var code = StreamerMode.Mask.Name(CodenameCategory.Account, "Qxalpha");
+            var vm = new StreamerSettingsViewModel(widget.Streamer, _ => "");
+            try
+            {
+                var row = vm.Rows.Single(r => r.Real == "Qxalpha");
+                int changed = 0;
+                widget.Streamer.Changed += () => changed++;
+
+                row.RenameCommand.Execute(null);
+                row.SaveRenameCommand.Execute(null);   // Enter on the drawn name, untouched
+                Assert.False(row.Editing);
+                Assert.Equal(0, changed);
+
+                row.RenameCommand.Execute(null);
+                row.Draft = "  ";
+                row.SaveRenameCommand.Execute(null);   // blank on a drawn (never named) codename
+                Assert.False(row.Editing);
+                Assert.Equal(0, changed);
+
+                vm.Read();
+                row = vm.Rows.Single(r => r.Real == "Qxalpha");
+                Assert.False(row.Chosen);
+                Assert.Equal(code, row.Codename);
+                Assert.DoesNotContain(widget.Streamer.Entries(), e => e.Real == "Qxalpha" && e.Chosen);
+
+                // A real change still saves, and a named codename saved again unchanged is also left alone.
+                row.RenameCommand.Execute(null);
+                row.Draft = "Lantern";
+                row.SaveRenameCommand.Execute(null);
+                Assert.Equal(1, changed);
+                vm.Read();
+                row = vm.Rows.Single(r => r.Real == "Qxalpha");
+                row.RenameCommand.Execute(null);
+                row.SaveRenameCommand.Execute(null);
+                Assert.Equal(1, changed);
+            }
+            finally { vm.Detach(); }
+        }
+        finally { widget.Dispose(); }
+    });
+
     private static IEnumerable<T> Below<T>(DependencyObject root) where T : DependencyObject
     {
         for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)

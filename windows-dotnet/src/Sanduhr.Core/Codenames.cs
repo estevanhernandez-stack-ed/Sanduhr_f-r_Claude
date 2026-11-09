@@ -20,7 +20,7 @@ public enum CodenameCategory { Account, Email, Folder, Project, Skill, Repo, Run
 public sealed record CodenameEntry(CodenameCategory Category, string Real, string? Codename, bool Shown, bool Chosen = false);
 
 /// <summary>What <see cref="CodenameBook.Rename"/> made of a picked codename. Anything but <see cref="Ok"/> and <see cref="Cleared"/> left the book as it was.</summary>
-public enum CodenameRename { Ok, Cleared, TooLong, BadCharacter, Taken, RealName }
+public enum CodenameRename { Ok, Cleared, TooLong, BadCharacter, Taken, RealName, TooLongForFolder }
 
 /// <summary>
 /// The salt, the map per category (real name → codename) and the allowlist: <c>%APPDATA%\Sanduhr\codenames.json</c> (spec). First-seen and
@@ -30,7 +30,7 @@ public enum CodenameRename { Ok, Cleared, TooLong, BadCharacter, Taken, RealName
 public sealed class CodenameBook
 {
     private readonly Dictionary<CodenameCategory, Dictionary<string, string>> _maps = [];
-    private readonly HashSet<string> _used = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _used = new(StringComparer.OrdinalIgnoreCase);   // a codename is one name however it is cased: "dune fox" and "Dune Fox" never both show
     private readonly HashSet<(CodenameCategory, string)> _shown = [];
     /// <summary>Names whose codename the person picked: kept through <see cref="Shuffle"/>, saved under <c>chosen</c>.</summary>
     private readonly HashSet<(CodenameCategory, string)> _chosen = [];
@@ -77,6 +77,7 @@ public sealed class CodenameBook
                     continue;
                 Map(category)[real] = name;
                 _used.Add(name);
+                DemoteMatching(category, real);
                 return name;
             }
         }
@@ -88,9 +89,10 @@ public sealed class CodenameBook
 
     /// <summary>
     /// Rename… on a row of Show the real name: <paramref name="name"/> becomes the name's codename and stays through Shuffle. Blank gives
-    /// the name back to the pool (its next use draws one). Refused, and nothing changes, when it is longer than
+    /// the name back to the pool: a name that had a picked codename draws a new one at once, so its row stays listed and a folder keeps
+    /// its label; a name with none is left alone. Refused, and nothing changes, when it is longer than
     /// <see cref="Codenames.MaxChosenLength"/>, carries a control or formatting character, is already another name's codename in any
-    /// category, or equals a real name in the book (ignoring case; a folder's leaf counts).
+    /// category, or equals a real name in the book (ignoring case; a folder's leaf counts, as does the label the statusline prints for it, and so does the Windows user name).
     /// </summary>
     public CodenameRename Rename(CodenameCategory category, string real, string? name)
     {
@@ -102,14 +104,15 @@ public sealed class CodenameBook
             {
                 Map(category).Remove(real);
                 _used.Remove(current);
+                _chosen.Remove((category, real));
+                Assign(category, real);
             }
-            _chosen.Remove((category, real));
             return CodenameRename.Cleared;
         }
-        var verdict = Codenames.CheckChosen(text);
+        var verdict = Codenames.CheckChosen(text, category);
         if (verdict != CodenameRename.Ok)
             return verdict;
-        if (_used.Any(u => u != current && string.Equals(u, text, StringComparison.OrdinalIgnoreCase)))
+        if (_used.Contains(text) && !string.Equals(current, text, StringComparison.OrdinalIgnoreCase))
             return CodenameRename.Taken;
         if (RealNames().Any(r => Codenames.MatchesReal(text, r.Item1, r.Item2)) || Codenames.MatchesReal(text, category, real))
             return CodenameRename.RealName;
@@ -121,13 +124,39 @@ public sealed class CodenameBook
         return CodenameRename.Ok;
     }
 
-    private IEnumerable<(CodenameCategory, string)> RealNames() =>
-        _maps.SelectMany(m => m.Value.Keys.Select(real => (m.Key, real))).Concat(_shown);
+    private IEnumerable<(CodenameCategory, string)> RealNames() => RealNamesOf(_maps.SelectMany(m => m.Value.Keys.Select(real => (m.Key, real))), _shown);
+
+    private static IEnumerable<(CodenameCategory, string)> RealNamesOf(IEnumerable<(CodenameCategory, string)> mapped, IEnumerable<(CodenameCategory, string)> shown) =>
+        mapped.Concat(shown);
 
     public void SetShown(CodenameCategory category, string real, bool shown)
     {
-        if (shown) _shown.Add((category, real));
+        if (shown)
+        {
+            _shown.Add((category, real));
+            DemoteMatching(category, real);
+        }
         else _shown.Remove((category, real));
+    }
+
+    /// <summary>A picked codename went back to a drawn one because a real name that matches it arrived (the row's category). The owner saves
+    /// the book, and rewrites streamer.json when it is a folder: the old label there now equals a real name.</summary>
+    public event Action<CodenameCategory>? Demoted;
+
+    /// <summary>A real name just entered the book (drawn for, or shown): a picked codename that equals it would now stand for two names,
+    /// so that row goes back to a drawn codename, the same rule <see cref="FromJson"/> applies on load.</summary>
+    private void DemoteMatching(CodenameCategory category, string real)
+    {
+        var clashes = _chosen.Where(c => (c.Item1, c.Item2) != (category, real) && _maps[c.Item1][c.Item2] is var code
+            && Codenames.MatchesReal(code, category, real)).ToList();
+        foreach (var (cat, name) in clashes)
+        {
+            _used.Remove(_maps[cat][name]);
+            _maps[cat].Remove(name);
+            _chosen.Remove((cat, name));
+            Assign(cat, name);
+            Demoted?.Invoke(cat);
+        }
     }
 
     /// <summary>Shuffle codenames… (spec): a new salt and an empty map. The allowlist is kept, and so is every codename the person
@@ -136,14 +165,12 @@ public sealed class CodenameBook
     {
         if (salt is null || salt.Length < Codenames.MinSaltBytes)
             throw new ArgumentException("The salt is too short.", nameof(salt));
-        var kept = _chosen.Select(c => (c.Item1, c.Item2, TryGet(c.Item1, c.Item2, out var code) ? code : "")).ToList();
+        var kept = _chosen.Select(c => (c.Item1, c.Item2, _maps[c.Item1][c.Item2])).ToList();   // every picked name has its codename in the map
         Salt = (byte[])salt.Clone();
         _maps.Clear();
         _used.Clear();
         foreach (var (category, real, code) in kept)
         {
-            if (code.Length == 0)
-                continue;
             Map(category)[real] = code;
             _used.Add(code);
         }
@@ -221,10 +248,10 @@ public sealed class CodenameBook
                         book._shown.Add((category, real));
             }
         }
-        var reals = chosen.Concat(drawn).Select(p => (p.Category, p.Real)).Concat(book._shown).ToList();
+        var reals = RealNamesOf(chosen.Concat(drawn).Select(p => (p.Category, p.Real)), book._shown).ToList();
         foreach (var (category, real, code) in chosen)
         {
-            if (Codenames.CheckChosen(code) != CodenameRename.Ok || book._used.Contains(code, StringComparer.OrdinalIgnoreCase)
+            if (Codenames.CheckChosen(code, category) != CodenameRename.Ok || book._used.Contains(code)
                 || reals.Any(r => Codenames.MatchesReal(code, r.Item1, r.Item2)) || book.TryGet(category, real, out _))
                 continue;
             book.Map(category)[real] = code;
@@ -279,6 +306,9 @@ public static partial class Codenames
     public const int MaxFileBytes = 4 * 1024 * 1024;
     /// <summary>The longest codename Rename… takes: two pool words with a numeral are under 20, and a line on stream has little room.</summary>
     public const int MaxChosenLength = 32;
+    /// <summary>A Claude Code folder's codename reaches the statusline, whose <c>Clean-Label</c> cuts a label at this many characters; a
+    /// longer one would show cut. Pinned against the script by a test.</summary>
+    public const int MaxFolderChosenLength = 24;
 
     public static IReadOnlyList<string> FirstWords { get; } =
         ["Dune", "Amber", "Mesa", "Dusk", "Ember", "Quartz", "Ochre", "Mirage", "Saffron", "Drift", "Tawny", "Opal", "Cinder", "Zenith"];
@@ -349,32 +379,49 @@ public static partial class Codenames
 
     /// <summary>
     /// The shape rules for a codename the person picks (Rename…), before uniqueness and real names: trimmed, 1 to
-    /// <see cref="MaxChosenLength"/> characters, and no control, formatting (bidi overrides, zero-width), separator-line or lone surrogate
-    /// characters, which would let a codename hide text or reorder a line on stream. Letters of any script, digits, spaces and punctuation are fine.
+    /// <see cref="MaxChosenLength"/> characters, and no control, formatting (bidi overrides, zero-width, tag), separator-line, private-use, lone surrogate or
+    /// invisible filler characters (variation selectors, Hangul fillers, the braille blank), astral ones included, which would let a codename hide text or reorder a line on stream. Letters of any script, digits, spaces and punctuation are fine.
     /// </summary>
-    public static CodenameRename CheckChosen(string text)
+    public static CodenameRename CheckChosen(string text, CodenameCategory? category = null)
     {
         if (text.Length == 0 || text != text.Trim())
             return CodenameRename.BadCharacter;
+        if (category == CodenameCategory.Folder && text.Length > MaxFolderChosenLength)
+            return CodenameRename.TooLongForFolder;
         if (text.Length > MaxChosenLength)
             return CodenameRename.TooLong;
         for (int i = 0; i < text.Length; i++)
         {
             char c = text[i];
+            // The category of the whole scalar: an astral character (a tag character, a plane-15 private-use glyph) is judged like a BMP one.
+            // A lone surrogate comes back as Surrogate and is refused below.
+            var kind = CharUnicodeInfo.GetUnicodeCategory(text, i);
+            int scalar = c;
             if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
             {
+                scalar = char.ConvertToUtf32(c, text[i + 1]);
                 i++;
-                continue;
             }
-            var kind = CharUnicodeInfo.GetUnicodeCategory(c);
             if (kind is UnicodeCategory.Control or UnicodeCategory.Format or UnicodeCategory.LineSeparator
                 or UnicodeCategory.ParagraphSeparator or UnicodeCategory.Surrogate or UnicodeCategory.PrivateUse or UnicodeCategory.OtherNotAssigned)
                 return CodenameRename.BadCharacter;
-            if (char.IsWhiteSpace(c) && c != ' ')
+            if (IsInvisible(scalar))
+                return CodenameRename.BadCharacter;
+            if (scalar < 0x10000 && char.IsWhiteSpace(c) && c != ' ')
                 return CodenameRename.BadCharacter;
         }
         return CodenameRename.Ok;
     }
+
+    /// <summary>
+    /// A character that draws nothing but is not a control or format character: the Unicode default-ignorable blanks that sit in the
+    /// letter, mark and symbol categories (variation selectors, the combining grapheme joiner, the Hangul and halfwidth Hangul fillers, the
+    /// Khmer inherent vowels, the Mongolian free variation selectors) and the braille blank. A fixed list on purpose: refusing every
+    /// nonspacing mark would refuse a decomposed "e" + U+0301, an ordinary accented letter.
+    /// </summary>
+    private static bool IsInvisible(int scalar) => scalar is
+        0x034F or 0x115F or 0x1160 or 0x17B4 or 0x17B5 or (>= 0x180B and <= 0x180D) or 0x180F or 0x2800 or 0x3164
+        or (>= 0xFE00 and <= 0xFE0F) or 0xFFA0 or (>= 0xE0100 and <= 0xE01EF);
 
     /// <summary>
     /// Whether a picked codename would show a real name: equal to it, ignoring case and surrounding spaces. A folder's key is its full
@@ -384,18 +431,32 @@ public static partial class Codenames
     public static bool MatchesReal(string codename, CodenameCategory category, string real)
     {
         static bool Same(string a, string b) => b.Length > 0 && string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
-        if (Same(codename, real))
+        if (Same(codename, real) || Same(codename, Environment.UserName))
             return true;
         if (category == CodenameCategory.Folder)
         {
             var leaf = real.TrimEnd('\\', '/');
             int cut = leaf.LastIndexOfAny(['\\', '/']);
             leaf = cut >= 0 ? leaf[(cut + 1)..] : leaf;
-            return Same(codename, leaf) || Same(codename, leaf.TrimStart('.'));
+            return Same(codename, leaf) || Same(codename, leaf.TrimStart('.')) || Same(codename, StatuslineLabel(leaf));
         }
         if (category == CodenameCategory.Email && real.IndexOf('@') is > 0 and var at)
             return Same(codename, real[..at]);
         return false;
+    }
+
+    /// <summary>
+    /// The label the statusline prints for a folder whose leaf is <paramref name="leaf"/>: <c>Get-FolderLabel</c> in
+    /// <see cref="StatuslineScript"/>, which strips a leading <c>.claude-</c> (ignoring case), prints nothing for <c>.claude</c> and
+    /// otherwise drops the leading dots. One rule here so a codename can't equal what the statusline would show; a test pins the script's text.
+    /// </summary>
+    public static string StatuslineLabel(string leaf)
+    {
+        if (leaf.StartsWith(".claude-", StringComparison.OrdinalIgnoreCase))
+            return leaf[8..].Trim();
+        if (string.Equals(leaf, ".claude", StringComparison.OrdinalIgnoreCase))
+            return "";
+        return leaf.TrimStart('.').Trim();
     }
 
     /// <summary>The book in <paramref name="path"/>; null when the file is missing, too large, not JSON or not a book.</summary>

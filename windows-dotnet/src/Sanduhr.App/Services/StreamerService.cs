@@ -185,6 +185,7 @@ public sealed class StreamerService : IDisposable
         if (_book is null)
         {
             _book = Codenames.Load(_paths.CodenamesFile) ?? CodenameBook.New();   // streamer: notname - a file location used for IO, never drawn
+            _book.Demoted += OnAssigned;   // a demoted folder row changes streamer.json's label for it, whichever category's name triggered it
         }
         return _book;
     }
