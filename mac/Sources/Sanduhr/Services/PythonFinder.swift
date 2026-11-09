@@ -60,10 +60,26 @@ enum PythonFinder {
 
     /// The real search. Runs pythons: call it off the main thread.
     static func find() -> Result {
-        let fm = FileManager.default
-        let dev = try? fm.destinationOfSymbolicLink(atPath: selectLink)
-        return find(fileExists: { fm.isExecutableFile(atPath: $0) || fm.fileExists(atPath: $0) },
-                    developerDir: dev, probe: probe)
+        find(fileExists: diskHas, developerDir: selectedDeveloperDir(), probe: probe)
+    }
+
+    /// The stub forwards to a real python3, by the same file checks `candidates` makes; nothing runs. An entry that
+    /// names the stub when this is false would open Apple's install dialog the moment anything starts it (2.42.3).
+    static func stubUsable(fileExists: (String) -> Bool, developerDir: String?) -> Bool {
+        candidates(fileExists: fileExists, developerDir: developerDir).contains(systemStub)
+    }
+
+    /// The same, against the disk.
+    static func stubUsable() -> Bool {
+        stubUsable(fileExists: diskHas, developerDir: selectedDeveloperDir())
+    }
+
+    private static func diskHas(_ path: String) -> Bool {
+        FileManager.default.isExecutableFile(atPath: path) || FileManager.default.fileExists(atPath: path)
+    }
+
+    private static func selectedDeveloperDir() -> String? {
+        try? FileManager.default.destinationOfSymbolicLink(atPath: selectLink)
     }
 
     /// `python3 -c` printing "major.minor", with a five-second limit.

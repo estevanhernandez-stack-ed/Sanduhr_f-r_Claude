@@ -212,6 +212,34 @@ final class IntegrationsModel {
             : (McpLaunchProbe.notAnswering(place, reason: probe.reason ?? McpLaunchProbe.didNotStart), true)
     }
 
+    /// What Check reads the registered entry with (tests point it at a temp home).
+    var checkInstaller: IntegrationInstaller = .standard
+
+    /// Check on an installed MCP row (2.42.3): start the entry `folder`'s `.claude.json` registers, as Claude Code will
+    /// run it (not what Install would write now), and say what it heard.
+    func checkMCP(folder: String, linked: [String]) async {
+        let place = display(folder)
+        busy = folder
+        defer { busy = nil }
+        note = (McpLaunchProbe.checkingInstalled(place), false)
+        let installer = checkInstaller
+        let read = await Task.detached(priority: .userInitiated) {
+            (launch: installer.registeredMCPLaunch(folder: folder), status: installer.status(.mcp, folder: folder))
+        }.value
+        guard let launch = read.launch else {
+            await load(linked: linked)
+            note = (McpLaunchProbe.noEntry(place), true)
+            return
+        }
+        let probe = await Task.detached(priority: .userInitiated) {
+            McpLaunchProbe.check(command: launch.command, args: launch.args)
+        }.value
+        note = probe.ok
+            ? (McpLaunchProbe.answeringInstalled(place, version: probe.version), false)
+            : (McpLaunchProbe.notAnsweringInstalled(place, reason: probe.reason ?? McpLaunchProbe.didNotStart,
+                                                    outdated: read.status == .outdated), true)
+    }
+
     /// Mods & Config, By Seat's Statusline (item 71, slice 1e): new picks for Sanduhr's own
     /// entry, alone or combined, written as an update (the receipt and Remove are unchanged).
     /// Nil when written, else what went wrong.
@@ -354,6 +382,7 @@ struct IntegrationsSettings: View {
                                  install: { kind in ask(kind, folder: f.path) },
                                  update: { kind in Task { await run(kind, folder: f.path, replace: false, combine: nil) } },
                                  remove: { kind in Task { await model.remove(kind, folder: f.path, linked: linked) } },
+                                 check: { Task { await model.checkMCP(folder: f.path, linked: linked) } },
                                  openAccounts: { owner in
                                      navigation.accountToShow = owner
                                      navigation.selection = .credentials
@@ -468,6 +497,8 @@ private struct IntegrationFolderBox: View {
     let install: (IntegrationKind) -> Void
     let update: (IntegrationKind) -> Void
     let remove: (IntegrationKind) -> Void
+    /// Check on the MCP server row (2.42.3).
+    let check: () -> Void
     let openAccounts: (String?) -> Void
 
     var body: some View {
@@ -480,7 +511,8 @@ private struct IntegrationFolderBox: View {
                                    file: model.configDisplay(kind, folder: folder.path),
                                    enabled: model.canRun(kind),
                                    install: { install(kind) }, update: { update(kind) },
-                                   remove: { remove(kind) })
+                                   remove: { remove(kind) },
+                                   check: kind == .mcp ? check : nil)
                 }
                 MetersModLine(text: meters)
             }
@@ -543,6 +575,8 @@ private struct IntegrationRow: View {
     let install: () -> Void
     let update: () -> Void
     let remove: () -> Void
+    /// Starts what is registered and says whether it answers; only the MCP server row has it (2.42.3).
+    var check: (() -> Void)?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -571,13 +605,26 @@ private struct IntegrationRow: View {
             Button("Install…", action: install).disabled(!enabled)
         case .outdated:
             HStack {
+                checkButton
                 Button("Update", action: update).disabled(!enabled)
                 Button("Remove", action: remove).disabled(!enabled)
             }
         case .installed:
-            Button("Remove", action: remove).disabled(!enabled)
+            HStack {
+                checkButton
+                Button("Remove", action: remove).disabled(!enabled)
+            }
         case .unreadable:
             EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private var checkButton: some View {
+        if let check {
+            Button("Check", action: check)
+                .disabled(!enabled)
+                .help("Start the registered server the way Claude Code does, and say whether it answers.")
         }
     }
 }

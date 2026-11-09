@@ -39,6 +39,21 @@ enum McpLaunchProbe {
             + "Install again, or check that Python 3 runs."
     }
 
+    // The status line after Check on an installed row (2.42.3).
+    static func checkingInstalled(_ place: String) -> String { "Checking that the MCP server for \(place) starts\u{2026}" }
+    static func answeringInstalled(_ place: String, version: String?) -> String {
+        let v = version.map { $0.isEmpty ? "" : " (version \($0))" } ?? ""
+        return "The MCP server for \(place) starts and answers\(v). Claude Code sessions started from now on use it."
+    }
+    static func notAnsweringInstalled(_ place: String, reason: String, outdated: Bool) -> String {
+        "The MCP server for \(place) doesn't start: \(reason). "
+            + (outdated ? "Click Update to point it at this version's server."
+                        : "Claude Code won't see it until this is fixed. Remove it and install again, or check that Python 3 runs.")
+    }
+    static func noEntry(_ place: String) -> String {
+        "The MCP server isn't registered for \(place) any more, so there was nothing to check."
+    }
+
     // The reasons, in the status line's words. None names a path.
     static let noPython = "the Python 3 it runs is missing"
     static let noServerFile = "the server file it runs is missing"
@@ -53,9 +68,13 @@ enum McpLaunchProbe {
         return check(command: command, args: args, timeout: defaultTimeout)
     }
 
-    static func check(command: String, args: [String], timeout: TimeInterval) -> McpProbeResult {
+    /// `stubUsable` stands in for `PythonFinder.stubUsable()` (tests never look at the real developer tools).
+    static func check(command: String, args: [String], timeout: TimeInterval,
+                      stubUsable: () -> Bool = PythonFinder.stubUsable) -> McpProbeResult {
         let fm = FileManager.default
         guard fm.isExecutableFile(atPath: command) else { return .failed(noPython) }
+        // Apple's stub with no developer tools behind it opens macOS's install dialog when started: never start it.
+        if command == PythonFinder.systemStub, !stubUsable() { return .failed(noPython) }
         if let script = args.first, script.hasSuffix(".py"), !fm.fileExists(atPath: script) { return .failed(noServerFile) }
 
         // network: local (Sanduhr's own MCP server on this Mac; the server has no network by contract)
