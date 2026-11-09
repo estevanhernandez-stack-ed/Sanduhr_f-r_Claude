@@ -36,6 +36,9 @@ final class IntegrationsModel {
     /// A folder or action in progress.
     private(set) var busy: String?
     var note: (text: String, isError: Bool)?
+    /// The folder `note` is about: it shows inside that folder's box, beside the button that was clicked, not under the
+    /// whole list, where a second folder pushes it out of sight (2.42.3). Nil shows it under the list.
+    private(set) var noteFolder: String?
     /// Folders picked with Choose… this time Settings is open.
     private var chosen: [String] = []
 
@@ -148,6 +151,7 @@ final class IntegrationsModel {
         panel.message = "Choose a Claude Code folder (one with a projects folder or a .claude.json)."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         guard ClaudeCodeFolders.looksLikeHome(url.path, home: home) else {
+            noteFolder = nil
             note = ("That folder doesn't look like a Claude Code folder: it has no projects folder and no .claude.json.", true)
             return
         }
@@ -163,6 +167,7 @@ final class IntegrationsModel {
         // The mod and the hooks run inside Claude Code: no python3 needed.
         guard let python = kind.needsPython ? pythonPath : (pythonPath ?? "") else { return nil }
         busy = folder
+        noteFolder = folder
         defer { busy = nil }
         let outcome = await Task.detached(priority: .userInitiated) { () -> Result<IntegrationInstaller.Outcome, IntegrationInstaller.Failure> in
             do {
@@ -202,6 +207,7 @@ final class IntegrationsModel {
     /// server that can't start is said now: Claude Code itself shows it as no server at all, not as a failed one.
     func checkMCPStarts(folder: String, python: String) async {
         let place = display(folder)
+        noteFolder = folder
         note = (McpLaunchProbe.checking(place), false)
         let launch = IntegrationInstaller.standard.mcpLaunch(python: python)
         let probe = await Task.detached(priority: .userInitiated) {
@@ -210,6 +216,35 @@ final class IntegrationsModel {
         note = probe.ok
             ? (McpLaunchProbe.answering(place, version: probe.version), false)
             : (McpLaunchProbe.notAnswering(place, reason: probe.reason ?? McpLaunchProbe.didNotStart), true)
+    }
+
+    /// What Check reads the registered entry with (tests point it at a temp home).
+    var checkInstaller: IntegrationInstaller = .standard
+
+    /// Check on an installed MCP row (2.42.3): start the entry `folder`'s `.claude.json` registers, as Claude Code will
+    /// run it (not what Install would write now), and say what it heard.
+    func checkMCP(folder: String, linked: [String]) async {
+        let place = display(folder)
+        busy = folder
+        defer { busy = nil }
+        noteFolder = folder
+        note = (McpLaunchProbe.checkingInstalled(place), false)
+        let installer = checkInstaller
+        let read = await Task.detached(priority: .userInitiated) {
+            (launch: installer.registeredMCPLaunch(folder: folder), status: installer.status(.mcp, folder: folder))
+        }.value
+        guard let launch = read.launch else {
+            await load(linked: linked)
+            note = (McpLaunchProbe.noEntry(place), true)
+            return
+        }
+        let probe = await Task.detached(priority: .userInitiated) {
+            McpLaunchProbe.check(command: launch.command, args: launch.args)
+        }.value
+        note = probe.ok
+            ? (McpLaunchProbe.answeringInstalled(place, version: probe.version), false)
+            : (McpLaunchProbe.notAnsweringInstalled(place, reason: probe.reason ?? McpLaunchProbe.didNotStart,
+                                                    outdated: read.status == .outdated), true)
     }
 
     /// Mods & Config, By Seat's Statusline (item 71, slice 1e): new picks for Sanduhr's own
@@ -250,6 +285,7 @@ final class IntegrationsModel {
             }
         }.value
         await load(linked: linked)
+        noteFolder = folder
         note = failure.map { (message($0), true) }
             ?? ("\(kind.title) removed from \(display(folder)).", false)
     }
@@ -309,11 +345,8 @@ struct IntegrationsSettings: View {
                 .settingsAnchor(SettingsAnchor.folders)
                 folderList
                 GlowHint()
-                if let note = model.note {
-                    Text(note.text)
-                        .font(.caption)
-                        .foregroundStyle(Color.hex(note.isError ? "f87171" : "4ade80"))
-                        .fixedSize(horizontal: false, vertical: true)
+                if let note = model.note, model.noteFolder == nil {
+                    IntegrationNote(text: note.text, isError: note.isError)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -354,6 +387,7 @@ struct IntegrationsSettings: View {
                                  install: { kind in ask(kind, folder: f.path) },
                                  update: { kind in Task { await run(kind, folder: f.path, replace: false, combine: nil) } },
                                  remove: { kind in Task { await model.remove(kind, folder: f.path, linked: linked) } },
+                                 check: { Task { await model.checkMCP(folder: f.path, linked: linked) } },
                                  openAccounts: { owner in
                                      navigation.accountToShow = owner
                                      navigation.selection = .credentials
@@ -468,6 +502,8 @@ private struct IntegrationFolderBox: View {
     let install: (IntegrationKind) -> Void
     let update: (IntegrationKind) -> Void
     let remove: (IntegrationKind) -> Void
+    /// Check on the MCP server row (2.42.3).
+    let check: () -> Void
     let openAccounts: (String?) -> Void
 
     var body: some View {
@@ -480,14 +516,31 @@ private struct IntegrationFolderBox: View {
                                    file: model.configDisplay(kind, folder: folder.path),
                                    enabled: model.canRun(kind),
                                    install: { install(kind) }, update: { update(kind) },
-                                   remove: { remove(kind) })
+                                   remove: { remove(kind) },
+                                   check: kind == .mcp ? check : nil)
                 }
                 MetersModLine(text: meters)
+                if let note = model.note, model.noteFolder == folder.path {
+                    IntegrationNote(text: note.text, isError: note.isError)
+                }
             }
             .padding(4)
         } label: {
             Text(model.display(folder.path)).font(.body.monospaced())
         }
+    }
+}
+
+/// The line saying what the last action did: green, or red for an error.
+private struct IntegrationNote: View {
+    let text: String
+    let isError: Bool
+
+    var body: some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(Color.hex(isError ? "f87171" : "4ade80"))
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -543,6 +596,8 @@ private struct IntegrationRow: View {
     let install: () -> Void
     let update: () -> Void
     let remove: () -> Void
+    /// Starts what is registered and says whether it answers; only the MCP server row has it (2.42.3).
+    var check: (() -> Void)?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -571,13 +626,26 @@ private struct IntegrationRow: View {
             Button("Install…", action: install).disabled(!enabled)
         case .outdated:
             HStack {
+                checkButton
                 Button("Update", action: update).disabled(!enabled)
                 Button("Remove", action: remove).disabled(!enabled)
             }
         case .installed:
-            Button("Remove", action: remove).disabled(!enabled)
+            HStack {
+                checkButton
+                Button("Remove", action: remove).disabled(!enabled)
+            }
         case .unreadable:
             EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private var checkButton: some View {
+        if let check {
+            Button("Check", action: check)
+                .disabled(!enabled)
+                .help("Start the registered server the way Claude Code does, and say whether it answers.")
         }
     }
 }

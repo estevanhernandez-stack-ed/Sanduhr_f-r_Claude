@@ -296,7 +296,11 @@ and `StatuslineInstaller` do. After an MCP install (2.42.2, #144, Windows #470) 
 `command` and `args` (`IntegrationInstaller.mcpLaunch`) through `ProcessRunner` with one `initialize` on stdin and a 15 s
 timeout, and the status line says the server is answering (with its version) or why not: python3 missing, the script
 missing, couldn't start, stopped at once with its exit code, no answer in time, not MCP, or a different server. stderr is
-never shown. A registration alone proves nothing: a command that can't start is listed by Claude Code as no server, not a failed one:
+never shown. An installed or outdated MCP row has **Check** (2.42.3): `IntegrationsModel.checkMCP` reads the entry the file
+registers now (`IntegrationInstaller.registeredMCPLaunch`, not what Install would write) and runs the same probe, with
+advice to Update on an outdated row. Apple's `/usr/bin/python3` stub with no developer tools behind it
+(`PythonFinder.stubUsable`, file checks only) is never started, since that opens Apple's install dialog: the probe says
+Python is missing, and `isCurrent` reads such an entry as outdated. A registration alone proves nothing: a command that can't start is listed by Claude Code as no server, not a failed one:
 
 ```jsonc
 // <folder>/.claude.json, or for ~/.claude the placement rule's file (see Mods)

@@ -164,6 +164,8 @@ struct IntegrationInstaller {
     /// The home folder the placement rule is relative to.
     let home: String
     let scripts: IntegrationScripts
+    /// Apple's python3 stub forwards to real developer tools (`PythonFinder.stubUsable`); tests stand in for the disk.
+    var stubUsable: @Sendable () -> Bool = { PythonFinder.stubUsable() }
 
     static let serverName = "sanduhr"
     static let statusLineKey = "statusLine"
@@ -224,6 +226,18 @@ struct IntegrationInstaller {
     /// The command and arguments the `sanduhr` MCP entry registers: what Claude Code runs, and what the install check runs.
     func mcpLaunch(python: String) -> (command: String, args: [String]) {
         (python, [scripts.installedPath(IntegrationScripts.mcpScript)])
+    }
+
+    /// The `command` and `args` of the `sanduhr` entry in `folder`'s `.claude.json`, as Claude Code will run them, for
+    /// Check (2.42.3): what the file says now, not what Install would write. Nil when there is no entry of Sanduhr's
+    /// or it has no string command; `args` that aren't all strings read as none. Reads a file: off the main thread.
+    func registeredMCPLaunch(folder: String) -> (command: String, args: [String])? {
+        guard let data = FileManager.default.contents(atPath: configFile(.mcp, folder: folder)),
+              let root = try? JSONEdit.root(data),
+              let servers = root[Self.serversKey] as? [String: Any],
+              let value = servers[Self.serverName], Self.isOurMCP(value),
+              let o = value as? [String: Any], let command = o["command"] as? String else { return nil }
+        return (command, o["args"] as? [String] ?? [])
     }
 
     func entry(_ kind: IntegrationKind, python: String) -> JSONEdit.Value {
@@ -468,6 +482,8 @@ struct IntegrationInstaller {
         case .mcp:
             guard let command = o["command"] as? String, fm.isExecutableFile(atPath: command),
                   let args = o["args"] as? [String] else { return false }
+            // The stub is an executable file even with no developer tools behind it: then it is not a python (2.42.3).
+            if command == PythonFinder.systemStub, !stubUsable() { return false }
             return args == [scripts.installedPath(IntegrationScripts.mcpScript)]
         case .statusline:
             guard let command = (o["command"] as? String).flatMap(Self.parseStatusline)?.base else { return false }

@@ -2862,3 +2862,25 @@ relative to `mac/smoke/fixtures`. The scenario sets a made-up companion pick, in
 refusal sentence, that `bad-no-license` is not installed and that the pick is unchanged. A run takes the pack out again
 (`widget-remove good-sprite`, by the restore plan) and puts the companion pick back. The hooks only touch packs made here: `widget-remove`
 refuses a catalog pack. `ruby smoke/selftest.rb` runs the scenario against its fixtures.
+
+## 76. Check an installed MCP server (2.42.3)
+
+Use a dev build (signed out, file store) after the section 45 backup, and a scratch Claude Code folder so nothing real is edited:
+`mkdir -p ~/cc-scratch/projects`, then Settings, Claude Code, **Add Folder…** and pick it. Check reads `.claude.json` and starts a
+process; it never writes.
+
+1. On `~/.claude` with the MCP server Installed: **Check** sits before **Remove**. Click it: the line under the folders reads
+   "Checking that the MCP server for ~/.claude starts…", then within a few seconds "The MCP server for ~/.claude starts and answers
+   (version …-mac). Claude Code sessions started from now on use it." Every button in that folder box is disabled while it runs.
+2. Install the MCP server into `~/cc-scratch`, then edit `~/cc-scratch/.claude.json` so the `sanduhr` entry's `command` is a script that
+   only runs `exit 3` (`printf '#!/bin/sh\nexit 3\n' > ~/cc-scratch/exit3.sh; chmod +x ~/cc-scratch/exit3.sh`). Reopen the page: the row
+   still says Installed (the script is executable and the server path is current). Check says "doesn't start: it stopped at once (exit code 3)."
+3. Point `command` at a path that doesn't exist: the row reads Outdated before anything is clicked, Check says "the Python 3 it runs is
+   missing" and "Click Update to point it at this version's server." Update turns the row Installed and Check green.
+4. Delete the `sanduhr` entry by hand and click Check without reopening the page: "The MCP server isn't registered for ~/cc-scratch any
+   more, so there was nothing to check." and the row reloads to Not installed.
+5. Not, Another entry and invalid JSON rows have no Check; the statusline and glow hook rows never do.
+6. Apple's stub with no developer tools behind it is not walked (that means removing the Command Line Tools). The unit tests cover it:
+   the probe says "the Python 3 it runs is missing" without starting it, and the row reads Outdated.
+
+Afterwards remove `~/cc-scratch` from Settings (Remove on its rows) and delete the folder, then restore per section 45.

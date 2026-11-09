@@ -11,6 +11,14 @@
 - **A widget pack zip you made yourself installs.** Install widget from file… now reads the zips Explorer's Send to, Compressed folder, Finder's Compress and zip tools make: compressed, with the pack's folder inside (its name may have spaces, as Finder and Explorer keep it), or with a Mac's hidden `__MACOSX` and `.DS_Store` files, which are skipped. It still holds every file to the same size limits while unpacking, checks each one's checksum, and runs every pack rule, so a zip that fails installs nothing and says why. Packs from the catalog keep their own stricter format (#459).
 - **Installing the MCP server checks that it starts.** After Install in Settings ▸ Claude Code, Sanduhr starts the server the way Claude Code will and waits for it to answer, then says so: installed and answering, with its version, or installed but not starting, and why (its launcher is missing, the server file it points to is gone, it stopped at once or didn't answer). Before, a launcher that couldn't start looked to Claude Code like no server at all, and nothing said otherwise (#144).
 
+## Unreleased (mac)
+
+### Fixes
+
+- **Check an installed MCP server.** In Settings, Claude Code, an installed MCP server row has a **Check** button. It starts the server exactly as that folder's `.claude.json` registers it, the way Claude Code will, and the line under the folder says it starts and answers, with its version, or that it doesn't start and why, with what to do: Update when the row is outdated, or remove it and install again. Before, the check ran only right after an install. Nothing goes over the network.
+- **What Install, Remove and Check did shows by the folder.** The line saying what happened used to sit under the whole folder list, out of sight with two folders or more. It now shows inside the box of the folder it is about.
+- **An MCP entry that names Apple's python3 stub with nothing behind it reads Outdated.** When the Command Line Tools were removed after the install, the row said Installed, though the stub can only offer to install them. It now reads Outdated, so Update points the entry at the Python 3 Sanduhr found, and neither Check nor the install check ever starts the stub, which would open Apple's install dialog.
+
 ## v2.42.2-mac — 2026-11-09
 
 ### Fixes
