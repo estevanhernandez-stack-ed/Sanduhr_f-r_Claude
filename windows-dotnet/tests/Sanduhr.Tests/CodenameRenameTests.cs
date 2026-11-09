@@ -129,19 +129,102 @@ public class CodenameRenameTests
     }
 
     [Fact]
-    public void Blank_gives_the_name_back_to_the_pool()
+    public void Blank_gives_a_picked_name_a_drawn_codename_at_once()
     {
         var book = Book();
         Assert.Equal(CodenameRename.Ok, book.Rename(CodenameCategory.Account, "Work", "Lantern"));
         Assert.Equal(CodenameRename.Cleared, book.Rename(CodenameCategory.Account, "Work", "   "));
 
-        Assert.False(book.TryGet(CodenameCategory.Account, "Work", out _));
+        // It keeps a codename (a hidden row stays listed, a folder keeps its label), drawn from the pool, and is no longer picked.
+        Assert.True(book.TryGet(CodenameCategory.Account, "Work", out var drawn));
+        Assert.True(Codenames.IsCodename(drawn), drawn);
         Assert.False(book.IsChosen(CodenameCategory.Account, "Work"));
-        Assert.Equal(0, book.Count);
-        var drawn = book.Assign(CodenameCategory.Account, "Work");
-        Assert.True(Codenames.IsCodename(drawn));
+        Assert.Equal(1, book.Count);
+        Assert.Contains(book.Entries(), e => e.Real == "Work" && e.Codename == drawn && !e.Chosen);
         // Lantern is free for someone else now.
         Assert.Equal(CodenameRename.Ok, book.Rename(CodenameCategory.Repo, "r", "Lantern"));
+    }
+
+    [Fact]
+    public void Clearing_a_hidden_row_keeps_it_listed_with_a_drawn_codename()
+    {
+        var book = Book();
+        const string folder = @"c:\x\.claude-qx";
+        Assert.Equal(CodenameRename.Ok, book.Rename(CodenameCategory.Folder, folder, "Work Bench"));
+        Assert.Equal(CodenameRename.Cleared, book.Rename(CodenameCategory.Folder, folder, ""));
+
+        var entry = Assert.Single(book.Entries());
+        Assert.False(entry.Shown);
+        Assert.True(Codenames.IsCodename(entry.Codename ?? ""), entry.Codename);
+        Assert.Equal(entry.Codename, (string?)book.ToJson()["maps"]!["folder"]![folder]);
+    }
+
+    [Fact]
+    public void Blank_on_a_row_with_no_codename_does_nothing()
+    {
+        var book = Book();
+        Assert.Equal(CodenameRename.Cleared, book.Rename(CodenameCategory.Account, "Work", ""));
+        Assert.False(book.TryGet(CodenameCategory.Account, "Work", out _));
+        Assert.Equal(0, book.Count);
+        Assert.Empty(book.Entries());
+    }
+
+    [Fact]
+    public void A_codename_differing_only_in_case_is_never_drawn_for_another_name()
+    {
+        var book = Book();
+        Assert.Equal(CodenameRename.Ok, book.Rename(CodenameCategory.Folder, @"c:\x\.claude", "dune fox"));
+        var all = Enumerable.Range(0, 300).Select(i => book.Assign(CodenameCategory.Account, "a" + i)).ToList();
+        Assert.DoesNotContain(all, n => string.Equals(n, "Dune Fox", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(300, all.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+    }
+
+    [Fact]
+    public void A_file_cant_give_two_names_one_codename_that_differs_only_in_case()
+    {
+        var book = CodenameBook.FromJson(File1(
+            maps: new JsonObject { ["project"] = new JsonObject { ["alpha"] = "Dune Fox" } },
+            chosen: new JsonObject { ["account"] = new JsonObject { ["Work"] = "dune fox" } }))!;
+        Assert.True(book.TryGet(CodenameCategory.Account, "Work", out var w) && w == "dune fox");
+        Assert.False(book.TryGet(CodenameCategory.Project, "alpha", out _));
+    }
+
+    [Fact]
+    public void An_astral_invisible_or_private_use_character_is_refused()
+    {
+        Assert.Equal(CodenameRename.BadCharacter, Book().Rename(CodenameCategory.Project, "alpha", "Dune" + char.ConvertFromUtf32(0xE0068) + char.ConvertFromUtf32(0xE0069)));   // tag characters, Cf
+        Assert.Equal(CodenameRename.BadCharacter, Book().Rename(CodenameCategory.Project, "alpha", "a" + char.ConvertFromUtf32(0xF0000)));    // plane 15 private use
+        Assert.Equal(CodenameRename.BadCharacter, Book().Rename(CodenameCategory.Project, "alpha", "a" + char.ConvertFromUtf32(0x10FFFD)));   // plane 16 private use
+        Assert.Equal(CodenameRename.BadCharacter, Book().Rename(CodenameCategory.Project, "alpha", "a" + char.ConvertFromUtf32(0xE0100)));    // variation selector supplement
+        Assert.Equal(CodenameRename.BadCharacter, Book().Rename(CodenameCategory.Project, "alpha", "\U000E0001ok"));                           // language tag, Cf
+        Assert.Equal(CodenameRename.Ok, Book().Rename(CodenameCategory.Project, "alpha", "Night Owl " + char.ConvertFromUtf32(0x1F989)));   // an emoji still passes
+        Assert.Equal(CodenameRename.Ok, Book().Rename(CodenameCategory.Project, "alpha", char.ConvertFromUtf32(0x1D400) + "old"));          // an astral letter passes
+    }
+
+    [Theory]
+    [InlineData("Dune\uFE0F")]      // variation selector 16
+    [InlineData("Dune\uFE00x")]
+    [InlineData("Dune\u034F")]      // combining grapheme joiner
+    [InlineData("a\u3164b")]        // Hangul filler
+    [InlineData("a\u115Fb")]        // Hangul choseong filler
+    [InlineData("a\u1160b")]
+    [InlineData("a\uFFA0b")]        // halfwidth Hangul filler
+    [InlineData("a\u2800b")]        // braille blank
+    [InlineData("a\u17B4b")]        // Khmer inherent vowel
+    [InlineData("a\u180Bb")]        // Mongolian free variation selector
+    public void An_invisible_character_inside_the_bmp_is_refused(string name)
+    {
+        Assert.Equal(CodenameRename.BadCharacter, Book().Rename(CodenameCategory.Project, "alpha", name));
+    }
+
+    [Theory]
+    [InlineData("Caf\u00E9")]                 // precomposed
+    [InlineData("Cafe\u0301")]                // decomposed: a base letter and its accent
+    [InlineData("\u0928\u093F")]              // a Devanagari consonant and vowel sign
+    [InlineData("na\u00EFve Owl")]
+    public void An_ordinary_accented_letter_is_accepted(string name)
+    {
+        Assert.Equal(CodenameRename.Ok, Book().Rename(CodenameCategory.Project, "alpha", name));
     }
 
     [Fact]
