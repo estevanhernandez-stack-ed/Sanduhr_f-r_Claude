@@ -4,7 +4,7 @@
 
 ### New
 
-- **Name your own codenames.** In Settings ▸ Privacy ▸ Show the real name, each row has **Rename…**: type the codename you want and press Enter. It has to be unique, up to 32 characters, and never a real name Sanduhr hides (a folder's name counts, with or without its dot). Shuffle keeps the codenames you named and redraws the rest, and a blank name draws one again. A named codename shows everywhere the drawn one did, including the Claude Code statusline. It's saved on this PC in codenames.json and never sent anywhere.
+- **Name your own codenames.** In Settings ▸ Privacy ▸ Show the real name, each row has **Rename…**: type the codename you want and press Enter. It has to be unique, up to 32 characters, and never a real name Sanduhr hides (a folder's name counts, with or without its dot), and "dune fox" is taken when "Dune Fox" is. Letters of any script and accents are fine; characters that draw nothing (zero-width, tag, variation selectors, filler and blank glyphs) and private-use ones are refused. Shuffle keeps the codenames you named and redraws the rest, and a blank name draws a new one at once. Saving a name you didn't change does nothing. A named codename shows everywhere the drawn one did, including the Claude Code statusline. It's saved on this PC in codenames.json and never sent anywhere.
 
 ### Fixes
 
