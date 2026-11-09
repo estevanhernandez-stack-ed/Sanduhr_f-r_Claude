@@ -966,12 +966,14 @@ public static class SettingsNames
     public const string RenameCancel = "Cancel";
     public const string RenameChosenTag = "named by you";
     public const string RenameTooLong = "That's longer than 32 characters.";
+    public const string RenameTooLongForFolder = "A Claude Code folder's codename can be up to 24 characters, the most the statusline shows.";
     public const string RenameBadCharacter = "That has a character that can't show on stream, such as a tab or an invisible mark.";
     public const string RenameTaken = "Another name already has that codename.";
     public const string RenameRealName = "That's a real name Sanduhr hides, so it can't be a codename.";
     public static string RenameRefused(CodenameRename verdict) => verdict switch
     {
         CodenameRename.TooLong => RenameTooLong,
+        CodenameRename.TooLongForFolder => RenameTooLongForFolder,
         CodenameRename.BadCharacter => RenameBadCharacter,
         CodenameRename.Taken => RenameTaken,
         CodenameRename.RealName => RenameRealName,
