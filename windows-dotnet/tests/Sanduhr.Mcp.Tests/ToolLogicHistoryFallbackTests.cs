@@ -33,6 +33,26 @@ public class ToolLogicHistoryFallbackTests
             ("extra_usage", Now.AddMinutes(-3), 0, null),
             ("seven_day_sonnet", Now.AddDays(-80), 1, Now.AddDays(-77)));   // dormant tier: not current
 
+    [Fact]
+    public void A_reserved_at_history_is_never_served_even_when_it_is_the_newest()
+    {
+        using var tmp = new TempDir();
+        WriteHistory(tmp.Path, "work", ("five_hour", Now.AddMinutes(-20), 30, null));
+        WriteHistory(tmp.Path, "@codex", ("five_hour", Now.AddMinutes(-1), 88, null));
+        var latest = HistoryReader.ReadFreshest(tmp.Path, null, Now, 900);
+        Assert.NotNull(latest);
+        Assert.Equal(SnapshotContract.AccountRef("work"), latest!.AccountRef);
+        Assert.Equal(30, Assert.Single(latest.Tiers, t => t.Key == "five_hour").Utilization);
+    }
+
+    [Fact]
+    public void Only_a_reserved_at_history_reads_as_no_history()
+    {
+        using var tmp = new TempDir();
+        WriteHistory(tmp.Path, "@codex", ("five_hour", Now.AddMinutes(-1), 88, null));
+        Assert.Null(HistoryReader.ReadFreshest(tmp.Path, null, Now, 900));
+    }
+
     // -- missing snapshot ----------------------------------------------------
 
     [Fact]

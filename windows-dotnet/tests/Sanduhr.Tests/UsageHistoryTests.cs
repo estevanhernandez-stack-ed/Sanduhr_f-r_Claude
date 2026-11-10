@@ -36,6 +36,17 @@ public class UsageHistoryTests
     private static HistoryPoint Point(DateTimeOffset t, int v)
         => new() { T = t.ToString("O", CultureInfo.InvariantCulture), V = v };
 
+    [Fact]
+    public void A_reserved_at_account_never_takes_the_legacy_history_file()
+    {
+        using var f = new Fixture("Personal");
+        File.WriteAllText(f.Paths.HistoryFile, "{\"five_hour\":[{\"t\":\"2026-11-01T00:00:00+00:00\",\"v\":7}]}");
+        f.History.AppendForAccount("five_hour", 40, "@codex");
+        Assert.True(File.Exists(f.Paths.HistoryFile));
+        Assert.Equal(new[] { 40 }, f.History.Load("five_hour", "@codex"));
+        Assert.Equal(new[] { 7 }, f.History.Load("five_hour", "Personal"));   // the active Claude account still inherits it
+    }
+
     // -- test_history.py (default 'Personal' active) --------------------------
 
     [Fact]

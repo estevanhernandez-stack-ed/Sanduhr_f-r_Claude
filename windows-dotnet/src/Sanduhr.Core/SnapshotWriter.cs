@@ -22,6 +22,7 @@ public sealed class SnapshotWriter
     private readonly string _path;
     private readonly Action<string>? _logBestEffort;
     private readonly string _writerVersion;
+    private readonly string? _source;
 
     /// <param name="snapshotPath">Full path of snapshot.json (injected for tests).</param>
     /// <param name="logBestEffort">Optional failure logger — receives one line
@@ -32,8 +33,11 @@ public sealed class SnapshotWriter
     /// unversioned "1.0.0", the tell that produced the 2026-09-13 stale-snapshot
     /// confusion (a dev build wrote the file; the installed 3.3.0 widget predates
     /// the writer and never touched it). The App passes its own version.</param>
-    public SnapshotWriter(string snapshotPath, Action<string>? logBestEffort = null, string? writerVersion = null)
+    /// <param name="source">Set for a non-Claude source (the Codex snapshot): the file then carries
+    /// <c>"source": source</c> and no <c>account_ref</c>, since it belongs to no Claude account.</param>
+    public SnapshotWriter(string snapshotPath, Action<string>? logBestEffort = null, string? writerVersion = null, string? source = null)
     {
+        _source = source;
         _path = snapshotPath;
         _logBestEffort = logBestEffort;
         _writerVersion = writerVersion
@@ -45,7 +49,7 @@ public sealed class SnapshotWriter
     /// null for count-based rows like routines, which carry used/limit).</summary>
     public void WriteOk(JsonObject payload, string? plan, string? accountLabel, DateTimeOffset now)
     {
-        var root = BuildCommon(plan, accountLabel, now, _writerVersion);
+        var root = BuildCommon(plan, accountLabel, now, _writerVersion, _source);
         root["status"] = "ok";
         root["error_kind"] = null;
         root["tiers"] = BuildTiers(payload);
@@ -63,7 +67,7 @@ public sealed class SnapshotWriter
         if (existing?["tiers"] is JsonArray tiers)
             lastGoodTiers = (JsonArray)tiers.DeepClone();
 
-        var root = BuildCommon(plan, accountLabel, now, _writerVersion);
+        var root = BuildCommon(plan, accountLabel, now, _writerVersion, _source);
         root["status"] = "error";
         root["error_kind"] = errorKind;
         root["tiers"] = lastGoodTiers;
@@ -75,7 +79,7 @@ public sealed class SnapshotWriter
     /// "sign in again" instead of showing numbers.</summary>
     public void WriteSignedOut(string? plan, string? accountLabel, DateTimeOffset now)
     {
-        var root = BuildCommon(plan, accountLabel, now, _writerVersion);
+        var root = BuildCommon(plan, accountLabel, now, _writerVersion, _source);
         root["status"] = "error";
         root["error_kind"] = SnapshotContract.ErrorSessionExpired;
         root["tiers"] = new JsonArray();
@@ -97,17 +101,21 @@ public sealed class SnapshotWriter
         }
     }
 
-    private static JsonObject BuildCommon(string? plan, string? accountLabel, DateTimeOffset now, string writerVersion)
-        => new()
+    private static JsonObject BuildCommon(string? plan, string? accountLabel, DateTimeOffset now, string writerVersion, string? source)
+    {
+        var root = new JsonObject
         {
             ["schema_version"] = SnapshotContract.SchemaVersion,
             ["writer_version"] = writerVersion,
             // UsageHistory.NowIso precedent: 6-digit fractional seconds + explicit offset.
             ["captured_at"] = now.ToUniversalTime()
                 .ToString("yyyy-MM-ddTHH:mm:ss.ffffffzzz", CultureInfo.InvariantCulture),
-            ["account_ref"] = SnapshotContract.AccountRef(accountLabel),
             ["plan"] = plan,
         };
+        if (source is not null) root["source"] = source;
+        else root["account_ref"] = SnapshotContract.AccountRef(accountLabel);
+        return root;
+    }
 
     private static JsonArray BuildTiers(JsonObject payload)
     {

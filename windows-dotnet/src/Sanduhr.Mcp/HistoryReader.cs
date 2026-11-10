@@ -48,6 +48,9 @@ public static class HistoryReader
         HistoryLatest? preferred = null;
         foreach (var file in files.OrderBy(f => f, StringComparer.Ordinal))
         {
+            // "@"-prefixed names are reserved for non-Claude sources (the Codex history, "@codex"): never a Claude account.
+            if (LabelFromFileName(file)?.StartsWith('@') == true)
+                continue;
             if (ReadOne(file) is not { } latest)
                 continue;
             bool fresh = (now - latest.LatestAt).TotalSeconds <= freshWindowSeconds;
