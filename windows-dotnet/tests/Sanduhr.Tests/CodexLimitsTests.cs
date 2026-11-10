@@ -122,4 +122,16 @@ public class CodexLimitsTests
         Assert.True(CodexLimits.TryParseLine(line, out var r));
         Assert.Equal(expected, r.Primary!.UsedPercent);
     }
+
+    [Fact]
+    public void Freshness_is_per_tier_an_idle_reading_is_fresh_only_where_its_reset_passed()
+    {
+        var asOf = DateTimeOffset.Parse("2026-11-09T06:00:00Z");
+        var now = asOf.AddHours(6);
+        var r = new CodexLimitsReading(asOf, new CodexWindow(99, 300, asOf.AddHours(5)), new CodexWindow(85, 10080, now.AddDays(3)), "plus");
+        Assert.Equal(new[] { "five_hour" }, CodexLimits.FreshTiers(r, now).OrderBy(x => x));
+        Assert.True(CodexLimits.IsFresh(r, now));   // any-tier meaning is unchanged
+        Assert.Equal(new[] { "five_hour", "seven_day" }, CodexLimits.FreshTiers(r, asOf.AddMinutes(10)).OrderBy(x => x));
+        Assert.Empty(CodexLimits.FreshTiers(new CodexLimitsReading(asOf, new CodexWindow(99, 300, now.AddHours(1)), null, null), now));
+    }
 }

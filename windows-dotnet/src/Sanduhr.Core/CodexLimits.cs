@@ -85,5 +85,21 @@ public static class CodexLimits
         return Passed(reading.Primary, now) || Passed(reading.Secondary, now);
     }
 
+    /// <summary>The tiers whose number can be trusted at <paramref name="now"/>: a tier is fresh when the event is within
+    /// <see cref="FreshFor"/> or that tier's own reset has passed (it then reads 0). Per tier, so an idle Codex whose
+    /// five-hour window rolled over does not make a stale seven-day percent look current.</summary>
+    public static IReadOnlySet<string> FreshTiers(CodexLimitsReading reading, DateTimeOffset now)
+    {
+        var set = new HashSet<string>();
+        bool recent = now - reading.AsOf <= FreshFor;
+        foreach (var w in new[] { reading.Primary, reading.Secondary })
+        {
+            if (w is null) continue;
+            string? key = w.WindowMinutes switch { 300 => FiveHour, 10080 => SevenDay, _ => null };
+            if (key is not null && (recent || Passed(w, now))) set.Add(key);
+        }
+        return set;
+    }
+
     private static bool Passed(CodexWindow? w, DateTimeOffset now) => w?.ResetsAt is { } r && r <= now;
 }

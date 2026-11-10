@@ -1,4 +1,5 @@
 using System.IO;
+using System.Threading;
 using System.Text.Json.Nodes;
 using Sanduhr.App.Services;
 using Sanduhr.Core;
@@ -198,5 +199,58 @@ public sealed class CodexUsageServiceTests : IDisposable
         svc.Poll();
         Assert.True(File.Exists(_paths.HistoryFile));
         Assert.Equal(new[] { 40 }, history.Load("five_hour", CodexUsageService.CodexHistoryAccount));
+    }
+
+    [Fact]
+    public void An_idle_codex_alerts_on_no_tier_whose_reset_has_not_passed()
+    {
+        // Idle 6 h: the five-hour reset passed (reads 0), the seven-day window is still the old 85%.
+        Rollout(Event(AsOf, 99, 85, fiveResets: AsOf.AddHours(5), weekResets: Now.AddDays(3)));
+        _clock = AsOf.AddHours(6);
+        var (svc, _) = Make();
+        svc.Poll();
+        Assert.True(svc.Current.Fresh);
+        Assert.Equal(new[] { "five_hour" }, svc.Current.FreshTiers.OrderBy(x => x));
+        Assert.Empty(svc.EvaluateAlerts(Config, true));
+        Assert.Empty(svc.EvaluateAlerts(Config, true));   // and again: no event on a later pass either
+    }
+
+    [Fact]
+    public void After_dispose_a_poll_does_no_io_and_raises_nothing()
+    {
+        Rollout(Event(AsOf, 40, 10));
+        var (svc, history) = Make();
+        int raised = 0;
+        svc.Changed += _ => raised++;
+        svc.Dispose();
+        var state = svc.Poll();
+        Assert.Equal(CodexReadStatus.NotInstalled, state.Status);
+        Assert.False(File.Exists(_paths.CodexSnapshotFile));
+        Assert.Empty(history.Load("five_hour", CodexUsageService.CodexHistoryAccount));
+        Assert.False(File.Exists(_paths.HistoryFileFor(CodexUsageService.CodexHistoryAccount)));
+        Assert.Equal(0, raised);
+    }
+
+    [Fact]
+    public void A_callback_queued_before_stop_does_nothing_after_it()
+    {
+        Rollout(Event(AsOf, 40, 10));
+        var (svc, history) = Make();
+        svc.Start(new[] { _home });
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (svc.Current.Status != CodexReadStatus.Ok && DateTime.UtcNow < deadline) Thread.Sleep(20);
+        Assert.Equal(CodexReadStatus.Ok, svc.Current.Status);
+        svc.Stop();
+        File.Delete(_paths.CodexSnapshotFile);
+        File.Delete(_paths.HistoryFileFor(CodexUsageService.CodexHistoryAccount));
+        int raised = 0;
+        svc.Changed += _ => raised++;
+        // The generation Start handed its timers is 0; Stop retired it.
+        typeof(CodexUsageService).GetMethod("SafePoll", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(svc, new object[] { 0 });
+        Thread.Sleep(700);   // longer than the debounce: a live watcher would have fired by now
+        Assert.False(File.Exists(_paths.CodexSnapshotFile));
+        Assert.False(File.Exists(_paths.HistoryFileFor(CodexUsageService.CodexHistoryAccount)));
+        Assert.Equal(0, raised);
+        svc.Dispose();
     }
 }
