@@ -2779,8 +2779,8 @@ account in a dev build. Paste only made-up JSON. Put made-up files on the Deskto
    changes nothing.
 4. Usage off. With an account and the statusline and the meters mod installed, open Set up Sanduhr (menu bar item, **Set up
    Sanduhr…**), untick **Track my AI usage**: "What changes" says "Your account stays saved. Remove it in Settings, Accounts." (and that
-   the Claude Code add-ons stay installed). Continue. `~/Library/Application Support/Sanduhr/snapshot.json` is gone and stays gone
-   after a minute and a relaunch; Settings, Accounts still lists the account and Keychain Access still has its item; Settings, Usage
+   the Claude Code add-ons stay installed). Continue. `~/Library/Application Support/Sanduhr/snapshot.json`, every `snapshot.<ref>.json` and `seats.json` are gone and
+   stay gone after a minute and a relaunch (step 5 brings them back); Settings, Accounts still lists the account and Keychain Access still has its item; Settings, Usage
    says "Usage tracking is off. Turn it on in Set up Sanduhr." In a Claude Code session the statusline prints no Sanduhr numbers and
    the meters mod shows no snapshot; `get_usage` (the Sanduhr MCP tool) answers no data with reason `missing`. With Little Snitch or
    `nettop -p <pid>` watching Sanduhr, no request to claude.ai goes out over a few minutes (Settings, Accounts, then an account's Claude

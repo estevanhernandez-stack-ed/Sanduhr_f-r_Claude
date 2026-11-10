@@ -1755,7 +1755,8 @@ the Claude Code add-ons stay installed.
 - **Usage off** (`Services/UsageSwitch.swift`, the guards in `UsageViewModel`). Stops every Claude usage fetch (the refresh, the
   timers, Follow the account I'm using and the per-seat meters), drops the numbers, sets the status line to "Usage tracking is off. Turn
   it on in Set up Sanduhr." on the Usage, Alerts and Claude Code pages, and deletes `snapshot.json` (at the switch and at each launch
-  while off). The account, its Keychain item, history and settings stay: nothing signs out. Sign-out, an account switch and Refresh
+  while off), and from 2.42.4 every per-seat `snapshot.<ref>.json` and `seats.json` with it (`SeatMeters.usageOff`: no sync,
+  seed, write or round while off; on again, the cached sync state is dropped so the next sync rewrites them). The account, its Keychain item, history and settings stay: nothing signs out. Sign-out, an account switch and Refresh
   keep it off and write no snapshot. A sign-in, an added account or a saved session key turns it on and fetches; a Save that only changes cf_clearance or clears the key does not. Nothing reaches claude.ai with usage off except a sign-in you start (`suggestedFolder`'s organization request is guarded on usage on). An absent setup, or one with
   no Claude entry, reads as on. The widget starts hidden with usage off and the Desk running (the menu bar item is the way back), and
   the welcome tour takes its Desk-only steps plus a last card, "Usage when you want it", that opens Set up Sanduhr.
