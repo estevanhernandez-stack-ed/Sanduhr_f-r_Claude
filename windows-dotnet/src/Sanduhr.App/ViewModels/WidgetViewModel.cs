@@ -1880,281 +1880,281 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         }
     }
 
-    // -- sources: stacked sections, combined bars, the Codex card, a primary-driven tray (agent layer) --------------------
-
-    private SourceSettings _sources = SourceSettings.Default;
-
-    private static readonly (string Key, string Label)[] CombinedWindows =
-    [
-        (TierModel.FiveHour, "Session (5hr)"),
-        (TierModel.SevenDay, "Weekly"),
-    ];
-
-    private SourceSectionViewModel MakeSection(string source)
-    {
-        var section = new SourceSectionViewModel(source, CombinedBarViewModel.BrushFor(_sources.ColorOf(source), false),
-            _sources.Collapsed.Contains(source));
-        section.CollapsedChanged += OnSectionCollapsed;
-        return section;
-    }
-
-    /// <summary>Collapse toggles save to <c>sources.collapsed</c>.</summary>
-    private void OnSectionCollapsed(SourceSectionViewModel section)
-    {
-        try
-        {
-            var current = _settings.LoadSources();
-            var collapsed = new HashSet<string>(current.Collapsed);
-            if (section.Collapsed) collapsed.Add(section.Source); else collapsed.Remove(section.Source);
-            _sources = current with { Collapsed = collapsed };
-            _settings.SaveSources(_sources);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            Debug.WriteLine($"[Sanduhr.Sources] collapse not saved: {ex.Message}");   // streamer: notname - written to the log file, never drawn
-        }
-    }
-
-    /// <summary>The ticked sources: Claude while its usage is on (or in demo mode, which draws samples with usage off), Codex while
-    /// its usage is on and no demo is showing.</summary>
-    private List<string> TickedSources()
-    {
-        var ticked = new List<string>();
-        if (UsageOn || IsDemo) ticked.Add(AgentSources.Claude);
-        if (_codexOn && !IsDemo) ticked.Add(AgentSources.Codex);
-        return ticked;
-    }
-
-    private SetupSettings TickedSetup()
-    {
-        var ticked = TickedSources();
-        return new SetupSettings(true, AgentSources.All.ToDictionary(s => s, s => ticked.Contains(s), StringComparer.Ordinal));
-    }
-
-    /// <summary>Reads setup and the per-source settings again and redraws the sections: after Set up Sanduhr changes what is ticked,
-    /// or a source's color, primary or collapse changes. Does not start or stop the Codex service; App does.</summary>
-    public void RefreshSources()
-    {
-        var setup = _settings.LoadSetup();
-        _codexOn = setup?.CodexUsage ?? false;
-        if (!_codexOn) _codexState = CodexState.Off;
-        OnPropertyChanged(nameof(AnyUsageOn));
-        OnPropertyChanged(nameof(ShowUsageOff));
-        RebuildSections();
-        RenderCodex(_codexState, DateTimeOffset.UtcNow);
-        UpdateTray();
-    }
-
-    /// <summary>Syncs <see cref="Sections"/> with what is ticked, in <see cref="AgentSources.All"/> order. One section hides its
-    /// header, so the Claude-only widget (and a Codex-only one) shows its cards as a single list.</summary>
-    private void RebuildSections()
-    {
-        if (_claudeSection is null) return;   // the constructor has not finished
-        _sources = _settings.LoadSources();
-        var ticked = TickedSources();
-        var wanted = new List<SourceSectionViewModel>();
-        foreach (var source in AgentSources.All)
-        {
-            var section = source == AgentSources.Claude ? _claudeSection : _codexSection;
-            section.Color = CombinedBarViewModel.BrushFor(_sources.ColorOf(source), false);
-            section.SetCollapsed(_sources.Collapsed.Contains(source));
-            if (ticked.Contains(source)) wanted.Add(section);
-        }
-        if (!Sections.SequenceEqual(wanted))
-        {
-            Sections.Clear();
-            foreach (var section in wanted) Sections.Add(section);
-        }
-        foreach (var section in Sections) section.ShowHeader = Sections.Count > 1;
-        RebuildCombined();
-    }
-
-    /// <summary>Codex's newest state arrived (App's service raised <c>Changed</c>; the argument is never trusted, so App passes
-    /// <c>Current</c> read on the UI thread).</summary>
-    public void ApplyCodex(CodexState state)
-    {
-        _codexState = state;
-        RenderCodex(state, DateTimeOffset.UtcNow);
-        UpdateTray(onlyIfChanged: true);
-    }
-
-    /// <summary>Test seam: renders a Claude payload as a fetch would, without a fetcher.</summary>
-    internal void ApplyClaudeForTests(JsonObject data)
-    {
-        _lastData = data;
-        RenderCards(data, DateTimeOffset.UtcNow);
-    }
-
-    /// <summary>Draws the Codex section: its cards (per-tier freshness dims a tier whose number can't be trusted), its "as of" text,
-    /// its empty line, and the collapsed summary; then the combined bars. Called when Codex changes and on the 30 s tick.</summary>
-    private void RenderCodex(CodexState state, DateTimeOffset now)
-    {
-        var section = _codexSection;
-        if (state.Status == CodexReadStatus.Ok)
-        {
-            section.EmptyText = null;
-            var keep = new List<string>();
-            foreach (var key in new[] { TierModel.FiveHour, TierModel.SevenDay })
-            {
-                if (Util(state.Tiers, key) is not { } util) continue;
-                keep.Add(key);
-                var card = section.Tiers.FirstOrDefault(t => t.TierKey == key);
-                if (card is null)
-                {
-                    card = new TierCardViewModel(key, _palette) { Source = AgentSources.Codex };
-                    card.SetThresholds(_alertConfig.WarnPct, _alertConfig.UrgentPct);
-                    section.Tiers.Insert(Math.Min(keep.Count - 1, section.Tiers.Count), card);
-                }
-                string? resetsAt = (state.Tiers[key] as JsonObject)?["resets_at"]?.GetValue<string>();
-                card.Update((int)Math.Round(util), resetsAt, null, null,
-                    _history.Load(key, CodexUsageService.CodexHistoryAccount), _palette, SparklineStyle, now);
-                card.Opacity = state.FreshTiers.Contains(key) ? 1 : CombinedBarViewModel.StaleOpacity;
-            }
-            foreach (var gone in section.Tiers.Where(t => !keep.Contains(t.TierKey)).ToList())
-                section.Tiers.Remove(gone);
-            section.Stale = !state.Fresh;
-            bool anyDim = keep.Any(k => !state.FreshTiers.Contains(k));
-            section.AsOfText = state.AsOf is { } asOf && (section.Stale || anyDim) ? AsOfLabel(asOf, now) : "";
-        }
-        else
-        {
-            section.Tiers.Clear();
-            section.Stale = false;
-            section.AsOfText = "";
-            section.EmptyText = state.Status == CodexReadStatus.Unreadable
-                ? SourceSectionViewModel.UnreadableLine
-                : SourceSectionViewModel.NoLimitsLine;
-        }
-        section.CollapsedSummary = SummaryOf(state.Status == CodexReadStatus.Ok ? state.Tiers : null);
-        UpdateTray(onlyIfChanged: true);
-        RebuildCombined();
-    }
-
-    /// <summary>"as of 3:42 PM", with the date once the reading is more than 7 days old.</summary>
-    private static string AsOfLabel(DateTimeOffset asOf, DateTimeOffset now)
-    {
-        var local = asOf.ToLocalTime();
-        return now - asOf > TimeSpan.FromDays(7)
-            ? "as of " + local.ToString("MMM d, h:mm tt", CultureInfo.InvariantCulture)
-            : "as of " + local.ToString("h:mm tt", CultureInfo.InvariantCulture);
-    }
-
-    /// <summary>"5h 40% · wk 12%": what a collapsed section says in one line.</summary>
-    private static string SummaryOf(JsonObject? tiers)
-    {
-        if (tiers is null) return "";
-        var parts = new List<string>();
-        if (Util(tiers, TierModel.FiveHour) is { } five) parts.Add($"5h {Math.Round(five).ToString(CultureInfo.InvariantCulture)}%");
-        if (Util(tiers, TierModel.SevenDay) is { } week) parts.Add($"wk {Math.Round(week).ToString(CultureInfo.InvariantCulture)}%");
-        return string.Join(" · ", parts);
-    }
-
-    /// <summary>A source's percent for a window, and whether it can be trusted now: Claude's last fetch always can; Codex's per tier.</summary>
-    private (double Percent, bool Fresh)? SourceValue(string source, string key)
-    {
-        if (source == AgentSources.Claude)
-            return ShownData is { } data && Util(data, key) is { } u ? (u, true) : null;
-        return _codexOn && _codexState.Status == CodexReadStatus.Ok && Util(_codexState.Tiers, key) is { } c
-            ? (Math.Round(c), _codexState.FreshTiers.Contains(key))
-            : null;
-    }
-
-    /// <summary>One combined bar per window two or more ticked sources report. A bar whose drawing did not change is kept.</summary>
-    private void RebuildCombined()
-    {
-        if (_claudeSection is null) return;
-        _claudeSection.CollapsedSummary = SummaryOf(ShownData);
-        var ticked = Sections.Select(s => s.Source).ToList();
-        var bars = new List<CombinedBarViewModel>();
-        if (ticked.Count >= 2)
-        {
-            string primary = _sources.PrimaryFor(TickedSetup());
-            foreach (var (key, label) in CombinedWindows)
-            {
-                var points = new List<SourcePercent>();
-                foreach (var source in ticked)
-                    if (SourceValue(source, key) is { } v)
-                        points.Add(new SourcePercent(source, v.Percent, !v.Fresh));
-                if (points.Count < 2) continue;
-                var layout = SourceBar.Layout(primary, points);
-                if (layout.Primary is null) continue;
-                var ticks = layout.Ticks.Select(t => (t.At, CombinedBarViewModel.BrushFor(_sources.ColorOf(t.Source), t.Stale), t.Stale,
-                    $"{AgentSources.Name(t.Source)} {Math.Round(t.At * 100).ToString(CultureInfo.InvariantCulture)}%{(t.Stale ? ", as of earlier" : "")}")).ToList();
-                bars.Add(new CombinedBarViewModel(label, layout, SourceBar.AccessibleName(label, points),
-                    CombinedBarViewModel.BrushFor(_sources.ColorOf(layout.Primary.Source), layout.Primary.Stale),
-                    layout.Beyond is { } b ? CombinedBarViewModel.BrushFor(_sources.ColorOf(b.Source), b.Stale) : null,
-                    ticks));
-            }
-        }
-        bool same = bars.Count == CombinedBars.Count && bars.Zip(CombinedBars).All(p => p.First.Signature == p.Second.Signature);
-        if (same) return;
-        CombinedBars.Clear();
-        foreach (var bar in bars) CombinedBars.Add(bar);
-    }
-
-    /// <summary>The tray's inputs follow the primary source (Claude, or Codex when it is the primary): session, weekly and the
-    /// highest card; and the tooltip's "beyond" clause names the furthest other fresh source for the reading's window.</summary>
-    private void UpdateTray(bool onlyIfChanged = false)
-    {
-        string primary = _sources.PrimaryFor(TickedSetup());
-        if (primary == AgentSources.Codex && _codexOn && _codexState.Status == CodexReadStatus.Ok)
-        {
-            _traySession = SourceValue(AgentSources.Codex, TierModel.FiveHour)?.Percent;
-            _trayWeekly = SourceValue(AgentSources.Codex, TierModel.SevenDay)?.Percent;
-            (string Label, double Util)? top = null;
-            foreach (var key in new[] { TierModel.FiveHour, TierModel.SevenDay })
-                if (SourceValue(AgentSources.Codex, key) is { } v && (top is null || v.Percent > top.Value.Util))
-                    top = (TierModel.Label(key), v.Percent);
-            _trayHighest = top;
-        }
-        else if (primary == AgentSources.Codex)
-        {
-            _traySession = null;
-            _trayWeekly = null;
-            _trayHighest = null;
-        }
-        else
-        {
-            _traySession = _claudeSession;
-            _trayWeekly = _claudeWeekly;
-            _trayHighest = _claudeHighest;
-        }
-
-        var reading = CurrentTrayReading;
-        string? beyond = null;
-        if (reading is not null && TrayWindowOf(reading.Label) is { } window)
-        {
-            (string Source, double Percent)? furthest = null;
-            foreach (var source in TickedSources().Where(s => s != primary))
-                if (SourceValue(source, window) is { Fresh: true } v && (int)v.Percent > reading.Percent
-                    && (furthest is null || v.Percent > furthest.Value.Percent))
-                    furthest = (source, v.Percent);
-            if (furthest is { } f)
-                beyond = $"{AgentSources.Name(f.Source)} {(window == TierModel.FiveHour ? "5h" : "week")} {((int)f.Percent).ToString(CultureInfo.InvariantCulture)}%.";
-        }
-
-        var key2 = (reading?.Percent, reading?.Label, beyond);
-        bool changed = key2 != _lastTrayKey;
-        _lastTrayKey = key2;
-        _trayBeyond = beyond;
-        if (!onlyIfChanged || changed) RaiseTray();
-    }
-
-    private (int? Percent, string? Label, string? Beyond) _lastTrayKey;
-
-    /// <summary>The window a tray label reads ("Session", "Weekly", or a card's own label), or null for one with no shared window.</summary>
-    private static string? TrayWindowOf(string label) =>
-        label == "Session" || label == TierModel.Label(TierModel.FiveHour) ? TierModel.FiveHour
-        : label == "Weekly" || label == TierModel.Label(TierModel.SevenDay) ? TierModel.SevenDay
-        : null;
-
-    /// <summary>Raised when what the snapshot writers need changes (the statusline or the MCP server turned on or off), so App
-    /// rebuilds the Codex service with or without its snapshot writer.</summary>
-    public event Action? SnapshotWantedChanged;
-
-    /// <summary>Whether <c>snapshot.json</c> (and the Codex snapshot beside it) should be written.</summary>
-    public bool SnapshotWanted => SnapshotConsumers.SnapshotWanted(_statuslineEnabled, _mcpEnabled);
-
+    // -- sources: stacked sections, combined bars, the Codex card, a primary-driven tray (agent layer) --------------------
+
+    private SourceSettings _sources = SourceSettings.Default;
+
+    private static readonly (string Key, string Label)[] CombinedWindows =
+    [
+        (TierModel.FiveHour, "Session (5hr)"),
+        (TierModel.SevenDay, "Weekly"),
+    ];
+
+    private SourceSectionViewModel MakeSection(string source)
+    {
+        var section = new SourceSectionViewModel(source, CombinedBarViewModel.BrushFor(_sources.ColorOf(source), false),
+            _sources.Collapsed.Contains(source));
+        section.CollapsedChanged += OnSectionCollapsed;
+        return section;
+    }
+
+    /// <summary>Collapse toggles save to <c>sources.collapsed</c>.</summary>
+    private void OnSectionCollapsed(SourceSectionViewModel section)
+    {
+        try
+        {
+            var current = _settings.LoadSources();
+            var collapsed = new HashSet<string>(current.Collapsed);
+            if (section.Collapsed) collapsed.Add(section.Source); else collapsed.Remove(section.Source);
+            _sources = current with { Collapsed = collapsed };
+            _settings.SaveSources(_sources);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Debug.WriteLine($"[Sanduhr.Sources] collapse not saved: {ex.Message}");   // streamer: notname - written to the log file, never drawn
+        }
+    }
+
+    /// <summary>The ticked sources: Claude while its usage is on (or in demo mode, which draws samples with usage off), Codex while
+    /// its usage is on and no demo is showing.</summary>
+    private List<string> TickedSources()
+    {
+        var ticked = new List<string>();
+        if (UsageOn || IsDemo) ticked.Add(AgentSources.Claude);
+        if (_codexOn && !IsDemo) ticked.Add(AgentSources.Codex);
+        return ticked;
+    }
+
+    private SetupSettings TickedSetup()
+    {
+        var ticked = TickedSources();
+        return new SetupSettings(true, AgentSources.All.ToDictionary(s => s, s => ticked.Contains(s), StringComparer.Ordinal));
+    }
+
+    /// <summary>Reads setup and the per-source settings again and redraws the sections: after Set up Sanduhr changes what is ticked,
+    /// or a source's color, primary or collapse changes. Does not start or stop the Codex service; App does.</summary>
+    public void RefreshSources()
+    {
+        var setup = _settings.LoadSetup();
+        _codexOn = setup?.CodexUsage ?? false;
+        if (!_codexOn) _codexState = CodexState.Off;
+        OnPropertyChanged(nameof(AnyUsageOn));
+        OnPropertyChanged(nameof(ShowUsageOff));
+        RebuildSections();
+        RenderCodex(_codexState, DateTimeOffset.UtcNow);
+        UpdateTray();
+    }
+
+    /// <summary>Syncs <see cref="Sections"/> with what is ticked, in <see cref="AgentSources.All"/> order. One section hides its
+    /// header, so the Claude-only widget (and a Codex-only one) shows its cards as a single list.</summary>
+    private void RebuildSections()
+    {
+        if (_claudeSection is null) return;   // the constructor has not finished
+        _sources = _settings.LoadSources();
+        var ticked = TickedSources();
+        var wanted = new List<SourceSectionViewModel>();
+        foreach (var source in AgentSources.All)
+        {
+            var section = source == AgentSources.Claude ? _claudeSection : _codexSection;
+            section.Color = CombinedBarViewModel.BrushFor(_sources.ColorOf(source), false);
+            section.SetCollapsed(_sources.Collapsed.Contains(source));
+            if (ticked.Contains(source)) wanted.Add(section);
+        }
+        if (!Sections.SequenceEqual(wanted))
+        {
+            Sections.Clear();
+            foreach (var section in wanted) Sections.Add(section);
+        }
+        foreach (var section in Sections) section.ShowHeader = Sections.Count > 1;
+        RebuildCombined();
+    }
+
+    /// <summary>Codex's newest state arrived (App's service raised <c>Changed</c>; the argument is never trusted, so App passes
+    /// <c>Current</c> read on the UI thread).</summary>
+    public void ApplyCodex(CodexState state)
+    {
+        _codexState = state;
+        RenderCodex(state, DateTimeOffset.UtcNow);
+        UpdateTray(onlyIfChanged: true);
+    }
+
+    /// <summary>Test seam: renders a Claude payload as a fetch would, without a fetcher.</summary>
+    internal void ApplyClaudeForTests(JsonObject data)
+    {
+        _lastData = data;
+        RenderCards(data, DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>Draws the Codex section: its cards (per-tier freshness dims a tier whose number can't be trusted), its "as of" text,
+    /// its empty line, and the collapsed summary; then the combined bars. Called when Codex changes and on the 30 s tick.</summary>
+    private void RenderCodex(CodexState state, DateTimeOffset now)
+    {
+        var section = _codexSection;
+        if (state.Status == CodexReadStatus.Ok)
+        {
+            section.EmptyText = null;
+            var keep = new List<string>();
+            foreach (var key in new[] { TierModel.FiveHour, TierModel.SevenDay })
+            {
+                if (Util(state.Tiers, key) is not { } util) continue;
+                keep.Add(key);
+                var card = section.Tiers.FirstOrDefault(t => t.TierKey == key);
+                if (card is null)
+                {
+                    card = new TierCardViewModel(key, _palette) { Source = AgentSources.Codex };
+                    card.SetThresholds(_alertConfig.WarnPct, _alertConfig.UrgentPct);
+                    section.Tiers.Insert(Math.Min(keep.Count - 1, section.Tiers.Count), card);
+                }
+                string? resetsAt = (state.Tiers[key] as JsonObject)?["resets_at"]?.GetValue<string>();
+                card.Update((int)Math.Round(util), resetsAt, null, null,
+                    _history.Load(key, CodexUsageService.CodexHistoryAccount), _palette, SparklineStyle, now);
+                card.Opacity = state.FreshTiers.Contains(key) ? 1 : CombinedBarViewModel.StaleOpacity;
+            }
+            foreach (var gone in section.Tiers.Where(t => !keep.Contains(t.TierKey)).ToList())
+                section.Tiers.Remove(gone);
+            section.Stale = !state.Fresh;
+            bool anyDim = keep.Any(k => !state.FreshTiers.Contains(k));
+            section.AsOfText = state.AsOf is { } asOf && (section.Stale || anyDim) ? AsOfLabel(asOf, now) : "";
+        }
+        else
+        {
+            section.Tiers.Clear();
+            section.Stale = false;
+            section.AsOfText = "";
+            section.EmptyText = state.Status == CodexReadStatus.Unreadable
+                ? SourceSectionViewModel.UnreadableLine
+                : SourceSectionViewModel.NoLimitsLine;
+        }
+        section.CollapsedSummary = SummaryOf(state.Status == CodexReadStatus.Ok ? state.Tiers : null);
+        UpdateTray(onlyIfChanged: true);
+        RebuildCombined();
+    }
+
+    /// <summary>"as of 3:42 PM", with the date once the reading is more than 7 days old.</summary>
+    private static string AsOfLabel(DateTimeOffset asOf, DateTimeOffset now)
+    {
+        var local = asOf.ToLocalTime();
+        return now - asOf > TimeSpan.FromDays(7)
+            ? "as of " + local.ToString("MMM d, h:mm tt", CultureInfo.InvariantCulture)
+            : "as of " + local.ToString("h:mm tt", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>"5h 40% · wk 12%": what a collapsed section says in one line.</summary>
+    private static string SummaryOf(JsonObject? tiers)
+    {
+        if (tiers is null) return "";
+        var parts = new List<string>();
+        if (Util(tiers, TierModel.FiveHour) is { } five) parts.Add($"5h {Math.Round(five).ToString(CultureInfo.InvariantCulture)}%");
+        if (Util(tiers, TierModel.SevenDay) is { } week) parts.Add($"wk {Math.Round(week).ToString(CultureInfo.InvariantCulture)}%");
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>A source's percent for a window, and whether it can be trusted now: Claude's last fetch always can; Codex's per tier.</summary>
+    private (double Percent, bool Fresh)? SourceValue(string source, string key)
+    {
+        if (source == AgentSources.Claude)
+            return ShownData is { } data && Util(data, key) is { } u ? (u, true) : null;
+        return _codexOn && _codexState.Status == CodexReadStatus.Ok && Util(_codexState.Tiers, key) is { } c
+            ? (Math.Round(c), _codexState.FreshTiers.Contains(key))
+            : null;
+    }
+
+    /// <summary>One combined bar per window two or more ticked sources report. A bar whose drawing did not change is kept.</summary>
+    private void RebuildCombined()
+    {
+        if (_claudeSection is null) return;
+        _claudeSection.CollapsedSummary = SummaryOf(ShownData);
+        var ticked = Sections.Select(s => s.Source).ToList();
+        var bars = new List<CombinedBarViewModel>();
+        if (ticked.Count >= 2)
+        {
+            string primary = _sources.PrimaryFor(TickedSetup());
+            foreach (var (key, label) in CombinedWindows)
+            {
+                var points = new List<SourcePercent>();
+                foreach (var source in ticked)
+                    if (SourceValue(source, key) is { } v)
+                        points.Add(new SourcePercent(source, v.Percent, !v.Fresh));
+                if (points.Count < 2) continue;
+                var layout = SourceBar.Layout(primary, points);
+                if (layout.Primary is null) continue;
+                var ticks = layout.Ticks.Select(t => (t.At, CombinedBarViewModel.BrushFor(_sources.ColorOf(t.Source), t.Stale), t.Stale,
+                    $"{AgentSources.Name(t.Source)} {Math.Round(t.At * 100).ToString(CultureInfo.InvariantCulture)}%{(t.Stale ? ", as of earlier" : "")}")).ToList();
+                bars.Add(new CombinedBarViewModel(label, layout, SourceBar.AccessibleName(label, points),
+                    CombinedBarViewModel.BrushFor(_sources.ColorOf(layout.Primary.Source), layout.Primary.Stale),
+                    layout.Beyond is { } b ? CombinedBarViewModel.BrushFor(_sources.ColorOf(b.Source), b.Stale) : null,
+                    ticks));
+            }
+        }
+        bool same = bars.Count == CombinedBars.Count && bars.Zip(CombinedBars).All(p => p.First.Signature == p.Second.Signature);
+        if (same) return;
+        CombinedBars.Clear();
+        foreach (var bar in bars) CombinedBars.Add(bar);
+    }
+
+    /// <summary>The tray's inputs follow the primary source (Claude, or Codex when it is the primary): session, weekly and the
+    /// highest card; and the tooltip's "beyond" clause names the furthest other fresh source for the reading's window.</summary>
+    private void UpdateTray(bool onlyIfChanged = false)
+    {
+        string primary = _sources.PrimaryFor(TickedSetup());
+        if (primary == AgentSources.Codex && _codexOn && _codexState.Status == CodexReadStatus.Ok)
+        {
+            _traySession = SourceValue(AgentSources.Codex, TierModel.FiveHour)?.Percent;
+            _trayWeekly = SourceValue(AgentSources.Codex, TierModel.SevenDay)?.Percent;
+            (string Label, double Util)? top = null;
+            foreach (var key in new[] { TierModel.FiveHour, TierModel.SevenDay })
+                if (SourceValue(AgentSources.Codex, key) is { } v && (top is null || v.Percent > top.Value.Util))
+                    top = (TierModel.Label(key), v.Percent);
+            _trayHighest = top;
+        }
+        else if (primary == AgentSources.Codex)
+        {
+            _traySession = null;
+            _trayWeekly = null;
+            _trayHighest = null;
+        }
+        else
+        {
+            _traySession = _claudeSession;
+            _trayWeekly = _claudeWeekly;
+            _trayHighest = _claudeHighest;
+        }
+
+        var reading = CurrentTrayReading;
+        string? beyond = null;
+        if (reading is not null && TrayWindowOf(reading.Label) is { } window)
+        {
+            (string Source, double Percent)? furthest = null;
+            foreach (var source in TickedSources().Where(s => s != primary))
+                if (SourceValue(source, window) is { Fresh: true } v && (int)v.Percent > reading.Percent
+                    && (furthest is null || v.Percent > furthest.Value.Percent))
+                    furthest = (source, v.Percent);
+            if (furthest is { } f)
+                beyond = $"{AgentSources.Name(f.Source)} {(window == TierModel.FiveHour ? "5h" : "week")} {((int)f.Percent).ToString(CultureInfo.InvariantCulture)}%.";
+        }
+
+        var key2 = (reading?.Percent, reading?.Label, beyond);
+        bool changed = key2 != _lastTrayKey;
+        _lastTrayKey = key2;
+        _trayBeyond = beyond;
+        if (!onlyIfChanged || changed) RaiseTray();
+    }
+
+    private (int? Percent, string? Label, string? Beyond) _lastTrayKey;
+
+    /// <summary>The window a tray label reads ("Session", "Weekly", or a card's own label), or null for one with no shared window.</summary>
+    private static string? TrayWindowOf(string label) =>
+        label == "Session" || label == TierModel.Label(TierModel.FiveHour) ? TierModel.FiveHour
+        : label == "Weekly" || label == TierModel.Label(TierModel.SevenDay) ? TierModel.SevenDay
+        : null;
+
+    /// <summary>Raised when what the snapshot writers need changes (the statusline or the MCP server turned on or off), so App
+    /// rebuilds the Codex service with or without its snapshot writer.</summary>
+    public event Action? SnapshotWantedChanged;
+
+    /// <summary>Whether <c>snapshot.json</c> (and the Codex snapshot beside it) should be written.</summary>
+    public bool SnapshotWanted => SnapshotConsumers.SnapshotWanted(_statuslineEnabled, _mcpEnabled);
+
     private void RenderCards(JsonObject data, DateTimeOffset now)
     {
         var utilByKey = new Dictionary<string, double?>();
