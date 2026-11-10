@@ -20,7 +20,7 @@ public static class StatuslineScript
 {
     /// <summary>Bumped when the script body changes; the installer re-writes the
     /// script whenever the installed copy differs from this source.</summary>
-    public const int Version = 6;
+    public const int Version = 7;
 
     /// <summary>PowerShell 5.1-compatible script body. Reads the snapshot per the
     /// reader contract (one-shot read, any parse failure = missing), renders per
@@ -242,7 +242,36 @@ function Get-OurLine {
     if ($folderLabel) { $line = $folderLabel + ' | ' + $line }   # the label may be non-ASCII; Emit writes UTF-8
   }
   if ($age -ge 450) { $line = $line + (' ({0}m ago)' -f [int][Math]::Floor($age / 60)) }
+  $codex = Get-CodexSegment
+  if ($codex) { $line = $line + ' ' + [char]0x00B7 + ' ' + $codex }   # a middle dot; Emit writes UTF-8
   return $line
+}
+
+# Codex's meters from snapshot.codex.json beside the Claude snapshot: only while it is alive (the same
+# 900 s dead rule) and a schema this script knows. Nothing otherwise; never a path, never an error.
+function Get-CodexSegment {
+  try {
+    $path = Join-Path (Join-Path $env:USERPROFILE '.sanduhr') 'snapshot.codex.json'
+    if (-not (Test-Path -LiteralPath $path)) { return $null }
+    $cx = Get-Content -LiteralPath $path -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    if ($null -eq $cx) { return $null }
+    if ([int]$cx.schema_version -gt 1) { return $null }
+    $at = ([DateTimeOffset]::Parse($cx.captured_at, [System.Globalization.CultureInfo]::InvariantCulture)).ToUniversalTime()
+    $cxNow = [DateTimeOffset]::UtcNow
+    if ([Math]::Max(0, [int]($cxNow - $at).TotalSeconds) -gt 900) { return $null }
+    $cxLabels = @{ five_hour = '5h'; seven_day = 'wk' }
+    $bits = @()
+    foreach ($tier in @($cx.tiers)) {
+      $label = $cxLabels[[string]$tier.key]
+      if (-not $label -or $null -eq $tier.utilization) { continue }
+      if ($tier.resets_at) {
+        try { if ([DateTimeOffset]::Parse($tier.resets_at, [System.Globalization.CultureInfo]::InvariantCulture).ToUniversalTime() -le $cxNow) { continue } } catch { }
+      }
+      $bits += ('{0} {1}%' -f $label, [int]$tier.utilization)
+    }
+    if ($bits.Count -eq 0) { return $null }
+    return ('cx ' + ($bits -join ' '))
+  } catch { return $null }
 }
 
 # ---- the user's own command (combine) ------------------------------------------

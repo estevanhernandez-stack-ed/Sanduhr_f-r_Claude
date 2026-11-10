@@ -177,6 +177,57 @@ public class StatuslineScriptRunTests : IDisposable
         Assert.All(line, c => Assert.True(c <= 0x7E));
     }
 
+    private static string CodexSnapshot(int fiveHour, int sevenDay, double capturedSecondsAgo = 10, int schema = 1)
+        => $$"""
+        {"schema_version":{{schema}},"source":"codex","captured_at":"{{Iso(DateTimeOffset.UtcNow.AddSeconds(-capturedSecondsAgo))}}","status":"ok",
+         "tiers":[{"key":"five_hour","utilization":{{fiveHour}},"resets_at":"{{Iso(DateTimeOffset.UtcNow.AddHours(2))}}"},
+                  {"key":"seven_day","utilization":{{sevenDay}},"resets_at":"{{Iso(DateTimeOffset.UtcNow.AddDays(3))}}"}]}
+        """;
+
+    [Fact]
+    public void The_script_version_is_seven_for_the_codex_segment()
+    {
+        Assert.Equal(7, StatuslineScript.Version);
+    }
+
+    [PowerShellFact]
+    public void A_fresh_codex_snapshot_appends_its_meters()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        WriteSanduhr("snapshot.codex.json", CodexSnapshot(40, 12));
+        var line = RunScript([]).Text.TrimEnd('\n');
+        Assert.StartsWith("5h 42% | wk 17% | wk resets ", line);
+        Assert.EndsWith(" · cx 5h 40% wk 12%", line);
+        Assert.DoesNotContain(_profile, line);
+    }
+
+    [PowerShellFact]
+    public void A_dead_codex_snapshot_prints_no_codex_segment()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        WriteSanduhr("snapshot.codex.json", CodexSnapshot(40, 12, capturedSecondsAgo: 1000));
+        var line = RunScript([]).Text.TrimEnd('\n');
+        Assert.DoesNotContain("cx", line);
+        Assert.StartsWith("5h 42% | wk 17% | wk resets ", line);
+        Assert.All(line, c => Assert.True(c <= 0x7E));
+    }
+
+    [PowerShellFact]
+    public void A_codex_snapshot_with_a_newer_schema_prints_no_codex_segment()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        WriteSanduhr("snapshot.codex.json", CodexSnapshot(40, 12, schema: 2));
+        Assert.DoesNotContain("cx", RunScript([]).Text);
+    }
+
+    [PowerShellFact]
+    public void Without_a_codex_file_the_claude_line_is_what_version_six_printed()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        var line = RunScript([]).Text.TrimEnd('\n');
+        Assert.Matches(@"^5h 42% \| wk 17% \| wk resets [A-Z][a-z]{2} \d{1,2}(:\d{2})?[ap]$", line);
+    }
+
     [PowerShellFact]
     public void Mine_weekly_prints_only_the_weekly_number()
     {

@@ -22,6 +22,15 @@ public sealed class McpConfig
     /// <summary>Full path of snapshot.json.</summary>
     public required string SnapshotPath { get; init; }
 
+    /// <summary>Full path of <c>snapshot.codex.json</c>, the Codex limits the widget writes beside the
+    /// Claude snapshot. Null = beside <see cref="SnapshotPath"/>.</summary>
+    public string? CodexSnapshotPath { get; init; }
+
+    /// <summary>The Codex snapshot to read: the configured path, else <c>snapshot.codex.json</c> in the
+    /// snapshot's own folder.</summary>
+    public string EffectiveCodexSnapshotPath
+        => CodexSnapshotPath ?? Path.Combine(Path.GetDirectoryName(SnapshotPath) ?? "", "snapshot.codex.json");
+
     /// <summary>The real usage-vault root (%LOCALAPPDATA%\Sanduhr\vault, or the
     /// SANDUHR_VAULT_DIR dev override). Read-only from this process. Reads go
     /// through <see cref="VaultDirs"/>.</summary>
@@ -231,6 +240,10 @@ public sealed class McpConfig
         return new McpConfig
         {
             SnapshotPath = snapshotPath,
+            // The dev-tier snapshot redirect moves the Codex file with it; fixed names, never from a file.
+            CodexSnapshotPath = snapOverride
+                ? Path.Combine(Path.GetDirectoryName(snapshotPath) ?? "", "snapshot.codex.json")
+                : Path.Combine(externalDir, "snapshot.codex.json"),
             VaultDir = vaultDir,
             VaultDirs = vaultDirs,
             // History stays private in AppData (pre-snapshot widgets write it there);
