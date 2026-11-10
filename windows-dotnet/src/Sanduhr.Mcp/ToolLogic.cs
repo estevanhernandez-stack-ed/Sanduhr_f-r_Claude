@@ -113,7 +113,17 @@ public sealed partial class ToolLogic
 
     // -- get_usage ------------------------------------------------------------
 
+    /// <summary>Claude's usage plus the independent Codex block: Codex shows whatever state Claude's
+    /// snapshot is in (missing, malformed, unsupported, degraded, ok, stale), so a Codex-only user sees it.</summary>
     public JsonObject BuildUsage()
+    {
+        var result = BuildClaudeUsage();
+        if (BuildCodexBlock(_clock()) is { } codex)
+            result["codex"] = codex;
+        return result;
+    }
+
+    private JsonObject BuildClaudeUsage()
     {
         var now = _clock();
         var (outcome, snap) = SnapshotReader.Read(_config.SnapshotPath);
@@ -203,8 +213,6 @@ public sealed partial class ToolLogic
             ["tiers"] = tiers,
             ["local_burn_since_snapshot"] = BuildLocalBurnSince(captured),
         };
-        if (BuildCodexBlock(now) is { } codex)
-            result["codex"] = codex;
         return result;
     }
 

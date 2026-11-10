@@ -229,6 +229,41 @@ public class StatuslineScriptRunTests : IDisposable
     }
 
     [PowerShellFact]
+    public void A_codex_only_user_sees_just_the_codex_segment()
+    {
+        WriteSanduhr("snapshot.codex.json", CodexSnapshot(40, 12));
+        Assert.Equal("cx 5h 40% wk 12%\n", RunScript([]).Text);
+    }
+
+    [PowerShellFact]
+    public void A_dead_claude_line_still_gets_the_codex_segment()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17, capturedSecondsAgo: 1200));
+        WriteSanduhr("snapshot.codex.json", CodexSnapshot(40, 12));
+        Assert.Equal("sanduhr: stale 20m - start widget \u00B7 cx 5h 40% wk 12%\n", RunScript([]).Text);
+    }
+
+    [PowerShellFact]
+    public void A_claude_error_line_still_gets_the_codex_segment()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17, status: "error").Replace("\"" + "status\":\"error\"", "\"status\":\"error\",\"error_kind\":\"session_expired\""));
+        WriteSanduhr("snapshot.codex.json", CodexSnapshot(40, 12));
+        var line = RunScript([]).Text.TrimEnd('\n');
+        Assert.StartsWith("sanduhr: reauth needed", line);
+        Assert.EndsWith(" \u00B7 cx 5h 40% wk 12%", line);
+    }
+
+    [PowerShellFact]
+    public void Mine_without_codex_hides_it_and_mine_with_codex_shows_it()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        WriteSanduhr("snapshot.codex.json", CodexSnapshot(40, 12));
+        Assert.Equal("wk 17%\n", RunScript(["-Mine", "weekly"]).Text);
+        Assert.Equal("wk 17% \u00B7 cx 5h 40% wk 12%\n", RunScript(["-Mine", "weekly,codex"]).Text);
+        Assert.Equal("cx 5h 40% wk 12%\n", RunScript(["-Mine", "codex"]).Text);
+    }
+
+    [PowerShellFact]
     public void Mine_weekly_prints_only_the_weekly_number()
     {
         WriteSanduhr("snapshot.json", Snapshot(42, 17));

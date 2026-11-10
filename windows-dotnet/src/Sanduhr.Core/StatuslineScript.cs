@@ -38,7 +38,7 @@ public static class StatuslineScript
 # stale on disk.
 #   -Chain <base64>   the user's own statusline command (UTF-8): run it first, print both
 #   -Join line|same   Sanduhr's line on its own row, or appended to their last row
-#   -Mine a,b,c       Sanduhr's segments: account, session, weekly, resets (default: all four)
+#   -Mine a,b,c       Sanduhr's segments: account, session, weekly, resets, codex (default: all five)
 # The account segment leads the line with the Claude Code folder's label. It is worked out
 # here, when the line renders, and written nowhere: SANDUHR_LABEL from the session's
 # environment (the folder's own settings.json env block), else the CLAUDE_CONFIG_DIR folder's
@@ -157,11 +157,12 @@ function Get-StreamerLabel([string]$label) {
 }
 
 # ---- Sanduhr's own line (null = nothing of Sanduhr's to print) -----------------
-function Get-OurLine {
+function Get-ClaudeLine {
   $segments = @('account', 'session', 'weekly', 'resets')
   if ($Mine) {
     $picked = @($Mine.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { @('account', 'session', 'weekly', 'resets') -contains $_ })
     if ($picked.Count -gt 0) { $segments = $picked }
+    elseif (Test-MineHas 'codex') { return $null }   # -Mine codex alone: Claude's line is not asked for
   }
   $showAccount = $segments -contains 'account'
   $showSession = $segments -contains 'session'
@@ -242,9 +243,26 @@ function Get-OurLine {
     if ($folderLabel) { $line = $folderLabel + ' | ' + $line }   # the label may be non-ASCII; Emit writes UTF-8
   }
   if ($age -ge 450) { $line = $line + (' ({0}m ago)' -f [int][Math]::Floor($age / 60)) }
-  $codex = Get-CodexSegment
-  if ($codex) { $line = $line + ' ' + [char]0x00B7 + ' ' + $codex }   # a middle dot; Emit writes UTF-8
   return $line
+}
+
+# -Mine names the segments to print; codex is one of them. No -Mine = everything, Codex included.
+function Test-MineHas([string]$name) {
+  if (-not $Mine) { return $true }
+  return (@($Mine.Split(',') | ForEach-Object { $_.Trim() }) -contains $name)
+}
+
+# Claude's line and Codex's segment are independent: either alone, or both joined by a middle dot
+# (Emit writes UTF-8). Codex never waits on Claude's snapshot, so a Codex-only user still sees it.
+function Get-OurLine {
+  $claude = Get-ClaudeLine
+  $codex = $null
+  $mineNames = @()
+  if ($Mine) { $mineNames = @($Mine.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { @('account', 'session', 'weekly', 'resets', 'codex') -contains $_ }) }
+  if ($mineNames.Count -eq 0 -or ($mineNames -contains 'codex')) { $codex = Get-CodexSegment }
+  if ($claude -and $codex) { return $claude + ' ' + [char]0x00B7 + ' ' + $codex }
+  if ($codex) { return $codex }
+  return $claude
 }
 
 # Codex's meters from snapshot.codex.json beside the Claude snapshot: only while it is alive (the same

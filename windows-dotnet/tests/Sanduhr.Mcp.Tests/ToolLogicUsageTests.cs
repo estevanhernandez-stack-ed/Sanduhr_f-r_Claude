@@ -246,4 +246,52 @@ public class ToolLogicUsageTests
         var r = UsageWithCodex("{ not json");
         Assert.False(r.ContainsKey("codex"));
     }
+
+    private static JsonObject UsageWith(string? claudeJson, Action<TempDir>? extra = null)
+    {
+        using var tmp = new TempDir();
+        var logic = Logic(tmp, claudeJson, Now);
+        File.WriteAllText(Path.Combine(tmp.Path, "snapshot.codex.json"), CodexJson(Now.AddSeconds(-60)));
+        extra?.Invoke(tmp);
+        return logic.BuildUsage();
+    }
+
+    private static void AssertCodexOk(JsonObject r)
+    {
+        Assert.Equal("ok", (string?)r["codex"]!["status"]);
+        Assert.Equal(40, (int?)r["codex"]!["tiers"]![0]!["utilization_pct"]);
+    }
+
+    [Fact]
+    public void Codex_shows_when_the_claude_snapshot_is_missing()
+    {
+        var r = UsageWith(null);
+        Assert.Equal("no_data", (string?)r["status"]);
+        AssertCodexOk(r);
+    }
+
+    [Fact]
+    public void Codex_shows_when_the_claude_snapshot_is_malformed()
+    {
+        var r = UsageWith("{ not json");
+        Assert.Equal("malformed", (string?)r["reason"]);
+        AssertCodexOk(r);
+    }
+
+    [Fact]
+    public void Codex_shows_when_the_claude_schema_is_unsupported()
+    {
+        var r = UsageWith("""{"schema_version":2,"captured_at":"2026-07-26T11:59:00+00:00","status":"ok","tiers":[]}""");
+        Assert.Equal("schema_unsupported", (string?)r["reason"]);
+        AssertCodexOk(r);
+    }
+
+    [Fact]
+    public void Codex_shows_when_claude_is_degraded_to_history()
+    {
+        var r = UsageWith(OkSnapshotJson(Now.AddDays(-48)), tmp => WriteHistory(tmp.Path, "Este",
+            ("five_hour", Now.AddMinutes(-3), 69, Now.AddMinutes(39))));
+        Assert.Equal("degraded", (string?)r["status"]);
+        AssertCodexOk(r);
+    }
 }
