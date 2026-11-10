@@ -24,6 +24,7 @@
          in-app probe (Updates/UpdateChecker.cs) checks the GitHub release feed best-effort. -->
     <PackageReference Include="Velopack" Version="0.0.1298" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.5" />
   </ItemGroup>
 
   <!-- Window + tray glyph share the shipped Sanduhr.ico (parity with the Python
