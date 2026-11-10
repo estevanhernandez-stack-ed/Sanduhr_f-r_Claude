@@ -58,11 +58,22 @@ A **source** produces a list of **limits**. Each limit carries a key, a used per
 
 ## 2. Downstream: everything takes a source
 
-- **History** points gain a `source` field. Existing points read as `claude`.
-- **`snapshot.json`** gains a `source` on each account entry, additive, so older readers ignore it. Codex
-  writes one entry, `source: "codex"`, with no account label.
-- **The MCP and the statusline** read `snapshot.json` already, so `get_usage` returns Codex rows with no new
-  Core file linked into `Sanduhr.Mcp`. The MCP stays network-free and `TrustBoundaryTests` do not change.
+A source's limits use the same tier shape Claude's fetch does (a `JsonObject` keyed by tier key, each
+`{utilization, resets_at}`), so Codex's 5-hour window is the tier `five_hour` and its weekly window is
+`seven_day`, inside the Codex source. `Pacing` derives a window's length from the tier key, so it works
+unchanged. A Codex window whose `window_minutes` is neither 300 nor 10080 is not shown (pacing would be
+wrong) and is logged once.
+
+- **History:** Codex gets its own history file, `history.@codex.json`, under the reserved account name
+  `@codex`. A Claude account label can't start with `@`, so the two never collide, and account rename and
+  delete never touch it.
+- **`snapshot.json`** holds one account per file, so Codex writes its own `snapshot.codex.json` beside it,
+  in the same schema plus a root `source: "codex"` and no `account_ref`. `snapshot.json` is unchanged.
+- **The MCP** reads `snapshot.codex.json` too, in its own `SnapshotReader`, and `get_usage` gains a `codex`
+  block in the same tier shape. That is MCP code, not a new Core file linked into `Sanduhr.Mcp`, so the MCP
+  stays network-free and the allowlist in `TrustBoundaryTests` does not change.
+- **The statusline** script (version 6 to 7) reads `snapshot.codex.json` when it is fresh and adds
+  `cx 5h 40% wk 12%` after Claude's meters.
 - **Alerts** are switched on per source in Settings ▸ Alerts. Codex alerts fire only on a fresh limit (see
   section 4), so an old log never raises one.
 - **The tray** follows the primary source (section 3).
@@ -97,8 +108,9 @@ view. With only one source ticked there are no combined bars, only that source's
 **The Desk:** each meter piece gains a source setting, Combined or one source. The ring and slim looks draw the
 two-tone fill and the ticks.
 
-**The tray** draws the primary source's fill and, only when another source is further out, the second
-segment. The tooltip spells out both.
+**The tray** icon is a number on a plate tinted by usage, too small for a bar, so it shows the primary
+source's number under the existing tray mode (Highest, Session, Weekly, Higher, Rotate). When another
+source is further out, the tooltip adds it: "Claude week 40%. Codex week 70%."
 
 **Settings ▸ Usage:** one row per source with its on switch, its color and a Primary choice. Primary defaults to
 Claude, or to the only ticked source. Choosing the primary also sets the tray. The setup screen's "Track my AI
