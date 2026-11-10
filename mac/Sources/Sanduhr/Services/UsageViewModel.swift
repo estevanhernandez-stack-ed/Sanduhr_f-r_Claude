@@ -321,9 +321,12 @@ final class UsageViewModel {
 
     /// Account following and the per-seat meters fetch on their own: they pause with usage off
     /// (and with demo mode) and resume as their own switches say.
+    /// Usage off pauses following and the seat meters, and the seat meters remove their files; on, they write them again.
     private func pauseSideFetchers(_ paused: Bool) {
         seatMeters.paused = paused || demo
+        seatMeters.usageOff = paused
         follower.apply(enabled: followEnabled && !paused && !demo)
+        if !paused { seatMeters.sync() }
     }
 
     private var api: ClaudeAPI?
