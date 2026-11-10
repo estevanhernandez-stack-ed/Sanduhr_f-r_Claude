@@ -12,7 +12,7 @@ public static class ZstdRollouts
         public override int Read(byte[] buffer, int offset, int count)
         {
             try { return inner.Read(buffer, offset, count); }
-            catch (ZstdSharp.ZstdException e) { throw new InvalidDataException("zstd: " + e.Message, e); }
+            catch (ZstdSharp.ZstdException e) { throw new InvalidDataException("zstd: " + e.Message, e); }   // streamer: cant - codec error text from a rollout frame, raised to the reader which logs only the type, never drawn
         }
         public override bool CanRead => true;
         public override bool CanSeek => false;

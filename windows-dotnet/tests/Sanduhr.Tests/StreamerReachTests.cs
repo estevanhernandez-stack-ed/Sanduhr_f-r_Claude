@@ -175,6 +175,7 @@ public class StreamerReachTests
         ("Sanduhr.App/Services/VaultService.cs", "key", 4),
         ("Sanduhr.App/Services/VaultService.cs", "notname", 6),
         ("Sanduhr.App/Services/WebView2ApiClient.cs", "notname", 1),
+        ("Sanduhr.App/Services/ZstdRollouts.cs", "cant", 1),
         ("Sanduhr.App/Updates/UpdateChecker.cs", "notname", 3),
         ("Sanduhr.App/ViewModels/AccountsViewModel.cs", "masked", 4),
         ("Sanduhr.App/ViewModels/CcLedgerViewModel.cs", "export", 5),

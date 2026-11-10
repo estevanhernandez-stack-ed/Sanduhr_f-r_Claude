@@ -33,6 +33,7 @@ public static class ThirdPartyNotices
         new("Microsoft.Web.WebView2", "BSD-style (Microsoft)", "https://aka.ms/webview"),
         new("Velopack", "MIT", "https://github.com/velopack/velopack"),
         new("WPF-UI", "MIT", "https://github.com/lepoco/wpfui"),
+        new("ZstdSharp.Port", "MIT", "https://github.com/oleg-st/ZstdSharp"),
     ];
 
     /// <summary>Data the Desk's weather piece shows (spec 6.5), credited as their licences ask: Open-Meteo's
