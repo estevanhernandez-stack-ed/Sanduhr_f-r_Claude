@@ -144,4 +144,20 @@ public class TrayReadoutTests
         Assert.Equal(TrayGlyphKind.Number, demo.Kind);
         Assert.Equal($"Sanduhr für Claude — {DemoMode.TrayLabel("Session", 42)}", demo.Tooltip);
     }
+
+    [Fact]
+    public void A_beyond_clause_ends_the_tooltip()
+    {
+        var g = TrayReadout.Glyph(true, new TrayReading(40, "Week"), false, beyond: "Codex week 70%.");
+        Assert.EndsWith("Codex week 70%.", g.Tooltip);
+        Assert.Equal(TrayReadout.Glyph(true, new TrayReading(40, "Week"), false).Tooltip + " Codex week 70%.", g.Tooltip);
+    }
+
+    [Fact]
+    public void No_beyond_clause_leaves_the_tooltip_exactly_as_it_was()
+    {
+        var reading = new TrayReading(40, "Week");
+        Assert.Equal(TrayReadout.Glyph(true, reading, false).Tooltip, TrayReadout.Glyph(true, reading, false, beyond: null).Tooltip);
+        Assert.Equal("Sanduhr für Claude — Week 40%", TrayReadout.Glyph(true, reading, false, beyond: null).Tooltip);
+    }
 }

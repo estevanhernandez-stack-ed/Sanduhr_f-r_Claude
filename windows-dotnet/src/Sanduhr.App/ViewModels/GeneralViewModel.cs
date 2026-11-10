@@ -39,7 +39,7 @@ public sealed partial class GeneralViewModel : ObservableObject
 
     /// <summary>The tray number is the AI usage, so its section (the preview and the picker) shows only while usage is on. With no widget
     /// to ask (a test, a bare page) it shows.</summary>
-    public bool ShowTray => _widget?.UsageOn ?? true;
+    public bool ShowTray => _widget?.AnyUsageOn ?? true;
 
     /// <summary>The one line General says in the section's place while usage is off.</summary>
     public bool ShowTrayOff => !ShowTray;
@@ -89,7 +89,7 @@ public sealed partial class GeneralViewModel : ObservableObject
     {
         if (e.PropertyName == nameof(WidgetViewModel.TrayMode))
             OnPropertyChanged(nameof(SelectedTrayMode));
-        if (e.PropertyName == nameof(WidgetViewModel.UsageOn))
+        if (e.PropertyName == nameof(WidgetViewModel.AnyUsageOn))
         {
             OnPropertyChanged(nameof(ShowTray));
             OnPropertyChanged(nameof(ShowTrayOff));

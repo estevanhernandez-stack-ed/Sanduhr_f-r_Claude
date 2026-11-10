@@ -18,6 +18,13 @@ public sealed partial class TierCardViewModel : ObservableObject
 {
     public string TierKey { get; }
 
+    /// <summary>Which source the card belongs to (<see cref="AgentSources"/>). A card of another source than Claude takes no
+    /// Claude actions: no reorder drag, no hide or mute menu.</summary>
+    public string Source { get; init; } = AgentSources.Claude;
+
+    /// <summary>The card's opacity: 1, or 0.55 when its number cannot be trusted (a Codex tier that is not fresh).</summary>
+    [ObservableProperty] private double _opacity = 1;
+
     // Cached state for the 30s tick re-derivation.
     private double _util;
     private string? _resetsAt;

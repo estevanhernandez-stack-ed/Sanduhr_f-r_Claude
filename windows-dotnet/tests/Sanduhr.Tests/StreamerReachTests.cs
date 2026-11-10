@@ -118,7 +118,7 @@ public class StreamerReachTests
     [
         ("Sanduhr.App/App.xaml.cs", "key", 8),
         ("Sanduhr.App/App.xaml.cs", "masked", 2),
-        ("Sanduhr.App/App.xaml.cs", "notname", 4),
+        ("Sanduhr.App/App.xaml.cs", "notname", 5),
         ("Sanduhr.App/Desk/DeskArrangeMode.cs", "notname", 3),
         ("Sanduhr.App/Desk/DeskClicks.cs", "notname", 4),
         ("Sanduhr.App/Desk/DeskCompanion.cs", "key", 1),
@@ -220,7 +220,8 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "cant", 4),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "key", 19),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "masked", 3),
-        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "notname", 19),
+        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "notname", 20),
+        ("Sanduhr.App/Views/CombinedBar.xaml.cs", "notname", 2),   // agent layer: a source's name and a percent on a bar segment or tick
         ("Sanduhr.App/Views/DeskLayoutMap.cs", "notname", 1),
         ("Sanduhr.App/Views/DrawersPage.xaml.cs", "notname", 1),   // Drawers (plan 2, Task 11): the folder picker's result, used for IO
         ("Sanduhr.App/Views/IntegrationConsentDialog.xaml.cs", "notname", 1),
