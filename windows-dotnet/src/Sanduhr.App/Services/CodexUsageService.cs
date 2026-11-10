@@ -215,6 +215,12 @@ public sealed class CodexUsageService : IDisposable
         lock (_debounceGate) _debounce?.Change(Debounce, Timeout.InfiniteTimeSpan);
     }
 
+    /// <summary>Test hook: the generation the live timers were issued with.</summary>
+    internal int LiveGeneration { get { lock (_gate) return _generation; } }
+
+    /// <summary>Test hook: the timer/debounce callback path, run synchronously for a given generation.</summary>
+    internal void RunCallback(int generation) => SafePoll(generation);
+
     private void SafePoll(int generation)
     {
         try { PollCore(generation); }
