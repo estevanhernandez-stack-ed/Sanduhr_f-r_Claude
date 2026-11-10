@@ -73,4 +73,13 @@ public sealed class SetupStoreTests : IDisposable
         Assert.False(store.MigrateSetup(hasAccount: true));    // a setup exists: untouched
         Assert.True(store.LoadSetup()!.Desktop);
     }
+
+    [Fact]
+    public void Sources_default_when_absent_and_round_trip_when_saved()
+    {
+        var store = Store();
+        Assert.Equal(SourceSettings.Default.Primary, store.LoadSources().Primary);
+        store.SaveSources(SourceSettings.Default with { Primary = "codex" });
+        Assert.Equal("codex", store.LoadSources().Primary);
+    }
 }

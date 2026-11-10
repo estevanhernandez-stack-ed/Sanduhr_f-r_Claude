@@ -103,10 +103,30 @@ public class SetupSettingsTests
     [Fact]
     public void ToSettings_keeps_sources_this_build_does_not_show()
     {
-        var before = new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false, ["codex"] = true });
+        var before = new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false, ["gemini"] = true });
         var after = new SetupChoices(false, true, true).ToSettings(before);
         Assert.False(after.Desktop);
         Assert.True(after.ClaudeUsage);
-        Assert.True(after.Usage["codex"]);
+        Assert.True(after.Usage["gemini"]);
+    }
+
+    [Fact]
+    public void Codex_usage_round_trips_and_counts_as_usage_on()
+    {
+        var s = SetupSettings.Decode(null, new SetupSettings(true, new Dictionary<string, bool>())).WithCodex(true);
+        var back = SetupSettings.Decode(System.Text.Json.Nodes.JsonNode.Parse(s.Encode().ToJsonString()), s);
+        Assert.True(back.CodexUsage);
+        Assert.False(back.ClaudeUsage);
+        Assert.True(back.UsageOn);
+    }
+
+    [Fact]
+    public void Choices_write_both_sources()
+    {
+        var before = new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = true, ["gemini"] = true });
+        var after = new SetupChoices(Desktop: true, Drawers: false, ClaudeUsage: false, CodexUsage: true).ToSettings(before);
+        Assert.False(after.ClaudeUsage);
+        Assert.True(after.CodexUsage);
+        Assert.True(after.Usage["gemini"]);
     }
 }

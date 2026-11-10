@@ -11,14 +11,20 @@ public sealed record SetupSettings(bool Desktop, IReadOnlyDictionary<string, boo
 {
     public const string Key = "setup";
     public const string Claude = "claude";
+    public const string Codex = AgentSources.Codex;
 
     public bool ClaudeUsage => Usage.TryGetValue(Claude, out var on) && on;
+
+    public bool CodexUsage => Usage.TryGetValue(Codex, out var on) && on;
 
     /// <summary>Any usage source on.</summary>
     public bool UsageOn => Usage.Values.Any(v => v);
 
     public SetupSettings WithClaude(bool on) =>
         this with { Usage = new Dictionary<string, bool>(Usage, StringComparer.Ordinal) { [Claude] = on } };
+
+    public SetupSettings WithCodex(bool on) =>
+        this with { Usage = new Dictionary<string, bool>(Usage, StringComparer.Ordinal) { [Codex] = on } };
 
     public JsonObject Encode()
     {
@@ -42,18 +48,18 @@ public sealed record SetupSettings(bool Desktop, IReadOnlyDictionary<string, boo
 }
 
 /// <summary>The three ticks on the setup screen (spec 2). Desktop reads as ticked only while the Desk runs (spec 1, the Desk page's own switch).</summary>
-public sealed record SetupChoices(bool Desktop, bool Drawers, bool ClaudeUsage)
+public sealed record SetupChoices(bool Desktop, bool Drawers, bool ClaudeUsage, bool CodexUsage = false)
 {
     /// <summary>A first run's ticks: the desktop and drawers, no usage.</summary>
     public static SetupChoices FirstRun { get; } = new(true, true, false);
 
-    public bool AnyTicked => Desktop || Drawers || ClaudeUsage;
+    public bool AnyTicked => Desktop || Drawers || ClaudeUsage || CodexUsage;
 
     /// <summary>The Desk runs whenever desktop or drawers is ticked.</summary>
     public bool DeskRuns => Desktop || Drawers;
 
     public static SetupChoices Of(SetupSettings s, bool drawersOn, bool deskEnabled) =>
-        new(s.Desktop && deskEnabled, drawersOn, s.ClaudeUsage);
+        new(s.Desktop && deskEnabled, drawersOn, s.ClaudeUsage, s.CodexUsage);
 
     /// <summary>The stored setup for these ticks; sources this build does not show keep their value from <paramref name="before"/>.</summary>
     public SetupSettings ToSettings(SetupSettings? before)
@@ -62,6 +68,7 @@ public sealed record SetupChoices(bool Desktop, bool Drawers, bool ClaudeUsage)
             ? new Dictionary<string, bool>(StringComparer.Ordinal)
             : new Dictionary<string, bool>(before.Usage, StringComparer.Ordinal);
         usage[SetupSettings.Claude] = ClaudeUsage;
+        usage[SetupSettings.Codex] = CodexUsage;
         return new SetupSettings(Desktop, usage);
     }
 }
