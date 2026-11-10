@@ -82,4 +82,44 @@ public class CodexLimitsTests
         Assert.False(CodexLimits.IsFresh(r, asOf.AddMinutes(31)));
         Assert.True(CodexLimits.IsFresh(r, asOf.AddHours(3).AddSeconds(1)));
     }
+
+    [Fact]
+    public void A_null_reset_parses_with_no_reset()
+    {
+        const string line = """{"timestamp":"2026-10-22T23:48:09Z","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":12.5,"window_minutes":300,"resets_at":null}}}}""";
+        Assert.True(CodexLimits.TryParseLine(line, out var r));
+        Assert.Null(r.Primary!.ResetsAt);
+    }
+
+    [Fact]
+    public void A_window_minutes_that_is_not_a_number_drops_that_window()
+    {
+        const string line = """{"timestamp":"2026-10-22T23:48:09Z","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":12.5,"window_minutes":"300"}}}}""";
+        Assert.False(CodexLimits.TryParseLine(line, out _));
+    }
+
+    [Fact]
+    public void An_out_of_range_reset_parses_with_no_reset()
+    {
+        const string line = """{"timestamp":"2026-10-22T23:48:09Z","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":12.5,"window_minutes":300,"resets_at":99999999999999}}}}""";
+        Assert.True(CodexLimits.TryParseLine(line, out var r));
+        Assert.Null(r.Primary!.ResetsAt);
+    }
+
+    [Fact]
+    public void A_used_percent_that_overflows_drops_that_window()
+    {
+        const string line = """{"timestamp":"2026-10-22T23:48:09Z","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":1e999,"window_minutes":300}}}}""";
+        Assert.False(CodexLimits.TryParseLine(line, out _));
+    }
+
+    [Theory]
+    [InlineData(150, 100)]
+    [InlineData(-5, 0)]
+    public void Used_percent_clamps_to_zero_through_one_hundred(int raw, double expected)
+    {
+        var line = """{"timestamp":"2026-10-22T23:48:09Z","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":""" + raw + ""","window_minutes":300}}}}""";
+        Assert.True(CodexLimits.TryParseLine(line, out var r));
+        Assert.Equal(expected, r.Primary!.UsedPercent);
+    }
 }

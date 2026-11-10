@@ -42,7 +42,7 @@ public static class CodexLimits
             reading = new CodexLimitsReading(asOf, primary, secondary, plan);
             return true;
         }
-        catch (JsonException)
+        catch (Exception e) when (e is JsonException or FormatException or InvalidOperationException)
         {
             return false;
         }
@@ -52,10 +52,13 @@ public static class CodexLimits
     {
         if (!rl.TryGetProperty(name, out var w) || w.ValueKind != JsonValueKind.Object) return null;
         if (!w.TryGetProperty("used_percent", out var up) || up.ValueKind != JsonValueKind.Number) return null;
-        if (!w.TryGetProperty("window_minutes", out var wm) || !wm.TryGetInt32(out var minutes)) return null;
-        DateTimeOffset? resets = w.TryGetProperty("resets_at", out var ra) && ra.TryGetInt64(out var epoch)
-            ? DateTimeOffset.FromUnixTimeSeconds(epoch) : null;
-        return new CodexWindow(Math.Clamp(up.GetDouble(), 0, 100), minutes, resets);
+        if (!up.TryGetDouble(out var used) || !double.IsFinite(used)) return null;
+        if (!w.TryGetProperty("window_minutes", out var wm) || wm.ValueKind != JsonValueKind.Number || !wm.TryGetInt32(out var minutes)) return null;
+        DateTimeOffset? resets = null;
+        if (w.TryGetProperty("resets_at", out var ra) && ra.ValueKind == JsonValueKind.Number && ra.TryGetInt64(out var epoch)
+            && epoch >= DateTimeOffset.MinValue.ToUnixTimeSeconds() && epoch <= DateTimeOffset.MaxValue.ToUnixTimeSeconds())
+            resets = DateTimeOffset.FromUnixTimeSeconds(epoch);
+        return new CodexWindow(Math.Clamp(used, 0, 100), minutes, resets);
     }
 
     public static JsonObject ToTiers(CodexLimitsReading reading, DateTimeOffset now, Action<int>? unknownWindow = null)
