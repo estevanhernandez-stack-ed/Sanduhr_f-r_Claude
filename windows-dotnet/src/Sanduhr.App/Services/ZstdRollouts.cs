@@ -13,6 +13,7 @@ public static class ZstdRollouts
         {
             try { return inner.Read(buffer, offset, count); }
             catch (ZstdSharp.ZstdException e) { throw new InvalidDataException("zstd: " + e.Message, e); }   // streamer: cant - codec error text from a rollout frame, raised to the reader which logs only the type, never drawn
+            catch (EndOfStreamException e) { throw new InvalidDataException("zstd: truncated frame", e); }
         }
         public override bool CanRead => true;
         public override bool CanSeek => false;
