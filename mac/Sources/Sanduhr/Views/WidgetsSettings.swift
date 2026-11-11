@@ -170,7 +170,7 @@ private struct WidgetsInstalledSection: View {
     }
 }
 
-/// "New sprite from an image...": pick a PNG or an animated GIF, then the sheet tags its cells to actions and makes a sprite of it.
+/// "New sprite from an image...": pick a PNG, an animated GIF or an Aseprite sheet's JSON, then the sheet tags its cells to actions and makes a sprite of it.
 private struct WidgetsNewSpriteSection: View {
     let model: WidgetsModel
     @State private var sprite: NewSpriteModel?
@@ -192,8 +192,16 @@ private struct WidgetsNewSpriteSection: View {
     }
 
     private func open() {
-        guard let data = NewSpritePicker.pick() else { return }
+        guard let url = NewSpritePicker.pickFile() else { return }
         let install: (WidgetNewSprite.Input) -> [String] = { model.installNewSprite($0) }
+        if NewSpritePicker.isJson(url) {
+            switch AsepriteImport.load(jsonURL: url) {
+            case .success(let loaded): sprite = NewSpriteModel(aseprite: loaded, install: install)
+            case .failure(let why): sprite = NewSpriteModel(refusal: why.message, install: install)
+            }
+            return
+        }
+        guard let data = NewSpritePicker.read(url) else { return }
         guard NewSpritePicker.looksLikeGif(data) else {
             sprite = NewSpriteModel(png: data, install: install)
             return
