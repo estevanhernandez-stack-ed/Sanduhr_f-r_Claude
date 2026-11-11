@@ -170,7 +170,7 @@ private struct WidgetsInstalledSection: View {
     }
 }
 
-/// "New sprite from an image...": pick a PNG, then the sheet tags its cells to actions and makes a sprite of it.
+/// "New sprite from an image...": pick a PNG or an animated GIF, then the sheet tags its cells to actions and makes a sprite of it.
 private struct WidgetsNewSpriteSection: View {
     let model: WidgetsModel
     @State private var sprite: NewSpriteModel?
@@ -192,8 +192,16 @@ private struct WidgetsNewSpriteSection: View {
     }
 
     private func open() {
-        guard let png = NewSpritePicker.pick() else { return }
-        sprite = NewSpriteModel(png: png, install: { model.installNewSprite($0) })
+        guard let data = NewSpritePicker.pick() else { return }
+        let install: (WidgetNewSprite.Input) -> [String] = { model.installNewSprite($0) }
+        guard NewSpritePicker.looksLikeGif(data) else {
+            sprite = NewSpriteModel(png: data, install: install)
+            return
+        }
+        switch SpriteFrames.read(data) {
+        case .success(let gif): sprite = NewSpriteModel(gif: gif, install: install)
+        case .failure(let why): sprite = NewSpriteModel(refusal: why.message, install: install)
+        }
     }
 }
 

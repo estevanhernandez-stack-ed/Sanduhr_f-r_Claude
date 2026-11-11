@@ -22,6 +22,7 @@ enum WidgetNewSprite {
     static let scaleRange = 1...4
     static let defaultScale = 2
     static let fps = 8
+    static let fpsRange = 1...24
     static let stageId = "sprite"
     /// The longest id the format allows, `my-` included.
     private static let maxIdLength = 40
@@ -35,6 +36,8 @@ enum WidgetNewSprite {
         var scale: Int?
         /// Action to the cells (row-major indexes) it plays, in order. An action missing or empty is untagged.
         var tags: [String: [Int]]
+        /// Nil keeps the default (8). A GIF import carries its own (1...24).
+        var fps: Int? = nil
     }
 
     /// `my-<slug>`, with `-2`, `-3` until it is not in `installedIds`. Nil when the name has no letter or digit.
@@ -109,6 +112,8 @@ enum WidgetNewSprite {
         }
         let scale = input.scale ?? defaultScale
         if !scaleRange.contains(scale) { return .failed("Scale is \(scaleRange.lowerBound) to \(scaleRange.upperBound).") }
+        let spriteFps = input.fps ?? fps
+        if !fpsRange.contains(spriteFps) { return .failed("Frames per second is \(fpsRange.lowerBound) to \(fpsRange.upperBound).") }
         let made = animations(input.tags, cells: cells)
         guard let table = made.table else { return .failed(made.error ?? "The tags aren't usable.") }
 
@@ -127,7 +132,7 @@ enum WidgetNewSprite {
         ]))
         let sprite = WidgetJson.object([
             ("schema_version", WidgetJson.int(1)), ("frame_w", WidgetJson.int(cw)), ("frame_h", WidgetJson.int(ch)),
-            ("scale", WidgetJson.int(scale)), ("fps", WidgetJson.int(fps)), ("stages", .array([stage])),
+            ("scale", WidgetJson.int(scale)), ("fps", WidgetJson.int(spriteFps)), ("stages", .array([stage])),
             ("animations", animations), ("moods", moods), ("triggers", triggers),
             ("roam", .object(WidgetJson.object([
                 ("edges", .array([.string("bottom"), .string("left"), .string("right")])), ("speed_px_s", WidgetJson.int(30)),
