@@ -214,6 +214,10 @@ private struct WidgetsFromFileRow: View {
             Text(status).font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        if let status = model.exportStatus {
+            Text(status).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
@@ -274,6 +278,7 @@ private struct WidgetsInstalledRow: View {
                     ownArtButton
                 }
             }
+            if model.canExport(row) { exportButton }
             Button("Uninstall") { model.uninstall(row.id) }
         }
     }
@@ -283,6 +288,30 @@ private extension WidgetsInstalledRow {
     var ownArtButton: some View {
         Button("Use my own art\u{2026}") { OwnArtPicker.run(model: model, id: row.id) }
             .accessibilityLabel("Use my own art for \(row.name)")
+    }
+}
+
+private extension WidgetsInstalledRow {
+    var exportButton: some View {
+        Button("Export\u{2026}") { ExportPicker.run(model: model, id: row.id) }
+            .accessibilityLabel("Export \(row.name)")
+    }
+}
+
+/// "Export..." (spec 21): a save panel named `<id>-<version>.zip`. The checks and the zip are `WidgetExport`'s and the
+/// file is written only where the panel says, atomically. Nothing is uploaded or shown to Claude.
+@MainActor
+private enum ExportPicker {
+    static func run(model: WidgetsModel, id: String) {
+        model.clearExportStatus()
+        guard case .zip(let data, let fileName) = model.exportOutcome(for: id) else { return }
+        let panel = NSSavePanel()
+        panel.title = "Export widget"
+        panel.nameFieldStringValue = fileName
+        panel.allowedContentTypes = [UTType.zip]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        model.writeExport(data, to: url, id: id, fileName: fileName)
     }
 }
 
