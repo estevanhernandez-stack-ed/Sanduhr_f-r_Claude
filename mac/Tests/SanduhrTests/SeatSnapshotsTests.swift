@@ -491,3 +491,50 @@ struct SeatMetersUsageOffTests {
         #expect(five(w.file("Home")) == 10)
     }
 }
+
+/// 2.42.5: an inactive account whose key claude.ai refused showed Signed in, in green, in
+/// Settings, Accounts, because only the active account's status was read there.
+@Suite("Expired accounts (2.42.5)")
+@MainActor
+struct ExpiredAccountsTests {
+    @Test func aRefusedKeyMarksTheAccountAndAGoodAnswerClearsIt() {
+        var e = ExpiredAccounts()
+        e.answered("Home", .failure(ClaudeAPI.APIError.unauthorized))
+        #expect(e.contains("Home"))
+        e.answered("Home", .success(usage(10)))
+        #expect(!e.contains("Home"))
+    }
+
+    @Test func cloudflareAndNetworkSayNothingAboutTheKey() {
+        var e = ExpiredAccounts()
+        e.answered("Home", .failure(ClaudeAPI.APIError.cloudflareChallenge))
+        e.answered("Home", .failure(URLError(.notConnectedToInternet)))
+        #expect(e.labels.isEmpty)
+        e.answered("Home", .failure(ClaudeAPI.APIError.unauthorized))
+        e.answered("Home", .failure(ClaudeAPI.APIError.cloudflareChallenge))
+        #expect(e.contains("Home"), "a challenge after a refusal keeps the mark")
+        e.answered(nil, .failure(ClaudeAPI.APIError.unauthorized))
+        #expect(e.labels == ["Home"])
+    }
+
+    @Test func forgetAndRenameFollowTheAccount() {
+        var e = ExpiredAccounts()
+        e.answered("Home", .failure(ClaudeAPI.APIError.unauthorized))
+        e.rename("Home", to: "Personal")
+        #expect(e.labels == ["Personal"])
+        e.rename("Nobody", to: "Else")
+        #expect(e.labels == ["Personal"])
+        e.forget("Personal")
+        #expect(e.labels.isEmpty)
+    }
+
+    @Test func aRoundsRefusedFetchReachesOnAnswer() async throws {
+        let w = try World()
+        w.answers["Home"] = .failure(ClaudeAPI.APIError.unauthorized)
+        var e = ExpiredAccounts()
+        w.meters.onAnswer = { label, result in e.answered(label, result) }
+        await w.activeAnswers()
+        #expect(w.calls("Home") == 1)
+        #expect(e.labels == ["Home"], "Work's own answer goes through the view model, not the round")
+    }
+}

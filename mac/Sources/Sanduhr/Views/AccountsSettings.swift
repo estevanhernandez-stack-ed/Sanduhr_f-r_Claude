@@ -135,6 +135,7 @@ private struct AccountList: View {
                 set: { if let s = $0 { selection = s; adding = false } })) { label in
                 AccountRow(label: label, active: label == vm.activeAccount,
                            signedIn: vm.signedInAccounts.contains(label),
+                           expired: vm.signedInAccounts.contains(label) && vm.keyRefused(label),
                            plan: vm.accountPlans[label])
                     .tag(label)
             }
@@ -149,6 +150,9 @@ private struct AccountRow: View {
     let label: String
     let active: Bool
     let signedIn: Bool
+    /// Its saved key was refused at its last fetch (2.42.5): the row says so in orange, so an
+    /// account that needs a sign-in shows in the list, not only on its own page.
+    var expired: Bool = false
     /// The account's kept plan name; nothing is drawn when unknown.
     var plan: String?
 
@@ -166,6 +170,8 @@ private struct AccountRow: View {
                 }
                 if !signedIn {
                     Text("Signed out").font(.caption2).foregroundStyle(.secondary)
+                } else if expired {
+                    Text("Session expired").font(.caption2).foregroundStyle(Color.hex("fb923c"))
                 }
             }
             Spacer(minLength: 0)
@@ -177,11 +183,11 @@ private struct AccountRow: View {
 }
 
 extension AccountRow {
-    /// "Work, Max ×20, Active, Signed out": the plan reads as part of the account.
+    /// "Work, Max ×20, Active, Signed out" (or "Session expired"): the plan reads as part of the account.
     fileprivate var rowSpeech: String {
         var parts = [AccountPlans.spokenLabel(label, plan: plan)]
         if active { parts.append("Active") }
-        if !signedIn { parts.append("Signed out") }
+        if !signedIn { parts.append("Signed out") } else if expired { parts.append("Session expired") }
         return parts.joined(separator: ", ")
     }
 }
@@ -299,8 +305,9 @@ private struct AccountDetail: View {
 
     private var isActive: Bool { label == vm.activeAccount }
     private var hasKey: Bool { vm.signedInAccounts.contains(label) }
-    /// The active account's key was refused at its last fetch.
-    private var expired: Bool { hasKey && isActive && vm.status.needsSignIn }
+    /// This account's key was refused at its last fetch: the active one's status, or for another
+    /// account what its own last fetch got (2.42.5; before, only the active account could show it).
+    private var expired: Bool { hasKey && vm.keyRefused(label) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
