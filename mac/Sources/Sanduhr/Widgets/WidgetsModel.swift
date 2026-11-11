@@ -46,6 +46,8 @@ final class WidgetsModel {
     private(set) var ownArtStatus: String?
     /// The last "Install widget from file..." outcome in a sentence, nil before one and after the panel opens.
     private(set) var fileInstallStatus: String?
+    /// The last "Export..." outcome in a sentence, nil before one and after the panel opens.
+    private(set) var exportStatus: String?
 
     let store: WidgetStore
     private let defaults: UserDefaults
@@ -331,6 +333,45 @@ final class WidgetsModel {
             fileInstallStatus = WidgetFileInstall.line(
                 for: manifest, wasUpdate: wasUpdate, isSprite: sprite,
                 deskOn: defaults.bool(forKey: DeskController.enabledKey), companionShown: companionPieceShown)
+        }
+    }
+
+    // MARK: Export (spec 21)
+
+    /// "Export..." is offered on a pack whose source is `local` (made here, own art, from a file), never a catalog pack.
+    func canExport(_ row: InstalledRow) -> Bool {
+        WidgetExport.canExport(store.load().find(row.id)?.source)
+    }
+
+    /// The panel is about to open: the last sentence goes.
+    func clearExportStatus() { exportStatus = nil }
+
+    /// The zip for an installed pack, or its refusal (also left in `exportStatus`). Nothing is written here.
+    func exportOutcome(for id: String) -> WidgetExport.Outcome {
+        guard let row = installed.first(where: { $0.id == id }), canExport(row) else {
+            exportStatus = WidgetExport.unreadable
+            return .refused(WidgetExport.unreadable)
+        }
+        let outcome = WidgetExport.export(id: id, store: store)
+        if case .refused(let why) = outcome { exportStatus = why }
+        return outcome
+    }
+
+    /// The save finished: `error` nil on success. A write that failed says so in a plain sentence.
+    func recordExport(id: String, fileName: String, error: Error?) {
+        let name = installed.first(where: { $0.id == id })?.name ?? id
+        exportStatus = error == nil
+            ? WidgetExport.exportedLine(name: name, fileName: fileName)
+            : "\(name) couldn't be saved there, so nothing was exported."
+    }
+
+    /// Writes the zip atomically to the URL the panel returned, then records the result.
+    func writeExport(_ data: Data, to url: URL, id: String, fileName: String) {
+        do {
+            try data.write(to: url, options: .atomic)
+            recordExport(id: id, fileName: url.lastPathComponent, error: nil)
+        } catch {
+            recordExport(id: id, fileName: fileName, error: error)
         }
     }
 
