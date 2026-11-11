@@ -477,6 +477,105 @@ Release: `mac/Info.plist` 2.42.0, build 57. A What's New card (`version: "2.42.0
 from a zip and checks the Desk. Done when a SpriteForge export that passes `validate.py --strict`
 installs on the Mac and walks on the Desk.
 
+## Release 2.43.0
+
+Added 2026-11-11. BACKLOG #9, the three sprite follow-ups, Mac first (Windows has none of them).
+Every rule below keeps the image boundary of sections 18 and 19: the art is read on the Mac, never
+sent anywhere, never shown to Claude. Built by the run in `docs/cart-runs/2026-11-11-sprites-2-43/`.
+
+## 21. Export a pack
+
+A pack made here can only leave the Mac by hand today (copying `widgets/<id>/` and zipping it).
+
+- Settings ▸ Widgets, an installed row whose source is `local` (made here, own art, installed from a
+  file) gains **Export…**. A catalog pack never shows it: its zip is the catalog's.
+- **Export…** opens an `NSSavePanel` named `<id>-<version>.zip`. Sanduhr reads the pack's files
+  from `WidgetStore`, validates them strict (`PackValidator.validate(files, folderName: id,
+  strict: true)`) and writes the zip only when they pass. A pack that fails says why with the
+  validator's sentences (the first three, then "and N more") and writes nothing.
+- The zip is `WidgetZip.write`: stored entries, CRC-32, the paths sorted, a fixed DOS date, no
+  directories and no extra fields, so the same pack always makes the same bytes. It refuses what
+  `WidgetZip.read` would refuse. Every zip it writes installs through **Install widget from file…**
+  (section 20) as the same pack.
+- Status line `WidgetsModel.exportStatus`: "<Name> is exported to <file name>." or the refusal.
+  Cleared when the panel opens.
+- **Privacy.** Sanduhr writes only where you save. Nothing is uploaded, submitted or shown to
+  Claude; carrying the zip to Windows or the catalog is yours (spec Scope).
+
+Tests (`WidgetExportTests`): write then read returns the same files for both `fromUser` values; two
+writes are byte-identical; `unzip -t` accepts the output; a made-here sprite exports and installs in
+a fresh store with byte-identical files; a catalog pack is not exportable; a pack edited on disk
+into failing validation is refused and nothing is written.
+
+## 22. Import an animated GIF
+
+- **New sprite from an image…** (section 18) accepts `.gif` beside `.png`. A GIF is read once with
+  `CGImageSource`; its frames are composited onto the full canvas in order (each frame drawn over
+  the last as ImageIO returns it) and laid out row-major, 16 across (`PixelSheet.layout`), into one
+  PNG sheet in memory. The sheet must meet the pack image rules (`WidgetOwnArt.imageSize`).
+- The tagging sheet opens with the cell set to the frame size, walk tagged with every frame in order,
+  sit with frame 1. The user changes the tags as for a PNG.
+- **fps** is the median frame delay (`kCGImagePropertyGIFUnclampedDelayTime`, else
+  `kCGImagePropertyGIFDelayTime`; a delay of 0 counts as 0.1 s) as frames per second, rounded and
+  held in 1...24. It goes into `sprite.json`; a PNG keeps 8. `WidgetNewSprite.Input` gains an
+  optional `fps`.
+- Refusals, one sentence each, nothing made:
+  - "That GIF has one frame. A sprite needs two or more to walk."
+  - "That GIF's frames are WxH. A sprite's cells are 8 to 64 pixels on a side."
+  - "That GIF has N frames. A sprite takes at most 256."
+  - the 2 MB and 4096 px sentences of `imageSize` for the made sheet;
+  - "That file isn't a GIF Sanduhr can read." when ImageIO can't.
+
+Tests (`SpriteFramesTests`): GIFs written in the test with `CGImageDestination`, frames of distinct
+colours and delays: the sheet's cells hold the frames in order; the fps rule including 0 delays;
+each refusal; a pack made from a GIF validates strict.
+
+## 23. Import an Aseprite sheet
+
+- **New sprite from an image…** accepts `.json`: the data Aseprite writes beside a sheet with
+  `File ▸ Export Sprite Sheet`, JSON Data, as a hash or an array. Native `.aseprite` files are not
+  read.
+- The sheet is the PNG `meta.image` names, read only from the folder the JSON is in: a plain file
+  name (no `/`, no `..`), a regular file, not a link. Nothing else is read.
+- Every frame must be one cell of one uniform grid: the same `w` and `h`, at `x` and `y` multiples of
+  them, not `rotated`, not `trimmed`. Each frame becomes its row-major cell index; frames in the
+  order the JSON lists them (array order, or the hash's keys in file order).
+- `meta.frameTags` named after an action (walk, sit, nap, cheer, worry; any case) pre-fill that tag
+  with the frames `from` to `to`: `forward` as is, `reverse` backwards, `pingpong` forward then back
+  without repeating the ends, `pingpong_reverse` the same from the end. Other tags are listed under
+  the grid as "Not used: <names>." With no action tags, walk is every frame and sit frame 1, as for a
+  GIF.
+- **fps** from the frames' median `duration` (ms), the GIF rule.
+- Refusals: "That isn't an Aseprite sheet's JSON.", "The frames aren't one grid of same-size cells.
+  Export with Trim and Rotate off.", "The sheet <name> isn't next to the JSON.", "The sheet's name
+  has a folder in it. Sanduhr reads only a sheet beside the JSON.", and the image rules.
+
+Tests (`AsepriteSheetTests`, JSON and PNG built in the test): hash and array forms; each direction;
+durations to fps; untagged; a trimmed and a non-grid export refused; a `meta.image` with a path or a
+link refused; a made pack validates strict.
+
+## 24. Own art, a column per stage
+
+- **Use my own art…** on a sprite with two or more stages opens a sheet with one column per stage in
+  growth order: the stage name, "From N% growth" (`min_growth`), the current sheet's first cell, a
+  **Choose…** button, and after a pick the new sheet's first cell or the check's sentence
+  (`WidgetOwnArt.checkImage`).
+- **Apply** runs `WidgetOwnArt.apply` once with every column picked: one patch bump, one reinstall.
+  Unpicked stages keep their sheets. A column whose pick failed blocks Apply until it is picked again
+  or cleared. **Cancel** changes nothing.
+- A one-stage sprite keeps today's single panel.
+- `OwnArtStagesModel` holds the columns and picks, so tests drive it without a panel.
+
+Tests (`OwnArtStagesTests`): columns follow `min_growth`; a bad pick shows its sentence and blocks
+only Apply; two of three stages picked changes exactly those sheets with one patch bump; a
+one-stage sprite skips the sheet.
+
+Release: `mac/Info.plist` 2.43.0, build 63. A What's New card (`version: "2.43.0"`, id
+`sprites-in-and-out`, destination `.widgets`) with its `WhatsNewTests` lines. CHANGELOG under
+`## Unreleased (mac)` ▸ New. PRIVACY.md's Mac paragraph names GIF and Aseprite files and Export.
+Smoke section 77. Done when a GIF and an Aseprite export each become a sprite that walks on the
+Desk, and its exported zip installs back as the same pack.
+
 ---
 
 ## 16. Privacy, docs and release (every release)
