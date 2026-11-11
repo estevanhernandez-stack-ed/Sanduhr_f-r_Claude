@@ -2099,6 +2099,21 @@ space in a raw name (the folder; every kept name still meets the validator's pat
 FORMAT 7's stored-only path, and so does `validate.py --zip`. Smoke hooks: `widget-from-file` (`arg=<absolute path to a .zip>`) and
 `widget-remove` (`arg=<pack id>`); the scenario is `smoke/scenarios/widget-from-file.yaml`.
 
+### Sprites in and out (2.43.0)
+
+Settings, Widgets. **Export…** (`WidgetExport`, `ExportPicker`) is on a row whose source is `local` only: it reads the
+pack's files from `WidgetStore`, validates them strict, and writes `<id>-<version>.zip` through `WidgetZip.write` (stored
+entries, CRC-32, sorted paths, a fixed DOS date, so the same pack is the same bytes) to the save panel's URL, atomically.
+A failing pack says why with the first three validator sentences and writes nothing; the zip installs through Install
+widget from file… as the same pack. **New sprite from an image…** also takes a GIF (`SpriteFrames`: `CGImageSource`
+returns each frame composited, one cell per frame, 16 across; fps is the median frame delay in 1...24; at most 256
+frames, a file read up to 32 MB) and an Aseprite sheet's JSON (`AsepriteSheet`, `AsepriteImport`: JSON at most 1 MB,
+hash or array, the one PNG `meta.image` names beside it as a plain file name and a regular file, never a link; every frame
+one cell of one grid, not rotated or trimmed; `frameTags` named after an action pre-fill its tag, fps from the median
+`duration`). A native `.aseprite` file is not read. **Use my own art…** on a sprite with two or more stages opens
+`OwnArtStagesSheet` (`OwnArtStagesModel`): a column per stage in growth order, one Apply, one `WidgetOwnArt.apply`, one
+patch bump; unpicked stages keep their sheets. Nothing is sent and Claude never sees an image.
+
 ## The Desk for Claude
 
 With the MCP server installed, Claude can read how your Desk is set up and suggest a whole look for it

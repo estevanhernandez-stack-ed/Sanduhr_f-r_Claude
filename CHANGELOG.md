@@ -11,6 +11,15 @@
 - **A widget pack zip you made yourself installs.** Install widget from file… now reads the zips Explorer's Send to, Compressed folder, Finder's Compress and zip tools make: compressed, with the pack's folder inside (its name may have spaces, as Finder and Explorer keep it), or with a Mac's hidden `__MACOSX` and `.DS_Store` files, which are skipped. It still holds every file to the same size limits while unpacking, checks each one's checksum, and runs every pack rule, so a zip that fails installs nothing and says why. Packs from the catalog keep their own stricter format (#459).
 - **Installing the MCP server checks that it starts.** After Install in Settings ▸ Claude Code, Sanduhr starts the server the way Claude Code will and waits for it to answer, then says so: installed and answering, with its version, or installed but not starting, and why (its launcher is missing, the server file it points to is gone, it stopped at once or didn't answer). Before, a launcher that couldn't start looked to Claude Code like no server at all, and nothing said otherwise (#144).
 
+## Unreleased (mac)
+
+### New
+
+- **Export a widget you made.** In Settings ▸ Widgets, a widget made here (a sprite you made, your own art, or one installed from a file) has **Export…**. It checks the pack the way an install does, then saves a zip where you choose, named with the widget's id and version. A pack that fails says why and writes nothing, and a catalog widget has no Export (its zip is the catalog's). The same pack always makes the same zip, and it installs back through **Install widget from file…** as the same pack. Sanduhr writes only where you save: nothing is uploaded.
+- **Make a sprite from an animated GIF.** **New sprite from an image…** now takes a `.gif` beside a PNG. Each frame becomes a cell, the walk is tagged with every frame in order and the sit with the first, and the speed comes from the GIF's own frame delays. A GIF with one frame, or frames over 64 pixels on a side, or more than 256 frames, says so and makes nothing. The GIF is read on this Mac, never sent anywhere and never shown to Claude.
+- **Make a sprite from an Aseprite export.** Pick the JSON Aseprite writes with File ▸ Export Sprite Sheet and Sanduhr reads that JSON and the one sheet it names beside it, nothing else. Tags named walk, sit, nap, cheer or worry fill those actions with their frames, in the direction Aseprite set, and the speed comes from the frames' durations. Export with Trim and Rotate off, so the frames are one grid of same-size cells. Both files stay on this Mac, never sent and never shown to Claude; a native `.aseprite` file is not read yet.
+- **Own art, a column for each growth stage.** On a sprite with two or more stages, **Use my own art…** opens one sheet with a column per stage: its name, the growth it starts at, its current first cell, and **Choose…**. Pick the stages you want, and Apply changes them all at once with one version bump; a stage you leave keeps its art. A sprite with one stage keeps the single file panel. The images stay on this Mac, never sent and never shown to Claude.
+
 ## v2.42.5-mac — 2026-11-11
 
 ### Fixes

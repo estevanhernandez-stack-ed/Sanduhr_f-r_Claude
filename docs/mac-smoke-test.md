@@ -2884,3 +2884,35 @@ process; it never writes.
    the probe says "the Python 3 it runs is missing" without starting it, and the row reads Outdated.
 
 Afterwards remove `~/cc-scratch` from Settings (Remove on its rows) and delete the folder, then restore per section 45.
+
+## 77. Sprites in and out (2.43.0)
+
+Use a release build after the section 45 backup (or a dev build, signed out, file store), and made-up art only. Make a three-frame GIF
+yourself: `ffmpeg -f lavfi -i "color=c=red:s=16x16:d=0.3,format=rgb24" -f lavfi -i "color=c=green:s=16x16:d=0.3,format=rgb24" -f lavfi -i
+"color=c=blue:s=16x16:d=0.3,format=rgb24" -filter_complex "[0][1][2]concat=n=3:v=1:a=0,fps=8" test.gif` (any small GIF of two or more
+frames, 8 to 64 pixels square, works). For the Aseprite step, put a four-cell sheet `test-sheet.png` (64x16, four 16x16 cells in a row) and a
+`test-sheet.json` that lists four frames (`frame` x 0, 16, 32, 48, y 0, w 16, h 16, `duration` 100, `rotated` and `trimmed` false), a
+`meta.image` of `test-sheet.png` and one `frameTags` entry `{"name": "walk", "from": 0, "to": 3, "direction": "forward"}` in one empty folder.
+
+1. Settings, Widgets, **New sprite from an image…**: choose `test.gif`. The sheet opens with the cell set to the GIF's frame size, walk
+   tagged with every frame in order and sit with frame 1. Name it and make it: the row reads **made here**, the sprite walks on the Desk
+   at about the GIF's speed (fps from its frame delays), and `widgets/<id>/art/sprite.png` holds the frames as one sheet. A one-frame GIF
+   says "That GIF has one frame. A sprite needs two or more to walk." and makes nothing.
+2. **New sprite from an image…** again, choose `test-sheet.json`: the tagging sheet shows the four cells with walk pre-filled to all four.
+   Make it: a second sprite, made here, that walks. Move `test-sheet.png` out of the folder and choose the JSON again: "The sheet
+   test-sheet.png isn't next to the JSON." A sheet made a symlink: "…is a link. Sanduhr reads only a sheet that is a file beside the JSON."
+3. On a sprite with three stages (a catalog sprite is not eligible: use a made-here one, or edit a made-here pack's `sprite.json` into three
+   stages and reinstall it with Install widget from file…), press **Use my own art…**: one sheet with a column per stage, each with its
+   name, "From N% growth" and its current first cell. Choose a small PNG (a whole number of the stage's cells) for two columns: each
+   shows its new first cell. Choose a bad file for the third: its sentence shows and **Apply** is off until it is chosen again or
+   cleared. Apply: the two stages change, the third keeps its art, the pack's patch version goes up by one, once. **Cancel** changes nothing.
+4. **Export…** sits on made-here rows only, not on a catalog widget's row. Press it on the GIF sprite: a save panel named
+   `<id>-<version>.zip`. Save it to a scratch folder: "<Name> is exported to <file name>." Export it again to a second name: the two
+   files are byte-identical (`shasum -a 256`). `unzip -t` accepts it.
+5. Uninstall the GIF sprite, then **Install widget from file…** and choose the exported zip: it installs as the same pack, the same id,
+   name and files, made here, and becomes the companion; it walks on the Desk.
+6. Check: the sprite from the GIF and the one from the Aseprite export each walk on the Desk. The exported zip installs back as the same
+   pack. A network monitor shows no request during any of this, and the only files read were the ones you picked (the GIF, the JSON and
+   the one sheet it names) and the save panel wrote only the zip. None of it is shown to Claude.
+
+Afterwards uninstall the made-up sprites and restore per section 45.
