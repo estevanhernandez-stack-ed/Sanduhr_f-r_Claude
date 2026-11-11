@@ -45,6 +45,8 @@ final class SeatMeters {
     /// The kept plan name of an account (AccountPlans), for the seats the view model's own plan
     /// does not cover.
     var planFor: (String) -> String? = { _ in nil }
+    /// A round's fetch of an account answered (2.42.5): Settings learns a refused key from it.
+    var onAnswer: (String, Result<UsageResponse, Error>) -> Void = { _, _ in }
     var now: () -> Date = Date.init
     var sleep: (TimeInterval) async -> Void = { try? await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) }
     /// Whether Claude Code wrote to a seat folder lately. Runs off the main thread.
@@ -258,6 +260,7 @@ final class SeatMeters {
               SeatSnapshots.fetchable(label, linked: after.linked, signedIn: after.signedIn, active: after.active)
         else { return }
         if case .failure(let e) = result, SnapshotWriter.errorKind(e) != "network" { authSkipped[label] = key }
+        onAnswer(label, result)
         write(label, result)
     }
 }
