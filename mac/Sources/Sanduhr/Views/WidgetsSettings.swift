@@ -270,6 +270,7 @@ private enum WidgetFilePicker {
 private struct WidgetsInstalledRow: View {
     let model: WidgetsModel
     let row: WidgetsModel.InstalledRow
+    @State var stagesModel: OwnArtStagesModel?
 
     var body: some View {
         HStack {
@@ -302,8 +303,20 @@ private struct WidgetsInstalledRow: View {
 
 private extension WidgetsInstalledRow {
     var ownArtButton: some View {
-        Button("Use my own art\u{2026}") { OwnArtPicker.run(model: model, id: row.id) }
+        Button("Use my own art\u{2026}") { openOwnArt() }
             .accessibilityLabel("Use my own art for \(row.name)")
+            .sheet(isPresented: Binding(get: { stagesModel != nil }, set: { if !$0 { stagesModel = nil } })) {
+                if let stagesModel { OwnArtStagesSheet(model: stagesModel, close: { self.stagesModel = nil }) }
+            }
+    }
+
+    /// Two or more stages open the column sheet; one stage keeps the single panel.
+    func openOwnArt() {
+        if OwnArtStagesModel.opensSheet(stageCount: model.ownArtStageCount(for: row.id) ?? 1) {
+            stagesModel = model.ownArtStagesModel(for: row.id)
+        } else {
+            OwnArtPicker.run(model: model, id: row.id)
+        }
     }
 }
 

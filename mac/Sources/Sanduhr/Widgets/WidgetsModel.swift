@@ -231,6 +231,25 @@ final class WidgetsModel {
         }
     }
 
+    /// How many stages the pack's sprite has; nil when it can't be read.
+    func ownArtStageCount(for id: String) -> Int? {
+        store.readFiles(id).flatMap { WidgetOwnArt.sprite($0) }?.stages.count
+    }
+
+    /// The column model for the stages sheet (spec 2.43.0 section 24), built from the installed pack's files. Applying
+    /// goes through `useOwnArt`, the one install path. Nil, with the status set, when the pack can't be read.
+    func ownArtStagesModel(for id: String) -> OwnArtStagesModel? {
+        ownArtStatus = nil
+        let name = installed.first { $0.id == id }?.name ?? id
+        guard let row = installed.first(where: { $0.id == id }), canUseOwnArt(row), let files = store.readFiles(id),
+              let stages = OwnArtStagesModel(files: files, apply: { [weak self] art in self?.useOwnArt(id: id, art: art) ?? false })
+        else {
+            ownArtStatus = "\(name) couldn't be read, so it is unchanged."
+            return nil
+        }
+        return stages
+    }
+
     /// One picked file against the pack image rules, before it is kept: nil when it may be used, else the sentence
     /// (also left in `ownArtStatus`). `data` nil: the file couldn't be read.
     func checkOwnArt(id: String, stageId: String, data: Data?) -> String? {
