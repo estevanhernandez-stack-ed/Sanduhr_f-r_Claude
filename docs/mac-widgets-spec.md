@@ -510,9 +510,9 @@ into failing validation is refused and nothing is written.
 ## 22. Import an animated GIF
 
 - **New sprite from an image…** (section 18) accepts `.gif` beside `.png`. A GIF is read once with
-  `CGImageSource`; its frames are composited onto the full canvas in order (each frame drawn over
-  the last as ImageIO returns it) and laid out row-major, 16 across (`PixelSheet.layout`), into one
-  PNG sheet in memory. The sheet must meet the pack image rules (`WidgetOwnArt.imageSize`).
+  `CGImageSource`, which returns every frame already composited at the full canvas with its
+  disposal applied; each frame as returned is one cell, laid out row-major, 16 across
+  (`PixelSheet.layout`), into one PNG sheet in memory. The sheet must meet the pack image rules (`WidgetOwnArt.imageSize`).
 - The tagging sheet opens with the cell set to the frame size, walk tagged with every frame in order,
   sit with frame 1. The user changes the tags as for a PNG.
 - **fps** is the median frame delay (`kCGImagePropertyGIFUnclampedDelayTime`, else

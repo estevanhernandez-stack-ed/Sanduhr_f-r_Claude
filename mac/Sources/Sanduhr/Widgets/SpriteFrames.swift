@@ -2,7 +2,7 @@ import Foundation
 import ImageIO
 import CoreGraphics
 
-/// "Import an animated GIF" (spec 2.43.0 section 22): a GIF's frames composited onto its full canvas, laid out
+/// "Import an animated GIF" (spec 2.43.0 section 22): a GIF's frames as ImageIO composites them, laid out
 /// row-major into one PNG sheet in memory, with the fps its delays make. Pure: bytes in, a sheet or a sentence out.
 /// Only ImageIO and Core Graphics; nothing is shown, written or sent.
 enum SpriteFrames {
@@ -49,8 +49,12 @@ enum SpriteFrames {
         var delays: [Double] = []
         for i in 0..<count {
             guard let frame = CGImageSourceCreateImageAtIndex(source, i, nil) else { return fail(unreadable) }
-            // A frame smaller than the canvas is drawn at the canvas's top-left, at its own size, never scaled.
+            // ImageIO hands back every frame already composited at the full canvas, with each frame's disposal
+            // applied (a delta GIF made by ffmpeg decodes with the moved sprite's old place clear). So each cell is
+            // that frame alone: the canvas is cleared first, or a moving sprite on a clear background would smear.
+            // A frame smaller than the canvas (not seen from ImageIO) is drawn at the top-left, never scaled.
             let fh = frame.height
+            canvas.clear(CGRect(x: 0, y: 0, width: w, height: h))
             canvas.draw(frame, in: CGRect(x: 0, y: h - fh, width: frame.width, height: fh))
             guard let composed = canvas.makeImage() else { return fail(unreadable) }
             // Core Graphics' origin is bottom-left: row 0 of the sheet is its top.

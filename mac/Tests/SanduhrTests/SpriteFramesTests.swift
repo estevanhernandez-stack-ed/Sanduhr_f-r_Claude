@@ -108,19 +108,32 @@ struct SpriteFramesTests {
 
     // MARK: Compositing
 
-    /// Probed on macOS 26: ImageIO's encoder writes every frame at the first frame's size (a smaller image is scaled
-    /// up, so no partial frame can be written here), and the decoder hands each frame back at the full canvas size,
-    /// uncomposited: a fully transparent frame decodes as fully transparent. So the persistent canvas does the
-    /// compositing, and a frame with transparency over an opaque first frame is the case to test: the first frame
-    /// shows through the clear pixels. (A smaller frame from a real-world GIF is drawn at the canvas's top-left.)
-    @Test func aTransparentFrameShowsTheFrameBeneath() throws {
+    /// ImageIO composites the frames itself, disposal included, so a cell is exactly the frame it returns: a clear
+    /// frame after an opaque one stays clear, and nothing from an earlier frame bleeds into a later cell.
+    @Test func aClearFrameStaysClear() throws {
         let base = Self.solid(16, 16, Self.palette[2])
         let clear = Self.solid(16, 16, (0, 0, 0, 0))
         let r = try made(Self.gif([(base, 0.1), (clear, 0.1)]))
         let d = Self.decode(r.png)
         #expect(Self.near(Self.pixel(d, 8, 8), Self.palette[2]))
-        #expect(Self.near(Self.pixel(d, 16 + 8, 8), Self.palette[2]), "frame 2 shows \(Self.pixel(d, 24, 8))")
-        #expect(Self.pixel(d, 16 + 8, 8).a == 255)
+        #expect(Self.pixel(d, 16 + 8, 8).a == 0)
+    }
+
+    /// A real delta GIF, made with ffmpeg (`-gifflags +transdiff+offsetting`): a 16 px red square steps across a
+    /// clear 64x16 canvas in four frames, each later frame a partial rectangle with disposal. Each cell shows the
+    /// square in its own place only; a canvas kept between frames would show a growing red bar.
+    static let movingSquare = Data(base64Encoded: "R0lGODlhQAAQAPf/MQAAAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAP8AAAD/ACH/C05FVFNDQVBFMi4wAwEAAAAh+QQJCgD/ACwAAAAAEAAQAAAIHQADCBxIsKDBgwgTKlzIsKHDhxAjSpxIsaLFgQEBACH5BAkKAP8ALBAAAAAQABAAAAgdAAMIHEiwoMGDCBMqXMiwocOHECNKnEixosWBAQEAIfkECQoA/wAsIAAAABAAEAAACB0AAwgcSLCgwYMIEypcyLChw4cQI0qcSLGixYEBAQAh+QQJCgD/ACwwAAAAEAAQAAAIHQADCBxIsKDBgwgTKlzIsKHDhxAjSpxIsaLFgQEBADs=")!
+
+    @Test func aDeltaGifsSpriteDoesNotSmear() throws {
+        let r = try made(Self.movingSquare)
+        #expect(r.frameCount == 4 && r.frameWidth == 64 && r.frameHeight == 16)
+        let d = Self.decode(r.png)
+        for frame in 0..<4 {
+            for block in 0..<4 {
+                let a = Self.pixel(d, frame * 64 + block * 16 + 8, 8).a
+                #expect((a > 128) == (block == frame), "frame \(frame) block \(block) alpha \(a)")
+            }
+        }
     }
 
     // MARK: fps
