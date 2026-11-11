@@ -30,6 +30,8 @@ final class NewSpriteModel {
     private(set) var made = false
     /// The frames per second a GIF import carries into `input`; nil (the default 8) for a PNG.
     private(set) var fps: Int?
+    /// Tag names from an Aseprite import that are no action, shown under the grid; empty otherwise.
+    private(set) var ignoredTags: [String] = []
 
     /// Installs the made `Input`; returns the sentences why not (empty when it went in).
     private let install: (WidgetNewSprite.Input) -> [String]
@@ -54,6 +56,21 @@ final class NewSpriteModel {
         setCell(width: gif.frameWidth, height: gif.frameHeight)
         tags = ["walk": Array(0..<gif.frameCount), "sit": [0]]
         fps = gif.fps
+    }
+
+    /// The sheet for an Aseprite import (spec 2.43.0 section 23): the cell is the frames' size, the action tags are
+    /// pre-filled from the JSON's tags, and its median duration is the fps.
+    convenience init(aseprite: AsepriteImport.Loaded, install: @escaping (WidgetNewSprite.Input) -> [String]) {
+        self.init(png: aseprite.png, install: install)
+        setCell(width: aseprite.plan.cellWidth, height: aseprite.plan.cellHeight)
+        tags = aseprite.plan.tags
+        fps = aseprite.plan.fps
+        ignoredTags = aseprite.plan.ignored
+    }
+
+    /// The note under the grid for tags no action uses, nil when there are none.
+    var ignoredNote: String? {
+        ignoredTags.isEmpty ? nil : "Not used: " + ignoredTags.joined(separator: ", ") + "."
     }
 
     /// A sheet that opens on one sentence and nothing else, for a picked file that could not be read.
