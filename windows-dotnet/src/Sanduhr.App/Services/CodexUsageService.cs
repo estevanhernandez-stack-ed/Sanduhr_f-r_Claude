@@ -107,7 +107,8 @@ public sealed class CodexUsageService : IDisposable
                 _snapshot?.Delete();
             }
             var prev = _current;
-            changed = prev.Status != next.Status || prev.AsOf != next.AsOf || prev.Fresh != next.Fresh
+            // Off is NotInstalled with nothing in it, so the first real reading always counts as a change.
+            changed = ReferenceEquals(prev, CodexState.Off) || prev.Status != next.Status || prev.AsOf != next.AsOf || prev.Fresh != next.Fresh
                 || !prev.FreshTiers.SetEquals(next.FreshTiers) || prev.Tiers.ToJsonString() != next.Tiers.ToJsonString();
             _current = next;
         }

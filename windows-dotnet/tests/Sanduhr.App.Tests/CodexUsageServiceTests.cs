@@ -209,6 +209,21 @@ public sealed class CodexUsageServiceTests : IDisposable
     }
 
     [Fact]
+    public void The_first_not_installed_poll_is_a_change_from_the_startup_state()
+    {
+        // CodexState.Off is itself NotInstalled with nothing in it, so a field-by-field compare
+        // would call the first real NotInstalled "no change" and the widget would never learn it.
+        var (svc, _) = Make(homeInstalled: false);
+        var states = new List<CodexState>();
+        svc.Changed += s => states.Add(s);
+        svc.Poll();
+        svc.Poll();
+        var only = Assert.Single(states);
+        Assert.Equal(CodexReadStatus.NotInstalled, only.Status);
+        Assert.False(ReferenceEquals(only, CodexState.Off));
+    }
+
+    [Fact]
     public void A_codex_history_never_inherits_the_legacy_claude_history_file()
     {
         Directory.CreateDirectory(_paths.AppDataDir);
