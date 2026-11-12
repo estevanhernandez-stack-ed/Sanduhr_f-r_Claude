@@ -111,7 +111,7 @@ public sealed class SetupWindowTests : AppWindowFixture
             var shown = new List<string>();
             CollectText(w, shown);
             Assert.Contains(SetupCopy.ClaudeTrademark, shown);
-            Assert.DoesNotContain(SetupCopy.ClaudeSource, shown);   // the source row itself needs usage ticked
+            Assert.True(w.FindName("UsageBox") is System.Windows.Controls.CheckBox { IsChecked: false });   // Claude's own tick is off; the line is the add-ons'
         }
         finally { w.Close(); }
     });
@@ -316,6 +316,106 @@ public sealed class SetupWindowTests : AppWindowFixture
         vm.DesignWithChatRequested = () => asked++;
         vm.DesignWithChatCommand.Execute(null);
         Assert.Equal(1, asked);
+    });
+
+    [Fact]
+    public void A_stored_Codex_tick_survives_a_setup_save_that_only_changes_Desktop() => AppHost.Run(() =>
+    {
+        var store = new SettingsStore(ScratchPaths());
+        store.SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false, ["codex"] = true }));
+        store.SaveDesk(store.LoadDesk() with { Enabled = true });
+        var vm = new SetupViewModel(new SetupService(store, new Host()), firstRun: false, codexInstalled: () => true);
+        Assert.True(vm.CodexUsage);                  // seeded from the saved setup
+        vm.Desktop = false;
+        vm.ContinueCommand.Execute(null);
+        Assert.True(vm.Saved);
+        Assert.True(store.LoadSetup()!.CodexUsage);
+        Assert.False(store.LoadSetup()!.Desktop);
+    });
+
+    [Fact]
+    public void A_stored_Codex_tick_survives_a_setup_save_when_Codex_is_no_longer_installed_and_can_be_cleared() => AppHost.Run(() =>
+    {
+        var store = new SettingsStore(ScratchPaths());
+        store.SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false, ["codex"] = true }));
+        store.SaveDesk(store.LoadDesk() with { Enabled = true });
+        var vm = new SetupViewModel(new SetupService(store, new Host()), firstRun: false, codexInstalled: () => false);
+        Assert.True(vm.CodexUsage);
+        Assert.True(vm.CodexEnabled);                // ticked from before: it can still be cleared
+        Assert.Equal(SetupCopy.CodexNotInstalled, vm.CodexNotInstalledText);
+        vm.Desktop = false;
+        vm.ContinueCommand.Execute(null);
+        Assert.True(store.LoadSetup()!.CodexUsage);
+        vm.CodexUsage = false;
+        Assert.False(vm.CodexEnabled);               // cleared and not installed: greyed
+        Assert.Equal([SetupCopy.CodexOffLine], vm.ChangeLines);
+    });
+
+    [Fact]
+    public void Codex_is_a_tick_beside_Claude_and_never_asks_to_sign_in() => AppHost.Run(() =>
+    {
+        var store = new SettingsStore(ScratchPaths());
+        var vm = new SetupViewModel(new SetupService(store, new Host()), firstRun: true, codexInstalled: () => true);
+        var w = new SetupWindow(vm);
+        OffScreen(w);
+        w.Show();
+        try
+        {
+            var codex = Assert.IsType<System.Windows.Controls.CheckBox>(w.FindName("CodexUsageBox"));
+            var claude = Assert.IsType<System.Windows.Controls.CheckBox>(w.FindName("UsageBox"));
+            Assert.True(codex.IsEnabled);
+            Assert.Equal(SetupCopy.CodexSource, System.Windows.Automation.AutomationProperties.GetName(codex));
+            Assert.Equal(SetupCopy.ClaudeSource, System.Windows.Automation.AutomationProperties.GetName(claude));
+            codex.IsChecked = true;
+            Assert.True(vm.CodexUsage);
+            Assert.False(vm.ClaudeUsage);
+            Assert.False(vm.ShowTrademark);           // Claude is not named, so no trademark line
+            vm.ContinueCommand.Execute(null);
+            Assert.True(store.LoadSetup()!.CodexUsage);
+            Assert.False(store.LoadSetup()!.ClaudeUsage);
+        }
+        finally { w.Close(); }
+    });
+
+    [Fact]
+    public void The_Codex_disclaimer_shows_beside_its_tile_ticked_or_not() => AppHost.Run(() =>
+    {
+        var vm = new SetupViewModel(new SetupService(new SettingsStore(ScratchPaths()), new Host()), firstRun: true, codexInstalled: () => true);
+        var w = new SetupWindow(vm);
+        OffScreen(w);
+        w.Show();
+        try
+        {
+            var before = new List<string>();
+            CollectText(w, before);
+            Assert.Contains(SetupCopy.CodexTrademark, before);   // the tile is on the screen, so its notice is
+            vm.CodexUsage = true;
+            w.UpdateLayout();
+            var after = new List<string>();
+            CollectText(w, after);
+            Assert.Contains(SetupCopy.CodexTrademark, after);
+            Assert.Contains("OpenAI", SetupCopy.CodexTrademark);
+        }
+        finally { w.Close(); }
+    });
+
+    [Fact]
+    public void Codex_not_installed_is_greyed_with_its_line_on_the_setup_screen() => AppHost.Run(() =>
+    {
+        var vm = new SetupViewModel(new SetupService(new SettingsStore(ScratchPaths()), new Host()), firstRun: true, codexInstalled: () => false);
+        var w = new SetupWindow(vm);
+        OffScreen(w);
+        w.Show();
+        try
+        {
+            var codex = Assert.IsType<System.Windows.Controls.CheckBox>(w.FindName("CodexUsageBox"));
+            Assert.False(codex.IsEnabled);
+            Assert.False(vm.CodexUsage);
+            var shown = new List<string>();
+            CollectText(w, shown);
+            Assert.Contains(SetupCopy.CodexNotInstalled, shown);
+        }
+        finally { w.Close(); }
     });
 
     [Fact]

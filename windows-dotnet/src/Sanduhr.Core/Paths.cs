@@ -181,6 +181,10 @@ public sealed class Paths
     /// In <see cref="ExternalDir"/>: read from outside the package.</summary>
     public string SnapshotFile => Path.Combine(ExternalDir, "snapshot.json");
 
+    /// <summary>The Codex limits snapshot, beside <see cref="SnapshotFile"/> (read from outside the package). Carries
+    /// <c>"source": "codex"</c> and no account_ref; its history lives under the reserved account <c>@codex</c>.</summary>
+    public string CodexSnapshotFile => Path.Combine(ExternalDir, "snapshot.codex.json");
+
     /// <summary>Streamer mode's half for the statusline (Settings v2, slice 7): on, and folder ref to codename, never a real name. In
     /// <see cref="ExternalDir"/> because the statusline runs outside the package. Shared ground: only this name is Sanduhr's. Built on the
     /// folder path, not <see cref="ExternalDir"/>, so asking for the path never creates the shared folder.</summary>

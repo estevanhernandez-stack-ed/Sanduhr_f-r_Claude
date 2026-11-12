@@ -36,7 +36,9 @@ public static class ToolCatalog
             "accounts. A stale or no_data status means unknown headroom - never assume budget. " +
             "sanduhr-mcp requires widget " + ToolLogic.RequiredWidgetVersion + " or later (the " +
             "snapshot writer): with an older widget the reason is widget_too_old, and status " +
-            "degraded serves the widget's history file instead (utilization and reset times only).",
+            "degraded serves the widget's history file instead (utilization and reset times only). " +
+            "A separate codex block with Codex's limits appears whenever Sanduhr has read them, with " +
+            "status ok or stale by age, and is absent when there is no Codex file or it cannot be read.",
             new JsonObject
             {
                 ["type"] = "object",

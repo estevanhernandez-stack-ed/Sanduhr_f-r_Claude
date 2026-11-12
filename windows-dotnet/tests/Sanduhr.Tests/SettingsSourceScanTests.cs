@@ -541,6 +541,15 @@ public class SettingsSourceScanTests
     }
 
     [Fact]
+    public void The_Desk_page_carries_the_Codex_notice_under_its_trademark_footer()
+    {
+        var desk = TabRange("Desk");
+        int footer = desk.IndexOf("<views:TrademarkFooter", StringComparison.Ordinal);
+        Assert.True(footer >= 0);
+        Assert.Contains("core:SettingsNames.CodexNotice", desk[footer..]);
+    }
+
+    [Fact]
     public void Message_mode_is_a_two_radio_segment()
     {
         var page = File.ReadAllText(Path.Combine(AppDir(), "Views", "DeskMessagePage.xaml"));

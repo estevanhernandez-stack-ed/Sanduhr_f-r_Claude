@@ -500,8 +500,8 @@ internal sealed partial class DeskView : Grid, IDisposable
         {
             "message" => _frame.Message is { } msg ? DeskMessagePiece.Create(msg, p.Scale, _ink, _fonts, _settings.Font, align, width, _live, _gate) : null,   // streamer: notname - frame.Message is the Desk message frame record
             "clock" => Clock(ts, align),
-            "claude" => p.Style == DeskMeterStyle.Bar ? ClaudeLine(ts) : StyledClaude(ts, align, p.Style),
-            "meters" => p.Style == DeskMeterStyle.Bar ? Meters(ts, align) : StyledMeters(ts, align, p.Style),
+            "claude" => p.Style == DeskMeterStyle.Bar ? ClaudeLine(ts, p.Source) : StyledClaude(ts, align, p.Style, p.Source),
+            "meters" => p.Style == DeskMeterStyle.Bar ? Meters(ts, align, p.Source) : StyledMeters(ts, align, p.Style, p.Source),
             "nowPlaying" => NowPlaying(ts, align),
             "telemetry" => p.Style == DeskMeterStyle.Bar ? TelemetryPiece(ts, align) : StyledTelemetry(ts, align, p.Style),
             "weather" => WeatherPiece(ts, align),
@@ -714,8 +714,14 @@ internal sealed partial class DeskView : Grid, IDisposable
         return panel;
     }
 
-    private FrameworkElement? ClaudeLine(double ts)
+    private FrameworkElement? ClaudeLine(double ts, string source = DeskSources.Combined)
     {
+        // A piece set to Codex (or combined with no Claude to draw) reads "Codex 5h 40% · wk 12%", and is gone with no Codex to read.
+        if (DeskMeters.Resolve(_frame.Usage, source) == DeskSources.Codex)
+        {
+            var codex = DeskMeters.ForSource(_frame.Usage, DeskSources.Codex, _frame.Now);
+            return DeskClaudeText.CodexLine(_frame.Usage) is { } text ? Text(text, ts * 0.19, codex.IsStale(_frame.Now) ? 0.45 : 0.75) : null;
+        }
         var line = DeskClaudeText.Line(_frame.Usage);
         if (line is null) return null;
         return Text(line, ts * 0.19, _frame.Usage.IsStale(_frame.Now) ? 0.45 : 0.75);
@@ -724,7 +730,7 @@ internal sealed partial class DeskView : Grid, IDisposable
     /// <summary>A row in the meters' shape: a label and a percent over a bar in the ink. Returns the
     /// pieces a live row updates.</summary>
     private (StackPanel Block, TextBlock Percent, Rectangle Fill) BarRow(string label, int percent, double fill, double size, double width,
-        MeterLevel level, bool first, double? pace = null)
+        MeterLevel level, bool first, double? pace = null, SourceBarLayout? combined = null)
     {
         var block = new StackPanel { Width = width, Margin = new Thickness(0, first ? 0 : size * 0.6, 0, 0) };
         var head = new DockPanel { LastChildFill = true };
@@ -750,7 +756,13 @@ internal sealed partial class DeskView : Grid, IDisposable
             Fill = MeterFill(level), Opacity = _ink.TextOpacity,
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
         };
-        bar.Children.Add(rect);
+        // A combined row draws the sources' two-tone fill and ticks in place of the one fill (agent layer).
+        if (combined is null) bar.Children.Add(rect);
+        else
+        {
+            AddCombinedFill(bar, combined, width, barHeight, barHeight * 2);
+            System.Windows.Automation.AutomationProperties.SetName(block, DeskMeters.CombinedName(label, combined));   // streamer: notname - a window and source names (Weekly, Codex), not an account
+        }
         if (pace is { } p)
             bar.Children.Add(new Rectangle
             {
@@ -762,20 +774,21 @@ internal sealed partial class DeskView : Grid, IDisposable
         return (block, pct, rect);
     }
 
-    private FrameworkElement? Meters(double ts, HorizontalAlignment align)
+    private FrameworkElement? Meters(double ts, HorizontalAlignment align, string source = DeskSources.Combined)
     {
-        var rows = DeskMeters.Rows(_frame.Usage, _frame.Now, warnAt: _frame.WarnAt, urgentAt: _frame.UrgentAt);
+        var (usage, rows) = MeterRows(source);
         double size = ts * 0.17;
         double width = ts * 3.2;
         if (rows.Count == 0)
         {
-            if (!DeskMeters.SignInLineShown(_frame.Usage)) return null;
-            return Text(DeskClaudeText.SignInLine(_frame.Usage.FirstSignIn), size, 0.75);
+            if (source == DeskSources.Codex || !DeskMeters.SignInLineShown(usage)) return null;   // a Codex piece with no Codex draws nothing
+            return Text(DeskClaudeText.SignInLine(usage.FirstSignIn), size, 0.75);
         }
-        var panel = new StackPanel { HorizontalAlignment = align, Opacity = _frame.Usage.IsStale(_frame.Now) ? 0.5 : 1 };
-        foreach (var row in rows)
+        var panel = new StackPanel { HorizontalAlignment = align, Opacity = DeskMeters.Resolve(_frame.Usage, source) != DeskSources.Codex && usage.IsStale(_frame.Now) ? 0.5 : 1 };   // a Codex piece dims per row
+        foreach (var (row, layout) in rows)
         {
-            var (block, _, _) = BarRow(row.Label, row.Percent, row.Fill, size, width, row.Level, panel.Children.Count == 0, row.Pace);
+            var (block, _, _) = BarRow(row.Label, row.Percent, row.Fill, size, width, row.Level, panel.Children.Count == 0, row.Pace, layout);
+            if (row.Stale) block.Opacity = SourceStaleOpacity;
             if (row.Reset.Length > 0)
                 block.Children.Add(Text($"resets {row.Reset}", size * 0.8, 0.7));
             panel.Children.Add(block);

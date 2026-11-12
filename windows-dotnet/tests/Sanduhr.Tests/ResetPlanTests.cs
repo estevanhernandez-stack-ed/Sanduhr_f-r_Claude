@@ -149,6 +149,22 @@ public class ResetPlanTests : IDisposable
     }
 
     [Fact]
+    public void The_codex_snapshot_and_history_are_listed_by_name_and_time_stays()
+    {
+        var paths = Make();
+        string ext = paths.ExternalDirPath;
+        Touch(paths.CodexSnapshotFile);
+        Touch(paths.HistoryFileFor("@codex"));
+        Touch(Path.Combine(ext, "time", "keep.txt"));
+
+        var all = ResetPlan.Inventory(paths)[ResetPart.History].Select(i => i.Path).ToList();
+        Assert.Contains(paths.CodexSnapshotFile, all);
+        Assert.Contains(paths.HistoryFileFor("@codex"), all);
+        Assert.DoesNotContain(all, p => p.StartsWith(Path.Combine(ext, "time"), StringComparison.OrdinalIgnoreCase));
+        Assert.All(ResetPlan.Inventory(paths).Values.SelectMany(v => v), i => Assert.False(i.IsDirectory && Path.TrimEndingDirectorySeparator(i.Path) == ext));
+    }
+
+    [Fact]
     public void A_foreign_file_in_the_external_folder_is_never_listed()
     {
         var paths = Make();

@@ -40,7 +40,7 @@ public partial class TierCard : UserControl
                 Math.Abs(p.Y - _dragStart.Y) > SystemParameters.MinimumVerticalDragDistance)
             {
                 _maybeDrag = false;
-                if (DataContext is TierCardViewModel vm)
+                if (DataContext is TierCardViewModel { Source: AgentSources.Claude } vm)
                     DragDrop.DoDragDrop(this, vm, DragDropEffects.Move);
             }
         }
@@ -59,7 +59,7 @@ public partial class TierCard : UserControl
         if (ContextMenu is not { } menu)
             return;
         menu.Items.Clear();
-        if (DataContext is not TierCardViewModel vm
+        if (DataContext is not TierCardViewModel { Source: AgentSources.Claude } vm
             || Window.GetWindow(this)?.DataContext is not WidgetViewModel host)
         {
             e.Handled = true;   // nothing to offer, so no empty menu

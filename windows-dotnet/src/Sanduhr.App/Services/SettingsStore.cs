@@ -896,6 +896,16 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>Per-source display settings (agent layer): <c>sources</c>, absent = <see cref="SourceSettings.Default"/>.</summary>
+    public SourceSettings LoadSources() => SourceSettings.Decode(Read()[SourceSettings.Key]);
+
+    public void SaveSources(SourceSettings value)
+    {
+        var root = Read();
+        root[SourceSettings.Key] = value.Encode();
+        Write(root);
+    }
+
     /// <summary>Runs once, on the first launch of a setup build (spec 1, Migration): writes <c>setup</c> only when it is absent and
     /// the file has an account or Just the Desk. The <c>just_the_desk</c> keys stay. True when it wrote.</summary>
     public bool MigrateSetup(bool hasAccount)

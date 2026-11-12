@@ -118,7 +118,7 @@ public class StreamerReachTests
     [
         ("Sanduhr.App/App.xaml.cs", "key", 8),
         ("Sanduhr.App/App.xaml.cs", "masked", 2),
-        ("Sanduhr.App/App.xaml.cs", "notname", 4),
+        ("Sanduhr.App/App.xaml.cs", "notname", 5),
         ("Sanduhr.App/Desk/DeskArrangeMode.cs", "notname", 3),
         ("Sanduhr.App/Desk/DeskClicks.cs", "notname", 4),
         ("Sanduhr.App/Desk/DeskCompanion.cs", "key", 1),
@@ -131,9 +131,9 @@ public class StreamerReachTests
         ("Sanduhr.App/Desk/DeskMessagePiece.cs", "notname", 3),
         ("Sanduhr.App/Desk/DeskReviewBar.xaml.cs", "notname", 13),
         ("Sanduhr.App/Desk/DeskReviewWindow.xaml.cs", "notname", 1),
-        ("Sanduhr.App/Desk/DeskView.Styles.cs", "notname", 1),
+        ("Sanduhr.App/Desk/DeskView.Styles.cs", "notname", 3),
         ("Sanduhr.App/Desk/DeskView.cs", "cant", 1),
-        ("Sanduhr.App/Desk/DeskView.cs", "notname", 1),
+        ("Sanduhr.App/Desk/DeskView.cs", "notname", 2),
         ("Sanduhr.App/Desk/Drawers/DrawerJournalStore.cs", "notname", 1),
         ("Sanduhr.App/Desk/Drawers/DrawerPlanEditWindow.xaml.cs", "masked", 2),
         ("Sanduhr.App/Desk/Drawers/DrawerMover.cs", "key", 13),   // final review I1: a move into a drawer that left settings is skipped by its leaf
@@ -175,6 +175,7 @@ public class StreamerReachTests
         ("Sanduhr.App/Services/VaultService.cs", "key", 4),
         ("Sanduhr.App/Services/VaultService.cs", "notname", 6),
         ("Sanduhr.App/Services/WebView2ApiClient.cs", "notname", 1),
+        ("Sanduhr.App/Services/ZstdRollouts.cs", "cant", 1),
         ("Sanduhr.App/Updates/UpdateChecker.cs", "notname", 3),
         ("Sanduhr.App/ViewModels/AccountsViewModel.cs", "masked", 4),
         ("Sanduhr.App/ViewModels/CcLedgerViewModel.cs", "export", 5),
@@ -206,6 +207,9 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/PublishViewModel.cs", "masked", 4),
         ("Sanduhr.App/ViewModels/ResetFolderListViewModel.cs", "key", 4),      // slice 8: Reset's rows key on real folders
         ("Sanduhr.App/ViewModels/ResetFolderListViewModel.cs", "masked", 1),   // slice 8: and draw them through ShowFolder (carry)
+        ("Sanduhr.App/ViewModels/SettingsViewModel.cs", "notname", 1),         // agent layer: Sources asks only whether a Codex home exists
+        ("Sanduhr.App/ViewModels/SetupViewModel.cs", "notname", 1),            // agent layer: and so does the setup screen's Codex tick
+        ("Sanduhr.App/ViewModels/SourcesViewModel.cs", "notname", 2),          // agent layer: save failures go to the debug log, never the screen
         ("Sanduhr.App/ViewModels/StreamerSettingsViewModel.cs", "key", 1),
         ("Sanduhr.App/ViewModels/ThemeDeskEditorViewModel.cs", "notname", 3),
         ("Sanduhr.App/ViewModels/ThemeMatchViewModel.cs", "cant", 4),
@@ -219,7 +223,8 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "cant", 4),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "key", 19),
         ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "masked", 3),
-        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "notname", 19),
+        ("Sanduhr.App/ViewModels/WidgetViewModel.cs", "notname", 20),
+        ("Sanduhr.App/Views/CombinedBar.xaml.cs", "notname", 2),   // agent layer: a source's name and a percent on a bar segment or tick
         ("Sanduhr.App/Views/DeskLayoutMap.cs", "notname", 1),
         ("Sanduhr.App/Views/DrawersPage.xaml.cs", "notname", 1),   // Drawers (plan 2, Task 11): the folder picker's result, used for IO
         ("Sanduhr.App/Views/IntegrationConsentDialog.xaml.cs", "notname", 1),

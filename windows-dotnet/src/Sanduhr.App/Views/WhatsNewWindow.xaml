@@ -309,6 +309,11 @@
                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                            AutomationProperties.Name="{x:Static core:SettingsNames.TrademarkNotice}"
                            Text="{x:Static core:SettingsNames.TrademarkNotice}" />
+                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                           Visibility="{Binding ShowCodexNotice, Converter={StaticResource BoolVis}}"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                           AutomationProperties.Name="{x:Static core:SettingsNames.CodexNotice}"
+                           Text="{x:Static core:SettingsNames.CodexNotice}" />
                 <DockPanel Margin="0,12,0,0" LastChildFill="False"
                            Visibility="{Binding IsWhatsNew, Converter={StaticResource BoolVis}}">
                     <CheckBox DockPanel.Dock="Left" Style="{StaticResource ThemedCheckBox}"

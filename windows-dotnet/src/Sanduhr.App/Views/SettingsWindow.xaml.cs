@@ -242,6 +242,10 @@ internal partial class SettingsWindow : Window
             _localCcTimer.Stop();
         }
 
+        // Sources reads setup and whether Codex is installed again on each visit: Set up Sanduhr and the tray change them too.
+        if (page == SettingsPage.UsageSources)
+            ViewModel.Sources.Reload();
+
         // Accounts shows the selected account's folder link, which the Claude Code page changes: read it again on each visit.
         if (page == SettingsPage.Accounts)
             ViewModel.Accounts.Reload();

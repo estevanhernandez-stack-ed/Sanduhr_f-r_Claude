@@ -119,8 +119,8 @@ public partial class App : Application
         {
             if (args.PropertyName == nameof(WidgetViewModel.TrayMode))
                 SyncTrayRotation();
-            if (args.PropertyName == nameof(WidgetViewModel.UsageOn) && _trayShowsItem is not null)
-                _trayShowsItem.Visibility = _vm.UsageOn ? Visibility.Visible : Visibility.Collapsed;   // no number to pick while usage is off
+            if (args.PropertyName == nameof(WidgetViewModel.AnyUsageOn) && _trayShowsItem is not null)
+                _trayShowsItem.Visibility = _vm.AnyUsageOn ? Visibility.Visible : Visibility.Collapsed;   // no number to pick while usage is off
             if (args.PropertyName == nameof(WidgetViewModel.IsDemo) && _endDemoItem is not null)
                 _endDemoItem.Visibility = _vm.IsDemo ? Visibility.Visible : Visibility.Collapsed;
         };
@@ -145,10 +145,15 @@ public partial class App : Application
         else
             _window.Show();
 
-        _vm.AttachAlertService(new AlertService(new Sanduhr.Core.Paths(), ShowWindow));
+        _alertService = new AlertService(new Sanduhr.Core.Paths(), ShowWindow);
+        _vm.AttachAlertService(_alertService);
 
         SetupTray();
         SyncTrayRotation();
+        // Codex usage (agent layer): the service runs while its source is ticked, and its snapshot writer follows the same
+        // consent as Claude's (a statusline or the MCP server wants it).
+        _vm.SnapshotWantedChanged += () => Dispatcher.BeginInvoke(SyncCodex);
+        SyncCodex();
         // Streamer mode (slice 7): App lives as long as the widget, so this is never detached.
         _vm.Streamer.Changed += OnStreamerChanged;
         Instance?.Listen(message => Dispatcher.BeginInvoke(() => { if (!_quitting) OnSecondLaunch(message); }));
@@ -416,7 +421,7 @@ public partial class App : Application
         try
         {
             var signedIn = _vm.ActiveAccount is not null || _vm.IsDemo;   // streamer: key - a null check, never drawn
-            var steps = WelcomeTour.StepsFor(!_vm.UsageOn, new HashSet<TourFeature>(), signedIn);
+            var steps = WelcomeTour.StepsFor(!_vm.AnyUsageOn, new HashSet<TourFeature>(), signedIn);
             WhatsNewWindow.ShowTour(new WelcomeTourViewModel(steps, _vm), ShowMe, EndTour);
         }
         catch (Exception e)
@@ -464,7 +469,7 @@ public partial class App : Application
 
     private void SetupTray()
     {
-        _trayIcon = _vm?.UsageOn == false ? TrayIconRenderer.Hourglass() : TrayIconRenderer.Render(-1);
+        _trayIcon = _vm?.AnyUsageOn == false ? TrayIconRenderer.Hourglass() : TrayIconRenderer.Render(-1);
         _tray = new TaskbarIcon
         {
             Icon = _trayIcon,
@@ -569,7 +574,7 @@ public partial class App : Application
         menu.Items.Add(_putBackItem);
         menu.Items.Add(refresh);
         _trayShowsItem = BuildTrayShowsMenu();
-        _trayShowsItem.Visibility = _vm?.UsageOn == false ? Visibility.Collapsed : Visibility.Visible;
+        _trayShowsItem.Visibility = _vm?.AnyUsageOn == false ? Visibility.Collapsed : Visibility.Visible;
         menu.Items.Add(_trayShowsItem);
         menu.Items.Add(streamer);
         menu.Items.Add(new Separator());
@@ -841,6 +846,18 @@ public partial class App : Application
         svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
         svm.Desk.Changed = () => _desk?.Reload();
+        // Sources: a Codex on or off starts or stops its service (as Set up Sanduhr does); a primary or color change redraws the widget.
+        svm.Sources.OnOffChanged = (wasAny, nowAny) =>
+        {
+            SyncCodex();
+            // Only a transition touches the window, and it never takes focus from Settings.
+            switch (SourcesViewModel.VisibilityFor(wasAny, nowAny))
+            {
+                case WidgetVisibility.Show: ShowWindowWithoutActivating(); break;
+                case WidgetVisibility.Hide: _window?.Hide(); break;
+            }
+        };
+        svm.Sources.DisplayChanged = () => _vm?.RefreshSources();
         // Turning drawers on or off from Settings reaches the running Desk the way the Desk page's own switch does.
         svm.Drawers.DeskChanged = () => { _desk?.Reload(); svm.Desk.Reload(); };
         // Tidy drawers on the Drawers page lines the drawers up from the corner and direction the page shows.
@@ -1064,8 +1081,11 @@ public partial class App : Application
     {
         if (_vm is not { } vm) return;
         vm.SetupPending = false;
-        if (result.Now.ClaudeUsage) ShowWindow(); else _window?.Hide();
+        bool anyUsage = result.Now.ClaudeUsage || result.Now.CodexUsage;
+        SyncCodex();   // starts or stops the Codex service for what was just ticked, and redraws the sections
+        ShowWidgetFor(anyUsage);
         _settingsWindow?.ViewModel.Desk.Reload();
+        _settingsWindow?.ViewModel.Sources.Reload();
         // What went wrong or was refused (a drawers turn-off that was not done, a failed save): one themed notice, now that the window has
         // closed. The first-drawers line is a note, not a problem, and is left out. Streamer mode: the host already masked any path in them.
         var problems = result.Lines.Where(l => l != DrawerReview.FirstOnLine).ToList();
@@ -1074,7 +1094,7 @@ public partial class App : Application
         if (!firstRun || !_tourHeldBySetup) return;
         _tourHeldBySetup = false;
         _tourOfferedThisLaunch = false;
-        if (result.Now.ClaudeUsage)
+        if (SetupLaunch.TourWaitsForClaudeFetch(result.Now))
         {
             // The first fetch offers the tour (OnFetchSucceeded); one that already succeeded (signed in before this screen) offers it now.
             if (_fetchedThisLaunch) OfferTourAfterFetch();
@@ -1146,7 +1166,7 @@ public partial class App : Application
     {
         if (_tray is null)
             return;
-        var glyph = TrayReadout.Glyph(_vm?.UsageOn ?? true, reading, _vm?.IsDemo == true);
+        var glyph = TrayReadout.Glyph(_vm?.AnyUsageOn ?? true, reading, _vm?.IsDemo == true, _vm?.TrayBeyond);
         var icon = glyph.Kind == TrayGlyphKind.Hourglass ? TrayIconRenderer.Hourglass() : TrayIconRenderer.Render(glyph.Percent);
         _tray.Icon = icon;
         _trayIcon?.Dispose();
@@ -1238,6 +1258,22 @@ public partial class App : Application
             ShowWindow();
     }
 
+    /// <summary>The widget shows while any usage source is on and hides when none is: after Set up Sanduhr and after a switch on the
+    /// Sources page.</summary>
+    private void ShowWidgetFor(bool anyUsage)
+    {
+        if (anyUsage) ShowWindow(); else _window?.Hide();
+    }
+
+    private void ShowWindowWithoutActivating()
+    {
+        if (_window is not { } window || window.IsVisible) return;
+        bool before = window.ShowActivated;
+        window.ShowActivated = false;
+        try { window.Show(); }
+        finally { window.ShowActivated = before; }
+    }
+
     private void ShowWindow()
     {
         if (_window is null)
@@ -1273,6 +1309,7 @@ public partial class App : Application
                 _dockerPipe?.Dispose();
                 _watchers?.Dispose();
                 _vm?.NowPlaying?.Dispose();
+                StopCodex(resetWidget: false);   // its timer and watcher must not recreate AppData or the snapshot
             },
             vm.InactiveReader.DeleteAllProfilesAsync,
             () => new SettingsStore(paths).ClearMcpSwitchesForReset(),
@@ -1416,9 +1453,103 @@ public partial class App : Application
         base.OnSessionEnding(e);
     }
 
+    // -- Codex usage (agent layer) ------------------------------------------------------------------------------------
+
+    private AlertService? _alertService;
+    private CodexUsageService? _codex;
+    private bool _codexHasSnapshotWriter;
+    private readonly AlertEngine _codexAlerts = new();   // one engine for the session: a rebuilt service must not toast a tier again
+
+    /// <summary>Brings the Codex service in line with what is ticked and what wants a snapshot: stopped and disposed when Codex is off
+    /// (its snapshot file removed by name), started when on, and rebuilt when the statusline or the MCP server turns on or off, since
+    /// the service's snapshot writer is fixed at construction (none, and a leftover file deleted, when nothing wants it). Idempotent.</summary>
+    private void SyncCodex()
+    {
+        if (_vm is not { } vm || _quitting || ResetGuard.Done) return;
+        var paths = new Sanduhr.Core.Paths();
+        bool on = new SettingsStore(paths).LoadSetup()?.CodexUsage == true;
+        bool wantSnapshot = vm.SnapshotWanted;
+        if (!on)
+        {
+            StopCodex(resetWidget: true);
+            DeleteCodexSnapshot(paths);   // Codex off: its snapshot goes, as Claude's does when Claude is off
+            vm.RefreshSources();
+            return;
+        }
+        if (_codex is null || _codexHasSnapshotWriter != wantSnapshot)
+        {
+            StopCodex(resetWidget: false);   // a rebuild keeps what the card shows until the new service's first poll
+            var codexPaths = paths;
+            void Log(string message)
+            {
+                try { System.IO.File.AppendAllText(codexPaths.LogFile, $"{DateTime.UtcNow:o} {message}{Environment.NewLine}"); }
+                catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException) { }
+            }
+            string[] Homes() => [.. CodexHomes.Discover(Environment.GetEnvironmentVariable("CODEX_HOME"),
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))];   // streamer: notname - the Codex homes the reader joins its folder names to, never drawn
+            var snapshot = wantSnapshot
+                ? new SnapshotWriter(paths.CodexSnapshotFile, Log, WidgetViewModel.AppVersion, source: "codex")
+                : null;
+            if (snapshot is null) DeleteCodexSnapshot(paths);   // nothing wants it, so a file left from an earlier run goes
+            var service = new CodexUsageService(new CodexLimitsReader(Homes, ZstdRollouts.Decompress, Log),
+                new UsageHistory(vm.AccountStore, paths), snapshot, () => DateTimeOffset.UtcNow, Log, _codexAlerts);
+            // Changed arrives on a timer or watcher thread and can arrive out of order: dispatch, then read Current there.
+            service.Changed += _ => Dispatcher.BeginInvoke(() => OnCodexChanged(service));
+            _codex = service;
+            _codexHasSnapshotWriter = wantSnapshot;
+            service.Start(Homes());
+        }
+        vm.RefreshSources();
+    }
+
+    private void StopCodex(bool resetWidget)
+    {
+        var service = _codex;
+        _codex = null;
+        _codexHasSnapshotWriter = false;
+        if (service is null) return;
+        service.Dispose();
+        if (resetWidget) _vm?.ApplyCodex(CodexState.Off);
+    }
+
+    /// <summary>The Codex snapshot goes by name; nothing else in <c>%USERPROFILE%\.sanduhr</c> is touched.</summary>
+    private static void DeleteCodexSnapshot(Sanduhr.Core.Paths paths)
+    {
+        try { System.IO.File.Delete(paths.CodexSnapshotFile); }
+        catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException) { /* best-effort */ }
+    }
+
+    /// <summary>On the UI thread: show the newest Codex state (read from the service, not the event) and deliver any alert it
+    /// raised, labelled "Codex Session (5hr)" and the like.</summary>
+    private void OnCodexChanged(CodexUsageService service)
+    {
+        if (_quitting || !ReferenceEquals(service, _codex) || _vm is not { } vm) return;
+        vm.ApplyCodex(service.Current);
+        try
+        {
+            var store = new SettingsStore(new Sanduhr.Core.Paths());
+            var events = service.EvaluateAlerts(store.LoadAlertConfig(), store.LoadSources().AlertsOn(AgentSources.Codex));
+            if (events.Count == 0 || _alertService is null || vm.IsDemo) return;   // demo hides the Codex section, so no toast either
+            bool sound = store.LoadAlertSound();
+            bool snake = store.LoadAlertSnakeFull();
+            foreach (var e in events)
+                _alertService.Deliver(e, "Codex " + SourceSectionViewModel.CodexTierLabel(e.TierKey), sound, snake);
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            try
+            {
+                System.IO.File.AppendAllText(new Sanduhr.Core.Paths().LogFile,
+                    $"{DateTime.UtcNow:o} codex alert failed ({e.GetType().Name}){Environment.NewLine}");
+            }
+            catch (System.IO.IOException) { }
+        }
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         WhatsNewWindow.Quitting = true;
+        _codex?.Dispose();
         _glow?.Dispose();
         _desk?.Dispose();
         _looks?.Dispose();

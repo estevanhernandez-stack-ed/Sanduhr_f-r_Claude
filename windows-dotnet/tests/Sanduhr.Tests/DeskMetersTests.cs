@@ -81,6 +81,16 @@ public class DeskMetersTests
     }
 
     [Fact]
+    public void A_passed_reset_says_when_it_reset_never_today()
+    {
+        // Live check, 4.8.0: an idle Codex 5-hour window that reset two days earlier read "Today 9:36 PM".
+        var later = new DateTimeOffset(2026, 10, 11, 20, 0, 0, TimeSpan.Zero);
+        Assert.Equal("Reset at 3:10 PM", DeskMeters.ResetDateTime("2026-10-11T15:10:00Z", later, TimeZoneInfo.Utc));
+        Assert.Equal("Reset Oct 9, 9:36 PM", DeskMeters.ResetDateTime("2026-10-09T21:36:00Z", later, TimeZoneInfo.Utc));
+        Assert.Equal("Tomorrow 9:30 AM", DeskMeters.ResetDateTime("2026-10-12T09:30:00Z", later, TimeZoneInfo.Utc));
+    }
+
+    [Fact]
     public void Line_SessionAndWeek()
     {
         var u = Usage(new DeskTier(TierModel.FiveHour, 7, Session), new DeskTier(TierModel.SevenDay, 63.9, Week));
@@ -154,5 +164,155 @@ public class DeskMetersTests
         Assert.Equal(["seven_day_sonnet"], DeskMeters.Rows(u, Now, TimeZoneInfo.Utc).Select(r => r.Key));
         // Without line tiers the visible ones feed the line, as before.
         Assert.Null(DeskClaudeText.Line(u with { LineTiers = null }, TimeZoneInfo.Utc));
+    }
+
+    // ---- agent layer: a piece's source, combined rows, the Codex line ----
+
+    private static DeskUsage TwoSources(double claudeWeek = 40, double codexWeek = 70, IReadOnlySet<string>? codexStale = null) =>
+        Usage(new DeskTier(TierModel.FiveHour, 10, Session), new DeskTier(TierModel.SevenDay, claudeWeek, Week)) with
+        {
+            SourceTiers = new Dictionary<string, IReadOnlyList<DeskTier>>
+            {
+                ["codex"] = [new DeskTier(TierModel.FiveHour, 25, Session), new DeskTier(TierModel.SevenDay, codexWeek, Week)],
+            },
+            SourceStaleTiers = codexStale is null ? null : new Dictionary<string, IReadOnlySet<string>> { ["codex"] = codexStale },
+        };
+
+    [Fact]
+    public void CombinedRows_JoinsTheWeeklyWindow_AndTheFurtherSourceContinuesTheBar()
+    {
+        var rows = DeskMeters.CombinedRows(TwoSources(), "claude", Now, TimeZoneInfo.Utc);
+        var weekly = Assert.Single(rows, r => r.Row.Key == TierModel.SevenDay);
+        Assert.Equal("Weekly", weekly.Row.Label);
+        Assert.Equal(40, weekly.Row.Percent);                       // the primary's number
+        Assert.Equal("claude", weekly.Layout.Primary!.Source);
+        Assert.Equal(0.4, weekly.Layout.Primary.To, 6);
+        Assert.Equal("codex", weekly.Layout.Beyond!.Source);
+        Assert.Equal(0.4, weekly.Layout.Beyond.From, 6);
+        Assert.Equal(0.7, weekly.Layout.Beyond.To, 6);
+        Assert.NotNull(weekly.Row.Pace);                            // Claude is primary: its pace mark stays
+    }
+
+    [Fact]
+    public void CombinedRows_WithCodexPrimary_TakesItsNumberAndResetAndDropsClaudesPace()
+    {
+        var rows = DeskMeters.CombinedRows(TwoSources(claudeWeek: 40, codexWeek: 70), "codex", Now, TimeZoneInfo.Utc);
+        var weekly = Assert.Single(rows, r => r.Row.Key == TierModel.SevenDay);
+        Assert.Equal(70, weekly.Row.Percent);
+        Assert.Equal(0.7, weekly.Row.Fill, 6);
+        Assert.Null(weekly.Row.Pace);
+        Assert.Equal("codex", weekly.Layout.Primary!.Source);
+        Assert.Equal("claude", Assert.Single(weekly.Layout.Ticks).Source);
+        Assert.Null(weekly.Layout.Beyond);
+    }
+
+    [Fact]
+    public void CombinedRows_WithOnlyClaude_IsRowsWithASingleSegmentEach()
+    {
+        var u = Usage(new DeskTier(TierModel.FiveHour, 10, Session), new DeskTier(TierModel.SevenDay, 40.9, Week), new DeskTier("seven_day_sonnet", 12, null));
+        var rows = DeskMeters.Rows(u, Now, TimeZoneInfo.Utc);
+        var combined = DeskMeters.CombinedRows(u, "claude", Now, TimeZoneInfo.Utc);
+        Assert.Equal(rows, combined.Select(c => c.Row));
+        for (int i = 0; i < rows.Count; i++)
+        {
+            var l = combined[i].Layout;
+            Assert.Equal("claude", l.Primary!.Source);
+            Assert.Equal(0, l.Primary.From);
+            Assert.Equal(u.Tiers[i].Utilization / 100, l.Primary.To, 6);
+            Assert.Null(l.Beyond);
+            Assert.Empty(l.Ticks);
+        }
+    }
+
+    [Fact]
+    public void CombinedRows_AModelWindowCodexDoesNotReport_StaysClaudesAlone()
+    {
+        var u = TwoSources() with { Tiers = [new DeskTier("seven_day_sonnet", 55, null)] };
+        var (row, layout) = Assert.Single(DeskMeters.CombinedRows(u, "claude", Now, TimeZoneInfo.Utc));
+        Assert.Equal("Weekly - Sonnet", row.Label);
+        Assert.Null(layout.Beyond);
+        Assert.Empty(layout.Ticks);
+    }
+
+    [Fact]
+    public void CombinedRows_AStaleCodexTier_MarksOnlyThatTierStale()
+    {
+        var rows = DeskMeters.CombinedRows(TwoSources(codexStale: new HashSet<string> { TierModel.SevenDay }), "claude", Now, TimeZoneInfo.Utc);
+        var session = Assert.Single(rows, r => r.Row.Key == TierModel.FiveHour).Layout;
+        var weekly = Assert.Single(rows, r => r.Row.Key == TierModel.SevenDay).Layout;
+        Assert.False(Assert.Single(session.Ticks).Stale);
+        Assert.True(weekly.Beyond!.Stale);
+        Assert.True(Assert.Single(weekly.Ticks).Stale);
+    }
+
+    [Fact]
+    public void CombinedRows_PercentsTruncateOnTheRowAndNameEverySourceInTheAccessibleName()
+    {
+        var u = TwoSources(claudeWeek: 40.9, codexWeek: 70.6, codexStale: new HashSet<string> { TierModel.SevenDay });
+        var weekly = Assert.Single(DeskMeters.CombinedRows(u, "claude", Now, TimeZoneInfo.Utc), r => r.Row.Key == TierModel.SevenDay);
+        Assert.Equal(40, weekly.Row.Percent);
+        string name = DeskMeters.CombinedName("Weekly", weekly.Layout);
+        Assert.StartsWith("Weekly. ", name);
+        Assert.Contains("Claude 40%.", name);
+        Assert.Contains("Codex 70%, as of earlier.", name);
+    }
+
+    [Fact]
+    public void CombinedRows_ASignInNeededDrawsNoRows()
+    {
+        Assert.Empty(DeskMeters.CombinedRows(TwoSources() with { SignInNeeded = true }, "claude", Now, TimeZoneInfo.Utc));
+    }
+
+    [Fact]
+    public void SourceRows_Codex_HasItsLabelsNoPaceAndPerTierStaleness()
+    {
+        var u = TwoSources(codexStale: new HashSet<string> { TierModel.FiveHour });
+        var rows = DeskMeters.SourceRows(u, "codex", Now, TimeZoneInfo.Utc);
+        Assert.Equal(["Codex session (5hr)", "Codex weekly"], rows.Select(r => r.Label));
+        Assert.Equal([25, 70], rows.Select(r => r.Percent));
+        Assert.All(rows, r => Assert.Null(r.Pace));
+        Assert.Equal([true, false], rows.Select(r => r.Stale));
+        Assert.Equal("Today 3:00 AM", rows[0].Reset);
+        Assert.Equal(DeskMeters.Rows(u, Now, TimeZoneInfo.Utc), DeskMeters.SourceRows(u, "claude", Now, TimeZoneInfo.Utc));
+    }
+
+    [Fact]
+    public void SourceRows_ACodexThatReportsNothing_IsNone()
+    {
+        Assert.Empty(DeskMeters.SourceRows(Usage(new DeskTier(TierModel.FiveHour, 10, null)), "codex", Now, TimeZoneInfo.Utc));
+    }
+
+    [Fact]
+    public void Resolve_CombinedWithNoClaudeAndACodex_DrawsCodex_ElseItStaysCombined()
+    {
+        Assert.Equal("codex", DeskMeters.Resolve(TwoSources() with { Tiers = [] }, "combined"));
+        Assert.Equal("combined", DeskMeters.Resolve(TwoSources(), "combined"));
+        Assert.Equal("combined", DeskMeters.Resolve(TwoSources() with { Tiers = [], SignInNeeded = true }, "combined"));   // a sign-in line wins
+        Assert.Equal("combined", DeskMeters.Resolve(DeskUsage.Empty, "combined"));
+        Assert.Equal("claude", DeskMeters.Resolve(TwoSources() with { Tiers = [] }, "claude"));
+    }
+
+    [Fact]
+    public void ForSource_Codex_IsCodexAloneAndStaleWhenNoTierIsFresh()
+    {
+        var all = TwoSources(codexStale: new HashSet<string> { TierModel.FiveHour, TierModel.SevenDay });
+        var alone = DeskMeters.ForSource(all with { SignInNeeded = true }, "codex", Now);
+        Assert.False(alone.SignInNeeded);
+        Assert.Equal("Codex", alone.Account);
+        Assert.Equal(["five_hour", "seven_day"], alone.Tiers.Select(t => t.Key));
+        Assert.True(alone.IsStale(Now));
+        Assert.False(DeskMeters.ForSource(TwoSources(), "codex", Now).IsStale(Now));
+        Assert.Same(all, DeskMeters.ForSource(all, "claude", Now));
+    }
+
+    [Fact]
+    public void CodexLine_ReadsFiveHourAndWeek_TruncatedAndNullWithNone()
+    {
+        Assert.Equal("Codex 5h 25% · wk 70%", DeskClaudeText.CodexLine(TwoSources()));
+        var weekOnly = Usage() with { SourceTiers = new Dictionary<string, IReadOnlyList<DeskTier>> { ["codex"] = [new DeskTier(TierModel.SevenDay, 12.9, null)] } };
+        Assert.Equal("Codex wk 12%", DeskClaudeText.CodexLine(weekOnly));
+        Assert.Null(DeskClaudeText.CodexLine(Usage()));
+        // The Claude line is unchanged by Codex being there.
+        Assert.Equal("claude   10% session, resets 3:00   40% week", DeskClaudeText.Line(TwoSources(), TimeZoneInfo.Utc));
     }
 }

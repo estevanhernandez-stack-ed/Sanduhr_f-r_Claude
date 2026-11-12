@@ -67,7 +67,8 @@ public sealed class UsageHistory : IUsageHistory
     /// file already exists (don't clobber the active account's real data).</summary>
     private void MigrateLegacyIfNeeded(string? active)
     {
-        if (active is null)
+        // A reserved "@" account (the Codex history) never inherits the legacy Claude file.
+        if (active is null || active.StartsWith('@'))
             return;
         var legacy = _paths.HistoryFile;
         var target = _paths.HistoryFileFor(active);

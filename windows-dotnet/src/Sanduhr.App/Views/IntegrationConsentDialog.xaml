@@ -101,7 +101,7 @@
             <StackPanel x:Name="SegmentsPanel" Margin="0,0,0,10" Visibility="Collapsed">
                 <TextBlock Text="Meters to show" FontSize="11" Margin="0,0,0,6"
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                <StackPanel Orientation="Horizontal">
+                <WrapPanel>
                     <CheckBox x:Name="AccountBox" Content="Account" IsChecked="True" Style="{StaticResource ConsentCheckBox}"
                               Margin="0,0,16,6" AutomationProperties.Name="Show the folder's label" />
                     <CheckBox x:Name="SessionBox" Content="Session" IsChecked="True" Style="{StaticResource ConsentCheckBox}"
@@ -109,8 +109,10 @@
                     <CheckBox x:Name="WeeklyBox" Content="Weekly" IsChecked="True" Style="{StaticResource ConsentCheckBox}"
                               Margin="0,0,16,6" AutomationProperties.Name="Show the weekly meter" />
                     <CheckBox x:Name="ResetsBox" Content="Weekly reset" IsChecked="True" Style="{StaticResource ConsentCheckBox}"
-                              Margin="0,0,0,6" AutomationProperties.Name="Show the weekly reset time" />
-                </StackPanel>
+                              Margin="0,0,16,6" AutomationProperties.Name="Show the weekly reset time" />
+                    <CheckBox x:Name="CodexBox" Content="Codex" IsChecked="True" Style="{StaticResource ConsentCheckBox}"
+                              Margin="0,0,0,6" AutomationProperties.Name="Show the Codex meters" />
+                </WrapPanel>
                 <StackPanel x:Name="JoinPanel" Visibility="Collapsed" Margin="0,4,0,0">
                     <TextBlock Text="Where Sanduhr's meters go" FontSize="11" Margin="0,0,0,6"
                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />

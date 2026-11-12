@@ -74,8 +74,44 @@ public static class DeskAnchors
 /// <see cref="DeskArrangement.MinTilt"/> to <see cref="DeskArrangement.MaxTilt"/>, of the stack the piece sits in. The pieces of one anchor
 /// share one slant (<see cref="DeskArrangement.SetTilt"/>); a stack whose words disagree slants by its first piece's.
 /// <paramref name="Style"/> is how a meter-like piece draws its numbers (#336): <see cref="DeskMeterStyle.Bar"/> for every other piece.</summary>
+/// <paramref name="Source"/> is which source a usage piece shows (agent layer): <see cref="DeskSources.Combined"/> (every ticked source,
+/// the default), <see cref="DeskSources.Claude"/> or <see cref="DeskSources.Codex"/>; combined for every piece that has no source.</summary>
 public sealed record DeskPlacement(string Widget, DeskAnchor Anchor, double Scale = 1, string? Monitor = null, double Tilt = 0,
-    DeskMeterStyle Style = DeskMeterStyle.Bar);
+    DeskMeterStyle Style = DeskMeterStyle.Bar, string Source = DeskSources.Combined);
+
+/// <summary>Which source a usage piece draws (agent layer): words, the pieces that take one, and the layout field. The field is
+/// <c>src=codex</c>, written after the other fields only when not combined, so every older layout reads and writes as it did.</summary>
+public static class DeskSources
+{
+    public const string Combined = "combined";
+    // The ids <see cref="AgentSources"/> uses, written out: this file is also linked into the network-free MCP process, which has no AgentSources.
+    public const string Claude = "claude";
+    public const string Codex = "codex";
+
+    /// <summary>Every choice, in Settings order.</summary>
+    public static readonly IReadOnlyList<string> All = [Combined, Claude, Codex];
+
+    /// <summary>The pieces that take a source: the Claude line and the Claude limits.</summary>
+    public static readonly IReadOnlyList<string> Pieces = ["claude", "meters"];
+
+    public const string Prefix = "src=";
+
+    public static bool Supports(string widget) => Pieces.Contains(widget, StringComparer.Ordinal);
+
+    /// <summary>The source for an exact lowercase word, null for anything else.</summary>
+    public static string? Parse(string? word) => All.FirstOrDefault(s => string.Equals(s, word, StringComparison.Ordinal));
+
+    /// <summary>The source a piece can carry: <paramref name="source"/> for a piece that takes one and a word this build knows, else combined.</summary>
+    public static string For(string widget, string? source) => Supports(widget) && Parse(source) is { } s ? s : Combined;
+
+    /// <summary>As Settings, Desk names it.</summary>
+    public static string Name(string source) => source switch
+    {
+        Claude => "Claude",
+        Codex => "Codex",
+        _ => "Combined",
+    };
+}
 
 /// <summary>
 /// How a meter-like piece draws (#336), so a stack fits its column, upright or slanted. <see cref="Bar"/>: today's full-width bar with
@@ -317,7 +353,10 @@ public sealed class DeskArrangement
             int at = word.IndexOf('@');
             string head = at < 0 ? word : word[..at];
             string? monitor = at < 0 ? null : DeskMonitors.FromWord(DeskMonitors.Unescape(word[(at + 1)..]));
-            var bits = head.Split(':', StringSplitOptions.RemoveEmptyEntries);
+            var all = head.Split(':', StringSplitOptions.RemoveEmptyEntries);
+            // The source (agent layer) is a "src=" field wherever it stands; the others keep their places. An unknown source is combined.
+            var srcBit = all.FirstOrDefault(b => b.StartsWith(DeskSources.Prefix, StringComparison.Ordinal));
+            var bits = all.Where(b => !b.StartsWith(DeskSources.Prefix, StringComparison.Ordinal)).ToArray();
             // A drawer piece (5.0) is drawer.<id>, any number of them; every other word must be one this build knows.
             if (bits.Length < 2 || !(Known.Contains(bits[0], StringComparer.Ordinal) || DrawerPieces.IsWord(bits[0]))) continue;
             var anchor = DeskAnchors.Parse(bits[1]) ?? DefaultAnchor(bits[0]);
@@ -332,7 +371,8 @@ public sealed class DeskArrangement
             // The meter style (#336) is the fifth field; a word this build does not know, or a style on a piece that has none, is a bar.
             var style = bits.Length >= 5 && DeskMeterStyles.Parse(bits[4]) is { } st ? DeskMeterStyles.For(bits[0], st) : DeskMeterStyle.Bar;
             _pieces.RemoveAll(p => p.Widget == bits[0]);
-            _pieces.Add(new DeskPlacement(bits[0], anchor, scale, monitor, tilt, style));
+            var source = bits.Length >= 2 && srcBit is not null ? DeskSources.For(bits[0], srcBit[DeskSources.Prefix.Length..]) : DeskSources.Combined;
+            _pieces.Add(new DeskPlacement(bits[0], anchor, scale, monitor, tilt, style, source));
         }
     }
 
@@ -411,6 +451,8 @@ public sealed class DeskArrangement
         if (tilt != 0 || style != DeskMeterStyle.Bar) word += ":" + tilt.ToString("0", CultureInfo.InvariantCulture);
         // The meter style rides after the tilt (#336); a bar writes nothing.
         if (style != DeskMeterStyle.Bar) word += ":" + DeskMeterStyles.Word(style);
+        // The source rides last (agent layer); combined writes nothing.
+        if (DeskSources.For(p.Widget, p.Source) is var source && source != DeskSources.Combined) word += ":" + DeskSources.Prefix + source;
         // Every monitor writes nothing, so a layout that never named a monitor reads and writes exactly as before.
         return DeskMonitors.FromWord(p.Monitor) is { } monitor ? word + "@" + DeskMonitors.Escape(monitor) : word;
     }
@@ -466,7 +508,7 @@ public sealed class DeskArrangement
         }
         if (old?.Anchor == a) return;
         // Into a stack, a piece takes its slant (one per stack); into an empty anchor it keeps its own.
-        var moved = new DeskPlacement(widget, a, old?.Scale ?? 1, old?.Monitor, StackTilt(a) ?? old?.Tilt ?? 0, old?.Style ?? DeskMeterStyle.Bar);
+        var moved = new DeskPlacement(widget, a, old?.Scale ?? 1, old?.Monitor, StackTilt(a) ?? old?.Tilt ?? 0, old?.Style ?? DeskMeterStyle.Bar, old?.Source ?? DeskSources.Combined);
         var rank = Rank(widget);
         if (!_pieces.Any(p => p.Anchor == a))
         {
@@ -579,6 +621,14 @@ public sealed class DeskArrangement
         var i = _pieces.FindIndex(p => p.Widget == widget);
         if (i < 0) return;
         _pieces[i] = _pieces[i] with { Style = DeskMeterStyles.For(widget, style) };
+    }
+
+    /// <summary>Sets which source a placed piece shows (agent layer); a piece that takes none, or a word this build does not know, is combined.</summary>
+    public void SetSource(string widget, string source)
+    {
+        var i = _pieces.FindIndex(p => p.Widget == widget);
+        if (i < 0) return;
+        _pieces[i] = _pieces[i] with { Source = DeskSources.For(widget, source) };
     }
 
     /// <summary>The slant of the stack at <paramref name="anchor"/>: its first piece's; null when the anchor has none.</summary>

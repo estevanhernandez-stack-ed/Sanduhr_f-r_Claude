@@ -1395,6 +1395,11 @@
                     <views:PrivacyPage />
                 </TabItem>
 
+                <!-- Usage, Sources (agent layer): one row per AI plan Sanduhr tracks, with on, primary, color and alerts. -->
+                <TabItem Header="Sources" Tag="UsageSources" AutomationProperties.Name="Sources" DataContext="{Binding Sources}">
+                    <views:SourcesPage />
+                </TabItem>
+
                 <!-- Claude Usage (WS-C; Settings v2, slice 5): Meters / Overview / Trends / Sessions over the meter history,
                      the session archive and the live session-log reader.
                      DataContext must live ON the TabItem: the CcSection* visibility triggers resolve
@@ -2610,6 +2615,9 @@
                                     <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
                                     <views:TrademarkFooter />
+                                    <!-- Store test 10.1.4.4: the Shows combo names Codex, so its disclaimer shows here too. -->
+                                    <TextBlock x:Name="DeskCodexNotice" Text="{x:Static core:SettingsNames.CodexNotice}" TextWrapping="Wrap" FontSize="11" Margin="0,6,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                 </StackPanel>
                             </Border>
                         </ScrollViewer>

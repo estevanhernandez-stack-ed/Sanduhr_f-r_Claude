@@ -34,6 +34,9 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
     /// <summary>Settings, Desk (spec 5.1).</summary>
     public DeskSettingsViewModel Desk { get; }
 
+    /// <summary>Settings, Usage, Sources (agent layer): on, primary, color and alerts for each source.</summary>
+    public SourcesViewModel Sources { get; }
+
     /// <summary>Settings, Drawers (5.0 drawers spec): on and off, the folder, Sort my desktop now, the rules, the drawers and the recent moves.</summary>
     public DrawersSettingsViewModel Drawers { get; }
 
@@ -235,6 +238,9 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
         Desk = new DeskSettingsViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies(),
             inkPresets: () => PackInkPresets.Merged(new WidgetStore(new Paths().WidgetsDir, Sanduhr.App.Services.WidgetCatalogService.EncodePng)));
         Drawers = new DrawersSettingsViewModel(Sanduhr.App.Desk.DrawerService.Current, Sanduhr.App.Desk.DrawerReviewService.Current, new SettingsStore(new Paths()));
+        Sources = new SourcesViewModel(new SettingsStore(new Paths()), () => widget.UsageOn, on => widget.SetUsageOn(on),
+            () => CodexHomes.Discover(Environment.GetEnvironmentVariable("CODEX_HOME"),
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));   // streamer: notname - only whether a Codex home exists, never drawn
         var msgPaths = new Paths();
         MessagePage = new DeskMessagePageViewModel(new SettingsStore(msgPaths), System.IO.Path.Combine(msgPaths.AppDataDir, "messages.txt"),
             () => !ResetGuard.Done, () => MessageChanged?.Invoke(), Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies(),

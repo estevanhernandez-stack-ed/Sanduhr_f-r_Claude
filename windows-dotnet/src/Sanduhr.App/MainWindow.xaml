@@ -566,11 +566,93 @@
                         </StackPanel>
                     </Border>
 
-                    <ItemsControl x:Name="TiersHost" ItemsSource="{Binding Tiers}"
-                                  AllowDrop="True" Drop="Tiers_Drop">
+                    <!-- Agent layer: one two-tone bar per window two or more sources report (none with one source), then each ticked
+                         source as a section. With one section the header is hidden and the cards read as a plain list. -->
+                    <ItemsControl ItemsSource="{Binding CombinedBars}" Focusable="False">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <views:TierCard />
+                                <views:CombinedBar />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <ItemsControl x:Name="SectionsHost" ItemsSource="{Binding Sections}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <Grid Margin="14,2,14,6"
+                                          Visibility="{Binding ShowHeader, Converter={StaticResource BoolVis}}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Rectangle Grid.Column="0" Width="10" Height="10" RadiusX="2" RadiusY="2"
+                                                   Fill="{Binding Color}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                        <TextBlock Grid.Column="2" Text="{Binding AsOfText}" FontSize="11" Margin="8,0,0,0"
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                                   Visibility="{Binding AsOfText, Converter={StaticResource StrVis}}" />
+                                        <Button Grid.Column="3" Command="{Binding ToggleCollapseCommand}" Cursor="Hand"
+                                                Width="24" Height="24" Padding="0" Background="Transparent" BorderThickness="0"
+                                                ToolTip="{Binding CollapseName}"
+                                                AutomationProperties.Name="{Binding CollapseName}">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="chip" CornerRadius="4" Background="{TemplateBinding Background}"
+                                                            BorderBrush="Transparent" BorderThickness="1">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="chip" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                                                        </Trigger>
+                                                        <Trigger Property="IsKeyboardFocused" Value="True">
+                                                            <Setter TargetName="chip" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                            <Path x:Name="chevron" Data="M0,0 L4,4 L8,0" Stroke="{DynamicResource Sanduhr.Brush.TextDim}"
+                                                  StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                  StrokeLineJoin="Round" Stretch="None" RenderTransformOrigin="0.5,0.5">
+                                                <Path.Style>
+                                                    <Style TargetType="Path">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Collapsed}" Value="True">
+                                                                <Setter Property="RenderTransform">
+                                                                    <Setter.Value>
+                                                                        <RotateTransform Angle="-90" />
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Path.Style>
+                                            </Path>
+                                        </Button>
+                                    </Grid>
+
+                                    <!-- Collapsed: one line. No reading: the section says why. Otherwise its cards (a tier that cannot be
+                                         trusted draws dimmed through the card's own Opacity). -->
+                                    <TextBlock Text="{Binding CollapsedSummary}" FontSize="12" Margin="14,0,14,8"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                               Visibility="{Binding ShowSummary, Converter={StaticResource BoolVis}}" />
+                                    <TextBlock Text="{Binding EmptyText}" FontSize="12" Margin="14,0,14,8" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                               Visibility="{Binding ShowEmpty, Converter={StaticResource BoolVis}}" />
+                                    <ItemsControl ItemsSource="{Binding Tiers}" AllowDrop="True" Drop="Tiers_Drop"
+                                                  Visibility="{Binding ShowCards, Converter={StaticResource BoolVis}}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <views:TierCard Opacity="{Binding Opacity}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

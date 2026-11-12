@@ -181,4 +181,48 @@ public sealed class SetupServiceTests : IDisposable
         }
         finally { File.SetAttributes(file, FileAttributes.Normal); }
     }
+
+    [Fact]
+    public void Ticking_only_Codex_saves_setup_usage_codex_and_leaves_Claude_off_without_a_sign_in()
+    {
+        var store = Store();
+        var host = new FakeHost { UsageOn = false };
+        var result = new SetupService(store, host).Apply(new SetupChoices(false, false, ClaudeUsage: false, CodexUsage: true));
+        Assert.True(store.LoadSetup()!.CodexUsage);
+        Assert.False(store.LoadSetup()!.ClaudeUsage);
+        Assert.True(result.Now.CodexUsage);
+        Assert.False(host.UsageOn);                                   // Claude's own switch never turns on, so no sign-in card
+        Assert.DoesNotContain("usage:True", host.Calls);
+        Assert.Empty(result.Lines);
+    }
+
+    [Fact]
+    public void Codex_ticked_beside_Claude_saves_both()
+    {
+        var store = Store();
+        var host = new FakeHost();
+        new SetupService(store, host).Apply(new SetupChoices(true, false, ClaudeUsage: true, CodexUsage: true));
+        Assert.True(store.LoadSetup()!.ClaudeUsage);
+        Assert.True(store.LoadSetup()!.CodexUsage);
+        Assert.Contains("usage:True", host.Calls);
+    }
+
+    [Fact]
+    public void Current_reads_the_saved_Codex_tick_back()
+    {
+        var store = Store();
+        store.SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false, ["codex"] = true }));
+        Assert.True(new SetupService(store, new FakeHost()).Current().CodexUsage);
+    }
+
+    [Fact]
+    public void Unticking_Codex_says_what_happens_in_a_line_of_its_own()
+    {
+        var store = Store();
+        store.SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false, ["codex"] = true }));
+        var svc = new SetupService(store, new FakeHost());
+        var lines = svc.Preview(svc.Current() with { CodexUsage = false });
+        Assert.Equal([SetupCopy.CodexOffLine], lines);
+        Assert.Empty(svc.Preview(svc.Current()));
+    }
 }

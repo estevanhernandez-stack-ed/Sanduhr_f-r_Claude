@@ -63,4 +63,26 @@ public sealed class DeskDesignDrawerTests
         var parsed = DeskDesign.Parse(JsonNode.Parse("""{"layout":{"drawer.screenshots":{"anchor":"tl"}}}"""));
         Assert.Contains(parsed.Reasons, r => r.Field == "layout.drawer.screenshots");
     }
+
+    [Fact]
+    public void A_design_keeps_the_source_each_piece_shows()
+    {
+        const string current = "meters:bl:src=codex clock:tr claude:br:1:0:ring:src=claude";
+        var cur = DeskDesign.Merge(null, new DeskDesign { Layout = DeskDesign.FromArrangement(new DeskArrangement(current)) });
+        var merged = DeskDesign.Merge(cur, D("""{"layout":{"clock":{"anchor":"tl"}}}"""));
+        var s = DeskDesignApply.Settings(DeskSettings.Default with { Layout = current }, DeskInkSettings.Default, LauncherModel.Empty, merged);
+        var layout = new DeskArrangement(s.Desk.Layout);
+        Assert.Equal(DeskAnchor.TL, layout.Placement("clock")!.Anchor);
+        Assert.Equal("codex", layout.Placement("meters")!.Source);
+        Assert.Equal("claude", layout.Placement("claude")!.Source);
+        Assert.Contains("meters:bl:src=codex", s.Desk.Layout);
+    }
+
+    [Fact]
+    public void A_piece_a_design_places_new_is_combined_and_a_hidden_one_forgets_nothing_it_still_has()
+    {
+        var s = DeskDesignApply.Settings(DeskSettings.Default with { Layout = "clock:bl" }, DeskInkSettings.Default, LauncherModel.Empty,
+            D("""{"layout":{"clock":{"anchor":"bl"},"meters":{"anchor":"tr"}}}"""));
+        Assert.Equal("combined", new DeskArrangement(s.Desk.Layout).Placement("meters")!.Source);
+    }
 }

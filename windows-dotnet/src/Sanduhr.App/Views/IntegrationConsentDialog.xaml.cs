@@ -30,7 +30,7 @@ internal partial class IntegrationConsentDialog : Window
 {
     private bool _confirmed;
 
-    private IntegrationConsentDialog(ConsentSpec spec)
+    internal IntegrationConsentDialog(ConsentSpec spec)
     {
         InitializeComponent();
         TitleText.Text = spec.Title;
@@ -68,13 +68,14 @@ internal partial class IntegrationConsentDialog : Window
         Close();
     }
 
-    private ConsentChoice Choice()
+    internal ConsentChoice Choice()
     {
         var segments = new List<string>();
         if (AccountBox.IsChecked == true) segments.Add("account");
         if (SessionBox.IsChecked == true) segments.Add("session");
         if (WeeklyBox.IsChecked == true) segments.Add("weekly");
         if (ResetsBox.IsChecked == true) segments.Add("resets");
+        if (CodexBox.IsChecked == true) segments.Add("codex");
         return new ConsentChoice(
             CombineRadio.IsChecked == true ? StatuslineMode.Combine : StatuslineMode.Replace,
             StatuslineInstaller.NormalizeSegments(segments),

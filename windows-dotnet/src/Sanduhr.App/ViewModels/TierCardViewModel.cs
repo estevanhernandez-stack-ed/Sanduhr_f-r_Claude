@@ -18,6 +18,13 @@ public sealed partial class TierCardViewModel : ObservableObject
 {
     public string TierKey { get; }
 
+    /// <summary>Which source the card belongs to (<see cref="AgentSources"/>). A card of another source than Claude takes no
+    /// Claude actions: no reorder drag, no hide or mute menu.</summary>
+    public string Source { get; init; } = AgentSources.Claude;
+
+    /// <summary>The card's opacity: 1, or 0.55 when its number cannot be trusted (a Codex tier that is not fresh).</summary>
+    [ObservableProperty] private double _opacity = 1;
+
     // Cached state for the 30s tick re-derivation.
     private double _util;
     private string? _resetsAt;
@@ -162,6 +169,21 @@ public sealed partial class TierCardViewModel : ObservableObject
 
     private void RefreshTimeDerived(DateTimeOffset now)
     {
+        // A window whose reset has passed (Codex idle for hours, or Claude between a reset and the next fetch) is over:
+        // say when it reset, and draw no countdown, pace or burn for it.
+        if (Pacing.Parse(_resetsAt) is { } reset && reset <= now)
+        {
+            PaceFraction = double.NaN;
+            ResetCountdown = PassedResetStr(reset, now);
+            ResetDateTime = "";
+            PaceLabel = "";
+            PaceBrush = new SolidColorBrush(_palette.TextDim);
+            BurnText = "";
+            HasBurn = false;
+            BurnBrush = new SolidColorBrush(_palette.TextMuted);
+            return;
+        }
+
         PaceFraction = Pacing.PaceFrac(_resetsAt, TierKey, now) ?? double.NaN;
         ResetCountdown = TierModel.ResetCountdown(_resetsAt, now);
         ResetDateTime = ResetDatetimeStr(_resetsAt, now);
@@ -192,6 +214,16 @@ public sealed partial class TierCardViewModel : ObservableObject
         if (days == 1) return $"Tomorrow {t}";
         if (days < 7) return $"{loc.ToString("ddd", CultureInfo.InvariantCulture)} {t}";
         return $"{loc.ToString("ddd MMM dd", CultureInfo.InvariantCulture)} {t}";
+    }
+
+    /// <summary>"Reset at 3:10 PM" for a reset earlier today, "Reset Nov 9, 9:36 PM" for an earlier day.</summary>
+    private static string PassedResetStr(DateTimeOffset reset, DateTimeOffset now)
+    {
+        var loc = reset.ToLocalTime();
+        string t = loc.ToString("h:mm tt", CultureInfo.InvariantCulture);
+        return loc.Date == now.ToLocalTime().Date
+            ? $"Reset at {t}"
+            : $"Reset {loc.ToString("MMM d", CultureInfo.InvariantCulture)}, {t}";
     }
 
     private static SolidColorBrush FromHex(string hex)

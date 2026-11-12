@@ -2,13 +2,17 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using Sanduhr.App.ViewModels;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.Desk;
 
 /// <summary>One reading a styled meter draws (#336): its label, the short name a ring carries, the percent, the fill (0 to 1), the
-/// pace mark (0 to 1, a Claude limit only) and its level by the alert thresholds (theme match, the usage signal).</summary>
-internal sealed record DeskGaugeRead(string Label, string Short, int Percent, double Fill, double? Pace = null, MeterLevel Level = MeterLevel.Calm);
+/// pace mark (0 to 1, a Claude limit only) and its level by the alert thresholds (theme match, the usage signal). A combined reading
+/// (agent layer) carries <paramref name="Layout"/>, the sources' two-tone fill and ticks, and <paramref name="Name"/>, its accessible name
+/// ("Weekly. Claude 40%. Codex 70%."); <paramref name="Stale"/> draws a Codex tier that is not fresh dimmed.</summary>
+internal sealed record DeskGaugeRead(string Label, string Short, int Percent, double Fill, double? Pace = null, MeterLevel Level = MeterLevel.Calm,
+    SourceBarLayout? Layout = null, string? Name = null, bool Stale = false);
 
 /// <summary>
 /// The meter styles (#336): <see cref="DeskMeterStyle.Slim"/>, <see cref="DeskMeterStyle.Ring"/> and <see cref="DeskMeterStyle.Ticks"/>
@@ -19,19 +23,101 @@ internal sealed record DeskGaugeRead(string Label, string Short, int Percent, do
 internal sealed partial class DeskView
 {
     /// <summary>The Claude limits in a style other than bar: the same rows, the sign-in line when there are none.</summary>
-    private FrameworkElement? StyledMeters(double ts, HorizontalAlignment align, DeskMeterStyle style)
+    private FrameworkElement? StyledMeters(double ts, HorizontalAlignment align, DeskMeterStyle style, string source = DeskSources.Combined)
     {
-        var rows = DeskMeters.Rows(_frame.Usage, _frame.Now, warnAt: _frame.WarnAt, urgentAt: _frame.UrgentAt);
+        var (usage, rows) = MeterRows(source);
         double size = ts * 0.17;
         if (rows.Count == 0)
         {
-            if (!DeskMeters.SignInLineShown(_frame.Usage)) return null;
-            return Text(DeskClaudeText.SignInLine(_frame.Usage.FirstSignIn), size, 0.75);
+            if (source == DeskSources.Codex || !DeskMeters.SignInLineShown(usage)) return null;   // a Codex piece with no Codex draws nothing
+            return Text(DeskClaudeText.SignInLine(usage.FirstSignIn), size, 0.75);
         }
-        var reads = rows.Select(r => new DeskGaugeRead(r.Label, DeskMeters.ShortLabel(r.Key), r.Percent, r.Fill, r.Pace, r.Level)).ToList();
-        var gauges = Gauges(reads, style, size, ts * 2.6, align, null);
-        gauges.Opacity = _frame.Usage.IsStale(_frame.Now) ? 0.5 : 1;
+        var gauges = Gauges(Reads(rows), style, size, ts * 2.6, align, null);
+        gauges.Opacity = DeskMeters.Resolve(_frame.Usage, source) != DeskSources.Codex && usage.IsStale(_frame.Now) ? 0.5 : 1;   // a Codex piece dims per row
         return gauges;
+    }
+
+    private static List<DeskGaugeRead> Reads(IReadOnlyList<(DeskMeterRow Row, SourceBarLayout? Layout)> rows) =>
+        [.. rows.Select(x => new DeskGaugeRead(x.Row.Label, DeskMeters.ShortLabel(x.Row.Key), x.Row.Percent, x.Row.Fill, x.Row.Pace, x.Row.Level,
+            x.Layout, x.Layout is null ? null : DeskMeters.CombinedName(x.Row.Label, x.Layout), x.Row.Stale))];
+
+    /// <summary>Opacity of a reading that is stale (a Codex tier that has not been fresh): the widget's own stale dimming.</summary>
+    private const double SourceStaleOpacity = CombinedBarViewModel.StaleOpacity;
+
+    /// <summary>
+    /// The rows a Claude-limits or Claude-line piece draws for the source it shows, with the usage they came from (the Codex view for Codex).
+    /// Combined with two sources: <see cref="DeskMeters.CombinedRows"/>, a layout on each joined row; with one, today's rows and no layout.
+    /// <paramref name="lineOnly"/> keeps the line's session and week.
+    /// </summary>
+    private (DeskUsage Usage, IReadOnlyList<(DeskMeterRow Row, SourceBarLayout? Layout)> Rows) MeterRows(string source, bool lineOnly = false)
+    {
+        var resolved = DeskMeters.Resolve(_frame.Usage, source);
+        if (resolved == DeskSources.Codex)
+            return (DeskMeters.ForSource(_frame.Usage, DeskSources.Codex, _frame.Now),
+                [.. DeskMeters.SourceRows(_frame.Usage, DeskSources.Codex, _frame.Now, warnAt: _frame.WarnAt, urgentAt: _frame.UrgentAt)
+                    .Select(r => (r, (SourceBarLayout?)null))]);
+        var usage = _frame.Usage;
+        if (lineOnly)
+            usage = usage with { Tiers = [.. (usage.LineTiers ?? usage.Tiers).Where(t => t.Key is TierModel.FiveHour or TierModel.SevenDay)] };
+        if (resolved == DeskSources.Combined && DeskMeters.HasSeveralSources(usage))
+            return (usage, [.. DeskMeters.CombinedRows(usage, usage.SourcePrimary, _frame.Now, warnAt: _frame.WarnAt, urgentAt: _frame.UrgentAt)
+                // A row no other source reports (a model's weekly) is today's row.
+                .Select(c => (c.Row, c.Layout is { Beyond: null, Ticks.Count: 0 } ? null : (SourceBarLayout?)c.Layout))]);
+        return (usage, [.. DeskMeters.Rows(usage, _frame.Now, warnAt: _frame.WarnAt, urgentAt: _frame.UrgentAt).Select(r => (r, (SourceBarLayout?)null))]);
+    }
+
+    /// <summary>A source's color as a brush, dimmed when stale: <see cref="SourceSettings.ColorOf"/>'s, carried on the usage.</summary>
+    private Brush SourceInk(string source, bool stale)
+    {
+        string hex = _frame.Usage.SourceColors is { } colors && colors.TryGetValue(source, out var h) && SourceSettings.IsColor(h)
+            ? h : AgentSources.DefaultColor(source);
+        return CombinedBarViewModel.BrushFor(hex, stale);
+    }
+
+    /// <summary>
+    /// The combined fill on a bar (agent layer, spec section 3): the furthest source's continuation under the primary's fill, each in its
+    /// own color, and a tick for every other source. Ticks are 3 px, the pace mark's 2 px stays Claude's. Elements are named for
+    /// automation so a reading can be told from the others.
+    /// </summary>
+    private void AddCombinedFill(Panel bar, SourceBarLayout layout, double width, double barHeight, double tickHeight)
+    {
+        double radius = barHeight / 2;
+        if (layout.Beyond is { } beyond)
+        {
+            // Drawn under the primary and starting a radius early, so the two pills meet without a notch.
+            double start = Math.Max(0, Math.Round(width * beyond.From) - radius);
+            var rect = new Rectangle
+            {
+                Width = Math.Max(0, Math.Round(width * beyond.To) - start), Height = barHeight, RadiusX = radius, RadiusY = radius,
+                Fill = SourceInk(beyond.Source, beyond.Stale), Opacity = _ink.TextOpacity,
+                HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(start, 0, 0, 0),
+            };
+            System.Windows.Automation.AutomationProperties.SetAutomationId(rect, "source-beyond:" + beyond.Source);
+            bar.Children.Add(rect);
+        }
+        if (layout.Primary is { } primary)
+        {
+            var rect = new Rectangle
+            {
+                Width = Math.Round(width * Math.Clamp(primary.To, 0, 1)), Height = barHeight, RadiusX = radius, RadiusY = radius,
+                Fill = SourceInk(primary.Source, primary.Stale), Opacity = _ink.TextOpacity,
+                HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
+            };
+            System.Windows.Automation.AutomationProperties.SetAutomationId(rect, "source-primary:" + primary.Source);
+            bar.Children.Add(rect);
+        }
+        foreach (var tick in layout.Ticks)
+        {
+            var mark = new Rectangle
+            {
+                Width = 3, Height = tickHeight, Fill = SourceInk(tick.Source, tick.Stale), Opacity = _ink.TextOpacity,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(Math.Max(0, Math.Min(width - 3, Math.Round(tick.At * width) - 1.5)), 0, 0, 0),
+            };
+            System.Windows.Automation.AutomationProperties.SetAutomationId(mark, "source-tick:" + tick.Source);
+            bar.Children.Add(mark);
+        }
     }
 
     /// <summary>CPU, RAM and disk in a style other than bar, updated in place as the bar ones are.</summary>
@@ -59,16 +145,16 @@ internal sealed partial class DeskView
     /// so it no longer runs past its column. Ring and ticks put the name over the session and week limits in that style, each with its
     /// pace mark; without numbers (a sign-in), they fall back to the two rows.
     /// </summary>
-    private FrameworkElement? StyledClaude(double ts, HorizontalAlignment align, DeskMeterStyle style)
+    private FrameworkElement? StyledClaude(double ts, HorizontalAlignment align, DeskMeterStyle style, string source = DeskSources.Combined)
     {
         double size = ts * 0.19;
-        double opacity = _frame.Usage.IsStale(_frame.Now) ? 0.45 : 0.75;
-        var tiers = (_frame.Usage.LineTiers ?? _frame.Usage.Tiers).Where(t => t.Key is TierModel.FiveHour or TierModel.SevenDay).ToList();
-        IReadOnlyList<DeskMeterRow> rows = style == DeskMeterStyle.Slim ? []
-            : DeskMeters.Rows(_frame.Usage with { Tiers = tiers }, _frame.Now, warnAt: _frame.WarnAt, urgentAt: _frame.UrgentAt);
+        var (usage, all) = MeterRows(source, lineOnly: true);
+        double opacity = usage.IsStale(_frame.Now) ? 0.45 : 0.75;
+        IReadOnlyList<(DeskMeterRow Row, SourceBarLayout? Layout)> rows = style == DeskMeterStyle.Slim ? [] : all;
         if (rows.Count == 0)
         {
-            if (DeskClaudeText.Compact(_frame.Usage) is not { } lines) return null;
+            // The line's compact rows read the source's own numbers; a Codex piece with no Codex has none and draws nothing.
+            if (DeskClaudeText.Compact(usage) is not { } lines) return null;
             var panel = new StackPanel { HorizontalAlignment = align };
             for (int i = 0; i < lines.Count; i++)
             {
@@ -79,13 +165,14 @@ internal sealed partial class DeskView
             return panel;
         }
         double small = ts * 0.17;
-        var column = new StackPanel { HorizontalAlignment = align, Opacity = _frame.Usage.IsStale(_frame.Now) ? 0.6 : 1 };
-        var name = Text(_frame.Usage.Account ?? "claude", small, 0.75, alignment: TextAlign(align));
+        var column = new StackPanel { HorizontalAlignment = align, Opacity = DeskMeters.Resolve(_frame.Usage, source) != DeskSources.Codex && usage.IsStale(_frame.Now) ? 0.6 : 1 };
+        var name = Text(usage.Account ?? "claude", small, 0.75, alignment: TextAlign(align));
         name.HorizontalAlignment = align;
         name.Margin = new Thickness(0, 0, 0, small * 0.3);
         column.Children.Add(name);
-        var reads = rows.Select(r => new DeskGaugeRead(r.Key == TierModel.FiveHour ? "session" : "week",
-            r.Key == TierModel.FiveHour ? "session" : "week", r.Percent, r.Fill, r.Pace, r.Level)).ToList();
+        var reads = rows.Select(x => new DeskGaugeRead(x.Row.Key == TierModel.FiveHour ? "session" : "week",
+            x.Row.Key == TierModel.FiveHour ? "session" : "week", x.Row.Percent, x.Row.Fill, x.Row.Pace, x.Row.Level,
+            x.Layout, x.Layout is null ? null : DeskMeters.CombinedName(x.Row.Key == TierModel.FiveHour ? "Session (5hr)" : "Weekly", x.Layout), x.Row.Stale)).ToList();
         column.Children.Add(Gauges(reads, style, small, ts * 2.6, align, null));
         return column;
     }
@@ -153,9 +240,12 @@ internal sealed partial class DeskView
             Fill = MeterFill(r.Level), Opacity = _ink.TextOpacity,
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
         };
-        bar.Children.Add(fill);
+        if (r.Layout is null) bar.Children.Add(fill);
+        else AddCombinedFill(bar, r.Layout, width, barH, markH);
         if (r.Pace is { } p) bar.Children.Add(PaceMark(p, width, markH));
         block.Children.Add(bar);
+        if (r.Name is not null) System.Windows.Automation.AutomationProperties.SetName(block, r.Name);   // streamer: notname - a window and source names, not an account
+        if (r.Stale) block.Opacity = SourceStaleOpacity;
         return (block, next =>
         {
             var t = $"{next.Percent}%";
@@ -252,6 +342,8 @@ internal sealed partial class DeskView
             canvas.Children.Add(mark);
         }
         block.Children.Add(canvas);
+        if (r.Name is not null) System.Windows.Automation.AutomationProperties.SetName(block, r.Name);   // streamer: notname - a window and source names, not an account
+        if (r.Stale) block.Opacity = SourceStaleOpacity;
         int shown = DeskMeters.LitTicks(r.Fill, n);
         return (block, next =>
         {
@@ -281,12 +373,40 @@ internal sealed partial class DeskView
             Data = Arc(c, radius, 1), Stroke = MeterTrack, StrokeThickness = t, Opacity = MeterTrackOpacity,
             StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
         });
+        // A combined ring (agent layer): the furthest source's arc under the primary's, each in its own color; the others are ticks.
+        if (r.Layout?.Beyond is { } beyond)
+        {
+            var under = new Path
+            {
+                Data = Arc(c, radius, beyond.From, beyond.To), Stroke = SourceInk(beyond.Source, beyond.Stale), StrokeThickness = t, Opacity = _ink.TextOpacity,
+                StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+            };
+            System.Windows.Automation.AutomationProperties.SetAutomationId(under, "source-beyond:" + beyond.Source);
+            face.Children.Add(under);
+        }
         var arc = new Path
         {
-            Data = Arc(c, radius, r.Fill), Stroke = MeterFill(r.Level), StrokeThickness = t, Opacity = _ink.TextOpacity,
+            Data = r.Layout?.Primary is { } lead ? Arc(c, radius, 0, lead.To) : Arc(c, radius, r.Fill),
+            Stroke = r.Layout?.Primary is { } tone ? SourceInk(tone.Source, tone.Stale) : MeterFill(r.Level),
+            StrokeThickness = t, Opacity = _ink.TextOpacity,
             StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
         };
         face.Children.Add(arc);
+        if (r.Layout?.Primary is { } named) System.Windows.Automation.AutomationProperties.SetAutomationId(arc, "source-primary:" + named.Source);
+        if (r.Layout is { } layout)
+            foreach (var tick in layout.Ticks)
+            {
+                double ta = (RingStart + RingSweep * Math.Clamp(tick.At, 0, 1)) * Math.PI / 180;
+                double lo = radius - t * 0.95, hi = radius + t * 0.95;
+                var mark = new Line
+                {
+                    X1 = c.X + lo * Math.Cos(ta), Y1 = c.Y + lo * Math.Sin(ta),
+                    X2 = c.X + hi * Math.Cos(ta), Y2 = c.Y + hi * Math.Sin(ta),
+                    Stroke = SourceInk(tick.Source, tick.Stale), StrokeThickness = 3, Opacity = _ink.TextOpacity,
+                };
+                System.Windows.Automation.AutomationProperties.SetAutomationId(mark, "source-tick:" + tick.Source);
+                face.Children.Add(mark);
+            }
         if (r.Pace is { } p)
         {
             double a = (RingStart + RingSweep * Math.Clamp(p, 0, 1)) * Math.PI / 180;
@@ -312,7 +432,8 @@ internal sealed partial class DeskView
         var ring = new StackPanel();
         ring.Children.Add(face);
         ring.Children.Add(label);
-        System.Windows.Automation.AutomationProperties.SetName(ring, $"{r.Label} {r.Percent}%");   // streamer: notname - the ring label is a tier name (Five-hour, Weekly), not an account
+        if (r.Stale) ring.Opacity = SourceStaleOpacity;
+        System.Windows.Automation.AutomationProperties.SetName(ring, r.Name ?? $"{r.Label} {r.Percent}%");   // streamer: notname - the ring label is a tier name (Five-hour, Weekly), not an account
         return (ring, next =>
         {
             var text = $"{next.Percent}";
@@ -322,12 +443,16 @@ internal sealed partial class DeskView
     }
 
     /// <summary>The ring's arc for a fill of 0 to 1 around <paramref name="c"/>; empty for nothing.</summary>
-    internal static Geometry Arc(Point c, double radius, double fill)
+    internal static Geometry Arc(Point c, double radius, double fill) => Arc(c, radius, 0, fill);
+
+    /// <summary>The arc from <paramref name="from"/> to <paramref name="to"/> (each 0 to 1 along the ring); empty when there is nothing between them.</summary>
+    internal static Geometry Arc(Point c, double radius, double from, double to)
     {
-        double f = Math.Clamp(double.IsFinite(fill) ? fill : 0, 0, 1);
+        double f0 = Math.Clamp(double.IsFinite(from) ? from : 0, 0, 1);
+        double f = Math.Clamp(double.IsFinite(to) ? to : 0, 0, 1) - f0;
         if (f <= 0.001) return Geometry.Empty;
         double sweep = Math.Min(RingSweep * f, 359.9);
-        double a0 = RingStart * Math.PI / 180, a1 = (RingStart + sweep) * Math.PI / 180;
+        double a0 = (RingStart + RingSweep * f0) * Math.PI / 180, a1 = (RingStart + RingSweep * f0 + sweep) * Math.PI / 180;
         var start = new Point(c.X + radius * Math.Cos(a0), c.Y + radius * Math.Sin(a0));
         var end = new Point(c.X + radius * Math.Cos(a1), c.Y + radius * Math.Sin(a1));
         var figure = new PathFigure { StartPoint = start, IsClosed = false, IsFilled = false };

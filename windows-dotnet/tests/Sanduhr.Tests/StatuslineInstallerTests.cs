@@ -460,11 +460,29 @@ public class StatuslineInstallerSpliceTests
             Assert.Equal(segments, parsed.Segments);
             Assert.Equal(installer.ScriptPath, parsed.ScriptPath);
         }
-        // Unknown names drop out, and what is left being the default writes no -Mine.
-        Assert.DoesNotContain("-Mine", installer.BuildCommand(null, "line", ["weekly", "resets", "session", "account", "bogus"]));
+        // Unknown names drop out. Only all five (the default) write no -Mine; the four Claude segments alone write one, so Codex hides.
+        Assert.DoesNotContain("-Mine", installer.BuildCommand(null, "line", ["weekly", "resets", "session", "account", "codex", "bogus"]));
+        Assert.EndsWith(" -Mine account,session,weekly,resets", installer.BuildCommand(null, "line", ["weekly", "resets", "session", "account", "bogus"]));
+        Assert.EndsWith(" -Mine account,session,weekly,resets", installer.BuildCommand(null, "line", ["account", "session", "weekly", "resets"]));
         // A list picked before Account existed keeps exactly its segments: it now names them.
         Assert.Contains("-Mine session,weekly,resets", installer.BuildCommand(null, "line", ["weekly", "resets", "session", "bogus"]));
         Assert.Contains("-Mine weekly", installer.BuildCommand(null, "line", ["weekly"]));
+    }
+
+    [Fact]
+    public void Unticking_only_Codex_writes_the_four_Claude_segments_and_only_all_five_write_no_Mine()
+    {
+        using var home = new TempDir();
+        using var bin = new TempDir();
+        var installer = new StatuslineInstaller(home.Path, bin.Path);
+        var noCodex = installer.BuildCommand(null, "line", ["account", "session", "weekly", "resets"]);
+        Assert.EndsWith(" -Mine account,session,weekly,resets", noCodex);
+        Assert.Equal(["account", "session", "weekly", "resets"], StatuslineInstaller.TryParseCommand(noCodex)!.Segments);
+        var all = installer.BuildCommand(null, "line", ["account", "session", "weekly", "resets", "codex"]);
+        Assert.DoesNotContain("-Mine", all);
+        Assert.Equal(StatuslineInstaller.DefaultSegments, StatuslineInstaller.TryParseCommand(all)!.Segments);
+        Assert.Contains("codex", StatuslineInstaller.DefaultSegments);   // an existing command with no -Mine still shows everything
+        Assert.DoesNotContain("-Mine", installer.BuildCommand());
     }
 
     [Theory]

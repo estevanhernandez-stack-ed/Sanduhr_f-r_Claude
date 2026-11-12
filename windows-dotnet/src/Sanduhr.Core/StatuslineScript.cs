@@ -20,7 +20,7 @@ public static class StatuslineScript
 {
     /// <summary>Bumped when the script body changes; the installer re-writes the
     /// script whenever the installed copy differs from this source.</summary>
-    public const int Version = 6;
+    public const int Version = 7;
 
     /// <summary>PowerShell 5.1-compatible script body. Reads the snapshot per the
     /// reader contract (one-shot read, any parse failure = missing), renders per
@@ -38,7 +38,7 @@ public static class StatuslineScript
 # stale on disk.
 #   -Chain <base64>   the user's own statusline command (UTF-8): run it first, print both
 #   -Join line|same   Sanduhr's line on its own row, or appended to their last row
-#   -Mine a,b,c       Sanduhr's segments: account, session, weekly, resets (default: all four)
+#   -Mine a,b,c       Sanduhr's segments: account, session, weekly, resets, codex (default: all five)
 # The account segment leads the line with the Claude Code folder's label. It is worked out
 # here, when the line renders, and written nowhere: SANDUHR_LABEL from the session's
 # environment (the folder's own settings.json env block), else the CLAUDE_CONFIG_DIR folder's
@@ -157,11 +157,12 @@ function Get-StreamerLabel([string]$label) {
 }
 
 # ---- Sanduhr's own line (null = nothing of Sanduhr's to print) -----------------
-function Get-OurLine {
+function Get-ClaudeLine {
   $segments = @('account', 'session', 'weekly', 'resets')
   if ($Mine) {
     $picked = @($Mine.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { @('account', 'session', 'weekly', 'resets') -contains $_ })
     if ($picked.Count -gt 0) { $segments = $picked }
+    elseif (Test-MineHas 'codex') { return $null }   # -Mine codex alone: Claude's line is not asked for
   }
   $showAccount = $segments -contains 'account'
   $showSession = $segments -contains 'session'
@@ -243,6 +244,52 @@ function Get-OurLine {
   }
   if ($age -ge 450) { $line = $line + (' ({0}m ago)' -f [int][Math]::Floor($age / 60)) }
   return $line
+}
+
+# -Mine names the segments to print; codex is one of them. No -Mine = everything, Codex included.
+function Test-MineHas([string]$name) {
+  if (-not $Mine) { return $true }
+  return (@($Mine.Split(',') | ForEach-Object { $_.Trim() }) -contains $name)
+}
+
+# Claude's line and Codex's segment are independent: either alone, or both joined by a middle dot
+# (Emit writes UTF-8). Codex never waits on Claude's snapshot, so a Codex-only user still sees it.
+function Get-OurLine {
+  $claude = Get-ClaudeLine
+  $codex = $null
+  $mineNames = @()
+  if ($Mine) { $mineNames = @($Mine.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { @('account', 'session', 'weekly', 'resets', 'codex') -contains $_ }) }
+  if ($mineNames.Count -eq 0 -or ($mineNames -contains 'codex')) { $codex = Get-CodexSegment }
+  if ($claude -and $codex) { return $claude + ' ' + [char]0x00B7 + ' ' + $codex }
+  if ($codex) { return $codex }
+  return $claude
+}
+
+# Codex's meters from snapshot.codex.json beside the Claude snapshot: only while it is alive (the same
+# 1800 s: the widget's 30 minutes for an idle Codex, not the 900 s Claude rule) and a schema this script knows. Nothing otherwise; never a path, never an error.
+function Get-CodexSegment {
+  try {
+    $path = Join-Path (Join-Path $env:USERPROFILE '.sanduhr') 'snapshot.codex.json'
+    if (-not (Test-Path -LiteralPath $path)) { return $null }
+    $cx = Get-Content -LiteralPath $path -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    if ($null -eq $cx) { return $null }
+    if ([int]$cx.schema_version -gt 1) { return $null }
+    $at = ([DateTimeOffset]::Parse($cx.captured_at, [System.Globalization.CultureInfo]::InvariantCulture)).ToUniversalTime()
+    $cxNow = [DateTimeOffset]::UtcNow
+    if ([Math]::Max(0, [int]($cxNow - $at).TotalSeconds) -gt 1800) { return $null }
+    $cxLabels = @{ five_hour = '5h'; seven_day = 'wk' }
+    $bits = @()
+    foreach ($tier in @($cx.tiers)) {
+      $label = $cxLabels[[string]$tier.key]
+      if (-not $label -or $null -eq $tier.utilization) { continue }
+      if ($tier.resets_at) {
+        try { if ([DateTimeOffset]::Parse($tier.resets_at, [System.Globalization.CultureInfo]::InvariantCulture).ToUniversalTime() -le $cxNow) { continue } } catch { }
+      }
+      $bits += ('{0} {1}%' -f $label, [int]$tier.utilization)
+    }
+    if ($bits.Count -eq 0) { return $null }
+    return ('cx ' + ($bits -join ' '))
+  } catch { return $null }
 }
 
 # ---- the user's own command (combine) ------------------------------------------

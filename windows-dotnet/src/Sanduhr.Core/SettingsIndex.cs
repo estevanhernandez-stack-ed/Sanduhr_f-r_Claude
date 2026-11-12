@@ -55,6 +55,8 @@ public static class SettingsIndex
     // History (retired in slice 5): kept for the aliases to Claude Usage, Meters
     public const string Chart = "chart";
     public const string HistoryExport = "export";
+    // Usage, Sources (agent layer)
+    public const string SourcesList = "sources";
     // Claude Usage
     /// <summary>Claude Usage, Meters (slice 5): the meter history and its export.</summary>
     public const string MeterHistory = "meters";
@@ -213,6 +215,10 @@ public static class SettingsIndex
              "Open-Meteo", "what leaves", "WebView2", "SmartScreen", "privacy policy"]),
         E(SettingsNames.WhatClaudeCanChange, SettingsPage.Privacy, Agents,
             ["agents", "agent", "consent", "consents", "permission", "permissions", "allow", "what can Claude do"]),
+
+        E(AgentSources.Name(AgentSources.Codex), SettingsPage.UsageSources, SourcesList,
+            ["sources", "codex", "OpenAI", "primary", "primary source", "color", "colors", "colour", "hex", "reset color", "alerts", "tray",
+             "combined bars", "not installed"]),
 
         E(SettingsNames.MeterHistorySection, SettingsPage.ClaudeUsage, MeterHistory,
             ["history", "30 days", "week", "month", "account", "all accounts", "chart", "graph", "meters over time"], MetersView),
@@ -473,6 +479,7 @@ public static class SettingsIndex
         [SettingsPage.Alerts] = ["notification", "warning"],
         [SettingsPage.Privacy] = ["privacy", "what leaves this PC", "what Claude can change", "agents", "network"],
         // "vault" lives on the archive section only: as a page synonym it ties the section at rank 1 and the page row wins.
+        [SettingsPage.UsageSources] = ["sources", "codex", "primary", "colors"],
         [SettingsPage.ClaudeUsage] = ["Claude Code", "tokens", "usage"],
         [SettingsPage.ClaudeCode] = ["Claude Code folders", "folder", "seat", "pieces"],
         [SettingsPage.Mods] = ["mod", "plugin", "widget packs", "extensions", "add-ons"],

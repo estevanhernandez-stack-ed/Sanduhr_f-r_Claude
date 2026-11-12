@@ -12,7 +12,8 @@ public class WhatsNewCardsTests
     public void Table_HasEveryReleaseNewestFirst()
     {
         Assert.Equal(
-            ["widget-from-file",
+            ["codex-limits",
+             "widget-from-file",
              "desk-under-icons",
              "choose-what-shows", "settings-rearranged", "one-theme", "streamer-mode",
              "ci-runners",
@@ -23,6 +24,22 @@ public class WhatsNewCardsTests
              "shortcut-keys", "tray-shows", "limits-come-and-go", "every-folder", "steady-sparklines", "whats-new"],
             Table.Select(c => c.Id));
     }
+
+    [Fact]
+    public void Release480_ShowsTheCodexCard()
+    {
+        var cards = WhatsNew.Cards("4.7.0", "4.8.0");
+        var card = Assert.Single(cards);
+        Assert.Equal("codex-limits", card.Id);
+        Assert.Equal("Codex limits, beside Claude's", card.Title);
+        Assert.StartsWith("Turn on Codex in Settings, Sources, and the widget shows its 5-hour and weekly limits under Claude's.", card.Body);
+        Assert.Equal(SettingsPage.UsageSources, card.Destination);
+        Assert.Equal(SettingsIndex.SourcesList, card.Anchor);
+    }
+
+    [Fact]
+    public void Only_the_Codex_card_names_Codex() =>
+        Assert.Equal(["codex-limits"], Table.Where(c => c.NamesCodex).Select(c => c.Id));
 
     [Fact]
     public void Release470_ShowsTheFromFileCard()

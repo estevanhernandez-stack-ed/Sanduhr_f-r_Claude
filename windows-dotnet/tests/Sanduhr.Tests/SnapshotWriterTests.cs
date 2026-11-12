@@ -126,4 +126,28 @@ public class SnapshotWriterTests
         Assert.False(File.Exists(path));
         writer.Delete(); // second delete is a no-op, not a throw
     }
+
+    [Fact]
+    public void A_source_writer_stamps_source_and_omits_account_ref()
+    {
+        using var tmp = new TempDir();
+        var path = Path.Combine(tmp.Path, "snapshot.codex.json");
+        var w = new SnapshotWriter(path, null, "5.0.0", source: "codex");
+        w.WriteOk(new JsonObject { ["five_hour"] = new JsonObject { ["utilization"] = 40.0, ["resets_at"] = null } },
+            plan: "plus", accountLabel: null, now: DateTimeOffset.Parse("2026-11-09T12:00:00Z"));
+        var root = ReadSnapshot(path);
+        Assert.Equal("codex", root["source"]!.GetValue<string>());
+        Assert.False(root.ContainsKey("account_ref"));
+    }
+
+    [Fact]
+    public void A_writer_without_a_source_keeps_account_ref_and_adds_no_source()
+    {
+        using var tmp = new TempDir();
+        var path = Path.Combine(tmp.Path, "snapshot.json");
+        new SnapshotWriter(path).WriteOk(SamplePayload(), null, "Este", Now);
+        var root = ReadSnapshot(path);
+        Assert.True(root.ContainsKey("account_ref"));
+        Assert.False(root.ContainsKey("source"));
+    }
 }

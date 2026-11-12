@@ -57,6 +57,14 @@ public class SetupSettingsTests
     }
 
     [Fact]
+    public void A_codex_only_first_run_does_not_wait_for_a_claude_fetch()
+    {
+        Assert.True(SetupLaunch.TourWaitsForClaudeFetch(new SetupChoices(true, true, ClaudeUsage: true, CodexUsage: true)));
+        Assert.False(SetupLaunch.TourWaitsForClaudeFetch(new SetupChoices(true, true, ClaudeUsage: false, CodexUsage: true)));
+        Assert.False(SetupLaunch.TourWaitsForClaudeFetch(new SetupChoices(true, true, ClaudeUsage: false)));
+    }
+
+    [Fact]
     public void Neither_an_account_nor_Just_the_Desk_is_a_first_run()
     {
         Assert.Null(SetupMigration.From(false, false, false, false));
@@ -103,10 +111,30 @@ public class SetupSettingsTests
     [Fact]
     public void ToSettings_keeps_sources_this_build_does_not_show()
     {
-        var before = new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false, ["codex"] = true });
+        var before = new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false, ["gemini"] = true });
         var after = new SetupChoices(false, true, true).ToSettings(before);
         Assert.False(after.Desktop);
         Assert.True(after.ClaudeUsage);
-        Assert.True(after.Usage["codex"]);
+        Assert.True(after.Usage["gemini"]);
+    }
+
+    [Fact]
+    public void Codex_usage_round_trips_and_counts_as_usage_on()
+    {
+        var s = SetupSettings.Decode(null, new SetupSettings(true, new Dictionary<string, bool>())).WithCodex(true);
+        var back = SetupSettings.Decode(System.Text.Json.Nodes.JsonNode.Parse(s.Encode().ToJsonString()), s);
+        Assert.True(back.CodexUsage);
+        Assert.False(back.ClaudeUsage);
+        Assert.True(back.UsageOn);
+    }
+
+    [Fact]
+    public void Choices_write_both_sources()
+    {
+        var before = new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = true, ["gemini"] = true });
+        var after = new SetupChoices(Desktop: true, Drawers: false, ClaudeUsage: false, CodexUsage: true).ToSettings(before);
+        Assert.False(after.ClaudeUsage);
+        Assert.True(after.CodexUsage);
+        Assert.True(after.Usage["gemini"]);
     }
 }

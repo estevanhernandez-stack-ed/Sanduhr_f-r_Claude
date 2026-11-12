@@ -24,6 +24,7 @@
          in-app probe (Updates/UpdateChecker.cs) checks the GitHub release feed best-effort. -->
     <PackageReference Include="Velopack" Version="0.0.1298" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.5" />
   </ItemGroup>
 
   <!-- Window + tray glyph share the shipped Sanduhr.ico (parity with the Python
@@ -83,9 +84,9 @@
          requires a 4-part version with the 4th component .0 (Partner Center rejects
          non-zero revisions). Keep these three in lockstep with <Identity Version> in
          Package.appxmanifest. -->
-    <Version>4.7.0.0</Version>
-    <AssemblyVersion>4.7.0.0</AssemblyVersion>
-    <FileVersion>4.7.0.0</FileVersion>
+    <Version>4.8.0.0</Version>
+    <AssemblyVersion>4.8.0.0</AssemblyVersion>
+    <FileVersion>4.8.0.0</FileVersion>
   </PropertyGroup>
 
   <!-- MCP integration: the widget carries the sanduhr-mcp server build in its own

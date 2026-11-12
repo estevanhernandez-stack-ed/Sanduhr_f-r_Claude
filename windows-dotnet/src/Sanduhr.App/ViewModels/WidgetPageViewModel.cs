@@ -156,7 +156,7 @@ public sealed partial class WidgetPageViewModel : ObservableObject
             case nameof(WidgetViewModel.IsCompact): OnPropertyChanged(nameof(IsCompact)); break;
             case nameof(WidgetViewModel.SparklineStyle): OnPropertyChanged(nameof(SelectedGraphStyle)); break;
             case nameof(WidgetViewModel.Pinned): OnPropertyChanged(nameof(KeepOnTop)); break;
-            case nameof(WidgetViewModel.UsageOn): OnPropertyChanged(nameof(ShowUsageOff)); break;
+            case nameof(WidgetViewModel.AnyUsageOn): OnPropertyChanged(nameof(ShowUsageOff)); break;
         }
     }
 

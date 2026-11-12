@@ -1,0 +1,25 @@
+<UserControl x:Class="Sanduhr.App.Views.CombinedBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Sanduhr.App.ViewModels"
+             mc:Ignorable="d"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DataContext="{d:DesignInstance vm:CombinedBarViewModel}"
+             Focusable="False"
+             AutomationProperties.Name="{Binding AccessibleName}">
+    <!-- One window across the stacked sources: the primary fills to its percent, the furthest source continues the bar in its own
+         color, every other source is a tick. The track is the same surface the tier cards' bars draw on (bar_bg). -->
+    <StackPanel Margin="14,0,14,8">
+        <TextBlock Text="{Binding WindowLabel}" FontSize="11"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+        <Grid Height="6" Margin="0,4,0,0">
+            <Border CornerRadius="3">
+                <Border.Background>
+                    <SolidColorBrush Color="{DynamicResource Sanduhr.Color.BarBg}" />
+                </Border.Background>
+            </Border>
+            <Canvas x:Name="Draw" />
+        </Grid>
+    </StackPanel>
+</UserControl>

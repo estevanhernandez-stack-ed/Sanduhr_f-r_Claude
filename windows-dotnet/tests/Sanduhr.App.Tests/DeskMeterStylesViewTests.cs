@@ -320,4 +320,326 @@ public sealed class DeskMeterStylesViewTests : IDisposable
         Assert.Equal(Color.FromRgb(0xF8, 0x71, 0x71), ((SolidColorBrush)urgent.Foreground).Color);
         view.Dispose();
     });
+
+    // ---- agent layer: a piece's source ----
+
+    /// <summary>Claude's session 42 and week 93 (Usage), plus Codex's session 20 and week 97: the week continues past Claude's, the session is a tick.</summary>
+    private static DeskUsage TwoSources(params string[] staleCodex) => Usage() with
+    {
+        SourceTiers = new Dictionary<string, IReadOnlyList<DeskTier>>
+        {
+            ["codex"] = [new DeskTier(TierModel.FiveHour, 20, Iso(Now.AddHours(1))), new DeskTier(TierModel.SevenDay, 97, Iso(Now.AddDays(2)))],
+        },
+        SourceStaleTiers = new Dictionary<string, IReadOnlySet<string>> { ["codex"] = new HashSet<string>(staleCodex) },
+    };
+
+    private static List<string> Ids(FrameworkElement piece) =>
+        [.. All<FrameworkElement>(piece).Select(System.Windows.Automation.AutomationProperties.GetAutomationId).Where(id => id.Length > 0)];
+
+    private static bool Drawn(DeskView view, string widget) => All<FrameworkElement>(view).Any(e => e.Tag as string == widget);
+
+    private static string WordFor(string piece, DeskMeterStyle style, string source = "combined")
+    {
+        string word = style == DeskMeterStyle.Bar ? $"{piece}:tr" : $"{piece}:tr:1:0:{DeskMeterStyles.Word(style)}";
+        return source == "combined" ? word : $"{word}:src={source}";
+    }
+
+    [Theory]
+    [InlineData(DeskMeterStyle.Bar)]
+    [InlineData(DeskMeterStyle.Slim)]
+    [InlineData(DeskMeterStyle.Ring)]
+    public void ACombinedPieceWithTwoSourcesDrawsTheTwoToneFillAndTheTicks(DeskMeterStyle style) => Sta.Run(() =>
+    {
+        var view = View(WordFor("meters", style), new DeskFrame { Usage = TwoSources(), Now = Now });
+        var meters = Piece(view, "meters");
+        var ids = Ids(meters);
+        Assert.Equal(["source-primary:claude", "source-primary:claude"], ids.Where(i => i.StartsWith("source-primary", StringComparison.Ordinal)));
+        Assert.Equal(["source-beyond:codex"], ids.Where(i => i.StartsWith("source-beyond", StringComparison.Ordinal)));   // the week only
+        Assert.Equal(["source-tick:codex", "source-tick:codex"], ids.Where(i => i.StartsWith("source-tick", StringComparison.Ordinal)));
+        // The rows are the joined windows, with Claude's pace marks kept.
+        var texts = All<TextBlock>(meters).Select(t => t.Text).ToList();
+        Assert.Contains(style == DeskMeterStyle.Ring ? "93" : "93%", texts);
+        if (style != DeskMeterStyle.Ring)
+        {
+            Assert.Contains("Session (5hr)", texts);
+            Assert.Contains("Weekly", texts);
+            Assert.Equal(2, All<Rectangle>(meters).Count(r => r.Width == 2));
+        }
+        else Assert.Equal(2, All<Line>(meters).Count(l => l.StrokeThickness == 2));
+        view.Dispose();
+    });
+
+    [Theory]
+    [InlineData(DeskMeterStyle.Bar)]
+    [InlineData(DeskMeterStyle.Slim)]
+    [InlineData(DeskMeterStyle.Ring)]
+    public void TheCombinedFillWearsEachSourcesOwnColor(DeskMeterStyle style) => Sta.Run(() =>
+    {
+        var colors = new Dictionary<string, string> { ["claude"] = "#102030", ["codex"] = "#A0B0C0" };
+        var view = View(WordFor("meters", style), new DeskFrame { Usage = TwoSources() with { SourceColors = colors }, Now = Now });
+        var meters = Piece(view, "meters");
+        Brush? Of(string id) => All<FrameworkElement>(meters).Where(e => System.Windows.Automation.AutomationProperties.GetAutomationId(e) == id)
+            .Select(e => e switch { Rectangle r => r.Fill, ShapePath p => p.Stroke, Line l => l.Stroke, _ => null }).FirstOrDefault();
+        Assert.Equal(Color.FromRgb(0x10, 0x20, 0x30), ((SolidColorBrush)Of("source-primary:claude")!).Color);
+        Assert.Equal(Color.FromRgb(0xA0, 0xB0, 0xC0), ((SolidColorBrush)Of("source-beyond:codex")!).Color);
+        Assert.Equal(Color.FromRgb(0xA0, 0xB0, 0xC0), ((SolidColorBrush)Of("source-tick:codex")!).Color);
+        view.Dispose();
+    });
+
+    [Fact]
+    public void ACombinedSlimFillSpansThePrimaryThenTheFurtherSource() => Sta.Run(() =>
+    {
+        var view = View(WordFor("meters", DeskMeterStyle.Slim), new DeskFrame { Usage = TwoSources(), Now = Now });
+        var meters = Piece(view, "meters");
+        Rectangle Find(string id) => All<Rectangle>(meters).First(r => System.Windows.Automation.AutomationProperties.GetAutomationId(r) == id);
+        double weekPrimary = All<Rectangle>(meters).Where(r => System.Windows.Automation.AutomationProperties.GetAutomationId(r) == "source-primary:claude")
+            .Max(r => r.Width);   // the week (93%) is the longer one
+        var beyond = Find("source-beyond:codex");
+        // The further source starts one radius early, under the primary's rounded end, and runs on past it (to 97%).
+        Assert.Equal(weekPrimary, beyond.Margin.Left + beyond.RadiusX, 1);
+        Assert.True(beyond.Margin.Left + beyond.Width > weekPrimary);
+        view.Dispose();
+    });
+
+    [Theory]
+    [InlineData(DeskMeterStyle.Bar)]
+    [InlineData(DeskMeterStyle.Slim)]
+    [InlineData(DeskMeterStyle.Ring)]
+    public void ACombinedRowNamesEverySourceAndWindowNotJustItsColor(DeskMeterStyle style) => Sta.Run(() =>
+    {
+        var view = View(WordFor("meters", style), new DeskFrame { Usage = TwoSources("seven_day"), Now = Now });
+        var names = All<FrameworkElement>(Piece(view, "meters")).Select(System.Windows.Automation.AutomationProperties.GetName).Where(n => n.Length > 0).ToList();
+        Assert.Contains("Session (5hr). Claude 42%. Codex 20%.", names);
+        Assert.Contains("Weekly. Claude 93%. Codex 97%, as of earlier.", names);
+        view.Dispose();
+    });
+
+    [Fact]
+    public void AStaleCodexTierDrawsDimmedAndAFreshOneDoesNot() => Sta.Run(() =>
+    {
+        var view = View(WordFor("meters", DeskMeterStyle.Slim), new DeskFrame { Usage = TwoSources("seven_day"), Now = Now });
+        var meters = Piece(view, "meters");
+        Brush Fill(string id) => All<Rectangle>(meters).First(r => System.Windows.Automation.AutomationProperties.GetAutomationId(r) == id).Fill;
+        var ticks = All<Rectangle>(meters).Where(r => System.Windows.Automation.AutomationProperties.GetAutomationId(r) == "source-tick:codex").ToList();
+        Assert.Equal(1.0, ticks[0].Fill.Opacity);                      // the session's Codex tier is fresh
+        Assert.Equal(CombinedBarViewModel.StaleOpacity, ticks[1].Fill.Opacity);   // the weekly one is not
+        Assert.Equal(CombinedBarViewModel.StaleOpacity, Fill("source-beyond:codex").Opacity);
+        view.Dispose();
+    });
+
+    [Theory]
+    [InlineData(DeskMeterStyle.Bar)]
+    [InlineData(DeskMeterStyle.Slim)]
+    [InlineData(DeskMeterStyle.Ring)]
+    public void CombinedWithOneSourceDrawsExactlyTodaysRows(DeskMeterStyle style) => Sta.Run(() =>
+    {
+        // No Codex tiers: the piece is what it was (compare with the same frame under an explicit Claude source).
+        var frame = new DeskFrame { Usage = Usage(), Now = Now };
+        var combined = View(WordFor("meters", style), frame);
+        var claude = View(WordFor("meters", style, "claude"), frame);
+        Assert.Empty(Ids(Piece(combined, "meters")));
+        Assert.Equal(All<TextBlock>(Piece(claude, "meters")).Select(t => t.Text), All<TextBlock>(Piece(combined, "meters")).Select(t => t.Text));
+        Assert.Equal(All<FrameworkElement>(Piece(claude, "meters")).Count(), All<FrameworkElement>(Piece(combined, "meters")).Count());
+        Assert.Equal(2, PaceMarks(Piece(combined, "meters")));
+        combined.Dispose();
+        claude.Dispose();
+    });
+
+    [Fact]
+    public void APieceSetToClaudeIgnoresCodexAndOneSetToCodexDrawsCodexRowsOnly() => Sta.Run(() =>
+    {
+        var frame = new DeskFrame { Usage = TwoSources(), Now = Now };
+        var claude = View(WordFor("meters", DeskMeterStyle.Slim, "claude"), frame);
+        Assert.Empty(Ids(Piece(claude, "meters")));
+        Assert.Contains("Weekly - All Models", All<TextBlock>(Piece(claude, "meters")).Select(t => t.Text));
+        claude.Dispose();
+
+        var codex = View(WordFor("meters", DeskMeterStyle.Slim, "codex"), frame);
+        var meters = Piece(codex, "meters");
+        var texts = All<TextBlock>(meters).Select(t => t.Text).ToList();
+        Assert.Equal(["20%", "Codex session (5hr)", "97%", "Codex weekly"], texts);   // each row: its value, then its label
+        Assert.Empty(Ids(meters));                                      // one source: no fill of two
+        Assert.Equal(0, All<Rectangle>(meters).Count(r => r.Width == 2));   // Codex has no pace mark
+        codex.Dispose();
+    });
+
+    [Theory]
+    [InlineData(DeskMeterStyle.Bar)]
+    [InlineData(DeskMeterStyle.Slim)]
+    [InlineData(DeskMeterStyle.Ring)]
+    [InlineData(DeskMeterStyle.Ticks)]
+    public void ACodexPieceWithCodexOffOrNotInstalledDrawsNothing(DeskMeterStyle style) => Sta.Run(() =>
+    {
+        foreach (var piece in new[] { "meters", "claude" })
+        {
+            var view = View(WordFor(piece, style, "codex"), new DeskFrame { Usage = Usage(), Now = Now });   // Claude has numbers, Codex has none
+            Assert.False(Drawn(view, piece));
+            view.Dispose();
+            // Signed out of Claude does not bring a sign-in line to a Codex piece either.
+            var signedOut = View(WordFor(piece, style, "codex"), new DeskFrame { Usage = Usage() with { SignInNeeded = true }, Now = Now });
+            Assert.False(Drawn(signedOut, piece));
+            signedOut.Dispose();
+        }
+    });
+
+    [Fact]
+    public void ACombinedPieceWithNoClaudeAndACodexDrawsCodexAlone() => Sta.Run(() =>
+    {
+        var codexOnly = TwoSources() with { Tiers = [], LineTiers = [] };
+        var view = View("meters:tr", new DeskFrame { Usage = codexOnly, Now = Now });
+        Assert.Equal(["20%", "Codex session (5hr)", "97%", "Codex weekly"], All<TextBlock>(Piece(view, "meters")).Select(t => t.Text).Where(t => !t.StartsWith("resets", StringComparison.Ordinal)));
+        view.Dispose();
+        // A sign-in still shows the sign-in line: Claude is on.
+        var signIn = View("meters:tr", new DeskFrame { Usage = codexOnly with { SignInNeeded = true }, Now = Now });
+        Assert.Equal(["sign in again in Sanduhr"], All<TextBlock>(Piece(signIn, "meters")).Select(t => t.Text));
+        signIn.Dispose();
+    });
+
+    [Fact]
+    public void TheClaudeLineReadsCodexForACodexPieceAndIsUnchangedForClaude() => Sta.Run(() =>
+    {
+        var frame = new DeskFrame { Usage = TwoSources(), Now = Now };
+        var codex = View("claude:bl:src=codex", frame);
+        Assert.Equal(["Codex 5h 20% · wk 97%"], All<TextBlock>(Piece(codex, "claude")).Select(t => t.Text));
+        codex.Dispose();
+        foreach (var source in new[] { "combined", "claude" })
+        {
+            var view = View(source == "combined" ? "claude:bl" : "claude:bl:src=claude", frame);
+            Assert.Equal([DeskClaudeText.Line(frame.Usage)!], All<TextBlock>(Piece(view, "claude")).Select(t => t.Text));
+            view.Dispose();
+        }
+    });
+
+    [Fact]
+    public void TheClaudeLineInRingsCombinesTheSourcesAndNamesCodexWhenSetToIt() => Sta.Run(() =>
+    {
+        var frame = new DeskFrame { Usage = TwoSources(), Now = Now };
+        var combined = View("claude:bl:1:0:ring", frame);
+        var ids = Ids(Piece(combined, "claude"));
+        Assert.Equal(2, ids.Count(i => i == "source-tick:codex"));
+        Assert.Contains("source-beyond:codex", ids);
+        combined.Dispose();
+
+        var codex = View("claude:bl:1:0:ring:src=codex", frame);
+        var texts = All<TextBlock>(Piece(codex, "claude")).Select(t => t.Text).ToList();
+        Assert.Contains("Codex", texts);
+        Assert.Contains("20", texts);
+        Assert.Contains("97", texts);
+        Assert.Empty(Ids(Piece(codex, "claude")));
+        Assert.Empty(All<Line>(Piece(codex, "claude")));   // no pace on Codex
+        codex.Dispose();
+    });
+
+    [Fact]
+    public void TheClaudeLinesSlimFormForCodexIsItsOwnTwoRows() => Sta.Run(() =>
+    {
+        var frame = new DeskFrame { Usage = TwoSources(), Now = Now };
+        var view = View("claude:bl:1:0:slim:src=codex", frame);
+        var texts = All<TextBlock>(Piece(view, "claude")).Select(t => t.Text).ToList();
+        Assert.Equal(DeskClaudeText.Compact(DeskMeters.ForSource(frame.Usage, "codex", Now))!, texts);
+        Assert.StartsWith("Codex", texts[0], StringComparison.Ordinal);
+        view.Dispose();
+    });
+
+    // ---- Settings, Desk: Shows ----
+
+    [Fact]
+    public void SettingsOffersShowsOnTheClaudeLineAndTheClaudeLimitsAndSavesIt()
+    {
+        Directory.CreateDirectory(_root);
+        var store = new SettingsStore(new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local")));
+        store.SaveDesk(DeskSettings.Default with { Enabled = true, Layout = "clock:bl meters:tr:1:0:ring telemetry:br" });
+        var page = new DeskSettingsViewModel(store, ["Segoe UI"], () => []);
+        Assert.Equal(["claude", "meters"], page.Pieces.Where(p => p.HasSource).Select(p => p.Widget).Order());
+        Assert.Equal(["Combined", "Claude", "Codex"], DeskSettingsViewModel.SourceOptions.Select(o => o.Name));
+        var meters = page.Pieces.Single(p => p.Widget == "meters");
+        Assert.Equal("combined", meters.Source.Source);
+
+        meters.Source = DeskSettingsViewModel.SourceFor("codex");
+        Assert.Equal("codex", new DeskArrangement(store.LoadDesk().Layout).Placement("meters")!.Source);
+        Assert.Equal("clock:bl meters:tr:1:0:ring:src=codex telemetry:br", store.LoadDesk().Layout);
+        meters.Source = DeskSettingsViewModel.SourceFor("combined");
+        Assert.DoesNotContain("src=", store.LoadDesk().Layout);
+        // A reload (a newer layout from elsewhere) reads the picker back.
+        store.SaveDesk(DeskSettings.Default with { Enabled = true, Layout = "meters:tr:src=claude" });
+        var again = new DeskSettingsViewModel(store, ["Segoe UI"], () => []);
+        Assert.Equal("claude", again.Pieces.Single(x => x.Widget == "meters").Source.Source);
+    }
+
+    [Fact]
+    public void TheShowsPickerIsAComboBoxNamedForItsPieceAndOnlyOnThePiecesThatTakeASource() => Sta.Run(() =>
+    {
+        _ = System.IO.Packaging.PackUriHelper.UriSchemePack;
+        Directory.CreateDirectory(_root);
+        var store = new SettingsStore(new Paths(appDataBase: _root, localAppDataBase: Path.Combine(_root, "local")));
+        store.SaveDesk(DeskSettings.Default with { Enabled = true, Layout = "clock:bl claude:bl:1:0:slim meters:tr telemetry:tr" });
+        var page = new DeskSettingsViewModel(store, ["Segoe UI"], () => []);
+        var panel = new DeskPiecesPanel { DataContext = page };
+        var window = new Window { Content = panel, Width = 700, Height = 900, ShowActivated = false, WindowStyle = WindowStyle.None, ShowInTaskbar = false };
+        window.Left = -20000;
+        window.Show();
+        try
+        {
+            panel.UpdateLayout();
+            var combos = Walk(UIElementAutomationPeer.CreatePeerForElement(panel))
+                .Where(p => p.GetAutomationControlType() == AutomationControlType.ComboBox).Select(p => p.GetName()).ToList();
+            Assert.Contains($"{SettingsNames.DeskClaudeLine}, shows", combos);
+            Assert.Contains($"{SettingsNames.DeskClaudeBars}, shows", combos);
+            Assert.DoesNotContain($"{SettingsNames.DeskTelemetry}, shows", combos);
+            Assert.DoesNotContain($"{SettingsNames.DeskClock}, shows", combos);
+            // The style pickers are still there beside them.
+            Assert.Contains($"{SettingsNames.DeskTelemetry}, style", combos);
+        }
+        finally { window.Close(); }
+    });
+
+    [Theory]
+    [InlineData(DeskMeterStyle.Bar)]
+    [InlineData(DeskMeterStyle.Slim)]
+    [InlineData(DeskMeterStyle.Ring)]
+    public void ACodexOnlyPieceSaysCodexInItsLabelsAndNames(DeskMeterStyle style) => Sta.Run(() =>
+    {
+        var view = View(WordFor("meters", style, "codex"), new DeskFrame { Usage = TwoSources(), Now = Now });
+        var meters = Piece(view, "meters");
+        var spoken = All<FrameworkElement>(meters).Select(System.Windows.Automation.AutomationProperties.GetName).Where(n => n.Length > 0).ToList();
+        var texts = All<TextBlock>(meters).Select(t => t.Text).ToList();
+        if (style == DeskMeterStyle.Ring) Assert.Contains("Codex weekly 97%", spoken);
+        else
+        {
+            Assert.Contains("Codex session (5hr)", texts);
+            Assert.Contains("Codex weekly", texts);
+        }
+        Assert.DoesNotContain(texts, t => t is "Weekly" or "Session (5hr)");
+        view.Dispose();
+    });
+
+    [Theory]
+    [InlineData(DeskMeterStyle.Bar)]
+    [InlineData(DeskMeterStyle.Slim)]
+    [InlineData(DeskMeterStyle.Ring)]
+    public void AFullyStaleCodexPieceDimsOnceByRowNotTwice(DeskMeterStyle style) => Sta.Run(() =>
+    {
+        var view = View(WordFor("meters", style, "codex"), new DeskFrame { Usage = TwoSources("five_hour", "seven_day"), Now = Now });
+        var meters = Piece(view, "meters");
+        // The piece itself is not dimmed; each row is, by the widget's stale opacity, once.
+        Assert.Equal(1.0, meters.Opacity);
+        var host = (Panel)All<Panel>(meters).First();
+        var rows = style == DeskMeterStyle.Ring ? host.Children.OfType<Panel>().ToList() : [.. host.Children.OfType<Panel>()];
+        Assert.Equal(1.0, host.Opacity);
+        Assert.NotEmpty(rows);
+        Assert.All(rows, r => Assert.Equal(CombinedBarViewModel.StaleOpacity, r.Opacity));
+        view.Dispose();
+    });
+
+    [Fact]
+    public void AFreshCodexPieceAndAStaleClaudePieceKeepTheirOwnDimming() => Sta.Run(() =>
+    {
+        var fresh = View("meters:tr:1:0:slim:src=codex", new DeskFrame { Usage = TwoSources(), Now = Now });
+        var host = (Panel)All<Panel>(Piece(fresh, "meters")).First();
+        Assert.All(host.Children.OfType<Panel>(), r => Assert.Equal(1.0, r.Opacity));
+        fresh.Dispose();
+        var staleClaude = View("meters:tr:1:0:slim", new DeskFrame { Usage = Usage() with { FetchedAt = Now.AddHours(-2) }, Now = Now });
+        Assert.Equal(0.5, ((Panel)All<Panel>(Piece(staleClaude, "meters")).First()).Opacity);
+        staleClaude.Dispose();
+    });
 }

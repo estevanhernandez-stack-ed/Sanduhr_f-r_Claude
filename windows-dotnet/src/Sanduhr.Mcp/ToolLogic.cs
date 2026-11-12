@@ -113,7 +113,17 @@ public sealed partial class ToolLogic
 
     // -- get_usage ------------------------------------------------------------
 
+    /// <summary>Claude's usage plus the independent Codex block: Codex shows whatever state Claude's
+    /// snapshot is in (missing, malformed, unsupported, degraded, ok, stale), so a Codex-only user sees it.</summary>
     public JsonObject BuildUsage()
+    {
+        var result = BuildClaudeUsage();
+        if (BuildCodexBlock(_clock()) is { } codex)
+            result["codex"] = codex;
+        return result;
+    }
+
+    private JsonObject BuildClaudeUsage()
     {
         var now = _clock();
         var (outcome, snap) = SnapshotReader.Read(_config.SnapshotPath);
@@ -204,6 +214,48 @@ public sealed partial class ToolLogic
             ["local_burn_since_snapshot"] = BuildLocalBurnSince(captured),
         };
         return result;
+    }
+
+    /// <summary>The Codex limits from <c>snapshot.codex.json</c>: ok while fresh by captured_at, stale after.
+    /// Null (no key at all) when the file is missing, unreadable, unparseable or a newer schema, same
+    /// refusal as Claude's but never an error: Codex is an extra, not the thing asked for.</summary>
+    private const int CodexFreshSeconds = 1800;
+
+    private JsonObject? BuildCodexBlock(DateTimeOffset now)
+    {
+        var (outcome, snap) = SnapshotReader.Read(_config.EffectiveCodexSnapshotPath);
+        if (outcome != SnapshotReadOutcome.Ok || snap is null) return null;
+        int schemaVersion;
+        try { schemaVersion = snap["schema_version"]!.GetValue<int>(); } catch { return null; }
+        if (schemaVersion > SnapshotContract.SchemaVersion) return null;
+        string? capturedText;
+        try { capturedText = (string?)snap["captured_at"]; } catch { return null; }
+        if (Pacing.Parse(capturedText) is not { } captured) return null;
+
+        // captured_at is the newest Codex event's time, so age counts Codex idle time: the widget's 30 minutes
+        // (CodexLimits.FreshFor in Core, which this process does not link), not Claude's 450 s.
+        bool fresh = SnapshotContract.AgeSeconds(captured, now) < CodexFreshSeconds;
+        string? fileStatus;
+        try { fileStatus = (string?)snap["status"]; } catch { return null; }
+        var tiers = new JsonArray();
+        try
+        {
+            foreach (var node in snap["tiers"] as JsonArray ?? new JsonArray())
+            {
+                if (node is not JsonObject t || (string?)t["key"] is not { Length: > 0 } key)
+                    continue;
+                tiers.Add((JsonNode)BuildTier(key, t, now));
+            }
+        }
+        catch { return null; }
+        return new JsonObject
+        {
+            ["status"] = fresh && fileStatus != "error" ? "ok" : "stale",
+            ["captured_at"] = capturedText,
+            ["age_seconds"] = Math.Round(SnapshotContract.AgeSeconds(captured, now)),
+            ["plan"] = (string?)snap["plan"],
+            ["tiers"] = tiers,
+        };
     }
 
     private JsonObject BuildTier(string key, JsonObject t, DateTimeOffset now)
