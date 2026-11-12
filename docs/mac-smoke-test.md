@@ -2899,7 +2899,8 @@ frames, 8 to 64 pixels square, works). For the Aseprite step, put a four-cell sh
    at about the GIF's speed (fps from its frame delays), and `widgets/<id>/art/sprite.png` holds the frames as one sheet. A one-frame GIF
    says "That GIF has one frame. A sprite needs two or more to walk." and makes nothing.
 2. **New sprite from an image…** again, choose `test-sheet.json`: the tagging sheet shows the four cells with walk pre-filled to all four.
-   Make it: a second sprite, made here, that walks. Move `test-sheet.png` out of the folder and choose the JSON again: "The sheet
+   Sit is not filled in, because the export has an action tag (spec 23): the Untagged line reads "sit (needs a cell)" and Make says
+   "Tag at least one cell as sit. It is the pose the sprite rests in." Pick sit and click cell 1, then make it: a second sprite, made here, that walks. Move `test-sheet.png` out of the folder and choose the JSON again: "The sheet
    test-sheet.png isn't next to the JSON." A sheet made a symlink: "…is a link. Sanduhr reads only a sheet that is a file beside the JSON."
 3. On a sprite with three stages (a catalog sprite is not eligible: use a made-here one, or edit a made-here pack's `sprite.json` into three
    stages and reinstall it with Install widget from file…), press **Use my own art…**: one sheet with a column per stage, each with its
