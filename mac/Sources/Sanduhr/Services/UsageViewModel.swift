@@ -511,12 +511,34 @@ final class UsageViewModel {
     private func noteAnswer(_ label: String?, _ result: Result<UsageResponse, Error>) {
         var next = expiredAccounts
         next.answered(label, result)
-        if next != expiredAccounts { expiredAccounts = next }
+        if let label, case .success = result { clearExpiredNotice(label) }
+        guard next != expiredAccounts else { return }
+        let announce = ExpiredAccountNotice.toNotify(before: expiredAccounts, after: next, active: activeAccount,
+                                                     demo: demo, notified: expiredNotified)
+        expiredAccounts = next
+        guard !announce.isEmpty else { return }
+        expiredNotified.formUnion(announce)
+        for label in announce.sorted() { Notifier.shared.accountExpired(label) }
     }
 
     private func forgetAnswer(_ label: String) {
+        clearExpiredNotice(label)
         guard expiredAccounts.contains(label) else { return }
         expiredAccounts.forget(label)
+    }
+
+    /// The accounts whose expiry was announced (ExpiredAccountNotice), kept across launches so one left expired
+    /// is announced once, not at every start.
+    private var expiredNotified: Set<String> {
+        get { Set(KeychainStore.accounts.defaults.object(forKey: Self.expiredNotifiedKey) as? [String] ?? []) }
+        set { KeychainStore.accounts.defaults.set(newValue.isEmpty ? nil : newValue.sorted(), forKey: Self.expiredNotifiedKey) }
+    }
+    static let expiredNotifiedKey = "expiredAccountsNotified"
+
+    private func clearExpiredNotice(_ label: String) {
+        guard expiredNotified.contains(label) else { return }
+        expiredNotified.remove(label)
+        Notifier.shared.clearAccountExpired(label)
     }
 
     /// Keeps an account's plan name (nil clears it) and refreshes what Accounts shows.
@@ -535,6 +557,7 @@ final class UsageViewModel {
         var renamed = expiredAccounts
         renamed.rename(old, to: new)
         if renamed != expiredAccounts { expiredAccounts = renamed }
+        if expiredNotified.contains(old) { expiredNotified.remove(old); expiredNotified.insert(new) }
         reloadAccounts()
         refreshInUse()
         onUsageUpdate?()

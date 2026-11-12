@@ -565,3 +565,45 @@ struct ExpiredAccountsTests {
         #expect(e.labels == ["Home"], "Work's own answer goes through the view model, not the round")
     }
 }
+
+/// 2.43.1: an account you aren't using whose key is refused gets one banner, not only the orange line in
+/// Settings, Accounts.
+@Suite("Expired account notice (2.43.1)")
+struct ExpiredAccountNoticeTests {
+    private func marked(_ labels: String...) -> ExpiredAccounts {
+        var e = ExpiredAccounts()
+        for l in labels { e.answered(l, .failure(ClaudeAPI.APIError.unauthorized)) }
+        return e
+    }
+
+    @Test func aNewlyRefusedInactiveAccountIsAnnounced() {
+        #expect(ExpiredAccountNotice.toNotify(before: marked(), after: marked("Home"), active: "Work", demo: false,
+                                              notified: []) == ["Home"])
+    }
+
+    @Test func theActiveAccountIsNotAnnouncedItsOwnPromptAsks() {
+        #expect(ExpiredAccountNotice.toNotify(before: marked(), after: marked("Work"), active: "Work", demo: false,
+                                              notified: []).isEmpty)
+    }
+
+    @Test func anAccountAlreadyMarkedOrAnnouncedIsNotAnnouncedAgain() {
+        // Still refused at the next fetch: no change, no banner.
+        #expect(ExpiredAccountNotice.toNotify(before: marked("Home"), after: marked("Home"), active: "Work", demo: false,
+                                              notified: []).isEmpty)
+        // Marked again after a relaunch, already announced before it.
+        #expect(ExpiredAccountNotice.toNotify(before: marked(), after: marked("Home"), active: "Work", demo: false,
+                                              notified: ["Home"]).isEmpty)
+    }
+
+    @Test func demoModeAnnouncesNothing() {
+        #expect(ExpiredAccountNotice.toNotify(before: marked(), after: marked("Home", "Lab"), active: "Work", demo: true,
+                                              notified: []).isEmpty)
+    }
+
+    @Test func twoAtOnceAreEachAnnouncedAndTheBannerOpensAccounts() {
+        #expect(ExpiredAccountNotice.toNotify(before: marked(), after: marked("Home", "Lab"), active: nil, demo: false,
+                                              notified: []) == ["Home", "Lab"])
+        #expect(ExpiredAccountNotice.title("Home") == "Home: session expired")
+        #expect(ExpiredAccountNotice.id("Home").hasPrefix(ExpiredAccountNotice.idPrefix))
+    }
+}

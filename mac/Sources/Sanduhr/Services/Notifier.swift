@@ -124,6 +124,26 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    // MARK: - An account you aren't using expired (2.43.1)
+
+    /// ExpiredAccountNotice's banner, as gentle as a suggestion's (alerts on, the delivery and quiet hours as an
+    /// alert's, no sound). Clicking it opens Settings, Accounts, where the account shows Session expired.
+    func accountExpired(_ label: String) {
+        guard MessageSuggestionNotice.banner(AlertSettings(defaults), deskRunning: DeskController.shared.running,
+                                             now: Date()) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = ExpiredAccountNotice.title(label)
+        content.body = ExpiredAccountNotice.body
+        content.sound = nil
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: ExpiredAccountNotice.id(label), content: content, trigger: nil))
+    }
+
+    /// The account answered again, got a new key, or was signed out or removed: its banner leaves Notification Center.
+    func clearAccountExpired(_ label: String) {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [ExpiredAccountNotice.id(label)])
+    }
+
     // MARK: - Claude's Desk message suggestions (item 54)
 
     /// A gentle banner for a suggestion, only when MessageSuggestionNotice allows (alerts on, the
@@ -238,7 +258,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let section: SettingsSection? = id.hasPrefix(Self.deskSuggestionPrefix) ? .message
             : id.hasPrefix(Self.themeSuggestionPrefix) ? .themes
             : id.hasPrefix(Self.widgetSuggestionPrefix) || id.hasPrefix(Self.spriteMotionPrefix) ? .widgets
-            : id.hasPrefix(Self.deskDesignSuggestionPrefix) ? .deskLayout : nil
+            : id.hasPrefix(Self.deskDesignSuggestionPrefix) ? .deskLayout
+            : id.hasPrefix(ExpiredAccountNotice.idPrefix) ? .credentials : nil
         if let section {
             DispatchQueue.main.async { MainActor.assumeIsolated { SettingsWindowController.shared.show(section) } }
         }
