@@ -46,6 +46,8 @@ final class WidgetsModel {
     private(set) var ownArtStatus: String?
     /// The last "Install widget from file..." outcome in a sentence, nil before one and after the panel opens.
     private(set) var fileInstallStatus: String?
+    /// The last "Export..." outcome in a sentence, nil before one and after the panel opens.
+    private(set) var exportStatus: String?
 
     let store: WidgetStore
     private let defaults: UserDefaults
@@ -229,6 +231,25 @@ final class WidgetsModel {
         }
     }
 
+    /// How many stages the pack's sprite has; nil when it can't be read.
+    func ownArtStageCount(for id: String) -> Int? {
+        store.readFiles(id).flatMap { WidgetOwnArt.sprite($0) }?.stages.count
+    }
+
+    /// The column model for the stages sheet (spec 2.43.0 section 24), built from the installed pack's files. Applying
+    /// goes through `useOwnArt`, the one install path. Nil, with the status set, when the pack can't be read.
+    func ownArtStagesModel(for id: String) -> OwnArtStagesModel? {
+        ownArtStatus = nil
+        let name = installed.first { $0.id == id }?.name ?? id
+        guard let row = installed.first(where: { $0.id == id }), canUseOwnArt(row), let files = store.readFiles(id),
+              let stages = OwnArtStagesModel(files: files, apply: { [weak self] art in self?.useOwnArt(id: id, art: art) ?? false })
+        else {
+            ownArtStatus = "\(name) couldn't be read, so it is unchanged."
+            return nil
+        }
+        return stages
+    }
+
     /// One picked file against the pack image rules, before it is kept: nil when it may be used, else the sentence
     /// (also left in `ownArtStatus`). `data` nil: the file couldn't be read.
     func checkOwnArt(id: String, stageId: String, data: Data?) -> String? {
@@ -331,6 +352,45 @@ final class WidgetsModel {
             fileInstallStatus = WidgetFileInstall.line(
                 for: manifest, wasUpdate: wasUpdate, isSprite: sprite,
                 deskOn: defaults.bool(forKey: DeskController.enabledKey), companionShown: companionPieceShown)
+        }
+    }
+
+    // MARK: Export (spec 21)
+
+    /// "Export..." is offered on a pack whose source is `local` (made here, own art, from a file), never a catalog pack.
+    func canExport(_ row: InstalledRow) -> Bool {
+        WidgetExport.canExport(store.load().find(row.id)?.source)
+    }
+
+    /// The panel is about to open: the last sentence goes.
+    func clearExportStatus() { exportStatus = nil }
+
+    /// The zip for an installed pack, or its refusal (also left in `exportStatus`). Nothing is written here.
+    func exportOutcome(for id: String) -> WidgetExport.Outcome {
+        guard let row = installed.first(where: { $0.id == id }), canExport(row) else {
+            exportStatus = WidgetExport.unreadable
+            return .refused(WidgetExport.unreadable)
+        }
+        let outcome = WidgetExport.export(id: id, store: store)
+        if case .refused(let why) = outcome { exportStatus = why }
+        return outcome
+    }
+
+    /// The save finished: `error` nil on success. A write that failed says so in a plain sentence.
+    func recordExport(id: String, fileName: String, error: Error?) {
+        let name = installed.first(where: { $0.id == id })?.name ?? id
+        exportStatus = error == nil
+            ? WidgetExport.exportedLine(name: name, fileName: fileName)
+            : "\(name) couldn't be saved there, so nothing was exported."
+    }
+
+    /// Writes the zip atomically to the URL the panel returned, then records the result.
+    func writeExport(_ data: Data, to url: URL, id: String, fileName: String) {
+        do {
+            try data.write(to: url, options: .atomic)
+            recordExport(id: id, fileName: url.lastPathComponent, error: nil)
+        } catch {
+            recordExport(id: id, fileName: fileName, error: error)
         }
     }
 

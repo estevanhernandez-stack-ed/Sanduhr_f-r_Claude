@@ -75,6 +75,70 @@ enum WidgetZip {
         }
     }
 
+    /// The zip for a pack's files, for Export… (spec 21): every entry stored (method 0) with its CRC-32 and sizes,
+    /// the paths in ordinal order, a fixed DOS date (1980-01-01 00:00), no directory entries, no extra fields, and
+    /// Unix regular-file attributes so `read` takes it. Deterministic: the same files always make the same bytes,
+    /// whatever order the dictionary holds them in. Pure: files in, zip out. It refuses what `read` would refuse
+    /// (an empty set, an unsafe or non-ASCII name, names that differ only in case, too many entries, a file over
+    /// 5 MB, files over 10 MB together, a zip over `maxZipBytes`), so everything it writes reads back as the same pack.
+    static func write(_ files: [String: Data]) -> Result<Data, WidgetZipError> {
+        if files.isEmpty { return .failure(WidgetZipError(message: "a pack zip needs at least one file")) }
+        if files.count > maxEntries {
+            return .failure(WidgetZipError(message: "the pack has \(files.count) files, a pack has at most \(maxEntries)"))
+        }
+        let names = PackValidator.ordinalSorted(Array(files.keys))
+        var seen = Set<String>()
+        var total = 0
+        for name in names {
+            guard let ascii = name.unicodeScalars.allSatisfy({ $0.value > 0x20 && $0.value < 0x7f }) ? name : nil else {
+                return .failure(WidgetZipError(message: "\(name): entry names must be plain ASCII without spaces"))
+            }
+            if let why = unsafeName(ascii) { return .failure(WidgetZipError(message: "\(name): \(why)")) }
+            if !seen.insert(name.lowercased()).inserted {
+                return .failure(WidgetZipError(message: "\(name): the pack has this name twice (names may not differ only in case)"))
+            }
+            let size = files[name]!.count
+            if size > maxEntryBytes {
+                return .failure(WidgetZipError(message: "\(name): \(size) bytes is over the 5 MB a pack file may be"))
+            }
+            total += size
+        }
+        if total > maxTotalBytes {
+            return .failure(WidgetZipError(message: "the files add up to more than the 10 MB a pack may be"))
+        }
+
+        func le16(_ v: Int) -> [UInt8] { [UInt8(v & 0xFF), UInt8((v >> 8) & 0xFF)] }
+        func le32(_ v: Int) -> [UInt8] { le16(v & 0xFFFF) + le16((v >> 16) & 0xFFFF) }
+        let dosTime = 0, dosDate = (0 << 9) | (1 << 5) | 1   // 1980-01-01 00:00:00
+        let versionNeeded = 10, versionMadeBy = (3 << 8) | 20   // Unix host, zip 2.0
+        let external = 0o100644 << 16
+
+        var out = [UInt8]()
+        var central = [UInt8]()
+        for name in names {
+            let data = [UInt8](files[name]!)
+            let nameBytes = [UInt8](name.utf8)
+            let crc = Int(PackValidator.crc32(data, 0, data.count))
+            let offset = out.count
+            out += le32(localSig) + le16(versionNeeded) + le16(0) + le16(0) + le16(dosTime) + le16(dosDate)
+            out += le32(crc) + le32(data.count) + le32(data.count) + le16(nameBytes.count) + le16(0)
+            out += nameBytes
+            out += data
+            central += le32(centralSig) + le16(versionMadeBy) + le16(versionNeeded) + le16(0) + le16(0)
+            central += le16(dosTime) + le16(dosDate) + le32(crc) + le32(data.count) + le32(data.count)
+            central += le16(nameBytes.count) + le16(0) + le16(0) + le16(0) + le16(0)
+            central += le32(external) + le32(offset) + nameBytes
+        }
+        let cdOffset = out.count
+        out += central
+        out += le32(eocdSig) + le16(0) + le16(0) + le16(names.count) + le16(names.count)
+        out += le32(central.count) + le32(cdOffset) + le16(0)
+        if out.count > maxZipBytes {
+            return .failure(WidgetZipError(message: "the zip would be larger than a pack may be"))
+        }
+        return .success(Data(out))
+    }
+
     /// An entry a user's zip may carry that is not a pack file: folders, Finder's resource forks and its folder view file.
     private static func skippable(_ name: String) -> Bool {
         name.hasSuffix("/") || name.hasPrefix("__MACOSX/") || name == ".DS_Store" || name.hasSuffix("/.DS_Store")

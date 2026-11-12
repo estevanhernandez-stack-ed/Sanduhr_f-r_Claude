@@ -45,6 +45,8 @@ final class SeatMeters {
     /// The kept plan name of an account (AccountPlans), for the seats the view model's own plan
     /// does not cover.
     var planFor: (String) -> String? = { _ in nil }
+    /// A round's fetch of an account answered (2.42.5): Settings learns a refused key from it.
+    var onAnswer: (String, Result<UsageResponse, Error>) -> Void = { _, _ in }
     var now: () -> Date = Date.init
     var sleep: (TimeInterval) async -> Void = { try? await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) }
     /// Whether Claude Code wrote to a seat folder lately. Runs off the main thread.
@@ -65,6 +67,25 @@ final class SeatMeters {
     /// Demo mode (slice 4): no round starts and no fetch goes out until it ends. The files and
     /// seats.json still follow the real accounts (`sync`), so nothing reads as signed out.
     var paused = false
+
+    /// Track my AI usage is off (setup, 2.42.4): no per-seat file and no `seats.json` exist, so a linked folder's
+    /// readers find nothing, as they do for `snapshot.json`. Turning it on lets the next `sync` write them again.
+    var usageOff = false {
+        didSet {
+            guard usageOff != oldValue else { return }
+            synced = nil
+            if usageOff { clearFiles() }
+        }
+    }
+
+    /// Usage off: the round stops, nothing waits to be read, and every seat file and `seats.json` go.
+    private func clearFiles() {
+        round?.cancel()
+        round = nil
+        pending = []
+        knownFetchable = []
+        SeatSnapshots.sync([], in: files, now: now())
+    }
 
     /// Reset Sanduhr… stopped it (slice 5): no round, no client, no file from here on.
     private(set) var stopped = false
@@ -97,7 +118,7 @@ final class SeatMeters {
     /// seats.json and the per-account files follow every change to the accounts, their sign-in
     /// and their links. Cheap when nothing changed.
     func sync() {
-        guard !stopped else { return }
+        guard !stopped, !usageOff else { return }
         let c = context()
         let linked = c.linked
         let seats = SeatSnapshots.seats(linked)
@@ -127,7 +148,7 @@ final class SeatMeters {
     /// The active account's seat starts from the numbers on screen, stamped with their fetch time,
     /// rather than waiting for the next fetch.
     func seed(_ usage: UsageResponse?, at: Date?, label: String?, plan: String? = nil) {
-        guard let usage, let at, let target = target(label),
+        guard !usageOff, let usage, let at, let target = target(label),
               !FileManager.default.fileExists(atPath: target.path) else { return }
         SnapshotWriter.writeOk(usage, accountRef: AccountRef.of(label), plan: plan, now: at, to: target)
     }
@@ -162,7 +183,7 @@ final class SeatMeters {
     /// `plan` is the seat's plan name: the active account's from the view model, else the kept one
     /// for that account (`planFor`), else nil.
     private func write(_ label: String?, _ result: Result<UsageResponse, Error>, plan: String? = nil) {
-        guard !stopped, let target = target(label) else { return }
+        guard !stopped, !usageOff, let target = target(label) else { return }
         let ref = AccountRef.of(label)
         let plan = plan ?? label.flatMap(planFor)
         switch result {
@@ -184,7 +205,7 @@ final class SeatMeters {
     /// here off the main thread, with Claude Code activity in its folder.
     @discardableResult
     func startRound() -> Task<Void, Never>? {
-        guard round == nil, !paused, !stopped else { return nil }
+        guard round == nil, !paused, !usageOff, !stopped else { return nil }
         let c = context()
         let candidates = c.linked.keys.filter {
             SeatSnapshots.fetchable($0, linked: c.linked, signedIn: c.signedIn, active: c.active) && !throttled($0)
@@ -239,6 +260,7 @@ final class SeatMeters {
               SeatSnapshots.fetchable(label, linked: after.linked, signedIn: after.signedIn, active: after.active)
         else { return }
         if case .failure(let e) = result, SnapshotWriter.errorKind(e) != "network" { authSkipped[label] = key }
+        onAnswer(label, result)
         write(label, result)
     }
 }

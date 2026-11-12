@@ -1,7 +1,8 @@
 import Foundation
 
 /// Claude usage on or off (setup spec, section 11). Off stops every Claude fetch, drops the shown
-/// numbers and deletes snapshot.json, so readers find no snapshot: the statusline prints nothing and
+/// numbers and deletes snapshot.json (and, through `pauseSides`, every per-seat `snapshot.<ref>.json`
+/// and `seats.json`), so readers find no snapshot: the statusline prints nothing and
 /// the MCP's `get_usage` answers no_data (missing). The account, its Keychain item, its history and every setting stay:
 /// nothing here signs out, removes or edits an account (that is `UsageViewModel.signOut`, which this
 /// type never reaches). On fetches at once when a key exists.
@@ -23,7 +24,7 @@ final class UsageSwitch {
         /// there is no key to build it from.
         var beginFetching: () -> Bool = { false }
         /// Pauses (true) or resumes (false) what fetches on the side: account following and the
-        /// per-seat meters.
+        /// per-seat meters, which remove their files while paused and write them again on resume.
         var pauseSides: (Bool) -> Void = { _ in }
         /// Tells the surfaces (menu bar, Desk, notch) to redraw.
         var announce: () -> Void = {}

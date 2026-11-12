@@ -1755,7 +1755,8 @@ the Claude Code add-ons stay installed.
 - **Usage off** (`Services/UsageSwitch.swift`, the guards in `UsageViewModel`). Stops every Claude usage fetch (the refresh, the
   timers, Follow the account I'm using and the per-seat meters), drops the numbers, sets the status line to "Usage tracking is off. Turn
   it on in Set up Sanduhr." on the Usage, Alerts and Claude Code pages, and deletes `snapshot.json` (at the switch and at each launch
-  while off). The account, its Keychain item, history and settings stay: nothing signs out. Sign-out, an account switch and Refresh
+  while off), and from 2.42.4 every per-seat `snapshot.<ref>.json` and `seats.json` with it (`SeatMeters.usageOff`: no sync,
+  seed, write or round while off; on again, the cached sync state is dropped so the next sync rewrites them). The account, its Keychain item, history and settings stay: nothing signs out. Sign-out, an account switch and Refresh
   keep it off and write no snapshot. A sign-in, an added account or a saved session key turns it on and fetches; a Save that only changes cf_clearance or clears the key does not. Nothing reaches claude.ai with usage off except a sign-in you start (`suggestedFolder`'s organization request is guarded on usage on). An absent setup, or one with
   no Claude entry, reads as on. The widget starts hidden with usage off and the Desk running (the menu bar item is the way back), and
   the welcome tour takes its Desk-only steps plus a last card, "Usage when you want it", that opens Set up Sanduhr.
@@ -2097,6 +2098,21 @@ the 5 MB and 10 MB limits bound first, so nothing grows past it; then CRC-32), d
 space in a raw name (the folder; every kept name still meets the validator's path rule). The catalog client keeps
 FORMAT 7's stored-only path, and so does `validate.py --zip`. Smoke hooks: `widget-from-file` (`arg=<absolute path to a .zip>`) and
 `widget-remove` (`arg=<pack id>`); the scenario is `smoke/scenarios/widget-from-file.yaml`.
+
+### Sprites in and out (2.43.0)
+
+Settings, Widgets. **Export…** (`WidgetExport`, `ExportPicker`) is on a row whose source is `local` only: it reads the
+pack's files from `WidgetStore`, validates them strict, and writes `<id>-<version>.zip` through `WidgetZip.write` (stored
+entries, CRC-32, sorted paths, a fixed DOS date, so the same pack is the same bytes) to the save panel's URL, atomically.
+A failing pack says why with the first three validator sentences and writes nothing; the zip installs through Install
+widget from file… as the same pack. **New sprite from an image…** also takes a GIF (`SpriteFrames`: `CGImageSource`
+returns each frame composited, one cell per frame, 16 across; fps is the median frame delay in 1...24; at most 256
+frames, a file read up to 32 MB) and an Aseprite sheet's JSON (`AsepriteSheet`, `AsepriteImport`: JSON at most 1 MB,
+hash or array, the one PNG `meta.image` names beside it as a plain file name and a regular file, never a link; every frame
+one cell of one grid, not rotated or trimmed; `frameTags` named after an action pre-fill its tag, fps from the median
+`duration`). A native `.aseprite` file is not read. **Use my own art…** on a sprite with two or more stages opens
+`OwnArtStagesSheet` (`OwnArtStagesModel`): a column per stage in growth order, one Apply, one `WidgetOwnArt.apply`, one
+patch bump; unpicked stages keep their sheets. Nothing is sent and Claude never sees an image.
 
 ## The Desk for Claude
 

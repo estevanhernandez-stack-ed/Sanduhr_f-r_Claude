@@ -6,19 +6,35 @@ import UniformTypeIdentifiers
 /// source of bytes; the rules are `WidgetNewSprite`'s and the choices are `NewSpriteModel`'s. Nothing is sent.
 @MainActor
 enum NewSpritePicker {
-    /// One PNG from an open panel, read at most one byte past the 2 MB limit; nil when cancelled or unreadable.
-    static func pick() -> Data? {
+    /// One PNG, GIF or Aseprite JSON from an open panel; nil when cancelled.
+    static func pickFile() -> URL? {
         let panel = NSOpenPanel()
         panel.title = "Choose the image for a new sprite"
         panel.message = panel.title
-        panel.allowedContentTypes = [.png]
+        panel.allowedContentTypes = [.png, .gif, .json]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        guard panel.runModal() == .OK, let url = panel.url,
-              let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    static func isJson(_ url: URL) -> Bool { url.pathExtension.lowercased() == "json" }
+
+    /// The picked PNG or GIF's bytes, read at most one byte past the 2 MB limit (a GIF up to its own cap); nil when unreadable.
+    static func read(_ url: URL) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
-        return try? handle.read(upToCount: PackValidator.maxImageBytes + 1)
+        // A GIF is read whole (it is turned into a sheet before the 2 MB rule applies to the sheet); a PNG one byte past.
+        let isGif = url.pathExtension.lowercased() == "gif"
+        return try? handle.read(upToCount: isGif ? gifReadLimit : PackValidator.maxImageBytes + 1)
+    }
+
+    /// The most of a GIF file read: 32 MB.
+    static let gifReadLimit = 32 * 1024 * 1024
+
+    /// Whether `data` starts like a GIF ("GIF87a" or "GIF89a").
+    static func looksLikeGif(_ data: Data) -> Bool {
+        data.starts(with: Array("GIF87a".utf8)) || data.starts(with: Array("GIF89a".utf8))
     }
 }
 
@@ -35,6 +51,7 @@ struct NewSpriteSheet: View {
                 NewSpriteCellSize(model: model)
                 NewSpriteActions(model: model)
                 NewSpriteGrid(model: model)
+                NewSpriteIgnoredNote(model: model)
                 NewSpriteIdentity(model: model)
             }
             NewSpriteErrors(errors: model.errors)
@@ -169,6 +186,17 @@ enum NewSpriteLayout {
         let col = Int(point.x / w), row = Int(point.y / h)
         guard col < model.columns, row < model.rows else { return -1 }
         return row * model.columns + col
+    }
+}
+
+private struct NewSpriteIgnoredNote: View {
+    let model: NewSpriteModel
+
+    var body: some View {
+        if let note = model.ignoredNote {
+            Text(note).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 

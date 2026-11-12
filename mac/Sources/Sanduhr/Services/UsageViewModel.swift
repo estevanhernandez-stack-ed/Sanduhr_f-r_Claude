@@ -212,6 +212,14 @@ final class UsageViewModel {
             refreshInUse()
         }
     }
+    /// The accounts whose saved key claude.ai refused at their last fetch, active or not (2.42.5).
+    private(set) var expiredAccounts = ExpiredAccounts()
+    /// Settings, Accounts: this account's key was refused at its last fetch. The active account
+    /// reads its own status; another reads what its last fetch got. Never in demo mode.
+    func keyRefused(_ label: String) -> Bool {
+        if label == activeAccount { return status.needsSignIn }
+        return !demo && expiredAccounts.contains(label)
+    }
     /// The other accounts following saw in use: "· in use" in the Accounts menu, a dot on the chip.
     private(set) var accountsInUse: Set<String> = []
     /// For a minute after an automatic switch the chip and the Desk line read "Label (in use)".
@@ -321,9 +329,12 @@ final class UsageViewModel {
 
     /// Account following and the per-seat meters fetch on their own: they pause with usage off
     /// (and with demo mode) and resume as their own switches say.
+    /// Usage off pauses following and the seat meters, and the seat meters remove their files; on, they write them again.
     private func pauseSideFetchers(_ paused: Bool) {
         seatMeters.paused = paused || demo
+        seatMeters.usageOff = paused
         follower.apply(enabled: followEnabled && !paused && !demo)
+        if !paused { seatMeters.sync() }
     }
 
     private var api: ClaudeAPI?
@@ -371,7 +382,11 @@ final class UsageViewModel {
         follower.onReadings = { [weak self] in self?.refreshInUse() }
         follower.onPlan = { [weak self] label, name in self?.keepPlan(name, for: label) }
         seatMeters.planFor = { AccountPlans.plan(for: $0, in: KeychainStore.accounts.defaults) }
-        follower.onResult = { [weak self] label, result in self?.seatMeters.followerAnswered(label, result) }
+        follower.onResult = { [weak self] label, result in
+            self?.noteAnswer(label, result)
+            self?.seatMeters.followerAnswered(label, result)
+        }
+        seatMeters.onAnswer = { [weak self] label, result in self?.noteAnswer(label, result) }
         seatMeters.context = { [weak self] in self?.seatContext() ?? SeatMeters.Context() }
         follower.apply(enabled: followEnabled && usageOn)
         vault.onCycleEnd = { [weak self] in
@@ -450,6 +465,7 @@ final class UsageViewModel {
     func signOut() -> SignOutResult {
         let active = KeychainStore.accounts.active
         let result = KeychainStore.signOut(label: active)
+        if let active { forgetAnswer(active) }
         stopFetching()
         // With usage off the status stays `usageOff` and no snapshot is written.
         if usageOn {
@@ -466,6 +482,7 @@ final class UsageViewModel {
     func signOut(account label: String) -> SignOutResult {
         guard label != KeychainStore.accounts.active else { return signOut() }
         let result = KeychainStore.signOut(label: label)
+        forgetAnswer(label)
         follower.forget(label)
         reloadAccounts()
         refreshInUse()
@@ -480,12 +497,26 @@ final class UsageViewModel {
         let wasActive = label == KeychainStore.accounts.active
         let folder = dataChoices(for: label).folder
         let result = KeychainStore.remove(label: label)
+        forgetAnswer(label)
         // Removing forgets the account's choices (the tombstone), so its record can go.
         if let folder { vault.erase(folder: folder) }
         follower.forget(label)
         if wasActive { showActiveAccount(leaving: accountLabel) } else { reloadAccounts() }
         refreshInUse()
         return result
+    }
+
+    /// Any account's fetch answered: a refused key marks it for Settings, a good answer clears it.
+    /// Assigns only on a change, so views redraw only then.
+    private func noteAnswer(_ label: String?, _ result: Result<UsageResponse, Error>) {
+        var next = expiredAccounts
+        next.answered(label, result)
+        if next != expiredAccounts { expiredAccounts = next }
+    }
+
+    private func forgetAnswer(_ label: String) {
+        guard expiredAccounts.contains(label) else { return }
+        expiredAccounts.forget(label)
     }
 
     /// Keeps an account's plan name (nil clears it) and refreshes what Accounts shows.
@@ -501,6 +532,9 @@ final class UsageViewModel {
         if apiAccount == old { apiAccount = new }
         follower.rename(old, to: new)
         seatMeters.rename(old, to: new)
+        var renamed = expiredAccounts
+        renamed.rename(old, to: new)
+        if renamed != expiredAccounts { expiredAccounts = renamed }
         reloadAccounts()
         refreshInUse()
         onUsageUpdate?()
@@ -660,6 +694,7 @@ final class UsageViewModel {
         let accounts = KeychainStore.accounts
         let wasEmpty = accounts.labels.isEmpty
         try accounts.add(label, sessionKey: sessionKey, cfClearance: cfClearance)
+        forgetAnswer(label)
         // A sign-in turns usage on; the fetch below (or the switch's) follows.
         if wasEmpty || makeActive { usageSwitch.set(true, fetchNow: false) }
         if wasEmpty {
@@ -681,6 +716,7 @@ final class UsageViewModel {
     /// the active account's key fetches with it at once.
     func saveCredentials(_ label: String, sessionKey: String?, cfClearance: String?) throws {
         try KeychainStore.accounts.save(label, sessionKey: sessionKey, cfClearance: cfClearance)
+        if Self.savesKey(sessionKey) { forgetAnswer(label) }
         if label == KeychainStore.accounts.active {
             credentialsChanged(turnsUsageOn: Self.savesKey(sessionKey))
         } else { reloadAccounts() }
@@ -1073,6 +1109,7 @@ final class UsageViewModel {
             // So is one that lands under demo mode.
             guard DemoSession.answerApplies(sameClient: self.api === api, demo: demo) else { return }
             showFailure(error, accountRef: ref)
+            noteAnswer(account, .failure(error))
             if apiAccount == account { seatMeters.activeAnswered(account, .failure(error), plan: planName) }
             endSwitchVeil()
             return
@@ -1084,6 +1121,7 @@ final class UsageViewModel {
         Self.reconcileHidden(u, now: Date())
         self.usage = u
         self.lastUpdated = Date()
+        noteAnswer(account, .success(u))
         // The org list is cached on the client by now, so this adds no request. A plan failure
         // never fails the fetch.
         let badge = try? await api.plan()

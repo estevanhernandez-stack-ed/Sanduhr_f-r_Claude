@@ -449,3 +449,92 @@ struct SeatActivityTests {
         #expect(fs.reads == 0)
     }
 }
+
+@Suite("Per-seat meters: usage off (2.42.4)")
+@MainActor
+struct SeatMetersUsageOffTests {
+    @Test func usageOffRemovesEverySeatFileAndSeatsJson() async throws {
+        let w = try World()
+        w.context.signedIn = ["Work", "Home"]                 // Lab signed out: it gets a signed-out file
+        w.meters.sync()
+        await w.activeAnswers()
+        #expect(FileManager.default.fileExists(atPath: w.file("Work").path))
+        #expect(FileManager.default.fileExists(atPath: w.file("Lab").path))
+        #expect(FileManager.default.fileExists(atPath: w.files.seats.path))
+        w.meters.usageOff = true
+        #expect(w.files.snapshotRefs().isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: w.files.seats.path))
+    }
+
+    @Test func nothingIsWrittenOrFetchedWhileOff() async throws {
+        let w = try World()
+        w.meters.usageOff = true
+        w.meters.sync()
+        w.meters.seed(usage(30), at: w.clock, label: "Work")
+        w.meters.activeAnswered("Work", .success(usage(40)))
+        #expect(w.meters.startRound() == nil)
+        await w.meters.round?.value
+        #expect(w.files.snapshotRefs().isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: w.files.seats.path))
+        #expect(w.calls("Home") == 0)
+    }
+
+    @Test func onAgainTheNextSyncWritesSeatsJsonAndTheRoundRuns() async throws {
+        let w = try World()
+        w.meters.sync()
+        w.meters.usageOff = true
+        w.meters.usageOff = false
+        w.meters.sync()
+        #expect(FileManager.default.fileExists(atPath: w.files.seats.path), "the cached sync state is dropped, so seats.json comes back")
+        await w.activeAnswers()
+        #expect(five(w.file("Work")) == 50)
+        #expect(five(w.file("Home")) == 10)
+    }
+}
+
+/// 2.42.5: an inactive account whose key claude.ai refused showed Signed in, in green, in
+/// Settings, Accounts, because only the active account's status was read there.
+@Suite("Expired accounts (2.42.5)")
+@MainActor
+struct ExpiredAccountsTests {
+    @Test func aRefusedKeyMarksTheAccountAndAGoodAnswerClearsIt() {
+        var e = ExpiredAccounts()
+        e.answered("Home", .failure(ClaudeAPI.APIError.unauthorized))
+        #expect(e.contains("Home"))
+        e.answered("Home", .success(usage(10)))
+        #expect(!e.contains("Home"))
+    }
+
+    @Test func cloudflareAndNetworkSayNothingAboutTheKey() {
+        var e = ExpiredAccounts()
+        e.answered("Home", .failure(ClaudeAPI.APIError.cloudflareChallenge))
+        e.answered("Home", .failure(URLError(.notConnectedToInternet)))
+        #expect(e.labels.isEmpty)
+        e.answered("Home", .failure(ClaudeAPI.APIError.unauthorized))
+        e.answered("Home", .failure(ClaudeAPI.APIError.cloudflareChallenge))
+        #expect(e.contains("Home"), "a challenge after a refusal keeps the mark")
+        e.answered(nil, .failure(ClaudeAPI.APIError.unauthorized))
+        #expect(e.labels == ["Home"])
+    }
+
+    @Test func forgetAndRenameFollowTheAccount() {
+        var e = ExpiredAccounts()
+        e.answered("Home", .failure(ClaudeAPI.APIError.unauthorized))
+        e.rename("Home", to: "Personal")
+        #expect(e.labels == ["Personal"])
+        e.rename("Nobody", to: "Else")
+        #expect(e.labels == ["Personal"])
+        e.forget("Personal")
+        #expect(e.labels.isEmpty)
+    }
+
+    @Test func aRoundsRefusedFetchReachesOnAnswer() async throws {
+        let w = try World()
+        w.answers["Home"] = .failure(ClaudeAPI.APIError.unauthorized)
+        var e = ExpiredAccounts()
+        w.meters.onAnswer = { label, result in e.answered(label, result) }
+        await w.activeAnswers()
+        #expect(w.calls("Home") == 1)
+        #expect(e.labels == ["Home"], "Work's own answer goes through the view model, not the round")
+    }
+}

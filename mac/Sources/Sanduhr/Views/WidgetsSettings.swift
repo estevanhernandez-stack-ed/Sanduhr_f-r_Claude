@@ -170,7 +170,7 @@ private struct WidgetsInstalledSection: View {
     }
 }
 
-/// "New sprite from an image...": pick a PNG, then the sheet tags its cells to actions and makes a sprite of it.
+/// "New sprite from an image...": pick a PNG, an animated GIF or an Aseprite sheet's JSON, then the sheet tags its cells to actions and makes a sprite of it.
 private struct WidgetsNewSpriteSection: View {
     let model: WidgetsModel
     @State private var sprite: NewSpriteModel?
@@ -192,8 +192,24 @@ private struct WidgetsNewSpriteSection: View {
     }
 
     private func open() {
-        guard let png = NewSpritePicker.pick() else { return }
-        sprite = NewSpriteModel(png: png, install: { model.installNewSprite($0) })
+        guard let url = NewSpritePicker.pickFile() else { return }
+        let install: (WidgetNewSprite.Input) -> [String] = { model.installNewSprite($0) }
+        if NewSpritePicker.isJson(url) {
+            switch AsepriteImport.load(jsonURL: url) {
+            case .success(let loaded): sprite = NewSpriteModel(aseprite: loaded, install: install)
+            case .failure(let why): sprite = NewSpriteModel(refusal: why.message, install: install)
+            }
+            return
+        }
+        guard let data = NewSpritePicker.read(url) else { return }
+        guard NewSpritePicker.looksLikeGif(data) else {
+            sprite = NewSpriteModel(png: data, install: install)
+            return
+        }
+        switch SpriteFrames.read(data) {
+        case .success(let gif): sprite = NewSpriteModel(gif: gif, install: install)
+        case .failure(let why): sprite = NewSpriteModel(refusal: why.message, install: install)
+        }
     }
 }
 
@@ -211,6 +227,10 @@ private struct WidgetsFromFileRow: View {
                 .accessibilityLabel("Install widget from file")
         }
         if let status = model.fileInstallStatus {
+            Text(status).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        if let status = model.exportStatus {
             Text(status).font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -250,6 +270,7 @@ private enum WidgetFilePicker {
 private struct WidgetsInstalledRow: View {
     let model: WidgetsModel
     let row: WidgetsModel.InstalledRow
+    @State var stagesModel: OwnArtStagesModel?
 
     var body: some View {
         HStack {
@@ -274,6 +295,7 @@ private struct WidgetsInstalledRow: View {
                     ownArtButton
                 }
             }
+            if model.canExport(row) { exportButton }
             Button("Uninstall") { model.uninstall(row.id) }
         }
     }
@@ -281,8 +303,44 @@ private struct WidgetsInstalledRow: View {
 
 private extension WidgetsInstalledRow {
     var ownArtButton: some View {
-        Button("Use my own art\u{2026}") { OwnArtPicker.run(model: model, id: row.id) }
+        Button("Use my own art\u{2026}") { openOwnArt() }
             .accessibilityLabel("Use my own art for \(row.name)")
+            .sheet(isPresented: Binding(get: { stagesModel != nil }, set: { if !$0 { stagesModel = nil } })) {
+                if let stagesModel { OwnArtStagesSheet(model: stagesModel, close: { self.stagesModel = nil }) }
+            }
+    }
+
+    /// Two or more stages open the column sheet; one stage keeps the single panel.
+    func openOwnArt() {
+        if OwnArtStagesModel.opensSheet(stageCount: model.ownArtStageCount(for: row.id) ?? 1) {
+            stagesModel = model.ownArtStagesModel(for: row.id)
+        } else {
+            OwnArtPicker.run(model: model, id: row.id)
+        }
+    }
+}
+
+private extension WidgetsInstalledRow {
+    var exportButton: some View {
+        Button("Export\u{2026}") { ExportPicker.run(model: model, id: row.id) }
+            .accessibilityLabel("Export \(row.name)")
+    }
+}
+
+/// "Export..." (spec 21): a save panel named `<id>-<version>.zip`. The checks and the zip are `WidgetExport`'s and the
+/// file is written only where the panel says, atomically. Nothing is uploaded or shown to Claude.
+@MainActor
+private enum ExportPicker {
+    static func run(model: WidgetsModel, id: String) {
+        model.clearExportStatus()
+        guard case .zip(let data, let fileName) = model.exportOutcome(for: id) else { return }
+        let panel = NSSavePanel()
+        panel.title = "Export widget"
+        panel.nameFieldStringValue = fileName
+        panel.allowedContentTypes = [UTType.zip]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        model.writeExport(data, to: url, id: id, fileName: fileName)
     }
 }
 

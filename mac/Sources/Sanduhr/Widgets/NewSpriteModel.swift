@@ -14,7 +14,7 @@ final class NewSpriteModel {
     let imageWidth: Int
     let imageHeight: Int
     /// One sentence when the picked file fails the pack image rules, nil otherwise.
-    let imageError: String?
+    private(set) var imageError: String?
 
     private(set) var cellWidth: Int
     private(set) var cellHeight: Int
@@ -28,6 +28,10 @@ final class NewSpriteModel {
     private(set) var errors: [String] = []
     /// True once the sprite was installed; the sheet closes on it.
     private(set) var made = false
+    /// The frames per second a GIF import carries into `input`; nil (the default 8) for a PNG.
+    private(set) var fps: Int?
+    /// Tag names from an Aseprite import that are no action, shown under the grid; empty otherwise.
+    private(set) var ignoredTags: [String] = []
 
     /// Installs the made `Input`; returns the sentences why not (empty when it went in).
     private let install: (WidgetNewSprite.Input) -> [String]
@@ -39,9 +43,40 @@ final class NewSpriteModel {
         imageWidth = size.width
         imageHeight = size.height
         imageError = size.error
+        fps = nil
         let start = Self.startingCell(size.width, size.height)
         cellWidth = start
         cellHeight = start
+    }
+
+    /// The sheet for a GIF import (spec 2.43.0 section 22): the cell is the frame size, walk plays every frame in
+    /// order, sit is frame 1, and the GIF's fps goes into the sprite.
+    convenience init(gif: SpriteFrames.Result, install: @escaping (WidgetNewSprite.Input) -> [String]) {
+        self.init(png: gif.png, install: install)
+        setCell(width: gif.frameWidth, height: gif.frameHeight)
+        tags = ["walk": Array(0..<gif.frameCount), "sit": [0]]
+        fps = gif.fps
+    }
+
+    /// The sheet for an Aseprite import (spec 2.43.0 section 23): the cell is the frames' size, the action tags are
+    /// pre-filled from the JSON's tags, and its median duration is the fps.
+    convenience init(aseprite: AsepriteImport.Loaded, install: @escaping (WidgetNewSprite.Input) -> [String]) {
+        self.init(png: aseprite.png, install: install)
+        setCell(width: aseprite.plan.cellWidth, height: aseprite.plan.cellHeight)
+        tags = aseprite.plan.tags
+        fps = aseprite.plan.fps
+        ignoredTags = aseprite.plan.ignored
+    }
+
+    /// The note under the grid for tags no action uses, nil when there are none.
+    var ignoredNote: String? {
+        ignoredTags.isEmpty ? nil : "Not used: " + ignoredTags.joined(separator: ", ") + "."
+    }
+
+    /// A sheet that opens on one sentence and nothing else, for a picked file that could not be read.
+    convenience init(refusal: String, install: @escaping (WidgetNewSprite.Input) -> [String]) {
+        self.init(png: Data(), install: install)
+        imageError = refusal
     }
 
     // MARK: Cells
@@ -110,7 +145,7 @@ final class NewSpriteModel {
     // MARK: Make
 
     var input: WidgetNewSprite.Input {
-        WidgetNewSprite.Input(png: png, cellWidth: cellWidth, cellHeight: cellHeight, name: name, scale: scale, tags: tags)
+        WidgetNewSprite.Input(png: png, cellWidth: cellWidth, cellHeight: cellHeight, name: name, scale: scale, tags: tags, fps: fps)
     }
 
     /// Make: installs through `install`; on failure the sentences are in `errors` and nothing changed.
