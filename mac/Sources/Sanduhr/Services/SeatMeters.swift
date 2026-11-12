@@ -219,12 +219,16 @@ final class SeatMeters {
                 let check = self.recentActivity
                 due += await Task.detached(priority: .utility) { rest.filter { check($0.1) }.map(\.0) }.value
             }
+            // Cancelled (Reset or usage off, #498): nothing more is asked, and `round` is left alone: whoever
+            // cancelled cleared it, and a later round may hold it now. `sleep` swallows the cancellation.
+            guard !Task.isCancelled else { return }
             self.pending.subtract(due)
             for label in due.sorted() {
                 await self.sleep(SeatSnapshots.stagger)
+                guard !Task.isCancelled else { return }
                 await self.fetch(label)
             }
-            guard !self.stopped else { return }
+            guard !Task.isCancelled, !self.stopped else { return }
             self.round = nil
             // A seat that became new during the round gets its turn now.
             if !self.pending.isEmpty { self.startRound() }
@@ -256,7 +260,7 @@ final class SeatMeters {
         do { result = .success(try await client.getUsage()) } catch { result = .failure(error) }
         // Switched to, signed out, removed, unlinked or renamed while the request ran: no one's.
         let after = context()
-        guard clients[label]?.client === client,
+        guard !Task.isCancelled, clients[label]?.client === client,
               SeatSnapshots.fetchable(label, linked: after.linked, signedIn: after.signedIn, active: after.active)
         else { return }
         if case .failure(let e) = result, SnapshotWriter.errorKind(e) != "network" { authSkipped[label] = key }

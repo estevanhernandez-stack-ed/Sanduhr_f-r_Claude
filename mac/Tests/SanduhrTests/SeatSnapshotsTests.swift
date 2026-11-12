@@ -209,12 +209,15 @@ private final class World {
                                      choices: ["Work": .init(folder: "/tmp/s/a"), "Home": .init(folder: "/tmp/s/b"), "Lab": .init(folder: "/tmp/s/c")],
                                      signedIn: ["Work", "Home", "Lab"], active: "Work", inUse: ["Home"])
         keys = ["Work": "kw", "Home": "kh", "Lab": "kl"]
-        meters.context = { [unowned self] in self.context }
-        meters.now = { [unowned self] in self.clock }
-        meters.sleep = { [unowned self] s in self.waits.append(s) }
+        // Weak, not unowned (#498): a round still running when a test returns holds the meters, and its next
+        // call into a gone world crashed the whole test run, charged to whichever suite was running then.
+        meters.context = { [weak self] in self?.context ?? SeatMeters.Context() }
+        meters.now = { [weak self] in self?.clock ?? Date(timeIntervalSince1970: 1_000_000) }
+        meters.sleep = { [weak self] s in self?.waits.append(s) }
         meters.recentActivity = { _ in false }
-        meters.credentials = { [unowned self] label in AccountCredentials(sessionKey: self.keys[label], cfClearance: nil) }
-        meters.makeClient = { [unowned self] creds in
+        meters.credentials = { [weak self] label in AccountCredentials(sessionKey: self?.keys[label], cfClearance: nil) }
+        meters.makeClient = { [weak self] creds in
+            guard let self else { return FakeClient(.success(usage(10))) }
             let label = self.keys.first { $0.value == creds.sessionKey }?.key ?? "?"
             let c = FakeClient(self.answers[label] ?? .success(usage(10)))
             self.clients[label] = c
@@ -231,7 +234,11 @@ private final class World {
         await meters.round?.value
     }
 
-    deinit { try? FileManager.default.removeItem(at: dir) }
+    deinit {
+        // A round the test left running stops at its next step and writes nothing into the deleted folder.
+        MainActor.assumeIsolated { meters.stop() }
+        try? FileManager.default.removeItem(at: dir)
+    }
 }
 
 @Suite("Per-seat meters: fetch rule")
@@ -281,6 +288,26 @@ struct SeatMetersTests {
         #expect(w.waits == [SeatSnapshots.stagger, SeatSnapshots.stagger])
         #expect((w.calls("Home"), w.calls("Lab")) == (1, 1))
         #expect(w.meters.round == nil)
+    }
+
+    /// #498: Reset and usage off cancel the round, and a cancelled round asks for nothing more. It went on
+    /// fetching, after Reset with clients it made again from the keys.
+    @Test func aStoppedRoundFetchesNothingMore() async throws {
+        let w = try World()
+        w.context.inUse = ["Home", "Lab"]
+        let round = try #require(w.meters.startRound())
+        w.meters.stop()
+        await round.value
+        #expect((w.calls("Home"), w.calls("Lab")) == (0, 0))
+    }
+
+    @Test func aRoundCancelledByUsageOffFetchesNothingMore() async throws {
+        let w = try World()
+        w.context.inUse = ["Home", "Lab"]
+        let round = try #require(w.meters.startRound())
+        w.meters.usageOff = true
+        await round.value
+        #expect((w.calls("Home"), w.calls("Lab")) == (0, 0))
     }
 
     @Test func aRefusedKeyStopsUntilANewKeyIsSaved() async throws {
