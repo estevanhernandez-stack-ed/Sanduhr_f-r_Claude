@@ -7,7 +7,16 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class WhatsNewCards
 {
-    public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release470(), .. Release460(), .. Release450(), .. Release400(), .. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
+    public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release480(), .. Release470(), .. Release460(), .. Release450(), .. Release400(), .. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
+
+    // 4.8.0 (agent layer): Codex limits beside Claude's; Show me lands on Settings ▸ Usage ▸ Sources.
+    private static WhatsNewCard[] Release480() =>
+    [
+        WhatsNewCard.Of("4.8.0", "codex-limits", "Codex limits, beside Claude's",
+            "Tick Codex in Settings, Sources and the widget shows its 5-hour and weekly limits under Claude's. They're read from Codex's own logs on this PC.",
+            "", // Diagnostic
+            WhatsNewPreview.None, SettingsPage.UsageSources),
+    ];
 
     // 4.7.0 (#408): Install widget from file on Mods & Widgets; Show me lands on the installed list, where the button sits.
     private static WhatsNewCard[] Release470() =>
@@ -208,6 +217,7 @@ public static class WhatsNewCards
     /// </summary>
     private static string? AnchorFor(string id) => id switch
     {
+        "codex-limits" => SettingsIndex.SourcesList,
         "widget-from-file" => SettingsIndex.ModList,
         "desk-under-icons" => SettingsIndex.DeskUnderIcons,
         "choose-what-shows" => SettingsIndex.GeneralSetup,
