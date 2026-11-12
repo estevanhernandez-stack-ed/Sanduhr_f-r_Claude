@@ -457,7 +457,7 @@ public sealed class DeskMeterStylesViewTests : IDisposable
         var codex = View(WordFor("meters", DeskMeterStyle.Slim, "codex"), frame);
         var meters = Piece(codex, "meters");
         var texts = All<TextBlock>(meters).Select(t => t.Text).ToList();
-        Assert.Equal(["20%", "Session (5hr)", "97%", "Weekly"], texts);   // each row: its value, then its label
+        Assert.Equal(["20%", "Codex session (5hr)", "97%", "Codex weekly"], texts);   // each row: its value, then its label
         Assert.Empty(Ids(meters));                                      // one source: no fill of two
         Assert.Equal(0, All<Rectangle>(meters).Count(r => r.Width == 2));   // Codex has no pace mark
         codex.Dispose();
@@ -487,7 +487,7 @@ public sealed class DeskMeterStylesViewTests : IDisposable
     {
         var codexOnly = TwoSources() with { Tiers = [], LineTiers = [] };
         var view = View("meters:tr", new DeskFrame { Usage = codexOnly, Now = Now });
-        Assert.Equal(["20%", "Session (5hr)", "97%", "Weekly"], All<TextBlock>(Piece(view, "meters")).Select(t => t.Text).Where(t => !t.StartsWith("resets", StringComparison.Ordinal)));
+        Assert.Equal(["20%", "Codex session (5hr)", "97%", "Codex weekly"], All<TextBlock>(Piece(view, "meters")).Select(t => t.Text).Where(t => !t.StartsWith("resets", StringComparison.Ordinal)));
         view.Dispose();
         // A sign-in still shows the sign-in line: Claude is on.
         var signIn = View("meters:tr", new DeskFrame { Usage = codexOnly with { SignInNeeded = true }, Now = Now });
@@ -591,5 +591,55 @@ public sealed class DeskMeterStylesViewTests : IDisposable
             Assert.Contains($"{SettingsNames.DeskTelemetry}, style", combos);
         }
         finally { window.Close(); }
+    });
+
+    [Theory]
+    [InlineData(DeskMeterStyle.Bar)]
+    [InlineData(DeskMeterStyle.Slim)]
+    [InlineData(DeskMeterStyle.Ring)]
+    public void ACodexOnlyPieceSaysCodexInItsLabelsAndNames(DeskMeterStyle style) => Sta.Run(() =>
+    {
+        var view = View(WordFor("meters", style, "codex"), new DeskFrame { Usage = TwoSources(), Now = Now });
+        var meters = Piece(view, "meters");
+        var spoken = All<FrameworkElement>(meters).Select(System.Windows.Automation.AutomationProperties.GetName).Where(n => n.Length > 0).ToList();
+        var texts = All<TextBlock>(meters).Select(t => t.Text).ToList();
+        if (style == DeskMeterStyle.Ring) Assert.Contains("Codex weekly 97%", spoken);
+        else
+        {
+            Assert.Contains("Codex session (5hr)", texts);
+            Assert.Contains("Codex weekly", texts);
+        }
+        Assert.DoesNotContain(texts, t => t is "Weekly" or "Session (5hr)");
+        view.Dispose();
+    });
+
+    [Theory]
+    [InlineData(DeskMeterStyle.Bar)]
+    [InlineData(DeskMeterStyle.Slim)]
+    [InlineData(DeskMeterStyle.Ring)]
+    public void AFullyStaleCodexPieceDimsOnceByRowNotTwice(DeskMeterStyle style) => Sta.Run(() =>
+    {
+        var view = View(WordFor("meters", style, "codex"), new DeskFrame { Usage = TwoSources("five_hour", "seven_day"), Now = Now });
+        var meters = Piece(view, "meters");
+        // The piece itself is not dimmed; each row is, by the widget's stale opacity, once.
+        Assert.Equal(1.0, meters.Opacity);
+        var host = (Panel)All<Panel>(meters).First();
+        var rows = style == DeskMeterStyle.Ring ? host.Children.OfType<Panel>().ToList() : [.. host.Children.OfType<Panel>()];
+        Assert.Equal(1.0, host.Opacity);
+        Assert.NotEmpty(rows);
+        Assert.All(rows, r => Assert.Equal(CombinedBarViewModel.StaleOpacity, r.Opacity));
+        view.Dispose();
+    });
+
+    [Fact]
+    public void AFreshCodexPieceAndAStaleClaudePieceKeepTheirOwnDimming() => Sta.Run(() =>
+    {
+        var fresh = View("meters:tr:1:0:slim:src=codex", new DeskFrame { Usage = TwoSources(), Now = Now });
+        var host = (Panel)All<Panel>(Piece(fresh, "meters")).First();
+        Assert.All(host.Children.OfType<Panel>(), r => Assert.Equal(1.0, r.Opacity));
+        fresh.Dispose();
+        var staleClaude = View("meters:tr:1:0:slim", new DeskFrame { Usage = Usage() with { FetchedAt = Now.AddHours(-2) }, Now = Now });
+        Assert.Equal(0.5, ((Panel)All<Panel>(Piece(staleClaude, "meters")).First()).Opacity);
+        staleClaude.Dispose();
     });
 }

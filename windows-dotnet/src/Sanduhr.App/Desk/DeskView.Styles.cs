@@ -33,7 +33,7 @@ internal sealed partial class DeskView
             return Text(DeskClaudeText.SignInLine(usage.FirstSignIn), size, 0.75);
         }
         var gauges = Gauges(Reads(rows), style, size, ts * 2.6, align, null);
-        gauges.Opacity = usage.IsStale(_frame.Now) ? 0.5 : 1;
+        gauges.Opacity = DeskMeters.Resolve(_frame.Usage, source) != DeskSources.Codex && usage.IsStale(_frame.Now) ? 0.5 : 1;   // a Codex piece dims per row
         return gauges;
     }
 
@@ -165,7 +165,7 @@ internal sealed partial class DeskView
             return panel;
         }
         double small = ts * 0.17;
-        var column = new StackPanel { HorizontalAlignment = align, Opacity = usage.IsStale(_frame.Now) ? 0.6 : 1 };
+        var column = new StackPanel { HorizontalAlignment = align, Opacity = DeskMeters.Resolve(_frame.Usage, source) != DeskSources.Codex && usage.IsStale(_frame.Now) ? 0.6 : 1 };
         var name = Text(usage.Account ?? "claude", small, 0.75, alignment: TextAlign(align));
         name.HorizontalAlignment = align;
         name.Margin = new Thickness(0, 0, 0, small * 0.3);

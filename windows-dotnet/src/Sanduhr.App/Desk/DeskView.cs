@@ -784,7 +784,7 @@ internal sealed partial class DeskView : Grid, IDisposable
             if (source == DeskSources.Codex || !DeskMeters.SignInLineShown(usage)) return null;   // a Codex piece with no Codex draws nothing
             return Text(DeskClaudeText.SignInLine(usage.FirstSignIn), size, 0.75);
         }
-        var panel = new StackPanel { HorizontalAlignment = align, Opacity = usage.IsStale(_frame.Now) ? 0.5 : 1 };
+        var panel = new StackPanel { HorizontalAlignment = align, Opacity = DeskMeters.Resolve(_frame.Usage, source) != DeskSources.Codex && usage.IsStale(_frame.Now) ? 0.5 : 1 };   // a Codex piece dims per row
         foreach (var (row, layout) in rows)
         {
             var (block, _, _) = BarRow(row.Label, row.Percent, row.Fill, size, width, row.Level, panel.Children.Count == 0, row.Pace, layout);

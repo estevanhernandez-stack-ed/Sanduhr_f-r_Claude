@@ -243,8 +243,8 @@ public class DeskMetersTests
         Assert.Equal(40, weekly.Row.Percent);
         string name = DeskMeters.CombinedName("Weekly", weekly.Layout);
         Assert.StartsWith("Weekly. ", name);
-        Assert.Contains("Claude 41%.", name);
-        Assert.Contains("Codex 71%, as of earlier.", name);
+        Assert.Contains("Claude 40%.", name);
+        Assert.Contains("Codex 70%, as of earlier.", name);
     }
 
     [Fact]
@@ -258,7 +258,7 @@ public class DeskMetersTests
     {
         var u = TwoSources(codexStale: new HashSet<string> { TierModel.FiveHour });
         var rows = DeskMeters.SourceRows(u, "codex", Now, TimeZoneInfo.Utc);
-        Assert.Equal(["Session (5hr)", "Weekly"], rows.Select(r => r.Label));
+        Assert.Equal(["Codex session (5hr)", "Codex weekly"], rows.Select(r => r.Label));
         Assert.Equal([25, 70], rows.Select(r => r.Percent));
         Assert.All(rows, r => Assert.Null(r.Pace));
         Assert.Equal([true, false], rows.Select(r => r.Stale));

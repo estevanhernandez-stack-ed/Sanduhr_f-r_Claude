@@ -35,7 +35,7 @@ public static class SourceBar
     public static string AccessibleName(string windowLabel, IReadOnlyList<SourcePercent> sources)
     {
         var parts = sources.OrderBy(s => AgentSources.Order(s.Source)).Select(s =>
-            string.Create(CultureInfo.InvariantCulture, $"{AgentSources.Name(s.Source)} {Math.Round(Math.Clamp(s.Percent, 0, 100))}%{(s.Stale ? ", as of earlier" : "")}."));
+            string.Create(CultureInfo.InvariantCulture, $"{AgentSources.Name(s.Source)} {(int)Math.Floor(Math.Clamp(s.Percent, 0, 100) + 1e-9)}%{(s.Stale ? ", as of earlier" : "")}."));
         return windowLabel + ". " + string.Join(" ", parts);
     }
 }

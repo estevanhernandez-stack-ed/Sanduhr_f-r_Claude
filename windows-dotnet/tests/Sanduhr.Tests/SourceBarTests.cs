@@ -61,4 +61,13 @@ public class SourceBarTests
         Assert.Equal("Weekly. Claude 40%. Codex 70%, as of earlier.",
             SourceBar.AccessibleName("Weekly", [S("codex", 70, stale: true), S("claude", 40)]));
     }
+
+    [Fact]
+    public void Accessible_name_truncates_like_the_visible_numbers_and_clamps()
+    {
+        Assert.Equal("Weekly. Claude 40%. Codex 70%.",
+            SourceBar.AccessibleName("Weekly", [S("claude", 40.9), S("codex", 70.6)]));
+        Assert.Equal("Weekly. Claude 29%. Codex 100%.",
+            SourceBar.AccessibleName("Weekly", [S("claude", 0.29 * 100), S("codex", 140)]));   // 0.29 * 100 is 28.999999999999996: float noise must not cost a point
+    }
 }

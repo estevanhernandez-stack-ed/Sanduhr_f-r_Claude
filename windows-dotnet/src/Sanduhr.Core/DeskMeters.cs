@@ -104,6 +104,13 @@ public static class DeskMeters
     /// <summary>The label Codex's tiers carry: "Session (5hr)" and "Weekly".</summary>
     public static string CodexLabel(string key) => CombinedLabel(key) ?? TierModel.Label(key);
 
+    /// <summary>The label of a row on a Codex-only piece, so it cannot be taken for Claude's: "Codex session (5hr)", "Codex weekly".</summary>
+    public static string CodexRowLabel(string key)
+    {
+        var label = CodexLabel(key);
+        return "Codex " + char.ToLowerInvariant(label[0]) + label[1..];
+    }
+
     /// <summary>True when Claude has something to draw: tiers, or a sign-in line.</summary>
     private static bool ClaudePresent(DeskUsage u) => u.Tiers.Count > 0 || u.SignInNeeded;
 
@@ -137,7 +144,7 @@ public static class DeskMeters
         int warnAt = MeterSignal.DefaultWarnAt, int urgentAt = MeterSignal.DefaultUrgentAt)
     {
         if (source != AgentSources.Codex) return Rows(usage, now, zone, warnAt, urgentAt);
-        return [.. usage.TiersOf(source).Select(t => Row(t, CodexLabel(t.Key), null, now, zone, warnAt, urgentAt, usage.IsTierStale(source, t.Key)))];
+        return [.. usage.TiersOf(source).Select(t => Row(t, CodexRowLabel(t.Key), null, now, zone, warnAt, urgentAt, usage.IsTierStale(source, t.Key)))];
     }
 
     private static DeskMeterRow Row(DeskTier t, string label, double? pace, DateTimeOffset now, TimeZoneInfo? zone,

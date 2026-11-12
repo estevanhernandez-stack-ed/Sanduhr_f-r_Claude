@@ -20,7 +20,7 @@ public static class DeskDesignApply
     {
         var nextDesk = desk with
         {
-            Layout = design.Layout is null ? desk.Layout : WithDrawers(Layout(design.Layout), desk.Layout),
+            Layout = design.Layout is null ? desk.Layout : WithSources(WithDrawers(Layout(design.Layout), desk.Layout), desk.Layout),
             Font = design.Font is null ? desk.Font : FontSetting(design.Font),
             Plate = design.Plate ?? desk.Plate,
         };
@@ -45,6 +45,15 @@ public static class DeskDesignApply
         var kept = new DeskArrangement(current).Pieces.Where(p => DrawerPieces.IsWord(p.Widget));
         var rest = new DeskArrangement(layout).Pieces.Where(p => !DrawerPieces.IsWord(p.Widget));
         return new DeskArrangement(rest.Concat(kept)).Layout;
+    }
+
+    /// <summary>A design has no say in which source a piece shows (its JSON carries none): each piece that takes one keeps the source it has
+    /// in <paramref name="current"/>, matched by widget word, so moving the clock never turns a Codex meters piece back to combined.</summary>
+    public static string WithSources(string layout, string current)
+    {
+        var had = new DeskArrangement(current).Pieces.Where(p => DeskSources.Supports(p.Widget)).ToDictionary(p => p.Widget, p => p.Source);
+        return new DeskArrangement(new DeskArrangement(layout).Pieces
+            .Select(p => had.TryGetValue(p.Widget, out var s) ? p with { Source = DeskSources.For(p.Widget, s) } : p)).Layout;
     }
 
     /// <summary>The <c>desk_font</c> value for a font: null is the default family, "" the system font, anything else a family name.</summary>
