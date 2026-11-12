@@ -714,6 +714,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// (the service needs an activation callback). Null in unit contexts.</summary>
     public AlertService? AlertService => _alertService;
 
+    /// <summary>Tests: takes the place of the alert service's delivery (toast and chime).</summary>
+    internal Action<AlertEvent, string, bool, bool>? AlertDelivery { get; set; }
+
     public void AttachAlertService(AlertService service) => _alertService = service;
 
     private VaultService? _vault;
@@ -2326,14 +2329,19 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>Evaluate + deliver alerts for a fresh fetch. Never throws —
     /// alerting must not break the fetch loop.</summary>
-    private void EvaluateAlerts(JsonObject data, DateTimeOffset now)
+    internal void EvaluateAlerts(JsonObject data, DateTimeOffset now)
     {
         try
         {
-            if (_alertService is null)
+            Action<AlertEvent, string, bool, bool>? deliver = AlertDelivery ?? (_alertService is { } service ? service.Deliver : null);
+            if (deliver is null)
                 return;
             var events = _alertEngine.Evaluate(BuildAlertSnapshots(data), _alertConfig, now);
             if (events.Count == 0)
+                return;
+            // Settings, Usage, Sources: Claude's Alerts switch. The engine has still run, so its state stays current and turning
+            // alerts back on does not toast what crossed meanwhile.
+            if (!_settings.LoadSources().AlertsOn(AgentSources.Claude))
                 return;
             bool sound = _settings.LoadAlertSound();
             bool scopedChime = _settings.LoadAlertSoundScoped();
@@ -2346,7 +2354,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
                 // headroom. The "Chime for model-scoped weekly tiers" checkbox
                 // restores sound for whoever wants it.
                 bool audible = sound && (scopedChime || !TierModel.IsModelScoped(e.TierKey));
-                _alertService.Deliver(e, TierModel.Label(e.TierKey), audible, snake);
+                deliver(e, TierModel.Label(e.TierKey), audible, snake);
             }
         }
         catch (Exception e)

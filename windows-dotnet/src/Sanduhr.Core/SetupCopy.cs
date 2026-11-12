@@ -13,6 +13,7 @@ public static class SetupCopy
     public const string UsageBody = "See how much of your plan you've used.";
     public const string ClaudeSource = "Claude";
     public const string CodexSource = "Codex";
+    public const string CodexTrademark = SettingsNames.CodexNotice;
     public const string CodexNotInstalled = SettingsNames.SourcesCodexNotInstalled;
     public const string ClaudeTrademark = SettingsNames.TrademarkNotice;
     public const string DesignWithChat = "Design it with an AI chat";
@@ -113,7 +114,7 @@ public static class SetupCopy
     /// <summary>For the copy tests.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
-        Title, Intro, DesktopTitle, DesktopBody, DrawersTitle, DrawersBody, UsageTitle, UsageBody, ClaudeSource, CodexSource, CodexNotInstalled, ClaudeTrademark,
+        Title, Intro, DesktopTitle, DesktopBody, DrawersTitle, DrawersBody, UsageTitle, UsageBody, ClaudeSource, CodexSource, CodexTrademark, CodexNotInstalled, ClaudeTrademark,
         DesignWithChat, DesignWithChatCaption, Continue, NotNow, Cancel, MenuItem, PickOne, SaveFailed, WhatChanges, WhatHappened, DesktopOffLine, UsageOffLine, CodexOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DesignDesktopOffNote, DrawersOffLine(2),
         ChatIntro, ChatCopyPrompt, ChatPasteName, ChatPastePlaceholder, ChatPreview, ChatUseRules, ChatUseDrawerSettings, ChatClose, ChatFindingsName, ChatReady,
         ChatPromptCopied, ChatDeskShown, ChatRulesShown, ChatNoDeskService, ChatRulesSavedNothing, ChatUntitledDesign, ChatFixCount(1), ChatFixCount(2), ChatManyBlocks(2),

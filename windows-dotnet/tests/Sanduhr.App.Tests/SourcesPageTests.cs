@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
@@ -21,10 +22,11 @@ public sealed class SourcesPageTests : AppWindowFixture
 
     /// <summary>A view model over scratch folders: Claude's switch is a local flag saved to setup the way the widget saves it, and
     /// Codex is installed only when its home folder exists under the scratch profile.</summary>
-    private (SourcesViewModel Vm, SettingsStore Store, Func<bool> ClaudeOn) Build(bool codexInstalled, bool claudeOn = false)
+    private (SourcesViewModel Vm, SettingsStore Store, Func<bool> ClaudeOn) Build(bool codexInstalled, bool claudeOn = false, bool deskOn = true)
     {
         if (codexInstalled) Directory.CreateDirectory(CodexHome);
         var store = new SettingsStore(ScratchPaths());
+        store.SaveDesk(store.LoadDesk() with { Enabled = deskOn });   // with the Desk on, switching every source off still leaves something shown
         bool claude = claudeOn;
         var vm = new SourcesViewModel(store, () => claude,
             on =>
@@ -79,7 +81,7 @@ public sealed class SourcesPageTests : AppWindowFixture
     {
         var (vm, store, claudeOn) = Build(codexInstalled: true);
         int redraws = 0;
-        vm.DisplayChanged = () => redraws++;
+        vm.OnOffChanged = () => redraws++;
         vm.Rows.Single(r => r.Source == AgentSources.Claude).On = true;
         Assert.True(claudeOn());
         Assert.True(store.LoadSetup()!.ClaudeUsage);
@@ -187,6 +189,7 @@ public sealed class SourcesPageTests : AppWindowFixture
     public void Codex_left_on_from_before_can_still_be_turned_off_when_it_is_no_longer_installed() => AppHost.Run(() =>
     {
         var store = new SettingsStore(ScratchPaths());
+        store.SaveDesk(store.LoadDesk() with { Enabled = true });
         store.SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false, ["codex"] = true }));
         var vm = new SourcesViewModel(store, () => false, _ => { }, () => CodexHomes.Discover(null, Profile));
         var codex = vm.Rows.Single(r => r.Source == AgentSources.Codex);
@@ -196,6 +199,126 @@ public sealed class SourcesPageTests : AppWindowFixture
         codex.On = false;
         Assert.False(store.LoadSetup()!.CodexUsage);
         Assert.False(codex.CanToggle);
+    });
+
+    [Fact]
+    public void The_last_source_cannot_be_turned_off_while_the_Desk_is_off_and_says_why() => AppHost.Run(() =>
+    {
+        var (vm, store, _) = Build(codexInstalled: true, deskOn: false);
+        var codex = vm.Rows.Single(r => r.Source == AgentSources.Codex);
+        codex.On = true;
+        Assert.Equal("", vm.Message);
+        int changed = 0;
+        vm.OnOffChanged = () => changed++;
+        codex.On = false;
+        Pump();
+        Assert.Equal("Keep one on, or turn on the Desk first.", vm.Message);
+        Assert.True(vm.HasMessage);
+        Assert.True(store.LoadSetup()!.CodexUsage);   // nothing was saved
+        Assert.True(codex.On);                        // the switch is back on
+        Assert.Equal(0, changed);
+        // Another source on lets it go; the line clears.
+        vm.Rows.Single(r => r.Source == AgentSources.Claude).On = true;
+        codex.On = false;
+        Assert.Equal("", vm.Message);
+        Assert.False(store.LoadSetup()!.CodexUsage);
+    });
+
+    [Fact]
+    public void With_the_Desk_on_the_last_source_can_be_turned_off() => AppHost.Run(() =>
+    {
+        var (vm, store, _) = Build(codexInstalled: true, deskOn: true);
+        var codex = vm.Rows.Single(r => r.Source == AgentSources.Codex);
+        codex.On = true;
+        codex.On = false;
+        Assert.Equal("", vm.Message);
+        Assert.False(store.LoadSetup()!.CodexUsage);
+    });
+
+    [Fact]
+    public void Switching_a_source_calls_App_once_so_it_starts_or_stops_the_source_and_shows_or_hides_the_widget() => AppHost.Run(() =>
+    {
+        var (vm, _, _) = Build(codexInstalled: true);
+        int calls = 0;
+        vm.OnOffChanged = () => calls++;
+        vm.Rows.Single(r => r.Source == AgentSources.Claude).On = true;
+        Assert.Equal(1, calls);
+        vm.Rows.Single(r => r.Source == AgentSources.Codex).On = true;
+        Assert.Equal(2, calls);
+    });
+
+    [Fact]
+    public void A_refused_color_reads_as_the_saved_one_in_the_real_box_with_the_line_showing() => AppHost.Run(() =>
+    {
+        Directory.CreateDirectory(CodexHome);
+        var (widget, _) = ScratchWidget("Personal");
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+        var window = new SettingsWindow(svm);
+        OffScreen(window);
+        window.Show();
+        try
+        {
+            window.SelectPage(SettingsPage.UsageSources);
+            window.UpdateLayout();
+            Pump();
+            var tab = ((TabControl)window.FindName("Tabs")).Items.OfType<TabItem>().Single(t => (string)t.Tag == "UsageSources");
+            var box = FindBox((DependencyObject)tab.Content, "Codex color");
+            string saved = box.Text;
+            Assert.Equal(AgentSources.DefaultColor(AgentSources.Codex), saved);
+
+            box.Text = "teal";
+            box.GetBindingExpression(TextBox.TextProperty)!.UpdateSource();
+            Pump();
+            Assert.Equal(saved, box.Text);
+            var row = svm.Sources.Rows.Single(r => r.Source == AgentSources.Codex);
+            Assert.Equal(SettingsNames.SourcesColorRefused, row.ColorMessage);
+            Assert.Contains(SettingsNames.SourcesColorRefused, NamesOf(window));
+
+            // A valid entry with spaces shows as it was saved, trimmed, and the line goes.
+            box.Text = " #112233 ";
+            box.GetBindingExpression(TextBox.TextProperty)!.UpdateSource();
+            Pump();
+            Assert.Equal("#112233", box.Text);
+            Assert.Equal("", row.ColorMessage);
+            Assert.Equal("#112233", new SettingsStore(new Paths()).LoadSources().ColorOf(AgentSources.Codex));
+        }
+        finally { window.Close(); }
+    });
+
+    private static TextBox FindBox(DependencyObject root, string name)
+    {
+        var found = FindBoxOrNull(root, name);
+        return found ?? throw new InvalidOperationException("no box named " + name);
+    }
+
+    private static TextBox? FindBoxOrNull(DependencyObject root, string name)
+    {
+        if (root is TextBox t && AutomationProperties.GetName(t) == name) return t;
+        int n = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < n; i++)
+            if (FindBoxOrNull(System.Windows.Media.VisualTreeHelper.GetChild(root, i), name) is { } hit) return hit;
+        return null;
+    }
+
+    [Fact]
+    public void Claude_alerts_off_on_the_Sources_page_deliver_nothing_and_on_deliver() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        var store = new SettingsStore(ScratchPaths());
+        var delivered = new List<AlertEvent>();
+        widget.AlertDelivery = (e, _, _, _) => delivered.Add(e);
+        JsonObject Data(int pct) => new() { ["five_hour"] = new JsonObject { ["utilization"] = (double)pct, ["resets_at"] = "2030-01-01T00:00:00+00:00" } };
+
+        store.SaveSources(store.LoadSources() with { Alerts = new Dictionary<string, bool> { [AgentSources.Claude] = false } });
+        widget.EvaluateAlerts(Data(85), DateTimeOffset.UtcNow);
+        Assert.Empty(delivered);
+
+        // The same crossing with alerts on (the default) is delivered.
+        store.SaveSources(store.LoadSources() with { Alerts = new Dictionary<string, bool> { [AgentSources.Claude] = true } });
+        var (other, _) = ScratchWidget("Other");
+        other.AlertDelivery = (e, _, _, _) => delivered.Add(e);
+        other.EvaluateAlerts(Data(85), DateTimeOffset.UtcNow);
+        Assert.Equal(AlertKind.Warn, Assert.Single(delivered).Kind);
     });
 
     [Fact]
@@ -219,8 +342,12 @@ public sealed class SourcesPageTests : AppWindowFixture
 
             var names = NamesOf(window);
             Assert.Empty(LeaksIn(names));
-            Assert.Contains("Codex color", names);
-            Assert.Contains("Claude color", names);
+            foreach (var name in new[] { "Codex color", "Claude color", "Track Claude", "Track Codex", "Claude primary", "Codex primary",
+                "Claude alerts", "Codex alerts", "Reset Claude color", "Reset Codex color" })
+                Assert.Contains(name, names);
+            // Store 10.1.4.4: the page names Claude and Codex, so both disclaimers are on it.
+            Assert.Contains(SettingsNames.TrademarkNotice, names);
+            Assert.Contains(SettingsNames.CodexNotice, names);
             Assert.Contains(SettingsNames.SourcesIntro, names);
             // Every control that takes a click or a key reads as words: On, Primary, the color box, Reset and Alerts, once per source.
             var page = (FrameworkElement)tab.Content;

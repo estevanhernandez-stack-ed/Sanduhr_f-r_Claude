@@ -847,7 +847,11 @@ public partial class App : Application
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
         svm.Desk.Changed = () => _desk?.Reload();
         // Sources: a Codex on or off starts or stops its service (as Set up Sanduhr does); a primary or color change redraws the widget.
-        svm.Sources.OnOffChanged = SyncCodex;
+        svm.Sources.OnOffChanged = () =>
+        {
+            SyncCodex();
+            if (_vm is { } widget) ShowWidgetFor(widget.AnyUsageOn);
+        };
         svm.Sources.DisplayChanged = () => _vm?.RefreshSources();
         // Turning drawers on or off from Settings reaches the running Desk the way the Desk page's own switch does.
         svm.Drawers.DeskChanged = () => { _desk?.Reload(); svm.Desk.Reload(); };
@@ -1074,7 +1078,7 @@ public partial class App : Application
         vm.SetupPending = false;
         bool anyUsage = result.Now.ClaudeUsage || result.Now.CodexUsage;
         SyncCodex();   // starts or stops the Codex service for what was just ticked, and redraws the sections
-        if (anyUsage) ShowWindow(); else _window?.Hide();
+        ShowWidgetFor(anyUsage);
         _settingsWindow?.ViewModel.Desk.Reload();
         _settingsWindow?.ViewModel.Sources.Reload();
         // What went wrong or was refused (a drawers turn-off that was not done, a failed save): one themed notice, now that the window has
@@ -1247,6 +1251,13 @@ public partial class App : Application
             _window.Hide();
         else
             ShowWindow();
+    }
+
+    /// <summary>The widget shows while any usage source is on and hides when none is: after Set up Sanduhr and after a switch on the
+    /// Sources page.</summary>
+    private void ShowWidgetFor(bool anyUsage)
+    {
+        if (anyUsage) ShowWindow(); else _window?.Hide();
     }
 
     private void ShowWindow()

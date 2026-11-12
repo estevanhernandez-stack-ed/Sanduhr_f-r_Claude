@@ -1186,6 +1186,17 @@ public static class SettingsNames
     public const string SourcesColorRefused = "Use a color like #2FB5A3.";
     /// <summary>The color box's spoken name: "Codex color".</summary>
     public static string SourcesColorName(string source) => $"{source} color";
+    public static string SourcesTrackName(string source) => $"Track {source}";
+    public static string SourcesPrimaryName(string source) => $"{source} primary";
+    public static string SourcesResetName(string source) => $"Reset {source} color";
+    public static string SourcesAlertsName(string source) => $"{source} alerts";
+    /// <summary>Said under the list when the last source is switched off with the Desk off too.</summary>
+    public const string SourcesKeepOne = "Keep one on, or turn on the Desk first.";
+    /// <summary>The disclaimer for Codex, in the wording of <see cref="TrademarkNotice"/>; shown where Codex is named.</summary>
+    public const string CodexNotice =
+        "\"Codex\" is a trademark of OpenAI, used nominatively. "
+        + "Sanduhr für Claude is an independent third-party tool, not affiliated with, endorsed by, "
+        + "or associated with OpenAI.";
 
     public const string DrawersTitle = "Drawers";
     public const string DrawersSwitch = "Use drawers";

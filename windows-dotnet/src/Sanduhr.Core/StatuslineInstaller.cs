@@ -50,11 +50,11 @@ public sealed class StatuslineInstaller
     public const string JoinLine = "line";
     public const string JoinSame = "same";
 
-    /// <summary>The segments Sanduhr's line prints without <c>-Mine</c>, in the order they print.</summary>
-    public static IReadOnlyList<string> DefaultSegments { get; } = ["account", "session", "weekly", "resets"];
+    /// <summary>The segments Sanduhr's line prints without <c>-Mine</c>, in the order they print: all five, Codex's meters
+    /// included. Only a pick of all five writes no <c>-Mine</c>; the four Claude segments alone write one, so Codex hides.</summary>
+    public static IReadOnlyList<string> DefaultSegments { get; } = ["account", "session", "weekly", "resets", "codex"];
 
-    /// <summary>Every name <c>-Mine</c> accepts: the defaults plus <c>codex</c> (Codex's meters, shown without
-    /// <c>-Mine</c> too, so a subset that leaves it out hides them).</summary>
+    /// <summary>Every name <c>-Mine</c> accepts.</summary>
     private static readonly string[] KnownSegments = ["account", "session", "weekly", "resets", "codex"];
 
     private const string CommandPrefix = "powershell -NoProfile -ExecutionPolicy Bypass -File \"";

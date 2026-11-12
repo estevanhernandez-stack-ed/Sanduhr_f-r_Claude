@@ -160,6 +160,9 @@
             <TextBlock Text="{Binding CodexNotInstalledText}" TextWrapping="Wrap" FontSize="10" Margin="28,2,0,0"
                        Visibility="{Binding HasCodexNotInstalledText, Converter={StaticResource BoolVis}}"
                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+            <TextBlock Text="{x:Static core:SetupCopy.CodexTrademark}" TextWrapping="Wrap" FontSize="10" Margin="28,4,0,0"
+                       Visibility="{Binding ShowCodexTrademark, Converter={StaticResource BoolVis}}"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
         </StackPanel>
 
         <!-- What unticking does, said before Continue applies it (reopened later only). -->

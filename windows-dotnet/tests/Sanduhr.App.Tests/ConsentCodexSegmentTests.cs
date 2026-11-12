@@ -52,6 +52,16 @@ public sealed class ConsentCodexSegmentTests : AppWindowFixture
     });
 
     [Fact]
+    public void Unticking_only_Codex_writes_the_four_Claude_segments_so_Codex_hides() => AppHost.Run(() =>
+    {
+        var dialog = Dialog();
+        ((CheckBox)dialog.FindName("CodexBox")).IsChecked = false;
+        var choice = dialog.Choice();
+        Assert.Equal(["account", "session", "weekly", "resets"], choice.Segments);
+        Assert.EndsWith(" -Mine account,session,weekly,resets", Command(choice.Segments));
+    });
+
+    [Fact]
     public void All_five_ticked_writes_no_Mine() => AppHost.Run(() =>
     {
         var choice = Dialog().Choice();

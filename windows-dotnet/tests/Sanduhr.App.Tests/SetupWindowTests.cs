@@ -378,6 +378,28 @@ public sealed class SetupWindowTests : AppWindowFixture
     });
 
     [Fact]
+    public void The_Codex_disclaimer_shows_with_Codex_ticked_and_not_before() => AppHost.Run(() =>
+    {
+        var vm = new SetupViewModel(new SetupService(new SettingsStore(ScratchPaths()), new Host()), firstRun: true, codexInstalled: () => true);
+        var w = new SetupWindow(vm);
+        OffScreen(w);
+        w.Show();
+        try
+        {
+            var before = new List<string>();
+            CollectText(w, before);
+            Assert.DoesNotContain(SetupCopy.CodexTrademark, before);
+            vm.CodexUsage = true;
+            w.UpdateLayout();
+            var after = new List<string>();
+            CollectText(w, after);
+            Assert.Contains(SetupCopy.CodexTrademark, after);
+            Assert.Contains("OpenAI", SetupCopy.CodexTrademark);
+        }
+        finally { w.Close(); }
+    });
+
+    [Fact]
     public void Codex_not_installed_is_greyed_with_its_line_on_the_setup_screen() => AppHost.Run(() =>
     {
         var vm = new SetupViewModel(new SetupService(new SettingsStore(ScratchPaths()), new Host()), firstRun: true, codexInstalled: () => false);

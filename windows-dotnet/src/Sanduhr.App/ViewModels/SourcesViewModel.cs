@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows.Input;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sanduhr.App.Services;
@@ -12,8 +13,9 @@ namespace Sanduhr.App.ViewModels;
 /// the widget's own <c>SetUsageOn</c>; Codex's is <c>setup.usage.codex</c>, and App starts or stops the Codex service when it changes
 /// (<see cref="OnOffChanged"/>). Color, primary and alerts save to <c>sources</c>. Turning the primary off moves it to
 /// <see cref="SourceSettings.PrimaryFor"/>.</summary>
-public sealed class SourcesViewModel
+public sealed partial class SourcesViewModel : ObservableObject
 {
+    private readonly Dispatcher _ui = Dispatcher.CurrentDispatcher;
     private readonly SettingsStore _store;
     private readonly Func<bool> _claudeOn;
     private readonly Action<bool> _setClaudeOn;
@@ -33,6 +35,11 @@ public sealed class SourcesViewModel
 
     /// <summary>A source was switched on or off and saved: App starts or stops the Codex service and redraws the widget.</summary>
     public Action? OnOffChanged { get; set; }
+
+    /// <summary>Why the last switch was refused ("Keep one on, or turn on the Desk first."); empty otherwise.</summary>
+    [ObservableProperty] private string _message = "";
+    public bool HasMessage => Message.Length > 0;
+    partial void OnMessageChanged(string value) => OnPropertyChanged(nameof(HasMessage));
 
     /// <summary>Primary or a color changed and saved: App redraws the widget's sections, bars and tray.</summary>
     public Action? DisplayChanged { get; set; }
@@ -59,8 +66,28 @@ public sealed class SourcesViewModel
             [AgentSources.Codex] = setup?.CodexUsage ?? false,
         });
 
+    /// <summary>Whether anything would still be shown with <paramref name="source"/> as <paramref name="on"/>: a usage source on, or the
+    /// Desk (the same rule Set up Sanduhr enforces with "Pick at least one").</summary>
+    private bool AnythingLeft(string source, bool on)
+    {
+        var setup = _store.LoadSetup() ?? SetupChoices.FirstRun.ToSettings(null);
+        var ticked = Ticked(setup);
+        bool claude = source == AgentSources.Claude ? on : ticked.ClaudeUsage;
+        bool codex = source == AgentSources.Codex ? on : ticked.CodexUsage;
+        var choices = SetupChoices.Of(setup, _store.LoadDrawers().Enabled, _store.LoadDesk().Enabled) with { ClaudeUsage = claude, CodexUsage = codex };
+        return choices.AnyTicked;
+    }
+
     internal void SetOn(string source, bool on)
     {
+        Message = "";
+        if (!on && !AnythingLeft(source, false))
+        {
+            Message = SettingsNames.SourcesKeepOne;
+            // The switch snaps back once the click has unwound (a notification inside the binding's own update is not reliably shown).
+            _ui.BeginInvoke(Reload);
+            return;
+        }
         try
         {
             if (source == AgentSources.Claude)
@@ -80,7 +107,7 @@ public sealed class SourcesViewModel
             System.Diagnostics.Debug.WriteLine($"[Sanduhr.Sources] not saved: {ex.Message}");   // streamer: notname - written to the log file, never drawn
         }
         Reload();
-        if (source == AgentSources.Codex) OnOffChanged?.Invoke(); else DisplayChanged?.Invoke();
+        OnOffChanged?.Invoke();
     }
 
     internal void SetPrimary(string source)
@@ -132,6 +159,7 @@ public sealed class SourcesViewModel
 public sealed partial class SourceRowViewModel : ObservableObject
 {
     private readonly SourcesViewModel _owner;
+    private readonly Dispatcher _ui = Dispatcher.CurrentDispatcher;
     private bool _loading;
     private bool _on, _isPrimary, _alertsOn, _installed = true;
     private string _color;
@@ -142,6 +170,10 @@ public sealed partial class SourceRowViewModel : ObservableObject
         Source = source;
         Name = AgentSources.Name(source);
         ColorName = SettingsNames.SourcesColorName(Name);
+        OnName = SettingsNames.SourcesTrackName(Name);
+        PrimaryName = SettingsNames.SourcesPrimaryName(Name);
+        ResetName = SettingsNames.SourcesResetName(Name);
+        AlertsName = SettingsNames.SourcesAlertsName(Name);
         _color = AgentSources.DefaultColor(source);
         ResetColorCommand = new RelayCommand(OnResetColor);
     }
@@ -154,6 +186,12 @@ public sealed partial class SourceRowViewModel : ObservableObject
 
     /// <summary>The color box's spoken name, "Codex color".</summary>
     public string ColorName { get; }
+
+    /// <summary>The other controls' spoken names, each with the source in it: "Track Codex", "Codex primary", "Reset Codex color", "Codex alerts".</summary>
+    public string OnName { get; }
+    public string PrimaryName { get; }
+    public string ResetName { get; }
+    public string AlertsName { get; }
 
     public ICommand ResetColor => ResetColorCommand;
     private RelayCommand ResetColorCommand { get; }
@@ -227,8 +265,10 @@ public sealed partial class SourceRowViewModel : ObservableObject
             }
             else
                 ColorMessage = SettingsNames.SourcesColorRefused;
-            OnPropertyChanged();   // a refused entry reads as the old color again
             OnPropertyChanged(nameof(Swatch));
+            // The box still shows what was typed (refused, or untrimmed). Say the saved color after the commit has unwound: a
+            // notification from inside the binding's own update is not reliably shown.
+            _ui.BeginInvoke(() => OnPropertyChanged(nameof(Color)));
         }
     }
 

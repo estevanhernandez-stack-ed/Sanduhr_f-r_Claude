@@ -71,7 +71,7 @@
                                     <!-- On, with the source's name; a source that is not installed is greyed and says why. -->
                                     <CheckBox Style="{DynamicResource ThemedCheckBox}" Content="{Binding Name}"
                                               IsChecked="{Binding On, Mode=TwoWay}" IsEnabled="{Binding CanToggle}"
-                                              AutomationProperties.Name="{Binding Name}" />
+                                              AutomationProperties.Name="{Binding OnName}" />
                                     <TextBlock Text="{Binding NotInstalledText}" FontSize="11" TextWrapping="Wrap" Margin="24,4,0,0"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                                Visibility="{Binding HasNotInstalledText, Converter={StaticResource BoolVis}}" />
@@ -80,7 +80,7 @@
                                         <RadioButton Style="{StaticResource SourcesRadio}" GroupName="sources-primary"
                                                      Content="{x:Static core:SettingsNames.SourcesPrimary}"
                                                      IsChecked="{Binding IsPrimary, Mode=TwoWay}" IsEnabled="{Binding CanBePrimary}"
-                                                     AutomationProperties.Name="{x:Static core:SettingsNames.SourcesPrimary}"
+                                                     AutomationProperties.Name="{Binding PrimaryName}"
                                                      VerticalAlignment="Center" Margin="0,0,20,0" />
                                         <TextBlock Text="{x:Static core:SettingsNames.SourcesColor}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
                                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
@@ -94,11 +94,11 @@
                                         <Button Style="{DynamicResource FlatButton}" Padding="10,4" Margin="6,0,20,0"
                                                 Content="{x:Static core:SettingsNames.SourcesReset}"
                                                 Command="{Binding ResetColor}"
-                                                AutomationProperties.Name="{x:Static core:SettingsNames.SourcesReset}" />
+                                                AutomationProperties.Name="{Binding ResetName}" />
                                         <CheckBox Style="{DynamicResource ThemedCheckBox}" VerticalAlignment="Center"
                                                   Content="{x:Static core:SettingsNames.SourcesAlerts}"
                                                   IsChecked="{Binding AlertsOn, Mode=TwoWay}"
-                                                  AutomationProperties.Name="{x:Static core:SettingsNames.SourcesAlerts}" />
+                                                  AutomationProperties.Name="{Binding AlertsName}" />
                                     </StackPanel>
                                     <TextBlock Text="{Binding ColorMessage}" FontSize="11" TextWrapping="Wrap" Margin="24,4,0,0"
                                                Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
@@ -111,7 +111,17 @@
                     </controls:RadioGroupPanel>
                     <TextBlock Text="{x:Static core:SettingsNames.SourcesPrimaryCaption}" FontSize="11" TextWrapping="Wrap"
                                Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                    <TextBlock Text="{Binding Message}" FontSize="11.5" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                               AutomationProperties.LiveSetting="Assertive"
+                               Visibility="{Binding HasMessage, Converter={StaticResource BoolVis}}" />
                 </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+                <!-- Store test 10.1.4.4: the page names Claude and Codex, so both disclaimers show. -->
+                <views:TrademarkFooter />
+                <TextBlock Text="{x:Static core:SettingsNames.CodexNotice}" TextWrapping="Wrap" FontSize="11" Margin="0,6,0,0"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
             </StackPanel>
         </ScrollViewer>
     </Border>
