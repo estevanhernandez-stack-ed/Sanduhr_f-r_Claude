@@ -1,0 +1,139 @@
+{
+  "run": "sprites-2-43",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "b3f498c9111859413eedf5ac49d8349486745548",
+  "integration_branch": "cart/sprites-2-43",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-sprites-2-43/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-sprites-2-43",
+  "builder_branch": "main",
+  "uncommitted_at_start": [],
+  "started_at": "2026-11-11T18:09:41.361Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "spec-2-43",
+      "title": "Spec 2.43.0 sections 21-24",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/sprites-2-43--01-spec-2-43",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "git diff --check",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "zip-writer",
+      "title": "WidgetZip.write",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/sprites-2-43--02-zip-writer",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "export-pack",
+      "title": "Export a pack",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/sprites-2-43--03-export-pack",
+      "worktree": "",
+      "on": 2,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "gif-import",
+      "title": "Import an animated GIF",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/sprites-2-43--04-gif-import",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "aseprite-import",
+      "title": "Import an Aseprite sheet",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/sprites-2-43--05-aseprite-import",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "stage-columns",
+      "title": "Own art, a column per stage",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/sprites-2-43--06-stage-columns",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 7,
+      "slug": "release-rows",
+      "title": "2.43.0 rows",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/sprites-2-43--07-release-rows",
+      "worktree": "",
+      "on": 6,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}

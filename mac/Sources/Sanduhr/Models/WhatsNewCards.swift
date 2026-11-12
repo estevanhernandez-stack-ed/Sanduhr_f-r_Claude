@@ -7,8 +7,16 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2420 + release2410 + release2400 + release2390 + release2380 + release2370 + release2360 + release2350 + release2340 + release2330 + release2320 + release2310 + release2300 + release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2430 + release2420 + release2410 + release2400 + release2390 + release2380 + release2370 + release2360 + release2350 + release2340 + release2330 + release2320 + release2310 + release2300 + release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2430: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.43.0", id: "sprites-in-and-out",
+            title: "Sprites in and out",
+            body: "A GIF or an Aseprite export becomes a sprite, Use my own art has a column for each growth stage, and Export saves a pack made here as a zip. Open Settings, Widgets.",
+            art: .symbol("square.and.arrow.up"), destination: .widgets),
+    ]
 
     static let release2420: [WhatsNewCard] = [
         WhatsNewCard(

@@ -352,6 +352,8 @@ file by hand.
 
 ## #9 — Sprite sheets, later (Mac first)
 
+**Planned as Mac 2.43.0** (2026-11-11): `docs/mac-widgets-spec.md` sections 21 to 24.
+
 **Raised 2026-10-28 by Este**, after the 2.36.0 own-art check. A new sprite from your own art and
 Claude-proposed motion are planned as 2.39.0 (`docs/mac-widgets-spec.md` sections 18 and 19). These
 three wait:
