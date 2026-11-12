@@ -1941,7 +1941,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(AnyUsageOn));
         OnPropertyChanged(nameof(ShowUsageOff));
         RebuildSections();
-        RenderCodex(_codexState, DateTimeOffset.UtcNow);
+        RenderCodex(_codexState, DateTimeOffset.UtcNow, reloadHistory: true);
         UpdateTray();
     }
 
@@ -1965,7 +1965,13 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             Sections.Clear();
             foreach (var section in wanted) Sections.Add(section);
         }
-        foreach (var section in Sections) section.ShowHeader = Sections.Count > 1;
+        foreach (var section in Sections)
+        {
+            // A lone Claude section is today's widget: no header, always expanded. A lone Codex section keeps its header.
+            bool loneClaude = Sections.Count == 1 && section.Source == AgentSources.Claude;
+            section.ShowHeader = !loneClaude;
+            section.AlwaysExpanded = loneClaude;
+        }
         RebuildCombined();
     }
 
@@ -1974,7 +1980,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     public void ApplyCodex(CodexState state)
     {
         _codexState = state;
-        RenderCodex(state, DateTimeOffset.UtcNow);
+        RenderCodex(state, DateTimeOffset.UtcNow, reloadHistory: true);
         UpdateTray(onlyIfChanged: true);
     }
 
@@ -1987,8 +1993,17 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>Draws the Codex section: its cards (per-tier freshness dims a tier whose number can't be trusted), its "as of" text,
     /// its empty line, and the collapsed summary; then the combined bars. Called when Codex changes and on the 30 s tick.</summary>
-    private void RenderCodex(CodexState state, DateTimeOffset now)
+    private readonly Dictionary<string, IReadOnlyList<int>> _codexHistory = new();
+
+    private void RenderCodex(CodexState state, DateTimeOffset now, bool reloadHistory = false)
     {
+        if (reloadHistory)
+        {
+            // Read from disk when Codex changed, not on every 30 s tick: the history only grows when a new event arrives.
+            _codexHistory.Clear();
+            foreach (var k in new[] { TierModel.FiveHour, TierModel.SevenDay })
+                _codexHistory[k] = _history.Load(k, CodexUsageService.CodexHistoryAccount);
+        }
         var section = _codexSection;
         if (state.Status == CodexReadStatus.Ok)
         {
@@ -2001,20 +2016,19 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
                 var card = section.Tiers.FirstOrDefault(t => t.TierKey == key);
                 if (card is null)
                 {
-                    card = new TierCardViewModel(key, _palette) { Source = AgentSources.Codex };
+                    card = new TierCardViewModel(key, _palette) { Source = AgentSources.Codex, Label = SourceSectionViewModel.CodexTierLabel(key) };
                     card.SetThresholds(_alertConfig.WarnPct, _alertConfig.UrgentPct);
                     section.Tiers.Insert(Math.Min(keep.Count - 1, section.Tiers.Count), card);
                 }
                 string? resetsAt = (state.Tiers[key] as JsonObject)?["resets_at"]?.GetValue<string>();
-                card.Update((int)Math.Round(util), resetsAt, null, null,
-                    _history.Load(key, CodexUsageService.CodexHistoryAccount), _palette, SparklineStyle, now);
+                card.Update((int)util, resetsAt, null, null,
+                    _codexHistory.GetValueOrDefault(key) ?? [], _palette, SparklineStyle, now);
                 card.Opacity = state.FreshTiers.Contains(key) ? 1 : CombinedBarViewModel.StaleOpacity;
             }
             foreach (var gone in section.Tiers.Where(t => !keep.Contains(t.TierKey)).ToList())
                 section.Tiers.Remove(gone);
             section.Stale = !state.Fresh;
-            bool anyDim = keep.Any(k => !state.FreshTiers.Contains(k));
-            section.AsOfText = state.AsOf is { } asOf && (section.Stale || anyDim) ? AsOfLabel(asOf, now) : "";
+            section.AsOfText = state.AsOf is { } asOf ? AsOfLabel(asOf, now) : "";
         }
         else
         {
@@ -2044,8 +2058,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         if (tiers is null) return "";
         var parts = new List<string>();
-        if (Util(tiers, TierModel.FiveHour) is { } five) parts.Add($"5h {Math.Round(five).ToString(CultureInfo.InvariantCulture)}%");
-        if (Util(tiers, TierModel.SevenDay) is { } week) parts.Add($"wk {Math.Round(week).ToString(CultureInfo.InvariantCulture)}%");
+        if (Util(tiers, TierModel.FiveHour) is { } five) parts.Add($"5h {((int)five).ToString(CultureInfo.InvariantCulture)}%");
+        if (Util(tiers, TierModel.SevenDay) is { } week) parts.Add($"wk {((int)week).ToString(CultureInfo.InvariantCulture)}%");
         return string.Join(" · ", parts);
     }
 
@@ -2055,8 +2069,20 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (source == AgentSources.Claude)
             return ShownData is { } data && Util(data, key) is { } u ? (u, true) : null;
         return _codexOn && _codexState.Status == CodexReadStatus.Ok && Util(_codexState.Tiers, key) is { } c
-            ? (Math.Round(c), _codexState.FreshTiers.Contains(key))
+            ? (c, _codexState.FreshTiers.Contains(key))
             : null;
+    }
+
+    /// <summary>"Codex weekly, 62%." or "Claude session, 40%."; a stale source adds " As of 3:42 PM." (the date past 7 days).</summary>
+    private string SourceTooltip(string source, string window, double percent, bool stale)
+    {
+        string text = $"{AgentSources.Name(source)} {(window == TierModel.FiveHour ? "session" : "weekly")}, {Math.Round(percent).ToString(CultureInfo.InvariantCulture)}%.";
+        if (stale && source == AgentSources.Codex && _codexState.AsOf is { } asOf)
+        {
+            string label = AsOfLabel(asOf, DateTimeOffset.UtcNow);
+            text += " A" + label[1..] + ".";
+        }
+        return text;
     }
 
     /// <summary>One combined bar per window two or more ticked sources report. A bar whose drawing did not change is kept.</summary>
@@ -2079,11 +2105,13 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
                 var layout = SourceBar.Layout(primary, points);
                 if (layout.Primary is null) continue;
                 var ticks = layout.Ticks.Select(t => (t.At, CombinedBarViewModel.BrushFor(_sources.ColorOf(t.Source), t.Stale), t.Stale,
-                    $"{AgentSources.Name(t.Source)} {Math.Round(t.At * 100).ToString(CultureInfo.InvariantCulture)}%{(t.Stale ? ", as of earlier" : "")}")).ToList();
+                    SourceTooltip(t.Source, key, t.At * 100, t.Stale))).ToList();
                 bars.Add(new CombinedBarViewModel(label, layout, SourceBar.AccessibleName(label, points),
                     CombinedBarViewModel.BrushFor(_sources.ColorOf(layout.Primary.Source), layout.Primary.Stale),
                     layout.Beyond is { } b ? CombinedBarViewModel.BrushFor(_sources.ColorOf(b.Source), b.Stale) : null,
-                    ticks));
+                    ticks,
+                    SourceTooltip(layout.Primary.Source, key, layout.Primary.To * 100, layout.Primary.Stale),
+                    layout.Beyond is { } bt ? SourceTooltip(bt.Source, key, bt.To * 100, bt.Stale) : ""));
             }
         }
         bool same = bars.Count == CombinedBars.Count && bars.Zip(CombinedBars).All(p => p.First.Signature == p.Second.Signature);
@@ -2104,7 +2132,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             (string Label, double Util)? top = null;
             foreach (var key in new[] { TierModel.FiveHour, TierModel.SevenDay })
                 if (SourceValue(AgentSources.Codex, key) is { } v && (top is null || v.Percent > top.Value.Util))
-                    top = (TierModel.Label(key), v.Percent);
+                    top = (SourceSectionViewModel.CodexTierLabel(key), v.Percent);
             _trayHighest = top;
         }
         else if (primary == AgentSources.Codex)
@@ -2130,7 +2158,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
                     && (furthest is null || v.Percent > furthest.Value.Percent))
                     furthest = (source, v.Percent);
             if (furthest is { } f)
-                beyond = $"{AgentSources.Name(f.Source)} {(window == TierModel.FiveHour ? "5h" : "week")} {((int)f.Percent).ToString(CultureInfo.InvariantCulture)}%.";
+            {
+                string word = window == TierModel.FiveHour ? "5h" : "week";
+                beyond = $"{AgentSources.Name(primary)} {word} {reading.Percent.ToString(CultureInfo.InvariantCulture)}%. "
+                    + $"{AgentSources.Name(f.Source)} {word} {((int)f.Percent).ToString(CultureInfo.InvariantCulture)}%.";
+            }
         }
 
         var key2 = (reading?.Percent, reading?.Label, beyond);

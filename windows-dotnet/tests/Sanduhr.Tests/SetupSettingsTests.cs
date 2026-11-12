@@ -57,6 +57,14 @@ public class SetupSettingsTests
     }
 
     [Fact]
+    public void A_codex_only_first_run_does_not_wait_for_a_claude_fetch()
+    {
+        Assert.True(SetupLaunch.TourWaitsForClaudeFetch(new SetupChoices(true, true, ClaudeUsage: true, CodexUsage: true)));
+        Assert.False(SetupLaunch.TourWaitsForClaudeFetch(new SetupChoices(true, true, ClaudeUsage: false, CodexUsage: true)));
+        Assert.False(SetupLaunch.TourWaitsForClaudeFetch(new SetupChoices(true, true, ClaudeUsage: false)));
+    }
+
+    [Fact]
     public void Neither_an_account_nor_Just_the_Desk_is_a_first_run()
     {
         Assert.Null(SetupMigration.From(false, false, false, false));

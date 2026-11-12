@@ -38,7 +38,7 @@ public sealed class CodexUsageService : IDisposable
     private readonly SnapshotWriter? _snapshot;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Action<string>? _log;
-    private readonly AlertEngine _alerts = new();
+    private readonly AlertEngine _alerts;
     private readonly object _gate = new();          // the poll lock: reader, history, snapshot, alert state
     private readonly object _startStop = new();     // serializes Start and Stop
     private readonly object _debounceGate = new();  // only re-arms or retires the debounce timer, never waits on a read
@@ -53,8 +53,12 @@ public sealed class CodexUsageService : IDisposable
     private bool _disposed;
     private volatile CodexState _current = CodexState.Off;
 
-    public CodexUsageService(CodexLimitsReader reader, UsageHistory history, SnapshotWriter? snapshot, Func<DateTimeOffset> clock, Action<string>? log)
+    /// <param name="alerts">The engine whose per-tier state decides what is new. A rebuilt service takes the old one's, so a tier already
+    /// past its warning is not toasted again in the same session.</param>
+    public CodexUsageService(CodexLimitsReader reader, UsageHistory history, SnapshotWriter? snapshot, Func<DateTimeOffset> clock, Action<string>? log,
+        AlertEngine? alerts = null)
     {
+        _alerts = alerts ?? new AlertEngine();
         _reader = reader;
         _history = history;
         _snapshot = snapshot;

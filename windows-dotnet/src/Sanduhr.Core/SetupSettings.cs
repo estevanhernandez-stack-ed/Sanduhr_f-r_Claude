@@ -97,6 +97,10 @@ public static class SetupLaunch
     /// <summary>No setup yet: the setup screen opens first.</summary>
     public static bool OpensSetup(SetupSettings? setup) => setup is null;
 
+    /// <summary>After the first setup, the welcome tour waits for Claude's first fetch only when Claude usage is ticked. A Codex-only
+    /// (or Desk-only) first run has no such fetch coming, so it takes the Desk-only path and is offered the tour at once.</summary>
+    public static bool TourWaitsForClaudeFetch(SetupChoices now) => now.ClaudeUsage;
+
     /// <summary>A tray left-click while no setup exists yet and no account is signed in opens the setup screen, not the widget
     /// (whose first-run card is gone). With an account the widget has meters to show, so the click toggles it as usual.</summary>
     public static bool TrayClickOpensSetup(bool setupPending, bool hasAccount) => setupPending && !hasAccount;

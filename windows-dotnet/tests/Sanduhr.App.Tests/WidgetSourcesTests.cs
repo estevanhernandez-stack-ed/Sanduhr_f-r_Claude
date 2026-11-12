@@ -79,7 +79,7 @@ public sealed class WidgetSourcesTests : AppWindowFixture
             Assert.Equal(["claude", "codex"], widget.Sections.Select(s => s.Source));
             Assert.Equal(["Session (5hr)", "Weekly"], widget.CombinedBars.Select(b => b.WindowLabel));
             Assert.All(widget.Sections, s => Assert.True(s.ShowHeader));
-            Assert.Equal(["Session (5hr)", "Weekly - All Models"], widget.Sections[1].Tiers.Select(t => t.Label));
+            Assert.Equal(["Session (5hr)", "Weekly"], widget.Sections[1].Tiers.Select(t => t.Label));   // not "Weekly - All Models"
             Assert.Equal(["five_hour", "seven_day"], widget.Sections[1].Tiers.Select(t => t.TierKey));
         }
         finally { widget.Dispose(); }
@@ -130,6 +130,8 @@ public sealed class WidgetSourcesTests : AppWindowFixture
             var weekly = widget.CombinedBars.Single(b => b.WindowLabel == "Weekly");
             Assert.Equal(0.55, weekly.BeyondBrush!.Opacity);
             Assert.Contains("as of earlier", weekly.AccessibleName);
+            Assert.Equal("Codex weekly, 70%. As of 3:42 PM.", weekly.BeyondTooltip);
+            Assert.Equal("Claude weekly, 40%.", weekly.PrimaryTooltip);
         }
         finally { widget.Dispose(); }
     });
@@ -146,6 +148,7 @@ public sealed class WidgetSourcesTests : AppWindowFixture
             widget.ApplyCodex(CodexOk(0, 70, fresh: true, asOf: DateTimeOffset.UtcNow.AddHours(-3), "five_hour"));
             var codex = widget.Sections[1];
             Assert.False(codex.Stale);
+            Assert.StartsWith("as of ", codex.AsOfText);   // shown whether or not the reading is stale
             Assert.Equal(1.0, codex.Tiers.Single(t => t.TierKey == "five_hour").Opacity);
             Assert.Equal(0.55, codex.Tiers.Single(t => t.TierKey == "seven_day").Opacity);
         }
@@ -226,7 +229,7 @@ public sealed class WidgetSourcesTests : AppWindowFixture
 
             widget.ApplyClaudeForTests(ClaudeData(10, 80));
             Assert.Equal(55, widget.CurrentTrayReading!.Percent);
-            Assert.Contains("Claude week 80%.", widget.CurrentTrayGlyph.Tooltip);
+            Assert.Equal("Sanduhr für Claude — Codex week 55%. Claude week 80%.", widget.CurrentTrayGlyph.Tooltip);
         }
         finally { widget.Dispose(); }
     });
@@ -244,7 +247,7 @@ public sealed class WidgetSourcesTests : AppWindowFixture
             Assert.Equal(30, widget.CurrentTrayReading!.Percent);
             Assert.DoesNotContain("Codex week", widget.CurrentTrayGlyph.Tooltip);
             widget.ApplyCodex(CodexOk(20, 55));
-            Assert.Contains("Codex week 55%.", widget.CurrentTrayGlyph.Tooltip);
+            Assert.Equal("Sanduhr für Claude — Claude week 30%. Codex week 55%.", widget.CurrentTrayGlyph.Tooltip);
         }
         finally { widget.Dispose(); }
     });
@@ -259,7 +262,8 @@ public sealed class WidgetSourcesTests : AppWindowFixture
             widget.Start();
             widget.ApplyCodex(CodexOk(15, 25));
             Assert.Equal(["codex"], widget.Sections.Select(s => s.Source));
-            Assert.False(widget.Sections[0].ShowHeader);
+            Assert.True(widget.Sections[0].ShowHeader);   // a lone Codex section keeps its name, as-of and chevron
+            Assert.StartsWith("as of ", widget.Sections[0].AsOfText);
             Assert.False(widget.ShowSignInPrompt);
             Assert.Equal(SignInReason.None, widget.Reason);
             Assert.True(widget.AnyUsageOn);
@@ -287,6 +291,74 @@ public sealed class WidgetSourcesTests : AppWindowFixture
             Assert.Equal(["codex"], widget.Sections.Select(s => s.Source));
         }
         finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void A_collapsed_lone_claude_section_comes_back_expanded_with_no_header() => AppHost.Run(() =>
+    {
+        var store = Setup(Both);
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            widget.ApplyClaudeForTests(ClaudeData(30, 40));
+            widget.ApplyCodex(CodexOk(50, 70));
+            var claude = widget.Sections[0];
+            claude.ToggleCollapseCommand.Execute(null);
+            Assert.True(claude.Collapsed);
+            Assert.True(claude.ShowSummary);
+            // Untick Codex: Claude is alone, so nothing could expand it. It is drawn expanded, header hidden, whatever was saved.
+            store.SaveSetup(new SetupSettings(true, ClaudeOnly));
+            widget.RefreshSources();
+            claude = Assert.Single(widget.Sections);
+            Assert.False(claude.ShowHeader);
+            Assert.True(claude.ShowCards);
+            Assert.False(claude.ShowSummary);
+            Assert.Contains("claude", store.LoadSources().Collapsed);   // the saved choice is kept for when Codex comes back
+            store.SaveSetup(new SetupSettings(true, Both));
+            widget.RefreshSources();
+            Assert.True(widget.Sections[0].ShowSummary);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void A_lone_codex_section_keeps_its_header_and_can_still_collapse() => AppHost.Run(() =>
+    {
+        var store = Setup(CodexOnly);
+        var (widget, _) = ScratchWidget();
+        try
+        {
+            widget.ApplyCodex(CodexOk(40, 12));
+            var codex = Assert.Single(widget.Sections);
+            Assert.True(codex.ShowHeader);
+            codex.ToggleCollapseCommand.Execute(null);
+            Assert.True(codex.ShowSummary);
+            Assert.False(codex.ShowCards);
+            Assert.Contains("codex", store.LoadSources().Collapsed);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void The_collapsed_summary_truncates_like_the_cards() => AppHost.Run(() =>
+    {
+        Setup(Both);
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            widget.ApplyCodex(CodexOk(39.9, 12.7));
+            var codex = widget.Sections[1];
+            Assert.Equal("5h 39% · wk 12%", codex.CollapsedSummary);
+            Assert.Equal("39%", codex.Tiers[0].ValueText);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void Codex_toasts_use_the_card_labels() => AppHost.Run(() =>
+    {
+        Assert.Equal("Session (5hr)", SourceSectionViewModel.CodexTierLabel("five_hour"));
+        Assert.Equal("Weekly", SourceSectionViewModel.CodexTierLabel("seven_day"));
     });
 
     [Fact]

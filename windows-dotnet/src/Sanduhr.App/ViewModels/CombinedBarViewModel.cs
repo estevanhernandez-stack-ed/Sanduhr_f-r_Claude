@@ -13,8 +13,11 @@ public sealed class CombinedBarViewModel
     public const double StaleOpacity = 0.55;
 
     public CombinedBarViewModel(string windowLabel, SourceBarLayout layout, string accessibleName,
-        Brush primaryBrush, Brush? beyondBrush, IReadOnlyList<(double At, Brush Brush, bool Stale, string Tooltip)> ticks)
+        Brush primaryBrush, Brush? beyondBrush, IReadOnlyList<(double At, Brush Brush, bool Stale, string Tooltip)> ticks,
+        string primaryTooltip = "", string beyondTooltip = "")
     {
+        PrimaryTooltip = primaryTooltip;
+        BeyondTooltip = beyondTooltip;
         WindowLabel = windowLabel;
         Layout = layout;
         AccessibleName = accessibleName;
@@ -24,6 +27,11 @@ public sealed class CombinedBarViewModel
     }
 
     public string WindowLabel { get; }
+
+    /// <summary>"Claude session, 40%." and, for a stale source, " As of 3:42 PM."</summary>
+    public string PrimaryTooltip { get; }
+
+    public string BeyondTooltip { get; }
 
     public SourceBarLayout Layout { get; }
 

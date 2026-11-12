@@ -167,6 +167,26 @@ public sealed class CodexUsageServiceTests : IDisposable
     }
 
     [Fact]
+    public void A_rebuilt_service_with_the_same_engine_does_not_toast_a_tier_again()
+    {
+        Rollout(Event(AsOf, five: 85, week: 10));
+        var engine = new AlertEngine();
+        var accounts = new AccountStore(new AppWindowFixture.MemoryCredentials());
+        CodexUsageService Build() => new(new CodexLimitsReader(() => new[] { _home }, null), new UsageHistory(accounts, _paths), null, () => _clock, null, engine);
+        var first = Build();
+        first.Poll();
+        Assert.Contains(first.EvaluateAlerts(Config, true), e => e.Kind == AlertKind.Warn);
+        first.Dispose();
+        var second = Build();
+        second.Poll();
+        Assert.DoesNotContain(second.EvaluateAlerts(Config, true), e => e.Kind == AlertKind.Warn);
+        // Without the carried engine the same reading toasts again.
+        var fresh = new CodexUsageService(new CodexLimitsReader(() => new[] { _home }, null), new UsageHistory(accounts, _paths), null, () => _clock, null);
+        fresh.Poll();
+        Assert.Contains(fresh.EvaluateAlerts(Config, true), e => e.Kind == AlertKind.Warn);
+    }
+
+    [Fact]
     public void Alerts_off_for_codex_raise_nothing()
     {
         Rollout(Event(AsOf, 99, 99));

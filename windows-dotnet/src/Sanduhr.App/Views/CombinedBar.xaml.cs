@@ -33,9 +33,9 @@ public partial class CombinedBar : UserControl
         Draw.Clip = new RectangleGeometry(new Rect(0, 0, w, h), 3, 3);
 
         if (bar.Layout.Primary is { } primary)
-            Draw.Children.Add(Segment(primary, bar.PrimaryBrush, w, h));
+            Draw.Children.Add(Segment(primary, bar.PrimaryBrush, bar.PrimaryTooltip, w, h));
         if (bar.Layout.Beyond is { } beyond && bar.BeyondBrush is { } beyondBrush)
-            Draw.Children.Add(Segment(beyond, beyondBrush, w, h));
+            Draw.Children.Add(Segment(beyond, beyondBrush, bar.BeyondTooltip, w, h));
         foreach (var tick in bar.Ticks)
         {
             var r = new Rectangle { Width = TickWidth, Height = h, Fill = tick.Brush, ToolTip = tick.Tooltip };
@@ -45,10 +45,9 @@ public partial class CombinedBar : UserControl
         }
     }
 
-    private static Rectangle Segment(BarSegment seg, Brush brush, double w, double h)
+    private static Rectangle Segment(BarSegment seg, Brush brush, string name, double w, double h)
     {
         var r = new Rectangle { Width = Math.Max(0, (seg.To - seg.From) * w), Height = h, Fill = brush };
-        string name = $"{AgentSources.Name(seg.Source)} {Math.Round(seg.To * 100).ToString(CultureInfo.InvariantCulture)}%{(seg.Stale ? ", as of earlier" : "")}";
         r.ToolTip = name;
         AutomationProperties.SetName(r, name);   // streamer: notname - a source's name and a percent, no account or project
         Canvas.SetLeft(r, seg.From * w);

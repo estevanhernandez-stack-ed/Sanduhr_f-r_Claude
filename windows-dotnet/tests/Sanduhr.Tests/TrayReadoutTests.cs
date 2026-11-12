@@ -148,9 +148,11 @@ public class TrayReadoutTests
     [Fact]
     public void A_beyond_clause_ends_the_tooltip()
     {
-        var g = TrayReadout.Glyph(true, new TrayReading(40, "Week"), false, beyond: "Codex week 70%.");
+        var g = TrayReadout.Glyph(true, new TrayReading(40, "Week"), false, beyond: "Claude week 40%. Codex week 70%.");
         Assert.EndsWith("Codex week 70%.", g.Tooltip);
-        Assert.Equal(TrayReadout.Glyph(true, new TrayReading(40, "Week"), false).Tooltip + " Codex week 70%.", g.Tooltip);
+        // The clause names the primary too, so it stands in for the plain reading.
+        Assert.Equal("Sanduhr für Claude — Claude week 40%. Codex week 70%.", g.Tooltip);
+        Assert.Equal(40, g.Percent);
     }
 
     [Fact]

@@ -46,19 +46,33 @@ public sealed partial class SourceSectionViewModel : ObservableObject
     /// <summary>"5h 40% · wk 12%", shown while collapsed.</summary>
     [ObservableProperty] private string _collapsedSummary = "";
 
-    /// <summary>The header row shows only when more than one source is stacked.</summary>
+    /// <summary>The header row: with several sources always; alone, only a non-Claude section keeps it (name, as-of, chevron), so the
+    /// Claude-only widget reads exactly as it always did.</summary>
     [ObservableProperty] private bool _showHeader;
+
+    /// <summary>A lone Claude section has no header to expand it from, so it is always drawn expanded whatever was saved.</summary>
+    [ObservableProperty] private bool _alwaysExpanded;
+
+    /// <summary>The label Codex's cards and toasts use: Session (5hr) and Weekly.</summary>
+    public static string CodexTierLabel(string tierKey) => tierKey switch
+    {
+        TierModel.FiveHour => "Session (5hr)",
+        TierModel.SevenDay => "Weekly",
+        _ => TierModel.Label(tierKey),
+    };
+
+    private bool ShownCollapsed => Collapsed && !AlwaysExpanded;
 
     /// <summary>Raised when the chevron toggles <see cref="Collapsed"/>; the widget saves it.</summary>
     public event Action<SourceSectionViewModel>? CollapsedChanged;
 
     public string CollapseName => (Collapsed ? "Expand " : "Collapse ") + Name;
 
-    public bool ShowCards => !Collapsed && EmptyText is null;
+    public bool ShowCards => !ShownCollapsed && EmptyText is null;
 
-    public bool ShowEmpty => !Collapsed && EmptyText is not null;
+    public bool ShowEmpty => !ShownCollapsed && EmptyText is not null;
 
-    public bool ShowSummary => Collapsed;
+    public bool ShowSummary => ShownCollapsed;
 
     /// <summary>What a screen reader reads for the header's text: the source, then when it was read.</summary>
     public string HeaderName => AsOfText.Length == 0 ? Name : $"{Name}, {AsOfText}";
@@ -79,6 +93,13 @@ public sealed partial class SourceSectionViewModel : ObservableObject
     partial void OnCollapsedChanged(bool value)
     {
         OnPropertyChanged(nameof(CollapseName));
+        OnPropertyChanged(nameof(ShowCards));
+        OnPropertyChanged(nameof(ShowEmpty));
+        OnPropertyChanged(nameof(ShowSummary));
+    }
+
+    partial void OnAlwaysExpandedChanged(bool value)
+    {
         OnPropertyChanged(nameof(ShowCards));
         OnPropertyChanged(nameof(ShowEmpty));
         OnPropertyChanged(nameof(ShowSummary));

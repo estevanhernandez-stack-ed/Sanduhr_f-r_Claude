@@ -1081,7 +1081,7 @@ public partial class App : Application
         if (!firstRun || !_tourHeldBySetup) return;
         _tourHeldBySetup = false;
         _tourOfferedThisLaunch = false;
-        if (anyUsage)
+        if (SetupLaunch.TourWaitsForClaudeFetch(result.Now))
         {
             // The first fetch offers the tour (OnFetchSucceeded); one that already succeeded (signed in before this screen) offers it now.
             if (_fetchedThisLaunch) OfferTourAfterFetch();
@@ -1428,6 +1428,7 @@ public partial class App : Application
     private AlertService? _alertService;
     private CodexUsageService? _codex;
     private bool _codexHasSnapshotWriter;
+    private readonly AlertEngine _codexAlerts = new();   // one engine for the session: a rebuilt service must not toast a tier again
 
     /// <summary>Brings the Codex service in line with what is ticked and what wants a snapshot: stopped and disposed when Codex is off
     /// (its snapshot file removed by name), started when on, and rebuilt when the statusline or the MCP server turns on or off, since
@@ -1461,7 +1462,7 @@ public partial class App : Application
                 : null;
             if (snapshot is null) DeleteCodexSnapshot(paths);   // nothing wants it, so a file left from an earlier run goes
             var service = new CodexUsageService(new CodexLimitsReader(Homes, ZstdRollouts.Decompress, Log),
-                new UsageHistory(vm.AccountStore, paths), snapshot, () => DateTimeOffset.UtcNow, Log);
+                new UsageHistory(vm.AccountStore, paths), snapshot, () => DateTimeOffset.UtcNow, Log, _codexAlerts);
             // Changed arrives on a timer or watcher thread and can arrive out of order: dispatch, then read Current there.
             service.Changed += _ => Dispatcher.BeginInvoke(() => OnCodexChanged(service));
             _codex = service;
@@ -1502,7 +1503,7 @@ public partial class App : Application
             bool sound = store.LoadAlertSound();
             bool snake = store.LoadAlertSnakeFull();
             foreach (var e in events)
-                _alertService.Deliver(e, "Codex " + TierModel.Label(e.TierKey), sound, snake);
+                _alertService.Deliver(e, "Codex " + SourceSectionViewModel.CodexTierLabel(e.TierKey), sound, snake);
         }
         catch (Exception e) when (e is not OutOfMemoryException)
         {

@@ -89,15 +89,17 @@ public static class TrayReadout
 
     /// <summary>The tray icon for a reading. A reading always shows its number (demo samples draw with usage off). No reading: the
     /// hourglass while usage is off, since no number is coming, and "--" while it is on, the not-connected tell.
-    /// <paramref name="beyond"/> is the clause naming another source further out ("Codex week 70%."), appended to a number's tooltip.</summary>
+    /// <paramref name="beyond"/> is the clause naming the primary and a source further out ("Claude week 40%. Codex week 70%."); it replaces the reading in a number's tooltip.</summary>
     public static TrayGlyph Glyph(bool usageOn, TrayReading? reading, bool demo, string? beyond = null)
     {
         if (reading is not null)
         {
+            // Another source further out (agent layer): the clause names the primary too ("Claude week 40%. Codex week 70%.").
             string tip = demo
                 ? $"{AppName} — {DemoMode.TrayLabel(reading.Label, reading.Percent)}"
-                : $"{AppName} — {reading.Label} {reading.Percent}%";
-            if (!string.IsNullOrEmpty(beyond)) tip += " " + beyond;   // another source further out (agent layer)
+                : !string.IsNullOrEmpty(beyond)
+                    ? $"{AppName} — {beyond}"
+                    : $"{AppName} — {reading.Label} {reading.Percent}%";
             return new(TrayGlyphKind.Number, reading.Percent, tip);
         }
         return usageOn
