@@ -12,15 +12,43 @@
          inside the page's margins) and wraps to two below (WF26). The Settings window supplies the styles (found at run time)
          and the theme brushes. DataContext: the Desk page. -->
     <UserControl.Resources>
-        <DataTemplate x:Key="StylePicker">
-            <ComboBox Width="138" Margin="0,6,0,0" HorizontalAlignment="Left" Style="{DynamicResource ThemedComboBox}"
-                      ItemsSource="{x:Static vm:DeskSettingsViewModel.StyleOptions}"
-                      SelectedItem="{Binding Style, Mode=TwoWay}"
-                      IsEnabled="{Binding IsPlaced}"
-                      AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, style'}"
-                      AutomationProperties.HelpText="Bars, Slim (one line over a thin bar), Rings (small gauges in a row) or Ticks (ten cells, kind to OLED screens)" />
-        </DataTemplate>
         <BooleanToVisibilityConverter x:Key="BoolVis" />
+        <DataTemplate x:Key="SourcePicker">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Shows" VerticalAlignment="Center" Margin="16,0,8,0"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                <ComboBox Width="120" Style="{DynamicResource ThemedComboBox}"
+                          ItemsSource="{x:Static vm:DeskSettingsViewModel.SourceOptions}"
+                          SelectedItem="{Binding Source, Mode=TwoWay}"
+                          IsEnabled="{Binding IsPlaced}"
+                          AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, shows'}"
+                          AutomationProperties.HelpText="Combined (every source Sanduhr is set up for, in one bar), Claude or Codex. A Codex piece is hidden while Codex usage is off." />
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="StylePicker">
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0" HorizontalAlignment="Left">
+                <ComboBox Width="138" Style="{DynamicResource ThemedComboBox}"
+                          ItemsSource="{x:Static vm:DeskSettingsViewModel.StyleOptions}"
+                          SelectedItem="{Binding Style, Mode=TwoWay}"
+                          IsEnabled="{Binding IsPlaced}"
+                          AutomationProperties.Name="{Binding Name, StringFormat='{}{0}, style'}"
+                          AutomationProperties.HelpText="Bars, Slim (one line over a thin bar), Rings (small gauges in a row) or Ticks (ten cells, kind to OLED screens)" />
+                <!-- Shows (agent layer): the Claude line and the Claude limits can draw both sources in one bar, or Claude or Codex alone.
+                     Made only for those two pieces (not merely hidden), so a screen reader never meets it on telemetry. -->
+                <ContentControl Focusable="False" IsTabStop="False">
+                    <ContentControl.Style>
+                        <Style TargetType="ContentControl">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasSource}" Value="True">
+                                    <Setter Property="Content" Value="{Binding}" />
+                                    <Setter Property="ContentTemplate" Value="{StaticResource SourcePicker}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ContentControl.Style>
+                </ContentControl>
+            </StackPanel>
+        </DataTemplate>
         <DataTemplate x:Key="CompanionExtras">
             <StackPanel Margin="0,6,0,0" DataContext="{Binding Companion}">
                 <TextBlock Text="{Binding Line}" FontSize="11" TextWrapping="Wrap"

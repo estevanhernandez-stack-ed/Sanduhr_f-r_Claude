@@ -408,4 +408,75 @@ public class DeskArrangementTests
         Assert.Equal((0, 1), a.StackPosition("weather"));
         Assert.Equal((-1, 0), a.StackPosition("message"));
     }
+
+    // ---- agent layer: a piece's source ----
+
+    [Theory]
+    [InlineData("clock:bl claude:bl")]
+    [InlineData("clock:bl:1:-18 claude:bl:1:-18 meters:tr:1.2")]
+    [InlineData("meters:bl:src=codex")]
+    [InlineData("claude:bl:1.3:0:ring:src=claude")]
+    [InlineData("meters:tr:1.2:src=codex@main")]
+    [InlineData("meters:tr:1:12:slim:src=codex")]
+    public void ASource_RoundTripsByteForByte(string layout) =>
+        Assert.Equal(layout, new DeskArrangement(layout).Layout);
+
+    [Fact]
+    public void ASource_ReadsFromWhereverItStands_AndOlderLayoutsAreCombined()
+    {
+        Assert.Equal("codex", Assert.Single(new DeskArrangement("meters:bl:src=codex").Pieces).Source);
+        Assert.Equal("codex", Assert.Single(new DeskArrangement("meters:bl:1.2:src=codex").Pieces).Source);
+        Assert.Equal(1.2, Assert.Single(new DeskArrangement("meters:bl:src=codex:1.2").Pieces).Scale);
+        Assert.All(new DeskArrangement(DeskArrangement.Standard).Pieces, p => Assert.Equal("combined", p.Source));
+        Assert.Equal(DeskArrangement.Standard, new DeskArrangement(DeskArrangement.Standard).Layout);
+    }
+
+    [Theory]
+    [InlineData("meters:bl:src=gemini")]
+    [InlineData("meters:bl:src=")]
+    [InlineData("meters:bl:src=Codex")]
+    [InlineData("meters:bl:src=combined")]
+    public void AnUnknownSource_IsCombined_AndWritesNothing(string layout)
+    {
+        var a = new DeskArrangement(layout);
+        Assert.Equal("combined", Assert.Single(a.Pieces).Source);
+        Assert.Equal("meters:bl", a.Layout);
+    }
+
+    [Fact]
+    public void OnlyTheClaudePiecesTakeASource()
+    {
+        Assert.Equal(["claude", "meters"], DeskSources.Pieces);
+        var a = new DeskArrangement("clock:bl:src=codex telemetry:tr:src=claude");
+        Assert.All(a.Pieces, p => Assert.Equal("combined", p.Source));
+        Assert.Equal("clock:bl telemetry:tr", a.Layout);
+        a.SetSource("clock", "codex");
+        Assert.Equal("clock:bl telemetry:tr", a.Layout);
+    }
+
+    [Fact]
+    public void SetSource_ChangesAPlacedPiece_AndSurvivesAMoveAndAResize()
+    {
+        var a = new DeskArrangement("meters:bl claude:tr");
+        a.SetSource("meters", "codex");
+        Assert.Equal("meters:bl:src=codex claude:tr", a.Layout);
+        a.Place("meters", DeskAnchor.TL);
+        a.SetScale("meters", 1.3);
+        a.SetStyle("meters", DeskMeterStyle.Ring);
+        Assert.Equal("meters:tl:1.3:0:ring:src=codex claude:tr", a.Layout);
+        a.SetSource("meters", "nonsense");
+        Assert.Equal("meters:tl:1.3:0:ring claude:tr", a.Layout);
+        a.SetSource("weather", "codex");   // not placed: nothing happens
+        Assert.Equal(2, a.Pieces.Count);
+    }
+
+    [Fact]
+    public void TheSourceWordsAreTheAgentSourceIds()
+    {
+        // DeskArrangement.cs is linked into the MCP process, which has no AgentSources, so DeskSources spells the ids out; they must agree.
+        Assert.Equal(AgentSources.Claude, DeskSources.Claude);
+        Assert.Equal(AgentSources.Codex, DeskSources.Codex);
+        Assert.Equal(["combined", .. AgentSources.All], DeskSources.All);
+        Assert.Equal(["Combined", "Claude", "Codex"], DeskSources.All.Select(DeskSources.Name));
+    }
 }

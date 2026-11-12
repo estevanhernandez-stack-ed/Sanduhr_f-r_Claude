@@ -17,6 +17,10 @@ public sealed record DeskTier(string Key, double Utilization, string? ResetsAt);
 /// hidden or not (the line reads session and week whatever the cards show); null uses
 /// <paramref name="Tiers"/>. <paramref name="SignInReminder"/> is the Desk's sign-in reminder switch
 /// (default on): with it off a needed sign-in draws nothing on the Claude line.
+/// Agent layer: <paramref name="SourceTiers"/> holds the tiers of the sources other than Claude (Codex's session and weekly), null with
+/// none; <paramref name="SourceStaleTiers"/> names, per source, the tier keys whose numbers are stale (freshness is per tier, so a
+/// per-source flag could not say it); <paramref name="SourcePrimary"/> is the primary source and <paramref name="SourceColors"/> each
+/// source's <c>#RRGGBB</c> (<see cref="SourceSettings.ColorOf"/>), for the combined fill.
 /// </summary>
 public sealed record DeskUsage(
     IReadOnlyList<DeskTier> Tiers,
@@ -25,13 +29,25 @@ public sealed record DeskUsage(
     bool FirstSignIn,
     string? Account,
     IReadOnlyList<DeskTier>? LineTiers = null,
-    bool SignInReminder = true)
+    bool SignInReminder = true,
+    IReadOnlyDictionary<string, IReadOnlyList<DeskTier>>? SourceTiers = null,
+    IReadOnlyDictionary<string, IReadOnlySet<string>>? SourceStaleTiers = null,
+    string SourcePrimary = AgentSources.Claude,
+    IReadOnlyDictionary<string, string>? SourceColors = null)
 {
     /// <summary>No tiers, never fetched, nothing needed.</summary>
     public static DeskUsage Empty { get; } = new([], null, false, false, null);
 
     /// <summary>Numbers older than this are drawn dimmed.</summary>
     public static readonly TimeSpan StaleAfter = TimeSpan.FromMinutes(15);
+
+    /// <summary>The tiers of a source other than Claude, in session, weekly order; empty with none.</summary>
+    public IReadOnlyList<DeskTier> TiersOf(string source) =>
+        SourceTiers is not null && SourceTiers.TryGetValue(source, out var t) ? t : [];
+
+    /// <summary>True when <paramref name="source"/>'s <paramref name="tierKey"/> is stale (not in the fresh set the widget knows).</summary>
+    public bool IsTierStale(string source, string tierKey) =>
+        SourceStaleTiers is not null && SourceStaleTiers.TryGetValue(source, out var s) && s.Contains(tierKey);
 
     /// <summary>Sign-in needed, never fetched, or fetched longer ago than <see cref="StaleAfter"/>.</summary>
     public bool IsStale(DateTimeOffset now) =>
@@ -48,7 +64,9 @@ public sealed record DeskUsage(
 /// <param name="Reset">"Today 5:00 PM" as the card prints it, or empty without a reset time.</param>
 /// <param name="Level">How far the limit is toward its end by the alert thresholds (<see cref="MeterSignal"/>): past Warn at the bar
 /// takes a yellow middle stop, past Urgent at a red one.</param>
-public sealed record DeskMeterRow(string Key, string Label, int Percent, double Fill, double? Pace, string Reset, MeterLevel Level);
+/// <param name="Stale">The reading is stale (a Codex tier that has not been fresh); it draws dimmed. Claude's rows are never stale here: the
+/// whole piece dims by <see cref="DeskUsage.IsStale"/>.</param>
+public sealed record DeskMeterRow(string Key, string Label, int Percent, double Fill, double? Pace, string Reset, MeterLevel Level, bool Stale = false);
 
 /// <summary>The Desk meters' rows (the Mac's <c>DeskMeterRow.rows</c>).</summary>
 public static class DeskMeters
@@ -76,6 +94,107 @@ public static class DeskMeters
                 MeterSignal.Level(t.Utilization, warnAt, urgentAt)));
         }
         return rows;
+    }
+
+    /// <summary>The windows the combined fill joins sources on, with the label a joined window carries.</summary>
+    private static readonly (string Key, string Label)[] CombinedWindows = [(TierModel.FiveHour, "Session (5hr)"), (TierModel.SevenDay, "Weekly")];
+
+    private static string? CombinedLabel(string key) => CombinedWindows.FirstOrDefault(w => w.Key == key).Label;
+
+    /// <summary>The label Codex's tiers carry: "Session (5hr)" and "Weekly".</summary>
+    public static string CodexLabel(string key) => CombinedLabel(key) ?? TierModel.Label(key);
+
+    /// <summary>True when Claude has something to draw: tiers, or a sign-in line.</summary>
+    private static bool ClaudePresent(DeskUsage u) => u.Tiers.Count > 0 || u.SignInNeeded;
+
+    /// <summary>What a piece set to <paramref name="source"/> draws: itself, except that combined with no Claude to draw and a Codex that has
+    /// tiers draws Codex alone (a Codex-only setup). Combined with one source is otherwise today's piece.</summary>
+    public static string Resolve(DeskUsage u, string source) =>
+        source == DeskSources.Combined && !ClaudePresent(u) && u.TiersOf(AgentSources.Codex).Count > 0 ? AgentSources.Codex : source;
+
+    /// <summary>True when two or more sources have numbers to put in one bar: Claude's tiers and Codex's.</summary>
+    public static bool HasSeveralSources(DeskUsage u) => !u.SignInNeeded && u.Tiers.Count > 0 && u.TiersOf(AgentSources.Codex).Count > 0;
+
+    /// <summary>
+    /// <paramref name="u"/> as one source alone: for Codex, its tiers (the line's too) in place of Claude's, named "Codex", never a sign-in,
+    /// stale when none of them is fresh; for any other source, <paramref name="u"/> itself. Lets the Claude pieces' drawing serve Codex unchanged.
+    /// </summary>
+    public static DeskUsage ForSource(DeskUsage u, string source, DateTimeOffset now)
+    {
+        if (source != AgentSources.Codex) return u;
+        var tiers = u.TiersOf(AgentSources.Codex);
+        bool anyFresh = tiers.Any(t => !u.IsTierStale(AgentSources.Codex, t.Key));
+        return u with
+        {
+            Tiers = tiers, LineTiers = tiers, SignInNeeded = false, FirstSignIn = false, Account = "Codex",
+            FetchedAt = anyFresh ? now : null,
+        };
+    }
+
+    /// <summary>One row per tier of <paramref name="source"/>: Claude's are <see cref="Rows"/>; Codex's carry no pace mark (the pace is Claude's)
+    /// and are stale per tier. None for a source that reports nothing.</summary>
+    public static IReadOnlyList<DeskMeterRow> SourceRows(DeskUsage usage, string source, DateTimeOffset now, TimeZoneInfo? zone = null,
+        int warnAt = MeterSignal.DefaultWarnAt, int urgentAt = MeterSignal.DefaultUrgentAt)
+    {
+        if (source != AgentSources.Codex) return Rows(usage, now, zone, warnAt, urgentAt);
+        return [.. usage.TiersOf(source).Select(t => Row(t, CodexLabel(t.Key), null, now, zone, warnAt, urgentAt, usage.IsTierStale(source, t.Key)))];
+    }
+
+    private static DeskMeterRow Row(DeskTier t, string label, double? pace, DateTimeOffset now, TimeZoneInfo? zone,
+        int warnAt, int urgentAt, bool stale = false) =>
+        new(t.Key, label, (int)t.Utilization, Math.Min(1.0, Math.Max(0.0, t.Utilization / 100.0)), pace, ResetDateTime(t.ResetsAt, now, zone),
+            MeterSignal.Level(t.Utilization, warnAt, urgentAt), stale);
+
+    /// <summary>
+    /// The rows for a combined piece: <see cref="Rows"/> (Claude's tiers, in order), each with the layout of its two-tone fill. A session or
+    /// weekly row that two or more sources report is one joined row: the label "Session (5hr)" or "Weekly", the number, level and reset of the
+    /// <paramref name="primary"/> source (the pace mark only when Claude is primary) and a <see cref="SourceBar.Layout"/> of every source's
+    /// percent, a source with a stale tier marked so. Any other row, and every row with one source, keeps today's row and a single-segment layout.
+    /// </summary>
+    public static IReadOnlyList<(DeskMeterRow Row, SourceBarLayout Layout)> CombinedRows(DeskUsage usage, string primary, DateTimeOffset now,
+        TimeZoneInfo? zone = null, int warnAt = MeterSignal.DefaultWarnAt, int urgentAt = MeterSignal.DefaultUrgentAt)
+    {
+        var rows = Rows(usage, now, zone, warnAt, urgentAt);
+        var result = new List<(DeskMeterRow, SourceBarLayout)>(rows.Count);
+        for (int i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            var claude = new SourcePercent(AgentSources.Claude, usage.Tiers[i].Utilization, false);
+            var points = new List<SourcePercent> { claude };
+            DeskTier? lead = null;
+            if (CombinedLabel(row.Key) is { } label)
+            {
+                foreach (var source in AgentSources.All)
+                {
+                    if (source == AgentSources.Claude) continue;
+                    if (usage.TiersOf(source).FirstOrDefault(t => t.Key == row.Key) is { } t)
+                    {
+                        points.Add(new SourcePercent(source, t.Utilization, usage.IsTierStale(source, row.Key)));
+                        if (source == primary) lead = t;
+                    }
+                }
+                if (points.Count >= 2)
+                {
+                    row = lead is { } l
+                        ? Row(l, label, null, now, zone, warnAt, urgentAt, usage.IsTierStale(primary, row.Key))
+                        : row with { Label = label };
+                    result.Add((row, SourceBar.Layout(primary, points)));
+                    continue;
+                }
+            }
+            result.Add((row, SourceBar.Layout(AgentSources.Claude, [claude])));
+        }
+        return result;
+    }
+
+    /// <summary>The accessible name of a combined row: "Weekly. Claude 40%. Codex 70%, as of earlier." (<see cref="SourceBar.AccessibleName"/>), read
+    /// back from the layout: the primary segment and every tick are the sources.</summary>
+    public static string CombinedName(string label, SourceBarLayout layout)
+    {
+        var points = new List<SourcePercent>();
+        if (layout.Primary is { } p) points.Add(new SourcePercent(p.Source, p.To * 100, p.Stale));
+        points.AddRange(layout.Ticks.Select(t => new SourcePercent(t.Source, t.At * 100, t.Stale)));
+        return SourceBar.AccessibleName(label, points);
     }
 
     /// <summary>The cells a <see cref="DeskMeterStyle.Ticks"/> meter has.</summary>
@@ -157,6 +276,16 @@ public static class DeskClaudeText
         var week = tiers.FirstOrDefault(t => t.Key == TierModel.SevenDay);
         if (week is not null) parts.Add($"{(int)week.Utilization}% week");
         return parts.Count == 0 ? null : new Parts(u.Account, string.Join("   ", parts));
+    }
+
+    /// <summary>The Codex line: "Codex 5h 40% · wk 12%", with only the windows Codex reports; null with none.</summary>
+    public static string? CodexLine(DeskUsage u)
+    {
+        var tiers = u.TiersOf(AgentSources.Codex);
+        var parts = new List<string>();
+        if (tiers.FirstOrDefault(t => t.Key == TierModel.FiveHour) is { } five) parts.Add($"5h {(int)five.Utilization}%");
+        if (tiers.FirstOrDefault(t => t.Key == TierModel.SevenDay) is { } week) parts.Add($"wk {(int)week.Utilization}%");
+        return parts.Count == 0 ? null : "Codex " + string.Join(" · ", parts);
     }
 
     /// <summary>"claude   7% session, resets 3:00   63% week", or null with nothing to say. With two

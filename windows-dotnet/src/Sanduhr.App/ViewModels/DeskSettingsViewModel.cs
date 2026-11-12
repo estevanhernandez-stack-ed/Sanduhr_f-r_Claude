@@ -51,6 +51,9 @@ public sealed partial class DeskPieceRow : ObservableObject
     /// <summary>The meter style (#336), for the pieces that have one (<see cref="HasStyle"/>).</summary>
     [ObservableProperty] private DeskStyleOption _style = DeskSettingsViewModel.StyleOptions[0];
 
+    /// <summary>Which source the piece shows (agent layer), for the pieces that take one (<see cref="HasSource"/>).</summary>
+    [ObservableProperty] private DeskSourceOption _source = DeskSettingsViewModel.SourceOptions[0];
+
     /// <summary>Order (WF5): live when another piece shares the place and this one isn't at that end of its stack.</summary>
     [ObservableProperty, NotifyCanExecuteChangedFor(nameof(MoveUpCommand))] private bool _canMoveUp;
     [ObservableProperty, NotifyCanExecuteChangedFor(nameof(MoveDownCommand))] private bool _canMoveDown;
@@ -62,6 +65,9 @@ public sealed partial class DeskPieceRow : ObservableObject
 
     /// <summary>True for the Claude line, the Claude limits and telemetry: their row shows a Style picker.</summary>
     public bool HasStyle => DeskMeterStyles.Supports(Widget);
+
+    /// <summary>True for the Claude line and the Claude limits: their row shows a Shows picker (Combined, Claude, Codex).</summary>
+    public bool HasSource => DeskSources.Supports(Widget);
 
     /// <summary>The companion's row carries its sprite and roaming inline (spec, Pieces).</summary>
     public bool IsCompanion => Widget == CompanionSettings.Widget;
@@ -113,6 +119,7 @@ public sealed partial class DeskPieceRow : ObservableObject
         Place = p is null ? DeskSettingsViewModel.Hidden : DeskSettingsViewModel.PlaceFor(p.Anchor);
         Size = p?.Scale ?? 1;
         Style = DeskSettingsViewModel.StyleFor(p?.Style ?? DeskMeterStyle.Bar);
+        Source = DeskSettingsViewModel.SourceFor(p?.Source);
         MonitorChoices = DeskMonitorNames.Choices(_owner.Monitors, p?.Monitor);
         Monitor = DeskMonitorNames.Select(MonitorChoices, p?.Monitor);
         if (p is not null) _owner.Remember(Widget, p.Anchor);   // whatever hides it later, Show returns to the last visible place
@@ -151,6 +158,17 @@ public sealed partial class DeskPieceRow : ObservableObject
     {
         if (!_loading && value is not null && HasStyle) _owner.Edit(a => a.SetStyle(Widget, value.Style));
     }
+
+    partial void OnSourceChanged(DeskSourceOption value)
+    {
+        if (!_loading && value is not null && HasSource) _owner.Edit(a => a.SetSource(Widget, value.Source));
+    }
+}
+
+/// <summary>A source as the Shows picker lists it (agent layer).</summary>
+public sealed record DeskSourceOption(string Source, string Name)
+{
+    public override string ToString() => Name;
 }
 
 /// <summary>A meter style as the Style picker lists it (#336).</summary>
@@ -182,6 +200,12 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         [.. DeskMeterStyles.All.Select(s => new DeskStyleOption(s, DeskMeterStyles.Name(s)))];
 
     public static DeskStyleOption StyleFor(DeskMeterStyle s) => StyleOptions.First(o => o.Style == s);
+
+    /// <summary>The sources a piece can show (agent layer): Combined, Claude, Codex.</summary>
+    public static IReadOnlyList<DeskSourceOption> SourceOptions { get; } =
+        [.. DeskSources.All.Select(s => new DeskSourceOption(s, DeskSources.Name(s)))];
+
+    public static DeskSourceOption SourceFor(string? source) => SourceOptions.FirstOrDefault(o => o.Source == source) ?? SourceOptions[0];
 
     /// <summary>The font picker's first entry: the system font (saved as "").</summary>
     public const string SystemFont = "System font (Segoe UI)";

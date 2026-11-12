@@ -402,4 +402,60 @@ public sealed class WidgetSourcesTests : AppWindowFixture
         }
         finally { window.Close(); widget.Dispose(); }
     });
+
+    // ---- the Desk's feed: Codex tiers, per-tier staleness, the primary and the colors ----
+
+    [Fact]
+    public void The_desk_usage_carries_codex_tiers_per_tier_staleness_the_primary_and_the_colors() => AppHost.Run(() =>
+    {
+        Setup(Both, primary: "codex");
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            int raised = 0;
+            widget.DeskUsageChanged += () => raised++;
+            widget.ApplyClaudeForTests(ClaudeData(30, 40));
+            int afterClaude = raised;
+            widget.ApplyCodex(CodexOk(50, 70.9, fresh: true, asOf: DateTimeOffset.UtcNow, "five_hour"));
+            Assert.True(raised > afterClaude);   // Codex arriving redraws the Desk
+            var usage = widget.CurrentDeskUsage;
+            var codex = usage.TiersOf("codex");
+            Assert.Equal(["five_hour", "seven_day"], codex.Select(t => t.Key));
+            Assert.Equal([50, 70.9], codex.Select(t => t.Utilization));
+            Assert.NotNull(codex[0].ResetsAt);
+            Assert.False(usage.IsTierStale("codex", "five_hour"));
+            Assert.True(usage.IsTierStale("codex", "seven_day"));   // not in the fresh set
+            Assert.Equal("codex", usage.SourcePrimary);
+            Assert.Equal("#E0875A", usage.SourceColors!["claude"], ignoreCase: true);
+            Assert.Equal("#2FB5A3", usage.SourceColors["codex"], ignoreCase: true);
+            Assert.Equal(["five_hour", "seven_day"], usage.Tiers.Select(t => t.Key));   // Claude's own tiers are untouched
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void The_desk_usage_has_no_codex_tiers_with_codex_off_or_unreadable() => AppHost.Run(() =>
+    {
+        Setup(ClaudeOnly);
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            widget.ApplyClaudeForTests(ClaudeData(30, 40));
+            widget.ApplyCodex(CodexOk(50, 70));   // a state arrives, but Codex usage is not on
+            Assert.Null(widget.CurrentDeskUsage.SourceTiers);
+            Assert.Empty(widget.CurrentDeskUsage.TiersOf("codex"));
+            Assert.Equal("claude", widget.CurrentDeskUsage.SourcePrimary);
+        }
+        finally { widget.Dispose(); }
+
+        Setup(Both);
+        var (second, _) = ScratchWidget("Personal");
+        try
+        {
+            second.ApplyClaudeForTests(ClaudeData(30, 40));
+            second.ApplyCodex(CodexState.Off);
+            Assert.Empty(second.CurrentDeskUsage.TiersOf("codex"));
+        }
+        finally { second.Dispose(); }
+    });
 }

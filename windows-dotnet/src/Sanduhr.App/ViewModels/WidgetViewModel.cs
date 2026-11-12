@@ -1946,6 +1946,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         RebuildSections();
         RenderCodex(_codexState, DateTimeOffset.UtcNow, reloadHistory: true);
         UpdateTray();
+        RaiseDesk();   // the primary, a color or what is ticked changed what the Desk's pieces draw
     }
 
     /// <summary>Syncs <see cref="Sections"/> with what is ticked, in <see cref="AgentSources.All"/> order. One section hides its
@@ -1985,6 +1986,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _codexState = state;
         RenderCodex(state, DateTimeOffset.UtcNow, reloadHistory: true);
         UpdateTray(onlyIfChanged: true);
+        RaiseDesk();   // a Desk piece set to Codex or Combined follows it
     }
 
     /// <summary>Test seam: renders a Claude payload as a fetch would, without a fetcher.</summary>
@@ -2289,11 +2291,32 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
                 : _accounts.ListAccounts().Count > 1 && _accounts.GetActive() is { } active   // streamer: masked - CP 5: Mask.Name masks on the next line
                     ? StreamerMode.Mask.Name(CodenameCategory.Account, active) : null;
             bool hide = signIn || !usage;   // usage off (or not set up yet) draws no numbers, whatever is left in memory
+            var (sourceTiers, staleTiers) = CodexDeskTiers();
             return new DeskUsage(hide ? [] : _deskTiers,
                 IsDemo ? DateTimeOffset.Now : _lastFetchAt,
                 signIn, Reason == SignInReason.FirstRun, account, hide ? [] : _deskLineTiers,
-                signIn ? _settings.LoadDeskSignInReminder() : true);
+                signIn ? _settings.LoadDeskSignInReminder() : true,
+                sourceTiers, staleTiers, _sources.PrimaryFor(TickedSetup()),
+                AgentSources.All.ToDictionary(s => s, s => _sources.ColorOf(s), StringComparer.Ordinal));
         }
+    }
+
+    /// <summary>Codex's session and weekly as the Desk draws them, and the keys among them that are stale (freshness is per tier);
+    /// null with Codex off, in demo mode, or not readable.</summary>
+    private (IReadOnlyDictionary<string, IReadOnlyList<DeskTier>>? Tiers, IReadOnlyDictionary<string, IReadOnlySet<string>>? Stale) CodexDeskTiers()
+    {
+        if (!_codexOn || IsDemo || _codexState.Status != CodexReadStatus.Ok) return (null, null);
+        var tiers = new List<DeskTier>();
+        var stale = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var key in new[] { TierModel.FiveHour, TierModel.SevenDay })
+        {
+            if (Util(_codexState.Tiers, key) is not { } util) continue;
+            tiers.Add(DeskTierFor(_codexState.Tiers, key, util));
+            if (!_codexState.FreshTiers.Contains(key)) stale.Add(key);
+        }
+        if (tiers.Count == 0) return (null, null);
+        return (new Dictionary<string, IReadOnlyList<DeskTier>> { [AgentSources.Codex] = tiers },
+            new Dictionary<string, IReadOnlySet<string>> { [AgentSources.Codex] = stale });
     }
 
     /// <summary>Raised after each render and when the sign-in state changes; the Desk reads

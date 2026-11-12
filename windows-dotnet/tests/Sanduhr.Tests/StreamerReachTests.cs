@@ -131,9 +131,9 @@ public class StreamerReachTests
         ("Sanduhr.App/Desk/DeskMessagePiece.cs", "notname", 3),
         ("Sanduhr.App/Desk/DeskReviewBar.xaml.cs", "notname", 13),
         ("Sanduhr.App/Desk/DeskReviewWindow.xaml.cs", "notname", 1),
-        ("Sanduhr.App/Desk/DeskView.Styles.cs", "notname", 1),
+        ("Sanduhr.App/Desk/DeskView.Styles.cs", "notname", 3),
         ("Sanduhr.App/Desk/DeskView.cs", "cant", 1),
-        ("Sanduhr.App/Desk/DeskView.cs", "notname", 1),
+        ("Sanduhr.App/Desk/DeskView.cs", "notname", 2),
         ("Sanduhr.App/Desk/Drawers/DrawerJournalStore.cs", "notname", 1),
         ("Sanduhr.App/Desk/Drawers/DrawerPlanEditWindow.xaml.cs", "masked", 2),
         ("Sanduhr.App/Desk/Drawers/DrawerMover.cs", "key", 13),   // final review I1: a move into a drawer that left settings is skipped by its leaf
