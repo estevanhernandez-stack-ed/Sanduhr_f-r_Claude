@@ -378,7 +378,7 @@ public sealed class SetupWindowTests : AppWindowFixture
     });
 
     [Fact]
-    public void The_Codex_disclaimer_shows_with_Codex_ticked_and_not_before() => AppHost.Run(() =>
+    public void The_Codex_disclaimer_shows_beside_its_tile_ticked_or_not() => AppHost.Run(() =>
     {
         var vm = new SetupViewModel(new SetupService(new SettingsStore(ScratchPaths()), new Host()), firstRun: true, codexInstalled: () => true);
         var w = new SetupWindow(vm);
@@ -388,7 +388,7 @@ public sealed class SetupWindowTests : AppWindowFixture
         {
             var before = new List<string>();
             CollectText(w, before);
-            Assert.DoesNotContain(SetupCopy.CodexTrademark, before);
+            Assert.Contains(SetupCopy.CodexTrademark, before);   // the tile is on the screen, so its notice is
             vm.CodexUsage = true;
             w.UpdateLayout();
             var after = new List<string>();

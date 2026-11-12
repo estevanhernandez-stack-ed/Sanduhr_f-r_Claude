@@ -847,10 +847,15 @@ public partial class App : Application
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
         svm.Desk.Changed = () => _desk?.Reload();
         // Sources: a Codex on or off starts or stops its service (as Set up Sanduhr does); a primary or color change redraws the widget.
-        svm.Sources.OnOffChanged = () =>
+        svm.Sources.OnOffChanged = (wasAny, nowAny) =>
         {
             SyncCodex();
-            if (_vm is { } widget) ShowWidgetFor(widget.AnyUsageOn);
+            // Only a transition touches the window, and it never takes focus from Settings.
+            switch (SourcesViewModel.VisibilityFor(wasAny, nowAny))
+            {
+                case WidgetVisibility.Show: ShowWindowWithoutActivating(); break;
+                case WidgetVisibility.Hide: _window?.Hide(); break;
+            }
         };
         svm.Sources.DisplayChanged = () => _vm?.RefreshSources();
         // Turning drawers on or off from Settings reaches the running Desk the way the Desk page's own switch does.
@@ -1258,6 +1263,15 @@ public partial class App : Application
     private void ShowWidgetFor(bool anyUsage)
     {
         if (anyUsage) ShowWindow(); else _window?.Hide();
+    }
+
+    private void ShowWindowWithoutActivating()
+    {
+        if (_window is not { } window || window.IsVisible) return;
+        bool before = window.ShowActivated;
+        window.ShowActivated = false;
+        try { window.Show(); }
+        finally { window.ShowActivated = before; }
     }
 
     private void ShowWindow()

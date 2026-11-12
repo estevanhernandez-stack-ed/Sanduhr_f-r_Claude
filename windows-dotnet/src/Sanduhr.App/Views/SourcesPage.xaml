@@ -102,8 +102,7 @@
                                     </StackPanel>
                                     <TextBlock Text="{Binding ColorMessage}" FontSize="11" TextWrapping="Wrap" Margin="24,4,0,0"
                                                Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
-                                               AutomationProperties.LiveSetting="Assertive"
-                                               Visibility="{Binding HasColorMessage, Converter={StaticResource BoolVis}}" />
+                                               AutomationProperties.LiveSetting="Assertive" />
                                 </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -113,8 +112,7 @@
                                Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                     <TextBlock Text="{Binding Message}" FontSize="11.5" TextWrapping="Wrap" Margin="0,8,0,0"
                                Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
-                               AutomationProperties.LiveSetting="Assertive"
-                               Visibility="{Binding HasMessage, Converter={StaticResource BoolVis}}" />
+                               AutomationProperties.LiveSetting="Assertive" />
                 </StackPanel>
 
                 <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />

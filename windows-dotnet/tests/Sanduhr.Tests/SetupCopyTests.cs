@@ -60,6 +60,9 @@ public class SetupCopyTests
         {
             Assert.DoesNotContain("\u2014", s);
             foreach (var mark in new[] { "ChatGPT", "Gemini", "Copilot" }) Assert.DoesNotContain(mark, s);
+            // OpenAI is named only where its Codex trademark is.
+            if (s != SetupCopy.CodexTrademark) Assert.DoesNotContain("OpenAI", s);
         }
+        Assert.Contains("OpenAI", SetupCopy.CodexTrademark);
     }
 }

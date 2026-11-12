@@ -65,7 +65,7 @@ public sealed class SourcesPageTests : AppWindowFixture
     {
         var (vm, store, _) = Build(codexInstalled: true);
         int started = 0;
-        vm.OnOffChanged = () => started++;
+        vm.OnOffChanged = (_, _) => started++;
         var codex = vm.Rows.Single(r => r.Source == AgentSources.Codex);
         Assert.True(codex.CanToggle);
         codex.On = true;
@@ -81,7 +81,7 @@ public sealed class SourcesPageTests : AppWindowFixture
     {
         var (vm, store, claudeOn) = Build(codexInstalled: true);
         int redraws = 0;
-        vm.OnOffChanged = () => redraws++;
+        vm.OnOffChanged = (_, _) => redraws++;
         vm.Rows.Single(r => r.Source == AgentSources.Claude).On = true;
         Assert.True(claudeOn());
         Assert.True(store.LoadSetup()!.ClaudeUsage);
@@ -209,7 +209,7 @@ public sealed class SourcesPageTests : AppWindowFixture
         codex.On = true;
         Assert.Equal("", vm.Message);
         int changed = 0;
-        vm.OnOffChanged = () => changed++;
+        vm.OnOffChanged = (_, _) => changed++;
         codex.On = false;
         Pump();
         Assert.Equal("Keep one on, or turn on the Desk first.", vm.Message);
@@ -239,12 +239,73 @@ public sealed class SourcesPageTests : AppWindowFixture
     public void Switching_a_source_calls_App_once_so_it_starts_or_stops_the_source_and_shows_or_hides_the_widget() => AppHost.Run(() =>
     {
         var (vm, _, _) = Build(codexInstalled: true);
-        int calls = 0;
-        vm.OnOffChanged = () => calls++;
-        vm.Rows.Single(r => r.Source == AgentSources.Claude).On = true;
-        Assert.Equal(1, calls);
-        vm.Rows.Single(r => r.Source == AgentSources.Codex).On = true;
-        Assert.Equal(2, calls);
+        var seen = new List<(bool Was, bool Now)>();
+        vm.OnOffChanged = (was, now) => seen.Add((was, now));
+        var claude = vm.Rows.Single(r => r.Source == AgentSources.Claude);
+        var codex = vm.Rows.Single(r => r.Source == AgentSources.Codex);
+        claude.On = true;
+        codex.On = true;
+        codex.On = false;
+        claude.On = false;
+        Assert.Equal([(false, true), (true, true), (true, true), (true, false)], seen);
+    });
+
+    [Theory]
+    [InlineData(false, true, WidgetVisibility.Show)]
+    [InlineData(true, false, WidgetVisibility.Hide)]
+    [InlineData(true, true, WidgetVisibility.Leave)]
+    [InlineData(false, false, WidgetVisibility.Leave)]
+    public void Only_a_transition_shows_or_hides_the_widget(bool was, bool now, WidgetVisibility expected) =>
+        Assert.Equal(expected, SourcesViewModel.VisibilityFor(was, now));
+
+    [Fact]
+    public void A_repeated_refusal_blanks_the_line_and_says_it_again_once_and_a_visit_clears_it() => AppHost.Run(() =>
+    {
+        var (vm, _, _) = Build(codexInstalled: true, deskOn: false);
+        var codex = vm.Rows.Single(r => r.Source == AgentSources.Codex);
+        codex.On = true;
+        var seen = new List<string>();
+        vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(SourcesViewModel.Message)) seen.Add(vm.Message); };
+        codex.On = false;
+        Pump();
+        Assert.Equal([SettingsNames.SourcesKeepOne], seen);   // set once: no blank first
+        codex.On = false;
+        Pump();
+        Assert.Equal([SettingsNames.SourcesKeepOne, "", SettingsNames.SourcesKeepOne], seen);   // blank now, set after
+        vm.Reload();
+        Assert.Equal("", vm.Message);
+    });
+
+    [Fact]
+    public void The_Sources_live_lines_stay_in_the_tree_visible_when_empty() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
+        var window = new SettingsWindow(svm);
+        OffScreen(window);
+        window.Show();
+        try
+        {
+            window.SelectPage(SettingsPage.UsageSources);
+            window.UpdateLayout();
+            Pump();
+            var tab = ((TabControl)window.FindName("Tabs")).Items.OfType<TabItem>().Single(t => (string)t.Tag == "UsageSources");
+            var live = new List<TextBlock>();
+            void Collect(DependencyObject d)
+            {
+                if (d is TextBlock { } tb && AutomationProperties.GetLiveSetting(tb) == AutomationLiveSetting.Assertive) live.Add(tb);
+                for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(d); i++)
+                    Collect(System.Windows.Media.VisualTreeHelper.GetChild(d, i));
+            }
+            Collect((DependencyObject)tab.Content);
+            Assert.Equal(1 + AgentSources.All.Count, live.Count);   // the page line and one color line per source
+            Assert.All(live, tb =>
+            {
+                Assert.Equal(Visibility.Visible, tb.Visibility);
+                Assert.Equal("", tb.Text);
+            });
+        }
+        finally { window.Close(); }
     });
 
     [Fact]

@@ -13,6 +13,9 @@ namespace Sanduhr.App.ViewModels;
 /// the widget's own <c>SetUsageOn</c>; Codex's is <c>setup.usage.codex</c>, and App starts or stops the Codex service when it changes
 /// (<see cref="OnOffChanged"/>). Color, primary and alerts save to <c>sources</c>. Turning the primary off moves it to
 /// <see cref="SourceSettings.PrimaryFor"/>.</summary>
+/// <summary>What a Sources switch does to the widget window.</summary>
+public enum WidgetVisibility { Leave, Show, Hide }
+
 public sealed partial class SourcesViewModel : ObservableObject
 {
     private readonly Dispatcher _ui = Dispatcher.CurrentDispatcher;
@@ -34,7 +37,13 @@ public sealed partial class SourcesViewModel : ObservableObject
     public ObservableCollection<SourceRowViewModel> Rows { get; } = [];
 
     /// <summary>A source was switched on or off and saved: App starts or stops the Codex service and redraws the widget.</summary>
-    public Action? OnOffChanged { get; set; }
+    public Action<bool, bool>? OnOffChanged { get; set; }
+
+    /// <summary>What the widget window should do when a switch took usage from <paramref name="wasAny"/> to <paramref name="nowAny"/>: show on
+    /// none-on to some-on, hide on some-on to none-on, and nothing otherwise (the window is never raised or brought back by a switch
+    /// between two sources, and never takes focus from Settings).</summary>
+    public static WidgetVisibility VisibilityFor(bool wasAny, bool nowAny) =>
+        !wasAny && nowAny ? WidgetVisibility.Show : wasAny && !nowAny ? WidgetVisibility.Hide : WidgetVisibility.Leave;
 
     /// <summary>Why the last switch was refused ("Keep one on, or turn on the Desk first."); empty otherwise.</summary>
     [ObservableProperty] private string _message = "";
@@ -45,8 +54,11 @@ public sealed partial class SourcesViewModel : ObservableObject
     public Action? DisplayChanged { get; set; }
 
     /// <summary>Reads setup, the sources settings and whether Codex is installed again (Settings does this on each visit).</summary>
-    public void Reload()
+    public void Reload() => Reload(clearMessage: true);
+
+    private void Reload(bool clearMessage)
     {
+        if (clearMessage && Message.Length > 0) Message = "";
         var setup = _store.LoadSetup();
         var sources = _store.LoadSources();
         bool codexInstalled = _codexHomes().Count > 0;
@@ -80,14 +92,20 @@ public sealed partial class SourcesViewModel : ObservableObject
 
     internal void SetOn(string source, bool on)
     {
-        Message = "";
         if (!on && !AnythingLeft(source, false))
         {
-            Message = SettingsNames.SourcesKeepOne;
-            // The switch snaps back once the click has unwound (a notification inside the binding's own update is not reliably shown).
-            _ui.BeginInvoke(Reload);
+            // The line is set once per refusal, after the switch has snapped back (a change inside the binding's own update is not
+            // reliably shown). A repeat of the same refusal blanks it first, so the live region has a change to announce.
+            if (Message.Length > 0) Message = "";
+            _ui.BeginInvoke(() =>
+            {
+                Reload(clearMessage: false);
+                Message = SettingsNames.SourcesKeepOne;
+            });
             return;
         }
+        var before = Ticked(_store.LoadSetup());
+        bool wasAny = before.ClaudeUsage || before.CodexUsage;
         try
         {
             if (source == AgentSources.Claude)
@@ -107,7 +125,8 @@ public sealed partial class SourcesViewModel : ObservableObject
             System.Diagnostics.Debug.WriteLine($"[Sanduhr.Sources] not saved: {ex.Message}");   // streamer: notname - written to the log file, never drawn
         }
         Reload();
-        OnOffChanged?.Invoke();
+        var after = Ticked(_store.LoadSetup());
+        OnOffChanged?.Invoke(wasAny, after.ClaudeUsage || after.CodexUsage);
     }
 
     internal void SetPrimary(string source)
@@ -262,6 +281,11 @@ public sealed partial class SourceRowViewModel : ObservableObject
             {
                 _color = value.Trim();
                 ColorMessage = "";
+            }
+            else if (ColorMessage == SettingsNames.SourcesColorRefused)
+            {
+                ColorMessage = "";   // the same refusal again: blank now, say it again after, so the live region announces it
+                _ui.BeginInvoke(() => ColorMessage = SettingsNames.SourcesColorRefused);
             }
             else
                 ColorMessage = SettingsNames.SourcesColorRefused;

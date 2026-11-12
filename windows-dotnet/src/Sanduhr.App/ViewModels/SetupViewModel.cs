@@ -69,9 +69,6 @@ internal sealed partial class SetupViewModel : ObservableObject
     /// that says Claude (the add-ons line names Claude Code with usage unticked).</summary>
     public bool ShowTrademark => ClaudeUsage || ChangeLines.Any(l => l.Contains("Claude", StringComparison.Ordinal));
 
-    /// <summary>The Codex disclaimer shows wherever Codex is named: ticked, or a change line that says Codex.</summary>
-    public bool ShowCodexTrademark => CodexUsage || ChangeLines.Any(l => l.Contains("Codex", StringComparison.Ordinal));
-
     partial void OnDesktopChanged(bool value) => Refresh();
     partial void OnDrawersChanged(bool value) => Refresh();
     partial void OnCodexUsageChanged(bool value)
@@ -103,7 +100,6 @@ internal sealed partial class SetupViewModel : ObservableObject
         OnPropertyChanged(nameof(ChangeText));
         OnPropertyChanged(nameof(HasResultLines));
         OnPropertyChanged(nameof(ShowTrademark));
-        OnPropertyChanged(nameof(ShowCodexTrademark));
     }
 
     /// <summary>Continue applied the choices; the result's lines are notes for the caller to show.</summary>
