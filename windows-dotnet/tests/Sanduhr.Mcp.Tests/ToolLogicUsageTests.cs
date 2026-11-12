@@ -225,9 +225,15 @@ public class ToolLogicUsageTests
     }
 
     [Fact]
+    public void Codex_snapshot_is_fresh_for_thirty_minutes_like_the_widget()
+    {
+        Assert.Equal("ok", (string?)UsageWithCodex(CodexJson(Now.AddSeconds(-600)))["codex"]!["status"]);
+    }
+
+    [Fact]
     public void Codex_snapshot_past_the_fresh_window_is_stale()
     {
-        var r = UsageWithCodex(CodexJson(Now.AddSeconds(-600)));
+        var r = UsageWithCodex(CodexJson(Now.AddSeconds(-1900)));
         Assert.Equal("stale", (string?)r["codex"]!["status"]);
         Assert.Equal(40, (int?)r["codex"]!["tiers"]![0]!["utilization_pct"]);
     }

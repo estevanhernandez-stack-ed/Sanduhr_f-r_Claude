@@ -1309,6 +1309,7 @@ public partial class App : Application
                 _dockerPipe?.Dispose();
                 _watchers?.Dispose();
                 _vm?.NowPlaying?.Dispose();
+                StopCodex(resetWidget: false);   // its timer and watcher must not recreate AppData or the snapshot
             },
             vm.InactiveReader.DeleteAllProfilesAsync,
             () => new SettingsStore(paths).ClearMcpSwitchesForReset(),
@@ -1464,7 +1465,7 @@ public partial class App : Application
     /// the service's snapshot writer is fixed at construction (none, and a leftover file deleted, when nothing wants it). Idempotent.</summary>
     private void SyncCodex()
     {
-        if (_vm is not { } vm || _quitting) return;
+        if (_vm is not { } vm || _quitting || ResetGuard.Done) return;
         var paths = new Sanduhr.Core.Paths();
         bool on = new SettingsStore(paths).LoadSetup()?.CodexUsage == true;
         bool wantSnapshot = vm.SnapshotWanted;
@@ -1482,7 +1483,7 @@ public partial class App : Application
             void Log(string message)
             {
                 try { System.IO.File.AppendAllText(codexPaths.LogFile, $"{DateTime.UtcNow:o} {message}{Environment.NewLine}"); }
-                catch (System.IO.IOException) { }
+                catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException) { }
             }
             string[] Homes() => [.. CodexHomes.Discover(Environment.GetEnvironmentVariable("CODEX_HOME"),
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))];   // streamer: notname - the Codex homes the reader joins its folder names to, never drawn
@@ -1528,7 +1529,7 @@ public partial class App : Application
         {
             var store = new SettingsStore(new Sanduhr.Core.Paths());
             var events = service.EvaluateAlerts(store.LoadAlertConfig(), store.LoadSources().AlertsOn(AgentSources.Codex));
-            if (events.Count == 0 || _alertService is null) return;
+            if (events.Count == 0 || _alertService is null || vm.IsDemo) return;   // demo hides the Codex section, so no toast either
             bool sound = store.LoadAlertSound();
             bool snake = store.LoadAlertSnakeFull();
             foreach (var e in events)

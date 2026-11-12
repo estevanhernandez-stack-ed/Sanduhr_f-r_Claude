@@ -47,13 +47,13 @@ public sealed class CodexUsageServiceTests : IDisposable
         return path;
     }
 
-    private (CodexUsageService Svc, UsageHistory History) Make(bool homeInstalled = true, bool withSnapshot = true)
+    private (CodexUsageService Svc, UsageHistory History) Make(bool homeInstalled = true, bool withSnapshot = true, Func<bool>? resetDone = null)
     {
         var accounts = new AccountStore(new AppWindowFixture.MemoryCredentials());
         var history = new UsageHistory(accounts, _paths);
         var reader = new CodexLimitsReader(() => homeInstalled ? new[] { _home } : Array.Empty<string>(), null);
         var snap = withSnapshot ? new SnapshotWriter(_paths.CodexSnapshotFile, null, "5.0.0", source: "codex") : null;
-        return (new CodexUsageService(reader, history, snap, () => _clock, null), history);
+        return (new CodexUsageService(reader, history, snap, () => _clock, null, resetDone: resetDone ?? (() => false)), history);
     }
 
     [Fact]
@@ -279,5 +279,40 @@ public sealed class CodexUsageServiceTests : IDisposable
         Assert.Single(history.Load("five_hour", CodexUsageService.CodexHistoryAccount));
         Assert.True(File.Exists(_paths.CodexSnapshotFile));
         svc.Dispose();
+    }
+
+    [Fact]
+    public void After_reset_a_callback_does_no_io()
+    {
+        bool done = false;
+        var (svc, history) = Make(resetDone: () => done);
+        svc.Start(new[] { _home });
+        Rollout(Event(AsOf, 40, 10));
+        done = true;
+        svc.RunCallback(svc.LiveGeneration);
+        svc.Poll();
+        Assert.Empty(history.Load("five_hour", CodexUsageService.CodexHistoryAccount));
+        Assert.False(File.Exists(_paths.CodexSnapshotFile));
+        svc.Dispose();
+    }
+
+    [Fact]
+    public void History_skips_an_unchanged_value_inside_five_minutes_and_keeps_a_changed_one()
+    {
+        var path = Rollout(Event(AsOf, 40, 10));
+        var (svc, history) = Make();
+        svc.Poll();
+        File.AppendAllText(path, Event(AsOf.AddMinutes(1), 40, 10) + "\n");
+        svc.Poll();
+        File.AppendAllText(path, Event(AsOf.AddMinutes(2), 40, 10) + "\n");
+        svc.Poll();
+        Assert.Single(history.Load("five_hour", CodexUsageService.CodexHistoryAccount));
+        File.AppendAllText(path, Event(AsOf.AddMinutes(3), 41, 10) + "\n");
+        svc.Poll();
+        Assert.Equal(new[] { 40, 41 }, history.Load("five_hour", CodexUsageService.CodexHistoryAccount));
+        Assert.Single(history.Load("seven_day", CodexUsageService.CodexHistoryAccount));
+        File.AppendAllText(path, Event(AsOf.AddMinutes(9), 41, 10) + "\n");
+        svc.Poll();
+        Assert.Equal(new[] { 40, 41, 41 }, history.Load("five_hour", CodexUsageService.CodexHistoryAccount));
     }
 }

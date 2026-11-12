@@ -219,6 +219,8 @@ public sealed partial class ToolLogic
     /// <summary>The Codex limits from <c>snapshot.codex.json</c>: ok while fresh by captured_at, stale after.
     /// Null (no key at all) when the file is missing, unreadable, unparseable or a newer schema, same
     /// refusal as Claude's but never an error: Codex is an extra, not the thing asked for.</summary>
+    private const int CodexFreshSeconds = 1800;
+
     private JsonObject? BuildCodexBlock(DateTimeOffset now)
     {
         var (outcome, snap) = SnapshotReader.Read(_config.EffectiveCodexSnapshotPath);
@@ -230,7 +232,9 @@ public sealed partial class ToolLogic
         try { capturedText = (string?)snap["captured_at"]; } catch { return null; }
         if (Pacing.Parse(capturedText) is not { } captured) return null;
 
-        bool fresh = SnapshotContract.AgeSeconds(captured, now) < SnapshotContract.FreshSeconds;
+        // captured_at is the newest Codex event's time, so age counts Codex idle time: the widget's 30 minutes
+        // (CodexLimits.FreshFor in Core, which this process does not link), not Claude's 450 s.
+        bool fresh = SnapshotContract.AgeSeconds(captured, now) < CodexFreshSeconds;
         string? fileStatus;
         try { fileStatus = (string?)snap["status"]; } catch { return null; }
         var tiers = new JsonArray();

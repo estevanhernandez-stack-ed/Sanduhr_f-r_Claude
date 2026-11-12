@@ -202,10 +202,18 @@ public class StatuslineScriptRunTests : IDisposable
     }
 
     [PowerShellFact]
-    public void A_dead_codex_snapshot_prints_no_codex_segment()
+    public void An_idle_codex_snapshot_inside_thirty_minutes_still_prints_its_segment()
     {
         WriteSanduhr("snapshot.json", Snapshot(42, 17));
         WriteSanduhr("snapshot.codex.json", CodexSnapshot(40, 12, capturedSecondsAgo: 1000));
+        Assert.EndsWith(" · cx 5h 40% wk 12%", RunScript([]).Text.TrimEnd((char)10));
+    }
+
+    [PowerShellFact]
+    public void A_dead_codex_snapshot_prints_no_codex_segment()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        WriteSanduhr("snapshot.codex.json", CodexSnapshot(40, 12, capturedSecondsAgo: 2000));
         var line = RunScript([]).Text.TrimEnd('\n');
         Assert.DoesNotContain("cx", line);
         Assert.StartsWith("5h 42% | wk 17% | wk resets ", line);

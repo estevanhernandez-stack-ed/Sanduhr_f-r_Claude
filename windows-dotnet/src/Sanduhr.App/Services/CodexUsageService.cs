@@ -38,6 +38,7 @@ public sealed class CodexUsageService : IDisposable
     private readonly SnapshotWriter? _snapshot;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Action<string>? _log;
+    private readonly Func<bool> _resetDone;
     private readonly AlertEngine _alerts;
     private readonly object _gate = new();          // the poll lock: reader, history, snapshot, alert state
     private readonly object _startStop = new();     // serializes Start and Stop
@@ -46,6 +47,8 @@ public sealed class CodexUsageService : IDisposable
     private readonly HashSet<int> _loggedWindows = new();
     private readonly List<FileSystemWatcher> _watchers = new();
     private DateTimeOffset? _lastAppended;
+    private readonly Dictionary<string, (int Pct, DateTimeOffset At)> _lastPoint = new();
+    private static readonly TimeSpan HistoryEvery = TimeSpan.FromMinutes(5);
     private bool _seeded;
     private string? _lastSnapshotKey;
     private Timer? _timer;
@@ -55,9 +58,12 @@ public sealed class CodexUsageService : IDisposable
 
     /// <param name="alerts">The engine whose per-tier state decides what is new. A rebuilt service takes the old one's, so a tier already
     /// past its warning is not toasted again in the same session.</param>
+    /// <param name="resetDone">True once Reset has run (default <see cref="ResetGuard.Done"/>); then a poll does no IO. A test passes its own,
+    /// because <see cref="ResetGuard"/> is process-wide and tests in other collections run in parallel.</param>
     public CodexUsageService(CodexLimitsReader reader, UsageHistory history, SnapshotWriter? snapshot, Func<DateTimeOffset> clock, Action<string>? log,
-        AlertEngine? alerts = null)
+        AlertEngine? alerts = null, Func<bool>? resetDone = null)
     {
+        _resetDone = resetDone ?? (() => ResetGuard.Done);
         _alerts = alerts ?? new AlertEngine();
         _reader = reader;
         _history = history;
@@ -78,7 +84,7 @@ public sealed class CodexUsageService : IDisposable
         bool changed;
         lock (_gate)
         {
-            if (_disposed || (generation is { } g && g != _generation))
+            if (_disposed || _resetDone() || (generation is { } g && g != _generation))
                 return _current;
             var now = _clock();
             var result = _reader.Read();
@@ -125,7 +131,13 @@ public sealed class CodexUsageService : IDisposable
         foreach (var (key, node) in tiers)
         {
             if (node is not JsonObject t || t["utilization"] is not JsonValue u || !u.TryGetValue<double>(out var pct)) continue;
-            try { _history.AppendForAccount(key, (int)Math.Round(pct), CodexHistoryAccount, (string?)t["resets_at"]); }
+            int rounded = (int)Math.Round(pct);
+            if (_lastPoint.TryGetValue(key, out var prior) && prior.Pct == rounded && asOf - prior.At < HistoryEvery) continue;
+            try
+            {
+                _history.AppendForAccount(key, rounded, CodexHistoryAccount, (string?)t["resets_at"]);
+                _lastPoint[key] = (rounded, asOf);
+            }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
                 _log?.Invoke($"codex: history write failed ({e.GetType().Name})");

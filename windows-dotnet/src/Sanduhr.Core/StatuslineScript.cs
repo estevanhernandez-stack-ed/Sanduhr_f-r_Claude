@@ -266,7 +266,7 @@ function Get-OurLine {
 }
 
 # Codex's meters from snapshot.codex.json beside the Claude snapshot: only while it is alive (the same
-# 900 s dead rule) and a schema this script knows. Nothing otherwise; never a path, never an error.
+# 1800 s: the widget's 30 minutes for an idle Codex, not the 900 s Claude rule) and a schema this script knows. Nothing otherwise; never a path, never an error.
 function Get-CodexSegment {
   try {
     $path = Join-Path (Join-Path $env:USERPROFILE '.sanduhr') 'snapshot.codex.json'
@@ -276,7 +276,7 @@ function Get-CodexSegment {
     if ([int]$cx.schema_version -gt 1) { return $null }
     $at = ([DateTimeOffset]::Parse($cx.captured_at, [System.Globalization.CultureInfo]::InvariantCulture)).ToUniversalTime()
     $cxNow = [DateTimeOffset]::UtcNow
-    if ([Math]::Max(0, [int]($cxNow - $at).TotalSeconds) -gt 900) { return $null }
+    if ([Math]::Max(0, [int]($cxNow - $at).TotalSeconds) -gt 1800) { return $null }
     $cxLabels = @{ five_hour = '5h'; seven_day = 'wk' }
     $bits = @()
     foreach ($tier in @($cx.tiers)) {
