@@ -44,7 +44,7 @@ public sealed class CodexLimitsReader
     private readonly Func<IReadOnlyList<string>> _homes;
     private readonly Func<Stream, Stream>? _decompressZst;
     private readonly Action<string>? _log;
-    private readonly Dictionary<string, (long Length, DateTime Mtime, CodexLimitsReading? Reading)> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (long Length, DateTime Mtime, CodexLimitsReading? Reading, bool Bad)> _cache = new(StringComparer.OrdinalIgnoreCase);
 
     public CodexLimitsReader(Func<IReadOnlyList<string>> homes, Func<Stream, Stream>? decompressZst, Action<string>? log = null)
     {
@@ -105,21 +105,34 @@ public sealed class CodexLimitsReader
         {
             tried++;
             CodexLimitsReading? reading;
+            long length = 0;
+            DateTime mtime = default;
             try
             {
-                var length = file.Length;
-                var mtime = file.LastWriteTimeUtc;
+                length = file.Length;
+                mtime = file.LastWriteTimeUtc;
                 if (_cache.TryGetValue(file.FullName, out var hit) && hit.Length == length && hit.Mtime == mtime)
+                {
+                    if (hit.Bad) failed++;   // a corrupt or over-cap file stays failed without being decompressed again
                     reading = hit.Reading;
+                }
                 else
                 {
                     var text = ReadText(file, length);
                     if (text is null) continue;
                     reading = Newest(text);
-                    _cache[file.FullName] = (length, mtime, reading);
+                    _cache[file.FullName] = (length, mtime, reading, false);
                 }
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException)
+            catch (InvalidDataException e)
+            {
+                // Same (path, length, mtime) will fail the same way: remember it. IO and lock errors are not cached.
+                failed++;
+                _cache[file.FullName] = (length, mtime, null, true);
+                _log?.Invoke($"codex: a rollout could not be read ({e.GetType().Name})");
+                continue;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
             {
                 failed++;
                 _log?.Invoke($"codex: a rollout could not be read ({e.GetType().Name})");

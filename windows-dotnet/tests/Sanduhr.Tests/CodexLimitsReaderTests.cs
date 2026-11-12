@@ -156,6 +156,18 @@ public class CodexLimitsReaderTests
         Assert.Equal(afterFirst, calls);
     }
 
+    [Fact]
+    public void A_corrupt_or_over_cap_file_is_not_decompressed_again_while_unchanged()
+    {
+        using var t = new TempDir();
+        Rollout(t.Path, "21", "rollout-bad", "garbage", compressed: true);
+        int calls = 0;
+        var reader = new CodexLimitsReader(() => [t.Path], _ => { calls++; throw new InvalidDataException("bad frame"); });
+        Assert.Equal(CodexReadStatus.Unreadable, reader.Read().Status);
+        Assert.Equal(CodexReadStatus.Unreadable, reader.Read().Status);
+        Assert.Equal(1, calls);
+    }
+
     private sealed class EndlessZeros : Stream
     {
         public override int Read(byte[] buffer, int offset, int count) { Array.Clear(buffer, offset, count); return count; }
