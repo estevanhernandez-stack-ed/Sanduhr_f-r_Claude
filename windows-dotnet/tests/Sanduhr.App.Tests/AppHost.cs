@@ -29,6 +29,22 @@ internal static class AppHost
         Sanduhr.App.Desk.DeskController.DefaultSpacingReader = () => null;
     }
 
+    /// <summary>
+    /// No test in this assembly touches the real profile, even after a fixture is disposed. AppWindowFixture sets
+    /// SANDUHR_DEV_PROFILE and restores the old value on Dispose; before this, the old value was unset, so a refresh
+    /// still queued from a disposed fixture built <c>new Paths()</c> over the real profile and rewrote
+    /// <c>~\.sanduhr\bin\sanduhr-statusline.ps1</c> (seen on the 4.8.0 branch, whose script differs from the installed one).
+    /// A scratch profile set here is what every fixture restores to.
+    /// </summary>
+    [System.Runtime.CompilerServices.ModuleInitializer]
+    internal static void KeepOffTheRealProfile()
+    {
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SANDUHR_DEV_PROFILE")))
+            return;
+        Environment.SetEnvironmentVariable("SANDUHR_DEV_PROFILE",
+            System.IO.Path.Combine(System.IO.Path.GetTempPath(), "sanduhr-apptests-" + Environment.ProcessId));
+    }
+
     private static readonly Lazy<Dispatcher> Dispatch = new(Start);
 
     private static Dispatcher Start()
