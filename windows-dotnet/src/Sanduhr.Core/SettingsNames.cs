@@ -26,7 +26,7 @@ public static class SettingsNames
     public static IReadOnlyList<SettingsGroup> Sidebar { get; } =
     [
         new(null, [SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts, SettingsPage.Privacy]),
-        new("Usage", [SettingsPage.ClaudeUsage, SettingsPage.Publish]),
+        new("Usage", [SettingsPage.UsageSources, SettingsPage.ClaudeUsage, SettingsPage.Publish]),
         new("Extend", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Widget, SettingsPage.Themes]),
         new("Desktop", [SettingsPage.Desk, SettingsPage.DeskLook, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather,
@@ -56,6 +56,7 @@ public static class SettingsNames
         SettingsPage.Alerts => "Alerts",
         SettingsPage.Privacy => PrivacyTitle,
         SettingsPage.History => "History",   // retired in slice 5: keeps its old title for aliases and logs
+        SettingsPage.UsageSources => SourcesTitle,
         SettingsPage.ClaudeUsage => "Claude Usage",
         SettingsPage.Publish => "Publish usage",
         SettingsPage.ClaudeCode => "Claude Code",
@@ -1171,6 +1172,21 @@ public static class SettingsNames
     public const string ThemeStudioDeskNote =
         "The Desk shows these while it follows the widget theme (Settings, Desk Look, Match the widget theme).";
     // ---- Drawers (5.0 drawers spec) ----
+    // ---- Usage, Sources (agent layer): one row per AI plan Sanduhr tracks ----
+    public const string SourcesTitle = "Sources";
+    public const string SourcesIntro = "The AI plans Sanduhr tracks. Codex is read from its own logs on this PC; nothing is sent anywhere.";
+    public const string SourcesCodexNotInstalled = "Codex isn't installed on this PC.";
+    public const string SourcesPrimary = "Primary";
+    /// <summary>The group the Primary radios sit in, for a screen reader.</summary>
+    public const string SourcesPrimaryGroup = "Primary source";
+    public const string SourcesPrimaryCaption = "The tray and the combined bars' fill follow the primary.";
+    public const string SourcesColor = "Color";
+    public const string SourcesReset = "Reset";
+    public const string SourcesAlerts = "Alerts";
+    public const string SourcesColorRefused = "Use a color like #2FB5A3.";
+    /// <summary>The color box's spoken name: "Codex color".</summary>
+    public static string SourcesColorName(string source) => $"{source} color";
+
     public const string DrawersTitle = "Drawers";
     public const string DrawersSwitch = "Use drawers";
     public const string DrawersLine = "Drawers sort your desktop into folders on the Desk. Nothing moves until you say so, and turning drawers off puts every file back on the Desktop.";

@@ -207,6 +207,9 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/PublishViewModel.cs", "masked", 4),
         ("Sanduhr.App/ViewModels/ResetFolderListViewModel.cs", "key", 4),      // slice 8: Reset's rows key on real folders
         ("Sanduhr.App/ViewModels/ResetFolderListViewModel.cs", "masked", 1),   // slice 8: and draw them through ShowFolder (carry)
+        ("Sanduhr.App/ViewModels/SettingsViewModel.cs", "notname", 1),         // agent layer: Sources asks only whether a Codex home exists
+        ("Sanduhr.App/ViewModels/SetupViewModel.cs", "notname", 1),            // agent layer: and so does the setup screen's Codex tick
+        ("Sanduhr.App/ViewModels/SourcesViewModel.cs", "notname", 2),          // agent layer: save failures go to the debug log, never the screen
         ("Sanduhr.App/ViewModels/StreamerSettingsViewModel.cs", "key", 1),
         ("Sanduhr.App/ViewModels/ThemeDeskEditorViewModel.cs", "notname", 3),
         ("Sanduhr.App/ViewModels/ThemeMatchViewModel.cs", "cant", 4),

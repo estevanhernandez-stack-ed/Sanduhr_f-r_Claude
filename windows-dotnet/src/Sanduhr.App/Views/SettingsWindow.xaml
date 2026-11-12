@@ -1395,6 +1395,11 @@
                     <views:PrivacyPage />
                 </TabItem>
 
+                <!-- Usage, Sources (agent layer): one row per AI plan Sanduhr tracks, with on, primary, color and alerts. -->
+                <TabItem Header="Sources" Tag="UsageSources" AutomationProperties.Name="Sources" DataContext="{Binding Sources}">
+                    <views:SourcesPage />
+                </TabItem>
+
                 <!-- Claude Usage (WS-C; Settings v2, slice 5): Meters / Overview / Trends / Sessions over the meter history,
                      the session archive and the live session-log reader.
                      DataContext must live ON the TabItem: the CcSection* visibility triggers resolve

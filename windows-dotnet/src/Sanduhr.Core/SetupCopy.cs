@@ -12,6 +12,8 @@ public static class SetupCopy
     public const string UsageTitle = "Track my AI usage";
     public const string UsageBody = "See how much of your plan you've used.";
     public const string ClaudeSource = "Claude";
+    public const string CodexSource = "Codex";
+    public const string CodexNotInstalled = SettingsNames.SourcesCodexNotInstalled;
     public const string ClaudeTrademark = SettingsNames.TrademarkNotice;
     public const string DesignWithChat = "Design it with an AI chat";
     /// <summary>Under the button on the setup screen and the Drawers page: what the chat does, in a line.</summary>
@@ -24,6 +26,7 @@ public static class SetupCopy
     public const string SaveFailed = "Your choices could not be saved.";
     public const string DesktopOffLine = "The clock, message and weather hide. Your layout is kept.";
     public const string UsageOffLine = "Your account stays saved. Remove it in Settings, Accounts.";
+    public const string CodexOffLine = "Codex limits stop being read. Nothing in Codex changes.";
     public const string AddOnsStayLine = "The Claude Code add-ons stay installed. Remove them on the Claude Code page.";
 
     /// <summary>Names for the two lists on the setup screen, for a screen reader.</summary>
@@ -110,8 +113,8 @@ public static class SetupCopy
     /// <summary>For the copy tests.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
-        Title, Intro, DesktopTitle, DesktopBody, DrawersTitle, DrawersBody, UsageTitle, UsageBody, ClaudeSource, ClaudeTrademark,
-        DesignWithChat, DesignWithChatCaption, Continue, NotNow, Cancel, MenuItem, PickOne, SaveFailed, WhatChanges, WhatHappened, DesktopOffLine, UsageOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DesignDesktopOffNote, DrawersOffLine(2),
+        Title, Intro, DesktopTitle, DesktopBody, DrawersTitle, DrawersBody, UsageTitle, UsageBody, ClaudeSource, CodexSource, CodexNotInstalled, ClaudeTrademark,
+        DesignWithChat, DesignWithChatCaption, Continue, NotNow, Cancel, MenuItem, PickOne, SaveFailed, WhatChanges, WhatHappened, DesktopOffLine, UsageOffLine, CodexOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DesignDesktopOffNote, DrawersOffLine(2),
         ChatIntro, ChatCopyPrompt, ChatPasteName, ChatPastePlaceholder, ChatPreview, ChatUseRules, ChatUseDrawerSettings, ChatClose, ChatFindingsName, ChatReady,
         ChatPromptCopied, ChatDeskShown, ChatRulesShown, ChatNoDeskService, ChatRulesSavedNothing, ChatUntitledDesign, ChatFixCount(1), ChatFixCount(2), ChatManyBlocks(2),
         ChatRulesLine(1, ["Photos"]), ChatRulesLine(2, ["Photos", "Receipts"]), ChatNotShown("the Desk is busy"),
@@ -133,6 +136,7 @@ public static class SetupChange
         var lines = new List<string>();
         if (before.Desktop && !after.Desktop) lines.Add(SetupCopy.DesktopOffLine);
         if (before.Drawers && !after.Drawers && drawerFiles > 0) lines.Add(SetupCopy.DrawersOffLine(drawerFiles));
+        if (before.CodexUsage && !after.CodexUsage) lines.Add(SetupCopy.CodexOffLine);
         if (before.ClaudeUsage && !after.ClaudeUsage)
         {
             if (hasAccount) lines.Add(SetupCopy.UsageOffLine);

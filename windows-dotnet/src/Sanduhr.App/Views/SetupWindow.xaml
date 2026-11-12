@@ -134,22 +134,31 @@
             </StackPanel>
         </CheckBox>
 
-        <CheckBox x:Name="UsageBox" Style="{StaticResource TickTile}" Margin="0,16,0,0" IsChecked="{Binding ClaudeUsage}"
-                  AutomationProperties.Name="{x:Static core:SetupCopy.UsageTitle}"
-                  AutomationProperties.HelpText="{x:Static core:SetupCopy.UsageBody}">
-            <StackPanel>
-                <TextBlock Text="{x:Static core:SetupCopy.UsageTitle}" FontWeight="SemiBold" />
-                <TextBlock Text="{x:Static core:SetupCopy.UsageBody}" TextWrapping="Wrap" FontSize="11" Margin="0,2,0,0"
-                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-            </StackPanel>
-        </CheckBox>
-        <!-- Ticking usage opens the source list: Claude. The trademark line shows wherever Claude is named: usage ticked, or a change
-             line that says Claude (Claude Code) with usage unticked. -->
-        <StackPanel Margin="28,8,0,0" Visibility="{Binding ShowTrademark, Converter={StaticResource BoolVis}}">
-            <TextBlock Text="{x:Static core:SetupCopy.ClaudeSource}" FontSize="12" FontWeight="SemiBold"
-                       Visibility="{Binding ClaudeUsage, Converter={StaticResource BoolVis}}"
+        <StackPanel Margin="0,16,0,0">
+            <TextBlock Text="{x:Static core:SetupCopy.UsageTitle}" FontSize="13" FontWeight="SemiBold"
+                       AutomationProperties.HeadingLevel="Level2"
                        Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-            <TextBlock Text="{x:Static core:SetupCopy.ClaudeTrademark}" TextWrapping="Wrap" FontSize="10" Margin="0,2,0,0"
+            <TextBlock Text="{x:Static core:SetupCopy.UsageBody}" TextWrapping="Wrap" FontSize="11" Margin="0,2,0,0"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+        </StackPanel>
+        <!-- The usage choice lists Claude and Codex as ticks. Codex never asks to sign in (it is read from its own logs on this PC), and
+             is greyed with a line when it is not installed. The trademark line shows wherever Claude is named: usage ticked, or a change
+             line that says Claude (Claude Code) with usage unticked. -->
+        <StackPanel Margin="0,10,0,0">
+            <CheckBox x:Name="UsageBox" Style="{StaticResource TickTile}" IsChecked="{Binding ClaudeUsage}"
+                      AutomationProperties.Name="{x:Static core:SetupCopy.ClaudeSource}">
+                <TextBlock Text="{x:Static core:SetupCopy.ClaudeSource}" FontSize="12" FontWeight="SemiBold" />
+            </CheckBox>
+            <TextBlock Text="{x:Static core:SetupCopy.ClaudeTrademark}" TextWrapping="Wrap" FontSize="10" Margin="28,2,0,6"
+                       Visibility="{Binding ShowTrademark, Converter={StaticResource BoolVis}}"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+            <CheckBox x:Name="CodexUsageBox" Style="{StaticResource TickTile}" Margin="0,6,0,0" IsChecked="{Binding CodexUsage}"
+                      IsEnabled="{Binding CodexEnabled}"
+                      AutomationProperties.Name="{x:Static core:SetupCopy.CodexSource}">
+                <TextBlock Text="{x:Static core:SetupCopy.CodexSource}" FontSize="12" FontWeight="SemiBold" />
+            </CheckBox>
+            <TextBlock Text="{Binding CodexNotInstalledText}" TextWrapping="Wrap" FontSize="10" Margin="28,2,0,0"
+                       Visibility="{Binding HasCodexNotInstalledText, Converter={StaticResource BoolVis}}"
                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
         </StackPanel>
 

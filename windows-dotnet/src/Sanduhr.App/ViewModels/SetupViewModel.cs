@@ -16,15 +16,20 @@ internal sealed partial class SetupViewModel : ObservableObject
 
     /// <param name="hasAccount">Whether an account is signed in now. On a first run an account (added from the widget's card while this
     /// screen was up) means usage is wanted: it is ticked when the window opens, and again at Continue if the person never touched that tick.</param>
-    internal SetupViewModel(SetupService service, bool firstRun, Func<bool>? hasAccount = null)
+    /// <param name="codexInstalled">Whether Codex is on this PC; a Codex tick is greyed without it (one already ticked can still be cleared).
+    /// Defaults to looking for a Codex home.</param>
+    internal SetupViewModel(SetupService service, bool firstRun, Func<bool>? hasAccount = null, Func<bool>? codexInstalled = null)
     {
         _service = service;
         _hasAccount = hasAccount ?? (() => false);
+        CodexInstalled = (codexInstalled ?? (() => CodexHomes.Discover(Environment.GetEnvironmentVariable("CODEX_HOME"),
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)).Count > 0))();   // streamer: notname - only whether a Codex home exists, never drawn
         FirstRun = firstRun;
         var now = firstRun ? SetupChoices.FirstRun : service.Current();
         _desktop = now.Desktop;
         _drawers = now.Drawers;
         _claudeUsage = now.ClaudeUsage || (firstRun && _hasAccount());
+        _codexUsage = now.CodexUsage;   // the saved tick: a setup save that never touched Codex keeps it
         Refresh();
     }
 
@@ -44,7 +49,14 @@ internal sealed partial class SetupViewModel : ObservableObject
     [ObservableProperty] private bool _desktop;
     [ObservableProperty] private bool _drawers;
     [ObservableProperty] private bool _claudeUsage;
+    [ObservableProperty] private bool _codexUsage;
     [ObservableProperty] private string? _blocked;
+
+    /// <summary>Codex can be ticked: it is installed, or it is already ticked (so it can be cleared).</summary>
+    public bool CodexEnabled => CodexInstalled || CodexUsage;
+    public bool CodexInstalled { get; }
+    public string? CodexNotInstalledText => CodexInstalled ? null : SetupCopy.CodexNotInstalled;
+    public bool HasCodexNotInstalledText => CodexNotInstalledText is not null;
 
     public bool CanContinue => Blocked is null;
     public bool HasChangeLines => ChangeLines.Count > 0;
@@ -59,6 +71,11 @@ internal sealed partial class SetupViewModel : ObservableObject
 
     partial void OnDesktopChanged(bool value) => Refresh();
     partial void OnDrawersChanged(bool value) => Refresh();
+    partial void OnCodexUsageChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CodexEnabled));
+        Refresh();
+    }
     partial void OnClaudeUsageChanged(bool value)
     {
         if (!_settingUsage) _usageTouched = true;
@@ -70,7 +87,7 @@ internal sealed partial class SetupViewModel : ObservableObject
         ContinueCommand.NotifyCanExecuteChanged();
     }
 
-    private SetupChoices Choices => new(Desktop, Drawers, ClaudeUsage);
+    private SetupChoices Choices => new(Desktop, Drawers, ClaudeUsage, CodexUsage);
 
     private void Refresh()
     {

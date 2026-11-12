@@ -54,12 +54,12 @@ public class SetupCopyTests
     }
 
     [Fact]
-    public void The_copy_names_no_AI_product_but_Claude_and_has_no_em_dash()
+    public void The_copy_names_no_AI_product_but_Claude_and_Codex_and_has_no_em_dash()
     {
         foreach (var s in SetupCopy.All)
         {
             Assert.DoesNotContain("\u2014", s);
-            foreach (var mark in new[] { "ChatGPT", "Gemini", "Copilot", "OpenAI", "Codex" }) Assert.DoesNotContain(mark, s);
+            foreach (var mark in new[] { "ChatGPT", "Gemini", "Copilot", "OpenAI" }) Assert.DoesNotContain(mark, s);
         }
     }
 }

@@ -846,6 +846,9 @@ public partial class App : Application
         svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
         svm.Desk.Changed = () => _desk?.Reload();
+        // Sources: a Codex on or off starts or stops its service (as Set up Sanduhr does); a primary or color change redraws the widget.
+        svm.Sources.OnOffChanged = SyncCodex;
+        svm.Sources.DisplayChanged = () => _vm?.RefreshSources();
         // Turning drawers on or off from Settings reaches the running Desk the way the Desk page's own switch does.
         svm.Drawers.DeskChanged = () => { _desk?.Reload(); svm.Desk.Reload(); };
         // Tidy drawers on the Drawers page lines the drawers up from the corner and direction the page shows.
@@ -1073,6 +1076,7 @@ public partial class App : Application
         SyncCodex();   // starts or stops the Codex service for what was just ticked, and redraws the sections
         if (anyUsage) ShowWindow(); else _window?.Hide();
         _settingsWindow?.ViewModel.Desk.Reload();
+        _settingsWindow?.ViewModel.Sources.Reload();
         // What went wrong or was refused (a drawers turn-off that was not done, a failed save): one themed notice, now that the window has
         // closed. The first-drawers line is a note, not a problem, and is left out. Streamer mode: the host already masked any path in them.
         var problems = result.Lines.Where(l => l != DrawerReview.FirstOnLine).ToList();

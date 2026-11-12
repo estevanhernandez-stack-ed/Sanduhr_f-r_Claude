@@ -21,6 +21,9 @@ public sealed partial record SourceSettings(
     [GeneratedRegex("^#[0-9A-Fa-f]{6}$")]
     private static partial Regex HexRe();
 
+    /// <summary>Whether <paramref name="text"/> is a color Sanduhr stores: <c>#RRGGBB</c>.</summary>
+    public static bool IsColor(string? text) => text is not null && HexRe().IsMatch(text);
+
     public string ColorOf(string source) =>
         Colors.TryGetValue(source, out var c) && HexRe().IsMatch(c) ? c : AgentSources.DefaultColor(source);
 
