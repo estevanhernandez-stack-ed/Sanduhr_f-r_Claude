@@ -170,6 +170,26 @@ public sealed class WidgetSourcesTests : AppWindowFixture
     });
 
     [Fact]
+    public void A_reading_from_another_day_names_the_day_not_just_the_time() => AppHost.Run(() =>
+    {
+        // Live check, 4.8.0: a reading two days old read "as of 8:22 PM", which looks like today.
+        Setup(Both);
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            var yesterday = new DateTimeOffset(DateTime.Today.AddDays(-1).AddHours(20).AddMinutes(22));
+            widget.ApplyCodex(CodexOk(50, 70, fresh: false, asOf: yesterday));
+            Assert.Equal("as of yesterday 8:22 PM", widget.Sections.Single(s => s.Source == "codex").AsOfText);
+
+            var twoDaysAgo = new DateTimeOffset(DateTime.Today.AddDays(-2).AddHours(20).AddMinutes(22));
+            widget.ApplyCodex(CodexOk(50, 70, fresh: false, asOf: twoDaysAgo));
+            Assert.Equal("as of " + twoDaysAgo.ToString("MMM d, h:mm tt", System.Globalization.CultureInfo.InvariantCulture),
+                widget.Sections.Single(s => s.Source == "codex").AsOfText);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
     public void No_limits_shows_the_run_codex_line_and_no_cards() => AppHost.Run(() =>
     {
         Setup(Both);

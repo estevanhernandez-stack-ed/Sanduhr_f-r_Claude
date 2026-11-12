@@ -169,6 +169,21 @@ public sealed partial class TierCardViewModel : ObservableObject
 
     private void RefreshTimeDerived(DateTimeOffset now)
     {
+        // A window whose reset has passed (Codex idle for hours, or Claude between a reset and the next fetch) is over:
+        // say when it reset, and draw no countdown, pace or burn for it.
+        if (Pacing.Parse(_resetsAt) is { } reset && reset <= now)
+        {
+            PaceFraction = double.NaN;
+            ResetCountdown = PassedResetStr(reset, now);
+            ResetDateTime = "";
+            PaceLabel = "";
+            PaceBrush = new SolidColorBrush(_palette.TextDim);
+            BurnText = "";
+            HasBurn = false;
+            BurnBrush = new SolidColorBrush(_palette.TextMuted);
+            return;
+        }
+
         PaceFraction = Pacing.PaceFrac(_resetsAt, TierKey, now) ?? double.NaN;
         ResetCountdown = TierModel.ResetCountdown(_resetsAt, now);
         ResetDateTime = ResetDatetimeStr(_resetsAt, now);
@@ -199,6 +214,16 @@ public sealed partial class TierCardViewModel : ObservableObject
         if (days == 1) return $"Tomorrow {t}";
         if (days < 7) return $"{loc.ToString("ddd", CultureInfo.InvariantCulture)} {t}";
         return $"{loc.ToString("ddd MMM dd", CultureInfo.InvariantCulture)} {t}";
+    }
+
+    /// <summary>"Reset at 3:10 PM" for a reset earlier today, "Reset Nov 9, 9:36 PM" for an earlier day.</summary>
+    private static string PassedResetStr(DateTimeOffset reset, DateTimeOffset now)
+    {
+        var loc = reset.ToLocalTime();
+        string t = loc.ToString("h:mm tt", CultureInfo.InvariantCulture);
+        return loc.Date == now.ToLocalTime().Date
+            ? $"Reset at {t}"
+            : $"Reset {loc.ToString("MMM d", CultureInfo.InvariantCulture)}, {t}";
     }
 
     private static SolidColorBrush FromHex(string hex)

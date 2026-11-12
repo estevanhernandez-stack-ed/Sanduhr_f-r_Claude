@@ -81,6 +81,16 @@ public class DeskMetersTests
     }
 
     [Fact]
+    public void A_passed_reset_says_when_it_reset_never_today()
+    {
+        // Live check, 4.8.0: an idle Codex 5-hour window that reset two days earlier read "Today 9:36 PM".
+        var later = new DateTimeOffset(2026, 10, 11, 20, 0, 0, TimeSpan.Zero);
+        Assert.Equal("Reset at 3:10 PM", DeskMeters.ResetDateTime("2026-10-11T15:10:00Z", later, TimeZoneInfo.Utc));
+        Assert.Equal("Reset Oct 9, 9:36 PM", DeskMeters.ResetDateTime("2026-10-09T21:36:00Z", later, TimeZoneInfo.Utc));
+        Assert.Equal("Tomorrow 9:30 AM", DeskMeters.ResetDateTime("2026-10-12T09:30:00Z", later, TimeZoneInfo.Utc));
+    }
+
+    [Fact]
     public void Line_SessionAndWeek()
     {
         var u = Usage(new DeskTier(TierModel.FiveHour, 7, Session), new DeskTier(TierModel.SevenDay, 63.9, Week));

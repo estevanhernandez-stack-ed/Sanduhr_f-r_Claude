@@ -2052,13 +2052,15 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         RebuildCombined();
     }
 
-    /// <summary>"as of 3:42 PM", with the date once the reading is more than 7 days old.</summary>
+    /// <summary>"as of 3:42 PM" today, "as of yesterday 3:42 PM", else "as of Nov 9, 3:42 PM": a time alone reads as today.</summary>
     private static string AsOfLabel(DateTimeOffset asOf, DateTimeOffset now)
     {
         var local = asOf.ToLocalTime();
-        return now - asOf > TimeSpan.FromDays(7)
-            ? "as of " + local.ToString("MMM d, h:mm tt", CultureInfo.InvariantCulture)
-            : "as of " + local.ToString("h:mm tt", CultureInfo.InvariantCulture);
+        int days = (now.ToLocalTime().Date - local.Date).Days;
+        string t = local.ToString("h:mm tt", CultureInfo.InvariantCulture);
+        return days <= 0 ? "as of " + t
+            : days == 1 ? "as of yesterday " + t
+            : "as of " + local.ToString("MMM d", CultureInfo.InvariantCulture) + ", " + t;
     }
 
     /// <summary>"5h 40% · wk 12%": what a collapsed section says in one line.</summary>

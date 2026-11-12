@@ -240,6 +240,9 @@ public static class DeskMeters
         var localNow = TimeZoneInfo.ConvertTime(now, z);
         int days = (loc.Date - localNow.Date).Days;
         string t = loc.ToString("h:mm tt", CultureInfo.InvariantCulture);
+        // A passed reset says when it happened, as the card does (TierCardViewModel.PassedResetStr).
+        if (rd.Value <= now)
+            return days == 0 ? $"Reset at {t}" : $"Reset {loc.ToString("MMM d", CultureInfo.InvariantCulture)}, {t}";
         if (days <= 0) return $"Today {t}";
         if (days == 1) return $"Tomorrow {t}";
         if (days < 7) return $"{loc.ToString("ddd", CultureInfo.InvariantCulture)} {t}";
