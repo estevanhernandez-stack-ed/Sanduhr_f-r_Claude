@@ -24,6 +24,17 @@ public sealed class WhatsNewBoxTests : AppWindowFixture
         typeof(Window).GetMethod("OnActivated", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [EventArgs.Empty]);
 
     [Fact]
+    public void The_Codex_notice_shows_only_beside_a_card_that_names_Codex() => AppHost.Run(() =>
+    {
+        var store = new SettingsStore(ScratchPaths());
+        var withCodex = new WhatsNewViewModel(WhatsNew.Cards("4.7.0", "4.8.0"), "Version 4.8.0", store);
+        var older = new WhatsNewViewModel(WhatsNew.Cards("4.6.0", "4.7.0"), "Version 4.7.0", store);
+        Assert.True(withCodex.ShowCodexNotice);
+        Assert.False(older.ShowCodexNotice);
+        Assert.False(new WhatsNewViewModel([], "Version 4.0.0", store).ShowCodexNotice);
+    });
+
+    [Fact]
     public void The_box_reads_the_key_again_when_the_window_is_brought_back() => AppHost.Run(() =>
     {
         var paths = ScratchPaths();

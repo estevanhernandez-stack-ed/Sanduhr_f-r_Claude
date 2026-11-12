@@ -208,7 +208,7 @@ public static class WhatsNewCards
 
     /// <summary>Each card with the section its Show me lands on (Settings v2, WF17).</summary>
     private static WhatsNewCard[] Anchored(WhatsNewCard[] cards) =>
-        [.. cards.Select(c => AnchorFor(c.Id) is { } anchor ? c with { Anchor = anchor } : c)];
+        [.. cards.Select(c => (AnchorFor(c.Id) is { } anchor ? c with { Anchor = anchor } : c) with { NamesCodex = c.Id is "codex-limits" })];
 
     /// <summary>
     /// Where each card lands, by id. Kept apart from the cards so their words and their landings change independently.

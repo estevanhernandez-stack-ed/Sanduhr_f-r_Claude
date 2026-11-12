@@ -42,6 +42,9 @@ public sealed record WhatsNewCard
     /// </summary>
     public string? Anchor { get; init; }
 
+    /// <summary>True when the card's words name Codex, so the window shows the Codex trademark line (Store test 10.1.4.4).</summary>
+    public bool NamesCodex { get; init; }
+
     public WhatsNewCard(IReadOnlyList<string> versions, string id, string title, string body,
         string glyph, WhatsNewPreview preview, SettingsPage destination)
     {

@@ -77,6 +77,7 @@ public sealed class WelcomeTourViewModel : ObservableObject
 
     public string WindowTitle => "Welcome to Sanduhr";
     public bool IsTour => true;
+    public bool ShowCodexNotice => false;
     public bool IsWhatsNew => false;
     public string AgainLine => WelcomeTour.AgainLine;
     public string SkipTitle => WelcomeTour.SkipTitle;

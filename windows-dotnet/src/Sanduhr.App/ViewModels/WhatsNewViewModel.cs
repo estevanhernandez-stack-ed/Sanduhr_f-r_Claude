@@ -85,6 +85,9 @@ public sealed class WhatsNewViewModel : ObservableObject
     public IReadOnlyList<WhatsNewCardItem> Items { get; }
     public bool IsEmpty => Items.Count == 0;
 
+    /// <summary>The Codex trademark line shows whenever a shown card names Codex.</summary>
+    public bool ShowCodexNotice => Items.Any(i => i.Card.NamesCodex);
+
     // The window's mode: What's New (cards, Don't show What's New after updates, Done).
     public string WindowTitle => "What's New in Sanduhr";
     public string HeaderName => Header;

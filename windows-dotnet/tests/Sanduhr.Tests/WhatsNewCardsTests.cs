@@ -37,6 +37,10 @@ public class WhatsNewCardsTests
     }
 
     [Fact]
+    public void Only_the_Codex_card_names_Codex() =>
+        Assert.Equal(["codex-limits"], Table.Where(c => c.NamesCodex).Select(c => c.Id));
+
+    [Fact]
     public void Release470_ShowsTheFromFileCard()
     {
         var cards = WhatsNew.Cards("4.6.0", "4.7.0");
