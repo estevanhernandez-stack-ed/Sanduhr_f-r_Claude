@@ -192,6 +192,39 @@ public sealed class WidgetSourcesTests : AppWindowFixture
     });
 
     [Fact]
+    public void A_real_not_installed_says_so_while_the_placeholder_says_run_codex() => AppHost.Run(() =>
+    {
+        Setup(Both);
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            widget.ApplyClaudeForTests(ClaudeData(30, 40));
+            widget.ApplyCodex(CodexState.Off);   // not polled yet
+            var codex = widget.Sections.Single(s => s.Source == "codex");
+            Assert.Equal("Run Codex once to see your limits.", codex.EmptyText);
+            widget.ApplyCodex(new CodexState(CodexReadStatus.NotInstalled, new JsonObject(), null, false, null, new HashSet<string>()));
+            Assert.Equal("Codex isn't installed on this PC.", codex.EmptyText);
+            Assert.Empty(codex.Tiers);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void A_source_tooltip_truncates_like_the_cards() => AppHost.Run(() =>
+    {
+        Setup(Both);
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            widget.ApplyClaudeForTests(ClaudeData(30, 40));
+            widget.ApplyCodex(CodexOk(50, 70.9, fresh: true, asOf: DateTimeOffset.UtcNow));
+            var weekly = widget.CombinedBars.Single(b => b.WindowLabel == "Weekly");
+            Assert.Equal("Codex weekly, 70%.", weekly.BeyondTooltip);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
     public void Collapsing_a_source_saves_and_shows_a_one_line_summary() => AppHost.Run(() =>
     {
         var store = Setup(Both);

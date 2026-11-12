@@ -2040,9 +2040,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             section.Tiers.Clear();
             section.Stale = false;
             section.AsOfText = "";
+            // CodexState.Off is the "not polled yet" placeholder; a NotInstalled the service built is a real answer.
             section.EmptyText = state.Status == CodexReadStatus.Unreadable
                 ? SourceSectionViewModel.UnreadableLine
-                : SourceSectionViewModel.NoLimitsLine;
+                : state.Status == CodexReadStatus.NotInstalled && !ReferenceEquals(state, CodexState.Off)
+                    ? SettingsNames.SourcesCodexNotInstalled
+                    : SourceSectionViewModel.NoLimitsLine;
         }
         section.CollapsedSummary = SummaryOf(state.Status == CodexReadStatus.Ok ? state.Tiers : null);
         UpdateTray(onlyIfChanged: true);
@@ -2081,7 +2084,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <summary>"Codex weekly, 62%." or "Claude session, 40%."; a stale source adds " As of 3:42 PM." (the date past 7 days).</summary>
     private string SourceTooltip(string source, string window, double percent, bool stale)
     {
-        string text = $"{AgentSources.Name(source)} {(window == TierModel.FiveHour ? "session" : "weekly")}, {Math.Round(percent).ToString(CultureInfo.InvariantCulture)}%.";
+        string text = $"{AgentSources.Name(source)} {(window == TierModel.FiveHour ? "session" : "weekly")}, {((int)Math.Floor(percent + 1e-9)).ToString(CultureInfo.InvariantCulture)}%.";
         if (stale && source == AgentSources.Codex && _codexState.AsOf is { } asOf)
         {
             string label = AsOfLabel(asOf, DateTimeOffset.UtcNow);

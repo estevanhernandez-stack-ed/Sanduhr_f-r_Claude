@@ -32,6 +32,7 @@ public class WhatsNewCardsTests
         var card = Assert.Single(cards);
         Assert.Equal("codex-limits", card.Id);
         Assert.Equal("Codex limits, beside Claude's", card.Title);
+        Assert.StartsWith("Turn on Codex in Settings, Sources, and the widget shows its 5-hour and weekly limits under Claude's.", card.Body);
         Assert.Equal(SettingsPage.UsageSources, card.Destination);
         Assert.Equal(SettingsIndex.SourcesList, card.Anchor);
     }

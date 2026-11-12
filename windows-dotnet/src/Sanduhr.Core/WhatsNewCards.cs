@@ -13,7 +13,7 @@ public static class WhatsNewCards
     private static WhatsNewCard[] Release480() =>
     [
         WhatsNewCard.Of("4.8.0", "codex-limits", "Codex limits, beside Claude's",
-            "Tick Codex in Settings, Sources and the widget shows its 5-hour and weekly limits under Claude's. They're read from Codex's own logs on this PC.",
+            "Turn on Codex in Settings, Sources, and the widget shows its 5-hour and weekly limits under Claude's. They're read from Codex's own logs on this PC.",
             "", // Diagnostic
             WhatsNewPreview.None, SettingsPage.UsageSources),
     ];

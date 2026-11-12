@@ -2615,6 +2615,9 @@
                                     <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
                                     <views:TrademarkFooter />
+                                    <!-- Store test 10.1.4.4: the Shows combo names Codex, so its disclaimer shows here too. -->
+                                    <TextBlock x:Name="DeskCodexNotice" Text="{x:Static core:SettingsNames.CodexNotice}" TextWrapping="Wrap" FontSize="11" Margin="0,6,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                 </StackPanel>
                             </Border>
                         </ScrollViewer>
