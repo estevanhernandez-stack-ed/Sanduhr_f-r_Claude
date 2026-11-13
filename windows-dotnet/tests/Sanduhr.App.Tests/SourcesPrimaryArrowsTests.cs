@@ -50,6 +50,42 @@ public sealed class SourcesPrimaryArrowsTests : AppWindowFixture
     });
 
     [Fact]
+    public void Empty_message_lines_are_not_heard_and_a_refusal_is() => AppHost.Run(() =>
+    {
+        // 4.8.0 hand pass: Narrator stopped on two blank lines, read as "text", one at the end of the list. Collapsed while empty, a
+        // refusal still reaches the tree and is announced (LiveRegion.Announces raises once layout shows it).
+        var (window, vm) = Host();
+        var raised = new List<UIElement>();
+        LiveRegion.Raised = raised.Add;
+        try
+        {
+            Assert.DoesNotContain(SettingsNames.SourcesColorRefused, NamesOf(window));
+
+            vm.Rows.Single(r => r.Source == AgentSources.Codex).Color = "teal";
+            window.UpdateLayout();
+            Pump();
+            Assert.Contains(SettingsNames.SourcesColorRefused, NamesOf(window));
+            Assert.Contains(raised, e => e is TextBlock { Text: var t } && t == SettingsNames.SourcesColorRefused);
+        }
+        finally { LiveRegion.Raised = null; window.Close(); }
+    });
+
+    private (Window Window, SourcesViewModel Vm) Host()
+    {
+        Directory.CreateDirectory(Path.Combine(Profile, ".codex"));
+        var store = new SettingsStore(ScratchPaths());
+        store.SaveSetup(SetupChoices.FirstRun.ToSettings(null).WithClaude(true).WithCodex(true));
+        bool claude = true;
+        var vm = new SourcesViewModel(store, () => claude, on => claude = on, () => CodexHomes.Discover(null, Profile));
+        var window = new Window { Content = new SourcesPage { DataContext = vm } };
+        OffScreen(window);
+        window.Show();
+        window.UpdateLayout();
+        Pump();
+        return (window, vm);
+    }
+
+    [Fact]
     public void Down_on_the_page_makes_Codex_primary() => AppHost.Run(() =>
     {
         Directory.CreateDirectory(Path.Combine(Profile, ".codex"));

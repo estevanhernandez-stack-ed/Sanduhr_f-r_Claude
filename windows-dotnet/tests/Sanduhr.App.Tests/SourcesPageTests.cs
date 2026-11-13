@@ -277,7 +277,7 @@ public sealed class SourcesPageTests : AppWindowFixture
     });
 
     [Fact]
-    public void The_Sources_live_lines_stay_in_the_tree_visible_when_empty() => AppHost.Run(() =>
+    public void The_Sources_live_lines_are_collapsed_while_empty_and_announce_when_they_fill() => AppHost.Run(() =>
     {
         var (widget, _) = ScratchWidget("Personal");
         var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask);
@@ -299,10 +299,13 @@ public sealed class SourcesPageTests : AppWindowFixture
             }
             Collect((DependencyObject)tab.Content);
             Assert.Equal(1 + AgentSources.All.Count, live.Count);   // the page line and one color line per source
+            // Empty, a line is collapsed: Narrator stopped on each blank one as "text" (4.8.0 hand pass). Visible-when-empty was the
+            // earlier fix for a collapsed line that never spoke; LiveRegion.Announces now raises the event once layout shows it.
             Assert.All(live, tb =>
             {
-                Assert.Equal(Visibility.Visible, tb.Visibility);
+                Assert.Equal(Visibility.Collapsed, tb.Visibility);
                 Assert.Equal("", tb.Text);
+                Assert.True(LiveRegion.GetAnnounces(tb));
             });
         }
         finally { window.Close(); }
