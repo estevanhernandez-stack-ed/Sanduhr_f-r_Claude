@@ -13,6 +13,12 @@
 - **A widget pack zip you made yourself installs.** Install widget from file… now reads the zips Explorer's Send to, Compressed folder, Finder's Compress and zip tools make: compressed, with the pack's folder inside (its name may have spaces, as Finder and Explorer keep it), or with a Mac's hidden `__MACOSX` and `.DS_Store` files, which are skipped. It still holds every file to the same size limits while unpacking, checks each one's checksum, and runs every pack rule, so a zip that fails installs nothing and says why. Packs from the catalog keep their own stricter format (#459).
 - **Installing the MCP server checks that it starts.** After Install in Settings ▸ Claude Code, Sanduhr starts the server the way Claude Code will and waits for it to answer, then says so: installed and answering, with its version, or installed but not starting, and why (its launcher is missing, the server file it points to is gone, it stopped at once or didn't answer). Before, a launcher that couldn't start looked to Claude Code like no server at all, and nothing said otherwise (#144).
 
+## Unreleased (mac)
+
+### Fixes
+
+- **An account that expires while Alerts are off is still announced once they're on.** 2.43.1 marked an expired account as announced even when Alerts were off or it was quiet hours, so no banner went out and none ever would. Now an account counts as announced only when its banner is actually sent, so turning Alerts on (or quiet hours ending) brings it at the next check. An account that expired while it was the active one counts as told by its own sign-in prompt, so switching away from it brings no banner.
+
 ## v2.43.1-mac — 2026-11-13
 
 ### New

@@ -34,14 +34,23 @@ struct ExpiredAccounts: Equatable {
 /// sign-in prompt already asks. Once per expiry, kept across launches (`notified`), so an account left expired
 /// is not announced again every time Sanduhr starts; a good answer, a new key, a sign-out or a removal ends it.
 enum ExpiredAccountNotice {
-    /// The accounts to announce now: newly marked by this answer, not the active one, not already announced,
-    /// and none in demo mode (its accounts are made up).
-    static func toNotify(before: ExpiredAccounts, after: ExpiredAccounts, active: String?, demo: Bool,
-                         notified: Set<String>) -> Set<String> {
-        guard !demo else { return [] }
-        var added = after.labels.subtracting(before.labels)
-        if let active { added.remove(active) }
-        return added.subtracting(notified)
+    /// The accounts to announce now, and to record as announced: every expired account but the active one that
+    /// was not announced yet, none in demo mode (its accounts are made up), and only while a banner can go out
+    /// (Alerts on, outside quiet hours). Checked at every answer, so an account that expired while Alerts were
+    /// off is announced at the first answer after they allow it (2.43.2; 2.43.1 recorded it unseen).
+    static func toNotify(expired: ExpiredAccounts, active: String?, demo: Bool, notified: Set<String>,
+                         bannerAllowed: Bool) -> Set<String> {
+        guard !demo, bannerAllowed else { return [] }
+        var due = expired.labels.subtracting(notified)
+        if let active { due.remove(active) }
+        return due
+    }
+
+    /// The active account when it is expired: its own "sign in again" prompt has told the user, so it counts as
+    /// announced and switching away from it later brings no banner.
+    static func toldByPrompt(expired: ExpiredAccounts, active: String?) -> String? {
+        guard let active, expired.labels.contains(active) else { return nil }
+        return active
     }
 
     static func title(_ label: String) -> String { "\(label): session expired" }

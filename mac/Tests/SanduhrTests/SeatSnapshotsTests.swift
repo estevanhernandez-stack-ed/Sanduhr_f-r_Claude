@@ -568,7 +568,7 @@ struct ExpiredAccountsTests {
 
 /// 2.43.1: an account you aren't using whose key is refused gets one banner, not only the orange line in
 /// Settings, Accounts.
-@Suite("Expired account notice (2.43.1)")
+@Suite("Expired account notice (2.43.1, gated in 2.43.2)")
 struct ExpiredAccountNoticeTests {
     private func marked(_ labels: String...) -> ExpiredAccounts {
         var e = ExpiredAccounts()
@@ -576,34 +576,53 @@ struct ExpiredAccountNoticeTests {
         return e
     }
 
-    @Test func aNewlyRefusedInactiveAccountIsAnnounced() {
-        #expect(ExpiredAccountNotice.toNotify(before: marked(), after: marked("Home"), active: "Work", demo: false,
-                                              notified: []) == ["Home"])
+    private func due(_ expired: ExpiredAccounts, active: String? = "Work", demo: Bool = false,
+                     notified: Set<String> = [], banner: Bool = true) -> Set<String> {
+        ExpiredAccountNotice.toNotify(expired: expired, active: active, demo: demo, notified: notified, bannerAllowed: banner)
+    }
+
+    @Test func aRefusedInactiveAccountIsAnnounced() {
+        #expect(due(marked("Home")) == ["Home"])
     }
 
     @Test func theActiveAccountIsNotAnnouncedItsOwnPromptAsks() {
-        #expect(ExpiredAccountNotice.toNotify(before: marked(), after: marked("Work"), active: "Work", demo: false,
-                                              notified: []).isEmpty)
+        #expect(due(marked("Work")).isEmpty)
     }
 
-    @Test func anAccountAlreadyMarkedOrAnnouncedIsNotAnnouncedAgain() {
-        // Still refused at the next fetch: no change, no banner.
-        #expect(ExpiredAccountNotice.toNotify(before: marked("Home"), after: marked("Home"), active: "Work", demo: false,
-                                              notified: []).isEmpty)
-        // Marked again after a relaunch, already announced before it.
-        #expect(ExpiredAccountNotice.toNotify(before: marked(), after: marked("Home"), active: "Work", demo: false,
-                                              notified: ["Home"]).isEmpty)
+    @Test func anAccountAlreadyAnnouncedIsNotAnnouncedAgain() {
+        // Still refused at the next fetch, or marked again after a relaunch: announced once.
+        #expect(due(marked("Home"), notified: ["Home"]).isEmpty)
     }
 
     @Test func demoModeAnnouncesNothing() {
-        #expect(ExpiredAccountNotice.toNotify(before: marked(), after: marked("Home", "Lab"), active: "Work", demo: true,
-                                              notified: []).isEmpty)
+        #expect(due(marked("Home", "Lab"), demo: true).isEmpty)
     }
 
     @Test func twoAtOnceAreEachAnnouncedAndTheBannerOpensAccounts() {
-        #expect(ExpiredAccountNotice.toNotify(before: marked(), after: marked("Home", "Lab"), active: nil, demo: false,
-                                              notified: []) == ["Home", "Lab"])
+        #expect(due(marked("Home", "Lab"), active: nil) == ["Home", "Lab"])
         #expect(ExpiredAccountNotice.title("Home") == "Home: session expired")
         #expect(ExpiredAccountNotice.id("Home").hasPrefix(ExpiredAccountNotice.idPrefix))
+    }
+
+    // 2.43.2: with Alerts off (or in quiet hours) no banner goes out, so nothing may be recorded as announced.
+    // 2.43.1 recorded it anyway, and an account that expired while Alerts were off was never announced.
+    @Test func withAlertsOffNothingIsAnnouncedOrRecorded() {
+        #expect(due(marked("Home"), banner: false).isEmpty)
+    }
+
+    @Test func anAccountThatExpiredWhileAlertsWereOffIsAnnouncedOnceTheyAreOn() {
+        let expired = marked("Home")
+        #expect(due(expired, banner: false).isEmpty)
+        // The next answer, with Alerts on and the account still refused (no change to the set): announced now.
+        #expect(due(expired, banner: true) == ["Home"])
+    }
+
+    @Test func anAccountThatExpiredWhileActiveCountsAsToldAndBringsNoBannerAfterASwitch() {
+        let expired = marked("Work")
+        #expect(ExpiredAccountNotice.toldByPrompt(expired: expired, active: "Work") == "Work")
+        #expect(ExpiredAccountNotice.toldByPrompt(expired: expired, active: "Home") == nil)
+        #expect(ExpiredAccountNotice.toldByPrompt(expired: marked(), active: "Work") == nil)
+        // Recorded while active, then the user switches to Home: Work stays quiet.
+        #expect(due(expired, active: "Home", notified: ["Work"]).isEmpty)
     }
 }
