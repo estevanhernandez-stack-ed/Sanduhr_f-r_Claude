@@ -27,13 +27,20 @@ internal static class AntigravitySummaries
 
     private static byte[] Z(string s) => Encoding.UTF8.GetBytes(s + "\0");
 
+    /// <summary>SQLite file URI built by hand: <c>Uri.AbsoluteUri</c> decodes a literal <c>%XX</c> in the path and opens the wrong file.</summary>
+    internal static string FileUri(string path)
+    {
+        var p = path.Replace('\\', '/').Replace("%", "%25").Replace("#", "%23").Replace("?", "%3F").Replace(" ", "%20");
+        return p.StartsWith("//", StringComparison.Ordinal) ? "file:" + p : "file:///" + p;
+    }
+
     public static IReadOnlyDictionary<string, string?>? Read(string dbPath, int busyTimeoutMs = 2000)
     {
         if (!File.Exists(dbPath)) return null;   // streamer: notname - a file location used for IO, never drawn
         IntPtr db = IntPtr.Zero, stmt = IntPtr.Zero;
         try
         {
-            var uri = new Uri(dbPath).AbsoluteUri + "?mode=ro";   // streamer: notname - the SQLite open URI, never drawn
+            var uri = FileUri(dbPath) + "?mode=ro";   // streamer: notname - the SQLite open URI, never drawn
             if (sqlite3_open_v2(Z(uri), out db, OpenReadOnly | OpenUri, IntPtr.Zero) != SqliteOk) return null;
             sqlite3_busy_timeout(db, busyTimeoutMs);
             if (sqlite3_prepare_v2(db, Z(Query), -1, out stmt, IntPtr.Zero) != SqliteOk) return null;
@@ -47,7 +54,7 @@ internal static class AntigravitySummaries
             }
             return rc == SqliteDone ? map : null;
         }
-        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or UriFormatException)
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
             return null;
         }

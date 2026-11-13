@@ -78,4 +78,26 @@ public class AntigravitySummariesTests
         }
         finally { dir.Delete(true); }
     }
+
+    [Fact]
+    public void FileUri_escapes_percent_first_and_leaves_non_ascii_raw() =>
+        Assert.Equal("file:///C:/a%20b/c%23d%2541%20é.db", AntigravitySummaries.FileUri(@"C:\a b\c#d%41 é.db"));
+
+    [Fact]
+    public void Reads_a_database_whose_folder_has_space_hash_and_percent_escapes()
+    {
+        var root = Directory.CreateTempSubdirectory("sanduhr-agy-");
+        try
+        {
+            var sub = Directory.CreateDirectory(Path.Combine(root.FullName, "a b#c%41"));
+            var path = Path.Combine(sub.FullName, "conversation_summaries.db");
+            sqlite3_close(Create(path, Schema));
+
+            var map = AntigravitySummaries.Read(path);
+
+            Assert.NotNull(map);
+            Assert.Equal("[\"file:///C:/x/api\"]", map!["c1"]);
+        }
+        finally { root.Delete(true); }
+    }
 }
