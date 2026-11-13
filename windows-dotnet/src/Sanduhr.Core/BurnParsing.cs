@@ -26,6 +26,13 @@ public sealed class ClaudeLineParser : IBurnLineParser
 {
     public BurnEvent? Parse(string line, out bool bad)
     {
+        try { return ParseCore(line, out bad); }
+        // Duplicate keys throw ArgumentException lazily on access; a malformed line is a bad line, never a thrown one.
+        catch (Exception e) when (e is JsonException or ArgumentException or InvalidOperationException) { bad = true; return null; }
+    }
+
+    public BurnEvent? ParseCore(string line, out bool bad)
+    {
         bad = false;
         // Perf prefilter only: looser than "type":"assistant" on purpose so formatting drift can never silently drop events.
         if (!line.Contains("\"assistant\"", StringComparison.Ordinal))

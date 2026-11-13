@@ -172,4 +172,28 @@ public class CodexBurnSourceTests
         Assert.False(bad);
         Assert.DoesNotContain("secret", p.SaveState() ?? "");
     }
+
+    [Fact]
+    public void Duplicate_keys_make_a_bad_line_not_an_exception()
+    {
+        var p = new CodexLineParser(null);
+        Assert.Null(p.Parse("""{"timestamp":"2026-11-10T16:01:00Z","type":"event_msg","type":"x","payload":{"type":"token_count"}}""", out var bad1));
+        Assert.True(bad1);
+        Assert.Null(p.Parse("""{"timestamp":"2026-11-10T16:01:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{},"total_token_usage":{}}}}""", out var bad2));
+        Assert.True(bad2);
+        Assert.Null(new ClaudeLineParser().Parse("""{"type":"assistant","timestamp":"2026-11-10T16:01:00Z","message":{"model":"a","model":"b","usage":{"input_tokens":1}}}""", out var bad3));
+        Assert.True(bad3);
+    }
+
+    [Fact]
+    public void Saved_state_carries_no_path_and_no_session_id()
+    {
+        var p = new CodexLineParser(null);
+        p.Parse(Meta("sess-secret-id", @"C:\Users\x\Projects\api"), out _);
+        p.Parse(Tokens("2026-11-10T16:01:00Z", 10, 0, 0, 1), out _);
+        var state = p.SaveState() ?? "";
+        Assert.DoesNotContain("Projects", state);
+        Assert.DoesNotContain("sess-secret-id", state);
+        Assert.NotNull(new CodexLineParser("""{"last":null}""").SaveState());
+    }
 }

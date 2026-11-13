@@ -60,6 +60,7 @@ public sealed class CodexBurnSource(Func<IReadOnlyList<string>> homes, Func<Stre
 public sealed class CodexLineParser : IBurnLineParser
 {
     private State _s;
+    private string? _cwd;   // this pass only: never persisted, a resumed parser learns it from the next session_meta/turn_context
 
     public CodexLineParser(string? state)
     {
@@ -67,9 +68,17 @@ public sealed class CodexLineParser : IBurnLineParser
         if (state is null) return;
         try { _s = JsonSerializer.Deserialize<State>(state) ?? new State(); }
         catch (JsonException) { _s = new State(); }   // an unreadable state restarts the segment total, never crashes
+        _s.Last ??= new Usage();
     }
 
     public BurnEvent? Parse(string line, out bool bad)
+    {
+        try { return ParseCore(line, out bad); }
+        // Duplicate keys throw ArgumentException lazily on access; a malformed line is a bad line, never a thrown one.
+        catch (Exception e) when (e is JsonException or ArgumentException or InvalidOperationException) { bad = true; return null; }
+    }
+
+    public BurnEvent? ParseCore(string line, out bool bad)
     {
         bad = false;
         if (!line.Contains("\"session_meta\"", StringComparison.Ordinal)
@@ -84,14 +93,13 @@ public sealed class CodexLineParser : IBurnLineParser
         switch (BurnJson.Str(d, "type"))
         {
             case "session_meta":
-                _s.Segment = BurnJson.Str(p, "session_id") ?? BurnJson.Str(p, "id");
-                _s.Cwd = BurnJson.Str(p, "cwd") ?? _s.Cwd;
+                _cwd = BurnJson.Str(p, "cwd") ?? _cwd;
                 _s.HasTotal = false;
                 _s.Last = new Usage();
                 return null;
             case "turn_context":
                 _s.Model = BurnJson.Str(p, "model") ?? _s.Model;
-                _s.Cwd = BurnJson.Str(p, "cwd") ?? _s.Cwd;
+                _cwd = BurnJson.Str(p, "cwd") ?? _cwd;
                 return null;
             case "event_msg" when BurnJson.Str(p, "type") == "token_count":
                 return Count(d, p);
@@ -121,16 +129,14 @@ public sealed class CodexLineParser : IBurnLineParser
         else return null;
 
         if (u.Input == 0 && u.Output == 0 && u.Cached == 0 && u.CacheWrite == 0) return null;
-        return new BurnEvent(ts, Math.Max(0, u.Input - u.Cached), u.Output, u.Cached, u.CacheWrite, _s.Model, _s.Cwd, null);
+        return new BurnEvent(ts, Math.Max(0, u.Input - u.Cached), u.Output, u.Cached, u.CacheWrite, _s.Model, _cwd, null);
     }
 
     public string? SaveState() => JsonSerializer.Serialize(_s);
 
     private sealed class State
     {
-        [JsonPropertyName("segment")] public string? Segment { get; set; }
         [JsonPropertyName("model")] public string? Model { get; set; }
-        [JsonPropertyName("cwd")] public string? Cwd { get; set; }
         [JsonPropertyName("has_total")] public bool HasTotal { get; set; }
         [JsonPropertyName("last")] public Usage Last { get; set; } = new();
     }
