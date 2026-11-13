@@ -736,7 +736,42 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// Null in unit contexts.</summary>
     public VaultService? Vault => _vault;
 
-    public void AttachVaultService(VaultService service) => _vault = service;
+    public void AttachVaultService(VaultService service)
+    {
+        if (_vault is not null) _vault.IngestCompleted -= OnVaultIngestCompleted;
+        _vault = service;
+        _vaultUi = Dispatcher.CurrentDispatcher;   // attached on the UI thread; IngestCompleted fires on a worker
+        _vault.IngestCompleted += OnVaultIngestCompleted;
+    }
+
+    private readonly AgentBurnDeltas _agentDeltas = new();
+    private Dispatcher? _vaultUi;
+
+    /// <summary>After each ingest: today's Vault total per active agent root feeds the footer's agent pieces (spec 3).</summary>
+    private void OnVaultIngestCompleted()
+    {
+        if (_vault is not { } vault || _vaultUi is not { } ui) return;
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var totals = new Dictionary<string, long>(StringComparer.Ordinal);
+        try
+        {
+            foreach (var root in vault.ConsentedRootNames().Where(r => r != AgentSources.Claude && AgentSources.Burn.Contains(r)))
+                totals[root] = vault.Reader.ReadWindow([root], today, today.AddDays(1)).ByDay.Values.Sum();
+        }
+        catch
+        {
+            return;   // a failed read leaves the footer as it was
+        }
+        ui.BeginInvoke(() =>
+        {
+            foreach (var agent in AgentSources.Burn.Where(a => a != AgentSources.Claude))
+            {
+                if (totals.TryGetValue(agent, out var total)) _agentDeltas.Observe(agent, today, total);
+                else _agentDeltas.Forget(agent);
+            }
+            UpdateFooter();
+        });
+    }
 
     private UsagePublishService? _publish;
 
@@ -2475,7 +2510,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // The CC delta is computed by RefreshCcDerivedAsync's single shared
         // walk — the footer never does its own file IO anymore.
         string cc = _ccDeltaTotal > 0 ? $"  ·  CC +{TokenFormat.Compact(_ccDeltaTotal)}" : "";
-        FooterText = $"Updated {ts}  ·  {mode}{cc}";
+        string agents = _agentDeltas.FooterPieces();
+        FooterText = $"Updated {ts}  ·  {mode}{cc}{agents}";
     }
 
     partial void OnPinnedChanged(bool value) => UpdateFooter();
@@ -2737,6 +2773,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _tickTimer.Stop();
         _riffTimer.Stop();
         _statusNoticeTimer?.Stop();
+        if (_vault is not null) _vault.IngestCompleted -= OnVaultIngestCompleted;
         _themeHandoff?.Dispose();
         Streamer.Changed -= OnStreamerChanged;
         Streamer.Dispose();
