@@ -209,7 +209,8 @@ internal partial class SettingsWindow : Window
 
     private void RenderLocalCc()
     {
-        BarStrip.SetData(ViewModel.ClaudeCode.Overview.ByDay, ViewModel.ClaudeCode.Overview.Palette);
+        BarStrip.SetData(ViewModel.ClaudeCode.Overview.ByDay, ViewModel.ClaudeCode.Overview.Palette,
+            ViewModel.ClaudeCode.Overview.ByDayByAgent, ViewModel.Sources.ColorsForStrip());
         CalendarStrip.SetData(
             ViewModel.ClaudeCode.Overview.CalendarDays,
             ViewModel.ClaudeCode.Overview.UncoveredDays,

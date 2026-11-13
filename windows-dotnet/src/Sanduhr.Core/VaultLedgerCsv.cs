@@ -18,16 +18,18 @@ public static class VaultLedgerCsv
         string LastTs,
         long TokensInScope,
         long TokensTotal,
-        string Models);
+        string Models,
+        string Agent);
 
     public static CsvExport.CsvBuildResult Build(IReadOnlyList<Row> rows)
     {
         var sb = new StringBuilder();
-        sb.Append("session,root,project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models\r\n");
+        sb.Append("session,root,agent,project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models\r\n");
         foreach (var r in rows)
         {
             Append(sb, r.Uuid); sb.Append(',');
             Append(sb, r.Root); sb.Append(',');
+            Append(sb, r.Agent); sb.Append(',');
             Append(sb, r.Project); sb.Append(',');
             Append(sb, r.FirstTs); sb.Append(',');
             Append(sb, r.LastTs); sb.Append(',');

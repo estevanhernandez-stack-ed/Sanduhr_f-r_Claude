@@ -8,16 +8,16 @@ public class VaultLedgerCsvTests
     public void Header_always_emitted_and_rows_in_given_order()
     {
         var result = VaultLedgerCsv.Build(Array.Empty<VaultLedgerCsv.Row>());
-        Assert.Equal("session,root,project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models\r\n",
+        Assert.Equal("session,root,agent,project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models\r\n",
             result.Text);
         Assert.Equal(0, result.RowCount);
 
         var rows = new[]
         {
             new VaultLedgerCsv.Row("u2", ".claude", "api", "2026-07-11T00:00:00+00:00",
-                "2026-07-11T01:00:00+00:00", 200, 200, "claude-fable-5:200"),
+                "2026-07-11T01:00:00+00:00", 200, 200, "claude-fable-5:200", "Claude Code"),
             new VaultLedgerCsv.Row("u1", ".claude", "web", "2026-07-10T00:00:00+00:00",
-                "2026-07-10T01:00:00+00:00", 100, 600, "claude-fable-5:400;claude-sonnet-5:200"),
+                "2026-07-10T01:00:00+00:00", 100, 600, "claude-fable-5:400;claude-sonnet-5:200", "Claude Code"),
         };
         var built = VaultLedgerCsv.Build(rows);
         Assert.Equal(2, built.RowCount);
@@ -32,9 +32,17 @@ public class VaultLedgerCsvTests
     {
         var rows = new[]
         {
-            new VaultLedgerCsv.Row("u1", ".claude", "odd,\"proj\"", "t", "t", 1, 1, "m"),
+            new VaultLedgerCsv.Row("u1", ".claude", "odd,\"proj\"", "t", "t", 1, 1, "m", "Claude Code"),
         };
         var built = VaultLedgerCsv.Build(rows);
         Assert.Contains("\"odd,\"\"proj\"\"\"", built.Text);
+    }
+
+    [Fact]
+    public void The_agent_column_follows_root()
+    {
+        var csv = VaultLedgerCsv.Build([new VaultLedgerCsv.Row("s", "codex", "api", "a", "b", 1, 2, "m", "Codex")]).Text;
+        Assert.StartsWith("session,root,agent,project,", csv);
+        Assert.Contains("s,codex,Codex,api,a,b,1,2,m", csv);
     }
 }

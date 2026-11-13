@@ -104,6 +104,13 @@ public sealed partial class LocalCcViewModel : ObservableObject
     private Dictionary<DateOnly, long> _byDay = new();
     public IReadOnlyDictionary<DateOnly, long> ByDay => _byDay;
 
+    /// <summary>Each non-Claude agent's per-day tokens in the 30-day window (spec 3). Claude Code's share of a day is the day's total minus these.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyDictionary<DateOnly, long>> ByDayByAgent { get; private set; }
+        = new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>();
+
+    private IReadOnlyDictionary<string, Dictionary<string, long>> _projectsByAgent
+        = new Dictionary<string, Dictionary<string, long>>();
+
     private HashSet<DateOnly> _uncovered = new();
     public IReadOnlySet<DateOnly> UncoveredDays => _uncovered;
 
@@ -237,7 +244,9 @@ public sealed partial class LocalCcViewModel : ObservableObject
         bool WindowSplitPartial,
         HashSet<DateOnly> Uncovered,
         Dictionary<DateOnly, long> CalendarByDay,
-        DateOnly CalendarStart);
+        DateOnly CalendarStart,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<DateOnly, long>>? ByDayByAgent = null,
+        IReadOnlyDictionary<string, Dictionary<string, long>>? ProjectsByAgent = null);
 
     public async Task RefreshAsync()
     {
@@ -304,6 +313,27 @@ public sealed partial class LocalCcViewModel : ObservableObject
         return (today, windowStart, roots, lastIngest, vaultOn, degraded, calFrom, uncovered);
     }
 
+    /// <summary>Reads each non-Claude agent root on its own over [from, toExclusive): per-day and per-project splits (spec 3).</summary>
+    private static (Dictionary<string, IReadOnlyDictionary<DateOnly, long>> ByDay,
+        Dictionary<string, Dictionary<string, long>> Projects) ReadAgents(
+        VaultService vault, IReadOnlyList<string> consentedRoots, DateOnly from, DateOnly toExclusive)
+    {
+        var byAgent = new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>(StringComparer.Ordinal);
+        var projectsByAgent = new Dictionary<string, Dictionary<string, long>>(StringComparer.Ordinal);
+        foreach (var root in consentedRoots.Where(r => vault.Reader.AgentOf(r) != AgentSources.Claude))
+        {
+            var agent = vault.Reader.AgentOf(root);
+            var w = vault.Reader.ReadWindow([root], from, toExclusive);
+            byAgent[agent] = w.ByDay;
+            foreach (var (name, tokens) in w.ByProjectName)   // streamer: key - project display name used as a dictionary key; Rows masks when listed (CP 15)
+            {
+                if (!projectsByAgent.TryGetValue(name, out var m)) projectsByAgent[name] = m = new(StringComparer.Ordinal);
+                m[agent] = m.GetValueOrDefault(agent) + tokens;
+            }
+        }
+        return (byAgent, projectsByAgent);
+    }
+
     /// <summary>Fast vault-only snapshot for the first paint — never touches
     /// <paramref name="vault"/>'s live reader, so it returns in milliseconds
     /// while the live walk runs behind it. Null when the vault can't serve
@@ -320,6 +350,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
         // Calendar-only head slice — same union grammar as Compute, still
         // disjoint from `win` by construction.
         var winCal = vault.Reader.ReadWindow(roots, calFrom, windowStart);
+        var agents = ReadAgents(vault, roots, windowStart, hotStart);
 
         var byDay = new Dictionary<DateOnly, long>(win.ByDay);   // no hot-day/live entries — those arrive in the full pass
 
@@ -336,7 +367,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
         bool partial = windowTotal > 0 && (sentWindow + recvWindow) < (long)(windowTotal * 0.95);
 
         return new OverviewData(byDay, projects, skills, "", 0, 0, sentWindow, recvWindow, partial, uncovered,
-            calendarByDay, calFrom);
+            calendarByDay, calFrom, agents.ByDay, agents.Projects);
     }
 
     private static OverviewData Compute(VaultService? vault, CcLogReader reader)
@@ -378,6 +409,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
         // Calendar-only head slice — [calFrom, windowStart), never touches the
         // 30-day `win` read above, so every existing figure stays bit-identical.
         var winCal = vault.Reader.ReadWindow(roots, calFrom, windowStart);
+        var agents = ReadAgents(vault, roots, windowStart, hotStart);
 
         var byDay = new Dictionary<DateOnly, long>(win.ByDay);
         for (var d = hotStart; d <= today; d = d.AddDays(1))
@@ -419,15 +451,26 @@ public sealed partial class LocalCcViewModel : ObservableObject
 
         return new OverviewData(byDay, projects, skills, "",
             sentToday, recvToday, sentWindow, recvWindow, partial, uncovered,
-            calendarByDay, calFrom);
+            calendarByDay, calFrom, agents.ByDay, agents.Projects);
     }
 
     /// <summary>"Stop archiving …?" naming the folder as its checkbox does (slice 7, CP 11).</summary>
     internal static string StopArchivingQuestion(string root) => $"Stop archiving {StreamerMode.Mask.FolderName(root)}?";   // streamer: masked - CP 11: Mask.FolderName masks on this line
 
     /// <summary>A top-ten table's rows (slice 7, CP 15): each name as shown, with its real name kept for the quick route.</summary>
-    internal static IReadOnlyList<BreakdownRow> Rows(IEnumerable<(string Name, long Tokens)> rows, CodenameCategory category) =>
-        [.. rows.Select(r => new BreakdownRow(StreamerMode.Mask.Name(category, r.Name), TokenFormat.Compact(r.Tokens), r.Name, category))];
+    internal static IReadOnlyList<BreakdownRow> Rows(IEnumerable<(string Name, long Tokens)> rows, CodenameCategory category,
+        IReadOnlyDictionary<string, Dictionary<string, long>>? byAgent = null) =>
+        [.. rows.Select(r => new BreakdownRow(StreamerMode.Mask.Name(category, r.Name), TokensText(r.Name, r.Tokens, byAgent), r.Name, category))];
+
+    /// <summary>A row's figure: today's compact tokens, or with several agents the same plus each agent's share (spec 3).</summary>
+    private static string TokensText(string name, long tokens, IReadOnlyDictionary<string, Dictionary<string, long>>? byAgent)
+    {
+        if (byAgent is null || !byAgent.TryGetValue(name, out var agents))
+            return TokenFormat.Compact(tokens);
+        var split = new Dictionary<string, long>(agents, StringComparer.Ordinal);
+        split[AgentSources.Claude] = Math.Max(0, tokens - split.Values.Sum());
+        return AgentShares.Describe(tokens, split);
+    }
 
     private IReadOnlyList<(string Name, long Tokens)> _topProjects = [];
     private IReadOnlyList<(string Name, long Tokens)> _topSkills = [];
@@ -437,7 +480,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
     private void FillBreakdowns()
     {
         Projects.Clear();
-        foreach (var row in Rows(_topProjects, CodenameCategory.Project))
+        foreach (var row in Rows(_topProjects, CodenameCategory.Project, _projectsByAgent))
             Projects.Add(row);
         Skills.Clear();
         foreach (var row in Rows(_topSkills, CodenameCategory.Skill))
@@ -487,6 +530,8 @@ public sealed partial class LocalCcViewModel : ObservableObject
 
         StatusLine = data.StatusLine;
         _byDay = data.ByDay;
+        ByDayByAgent = data.ByDayByAgent ?? new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>();
+        _projectsByAgent = data.ProjectsByAgent ?? new Dictionary<string, Dictionary<string, long>>();
 
         _topProjects = [.. data.Projects.OrderByDescending(kv => kv.Value).Take(10).Select(kv => (kv.Key, kv.Value))];   // streamer: masked - via FillBreakdowns: Rows masks each name (CP 15)
         _topSkills = [.. data.Skills.OrderByDescending(kv => kv.Value).Take(10).Select(kv => (kv.Key, kv.Value))];

@@ -1788,6 +1788,13 @@
                                 </Grid.RowDefinitions>
 
                                 <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="0,0,12,0"
+                                                Visibility="{Binding ShowAgentFilter, Converter={StaticResource BoolVis}}">
+                                        <TextBlock Text="Agent" FontSize="10.5" VerticalAlignment="Center" Margin="0,0,6,0"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                        <ComboBox ItemsSource="{Binding AgentFilters}" SelectedItem="{Binding SelectedAgentFilter, Mode=TwoWay}"
+                                                  MinWidth="120" AutomationProperties.Name="Agent" />
+                                    </StackPanel>
                                     <Button DockPanel.Dock="Right" Style="{StaticResource AccentButton}"
                                             Content="{x:Static core:SettingsNames.ExportSessions}" Command="{Binding ExportCsvCommand}" />
                                     <TextBlock DockPanel.Dock="Right" Text="{x:Static core:SettingsNames.ExportsKeepRealNames}" FontSize="10.5"
@@ -1839,6 +1846,7 @@
                                         BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
                                     <Grid>
                                         <ListBox ItemsSource="{Binding View}" Background="Transparent" BorderThickness="0" AutomationProperties.Name="Sessions"
+                                                 Tag="{Binding ShowAgentFilter}"
                                                  HorizontalContentAlignment="Stretch"
                                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                                  VirtualizingPanel.IsVirtualizing="True"
@@ -1900,10 +1908,16 @@
                                                                 </Grid.ColumnDefinitions>
                                                                 <TextBlock Grid.Column="0" Text="{Binding LastActiveText}" FontSize="11"
                                                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                                                <TextBlock Grid.Column="1" Text="{Binding ProjectText}" FontSize="11"
-                                                                           TextTrimming="CharacterEllipsis"
-                                                                           ToolTip="{Binding CwdTooltip}"
-                                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                                <StackPanel Grid.Column="1">
+                                                                    <TextBlock Text="{Binding ProjectText}" FontSize="11"
+                                                                               TextTrimming="CharacterEllipsis"
+                                                                               ToolTip="{Binding CwdTooltip}"
+                                                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                                    <!-- Agent label: shown only while the ledger holds two or more agents (the Agent filter's rule). -->
+                                                                    <TextBlock Text="{Binding AgentLabel}" FontSize="9.5"
+                                                                               Visibility="{Binding Tag, RelativeSource={RelativeSource AncestorType=ListBox}, Converter={StaticResource BoolVis}}"
+                                                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                                                </StackPanel>
                                                                 <TextBlock Grid.Column="2" Text="{Binding ModelBadge}" FontSize="10"
                                                                            TextTrimming="CharacterEllipsis"
                                                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />

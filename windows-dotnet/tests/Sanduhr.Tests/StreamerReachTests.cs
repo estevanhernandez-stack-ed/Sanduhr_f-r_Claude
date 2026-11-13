@@ -228,6 +228,7 @@ public class StreamerReachTests
         ("Sanduhr.App/Views/DeskLayoutMap.cs", "notname", 1),
         ("Sanduhr.App/Views/DrawersPage.xaml.cs", "notname", 1),   // Drawers (plan 2, Task 11): the folder picker's result, used for IO
         ("Sanduhr.App/Views/IntegrationConsentDialog.xaml.cs", "notname", 1),
+        ("Sanduhr.App/Views/LocalCcBarStrip.cs", "notname", 1),   // Local burn page (spec 3): the strip's spoken name lists agent product names and token figures
         ("Sanduhr.App/Views/ManualKeyWindow.xaml.cs", "masked", 1),
         ("Sanduhr.App/Views/McpConsentDialog.xaml.cs", "masked", 3),
         ("Sanduhr.App/Views/ResetWindow.xaml.cs", "key", 1),      // slice 8: the real paths of the unticked rows

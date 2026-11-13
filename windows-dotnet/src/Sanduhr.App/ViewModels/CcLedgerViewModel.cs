@@ -30,9 +30,16 @@ public sealed partial class LedgerRowViewModel : ObservableObject
     public DateTimeOffset LastTs => Info.LastTs;
     public string ProjectSort => ProjectText;
 
-    /// <summary>What a screen reader reads for the row: project, last active, models, tokens.</summary>
+    /// <summary>"Claude Code", "Codex" or "Antigravity"; a project group spanning agents reads "Several agents".</summary>
+    public string AgentLabel => Members.Select(m => m.Agent).Distinct().Count() > 1
+        ? SettingsNames.SeveralAgents
+        : AgentSources.BurnName(Info.Agent);
+
+    /// <summary>What a screen reader reads for the row: project, last active, models, tokens. The agent follows the project
+    /// only when it is not Claude Code, so a Claude Code only ledger reads exactly as before.</summary>
     public override string ToString() =>
-        string.Join(", ", new[] { ProjectText, LastActiveText, ModelBadge, ScopedTokensText }.Where(p => !string.IsNullOrWhiteSpace(p)));
+        string.Join(", ", new[] { ProjectText, AgentLabel == AgentSources.BurnName(AgentSources.Claude) ? "" : AgentLabel,
+            LastActiveText, ModelBadge, ScopedTokensText }.Where(p => !string.IsNullOrWhiteSpace(p)));
 
     /// <summary>Full-path tooltip — non-null ONLY under store_full_paths
     /// (spec: Ledger). A null ToolTip renders nothing in WPF. Group rows carry
@@ -269,6 +276,34 @@ public sealed partial class CcLedgerViewModel : ObservableObject
 
     public ObservableCollection<LedgerRowViewModel> Rows { get; } = new();
 
+    /// <summary>"All" plus each agent present in the sessions read; the Agent filter shows only with two or more (spec 3).</summary>
+    public ObservableCollection<string> AgentFilters { get; } = [SettingsNames.AllAgents];
+    [ObservableProperty] private string _selectedAgentFilter = SettingsNames.AllAgents;
+    [ObservableProperty] private bool _showAgentFilter;
+    partial void OnSelectedAgentFilterChanged(string value) => ApplyFilter();
+
+    /// <summary>One predicate for the day-mode filter and the agent filter.</summary>
+    private void ApplyFilter()
+    {
+        bool dayScoped = _dayScope is not null;
+        bool agentOn = SelectedAgentFilter is { } f && f != SettingsNames.AllAgents;
+        View.Filter = !dayScoped && !agentOn ? null : item => item is LedgerRowViewModel r
+            && (!dayScoped || r.ScopedTokens > 0)
+            && (!agentOn || r.AgentLabel == SelectedAgentFilter);
+    }
+
+    private void UpdateAgentFilters()
+    {
+        var keep = SelectedAgentFilter;
+        var present = AgentSources.Burn.Where(a => _lastSessions.Any(x => x.Agent == a)).Select(AgentSources.BurnName).ToList();
+        ShowAgentFilter = present.Count > 1;
+        AgentFilters.Clear();
+        AgentFilters.Add(SettingsNames.AllAgents);
+        foreach (var name in present) AgentFilters.Add(name);
+        SelectedAgentFilter = keep is not null && AgentFilters.Contains(keep) ? keep : SettingsNames.AllAgents;
+        ApplyFilter();   // the combo box may have cleared the selection while the list was rebuilt
+    }
+
     public ListCollectionView View { get; }
 
     public ThemePalette Palette => _widget.Palette;
@@ -335,7 +370,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
             return;
         _dayScope = null;   // chips always escape day mode
         IsDayMode = false;
-        View.Filter = null; // ...and take the day-mode filter with them
+        ApplyFilter();      // ...and take the day-mode filter with them (the agent filter stays)
         Scope = scope;
         var (from, to) = ScopeRange();
         foreach (var row in Rows)
@@ -360,7 +395,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         var (from, to) = ScopeRange();
         foreach (var row in Rows)
             row.Rescope(from, to);
-        View.Filter = item => item is LedgerRowViewModel r && r.ScopedTokens > 0;
+        ApplyFilter();
         View.Refresh();
         NotifyHeaders();
         // Day-mode empty must read as "nothing happened that day", never the
@@ -462,7 +497,8 @@ public sealed partial class CcLedgerViewModel : ObservableObject
                 x.Info.LastTs.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
                 x.ScopedTokens, x.Info.Total,
                 string.Join(";", x.Info.ByModel.OrderByDescending(kv => kv.Value)
-                    .Select(kv => $"{kv.Key}:{kv.Value}"))))
+                    .Select(kv => $"{kv.Key}:{kv.Value}")),
+                AgentSources.BurnName(x.Info.Agent)))
             .ToList();
     }
 
@@ -470,6 +506,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
     internal void PresentForTests(IReadOnlyList<VaultSessionInfo> sessions)
     {
         _lastSessions = sessions;
+        UpdateAgentFilters();
         Present();
     }
 
@@ -490,6 +527,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         }
 
         _lastSessions = sessions;
+        UpdateAgentFilters();
         Present();
     }
 
@@ -564,7 +602,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
             projectKey, root, projectKey, first.ProjectName, null,   // streamer: key - builds the merged row's info; the row masks its name
             members.Min(m => m.FirstTs), members.Max(m => m.LastTs),
             total, byModel, bySkill, byDay, null,
-            members.Sum(m => m.AgentCount), members.Sum(m => m.AgentTokens));
+            members.Sum(m => m.AgentCount), members.Sum(m => m.AgentTokens), first.Agent);
     }
 
     /// <summary>Re-presents Rows from <see cref="_lastSessions"/> under the

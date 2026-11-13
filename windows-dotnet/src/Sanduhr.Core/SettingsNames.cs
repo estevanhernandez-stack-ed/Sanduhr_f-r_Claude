@@ -17,6 +17,14 @@ public sealed record SettingsGroup(string? Title, IReadOnlyList<SettingsPage> Pa
 /// </summary>
 public static class SettingsNames
 {
+    // ---- Local burn ledger (spec 3) ----
+
+    /// <summary>A stacked project row whose sessions come from more than one agent.</summary>
+    public const string SeveralAgents = "Several agents";
+
+    /// <summary>The ledger's Agent filter, no agent chosen.</summary>
+    public const string AllAgents = "All";
+
     // ---- Pages ----
 
     /// <summary>The sidebar: six groups, each page once. Widget is a page since slice 5; Widget with no anchor still means the widget itself

@@ -68,6 +68,13 @@ public sealed partial class SourcesViewModel : ObservableObject
     /// <summary>Primary or a color changed and saved: App redraws the widget's sections, bars and tray.</summary>
     public Action? DisplayChanged { get; set; }
 
+    /// <summary>Each burn source's color as saved in Sources (Antigravity's default), for the Local burn page's strip.</summary>
+    public Func<string, System.Windows.Media.Color> ColorsForStrip()
+    {
+        var sources = _store.LoadSources();
+        return id => (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(sources.ColorOf(id));
+    }
+
     /// <summary>Reads setup, the sources settings and whether Codex is installed again (Settings does this on each visit).</summary>
     public void Reload() => Reload(clearMessage: true);
 
