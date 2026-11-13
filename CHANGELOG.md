@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (windows)
+## v4.8.0 — 2026-11-12
 
 ### New
 
