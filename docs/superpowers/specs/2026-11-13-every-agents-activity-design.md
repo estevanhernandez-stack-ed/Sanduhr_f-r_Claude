@@ -8,10 +8,10 @@ Windows, 5.0 spec 3 of 4 (the frame is in `2026-10-28-drawers-design.md`). Brain
 
 Someone who works across more than one coding agent sees where their week went, by project, across all of
 them. Sanduhr already shows Claude Code's local burn; this spec adds Codex and Antigravity to the same
-ledger, the same Vault and the widget's local-burn strip, read from each agent's own files on this PC.
+ledger, the same Vault and the widget's footer, read from each agent's own files on this PC.
 
-**Success:** someone with Codex and Antigravity history switches both on in Sources. Within one refresh the
-widget's strip shows today's burn split three ways, and the Local burn ledger shows each project's 30 days
+**Success:** someone with Codex and Antigravity history switches both on in Sources. Within two refreshes the
+widget's footer shows each agent's new tokens beside Claude Code's, and the Local burn ledger shows each project's 30 days
 with bars split by agent and a filter that narrows the session list to one agent. No sign-in, no network
 call, and no prompt or reply text is read.
 
@@ -68,15 +68,20 @@ call, and no prompt or reply text is read.
   `agent` (`"codex"`, `"antigravity"`; absent means `"claude"`). Shards, rollups, checkpoints, quarantine
   and purge are the existing ones.
 - **Read side.** `VaultReader` reports each row's agent from its root. `CcLedgerViewModel` and
-  `LedgerRowViewModel` carry it; `LocalCcBarStrip` stacks by it.
+  `LedgerRowViewModel` carry it; `LocalCcBarStrip` (the Local burn page's 30-day strip) stacks by it.
 - **`AgentSources`** gains `antigravity` and its default color.
-- **The MCP** gains an `agent` field on `get_local_burn_by_project` rows and links nothing new.
+- **The MCP** gains an `agents` list on `get_local_burn_by_project`, read from Vault rollups, and links
+  nothing new. Claude reading an agent's project totals is consented the way a Claude Code folder is: a
+  switch per agent, off by default, beside the folders on Settings, Claude Code, Folders ("Let Claude read
+  Codex's project totals"), saved as `mcp_agents` and exported to the MCP's settings projection.
 
 ## 3. Data flow
 
 ### Codex: a rollout line becomes a token event
 
-- `session_meta` opens a segment, keyed by `codexStreamId(realPath, session_id)` as in Sanduhr Time.
+- One rollout file is one Vault session, keyed by its file name without `.jsonl` or `.jsonl.zst`, so the
+  plain and compressed copies of a rollout write the same row. `session_meta` opens a segment (a subagent or
+  guardian thread inside the file); segments fold into the file's row and only scope the running total.
 - `turn_context` sets the model in force (`model`) and the project in force (`cwd`). Before any
   `turn_context`, the segment's `session_meta.cwd` is the project.
 - `event_msg` / `token_count` with a non-null `info`: the event's tokens are the change in
@@ -87,9 +92,12 @@ call, and no prompt or reply text is read.
   `total` is input plus output, the same sum Claude's rows use.
 - Each event is dated by its own `timestamp` into `by_day`. A rollout grows for days, so the file's time
   never dates anything.
-- The checkpoint is the byte offset in the uncompressed stream plus the segment state in force (session id,
-  model, cwd, last total). A `.jsonl.zst` is checkpointed under its uncompressed path, so when Codex
-  compresses a rollout the checkpoint carries over and nothing is counted twice.
+- A plain rollout's checkpoint is its byte offset plus the parser state in force (segment, model, cwd,
+  last total), so a grown file resumes mid-segment. A `.jsonl.zst` is a finished rollout: it is parsed whole
+  once and then skipped while unchanged. Because it writes the same session key as its plain original, the
+  row is replaced, never added to, and nothing counts twice.
+- The row's project is the `cwd` in force at the file's first counted token event, the same first-wins rule
+  Claude's rows use.
 
 ### Antigravity CLI: a transcript line becomes a token event
 
@@ -100,8 +108,9 @@ call, and no prompt or reply text is read.
   `total` is input plus output. Model is recorded as `antigravity`; the transcript does not name one.
 - The project comes from the conversation's summaries row: the first `workspace_uris` entry, turned from a
   `file:` URI into a path and keyed and named by the same rules as Claude's `cwd`
-  (`CcLogReader.ProjectDisplayName`). No workspace, or no row yet, means the project "(no folder)"; a later
-  pass does not move rows already written.
+  (`CcLogReader.ProjectDisplayName`). No workspace, or no row yet, means the project "(none)", Claude's
+  existing name for an unattributed session; once the summaries row appears, the next parse of that
+  transcript moves the whole session to its project.
 - The reader selects only `conversation_id` and `workspace_uris` from the database.
 - The checkpoint is the transcript's byte offset, the same as a Claude transcript. The session is the
   conversation id.
@@ -109,7 +118,7 @@ call, and no prompt or reply text is read.
 ### From the Vault outward
 
 Both readers produce `VaultSessionRow`, so rollups, the 30-day ledger, CSV export and the MCP read agents
-with no new storage shape. The widget's strip reads today's rows per root on the existing refresh tick.
+with no new storage shape. The widget's footer reads each agent root's today total after every ingest.
 
 ## 4. What you see and switch
 
@@ -121,11 +130,17 @@ with no new storage shape. The widget's strip reads today's rows per root on the
 - **Color.** `antigravity` defaults to a periwinkle near `#7B8CF0`, evoking Google's blue without copying it
   (Store 10.1.4.4). Locked only after `ThemeContrastTests` passes it against all six built-in themes and
   beside Claude's `#E0875A` and Codex's `#2FB5A3`.
-- **The widget's strip.** `LocalCcBarStrip` stacks today's burn by agent in source colors. Its accessible
-  name names each agent with a figure ("Today, Claude Code 1.4M, Codex 380K, Antigravity 90K"), so color is
-  never the only cue. With one agent it looks exactly as it does today.
-- **The ledger** (Local burn page and the Vault's view of it). The totals combine all agents. Each project
-  bar is split by agent color; its accessible name and tooltip list each agent's share. An agent filter
+- **The widget's footer.** Today it reads "Updated 4:10 PM · Float · CC +12K", where CC is Claude Code's
+  tokens since the last fetch. It gains a piece per agent: "· Codex +3K · Agy +1K". An agent's figure is its
+  Vault total for today after the latest ingest minus the total after the ingest before it, so it is the
+  burn of the last cycle (about five minutes) and lags Claude Code by one ingest. A piece with nothing new is
+  left out, as CC's is. At a day change the earlier total counts as zero. Demo mode shows none.
+- **The Local burn page's 30-day strip.** `LocalCcBarStrip` stacks each day's bar by agent in source colors.
+  Its accessible name gives the window's total per agent ("30 days, Claude Code 41M, Codex 6.2M, Antigravity
+  1.1M"), so color is never the only cue. With one agent it looks exactly as it does today.
+- **The ledger** (Local burn page and the Vault's view of it). The totals combine all agents. The page's
+  project list (text rows, no bars today) gives each project's agent shares in the row: "api, 1.2M (Claude
+  Code 900K, Codex 300K)", one agent's project reading exactly as today. An agent filter
   (All, Claude Code, Codex, Antigravity) sits above the session list and shows only when more than one agent
   has data. Session rows carry a small agent label. Sorting works as today. `VaultLedgerCsv` gains an `agent` column.
 - **Not changing:** the tray tooltip, alerts, pace markers and limits. They are about plan limits.
@@ -135,9 +150,9 @@ with no new storage shape. The widget's strip reads today's rows per root on the
 - **Isolation.** Each root ingests in its own try block. One agent failing never stops another agent or
   Claude Code. A failure logs once per pass.
 - **Missing folder or database:** no rows, no error.
-- **Locked database** (Antigravity running): opened read-only (`mode=ro`) with a short busy timeout. Still
-  locked means this pass skips its new lines and keeps their checkpoints, so the next pass reads them with
-  their project.
+- **Locked database** (Antigravity running): opened read-only (`mode=ro`) through Windows' own
+  `winsqlite3.dll` (no new package) with a two-second busy timeout. Still locked means this pass lists no
+  Antigravity files, so no checkpoint moves and the next pass reads them with their project.
 - **Bad line or bad `.zst` frame:** counted in `skipped_lines`, as Claude's are. A corrupt Vault shard goes
   to the existing quarantine.
 - **Format drift** (a missing `info`, a renamed column): the item yields nothing and the log records the
@@ -165,13 +180,15 @@ with no new storage shape. The widget's strip reads today's rows per root on the
   `conversation_id` and `workspace_uris`, so `title`, `preview` and `raw_summary` can never be read.
 - **Vault:** agent roots round-trip; a meta without `agent` reads as Claude; purge and quarantine per agent
   root; the CSV `agent` column.
-- **App:** the strip's accessible name with one agent and with three; the ledger filter hidden with one
+- **App:** the footer's agent pieces (new tokens shown, nothing new left out, day change, demo mode); the
+  strip's accessible name with one agent and with three; the ledger filter hidden with one
   agent; project bar shares; Antigravity off by default and absent from the primary choice;
   `ThemeContrastTests` for the new color.
-- **MCP:** `agent` on `get_local_burn_by_project` rows from Vault fixtures; `TrustBoundaryTests` unchanged
+- **MCP:** the `agents` list on `get_local_burn_by_project` from Vault fixtures, absent unless `mcp_agents`
+  consents the agent; `TrustBoundaryTests` unchanged
   and green.
 - **Live smoke on this machine:** a dev build ingests the real Codex and Antigravity history. Totals are
-  compared with a one-off probe sum, and the strip and ledger are read through UI Automation, using only
+  compared with a one-off probe sum, and the footer, strip and ledger are read through UI Automation, using only
   figures and names the UI shows.
 
 ## Shipping
@@ -190,6 +207,6 @@ with no new storage shape. The widget's strip reads today's rows per root on the
 2. `CodexBurnReader` and its fixtures.
 3. `AntigravityBurnReader` and its fixtures.
 4. Wiring in the App: Sources switch, readers on the refresh tick, the new color.
-5. The strip and the ledger: stacking, filter, labels, CSV.
-6. The MCP `agent` field.
+5. The footer, the strip and the ledger: agent pieces, stacking, filter, labels, CSV.
+6. The MCP `agents` list and its consent switches.
 7. Live smoke, privacy copy, ADR note, release.

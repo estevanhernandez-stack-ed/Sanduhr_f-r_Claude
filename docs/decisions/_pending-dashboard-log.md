@@ -112,3 +112,13 @@ The 626 dashboard MCP was disconnected when these were made. The next session wi
   usage isn't readable. Showing IDE conversations as zero-token sessions was rejected too: a zero row reads like a bug.
   With per-turn `created_at`, the Antigravity reader becomes append-only JSONL with byte-offset checkpoints, like Codex.
 - **Revisit if:** the IDE starts writing token fields to `transcript.jsonl`.
+
+### Spec 3 live signal: the widget footer, per agent
+
+- **Category:** scope
+- **Decision (Este, 2026-11-13):** the design's "strip on the widget" did not exist; `LocalCcBarStrip` is the Local burn
+  page's 30-day strip (it still stacks by agent there). The widget's live signal is its footer: "CC +12K" gains
+  "Codex +3K · Agy +1K", each the change in the agent's Vault total for today between the last two ingests (the 5-minute
+  cycle), so agents lag Claude Code by one ingest. Chosen over today's totals in the footer (two meanings on one line)
+  and over no widget signal.
+- **Revisit if:** agent readers move onto the fetch tick and can give a true since-fetch figure.
