@@ -122,3 +122,14 @@ The 626 dashboard MCP was disconnected when these were made. The next session wi
   cycle), so agents lag Claude Code by one ingest. Chosen over today's totals in the footer (two meanings on one line)
   and over no widget signal.
 - **Revisit if:** agent readers move onto the fetch tick and can give a true since-fetch figure.
+
+### Spec 3 plan: winsqlite3 for Antigravity, consent switches for MCP agent reads, text shares not bars
+
+- **Category:** architecture
+- **Decision:** Antigravity's summaries database is read through Windows' own `winsqlite3.dll` by P/Invoke in the App
+  (no SQLite package; Core stays package-free and gets the lookup as a callback). Claude reading an agent's project
+  totals through `get_local_burn_by_project` gets its own switch per agent on Claude Code, Folders (`mcp_agents`, off by
+  default, exported in the MCP projection; MCP mirrors the agent names literally so `TrustBoundaryTests` stays unchanged).
+  The Local burn page's project list has no bars, so agent shares go in the row text ("api, 1.2M (Claude Code 900K,
+  Codex 300K)"). The ingester gains a line-parser seam; Claude's path moves onto it with no behavior change.
+- **Revisit if:** winsqlite3 is unavailable on a supported Windows build, or users ask for visual project bars.
