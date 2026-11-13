@@ -1,8 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 
 namespace Sanduhr.Core;
 
@@ -73,7 +71,7 @@ public sealed class VaultIngester
     /// just-purged folder stays purged instead of silently resurrecting.</param>
     public VaultIngestResult IngestOnce(
         IReadOnlyList<string> consentedRootNames, bool storeFullPaths, DateTimeOffset nowUtc,
-        Func<string, bool>? stillConsented = null)
+        Func<string, bool>? stillConsented = null, IReadOnlyList<IAgentBurnSource>? agents = null)
     {
         using var mutex = new Mutex(initiallyOwned: false, _mutexName);
         bool acquired;
@@ -95,7 +93,23 @@ public sealed class VaultIngester
             int seen = 0, full = 0, tail = 0, skipped = 0, failed = 0, aborted = 0;
             foreach (var rootName in consentedRootNames)
             {
-                var r = IngestRoot(rootName, storeFullPaths, nowUtc, stillConsented);
+                var r = IngestClaudeRoot(rootName, storeFullPaths, nowUtc, stillConsented);
+                seen += r.FilesSeen; full += r.FilesFullParsed; tail += r.FilesTailParsed;
+                skipped += r.FilesSkipped; failed += r.FilesFailed; aborted += r.RootsAborted;
+            }
+            foreach (var source in agents ?? [])
+            {
+                VaultIngestResult r;
+                try
+                {
+                    r = IngestAgentRoot(source, storeFullPaths, nowUtc, stillConsented);
+                }
+                catch (Exception e)
+                {
+                    // One agent failing never stops another agent or Claude Code (spec 3, section 5).
+                    Log2("agent-root", e);
+                    r = new VaultIngestResult(true, 0, 0, 0, 0, 0, 1);
+                }
                 seen += r.FilesSeen; full += r.FilesFullParsed; tail += r.FilesTailParsed;
                 skipped += r.FilesSkipped; failed += r.FilesFailed; aborted += r.RootsAborted;
             }
@@ -107,11 +121,14 @@ public sealed class VaultIngester
         }
     }
 
-    private VaultIngestResult IngestRoot(
+    /// <summary>One file of a root's walk: a Claude Code transcript or an agent source's file.</summary>
+    private sealed record WalkItem(
+        FileInfo File, string Uuid, string? ParentSession, string? Cwd, bool Compressed,
+        Func<Stream> Open, Func<string?, IBurnLineParser> Parser);
+
+    private VaultIngestResult IngestClaudeRoot(
         string rootName, bool storeFullPaths, DateTimeOffset nowUtc, Func<string, bool>? stillConsented)
     {
-        int seen = 0, full = 0, tailParsed = 0, skipped = 0, failed = 0;
-
         // walk_version gate: a vault written by an older (narrower) walk
         // re-ingests everything once. Aborted cycles leave the old meta, so
         // this re-fires until a cycle completes — idempotent convergence.
@@ -121,17 +138,9 @@ public sealed class VaultIngester
             _store.DeleteCheckpoints(rootName);
             Log("walk upgraded — checkpoints invalidated for re-ingest");
         }
-
-        var checkpoints = _store.LoadCheckpoints(rootName);
-        var shardCache = new Dictionary<string, VaultSessionShard>(StringComparer.Ordinal);
-        var dirtyMonths = new HashSet<string>(StringComparer.Ordinal);
-        var nowIso = IsoUtc(nowUtc);
-
-        // Oldest-first, single-threaded; Length/LastWriteTimeUtc come off the
-        // FileInfo the walk already produced (no per-file stat pass) and are
-        // the PRE-OPEN stat the checkpoint will record. Recursive since walk
-        // v2: nested subagent transcripts count too, tagged with the project
-        // dir so their parent session can be derived from the path.
+        // Recursive since walk v2: nested subagent transcripts count too,
+        // tagged with the project dir so their parent session can be derived
+        // from the path.
         var files = new List<(FileInfo File, string ProjectDir)>();
         var projects = new DirectoryInfo(Path.Combine(_homeDir, rootName, "projects"));
         if (projects.Exists)
@@ -140,17 +149,47 @@ public sealed class VaultIngester
                 foreach (var fi in projectDir.EnumerateFiles("*.jsonl", SearchOption.AllDirectories))
                     files.Add((fi, projectDir.FullName));
         }
-        files.Sort((a, b) => a.File.LastWriteTimeUtc.CompareTo(b.File.LastWriteTimeUtc));
+        var items = files.Select(f => new WalkItem(
+            f.File, Path.GetFileNameWithoutExtension(f.File.Name), ParentSessionOf(f.File.FullName, f.ProjectDir), null, false,
+            () => new FileStream(f.File.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete),
+            _ => new ClaudeLineParser())).ToList();
+        return IngestRoot(rootName, items, agent: null, storeFullPaths, nowUtc, stillConsented);
+    }
 
-        foreach (var (fi, projectDir) in files)
+    private VaultIngestResult IngestAgentRoot(
+        IAgentBurnSource source, bool storeFullPaths, DateTimeOffset nowUtc, Func<string, bool>? stillConsented)
+    {
+        var items = source.Discover().Select(f => new WalkItem(
+            f.File, f.SessionId, null, f.Cwd, f.Compressed, () => source.Open(f), source.NewParser)).ToList();
+        return IngestRoot(source.Agent, items, source.Agent, storeFullPaths, nowUtc, stillConsented);
+    }
+
+    private VaultIngestResult IngestRoot(
+        string rootName, List<WalkItem> items, string? agent, bool storeFullPaths, DateTimeOffset nowUtc,
+        Func<string, bool>? stillConsented)
+    {
+        int seen = 0, full = 0, tailParsed = 0, skipped = 0, failed = 0;
+
+        var checkpoints = _store.LoadCheckpoints(rootName);
+        var shardCache = new Dictionary<string, VaultSessionShard>(StringComparer.Ordinal);
+        var dirtyMonths = new HashSet<string>(StringComparer.Ordinal);
+        var nowIso = IsoUtc(nowUtc);
+
+        // Oldest-first, single-threaded; Length/LastWriteTimeUtc come off the
+        // FileInfo the walk already produced (no per-file stat pass) and are
+        // the PRE-OPEN stat the checkpoint will record.
+        items.Sort((a, b) => a.File.LastWriteTimeUtc.CompareTo(b.File.LastWriteTimeUtc));
+
+        foreach (var item in items)
         {
+            var fi = item.File;
             seen++;
             var key = VaultStore.PathKey(fi.FullName);
             long statLen = fi.Length;
             long statMtime = fi.LastWriteTimeUtc.Ticks;
             checkpoints.Entries.TryGetValue(key, out var cp);
-            var uuid = Path.GetFileNameWithoutExtension(fi.Name);
-            var parentSession = ParentSessionOf(fi.FullName, projectDir);
+            var uuid = item.Uuid;
+            var parentSession = item.ParentSession;
 
             bool unchanged = cp is not null && cp.MtimeTicks == statMtime && cp.Length == statLen;
             bool quiesced = nowUtc - fi.LastWriteTimeUtc >= QuiesceAfter;
@@ -166,7 +205,7 @@ public sealed class VaultIngester
             // parse, then seal; (B) grown + verified guard -> tail parse seeded
             // from the stored rows; (C) everything else -> full reparse.
             bool sealAfter = unchanged;
-            bool wantTail = !unchanged && cp is not null && !cp.Sealed
+            bool wantTail = !item.Compressed && !unchanged && cp is not null && !cp.Sealed
                 && statLen > cp.Length && cp.Offset > 0 && cp.TailGuard.Length > 0;
 
             SessionAgg? seed = null;
@@ -198,26 +237,28 @@ public sealed class VaultIngester
             long endOffset;
             string tailGuard;
             bool usedTail = false;
+            IBurnLineParser parser;
             try
             {
-                using var fs = new FileStream(
-                    fi.FullName, FileMode.Open, FileAccess.Read,
-                    FileShare.ReadWrite | FileShare.Delete);
-                if (seed is not null && fs.Length >= cp!.Offset
+                using var s = item.Open();
+                if (seed is not null && s is FileStream fs && fs.Length >= cp!.Offset
                     && GuardAt(fs, cp.Offset) == cp.TailGuard)
                 {
                     agg = seed;
-                    endOffset = ParseLines(fs, cp.Offset, agg, new ClaudeLineParser());
+                    parser = item.Parser(cp.ParserState);
+                    if (item.Cwd is not null) agg.Cwd = item.Cwd;   // a project learned since the last pass moves the session
+                    endOffset = ParseLines(fs, cp.Offset, agg, parser);
                     usedTail = true;
                 }
                 else
                 {
-                    agg = new SessionAgg();
-                    endOffset = ParseLines(fs, 0, agg, new ClaudeLineParser());
+                    agg = new SessionAgg { Cwd = item.Cwd };
+                    parser = item.Parser(null);
+                    endOffset = ParseLines(s, 0, agg, parser);
                 }
-                tailGuard = GuardAt(fs, endOffset);
+                tailGuard = s is FileStream seekable ? GuardAt(seekable, endOffset) : "";
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
             {
                 if (cp is not null)
                     cp.LastSeenTs = nowIso;
@@ -258,6 +299,7 @@ public sealed class VaultIngester
                 Months = newRows.Keys.OrderBy(m => m, StringComparer.Ordinal).ToList(),
                 Sealed = sealAfter,
                 LastSeenTs = nowIso,
+                ParserState = parser.SaveState(),
             };
             if (usedTail) tailParsed++; else full++;
         }
@@ -270,7 +312,7 @@ public sealed class VaultIngester
         {
             // An unparseable LastSeenTs counts as stale — otherwise a malformed
             // stamp becomes immortal bookkeeping and defeats the size bound.
-            if (ParseIso(entry.LastSeenTs) is not { } lastSeen || lastSeen < pruneBefore)
+            if (BurnJson.ParseIso(entry.LastSeenTs) is not { } lastSeen || lastSeen < pruneBefore)
                 checkpoints.Entries.Remove(k);
         }
 
@@ -307,7 +349,7 @@ public sealed class VaultIngester
 
         _store.SaveCheckpoints(rootName, checkpoints);
 
-        UpdateMeta(rootName, nowUtc, nowIso);
+        UpdateMeta(rootName, nowUtc, nowIso, agent);
         return new VaultIngestResult(true, seen, full, tailParsed, skipped, failed, 0);
     }
 
@@ -354,8 +396,8 @@ public sealed class VaultIngester
         var merged = VaultRowMath.Merge(rows);
         var agg = new SessionAgg
         {
-            FirstTs = ParseIso(merged.FirstTs),
-            LastTs = ParseIso(merged.LastTs),
+            FirstTs = BurnJson.ParseIso(merged.FirstTs),
+            LastTs = BurnJson.ParseIso(merged.LastTs),
             EventCount = merged.EventCount,
             SkippedLines = merged.SkippedLines,
             Cwd = merged.Cwd,
@@ -431,9 +473,10 @@ public sealed class VaultIngester
         });
     }
 
-    private void UpdateMeta(string rootName, DateTimeOffset nowUtc, string nowIso)
+    private void UpdateMeta(string rootName, DateTimeOffset nowUtc, string nowIso, string? agent)
     {
         var meta = _store.LoadMeta(rootName) ?? new VaultRootMeta();
+        if (agent is not null) meta.Agent = agent;
         var today = LocalDate(nowUtc);
         if (string.IsNullOrEmpty(meta.Since))
             meta.Since = DayKey(today);
@@ -495,6 +538,8 @@ public sealed class VaultIngester
     /// completes after this checkpoint converges instead of being lost.</summary>
     private long ParseLines(Stream fs, long start, SessionAgg agg, IBurnLineParser parser)
     {
+        if (start > 0 && !fs.CanSeek)
+            throw new InvalidOperationException("a non-seekable stream cannot resume mid-file");
         // Always seek on a seekable stream: the guard check reads the head first, so position 0 is not a given.
         if (fs.CanSeek)
             fs.Seek(start, SeekOrigin.Begin);
@@ -659,15 +704,6 @@ public sealed class VaultIngester
 
     private static string IsoUtc(DateTimeOffset ts)
         => ts.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.ffffffzzz", CultureInfo.InvariantCulture);
-
-    private static DateTimeOffset? ParseIso(string? s)
-    {
-        if (string.IsNullOrEmpty(s))
-            return null;
-        return DateTimeOffset.TryParse(
-            s.Replace("Z", "+00:00"), CultureInfo.InvariantCulture,
-            DateTimeStyles.AssumeUniversal, out var dt) ? dt : null;
-    }
 
     // PRIVACY.md contract: fixed phrases + exception type names only.
     private void Log(string message)
