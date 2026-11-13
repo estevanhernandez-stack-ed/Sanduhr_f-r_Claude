@@ -4,7 +4,7 @@
 
 ### What's new
 
-- **Codex limits, beside Claude's.** Tick Codex in Set up Sanduhr or Settings ▸ Usage ▸ Sources and the widget shows Codex's 5-hour and weekly limits under Claude's, with the same pace marker and burn projection. Sanduhr reads them from the logs Codex already writes on your PC, so there's no sign-in and nothing is sent anywhere. Each limit says "as of" the last time Codex wrote, and dims after 30 quiet minutes.
+- **Codex limits, beside Claude's.** Tick Codex in Set up Sanduhr or Settings ▸ Usage ▸ Sources and the widget shows Codex's 5-hour and weekly limits under Claude's, with the same pace marker and burn projection. Sanduhr reads them from the logs Codex already writes on your PC, so there's no sign-in and nothing is sent anywhere. Each limit says "as of" the last time Codex wrote. After 30 quiet minutes it dims and drops its pace and burn, so an old number never reads as current.
 - **Both plans on one bar.** With Claude and Codex on, combined bars fill to your primary plan and carry on in the other plan's color when it's further along. Pick the primary, each plan's color and its alerts on the new Sources page. The tray follows your primary.
 - **Codex on the Desk, in the MCP and in the statusline.** Desk meter pieces can show Combined, Claude or Codex. The MCP's `get_usage` and the Claude Code statusline (`cx 5h 40% wk 12%`) include Codex too.
 - **Name your own codenames.** In Settings ▸ Privacy ▸ Show the real name, **Rename…** lets you pick the codename streamer mode shows for each account, folder or repo.
