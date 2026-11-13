@@ -13,6 +13,13 @@ public class AgentSourcesBurnTests
         Assert.Equal(new[] { "antigravity" }, AgentSources.ActivityOnly);
     }
 
+    [Fact]
+    public void VaultReader_mirrors_the_claude_agent_name()
+    {
+        // Sanduhr.Mcp links VaultReader but not AgentSources, so the name is mirrored.
+        Assert.Equal(AgentSources.Claude, VaultReader.ClaudeAgent);
+    }
+
     [Theory]
     [InlineData("claude", "CC", "Claude Code")]
     [InlineData("codex", "Codex", "Codex")]
