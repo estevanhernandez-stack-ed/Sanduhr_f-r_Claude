@@ -512,10 +512,15 @@ final class UsageViewModel {
         var next = expiredAccounts
         next.answered(label, result)
         if let label, case .success = result { clearExpiredNotice(label) }
-        guard next != expiredAccounts else { return }
-        let announce = ExpiredAccountNotice.toNotify(before: expiredAccounts, after: next, active: activeAccount,
-                                                     demo: demo, notified: expiredNotified)
-        expiredAccounts = next
+        if next != expiredAccounts { expiredAccounts = next }
+        guard !expiredAccounts.labels.isEmpty else { return }
+        if let told = ExpiredAccountNotice.toldByPrompt(expired: expiredAccounts, active: activeAccount),
+           !expiredNotified.contains(told) {
+            expiredNotified.insert(told)
+        }
+        let announce = ExpiredAccountNotice.toNotify(expired: expiredAccounts, active: activeAccount, demo: demo,
+                                                     notified: expiredNotified,
+                                                     bannerAllowed: Notifier.shared.accountBannerAllowed)
         guard !announce.isEmpty else { return }
         expiredNotified.formUnion(announce)
         for label in announce.sorted() { Notifier.shared.accountExpired(label) }
