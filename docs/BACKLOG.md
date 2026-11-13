@@ -350,9 +350,10 @@ says which one it is on.
 a Desk they designed and at least one widget or mod that Claude made for them, without editing a
 file by hand.
 
-## #9 — Sprite sheets, later (Mac first)
+## #9 — Sprite sheets, later (shipped in Mac 2.43.0)
 
-**Planned as Mac 2.43.0** (2026-11-11): `docs/mac-widgets-spec.md` sections 21 to 24.
+**Shipped in Mac 2.43.0** (2026-11-11): GIF and Aseprite import, the per-stage page and pack Export, as
+`docs/mac-widgets-spec.md` sections 21 to 24 describe. Windows parity is the Windows agent's.
 
 **Raised 2026-10-28 by Este**, after the 2.36.0 own-art check. A new sprite from your own art and
 Claude-proposed motion are planned as 2.39.0 (`docs/mac-widgets-spec.md` sections 18 and 19). These

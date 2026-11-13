@@ -151,6 +151,16 @@ export interface OffsetEntry {
   mtimeMs: number;
   /** Codex rollouts only: the segment in force at `offset`, so a pass resuming mid-file knows it. */
   codex?: CodexSegmentState;
+  /**
+   * Codex rollouts read from `rollout-*.jsonl.zst`: the compressed file's own size and mtime.
+   * The entry stays keyed by the uncompressed path; `offset` and `size` count decompressed bytes.
+   */
+  zst?: {
+    size: number;
+    mtimeMs: number;
+    /** Set when the entry came over from the plain file: only records after this time become events. */
+    afterMs?: number;
+  };
 }
 
 /**
@@ -163,6 +173,11 @@ export interface CodexSegmentState {
   stream?: string;
   threadSource?: string;
   cwd?: string;
+  /**
+   * The newest record timestamp read so far (epoch ms). When Codex compresses the rollout, the
+   * compressed copy is read from its start and only records after this one become events.
+   */
+  lastMs?: number;
 }
 
 export type OffsetsState = Record<string, OffsetEntry>;

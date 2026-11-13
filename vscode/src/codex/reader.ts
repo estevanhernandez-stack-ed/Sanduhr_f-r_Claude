@@ -9,10 +9,15 @@
  * and the working directory in force are saved with the offset, so a pass that resumes mid-file
  * still knows them. Only timestamps, kinds, hashed streams and paths, project keys and line
  * counts are extracted; message text, credentials and account ids are never read into an event.
+ *
+ * Codex later compresses an older rollout to `rollout-*.jsonl.zst`. The compressed file is read
+ * under its uncompressed path, so its stream ids and its offset entry carry over from the plain
+ * file; a VS Code whose Node has no zstd leaves it unread until one that has it.
  */
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as zlib from 'node:zlib';
 import { yieldTurn, type ReadPassResult } from '../claude/reader';
 import type { HomeOptions } from '../claude/homes';
 import { resolve as resolveProject } from '../project';
@@ -21,7 +26,7 @@ import { hashPath } from '../store/hash';
 import { readChunk, splitLines } from '../store/lines';
 import { stateDir } from '../store/paths';
 import { readOffsets, writeOffsets } from '../store/state';
-import type { AgentEvent, CodexSegmentState, InstalledState, OffsetsState } from '../types';
+import type { AgentEvent, CodexSegmentState, InstalledState, OffsetEntry, OffsetsState } from '../types';
 import { discoverCodexHomes, listRollouts } from './homes';
 import { findPatches } from './patch';
 
@@ -38,7 +43,20 @@ export interface CodexPassOptions extends HomeOptions {
   /** Byte budget across all rollouts for this pass. Default 8 MB. */
   maxBytes?: number;
   platform?: NodeJS.Platform;
+  /** zstd decompressor for `.jsonl.zst` rollouts; default `nativeZstd()`, null for none. */
+  zstd?: ZstdDecompress | null;
 }
+
+/** Decompress a whole zstd buffer. */
+export type ZstdDecompress = (compressed: Buffer) => Buffer;
+
+/** Node's own zstd (Node 22.15 and later; VS Code 1.146 runs Node 24). Undefined without it. */
+export function nativeZstd(): ZstdDecompress | undefined {
+  const f = (zlib as unknown as { zstdDecompressSync?: (b: Buffer) => Buffer }).zstdDecompressSync;
+  return typeof f === 'function' ? (b) => f(b) : undefined;
+}
+
+const ZST = '.zst';
 
 /** The thread sources whose `user` messages can be the human's prompts. */
 const HUMAN_THREAD = 'user';
@@ -136,11 +154,11 @@ function applyContext(o: Json, seg: CodexSegmentState, ctx: Pick<FileCtx, 'real'
  * Rebuild the segment state at `upTo` from the start of the file, parsing only context lines.
  * Needed once for a rollout first seen mid-way (older than the install, then resumed).
  */
-function scanContext(fd: number, upTo: number, ctx: Pick<FileCtx, 'real' | 'platform'>): CodexSegmentState {
+function scanContext(body: Body, upTo: number, ctx: Pick<FileCtx, 'real' | 'platform'>): CodexSegmentState {
   const seg: CodexSegmentState = {};
   let offset = 0;
   while (offset < upTo) {
-    const buf = readChunk(fd, offset, upTo, SCAN_CHUNK);
+    const buf = body.chunk(offset, SCAN_CHUNK, upTo);
     const lines = splitLines(buf);
     if (lines.length === 0) break;
     for (const { start, end } of lines) {
@@ -169,10 +187,14 @@ function processLines(
   seg: CodexSegmentState,
   unreadable: Record<string, number>,
   lastDate: { value: string },
+  afterMs?: number,
 ): { events: AgentEvent[]; consumed: number } {
   const events: AgentEvent[] = [];
   const lines = splitLines(buf);
+  // Re-reading a compressed copy: lines up to the watermark were counted the first time.
+  let quiet = afterMs !== undefined;
   const bump = (date: string): void => {
+    if (quiet) return;
     unreadable[date] = (unreadable[date] ?? 0) + 1;
   };
   for (const { start, end } of lines) {
@@ -196,7 +218,12 @@ function processLines(
     }
     const date = localDate(ms);
     lastDate.value = date;
+    if (seg.lastMs === undefined || ms > seg.lastMs) seg.lastMs = ms;
     if (applyContext(o, seg, ctx)) continue;
+    if (afterMs !== undefined) {
+      if (ms <= afterMs) continue;
+      quiet = false;
+    }
 
     const prompt = isCodexPrompt(o, seg.threadSource);
     if (!prompt && !isCodexActivity(o)) continue;
@@ -237,16 +264,58 @@ function processLines(
   return { events, consumed: last ? last.end + 1 : 0 };
 }
 
+/** Bytes of one rollout, plain on disk or decompressed in memory. */
+interface Body {
+  /** `[offset, offset+budget)` extended to the end of a line, never past `upTo`. */
+  chunk(offset: number, budget: number, upTo?: number): Buffer;
+  close(): void;
+}
+
+function fileBody(fd: number, size: number): Body {
+  return {
+    chunk: (offset, budget, upTo = size) => readChunk(fd, offset, upTo, budget),
+    close: () => fs.closeSync(fd),
+  };
+}
+
+/** A decompressed rollout is sealed, so its last line counts even without a trailing newline. */
+function bufferBody(data: Buffer): Body {
+  return {
+    chunk: (offset, budget, upTo = data.length) => {
+      let end = Math.min(offset + Math.max(budget, 1), upTo);
+      const nl = data.indexOf(0x0a, end - 1);
+      end = nl === -1 || nl >= upTo ? upTo : nl + 1;
+      const out = data.subarray(offset, end);
+      return end === data.length && out.length > 0 && out[out.length - 1] !== 0x0a ? Buffer.concat([out, Buffer.from('\n')]) : out;
+    },
+    close: () => undefined,
+  };
+}
+
+/** The last decompressed rollout, kept while a pass works through it over several budgets. */
+let unpacked: { key: string; data: Buffer } | undefined;
+
+function decompress(zstd: ZstdDecompress, file: string, stat: fs.Stats): Buffer {
+  const key = `${file}\n${stat.size}\n${stat.mtimeMs}`;
+  if (unpacked?.key !== key) unpacked = { key, data: zstd(fs.readFileSync(file)) };
+  return unpacked.data;
+}
+
 /**
  * One bounded pass over every rollout. For each file: append its events to the agent spool,
  * then advance and persist its offset and segment. Reads at most `maxBytes` (default 8 MB)
  * across files, yielding between files; `more` says whether work remains. A rollout first
  * seen with an mtime before the install starts at its current size, like a Claude transcript.
+ *
+ * A `.jsonl.zst` is read only when its plain `.jsonl` is gone, under the plain path. When the
+ * entry it inherits came from the plain file, it is read from the start and only records newer
+ * than the plain file's last one become events, whatever its bytes look like compressed.
  */
 export async function readCodexPass(opts: CodexPassOptions): Promise<ReadPassResult> {
   const homes = opts.homes ?? discoverCodexHomes(opts);
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES;
   const platform = opts.platform ?? process.platform;
+  const zstd = opts.zstd === undefined ? nativeZstd() : (opts.zstd ?? undefined);
   const sdir = stateDir(opts.dir);
   const installedMs = Date.parse(opts.installed.installedAt);
   const offsets: OffsetsState = readOffsets(sdir);
@@ -258,8 +327,8 @@ export async function readCodexPass(opts: CodexPassOptions): Promise<ReadPassRes
   let more = false;
   let dirty = false;
 
-  const seen = new Set<string>();
-  const files: string[] = [];
+  // Keyed by the uncompressed real path; the plain file wins while both exist.
+  const sources = new Map<string, { plain?: string; zst?: string }>();
   for (const home of homes) {
     for (const f of listRollouts(home)) {
       let real: string;
@@ -268,67 +337,113 @@ export async function readCodexPass(opts: CodexPassOptions): Promise<ReadPassRes
       } catch {
         continue;
       }
-      if (!seen.has(real)) {
-        seen.add(real);
-        files.push(real);
-      }
+      const compressed = real.endsWith(ZST);
+      const logical = compressed ? real.slice(0, -ZST.length) : real;
+      let src = sources.get(logical);
+      if (!src) sources.set(logical, (src = {}));
+      if (compressed) src.zst ??= real;
+      else src.plain ??= real;
     }
   }
 
-  for (const real of files) {
+  for (const [real, src] of sources) {
     await yieldTurn();
     if (budget <= 0) {
       more = true;
       break;
     }
+    const file = src.plain ?? src.zst;
+    if (!file) continue;
     let stat: fs.Stats;
     try {
-      stat = fs.statSync(real);
+      stat = fs.statSync(file);
     } catch {
       continue;
     }
     const entry = offsets[real];
     let offset: number;
+    let size: number;
     let seg: CodexSegmentState | undefined;
-    if (!entry) offset = stat.mtimeMs < installedMs ? stat.size : 0;
-    else if (stat.size < entry.size || stat.size < entry.offset) offset = 0;
-    else {
-      offset = entry.offset;
-      seg = entry.codex;
-    }
+    let afterMs: number | undefined;
+    let zst: OffsetEntry['zst'];
+    let data: Buffer | undefined;
 
-    if (offset >= stat.size) {
-      if (!entry || entry.offset !== offset || entry.size !== stat.size || entry.mtimeMs !== stat.mtimeMs) {
-        offsets[real] = { offset, size: stat.size, mtimeMs: stat.mtimeMs, ...(seg ? { codex: seg } : {}) };
+    if (src.plain) {
+      size = stat.size;
+      if (!entry || entry.zst) offset = stat.mtimeMs < installedMs ? stat.size : 0;
+      else if (stat.size < entry.size || stat.size < entry.offset) offset = 0;
+      else {
+        offset = entry.offset;
+        seg = entry.codex;
+      }
+    } else {
+      const same = entry?.zst !== undefined && entry.zst.size === stat.size && entry.zst.mtimeMs === stat.mtimeMs;
+      if (same && entry.offset >= entry.size) continue;
+      if (!zstd) continue; // no zstd in this Node: leave it for one that has it
+      try {
+        data = decompress(zstd, file, stat);
+      } catch {
+        continue; // not a whole zstd frame yet, or damaged
+      }
+      size = data.length;
+      if (same) {
+        offset = entry.offset;
+        seg = entry.codex;
+        afterMs = entry.zst?.afterMs;
+      } else {
+        offset = 0;
+        // The plain file's mtime stands in for an older entry with no lastMs; a compressed
+        // entry's mtime is when Codex compressed it, not its newest record, so never that.
+        const fromPlain = entry !== undefined && entry.zst === undefined && entry.offset >= entry.size;
+        afterMs = entry?.codex?.lastMs ?? (fromPlain ? entry.mtimeMs : undefined);
+      }
+      zst = { size: stat.size, mtimeMs: stat.mtimeMs, ...(afterMs !== undefined ? { afterMs } : {}) };
+    }
+    const stamp = { size, mtimeMs: stat.mtimeMs, ...(zst ? { zst } : {}) };
+
+    if (offset >= size) {
+      if (!entry || entry.offset !== offset || entry.size !== size || entry.mtimeMs !== stat.mtimeMs || !entry.zst !== !zst) {
+        offsets[real] = { offset, ...stamp, ...(seg ? { codex: seg } : {}) };
         dirty = true;
       }
       continue;
     }
 
     const ctx: FileCtx = { real, salt: opts.installed.salt, installedMs, platform, projectKeys: new Map() };
-    let fd: number;
-    try {
-      fd = fs.openSync(real, 'r');
-    } catch {
-      continue;
+    let body: Body;
+    if (data) body = bufferBody(data);
+    else {
+      try {
+        body = fileBody(fs.openSync(file, 'r'), size);
+      } catch {
+        continue;
+      }
     }
     let fileEvents: AgentEvent[];
     let consumed: number;
     try {
       if (offset === 0) seg = {};
-      else if (!seg) seg = scanContext(fd, offset, ctx);
-      const buf = readChunk(fd, offset, stat.size, budget);
+      else if (!seg) seg = scanContext(body, offset, ctx);
+      const buf = body.chunk(offset, budget);
       budget -= buf.length;
-      ({ events: fileEvents, consumed } = processLines(buf, offset, ctx, seg, unreadableByDate, {
-        value: localDate(stat.mtimeMs),
-      }));
+      ({ events: fileEvents, consumed } = processLines(
+        buf,
+        offset,
+        ctx,
+        seg,
+        unreadableByDate,
+        { value: localDate(stat.mtimeMs) },
+        afterMs,
+      ));
     } finally {
-      fs.closeSync(fd);
+      body.close();
     }
+    const next = Math.min(offset + consumed, size);
+    if (data && next >= size) unpacked = undefined;
 
     // Spool first, offsets second.
     appendAgentEvents(opts.dir, fileEvents);
-    offsets[real] = { offset: offset + consumed, size: stat.size, mtimeMs: stat.mtimeMs, codex: seg };
+    offsets[real] = { offset: next, ...stamp, codex: seg };
     writeOffsets(sdir, offsets);
     dirty = false;
 
@@ -336,7 +451,7 @@ export async function readCodexPass(opts: CodexPassOptions): Promise<ReadPassRes
       events.push(ev);
       touched.add(localDate(ev.time * 1000));
     }
-    if (offset + consumed < stat.size && budget <= 0 && consumed > 0) more = true;
+    if (next < size && budget <= 0 && consumed > 0) more = true;
   }
 
   if (dirty) writeOffsets(sdir, offsets);
