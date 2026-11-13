@@ -207,13 +207,13 @@ public sealed class VaultIngester
                     && GuardAt(fs, cp.Offset) == cp.TailGuard)
                 {
                     agg = seed;
-                    endOffset = ParseLines(fs, cp.Offset, agg);
+                    endOffset = ParseLines(fs, cp.Offset, agg, new ClaudeLineParser());
                     usedTail = true;
                 }
                 else
                 {
                     agg = new SessionAgg();
-                    endOffset = ParseLines(fs, 0, agg);
+                    endOffset = ParseLines(fs, 0, agg, new ClaudeLineParser());
                 }
                 tailGuard = GuardAt(fs, endOffset);
             }
@@ -493,9 +493,11 @@ public sealed class VaultIngester
     /// byte offset AFTER the last consumed '\n'. A torn trailing line (no
     /// terminator) is NOT consumed — the next cycle re-reads it, so a line that
     /// completes after this checkpoint converges instead of being lost.</summary>
-    private long ParseLines(FileStream fs, long start, SessionAgg agg)
+    private long ParseLines(Stream fs, long start, SessionAgg agg, IBurnLineParser parser)
     {
-        fs.Seek(start, SeekOrigin.Begin);
+        // Always seek on a seekable stream: the guard check reads the head first, so position 0 is not a given.
+        if (fs.CanSeek)
+            fs.Seek(start, SeekOrigin.Begin);
         var buf = new byte[64 * 1024];
         using var pending = new MemoryStream();
         long pos = start;       // absolute offset of buf[0]
@@ -519,7 +521,7 @@ public sealed class VaultIngester
                 {
                     line = Encoding.UTF8.GetString(buf, lineStart, i - lineStart);
                 }
-                ProcessLine(line, agg);
+                ProcessLine(line, agg, parser);
                 consumed = pos + i + 1;
                 lineStart = i + 1;
             }
@@ -530,66 +532,44 @@ public sealed class VaultIngester
         return consumed;
     }
 
-    private void ProcessLine(string rawLine, SessionAgg agg)
+    private void ProcessLine(string rawLine, SessionAgg agg, IBurnLineParser parser)
     {
         var line = rawLine.Trim();
         if (line.Length == 0)
             return;
-        // Perf prefilter only — looser than "type":"assistant" on purpose so
-        // formatting drift can never silently drop events. False positives are
-        // parsed and rejected below.
-        if (!line.Contains("\"assistant\"", StringComparison.Ordinal))
-            return;
-        JsonNode? node;
-        try
-        {
-            node = JsonNode.Parse(line);
-        }
-        catch (JsonException)
-        {
+        var ev = parser.Parse(line, out bool bad);
+        if (bad)
             agg.SkippedLines++;   // counts assistant-looking lines that fail to parse
-            return;
-        }
-        if (node is not JsonObject d)
-        {
-            agg.SkippedLines++;
-            return;
-        }
-        if (Str(d, "type") != "assistant")
-            return;
-        if (d["message"] is not JsonObject msg || msg["usage"] is not JsonObject usage)
-            return;
-        var ts = ParseIso(Str(d, "timestamp"));
-        if (ts is null)
-            return;   // matches the live reader: untimestamped events don't count
+        if (ev is { } e)
+            Fold(e, agg);
+    }
 
-        agg.CacheRead += Num(usage, "cache_read_input_tokens");
-        agg.CacheCreation += Num(usage, "cache_creation_input_tokens");
-
-        long input = Num(usage, "input_tokens");
-        long output = Num(usage, "output_tokens");
-        long tokens = input + output;
+    /// <summary>Adds one event to the session. Cache counts land even for a zero-token event (as before spec 3);
+    /// everything else needs input + output above zero.</summary>
+    private void Fold(BurnEvent e, SessionAgg agg)
+    {
+        agg.CacheRead += e.CacheRead;
+        agg.CacheCreation += e.CacheCreation;
+        long tokens = e.Input + e.Output;
         if (tokens <= 0)
             return;   // matches AggregateForLocalCcTab's tokens<=0 skip
 
-        agg.Cwd ??= Str(d, "cwd");
-        var model = Str(msg, "model");
-        model = string.IsNullOrEmpty(model) ? "<none>" : model;   // conservation: sum(by_model) == total
-        var skill = Str(d, "attributionSkill");
-
+        agg.Cwd ??= e.Cwd;
+        var model = string.IsNullOrEmpty(e.Model) ? "<none>" : e.Model;   // conservation: sum(by_model) == total
+        var ts = e.Timestamp;
         if (agg.FirstTs is null || ts < agg.FirstTs) agg.FirstTs = ts;
         if (agg.LastTs is null || ts > agg.LastTs) agg.LastTs = ts;
         agg.EventCount++;
 
-        var day = LocalDate(ts.Value);
+        var day = LocalDate(ts);
         if (!agg.ByDay.TryGetValue(day, out var bucket))
             agg.ByDay[day] = bucket = new DayAgg();
         bucket.Total += tokens;
-        bucket.Input += input;
-        bucket.Output += output;
+        bucket.Input += e.Input;
+        bucket.Output += e.Output;
         bucket.ByModel[model] = bucket.ByModel.GetValueOrDefault(model) + tokens;
-        if (!string.IsNullOrEmpty(skill))
-            bucket.BySkill[skill] = bucket.BySkill.GetValueOrDefault(skill) + tokens;
+        if (!string.IsNullOrEmpty(e.Skill))
+            bucket.BySkill[e.Skill] = bucket.BySkill.GetValueOrDefault(e.Skill) + tokens;
     }
 
     /// <summary>parent_session per the WS-C.1 rule: for a NESTED file
@@ -687,20 +667,6 @@ public sealed class VaultIngester
         return DateTimeOffset.TryParse(
             s.Replace("Z", "+00:00"), CultureInfo.InvariantCulture,
             DateTimeStyles.AssumeUniversal, out var dt) ? dt : null;
-    }
-
-    private static string? Str(JsonObject o, string key)
-        => o[key] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
-
-    private static long Num(JsonObject o, string key)
-    {
-        if (o[key] is not JsonValue v)
-            return 0;
-        if (v.TryGetValue<long>(out var l))
-            return l;
-        if (v.TryGetValue<double>(out var d))
-            return (long)d;
-        return 0;
     }
 
     // PRIVACY.md contract: fixed phrases + exception type names only.
