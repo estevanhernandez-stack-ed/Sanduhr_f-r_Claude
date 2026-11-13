@@ -55,10 +55,9 @@ The 626 dashboard MCP was disconnected when these were made. The next session wi
   session list underneath stays one list with an agent filter. Chosen over an agent column only (no visual split) and
   over one section per agent (no cross-agent project totals). Local models deferred: no project attribution in Ollama
   or LM Studio logs.
-- **Gotcha:** Antigravity transcripts carry tokens but no timestamps or project. Project and time come from
-  `conversation_summaries.db` (`workspace_uris`, `last_modified_time`) joined on conversation id, so an Antigravity
-  conversation dates to its last activity, not per turn.
-- **Revisit if:** Antigravity starts timestamping transcript lines, or users want per-agent sections over combined bars.
+- **Gotcha (corrected by the build check below):** Antigravity CLI transcripts do carry `created_at` per line, so
+  turns are dated individually; only the project comes from `conversation_summaries.db` (`workspace_uris`).
+- **Revisit if:** users want per-agent sections over combined bars.
 
 ### Spec 3 architecture: each agent is a Vault root
 
@@ -93,3 +92,23 @@ The 626 dashboard MCP was disconnected when these were made. The next session wi
   allowlist and `TrustBoundaryTests` do not change.
 - **Tradeoff:** agent rows reach Claude Code only as fresh as the widget's last ingest; Claude Code's own rows stay live.
 - **Revisit if:** .NET ships zstd in `System.IO.Compression` (drop the package), or people need live agent burn in the MCP.
+
+### Spec 3 build check: Antigravity CLI is per-turn and readable; the IDE keeps tokens only in protobuf
+
+- **Category:** gotcha
+- **Finding (2026-11-13, counts and shapes only):** brain folder id equals `conversation_id` (CLI 8 of 8, IDE 2 of 2).
+  `cache_read_tokens` is separate from `input_tokens` (676 of 704 turns exceed their input), so input is used as is.
+  CLI transcripts carry `created_at` (ISO, UTC) on every line, so Antigravity CLI dates per turn like Codex, and the
+  spec's last-activity tradeoff goes away. `transcript_full.jsonl` repeats `transcript.jsonl` token for token, so only
+  `transcript.jsonl` is read (a `transcript*` glob would double-count). The IDE writes 62 conversations as
+  `conversations/*.pb` (undocumented protobuf) plus markdown artifacts in `brain/`; its two transcripts carry no token
+  fields, and its one per-conversation SQLite keeps generation data as binary blobs. IDE token use is not readable.
+
+### Spec 3 scope: Antigravity CLI tokens only, not the IDE
+
+- **Category:** scope
+- **Decision (Este, 2026-11-13):** Antigravity in the ledger is the CLI only. The IDE keeps its token use in
+  undocumented protobuf, and decoding it was rejected as fragile across updates. The Sources caption says the IDE's
+  usage isn't readable. Showing IDE conversations as zero-token sessions was rejected too: a zero row reads like a bug.
+  With per-turn `created_at`, the Antigravity reader becomes append-only JSONL with byte-offset checkpoints, like Codex.
+- **Revisit if:** the IDE starts writing token fields to `transcript.jsonl`.

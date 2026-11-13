@@ -23,7 +23,10 @@ call, and no prompt or reply text is read.
 - **The Gemini-app limits meter** (web sign-in to `gemini.google.com/usage`). Proven feasible on 2026-11-13,
   but it is a separate pool from Antigravity and the only piece with network and privacy cost. Parked.
 - **Live agent burn in the MCP.** The MCP reads agent rows from the Vault; see section 5.
-- **Per-turn dating for Antigravity.** Its transcripts carry no timestamps; see section 3.
+- **The Antigravity IDE's token use.** The IDE keeps its conversations as undocumented protobuf
+  (`conversations/*.pb`) and its transcripts carry no token fields; only the Antigravity CLI writes readable
+  tokens. Decoding the protobuf was rejected as fragile (owner's call, 2026-11-13). Revisit if the IDE starts
+  writing token fields to `transcript.jsonl`.
 - **The Mac.** The Mac app has its own Vault; a Mac task follows this spec.
 
 ## 1. What was checked (2026-11-13, key shapes only, no content)
@@ -36,19 +39,17 @@ call, and no prompt or reply text is read.
   `session_meta` carries `session_id`, `cwd` and `thread_source`. Sanduhr Time's Codex reader
   (`vscode/src/codex/reader.ts`) emits activity events only and never reads tokens, so token counting is
   new work. Its discovery, segment and `.zst` rules carry over.
-- **Antigravity.** `~/.gemini/antigravity-cli/conversation_summaries.db` and
-  `~/.gemini/antigravity/conversation_summaries.db` are ordinary SQLite, one row per conversation in
-  `conversation_summaries` (71 rows each here), with `conversation_id`, `workspace_uris` (a JSON string),
-  `last_modified_time`, `last_user_input_time` and `step_count` among others. Per-turn tokens
-  (`input_tokens`, `output_tokens`, `cache_read_tokens`) are in
-  `brain/<id>/.system_generated/logs/transcript*.jsonl`, with no timestamp, project or model.
-  `conversations/*.pb` is undocumented protobuf and is not read.
-- **Build check, before the plan's first task:** confirm on this machine that a brain folder id equals a
-  `conversation_id` in the summaries database. If it does not, stop and revisit section 3 before any code.
-  Also settle whether Antigravity's `input_tokens` already includes `cache_read_tokens` (compare the two
-  across turns: a turn whose `cache_read_tokens` exceeds its `input_tokens` means they are separate). Total
-  is fresh input plus output, the same sum Claude's rows use, so the answer decides whether input is used as
-  is or less cache read.
+- **Antigravity.** `~/.gemini/antigravity-cli/conversation_summaries.db` is ordinary SQLite, one row per
+  conversation in `conversation_summaries` (71 rows here), with `conversation_id`, `workspace_uris` (a JSON
+  array of `file:` URIs, empty for one row) and `last_modified_time` among others. Per-turn tokens are in
+  `brain/<conversation_id>/.system_generated/logs/transcript.jsonl`, one JSON object per line with
+  `created_at` (ISO 8601, UTC), `input_tokens`, `output_tokens` and `cache_read_tokens` on the turns that
+  used the model. `transcript_full.jsonl` beside it repeats the same tokens line for line and is never read.
+  The IDE's folder (`~/.gemini/antigravity`) has a summaries database of its own, but its conversations live
+  in `conversations/*.pb` and its transcripts carry no token fields, so it is not read (out of scope).
+- **Build check, done 2026-11-13 (counts and shapes only):** a brain folder id equals a `conversation_id`
+  (8 of 8 CLI transcripts). `cache_read_tokens` is separate from `input_tokens` (676 of 704 turns read more
+  from cache than their input), so `input_tokens` is fresh input as is.
 
 ## 2. Components
 
@@ -56,10 +57,11 @@ call, and no prompt or reply text is read.
   home from `CodexHomes.Discover`. Takes the decompressor as `Func<Stream, Stream>?`, the same injection
   `CodexLimitsReader` uses (the App passes `ZstdRollouts.Decompress`; Core keeps no package references),
   and the same 64 MB decompression cap. Yields token events.
-- **`AntigravityBurnReader`** (Core, new, pure). Opens both summary databases read-only, sums each
-  conversation's transcript tokens, yields one session per conversation.
-- **`IAgentBurnSource`** (Core, new). The small interface both readers implement: discover items, read an
-  item from a checkpoint, return the rows and the new checkpoint.
+- **`AntigravityBurnReader`** (Core, new, pure). Walks the CLI's `brain/*/.system_generated/logs/transcript.jsonl`
+  like Codex's rollouts, and looks each conversation's project up in the CLI summaries database, opened
+  read-only. Yields token events.
+- **`IAgentBurnSource`** (Core, new). The small interface both readers implement: list the files to read,
+  and read one file from a byte offset, returning token events and the new offset.
 - **`VaultIngester`** gains one entry point that ingests an `IAgentBurnSource` into a named root. The Claude
   Code path is untouched.
 - **Vault roots** `codex` and `antigravity`, beside the Claude Code roots. `VaultRootMeta` gains
@@ -89,21 +91,20 @@ call, and no prompt or reply text is read.
   model, cwd, last total). A `.jsonl.zst` is checkpointed under its uncompressed path, so when Codex
   compresses a rollout the checkpoint carries over and nothing is counted twice.
 
-### Antigravity: a conversation becomes a session row
+### Antigravity CLI: a transcript line becomes a token event
 
-- From `conversation_summaries`, the reader selects only `conversation_id`, `workspace_uris` and
-  `last_modified_time`. The project is the first `workspace_uris` entry, turned into a path and keyed and
-  named by the same rules as Claude's `cwd` (`CcLogReader.ProjectDisplayName`). No workspace means the
-  project "(no folder)".
-- Tokens are the sum over `brain/<conversation_id>/.system_generated/logs/transcript*.jsonl`:
-  `cache_read_tokens` is cache read, `output_tokens` is output, and input follows the section 1 check.
-  Model is recorded as `antigravity`.
-- **The date tradeoff:** the whole conversation lands on the local day of `last_modified_time`. A
-  conversation that spans three days shows on its last one. The ledger says so (section 4).
-- The checkpoint is `(conversation_id, last_modified_time, total transcript bytes)`. When either changes,
-  the conversation is summed again and its row is replaced, never added to.
-- A conversation listed in both the CLI and IDE databases counts once, keeping the newer
-  `last_modified_time`.
+- A transcript line with any of `input_tokens`, `output_tokens` or `cache_read_tokens` is a token event,
+  dated by its own `created_at`. Lines without them (user input, tool steps) are skipped without counting
+  as bad.
+- Into the Vault row: `input_tokens` is input, `cache_read_tokens` is cache read, `output_tokens` is output.
+  `total` is input plus output. Model is recorded as `antigravity`; the transcript does not name one.
+- The project comes from the conversation's summaries row: the first `workspace_uris` entry, turned from a
+  `file:` URI into a path and keyed and named by the same rules as Claude's `cwd`
+  (`CcLogReader.ProjectDisplayName`). No workspace, or no row yet, means the project "(no folder)"; a later
+  pass does not move rows already written.
+- The reader selects only `conversation_id` and `workspace_uris` from the database.
+- The checkpoint is the transcript's byte offset, the same as a Claude transcript. The session is the
+  conversation id.
 
 ### From the Vault outward
 
@@ -113,8 +114,8 @@ with no new storage shape. The widget's strip reads today's rows per root on the
 ## 4. What you see and switch
 
 - **Sources page.** Antigravity joins as an activity-only source: its own switch, off by default, with the
-  caption "Activity only: Sanduhr can't see Antigravity's limits. Conversations are dated by their last
-  activity." It is never offered as the primary source. Codex's burn follows the existing Codex switch.
+  caption "Activity only, from the Antigravity CLI. Sanduhr can't see Antigravity's limits or the IDE's
+  usage." It is never offered as the primary source. Codex's burn follows the existing Codex switch.
   Turning a source off stops its reader; the Vault rows it wrote stay, as a Claude folder's do. A source
   with nothing on disk shows "Nothing found yet."
 - **Color.** `antigravity` defaults to a periwinkle near `#7B8CF0`, evoking Google's blue without copying it
@@ -126,8 +127,7 @@ with no new storage shape. The widget's strip reads today's rows per root on the
 - **The ledger** (Local burn page and the Vault's view of it). The totals combine all agents. Each project
   bar is split by agent color; its accessible name and tooltip list each agent's share. An agent filter
   (All, Claude Code, Codex, Antigravity) sits above the session list and shows only when more than one agent
-  has data. Session rows carry a small agent label; an Antigravity row's tooltip says "Dated by last
-  activity". Sorting works as today. `VaultLedgerCsv` gains an `agent` column.
+  has data. Session rows carry a small agent label. Sorting works as today. `VaultLedgerCsv` gains an `agent` column.
 - **Not changing:** the tray tooltip, alerts, pace markers and limits. They are about plan limits.
 
 ## 5. Failure and privacy
@@ -136,13 +136,14 @@ with no new storage shape. The widget's strip reads today's rows per root on the
   Claude Code. A failure logs once per pass.
 - **Missing folder or database:** no rows, no error.
 - **Locked database** (Antigravity running): opened read-only (`mode=ro`) with a short busy timeout. Still
-  locked means this pass skips it and keeps the last checkpoint.
+  locked means this pass skips its new lines and keeps their checkpoints, so the next pass reads them with
+  their project.
 - **Bad line or bad `.zst` frame:** counted in `skipped_lines`, as Claude's are. A corrupt Vault shard goes
   to the existing quarantine.
 - **Format drift** (a missing `info`, a renamed column): the item yields nothing and the log records the
   shape found, never the content.
 - **What is read.** Codex: timestamps, segment ids, `cwd`, model names, token counts. Antigravity:
-  `conversation_id`, `workspace_uris`, `last_modified_time`, token counts. Never prompts, replies,
+  `conversation_id`, `workspace_uris`, `created_at`, token counts. Never prompts, replies,
   `title`, `preview` or `raw_summary`. Full paths follow `store_full_paths` (off by default).
 - **No network, no credential.** Nothing new is written outside the Vault folder.
 - **Store build.** Reading `%USERPROFILE%\.codex` and `%USERPROFILE%\.gemini` works under `runFullTrust` as
@@ -157,10 +158,11 @@ with no new storage shape. The widget's strip reads today's rows per root on the
   a checkpoint that carries over; a repeated reading counts once; a total that drops falls back to
   `last_token_usage`; a null `info`; two `session_meta` segments in one file; `cwd` changing mid-segment; a
   pass resumed mid-file from a saved checkpoint; a file over the decompression cap.
-- **`AntigravityBurnReader`** against a generated SQLite database and brain folders: the same id in the CLI
-  and IDE databases counts once; a changed `last_modified_time` replaces the row; a missing transcript; a
-  locked database skips the pass. **A column pin**: the reader's SQL selects exactly the three columns in
-  section 3, so `title`, `preview` and `raw_summary` can never be read.
+- **`AntigravityBurnReader`** against a generated SQLite database and brain folders: per-turn dating across
+  two days; non-token lines skipped without counting as bad; `transcript_full.jsonl` never read; a
+  conversation with no summaries row lands on "(no folder)"; a locked database skips the pass and keeps the
+  offset; a pass resumed from an offset. **A column pin**: the reader's SQL selects exactly
+  `conversation_id` and `workspace_uris`, so `title`, `preview` and `raw_summary` can never be read.
 - **Vault:** agent roots round-trip; a meta without `agent` reads as Claude; purge and quarantine per agent
   root; the CSV `agent` column.
 - **App:** the strip's accessible name with one agent and with three; the ledger filter hidden with one
@@ -184,7 +186,6 @@ with no new storage shape. The widget's strip reads today's rows per root on the
 
 ## Build order
 
-0. The build check in section 1 (brain id equals `conversation_id`).
 1. `IAgentBurnSource`, the `agent` meta field and the `VaultIngester` entry point, with Vault tests.
 2. `CodexBurnReader` and its fixtures.
 3. `AntigravityBurnReader` and its fixtures.
