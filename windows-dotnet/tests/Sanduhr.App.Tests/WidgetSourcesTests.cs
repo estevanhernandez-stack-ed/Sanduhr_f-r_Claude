@@ -288,6 +288,58 @@ public sealed class WidgetSourcesTests : AppWindowFixture
     });
 
     [Fact]
+    public void A_stale_codex_tier_draws_no_pace_or_burn_and_a_fresh_one_does() => AppHost.Run(() =>
+    {
+        // 4.8.0 hand pass: a three-day-old 12% read "33% under" against today's clock.
+        Setup(Both);
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            widget.ApplyClaudeForTests(ClaudeData(30, 40));
+            widget.ApplyCodex(CodexOk(5, 12, fresh: true, asOf: DateTimeOffset.UtcNow.AddHours(-3), "five_hour"));
+            var codex = widget.Sections[1];
+            var weekly = codex.Tiers.Single(t => t.TierKey == "seven_day");
+            Assert.True(weekly.Stale);
+            Assert.Equal("", weekly.PaceLabel);
+            Assert.True(double.IsNaN(weekly.PaceFraction));
+            Assert.False(weekly.HasBurn);
+            Assert.StartsWith("Resets in ", weekly.ResetCountdown);   // the countdown still holds
+            var session = codex.Tiers.Single(t => t.TierKey == "five_hour");
+            Assert.False(session.Stale);
+            Assert.NotEqual("", session.PaceLabel);
+
+            weekly.Tick(DateTimeOffset.UtcNow);   // the 30 s tick keeps it paceless
+            Assert.Equal("", weekly.PaceLabel);
+
+            widget.ApplyCodex(CodexOk(5, 12));   // fresh again: the pace returns
+            Assert.False(weekly.Stale);
+            Assert.NotEqual("", weekly.PaceLabel);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
+    public void A_stale_codex_primary_says_as_of_earlier_in_the_tray() => AppHost.Run(() =>
+    {
+        Setup(Both, primary: "codex");
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            widget.TrayMode = TrayMode.Weekly;
+            widget.ApplyClaudeForTests(ClaudeData(10, 5));
+            widget.ApplyCodex(CodexOk(20, 12, fresh: false));
+            Assert.Equal("Sanduhr für Claude — Codex week 12%, as of earlier.", widget.CurrentTrayGlyph.Tooltip);
+
+            widget.ApplyClaudeForTests(ClaudeData(10, 51));
+            Assert.Equal("Sanduhr für Claude — Codex week 12%, as of earlier. Claude week 51%.", widget.CurrentTrayGlyph.Tooltip);
+
+            widget.ApplyCodex(CodexOk(20, 12));
+            Assert.Equal("Sanduhr für Claude — Codex week 12%. Claude week 51%.", widget.CurrentTrayGlyph.Tooltip);
+        }
+        finally { widget.Dispose(); }
+    });
+
+    [Fact]
     public void The_tray_names_only_a_fresh_source_further_out() => AppHost.Run(() =>
     {
         Setup(Both);   // primary claude

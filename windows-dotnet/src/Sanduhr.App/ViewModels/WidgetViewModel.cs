@@ -2026,9 +2026,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
                     section.Tiers.Insert(Math.Min(keep.Count - 1, section.Tiers.Count), card);
                 }
                 string? resetsAt = (state.Tiers[key] as JsonObject)?["resets_at"]?.GetValue<string>();
+                bool fresh = state.FreshTiers.Contains(key);
+                card.Stale = !fresh;   // before Update: a stale tier draws no pace or burn
                 card.Update((int)util, resetsAt, null, null,
                     _codexHistory.GetValueOrDefault(key) ?? [], _palette, SparklineStyle, now);
-                card.Opacity = state.FreshTiers.Contains(key) ? 1 : CombinedBarViewModel.StaleOpacity;
+                card.Opacity = fresh ? 1 : CombinedBarViewModel.StaleOpacity;
             }
             foreach (var gone in section.Tiers.Where(t => !keep.Contains(t.TierKey)).ToList())
                 section.Tiers.Remove(gone);
@@ -2167,12 +2169,16 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
                 if (SourceValue(source, window) is { Fresh: true } v && (int)v.Percent > reading.Percent
                     && (furthest is null || v.Percent > furthest.Value.Percent))
                     furthest = (source, v.Percent);
+            // A stale primary (Codex idle past its freshness window) says so, as the combined bar's name does: an old percent in the
+            // tray otherwise reads as now (4.8.0 hand pass).
+            bool primaryStale = primary == AgentSources.Codex && SourceValue(primary, window) is { Fresh: false };
+            string word = window == TierModel.FiveHour ? "5h" : "week";
+            string mine = $"{AgentSources.Name(primary)} {word} {reading.Percent.ToString(CultureInfo.InvariantCulture)}%"
+                + (primaryStale ? ", as of earlier." : ".");
             if (furthest is { } f)
-            {
-                string word = window == TierModel.FiveHour ? "5h" : "week";
-                beyond = $"{AgentSources.Name(primary)} {word} {reading.Percent.ToString(CultureInfo.InvariantCulture)}%. "
-                    + $"{AgentSources.Name(f.Source)} {word} {((int)f.Percent).ToString(CultureInfo.InvariantCulture)}%.";
-            }
+                beyond = $"{mine} {AgentSources.Name(f.Source)} {word} {((int)f.Percent).ToString(CultureInfo.InvariantCulture)}%.";
+            else if (primaryStale)
+                beyond = mine;
         }
 
         var key2 = (reading?.Percent, reading?.Label, beyond);

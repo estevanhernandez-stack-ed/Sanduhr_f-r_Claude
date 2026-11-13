@@ -117,7 +117,8 @@ public static class LiveRegion
 
     /// <summary>
     /// A status line whose text is the news (an outcome: "Installed.", "Couldn't reach the catalog."):
-    /// <c>views:LiveRegion.Announces="True"</c> on a TextBlock. It marks the line a polite live region and raises LiveRegionChanged
+    /// <c>views:LiveRegion.Announces="True"</c> on a TextBlock. It marks the line a polite live region (unless it sets its own
+    /// LiveSetting) and raises LiveRegionChanged
     /// each time the text changes to something non-empty on a loaded, visible line. The page's first text is not announced. The
     /// same text twice is one change, so a line that repeats a message clears it first (as About's status does).
     /// </summary>
@@ -150,7 +151,10 @@ public static class LiveRegion
         tb.Loaded -= OnAnnouncerLoaded;
         if (e.NewValue is true)
         {
-            System.Windows.Automation.AutomationProperties.SetLiveSetting(tb, System.Windows.Automation.AutomationLiveSetting.Polite);
+            // Polite unless the line set its own (the Sources refusals are Assertive). A template applies its properties in no set
+            // order, so a local Polite here would override the template's Assertive.
+            if (DependencyPropertyHelper.GetValueSource(tb, System.Windows.Automation.AutomationProperties.LiveSettingProperty).BaseValueSource == BaseValueSource.Default)
+                System.Windows.Automation.AutomationProperties.SetLiveSetting(tb, System.Windows.Automation.AutomationLiveSetting.Polite);
             tb.Unloaded += OnAnnouncerUnloaded;
             tb.Loaded += OnAnnouncerLoaded;
             // Hooked on Loaded, or now when it is already loaded: an element that never loads is never held by the descriptor's table.

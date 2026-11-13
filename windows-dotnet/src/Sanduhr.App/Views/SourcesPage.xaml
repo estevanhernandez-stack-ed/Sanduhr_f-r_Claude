@@ -81,6 +81,7 @@
                                                      Content="{x:Static core:SettingsNames.SourcesPrimary}"
                                                      IsChecked="{Binding IsPrimary, Mode=TwoWay}" IsEnabled="{Binding CanBePrimary}"
                                                      AutomationProperties.Name="{Binding PrimaryName}"
+                                                     PreviewKeyDown="OnPrimaryKeyDown"
                                                      VerticalAlignment="Center" Margin="0,0,20,0" />
                                         <TextBlock Text="{x:Static core:SettingsNames.SourcesColor}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
                                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
@@ -100,8 +101,12 @@
                                                   IsChecked="{Binding AlertsOn, Mode=TwoWay}"
                                                   AutomationProperties.Name="{Binding AlertsName}" />
                                     </StackPanel>
+                                    <!-- Collapsed while empty, so Narrator never stops on a blank "text" at the end of the list (4.8.0 hand pass);
+                                         LiveRegion.Announces speaks it once layout shows it. Assertive after Announces, which sets Polite. -->
                                     <TextBlock Text="{Binding ColorMessage}" FontSize="11" TextWrapping="Wrap" Margin="24,4,0,0"
                                                Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                               Visibility="{Binding HasColorMessage, Converter={StaticResource BoolVis}}"
+                                               views:LiveRegion.Announces="True"
                                                AutomationProperties.LiveSetting="Assertive" />
                                 </StackPanel>
                             </DataTemplate>
@@ -112,6 +117,8 @@
                                Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                     <TextBlock Text="{Binding Message}" FontSize="11.5" TextWrapping="Wrap" Margin="0,8,0,0"
                                Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                               Visibility="{Binding HasMessage, Converter={StaticResource BoolVis}}"
+                               views:LiveRegion.Announces="True"
                                AutomationProperties.LiveSetting="Assertive" />
                 </StackPanel>
 
