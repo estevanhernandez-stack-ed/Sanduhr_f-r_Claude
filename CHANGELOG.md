@@ -15,6 +15,10 @@
 
 ## Unreleased (mac)
 
+### New
+
+- **A notification when an account you aren't using expires.** When claude.ai refuses the saved key of an account other than the one Sanduhr shows, a notification says so once ("Personal: session expired"), and clicking it opens Settings, Accounts, where the account shows Session expired with Sign In Again. Before, only that orange line said so, so you found out when you looked. It follows your Alerts settings like Sanduhr's other gentle banners, with no sound. The active account gets none (its own sign-in prompt asks), demo mode sends none, and an account left expired is not announced again at every launch; signing it in again takes the notification away.
+
 ### Fixes
 
 - **Reset and Track my AI usage off stop the per-seat meters at once.** A linked Claude Code folder's meter round that was running when you reset Sanduhr or turned usage tracking off went on asking claude.ai for its remaining accounts; after Reset it even used their saved keys again. Nothing was written, but the requests went out. Now a stopped round asks for nothing more, and it no longer clears the round that starts when usage comes back on (#498).
