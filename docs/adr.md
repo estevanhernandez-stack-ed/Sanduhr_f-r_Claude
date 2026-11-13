@@ -93,6 +93,8 @@ Solved the problem in under 10 minutes. cloudscraper is the only external depend
 
 **Consequences:** Still deferred: `README.md` lists "Antigravity (Google Gemini IDE) quota tracking" as an open roadmap item, and neither app contains Gemini quota code (the Mac app's Gemini references are config export for Gemini CLI, not usage tracking).
 
+**Note (2026-11-13, Windows 5.0 spec 3):** Checked again and still deferred. Antigravity keeps no limits on disk: `quota_manager.go` fetches them from Google at startup and logs no values, and a full scan of its folders found no quota fields. The Gemini app's own limits can be read through a web sign-in to `gemini.google.com/usage` (a WebView2 sign-in passed), but that is a separate pool from Antigravity, so the meter is parked. Antigravity ships as activity only: its local conversation and token files become a Vault root beside Claude Code and Codex (`docs/superpowers/specs/2026-11-13-every-agents-activity-design.md`).
+
 ---
 
 ## ADR-007: Theme system as flat dicts
