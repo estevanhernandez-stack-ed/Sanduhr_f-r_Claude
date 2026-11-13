@@ -128,14 +128,35 @@ public class VaultAgentIngestTests
         var (ing, store) = Make(t.Path, Path.Combine(t.Path, "vault"));
         ing.IngestOnce([], false, Now, agents: [src]);
 
-        var zst = Write(dir, "a.jsonl.zst", body, gzip: true);
+        // Distinct body: 152 = the .zst was parsed whole and replaced the row; 150 = skipped; 302 = counts added.
+        var zst = Write(dir, "a.jsonl.zst", body + "2026-11-10T17:00:00Z,1,1\n", gzip: true);
         var both = new FakeSource("codex", () =>
             [new AgentBurnFile(new FileInfo(plain), "sess-a", null, false), new AgentBurnFile(new FileInfo(zst), "sess-a", null, true)]);
-        ing.IngestOnce([], false, Now, agents: [both]);
-        ing.IngestOnce([], false, Now, agents: [both]);
+        var r = ing.IngestOnce([], false, Now, agents: [both]);
 
+        Assert.Equal(0, r.FilesFailed);
+        Assert.Equal(0, r.RootsAborted);
+        Assert.Equal(1, r.FilesFullParsed);
         store.TryLoadSessionShard("codex", "2026-11", out var shard);
-        Assert.Equal(150, shard.Sessions["sess-a"].Total);   // replaced, never added to
+        Assert.Equal(152, shard.Sessions["sess-a"].Total);
+    }
+
+    [Fact]
+    public void CappedReadStream_allows_exactly_the_cap_and_throws_one_byte_past_it()
+    {
+        using (var ok = new CappedReadStream(new MemoryStream(new byte[10]), 10))
+        {
+            var buf = new byte[32];
+            int total = 0, n;
+            while ((n = ok.Read(buf, 0, buf.Length)) > 0) total += n;
+            Assert.Equal(10, total);
+        }
+        using var over = new CappedReadStream(new MemoryStream(new byte[11]), 10);
+        Assert.Throws<InvalidDataException>(() =>
+        {
+            var buf = new byte[32];
+            while (over.Read(buf, 0, buf.Length) > 0) { }
+        });
     }
 
     [Fact]
