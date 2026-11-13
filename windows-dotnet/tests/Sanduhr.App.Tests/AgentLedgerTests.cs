@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows.Media;
 using Sanduhr.App.Services;
 using Sanduhr.App.Theming;
@@ -114,5 +115,87 @@ public sealed class AgentLedgerTests : AppWindowFixture
 
         strip.SetData(byDay, ThemePalette.Obsidian);
         Assert.Equal("", System.Windows.Automation.AutomationProperties.GetName(strip));
+    });
+
+    private static (VaultReader Reader, string Dir) VaultWith(params (string Root, string Day, long Total)[] days)
+    {
+        var dir = Directory.CreateTempSubdirectory("sanduhr-agents").FullName;
+        var store = new VaultStore(dir);
+        foreach (var root in days.Select(d => d.Root).Distinct())
+        {
+            if (root != ".claude") store.SaveMeta(root, new VaultRootMeta { Agent = root });
+            foreach (var month in days.Where(d => d.Root == root).Select(d => d.Day[..7]).Distinct())
+            {
+                var shard = new VaultRollupShard { SchemaVersion = 1 };
+                foreach (var (_, day, total) in days.Where(d => d.Root == root && d.Day.StartsWith(month)))
+                {
+                    var rd = new VaultRollupDay { Total = total, Input = total / 2, Output = total / 2 };
+                    rd.ByProject["api~12345678"] = total;
+                    shard.Days[day] = rd;
+                }
+                store.SaveRollupShard(root, month, shard);
+            }
+        }
+        return (new VaultReader(store), dir);
+    }
+
+    [Fact]
+    public void An_agents_hot_day_burn_is_read_into_the_hot_maps_and_the_window_split()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var t = today.ToString("yyyy-MM-dd");
+        var (reader, dir) = VaultWith(("codex", t, 400_000));
+        try
+        {
+            var a = LocalCcViewModel.ReadAgents(reader, ["codex"], today.AddDays(-29), today, today);
+            Assert.Equal(400_000, a.ByDay["codex"][today]);
+            Assert.Equal(400_000, a.HotDay[today]);
+            Assert.Equal(400_000, a.HotProjects["api"]);
+            Assert.Equal(200_000, a.HotIn[today]);
+            Assert.Equal(400_000, a.Projects["api"]["codex"]);
+            var row = LocalCcViewModel.Rows([("api", 1_000_000L)], CodenameCategory.Project, a.Projects).Single();
+            Assert.Equal($"{TokenFormat.Compact(1_000_000)} (Claude Code {TokenFormat.Compact(600_000)}, Codex {TokenFormat.Compact(400_000)})", row.Tokens);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void A_consented_agent_root_with_no_rows_changes_nothing_on_the_strip()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var (reader, dir) = VaultWith((".claude", today.AddDays(-3).ToString("yyyy-MM-dd"), 100));
+        try
+        {
+            var a = LocalCcViewModel.ReadAgents(reader, [".claude", "codex"], today.AddDays(-29), today, today);
+            Assert.Empty(a.ByDay);
+            Assert.Empty(a.Projects);
+            AppHost.Run(() =>
+            {
+                var strip = new LocalCcBarStrip();
+                strip.SetData(new Dictionary<DateOnly, long> { [today] = 5 }, ThemePalette.Obsidian, a.ByDay, _ => Colors.Teal);
+                Assert.False(strip.Stacked);
+                strip.SetData(new Dictionary<DateOnly, long> { [today] = 5 }, ThemePalette.Obsidian,
+                    new Dictionary<string, IReadOnlyDictionary<DateOnly, long>> { ["codex"] = new Dictionary<DateOnly, long>() }, _ => Colors.Teal);
+                Assert.False(strip.Stacked);
+                Assert.Equal("", System.Windows.Automation.AutomationProperties.GetName(strip));
+            });
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void A_stacked_project_with_a_claude_and_a_codex_session_stays_under_the_codex_filter() => AppHost.Run(() =>
+    {
+        var (widget, _) = ScratchWidget("Personal");
+        try
+        {
+            var vm = new CcLedgerViewModel(widget, true, _ => { });
+            vm.PresentForTests([Session("u1", ".claude", "claude"), Session("u2", "codex", "codex")]);
+            vm.SelectedAgentFilter = "Codex";
+            Assert.Single(vm.View.Cast<LedgerRowViewModel>());
+            vm.SelectedAgentFilter = "Claude Code";
+            Assert.Single(vm.View.Cast<LedgerRowViewModel>());
+        }
+        finally { widget.Dispose(); }
     });
 }

@@ -31,6 +31,10 @@ public sealed class LocalCcBarStrip : FrameworkElement
         new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>();
     private Func<string, Color>? _colorOf;
 
+    /// <summary>True while some non-Claude agent has tokens in the window: only then does the strip stack by agent and word its
+    /// empty state for every agent. A consented agent root with no rows leaves the strip as it always was.</summary>
+    internal bool Stacked { get; private set; }
+
     public void SetData(IReadOnlyDictionary<DateOnly, long> byDay, ThemePalette palette)
         => SetData(byDay, palette, new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>(), null);
 
@@ -41,6 +45,7 @@ public sealed class LocalCcBarStrip : FrameworkElement
         _palette = palette;
         _byAgent = byAgent ?? new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>();
         _colorOf = colorOf;
+        Stacked = _byAgent.Values.Any(days => days.Values.Sum() > 0);
         var totals = new Dictionary<string, long>(StringComparer.Ordinal);
         foreach (var (agent, days) in _byAgent) totals[agent] = days.Values.Sum();
         totals[AgentSources.Claude] = Math.Max(0, _byDay.Values.Sum() - totals.Values.Sum());
@@ -70,7 +75,7 @@ public sealed class LocalCcBarStrip : FrameworkElement
             double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
             var brush = Frozen(_palette.TextDim);
             var ft = new FormattedText(
-                _byAgent.Count > 0 ? "No local activity in the last 30 days." : "No local CC activity in the last 30 days.",
+                Stacked ? "No local activity in the last 30 days." : "No local CC activity in the last 30 days.",
                 CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
                 new Typeface("Segoe UI"), 11, brush, dpi)
             {
@@ -97,7 +102,7 @@ public sealed class LocalCcBarStrip : FrameworkElement
             {
                 dc.DrawRectangle(baselineColor, null, new Rect(x, baselineY, barW, 1));
             }
-            else if (_byAgent.Count == 0 || _colorOf is null)
+            else if (!Stacked || _colorOf is null)
             {
                 double barH = Math.Max(2, v / (double)maxV * (h - 8));
                 dc.DrawRectangle(barColor, null, new Rect(x, baselineY - barH, barW, barH));

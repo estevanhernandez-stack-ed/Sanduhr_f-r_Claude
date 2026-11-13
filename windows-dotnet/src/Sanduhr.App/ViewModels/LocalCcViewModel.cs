@@ -313,25 +313,62 @@ public sealed partial class LocalCcViewModel : ObservableObject
         return (today, windowStart, roots, lastIngest, vaultOn, degraded, calFrom, uncovered);
     }
 
-    /// <summary>Reads each non-Claude agent root on its own over [from, toExclusive): per-day and per-project splits (spec 3).</summary>
-    private static (Dictionary<string, IReadOnlyDictionary<DateOnly, long>> ByDay,
-        Dictionary<string, Dictionary<string, long>> Projects) ReadAgents(
-        VaultService vault, IReadOnlyList<string> consentedRoots, DateOnly from, DateOnly toExclusive)
+    /// <summary>What the agent roots add to the page: the window split per agent (strip, shares) and the hot days (from the
+    /// hot boundary through today), which the live Claude Code reader never serves, so they are added to the totals here.</summary>
+    internal sealed record AgentReads(
+        Dictionary<string, IReadOnlyDictionary<DateOnly, long>> ByDay,
+        Dictionary<string, Dictionary<string, long>> Projects,
+        Dictionary<DateOnly, long> HotDay,
+        Dictionary<string, long> HotProjects,
+        Dictionary<string, long> HotSkills,
+        Dictionary<DateOnly, long> HotIn,
+        Dictionary<DateOnly, long> HotOut);
+
+    /// <summary>Reads each non-Claude agent root on its own over [windowStart, today] (spec 3). Agents have no live reader, so the
+    /// Vault is their only source and a hot day reads from it too; the combined <c>win</c> read excludes hot days for every root,
+    /// so nothing counts twice. An agent with no tokens in the window is dropped: an idle consented root changes nothing on screen.</summary>
+    internal static AgentReads ReadAgents(VaultReader reader, IReadOnlyList<string> consentedRoots, DateOnly windowStart,
+        DateOnly hotStart, DateOnly today)
     {
         var byAgent = new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>(StringComparer.Ordinal);
         var projectsByAgent = new Dictionary<string, Dictionary<string, long>>(StringComparer.Ordinal);
-        foreach (var root in consentedRoots.Where(r => vault.Reader.AgentOf(r) != AgentSources.Claude))
+        var hotDay = new Dictionary<DateOnly, long>();
+        var hotProjects = new Dictionary<string, long>(StringComparer.Ordinal);   // streamer: key - project display name used as a dictionary key; Rows masks when listed (CP 15)
+        var hotSkills = new Dictionary<string, long>(StringComparer.Ordinal);   // streamer: key - skill tokens summed into a dictionary; Rows masks when listed (CP 15)
+        var hotIn = new Dictionary<DateOnly, long>();
+        var hotOut = new Dictionary<DateOnly, long>();
+        var end = today.AddDays(1);
+        foreach (var root in consentedRoots.Where(r => reader.AgentOf(r) != AgentSources.Claude))
         {
-            var agent = vault.Reader.AgentOf(root);
-            var w = vault.Reader.ReadWindow([root], from, toExclusive);
+            var agent = reader.AgentOf(root);
+            var w = reader.ReadWindow([root], windowStart, end);
+            if (w.ByDay.Values.Sum() <= 0)
+                continue;
             byAgent[agent] = w.ByDay;
             foreach (var (name, tokens) in w.ByProjectName)   // streamer: key - project display name used as a dictionary key; Rows masks when listed (CP 15)
             {
                 if (!projectsByAgent.TryGetValue(name, out var m)) projectsByAgent[name] = m = new(StringComparer.Ordinal);
                 m[agent] = m.GetValueOrDefault(agent) + tokens;
             }
+            if (hotStart > today)
+                continue;
+            var hot = reader.ReadWindow([root], hotStart, end);
+            foreach (var (d, v) in hot.ByDay) hotDay[d] = hotDay.GetValueOrDefault(d) + v;
+            foreach (var (n, v) in hot.ByProjectName) hotProjects[n] = hotProjects.GetValueOrDefault(n) + v;   // streamer: key - project display name used as a dictionary key; Rows masks when listed (CP 15)
+            foreach (var (k, v) in hot.BySkill) hotSkills[k] = hotSkills.GetValueOrDefault(k) + v;   // streamer: key - skill tokens summed into a dictionary; Rows masks when listed (CP 15)
+            foreach (var (d, v) in hot.ByDayInput) hotIn[d] = hotIn.GetValueOrDefault(d) + v;
+            foreach (var (d, v) in hot.ByDayOutput) hotOut[d] = hotOut.GetValueOrDefault(d) + v;
         }
-        return (byAgent, projectsByAgent);
+        return new AgentReads(byAgent, projectsByAgent, hotDay, hotProjects, hotSkills, hotIn, hotOut);
+    }
+
+    /// <summary>Adds the agents' hot-day burn to the combined maps the page shows.</summary>
+    private static void AddHot(AgentReads agents, Dictionary<DateOnly, long> byDay, Dictionary<string, long> projects,
+        Dictionary<string, long> skills)
+    {
+        foreach (var (d, v) in agents.HotDay) byDay[d] = byDay.GetValueOrDefault(d) + v;
+        foreach (var (n, v) in agents.HotProjects) projects[n] = projects.GetValueOrDefault(n) + v;   // streamer: key - project display name used as a dictionary key; Rows masks when listed (CP 15)
+        foreach (var (k, v) in agents.HotSkills) skills[k] = skills.GetValueOrDefault(k) + v;   // streamer: key - skill tokens summed into a dictionary; Rows masks when listed (CP 15)
     }
 
     /// <summary>Fast vault-only snapshot for the first paint — never touches
@@ -350,9 +387,9 @@ public sealed partial class LocalCcViewModel : ObservableObject
         // Calendar-only head slice — same union grammar as Compute, still
         // disjoint from `win` by construction.
         var winCal = vault.Reader.ReadWindow(roots, calFrom, windowStart);
-        var agents = ReadAgents(vault, roots, windowStart, hotStart);
+        var agents = ReadAgents(vault.Reader, roots, windowStart, hotStart, today);
 
-        var byDay = new Dictionary<DateOnly, long>(win.ByDay);   // no hot-day/live entries — those arrive in the full pass
+        var byDay = new Dictionary<DateOnly, long>(win.ByDay);   // no live Claude Code hot-day entries (those arrive in the full pass); the agents' Vault hot days are added below-day/live entries — those arrive in the full pass
 
         var calendarByDay = new Dictionary<DateOnly, long>(winCal.ByDay);
         foreach (var (d, v) in byDay)
@@ -360,9 +397,12 @@ public sealed partial class LocalCcViewModel : ObservableObject
 
         var projects = new Dictionary<string, long>(win.ByProjectName);
         var skills = new Dictionary<string, long>(win.BySkill);   // streamer: key - skill tokens copied into a dictionary; Rows masks when listed (CP 15)
+        AddHot(agents, byDay, projects, skills);
+        foreach (var (d, v) in agents.HotDay)
+            calendarByDay[d] = byDay[d];
 
-        long sentWindow = win.ByDayInput.Values.Sum();
-        long recvWindow = win.ByDayOutput.Values.Sum();
+        long sentWindow = win.ByDayInput.Values.Sum() + agents.HotIn.Values.Sum();
+        long recvWindow = win.ByDayOutput.Values.Sum() + agents.HotOut.Values.Sum();
         long windowTotal = byDay.Values.Sum();
         bool partial = windowTotal > 0 && (sentWindow + recvWindow) < (long)(windowTotal * 0.95);
 
@@ -409,7 +449,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
         // Calendar-only head slice — [calFrom, windowStart), never touches the
         // 30-day `win` read above, so every existing figure stays bit-identical.
         var winCal = vault.Reader.ReadWindow(roots, calFrom, windowStart);
-        var agents = ReadAgents(vault, roots, windowStart, hotStart);
+        var agents = ReadAgents(vault.Reader, roots, windowStart, hotStart, today);
 
         var byDay = new Dictionary<DateOnly, long>(win.ByDay);
         for (var d = hotStart; d <= today; d = d.AddDays(1))
@@ -436,6 +476,9 @@ public sealed partial class LocalCcViewModel : ObservableObject
         var skills = new Dictionary<string, long>(win.BySkill);   // streamer: key - skill tokens summed into a dictionary; Rows masks when listed (CP 15)
         foreach (var (skill, v) in todayAgg.BySkill)
             skills[skill] = skills.GetValueOrDefault(skill) + v;
+        foreach (var (d, v) in agents.HotDay)
+            calendarByDay[d] = calendarByDay.GetValueOrDefault(d) + v;   // the calendar union above already holds the live hot days
+        AddHot(agents, byDay, projects, skills);
 
         long sentWindow = win.ByDayInput.Values.Sum();
         long recvWindow = win.ByDayOutput.Values.Sum();
@@ -444,8 +487,10 @@ public sealed partial class LocalCcViewModel : ObservableObject
             sentWindow += live.ByDayInput.GetValueOrDefault(d);
             recvWindow += live.ByDayOutput.GetValueOrDefault(d);
         }
-        long sentToday = todayAgg.ByDayInput.GetValueOrDefault(today);
-        long recvToday = todayAgg.ByDayOutput.GetValueOrDefault(today);
+        sentWindow += agents.HotIn.Values.Sum();
+        recvWindow += agents.HotOut.Values.Sum();
+        long sentToday = todayAgg.ByDayInput.GetValueOrDefault(today) + agents.HotIn.GetValueOrDefault(today);
+        long recvToday = todayAgg.ByDayOutput.GetValueOrDefault(today) + agents.HotOut.GetValueOrDefault(today);
         long windowTotal = byDay.Values.Sum();
         bool partial = windowTotal > 0 && (sentWindow + recvWindow) < (long)(windowTotal * 0.95);
 

@@ -196,7 +196,7 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/HistoryTabViewModel.cs", "masked", 4),
         ("Sanduhr.App/ViewModels/LauncherSettingsViewModel.cs", "key", 1),
         ("Sanduhr.App/ViewModels/LauncherSettingsViewModel.cs", "notname", 1),
-        ("Sanduhr.App/ViewModels/LocalCcViewModel.cs", "key", 6),
+        ("Sanduhr.App/ViewModels/LocalCcViewModel.cs", "key", 7),
         ("Sanduhr.App/ViewModels/LocalCcViewModel.cs", "masked", 5),   // streamer smoke: archive folder names redraw on the switch; agent roots show their product name through ShownFor
         ("Sanduhr.App/ViewModels/ModsPageViewModel.cs", "key", 3),
         ("Sanduhr.App/ViewModels/ModsPageViewModel.cs", "masked", 6),

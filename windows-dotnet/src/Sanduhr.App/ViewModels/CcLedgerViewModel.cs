@@ -31,6 +31,11 @@ public sealed partial class LedgerRowViewModel : ObservableObject
     public string ProjectSort => ProjectText;
 
     /// <summary>"Claude Code", "Codex" or "Antigravity"; a project group spanning agents reads "Several agents".</summary>
+    /// <summary>Whether any of the row's sessions came from the agent named <paramref name="label"/> (a stacked project can span agents).</summary>
+    public bool HasAgent(string label) => Members.Count > 0
+        ? Members.Any(m => AgentSources.BurnName(m.Agent) == label)
+        : AgentSources.BurnName(Info.Agent) == label;
+
     public string AgentLabel => Members.Select(m => m.Agent).Distinct().Count() > 1
         ? SettingsNames.SeveralAgents
         : AgentSources.BurnName(Info.Agent);
@@ -289,7 +294,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         bool agentOn = SelectedAgentFilter is { } f && f != SettingsNames.AllAgents;
         View.Filter = !dayScoped && !agentOn ? null : item => item is LedgerRowViewModel r
             && (!dayScoped || r.ScopedTokens > 0)
-            && (!agentOn || r.AgentLabel == SelectedAgentFilter);
+            && (!agentOn || r.HasAgent(SelectedAgentFilter));
     }
 
     private void UpdateAgentFilters()
