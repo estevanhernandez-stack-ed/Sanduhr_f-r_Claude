@@ -27,6 +27,18 @@ The 626 dashboard MCP was down (502) when these were made. The next session with
   group has the same trap.
 - **Files:** `windows-dotnet/src/Sanduhr.App/Views/SourcesPage.xaml(.cs)` (commit cb3e183b)
 
+### Empty live lines collapse and announce through LiveRegion.Announces; it keeps a line's own LiveSetting
+
+- **Category:** bugfix
+- **Decision:** The Sources message line and the per-row color lines collapse while empty and carry
+  `views:LiveRegion.Announces`, which raises LiveRegionChanged once layout shows them. `LiveRegion.Announces` now sets
+  Polite only when the line has no LiveSetting of its own.
+- **Rationale:** Narrator stopped on each blank line as "text" (Este's Narrator listen, 2026-11-12). An earlier fix
+  (ab842be0) made them visible while empty, because a collapsed line with only `LiveSetting` never spoke: LiveSetting raises
+  nothing. Gotcha: inside a DataTemplate, WPF applies attached properties in no set order, so Announces' local Polite
+  overrode the template's Assertive.
+- **Files:** `windows-dotnet/src/Sanduhr.App/Views/SourcesPage.xaml`, `windows-dotnet/src/Sanduhr.App/Views/SettingsReach.cs` (commit e4b42b23)
+
 ### 4.8.0 hand pass ran through UI Automation; the Desk-rows blind spot did not reproduce
 
 - **Category:** deployment
