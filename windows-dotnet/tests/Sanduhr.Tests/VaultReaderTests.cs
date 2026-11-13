@@ -62,6 +62,23 @@ public class VaultReaderTests
     }
 
     [Fact]
+    public void Sessions_carry_the_agent_of_their_root_and_claude_when_meta_has_none()
+    {
+        using var t = new TempDir();
+        var store = new VaultStore(t.Path);
+        foreach (var root in new[] { ".claude", "codex" })
+            SaveShard(store, root, "2026-11",
+                ("s1", Row("api~12345678", "2026-11-10T10:00:00.000000+00:00", "2026-11-10T11:00:00.000000+00:00",
+                    false, ("2026-11-10", 10))));
+        store.SaveMeta("codex", new VaultRootMeta { Agent = "codex" });
+
+        var sessions = new VaultReader(store).ReadSessions(new[] { ".claude", "codex" });
+
+        Assert.Equal("claude", sessions.Single(s => s.Root == ".claude").Agent);
+        Assert.Equal("codex", sessions.Single(s => s.Root == "codex").Agent);
+    }
+
+    [Fact]
     public void ReadWindow_merges_roots_and_projects_by_display_name()
     {
         using var tmp = new TempDir();

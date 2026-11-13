@@ -38,7 +38,8 @@ public sealed record VaultSessionInfo(
     Dictionary<string, VaultDayBucket> ByDay,
     VaultCacheTokens? Cache,
     int AgentCount,
-    long AgentTokens);
+    long AgentTokens,
+    string Agent = AgentSources.Claude);
 
 /// <summary>
 /// Read side of the vault. NEVER mutates: corrupt or missing shards degrade to
@@ -50,6 +51,9 @@ public sealed class VaultReader
     private readonly VaultStore _store;
 
     public VaultReader(VaultStore store) => _store = store;
+
+    /// <summary>The agent a root holds, from its meta; a root without one is a Claude Code home.</summary>
+    public string AgentOf(string root) => _store.LoadMeta(root)?.Agent ?? AgentSources.Claude;
 
     public static string ProjectNameOf(string projectKey)
     {
@@ -133,7 +137,8 @@ public sealed class VaultReader
         var result = new List<VaultSessionInfo>();
         foreach (var root in roots)
         {
-            var byUuid = new Dictionary<string, List<VaultSessionRow>>();
+            var agent = AgentOf(root);
+            var byUuid =new Dictionary<string, List<VaultSessionRow>>();
             foreach (var month in _store.ListSessionShardMonths(root))
             {
                 if (_store.TryLoadSessionShard(root, month, out var shard) != ShardLoadResult.Ok)
@@ -180,7 +185,7 @@ public sealed class VaultReader
                     (cacheRead + cacheCreation) > 0
                         ? new VaultCacheTokens { Read = cacheRead, Creation = cacheCreation }
                         : null,
-                    agentCount, agentTokens));
+                    agentCount, agentTokens, agent));
             }
         }
         return result;

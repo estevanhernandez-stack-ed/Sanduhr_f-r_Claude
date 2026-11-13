@@ -178,6 +178,12 @@ public sealed class VaultRootMeta
     /// subagent transcripts still inside CC retention.</summary>
     [JsonPropertyName("walk_version")]
     public int WalkVersion { get; set; }
+
+    /// <summary>Which agent's burn this root holds (spec 3): "codex" or "antigravity". Absent means a Claude Code
+    /// home, so every vault written before spec 3 reads unchanged.</summary>
+    [JsonPropertyName("agent")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Agent { get; set; }
 }
 
 public enum ShardLoadResult
