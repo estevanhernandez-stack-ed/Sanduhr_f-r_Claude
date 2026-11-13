@@ -2,7 +2,7 @@
   "name": "sanduhr-time",
   "displayName": "Sanduhr Time",
   "description": "Local-first coding time tracker that separates your time from your agents' (Claude Code and Codex).",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "626labs",
   "license": "MIT",
   "repository": {

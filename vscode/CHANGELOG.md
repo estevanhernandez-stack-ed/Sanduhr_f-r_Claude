@@ -2,7 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.1]
+
 - **Older Codex days stay counted (#495).** Codex compresses an older rollout to `rollout-*.jsonl.zst`, and Sanduhr Time stopped reading it there, so past days lost their Codex time and lines. It now reads the compressed file under the rollout's own path, so nothing already counted is counted again, and lines Codex wrote after the last read still count once. It uses the zstd built into VS Code's Node (VS Code 1.146 runs Node 24) and adds no dependency; a VS Code without it leaves compressed rollouts unread until one with it opens.
+- Day files say which rule made them: `caveats.readerVersion` is `0.3.1`.
 
 ## [0.3.0]
 
