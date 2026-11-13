@@ -12,7 +12,7 @@ For every project, every day:
 
 - **Your time.** Editor activity in a focused VS Code window (edits, saves, switching files, moving the cursor), plus the time you spent reading answers and writing prompts to Claude Code or Codex.
 - **Claude's time.** Read from Claude Code's own transcripts, in every config home on the machine (`CLAUDE_CONFIG_DIR` and each `~/.claude*` folder that has a `projects/` directory). Subagents count, and parallel sessions show up as agent time next to the split.
-- **Codex's time.** Read from Codex's rollouts under `sessions/` in `CODEX_HOME` and `~/.codex`. A Codex thread can run for days; each record counts on its own day. Subagent and self-review threads are Codex working, never your prompts.
+- **Codex's time.** Read from Codex's rollouts under `sessions/` in `CODEX_HOME` and `~/.codex`, the compressed `.jsonl.zst` ones included. A Codex thread can run for days; each record counts on its own day. Subagent and self-review threads are Codex working, never your prompts.
 - **The split.** You only, agents only, and both. The agents part is the union of every agent, so a minute Claude and Codex share counts once, and so does a minute you and an agent share. Each agent's own time is listed beside it.
 - **Lines.** Lines you changed in the editor, and lines each agent added or removed through its edit tools (Codex's patches included). Disk reloads of a file an agent just changed are not credited to you.
 - **Languages.** Where your editor time went, by language.

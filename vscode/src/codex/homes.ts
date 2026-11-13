@@ -41,9 +41,12 @@ export function discoverCodexHomes(opts: HomeOptions = {}): string[] {
   return homes;
 }
 
-const ROLLOUT = /^rollout-.*\.jsonl$/;
+const ROLLOUT = /^rollout-.*\.jsonl(\.zst)?$/;
 
-/** Every `sessions/**\/rollout-*.jsonl` under one home, sorted for a stable order. */
+/**
+ * Every `sessions/**\/rollout-*.jsonl` under one home, and the `rollout-*.jsonl.zst` Codex
+ * compresses an older one into, sorted for a stable order.
+ */
 export function listRollouts(home: string): string[] {
   const out: string[] = [];
   const walk = (dir: string): void => {

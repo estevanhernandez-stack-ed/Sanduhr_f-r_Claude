@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import * as zlib from 'node:zlib';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearProjectCache, resolve as resolveProject } from '../project';
 import { readAgentsPass } from '../readAgents';
@@ -11,7 +12,7 @@ import { readOffsets, writeOffsets } from '../store/state';
 import type { AgentEvent, InstalledState } from '../types';
 import * as fx from './fixtures';
 import { discoverCodexHomes } from './homes';
-import { codexStreamId, readCodexPass } from './reader';
+import { codexStreamId, nativeZstd, readCodexPass } from './reader';
 
 const SALT = 'b'.repeat(64);
 const oldInstall: InstalledState = { installedAt: '2020-01-01T00:00:00.000Z', salt: SALT };
@@ -222,7 +223,12 @@ describe('offsets', () => {
     expect(new Set(all.map((e) => e.id)).size).toBe(13);
     const off = readOffsets(stateDir(data))[fs.realpathSync(f)];
     expect(off.offset).toBe(fs.statSync(f).size);
-    expect(off.codex).toEqual({ stream: codexStreamId(fs.realpathSync(f), S_GUARD), threadSource: 'guardian_review', cwd: CWD });
+    expect(off.codex).toEqual({
+      stream: codexStreamId(fs.realpathSync(f), S_GUARD),
+      threadSource: 'guardian_review',
+      cwd: CWD,
+      lastMs: Date.parse(iso(11, 2)),
+    });
   });
 
   it('reads only what was appended, in the segment already in force', async () => {
@@ -273,6 +279,152 @@ describe('offsets', () => {
     write(rollout(), [...head(), fx.reasoning('2026-02-01T00:00:00.000Z'), fx.reasoning(iso(9, 1))]);
     const r = await pass({ installed: { installedAt: '2026-03-01T00:00:00.000Z', salt: SALT } });
     expect(r.events).toHaveLength(1);
+  });
+});
+
+// Node 22.15+ has zstd; CI runs Node 24, the Node VS Code 1.146 ships.
+const zstdCompress = (zlib as unknown as { zstdCompressSync: (b: Buffer) => Buffer }).zstdCompressSync;
+
+describe('compressed rollouts (.jsonl.zst)', () => {
+  /** What Codex does to an older rollout: write `<name>.zst` (optionally other bytes) and remove the plain file. */
+  const compress = (plain: string, text?: string): string => {
+    const z = `${plain}.zst`;
+    fs.writeFileSync(z, zstdCompress(Buffer.from(text ?? fs.readFileSync(plain, 'utf8'))));
+    fs.rmSync(plain);
+    return z;
+  };
+  /** The real path the plain file had, which keys the stream and the offset entry either way. */
+  const logical = (z: string): string => path.join(fs.realpathSync(path.dirname(z)), path.basename(z, '.zst'));
+  const counting = () => {
+    const native = nativeZstd();
+    if (!native) throw new Error('this Node has no zstd');
+    const calls = { n: 0 };
+    return { calls, zstd: (b: Buffer) => (calls.n++, native(b)) };
+  };
+
+  it('reads a rollout that only exists compressed, under its uncompressed path', async () => {
+    const plain = write(rollout(), [...head(), fx.humanPrompt(iso(9, 1), 1), fx.reasoning(iso(9, 2))]);
+    const z = compress(plain);
+    const r = await pass();
+    expect(kinds(r.events)).toEqual(['prompt', 'activity']);
+    expect(r.events[0].stream).toBe(codexStreamId(logical(z), S_MAIN));
+    const off = readOffsets(stateDir(data))[logical(z)];
+    expect(off.offset).toBe(off.size);
+    expect(off.zst).toEqual({ size: fs.statSync(z).size, mtimeMs: fs.statSync(z).mtimeMs });
+  });
+
+  it('a rollout read plain and then compressed adds nothing, and is not decompressed again', async () => {
+    const plain = write(rollout(), [...head(), fx.humanPrompt(iso(9, 1), 1), fx.reasoning(iso(9, 2))]);
+    expect((await pass()).events).toHaveLength(2);
+    compress(plain);
+    const { calls, zstd } = counting();
+    expect((await pass({ zstd })).events).toEqual([]);
+    expect((await pass({ zstd })).events).toEqual([]);
+    expect(calls.n).toBe(1);
+    expect(spooled()).toHaveLength(2);
+  });
+
+  it('lines Codex wrote after the last plain read still count once, in the segment in force', async () => {
+    const plain = write(rollout(), [...head(S_MAIN, 'user', CWD_B), fx.humanPrompt(iso(9, 1), 1)]);
+    await pass();
+    append(plain, [fx.reasoning(iso(9, 2)), fx.humanPrompt(iso(9, 3), 2)]);
+    compress(plain);
+    const r = await pass();
+    expect(r.events.map((e) => [e.kind, e.project])).toEqual([
+      ['activity', resolveProject(CWD_B).key],
+      ['prompt', resolveProject(CWD_B).key],
+    ]);
+    expect(kinds(spooled())).toEqual(['prompt', 'activity', 'prompt']);
+  });
+
+  it('a compressed copy whose bytes differ from the plain file (re-serialized) doubles nothing', async () => {
+    const lines = [...head(), fx.humanPrompt(iso(9, 1), 1), fx.reasoning(iso(9, 2))];
+    const plain = write(rollout(), lines);
+    await pass();
+    const later = [fx.reasoning(iso(9, 5))];
+    // Pretty-printed with a prefix line: every byte offset moves, so event ids would too.
+    const text = ['{"timestamp":"' + iso(8, 59) + '","type":"other"}', ...[...lines, ...later].map((l) => JSON.stringify(l, null, 0).replace(/,/g, ', '))].join('\n') + '\n';
+    compress(plain, text);
+    const r = await pass();
+    expect(kinds(r.events)).toEqual(['activity']);
+    expect(r.unreadableByDate).toEqual({});
+    expect(kinds(spooled())).toEqual(['prompt', 'activity', 'activity']);
+  });
+
+  it('an entry saved before lastMs existed falls back to the plain file mtime as the watermark', async () => {
+    const plain = write(rollout(), [...head(), fx.humanPrompt(iso(9, 1), 1)]);
+    await pass();
+    const offs = readOffsets(stateDir(data));
+    const key = fs.realpathSync(plain);
+    delete offs[key].codex?.lastMs;
+    offs[key].mtimeMs = Date.parse(iso(9, 1));
+    writeOffsets(stateDir(data), offs);
+    const text = fs.readFileSync(plain, 'utf8');
+    compress(plain, 'x' + text + fx.toJsonl([fx.reasoning(iso(9, 4))])); // bytes shifted by one
+    expect(kinds((await pass()).events)).toEqual(['activity']);
+  });
+
+  it('while both exist the plain file is read and the compressed one ignored', async () => {
+    const plain = write(rollout(), [...head(), fx.humanPrompt(iso(9, 1), 1)]);
+    fs.writeFileSync(`${plain}.zst`, zstdCompress(Buffer.from(fx.toJsonl([...head(), fx.humanPrompt(iso(9, 1), 1)]))));
+    const { calls, zstd } = counting();
+    expect(kinds((await pass({ zstd })).events)).toEqual(['prompt']);
+    expect(calls.n).toBe(0);
+    expect(Object.keys(readOffsets(stateDir(data)))).toEqual([fs.realpathSync(plain)]);
+  });
+
+  it('without zstd a compressed rollout is left unread, and a Node that has it reads it later', async () => {
+    const z = compress(write(rollout(), [...head(), fx.humanPrompt(iso(9, 1), 1)]));
+    expect((await pass({ zstd: null })).events).toEqual([]);
+    expect(readOffsets(stateDir(data))[logical(z)]).toBeUndefined();
+    expect(kinds((await pass()).events)).toEqual(['prompt']);
+  });
+
+  it('works through a compressed rollout in small passes; its last line counts without a newline', async () => {
+    const lines = [
+      ...head(),
+      ...Array.from({ length: 6 }, (_, i) => [fx.humanPrompt(iso(10, i * 2), i + 1), fx.reasoning(iso(10, i * 2 + 1))]).flat(),
+    ];
+    const plain = write(rollout(), lines);
+    const z = compress(plain, fx.toJsonl(lines).trimEnd());
+    let more = true;
+    let passes = 0;
+    for (; passes < 100 && more; passes++) more = (await pass({ maxBytes: 200 })).more;
+    expect(passes).toBeGreaterThan(3);
+    const all = spooled();
+    expect(kinds(all)).toEqual(Array(6).fill(['prompt', 'activity']).flat());
+    expect(new Set(all.map((e) => e.id)).size).toBe(12);
+    const off = readOffsets(stateDir(data))[logical(z)];
+    expect(off.offset).toBe(off.size);
+    expect((await pass()).events).toEqual([]);
+  });
+
+  it('a compressed file caught half-written is read again whole once it is done, nothing doubled', async () => {
+    const lines = [
+      ...head(),
+      ...Array.from({ length: 40 }, (_, i) => [fx.humanPrompt(iso(10, i), i + 1), fx.reasoning(iso(10, i, 30))]).flat(),
+    ];
+    const plain = write(rollout(), lines);
+    const whole = zstdCompress(Buffer.from(fx.toJsonl(lines)));
+    fs.rmSync(plain);
+    const z = `${plain}.zst`;
+    // zstd hands back what a cut frame decodes to (or throws, depending on the Node); either way the pass goes on.
+    fs.writeFileSync(z, whole.subarray(0, Math.floor(whole.length / 2)));
+    await pass();
+    fs.writeFileSync(z, whole);
+    fs.utimesSync(z, new Date(), new Date(Date.now() + 5000));
+    await pass();
+    const all = spooled();
+    expect(kinds(all)).toEqual(Array(40).fill(['prompt', 'activity']).flat());
+    expect(new Set(all.map((e) => e.time)).size).toBe(80);
+  });
+
+  it('a damaged compressed file is skipped and the pass goes on', async () => {
+    const plain = write(rollout(), [...head(), fx.humanPrompt(iso(9, 1), 1)]);
+    fs.writeFileSync(`${plain}.zst`, Buffer.from('not zstd'));
+    fs.rmSync(plain);
+    write(rollout('rollout-other.jsonl'), [...head(), fx.reasoning(iso(9, 2))]);
+    expect(kinds((await pass()).events)).toEqual(['activity']);
   });
 });
 
