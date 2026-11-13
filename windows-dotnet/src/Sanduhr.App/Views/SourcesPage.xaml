@@ -81,6 +81,7 @@
                                                      Content="{x:Static core:SettingsNames.SourcesPrimary}"
                                                      IsChecked="{Binding IsPrimary, Mode=TwoWay}" IsEnabled="{Binding CanBePrimary}"
                                                      AutomationProperties.Name="{Binding PrimaryName}"
+                                                     PreviewKeyDown="OnPrimaryKeyDown"
                                                      VerticalAlignment="Center" Margin="0,0,20,0" />
                                         <TextBlock Text="{x:Static core:SettingsNames.SourcesColor}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
                                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />

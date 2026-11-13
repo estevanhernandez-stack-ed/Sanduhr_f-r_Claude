@@ -76,6 +76,13 @@ public sealed partial class TierCardViewModel : ObservableObject
         _label = TierModel.Label(tierKey);
     }
 
+    /// <summary>
+    /// A tier whose reading is too old to trust (a Codex tier past its freshness window, dimmed on the widget). Its countdown still
+    /// holds, but a pace or burn worked out from an old percent against today's clock reads as current, so it draws neither
+    /// (4.8.0 hand pass: a three-day-old 12% said "33% under"). Set before <see cref="Update"/>; the 30 s tick keeps it.
+    /// </summary>
+    public bool Stale { get; set; }
+
     /// <summary>Full refresh on a fresh fetch.</summary>
     public void Update(
         int util, string? resetsAt, int? used, int? limit,
@@ -184,9 +191,20 @@ public sealed partial class TierCardViewModel : ObservableObject
             return;
         }
 
-        PaceFraction = Pacing.PaceFrac(_resetsAt, TierKey, now) ?? double.NaN;
         ResetCountdown = TierModel.ResetCountdown(_resetsAt, now);
         ResetDateTime = ResetDatetimeStr(_resetsAt, now);
+        if (Stale)
+        {
+            PaceFraction = double.NaN;
+            PaceLabel = "";
+            PaceBrush = new SolidColorBrush(_palette.TextDim);
+            BurnText = "";
+            HasBurn = false;
+            BurnBrush = new SolidColorBrush(_palette.TextMuted);
+            return;
+        }
+
+        PaceFraction = Pacing.PaceFrac(_resetsAt, TierKey, now) ?? double.NaN;
 
         var pace = Pacing.PaceInfo(_util, _resetsAt, TierKey, now);
         PaceLabel = pace?.Label ?? "";
