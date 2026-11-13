@@ -500,6 +500,28 @@ public sealed class SettingsStore
         return result;
     }
 
+    /// <summary>Activity-only sources switched on in Sources (spec 3): settings.json "activity", {"antigravity": true}.</summary>
+    public IReadOnlyDictionary<string, bool> LoadActivity()
+    {
+        var result = new Dictionary<string, bool>(StringComparer.Ordinal);
+        if (Read()["activity"] is JsonObject map)
+            foreach (var (name, node) in map)
+            {
+                try { result[name] = node?.GetValue<bool>() ?? false; }
+                catch { result[name] = false; }
+            }
+        return result;
+    }
+
+    public void SaveActivity(string source, bool on)
+    {
+        var root = Read();
+        var map = root["activity"] as JsonObject ?? new JsonObject();
+        map[source] = on;
+        root["activity"] = map;
+        Write(root);
+    }
+
     public void SaveVaultRoots(IReadOnlyDictionary<string, bool> roots)
     {
         var root = Read();

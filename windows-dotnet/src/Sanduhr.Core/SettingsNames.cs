@@ -1192,6 +1192,12 @@ public static class SettingsNames
     public static string SourcesAlertsName(string source) => $"{source} alerts";
     /// <summary>Said under the list when the last source is switched off with the Desk off too.</summary>
     public const string SourcesKeepOne = "Keep one on, or turn on the Desk first.";
+    public const string ActivityOnlyHeader = "Activity only";
+    public const string AntigravityActivityCaption = "Activity only, from the Antigravity CLI. Sanduhr can't see Antigravity's limits or the IDE's usage.";
+    public const string NothingFoundYet = "Nothing found yet.";
+    public const string AntigravityNotice =
+        "Antigravity and Gemini are trademarks of Google LLC. Sanduhr is not affiliated with or endorsed by Google.";
+
     /// <summary>The disclaimer for Codex, in the wording of <see cref="TrademarkNotice"/>; shown where Codex is named.</summary>
     public const string CodexNotice =
         "\"Codex\" is a trademark of OpenAI, used nominatively. "

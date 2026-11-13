@@ -76,7 +76,7 @@ public sealed class SourcesPrimaryArrowsTests : AppWindowFixture
         var store = new SettingsStore(ScratchPaths());
         store.SaveSetup(SetupChoices.FirstRun.ToSettings(null).WithClaude(true).WithCodex(true));
         bool claude = true;
-        var vm = new SourcesViewModel(store, () => claude, on => claude = on, () => CodexHomes.Discover(null, Profile));
+        var vm = new SourcesViewModel(store, () => claude, on => claude = on, () => CodexHomes.Discover(null, Profile), () => false, _ => { });
         var window = new Window { Content = new SourcesPage { DataContext = vm } };
         OffScreen(window);
         window.Show();
@@ -92,7 +92,7 @@ public sealed class SourcesPrimaryArrowsTests : AppWindowFixture
         var store = new SettingsStore(ScratchPaths());
         store.SaveSetup(SetupChoices.FirstRun.ToSettings(null).WithClaude(true).WithCodex(true));
         bool claude = true;
-        var vm = new SourcesViewModel(store, () => claude, on => claude = on, () => CodexHomes.Discover(null, Profile));
+        var vm = new SourcesViewModel(store, () => claude, on => claude = on, () => CodexHomes.Discover(null, Profile), () => false, _ => { });
         var window = new Window { Content = new SourcesPage { DataContext = vm } };
         OffScreen(window);
         window.Show();

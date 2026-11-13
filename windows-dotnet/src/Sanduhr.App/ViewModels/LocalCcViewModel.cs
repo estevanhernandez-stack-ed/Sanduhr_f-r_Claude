@@ -37,7 +37,7 @@ public sealed partial class VaultRootToggleViewModel : ObservableObject
     {
         _owner = owner;
         Name = name;
-        Shown = StreamerMode.Mask.FolderName(name);   // streamer: masked - CP 11: Mask.FolderName masks on this line
+        Shown = ShownFor(name);   // streamer: masked - agent names are product names, folders pass Mask.FolderName in ShownFor
         IsEnabled = enabled;
         _loading = false;
     }
@@ -45,9 +45,14 @@ public sealed partial class VaultRootToggleViewModel : ObservableObject
     /// <summary>Redraws the folder's name after streamer mode flips or Shuffle draws new codenames (the checkbox is built once).</summary>
     public void RefreshShown()
     {
-        Shown = StreamerMode.Mask.FolderName(Name);   // streamer: masked - CP 11: Mask.FolderName masks on this line
+        Shown = ShownFor(Name);   // streamer: masked - agent names are product names, folders pass Mask.FolderName in ShownFor
         OnPropertyChanged(nameof(Shown));
     }
+
+    private static string ShownFor(string name)
+        => AgentSources.Burn.Contains(name) && name != AgentSources.Claude
+            ? AgentSources.BurnName(name)
+            : StreamerMode.Mask.FolderName(name);   // streamer: masked - CP 11: Mask.FolderName masks on this line
 
     partial void OnIsEnabledChanged(bool value)
     {

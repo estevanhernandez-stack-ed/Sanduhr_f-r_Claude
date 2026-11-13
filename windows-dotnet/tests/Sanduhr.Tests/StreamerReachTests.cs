@@ -118,7 +118,7 @@ public class StreamerReachTests
     [
         ("Sanduhr.App/App.xaml.cs", "key", 8),
         ("Sanduhr.App/App.xaml.cs", "masked", 2),
-        ("Sanduhr.App/App.xaml.cs", "notname", 5),
+        ("Sanduhr.App/App.xaml.cs", "notname", 6),
         ("Sanduhr.App/Desk/DeskArrangeMode.cs", "notname", 3),
         ("Sanduhr.App/Desk/DeskClicks.cs", "notname", 4),
         ("Sanduhr.App/Desk/DeskCompanion.cs", "key", 1),
@@ -172,7 +172,7 @@ public class StreamerReachTests
         ("Sanduhr.App/Services/UsagePublishService.cs", "key", 3),
         ("Sanduhr.App/Services/UsagePublishService.cs", "notname", 6),
         ("Sanduhr.App/Services/VaultService.cs", "cant", 1),
-        ("Sanduhr.App/Services/VaultService.cs", "key", 4),
+        ("Sanduhr.App/Services/VaultService.cs", "key", 3),
         ("Sanduhr.App/Services/VaultService.cs", "notname", 6),
         ("Sanduhr.App/Services/WebView2ApiClient.cs", "notname", 1),
         ("Sanduhr.App/Services/ZstdRollouts.cs", "cant", 1),
@@ -197,7 +197,7 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/LauncherSettingsViewModel.cs", "key", 1),
         ("Sanduhr.App/ViewModels/LauncherSettingsViewModel.cs", "notname", 1),
         ("Sanduhr.App/ViewModels/LocalCcViewModel.cs", "key", 6),
-        ("Sanduhr.App/ViewModels/LocalCcViewModel.cs", "masked", 6),   // streamer smoke: archive folder names redraw on the switch
+        ("Sanduhr.App/ViewModels/LocalCcViewModel.cs", "masked", 5),   // streamer smoke: archive folder names redraw on the switch; agent roots show their product name through ShownFor
         ("Sanduhr.App/ViewModels/ModsPageViewModel.cs", "key", 3),
         ("Sanduhr.App/ViewModels/ModsPageViewModel.cs", "masked", 6),
         ("Sanduhr.App/ViewModels/ModsPageViewModel.cs", "notname", 2),
@@ -207,7 +207,7 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/PublishViewModel.cs", "masked", 4),
         ("Sanduhr.App/ViewModels/ResetFolderListViewModel.cs", "key", 4),      // slice 8: Reset's rows key on real folders
         ("Sanduhr.App/ViewModels/ResetFolderListViewModel.cs", "masked", 1),   // slice 8: and draw them through ShowFolder (carry)
-        ("Sanduhr.App/ViewModels/SettingsViewModel.cs", "notname", 1),         // agent layer: Sources asks only whether a Codex home exists
+        ("Sanduhr.App/ViewModels/SettingsViewModel.cs", "notname", 2),         // agent layer: Sources asks only whether a Codex home or the Antigravity folder exists
         ("Sanduhr.App/ViewModels/SetupViewModel.cs", "notname", 1),            // agent layer: and so does the setup screen's Codex tick
         ("Sanduhr.App/ViewModels/SourcesViewModel.cs", "notname", 2),          // agent layer: save failures go to the debug log, never the screen
         ("Sanduhr.App/ViewModels/StreamerSettingsViewModel.cs", "key", 1),

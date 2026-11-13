@@ -122,10 +122,29 @@
                                AutomationProperties.LiveSetting="Assertive" />
                 </StackPanel>
 
+                <TextBlock Text="{x:Static core:SettingsNames.ActivityOnlyHeader}" FontWeight="SemiBold" Margin="0,16,0,6"
+                           AutomationProperties.HeadingLevel="Level2" Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                <ItemsControl ItemsSource="{Binding ActivityRows}" Focusable="False">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,0,0,8">
+                                <CheckBox Style="{DynamicResource ThemedCheckBox}" Content="{Binding Name}"
+                                          IsChecked="{Binding On, Mode=TwoWay}" IsEnabled="{Binding Installed}"
+                                          AutomationProperties.Name="{Binding Name}"
+                                          AutomationProperties.HelpText="{Binding Caption}" />
+                                <TextBlock Text="{Binding Caption}" FontSize="11" TextWrapping="Wrap" Margin="24,2,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
                 <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
                 <!-- Store test 10.1.4.4: the page names Claude and Codex, so both disclaimers show. -->
                 <views:TrademarkFooter />
                 <TextBlock Text="{x:Static core:SettingsNames.CodexNotice}" TextWrapping="Wrap" FontSize="11" Margin="0,6,0,0"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                <TextBlock Text="{x:Static core:SettingsNames.AntigravityNotice}" TextWrapping="Wrap" FontSize="11" Margin="0,6,0,0"
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
             </StackPanel>
         </ScrollViewer>

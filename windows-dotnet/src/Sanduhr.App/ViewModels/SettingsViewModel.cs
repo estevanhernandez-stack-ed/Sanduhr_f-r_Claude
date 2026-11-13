@@ -240,7 +240,9 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
         Drawers = new DrawersSettingsViewModel(Sanduhr.App.Desk.DrawerService.Current, Sanduhr.App.Desk.DrawerReviewService.Current, new SettingsStore(new Paths()));
         Sources = new SourcesViewModel(new SettingsStore(new Paths()), () => widget.UsageOn, on => widget.SetUsageOn(on),
             () => CodexHomes.Discover(Environment.GetEnvironmentVariable("CODEX_HOME"),
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));   // streamer: notname - only whether a Codex home exists, never drawn
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)),   // streamer: notname - only whether a Codex home exists, never drawn
+            () => System.IO.Directory.Exists(AntigravityBurnSource.DefaultCliHome(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))),   // streamer: notname - only whether the folder exists, never drawn
+            agent => widget.Vault?.SetAgentVaultOn(agent));
         var msgPaths = new Paths();
         MessagePage = new DeskMessagePageViewModel(new SettingsStore(msgPaths), System.IO.Path.Combine(msgPaths.AppDataDir, "messages.txt"),
             () => !ResetGuard.Done, () => MessageChanged?.Invoke(), Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies(),

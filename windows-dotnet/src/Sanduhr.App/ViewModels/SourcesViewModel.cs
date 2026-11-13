@@ -23,18 +23,33 @@ public sealed partial class SourcesViewModel : ObservableObject
     private readonly Func<bool> _claudeOn;
     private readonly Action<bool> _setClaudeOn;
     private readonly Func<IReadOnlyList<string>> _codexHomes;
+    private readonly Func<bool> _antigravityInstalled;
+    private readonly Action<string> _agentVaultOn;
 
-    internal SourcesViewModel(SettingsStore store, Func<bool> claudeOn, Action<bool> setClaudeOn, Func<IReadOnlyList<string>> codexHomes)
+    internal SourcesViewModel(SettingsStore store, Func<bool> claudeOn, Action<bool> setClaudeOn, Func<IReadOnlyList<string>> codexHomes,
+        Func<bool> antigravityInstalled, Action<string> agentVaultOn)
     {
+        _antigravityInstalled = antigravityInstalled;
+        _agentVaultOn = agentVaultOn;
         _store = store;
         _claudeOn = claudeOn;
         _setClaudeOn = setClaudeOn;
         _codexHomes = codexHomes;
         foreach (var source in AgentSources.All) Rows.Add(new SourceRowViewModel(this, source));
+        foreach (var s in AgentSources.ActivityOnly) ActivityRows.Add(new ActivityRowViewModel(this, s));
         Reload();
     }
 
     public ObservableCollection<SourceRowViewModel> Rows { get; } = [];
+
+    /// <summary>Activity-only sources (Antigravity): a switch and a caption, never a primary, color or limits row.</summary>
+    public ObservableCollection<ActivityRowViewModel> ActivityRows { get; } = [];
+
+    internal void SetActivityOn(string source, bool on)
+    {
+        _store.SaveActivity(source, on);
+        if (on) _agentVaultOn(source);   // clears a purge tombstone, so ingest resumes
+    }
 
     /// <summary>A source was switched on or off and saved: App starts or stops the Codex service and redraws the widget.</summary>
     public Action<bool, bool>? OnOffChanged { get; set; }
@@ -69,6 +84,7 @@ public sealed partial class SourcesViewModel : ObservableObject
             bool installed = row.Source != AgentSources.Codex || codexInstalled;
             row.Load(installed, ticked.Usage[row.Source], row.Source == primary, sources.ColorOf(row.Source), sources.AlertsOn(row.Source));
         }
+        foreach (var row in ActivityRows) row.Load(_antigravityInstalled(), _store.LoadActivity().GetValueOrDefault(row.Source));
     }
 
     private SetupSettings Ticked(SetupSettings? setup) =>
@@ -114,6 +130,7 @@ public sealed partial class SourcesViewModel : ObservableObject
             {
                 var setup = _store.LoadSetup() ?? SetupChoices.FirstRun.ToSettings(null);
                 _store.SaveSetup(setup.WithCodex(on));
+                if (on) _agentVaultOn(AgentSources.Codex);
             }
             // The primary follows what is on: a source turned off while primary hands it to the first ticked one.
             var sources = _store.LoadSources();
@@ -172,6 +189,25 @@ public sealed partial class SourcesViewModel : ObservableObject
             System.Diagnostics.Debug.WriteLine($"[Sanduhr.Sources] not saved: {ex.Message}");   // streamer: notname - written to the log file, never drawn
         }
     }
+}
+
+/// <summary>An activity-only source on the Sources page (Antigravity): one switch, disabled when its CLI folder is absent.</summary>
+public sealed partial class ActivityRowViewModel(SourcesViewModel owner, string source) : ObservableObject
+{
+    public string Source { get; } = source;
+    public string Name => AgentSources.Name(Source);
+
+    /// <summary>The row reads as its source's name to a screen reader (an ItemsControl names its items by this).</summary>
+    public override string ToString() => Name;
+    public string Caption => Installed ? SettingsNames.AntigravityActivityCaption : SettingsNames.NothingFoundYet;
+    [ObservableProperty] private bool _installed;
+    [ObservableProperty] private bool _on;
+    private bool _loading;
+
+    partial void OnInstalledChanged(bool value) => OnPropertyChanged(nameof(Caption));
+    partial void OnOnChanged(bool value) { if (!_loading) owner.SetActivityOn(Source, value); }
+
+    internal void Load(bool installed, bool on) { _loading = true; Installed = installed; On = on; _loading = false; }
 }
 
 /// <summary>One source on the Sources page. Tab order is the order of its controls: On, Primary, Color, Reset, Alerts.</summary>
