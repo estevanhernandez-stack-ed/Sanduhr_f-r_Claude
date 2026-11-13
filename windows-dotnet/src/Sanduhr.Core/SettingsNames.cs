@@ -815,7 +815,9 @@ public static class SettingsNames
         + "your wallpaper's colors; " + McpAnswerPaths + "; " + McpAnswerThemeName + "; "
         + "your Desk messages; the names of the Claude Code folders Sanduhr found; "
         + "and, for each folder where you let Claude read project totals, token counts per project and model with "
-        + "project names, or full project paths when Claude asks.";
+        + "project names, or full project paths when Claude asks. "
+        + "The same goes for Codex and Antigravity, each with its own switch.";
+    public static string LetClaudeReadAgentTotals(string agent) => $"Let Claude read {agent}'s project totals";
     public const string NetThroughClaudeOff =
         "Don't install Sanduhr's MCP server, or remove it from a folder. Each folder's project totals have their own switch.";
 

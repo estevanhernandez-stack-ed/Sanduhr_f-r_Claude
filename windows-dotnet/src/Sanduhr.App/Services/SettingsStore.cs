@@ -636,6 +636,28 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>Spec 3: whether Claude may read an agent's project totals ("mcp_agents"), off by default.</summary>
+    public IReadOnlyDictionary<string, bool> LoadMcpAgents()
+    {
+        var result = new Dictionary<string, bool>(StringComparer.Ordinal);
+        if (Read()["mcp_agents"] is JsonObject map)
+            foreach (var (name, node) in map)
+            {
+                try { result[name] = node?.GetValue<bool>() ?? false; }
+                catch { result[name] = false; }
+            }
+        return result;
+    }
+
+    public void SaveMcpAgent(string agent, bool on)
+    {
+        var root = Read();
+        var map = root["mcp_agents"] as JsonObject ?? new JsonObject();
+        map[agent] = on;
+        root["mcp_agents"] = map;
+        Write(root);
+    }
+
     /// <summary>Claude Code folders the user added by hand (settings.json "cc_folders_added", a list of
     /// full paths). They are installer targets on the Claude Code page and are never read by the MCP server.</summary>
     public IReadOnlyList<string> LoadCcFoldersAdded() => LoadStringArray("cc_folders_added");

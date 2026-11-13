@@ -10,6 +10,47 @@ public class ToolLogicBurnTests
         => new(Config(Path.Combine(tmp.Path, "snapshot.json"), roots), () => Now);
 
     [Fact]
+    public void Consented_agents_report_their_project_totals_from_the_vault()
+    {
+        using var tmp = new TempDir();
+        var cfg = new McpConfig
+        {
+            SnapshotPath = Path.Combine(tmp.Path, "snapshot.json"),
+            VaultDir = Path.Combine(tmp.Path, "vault"),
+            ConsentedRoots = Array.Empty<(string, string)>(),
+            RootsFound = Array.Empty<string>(),
+            ConsentedAgents = new[] { "codex" },
+        };
+        string day = DateOnly.FromDateTime(Now.LocalDateTime).ToString("yyyy-MM-dd");
+        string month = day[..7];
+        new Sanduhr.Core.VaultStore(cfg.VaultDir).SaveRollupShard("codex", month, new Sanduhr.Core.VaultRollupShard
+        {
+            Days = new Dictionary<string, Sanduhr.Core.VaultRollupDay>
+            {
+                [day] = new() { Total = 300, Input = 100, Output = 200, ByProject = new() { ["api~12345678"] = 300 } },
+            },
+        });
+
+        var result = new ToolLogic(cfg, () => Now).BuildBurn(7, fullPaths: false);
+
+        Assert.Equal("ok", result["status"]!.GetValue<string>());
+        var agent = (JsonObject)((JsonArray)result["agents"]!)[0]!;
+        Assert.Equal("codex", agent["agent"]!.GetValue<string>());
+        Assert.Equal(300, agent["total_tokens"]!.GetValue<long>());
+        Assert.Equal("codex", (string?)((JsonArray)result["agents_scanned"]!)[0]);
+    }
+
+    [Fact]
+    public void Without_agent_consent_no_agents_are_reported()
+    {
+        using var tmp = new TempDir();
+        string root = Path.Combine(tmp.Path, ".claude");
+        Directory.CreateDirectory(root);
+        var result = Logic(tmp, (".claude", root)).BuildBurn(7, fullPaths: false);
+        Assert.Empty((JsonArray)result["agents"]!);
+    }
+
+    [Fact]
     public void Invalid_window_is_a_typed_result_not_a_protocol_error()
     {
         using var tmp = new TempDir();

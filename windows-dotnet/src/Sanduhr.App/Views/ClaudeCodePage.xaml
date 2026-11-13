@@ -237,6 +237,14 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <ItemsControl ItemsSource="{Binding AgentReads}" Focusable="False" Margin="0,8,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox Style="{DynamicResource ThemedCheckBox}" Content="{Binding Name}" Margin="0,0,0,6"
+                                      IsChecked="{Binding On, Mode=TwoWay}" AutomationProperties.Name="{Binding Name}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
                 <!-- Claude Code glow (WF11): the section and the Desk piece share this name; the hook is installed from a card above. -->
                 <StackPanel views:SettingsAnchor.Id="glow" Margin="0,8,0,0">

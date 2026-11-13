@@ -53,6 +53,12 @@ public sealed class McpConfig
     /// (.claude first, then .claude-* in natural order). Empty = nothing consented.</summary>
     public required IReadOnlyList<(string Name, string Path)> ConsentedRoots { get; init; }
 
+    /// <summary>Agents whose project totals Claude may read (spec 3), from the projection's mcp_agents. The names mirror
+    /// Core's AgentSources literally: linking that file would widen the trust boundary.</summary>
+    public IReadOnlyList<string> ConsentedAgents { get; init; } = [];
+
+    private static readonly string[] KnownAgents = ["codex", "antigravity"];   // mirrors AgentSources.Codex / .Antigravity
+
     /// <summary>All CC roots that exist on this machine (consented or not) —
     /// ping reports both so a cold agent can tell "no roots" from "no consent".</summary>
     public required IReadOnlyList<string> RootsFound { get; init; }
@@ -210,6 +216,7 @@ public sealed class McpConfig
         // Discovery gives names only; a path is built solely from a discovered name.
         var found = ClaudeCodeHomes.Discover(home, env("CLAUDE_CONFIG_DIR"));
 
+        IReadOnlyList<string> consentedAgents = [];
         var consented = new List<(string, string)>();
         if (env("SANDUHR_CC_ROOTS") is { Length: > 0 } envRoots)
         {
@@ -229,7 +236,9 @@ public sealed class McpConfig
             // only looked up BY a discovered name, so a key that is not one is ignored, and
             // folders added by hand in the widget never reach this process (design review:
             // the file-oracle guard; 2026-10-11 ruling).
-            var consentMap = ReadMcpRootsConsent(mcpSettingsPath);
+            var consentMap = ReadProjectionConsent(mcpSettingsPath, "mcp_roots");
+            var agentMap = ReadProjectionConsent(mcpSettingsPath, "mcp_agents");
+            consentedAgents = KnownAgents.Where(a => agentMap.TryGetValue(a, out var on) && on).ToList();
             foreach (var name in found)
             {
                 if (consentMap.TryGetValue(name, out bool on) && on)
@@ -250,6 +259,7 @@ public sealed class McpConfig
             // the dev-tier snapshot redirect moves it with the snapshot.
             HistoryDir = snapOverride ? Path.GetDirectoryName(snapshotPath) : appDataSanduhrDir,
             ConsentedRoots = consented,
+            ConsentedAgents = consentedAgents,
             RootsFound = found,
             McpSettingsPath = mcpSettingsPath,
             // Mirrors Core's PublishHandoff.RequestFileName/ResultFileName literally
@@ -293,7 +303,7 @@ public sealed class McpConfig
         catch { return false; }
     }
 
-    private static Dictionary<string, bool> ReadMcpRootsConsent(string projectionPath)
+    private static Dictionary<string, bool> ReadProjectionConsent(string projectionPath, string key)
     {
         var result = new Dictionary<string, bool>(StringComparer.Ordinal);
         try
@@ -304,7 +314,7 @@ public sealed class McpConfig
                 return result;
             if (!IsSchemaV1(root["schema_version"]))
                 return result;   // another schema = nothing consented (fail closed)
-            if (root["mcp_roots"] is not JsonObject map)
+            if (root[key] is not JsonObject map)
                 return result;
             foreach (var (name, node) in map)
             {

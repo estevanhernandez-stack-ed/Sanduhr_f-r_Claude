@@ -649,6 +649,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     public void SaveMcpCcHome(string ccHomeName) => _settings.SaveMcpCcHome(ccHomeName);
     public IReadOnlyDictionary<string, bool> LoadMcpRoots() => _settings.LoadMcpRoots();
     public void SaveMcpRoots(IReadOnlyDictionary<string, bool> roots) => _settings.SaveMcpRoots(roots);
+    public IReadOnlyDictionary<string, bool> LoadMcpAgents() => _settings.LoadMcpAgents();
+    public void SaveMcpAgent(string agent, bool on) => _settings.SaveMcpAgent(agent, on);
 
     // -- Claude Code page (spec 4.2, 4.5) ----------------------------------------
 

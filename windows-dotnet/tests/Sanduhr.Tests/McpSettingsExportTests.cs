@@ -18,6 +18,16 @@ public class McpSettingsExportTests : IDisposable
     private static JsonObject Parse(string json) => (JsonObject)JsonNode.Parse(json)!;
 
     [Fact]
+    public void Agent_read_consent_is_projected_for_known_agents_only()
+    {
+        var p = McpSettingsExport.Project(Parse("""{"mcp_enabled":true,"mcp_agents":{"codex":true,"antigravity":false,"other":true}}"""))!;
+        var agents = (JsonObject)p["mcp_agents"]!;
+        Assert.True(agents["codex"]!.GetValue<bool>());
+        Assert.False(agents["antigravity"]!.GetValue<bool>());
+        Assert.Null(agents["other"]);
+    }
+
+    [Fact]
     public void Project_is_null_unless_mcp_enabled_is_true()
     {
         Assert.Null(McpSettingsExport.Project(Parse("{}")));

@@ -9,6 +9,15 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
+/// <summary>One agent's "Let Claude read its project totals" switch on the Folders list (spec 3). Off by default.</summary>
+public sealed partial class AgentReadRowViewModel(string agent, bool on, Action<string, bool> save) : ObservableObject
+{
+    public string Agent { get; } = agent;
+    public string Name => SettingsNames.LetClaudeReadAgentTotals(AgentSources.BurnName(Agent));
+    [ObservableProperty] private bool _on = on;
+    partial void OnOnChanged(bool value) => save(Agent, value);
+}
+
 /// <summary>One Claude Code folder card (Settings v2 slice 4): its path, the linked account, the MCP read switch, Sanduhr's pieces in this
 /// folder, the meters' state here and the collapsed "What this folder holds". Every action on the card acts on this folder.</summary>
 public sealed partial class CcFolderRowViewModel : ObservableObject
@@ -225,6 +234,8 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     private readonly ClaudeCodeHost _host;
 
     public ObservableCollection<CcFolderRowViewModel> Folders { get; } = new();
+    /// <summary>Spec 3: one switch per active agent, "Let Claude read X's project totals" (settings.json mcp_agents).</summary>
+    public ObservableCollection<AgentReadRowViewModel> AgentReads { get; } = new();
     public ObservableCollection<AccountChoice> AccountOptions { get; } = new();
 
     /// <summary>A card's quick route (decision 16): the folder's real name shows on stream; every masked page reloads through the service.</summary>
@@ -479,6 +490,11 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             Folders.Add(row);
         }
         HasFolders = Folders.Count > 0;
+        AgentReads.Clear();
+        var agentReads = _widget.LoadMcpAgents();
+        var active = _widget.Vault?.ActiveAgents().Select(a => a.Agent).ToHashSet() ?? [];
+        foreach (var agent in AgentSources.Burn.Where(active.Contains))
+            AgentReads.Add(new AgentReadRowViewModel(agent, agentReads.GetValueOrDefault(agent), _widget.SaveMcpAgent));
         _loading = false;
         RefreshStatuses();
         SyncSnapshotConsumers(forceWrite: false);

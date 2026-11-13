@@ -489,9 +489,9 @@ public sealed partial class ToolLogic
     {
         if (windowDays is not (1 or 7 or 30))
             return NoData("invalid_params", "window_days must be 1, 7, or 30");
-        if (_config.ConsentedRoots.Count == 0)
+        if (_config.ConsentedRoots.Count == 0 && _config.ConsentedAgents.Count == 0)
             return NoData("disabled",
-                "No Claude Code folders are consented for MCP reads. Turn on 'Let Claude read this folder's project totals' on a folder in the Sanduhr widget (Settings, Claude Code, Folders).");
+                "No Claude Code folders or agents are consented for MCP reads. Turn on 'Let Claude read this folder's project totals' on a folder, or an agent's project totals, in the Sanduhr widget (Settings, Claude Code, Folders).");
 
         var now = _clock();
         var since = now.AddDays(-windowDays);
@@ -533,6 +533,23 @@ public sealed partial class ToolLogic
             });
         }
 
+        var agents = new JsonArray();
+        var today = DateOnly.FromDateTime(now.LocalDateTime);
+        var from = DateOnly.FromDateTime(since.LocalDateTime);
+        foreach (var agent in _config.ConsentedAgents)
+        {
+            var win = ReadVaultOverlay([agent], from, today.AddDays(1));
+            var agentProjects = new JsonArray();
+            foreach (var (proj, tokens) in win.ByProjectName.OrderByDescending(p => p.Value))
+                agentProjects.Add((JsonNode)new JsonObject { ["name"] = proj, ["tokens"] = tokens });
+            agents.Add((JsonNode)new JsonObject
+            {
+                ["agent"] = agent,
+                ["total_tokens"] = win.ByProjectName.Values.Sum(),
+                ["projects"] = agentProjects,
+            });
+        }
+
         return new JsonObject
         {
             ["status"] = "ok",
@@ -543,8 +560,10 @@ public sealed partial class ToolLogic
             ["full_paths"] = fullPaths,
             ["roots_scanned"] = ToArray(_config.ConsentedRoots.Select(r => r.Name)),
             ["roots"] = roots,
+            ["agents_scanned"] = ToArray(_config.ConsentedAgents),
+            ["agents"] = agents,
             ["files_scanned"] = filesScanned,
-            ["caveat"] = BurnCaveat,
+            ["caveat"] = BurnCaveat + " Agent totals come from the Vault and are as fresh as the widget's last ingest.",
         };
     }
 

@@ -137,6 +137,14 @@ public sealed class McpConfigTests : IDisposable
     }
 
     [Fact]
+    public void Agent_consent_reads_known_names_from_the_projection_only()
+    {
+        File.WriteAllText(Path.Combine(External, "mcp-settings.json"),
+            """{"schema_version":1,"mcp_roots":{},"mcp_agents":{"codex":true,"antigravity":false,"other":true}}""");
+        Assert.Equal(new[] { "codex" }, Resolve().ConsentedAgents);
+    }
+
+    [Fact]
     public void Consent_comes_from_the_projection_not_settings_json()
     {
         MakeHome(".claude");
