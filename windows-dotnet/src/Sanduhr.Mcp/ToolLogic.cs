@@ -534,20 +534,30 @@ public sealed partial class ToolLogic
         }
 
         var agents = new JsonArray();
+        string? agentsReason = null;
         var today = DateOnly.FromDateTime(now.LocalDateTime);
         var from = today.AddDays(-(windowDays - 1));   // day-granular, same span as BuildHistory
-        foreach (var agent in _config.ConsentedAgents)
+        try
         {
-            var win = ReadVaultOverlay([agent], from, today.AddDays(1));
-            var agentProjects = new JsonArray();
-            foreach (var (proj, tokens) in win.ByProjectName.OrderByDescending(p => p.Value))
-                agentProjects.Add((JsonNode)new JsonObject { ["name"] = proj, ["tokens"] = tokens });
-            agents.Add((JsonNode)new JsonObject
+            foreach (var agent in _config.ConsentedAgents)
             {
-                ["agent"] = agent,
-                ["total_tokens"] = win.ByProjectName.Values.Sum(),
-                ["projects"] = agentProjects,
-            });
+                var win = ReadVaultOverlay([agent], from, today.AddDays(1));
+                var agentProjects = new JsonArray();
+                foreach (var (proj, tokens) in win.ByProjectName.OrderByDescending(p => p.Value))
+                    agentProjects.Add((JsonNode)new JsonObject { ["name"] = proj, ["tokens"] = tokens });
+                agents.Add((JsonNode)new JsonObject
+                {
+                    ["agent"] = agent,
+                    ["total_tokens"] = win.ByProjectName.Values.Sum(),
+                    ["projects"] = agentProjects,
+                });
+            }
+        }
+        catch (Exception)
+        {
+            // An unreadable vault drops the agents only (the BuildHistory wrap); the Claude Code roots above still answer.
+            agents = new JsonArray();
+            agentsReason = "unreadable";
         }
 
         return new JsonObject
@@ -563,6 +573,7 @@ public sealed partial class ToolLogic
             ["agents_scanned"] = ToArray(_config.ConsentedAgents),
             ["agents_from"] = from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             ["agents"] = agents,
+            ["agents_reason"] = agentsReason,
             ["files_scanned"] = filesScanned,
             ["caveat"] = BurnCaveat + " Agent totals come from the Vault and are as fresh as the widget's last ingest.",
         };

@@ -78,6 +78,45 @@ public class ToolLogicBurnTests
     }
 
     [Fact]
+    public void An_unreadable_vault_drops_the_agents_and_the_claude_roots_still_answer()
+    {
+        using var tmp = new TempDir();
+        string personal = Path.Combine(tmp.Path, ".claude-personal");
+        WriteSessionLog(personal, "c--sanduhr",
+            EventLine(Now.AddHours(-1), "claude-fable-5", 100, 200, Path.Combine(tmp.Path, "Sanduhr")));
+        var cfg = new McpConfig
+        {
+            SnapshotPath = Path.Combine(tmp.Path, "snapshot.json"),
+            VaultDir = Path.Combine(tmp.Path, "vault"),
+            ConsentedRoots = new[] { (".claude-personal", personal) },
+            RootsFound = Array.Empty<string>(),
+            ConsentedAgents = new[] { "codex" },
+        };
+        // Parseable but broken: a shard whose days are null fails the read itself, not the load.
+        string month = DateOnly.FromDateTime(Now.LocalDateTime).ToString("yyyy-MM");
+        Directory.CreateDirectory(Path.Combine(cfg.VaultDir, "codex"));
+        File.WriteAllText(Path.Combine(cfg.VaultDir, "codex", $"rollups-{month}.json"), "{\"schema_version\":1,\"days\":null}");
+
+        var result = new ToolLogic(cfg, () => Now).BuildBurn(7, fullPaths: false);
+
+        Assert.Equal("ok", (string?)result["status"]);
+        Assert.Empty((JsonArray)result["agents"]!);
+        Assert.Equal("unreadable", (string?)result["agents_reason"]);
+        var root = (JsonObject)((JsonArray)result["roots"]!)[0]!;
+        Assert.Equal(300, root["total_tokens"]!.GetValue<long>());
+    }
+
+    [Fact]
+    public void A_readable_vault_gives_no_agents_reason()
+    {
+        using var tmp = new TempDir();
+        string root = Path.Combine(tmp.Path, ".claude");
+        Directory.CreateDirectory(root);
+        var result = Logic(tmp, (".claude", root)).BuildBurn(7, fullPaths: false);
+        Assert.Null(result["agents_reason"]);
+    }
+
+    [Fact]
     public void Without_agent_consent_no_agents_are_reported()
     {
         using var tmp = new TempDir();
