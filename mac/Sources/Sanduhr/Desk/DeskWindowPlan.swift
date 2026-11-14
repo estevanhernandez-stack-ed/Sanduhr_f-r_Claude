@@ -39,8 +39,14 @@ struct DeskWindowPlan: Equatable {
     /// main window only (its driver is one, CompanionDriver).
     static let mainOnly: Set<String> = ["companion"]
 
-    static func plan(_ arrangement: DeskArrangement, screens: [DeskScreenInfo]) -> DeskWindowPlan {
+    /// While arranging (2.44) every connected display with an id has a window, so a piece can be
+    /// dragged onto a display that has none yet; Done or Cancel plans from the layout again.
+    static func plan(_ arrangement: DeskArrangement, screens: [DeskScreenInfo], arranging: Bool = false) -> DeskWindowPlan {
         let main = DeskScreens.main(screens)
+        if arranging, let main {
+            let all = screens.filter { $0 == main || $0.id != nil }
+            return DeskWindowPlan(windows: all.map { Window(screen: $0, isMain: $0 == main) })
+        }
         var spread = arrangement
         spread.pieces = arrangement.pieces.filter { !mainOnly.contains($0.widget) }
         let windows = DeskScreens.screensWithPieces(spread, screens).map { Window(screen: $0, isMain: $0 == main) }

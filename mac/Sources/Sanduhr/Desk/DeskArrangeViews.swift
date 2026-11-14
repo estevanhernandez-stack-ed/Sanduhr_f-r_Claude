@@ -11,18 +11,12 @@ struct DeskArrangeGeometry: Equatable {
     var dockBottom: CGFloat = 0
 }
 
-extension DeskArrangeMode {
-    /// The anchor a drag of `widget` at `point` lands on: the stack under the pointer (its own
-    /// first), else the nearest anchor (DeskArrange.target). The drop and the lit anchor agree.
-    func target(of widget: String, at point: CGPoint, geometry: DeskArrangeGeometry) -> DeskAnchor {
-        let stacks = working.map { DeskArrange.stackBounds($0, frames: frames) } ?? [:]
-        return DeskArrange.target(point: point, content: geometry.content, centerDrop: geometry.centerDrop,
-                                  stacks: stacks, own: working?.placement(widget)?.anchor)
-    }
-}
-
 private struct DeskArrangeGeometryKey: EnvironmentKey {
     static let defaultValue: DeskArrangeGeometry? = nil
+}
+
+private struct DeskArrangeWindowKey: EnvironmentKey {
+    static let defaultValue: DeskArrangeWindow? = nil
 }
 
 extension EnvironmentValues {
@@ -30,6 +24,12 @@ extension EnvironmentValues {
     var deskArrangeGeometry: DeskArrangeGeometry? {
         get { self[DeskArrangeGeometryKey.self] }
         set { self[DeskArrangeGeometryKey.self] = newValue }
+    }
+
+    /// The Desk window a piece is drawn on, as Arrange sees it (2.44); set with the geometry.
+    var deskArrangeWindow: DeskArrangeWindow? {
+        get { self[DeskArrangeWindowKey.self] }
+        set { self[DeskArrangeWindowKey.self] = newValue }
     }
 }
 
@@ -47,6 +47,7 @@ private struct DeskArrangeable: ViewModifier {
     let mode: DeskArrangeMode
 
     @Environment(\.deskArrangeGeometry) private var geometry
+    @Environment(\.deskArrangeWindow) private var window
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var resizeStart: ResizeStart?
 
@@ -59,6 +60,8 @@ private struct DeskArrangeable: ViewModifier {
     static let outlinePad: CGFloat = 6
 
     private var widget: String { placement.widget }
+    /// The window's display key: `.main` until a window reports itself.
+    private var windowKey: DeskDisplay { window?.display ?? .main }
     private var name: String { DeskLayout.widgets.first { $0.key == widget }?.name ?? widget }
 
     func body(content: Content) -> some View {
@@ -85,8 +88,9 @@ private struct DeskArrangeable: ViewModifier {
     private var frameReporter: some View {
         GeometryReader { geo in
             Color.clear
-                .onAppear { mode.frames[widget] = geo.frame(in: .named(DeskArrange.space)) }
-                .onChange(of: geo.frame(in: .named(DeskArrange.space))) { _, f in mode.frames[widget] = f }
+                .onAppear { mode.setFrame(geo.frame(in: .named(DeskArrange.space)), of: widget, in: windowKey) }
+                .onChange(of: geo.frame(in: .named(DeskArrange.space))) { _, f in mode.setFrame(f, of: widget, in: windowKey) }
+                .onDisappear { mode.setFrame(nil, of: widget, in: windowKey) }
         }
     }
 
@@ -106,6 +110,7 @@ private struct DeskArrangeable: ViewModifier {
     private var nameTag: some View {
         HStack(spacing: 4) {
             Text(name)
+            if showsShowOn { DeskArrangeShowOnMenu(mode: mode, placement: placement, window: windowKey) }
             Button { mode.edit { $0.hide(widget) } } label: {
                 Image(systemName: "xmark.circle.fill")
             }
@@ -139,37 +144,37 @@ private struct DeskArrangeable: ViewModifier {
         DragGesture(minimumDistance: 3, coordinateSpace: .named(DeskArrange.space))
             .onChanged { v in
                 mode.drag = DeskArrangeDrag(widget: widget, location: v.location, translation: v.translation,
-                                            frame: mode.drag?.frame ?? mode.layoutFrame(of: widget) ?? .zero)
+                                            frame: mode.drag?.frame ?? mode.layoutFrame(of: widget, in: windowKey) ?? .zero,
+                                            window: windowKey, origin: window?.rect.origin ?? .zero)
             }
             .onEnded { v in drop(at: v.location) }
     }
 
-    /// The drop: the stack under the pointer or else the nearest anchor, in front of the first
-    /// piece there whose middle is below the pointer (so a drop within the piece's own stack
-    /// reorders it, however tall the stack).
+    /// The drop (DeskArrangeMode.drop, DeskArrange.dropped): onto the window under the pointer, the
+    /// stack there or else the nearest anchor, in front of the first piece whose middle is below the
+    /// pointer. Within this window that is the drop from before 2.44 (a reorder within its stack).
     private func drop(at location: CGPoint) {
-        guard let geometry, let working = mode.working else {
+        guard let geometry, mode.working != nil else {
             mode.drag = nil
             return
         }
-        let anchor = mode.target(of: widget, at: location, geometry: geometry)
-        let stack = working.stack(anchor)
-            .filter { $0.widget != widget }
-            .map { (widget: $0.widget, frame: mode.layoutFrame(of: $0.widget) ?? .zero) }
-        // The stack's frames are taken back to the unslanted layout: a drop on a slanted stack is judged where the
-        // pointer is on the stack's own face, not on the screen (the fold).
-        let face = mode.folds[anchor].map { $0.unapply(location) } ?? location
-        let before = DeskArrange.pieceAfter(y: face.y, in: stack)
+        let source = window ?? DeskArrangeWindow(display: .main, rect: .zero, geometry: geometry)
         withAnimation(DeskArrange.snapAnimation(reduceMotion: reduceMotion)) {
-            mode.edit { $0.put(widget, at: anchor, before: before) }
+            mode.drop(widget, at: location, from: source)
             mode.drag = nil
         }
+    }
+
+    /// Show on in the chrome: offered with more than one display, never for the companion.
+    private var showsShowOn: Bool {
+        mode.offersShowOn && !DeskWindowPlan.mainOnly.contains(widget)
     }
 
     private var resize: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named(DeskArrange.space))
             .onChanged { v in
-                let start = resizeStart ?? ResizeStart(scale: placement.scale, size: mode.layoutFrame(of: widget)?.size ?? .zero)
+                let start = resizeStart ?? ResizeStart(scale: placement.scale,
+                                                       size: mode.layoutFrame(of: widget, in: windowKey)?.size ?? .zero)
                 if resizeStart == nil { resizeStart = start }
                 let scale = DeskArrange.scale(from: start.scale, size: start.size, drag: v.translation, anchor: placement.anchor)
                 if scale != placement.scale { mode.edit { $0.setScale(widget, scale) } }
@@ -185,6 +190,38 @@ private struct DeskArrangeable: ViewModifier {
         Button("Bigger") { mode.edit { $0.setScale(widget, placement.scale + DeskArrangement.scaleStep) } }
         Button("Smaller") { mode.edit { $0.setScale(widget, placement.scale - DeskArrangement.scaleStep) } }
         Button(DeskArrangeCopy.hide) { mode.edit { $0.hide(widget) } }
+        if showsShowOn {
+            Button("\(DeskArrangeCopy.showOn) \(DeskArrangeCopy.showOnThis)") { mode.showOn(widget, all: false, window: windowKey) }
+            Button("\(DeskArrangeCopy.showOn) \(DeskArrangeCopy.showOnAll)") { mode.showOn(widget, all: true, window: windowKey) }
+        }
+    }
+}
+
+/// Show on, in a piece's name tag (2.44): This display or All displays, the one in force checked.
+private struct DeskArrangeShowOnMenu: View {
+    let mode: DeskArrangeMode
+    let placement: DeskPlacement
+    let window: DeskDisplay
+
+    var body: some View {
+        let all = placement.monitor == .all
+        Menu {
+            Toggle(DeskArrangeCopy.showOnThis, isOn: choice(all: false, on: !all))
+            Toggle(DeskArrangeCopy.showOnAll, isOn: choice(all: true, on: all))
+        } label: {
+            Image(systemName: all ? "display.2" : "display")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(DeskArrangeCopy.showOn)
+        .accessibilityLabel(DeskArrangeCopy.showOn)
+    }
+
+    private func choice(all: Bool, on: Bool) -> Binding<Bool> {
+        Binding(get: { on }, set: { picked in
+            if picked { mode.showOn(placement.widget, all: all, window: window) }
+        })
     }
 }
 
@@ -207,6 +244,11 @@ struct DeskArrangePlate: View {
 struct DeskArrangeOverlay: View {
     let mode: DeskArrangeMode
     let geometry: DeskArrangeGeometry
+    /// This window (2.44): the lights show on the window under the pointer, the ghost follows the
+    /// pointer across windows, and the Hidden strip is the main window's.
+    var window: DeskArrangeWindow? = nil
+
+    private var display: DeskDisplay { window?.display ?? .main }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -214,7 +256,7 @@ struct DeskArrangeOverlay: View {
                 lights(drag)
                 ghost(drag)
             }
-            if let hidden = mode.working?.hidden, !hidden.isEmpty {
+            if display == .main, let hidden = mode.working?.hidden, !hidden.isEmpty {
                 hiddenStrip(hidden)
             }
         }
@@ -251,9 +293,22 @@ struct DeskArrangeOverlay: View {
         .accessibilityLabel(DeskArrangeCopy.hiddenStrip)
     }
 
+    /// The drag's landing, when it is on this window.
+    private func target(_ drag: DeskArrangeDrag) -> DeskAnchor? {
+        let here = window ?? DeskArrangeWindow(display: .main, rect: .zero, geometry: geometry)
+        let source = mode.windows[drag.window] ?? (drag.window == here.display ? here : nil)
+        guard let source, let land = mode.landing(of: drag.widget, at: drag.location, from: source),
+              land.window == here.display else { return nil }
+        return land.anchor
+    }
+
+    @ViewBuilder
     private func lights(_ drag: DeskArrangeDrag) -> some View {
-        let target = mode.target(of: drag.widget, at: drag.location, geometry: geometry)
-        return ForEach(DeskAnchor.allCases, id: \.self) { anchor in
+        if let target = target(drag) { anchorDots(lit: target) }
+    }
+
+    private func anchorDots(lit target: DeskAnchor) -> some View {
+        ForEach(DeskAnchor.allCases, id: \.self) { anchor in
             let lit = anchor == target
             Circle()
                 .fill(lit ? Color.accentColor : Color.white.opacity(0.35))
@@ -268,11 +323,13 @@ struct DeskArrangeOverlay: View {
 
     private func ghost(_ drag: DeskArrangeDrag) -> some View {
         let f = drag.frame
+        let origin = window?.rect.origin ?? .zero
+        let center = drag.ghostCenter
         return RoundedRectangle(cornerRadius: 8)
             .fill(Color.accentColor.opacity(0.18))
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.white.opacity(0.9), lineWidth: 1.5))
             .frame(width: max(40, f.width + 12), height: max(20, f.height + 12))
-            .position(x: f.midX + drag.translation.width, y: f.midY + drag.translation.height)
+            .position(x: center.x - origin.x, y: center.y - origin.y)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }

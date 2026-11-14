@@ -345,7 +345,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         // The other displays' windows follow the same layer; under the icons each has its own click layer.
         for i in extras.indices {
             let e = extras[i].window
-            e.level = DeskLayer.level(underIcons: under)
+            e.level = DeskLayer.level(underIcons: under && !model.arrange.active)
             if layerActive {
                 if !e.ignoresMouseEvents { e.ignoresMouseEvents = true }
                 if extras[i].clickWindow == nil { extras[i].clickWindow = makeClickWindow(frame: e.frame) }
@@ -462,7 +462,10 @@ final class DeskController: NSObject, NSMenuDelegate {
             clickWindow = makeClickWindow(frame: screen.frame)
         }
         // The bar's panel follows the Desk to its new screen.
-        if model.arrange.active { arrangeBar.place(on: screen) }
+        if model.arrange.active {
+            arrangeBarScreen = 0
+            arrangeBar.place(on: screen)
+        }
         NotificationCenter.default.addObserver(
             self, selector: #selector(occlusionChanged),
             name: NSWindow.didChangeOcclusionStateNotification, object: w)
@@ -487,7 +490,7 @@ final class DeskController: NSObject, NSMenuDelegate {
             model.drawnArrangement(saved: desk.string(forKey: "layout") ?? DeskLayout.standard)
         }
         shown.pieces = shown.shown(showMeetings: showMeetings)
-        return DeskWindowPlan.plan(shown, screens: model.screens).extraScreens
+        return DeskWindowPlan.plan(shown, screens: model.screens, arranging: model.arrange.active).extraScreens
     }
 
     /// A layout change (DeskView's watch) added or emptied another display: its window comes or
@@ -500,6 +503,7 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     private func closeExtraWindows() {
         for e in extras {
+            model.arrange.removeWindow(.id(e.screen.id ?? ""))
             NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: e.window)
             e.window.close()
             e.clickWindow?.close()
@@ -516,8 +520,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         let underIcons = DeskLayer.isOn(in: UserDefaults.desk)
         for info in screens {
             guard let ns = NSScreen.screens.first(where: { $0.frame == info.frame && DeskScreens.id(of: $0) == info.id }) else { continue }
-            let w = makeDeskWindow(frame: ns.frame, arranging: false)
-            w.level = DeskLayer.level(underIcons: underIcons)
+            let w = makeDeskWindow(frame: ns.frame, arranging: model.arrange.active)
             let extra = DeskExtraWindow(geometry: DeskScreenGeometry.of(info, visibleFrame: ns.visibleFrame, notch: nil),
                                         offset: DeskWindowPlan.offset(of: ns.frame, from: mainFrame))
             w.contentView = FirstClickHostingView(rootView: DeskView(model: model, extra: extra))
@@ -1011,16 +1014,23 @@ final class DeskController: NSObject, NSMenuDelegate {
         // window covers it. The click layer (DeskClickLayer) takes the mouse in its place, over
         // the same areas, and the Desk window keeps ignoring it.
         syncClickAreas()
-        // On another display, that display's window (or its click layer) takes the mouse, and every
-        // other Desk window lets it through. Arrange mode runs on the main window only.
-        let extra = arranging ? nil : extraUnderPointer()
-        let taker = extra.map { $0.clickWindow ?? $0.window } ?? clickWindow ?? w
-        let over = arranging ? wanted
-            : DeskPointerDrag.takesMouse(wanted: wanted, buttonDown: NSEvent.pressedMouseButtons != 0,
-                                         takingNow: !taker.ignoresMouseEvents)
-        if taker.ignoresMouseEvents == over { taker.ignoresMouseEvents = !over }
-        let others: [NSWindow] = [w, clickWindow].compactMap { $0 } + extras.flatMap { [$0.window, $0.clickWindow].compactMap { $0 } }
-        for o in others where o !== taker && !o.ignoresMouseEvents { o.ignoresMouseEvents = true }
+        if arranging {
+            // Arrange mode (2.44) runs on every Desk window: each takes the mouse over its whole
+            // frame (they sit on different displays), so a drag starts on any of them, and the bar
+            // follows the pointer to its display.
+            for d in deskWindows where d.ignoresMouseEvents { d.ignoresMouseEvents = false }
+            arrangeBarFollowPointer()
+        } else {
+            // On another display, that display's window (or its click layer) takes the mouse, and
+            // every other Desk window lets it through.
+            let extra = extraUnderPointer()
+            let taker = extra.map { $0.clickWindow ?? $0.window } ?? clickWindow ?? w
+            let over = DeskPointerDrag.takesMouse(wanted: wanted, buttonDown: NSEvent.pressedMouseButtons != 0,
+                                                  takingNow: !taker.ignoresMouseEvents)
+            if taker.ignoresMouseEvents == over { taker.ignoresMouseEvents = !over }
+            let others: [NSWindow] = [w, clickWindow].compactMap { $0 } + extras.flatMap { [$0.window, $0.clickWindow].compactMap { $0 } }
+            for o in others where o !== taker && !o.ignoresMouseEvents { o.ignoresMouseEvents = true }
+        }
         let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame,
                       model.nowPlayingFrame, model.stripFrame, model.stripNextFrame,
                       model.watchersFrame, model.stripWatcherFrame, model.stripAVFrame]
@@ -1079,6 +1089,20 @@ final class DeskController: NSObject, NSMenuDelegate {
         DeskArrange.clickThrough(arranging: model.arrange.active, windowTakesMouse: window.map { !$0.ignoresMouseEvents } ?? false)
     }
 
+    /// The screen the bar's panel is on while arranging, by index in NSScreen.screens.
+    private var arrangeBarScreen: Int?
+
+    /// The bar's panel moves to the display under the pointer when the pointer crosses to another
+    /// one (DeskArrange.barScreen); on the same display it stays put.
+    private func arrangeBarFollowPointer() {
+        let screens = NSScreen.screens
+        guard let i = DeskArrange.barScreen(pointer: NSEvent.mouseLocation, screens: screens.map(\.frame),
+                                            current: arrangeBarScreen),
+              i != arrangeBarScreen, i < screens.count else { return }
+        arrangeBarScreen = i
+        arrangeBar.place(on: screens[i])
+    }
+
     /// state.yaml's `desk_arrange.bar_visible`: the bar's panel is on screen.
     var arrangeBarVisible: Bool { arrangeBar.isVisible }
 
@@ -1092,7 +1116,11 @@ final class DeskController: NSObject, NSMenuDelegate {
         guard running, model.desktopOn, !model.arrange.active, let w = window as? DeskWindow else { return }
         model.arrange.begin()
         w.takesKey = true
-        // Under the icons (DeskLayer) the window comes up for the edit, and the click layer rests.
+        // Every display gets a window while arranging (DeskWindowPlan.plan), so a piece can go to
+        // one that has none yet; each can take the key after a click on a piece.
+        extraScreensChanged(plannedExtraScreens())
+        for e in extras { e.window.takesKey = true }
+        // Under the icons (DeskLayer) the windows come up for the edit, and the click layers rest.
         applyLayer()
         // Arrange runs on the main thread (menus, Settings' button, the debug hooks).
         arrangeStash = MainActor.assumeIsolated {
@@ -1101,7 +1129,10 @@ final class DeskController: NSObject, NSMenuDelegate {
             return stash
         }
         NSApp.activate()
-        arrangeBar.show(on: w.screen ?? NSScreen.screens.first)
+        // The bar opens on the display under the pointer (else the Desk's) and follows the pointer.
+        let screens = NSScreen.screens
+        arrangeBarScreen = DeskArrange.barScreen(pointer: NSEvent.mouseLocation, screens: screens.map(\.frame), current: nil)
+        arrangeBar.show(on: arrangeBarScreen.map { screens[$0] } ?? w.screen ?? screens.first)
         arrangeKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             guard let self, self.model.arrange.active,
                   let end = DeskArrange.endKey(event.keyCode) else { return event }
@@ -1122,10 +1153,13 @@ final class DeskController: NSObject, NSMenuDelegate {
         guard model.arrange.active else { return }
         if keep { model.arrange.done() } else { model.arrange.cancel() }
         arrangeBar.close()
-        if let w = window as? DeskWindow {
-            w.takesKey = false
-            w.resignKey()
+        arrangeBarScreen = nil
+        for case let d as DeskWindow in deskWindows {
+            d.takesKey = false
+            d.resignKey()
         }
+        // The displays that only had a window for the edit lose it; one that gained a piece keeps it.
+        extraScreensChanged(plannedExtraScreens())
         if let stash = arrangeStash {
             arrangeStash = nil
             MainActor.assumeIsolated { stash.restore() }

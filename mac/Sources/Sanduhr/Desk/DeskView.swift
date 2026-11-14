@@ -43,7 +43,7 @@ struct DeskView: View {
     var model: DeskModel
     /// A window besides the main one (one per display with pieces, DeskWindowPlan): its geometry and
     /// its offset from the main window. nil on the main window, which reads the model's geometry and
-    /// alone carries the notch, Arrange's chrome and the slanted stacks' click areas.
+    /// alone carries the notch and the slanted stacks' click areas. Arrange runs on every window (2.44).
     var extra: DeskExtraWindow? = nil
 
     @AppStorage("layout", store: .desk) private var layout = "message:tl clock:bl claude:bl meetings:bl"
@@ -85,7 +85,7 @@ struct DeskView: View {
     var body: some View {
         let arrangement = model.drawnArrangement(saved: layout)
         let place = stacks(arrangement)
-        let arranging = extra == nil && model.arrange.active
+        let arranging = model.arrange.active
         let margins = DeskAnchorGeometry.margins(left: left, right: right, top: top, bottom: bottom,
                                                  topInset: topInset, dock: dockInsets, inset: inset)
         content(place, arranging: arranging, margins: margins)
@@ -100,7 +100,7 @@ struct DeskView: View {
         guard extra == nil, !model.screens.isEmpty else { return nil }
         var shown = arrangement
         shown.pieces = arrangement.shown(showMeetings: showMeetings)
-        return DeskWindowPlan.plan(shown, screens: model.screens).extraScreens
+        return DeskWindowPlan.plan(shown, screens: model.screens, arranging: model.arrange.active).extraScreens
     }
 
     private func content(_ place: [DeskAnchor: [DeskPlacement]], arranging: Bool,
@@ -124,11 +124,24 @@ struct DeskView: View {
             .padding(.top, margins.top)
             .padding(.bottom, margins.bottom)
             .environment(\.deskArrangeGeometry, arranging ? anchors : nil)
-            if arranging { DeskArrangeOverlay(mode: model.arrange, geometry: anchors) }
+            .environment(\.deskArrangeWindow, arranging ? arrangeWindow(geo.size, anchors) : nil)
+            if arranging {
+                let here = arrangeWindow(geo.size, anchors)
+                DeskArrangeOverlay(mode: model.arrange, geometry: anchors, window: here)
+                    .modifier(DeskArrangeWindowReport(mode: model.arrange, window: here))
+            }
         }
         if extra == nil { NotchView(model: model) }
         }
         .coordinateSpace(.named(DeskArrange.space))
+    }
+
+    /// This window as Arrange sees it (2.44): `.main`, or its screen's id; its rectangle in the main
+    /// window's coordinates.
+    private func arrangeWindow(_ size: CGSize, _ geometry: DeskArrangeGeometry) -> DeskArrangeWindow {
+        let display: DeskDisplay = extra.map { .id($0.geometry.screen.id ?? "") } ?? .main
+        return DeskArrangeWindow(display: display, rect: CGRect(origin: extra?.offset ?? .zero, size: size),
+                                 geometry: geometry)
     }
 
     /// The anchors' rectangle and the top center's drop, as the columns below lay them out.
@@ -230,13 +243,14 @@ struct DeskView: View {
                         .oledDrift(model)
                 } else {
                     extraPiece(widget, p, alignment: alignment, lineInLayout: lineInLayout)
+                        .deskArrangeable(p, mode: model.arrange)
                 }
             }
         }
     }
 
-    /// A piece on a window besides the main one: no Arrange chrome (Arrange runs on the main window),
-    /// and a piece on All displays reports no frames here, so its click areas stay the main window's.
+    /// A piece on a window besides the main one (it takes Arrange's chrome as the main window's do):
+    /// a piece on All displays reports no click frames here, so its click areas stay the main window's.
     private func extraPiece(_ widget: Widget, _ p: DeskPlacement, alignment: HorizontalAlignment,
                             lineInLayout: Bool) -> some View {
         DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale,
@@ -972,6 +986,20 @@ extension EnvironmentValues {
     var deskScreenGeometry: DeskScreenGeometry? {
         get { self[DeskScreenGeometryKey.self] }
         set { self[DeskScreenGeometryKey.self] = newValue }
+    }
+}
+
+/// Each window tells Arrange where it is while arranging (DeskArrangeMode.windows), so a drag
+/// carried onto it finds it.
+private struct DeskArrangeWindowReport: ViewModifier {
+    let mode: DeskArrangeMode
+    let window: DeskArrangeWindow
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { mode.setWindow(window) }
+            .onChange(of: window) { _, w in mode.setWindow(w) }
+            .onDisappear { mode.removeWindow(window.display) }
     }
 }
 

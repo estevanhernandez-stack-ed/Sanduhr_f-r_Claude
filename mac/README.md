@@ -1341,8 +1341,9 @@ pure pieces are in `DeskArrange.swift`, the views and the bar's panel in `DeskAr
 - **The bar floats.** The bar with what to do, Cancel and Done is not on the Desk window (which sits
   just below normal windows, so any app window covered it). It is its own small borderless panel
   (`DeskArrangeBarController`, an `NSPanel` at the floating level on every Space) centered on the
-  visible frame of the Desk's screen (`DeskArrange.barOrigin`), shown while arranging, moved with
-  the Desk on a display change, and closed when Arrange ends. It reads "Return or Done keeps the
+  visible frame of the display under the pointer (`DeskArrange.barOrigin`, `DeskArrange.barScreen`),
+  shown while arranging, moved when the pointer crosses to another display and with the Desk on a
+  display change, and closed when Arrange ends. It reads "Return or Done keeps the
   new layout. Escape or Cancel puts it back." Sanduhr activates and the panel takes the key.
 - **Keys.** While arranging, a local key monitor ends Arrange mode wherever the key focus is in
   Sanduhr (the panel, the Desk window after a click on a piece, the widget): Return and keypad
@@ -1374,6 +1375,22 @@ pure pieces are in `DeskArrange.swift`, the views and the bar's panel in `DeskAr
   notch drop, and the anchor dots use the same geometry (`DeskAnchorGeometry`). With Reduce Motion a
   drop has no snap animation. VoiceOver gets Move Up, Move Down, Bigger and Smaller on each piece.
 
+- **Across displays (2.44).** Arrange runs on every Desk window, and while it runs every connected
+  display with an id has one (`DeskWindowPlan.plan(arranging:)`), so a piece can go to a display that
+  had none; Done or Cancel plans from the layout again. Each window shows its own pieces with the
+  same chrome and takes the mouse over its whole frame. A drag keeps its start window's coordinates;
+  the drop is moved by that window's offset onto the window under the pointer
+  (`DeskArrangeMode.drop`, the pure `DeskArrange.dropped`): within one window it is the drop above,
+  onto another the piece takes that window's display (`.main` for the main one) at the anchor it
+  lands on there, and the lit anchors and the ghost show on the window under the pointer. **The All
+  displays rule:** a piece on All displays stays on All displays wherever it is dropped, within a
+  window or onto another; only its anchor and place change, everywhere. The companion stays on the
+  main display; dropped on another window it does not move. With more than one window, or a piece
+  already off the main display, a piece's name tag gains **Show on** (This display, All displays;
+  `DeskArrange.showOn`): All writes `@all`, This display the window's display. One display shows
+  none of it. The Hidden strip stays on the main window, and a slanted stack on another window is
+  dropped on by the box around what is drawn (only the main window reports folds).
+
 `desk_arrange` in the smoke state has `active`, `changed`, `working` (the layout string being
 edited), `click_through` (`whole` or `drawn`) and `bar_visible` (the floating bar is on screen);
 the `desk-arrange start|test|done|cancel` hook drives it, and `scenarios/desk-arrange.yaml` starts
@@ -1385,7 +1402,7 @@ arranging, that Cancel leaves `layout` alone and that Done writes it.
 One Desk window per display that has pieces (`DeskWindowPlan`, `DeskController.buildWindow`): the
 main one on the menu bar display (`NSScreen.screens.first`, not `NSScreen.main`) carries every role
 it always had (the notch, wings and pill, the Dock follower, drawers, the companion, the camera
-badge, Arrange and the click layer's main plates), and each other display a piece draws on
+badge and the click layer's main plates; Arrange runs on every window, see Across displays above), and each other display a piece draws on
 (`DeskScreens.showsOn`) gets a plain window at the same level, click-through the same way. A window
 draws only its own share (`DeskWindowPlan.stacks`); a piece on All displays draws on every window, a
 piece whose display is not connected falls back to the main one, and the companion stays on main.
