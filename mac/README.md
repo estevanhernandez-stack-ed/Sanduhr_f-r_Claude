@@ -1285,7 +1285,7 @@ through the same decoding, whatever the switches say; `scenarios/watchers.yaml` 
 
 ## Desk layout
 
-Settings, Desk places each Desk piece (item 59; the pure pieces in `DeskArrangement.swift`):
+Settings, Desk places each Desk piece (item 59; the pure pieces in `DeskArrangement.swift`; per display since 2.44.0, `docs/superpowers/specs/2026-11-14-mac-desk-per-monitor-design.md`):
 
 - **Eight places.** The four corners, Top center, Bottom center, Middle left and Middle right.
   The top and bottom of a side share a column with a spacer between them, as before, so a growing
