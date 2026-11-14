@@ -246,10 +246,10 @@ struct DeskArrangement: Equatable {
         }
     }
 
-    /// Each anchor's stack, top to bottom, of the pieces DeskView draws, every display merged:
-    /// the drawing callers read this until the Desk draws per screen (a piece on `.all` or on one
-    /// display still draws, as on a single display today). Use `displayStacks` where two displays'
-    /// stacks must stay apart (tilt, Settings).
+    /// Each anchor's stack, top to bottom, every display merged: the layout map and a DeskView that
+    /// does not know the screens yet read this. The Desk windows draw their own share
+    /// (DeskWindowPlan.stacks). Use `displayStacks` where two displays' stacks must stay apart
+    /// (tilt, Settings).
     func stacks(showMeetings: Bool = true, showClaude: Bool = true) -> [DeskAnchor: [DeskPlacement]] {
         var out: [DeskAnchor: [DeskPlacement]] = [:]
         for p in shown(showMeetings: showMeetings, showClaude: showClaude) {
