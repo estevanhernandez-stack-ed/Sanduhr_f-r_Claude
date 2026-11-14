@@ -75,6 +75,9 @@
                                     <TextBlock Text="{Binding NotInstalledText}" FontSize="11" TextWrapping="Wrap" Margin="24,4,0,0"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                                Visibility="{Binding HasNotInstalledText, Converter={StaticResource BoolVis}}" />
+                                    <TextBlock Text="{Binding ArchiveCaption}" FontSize="11" TextWrapping="Wrap" Margin="24,4,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                               Visibility="{Binding HasArchiveCaption, Converter={StaticResource BoolVis}}" />
 
                                     <StackPanel Orientation="Horizontal" Margin="24,8,0,0">
                                         <RadioButton Style="{StaticResource SourcesRadio}" GroupName="sources-primary"
@@ -129,10 +132,12 @@
                         <DataTemplate>
                             <StackPanel Margin="0,0,0,8">
                                 <CheckBox Style="{DynamicResource ThemedCheckBox}" Content="{Binding Name}"
-                                          IsChecked="{Binding On, Mode=TwoWay}" IsEnabled="{Binding Installed}"
+                                          IsChecked="{Binding On, Mode=TwoWay}" IsEnabled="{Binding CanToggle}"
                                           AutomationProperties.Name="{Binding Name}"
-                                          AutomationProperties.HelpText="{Binding Caption}" />
+                                          AutomationProperties.HelpText="{Binding HelpText}" />
                                 <TextBlock Text="{Binding Caption}" FontSize="11" TextWrapping="Wrap" Margin="24,2,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                <TextBlock Text="{Binding ArchiveCaption}" FontSize="11" TextWrapping="Wrap" Margin="24,2,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                             </StackPanel>
                         </DataTemplate>

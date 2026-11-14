@@ -72,6 +72,56 @@ public sealed class SourcesPageTests : AppWindowFixture
     });
 
     [Fact]
+    public void A_checked_Antigravity_box_stays_enabled_when_its_cli_folder_goes_so_it_can_be_turned_off() => AppHost.Run(() =>
+    {
+        bool installed = true;
+        var (vm, store) = NewSources(antigravityInstalled: () => installed, agentVaultOn: _ => { });
+        var row = Assert.Single(vm.ActivityRows);
+        row.On = true;
+        var changed = new List<string?>();
+        row.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        installed = false;
+        vm.Reload();
+
+        Assert.False(row.Installed);
+        Assert.True(row.CanToggle);
+        Assert.Contains(nameof(ActivityRowViewModel.CanToggle), changed);
+        row.On = false;
+        Assert.False(store.LoadActivity()["antigravity"]);
+        Assert.False(row.CanToggle);
+    });
+
+    [Fact]
+    public void An_Antigravity_switch_that_cannot_be_saved_snaps_back() => AppHost.Run(() =>
+    {
+        var calls = new List<string>();
+        var (vm, _) = NewSources(antigravityInstalled: () => true, agentVaultOn: calls.Add);
+        var row = Assert.Single(vm.ActivityRows);
+        var settings = ScratchPaths().SettingsFile;
+        File.SetAttributes(settings, File.GetAttributes(settings) | FileAttributes.ReadOnly);
+        try
+        {
+            row.On = true;
+            Assert.False(row.On);   // reloaded from what is saved
+            Assert.Empty(calls);    // the archive was not turned on for a switch that did not save
+        }
+        finally { File.SetAttributes(settings, File.GetAttributes(settings) & ~FileAttributes.ReadOnly); }
+    });
+
+    [Fact]
+    public void The_Codex_and_Antigravity_rows_say_their_token_counts_are_archived() => AppHost.Run(() =>
+    {
+        var (vm, _) = NewSources(antigravityInstalled: () => true, agentVaultOn: _ => { });
+        Assert.Equal(SettingsNames.AgentArchiveCaption, vm.Rows.Single(r => r.Source == AgentSources.Codex).ArchiveCaption);
+        Assert.Null(vm.Rows.Single(r => r.Source == AgentSources.Claude).ArchiveCaption);
+        var agy = Assert.Single(vm.ActivityRows);
+        Assert.Equal(SettingsNames.AgentArchiveCaption, agy.ArchiveCaption);
+        Assert.Contains(SettingsNames.AgentArchiveCaption, agy.HelpText);
+        Assert.StartsWith(agy.Caption, agy.HelpText);
+    });
+
+    [Fact]
     public void Rows_follow_AgentSources_order() => AppHost.Run(() =>
     {
         var (vm, _, _) = Build(codexInstalled: true);

@@ -1206,6 +1206,8 @@ public static class SettingsNames
     public const string ActivityOnlyHeader = "Activity only";
     public const string AntigravityActivityCaption = "Activity only, from the Antigravity CLI. Sanduhr can't see Antigravity's limits or the IDE's usage.";
     public const string NothingFoundYet = "Nothing found yet.";
+    /// <summary>The extra caption line under the Codex row and the Antigravity activity row on Settings, Usage, Sources.</summary>
+    public const string AgentArchiveCaption = "Its token counts are kept in the session archive on this PC.";
     public const string AntigravityNotice =
         "Antigravity and Gemini are trademarks of Google LLC. Sanduhr is not affiliated with or endorsed by Google.";
 

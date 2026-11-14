@@ -209,7 +209,7 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/ResetFolderListViewModel.cs", "masked", 1),   // slice 8: and draw them through ShowFolder (carry)
         ("Sanduhr.App/ViewModels/SettingsViewModel.cs", "notname", 2),         // agent layer: Sources asks only whether a Codex home or the Antigravity folder exists
         ("Sanduhr.App/ViewModels/SetupViewModel.cs", "notname", 1),            // agent layer: and so does the setup screen's Codex tick
-        ("Sanduhr.App/ViewModels/SourcesViewModel.cs", "notname", 2),          // agent layer: save failures go to the debug log, never the screen
+        ("Sanduhr.App/ViewModels/SourcesViewModel.cs", "notname", 3),          // agent layer: save failures go to the debug log, never the screen (final review F5: the activity switch's too)
         ("Sanduhr.App/ViewModels/StreamerSettingsViewModel.cs", "key", 1),
         ("Sanduhr.App/ViewModels/ThemeDeskEditorViewModel.cs", "notname", 3),
         ("Sanduhr.App/ViewModels/ThemeMatchViewModel.cs", "cant", 4),
