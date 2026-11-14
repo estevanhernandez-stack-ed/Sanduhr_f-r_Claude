@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### New
+
+- **Every agent's activity: Codex and the Antigravity CLI join Claude Code's local burn.** Sanduhr reads their own files on this PC, so there's no sign-in and no network. Codex follows its existing switch in Settings ▸ Usage ▸ Sources; the Antigravity CLI has its own "Activity only" switch there, off by default. The Antigravity IDE's usage can't be read (it keeps protobuf only), and Antigravity's limits aren't visible, so only its activity counts. The widget footer shows each agent's new tokens since the last ingest, about five minutes and one ingest behind Claude Code: "CC +12.0k  ·  Codex +3.0k  ·  Agy +1.0k". On the Local burn page the 30-day strip stacks by agent color, each project row gives each agent's share, the session ledger labels every session with its agent and has an agent filter (shown when more than one agent is present), and the ledger CSV has an `agent` column after `root`. The MCP's `get_local_burn_by_project` adds an `agents` list (project totals from the Vault for the day window, with `agents_from`), only for agents you switch on under Settings ▸ Claude Code ▸ Folders ("Let Claude read Codex's project totals"), off by default. Purging an agent's folder on the Local burn page, or erasing the archive, stops its ingest until you switch its source on again.
+
 ## v4.8.0 — 2026-11-12
 
 ### New
