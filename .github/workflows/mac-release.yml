@@ -33,6 +33,8 @@ jobs:
       TAG: v${{ inputs.version }}-mac
       SIGN_IDENTITY: "Developer ID Application: Estevan Hernandez (82BSR56X5J)"
       GH_TOKEN: ${{ github.token }}
+      # A milestone is X.Y.0 with Y divisible by this: 2.50.0, 2.75.0, 3.0.0. See "Draft GitHub Release".
+      MILESTONE_EVERY: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -130,11 +132,32 @@ jobs:
           echo "SIG=$SIG" >> "$GITHUB_ENV"
 
       - name: Draft GitHub Release
+        env:
+          MAC_RELEASE_PAT: ${{ secrets.MAC_RELEASE_PAT }}
         run: |
           # Release notes: the CHANGELOG's "Unreleased (mac)" section, edited in the draft as needed.
           awk '/^## Unreleased \(mac\)/{on=1; next} on && /^## /{exit} on' ../CHANGELOG.md > "$RUNNER_TEMP/notes.md"
-          gh release create "$TAG" "$DMG" --draft --target "$GITHUB_SHA" \
-            --title "Sanduhr for Mac $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          draft() {
+            gh release create "$TAG" "$DMG" --draft --target "$GITHUB_SHA" \
+              --title "Sanduhr for Mac $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          }
+          # GitHub credits a release to the account that created its draft, whoever publishes it,
+          # and a follower's feed lists only the releases a person published. A milestone is
+          # drafted with the repo owner's token so it carries the owner's name; every build
+          # between stays with the Actions bot, or the feed would be one line a day. A token that
+          # is missing or refused costs the credit and never the release.
+          if [[ "$VERSION" =~ ^[0-9]+\.([0-9]+)\.0$ ]] && (( 10#${BASH_REMATCH[1]} % MILESTONE_EVERY == 0 )); then
+            if [[ -z "$MAC_RELEASE_PAT" ]]; then
+              echo "::warning::$VERSION is a milestone but MAC_RELEASE_PAT is not set; drafting as the Actions bot"
+            elif GH_TOKEN="$MAC_RELEASE_PAT" draft; then
+              echo "Milestone $VERSION drafted with MAC_RELEASE_PAT"
+              exit 0
+            else
+              echo "::warning::MAC_RELEASE_PAT could not draft $TAG (expired, or no Contents write on this repo); drafting as the Actions bot"
+              gh release delete "$TAG" --yes >/dev/null 2>&1 || true
+            fi
+          fi
+          draft
 
       - name: Pull request with appcast and cask
         run: |
