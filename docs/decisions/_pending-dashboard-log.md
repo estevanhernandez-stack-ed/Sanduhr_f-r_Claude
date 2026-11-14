@@ -133,3 +133,23 @@ The 626 dashboard MCP was disconnected when these were made. The next session wi
   The Local burn page's project list has no bars, so agent shares go in the row text ("api, 1.2M (Claude Code 900K,
   Codex 300K)"). The ingester gains a line-parser seam; Claude's path moves onto it with no behavior change.
 - **Revisit if:** winsqlite3 is unavailable on a supported Windows build, or users ask for visual project bars.
+
+### Spec 3 build: an agent's archive follows the person's answer to the archive prompt
+
+- **Category:** scope
+- **Decision:** Codex and Antigravity burn is kept in the session archive when their source is on, except when the person
+  answered the archive prompt and archived no Claude Code folder: then agent archiving starts off and is turned on from the
+  Local burn page's toggle. Sources says under each agent that its token counts are kept in the session archive. Found by
+  the final branch review: the spec's "follows the Codex switch" would have copied Codex history into an archive the person
+  had declined.
+- **Revisit if:** people expect agent archiving to follow the Sources switch alone.
+
+### Spec 3 build: the Local burn page decides archive state from Claude Code folders only
+
+- **Category:** gotcha
+- **Decision:** agent roots joined ConsentedRootNames, so the Local burn page used them for archive on/off, the last-ingest
+  boundary, degraded state and coverage. Someone with only agents archived lost Claude Code's live 30 days, and a new or
+  failing agent degraded the whole page. The page now decides those from Claude Code folders only and reads agents from
+  the Vault in every path. Also: the session ledger CSV's new `agent` column goes at the end of the row so existing
+  positional parsers keep working.
+- **Revisit if:** a third kind of root joins the Vault.
