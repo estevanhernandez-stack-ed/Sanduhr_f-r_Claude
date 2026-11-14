@@ -816,7 +816,7 @@ public static class SettingsNames
         + "your Desk messages; the names of the Claude Code folders Sanduhr found; "
         + "and, for each folder where you let Claude read project totals, token counts per project and model with "
         + "project names, or full project paths when Claude asks. "
-        + "Codex's and Antigravity's project totals go the same way, when their switches under Claude Code, Folders are on.";
+        + "Codex's and Antigravity's project totals, with project names, go to Claude when their switches under Claude Code, Folders are on.";
     public static string LetClaudeReadAgentTotals(string agent) => $"Let Claude read {agent}'s project totals";
     public const string NetThroughClaudeOff =
         "Don't install Sanduhr's MCP server, or remove it from a folder. Each folder's project totals have their own switch.";
