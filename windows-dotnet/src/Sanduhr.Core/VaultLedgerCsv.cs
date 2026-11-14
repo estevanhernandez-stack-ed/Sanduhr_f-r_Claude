@@ -24,18 +24,18 @@ public static class VaultLedgerCsv
     public static CsvExport.CsvBuildResult Build(IReadOnlyList<Row> rows)
     {
         var sb = new StringBuilder();
-        sb.Append("session,root,agent,project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models\r\n");
+        sb.Append("session,root,project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models,agent\r\n");
         foreach (var r in rows)
         {
             Append(sb, r.Uuid); sb.Append(',');
             Append(sb, r.Root); sb.Append(',');
-            Append(sb, r.Agent); sb.Append(',');
             Append(sb, r.Project); sb.Append(',');
             Append(sb, r.FirstTs); sb.Append(',');
             Append(sb, r.LastTs); sb.Append(',');
             sb.Append(r.TokensInScope.ToString(CultureInfo.InvariantCulture)); sb.Append(',');
             sb.Append(r.TokensTotal.ToString(CultureInfo.InvariantCulture)); sb.Append(',');
-            Append(sb, r.Models);
+            Append(sb, r.Models); sb.Append(',');
+            Append(sb, r.Agent);   // last, so a parser reading the older columns by position keeps working
             sb.Append("\r\n");
         }
         return new CsvExport.CsvBuildResult(sb.ToString(), rows.Count);

@@ -31,7 +31,7 @@ public sealed class ClaudeLineParser : IBurnLineParser
         catch (Exception e) when (e is JsonException or ArgumentException or InvalidOperationException) { bad = true; return null; }
     }
 
-    public BurnEvent? ParseCore(string line, out bool bad)
+    private BurnEvent? ParseCore(string line, out bool bad)
     {
         bad = false;
         // Perf prefilter only: looser than "type":"assistant" on purpose so formatting drift can never silently drop events.

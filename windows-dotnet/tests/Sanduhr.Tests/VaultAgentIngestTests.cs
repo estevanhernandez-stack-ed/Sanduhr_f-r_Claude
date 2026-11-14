@@ -194,6 +194,23 @@ public class VaultAgentIngestTests
     }
 
     [Fact]
+    public void A_claude_root_that_throws_skips_only_itself_and_the_agents_still_land()
+    {
+        using var t = new TempDir();
+        var file = Write(Path.Combine(t.Path, "in"), "a.jsonl", "2026-11-10T16:00:00Z,1,1\n");
+        var ok = new FakeSource("codex", () => [new AgentBurnFile(new FileInfo(file), "s", null, false)]);
+        var (ing, store) = Make(t.Path, Path.Combine(t.Path, "vault"));
+
+        // The consent recheck reads settings.json in the App; a read that fails throws out of the Claude Code root's pass.
+        var r = ing.IngestOnce([".claude"], false, Now,
+            stillConsented: root => root == ".claude" ? throw new IOException("settings locked") : true, agents: [ok]);
+
+        Assert.True(r.Acquired);
+        Assert.Equal(1, r.RootsAborted);
+        Assert.Equal(ShardLoadResult.Ok, store.TryLoadSessionShard("codex", "2026-11", out _));
+    }
+
+    [Fact]
     public void An_agent_root_revoked_mid_cycle_writes_nothing()
     {
         using var t = new TempDir();

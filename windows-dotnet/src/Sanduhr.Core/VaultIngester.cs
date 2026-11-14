@@ -93,7 +93,17 @@ public sealed class VaultIngester
             int seen = 0, full = 0, tail = 0, skipped = 0, failed = 0, aborted = 0;
             foreach (var rootName in consentedRootNames)
             {
-                var r = IngestClaudeRoot(rootName, storeFullPaths, nowUtc, stillConsented);
+                VaultIngestResult r;
+                try
+                {
+                    r = IngestClaudeRoot(rootName, storeFullPaths, nowUtc, stillConsented);
+                }
+                catch (Exception e)
+                {
+                    // A Claude Code root failing never stops another root or the agents (spec 3, section 5).
+                    Log2("claude-root", e);
+                    r = new VaultIngestResult(true, 0, 0, 0, 0, 0, 1);
+                }
                 seen += r.FilesSeen; full += r.FilesFullParsed; tail += r.FilesTailParsed;
                 skipped += r.FilesSkipped; failed += r.FilesFailed; aborted += r.RootsAborted;
             }

@@ -54,4 +54,17 @@ public class AgentBurnDeltasTests
         d.Forget("codex");
         Assert.Equal("", d.FooterPieces());
     }
+
+    [Fact]
+    public void An_observation_after_forget_is_a_first_observation_and_shows_nothing()
+    {
+        var d = new AgentBurnDeltas();
+        d.Observe("codex", D1, 1000);
+        d.Observe("codex", D1, 3000);
+        d.Forget("codex");
+        d.Observe("codex", D1, 9000);
+        Assert.Equal("", d.FooterPieces());
+        d.Observe("codex", D1, 10_000);
+        Assert.Equal("  ·  Codex +1.0k", d.FooterPieces());
+    }
 }

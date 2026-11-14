@@ -8,7 +8,7 @@ public class VaultLedgerCsvTests
     public void Header_always_emitted_and_rows_in_given_order()
     {
         var result = VaultLedgerCsv.Build(Array.Empty<VaultLedgerCsv.Row>());
-        Assert.Equal("session,root,agent,project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models\r\n",
+        Assert.Equal("session,root,project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models,agent\r\n",
             result.Text);
         Assert.Equal(0, result.RowCount);
 
@@ -39,10 +39,10 @@ public class VaultLedgerCsvTests
     }
 
     [Fact]
-    public void The_agent_column_follows_root()
+    public void The_agent_column_comes_last_so_positional_parsers_keep_working()
     {
         var csv = VaultLedgerCsv.Build([new VaultLedgerCsv.Row("s", "codex", "api", "a", "b", 1, 2, "m", "Codex")]).Text;
-        Assert.StartsWith("session,root,agent,project,", csv);
-        Assert.Contains("s,codex,Codex,api,a,b,1,2,m", csv);
+        Assert.StartsWith("session,root,project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models,agent\r\n", csv);
+        Assert.Contains("s,codex,api,a,b,1,2,m,Codex\r\n", csv);
     }
 }

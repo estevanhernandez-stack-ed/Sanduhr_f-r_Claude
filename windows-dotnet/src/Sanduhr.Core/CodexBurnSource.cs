@@ -78,7 +78,7 @@ public sealed class CodexLineParser : IBurnLineParser
         catch (Exception e) when (e is JsonException or ArgumentException or InvalidOperationException) { bad = true; return null; }
     }
 
-    public BurnEvent? ParseCore(string line, out bool bad)
+    private BurnEvent? ParseCore(string line, out bool bad)
     {
         bad = false;
         if (!line.Contains("\"session_meta\"", StringComparison.Ordinal)
