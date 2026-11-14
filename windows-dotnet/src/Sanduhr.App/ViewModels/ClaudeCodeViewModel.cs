@@ -13,6 +13,12 @@ namespace Sanduhr.App.ViewModels;
 public sealed partial class AgentReadRowViewModel(string agent, bool on, Action<string, bool> save) : ObservableObject
 {
     public string Agent { get; } = agent;
+
+    /// <summary>Agents that get a switch: every non-Claude burn source that is active or still consented, so a consent
+    /// can always be revoked after the agent goes inactive.</summary>
+    public static IReadOnlyList<string> Shown(IReadOnlySet<string> active, IReadOnlyDictionary<string, bool> consent)
+        => AgentSources.Burn.Where(a => a != AgentSources.Claude && (active.Contains(a) || consent.GetValueOrDefault(a))).ToList();
+
     public string Name => SettingsNames.LetClaudeReadAgentTotals(AgentSources.BurnName(Agent));
     [ObservableProperty] private bool _on = on;
     partial void OnOnChanged(bool value) => save(Agent, value);
@@ -493,7 +499,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         AgentReads.Clear();
         var agentReads = _widget.LoadMcpAgents();
         var active = _widget.Vault?.ActiveAgents().Select(a => a.Agent).ToHashSet() ?? [];
-        foreach (var agent in AgentSources.Burn.Where(active.Contains))
+        foreach (var agent in AgentReadRowViewModel.Shown(active, agentReads))
             AgentReads.Add(new AgentReadRowViewModel(agent, agentReads.GetValueOrDefault(agent), _widget.SaveMcpAgent));
         _loading = false;
         RefreshStatuses();

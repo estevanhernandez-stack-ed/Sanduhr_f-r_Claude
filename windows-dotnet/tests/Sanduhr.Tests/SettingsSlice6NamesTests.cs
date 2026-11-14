@@ -63,7 +63,7 @@ public class SettingsSlice6NamesTests
             Assert.Contains("plan", text);
         }
         // P17: the folder reads caption admits full paths.
-        Assert.Contains("Project names go with them, or full project paths when Claude asks.", SettingsNames.AgentFolderReadsCaption);
+        Assert.EndsWith("Project names go with them, or full project paths when Claude asks. Codex and Antigravity each have their own switch for project totals.", SettingsNames.AgentFolderReadsCaption);
         // P19: no "none of these work".
         Assert.DoesNotContain("None of these work", SettingsNames.AgentsIntro);
         Assert.Contains("each needs it installed", SettingsNames.AgentsIntro);

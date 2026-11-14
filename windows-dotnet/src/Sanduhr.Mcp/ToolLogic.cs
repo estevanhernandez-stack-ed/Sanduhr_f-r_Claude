@@ -535,7 +535,7 @@ public sealed partial class ToolLogic
 
         var agents = new JsonArray();
         var today = DateOnly.FromDateTime(now.LocalDateTime);
-        var from = DateOnly.FromDateTime(since.LocalDateTime);
+        var from = today.AddDays(-(windowDays - 1));   // day-granular, same span as BuildHistory
         foreach (var agent in _config.ConsentedAgents)
         {
             var win = ReadVaultOverlay([agent], from, today.AddDays(1));
@@ -561,6 +561,7 @@ public sealed partial class ToolLogic
             ["roots_scanned"] = ToArray(_config.ConsentedRoots.Select(r => r.Name)),
             ["roots"] = roots,
             ["agents_scanned"] = ToArray(_config.ConsentedAgents),
+            ["agents_from"] = from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             ["agents"] = agents,
             ["files_scanned"] = filesScanned,
             ["caveat"] = BurnCaveat + " Agent totals come from the Vault and are as fresh as the widget's last ingest.",

@@ -816,7 +816,7 @@ public static class SettingsNames
         + "your Desk messages; the names of the Claude Code folders Sanduhr found; "
         + "and, for each folder where you let Claude read project totals, token counts per project and model with "
         + "project names, or full project paths when Claude asks. "
-        + "The same goes for Codex and Antigravity, each with its own switch.";
+        + "Codex's and Antigravity's project totals go the same way, when their switches under Claude Code, Folders are on.";
     public static string LetClaudeReadAgentTotals(string agent) => $"Let Claude read {agent}'s project totals";
     public const string NetThroughClaudeOff =
         "Don't install Sanduhr's MCP server, or remove it from a folder. Each folder's project totals have their own switch.";
@@ -895,7 +895,8 @@ public static class SettingsNames
     public const string AgentSongsDirectCaption = "On: a look Claude suggests for a song is saved at once. Off: each waits as a card on Now playing.";
     public const string AgentFolderReadsCaption =
         "Per folder: token counts per project and per model, the folder's session archive, and its recent use beside your meters. "
-        + "Project names go with them, or full project paths when Claude asks.";
+        + "Project names go with them, or full project paths when Claude asks. "
+        + "Codex and Antigravity each have their own switch for project totals.";
     public const string AgentPublish = "Publish your usage when Claude asks";
     public const string AgentPublishCaption = "Claude can ask Sanduhr to send the day's record to your endpoint. It follows Publish daily at.";
     public const string AgentTheme = "Give the widget a theme";

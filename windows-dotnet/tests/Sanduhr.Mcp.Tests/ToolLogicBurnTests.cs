@@ -37,7 +37,44 @@ public class ToolLogicBurnTests
         var agent = (JsonObject)((JsonArray)result["agents"]!)[0]!;
         Assert.Equal("codex", agent["agent"]!.GetValue<string>());
         Assert.Equal(300, agent["total_tokens"]!.GetValue<long>());
+        Assert.Equal("api", (string?)((JsonObject)((JsonArray)agent["projects"]!)[0]!)["name"]);
         Assert.Equal("codex", (string?)((JsonArray)result["agents_scanned"]!)[0]);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(7)]
+    public void Agent_window_is_windowDays_calendar_days_ending_today(int windowDays)
+    {
+        using var tmp = new TempDir();
+        var cfg = new McpConfig
+        {
+            SnapshotPath = Path.Combine(tmp.Path, "snapshot.json"),
+            VaultDir = Path.Combine(tmp.Path, "vault"),
+            ConsentedRoots = Array.Empty<(string, string)>(),
+            RootsFound = Array.Empty<string>(),
+            ConsentedAgents = new[] { "codex" },
+        };
+        var today = DateOnly.FromDateTime(Now.LocalDateTime);
+        var outside = today.AddDays(-windowDays);
+        var inside = today.AddDays(-(windowDays - 1));
+        var store = new Sanduhr.Core.VaultStore(cfg.VaultDir);
+        foreach (var g in new[] { outside, inside }.GroupBy(d => d.ToString("yyyy-MM")))
+        {
+            var days = new Dictionary<string, Sanduhr.Core.VaultRollupDay>();
+            foreach (var d in g)
+            {
+                long t = d == inside ? 50 : 900;
+                days[d.ToString("yyyy-MM-dd")] = new() { Total = t, Input = t, Output = 0, ByProject = new() { ["api~12345678"] = t } };
+            }
+            store.SaveRollupShard("codex", g.Key, new Sanduhr.Core.VaultRollupShard { Days = days });
+        }
+
+        var result = new ToolLogic(cfg, () => Now).BuildBurn(windowDays, fullPaths: false);
+
+        var agent = (JsonObject)((JsonArray)result["agents"]!)[0]!;
+        Assert.Equal(50, agent["total_tokens"]!.GetValue<long>());
+        Assert.Equal(inside.ToString("yyyy-MM-dd"), (string?)result["agents_from"]);
     }
 
     [Fact]
