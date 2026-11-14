@@ -31,16 +31,25 @@ public sealed class LocalCcBarStrip : FrameworkElement
         new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>();
     private Func<string, Color>? _colorOf;
 
-    /// <summary>True while some non-Claude agent has tokens in the window: only then does the strip stack by agent and word its
-    /// empty state for every agent. A consented agent root with no rows leaves the strip as it always was.</summary>
+    /// <summary>True while some non-Claude agent has tokens in the window: only then does the strip stack by agent. A consented
+    /// agent root with no rows leaves the bars as they always were.</summary>
     internal bool Stacked { get; private set; }
+
+    private bool _agentsConsented;
+
+    /// <summary>What an empty window says: every agent's activity once an agent root is archived, Claude Code's otherwise.</summary>
+    internal string EmptyText => _agentsConsented
+        ? "No local activity in the last 30 days."
+        : "No local CC activity in the last 30 days.";
 
     public void SetData(IReadOnlyDictionary<DateOnly, long> byDay, ThemePalette palette)
         => SetData(byDay, palette, new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>(), null);
 
     public void SetData(IReadOnlyDictionary<DateOnly, long> byDay, ThemePalette palette,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<DateOnly, long>> byAgent, Func<string, Color>? colorOf)
+        IReadOnlyDictionary<string, IReadOnlyDictionary<DateOnly, long>> byAgent, Func<string, Color>? colorOf,
+        bool agentsConsented = false)
     {
+        _agentsConsented = agentsConsented;
         _byDay = byDay ?? new Dictionary<DateOnly, long>();
         _palette = palette;
         _byAgent = byAgent ?? new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>();
@@ -75,7 +84,7 @@ public sealed class LocalCcBarStrip : FrameworkElement
             double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
             var brush = Frozen(_palette.TextDim);
             var ft = new FormattedText(
-                Stacked ? "No local activity in the last 30 days." : "No local CC activity in the last 30 days.",
+                EmptyText,
                 CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
                 new Typeface("Segoe UI"), 11, brush, dpi)
             {

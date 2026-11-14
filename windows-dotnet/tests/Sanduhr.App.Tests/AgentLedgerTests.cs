@@ -198,4 +198,117 @@ public sealed class AgentLedgerTests : AppWindowFixture
         }
         finally { widget.Dispose(); }
     });
+
+    // -- F1: the archive decisions read the Claude Code roots only; agents come from the Vault on every path ----------
+
+    private static string Day(DateOnly d) => d.ToString("yyyy-MM-dd");
+
+    /// <summary>A Claude Code root's meta: ingested <paramref name="ingestedAgo"/> ago, covering the last 35 days.</summary>
+    private static void ClaudeMeta(string vaultDir, TimeSpan ingestedAgo)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        new VaultStore(vaultDir).SaveMeta(".claude", new VaultRootMeta
+        {
+            LastIngestTs = DateTimeOffset.UtcNow.Subtract(ingestedAgo).ToString("o"),
+            Covered = [new VaultDateRange { From = Day(today.AddDays(-40)), To = Day(today) }],
+        });
+    }
+
+    /// <summary>A home with one live Claude Code transcript: one event of 100 in + 200 out, <paramref name="daysAgo"/> days back at noon.</summary>
+    private static (CcLogReader Reader, string Home) LiveHome(int daysAgo)
+    {
+        var home = Directory.CreateTempSubdirectory("sanduhr-live").FullName;
+        var dir = Path.Combine(home, ".claude", "projects", "P");
+        Directory.CreateDirectory(dir);
+        var ts = new DateTimeOffset(DateTime.Now.Date.AddDays(-daysAgo).AddHours(12)).ToUniversalTime()
+            .ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+        File.WriteAllText(Path.Combine(dir, "s.jsonl"),
+            "{\"type\":\"assistant\",\"timestamp\":\"" + ts + "\",\"message\":{\"model\":\"claude-opus-4-7\",\"usage\":{\"input_tokens\":100,\"output_tokens\":200}}}\n");
+        var reader = new CcLogReader(home);
+        reader.InvalidateCache();
+        return (reader, home);
+    }
+
+    [Fact]
+    public void With_an_agent_archived_and_no_claude_folder_claudes_live_days_still_show_and_the_agent_adds_to_them()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var (vault, dir) = VaultWith(("codex", Day(today.AddDays(-2)), 400_000), ("codex", Day(today), 1_000));
+        var (live, home) = LiveHome(daysAgo: 1);
+        try
+        {
+            var data = LocalCcViewModel.Compute(vault, ["codex"], live);
+
+            Assert.Equal("session archive off, these numbers are the live logs, not an archive", data.StatusLine);
+            Assert.Equal(300, data.ByDay[today.AddDays(-1)]);              // Claude Code's live day
+            Assert.Equal(400_000, data.ByDay[today.AddDays(-2)]);          // Codex's day, from the Vault
+            Assert.Equal(1_000, data.ByDay[today]);
+            Assert.Equal(400_000, data.CalendarByDay[today.AddDays(-2)]);
+            Assert.Equal(401_000, data.ByDayByAgent!["codex"].Values.Sum());
+            Assert.Equal(401_000, data.Projects["api"]);
+            Assert.Equal(100 + 200_000 + 500, data.SentWindow);   // Claude Code's live 100 in, plus Codex's input (half of each day)
+            Assert.Equal(500, data.SentToday);
+            Assert.True(data.AgentsConsented);
+        }
+        finally { Directory.Delete(dir, true); Directory.Delete(home, true); }
+    }
+
+    [Fact]
+    public void An_agent_root_with_no_meta_yet_does_not_pause_the_archive()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var (vault, dir) = VaultWith((".claude", Day(today.AddDays(-3)), 700));
+        ClaudeMeta(dir, TimeSpan.FromMinutes(1));
+        var (live, home) = LiveHome(daysAgo: 0);
+        try
+        {
+            var data = LocalCcViewModel.Compute(vault, [".claude", "codex"], live);   // codex: switched on, never ingested
+
+            Assert.Equal("", data.StatusLine);
+            Assert.Equal(700, data.ByDay[today.AddDays(-3)]);
+            Assert.Equal(300, data.ByDay[today]);
+            Assert.NotNull(LocalCcViewModel.ComputePreview(vault, [".claude", "codex"]));
+        }
+        finally { Directory.Delete(dir, true); Directory.Delete(home, true); }
+    }
+
+    [Fact]
+    public void Coverage_ignores_agent_roots()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var (vault, dir) = VaultWith((".claude", Day(today.AddDays(-3)), 700), ("codex", Day(today.AddDays(-1)), 50));   // codex meta: no ranges
+        ClaudeMeta(dir, TimeSpan.FromMinutes(1));
+        var (live, home) = LiveHome(daysAgo: 0);
+        try
+        {
+            var data = LocalCcViewModel.Compute(vault, [".claude", "codex"], live);
+
+            Assert.Empty(data.Uncovered);
+            Assert.Equal(50, data.ByDay[today.AddDays(-1)]);
+        }
+        finally { Directory.Delete(dir, true); Directory.Delete(home, true); }
+    }
+
+    [Fact]
+    public void Stopping_an_agent_names_it_by_product_and_speaks_of_its_token_counts()
+    {
+        Assert.Equal("Stop archiving Codex?", LocalCcViewModel.StopArchivingQuestion("codex"));
+        Assert.Equal("Stop archiving Antigravity?", LocalCcViewModel.StopArchivingQuestion("antigravity"));
+        Assert.Contains("Codex", LocalCcViewModel.StopArchivingDetail("codex"));
+        Assert.Contains("token counts already in the archive stay until you delete them", LocalCcViewModel.StopArchivingDetail("codex"));
+        Assert.DoesNotContain("folder", LocalCcViewModel.StopArchivingDetail("codex"));
+        Assert.Equal("Archiving is off for this folder either way. Erase the history already stored for it?",
+            LocalCcViewModel.StopArchivingDetail(".claude"));
+    }
+
+    [Fact]
+    public void The_empty_strip_speaks_for_every_agent_once_one_is_archived() => AppHost.Run(() =>
+    {
+        var strip = new LocalCcBarStrip();
+        var none = new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>();
+        strip.SetData(new Dictionary<DateOnly, long>(), ThemePalette.Obsidian, none, null, agentsConsented: true);
+        Assert.Equal("No local activity in the last 30 days.", strip.EmptyText);
+        strip.SetData(new Dictionary<DateOnly, long>(), ThemePalette.Obsidian, none, null);
+        Assert.Equal("No local CC activity in the last 30 days.", strip.EmptyText);
+    });
 }

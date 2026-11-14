@@ -30,12 +30,12 @@ public sealed partial class LedgerRowViewModel : ObservableObject
     public DateTimeOffset LastTs => Info.LastTs;
     public string ProjectSort => ProjectText;
 
-    /// <summary>"Claude Code", "Codex" or "Antigravity"; a project group spanning agents reads "Several agents".</summary>
     /// <summary>Whether any of the row's sessions came from the agent named <paramref name="label"/> (a stacked project can span agents).</summary>
     public bool HasAgent(string label) => Members.Count > 0
         ? Members.Any(m => AgentSources.BurnName(m.Agent) == label)
         : AgentSources.BurnName(Info.Agent) == label;
 
+    /// <summary>"Claude Code", "Codex" or "Antigravity"; a project group spanning agents reads "Several agents".</summary>
     public string AgentLabel => Members.Select(m => m.Agent).Distinct().Count() > 1
         ? SettingsNames.SeveralAgents
         : AgentSources.BurnName(Info.Agent);
