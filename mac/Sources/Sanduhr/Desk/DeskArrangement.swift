@@ -103,6 +103,8 @@ struct DeskPlacement: Equatable, Hashable {
     var scale: Double = 1
     var tilt: Double = 0
     var style: DeskMeterStyle = .bar
+    /// The display the piece draws on (the layout word's `@` suffix); `.main` unless set.
+    var monitor: DeskDisplay = .main
 }
 
 /// Two pieces of one stack given different slants: the refusal a design or layout check reports.
@@ -110,6 +112,7 @@ struct DeskPlacement: Equatable, Hashable {
 struct DeskTiltConflict: Equatable {
     var anchor: DeskAnchor
     var pieces: [String]
+    var display: DeskDisplay = .main
     var field: String { "layout.\(pieces[0]).tilt" }
     var message: String {
         "the pieces at \(anchor.rawValue) share one slant; give \(pieces.joined(separator: " and ")) the same tilt"
@@ -126,6 +129,14 @@ struct DeskTiltConflict: Equatable {
 /// build does not know is dropped; an anchor it does not know puts the piece at its default
 /// anchor instead of hiding it; a size it cannot read is 1. A widget named twice keeps its last
 /// word. A size of 1 is not written, so a string without sizes stays readable by older builds.
+/// A word may end in `@<display>` (Windows' suffix): `@all` for every display, `@<UUID>` for one
+/// display, none for the main display (a literal `@main` and an empty id read as main too; an id
+/// with a space, `:` or `@`, or over 300 characters, is refused and reads as main). Written on a
+/// piece that is not on the main display, the word is always the long form, all five fields, with
+/// the suffix last (`clock:tl:1:0:bar@all`): a 2.43 build splits on `:`, reads fields 1 to 3 and
+/// ignores the rest, so it keeps the piece's anchor, size and tilt and only loses the display. The
+/// reader takes the suffix on any field count (`clock:tl@all`, `clock:tl:1.2@all`).
+/// A stack is a display and an anchor: `tl` on two displays are two stacks, each with its own slant.
 struct DeskArrangement: Equatable {
     /// Known widgets, each once, in order: the order within an anchor is the order here.
     var pieces: [DeskPlacement] = []
@@ -179,7 +190,14 @@ struct DeskArrangement: Equatable {
 
     init(_ layout: String) {
         let known = Set(Self.known)
-        for word in layout.split(separator: " ") {
+        for full in layout.split(separator: " ") {
+            // The display rides last, after the final field: cut it off before the fields split.
+            var word = Substring(full)
+            var monitor = DeskDisplay.main
+            if let at = full.firstIndex(of: "@") {
+                word = full[..<at]
+                monitor = DeskDisplay.parse(String(full[full.index(after: at)...]))
+            }
             let bits = word.split(separator: ":").map(String.init)
             guard bits.count >= 2, known.contains(bits[0]) else { continue }
             let anchor = DeskAnchor(rawValue: bits[1]) ?? Self.defaultAnchor(bits[0])
@@ -189,7 +207,7 @@ struct DeskArrangement: Equatable {
             // piece that has none, is a bar.
             let style = bits.count >= 5 ? DeskMeterStyles.parse(bits[4]).map { DeskMeterStyles.for(bits[0], $0) } ?? .bar : .bar
             pieces.removeAll { $0.widget == bits[0] }
-            pieces.append(DeskPlacement(widget: bits[0], anchor: anchor, scale: scale, tilt: tilt, style: style))
+            pieces.append(DeskPlacement(widget: bits[0], anchor: anchor, scale: scale, tilt: tilt, style: style, monitor: monitor))
         }
     }
 
@@ -202,12 +220,16 @@ struct DeskArrangement: Equatable {
         let head = "\(p.widget):\(p.anchor.rawValue)"
         let tilt = clampTilt(p.tilt)
         let style = DeskMeterStyles.for(p.widget, p.style)
-        guard p.scale != 1 || tilt != 0 || style != .bar else { return head }
+        let suffix = p.monitor.suffix.map { "@" + $0 }
+        guard p.scale != 1 || tilt != 0 || style != .bar || suffix != nil else { return head }
         var word = head + ":" + String(format: "%g", p.scale)
+        // A piece off the main display writes every field, so an older build reads the anchor, size
+        // and tilt and skips the rest; the display rides last.
+        let long = suffix != nil
         // The fold rides after the size and the style after the fold, each only when not default.
-        if tilt != 0 || style != .bar { word += ":" + String(format: "%.0f", tilt) }
-        if style != .bar { word += ":" + DeskMeterStyles.word(style) }
-        return word
+        if tilt != 0 || style != .bar || long { word += ":" + String(format: "%.0f", tilt) }
+        if style != .bar || long { word += ":" + DeskMeterStyles.word(style) }
+        return word + (suffix ?? "")
     }
 
     func placement(_ widget: String) -> DeskPlacement? {
@@ -224,7 +246,10 @@ struct DeskArrangement: Equatable {
         }
     }
 
-    /// Each anchor's stack, top to bottom, of the pieces DeskView draws.
+    /// Each anchor's stack, top to bottom, of the pieces DeskView draws, every display merged:
+    /// the drawing callers read this until the Desk draws per screen (a piece on `.all` or on one
+    /// display still draws, as on a single display today). Use `displayStacks` where two displays'
+    /// stacks must stay apart (tilt, Settings).
     func stacks(showMeetings: Bool = true, showClaude: Bool = true) -> [DeskAnchor: [DeskPlacement]] {
         var out: [DeskAnchor: [DeskPlacement]] = [:]
         for p in shown(showMeetings: showMeetings, showClaude: showClaude) {
@@ -233,9 +258,18 @@ struct DeskArrangement: Equatable {
         return out
     }
 
-    /// One anchor's stack, every piece placed there (switches aside), top to bottom.
-    func stack(_ anchor: DeskAnchor) -> [DeskPlacement] {
-        pieces.filter { $0.anchor == anchor }
+    /// The same stacks keyed by display and anchor: `tl` on two displays are two stacks.
+    func displayStacks(showMeetings: Bool = true, showClaude: Bool = true) -> [DeskStackKey: [DeskPlacement]] {
+        var out: [DeskStackKey: [DeskPlacement]] = [:]
+        for p in shown(showMeetings: showMeetings, showClaude: showClaude) {
+            out[DeskStackKey(display: p.monitor, anchor: p.anchor), default: []].append(p)
+        }
+        return out
+    }
+
+    /// One anchor's stack on `display`, every piece placed there (switches aside), top to bottom.
+    func stack(_ anchor: DeskAnchor, on display: DeskDisplay = .main) -> [DeskPlacement] {
+        pieces.filter { $0.anchor == anchor && $0.monitor == display }
     }
 
     // MARK: Changes
@@ -252,11 +286,14 @@ struct DeskArrangement: Equatable {
             return
         }
         if old?.anchor == anchor { return }
+        // The piece keeps its display; the anchor's stack is the one on that display.
+        let display = old?.monitor ?? .main
         // Into a stack a piece takes its slant (one per stack); into an empty anchor it keeps its own.
         let moved = DeskPlacement(widget: widget, anchor: anchor, scale: old?.scale ?? 1,
-                                  tilt: stackTilt(anchor) ?? old?.tilt ?? 0, style: old?.style ?? .bar)
+                                  tilt: stackTilt(anchor, on: display) ?? old?.tilt ?? 0, style: old?.style ?? .bar,
+                                  monitor: display)
         let rank = Self.rank(widget)
-        if stack(anchor).isEmpty {
+        if stack(anchor, on: display).isEmpty {
             if let i = pieces.firstIndex(where: { $0.widget == widget }) {
                 pieces[i] = moved
             } else {
@@ -266,9 +303,29 @@ struct DeskArrangement: Equatable {
             return
         }
         pieces.removeAll { $0.widget == widget }
-        let there = pieces.indices.filter { pieces[$0].anchor == anchor }
+        let there = pieces.indices.filter { pieces[$0].anchor == anchor && pieces[$0].monitor == display }
         let at = there.first { Self.rank(pieces[$0].widget) > rank } ?? (there.last.map { $0 + 1 } ?? pieces.endIndex)
         pieces.insert(moved, at: at)
+    }
+
+    /// Moves a placed piece to `display`, same anchor: it joins that display's stack at the
+    /// anchor by Settings' order, takes the stack's slant if it has one, and keeps its size and
+    /// style. A hidden piece, or one already there, changes nothing.
+    mutating func setDisplay(_ widget: String, _ display: DeskDisplay) {
+        guard let old = placement(widget), old.monitor != display else { return }
+        var moved = old
+        moved.monitor = display
+        if let joined = stackTilt(old.anchor, on: display) { moved.tilt = joined }
+        let rank = Self.rank(widget)
+        pieces.removeAll { $0.widget == widget }
+        let there = pieces.indices.filter { pieces[$0].anchor == old.anchor && pieces[$0].monitor == display }
+        if there.isEmpty {
+            let at = pieces.firstIndex { Self.rank($0.widget) > rank } ?? pieces.endIndex
+            pieces.insert(moved, at: at)
+        } else {
+            let at = there.first { Self.rank(pieces[$0].widget) > rank } ?? (there.last! + 1)
+            pieces.insert(moved, at: at)
+        }
     }
 
     /// Takes `widget` off the Desk: the write Settings makes when a piece's place is set to
@@ -306,13 +363,13 @@ struct DeskArrangement: Equatable {
     }
 
     /// The slant of the stack at `anchor`: its first piece's; nil when the anchor has none.
-    func stackTilt(_ anchor: DeskAnchor) -> Double? {
-        pieces.first { $0.anchor == anchor }?.tilt
+    func stackTilt(_ anchor: DeskAnchor, on display: DeskDisplay = .main) -> Double? {
+        pieces.first { $0.anchor == anchor && $0.monitor == display }?.tilt
     }
 
     /// The slant of the stack `widget` sits in; nil when it is not placed. What the Desk draws by.
     func tilt(of widget: String) -> Double? {
-        placement(widget).map { stackTilt($0.anchor) ?? $0.tilt }
+        placement(widget).map { stackTilt($0.anchor, on: $0.monitor) ?? $0.tilt }
     }
 
     /// The style `widget` draws in: its own, `.bar` for a piece without one or one not placed.
@@ -325,28 +382,35 @@ struct DeskArrangement: Equatable {
     mutating func setTilt(_ widget: String, _ tilt: Double) {
         guard let p = placement(widget) else { return }
         let t = Self.clampTilt(tilt)
-        for i in pieces.indices where pieces[i].anchor == p.anchor { pieces[i].tilt = t }
+        for i in pieces.indices where pieces[i].anchor == p.anchor && pieces[i].monitor == p.monitor { pieces[i].tilt = t }
     }
 
     /// Stacks whose pieces carry different tilts, in anchor order (what a layout string can say and
     /// the Desk resolves by the first piece's). A design or layout check refuses these.
     var tiltConflicts: [DeskTiltConflict] {
-        Self.tiltConflicts(pieces.map { ($0.widget, $0.anchor, Optional($0.tilt)) })
+        Self.tiltConflicts(displayed: pieces.map { ($0.widget, $0.anchor, $0.monitor, Optional($0.tilt)) })
     }
 
     /// The same check over words a design gives: pieces sent to one anchor with different tilts
     /// (a nil tilt says nothing and never conflicts), at most three, in the pieces' order.
     static func tiltConflicts(_ words: [(widget: String, anchor: DeskAnchor, tilt: Double?)]) -> [DeskTiltConflict] {
-        var order: [DeskAnchor] = []
-        var by: [DeskAnchor: [(String, Double)]] = [:]
+        tiltConflicts(displayed: words.map { ($0.widget, $0.anchor, DeskDisplay.main, $0.tilt) })
+    }
+
+    /// The same check with a display per word (a design word with no display is main): a stack is a
+    /// display and an anchor, so the same anchor on two displays never conflicts.
+    static func tiltConflicts(displayed words: [(widget: String, anchor: DeskAnchor, display: DeskDisplay, tilt: Double?)]) -> [DeskTiltConflict] {
+        var order: [DeskStackKey] = []
+        var by: [DeskStackKey: [(String, Double)]] = [:]
         for w in words {
             guard let t = w.tilt else { continue }
-            if by[w.anchor] == nil { order.append(w.anchor) }
-            by[w.anchor, default: []].append((w.widget, t))
+            let key = DeskStackKey(display: w.display, anchor: w.anchor)
+            if by[key] == nil { order.append(key) }
+            by[key, default: []].append((w.widget, t))
         }
-        return order.compactMap { a -> DeskTiltConflict? in
-            guard let g = by[a], Set(g.map(\.1)).count > 1 else { return nil }
-            return DeskTiltConflict(anchor: a, pieces: g.map(\.0))
+        return order.compactMap { k -> DeskTiltConflict? in
+            guard let g = by[k], Set(g.map(\.1)).count > 1 else { return nil }
+            return DeskTiltConflict(anchor: k.anchor, pieces: g.map(\.0), display: k.display)
         }.prefix(3).map { $0 }
     }
 
@@ -358,8 +422,9 @@ struct DeskArrangement: Equatable {
         guard widget != target, let from = pieces.firstIndex(where: { $0.widget == widget }),
               let to = pieces.firstIndex(where: { $0.widget == target }) else { return }
         var piece = pieces[from]
-        let sameAnchor = piece.anchor == pieces[to].anchor
+        let sameAnchor = piece.anchor == pieces[to].anchor && piece.monitor == pieces[to].monitor
         piece.anchor = pieces[to].anchor
+        piece.monitor = pieces[to].monitor
         if !sameAnchor { piece.tilt = pieces[to].tilt }
         pieces.remove(at: from)
         let target = pieces.firstIndex { $0.widget == target } ?? pieces.endIndex
@@ -369,7 +434,7 @@ struct DeskArrangement: Equatable {
     /// Moves `widget` one place up (-1) or down (+1) in its stack; the stack's ends stay put.
     mutating func move(_ widget: String, by step: Int) {
         guard let p = placement(widget) else { return }
-        let stack = stack(p.anchor).map(\.widget)
+        let stack = stack(p.anchor, on: p.monitor).map(\.widget)
         guard let i = stack.firstIndex(of: widget), stack.indices.contains(i + step) else { return }
         move(widget, onto: stack[i + step])
     }
