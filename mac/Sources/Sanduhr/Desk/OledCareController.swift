@@ -40,6 +40,12 @@ final class OledCareController {
         window?.alphaValue = idle.dimmed ? OledIdle.deskDimmedOpacity : 1
     }
 
+    /// Every Desk window was rebuilt, or some were added (one per display with pieces): each comes up
+    /// at the opacity it should have now.
+    func deskWindowsRebuilt(_ windows: [NSWindow]) {
+        for w in windows { deskWindowRebuilt(w) }
+    }
+
     // MARK: Running
 
     private func begin() {
@@ -90,8 +96,8 @@ final class OledCareController {
 
     /// The Desk's window to 0.40 and the widget's to 0.70, or both back to 1.
     private func setDimmed(_ dim: Bool, duration: TimeInterval) {
-        let windows: [(NSWindow?, CGFloat)] = [
-            (DeskController.shared.window, dim ? OledIdle.deskDimmedOpacity : 1),
+        // Every Desk window (one per display with pieces) dims together.
+        let windows: [(NSWindow?, CGFloat)] = DeskController.shared.deskWindows.map { ($0, dim ? OledIdle.deskDimmedOpacity : 1) } + [
             (NSApp.windows.first { $0 is FloatingPanel }, dim ? OledIdle.widgetDimmedOpacity : 1),
         ]
         guard duration > 0 else {
@@ -113,6 +119,10 @@ final class OledCareController {
 private struct OledDriftModifier: ViewModifier {
     var model: DeskModel
     @State private var home = CGRect.zero
+    /// A window besides the main one: its own size, menu bar and Dock (DeskExtraWindow); nil on the
+    /// main window, which reads the model's.
+    @Environment(\.deskScreenGeometry) private var geometry
+    private var deskSize: CGSize { geometry?.deskSize ?? model.deskSize }
 
     func body(content: Content) -> some View {
         let d = offset()
@@ -124,17 +134,19 @@ private struct OledDriftModifier: ViewModifier {
     private var drifting: Bool { model.oledStep != nil && !model.arrange.active }
 
     private func offset() -> CGSize {
-        guard drifting, let step = model.oledStep, home.width > 0, model.deskSize.width > 0 else { return .zero }
-        let area = CGRect(origin: .zero, size: model.deskSize)
+        guard drifting, let step = model.oledStep, home.width > 0, deskSize.width > 0 else { return .zero }
+        let area = CGRect(origin: .zero, size: deskSize)
         let moved = OledDrift.drifted(home, step: step, area: area, clearance: clearance())
         return CGSize(width: moved.minX - home.minX, height: moved.minY - home.minY)
     }
 
     /// The menu bar on top (and the notch's strip for a piece beneath it), the Dock on its side.
     private func clearance() -> OledInsets {
-        var top = model.topInset
-        if let notch = model.notchRect, home.maxX > notch.minX, home.minX < notch.maxX { top = max(top, notch.maxY) }
-        return OledInsets(left: model.dockInsets.left, top: top, right: model.dockInsets.right, bottom: model.dockInsets.bottom)
+        var top = geometry?.topInset ?? model.topInset
+        let notchRect = geometry == nil ? model.notchRect : geometry?.notchRect
+        let dock = geometry?.dockInsets ?? model.dockInsets
+        if let notch = notchRect, home.maxX > notch.minX, home.minX < notch.maxX { top = max(top, notch.maxY) }
+        return OledInsets(left: dock.left, top: top, right: dock.right, bottom: dock.bottom)
     }
 
     @ViewBuilder

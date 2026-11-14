@@ -265,7 +265,7 @@ enum DebugHooks {
             guard w.isVisible else { return nil }
             let kind: String
             if w is FloatingPanel { kind = "widget" }
-            else if w === desk.window { kind = "desk" }
+            else if w === desk.window || desk.extraDeskWindows.contains(where: { $0 === w }) { kind = "desk" }
             else if w === desk.wingsWindow { kind = "notch" }
             else if w === desk.pillWindow { kind = "pill" }
             else if w === CameraLightController.shared.window { kind = "camera" }

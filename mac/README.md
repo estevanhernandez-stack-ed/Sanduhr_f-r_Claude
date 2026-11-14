@@ -1380,6 +1380,22 @@ the `desk-arrange start|test|done|cancel` hook drives it, and `scenarios/desk-ar
 it from Settings, checks that Settings steps aside and comes back, that the bar shows only while
 arranging, that Cancel leaves `layout` alone and that Done writes it.
 
+### Desk windows per display
+
+One Desk window per display that has pieces (`DeskWindowPlan`, `DeskController.buildWindow`): the
+main one on the menu bar display (`NSScreen.screens.first`, not `NSScreen.main`) carries every role
+it always had (the notch, wings and pill, the Dock follower, drawers, the companion, the camera
+badge, Arrange and the click layer's main plates), and each other display a piece draws on
+(`DeskScreens.showsOn`) gets a plain window at the same level, click-through the same way. A window
+draws only its own share (`DeskWindowPlan.stacks`); a piece on All displays draws on every window, a
+piece whose display is not connected falls back to the main one, and the companion stays on main.
+Each window has its own geometry (`DeskScreenGeometry`: size and menu bar from its screen; no notch
+and no Dock clearance off the main display). Frames from another window reach the model moved by its
+offset from the main window (`DeskFrameReporting`), so the one hit test covers every display. The
+copy of an All-displays piece on another window reports nothing (its click areas are the main
+window's), and a slanted stack there reports no fold, so it clicks by the box around what is drawn. Windows are rebuilt on a display change and come or go when a
+layout change adds or empties a display; OLED care drifts and dims them all.
+
 ### Desk clicks
 
 The Desk window is transparent and sits just below app windows, and the window server hands a
