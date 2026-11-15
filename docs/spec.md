@@ -168,6 +168,7 @@ mac/
 | 75 | `docs/mod-studio-spec.md` | Mod Studio: a sheet for working on one mod with a live preview that replays `mac/integrations/band-fixtures/`, and a shorter Catalog |
 | 76 | `docs/config-transfer-spec.md` | Packs: one format to share a mod, then carry a whole Claude Code folder, always reviewed before it lands |
 | 76, slice H | `docs/agnostify-spec.md` | Agnostify: the pack's second folder, any-agent, in the formats Codex, Gemini CLI, Cursor and Copilot read |
+| 2.44.0 | `docs/superpowers/specs/2026-11-14-mac-desk-per-monitor-design.md` | Desk pieces per display: main, all or one named display, in Settings, Arrange and `propose_desk` |
 
 ### Plans, checklist and release
 

@@ -410,19 +410,21 @@ MOTION_GUIDE = (
     "uploaded.")
 
 # get_desk and propose_desk (2.37.0): Windows' tool names and schemas, with the guide text cut to what the
-# Mac Desk has (no monitors, wallpaper summary, Launcher, saved designs or direct-change switch).
+# Mac Desk has (no wallpaper summary, Launcher, saved designs or direct-change switch).
 DESIGN_GUIDE_READ = (
     "Read the user's Desk before designing it. The Desk is what Sanduhr draws on the Mac desktop: a clock, Claude "
     "usage, a handwritten message and other pieces, each placed at one of eight anchors (tl tc tr ml mr bl bc br) "
     "with a size, in a font and an ink, optionally on a soft plate. Returns design (the current look as a design: "
-    "layout with every piece's anchor, size, hidden and tilt (the slant of its stack in degrees, 0 upright), and "
+    "layout with every piece's anchor, size, hidden, monitor (\"main\", \"all\" or a display id) and tilt (the slant "
+    "of its stack in degrees, 0 upright), and "
     "for claude, meters and telemetry its style (bar, slim, ring or ticks; limits.piece_style lists the pieces and "
     "the words), weather.nickname (the name the weather piece shows instead of the place's, \"\" for the place's own), "
-    "font, ink, plate, shadow), pieces and anchors (the allowed words), fonts (installed families, and the "
+    "font, ink, plate, shadow), pieces and anchors (the allowed words), monitors (each display: id, name, width, "
+    "height, primary, left, top; the Desk places pieces per display), fonts (installed families, and the "
     "bundled handwriting fonts EsteFont Pro and EsteFont 26), shown (the pieces the Desk draws now), "
     "message_color and notch_text_color (hex colors, read-only: propose_desk does not change them), limits and "
     "sprites (each sprite made here: id, name, frame_w, frame_h and cells, never its image; propose_sprite_motion uses it). "
-    "The Mac Desk has no monitors, wallpaper summary, Launcher, saved designs or direct-change switch, so those "
+    "The Mac Desk has no wallpaper summary, Launcher, saved designs or direct-change switch, so those "
     "keys are never here, and propose_desk cannot judge ink against the wallpaper: choose an ink that reads on "
     "what the user has. Call this before propose_desk and design from what it says. status no_data with reason "
     "missing means Sanduhr is not running or has not written the Desk state yet.")
@@ -430,12 +432,14 @@ DESIGN_GUIDE_READ = (
 DESIGN_GUIDE_PROPOSE = (
     "Propose a look for the user's Desk. The design is PARTIAL: send only the fields to change; everything absent "
     "stays as it is. Fields, all optional: name (up to 40 characters); note (one sentence for the user, up to 200); "
-    "layout {piece: {anchor, size, hidden}}, where piece is a key from get_desk pieces, anchor is tl tc tr ml mr bl "
-    "bc br, size is 0.6 to 1.6, and hidden removes the piece (the companion piece draws the sprite the user chose "
-    "in Settings, Widgets, and draws nothing until a sprite is installed); "
+    "layout {piece: {anchor, size, hidden, monitor}}, where piece is a key from get_desk pieces, anchor is tl tc tr ml "
+    "mr bl bc br, size is 0.6 to 1.6, hidden removes the piece (the companion piece draws the sprite the user chose "
+    "in Settings, Widgets, and draws nothing until a sprite is installed), and monitor puts it on the \"main\" "
+    "display (the default), on \"all\" displays or on one display by its id from get_desk monitors (a piece on a "
+    "display that is unplugged shows on the main one meanwhile); "
     "tilt in a layout piece slants the piece's whole stack from -20 to 20 degrees (negative rises to the right, "
     "positive falls; 0 upright), so a left stack at -18 and a right stack at 18 read as two faces of a fold; pieces "
-    "at one anchor share one slant, so give them the same tilt; "
+    "at one anchor of one display share one slant, so give them the same tilt; "
     "style in a layout piece, only on claude, meters and telemetry, is how its numbers draw so a stack fits its column: bar "
     "(the default, a full-width bar with its label above), slim (label and value on one line over a thin bar, about "
     "half the height; claude becomes a compact two-row line), ring (small arc gauges with the value inside, side by "
@@ -446,11 +450,11 @@ DESIGN_GUIDE_PROPOSE = (
     "left-to-right gradient); plate and shadow (true or false; the plate is a soft panel behind each stack of "
     "pieces); weather {nickname} (up to 24 characters, shown on the Desk's weather piece instead of the place's "
     "name, \"\" for the place's own name; the city and the unit stay the user's to choose in Settings, Weather). "
-    "The Mac refuses, with a reason and nothing written, what only Windows has: monitor in a layout piece, "
+    "The Mac refuses, with a reason and nothing written, what only Windows has: "
     "the launcher and glow pieces, the launcher field, the messages, looks and theme fields (send message lines with propose_desk_messages, song "
     "looks with propose_now_playing_looks and a widget theme with propose_theme), and the Windows ink words auto, "
     "light, dark and theme. The server checks before anything is sent: every field's shape and range, the tilt of "
-    "each stack and the style words. status rejected comes with reasons, each {field, message}: fix those fields "
+    "each stack, the style words and that a monitor id is a display connected now. status rejected comes with reasons, each {field, message}: fix those fields "
     "and call again; nothing was written. Otherwise Sanduhr draws the design live on the desktop with a bar on "
     "Settings, Desk where the user chooses Apply or Dismiss: previewing means the user is reviewing it now (do not "
     "send the same look again), applied means it is in place (their previous look is saved), needs_font lists the "
@@ -823,7 +827,7 @@ TOOLS += [
                         "name": {"type": "string", "maxLength": 40},
                         "note": {"type": "string", "maxLength": 200},
                         "layout": {"type": "object",
-                                   "description": "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean, tilt: -20 to 20 degrees, the slant of the piece's whole stack, style: bar|slim|ring|ticks, only on claude, meters and telemetry}. monitor is Windows only and refused here."},
+                                   "description": "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean, monitor: main|all|a display id from get_desk monitors, tilt: -20 to 20 degrees, the slant of the piece's whole stack, style: bar|slim|ring|ticks, only on claude, meters and telemetry}."},
                         "weather": {"type": "object",
                                     "description": "{nickname: up to 24 characters}: the name the weather piece shows instead of the place's own; \"\" goes back to the place's name. Local only; the forecast keeps the city's coordinates.",
                                     "properties": {"nickname": {"type": "string", "maxLength": 24}},
@@ -3880,8 +3884,8 @@ def build_propose_sprite_motion(args, now=None, paths=None, wait=MOTION_WAIT_SEC
 # A port of the Mac subset of Windows' DeskDesign.Parse and Validate (Core), ToolLogic.Desk.cs and the two
 # tools' entries; the app's Swift DeskDesign and DeskDesignValidator are the third copy, and
 # Tests/SanduhrTests/Fixtures/desk-designs/ holds the designs both this file and the Swift build are held
-# to. Rules and messages are Windows' where the field exists on the Mac. What only Windows has (monitors,
-# the launcher and glow pieces, the launcher, messages, looks and theme fields,
+# to. Rules and messages are Windows' where the field exists on the Mac. What only Windows has (the launcher
+# and glow pieces, the launcher, messages, looks and theme fields,
 # the auto, light, dark and theme ink words) is refused with a reason, never dropped. This server never
 # changes the Desk: it validates, queues desk-request.json and waits for desk-result.json.
 
@@ -3905,8 +3909,9 @@ DESIGN_MAX_TILT = 20
 DESIGN_BUNDLED_FONTS = ("EsteFont Pro", "EsteFont 26")
 DESIGN_LINK_MAX = 2048
 DESIGN_ANSWER_STATUSES = ("previewing", "applied", "rejected", "needs_font")
-DESIGN_STATE_KEYS = ("design", "pieces", "anchors", "fonts", "shown", "message_color", "notch_text_color", "limits",
-                     "sprites")
+DESIGN_STATE_KEYS = ("design", "pieces", "anchors", "fonts", "monitors", "shown", "message_color", "notch_text_color",
+                     "limits", "sprites")
+DESIGN_MONITOR_ID_MAX = 300
 DESIGN_INK_WORDS = ("auto", "light", "dark", "theme")
 DESIGN_WINDOWS_ONLY_FIELDS = {
     "launcher": "is Windows only: the Mac Desk has no Launcher piece",
@@ -4025,11 +4030,37 @@ def design_parse_weather(node, reasons):
     return None if len(reasons) > before else nick
 
 
-def design_parse_layout(node, reasons):
+def design_monitor_word(raw):
+    """A design's monitor word: "main" and "all" (any case, trimmed), else an id the Mac layout can carry (no
+    spaces, ':', '@' or control characters, at most 300 characters). None when refused."""
+    if not isinstance(raw, str):
+        return None
+    t = raw.strip()
+    if not t or len(t) > DESIGN_MONITOR_ID_MAX or any(is_control(c) for c in t):
+        return None
+    if t.lower() in ("main", "all"):
+        return t.lower()
+    if any(c in ":@" or c.isspace() for c in t):
+        return None
+    return t
+
+
+def design_stack_display(word, monitors):
+    """The stack a monitor word belongs to, for the slant rule: the main display's own id is main, and ids
+    compare without regard to case."""
+    if word in ("main", "all"):
+        return word
+    for m in monitors or ():
+        if m.get("primary") is True and isinstance(m.get("id"), str) and m["id"].lower() == word.lower():
+            return "main"
+    return "id:" + word.lower()
+
+
+def design_parse_layout(node, reasons, monitors=None, current=None):
     if node is None:
         return None
     if not isinstance(node, dict):
-        reasons.append(design_reason("layout", "must be an object of piece name to {anchor, size, hidden, tilt, style}"))
+        reasons.append(design_reason("layout", "must be an object of piece name to {anchor, size, hidden, monitor, tilt, style}"))
         return None
     if len(node) > DESIGN_MAX_PIECES:
         reasons.append(design_reason("layout", "names %d pieces; the Desk has %d" % (len(node), len(DESIGN_PIECES))))
@@ -4045,13 +4076,10 @@ def design_parse_layout(node, reasons):
                 reasons.append(design_reason(field, "is not a Desk piece; the pieces are " + ", ".join(DESIGN_PIECES)))
             continue
         if not isinstance(value, dict):
-            reasons.append(design_reason(field, "must be an object with anchor, size, hidden, tilt and style"))
+            reasons.append(design_reason(field, "must be an object with anchor, size, hidden, monitor, tilt and style"))
             continue
-        for bad in sorted((k for k in value if k not in ("anchor", "size", "hidden", "tilt", "style")), key=u16)[:3]:
-            if bad == "monitor":
-                reasons.append(design_reason(field, "monitor is Windows only: the Mac Desk has no per-monitor placement; use anchor, size, hidden, tilt and style"))
-            else:
-                reasons.append(design_reason(field, "unknown member '%s'; use anchor, size, hidden, tilt and style" % design_clip(bad, 20)))
+        for bad in sorted((k for k in value if k not in ("anchor", "size", "hidden", "monitor", "tilt", "style")), key=u16)[:3]:
+            reasons.append(design_reason(field, "unknown member '%s'; use anchor, size, hidden, monitor, tilt and style" % design_clip(bad, 20)))
         anchor = None
         if value.get("anchor") is not None:
             word = design_str(value["anchor"])
@@ -4072,6 +4100,11 @@ def design_parse_layout(node, reasons):
                 hidden = value["hidden"]
             else:
                 reasons.append(design_reason(field + ".hidden", "must be true or false"))
+        monitor = None
+        if value.get("monitor") is not None:
+            monitor = design_monitor_word(value["monitor"])
+            if monitor is None:
+                reasons.append(design_reason(field + ".monitor", "must be \"all\", \"main\" or a monitor id from get_desk monitors"))
         tilt = None
         if value.get("tilt") is not None:
             t = design_number(value["tilt"])
@@ -4091,14 +4124,17 @@ def design_parse_layout(node, reasons):
                 else:
                     reasons.append(design_reason(field + ".style", "must be one of " + ", ".join(DESIGN_STYLES)))
         if hidden is True:
-            anchor = size = tilt = style = None
-        pieces.append({"piece": key, "anchor": anchor, "size": size, "hidden": hidden, "tilt": tilt, "style": style})
-    # One slant per stack: two pieces sent to the same anchor with different tilts cannot both be honored.
+            anchor = size = tilt = style = monitor = None
+        pieces.append({"piece": key, "anchor": anchor, "size": size, "hidden": hidden, "tilt": tilt, "style": style,
+                       "monitor": monitor})
+    # One slant per stack: two pieces sent to the same anchor of one display with different tilts cannot both be
+    # honored. A piece that names no monitor keeps the display it is on now.
     groups = {}
     for p in pieces:
         if p["anchor"] is not None and p["tilt"] is not None:
-            groups.setdefault(p["anchor"], []).append(p)
-    clashes = [(a, g) for a, g in groups.items() if len(set(p["tilt"] for p in g)) > 1]
+            word = p["monitor"] or (current or {}).get(p["piece"]) or "main"
+            groups.setdefault((design_stack_display(word, monitors), p["anchor"]), []).append(p)
+    clashes = [(k[1], g) for k, g in groups.items() if len(set(p["tilt"] for p in g)) > 1]
     for anchor, group in clashes[:3]:
         reasons.append(design_reason("layout." + group[0]["piece"] + ".tilt",
                                      "the pieces at %s share one slant; give %s the same tilt"
@@ -4236,7 +4272,7 @@ def design_parse_ink(node, reasons):
     return None
 
 
-def design_parse(node):
+def design_parse(node, monitors=None, current=None):
     """(design or None, reasons): shapes, ranges, words and the Mac's refusals. A field that is wrong is a reason
     and the design is None; an unknown field is a reason too, so a typo never silently does nothing."""
     if not isinstance(node, dict):
@@ -4248,7 +4284,7 @@ def design_parse(node):
                                + ". The fields are " + ", ".join(DESIGN_FIELDS) + "."))
     name = design_text(node, "name", DESIGN_NAME_MAX, r)
     note = design_text(node, "note", DESIGN_NOTE_MAX, r)
-    layout = design_parse_layout(node.get("layout"), r)
+    layout = design_parse_layout(node.get("layout"), r, monitors, current)
     weather_nickname = design_parse_weather(node.get("weather"), r)
     font = design_parse_font(node.get("font"), r)
     ink = design_parse_ink(node.get("ink"), r)
@@ -4284,6 +4320,8 @@ def design_to_json(d):
                 po["tilt"] = design_out(p["tilt"])
             if p["style"] is not None:
                 po["style"] = p["style"]
+            if p.get("monitor") is not None:
+                po["monitor"] = p["monitor"]
             lo[p["piece"]] = po
         o["layout"] = lo
     if d.get("weather_nickname") is not None:
@@ -4299,9 +4337,10 @@ def design_to_json(d):
     return o
 
 
-def design_validate(design, installed_fonts=None):
-    """The one gate for a design: {status: ok|needs_font|rejected, reasons, fonts, design}. installed_fonts is the
-    list get_desk reports (None: unknown, so the font rule is left to the app, which always knows)."""
+def design_validate(design, installed_fonts=None, monitors=None, current=None):
+    """The one gate for a design: {status: ok|needs_font|rejected, reasons, fonts, design}. installed_fonts and
+    monitors are the lists get_desk reports, current each placed piece's monitor word now (None: unknown, so the rule
+    that needs it is left to the app, which always knows)."""
     if design is not None:
         try:
             size = len(widget_json(design).encode("utf-8"))
@@ -4310,9 +4349,18 @@ def design_validate(design, installed_fonts=None):
         if size > DESIGN_MAX_JSON_BYTES:
             return {"status": "rejected", "reasons": [design_reason("design", "is larger than %d KB" % (DESIGN_MAX_JSON_BYTES // 1024))],
                     "fonts": [], "design": None}
-    d, reasons = design_parse(design)
+    d, reasons = design_parse(design, monitors, current)
     if d is None:
         return {"status": "rejected", "reasons": reasons, "fonts": [], "design": None}
+    # Windows' CheckMonitors: a monitor id must be a display connected now.
+    if monitors is not None and d["layout"] is not None:
+        ids = set(m["id"].lower() for m in monitors if isinstance(m.get("id"), str))
+        for p in d["layout"]:
+            if p["monitor"] is not None and p["monitor"] not in ("main", "all") and p["monitor"].lower() not in ids:
+                reasons.append(design_reason("layout.%s.monitor" % p["piece"],
+                                             "is not a display connected to this Mac; use \"all\", \"main\" or an id from monitors in get_desk."))
+        if reasons:
+            return {"status": "rejected", "reasons": reasons, "fonts": [], "design": None}
     missing = []
     font = d["font"]
     if font is not None and font["family"] and installed_fonts is not None and font["family"] not in DESIGN_BUNDLED_FONTS:
@@ -4354,6 +4402,29 @@ def design_installed_fonts(state):
     if not isinstance(installed, list):
         return None
     return [f for f in installed[:5000] if isinstance(f, str)]
+
+
+def design_monitors(state):
+    """The displays get_desk reports (id and primary are what the rules read), None when the state has none."""
+    monitors = state.get("monitors") if isinstance(state, dict) else None
+    if not isinstance(monitors, list):
+        return None
+    return [m for m in monitors[:64] if isinstance(m, dict) and isinstance(m.get("id"), str)]
+
+
+def design_current_monitors(state):
+    """Each placed piece's monitor word in the state's design, {} when it says none."""
+    design = state.get("design") if isinstance(state, dict) else None
+    layout = design.get("layout") if isinstance(design, dict) else None
+    if not isinstance(layout, dict):
+        return {}
+    out = {}
+    for piece, p in layout.items():
+        if isinstance(p, dict) and p.get("hidden") is not True and isinstance(p.get("monitor"), str):
+            word = design_monitor_word(p["monitor"])
+            if word is not None:
+                out[piece] = word
+    return out
 
 
 def build_get_desk(now=None, paths=None):
@@ -4430,7 +4501,7 @@ def build_propose_desk(args, now=None, paths=None, wait=DESIGN_WAIT_SECONDS, pol
         proposal["note"] = args["note"]
 
     _outcome, state = read_design_state(paths)
-    verdict = design_validate(proposal, design_installed_fonts(state))
+    verdict = design_validate(proposal, design_installed_fonts(state), design_monitors(state), design_current_monitors(state))
     if verdict["status"] == "rejected":
         return {"status": "rejected", "reasons": verdict["reasons"]}
 

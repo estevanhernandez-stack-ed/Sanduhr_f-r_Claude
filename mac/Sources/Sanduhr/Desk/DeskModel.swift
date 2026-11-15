@@ -168,6 +168,24 @@ final class DeskModel {
     var deskSize: CGSize = .zero
     /// The camera notch in window coordinates (top-left origin), or nil on screens without one.
     var notchRect: CGRect?
+    /// The connected displays, named (DeskScreens.current), as of the last window build; empty
+    /// before the first. The main window's DeskView draws its share by them (DeskWindowPlan); empty,
+    /// it draws every piece, as before 2.44. The geometry above is the main window's.
+    var screens: [DeskScreenInfo] = []
+    /// The main window's DeskView saw the windows besides the main one change (a layout change put a
+    /// piece on another display or took the last one off it): DeskController builds or drops them.
+    @ObservationIgnored var onExtraScreensChange: (([DeskScreenInfo]) -> Void)?
+
+    /// The layout the Desk draws: Arrange's working copy, else a Desk design's preview, else
+    /// `saved`, with the companion a widget proposal previews and the setup's desktop switch applied.
+    @MainActor func drawnArrangement(saved: String) -> DeskArrangement {
+        var arrangement = arrange.working ?? DeskDesignPreview.shared.layout ?? DeskArrangement(saved)
+        // A proposed sprite is previewed even while the piece is Hidden (WidgetProposalHandoff); never saved.
+        if widgetPreviewsCompanion, arrangement.placement("companion") == nil {
+            arrangement.pieces.append(DeskPlacement(widget: "companion", anchor: DeskArrangement.defaultAnchor("companion")))
+        }
+        return SetupDesk.visible(arrangement, desktop: desktopOn)
+    }
     /// The Claude meters, short enough for the notch: "5h 7%  wk 63%".
     var claudeCompact: String?
     /// The `claude` piece's compact two-row form (slim style), nil when there is nothing to say.
@@ -735,8 +753,18 @@ final class DeskModel {
         input.claudeLineDrawn = claudeLine != nil || claudeParts?.account != nil || switchNote
         input.claudeLineFrame = claudeLineFrame
         return DeskElements.folded(DeskElements.build(input),
-                                   arrangement: DeskArrangement(layoutWords),
+                                   arrangement: Self.mainWindowPieces(DeskArrangement(layoutWords), screens: screens),
                                    folds: folds)
+    }
+
+    /// The pieces the main window draws: only its slanted stacks report a fold (DeskFoldStack), so a
+    /// piece on another window never takes the main window's slant for its anchor. No screens known:
+    /// every piece, as before 2.44.
+    static func mainWindowPieces(_ arrangement: DeskArrangement, screens: [DeskScreenInfo]) -> DeskArrangement {
+        guard let main = DeskWindowPlan.plan(arrangement, screens: screens).main else { return arrangement }
+        var onMain = arrangement
+        onMain.pieces = arrangement.pieces.filter { DeskWindowPlan.draws($0, on: main, connected: screens) }
+        return onMain
     }
 
     /// The first meeting still to come (or in progress) that has a join link.

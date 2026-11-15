@@ -41,6 +41,10 @@ import AppKit
 /// ~/Library/Application Support/Desk/messages.txt (no restart needed).
 struct DeskView: View {
     var model: DeskModel
+    /// A window besides the main one (one per display with pieces, DeskWindowPlan): its geometry and
+    /// its offset from the main window. nil on the main window, which reads the model's geometry and
+    /// alone carries the notch and the slanted stacks' click areas. Arrange runs on every window (2.44).
+    var extra: DeskExtraWindow? = nil
 
     @AppStorage("layout", store: .desk) private var layout = "message:tl clock:bl claude:bl meetings:bl"
     @AppStorage("left", store: .desk) private var left = 52.0
@@ -57,24 +61,50 @@ struct DeskView: View {
 
     private var inset: CGFloat { timeSize * 0.18 }
 
-    /// Each anchor's pieces, top to bottom (DeskArrangement). Unknown widgets are skipped, so a
-    /// typo hides one widget instead of blanking the desktop; an unknown anchor falls back to
-    /// the widget's default.
+    /// This window's menu bar strip, Dock reach and notch: the model's on the main window.
+    private var topInset: CGFloat { extra?.geometry.topInset ?? model.topInset }
+    private var dockInsets: DockInsets { extra?.geometry.dockInsets ?? model.dockInsets }
+    private var notchRect: CGRect? { extra == nil ? model.notchRect : extra?.geometry.notchRect }
+
+    /// The window this view draws, as the plan names it; nil before the screens are known (then it
+    /// draws every piece, as one window did before 2.44).
+    private var window: DeskWindowPlan.Window? {
+        if let extra { return extra.plan }
+        return DeskScreens.main(model.screens).map { DeskWindowPlan.Window(screen: $0, isMain: true) }
+    }
+
+    /// Each anchor's pieces on this window, top to bottom (DeskArrangement, DeskWindowPlan.stacks).
+    /// Unknown widgets are skipped, so a typo hides one widget instead of blanking the desktop; an
+    /// unknown anchor falls back to the widget's default.
     /// While arranging (item 60), the layout being edited; nothing is saved until Done.
-    private var stacks: [DeskAnchor: [DeskPlacement]] {
-        var arrangement = model.arrange.working ?? DeskDesignPreview.shared.layout ?? DeskArrangement(layout)
-        // A proposed sprite is previewed even while the piece is Hidden (WidgetProposalHandoff); never saved.
-        if model.widgetPreviewsCompanion, arrangement.placement("companion") == nil {
-            arrangement.pieces.append(DeskPlacement(widget: "companion", anchor: DeskArrangement.defaultAnchor("companion")))
-        }
-        return SetupDesk.visible(arrangement, desktop: model.desktopOn).stacks(showMeetings: showMeetings)
+    private func stacks(_ arrangement: DeskArrangement) -> [DeskAnchor: [DeskPlacement]] {
+        guard let window else { return arrangement.stacks(showMeetings: showMeetings) }
+        return DeskWindowPlan.stacks(arrangement, on: window, connected: model.screens, showMeetings: showMeetings)
     }
 
     var body: some View {
-        let place = stacks
+        let arrangement = model.drawnArrangement(saved: layout)
+        let place = stacks(arrangement)
         let arranging = model.arrange.active
         let margins = DeskAnchorGeometry.margins(left: left, right: right, top: top, bottom: bottom,
-                                                 topInset: model.topInset, dock: model.dockInsets, inset: inset)
+                                                 topInset: topInset, dock: dockInsets, inset: inset)
+        content(place, arranging: arranging, margins: margins)
+            .modifier(DeskExtraScreensWatch(model: model, extras: extraScreens(arrangement)))
+            .environment(\.deskScreenGeometry, extra?.geometry)
+            .environment(\.deskFrameReporting, extra.map { DeskFrameReporting(offset: $0.offset, mainWindow: false) } ?? .main)
+    }
+
+    /// On the main window, the screens the other windows should cover now (DeskWindowPlan), so a
+    /// layout change that moves a piece to another display brings its window; nil elsewhere.
+    private func extraScreens(_ arrangement: DeskArrangement) -> [DeskScreenInfo]? {
+        guard extra == nil, !model.screens.isEmpty else { return nil }
+        var shown = arrangement
+        shown.pieces = arrangement.shown(showMeetings: showMeetings)
+        return DeskWindowPlan.plan(shown, screens: model.screens, arranging: model.arrange.active).extraScreens
+    }
+
+    private func content(_ place: [DeskAnchor: [DeskPlacement]], arranging: Bool,
+                         margins: DeskAnchorGeometry.Margins) -> some View {
         ZStack(alignment: .topLeading) {
         // Arrange mode: the whole screen takes clicks (DeskArrangePlate); outside it, only what is drawn.
         if arranging { DeskArrangePlate() }
@@ -94,20 +124,33 @@ struct DeskView: View {
             .padding(.top, margins.top)
             .padding(.bottom, margins.bottom)
             .environment(\.deskArrangeGeometry, arranging ? anchors : nil)
-            if arranging { DeskArrangeOverlay(mode: model.arrange, geometry: anchors) }
+            .environment(\.deskArrangeWindow, arranging ? arrangeWindow(geo.size, anchors) : nil)
+            if arranging {
+                let here = arrangeWindow(geo.size, anchors)
+                DeskArrangeOverlay(mode: model.arrange, geometry: anchors, window: here)
+                    .modifier(DeskArrangeWindowReport(mode: model.arrange, window: here))
+            }
         }
-        NotchView(model: model)
+        if extra == nil { NotchView(model: model) }
         }
         .coordinateSpace(.named(DeskArrange.space))
     }
 
+    /// This window as Arrange sees it (2.44): `.main`, or its screen's id; its rectangle in the main
+    /// window's coordinates.
+    private func arrangeWindow(_ size: CGSize, _ geometry: DeskArrangeGeometry) -> DeskArrangeWindow {
+        let display: DeskDisplay = extra.map { .id($0.geometry.screen.id ?? "") } ?? .main
+        return DeskArrangeWindow(display: display, rect: CGRect(origin: extra?.offset ?? .zero, size: size),
+                                 geometry: geometry)
+    }
+
     /// The anchors' rectangle and the top center's drop, as the columns below lay them out.
     private func arrangeGeometry(_ size: CGSize, margins: DeskAnchorGeometry.Margins) -> DeskArrangeGeometry {
-        let notch = DeskAnchorGeometry.notchBottom(notch: model.notchRect, island: island, chin: chin)
+        let notch = DeskAnchorGeometry.notchBottom(notch: notchRect, island: island, chin: chin)
         return DeskArrangeGeometry(
             content: DeskAnchorGeometry.content(window: size, margins: margins, inset: inset),
             centerDrop: DeskAnchorGeometry.centerDrop(contentTop: margins.top + inset, notchBottom: notch),
-            dockBottom: model.dockInsets.bottom)
+            dockBottom: dockInsets.bottom)
     }
 
     /// The columns. Corners and middles only: the two side columns as before item 59, the
@@ -162,7 +205,7 @@ struct DeskView: View {
         let top = place[.tc] ?? []
         let bottom = place[.bc] ?? []
         if !top.isEmpty || !bottom.isEmpty {
-            let notch = DeskAnchorGeometry.notchBottom(notch: model.notchRect, island: island, chin: chin)
+            let notch = DeskAnchorGeometry.notchBottom(notch: notchRect, island: island, chin: chin)
             VStack(alignment: .center, spacing: DeskNowPlaying.columnSpacing) {
                 pieces(top, alignment: .center, lineInLayout: lineInLayout)
                 Spacer(minLength: 32)
@@ -193,12 +236,27 @@ struct DeskView: View {
     private func stackPieces(_ stack: [DeskPlacement], alignment: HorizontalAlignment, lineInLayout: Bool) -> some View {
         ForEach(stack, id: \.widget) { p in
             if let widget = Widget(rawValue: p.widget) {
-                DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale,
-                          style: p.style)
-                    .deskArrangeable(p, mode: model.arrange)
-                    .oledDrift(model)
+                if extra == nil {
+                    DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale,
+                              style: p.style)
+                        .deskArrangeable(p, mode: model.arrange)
+                        .oledDrift(model)
+                } else {
+                    extraPiece(widget, p, alignment: alignment, lineInLayout: lineInLayout)
+                        .deskArrangeable(p, mode: model.arrange)
+                }
             }
         }
+    }
+
+    /// A piece on a window besides the main one (it takes Arrange's chrome as the main window's do):
+    /// a piece on All displays reports no click frames here, so its click areas stay the main window's.
+    private func extraPiece(_ widget: Widget, _ p: DeskPlacement, alignment: HorizontalAlignment,
+                            lineInLayout: Bool) -> some View {
+        DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale,
+                  style: p.style)
+            .oledDrift(model)
+            .transformEnvironment(\.deskFrameReporting) { if p.monitor == .all { $0.on = false } }
     }
 }
 
@@ -858,13 +916,15 @@ extension View {
 private struct GlobalFrameReport: ViewModifier {
     let report: (CGRect) -> Void
     @Environment(\.isSurfacePreview) private var preview
+    @Environment(\.deskFrameReporting) private var reporting
 
     func body(content: Content) -> some View {
-        if SurfacePreview.reportsFrames(preview: preview) {
+        if SurfacePreview.reportsFrames(preview: preview), reporting.on {
+            let r = reporting
             content.background(GeometryReader { geo in
                 Color.clear
-                    .onAppear { report(geo.frame(in: .global)) }
-                    .onChange(of: geo.frame(in: .global)) { _, frame in report(frame) }
+                    .onAppear { report(r.shifted(geo.frame(in: .global))) }
+                    .onChange(of: geo.frame(in: .global)) { _, frame in report(r.shifted(frame)) }
             })
         } else {
             content
@@ -889,5 +949,70 @@ extension EnvironmentValues {
     var isSurfacePreview: Bool {
         get { self[SurfacePreviewKey.self] }
         set { self[SurfacePreviewKey.self] = newValue }
+    }
+}
+
+/// How a Desk window's views report their frames (onGlobalFrame): the main window's as they are; a
+/// window on another display moved by its offset from the main window (DeskWindowPlan.offset), so the
+/// model holds every frame in the main window's coordinates and one hit test covers every window. Off
+/// for a piece on All displays drawn on another window: the main window's copy is the click area.
+struct DeskFrameReporting: Equatable {
+    var on = true
+    var offset: CGPoint = .zero
+    /// The main window: only it reports the slanted stacks' folds (DeskFoldStack).
+    var mainWindow = true
+
+    static let main = DeskFrameReporting()
+
+    func shifted(_ frame: CGRect) -> CGRect { frame.offsetBy(dx: offset.x, dy: offset.y) }
+}
+
+private struct DeskFrameReportingKey: EnvironmentKey {
+    static let defaultValue = DeskFrameReporting.main
+}
+
+private struct DeskScreenGeometryKey: EnvironmentKey {
+    static let defaultValue: DeskScreenGeometry? = nil
+}
+
+extension EnvironmentValues {
+    var deskFrameReporting: DeskFrameReporting {
+        get { self[DeskFrameReportingKey.self] }
+        set { self[DeskFrameReportingKey.self] = newValue }
+    }
+
+    /// A Desk window's geometry when it is not the main one (OLED care's drift reads it); nil on the
+    /// main window, whose geometry is the model's.
+    var deskScreenGeometry: DeskScreenGeometry? {
+        get { self[DeskScreenGeometryKey.self] }
+        set { self[DeskScreenGeometryKey.self] = newValue }
+    }
+}
+
+/// Each window tells Arrange where it is while arranging (DeskArrangeMode.windows), so a drag
+/// carried onto it finds it.
+private struct DeskArrangeWindowReport: ViewModifier {
+    let mode: DeskArrangeMode
+    let window: DeskArrangeWindow
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { mode.setWindow(window) }
+            .onChange(of: window) { _, w in mode.setWindow(w) }
+            .onDisappear { mode.removeWindow(window.display) }
+    }
+}
+
+/// The main window's watch on the other windows' screens: a change goes to DeskController
+/// (DeskModel.onExtraScreensChange), after the update that saw it.
+private struct DeskExtraScreensWatch: ViewModifier {
+    var model: DeskModel
+    let extras: [DeskScreenInfo]?
+
+    func body(content: Content) -> some View {
+        content.onChange(of: extras) { _, now in
+            guard let now else { return }
+            DispatchQueue.main.async { model.onExtraScreensChange?(now) }
+        }
     }
 }

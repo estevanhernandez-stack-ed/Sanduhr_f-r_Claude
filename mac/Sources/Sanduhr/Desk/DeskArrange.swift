@@ -130,19 +130,108 @@ enum DeskArrange {
     static func clickThrough(arranging: Bool, windowTakesMouse: Bool) -> String {
         arranging && windowTakesMouse ? "whole" : "drawn"
     }
+
+    // MARK: Across displays (2.44)
+
+    /// The window a point in the main window's top-left coordinates is over; nil off every window.
+    static func window(at point: CGPoint, in windows: [DeskArrangeWindow]) -> DeskArrangeWindow? {
+        windows.first { $0.rect.contains(point) }
+    }
+
+    /// Where a drop of `widget` at `point` (the window's own DeskArrange.space) lands on one window:
+    /// the stack under the pointer (its own first, when it is drawn here), else the nearest anchor,
+    /// in front of the first piece there whose middle is below the pointer. `frames` are that
+    /// window's drawn pieces; `folds` its slanted stacks (the main window's only).
+    static func landing(_ widget: String, in arrangement: DeskArrangement, at point: CGPoint,
+                        geometry: DeskArrangeGeometry, frames: [String: CGRect],
+                        folds: [DeskAnchor: DeskFold] = [:]) -> (anchor: DeskAnchor, before: String?) {
+        let own = frames[widget] == nil ? nil : arrangement.placement(widget)?.anchor
+        let anchor = target(point: point, content: geometry.content, centerDrop: geometry.centerDrop,
+                            stacks: stackBounds(arrangement, frames: frames), own: own)
+        let fold = folds[anchor].flatMap { DeskArrangement.clampTilt($0.tilt) != 0 ? $0 : nil }
+        // The window's drawn stack at the anchor, in layout order, its frames back in the unslanted layout.
+        let stack = arrangement.pieces.compactMap { p -> (widget: String, frame: CGRect)? in
+            guard p.anchor == anchor, p.widget != widget, let f = frames[p.widget] else { return nil }
+            return (p.widget, fold.map { $0.layoutFrame(fromBounds: f) } ?? f)
+        }
+        // A drop on a slanted stack is judged where the pointer is on the stack's own face.
+        let face = folds[anchor].map { $0.unapply(point) } ?? point
+        return (anchor, pieceAfter(y: face.y, in: stack))
+    }
+
+    /// The arrangement after a drop of `widget` dragged on window `source` and let go over window
+    /// `target` (each named by the display This display writes for it), at `point` in the target's
+    /// own coordinates. Within one window it is the drop from before 2.44: anchor and place only.
+    /// On another window the piece moves to that window's display at the landing anchor.
+    /// The All displays rule: a piece on `.all` keeps `.all` wherever it is dropped, within one
+    /// window or onto another; only its anchor and place change, and they change on every display.
+    /// A piece that stays on the main display (DeskWindowPlan.mainOnly) dropped elsewhere does not move.
+    static func dropped(_ arrangement: DeskArrangement, widget: String, from source: DeskDisplay,
+                        onto target: DeskDisplay, at point: CGPoint, geometry: DeskArrangeGeometry,
+                        frames: [String: CGRect] = [:], folds: [DeskAnchor: DeskFold] = [:]) -> DeskArrangement {
+        guard let piece = arrangement.placement(widget) else { return arrangement }
+        let across = source != target
+        if across && DeskWindowPlan.mainOnly.contains(widget) { return arrangement }
+        let land = landing(widget, in: arrangement, at: point, geometry: geometry, frames: frames, folds: folds)
+        let display = !across || piece.monitor == .all ? piece.monitor : target
+        var out = arrangement
+        out.put(widget, at: land.anchor, on: display, before: land.before)
+        return out
+    }
+
+    /// Whether a piece's chrome offers Show on: with more than one Desk window, or with a piece
+    /// already off the main display. A one-display Arrange looks exactly as before 2.44.
+    static func offersShowOn(windows: Int, _ arrangement: DeskArrangement) -> Bool {
+        windows > 1 || arrangement.pieces.contains { $0.monitor != .main }
+    }
+
+    /// Show on, for the piece's chrome on the window named `window`: All displays sets `.all`,
+    /// This display sets the window's display (`.main` on the main window, its id on another).
+    static func showOn(_ arrangement: DeskArrangement, widget: String, all: Bool, window: DeskDisplay) -> DeskArrangement {
+        var out = arrangement
+        out.setDisplay(widget, all ? .all : window)
+        return out
+    }
+
+    /// The screen the floating bar goes on: the one under the pointer, else the one it is on.
+    static func barScreen(pointer: CGPoint, screens: [CGRect], current: Int?) -> Int? {
+        screens.firstIndex { $0.contains(pointer) } ?? current
+    }
+}
+
+/// One Desk window as Arrange sees it (2.44): the display Show on's This display writes for it
+/// (`.main` on the main window, its screen's id on another), its rectangle in the main window's
+/// top-left coordinates (DeskWindowPlan.offset and its size) and where its anchors are.
+struct DeskArrangeWindow: Equatable {
+    var display: DeskDisplay
+    var rect: CGRect
+    var geometry: DeskArrangeGeometry
 }
 
 extension DeskArrangement {
     /// Puts a placed piece at `anchor`, in front of `before` in that anchor's stack (nil: at its
     /// bottom). Into an empty anchor it keeps its place in the string, as `place` does. The piece
     /// keeps its size and style, and joins the stack's slant. Nothing changes for a piece that is not placed, or when `before` is the
-    /// piece itself.
+    /// piece itself. The piece keeps its display.
     mutating func put(_ widget: String, at anchor: DeskAnchor, before: String?) {
+        guard let display = placement(widget)?.monitor else { return }
+        put(widget, at: anchor, on: display, before: before)
+    }
+
+    /// `put` onto `display` as well: the piece joins that display's stack at `anchor` (a stack is a
+    /// display and an anchor), taking its slant; into an empty one it keeps its own. `before` is
+    /// found at `anchor` on any display, since a window draws several displays' pieces as one stack
+    /// (All displays, a display that is not connected) in layout order.
+    mutating func put(_ widget: String, at anchor: DeskAnchor, on display: DeskDisplay, before: String?) {
         guard widget != before, let from = pieces.firstIndex(where: { $0.widget == widget }) else { return }
         var piece = pieces[from]
-        // Into another anchor's stack the piece takes its slant; into an empty one it keeps its own.
-        if piece.anchor != anchor, let joined = stackTilt(anchor) { piece.tilt = joined }
+        // Into another stack the piece takes its slant; into an empty one it keeps its own.
+        if piece.anchor != anchor || piece.monitor != display,
+           let joined = pieces.first(where: { $0.anchor == anchor && $0.monitor == display && $0.widget != widget })?.tilt {
+            piece.tilt = joined
+        }
         piece.anchor = anchor
+        piece.monitor = display
         pieces.remove(at: from)
         if let before, let i = pieces.firstIndex(where: { $0.widget == before && $0.anchor == anchor }) {
             pieces.insert(piece, at: i)
@@ -175,6 +264,9 @@ enum DeskArrangeCopy {
     static let hide = "Hide"
     static let show = "Show"
     static let hiddenStrip = "Hidden:"
+    static let showOn = "Show on"
+    static let showOnThis = "This display"
+    static let showOnAll = "All displays"
 }
 
 /// One Arrange mode edit: the layout string as it was saved, kept verbatim so Cancel leaves it
@@ -202,6 +294,18 @@ struct DeskArrangeDrag: Equatable {
     var location: CGPoint
     var translation: CGSize
     var frame: CGRect
+    /// The window the drag started on (2.44): its display key and its top-left corner in the main
+    /// window's coordinates, which the location and the frame are relative to.
+    var window: DeskDisplay = .main
+    var origin: CGPoint = .zero
+
+    /// The pointer in the main window's top-left coordinates.
+    var global: CGPoint { CGPoint(x: origin.x + location.x, y: origin.y + location.y) }
+
+    /// The ghost's middle in the main window's top-left coordinates.
+    var ghostCenter: CGPoint {
+        CGPoint(x: origin.x + frame.midX + translation.width, y: origin.y + frame.midY + translation.height)
+    }
 }
 
 /// Arrange mode's state, on DeskModel. Begin reads the saved layout; every change edits the
@@ -213,8 +317,73 @@ final class DeskArrangeMode {
 
     private(set) var session: DeskArrangeSession?
     var drag: DeskArrangeDrag?
-    /// Each drawn piece's frame in DeskArrange.space, reported while arranging (reorder drops).
-    @ObservationIgnored var frames: [String: CGRect] = [:]
+    /// Each window's drawn pieces' frames in its own DeskArrange.space, by the window's display key
+    /// (`.main`, or another screen's id), reported while arranging (reorder drops). Kept per window
+    /// because a piece on All displays is drawn, and reports, on every window.
+    @ObservationIgnored var framesByWindow: [DeskDisplay: [String: CGRect]] = [:]
+    /// The main window's frames.
+    var frames: [String: CGRect] {
+        get { framesByWindow[.main] ?? [:] }
+        set { framesByWindow[.main] = newValue }
+    }
+    /// The Desk windows, by display key, as each DeskView reports itself (2.44).
+    private(set) var windows: [DeskDisplay: DeskArrangeWindow] = [:]
+
+    func setFrame(_ frame: CGRect?, of widget: String, in window: DeskDisplay) {
+        if framesByWindow[window]?[widget] != frame { framesByWindow[window, default: [:]][widget] = frame }
+    }
+
+    func setWindow(_ window: DeskArrangeWindow) {
+        if windows[window.display] != window { windows[window.display] = window }
+    }
+
+    func removeWindow(_ display: DeskDisplay) {
+        if windows[display] != nil { windows[display] = nil }
+        framesByWindow[display] = nil
+    }
+
+    /// Whether the pieces' chrome offers Show on (DeskArrange.offersShowOn): never on one display.
+    var offersShowOn: Bool {
+        working.map { DeskArrange.offersShowOn(windows: max(1, windows.count), $0) } ?? false
+    }
+
+    /// The window a point in the main window's coordinates is over, else `fallback`.
+    func window(at global: CGPoint, fallback: DeskArrangeWindow) -> DeskArrangeWindow {
+        DeskArrange.window(at: global, in: Array(windows.values)) ?? fallback
+    }
+
+    /// Where a drag at `location` on window `source` would land: the window under the pointer and
+    /// the anchor there. What the lit anchors show and the drop does.
+    func landing(of widget: String, at location: CGPoint, from source: DeskArrangeWindow) -> (window: DeskDisplay, anchor: DeskAnchor)? {
+        guard let working else { return nil }
+        let global = CGPoint(x: source.rect.minX + location.x, y: source.rect.minY + location.y)
+        let target = window(at: global, fallback: source)
+        let local = CGPoint(x: global.x - target.rect.minX, y: global.y - target.rect.minY)
+        let land = DeskArrange.landing(widget, in: working, at: local, geometry: target.geometry,
+                                       frames: framesByWindow[target.display] ?? [:],
+                                       folds: target.display == .main ? folds : [:])
+        return (target.display, land.anchor)
+    }
+
+    /// The drop of a drag let go at `location` on window `source` (DeskArrange.dropped): onto the
+    /// window under the pointer, or within `source` when it is over none.
+    func drop(_ widget: String, at location: CGPoint, from source: DeskArrangeWindow) {
+        guard working != nil else { return }
+        let global = CGPoint(x: source.rect.minX + location.x, y: source.rect.minY + location.y)
+        let target = window(at: global, fallback: source)
+        let local = CGPoint(x: global.x - target.rect.minX, y: global.y - target.rect.minY)
+        let frames = framesByWindow[target.display] ?? [:]
+        let folds = target.display == .main ? self.folds : [:]
+        edit { a in
+            a = DeskArrange.dropped(a, widget: widget, from: source.display, onto: target.display, at: local,
+                                    geometry: target.geometry, frames: frames, folds: folds)
+        }
+    }
+
+    /// Show on, from the piece's chrome on window `window` (DeskArrange.showOn).
+    func showOn(_ widget: String, all: Bool, window: DeskDisplay) {
+        edit { a in a = DeskArrange.showOn(a, widget: widget, all: all, window: window) }
+    }
     /// Each slanted stack's tilt and top left in DeskArrange.space (the fold), by anchor; the
     /// frames above are the boxes around what is drawn. A stack that stands upright has none.
     @ObservationIgnored private(set) var folds: [DeskAnchor: DeskFold] = [:]
@@ -233,6 +402,12 @@ final class DeskArrangeMode {
     /// `widget`'s frame in the unslanted layout: SwiftUI reports the box around what is drawn
     /// (`frames`), so a slanted piece's is taken back along its stack's shear. nil with no frame.
     func layoutFrame(of widget: String) -> CGRect? {
+        layoutFrame(of: widget, in: .main)
+    }
+
+    /// The same on any window: another window's stacks report no fold, so its frames are as drawn.
+    func layoutFrame(of widget: String, in window: DeskDisplay) -> CGRect? {
+        guard window == .main else { return framesByWindow[window]?[widget] }
         guard let f = frames[widget] else { return nil }
         return fold(of: widget).map { $0.layoutFrame(fromBounds: f) } ?? f
     }
@@ -260,7 +435,7 @@ final class DeskArrangeMode {
         let saved = store.object(forKey: Self.layoutKey) as? String ?? DeskLayout.standard
         session = DeskArrangeSession(saved: saved)
         drag = nil
-        frames = [:]
+        framesByWindow = [:]
     }
 
     /// Changes the working layout; nothing is saved.

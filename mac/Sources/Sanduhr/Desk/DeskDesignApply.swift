@@ -2,8 +2,8 @@ import Foundation
 import Observation
 
 /// The Desk settings a design can change (spec 8), read from and written to the `.desk` defaults suite: the layout
-/// (anchors, sizes, tilt, style), the font, the ink, the plate and the shadow. The Mac subset of Windows'
-/// `DeskDesignSettings`: no Launcher, no theme, no monitor. The weather nickname rides along (saved in `desk_weather`). Margins, sizes of the clock and
+/// (anchors, sizes, tilt, style, display), the font, the ink, the plate and the shadow. The Mac subset of Windows'
+/// `DeskDesignSettings`: no Launcher, no theme. The weather nickname rides along (saved in `desk_weather`). Margins, sizes of the clock and
 /// whether the Desk is on are not part of a design and are never touched.
 struct DeskDesignLook: Equatable {
     var arrangement: DeskArrangement
@@ -44,9 +44,9 @@ struct DeskDesignLook: Equatable {
 /// `merged`, so what is previewed is what is applied (Windows' `DeskDesignApply` and `DeskDesign.Merge/Diff`).
 enum DeskDesignApply {
     /// The look a design asks for, over `current`. A field the design leaves nil keeps its current value.
-    static func merged(_ current: DeskDesignLook, _ design: DeskDesign) -> DeskDesignLook {
+    static func merged(_ current: DeskDesignLook, _ design: DeskDesign, screens: [DeskScreenInfo] = []) -> DeskDesignLook {
         var next = current
-        if let layout = design.layout { next.arrangement = mergeLayout(current.arrangement, layout) }
+        if let layout = design.layout { next.arrangement = mergeLayout(current.arrangement, layout, screens: screens) }
         if let font = design.font { next.font = fontSetting(font) }
         if let ink = design.ink, !ink.isEmpty { next.ink = ink.compactMap { DeskDesign.hex($0) }.prefix(4).joined(separator: ",") }
         if let plate = design.plate { next.plate = plate }
@@ -56,19 +56,47 @@ enum DeskDesignApply {
     }
 
     /// The layout merged piece by piece (Windows' `MergeLayout`): a hidden piece goes; an anchor places the piece
-    /// (a moved piece keeps its size); a piece shown with no anchor takes its standard one; size, tilt (the stack's
-    /// slant) and style follow.
-    static func mergeLayout(_ current: DeskArrangement, _ pieces: [DeskPieceLayout]) -> DeskArrangement {
+    /// (a moved piece keeps its size and display); a piece shown with no anchor takes its standard one; the display
+    /// (through `setDisplay`: it joins that display's stack at its anchor), size, tilt (the stack's slant) and style follow.
+    static func mergeLayout(_ current: DeskArrangement, _ pieces: [DeskPieceLayout], screens: [DeskScreenInfo] = []) -> DeskArrangement {
         var arr = current
         for p in pieces {
             guard DeskArrangement.known.contains(p.piece) else { continue }
             if p.hidden == true { arr.hide(p.piece); continue }
             if let a = p.anchor { arr.place(p.piece, at: a) } else if p.hidden == false, arr.placement(p.piece) == nil { arr.show(p.piece) }
+            if let m = p.monitor, arr.placement(p.piece) != nil { arr.setDisplay(p.piece, display(m, screens: screens)) }
             if let s = p.size { arr.setScale(p.piece, s) }
             if let t = p.tilt { arr.setTilt(p.piece, t) }
             if let st = p.style { arr.setStyle(p.piece, st) }
         }
         return arr
+    }
+
+    /// The display a design's monitor word writes: the main display's own id is `.main`, and an id takes the
+    /// connected display's spelling (ids compare without regard to case).
+    static func display(_ word: DeskDisplay, screens: [DeskScreenInfo]) -> DeskDisplay {
+        guard case .id(let id) = word else { return word }
+        if let m = DeskScreens.main(screens), m.id?.caseInsensitiveCompare(id) == .orderedSame { return .main }
+        if let s = screens.first(where: { $0.id?.caseInsensitiveCompare(id) == .orderedSame }), let sid = s.id { return .id(sid) }
+        return word
+    }
+
+    /// How the what-changed lines name a display: "the main display", "all displays", a connected display's name
+    /// ("1920×1080, right of main") or "a display that is not connected".
+    static func displayName(_ display: DeskDisplay, screens: [DeskScreenInfo]) -> String {
+        switch display {
+        case .main: return "the main display"
+        case .all: return "all displays"
+        case .id(let id):
+            if let m = DeskScreens.main(screens), m.id?.caseInsensitiveCompare(id) == .orderedSame { return "the main display" }
+            let named = DeskScreens.named(screens)
+            return named.first { $0.id?.caseInsensitiveCompare(id) == .orderedSame }?.name ?? "a display that is not connected"
+        }
+    }
+
+    /// Whether two displays are the same place (the main display's own id is main; ids ignore case).
+    private static func sameDisplay(_ a: DeskDisplay, _ b: DeskDisplay, screens: [DeskScreenInfo]) -> Bool {
+        DeskDesign.stackDisplay(a, screens) == DeskDesign.stackDisplay(b, screens)
     }
 
     /// The `font` value for a design's font: "" stays the system font, anything else the family name.
@@ -163,7 +191,8 @@ enum DeskDesignApply {
 
     /// The "what changed" lines for the banner: one plain sentence per difference, pieces first (in the Desk's
     /// order), then the font, ink, plate and shadow. Windows' `Diff`, with this Mac's own names.
-    static func changes(from a: DeskDesignLook, to b: DeskDesignLook, available: (String) -> Bool = DeskFont.isAvailable) -> [String] {
+    static func changes(from a: DeskDesignLook, to b: DeskDesignLook, available: (String) -> Bool = DeskFont.isAvailable,
+                        screens: [DeskScreenInfo] = []) -> [String] {
         var lines: [String] = []
         for key in DeskArrangement.known {
             let name = DeskLayout.widgets.first { $0.key == key }?.name ?? key
@@ -179,6 +208,10 @@ enum DeskDesignApply {
                     lines.append("\(name): moved from \(was.anchor.name.lowercased()) to \(now.anchor.name.lowercased())")
                 }
                 if abs(was.scale - now.scale) > 1e-9 { lines.append("\(name): size \(percent(was.scale)) to \(percent(now.scale))") }
+                if !sameDisplay(was.monitor, now.monitor, screens: screens) {
+                    lines.append(now.monitor == .all ? "\(name): now on all displays"
+                                 : "\(name): moved to \(displayName(now.monitor, screens: screens))")
+                }
                 let wasTilt = a.arrangement.tilt(of: key) ?? 0
                 if abs(wasTilt - tilt) > 1e-9 { lines.append("\(name): slant \(degrees(wasTilt)) to \(degrees(tilt))") }
                 if DeskMeterStyles.supports(key), style != a.arrangement.style(of: key) {
@@ -187,6 +220,7 @@ enum DeskDesignApply {
             } else {
                 var line = "\(name): shown at \(now.anchor.name.lowercased())"
                 if abs(now.scale - 1) > 1e-9 { line += ", size \(percent(now.scale))" }
+                if !sameDisplay(now.monitor, .main, screens: screens) { line += ", on \(displayName(now.monitor, screens: screens))" }
                 if tilt != 0 { line += ", slanted \(degrees(tilt))" }
                 if DeskMeterStyles.supports(key), style != .bar { line += ", \(DeskMeterStyles.word(style))" }
                 lines.append(line)

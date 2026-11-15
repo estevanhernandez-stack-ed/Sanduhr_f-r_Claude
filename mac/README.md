@@ -1285,7 +1285,7 @@ through the same decoding, whatever the switches say; `scenarios/watchers.yaml` 
 
 ## Desk layout
 
-Settings, Desk places each Desk piece (item 59; the pure pieces in `DeskArrangement.swift`):
+Settings, Desk places each Desk piece (item 59; the pure pieces in `DeskArrangement.swift`; per display since 2.44.0, `docs/superpowers/specs/2026-11-14-mac-desk-per-monitor-design.md`):
 
 - **Eight places.** The four corners, Top center, Bottom center, Middle left and Middle right.
   The top and bottom of a side share a column with a spacer between them, as before, so a growing
@@ -1304,6 +1304,18 @@ Settings, Desk places each Desk piece (item 59; the pure pieces in `DeskArrangem
   first piece there that Settings lists after it.
 - **A size per piece.** 60% to 160% in 10% steps, kept when the piece moves. Every piece scales
   from the clock size in Desk Look, the message from its own size.
+- **A display per piece (2.44).** Each placed piece draws on the **main display** (the menu bar
+  display, `NSScreen.screens.first`, not `NSScreen.main`), on **All displays**, or on one display by
+  id (`DeskDisplay`). Main is the default: a layout from before 2.44 has no display and reads as
+  main, so nothing moves on update. The display is a suffix on the piece's word, `@all` or
+  `@<UUID>` (the display UUID, `CGDisplayCreateUUIDFromDisplayID`, which survives reboots and
+  resolution changes, unlike a `CGDirectDisplayID`), and the word is then always the long form, all
+  five fields (`clock:tl:1:0:bar@all`): a 2.43 build reads fields 1 to 3 and ignores the rest, so it
+  keeps the piece's anchor, size and tilt and only loses the display. A piece whose display is not
+  connected draws on the main display at the same anchor and nothing is rewritten, so it returns
+  when the display does. A stack is a display and an anchor, so `tl` on two displays are two stacks,
+  each with its own slant. Settings' Display picker, Arrange's Show on and `monitor` in
+  `get_desk` and `propose_desk` ("main", "all" or an id from `monitors`) all edit this one setting.
 - **The map.** The Layout card (`DeskLayoutMap`) draws the screen with the menu bar, the notch (and
   the island), the Dock on its edge and each piece outlined at its place, in its order and at its
   size, live, from the same `DeskArrangement.stacks` call the Desk draws from.
@@ -1341,8 +1353,9 @@ pure pieces are in `DeskArrange.swift`, the views and the bar's panel in `DeskAr
 - **The bar floats.** The bar with what to do, Cancel and Done is not on the Desk window (which sits
   just below normal windows, so any app window covered it). It is its own small borderless panel
   (`DeskArrangeBarController`, an `NSPanel` at the floating level on every Space) centered on the
-  visible frame of the Desk's screen (`DeskArrange.barOrigin`), shown while arranging, moved with
-  the Desk on a display change, and closed when Arrange ends. It reads "Return or Done keeps the
+  visible frame of the display under the pointer (`DeskArrange.barOrigin`, `DeskArrange.barScreen`),
+  shown while arranging, moved when the pointer crosses to another display and with the Desk on a
+  display change, and closed when Arrange ends. It reads "Return or Done keeps the
   new layout. Escape or Cancel puts it back." Sanduhr activates and the panel takes the key.
 - **Keys.** While arranging, a local key monitor ends Arrange mode wherever the key focus is in
   Sanduhr (the panel, the Desk window after a click on a piece, the widget): Return and keypad
@@ -1374,11 +1387,43 @@ pure pieces are in `DeskArrange.swift`, the views and the bar's panel in `DeskAr
   notch drop, and the anchor dots use the same geometry (`DeskAnchorGeometry`). With Reduce Motion a
   drop has no snap animation. VoiceOver gets Move Up, Move Down, Bigger and Smaller on each piece.
 
+- **Across displays (2.44).** Arrange runs on every Desk window, and while it runs every connected
+  display with an id has one (`DeskWindowPlan.plan(arranging:)`), so a piece can go to a display that
+  had none; Done or Cancel plans from the layout again. Each window shows its own pieces with the
+  same chrome and takes the mouse over its whole frame. A drag keeps its start window's coordinates;
+  the drop is moved by that window's offset onto the window under the pointer
+  (`DeskArrangeMode.drop`, the pure `DeskArrange.dropped`): within one window it is the drop above,
+  onto another the piece takes that window's display (`.main` for the main one) at the anchor it
+  lands on there, and the lit anchors and the ghost show on the window under the pointer. **The All
+  displays rule:** a piece on All displays stays on All displays wherever it is dropped, within a
+  window or onto another; only its anchor and place change, everywhere. The companion stays on the
+  main display; dropped on another window it does not move. With more than one window, or a piece
+  already off the main display, a piece's name tag gains **Show on** (This display, All displays;
+  `DeskArrange.showOn`): All writes `@all`, This display the window's display. One display shows
+  none of it. The Hidden strip stays on the main window, and a slanted stack on another window is
+  dropped on by the box around what is drawn (only the main window reports folds).
+
 `desk_arrange` in the smoke state has `active`, `changed`, `working` (the layout string being
 edited), `click_through` (`whole` or `drawn`) and `bar_visible` (the floating bar is on screen);
 the `desk-arrange start|test|done|cancel` hook drives it, and `scenarios/desk-arrange.yaml` starts
 it from Settings, checks that Settings steps aside and comes back, that the bar shows only while
 arranging, that Cancel leaves `layout` alone and that Done writes it.
+
+### Desk windows per display
+
+One Desk window per display that has pieces (`DeskWindowPlan`, `DeskController.buildWindow`): the
+main one on the menu bar display (`NSScreen.screens.first`, not `NSScreen.main`) carries every role
+it always had (the notch, wings and pill, the Dock follower, drawers, the companion, the camera
+badge and the click layer's main plates; Arrange runs on every window, see Across displays above), and each other display a piece draws on
+(`DeskScreens.showsOn`) gets a plain window at the same level, click-through the same way. A window
+draws only its own share (`DeskWindowPlan.stacks`); a piece on All displays draws on every window, a
+piece whose display is not connected falls back to the main one, and the companion stays on main.
+Each window has its own geometry (`DeskScreenGeometry`: size and menu bar from its screen; no notch
+and no Dock clearance off the main display). Frames from another window reach the model moved by its
+offset from the main window (`DeskFrameReporting`), so the one hit test covers every display. The
+copy of an All-displays piece on another window reports nothing (its click areas are the main
+window's), and a slanted stack there reports no fold, so it clicks by the box around what is drawn. Windows are rebuilt on a display change and come or go when a
+layout change adds or empties a display; OLED care drifts and dims them all.
 
 ### Desk clicks
 
@@ -2123,22 +2168,25 @@ switch: a design always waits for Apply.
 **`get_desk`** answers from `desk-state.json` in `~/Library/Application Support/Sanduhr/`, not from the preferences
 plist (reading it from Python races the preferences daemon and can be stale). `DeskStateExporter` writes it
 (owner-only, atomic, through `HandoffFiles.writeOwnerOnly`) at launch and 0.5 seconds after a Desk setting, an installed
-font or a font pack changes, and only when the bytes differ from its last write, so nothing writes per frame
-(`DeskStateExport.swift`). It holds the design (every piece's place, size, slant and style, or hidden; the Desk font,
-ink, plate and shadow), the pieces and places the Desk knows, the font names (the Desk's and the message's, the two
+font, a font pack or the displays change, and only when the bytes differ from its last write, so nothing writes per frame
+(`DeskStateExport.swift`). It holds the design (every piece's place, size, slant, style and display, `monitor`: `main`, `all` or a display id,
+or hidden; the Desk font, ink, plate and shadow), the pieces and places the Desk knows, `monitors` (each connected
+display with Windows' keys: `id`, `name`, `width` and `height` in points, `primary`, and `left`/`top` from the main
+display's top-left corner; a one-display Mac lists one), the font names (the Desk's and the message's, the two
 bundled families, and the installed families, capped at 2000), the pieces shown, the message and notch colours and the
 limits a design must keep. It never holds usage, a message's text, a path or an account name. The server returns it
 with `state_age_seconds` and `writer_version`; with no file it answers `no_data` and says to start Sanduhr.
 
 **`propose_desk`** takes `{design, name?, note?}` where `design` has only the fields to change: `layout` (a piece to
-`{anchor, size, hidden, tilt, style}`), `font` (a family, or `{family, link}`), `ink` (`#rrggbb`, or two to four for a
+`{anchor, size, hidden, monitor, tilt, style}`; `monitor` is `main`, `all` or an id from `monitors`, and an id that
+is not connected is refused on `layout.<piece>.monitor`), `font` (a family, or `{family, link}`), `ink` (`#rrggbb`, or two to four for a
 gradient), `plate`, `shadow` and `weather` (`{nickname}`: up to 24 characters, `""` goes back to the place's name; the
 `telemetry` and `weather` pieces are ordinary layout pieces, `telemetry` takes a style). `design_validate` in `sanduhr_mcp.py` checks it with the app's rules; a refusal returns
 `rejected` with reasons and writes nothing. Windows' rules govern the fields and the messages (the Windows C# is the
 guide), the spec governs the Mac surfaces. The Mac refuses, with a reason and never silently: `messages`, `looks` and
-`theme` (their own tools exist), Windows-only fields (`launcher`, `monitor`, the ink words `auto`, `light`, `dark` and
+`theme` (their own tools exist), Windows-only fields (`launcher`, the ink words `auto`, `light`, `dark` and
 `theme`, the glow piece, the Launcher piece). A tilt that differs inside one
-stack is refused, a style on a piece other than `claude`, `meters` and `telemetry` or an unknown word is refused, and Windows'
+stack (an anchor on one display; a piece that names no monitor keeps its display) is refused, a style on a piece other than `claude`, `meters` and `telemetry` or an unknown word is refused, and Windows'
 wallpaper contrast rule is skipped. A good design goes to `desk-request.json` (owner-only, atomic, at most 128 KB) and
 the tool waits about ten seconds for `desk-result.json`; no answer is `queued`, `widget_not_responding`, and the request
 stays for ten minutes.

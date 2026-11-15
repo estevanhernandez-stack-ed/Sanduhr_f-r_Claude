@@ -1,0 +1,11 @@
+{
+  "layout": {
+    "clock": {
+      "anchor": "tl",
+      "monitor": 2
+    },
+    "claude": {
+      "monitor": "left screen"
+    }
+  }
+}

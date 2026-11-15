@@ -8,8 +8,9 @@ struct DeskFontChoice: Equatable {
 }
 
 /// One piece's part of a design's layout. Every member but `piece` is optional: absent leaves the current
-/// value alone. A hidden piece has no anchor, size, tilt or style. `tilt` is the fold (whole degrees, -20 to
-/// 20) and belongs to the piece's stack; `style` is the meter style, only on `DeskMeterStyles.pieces`.
+/// value alone. A hidden piece has no anchor, size, tilt, style or monitor. `tilt` is the fold (whole degrees, -20 to
+/// 20) and belongs to the piece's stack; `style` is the meter style, only on `DeskMeterStyles.pieces`; `monitor` is
+/// the display ("main", "all" or a display id from get_desk `monitors`).
 struct DeskPieceLayout: Equatable {
     var piece: String
     var anchor: DeskAnchor?
@@ -17,6 +18,7 @@ struct DeskPieceLayout: Equatable {
     var hidden: Bool?
     var tilt: Double?
     var style: DeskMeterStyle?
+    var monitor: DeskDisplay? = nil
 }
 
 /// A font a design names that this Mac lacks, with the link to get it when the design gave one.
@@ -43,10 +45,14 @@ enum DeskDesignStatus: Equatable {
     }
 }
 
-/// What the machine adds to the rules. A nil `installedFonts` is unknown, and the font rule is skipped (the
+/// What the machine adds to the rules. A nil member is unknown, and the rule that needs it is skipped (the
 /// app, which always knows, checks again).
 struct DeskDesignContext {
     var installedFonts: [String]?
+    /// The displays connected now: the ids a piece's `monitor` may name, and which one is main.
+    var monitors: [DeskScreenInfo]? = nil
+    /// Each placed piece's display now. A design piece that names no monitor keeps it (for the one slant per stack).
+    var displays: [String: DeskDisplay]? = nil
 
     static let unknown = DeskDesignContext(installedFonts: nil)
 }
@@ -63,11 +69,11 @@ struct DeskValidation {
 }
 
 /// A Desk design (spec 8): a PARTIAL set of changes to the Desk; a nil field leaves the current value alone.
-/// The Mac subset of Windows' `DeskDesign`: `name`, `note`, `layout` ({piece: {anchor, size, hidden, tilt,
-/// style}}), `font` (a family, or {family, link}), `ink` (one `#rrggbb`, or two to four for a gradient),
-/// `plate`, `shadow` and `weather` ({nickname}). What only Windows has is refused with a reason, never
-/// dropped: `monitor` in a layout piece, the launcher and glow pieces, the launcher, messages, looks and theme
-/// fields, and the auto, light, dark and theme ink words.
+/// The Mac subset of Windows' `DeskDesign`: `name`, `note`, `layout` ({piece: {anchor, size, hidden, monitor,
+/// tilt, style}}), `font` (a family, or {family, link}), `ink` (one `#rrggbb`, or two to four for a gradient),
+/// `plate`, `shadow` and `weather` ({nickname}); a layout piece's `monitor` is "main", "all" or a display id.
+/// What only Windows has is refused with a reason, never dropped: the launcher and glow pieces, the launcher,
+/// messages, looks and theme fields, and the auto, light, dark and theme ink words.
 ///
 /// Pure data and rules, no IO. `Tests/SanduhrTests/Fixtures/desk-designs/` holds the designs this and the
 /// Python MCP's `design_validate` must judge the same way.
@@ -95,7 +101,7 @@ struct DeskDesign: Equatable {
     static let maxJsonBytes = 128 * 1024
 
     static let fields = ["name", "note", "layout", "weather", "font", "ink", "plate", "shadow"]
-    static let layoutMembers = ["anchor", "size", "hidden", "tilt", "style"]
+    static let layoutMembers = ["anchor", "size", "hidden", "monitor", "tilt", "style"]
     static let inkWords = ["auto", "light", "dark", "theme"]
 
     /// Fields Windows has and the Mac Desk lacks: refused with this reason.
@@ -116,7 +122,7 @@ struct DeskDesign: Equatable {
     /// Reads a design from JSON, checking everything that needs no knowledge of the machine. A field that is
     /// wrong is a reason and the design is nil; an unknown field is a reason too, so a typo never silently
     /// does nothing.
-    static func parse(_ node: PackValue?) -> (design: DeskDesign?, reasons: [DeskReason]) {
+    static func parse(_ node: PackValue?, context: DeskDesignContext = .unknown) -> (design: DeskDesign?, reasons: [DeskReason]) {
         guard let o = present(node)?.object else { return (nil, [DeskReason("design", "must be an object")]) }
         var r: [DeskReason] = []
         let windowsOnly = windowsOnlyFields.map(\.field)
@@ -127,7 +133,7 @@ struct DeskDesign: Equatable {
         }
         let name = text(o, "name", nameMax, &r)
         let note = text(o, "note", noteMax, &r)
-        let layout = parseLayout(present(o["layout"]), &r)
+        let layout = parseLayout(present(o["layout"]), context, &r)
         let weatherNickname = parseWeather(present(o["weather"]), &r)
         let font = parseFont(present(o["font"]), &r)
         let ink = parseInk(present(o["ink"]), &r)
@@ -206,10 +212,10 @@ struct DeskDesign: Equatable {
         return r.count > before ? nil : nick
     }
 
-    private static func parseLayout(_ node: PackValue?, _ r: inout [DeskReason]) -> [DeskPieceLayout]? {
+    private static func parseLayout(_ node: PackValue?, _ context: DeskDesignContext, _ r: inout [DeskReason]) -> [DeskPieceLayout]? {
         guard let node else { return nil }
         guard let lo = node.object else {
-            r.append(DeskReason("layout", "must be an object of piece name to {anchor, size, hidden, tilt, style}"))
+            r.append(DeskReason("layout", "must be an object of piece name to {anchor, size, hidden, monitor, tilt, style}"))
             return nil
         }
         if lo.count > maxPieces {
@@ -229,15 +235,11 @@ struct DeskDesign: Equatable {
                 continue
             }
             guard let po = lo[key]?.object else {
-                r.append(DeskReason(field, "must be an object with anchor, size, hidden, tilt and style"))
+                r.append(DeskReason(field, "must be an object with anchor, size, hidden, monitor, tilt and style"))
                 continue
             }
             for bad in WidgetProposal.ordinalSorted(po.keys.filter { !layoutMembers.contains($0) }).prefix(3) {
-                if bad == "monitor" {
-                    r.append(DeskReason(field, "monitor is Windows only: the Mac Desk has no per-monitor placement; use anchor, size, hidden, tilt and style"))
-                } else {
-                    r.append(DeskReason(field, "unknown member '\(clip(bad, 20))'; use anchor, size, hidden, tilt and style"))
-                }
+                r.append(DeskReason(field, "unknown member '\(clip(bad, 20))'; use anchor, size, hidden, monitor, tilt and style"))
             }
             var anchor: DeskAnchor?
             if let an = present(po["anchor"]) {
@@ -259,6 +261,14 @@ struct DeskDesign: Equatable {
             if let hn = present(po["hidden"]) {
                 if let h = hn.bool { hidden = h } else { r.append(DeskReason(field + ".hidden", "must be true or false")) }
             }
+            var monitor: DeskDisplay?
+            if let mn = present(po["monitor"]) {
+                if let w = mn.string, let d = monitorWord(w) {
+                    monitor = d
+                } else {
+                    r.append(DeskReason(field + ".monitor", "must be \"all\", \"main\" or a monitor id from get_desk monitors"))
+                }
+            }
             var tilt: Double?
             if let tn = present(po["tilt"]) {
                 if let t = number(tn), t >= DeskArrangement.tiltRange.lowerBound - 1e-9, t <= DeskArrangement.tiltRange.upperBound + 1e-9 {
@@ -276,16 +286,47 @@ struct DeskDesign: Equatable {
                     style = DeskMeterStyles.parse(stn.string?.trimmingCharacters(in: .whitespaces).lowercased())
                 }
             }
-            if hidden == true { anchor = nil; size = nil; tilt = nil; style = nil }
-            pieces.append(DeskPieceLayout(piece: key, anchor: anchor, size: size, hidden: hidden, tilt: tilt, style: style))
+            if hidden == true { anchor = nil; size = nil; tilt = nil; style = nil; monitor = nil }
+            pieces.append(DeskPieceLayout(piece: key, anchor: anchor, size: size, hidden: hidden, tilt: tilt, style: style,
+                                          monitor: monitor))
         }
-        // One slant per stack: two pieces sent to the same anchor with different tilts cannot both be honored.
-        let words: [(widget: String, anchor: DeskAnchor, tilt: Double?)] = pieces.compactMap { p in
+        // One slant per stack: two pieces sent to the same anchor of one display with different tilts cannot both be
+        // honored. A piece that names no monitor keeps the display it is on now.
+        let words: [(widget: String, anchor: DeskAnchor, display: DeskDisplay, tilt: Double?)] = pieces.compactMap { p in
             guard let a = p.anchor, p.tilt != nil else { return nil }
-            return (p.piece, a, p.tilt)
+            let display = p.monitor ?? context.displays?[p.piece] ?? .main
+            return (p.piece, a, stackDisplay(display, context.monitors), p.tilt)
         }
-        for clash in DeskArrangement.tiltConflicts(words) { r.append(DeskReason(clash.field, clash.message)) }
+        for clash in DeskArrangement.tiltConflicts(displayed: words) { r.append(DeskReason(clash.field, clash.message)) }
         return r.count > before ? nil : pieces
+    }
+
+    /// A design's monitor word as a display: "main" and "all" (any case, trimmed), else an id `DeskDisplay` can
+    /// carry (no spaces, `:`, `@` or control characters, at most `DeskDisplay.maxIdLength`). Nil when refused.
+    static func monitorWord(_ raw: String) -> DeskDisplay? {
+        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.isEmpty || t.count > DeskDisplay.maxIdLength || hasControl(t) { return nil }
+        if t.lowercased() == "main" { return .main }
+        if t.lowercased() == "all" { return .all }
+        if t.contains(where: { $0 == ":" || $0 == "@" || $0.isWhitespace }) { return nil }
+        return .id(t)
+    }
+
+    /// The stack a display word belongs to, for the slant rule: the main display's own id is main, and ids compare
+    /// without regard to case.
+    static func stackDisplay(_ display: DeskDisplay, _ monitors: [DeskScreenInfo]?) -> DeskDisplay {
+        guard case .id(let id) = display else { return display }
+        if let monitors, let m = DeskScreens.main(monitors), m.id?.caseInsensitiveCompare(id) == .orderedSame { return .main }
+        return .id(id.lowercased())
+    }
+
+    /// The word a display has in a design and in get_desk: "main", "all" or the id.
+    static func monitorJson(_ display: DeskDisplay) -> String {
+        switch display {
+        case .main: return "main"
+        case .all: return "all"
+        case .id(let id): return id
+        }
     }
 
     /// Why a font family name is refused, or nil. A family is a name as the font picker shows it: letters,
@@ -451,6 +492,7 @@ struct DeskDesign: Equatable {
                 if let h = p.hidden { pf.append(("hidden", .bool(h))) }
                 if let t = p.tilt { pf.append(("tilt", Self.num(t))) }
                 if let st = p.style { pf.append(("style", .string(DeskMeterStyles.word(st)))) }
+                if let m = p.monitor { pf.append(("monitor", .string(Self.monitorJson(m)))) }
                 lo.add(p.piece, .object(WidgetJson.object(pf)))
             }
             f.append(("layout", .object(lo)))
@@ -473,6 +515,17 @@ struct DeskDesign: Equatable {
 
     // MARK: - Validating
 
+    /// Windows' `CheckMonitors`: a piece's monitor id must be a display connected now. Skipped when they are unknown.
+    static func monitorProblems(_ d: DeskDesign, _ context: DeskDesignContext) -> [DeskReason] {
+        guard let layout = d.layout, let monitors = context.monitors else { return [] }
+        return layout.compactMap { p -> DeskReason? in
+            guard case .id(let id)? = p.monitor else { return nil }
+            if monitors.contains(where: { $0.id?.caseInsensitiveCompare(id) == .orderedSame }) { return nil }
+            return DeskReason("layout.\(p.piece).monitor",
+                              "is not a display connected to this Mac; use \"all\", \"main\" or an id from monitors in get_desk.")
+        }
+    }
+
     /// The one gate for a design: reads it with `parse`, then applies what needs the machine. A font that is
     /// neither bundled nor installed makes the design `needsFont` (valid, but it waits for the font); any other
     /// reason makes it rejected.
@@ -480,9 +533,13 @@ struct DeskDesign: Equatable {
         if let node, WidgetJson.compact(node).utf8.count > maxJsonBytes {
             return DeskValidation(status: .rejected, reasons: [DeskReason("design", "is larger than \(maxJsonBytes / 1024) KB")], fonts: [], design: nil)
         }
-        let parsed = parse(node)
+        let parsed = parse(node, context: context)
         guard let d = parsed.design else {
             return DeskValidation(status: .rejected, reasons: parsed.reasons, fonts: [], design: nil)
+        }
+        let unknownMonitors = monitorProblems(d, context)
+        if !unknownMonitors.isEmpty {
+            return DeskValidation(status: .rejected, reasons: unknownMonitors, fonts: [], design: nil)
         }
         var missing: [MissingFont] = []
         if let font = d.font, !font.family.isEmpty, let installed = context.installedFonts,
