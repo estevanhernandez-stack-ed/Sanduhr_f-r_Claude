@@ -2156,22 +2156,25 @@ switch: a design always waits for Apply.
 **`get_desk`** answers from `desk-state.json` in `~/Library/Application Support/Sanduhr/`, not from the preferences
 plist (reading it from Python races the preferences daemon and can be stale). `DeskStateExporter` writes it
 (owner-only, atomic, through `HandoffFiles.writeOwnerOnly`) at launch and 0.5 seconds after a Desk setting, an installed
-font or a font pack changes, and only when the bytes differ from its last write, so nothing writes per frame
-(`DeskStateExport.swift`). It holds the design (every piece's place, size, slant and style, or hidden; the Desk font,
-ink, plate and shadow), the pieces and places the Desk knows, the font names (the Desk's and the message's, the two
+font, a font pack or the displays change, and only when the bytes differ from its last write, so nothing writes per frame
+(`DeskStateExport.swift`). It holds the design (every piece's place, size, slant, style and display, `monitor`: `main`, `all` or a display id,
+or hidden; the Desk font, ink, plate and shadow), the pieces and places the Desk knows, `monitors` (each connected
+display with Windows' keys: `id`, `name`, `width` and `height` in points, `primary`, and `left`/`top` from the main
+display's top-left corner; a one-display Mac lists one), the font names (the Desk's and the message's, the two
 bundled families, and the installed families, capped at 2000), the pieces shown, the message and notch colours and the
 limits a design must keep. It never holds usage, a message's text, a path or an account name. The server returns it
 with `state_age_seconds` and `writer_version`; with no file it answers `no_data` and says to start Sanduhr.
 
 **`propose_desk`** takes `{design, name?, note?}` where `design` has only the fields to change: `layout` (a piece to
-`{anchor, size, hidden, tilt, style}`), `font` (a family, or `{family, link}`), `ink` (`#rrggbb`, or two to four for a
+`{anchor, size, hidden, monitor, tilt, style}`; `monitor` is `main`, `all` or an id from `monitors`, and an id that
+is not connected is refused on `layout.<piece>.monitor`), `font` (a family, or `{family, link}`), `ink` (`#rrggbb`, or two to four for a
 gradient), `plate`, `shadow` and `weather` (`{nickname}`: up to 24 characters, `""` goes back to the place's name; the
 `telemetry` and `weather` pieces are ordinary layout pieces, `telemetry` takes a style). `design_validate` in `sanduhr_mcp.py` checks it with the app's rules; a refusal returns
 `rejected` with reasons and writes nothing. Windows' rules govern the fields and the messages (the Windows C# is the
 guide), the spec governs the Mac surfaces. The Mac refuses, with a reason and never silently: `messages`, `looks` and
-`theme` (their own tools exist), Windows-only fields (`launcher`, `monitor`, the ink words `auto`, `light`, `dark` and
+`theme` (their own tools exist), Windows-only fields (`launcher`, the ink words `auto`, `light`, `dark` and
 `theme`, the glow piece, the Launcher piece). A tilt that differs inside one
-stack is refused, a style on a piece other than `claude`, `meters` and `telemetry` or an unknown word is refused, and Windows'
+stack (an anchor on one display; a piece that names no monitor keeps its display) is refused, a style on a piece other than `claude`, `meters` and `telemetry` or an unknown word is refused, and Windows'
 wallpaper contrast rule is skipped. A good design goes to `desk-request.json` (owner-only, atomic, at most 128 KB) and
 the tool waits about ten seconds for `desk-result.json`; no answer is `queued`, `widget_not_responding`, and the request
 stays for ten minutes.

@@ -106,7 +106,7 @@ class SharedFixtures(unittest.TestCase):
             with self.subTest(name=name):
                 with open(os.path.join(DESIGNS, name), encoding="utf-8") as f:
                     design = json.load(f)
-                v = mcp.design_validate(design, expected["installed_fonts"])
+                v = mcp.design_validate(design, expected["installed_fonts"], expected["monitors"])
                 self.assertEqual(v["status"], want["status"])
                 self.assertEqual(v["reasons"], want["reasons"])
                 self.assertEqual(v["fonts"], want["fonts"])
@@ -151,7 +151,7 @@ class GetDesk(Base):
         self.assertEqual(r["shown"], ["clock", "claude"])
         self.assertEqual(r["message_color"], "9ad7ff")
         self.assertNotIn("secret", r)
-        for windows_only in ("monitors", "wallpaper", "designs", "direct", "start_menu_apps"):
+        for windows_only in ("wallpaper", "designs", "direct", "start_menu_apps"):
             self.assertNotIn(windows_only, r)
 
     def test_it_passes_the_tilts_and_the_styles_and_their_limits_through(self):
@@ -244,7 +244,6 @@ class ProposeRefusals(Base):
             ({"messages": {"lines": ["Hello."]}}, "messages", "propose_desk_messages"),
             ({"looks": []}, "looks", "propose_now_playing_looks"),
             ({"theme": {"name": "x"}}, "theme", "propose_theme"),
-            ({"layout": {"clock": {"anchor": "bl", "monitor": "main"}}}, "layout.clock", "monitor is Windows only"),
             ({"layout": {"system": {"anchor": "tr"}}}, "layout.system", "not a Desk piece"),
             ({"layout": {"launcher": {"anchor": "tr"}}}, "layout.launcher", "no Launcher"),
             ({"layout": {"glow": {}}}, "layout.glow", "no glow piece"),
@@ -315,6 +314,74 @@ class ProposeWeather(Base):
         propose = [t for t in mcp.TOOLS if t["name"] == "propose_desk"][0]
         self.assertIn("weather {nickname}", propose["description"])
         self.assertIn("nickname", propose["inputSchema"]["properties"]["design"]["properties"]["weather"]["properties"])
+
+
+MAIN_ID = "3C1A9E52-7B44-4F0D-A6E2-11D8B0C4F9A7"   # made-up display ids
+SIDE_ID = "9B2E6D10-55AF-4C3B-8E71-D04A2F6C8B35"
+TWO_MONITORS = [
+    {"id": MAIN_ID, "name": "1512\u00d7982, main", "width": 1512, "height": 982, "primary": True, "left": 0, "top": 0},
+    {"id": SIDE_ID, "name": "1024\u00d7768, left of main", "width": 1024, "height": 768, "primary": False,
+     "left": -1024, "top": 0},
+]
+
+
+class Displays(Base):
+    """The Desk per display (2.44.0): get_desk's monitors and every piece's monitor, propose_desk's monitor."""
+
+    def two_monitors(self, doc):
+        doc["monitors"] = TWO_MONITORS
+        doc["design"]["layout"]["clock"]["monitor"] = SIDE_ID
+        doc["design"]["layout"]["claude"]["monitor"] = "main"
+
+    def test_get_desk_passes_two_monitors_and_each_pieces_monitor_through(self):
+        self.write_state(self.two_monitors)
+        r = mcp.build_get_desk(now=NOW, paths=self.paths)
+        self.assertEqual(r["monitors"], TWO_MONITORS)
+        self.assertEqual(r["design"]["layout"]["clock"]["monitor"], SIDE_ID)
+        self.assertEqual(r["design"]["layout"]["claude"]["monitor"], "main")
+
+    def test_an_unknown_id_is_rejected_naming_the_field_and_nothing_is_written(self):
+        self.write_state(self.two_monitors)
+        r = self.propose({"layout": {"clock": {"anchor": "tl", "monitor": "00000000-1111-2222-3333-444444444444"}}})
+        self.assertEqual(r["status"], "rejected")
+        self.assertEqual(r["reasons"], [{"field": "layout.clock.monitor", "message":
+                         'is not a display connected to this Mac; use "all", "main" or an id from monitors in get_desk.'}])
+        self.assert_no_request()
+
+    def test_a_known_id_passes_the_servers_check_in_any_case(self):
+        self.write_state(self.two_monitors)
+        r = self.propose({"layout": {"weather": {"anchor": "br", "monitor": SIDE_ID.lower()}}})
+        self.assertEqual(r["status"], "queued")
+        self.assertEqual(self.request()["design"]["layout"]["weather"], {"anchor": "br", "monitor": SIDE_ID.lower()})
+
+    def test_a_word_that_is_not_a_string_is_refused(self):
+        self.write_state(self.two_monitors)
+        r = self.propose({"layout": {"clock": {"monitor": 2}}})
+        self.assertEqual([x["field"] for x in r["reasons"]], ["layout.clock.monitor"])
+
+    def test_slants_are_per_display_and_a_piece_with_no_monitor_keeps_its_display(self):
+        # clock is on the side display now (two_monitors), claude on main: one anchor, two stacks.
+        self.write_state(self.two_monitors)
+        r = self.propose({"layout": {"clock": {"anchor": "tl", "tilt": 8}, "claude": {"anchor": "tl", "tilt": -8}}})
+        self.assertEqual(r["status"], "queued")
+        # The main display's own id is the main display's stack.
+        r = self.propose({"layout": {"clock": {"anchor": "tl", "tilt": 8, "monitor": MAIN_ID},
+                                     "claude": {"anchor": "tl", "tilt": -8}}})
+        self.assertEqual([x["field"] for x in r["reasons"]], ["layout.clock.tilt"])
+
+    def test_without_monitors_in_the_state_an_id_is_left_to_the_app(self):
+        self.write_state()
+        r = self.propose({"layout": {"clock": {"monitor": SIDE_ID}}})
+        self.assertEqual(r["status"], "queued")
+
+    def test_the_tool_text_says_the_mac_desk_places_pieces_per_display(self):
+        read = [t for t in mcp.TOOLS if t["name"] == "get_desk"][0]["description"]
+        propose = [t for t in mcp.TOOLS if t["name"] == "propose_desk"][0]
+        self.assertIn("monitors", read)
+        self.assertNotIn("no monitors", read)
+        self.assertIn("no wallpaper summary, Launcher, saved designs or direct-change switch", read)
+        self.assertIn("from get_desk monitors", propose["description"])
+        self.assertIn("monitor: main|all", propose["inputSchema"]["properties"]["design"]["properties"]["layout"]["description"])
 
 
 class ProposeHandoff(Base):
