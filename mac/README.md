@@ -1304,6 +1304,18 @@ Settings, Desk places each Desk piece (item 59; the pure pieces in `DeskArrangem
   first piece there that Settings lists after it.
 - **A size per piece.** 60% to 160% in 10% steps, kept when the piece moves. Every piece scales
   from the clock size in Desk Look, the message from its own size.
+- **A display per piece (2.44).** Each placed piece draws on the **main display** (the menu bar
+  display, `NSScreen.screens.first`, not `NSScreen.main`), on **All displays**, or on one display by
+  id (`DeskDisplay`). Main is the default: a layout from before 2.44 has no display and reads as
+  main, so nothing moves on update. The display is a suffix on the piece's word, `@all` or
+  `@<UUID>` (the display UUID, `CGDisplayCreateUUIDFromDisplayID`, which survives reboots and
+  resolution changes, unlike a `CGDirectDisplayID`), and the word is then always the long form, all
+  five fields (`clock:tl:1:0:bar@all`): a 2.43 build reads fields 1 to 3 and ignores the rest, so it
+  keeps the piece's anchor, size and tilt and only loses the display. A piece whose display is not
+  connected draws on the main display at the same anchor and nothing is rewritten, so it returns
+  when the display does. A stack is a display and an anchor, so `tl` on two displays are two stacks,
+  each with its own slant. Settings' Display picker, Arrange's Show on and `monitor` in
+  `get_desk` and `propose_desk` ("main", "all" or an id from `monitors`) all edit this one setting.
 - **The map.** The Layout card (`DeskLayoutMap`) draws the screen with the menu bar, the notch (and
   the island), the Dock on its edge and each piece outlined at its place, in its order and at its
   size, live, from the same `DeskArrangement.stacks` call the Desk draws from.

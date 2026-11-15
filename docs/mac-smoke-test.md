@@ -2917,3 +2917,35 @@ frames, 8 to 64 pixels square, works). For the Aseprite step, put a four-cell sh
    the one sheet it names) and the save panel wrote only the zip. None of it is shown to Claude.
 
 Afterwards uninstall the made-up sprites and restore per section 45.
+
+## 78. The Desk on two displays (2.44.0)
+
+Use a release build after the section 45 backup (or a dev build, signed out, file store), with the Desk on, the MCP server installed and an
+external display plugged in. Start with only the built-in display if you can: unplug the external one first.
+
+1. One display: the Desk looks exactly as before, and Settings, Desk, Layout shows no Display picker (or one that offers only Main display
+   and All displays). `desk-state.json` lists one monitor, `primary` true.
+2. Plug in the second display: nothing moves. Every piece stays where it was, on the display with the menu bar, and no window appears on
+   the new one yet.
+3. Settings, Desk, Layout: each piece has a **Display** picker (Main display, All displays, and the new display named by its size and
+   place, such as "2560x1440, right of main"). Put the clock on the second display: a Desk window appears there, the clock draws at its
+   anchor and the map follows. Clicks work on it: a meeting row joins its call, a two-finger click opens the shared menu, now playing's
+   controls answer.
+4. Set a piece to **All displays**: it draws on both. Set it back to Main display: the second copy goes.
+5. **Arrange Desk…**: the floating bar follows the pointer from one display to the other, and both displays show their anchors. Drag a
+   piece across: it lands on the second display at the anchor you drop it on. Its name tag shows **Show on** (This display, All displays);
+   choose All displays and drag it anywhere: it stays on All displays. **Cancel** restores the layout from before; **Done** keeps it.
+6. Claude: `get_desk` lists both displays under `monitors` (id, name, size, position, `primary`) and each piece's `monitor`.
+   `propose_desk` with a piece's `monitor` set to the second display's id previews on that display; "all" and "main" work, and an id that is
+   not connected is refused with a reason.
+7. Unplug the second display: its pieces move to the main display at the same anchors and the extra window goes. Plug it back in: they
+   return. Sleep the Mac and wake it: both windows come back where they were.
+8. **OLED care** on: both windows dim and drift. With another app focused on the second display, the main Desk stays on the display with
+   the menu bar, and the notch island, the Dock follower and the companion stay there too.
+9. Idle CPU with two windows, measured as backlog item 7 says: `cputime` deltas over a minute (`ps -o cputime`, never `ps %cpu`), under 1
+   percent of a core with nothing happening.
+
+Known gaps to look at while you are here: the extra windows ignore the Dock and the notch; an All-displays piece clicks only on the main
+display's copy; a slanted stack on an extra window clicks by the box around what is drawn, not along its slant.
+
+Afterwards put the layout back the way it was and restore per section 45.
