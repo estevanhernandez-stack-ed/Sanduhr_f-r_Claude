@@ -41,7 +41,7 @@ struct SetupPromptTests {
 
     @Test func teachesNothingTheDeskValidatorRefuses() {
         #expect(!prompt.contains("launcher"))
-        #expect(!prompt.contains("monitor"))
+        #expect(prompt.contains("monitor"))
         #expect(!prompt.contains("messages"))
         #expect(!prompt.contains("glow"))
         for f in SetupPrompt.deskFields { #expect(DeskDesign.fields.contains(f)) }

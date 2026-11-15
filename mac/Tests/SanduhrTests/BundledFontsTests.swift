@@ -8,6 +8,11 @@ import Testing
 /// EsteFont Pro and EsteFont 26 (items 58, 65 (e)): the bundle lookup, the font files
 /// themselves, process-only registration, the Desk's default and fallback, the pickers' order and
 /// the Bold face.
+/// On the main actor: the first CTFont or NSFontManager call runs `+[NSFont initialize]`, which registers defaults and
+/// posts `UserDefaults.didChangeNotification`. Off the main thread, while a main-thread test was initializing
+/// NSApplication, that post waited on the main queue for an observer while holding the class-init lock the main thread
+/// needed: the whole test run hung (sampled 2026-11-15).
+@MainActor
 @Suite("Bundled fonts")
 struct BundledFontsTests {
     /// mac/, from this file.
