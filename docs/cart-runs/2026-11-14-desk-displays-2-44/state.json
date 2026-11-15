@@ -1,0 +1,159 @@
+{
+  "run": "desk-displays-2-44",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "83e5509b18b80a23c5fc84ae46c7f40acac5f88b",
+  "integration_branch": "cart/desk-displays-2-44",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-desk-displays-2-44/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-desk-displays-2-44",
+  "builder_branch": "main",
+  "uncommitted_at_start": [
+    "docs/superpowers/specs/2026-11-14-mac-desk-per-monitor-design.md"
+  ],
+  "started_at": "2026-11-14T16:27:33.799Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "spec-on-branch",
+      "title": "The spec on the branch",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-displays-2-44--01-spec-on-branch",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "git diff --check HEAD~1",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "layout-display",
+      "title": "A display per placed piece",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-displays-2-44--02-layout-display",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "desk-screens",
+      "title": "Displays: identity, names",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-displays-2-44--03-desk-screens",
+      "worktree": "",
+      "on": 2,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "window-per-display",
+      "title": "One Desk window per display",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-displays-2-44--04-window-per-display",
+      "worktree": "",
+      "on": 3,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "arrange-across",
+      "title": "Arrange Desk across displays",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-displays-2-44--05-arrange-across",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "settings-picker",
+      "title": "Settings Display picker",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-displays-2-44--06-settings-picker",
+      "worktree": "",
+      "on": 3,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 7,
+      "slug": "design-monitors",
+      "title": "monitors in get_desk and propose_desk",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-displays-2-44--07-design-monitors",
+      "worktree": "",
+      "on": 3,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && python3 -m pytest -q integrations/tests",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 8,
+      "slug": "rows-2-44",
+      "title": "The 2.44.0 rows",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-displays-2-44--08-rows-2-44",
+      "worktree": "",
+      "on": 7,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh (x11, watchdog) && ruby smoke/selftest.rb && python3 -m pytest -q integrations/tests",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}
