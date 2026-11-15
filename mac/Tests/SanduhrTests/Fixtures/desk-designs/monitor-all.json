@@ -1,0 +1,12 @@
+{
+  "layout": {
+    "clock": {
+      "monitor": "ALL"
+    },
+    "claude": {
+      "anchor": "tr",
+      "monitor": "all",
+      "tilt": 4
+    }
+  }
+}

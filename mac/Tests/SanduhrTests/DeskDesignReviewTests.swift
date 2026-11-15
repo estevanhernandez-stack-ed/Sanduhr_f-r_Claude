@@ -33,6 +33,7 @@ struct DeskDesignReviewTests {
         let host = FakeHost()
         let handoff: DeskDesignProposalHandoff
         var families = DeskDesignReviewTests.installed
+        var screens: [DeskScreenInfo] = []
         var answers: [(String, DeskAnswer)] = []
         var decided: [String] = []
         var suggested: [DeskDesignReviewModel] = []
@@ -44,9 +45,11 @@ struct DeskDesignReviewTests {
             defaults.set(112.0, forKey: "timeSize")
             let support = root.appendingPathComponent("support", isDirectory: true)
             var fonts: () -> [String] = { [] }
+            var displays: () -> [DeskScreenInfo] = { [] }
             handoff = DeskDesignProposalHandoff(paths: .init(support: support), defaults: defaults, now: { now },
-                                                installedFamilies: { fonts() })
+                                                installedFamilies: { fonts() }, screens: { displays() })
             fonts = { [unowned self] in families }
+            displays = { [unowned self] in screens }
             if wired { handoff.host = host }
             handoff.onAnswered = { [unowned self] in answers.append(($0, $1)) }
             handoff.onDecided = { [unowned self] in decided.append($0) }
@@ -181,7 +184,7 @@ struct DeskDesignReviewTests {
 
     @Test func aDesignThatBreaksARuleIsRefusedWithItsReasonsAndNeverHeld() throws {
         let w = World()
-        w.send("b1", #"{"launcher":{"buttons":[]},"layout":{"clock":{"monitor":"main"}}}"#)
+        w.send("b1", #"{"launcher":{"buttons":[]},"layout":{"clock":{"wobble":1}}}"#)
         #expect(try w.status() == "rejected")
         #expect(try w.reason() == nil)
         let fields = try #require(TJ.get(try w.result(), ["result", "reasons"])?.array).compactMap { TJ.get($0, ["field"])?.string }
