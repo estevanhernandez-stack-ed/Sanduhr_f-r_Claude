@@ -57,7 +57,7 @@ enum SetupPrompt {
              + " (t top, m middle, b bottom; l left, c center, r right). Pieces at one anchor stack top to bottom.")
         line("  size: a number from \(n(DeskArrangement.scaleRange.lowerBound)) to \(n(DeskArrangement.scaleRange.upperBound)), 1 is the piece's own size.")
         line("  hidden: true removes the piece; send nothing else for it.")
-        line("  monitor: which display the piece draws on: \"main\" (the menu bar display, the default), \"all\" (every display), or a display id I give you from get_desk monitors.")
+        line("  monitor: which display the piece draws on: \"main\" (the menu bar display, the default) or \"all\" (every display). Use only those two here: a display id comes from Sanduhr's get_desk, which this chat cannot read.")
         line("  tilt: whole degrees from \(deg(DeskArrangement.tiltRange.lowerBound)) to \(deg(DeskArrangement.tiltRange.upperBound)), the slant of the whole stack at that anchor, so pieces at one anchor must share one tilt.")
         line("  style: " + DeskMeterStyle.allCases.map(DeskMeterStyles.word).joined(separator: ", ")
              + ", only on " + DeskMeterStyles.pieces.joined(separator: ", ") + ".")
