@@ -43,7 +43,8 @@ struct DeskView: View {
     var model: DeskModel
     /// A window besides the main one (one per display with pieces, DeskWindowPlan): its geometry and
     /// its offset from the main window. nil on the main window, which reads the model's geometry and
-    /// alone carries the notch and the slanted stacks' click areas. Arrange runs on every window (2.44).
+    /// alone carries the notch. Arrange runs on every window (2.44), and every window's slanted stacks
+    /// take clicks by their shape (2.45).
     var extra: DeskExtraWindow? = nil
 
     @AppStorage("layout", store: .desk) private var layout = "message:tl clock:bl claude:bl meetings:bl"
@@ -971,7 +972,7 @@ struct DeskFrameReporting: Equatable {
     var offset: CGPoint = .zero
     /// The window the views are drawn on: `.main`, or another window's key (DeskWindowElements.key).
     var window: DeskDisplay = .main
-    /// The main window: only it reports the slanted stacks' folds (DeskFoldStack).
+    /// The main window: only it reports the slanted stacks' folds to Arrange (DeskFoldStack).
     var mainWindow: Bool { window == .main }
 
     static let main = DeskFrameReporting()

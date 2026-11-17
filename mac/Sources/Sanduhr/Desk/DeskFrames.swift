@@ -24,6 +24,10 @@ struct DeskFrames: Equatable {
     var clockFrame: CGRect = .zero
     var messageFrame: CGRect = .zero
     var claudeLineFrame: CGRect = .zero
+    /// Each slanted stack this window draws: its tilt and top left, by anchor, in the same main
+    /// window coordinates (DeskFoldStack moves another window's by its offset). Two windows' stacks
+    /// at one anchor keep their own (2.45).
+    var folds: [DeskAnchor: DeskFold] = [:]
 
     /// The blocks the close pointer watch looks around (DeskPointerWatch): the meters, the account
     /// name, the calendar note, the meeting list, now playing, the strip's pieces and the watchers,
@@ -104,6 +108,20 @@ enum DeskWindowElements {
         if !input.placed.contains(WatcherPlacement.widget) { input.watcherRows = [] }
         if !input.placed.contains(NowPlayingPlacement.widget) { input.nowPlayingLine = false }
         return input
+    }
+
+    /// `window`'s elements, built from `input(...)` and folded with its own stacks' slants (its
+    /// frames' folds) over the pieces it draws, so two windows' stacks at one anchor never mix (2.45).
+    /// The main window (or no window: the screens not known yet) folds over the main window's pieces
+    /// exactly as before 2.45 (DeskModel.mainWindowPieces).
+    static func elements(_ shared: DeskElements.Input, frames: DeskFrames, arrangement: DeskArrangement,
+                         window: DeskWindowPlan.Window?, connected: [DeskScreenInfo]) -> [DeskElement] {
+        let built = DeskElements.build(input(shared, frames: frames, arrangement: arrangement,
+                                             window: window, connected: connected))
+        let extra = window.map { !$0.isMain } ?? false
+        let folding = extra ? pieces(arrangement, on: window, connected: connected)
+            : DeskModel.mainWindowPieces(arrangement, screens: connected)
+        return DeskElements.folded(built, arrangement: folding, folds: frames.folds)
     }
 
     /// The meters' frame to put the widget beside (Show Widget): the copy on `preferring`, else the

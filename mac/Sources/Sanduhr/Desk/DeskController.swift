@@ -383,8 +383,7 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     /// The plates follow the frames (onHitAreasChange, every mouse-through check), on every
     /// display's click layer, each from its own window's elements (2.45): the frames are in the main
-    /// window's coordinates, so another window's plates move back by its offset (its slanted stacks
-    /// report no fold, so it has none).
+    /// window's coordinates, so another window's plates, its slanted ones too, move back by its offset.
     private func syncClickAreas() {
         if let main = clickWindow { syncClickAreas(main, key: .main, offset: .zero) }
         for e in extras { if let c = e.clickWindow { syncClickAreas(c, key: e.key, offset: e.offset) } }

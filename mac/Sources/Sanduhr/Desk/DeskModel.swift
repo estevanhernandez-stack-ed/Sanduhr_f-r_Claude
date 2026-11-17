@@ -295,16 +295,18 @@ final class DeskModel {
     var clockFrame: CGRect { get { frames.clockFrame } set { frames.clockFrame = newValue } }
     var messageFrame: CGRect { get { frames.messageFrame } set { frames.messageFrame = newValue } }
     var claudeLineFrame: CGRect { get { frames.claudeLineFrame } set { frames.claudeLineFrame = newValue } }
-    /// Each slanted stack's tilt and top left in the global space the frames above are in (the
-    /// fold), by anchor; reported by DeskFoldStack. A stack that stands upright has none. The
-    /// frames above are the boxes around what is drawn (SwiftUI reports a slanted view's bounds);
-    /// `elements()` recovers each one's layout frame and attaches the slant.
-    @ObservationIgnored private(set) var folds: [DeskAnchor: DeskFold] = [:]
+    /// The main window's slanted stacks: each one's tilt and top left in the global space the frames
+    /// above are in (the fold), by anchor; reported by DeskFoldStack. A stack that stands upright has
+    /// none. The frames above are the boxes around what is drawn (SwiftUI reports a slanted view's
+    /// bounds); `elements(on:)` recovers each one's layout frame and attaches the slant. Every other
+    /// window keeps its own beside its frames (DeskFrames.folds, 2.45).
+    var folds: [DeskAnchor: DeskFold] { frames.folds }
 
-    func setFold(_ fold: DeskFold?, at anchor: DeskAnchor) {
-        guard folds[anchor] != fold else { return }
-        folds[anchor] = fold
-        onHitAreasChange?()
+    /// Changes one window's fold at `anchor` (DeskFoldStack); nil clears it. Clearing one that is not
+    /// there changes nothing, so a stack going with its window leaves no empty frames behind.
+    func setFold(_ fold: DeskFold?, at anchor: DeskAnchor, in window: DeskDisplay = .main) {
+        guard frames(in: window).folds[anchor] != fold else { return }
+        setFrames(in: window) { $0.folds[anchor] = fold }
     }
 
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
@@ -773,18 +775,13 @@ final class DeskModel {
         // (its display unplugged) has no elements.
         let plan = DeskWindowElements.window(window, connected: screens)
         if plan == nil, window != .main { return [] }
-        let share = DeskWindowElements.input(input, frames: frames(in: window), arrangement: arrangement,
-                                             window: plan, connected: screens)
-        // The slanted stacks' folds are the main window's alone (DeskFoldStack).
-        guard window == .main else { return DeskElements.build(share) }
-        return DeskElements.folded(DeskElements.build(share),
-                                   arrangement: Self.mainWindowPieces(arrangement, screens: screens),
-                                   folds: folds)
+        return DeskWindowElements.elements(input, frames: frames(in: window), arrangement: arrangement,
+                                           window: plan, connected: screens)
     }
 
-    /// The pieces the main window draws: only its slanted stacks report a fold (DeskFoldStack), so a
-    /// piece on another window never takes the main window's slant for its anchor. No screens known:
-    /// every piece, as before 2.44.
+    /// The pieces the main window draws: its slanted stacks report into its own folds (DeskFoldStack),
+    /// so a piece on another window never takes the main window's slant for its anchor. No screens
+    /// known: every piece, as before 2.44.
     static func mainWindowPieces(_ arrangement: DeskArrangement, screens: [DeskScreenInfo]) -> DeskArrangement {
         guard let main = DeskWindowPlan.plan(arrangement, screens: screens).main else { return arrangement }
         var onMain = arrangement
