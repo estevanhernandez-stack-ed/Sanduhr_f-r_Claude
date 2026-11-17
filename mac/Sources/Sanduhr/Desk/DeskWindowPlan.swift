@@ -104,4 +104,6 @@ struct DeskExtraWindow: Equatable {
     var offset: CGPoint
 
     var plan: DeskWindowPlan.Window { DeskWindowPlan.Window(screen: geometry.screen, isMain: false) }
+    /// The key its frames are stored under (DeskWindowElements.key, DeskModel.windowFrames).
+    var key: DeskDisplay { DeskWindowElements.key(plan) }
 }

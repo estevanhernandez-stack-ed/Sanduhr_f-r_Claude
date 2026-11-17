@@ -39,6 +39,20 @@ enum DeskClickLayer {
         elements(in: all).filter { $0.fold != nil }.compactMap(DeskHitTest.quad)
     }
 
+    /// One click layer's plates, from its own window's elements (DeskModel.elements(on:), 2.45). The
+    /// frames are in the main window's coordinates, so another window's plates move back by its
+    /// offset from the main window (DeskWindowPlan.offset); the main window's (offset zero) are
+    /// `areas` and `slantedAreas` as they are.
+    static func plates(in elements: [DeskElement], offset: CGPoint) -> (areas: [CGRect], slanted: [DeskQuad]) {
+        let areas = areas(in: elements), slanted = slantedAreas(in: elements)
+        guard offset != .zero else { return (areas, slanted) }
+        let dx = -offset.x, dy = -offset.y
+        func moved(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x + dx, y: p.y + dy) }
+        return (areas.map { $0.offsetBy(dx: dx, dy: dy) },
+                slanted.map { DeskQuad(topLeft: moved($0.topLeft), topRight: moved($0.topRight),
+                                       bottomRight: moved($0.bottomRight), bottomLeft: moved($0.bottomLeft)) })
+    }
+
     /// True when the layer stands in for the Desk window: under the icons, and not arranging.
     /// Arrange mode (item 60) takes the whole Desk window, which comes up to this level for it.
     static func active(underIcons: Bool, arranging: Bool) -> Bool {
