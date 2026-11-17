@@ -161,6 +161,10 @@ final class DeskModel {
     /// corners on that side sit this much further in. Changes with an animation while an
     /// auto-hiding Dock comes and goes.
     var dockInsets = DockInsets()
+    /// The auto-hiding Dock's slide on each Desk window besides the main one (2.45, DockFollower),
+    /// by window key: what its DeskView lays out against in place of its geometry's reservation,
+    /// changed in place with the slide's animation, so no window is rebuilt per slide.
+    var extraDockInsets: [DeskDisplay: DockInsets] = [:]
     /// OLED care's drift step (OledDrift), nil while OLED care is off: each piece sits at the orbit's
     /// offset for it. Set by OledCareController inside one animation per step.
     var oledStep: Int?

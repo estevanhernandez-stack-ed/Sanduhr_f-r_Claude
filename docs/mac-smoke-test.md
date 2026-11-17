@@ -2958,7 +2958,10 @@ otherwise. Where a step says "one display", unplug the second one first.
 
 1. Dock on the second display: set the Dock to the bottom, then left, then right of that display (System Settings, Desktop & Dock, with
    "Displays have separate Spaces" on). Pieces on it keep clear of the Dock each time. Move the Dock to the main display and back: the
-   second display's Desk follows. An auto-hiding Dock reserves nothing there, so pieces rest at the edge, as on a one-display Mac.
+   second display's Desk follows. Then turn on auto-hiding: rest the pointer at the bottom edge of the second display; as the Dock rises
+   there, its pieces slide clear with it and the main display's stay put. Move to the main display's edge: the second display's pieces
+   go back down and the main display's slide up. With separate Spaces off the Dock stays on one display: only that display's pieces slide,
+   and resting at the other display's edge moves nothing.
 2. A notched display as the non-main one, if you have it: pieces on it clear the notch and the menu bar.
 3. Clicks on the second display's copies: a meeting row joins its call, now playing answers a click and a two-finger click opens its
    shared menu, a meter row's limit menu opens, a watcher link opens its page. The clock and message two-finger menu opens too.

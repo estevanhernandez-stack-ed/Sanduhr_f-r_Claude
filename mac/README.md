@@ -1422,7 +1422,8 @@ window its display resolves to, All displays or a display that is not connected 
 re-seats only when its window changes.
 Each window has its own geometry (`DeskScreenGeometry`: size and menu bar from its screen; the notch
 of that screen and the Dock's share of it when the Dock is always shown, so pieces clear both on every
-display; an auto-hiding Dock's slide is followed on the main display only). Frames from another window reach the model moved by its
+display; the auto-hiding Dock's slide follows the display under the pointer, one display at a time, `DockTarget`, and reaches
+another window through `DeskModel.extraDockInsets`). Frames from another window reach the model moved by its
 offset from the main window (`DeskFrameReporting`), so the one hit test covers every display. Frames
 are kept per window (`DeskModel.windowFrames`) and a click is judged against the window under the
 pointer, so every copy of an All-displays piece takes clicks (2.45) and a piece on one display lets

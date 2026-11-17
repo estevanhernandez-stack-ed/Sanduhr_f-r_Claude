@@ -127,6 +127,9 @@ final class DeskController: NSObject, NSMenuDelegate {
             NSRunningApplication.runningApplications(withBundleIdentifier: id).forEach { $0.terminate() }
         }
         dock.apply = { [weak self] insets, animation in self?.applyDock(insets, animation: animation) }
+        dock.applyExtra = { [weak self] key, insets, animation in
+            self?.applyExtraDock(key, insets, animation: animation)
+        }
         dock.start()
         buildWindow()
         applyOled()
@@ -175,6 +178,23 @@ final class DeskController: NSObject, NSMenuDelegate {
         } else {
             model.dockInsets = insets
         }
+    }
+
+    /// The auto-hiding Dock's slide on another display's window (2.45): its DeskView reads it from
+    /// the model, so the window slides in place. Nil hands the window back to its geometry.
+    private func applyExtraDock(_ key: DeskDisplay, _ insets: DockInsets?, animation: Animation?) {
+        guard model.extraDockInsets[key] != insets else { return }
+        if let animation {
+            withAnimation(animation) { model.extraDockInsets[key] = insets }
+        } else {
+            model.extraDockInsets[key] = insets
+        }
+    }
+
+    /// The pointer in global CoreGraphics coordinates, for the Dock's slide on every display.
+    private func dockPointer() -> CGPoint {
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        return DockTarget.topLeft(NSEvent.mouseLocation, primaryHeight: primaryHeight)
     }
 
     /// OLED care follows the switch and the Desk: the drift timer and the idle subscription exist only
@@ -282,7 +302,9 @@ final class DeskController: NSObject, NSMenuDelegate {
         model.onHitAreasChange = nil
         dock.stop()
         dock.apply = nil
+        dock.applyExtra = nil
         model.dockInsets = DockInsets()
+        model.extraDockInsets = [:]
         setMenuIcon(false)
         model.stop()
         applyHotKeys()
@@ -523,6 +545,15 @@ final class DeskController: NSObject, NSMenuDelegate {
         if stale { buildExtraWindows(extras.map(\.screen)) }
     }
 
+    /// The Dock follower watches the other displays' windows as built now; a gone window's slide
+    /// leaves the model.
+    private func followDockOnExtras() {
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        let keys = Set(extras.map(\.key))
+        model.extraDockInsets = model.extraDockInsets.filter { keys.contains($0.key) }
+        dock.setExtras(extras.map { DockDisplay(key: $0.key, frame: DebugTree.topLeft($0.window.frame, primaryHeight: primaryHeight)) })
+    }
+
     private func closeExtraWindows() {
         for e in extras {
             model.arrange.removeWindow(.id(e.screen.id ?? ""))
@@ -535,9 +566,10 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     /// A plain Desk window on each of `screens`: the pieces whose display shows there, at that
     /// screen's size and menu bar, its own notch and the always-shown Dock's clearance (the auto-hiding
-    /// Dock's slide is followed on the main display only), at the main window's layer, click-through, with a click layer under the icons.
+    /// Dock's slide follows each one too, DockFollower), at the main window's layer, click-through, with a click layer under the icons.
     private func buildExtraWindows(_ screens: [DeskScreenInfo]) {
         closeExtraWindows()
+        defer { followDockOnExtras() }
         guard let mainFrame = window?.frame else { return }
         let underIcons = DeskLayer.isOn(in: UserDefaults.desk)
         let dockPrefs = dock.prefs
@@ -1067,7 +1099,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         let blocks = model.frames(in: keyUnderPointer).watchedBlocks(piecesTakeClicks: DeskPieceClicks.isOn(in: UserDefaults.desk))
         nearBlocks = DeskPointerWatch.near(point, frames: blocks)
         // The auto-hiding Dock's edge (item 56) runs the same watch, which reads the window list.
-        watchApproach(nearBlocks || dock.wantsWatch(pointer: point, size: w.frame.size))
+        watchApproach(nearBlocks || dock.wantsWatch(pointer: dockPointer()))
     }
 
     /// The close watch's tick: a pointer that has not moved since the last tick needs nothing
@@ -1081,10 +1113,10 @@ final class DeskController: NSObject, NSMenuDelegate {
             lastWatchedPointer = p
             updateMouseThrough()
         }
-        guard approachTimer != nil, let w = window else { return }
-        let point = pointerInWindow()
-        dock.tick(pointer: point, size: w.frame.size, moved: moved)
-        if !nearBlocks, !dock.wantsWatch(pointer: point, size: w.frame.size) { watchApproach(false) }
+        guard approachTimer != nil, window != nil else { return }
+        let point = dockPointer()
+        dock.tick(pointer: point, moved: moved)
+        if !nearBlocks, !dock.wantsWatch(pointer: point) { watchApproach(false) }
     }
 
     /// Starts the close watch when `on` and none runs, stops it when off. Common run loop modes,
