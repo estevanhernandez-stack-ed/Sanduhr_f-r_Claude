@@ -7,7 +7,18 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class WhatsNewCards
 {
-    public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release480(), .. Release470(), .. Release460(), .. Release450(), .. Release400(), .. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
+    public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release490(), .. Release480(), .. Release470(), .. Release460(), .. Release450(), .. Release400(), .. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
+
+    // 4.9.0 (spec 3, every agent's activity): Codex's local burn beside Claude Code's. Names Codex only: a card naming
+    // Antigravity would need a Google trademark line the window does not carry; its Sources row carries one. Show me lands on
+    // Settings ▸ Usage ▸ Sources, where the agents are switched on.
+    private static WhatsNewCard[] Release490() =>
+    [
+        WhatsNewCard.Of("4.9.0", "agent-activity", "Every agent's tokens, side by side",
+            "Codex's local burn now counts beside Claude Code's on the Local burn page and in the widget footer. Turn agents on in Settings, Sources.",
+            "", // Diagnostic, as the Codex card
+            WhatsNewPreview.None, SettingsPage.UsageSources),
+    ];
 
     // 4.8.0 (agent layer): Codex limits beside Claude's; Show me lands on Settings ▸ Usage ▸ Sources.
     private static WhatsNewCard[] Release480() =>
@@ -208,7 +219,7 @@ public static class WhatsNewCards
 
     /// <summary>Each card with the section its Show me lands on (Settings v2, WF17).</summary>
     private static WhatsNewCard[] Anchored(WhatsNewCard[] cards) =>
-        [.. cards.Select(c => (AnchorFor(c.Id) is { } anchor ? c with { Anchor = anchor } : c) with { NamesCodex = c.Id is "codex-limits" })];
+        [.. cards.Select(c => (AnchorFor(c.Id) is { } anchor ? c with { Anchor = anchor } : c) with { NamesCodex = c.Id is "codex-limits" or "agent-activity" })];
 
     /// <summary>
     /// Where each card lands, by id. Kept apart from the cards so their words and their landings change independently.
@@ -217,7 +228,7 @@ public static class WhatsNewCards
     /// </summary>
     private static string? AnchorFor(string id) => id switch
     {
-        "codex-limits" => SettingsIndex.SourcesList,
+        "codex-limits" or "agent-activity" => SettingsIndex.SourcesList,
         "widget-from-file" => SettingsIndex.ModList,
         "desk-under-icons" => SettingsIndex.DeskUnderIcons,
         "choose-what-shows" => SettingsIndex.GeneralSetup,
