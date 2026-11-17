@@ -125,6 +125,37 @@ struct DeskWindowPlanTests {
         #expect(g.notchRect == notch)
     }
 
+    @Test func extraWindowsGetTheDockOnItsSideAndNothingElsewhere() {
+        // The right display, 1920x1080, with the visible frame reduced on the Dock's side only.
+        let frame = right.frame
+        let bottom = CGRect(x: 1512, y: 70, width: 1920, height: 985)
+        let leftSide = CGRect(x: 1512 + 80, y: 0, width: 1840, height: 1055)
+        let rightSide = CGRect(x: 1512, y: 0, width: 1840, height: 1055)
+        let none = CGRect(x: 1512, y: 0, width: 1920, height: 1055)
+        func geo(_ side: DockSide, _ visible: CGRect, autohide: Bool = false) -> DeskScreenGeometry {
+            DeskScreenGeometry.extra(right, visibleFrame: visible, notch: nil, dockPrefs: DockPrefs(side: side, autohide: autohide))
+        }
+        #expect(frame.size == CGSize(width: 1920, height: 1080))
+        #expect(geo(.bottom, bottom).dockInsets == .on(.bottom, 70))
+        #expect(geo(.left, leftSide).dockInsets == .on(.left, 80))
+        #expect(geo(.right, rightSide).dockInsets == .on(.right, 80))
+        // The Dock is on another display, or hides: nothing reserved here.
+        #expect(geo(.bottom, none).dockInsets == DockInsets())
+        #expect(geo(.bottom, bottom, autohide: true).dockInsets == DockInsets())
+    }
+
+    @Test func aNotchedExtraScreenKeepsItsNotchAndTheMainGeometryIsUnchanged() {
+        let notch = CGRect(x: 640, y: 0, width: 188, height: 32)
+        let visible = CGRect(x: 1512, y: 0, width: 1920, height: 1055)
+        let g = DeskScreenGeometry.extra(right, visibleFrame: visible, notch: notch, dockPrefs: DockPrefs())
+        #expect(g.notchRect == notch)
+        #expect(g.topInset == 25)
+        // The main window's geometry still comes from `of`, with the Dock left to DockFollower.
+        let main = DeskScreenGeometry.of(mainScreen, visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 945), notch: nil)
+        #expect(main.dockInsets == DockInsets())
+        #expect(main.topInset == 37)
+    }
+
     @Test func offsetsAreFromTheMainWindowsTopLeft() {
         let main = mainScreen.frame
         #expect(DeskWindowPlan.offset(of: main, from: main) == .zero)

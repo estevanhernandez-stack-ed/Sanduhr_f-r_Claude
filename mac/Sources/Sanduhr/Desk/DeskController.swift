@@ -44,6 +44,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         var clickWindow: NSWindow?
         let screen: DeskScreenInfo
         let offset: CGPoint
+        let geometry: DeskScreenGeometry
     }
     private var extras: [ExtraWindow] = []
     /// The Desk windows besides the main one, for the debug hooks' window list.
@@ -158,12 +159,14 @@ final class DeskController: NSObject, NSMenuDelegate {
     @objc private func otherAppActivated() {
         // Back from System Settings, Desktop & Dock: the Dock may have moved or stopped hiding.
         dock.refreshPrefs()
+        refreshExtraGeometry()
         updateMouseThrough()
     }
 
     /// The Dock's reach changed (DockFollower): the corners move, sliding with the auto-hiding
     /// Dock (no slide with Reduce Motion, which DockFollower passes as no animation).
     private func applyDock(_ insets: DockInsets, animation: Animation?) {
+        refreshExtraGeometry()
         guard model.dockInsets != insets else { return }
         if let animation {
             withAnimation(animation) { model.dockInsets = insets }
@@ -501,6 +504,20 @@ final class DeskController: NSObject, NSMenuDelegate {
         applyLayer()
     }
 
+    /// The Dock moved to another display, resized or started or stopped hiding: the other displays'
+    /// windows are built again when their Dock clearance or notch no longer matches. Screen
+    /// parameter changes rebuild every window anyway (screensChanged).
+    private func refreshExtraGeometry() {
+        guard running, !extras.isEmpty else { return }
+        let prefs = dock.prefs
+        let stale = extras.contains { e in
+            guard let ns = NSScreen.screens.first(where: { $0.frame == e.screen.frame && DeskScreens.id(of: $0) == e.screen.id }) else { return false }
+            return DeskScreenGeometry.extra(e.screen, visibleFrame: ns.visibleFrame, notch: ns.cameraNotch,
+                                            dockPrefs: prefs) != e.geometry
+        }
+        if stale { buildExtraWindows(extras.map(\.screen)) }
+    }
+
     private func closeExtraWindows() {
         for e in extras {
             model.arrange.removeWindow(.id(e.screen.id ?? ""))
@@ -512,23 +529,26 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     /// A plain Desk window on each of `screens`: the pieces whose display shows there, at that
-    /// screen's size and menu bar, with no notch and no Dock clearance (the Dock is followed on the
-    /// main display only), at the main window's layer, click-through, with a click layer under the icons.
+    /// screen's size and menu bar, its own notch and the always-shown Dock's clearance (the auto-hiding
+    /// Dock's slide is followed on the main display only), at the main window's layer, click-through, with a click layer under the icons.
     private func buildExtraWindows(_ screens: [DeskScreenInfo]) {
         closeExtraWindows()
         guard let mainFrame = window?.frame else { return }
         let underIcons = DeskLayer.isOn(in: UserDefaults.desk)
+        let dockPrefs = dock.prefs
         for info in screens {
             guard let ns = NSScreen.screens.first(where: { $0.frame == info.frame && DeskScreens.id(of: $0) == info.id }) else { continue }
             let w = makeDeskWindow(frame: ns.frame, arranging: model.arrange.active)
-            let extra = DeskExtraWindow(geometry: DeskScreenGeometry.of(info, visibleFrame: ns.visibleFrame, notch: nil),
+            let extra = DeskExtraWindow(geometry: DeskScreenGeometry.extra(info, visibleFrame: ns.visibleFrame, notch: ns.cameraNotch,
+                                                                         dockPrefs: dockPrefs),
                                         offset: DeskWindowPlan.offset(of: ns.frame, from: mainFrame))
             w.contentView = FirstClickHostingView(rootView: DeskView(model: model, extra: extra))
             w.setFrame(ns.frame, display: true)
             w.orderFront(nil)
             let click = DeskClickLayer.active(underIcons: underIcons, arranging: model.arrange.active)
                 ? makeClickWindow(frame: ns.frame) : nil
-            extras.append(ExtraWindow(window: w, clickWindow: click, screen: info, offset: extra.offset))
+            extras.append(ExtraWindow(window: w, clickWindow: click, screen: info, offset: extra.offset,
+                                      geometry: extra.geometry))
             NotificationCenter.default.addObserver(
                 self, selector: #selector(occlusionChanged),
                 name: NSWindow.didChangeOcclusionStateNotification, object: w)
