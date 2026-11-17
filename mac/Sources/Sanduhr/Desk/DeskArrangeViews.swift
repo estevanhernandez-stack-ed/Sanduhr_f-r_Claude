@@ -167,7 +167,7 @@ private struct DeskArrangeable: ViewModifier {
 
     /// Show on in the chrome: offered with more than one display, never for the companion.
     private var showsShowOn: Bool {
-        mode.offersShowOn && !DeskWindowPlan.mainOnly.contains(widget)
+        DeskArrange.offersShowOn(widget, offered: mode.offersShowOn)
     }
 
     private var resize: some Gesture {

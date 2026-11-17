@@ -36,8 +36,8 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// The click layer (DeskClickLayer): stands in for the Desk window's click areas while the
     /// Desk is under the desktop icons, nil otherwise and while arranging.
     private(set) var clickWindow: NSWindow?
-    /// A Desk window on a display besides the main one (DeskWindowPlan): its pieces only, no notch,
-    /// wings, pill, drawers or companion. Its frames reach the model moved by `offset`, in the main
+    /// A Desk window on a display besides the main one (DeskWindowPlan): its pieces only (the
+    /// companion too, when it is placed there), no notch, wings, pill or drawers. Its frames reach the model moved by `offset`, in the main
     /// window's coordinates, into its own frames (`key`, DeskModel.windowFrames), so a click on it is
     /// judged against its own elements with the same pointer reading and click handling.
     private struct ExtraWindow {
@@ -443,8 +443,8 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     /// One Desk window per display with pieces (DeskWindowPlan): the main one on the menu bar
-    /// display with every role (wings, pill, notch, Dock, drawers, companion, click layer, Arrange),
-    /// and a plain one on each other display a piece draws on.
+    /// display with every role (wings, pill, notch, Dock follower, drawers, click layer, Arrange),
+    /// and a plain one on each other display a piece draws on (the companion's included).
     private func buildWindow() {
         if let old = window {
             NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: old)

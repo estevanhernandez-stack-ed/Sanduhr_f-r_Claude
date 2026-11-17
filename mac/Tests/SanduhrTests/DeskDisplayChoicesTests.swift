@@ -27,6 +27,24 @@ struct DeskDisplayChoicesTests {
         #expect(DeskDisplayChoices.choices(for: p, screens: one()).map(\.title) == ["Main display", "All displays"])
     }
 
+    @Test("2.45: the companion's choices are Main and each display, never All")
+    func companionChoices() {
+        let c = DeskDisplayChoices.choices(for: DeskArrangement("companion:br").placement("companion")!, screens: two())
+        #expect(c.map(\.title) == ["Main display", "1024×768, left of main"])
+        #expect(DeskDisplayChoices.choices(for: DeskArrangement("companion:br").placement("companion")!,
+                                           screens: one()).map(\.title) == ["Main display"])
+        let stranded = DeskArrangement("companion:br@AAAAAAAA-0000-4000-8000-00000000000A").placement("companion")!
+        #expect(DeskDisplayChoices.choices(for: stranded, screens: two()).map(\.kind)
+                == [.main, .screen(secondID), .notConnected])
+        // On All (a hand-written layout or a design) it reads as Main, where it draws.
+        let onAll = DeskArrangement("companion:br@all").placement("companion")!
+        #expect(DeskDisplayChoices.selection(for: onAll, screens: two()).kind == .main)
+        var a = DeskArrangement("message:tl companion:br")
+        DeskDisplayChoices.apply(c[1], widget: "companion", to: &a, screens: two())
+        #expect(a.placement("companion")?.monitor == .id(secondID))
+        #expect(DeskDisplayChoices.selection(for: a.placement("companion")!, screens: two()).kind == .screen(secondID))
+    }
+
     @Test func twoScreensListMainAllAndTheSecondByName() {
         let a = DeskArrangement("clock:tl")
         #expect(DeskDisplayChoices.shows(a, screens: two()))

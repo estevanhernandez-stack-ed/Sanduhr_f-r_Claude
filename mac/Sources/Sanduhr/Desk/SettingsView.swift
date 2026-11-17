@@ -412,7 +412,8 @@ private struct DeskPlaceRow: View {
     }
 }
 
-/// A placed piece's Display picker (2.44): Main, All, each other display, and a stranded choice.
+/// A placed piece's Display picker (2.44): Main, All (not for the companion, 2.45), each other
+/// display, and a stranded choice.
 private struct DeskDisplayPicker: View {
     let name: String
     let placement: DeskPlacement
