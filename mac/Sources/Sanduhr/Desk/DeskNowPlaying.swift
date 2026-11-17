@@ -77,7 +77,7 @@ struct DeskNowPlayingLine: View {
         .onHover { inside in
             if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
-        .onGlobalFrame { model.nowPlayingFrame = $0 }
+        .onDeskFrame(model) { $0.nowPlayingFrame = $1 }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Plays or pauses")

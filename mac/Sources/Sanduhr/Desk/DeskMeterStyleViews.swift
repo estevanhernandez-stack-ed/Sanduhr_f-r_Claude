@@ -7,7 +7,7 @@ import SwiftUI
 /// The rules (cells lit, short names, what each style leaves out) are `DeskMeterStyleModel`'s.
 
 /// The readings of one styled block, in a style: rings side by side in a row, slim and ticks
-/// stacked. `report` gets each reading's frame, for the limit menu's hit areas.
+/// stacked. `report` gets each reading's frame and its Desk window, for the limit menu's hit areas.
 struct DeskStyledGauges: View {
     let gauges: [DeskMeterStyleModel.Gauge]
     let style: DeskMeterStyle
@@ -16,7 +16,7 @@ struct DeskStyledGauges: View {
     let size: CGFloat
     let width: CGFloat
     let alignment: HorizontalAlignment
-    var report: ((Tier, CGRect) -> Void)?
+    var report: ((Tier, CGRect, DeskDisplay) -> Void)?
 
     var body: some View {
         if style == .ring {
@@ -48,9 +48,9 @@ struct DeskStyledGauges: View {
 
 private extension View {
     @ViewBuilder
-    func reporting(_ tier: Tier, _ report: ((Tier, CGRect) -> Void)?) -> some View {
+    func reporting(_ tier: Tier, _ report: ((Tier, CGRect, DeskDisplay) -> Void)?) -> some View {
         if let report {
-            onGlobalFrame { report(tier, $0) }
+            onGlobalFrame { report(tier, $0, $1) }
         } else {
             self
         }
