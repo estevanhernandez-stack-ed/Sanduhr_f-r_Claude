@@ -44,9 +44,17 @@ public sealed class CodexBurnSource(Func<IReadOnlyList<string>> homes, Func<Stre
     {
         var fs = new FileStream(file.File.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         if (!file.Compressed) return fs;
-        try { return new CappedReadStream(decompressZst!(fs), CodexLimitsReader.MaxDecompressedBytes); }
+        try { return new CappedReadStream(decompressZst!(fs), DecompressedCap(fs.Length)); }
         catch { fs.Dispose(); throw; }
     }
+
+    /// <summary>How far a compressed rollout may expand: 64 MB, or 64 times its size on disk when that is larger. Lines are
+    /// read one at a time, so the cap bounds a decompression bomb's work, not memory. A fixed 64 MB dropped real long
+    /// sessions whole (a 70 MB rollout expands to 174 MB); a bomb expands thousands of times, far past 64.</summary>
+    public static long DecompressedCap(long compressedLength) =>
+        Math.Max(CodexLimitsReader.MaxDecompressedBytes, compressedLength * MaxExpansion);
+
+    public const long MaxExpansion = 64;
 
     public IBurnLineParser NewParser(string? state) => new CodexLineParser(state);
 }

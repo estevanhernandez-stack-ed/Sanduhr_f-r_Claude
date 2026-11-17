@@ -164,6 +164,20 @@ public class CodexBurnSourceTests
         Assert.True(shard.Sessions.ContainsKey("rollout-ok"));
     }
 
+    [Theory]
+    [InlineData(0L, 64L * 1024 * 1024)]                         // small files keep the 64 MB floor
+    [InlineData(1024L * 1024, 64L * 1024 * 1024)]               // 1 MB on disk: 64 MB either way
+    [InlineData(2L * 1024 * 1024, 128L * 1024 * 1024)]          // past the floor, 64 times the file
+    public void The_decompressed_cap_is_64_MB_or_64_times_the_file(long compressed, long cap)
+        => Assert.Equal(cap, CodexBurnSource.DecompressedCap(compressed));
+
+    [Fact]
+    public void A_long_real_session_fits_under_the_cap()
+    {
+        // Live smoke 2026-11-17: a 70.5 MB rollout expanded to 174.4 MB and the fixed 64 MB cap dropped its whole day.
+        Assert.True(CodexBurnSource.DecompressedCap((long)(70.5 * 1024 * 1024)) > (long)(174.4 * 1024 * 1024));
+    }
+
     [Fact]
     public void The_parser_never_reads_message_text()
     {
