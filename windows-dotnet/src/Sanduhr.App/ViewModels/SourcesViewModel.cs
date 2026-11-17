@@ -23,18 +23,41 @@ public sealed partial class SourcesViewModel : ObservableObject
     private readonly Func<bool> _claudeOn;
     private readonly Action<bool> _setClaudeOn;
     private readonly Func<IReadOnlyList<string>> _codexHomes;
+    private readonly Func<bool> _antigravityInstalled;
+    private readonly Action<string> _agentVaultOn;
 
-    internal SourcesViewModel(SettingsStore store, Func<bool> claudeOn, Action<bool> setClaudeOn, Func<IReadOnlyList<string>> codexHomes)
+    internal SourcesViewModel(SettingsStore store, Func<bool> claudeOn, Action<bool> setClaudeOn, Func<IReadOnlyList<string>> codexHomes,
+        Func<bool> antigravityInstalled, Action<string> agentVaultOn)
     {
+        _antigravityInstalled = antigravityInstalled;
+        _agentVaultOn = agentVaultOn;
         _store = store;
         _claudeOn = claudeOn;
         _setClaudeOn = setClaudeOn;
         _codexHomes = codexHomes;
         foreach (var source in AgentSources.All) Rows.Add(new SourceRowViewModel(this, source));
+        foreach (var s in AgentSources.ActivityOnly) ActivityRows.Add(new ActivityRowViewModel(this, s));
         Reload();
     }
 
     public ObservableCollection<SourceRowViewModel> Rows { get; } = [];
+
+    /// <summary>Activity-only sources (Antigravity): a switch and a caption, never a primary, color or limits row.</summary>
+    public ObservableCollection<ActivityRowViewModel> ActivityRows { get; } = [];
+
+    internal void SetActivityOn(string source, bool on)
+    {
+        try
+        {
+            _store.SaveActivity(source, on);
+            if (on) _agentVaultOn(source);   // clears a purge tombstone, so ingest resumes
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Sanduhr.Sources] not saved: {ex.Message}");   // streamer: notname - written to the log file, never drawn
+            Reload();   // the switch snaps back to what is saved
+        }
+    }
 
     /// <summary>A source was switched on or off and saved: App starts or stops the Codex service and redraws the widget.</summary>
     public Action<bool, bool>? OnOffChanged { get; set; }
@@ -53,6 +76,13 @@ public sealed partial class SourcesViewModel : ObservableObject
     /// <summary>Primary or a color changed and saved: App redraws the widget's sections, bars and tray.</summary>
     public Action? DisplayChanged { get; set; }
 
+    /// <summary>Each burn source's color as saved in Sources (Antigravity's default), for the Local burn page's strip.</summary>
+    public Func<string, System.Windows.Media.Color> ColorsForStrip()
+    {
+        var sources = _store.LoadSources();
+        return id => (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(sources.ColorOf(id));
+    }
+
     /// <summary>Reads setup, the sources settings and whether Codex is installed again (Settings does this on each visit).</summary>
     public void Reload() => Reload(clearMessage: true);
 
@@ -69,6 +99,7 @@ public sealed partial class SourcesViewModel : ObservableObject
             bool installed = row.Source != AgentSources.Codex || codexInstalled;
             row.Load(installed, ticked.Usage[row.Source], row.Source == primary, sources.ColorOf(row.Source), sources.AlertsOn(row.Source));
         }
+        foreach (var row in ActivityRows) row.Load(_antigravityInstalled(), _store.LoadActivity().GetValueOrDefault(row.Source));
     }
 
     private SetupSettings Ticked(SetupSettings? setup) =>
@@ -114,6 +145,7 @@ public sealed partial class SourcesViewModel : ObservableObject
             {
                 var setup = _store.LoadSetup() ?? SetupChoices.FirstRun.ToSettings(null);
                 _store.SaveSetup(setup.WithCodex(on));
+                if (on) _agentVaultOn(AgentSources.Codex);
             }
             // The primary follows what is on: a source turned off while primary hands it to the first ticked one.
             var sources = _store.LoadSources();
@@ -174,6 +206,45 @@ public sealed partial class SourcesViewModel : ObservableObject
     }
 }
 
+/// <summary>An activity-only source on the Sources page (Antigravity): one switch, disabled when its CLI folder is absent.</summary>
+public sealed partial class ActivityRowViewModel(SourcesViewModel owner, string source) : ObservableObject
+{
+    public string Source { get; } = source;
+    public string Name => AgentSources.Name(Source);
+
+    /// <summary>The row reads as its source's name to a screen reader (an ItemsControl names its items by this).</summary>
+    public override string ToString() => Name;
+    public string Caption => Installed ? SettingsNames.AntigravityActivityCaption : SettingsNames.NothingFoundYet;
+
+    /// <summary>The second caption line: where the source's token counts are kept.</summary>
+    public string ArchiveCaption => SettingsNames.AgentArchiveCaption;
+
+    /// <summary>What a screen reader hears after the switch's name: both caption lines.</summary>
+    public string HelpText => $"{Caption} {ArchiveCaption}";
+
+    [ObservableProperty] private bool _installed;
+    [ObservableProperty] private bool _on;
+    private bool _loading;
+
+    /// <summary>A source whose CLI folder is gone is greyed; one left on from before can still be turned off.</summary>
+    public bool CanToggle => Installed || On;
+
+    partial void OnInstalledChanged(bool value)
+    {
+        OnPropertyChanged(nameof(Caption));
+        OnPropertyChanged(nameof(HelpText));
+        OnPropertyChanged(nameof(CanToggle));
+    }
+
+    partial void OnOnChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanToggle));
+        if (!_loading) owner.SetActivityOn(Source, value);
+    }
+
+    internal void Load(bool installed, bool on) { _loading = true; Installed = installed; On = on; _loading = false; }
+}
+
 /// <summary>One source on the Sources page. Tab order is the order of its controls: On, Primary, Color, Reset, Alerts.</summary>
 public sealed partial class SourceRowViewModel : ObservableObject
 {
@@ -232,6 +303,10 @@ public sealed partial class SourceRowViewModel : ObservableObject
     /// <summary>"Codex isn't installed on this PC." for a source whose program is not here; null otherwise.</summary>
     public string? NotInstalledText => Installed ? null : SettingsNames.SourcesCodexNotInstalled;
     public bool HasNotInstalledText => NotInstalledText is not null;
+
+    /// <summary>Codex's second caption line, where its token counts are kept; null for a source the archive doesn't hold this way.</summary>
+    public string? ArchiveCaption => Source == AgentSources.Codex ? SettingsNames.AgentArchiveCaption : null;
+    public bool HasArchiveCaption => ArchiveCaption is not null;
 
     /// <summary>A source that is not installed is greyed; one left on from before can still be turned off.</summary>
     public bool CanToggle => Installed || On;

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using Sanduhr.App.Theming;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.Views;
 
@@ -26,10 +27,39 @@ public sealed class LocalCcBarStrip : FrameworkElement
         MinHeight = 60;
     }
 
+    private IReadOnlyDictionary<string, IReadOnlyDictionary<DateOnly, long>> _byAgent =
+        new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>();
+    private Func<string, Color>? _colorOf;
+
+    /// <summary>True while some non-Claude agent has tokens in the window: only then does the strip stack by agent. A consented
+    /// agent root with no rows leaves the bars as they always were.</summary>
+    internal bool Stacked { get; private set; }
+
+    private bool _agentsConsented;
+
+    /// <summary>What an empty window says: every agent's activity once an agent root is archived, Claude Code's otherwise.</summary>
+    internal string EmptyText => _agentsConsented
+        ? "No local activity in the last 30 days."
+        : "No local CC activity in the last 30 days.";
+
     public void SetData(IReadOnlyDictionary<DateOnly, long> byDay, ThemePalette palette)
+        => SetData(byDay, palette, new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>(), null);
+
+    public void SetData(IReadOnlyDictionary<DateOnly, long> byDay, ThemePalette palette,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<DateOnly, long>> byAgent, Func<string, Color>? colorOf,
+        bool agentsConsented = false)
     {
+        _agentsConsented = agentsConsented;
         _byDay = byDay ?? new Dictionary<DateOnly, long>();
         _palette = palette;
+        _byAgent = byAgent ?? new Dictionary<string, IReadOnlyDictionary<DateOnly, long>>();
+        _colorOf = colorOf;
+        Stacked = _byAgent.Values.Any(days => days.Values.Sum() > 0);
+        var totals = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (var (agent, days) in _byAgent) totals[agent] = days.Values.Sum();
+        totals[AgentSources.Claude] = Math.Max(0, _byDay.Values.Sum() - totals.Values.Sum());
+        System.Windows.Automation.AutomationProperties.SetName(this,   // streamer: notname - agent product names and token figures only, no project or folder
+            totals.Count(kv => kv.Value > 0) > 1 ? AgentShares.StripName(totals) : "");
         InvalidateVisual();
     }
 
@@ -54,7 +84,7 @@ public sealed class LocalCcBarStrip : FrameworkElement
             double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
             var brush = Frozen(_palette.TextDim);
             var ft = new FormattedText(
-                "No local CC activity in the last 30 days.",
+                EmptyText,
                 CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
                 new Typeface("Segoe UI"), 11, brush, dpi)
             {
@@ -81,10 +111,28 @@ public sealed class LocalCcBarStrip : FrameworkElement
             {
                 dc.DrawRectangle(baselineColor, null, new Rect(x, baselineY, barW, 1));
             }
-            else
+            else if (!Stacked || _colorOf is null)
             {
                 double barH = Math.Max(2, v / (double)maxV * (h - 8));
                 dc.DrawRectangle(barColor, null, new Rect(x, baselineY - barH, barW, barH));
+            }
+            else
+            {
+                double scale = (h - 8) / maxV;
+                double y = baselineY;
+                long agentsSum = 0;
+                foreach (var agent in AgentSources.Burn.Where(a => a != AgentSources.Claude))
+                    agentsSum += _byAgent.TryGetValue(agent, out var agentDays) ? agentDays.GetValueOrDefault(d) : 0;
+                foreach (var agent in AgentSources.Burn)
+                {
+                    long part = agent == AgentSources.Claude
+                        ? Math.Max(0, v - agentsSum)
+                        : (_byAgent.TryGetValue(agent, out var agentDays) ? agentDays.GetValueOrDefault(d) : 0);
+                    if (part <= 0) continue;
+                    double segH = Math.Max(1, part * scale);
+                    y -= segH;
+                    dc.DrawRectangle(Frozen(_colorOf(agent)), null, new Rect(x, y, barW, segH));
+                }
             }
             x += barW + gap;
         }

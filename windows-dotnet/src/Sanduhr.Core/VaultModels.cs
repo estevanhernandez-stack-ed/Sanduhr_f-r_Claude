@@ -148,6 +148,12 @@ public sealed class VaultCheckpointEntry
     [JsonPropertyName("months")] public List<string> Months { get; set; } = new();
     [JsonPropertyName("sealed")] public bool Sealed { get; set; }
     [JsonPropertyName("last_seen")] public string LastSeenTs { get; set; } = "";
+
+    /// <summary>The line parser's state after <see cref="Offset"/> (spec 3: Codex's segment, model, cwd and last
+    /// total). Null for Claude Code files and other stateless parsers.</summary>
+    [JsonPropertyName("parser_state")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ParserState { get; set; }
 }
 
 public sealed class VaultCheckpointFile
@@ -178,6 +184,12 @@ public sealed class VaultRootMeta
     /// subagent transcripts still inside CC retention.</summary>
     [JsonPropertyName("walk_version")]
     public int WalkVersion { get; set; }
+
+    /// <summary>Which agent's burn this root holds (spec 3): "codex" or "antigravity". Absent means a Claude Code
+    /// home, so every vault written before spec 3 reads unchanged.</summary>
+    [JsonPropertyName("agent")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Agent { get; set; }
 }
 
 public enum ShardLoadResult

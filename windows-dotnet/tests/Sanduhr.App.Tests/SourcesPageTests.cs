@@ -34,9 +34,92 @@ public sealed class SourcesPageTests : AppWindowFixture
                 claude = on;
                 store.SaveSetup((store.LoadSetup() ?? SetupChoices.FirstRun.ToSettings(null)).WithClaude(on));
             },
-            () => CodexHomes.Discover(null, Profile));
+            () => CodexHomes.Discover(null, Profile), () => false, _ => { });
         return (vm, store, () => claude);
     }
+
+    private (SourcesViewModel Vm, SettingsStore Store) NewSources(Func<bool> antigravityInstalled, Action<string> agentVaultOn)
+    {
+        var store = new SettingsStore(ScratchPaths());
+        store.SaveDesk(store.LoadDesk() with { Enabled = true });
+        var vm = new SourcesViewModel(store, () => false, _ => { }, () => CodexHomes.Discover(null, Profile), antigravityInstalled, agentVaultOn);
+        return (vm, store);
+    }
+
+    [Fact]
+    public void Antigravity_is_an_activity_row_off_by_default_and_never_a_primary_choice() => AppHost.Run(() =>
+    {
+        var calls = new List<string>();
+        var (vm, store) = NewSources(antigravityInstalled: () => true, agentVaultOn: calls.Add);
+        var row = Assert.Single(vm.ActivityRows);
+        Assert.Equal("antigravity", row.Source);
+        Assert.False(row.On);
+        Assert.DoesNotContain(vm.Rows, r => r.Source == "antigravity");
+
+        row.On = true;
+
+        Assert.Equal(new[] { "antigravity" }, calls);
+        Assert.True(store.LoadActivity()["antigravity"]);
+    });
+
+    [Fact]
+    public void Without_the_cli_the_row_is_disabled_and_says_nothing_found_yet() => AppHost.Run(() =>
+    {
+        var (vm, _) = NewSources(antigravityInstalled: () => false, agentVaultOn: _ => { });
+        var row = Assert.Single(vm.ActivityRows);
+        Assert.False(row.Installed);
+        Assert.Equal(SettingsNames.NothingFoundYet, row.Caption);
+    });
+
+    [Fact]
+    public void A_checked_Antigravity_box_stays_enabled_when_its_cli_folder_goes_so_it_can_be_turned_off() => AppHost.Run(() =>
+    {
+        bool installed = true;
+        var (vm, store) = NewSources(antigravityInstalled: () => installed, agentVaultOn: _ => { });
+        var row = Assert.Single(vm.ActivityRows);
+        row.On = true;
+        var changed = new List<string?>();
+        row.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        installed = false;
+        vm.Reload();
+
+        Assert.False(row.Installed);
+        Assert.True(row.CanToggle);
+        Assert.Contains(nameof(ActivityRowViewModel.CanToggle), changed);
+        row.On = false;
+        Assert.False(store.LoadActivity()["antigravity"]);
+        Assert.False(row.CanToggle);
+    });
+
+    [Fact]
+    public void An_Antigravity_switch_that_cannot_be_saved_snaps_back() => AppHost.Run(() =>
+    {
+        var calls = new List<string>();
+        var (vm, _) = NewSources(antigravityInstalled: () => true, agentVaultOn: calls.Add);
+        var row = Assert.Single(vm.ActivityRows);
+        var settings = ScratchPaths().SettingsFile;
+        File.SetAttributes(settings, File.GetAttributes(settings) | FileAttributes.ReadOnly);
+        try
+        {
+            row.On = true;
+            Assert.False(row.On);   // reloaded from what is saved
+            Assert.Empty(calls);    // the archive was not turned on for a switch that did not save
+        }
+        finally { File.SetAttributes(settings, File.GetAttributes(settings) & ~FileAttributes.ReadOnly); }
+    });
+
+    [Fact]
+    public void The_Codex_and_Antigravity_rows_say_their_token_counts_are_archived() => AppHost.Run(() =>
+    {
+        var (vm, _) = NewSources(antigravityInstalled: () => true, agentVaultOn: _ => { });
+        Assert.Equal(SettingsNames.AgentArchiveCaption, vm.Rows.Single(r => r.Source == AgentSources.Codex).ArchiveCaption);
+        Assert.Null(vm.Rows.Single(r => r.Source == AgentSources.Claude).ArchiveCaption);
+        var agy = Assert.Single(vm.ActivityRows);
+        Assert.Equal(SettingsNames.AgentArchiveCaption, agy.ArchiveCaption);
+        Assert.Contains(SettingsNames.AgentArchiveCaption, agy.HelpText);
+        Assert.StartsWith(agy.Caption, agy.HelpText);
+    });
 
     [Fact]
     public void Rows_follow_AgentSources_order() => AppHost.Run(() =>
@@ -191,7 +274,7 @@ public sealed class SourcesPageTests : AppWindowFixture
         var store = new SettingsStore(ScratchPaths());
         store.SaveDesk(store.LoadDesk() with { Enabled = true });
         store.SaveSetup(new SetupSettings(true, new Dictionary<string, bool> { ["claude"] = false, ["codex"] = true }));
-        var vm = new SourcesViewModel(store, () => false, _ => { }, () => CodexHomes.Discover(null, Profile));
+        var vm = new SourcesViewModel(store, () => false, _ => { }, () => CodexHomes.Discover(null, Profile), () => false, _ => { });
         var codex = vm.Rows.Single(r => r.Source == AgentSources.Codex);
         Assert.False(codex.Installed);
         Assert.True(codex.On);
@@ -412,14 +495,15 @@ public sealed class SourcesPageTests : AppWindowFixture
             // Store 10.1.4.4: the page names Claude and Codex, so both disclaimers are on it.
             Assert.Contains(SettingsNames.TrademarkNotice, names);
             Assert.Contains(SettingsNames.CodexNotice, names);
+            Assert.Contains(SettingsNames.AntigravityNotice, names);
             Assert.Contains(SettingsNames.SourcesIntro, names);
-            // Every control that takes a click or a key reads as words: On, Primary, the color box, Reset and Alerts, once per source.
+            // Every control that takes a click or a key reads as words: On, Primary, the color box, Reset and Alerts, once per source, plus one switch per activity-only source.
             var page = (FrameworkElement)tab.Content;
             var controls = Walk(UIElementAutomationPeer.CreatePeerForElement(page))
                 .Where(p => p.GetAutomationControlType() is AutomationControlType.Button or AutomationControlType.CheckBox
                     or AutomationControlType.RadioButton or AutomationControlType.Edit)
                 .ToList();
-            Assert.Equal(AgentSources.All.Count * 5, controls.Count);
+            Assert.Equal(AgentSources.All.Count * 5 + AgentSources.ActivityOnly.Count, controls.Count);
             Assert.All(controls, p => Assert.False(string.IsNullOrWhiteSpace(p.GetName())));
         }
         finally { window.Close(); }

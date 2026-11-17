@@ -10,6 +10,123 @@ public class ToolLogicBurnTests
         => new(Config(Path.Combine(tmp.Path, "snapshot.json"), roots), () => Now);
 
     [Fact]
+    public void Consented_agents_report_their_project_totals_from_the_vault()
+    {
+        using var tmp = new TempDir();
+        var cfg = new McpConfig
+        {
+            SnapshotPath = Path.Combine(tmp.Path, "snapshot.json"),
+            VaultDir = Path.Combine(tmp.Path, "vault"),
+            ConsentedRoots = Array.Empty<(string, string)>(),
+            RootsFound = Array.Empty<string>(),
+            ConsentedAgents = new[] { "codex" },
+        };
+        string day = DateOnly.FromDateTime(Now.LocalDateTime).ToString("yyyy-MM-dd");
+        string month = day[..7];
+        new Sanduhr.Core.VaultStore(cfg.VaultDir).SaveRollupShard("codex", month, new Sanduhr.Core.VaultRollupShard
+        {
+            Days = new Dictionary<string, Sanduhr.Core.VaultRollupDay>
+            {
+                [day] = new() { Total = 300, Input = 100, Output = 200, ByProject = new() { ["api~12345678"] = 300 } },
+            },
+        });
+
+        var result = new ToolLogic(cfg, () => Now).BuildBurn(7, fullPaths: false);
+
+        Assert.Equal("ok", result["status"]!.GetValue<string>());
+        var agent = (JsonObject)((JsonArray)result["agents"]!)[0]!;
+        Assert.Equal("codex", agent["agent"]!.GetValue<string>());
+        Assert.Equal(300, agent["total_tokens"]!.GetValue<long>());
+        Assert.Equal("api", (string?)((JsonObject)((JsonArray)agent["projects"]!)[0]!)["name"]);
+        Assert.Equal("codex", (string?)((JsonArray)result["agents_scanned"]!)[0]);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(7)]
+    public void Agent_window_is_windowDays_calendar_days_ending_today(int windowDays)
+    {
+        using var tmp = new TempDir();
+        var cfg = new McpConfig
+        {
+            SnapshotPath = Path.Combine(tmp.Path, "snapshot.json"),
+            VaultDir = Path.Combine(tmp.Path, "vault"),
+            ConsentedRoots = Array.Empty<(string, string)>(),
+            RootsFound = Array.Empty<string>(),
+            ConsentedAgents = new[] { "codex" },
+        };
+        var today = DateOnly.FromDateTime(Now.LocalDateTime);
+        var outside = today.AddDays(-windowDays);
+        var inside = today.AddDays(-(windowDays - 1));
+        var store = new Sanduhr.Core.VaultStore(cfg.VaultDir);
+        foreach (var g in new[] { outside, inside }.GroupBy(d => d.ToString("yyyy-MM")))
+        {
+            var days = new Dictionary<string, Sanduhr.Core.VaultRollupDay>();
+            foreach (var d in g)
+            {
+                long t = d == inside ? 50 : 900;
+                days[d.ToString("yyyy-MM-dd")] = new() { Total = t, Input = t, Output = 0, ByProject = new() { ["api~12345678"] = t } };
+            }
+            store.SaveRollupShard("codex", g.Key, new Sanduhr.Core.VaultRollupShard { Days = days });
+        }
+
+        var result = new ToolLogic(cfg, () => Now).BuildBurn(windowDays, fullPaths: false);
+
+        var agent = (JsonObject)((JsonArray)result["agents"]!)[0]!;
+        Assert.Equal(50, agent["total_tokens"]!.GetValue<long>());
+        Assert.Equal(inside.ToString("yyyy-MM-dd"), (string?)result["agents_from"]);
+    }
+
+    [Fact]
+    public void An_unreadable_vault_drops_the_agents_and_the_claude_roots_still_answer()
+    {
+        using var tmp = new TempDir();
+        string personal = Path.Combine(tmp.Path, ".claude-personal");
+        WriteSessionLog(personal, "c--sanduhr",
+            EventLine(Now.AddHours(-1), "claude-fable-5", 100, 200, Path.Combine(tmp.Path, "Sanduhr")));
+        var cfg = new McpConfig
+        {
+            SnapshotPath = Path.Combine(tmp.Path, "snapshot.json"),
+            VaultDir = Path.Combine(tmp.Path, "vault"),
+            ConsentedRoots = new[] { (".claude-personal", personal) },
+            RootsFound = Array.Empty<string>(),
+            ConsentedAgents = new[] { "codex" },
+        };
+        // Parseable but broken: a shard whose days are null fails the read itself, not the load.
+        string month = DateOnly.FromDateTime(Now.LocalDateTime).ToString("yyyy-MM");
+        Directory.CreateDirectory(Path.Combine(cfg.VaultDir, "codex"));
+        File.WriteAllText(Path.Combine(cfg.VaultDir, "codex", $"rollups-{month}.json"), "{\"schema_version\":1,\"days\":null}");
+
+        var result = new ToolLogic(cfg, () => Now).BuildBurn(7, fullPaths: false);
+
+        Assert.Equal("ok", (string?)result["status"]);
+        Assert.Empty((JsonArray)result["agents"]!);
+        Assert.Equal("unreadable", (string?)result["agents_reason"]);
+        var root = (JsonObject)((JsonArray)result["roots"]!)[0]!;
+        Assert.Equal(300, root["total_tokens"]!.GetValue<long>());
+    }
+
+    [Fact]
+    public void A_readable_vault_gives_no_agents_reason()
+    {
+        using var tmp = new TempDir();
+        string root = Path.Combine(tmp.Path, ".claude");
+        Directory.CreateDirectory(root);
+        var result = Logic(tmp, (".claude", root)).BuildBurn(7, fullPaths: false);
+        Assert.Null(result["agents_reason"]);
+    }
+
+    [Fact]
+    public void Without_agent_consent_no_agents_are_reported()
+    {
+        using var tmp = new TempDir();
+        string root = Path.Combine(tmp.Path, ".claude");
+        Directory.CreateDirectory(root);
+        var result = Logic(tmp, (".claude", root)).BuildBurn(7, fullPaths: false);
+        Assert.Empty((JsonArray)result["agents"]!);
+    }
+
+    [Fact]
     public void Invalid_window_is_a_typed_result_not_a_protocol_error()
     {
         using var tmp = new TempDir();

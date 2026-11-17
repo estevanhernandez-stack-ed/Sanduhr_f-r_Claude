@@ -17,6 +17,14 @@ public sealed record SettingsGroup(string? Title, IReadOnlyList<SettingsPage> Pa
 /// </summary>
 public static class SettingsNames
 {
+    // ---- Local burn ledger (spec 3) ----
+
+    /// <summary>A stacked project row whose sessions come from more than one agent.</summary>
+    public const string SeveralAgents = "Several agents";
+
+    /// <summary>The ledger's Agent filter, no agent chosen.</summary>
+    public const string AllAgents = "All";
+
     // ---- Pages ----
 
     /// <summary>The sidebar: six groups, each page once. Widget is a page since slice 5; Widget with no anchor still means the widget itself
@@ -807,7 +815,9 @@ public static class SettingsNames
         + "your wallpaper's colors; " + McpAnswerPaths + "; " + McpAnswerThemeName + "; "
         + "your Desk messages; the names of the Claude Code folders Sanduhr found; "
         + "and, for each folder where you let Claude read project totals, token counts per project and model with "
-        + "project names, or full project paths when Claude asks.";
+        + "project names, or full project paths when Claude asks. "
+        + "Codex's and Antigravity's project totals, with project names, go to Claude when their switches under Claude Code, Folders are on.";
+    public static string LetClaudeReadAgentTotals(string agent) => $"Let Claude read {agent}'s project totals";
     public const string NetThroughClaudeOff =
         "Don't install Sanduhr's MCP server, or remove it from a folder. Each folder's project totals have their own switch.";
 
@@ -885,7 +895,8 @@ public static class SettingsNames
     public const string AgentSongsDirectCaption = "On: a look Claude suggests for a song is saved at once. Off: each waits as a card on Now playing.";
     public const string AgentFolderReadsCaption =
         "Per folder: token counts per project and per model, the folder's session archive, and its recent use beside your meters. "
-        + "Project names go with them, or full project paths when Claude asks.";
+        + "Project names go with them, or full project paths when Claude asks. "
+        + "Codex and Antigravity each have their own switch for project totals.";
     public const string AgentPublish = "Publish your usage when Claude asks";
     public const string AgentPublishCaption = "Claude can ask Sanduhr to send the day's record to your endpoint. It follows Publish daily at.";
     public const string AgentTheme = "Give the widget a theme";
@@ -1192,6 +1203,14 @@ public static class SettingsNames
     public static string SourcesAlertsName(string source) => $"{source} alerts";
     /// <summary>Said under the list when the last source is switched off with the Desk off too.</summary>
     public const string SourcesKeepOne = "Keep one on, or turn on the Desk first.";
+    public const string ActivityOnlyHeader = "Activity only";
+    public const string AntigravityActivityCaption = "Activity only, from the Antigravity CLI. Sanduhr can't see Antigravity's limits or the IDE's usage.";
+    public const string NothingFoundYet = "Nothing found yet.";
+    /// <summary>The extra caption line under the Codex row and the Antigravity activity row on Settings, Usage, Sources.</summary>
+    public const string AgentArchiveCaption = "Its token counts are kept in the session archive on this PC.";
+    public const string AntigravityNotice =
+        "Antigravity and Gemini are trademarks of Google LLC. Sanduhr is not affiliated with or endorsed by Google.";
+
     /// <summary>The disclaimer for Codex, in the wording of <see cref="TrademarkNotice"/>; shown where Codex is named.</summary>
     public const string CodexNotice =
         "\"Codex\" is a trademark of OpenAI, used nominatively. "

@@ -45,10 +45,17 @@ public static class McpSettingsExport
             enabled = hasEndpoint = credentialReady = false;
         }
 
+        var agents = new JsonObject();
+        if (settingsRoot["mcp_agents"] is JsonObject agentMap)
+            foreach (var (name, node) in agentMap)
+                if (name is AgentSources.Codex or AgentSources.Antigravity)
+                    agents[name] = ReadBool(node);
+
         return new JsonObject
         {
             ["schema_version"] = 1,
             ["mcp_roots"] = roots,
+            ["mcp_agents"] = agents,
             ["publish"] = new JsonObject
             {
                 ["enabled"] = enabled,

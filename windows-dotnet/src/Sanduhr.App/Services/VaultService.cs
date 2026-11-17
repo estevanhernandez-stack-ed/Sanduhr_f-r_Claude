@@ -51,17 +51,49 @@ public sealed class VaultService
     /// exist on this machine right now.</summary>
     public IReadOnlyList<string> DetectedRootNames()   // streamer: key - root names for consent keys, never drawn here
         => _reader.SearchRoots().Select(Path.GetFileName).Where(n => !string.IsNullOrEmpty(n))
-            .Select(n => n!).ToList();
+            .Select(n => n!).Concat(ActiveAgents().Select(a => a.Agent)).ToList();   // streamer: key - agent root names for consent keys, never drawn here
+
+    /// <summary>The agent sources whose switch is on and whose files exist (spec 3), set by App. Read on every cycle, so a
+    /// Sources switch takes effect on the next ingest without rebuilding anything.</summary>
+    public Func<IReadOnlyList<IAgentBurnSource>> ActiveAgents { get; set; } = () => [];
+
+    /// <summary>A Claude Code home needs an explicit yes in vault_roots. An active agent root follows its own vault_roots
+    /// value when there is one (true from the Local burn toggle or a Sources switch, false the tombstone Purge and Erase
+    /// write); without one it is on, unless the person answered the archive prompt and archives no Claude Code folder,
+    /// which reads as a no to the archive.</summary>
+    internal static bool Consented(string root, IReadOnlyDictionary<string, bool> vaultRoots, IReadOnlyCollection<string> activeAgents,
+        bool prompted)
+    {
+        if (!IsAgentRoot(root))
+            return vaultRoots.GetValueOrDefault(root);
+        if (!activeAgents.Contains(root))
+            return false;
+        if (vaultRoots.TryGetValue(root, out var explicitValue))
+            return explicitValue;
+        bool claudeArchived = vaultRoots.Any(kv => kv.Value && !IsAgentRoot(kv.Key));   // streamer: key - consent keys, never drawn
+        return !prompted || claudeArchived;
+    }
+
+    private static bool IsAgentRoot(string root) => AgentSources.Burn.Contains(root) && root != AgentSources.Claude;
+
+    public bool IsConsented(string root)
+        => Consented(root, _settings.LoadVaultRoots(), ActiveAgents().Select(a => a.Agent).ToList(),   // streamer: key - root names for consent keys, never drawn here
+            _settings.LoadVaultPrompted());
+
+    /// <summary>A source switched on in Sources clears its purge tombstone, so ingest resumes.</summary>
+    public void SetAgentVaultOn(string agent) => SetRootConsent(agent, true);   // streamer: key - an agent name written as a consent key, never drawn
 
     /// <summary>Detected ∩ consented — the only roots the ingester ever touches.</summary>
     public IReadOnlyList<string> ConsentedRootNames()
     {
         var consent = _settings.LoadVaultRoots();
-        return DetectedRootNames().Where(r => consent.GetValueOrDefault(r)).ToList();   // streamer: key - root names for consent keys, never drawn here
+        var active = ActiveAgents().Select(a => a.Agent).ToList();   // streamer: key - root names for consent keys, never drawn here
+        var prompted = _settings.LoadVaultPrompted();
+        return DetectedRootNames().Where(r => Consented(r, consent, active, prompted)).ToList();   // streamer: key - root names for consent keys, never drawn here
     }
 
     public bool NeedsConsentPrompt
-        => !_settings.LoadVaultPrompted() && DetectedRootNames().Count > 0;   // streamer: key - a count, never drawn
+        => !_settings.LoadVaultPrompted() && _reader.SearchRoots().Count > 0;   // streamer: key - a count, never drawn
 
     public void SaveConsent(IReadOnlyDictionary<string, bool> roots)
     {
@@ -89,10 +121,13 @@ public sealed class VaultService
             return;   // previous run still going -> skip this cycle
 
         IReadOnlyList<string> roots;
+        IReadOnlyList<IAgentBurnSource> agents;
         bool fullPaths;
         try
         {
-            roots = ConsentedRootNames();
+            var consented = ConsentedRootNames();
+            agents = ActiveAgents().Where(a => consented.Contains(a.Agent)).ToList();   // streamer: key - root names for consent keys, never drawn here
+            roots = consented.Where(r => !agents.Any(a => a.Agent == r)).ToList();   // streamer: key - root names for consent keys, never drawn here
             fullPaths = _settings.LoadVaultStoreFullPaths();
         }
         catch (Exception e)
@@ -103,9 +138,13 @@ public sealed class VaultService
             return;
         }
 
-        if (roots.Count == 0)
+        if (roots.Count == 0 && agents.Count == 0)
         {
             Interlocked.Exchange(ref _ingestRunning, 0);
+            // Nothing to ingest is still a finished cycle: subscribers drop what is no longer consented (the footer's agent
+            // pieces). Raised on the caller's thread here; subscribers marshal as they do for the worker-thread raise.
+            try { IngestCompleted?.Invoke(); }
+            catch (Exception e) { LogBestEffort("ingest", e); }
             return;
         }
         _ = Task.Run(() =>
@@ -116,7 +155,7 @@ public sealed class VaultService
                 // mutex wait, so re-reading settings at write time gates an
                 // in-flight cycle out of a just-purged folder.
                 _ingester.IngestOnce(roots, fullPaths, DateTimeOffset.UtcNow,
-                    stillConsented: root => _settings.LoadVaultRoots().GetValueOrDefault(root));
+                    stillConsented: IsConsented, agents: agents);
                 IngestCompleted?.Invoke();
             }
             catch (Exception e)

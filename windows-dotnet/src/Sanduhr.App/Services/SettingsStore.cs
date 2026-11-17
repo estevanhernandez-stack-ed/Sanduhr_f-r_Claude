@@ -500,6 +500,28 @@ public sealed class SettingsStore
         return result;
     }
 
+    /// <summary>Activity-only sources switched on in Sources (spec 3): settings.json "activity", {"antigravity": true}.</summary>
+    public IReadOnlyDictionary<string, bool> LoadActivity()
+    {
+        var result = new Dictionary<string, bool>(StringComparer.Ordinal);
+        if (Read()["activity"] is JsonObject map)
+            foreach (var (name, node) in map)
+            {
+                try { result[name] = node?.GetValue<bool>() ?? false; }
+                catch { result[name] = false; }
+            }
+        return result;
+    }
+
+    public void SaveActivity(string source, bool on)
+    {
+        var root = Read();
+        var map = root["activity"] as JsonObject ?? new JsonObject();
+        map[source] = on;
+        root["activity"] = map;
+        Write(root);
+    }
+
     public void SaveVaultRoots(IReadOnlyDictionary<string, bool> roots)
     {
         var root = Read();
@@ -611,6 +633,28 @@ public sealed class SettingsStore
         foreach (var (name, on) in roots)
             map[name] = on;
         root["mcp_roots"] = map;
+        Write(root);
+    }
+
+    /// <summary>Spec 3: whether Claude may read an agent's project totals ("mcp_agents"), off by default.</summary>
+    public IReadOnlyDictionary<string, bool> LoadMcpAgents()
+    {
+        var result = new Dictionary<string, bool>(StringComparer.Ordinal);
+        if (Read()["mcp_agents"] is JsonObject map)
+            foreach (var (name, node) in map)
+            {
+                try { result[name] = node?.GetValue<bool>() ?? false; }
+                catch { result[name] = false; }
+            }
+        return result;
+    }
+
+    public void SaveMcpAgent(string agent, bool on)
+    {
+        var root = Read();
+        var map = root["mcp_agents"] as JsonObject ?? new JsonObject();
+        map[agent] = on;
+        root["mcp_agents"] = map;
         Write(root);
     }
 

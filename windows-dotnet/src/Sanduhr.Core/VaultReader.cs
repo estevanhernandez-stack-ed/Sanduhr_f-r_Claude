@@ -38,7 +38,8 @@ public sealed record VaultSessionInfo(
     Dictionary<string, VaultDayBucket> ByDay,
     VaultCacheTokens? Cache,
     int AgentCount,
-    long AgentTokens);
+    long AgentTokens,
+    string Agent = VaultReader.ClaudeAgent);
 
 /// <summary>
 /// Read side of the vault. NEVER mutates: corrupt or missing shards degrade to
@@ -47,9 +48,15 @@ public sealed record VaultSessionInfo(
 /// </summary>
 public sealed class VaultReader
 {
+    /// <summary>Mirrors AgentSources.Claude: Sanduhr.Mcp links VaultReader but not AgentSources.</summary>
+    internal const string ClaudeAgent = "claude";
+
     private readonly VaultStore _store;
 
     public VaultReader(VaultStore store) => _store = store;
+
+    /// <summary>The agent a root holds, from its meta; a root without one is a Claude Code home.</summary>
+    public string AgentOf(string root) => _store.LoadMeta(root)?.Agent ?? ClaudeAgent;
 
     public static string ProjectNameOf(string projectKey)
     {
@@ -133,6 +140,7 @@ public sealed class VaultReader
         var result = new List<VaultSessionInfo>();
         foreach (var root in roots)
         {
+            var agent = AgentOf(root);
             var byUuid = new Dictionary<string, List<VaultSessionRow>>();
             foreach (var month in _store.ListSessionShardMonths(root))
             {
@@ -180,7 +188,7 @@ public sealed class VaultReader
                     (cacheRead + cacheCreation) > 0
                         ? new VaultCacheTokens { Read = cacheRead, Creation = cacheCreation }
                         : null,
-                    agentCount, agentTokens));
+                    agentCount, agentTokens, agent));
             }
         }
         return result;

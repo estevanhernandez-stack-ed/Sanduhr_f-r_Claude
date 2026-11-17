@@ -9,7 +9,7 @@ public class AgentSourceColorTests
     {
         var d = new TheoryData<string, string>();
         foreach (var theme in ThemeCatalog.BuiltInOrder)
-            foreach (var source in AgentSources.All)
+            foreach (var source in AgentSources.Burn)
                 d.Add(theme, source);
         return d;
     }

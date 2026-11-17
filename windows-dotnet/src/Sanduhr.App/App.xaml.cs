@@ -168,6 +168,22 @@ public partial class App : Application
         // The archive is about Claude Code usage: asked only once a setup exists with usage on, never ahead of the setup screen.
         if (vaultService.NeedsConsentPrompt && startupSettings.LoadSetup()?.ClaudeUsage == true)
             vaultService.SaveConsent(VaultConsentDialog.ShowConsent(_window, vaultService.DetectedRootNames()));   // streamer: masked - via ShowConsent: the consent dialog draws each folder as Mask.FolderName
+        // Agent roots (spec 3) join after the consent prompt, so the dialog lists Claude Code homes only. Read on every cycle,
+        // so a Sources switch takes effect on the next ingest.
+        var agentPaths = new Sanduhr.Core.Paths();
+        vaultService.ActiveAgents = () =>
+        {
+            var settings = new SettingsStore(agentPaths);
+            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);   // streamer: notname - user folder handed to the readers, never drawn
+            var list = new List<IAgentBurnSource>();
+            var codexHomes = CodexHomes.Discover(Environment.GetEnvironmentVariable("CODEX_HOME"), profile);
+            if ((settings.LoadSetup()?.CodexUsage ?? false) && codexHomes.Count > 0)
+                list.Add(new CodexBurnSource(() => codexHomes, ZstdRollouts.Decompress));
+            var agyHome = AntigravityBurnSource.DefaultCliHome(profile);   // streamer: notname - the CLI folder the reader joins its names to, never drawn
+            if (settings.LoadActivity().GetValueOrDefault(AgentSources.Antigravity) && System.IO.Directory.Exists(agyHome))
+                list.Add(new AntigravityBurnSource(agyHome, () => AntigravitySummaries.Read(AntigravityBurnSource.SummariesPath(agyHome))));
+            return list;
+        };
         _vm.AttachVaultService(vaultService);
 
         // Publish usage: everything defaults off (toggle + every home, no endpoint),
