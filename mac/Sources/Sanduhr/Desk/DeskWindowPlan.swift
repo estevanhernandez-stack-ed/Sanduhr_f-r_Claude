@@ -20,6 +20,16 @@ struct DeskScreenGeometry: Equatable {
                            topInset: screen.frame.maxY - visibleFrame.maxY,
                            notchRect: notch, dockInsets: dock)
     }
+
+    /// The geometry for a display besides the main one: its own notch and, when the Dock shows on it,
+    /// the Dock's reservation (`DockGeometry.alwaysShown`, read from that screen's frame against its
+    /// visible frame, so a screen the Dock is not on gets none). The auto-hiding Dock's slide is
+    /// followed on the main display only.
+    static func extra(_ screen: DeskScreenInfo, visibleFrame: CGRect, notch: CGRect?,
+                      dockPrefs: DockPrefs) -> DeskScreenGeometry {
+        of(screen, visibleFrame: visibleFrame, notch: notch,
+           dock: DockGeometry.alwaysShown(dockPrefs, frame: screen.frame, visible: visibleFrame))
+    }
 }
 
 /// The Desk windows to build (spec, Drawing): one on the main display always, and one on each other
