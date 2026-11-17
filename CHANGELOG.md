@@ -13,6 +13,18 @@
 - **A widget pack zip you made yourself installs.** Install widget from file… now reads the zips Explorer's Send to, Compressed folder, Finder's Compress and zip tools make: compressed, with the pack's folder inside (its name may have spaces, as Finder and Explorer keep it), or with a Mac's hidden `__MACOSX` and `.DS_Store` files, which are skipped. It still holds every file to the same size limits while unpacking, checks each one's checksum, and runs every pack rule, so a zip that fails installs nothing and says why. Packs from the catalog keep their own stricter format (#459).
 - **Installing the MCP server checks that it starts.** After Install in Settings ▸ Claude Code, Sanduhr starts the server the way Claude Code will and waits for it to answer, then says so: installed and answering, with its version, or installed but not starting, and why (its launcher is missing, the server file it points to is gone, it stopped at once or didn't answer). Before, a launcher that couldn't start looked to Claude Code like no server at all, and nothing said otherwise (#144).
 
+## Unreleased (mac)
+
+### New
+
+- **The companion lives on the display you put it on.** Settings ▸ Desk ▸ Layout gives the companion a Display picker (Main display, or one display; there is no All displays for it, since there is one companion), and in Arrange Desk you can drag it from one display to another. It roams that display clear of its menu bar and Dock. Unplug the display and it comes to the main display; plug it back in and it returns. A one-display Mac behaves as before, and `propose_desk` with a `monitor` for the companion works the same way ("all" draws it on the main display).
+
+### Fixes
+
+- **Every display's Desk keeps clear of its Dock and notch.** A Desk window on a second display ignored that display's Dock and a notch on it, so pieces could sit under either. It now clears an always-shown Dock at the bottom, left or right of that display, and its notch. An auto-hiding Dock's slide is still followed on the main display only.
+- **Every copy of a piece on All displays takes clicks.** Meeting rows, now playing, a meter row's limit menu and watcher links answered only on the main display's copy. They answer on every display now, and a piece on one display lets clicks through on the other.
+- **Slanted stacks click by their shape on every display.** On a second display a tilted stack took clicks in the box around it, empty corners included. It now follows the slant, as on the main display.
+
 ## v2.44.0-mac — 2026-11-15
 
 ### New

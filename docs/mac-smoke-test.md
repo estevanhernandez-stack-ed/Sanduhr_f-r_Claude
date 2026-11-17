@@ -2949,3 +2949,34 @@ Known gaps to look at while you are here: the extra windows ignore the Dock and 
 display's copy; a slanted stack on an extra window clicks by the box around what is drawn, not along its slant.
 
 Afterwards put the layout back the way it was and restore per section 45.
+
+## 79. The Desk on two displays, finished (2.45.0)
+
+Use a release build after the section 45 backup (or a dev build, signed out, file store), with the Desk on, the MCP server installed and a
+second display plugged in. Put the clock, the meters, the meetings, now playing and the watchers on **All displays** unless a step says
+otherwise. Where a step says "one display", unplug the second one first.
+
+1. Dock on the second display: set the Dock to the bottom, then left, then right of that display (System Settings, Desktop & Dock, with
+   "Displays have separate Spaces" on). Pieces on it keep clear of the Dock each time. Move the Dock to the main display and back: the
+   second display's Desk follows. An auto-hiding Dock reserves nothing there, so pieces rest at the edge, as on a one-display Mac.
+2. A notched display as the non-main one, if you have it: pieces on it clear the notch and the menu bar.
+3. Clicks on the second display's copies: a meeting row joins its call, now playing answers a click and a two-finger click opens its
+   shared menu, a meter row's limit menu opens, a watcher link opens its page. The clock and message two-finger menu opens too.
+4. A piece on one display only (Settings, Desk, Layout, Display): clicks fall through to the desktop where it is not drawn on the other
+   display, and it still takes them where it is.
+5. Under-icons click layer on (Settings, Desk, Clicks): the plates line up with what is drawn on the second display. **Show Widget** from
+   the second display's meters opens the widget beside them.
+6. Unplug and replug the second display: clicks work again on both once it is back.
+7. A slanted stack: tilt the stack at `tl` on the second display. A click in its empty corner goes through to the desktop, and a click
+   on its face lands. Give the main display's `tl` stack a different tilt: each display keeps its own.
+8. The companion: in Settings, Desk, Layout, move it to the second display. It roams there clear of that display's menu bar and Dock.
+   Its picker offers Main display and each display, and no All displays; Arrange Desk shows no Show on for it. Drag it across in Arrange:
+   it moves. Unplug the second display: it comes to the main display; replug: it returns. After any move it is never at the top-left
+   corner. `propose_desk` with `monitor: "all"` for the companion draws one companion, on the main display.
+9. Now playing on All displays: both copies draw and answer, and the song look agrees on both.
+10. Focus another app on the second display: the main Desk stays on the display with the menu bar, and the notch island and the Dock
+    follower stay there too.
+11. **OLED care** on: both windows dim and drift, each on its own display.
+12. One display: everything looks and clicks exactly as 2.44.0, and the companion is where it was.
+
+Afterwards put the layout back the way it was and restore per section 45.
