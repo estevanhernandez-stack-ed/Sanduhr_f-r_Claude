@@ -21,7 +21,7 @@
 
 ### Fixes
 
-- **Every display's Desk keeps clear of its Dock and notch.** A Desk window on a second display ignored that display's Dock and a notch on it, so pieces could sit under either. It now clears an always-shown Dock at the bottom, left or right of that display, and its notch. An auto-hiding Dock's slide is still followed on the main display only.
+- **Every display's Desk keeps clear of its Dock and notch.** A Desk window on a second display ignored that display's Dock and a notch on it, so pieces could sit under either. It now clears an always-shown Dock at the bottom, left or right of that display, and its notch. An auto-hiding Dock's slide now follows it on every display: with separate Spaces, the pieces on the display the Dock comes up on slide clear as it rises, while the other displays' stay put.
 - **Every copy of a piece on All displays takes clicks.** Meeting rows, now playing, a meter row's limit menu and watcher links answered only on the main display's copy. They answer on every display now, and a piece on one display lets clicks through on the other.
 - **Slanted stacks click by their shape on every display.** On a second display a tilted stack took clicks in the box around it, empty corners included. It now follows the slant, as on the main display.
 

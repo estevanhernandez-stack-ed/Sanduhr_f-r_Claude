@@ -166,7 +166,8 @@ enum DockGeometry {
     /// says only that the Dock shows, and `fallback` gives the depth.
     static func shownExtent(_ windows: [DockWindow], layer: Int, screen: CGRect, side: DockSide,
                             fallback: CGFloat) -> CGFloat? {
-        let mine = windows.filter { $0.layer == layer && $0.onScreen && !$0.bounds.intersection(screen).isNull }
+        // A window only touching this screen's edge (the Dock on the display beside it) is not over it.
+        let mine = windows.filter { $0.layer == layer && $0.onScreen && !$0.bounds.intersection(screen).isEmpty }
         guard !mine.isEmpty else { return nil }
         var deepest: CGFloat = 0
         for w in mine {
@@ -309,5 +310,59 @@ enum DockWatch {
         if inZone { return pointerMoved || sinceActivity < quietAfter(delay: delay) }
         if phase != .hidden { return tick % awayEvery == 0 }
         return false
+    }
+}
+
+/// One Desk display the auto-hiding Dock's slide can follow (2.45): its window's key and its
+/// frame in global CoreGraphics coordinates (top-left origin of the primary screen).
+struct DockDisplay: Equatable {
+    var key: DeskDisplay
+    var frame: CGRect
+}
+
+/// Which display's Desk window the auto-hiding Dock's slide follows (2.45). With "Displays have
+/// separate Spaces" on, the Dock comes up at the edge of the display the pointer is on, so the
+/// slide follows the pointer's display; one display slides at a time and the others rest. Pure,
+/// from the displays as values; a one-display Mac only ever has the main one.
+enum DockTarget {
+    /// The display under `pointer` (global CoreGraphics coordinates) among `displays`, nil off
+    /// every one. A point inside a frame wins; then a point within a point of a frame's edge, as
+    /// the pointer pinned to the bottom edge reads one past it (DockGeometry's own slack).
+    static func display(under pointer: CGPoint, among displays: [DockDisplay]) -> DockDisplay? {
+        if let inside = displays.first(where: { $0.frame.contains(pointer) }) { return inside }
+        return displays.first { d in
+            pointer.x >= d.frame.minX - 1 && pointer.x <= d.frame.maxX + 1
+                && pointer.y >= d.frame.minY - 1 && pointer.y <= d.frame.maxY + 1
+        }
+    }
+
+    /// `pointer` in `display`'s window coordinates (top-left origin), what the trigger zone reads.
+    static func local(_ pointer: CGPoint, in display: DockDisplay) -> CGPoint {
+        CGPoint(x: pointer.x - display.frame.minX, y: pointer.y - display.frame.minY)
+    }
+
+    /// An AppKit screen point (`NSEvent.mouseLocation`) in global CoreGraphics coordinates.
+    static func topLeft(_ point: CGPoint, primaryHeight: CGFloat) -> CGPoint {
+        CGPoint(x: point.x, y: primaryHeight - point.y)
+    }
+
+    /// Whether resting at `display`'s Dock edge slides ahead of the window list. The main display
+    /// always; another one only with separate Spaces, where the Dock comes up on any display.
+    /// Without them the Dock lives on one display, and another display's slide waits for the
+    /// window list to show it there, so a pointer resting at a Dock-less edge moves nothing.
+    static func anticipates(on display: DeskDisplay, separateSpaces: Bool) -> Bool {
+        display == .main || separateSpaces
+    }
+
+    /// The insets for `display`'s window: the slide's on the target display, at rest (zero) on
+    /// every other, with the auto-hiding Dock on `side`.
+    static func slideInsets(for display: DeskDisplay, target: DeskDisplay, side: DockSide, inset: CGFloat) -> DockInsets {
+        .on(side, display == target ? inset : 0)
+    }
+
+    /// "Displays have separate Spaces" (`com.apple.spaces` `spans-displays`, true when it is off;
+    /// unset means on, the macOS default). Read only.
+    static func separateSpaces(_ value: (String) -> Any?) -> Bool {
+        !((value("spans-displays") as? NSNumber)?.boolValue ?? false)
     }
 }

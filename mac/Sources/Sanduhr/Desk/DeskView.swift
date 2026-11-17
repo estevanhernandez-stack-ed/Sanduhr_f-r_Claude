@@ -64,7 +64,11 @@ struct DeskView: View {
 
     /// This window's menu bar strip, Dock reach and notch: the model's on the main window.
     private var topInset: CGFloat { extra?.geometry.topInset ?? model.topInset }
-    private var dockInsets: DockInsets { extra?.geometry.dockInsets ?? model.dockInsets }
+    /// On another display, the auto-hiding Dock's slide there (2.45) wins over the geometry's.
+    private var dockInsets: DockInsets {
+        guard let extra else { return model.dockInsets }
+        return model.extraDockInsets[extra.key] ?? extra.geometry.dockInsets
+    }
     private var notchRect: CGRect? { extra == nil ? model.notchRect : extra?.geometry.notchRect }
 
     /// The window this view draws, as the plan names it; nil before the screens are known (then it
