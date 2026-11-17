@@ -374,6 +374,17 @@ class Displays(Base):
         r = self.propose({"layout": {"clock": {"monitor": SIDE_ID}}})
         self.assertEqual(r["status"], "queued")
 
+    def test_the_companion_takes_a_monitor_like_any_piece(self):
+        # 2.45: the companion roams the display it is placed on; All draws it on the main one.
+        self.write_state(self.two_monitors)
+        r = self.propose({"layout": {"companion": {"anchor": "br", "monitor": SIDE_ID}}})
+        self.assertEqual(r["status"], "queued")
+        self.assertEqual(self.request()["design"]["layout"]["companion"], {"anchor": "br", "monitor": SIDE_ID})
+        r = self.propose({"layout": {"companion": {"monitor": "00000000-1111-2222-3333-444444444444"}}})
+        self.assertEqual([x["field"] for x in r["reasons"]], ["layout.companion.monitor"])
+        propose = [t for t in mcp.TOOLS if t["name"] == "propose_desk"][0]
+        self.assertIn('so "all" draws it on the main display only', propose["description"])
+
     def test_the_tool_text_says_the_mac_desk_places_pieces_per_display(self):
         read = [t for t in mcp.TOOLS if t["name"] == "get_desk"][0]["description"]
         propose = [t for t in mcp.TOOLS if t["name"] == "propose_desk"][0]

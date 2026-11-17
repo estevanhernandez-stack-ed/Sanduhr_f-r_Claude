@@ -1,0 +1,11 @@
+{
+  "layout": {
+    "companion": {
+      "anchor": "br",
+      "monitor": "e5b21c90-6f3d-4a7e-8b14-2c9d7f1e3a42"
+    },
+    "clock": {
+      "monitor": "all"
+    }
+  }
+}
