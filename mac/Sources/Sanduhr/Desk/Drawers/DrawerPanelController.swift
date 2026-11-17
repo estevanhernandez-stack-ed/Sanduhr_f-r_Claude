@@ -30,7 +30,7 @@ final class DrawerPanelController {
     /// screens, and whenever the service publishes a change.
     func refresh() {
         armTracking()
-        guard shouldShow, let screen = DeskController.shared.window?.screen ?? NSScreen.main else {
+        guard shouldShow, let screen = DeskController.shared.window?.screen ?? NSScreen.screens.first else {
             closeAll()
             return
         }
@@ -136,7 +136,7 @@ final class DrawerPanelController {
 
     /// Where a title-bar drag settles: snapped to the other drawers, then the Desk's pieces, then the margin.
     private func settle(_ id: String, proposed: CGRect, snapping: Bool) -> CGRect {
-        guard let screen = DeskController.shared.window?.screen ?? NSScreen.main else { return proposed }
+        guard let screen = DeskController.shared.window?.screen ?? NSScreen.screens.first else { return proposed }
         let visible = screen.visibleFrame
         let others = panels.filter { $0.key != id }.map { DrawerPlacement.workRect(ofFrame: $0.value.frame, in: visible) }
         let snapped = DrawerSnap.snap(DrawerPlacement.workRect(ofFrame: proposed, in: visible), work: workArea(screen),
@@ -152,7 +152,7 @@ final class DrawerPanelController {
     }
 
     private func place(_ id: String, frame: CGRect) {
-        guard let screen = DeskController.shared.window?.screen ?? NSScreen.main else { return }
+        guard let screen = DeskController.shared.window?.screen ?? NSScreen.screens.first else { return }
         let o = DrawerPlacement.offset(ofFrame: frame, in: screen.visibleFrame)
         let key = screenKey(screen)
         service.updateSettings { $0.places[id] = DrawerPlace(screen: key, x: Double(o.x), y: Double(o.y)) }
@@ -229,7 +229,7 @@ final class DrawerPanelController {
 
     /// Lines the shown drawers up from the Tidy corner. Undo puts the places back.
     func tidy() {
-        guard let screen = DeskController.shared.window?.screen ?? NSScreen.main else { return }
+        guard let screen = DeskController.shared.window?.screen ?? NSScreen.screens.first else { return }
         let visible = screen.visibleFrame
         var current: [String: CGRect] = [:]
         for (id, w) in panels { current[id] = DrawerPlacement.workRect(ofFrame: w.frame, in: visible) }

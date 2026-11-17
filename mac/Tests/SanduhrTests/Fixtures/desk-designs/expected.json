@@ -3,6 +3,26 @@
     "Segoe UI",
     "Caveat"
   ],
+  "monitors": [
+    {
+      "id": "7D3F1A2B-0C4E-4B6A-9E21-5A8C3D9F0B11",
+      "name": "1512×982, main",
+      "width": 1512,
+      "height": 982,
+      "primary": true,
+      "left": 0,
+      "top": 0
+    },
+    {
+      "id": "E5B21C90-6F3D-4A7E-8B14-2C9D7F1E3A42",
+      "name": "1920×1080, right of main",
+      "width": 1920,
+      "height": 1080,
+      "primary": false,
+      "left": 1512,
+      "top": -98
+    }
+  ],
   "cases": {
     "bad-anchor.json": {
       "status": "rejected",
@@ -151,6 +171,78 @@
           }
         }
       }
+    },
+    "monitor-all.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "layout": {
+          "clock": {
+            "monitor": "all"
+          },
+          "claude": {
+            "anchor": "tr",
+            "tilt": 4,
+            "monitor": "all"
+          }
+        }
+      }
+    },
+    "monitor-bad.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.clock.monitor",
+          "message": "must be \"all\", \"main\" or a monitor id from get_desk monitors"
+        },
+        {
+          "field": "layout.claude.monitor",
+          "message": "must be \"all\", \"main\" or a monitor id from get_desk monitors"
+        }
+      ],
+      "fonts": []
+    },
+    "monitor-id.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "layout": {
+          "clock": {
+            "anchor": "tr",
+            "tilt": 10,
+            "monitor": "E5B21C90-6F3D-4A7E-8B14-2C9D7F1E3A42"
+          },
+          "claude": {
+            "anchor": "tr",
+            "tilt": -5
+          }
+        }
+      }
+    },
+    "monitor-main.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "layout": {
+          "clock": {
+            "anchor": "bl",
+            "monitor": "main"
+          }
+        }
+      }
+    },
+    "monitor-unknown.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.clock.monitor",
+          "message": "is not a display connected to this Mac; use \"all\", \"main\" or an id from monitors in get_desk."
+        }
+      ],
+      "fonts": []
     },
     "multi-reasons.json": {
       "status": "rejected",
@@ -319,11 +411,11 @@
       "reasons": [
         {
           "field": "layout.clock",
-          "message": "unknown member 'color'; use anchor, size, hidden, tilt and style"
+          "message": "unknown member 'color'; use anchor, size, hidden, monitor, tilt and style"
         },
         {
           "field": "layout.clock",
-          "message": "unknown member 'zindex'; use anchor, size, hidden, tilt and style"
+          "message": "unknown member 'zindex'; use anchor, size, hidden, monitor, tilt and style"
         }
       ],
       "fonts": []
@@ -443,16 +535,6 @@
         {
           "field": "theme",
           "message": "is not part of a Mac Desk design; send a widget theme with propose_theme"
-        }
-      ],
-      "fonts": []
-    },
-    "windows-only-monitor.json": {
-      "status": "rejected",
-      "reasons": [
-        {
-          "field": "layout.clock",
-          "message": "monitor is Windows only: the Mac Desk has no per-monitor placement; use anchor, size, hidden, tilt and style"
         }
       ],
       "fonts": []

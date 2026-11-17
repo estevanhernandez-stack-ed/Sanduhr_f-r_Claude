@@ -128,9 +128,14 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     /// ExpiredAccountNotice's banner, as gentle as a suggestion's (alerts on, the delivery and quiet hours as an
     /// alert's, no sound). Clicking it opens Settings, Accounts, where the account shows Session expired.
+    /// Whether an expired-account banner may go out now: the gate a Desk message suggestion uses (Alerts on,
+    /// the delivery choice, quiet hours). The caller records an account as announced only when this is true.
+    var accountBannerAllowed: Bool {
+        MessageSuggestionNotice.banner(AlertSettings(defaults), deskRunning: DeskController.shared.running, now: Date())
+    }
+
+    /// Posts the banner; call it only when `accountBannerAllowed` (ExpiredAccountNotice.toNotify checks it).
     func accountExpired(_ label: String) {
-        guard MessageSuggestionNotice.banner(AlertSettings(defaults), deskRunning: DeskController.shared.running,
-                                             now: Date()) else { return }
         let content = UNMutableNotificationContent()
         content.title = ExpiredAccountNotice.title(label)
         content.body = ExpiredAccountNotice.body

@@ -143,6 +143,8 @@ final class DeskDesignProposalHandoff {
     @ObservationIgnored private let defaults: DefaultsStore
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let installedFamilies: @MainActor () -> [String]
+    /// The displays connected now (`DeskScreens.current()`); tests inject their own.
+    @ObservationIgnored private let screens: @MainActor () -> [DeskScreenInfo]
     /// The Desk side of a review; nil answers a design `not_ready` (tests, a build with no Desk).
     @ObservationIgnored var host: DeskDesignPreviewHost?
     /// A design arrived and waits (the notification is the caller's).
@@ -156,11 +158,13 @@ final class DeskDesignProposalHandoff {
     /// - Parameters:
     ///   - defaults: The Desk defaults suite an Apply writes (the app's, or an isolated one in tests).
     ///   - installedFamilies: The font families this Mac has (the picker's list); tests inject their own.
+    ///   - screens: The connected displays, for a piece's monitor; tests inject their own.
     init(paths: Paths = .standard, defaults: DefaultsStore = UserDefaults.desk, now: @escaping () -> Date = Date.init,
-         installedFamilies: (@MainActor () -> [String])? = nil) {
+         installedFamilies: (@MainActor () -> [String])? = nil, screens: (@MainActor () -> [DeskScreenInfo])? = nil) {
         self.paths = paths
         self.defaults = defaults
         self.now = now
+        self.screens = screens ?? { DeskScreens.current() }
         self.installedFamilies = installedFamilies ?? {
             DeskFont.pickerFamilies(installed: NSFontManager.shared.availableFontFamilies)
         }
@@ -184,7 +188,7 @@ final class DeskDesignProposalHandoff {
 
     /// One request's bytes, as read from the file.
     func receive(_ data: Data) {
-        let request = DeskDesignHandoff.decode(data, now: now(), context: DeskDesignContext(installedFonts: installedFamilies()))
+        let request = DeskDesignHandoff.decode(data, now: now(), context: designContext())
         switch request.kind {
         case .discard:
             return
@@ -198,6 +202,14 @@ final class DeskDesignProposalHandoff {
     private func answer(_ id: String, _ answer: DeskAnswer) {
         onAnswered?(id, answer)
         HandoffFiles.writeOwnerOnly(DeskDesignHandoff.resultJson(id: id, answer: answer, now: now()), to: paths.result)
+    }
+
+    /// The rules' view of this Mac: its fonts, its displays and the display each placed piece is on.
+    private func designContext() -> DeskDesignContext {
+        let arrangement = DeskDesignLook.read(defaults).arrangement
+        var displays: [String: DeskDisplay] = [:]
+        for p in arrangement.pieces { displays[p.widget] = p.monitor }
+        return DeskDesignContext(installedFonts: installedFamilies(), monitors: screens(), displays: displays)
     }
 
     // MARK: - The review
@@ -230,7 +242,7 @@ final class DeskDesignProposalHandoff {
 
     /// The Desk's rules for a pasted design, with this Mac's fonts: `propose_desk`'s own validator, unchanged.
     func validatePasted(_ node: PackValue) -> DeskValidation {
-        DeskDesign.validate(node, context: DeskDesignContext(installedFonts: installedFamilies()))
+        DeskDesign.validate(node, context: designContext())
     }
 
     /// A design pasted from the AI chat window that passed `validatePasted`: held for the review like a proposal, in memory
@@ -265,8 +277,9 @@ final class DeskDesignProposalHandoff {
 
     private func changeLines(for r: Review) -> [String] {
         let current = DeskDesignLook.read(defaults)
-        return DeskDesignApply.changes(from: current, to: DeskDesignApply.merged(current, r.design),
-                                       available: { [self] in fontInstalled($0) })
+        let screens = screens()
+        return DeskDesignApply.changes(from: current, to: DeskDesignApply.merged(current, r.design, screens: screens),
+                                       available: { [self] in fontInstalled($0) }, screens: screens)
     }
 
     /// What the banner shows for the pending design, nil with none.
@@ -288,7 +301,7 @@ final class DeskDesignProposalHandoff {
     /// it has; the design keeps the family it asked for.
     private func previewState(_ p: Review) -> DeskDesignPreviewState {
         let current = DeskDesignLook.read(defaults)
-        let next = DeskDesignApply.merged(current, p.design)
+        let next = DeskDesignApply.merged(current, p.design, screens: screens())
         var state = DeskDesignPreviewState()
         if p.design.layout != nil { state.layout = next.arrangement }
         if let asked = p.design.font {
@@ -344,8 +357,9 @@ final class DeskDesignProposalHandoff {
         pending = nil
         previewNote = nil
         let current = DeskDesignLook.read(defaults)
-        let next = DeskDesignApply.merged(current, p.design)
-        let changes = DeskDesignApply.changes(from: current, to: next, available: { [self] in fontInstalled($0) })
+        let screens = screens()
+        let next = DeskDesignApply.merged(current, p.design, screens: screens)
+        let changes = DeskDesignApply.changes(from: current, to: next, available: { [self] in fontInstalled($0) }, screens: screens)
         DeskDesignApply.recordBefore(next, over: current, name: p.design.name, now: now(), in: defaults)
         DeskDesignApply.write(next, over: current, to: defaults)
         endPreview()   // the preview gives way to what was written

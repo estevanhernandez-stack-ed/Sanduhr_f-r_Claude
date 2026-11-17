@@ -20,6 +20,25 @@ struct DeskDesignFixtureTests {
         TJ.parse(String(decoding: FileManager.default.contents(atPath: root + "/" + file)!, as: UTF8.self))
     }
 
+    /// The fixture's displays as the app sees them: get_desk's shape, read back into screens (top-left origin to y up).
+    static func monitors(_ all: [String: Any]) -> [DeskScreenInfo] {
+        let list = all["monitors"] as! [[String: Any]]
+        let mainHeight = Double(list.first { $0["primary"] as? Bool == true }?["height"] as? Int ?? 0)
+        return list.map { m in
+            let w = Double(m["width"] as! Int), h = Double(m["height"] as! Int)
+            let left = Double(m["left"] as! Int), top = Double(m["top"] as! Int)
+            return DeskScreenInfo(id: m["id"] as? String, frame: CGRect(x: left, y: mainHeight - top - h, width: w, height: h),
+                                  primary: m["primary"] as? Bool ?? false, name: m["name"] as? String ?? "")
+        }
+    }
+
+    @Test func theFixtureDisplaysRoundTripThroughTheExport() {
+        let all = Self.expected()
+        let back = DeskStateExport.monitorsJson(Self.monitors(all))
+        let want = all["monitors"] as! [[String: Any]]
+        #expect((back as NSArray).isEqual(to: want))
+    }
+
     @Test func theCorpusIsAllThere() {
         let names = ((try? FileManager.default.contentsOfDirectory(atPath: Self.root)) ?? []).filter { $0 != "expected.json" }
         #expect(Set(names) == Set((Self.expected()["cases"] as! [String: Any]).keys))
@@ -29,9 +48,10 @@ struct DeskDesignFixtureTests {
     @Test func everyDesignIsJudgedAsExpected() throws {
         let all = Self.expected()
         let installed = all["installed_fonts"] as! [String]
+        let monitors = Self.monitors(all)
         let cases = all["cases"] as! [String: [String: Any]]
         for (file, want) in cases.sorted(by: { $0.key < $1.key }) {
-            let v = DeskDesign.validate(Self.design(file), context: DeskDesignContext(installedFonts: installed))
+            let v = DeskDesign.validate(Self.design(file), context: DeskDesignContext(installedFonts: installed, monitors: monitors))
             let detail = v.reasons.map(\.description).joined(separator: " | ")
             #expect(v.status.word == (want["status"] as! String), "\(file): status \(v.status.word): \(detail)")
             let wantReasons = (want["reasons"] as! [[String: String]]).map { DeskReason($0["field"]!, $0["message"]!) }
@@ -238,8 +258,8 @@ struct DeskStateExportTests {
         let text = String(decoding: data, as: UTF8.self)
         #expect(!text.contains("pinned message"))
         let s = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect(Set(s.keys) == ["schema_version", "writer_version", "design", "pieces", "anchors", "fonts", "shown",
-                                "message_color", "notch_text_color", "limits", "sprites"])
+        #expect(Set(s.keys) == ["schema_version", "writer_version", "design", "pieces", "anchors", "fonts", "monitors",
+                                "shown", "message_color", "notch_text_color", "limits", "sprites"])
     }
 
     @Test func installedFamiliesAreValidNamesOnceEachAndCapped() {

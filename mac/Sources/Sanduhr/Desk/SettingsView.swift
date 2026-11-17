@@ -13,9 +13,11 @@ import ServiceManagement
 struct DeskLayoutSection: View {
     @AppStorage("layout", store: .desk) private var layout = "message:tl clock:bl claude:bl meetings:bl"
     @AppStorage(DeskController.enabledKey, store: .desk) private var deskOn = false
+    @State private var screens = DeskScreens.current()
 
     var body: some View {
         let arranging = DeskController.shared.model.arrange.active
+        let showsDisplays = DeskDisplayChoices.shows(DeskArrangement(layout), screens: screens)
         Form {
             DeskDesignSuggestionSection()
             DeskDesignUndoSection()
@@ -30,7 +32,8 @@ struct DeskLayoutSection: View {
             }
             Section("Where each piece sits") {
                 ForEach(DeskLayout.widgets, id: \.key) { w in
-                    DeskPlaceRow(widget: w.key, name: w.name, layout: $layout)
+                    DeskPlaceRow(widget: w.key, name: w.name, layout: $layout,
+                                 screens: showsDisplays ? screens : nil)
                         .disabled(arranging)
                         .modifier(FirstPieceAnchor(widget: w.key))
                     DeskPieceExtra(widget: w.key, arranging: arranging, layout: $layout)
@@ -43,7 +46,7 @@ struct DeskLayoutSection: View {
             DeskSlantSection(layout: $layout, arranging: arranging)
             Section("Order") {
                 // One row, so the section's anchor marks the whole list.
-                VStack(alignment: .leading, spacing: 10) { DeskOrderList(layout: $layout) }
+                VStack(alignment: .leading, spacing: 10) { DeskOrderList(layout: $layout, screens: screens) }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .disabled(arranging)
                     .settingsAnchor(SettingsAnchor.order)
@@ -58,6 +61,9 @@ struct DeskLayoutSection: View {
             AdvancedSection(page: .deskLayout) { DeskMarginsRows().disabled(arranging) }
         }
         .formStyle(.grouped)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+            screens = DeskScreens.current()
+        }
     }
 }
 
@@ -359,11 +365,16 @@ private struct DeskPlaceRow: View {
     let widget: String
     let name: String
     @Binding var layout: String
+    /// The connected displays when the Display picker shows (more than one, or a stranded piece), else nil.
+    var screens: [DeskScreenInfo]?
 
     var body: some View {
         let placed = DeskArrangement(layout).placement(widget)
         LabeledContent(name) {
             HStack(spacing: 8) {
+                if let screens, let placed {
+                    DeskDisplayPicker(name: name, placement: placed, screens: screens, layout: $layout)
+                }
                 Picker("\(name) place", selection: anchor) {
                     ForEach(DeskAnchor.allCases, id: \.self) { Text($0.name).tag($0.rawValue) }
                     Divider()
@@ -396,6 +407,36 @@ private struct DeskPlaceRow: View {
             set: { value in
                 var a = DeskArrangement(layout)
                 a.setScale(widget, value)
+                layout = a.string
+            })
+    }
+}
+
+/// A placed piece's Display picker (2.44): Main, All, each other display, and a stranded choice.
+private struct DeskDisplayPicker: View {
+    let name: String
+    let placement: DeskPlacement
+    let screens: [DeskScreenInfo]
+    @Binding var layout: String
+
+    var body: some View {
+        let choices = DeskDisplayChoices.choices(for: placement, screens: screens)
+        Picker("\(name) display", selection: selection) {
+            ForEach(choices, id: \.tag) { Text($0.title).tag($0.tag) }
+        }
+        .labelsHidden()
+        .fixedSize()
+    }
+
+    private var selection: Binding<String> {
+        Binding(
+            get: { DeskDisplayChoices.selection(for: placement, screens: screens).tag },
+            set: { tag in
+                let current = DeskArrangement(layout).placement(placement.widget) ?? placement
+                guard let choice = DeskDisplayChoices.choices(for: current, screens: screens).first(where: { $0.tag == tag })
+                else { return }
+                var a = DeskArrangement(layout)
+                DeskDisplayChoices.apply(choice, widget: placement.widget, to: &a, screens: screens)
                 layout = a.string
             })
     }
@@ -444,21 +485,25 @@ private struct DeskSlantSection: View {
 /// onto another to take its place (DeskArrangement.move); VoiceOver gets Move Up and Move Down.
 private struct DeskOrderList: View {
     @Binding var layout: String
+    let screens: [DeskScreenInfo]
 
     var body: some View {
-        let a = DeskArrangement(layout)
-        let anchors = DeskAnchor.allCases.filter { !a.stack($0).isEmpty }
-        if anchors.isEmpty {
+        let groups = DeskDisplayChoices.orderGroups(DeskArrangement(layout), screens: screens)
+        if groups.isEmpty {
             Text("Nothing is placed on the Desk.").foregroundStyle(.secondary)
         }
-        ForEach(anchors, id: \.self) { anchor in
+        ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
             VStack(alignment: .leading, spacing: 4) {
-                Text(anchor.name).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                ForEach(a.stack(anchor), id: \.widget) { p in
+                Text(heading(group)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                ForEach(group.pieces, id: \.widget) { p in
                     DeskOrderRow(placement: p, layout: $layout)
                 }
             }
         }
+    }
+
+    private func heading(_ group: DeskOrderGroup) -> String {
+        group.displayTitle.map { "\($0), \(group.anchor.name)" } ?? group.anchor.name
     }
 }
 

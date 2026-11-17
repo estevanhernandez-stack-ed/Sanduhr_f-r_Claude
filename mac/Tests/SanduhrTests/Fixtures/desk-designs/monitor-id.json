@@ -1,0 +1,13 @@
+{
+  "layout": {
+    "clock": {
+      "anchor": "tr",
+      "tilt": 10,
+      "monitor": "E5B21C90-6F3D-4A7E-8B14-2C9D7F1E3A42"
+    },
+    "claude": {
+      "anchor": "tr",
+      "tilt": -5
+    }
+  }
+}

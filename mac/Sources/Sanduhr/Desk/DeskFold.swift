@@ -227,6 +227,9 @@ struct DeskFoldStack<Content: View>: View {
     let tilt: Double
     var model: DeskModel
     @ViewBuilder var content: () -> Content
+    /// Only the main window reports folds: the model and Arrange key them by anchor, and a stack on
+    /// another window would clear or replace the main window's (DeskFrameReporting).
+    @Environment(\.deskFrameReporting) private var reporting
 
     var body: some View {
         DeskFoldLayout(tilt: tilt) {
@@ -247,11 +250,13 @@ struct DeskFoldStack<Content: View>: View {
     }
 
     private func report(_ p: DeskFoldProbe) {
+        guard reporting.mainWindow, reporting.on else { return }
         model.setFold(DeskFold(tilt: p.tilt, origin: DeskFold.origin(ofStackBounds: p.global, tilt: p.tilt)), at: anchor)
         model.arrange.setFold(DeskFold(tilt: p.tilt, origin: DeskFold.origin(ofStackBounds: p.arrange, tilt: p.tilt)), at: anchor)
     }
 
     private func clear() {
+        guard reporting.mainWindow, reporting.on else { return }
         model.setFold(nil, at: anchor)
         model.arrange.setFold(nil, at: anchor)
     }

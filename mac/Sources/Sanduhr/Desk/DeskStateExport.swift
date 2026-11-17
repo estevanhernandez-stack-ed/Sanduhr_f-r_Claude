@@ -4,7 +4,7 @@ import Foundation
 /// `desk-state.json` (spec 8, ledger D2): what `get_desk` reads. The Desk's settings live in the
 /// `com.626labs.sanduhr.desk` defaults suite, which the MCP server cannot read without racing cfprefsd, so the
 /// app keeps this small owner-only file current instead. It holds only the schema version, the layout words
-/// (anchor, size, tilt, style per piece), the Desk ink, plate and shadow, the font names, the weather nickname, which pieces show,
+/// (anchor, size, tilt, style and display per piece), the connected displays (id, name and geometry), the Desk ink, plate and shadow, the font names, the weather nickname, which pieces show,
 /// the message and notch text colors, the limits a design must keep, and each sprite made here (id, name, frame size and
 /// cell count, for `propose_sprite_motion`; never an image). No usage numbers, no message text,
 /// no paths, no account names.
@@ -32,16 +32,32 @@ enum DeskStateExport {
         return out
     }
 
-    /// The state file's bytes for the Desk settings in `defaults`.
+    /// get_desk's `monitors`, with Windows' keys: each connected display with an id, its name (`DeskScreens.named`),
+    /// its size in points and its top-left corner in top-left-origin points from the main display's (main is 0,0).
+    static func monitorsJson(_ screens: [DeskScreenInfo]) -> [[String: Any]] {
+        guard let main = DeskScreens.main(screens) else { return [] }
+        let mainFrame = main.frame
+        return DeskScreens.named(screens).compactMap { s -> [String: Any]? in
+            guard let id = s.id else { return nil }
+            return ["id": id, "name": s.name,
+                    "width": Int(s.frame.width.rounded()), "height": Int(s.frame.height.rounded()),
+                    "primary": s.id == main.id && s.frame == mainFrame,
+                    "left": Int((s.frame.minX - mainFrame.minX).rounded()),
+                    "top": Int((mainFrame.maxY - s.frame.maxY).rounded())]
+        }
+    }
+
+    /// The state file's bytes for the Desk settings in `defaults`, with the displays connected now.
     static func stateJson(defaults d: UserDefaults, installedFonts: [String], writerVersion: String,
-                          sprites: [SpriteMotionSprite] = [],
+                          sprites: [SpriteMotionSprite] = [], screens: [DeskScreenInfo] = [],
                           fontAvailable: (String) -> Bool = DeskFont.isAvailable) -> Data {
         let arrangement = DeskArrangement(d.string(forKey: "layout") ?? DeskLayout.standard)
         var layout: [String: Any] = [:]
         for widget in DeskArrangement.known {
             guard let p = arrangement.placement(widget) else { layout[widget] = ["hidden": true]; continue }
             var piece: [String: Any] = ["anchor": p.anchor.rawValue, "size": p.scale, "hidden": false,
-                                        "tilt": Int(arrangement.tilt(of: widget) ?? 0)]
+                                        "tilt": Int(arrangement.tilt(of: widget) ?? 0),
+                                        "monitor": DeskDesign.monitorJson(p.monitor)]
             if DeskMeterStyles.supports(widget) { piece["style"] = DeskMeterStyles.word(arrangement.style(of: widget)) }
             layout[widget] = piece
         }
@@ -62,6 +78,7 @@ enum DeskStateExport {
             "design": design,
             "pieces": DeskArrangement.known,
             "anchors": DeskAnchor.allCases.map(\.rawValue),
+            "monitors": monitorsJson(screens),
             "fonts": ["desk": desk, "message": d.string(forKey: "messageFont") ?? "",
                       "bundled": BundledFonts.families.map(\.name), "installed": installedFamilies(installedFonts)],
             "shown": arrangement.shown(showMeetings: showMeetings).map(\.widget),
@@ -83,7 +100,7 @@ enum DeskStateExport {
 }
 
 /// Keeps `desk-state.json` current: written at launch and, a moment after, whenever a Desk setting, the
-/// installed fonts or a font pack changes (debounced, and only when the bytes differ, so a change elsewhere
+/// installed fonts, a font pack or the displays change (debounced, and only when the bytes differ, so a change elsewhere
 /// writes nothing and nothing writes per frame). Owner-only and atomic (`HandoffFiles.writeOwnerOnly`).
 @MainActor
 final class DeskStateExporter {
@@ -107,7 +124,8 @@ final class DeskStateExporter {
         guard !started else { return }
         started = true
         let nc = NotificationCenter.default
-        for name in [UserDefaults.didChangeNotification, .widgetPacksDidChange, NSFont.fontSetChangedNotification] {
+        for name in [UserDefaults.didChangeNotification, .widgetPacksDidChange, NSFont.fontSetChangedNotification,
+                     NSApplication.didChangeScreenParametersNotification] {
             nc.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.schedule() }
             }
@@ -131,7 +149,8 @@ final class DeskStateExporter {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
         let families = DeskFont.pickerFamilies(installed: NSFontManager.shared.availableFontFamilies)
         let sprites = SpriteMotionState.sprites(store: .shared)
-        let data = DeskStateExport.stateJson(defaults: defaults, installedFonts: families, writerVersion: version, sprites: sprites)
+        let data = DeskStateExport.stateJson(defaults: defaults, installedFonts: families, writerVersion: version, sprites: sprites,
+                                             screens: DeskScreens.current())
         guard !data.isEmpty, data != lastData else { return false }
         lastData = data
         HandoffFiles.writeOwnerOnly(data, to: url)

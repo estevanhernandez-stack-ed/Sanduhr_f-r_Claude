@@ -160,7 +160,8 @@ struct DeskLayoutPreview: View {
     var live: DeskModel
 
     var body: some View {
-        let screen = NSScreen.main ?? NSScreen.screens.first
+        // The Desk's main window sits on the menu bar display, not the one with the key window.
+        let screen = NSScreen.screens.first
         let frame = screen?.frame.size ?? CGSize(width: 1512, height: 982)
         let menuBar = screen.map { $0.frame.maxY - $0.visibleFrame.maxY } ?? 24
         let prefs = DockFollower.readPrefs()

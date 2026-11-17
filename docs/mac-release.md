@@ -22,6 +22,27 @@ the draft, then merge the pull request, and only that merge offers the update to
 | `MAC_NOTARY_PASSWORD` | an app-specific password for notarization |
 | `MAC_SPARKLE_ED_KEY` | Sparkle's EdDSA private key; its public half is `SUPublicEDKey` in `mac/Info.plist` |
 
+### Whose name a release carries
+
+GitHub credits a release to the account that created its draft, not the one that publishes it.
+Every draft this workflow makes with its own token belongs to `github-actions[bot]`, and a
+follower's feed lists only the releases a person published, so those never appear in one.
+
+A **milestone** is the exception: a version `X.Y.0` whose minor divides by `MILESTONE_EVERY` in
+the workflow (25, so 2.50.0, 2.75.0, 3.0.0). Its draft is created with a sixth, optional secret
+in the same environment, and carries the repo owner's name. Every build between stays with the
+bot, which keeps the feed to one Mac line every few weeks instead of one a day.
+
+| Secret (environment `mac-release`) | What it is |
+|---|---|
+| `MAC_RELEASE_PAT` | a fine-grained personal access token of the repo owner: this repository only, **Contents: read and write**, nothing else |
+
+`export-release-secrets.sh` does not create it. Make the token at GitHub, Settings, Developer
+settings, Fine-grained tokens, then `gh secret set MAC_RELEASE_PAT --env mac-release`. It expires
+(a year at most), and the workflow says so instead of failing: a milestone run with the secret
+unset, expired or refused prints a warning and drafts as the bot. The release ships either way;
+only the credit is lost, since a release keeps the author its draft was created with.
+
 ## Part A. One-time setup, on the old Mac
 
 About 20 minutes. Use the same macOS user account that built 2.0.4: the Sparkle key and the

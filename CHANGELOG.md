@@ -19,6 +19,18 @@
 - **A widget pack zip you made yourself installs.** Install widget from file… now reads the zips Explorer's Send to, Compressed folder, Finder's Compress and zip tools make: compressed, with the pack's folder inside (its name may have spaces, as Finder and Explorer keep it), or with a Mac's hidden `__MACOSX` and `.DS_Store` files, which are skipped. It still holds every file to the same size limits while unpacking, checks each one's checksum, and runs every pack rule, so a zip that fails installs nothing and says why. Packs from the catalog keep their own stricter format (#459).
 - **Installing the MCP server checks that it starts.** After Install in Settings ▸ Claude Code, Sanduhr starts the server the way Claude Code will and waits for it to answer, then says so: installed and answering, with its version, or installed but not starting, and why (its launcher is missing, the server file it points to is gone, it stopped at once or didn't answer). Before, a launcher that couldn't start looked to Claude Code like no server at all, and nothing said otherwise (#144).
 
+## v2.44.0-mac — 2026-11-15
+
+### New
+
+- **The Desk on every display.** Each Desk piece now has a display: the main display, All displays, or one display you pick. Settings ▸ Desk ▸ Layout has a Display picker for each piece, and Arrange Desk runs on every display at once: with more than one connected, a piece's name tag gains Show on (This display or All displays) and you can drag a piece from one display to another. Claude places pieces per display through `propose_desk` with a `monitor` of "main", "all" or an id from `get_desk`, which now lists your displays. A display that is disconnected leaves its pieces on the main display, at the same anchor, until it comes back. Every layout you have now stays on the main display, which is always the display with the menu bar, so nothing moves on update. Extra displays get a plain Desk window; the notch, the Dock follower and the companion stay on the main display. Display ids, sizes and positions are saved on this Mac in the Desk layout and `desk-state.json`, and go to Claude only through the local `get_desk` tool.
+
+## v2.43.2-mac — 2026-11-13
+
+### Fixes
+
+- **An account that expires while Alerts are off is still announced once they're on.** 2.43.1 marked an expired account as announced even when Alerts were off or it was quiet hours, so no banner went out and none ever would. Now an account counts as announced only when its banner is actually sent, so turning Alerts on (or quiet hours ending) brings it at the next check. An account that expired while it was the active one counts as told by its own sign-in prompt, so switching away from it brings no banner.
+
 ## v2.43.1-mac — 2026-11-13
 
 ### New
