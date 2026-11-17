@@ -12,7 +12,8 @@ public class WhatsNewCardsTests
     public void Table_HasEveryReleaseNewestFirst()
     {
         Assert.Equal(
-            ["codex-limits",
+            ["agent-activity",
+             "codex-limits",
              "widget-from-file",
              "desk-under-icons",
              "choose-what-shows", "settings-rearranged", "one-theme", "streamer-mode",
@@ -38,8 +39,29 @@ public class WhatsNewCardsTests
     }
 
     [Fact]
-    public void Only_the_Codex_card_names_Codex() =>
-        Assert.Equal(["codex-limits"], Table.Where(c => c.NamesCodex).Select(c => c.Id));
+    public void Release490_ShowsTheAgentActivityCard()
+    {
+        var cards = WhatsNew.Cards("4.8.0", "4.9.0");
+        var card = Assert.Single(cards);
+        Assert.Equal("agent-activity", card.Id);
+        Assert.Equal("Every agent's tokens, side by side", card.Title);
+        Assert.StartsWith("Codex's local burn now counts beside Claude Code's", card.Body);
+        Assert.Equal(SettingsPage.UsageSources, card.Destination);
+        Assert.Equal(SettingsIndex.SourcesList, card.Anchor);
+    }
+
+    /// <summary>The window carries a Codex trademark line only; a card naming Antigravity would need Google's too.</summary>
+    [Fact]
+    public void No_card_names_Antigravity() =>
+        Assert.DoesNotContain(Table, c => (c.Title + c.Body).Contains("Antigravity", StringComparison.OrdinalIgnoreCase));
+
+    [Fact]
+    public void Only_the_Codex_cards_name_Codex() =>
+        Assert.Equal(["agent-activity", "codex-limits"], Table.Where(c => c.NamesCodex).Select(c => c.Id));
+
+    [Fact]
+    public void Every_card_that_says_Codex_shows_the_trademark_line() =>
+        Assert.All(Table.Where(c => (c.Title + c.Body).Contains("Codex", StringComparison.Ordinal)), c => Assert.True(c.NamesCodex, c.Id));
 
     [Fact]
     public void Release470_ShowsTheFromFileCard()
