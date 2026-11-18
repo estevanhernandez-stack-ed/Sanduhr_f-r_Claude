@@ -121,4 +121,16 @@ public class CodexTurnReaderTests
     [InlineData("{\"timestamp\":\"2026-11-17T20:00:00Z\",\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"content\":\"task_complete\"}}")]
     public void A_line_it_cannot_use_is_skipped(string line) =>
         Assert.Null(new CodexTurnReader("rollout-a").Read(line));
+
+    [Fact]
+    public void A_logged_duration_too_large_for_a_time_span_falls_back_to_the_markers()
+    {
+        var r = new CodexTurnReader("rollout-a");
+        r.Read(Meta());
+        r.Read(Event(T0, "task_started"));
+        var done = r.Read(Event(T2m, "task_complete", new() { ["duration_ms"] = 1e300 }));
+        Assert.Equal(AgentTurnKind.Finished, done!.Kind);
+        Assert.Equal(TimeSpan.FromSeconds(124), done.Duration);
+        Assert.False(r.TurnOpen);
+    }
 }

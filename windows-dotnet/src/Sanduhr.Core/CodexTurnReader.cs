@@ -80,7 +80,8 @@ public sealed class CodexTurnReader(string session)
     private TimeSpan? Since(DateTimeOffset at) => _started is { } s && at >= s ? at - s : null;
 
     private static TimeSpan? LoggedDuration(JsonObject p) =>
-        p["duration_ms"] is JsonValue v && v.TryGetValue<double>(out var ms) && ms >= 0 ? TimeSpan.FromMilliseconds(ms) : null;
+        p["duration_ms"] is JsonValue v && v.TryGetValue<double>(out var ms) && ms >= 0 && ms <= TimeSpan.MaxValue.TotalMilliseconds
+            ? TimeSpan.FromMilliseconds(ms) : null;
 
     private static bool HasText(JsonObject p, string key) =>
         p[key] is JsonValue v && v.TryGetValue<string>(out var s) && s.Length > 0;
