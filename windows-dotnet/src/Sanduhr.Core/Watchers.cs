@@ -271,7 +271,8 @@ public sealed partial class WatcherBoard
     public static readonly TimeSpan TurnFadeAfter = TimeSpan.FromSeconds(60);
 
     /// <summary>The Antigravity agent id (<c>AgentSources.Antigravity</c>). Written out here because the MCP server links this
-    /// file and not <c>AgentSources.cs</c>; a test pins the Antigravity window.</summary>
+    /// file and not <c>AgentSources.cs</c>; the test A_running_turn_loses_touch_after_an_hour_and_antigravitys_after_ten_minutes
+    /// (WatcherTurnCardsTests) uses <c>AgentSources.Antigravity</c> as the agent, so it fails if the two drift apart.</summary>
     private const string AntigravityId = "antigravity";
 
     public static string TurnId(string agent, string session) => $"t:{agent}:{session}";

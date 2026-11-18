@@ -103,11 +103,11 @@ public class WatcherTurnCardsTests
     {
         var b = new WatcherBoard();
         b.ApplyTurn(E(AgentTurnKind.Started), "Codex · alpha", "Codex", Now);
-        b.ApplyTurn(E(AgentTurnKind.Started, agent: "antigravity"), "Antigravity · alpha", "Agy", Now);
+        b.ApplyTurn(E(AgentTurnKind.Started, agent: AgentSources.Antigravity), "Antigravity · alpha", "Agy", Now);
 
         b.Tick(Now.AddMinutes(11));
         Assert.Equal(WatcherState.Running, Card(b).State);
-        Assert.Equal(WatcherState.LostTouch, Card(b, "antigravity").State);
+        Assert.Equal(WatcherState.LostTouch, Card(b, AgentSources.Antigravity).State);
 
         b.Tick(Now.AddMinutes(61));
         Assert.Equal(WatcherState.LostTouch, Card(b).State);
