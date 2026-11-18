@@ -191,6 +191,7 @@ public sealed class AgentActivityWatcherTests : IDisposable
         Rollout("rollout-a", Started(_now) + Complete(_now.AddSeconds(124)));   // it carries on from its new end
         w.Scan();
         Assert.Equal(2, _events.Count);
+        Assert.All(_events, e => Assert.Equal(@"C:\proj\alpha", e.Folder));
 
         _events.Clear();
         Rollout("rollout-a", Started(_now.AddMinutes(5)));
@@ -225,6 +226,76 @@ public sealed class AgentActivityWatcherTests : IDisposable
         Rollout("rollout-a", Complete(_now.AddMinutes(6)));
         w.Scan();
         Assert.Equal(AgentTurnKind.Finished, _events[^1].Kind);
+    }
+
+    [Fact]
+    public void A_sub_agents_rollout_stays_silent_after_it_is_rewritten_shorter()
+    {
+        var path = Rollout("rollout-child", Meta(parent: "parent-thread") + Started(_now.AddMinutes(-1)));
+        using var w = Sut();
+        w.Scan();
+        File.WriteAllText(path, Meta(parent: "parent-thread"));
+        w.Scan();
+        Rollout("rollout-child", Started(_now) + Complete(_now.AddSeconds(124)));
+        w.Scan();
+        Assert.Empty(_events);
+    }
+
+    [Fact]
+    public void A_history_file_that_is_locked_during_the_first_pass_is_not_replayed_when_it_opens()
+    {
+        var path = Rollout("rollout-a", Meta() + Started(_now.AddMinutes(-9)) + Complete(_now.AddMinutes(-7)));
+        File.SetCreationTimeUtc(path, _now.UtcDateTime.AddDays(-1));
+        using var w = Sut();
+        using (new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            w.Scan();                               // the prime cannot open it
+        w.Scan();                                   // opens now: still history
+        Assert.Empty(_events);
+
+        Rollout("rollout-a", Started(_now) + Complete(_now.AddSeconds(124)));
+        w.Scan();
+        Assert.Equal([AgentTurnKind.Started, AgentTurnKind.Finished], _events.Select(e => e.Kind));
+    }
+
+    [Fact]
+    public void A_listener_that_throws_on_agent_off_does_not_stop_the_others()
+    {
+        Rollout("rollout-a", Meta());
+        using var w = Sut();
+        w.AgentOff += _ => throw new InvalidOperationException("boom");
+        var heard = new List<string>();
+        w.AgentOff += heard.Add;
+        w.Scan();
+        _codexOn = false;
+        w.Scan();
+        Assert.Equal(["codex"], heard);
+    }
+
+    [Fact]
+    public void Two_scans_deliver_their_events_in_file_order()
+    {
+        using var w = Sut();
+        w.Scan();
+        var delivered = new List<AgentTurnKind>();
+        var gate = new object();
+        Task? second = null;
+        bool secondFinishedEarly = false;
+        int fired = 0;
+        w.Turn += e =>
+        {
+            if (Interlocked.Exchange(ref fired, 1) == 0)
+            {
+                Rollout("rollout-new", Started(_now.AddMinutes(1)));   // a later event, for the second scan
+                second = Task.Run(w.Scan);
+                secondFinishedEarly = second.Wait(400);
+            }
+            lock (gate) delivered.Add(e.Kind);
+        };
+        Rollout("rollout-new", Meta() + Started(_now) + Complete(_now.AddSeconds(124)), newFile: true);
+        w.Scan();
+        second!.Wait();
+        Assert.False(secondFinishedEarly);
+        Assert.Equal([AgentTurnKind.Started, AgentTurnKind.Finished, AgentTurnKind.Started], delivered);
     }
 
     // ---- Antigravity ----

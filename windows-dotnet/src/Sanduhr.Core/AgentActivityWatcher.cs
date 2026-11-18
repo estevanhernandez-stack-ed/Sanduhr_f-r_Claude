@@ -7,6 +7,8 @@ namespace Sanduhr.Core;
 /// change: Codex's plain rollouts, the Antigravity CLI's transcripts and the signal files Claude Code's hook writes. It
 /// tails each file from an offset kept in memory and stores nothing. The first pass over an agent reads for state and
 /// raises nothing, so starting Sanduhr never replays old turns. An agent that is off is not read at all.
+/// Scans run one at a time and raise their events before the next scan starts, so events arrive in file order. A
+/// listener may call Start, Refresh or Dispose, but must not block on another thread that is waiting to scan.
 /// </summary>
 public sealed class AgentActivityWatcher : IDisposable
 {
@@ -30,6 +32,7 @@ public sealed class AgentActivityWatcher : IDisposable
     private readonly Action<string>? _log;
 
     private readonly object _gate = new();
+    private readonly object _scanGate = new();   // held across a whole Scan, raising included, so scans deliver in order
     private readonly Dictionary<string, Tail> _tails = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DateTimeOffset> _firstPass = new(StringComparer.Ordinal);   // agent -> when its first pass ran
     private readonly ClaudeCodeTurns _claude = new();
@@ -120,21 +123,26 @@ public sealed class AgentActivityWatcher : IDisposable
     /// <summary>One pass over everything that is on. The timers call it; a test calls it directly.</summary>
     public void Scan()
     {
-        var events = new List<AgentTurnEvent>();
-        var off = new List<string>();
-        lock (_gate)
+        lock (_scanGate)
         {
-            if (_disposed) return;
-            var now = _clock();
-            ScanAgent(AgentSources.Codex, CodexFiles(), now, events, off);
-            ScanAgent(AgentSources.Antigravity, AntigravityFiles(), now, events, off);
-            ScanSignals(now, events, off);
-            ArmDue(now);
+            var events = new List<AgentTurnEvent>();
+            var off = new List<string>();
+            lock (_gate)
+            {
+                if (_disposed) return;
+                var now = _clock();
+                ScanAgent(AgentSources.Codex, CodexFiles(), now, events, off);
+                ScanAgent(AgentSources.Antigravity, AntigravityFiles(), now, events, off);
+                ScanSignals(now, events, off);
+                ArmDue(now);
+            }
+            foreach (var agent in off)
+                foreach (var handler in AgentOff?.GetInvocationList() ?? [])
+                    Raise(() => ((Action<string>)handler)(agent));
+            foreach (var e in events)
+                foreach (var handler in Turn?.GetInvocationList() ?? [])
+                    Raise(() => ((Action<AgentTurnEvent>)handler)(e));
         }
-        foreach (var agent in off) Raise(() => AgentOff?.Invoke(agent));
-        foreach (var e in events)
-            foreach (var handler in Turn?.GetInvocationList() ?? [])
-                Raise(() => ((Action<AgentTurnEvent>)handler)(e));
     }
 
     private void SafeScan()
@@ -220,15 +228,18 @@ public sealed class AgentActivityWatcher : IDisposable
                 if (!fi.Exists) continue;
                 if (!_tails.TryGetValue(path, out var tail))
                 {
-                    _tails[path] = tail = new Tail(agent, session);
+                    tail = new Tail(agent, session);
                     // A file that was there before this agent's first pass is history: read it for state, raise nothing.
+                    // The tail is kept only once its prime has succeeded, so a failed prime is retried as history.
                     if (first || fi.CreationTimeUtc < firstPassAt.UtcDateTime)
                     {
                         Prime(tail, fi, now);
+                        _tails[path] = tail;
                         continue;
                     }
+                    _tails[path] = tail;
                 }
-                if (fi.Length < tail.Offset) tail.Reset(fi.Length);        // rewritten shorter: carry on from its new end
+                if (fi.Length < tail.Offset) Rewritten(tail, fi);          // rewritten shorter: carry on from its new end
                 else if (fi.Length > tail.Offset) ReadNew(tail, path, now, events);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -246,6 +257,28 @@ public sealed class AgentActivityWatcher : IDisposable
                 events.Add(e);
     }
 
+    /// <summary>A file shrank: start its reader afresh at the new end. A Codex rollout's first line (its sub-agent mark and
+    /// folder) is read again, as the prime does. If that read fails, the offset is left past any length so the next scan
+    /// resets and tries again.</summary>
+    private void Rewritten(Tail tail, FileInfo fi)
+    {
+        tail.Reset(fi.Length);
+        if (tail.Codex is null) return;
+        try
+        {
+            using var fs = Open(fi.FullName);
+            long consumed = 0;
+            ReadLines(tail, fs, Math.Min(fs.Length, MaxLineBytes), false, default, null, null, ref consumed, firstLineOnly: true);
+            tail.Partial.SetLength(0);
+            tail.Oversized = false;
+        }
+        catch
+        {
+            tail.Offset = long.MaxValue;
+            throw;
+        }
+    }
+
     private void DropTails(Func<Tail, bool> which, HashSet<string>? keep = null)
     {
         foreach (var key in _tails.Where(kv => which(kv.Value) && keep?.Contains(kv.Key) != true).Select(kv => kv.Key).ToList())
@@ -261,7 +294,8 @@ public sealed class AgentActivityWatcher : IDisposable
     {
         using var fs = Open(fi.FullName);
         long length = fs.Length;
-        if (tail.Codex is not null) ReadLines(tail, fs, Math.Min(length, MaxLineBytes), false, now, null, null, firstLineOnly: true);
+        long consumed = 0;   // the prime sets the offset itself
+        if (tail.Codex is not null) ReadLines(tail, fs, Math.Min(length, MaxLineBytes), false, now, null, null, ref consumed, firstLineOnly: true);
         tail.Partial.SetLength(0);
         tail.Oversized = false;
 
@@ -269,7 +303,7 @@ public sealed class AgentActivityWatcher : IDisposable
         {
             long start = Math.Max(0, length - PrimeTailBytes);
             fs.Seek(start, SeekOrigin.Begin);
-            ReadLines(tail, fs, length - start, skipFirstPartial: start > 0, now, null, null);
+            ReadLines(tail, fs, length - start, skipFirstPartial: start > 0, now, null, null, ref consumed);
             tail.Antigravity?.Settle();
         }
         tail.Offset = length;
@@ -282,14 +316,15 @@ public sealed class AgentActivityWatcher : IDisposable
         if (length <= tail.Offset) return;
         fs.Seek(tail.Offset, SeekOrigin.Begin);
         var folder = tail.Antigravity is null ? null : _antigravityFolder(tail.Session);
-        ReadLines(tail, fs, length - tail.Offset, false, now, events, folder);
-        tail.Offset = length;
+        long consumed = 0;
+        try { ReadLines(tail, fs, length - tail.Offset, false, now, events, folder, ref consumed); }
+        finally { tail.Offset += consumed; }   // Offset and Partial always agree, even when a read faults part-way
     }
 
     /// <summary>Feeds every complete line in the next <paramref name="count"/> bytes to the tail's reader. A line with no
     /// newline yet stays in the tail for the next read. <paramref name="sink"/> null drops the events (history).</summary>
     private static void ReadLines(Tail tail, FileStream fs, long count, bool skipFirstPartial, DateTimeOffset now,
-        List<AgentTurnEvent>? sink, string? folder, bool firstLineOnly = false)
+        List<AgentTurnEvent>? sink, string? folder, ref long consumed, bool firstLineOnly = false)
     {
         var buf = new byte[64 * 1024];
         long left = count;
@@ -299,6 +334,7 @@ public sealed class AgentActivityWatcher : IDisposable
             int n = fs.Read(buf, 0, (int)Math.Min(buf.Length, left));
             if (n <= 0) break;
             left -= n;
+            consumed += n;
             int lineStart = 0;
             for (int i = 0; i < n; i++)
             {
