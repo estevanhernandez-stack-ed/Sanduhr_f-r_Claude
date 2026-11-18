@@ -1,0 +1,121 @@
+{
+  "run": "desk-d7-gaps-2-45",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "ee34fb3d0591a5cebcd6b99e5db40c20dfc73e8c",
+  "integration_branch": "cart/desk-d7-gaps-2-45",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-desk-d7-gaps-2-45/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-desk-d7-gaps-2-45",
+  "builder_branch": "main",
+  "uncommitted_at_start": [],
+  "started_at": "2026-11-17T03:01:37.005Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "dock-notch-extra",
+      "title": "Dock clearance and the notch on every Desk window",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-d7-gaps-2-45--01-dock-notch-extra",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "all-copies-click",
+      "title": "Every copy of a piece on All displays takes clicks",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-d7-gaps-2-45--02-all-copies-click",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "slanted-extra",
+      "title": "Slanted stacks take clicks by their shape on every window",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-d7-gaps-2-45--03-slanted-extra",
+      "worktree": "",
+      "on": 2,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "companion-display",
+      "title": "The companion roams the display it is placed on",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-d7-gaps-2-45--04-companion-display",
+      "worktree": "",
+      "on": 1,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb && python3 -m pytest -q integrations/tests",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "rows-2-45",
+      "title": "The 2.45.0 rows",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-d7-gaps-2-45--05-rows-2-45",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb && python3 -m pytest -q integrations/tests",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "dock-slide-every-display",
+      "title": "The auto-hiding Dock's slide on every display",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/desk-d7-gaps-2-45--06-dock-slide-every-display",
+      "worktree": "",
+      "on": 5,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}

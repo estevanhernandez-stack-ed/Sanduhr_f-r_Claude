@@ -165,15 +165,16 @@ enum DeskArrange {
     /// On another window the piece moves to that window's display at the landing anchor.
     /// The All displays rule: a piece on `.all` keeps `.all` wherever it is dropped, within one
     /// window or onto another; only its anchor and place change, and they change on every display.
-    /// A piece that stays on the main display (DeskWindowPlan.mainOnly) dropped elsewhere does not move.
+    /// A piece drawn once (DeskWindowPlan.drawnOnce, the companion) has one copy, so a drop on another
+    /// window moves it to that window's display, from All displays too (2.45).
     static func dropped(_ arrangement: DeskArrangement, widget: String, from source: DeskDisplay,
                         onto target: DeskDisplay, at point: CGPoint, geometry: DeskArrangeGeometry,
                         frames: [String: CGRect] = [:], folds: [DeskAnchor: DeskFold] = [:]) -> DeskArrangement {
         guard let piece = arrangement.placement(widget) else { return arrangement }
         let across = source != target
-        if across && DeskWindowPlan.mainOnly.contains(widget) { return arrangement }
         let land = landing(widget, in: arrangement, at: point, geometry: geometry, frames: frames, folds: folds)
-        let display = !across || piece.monitor == .all ? piece.monitor : target
+        let keepsAll = piece.monitor == .all && !DeskWindowPlan.drawnOnce.contains(widget)
+        let display = !across || keepsAll ? piece.monitor : target
         var out = arrangement
         out.put(widget, at: land.anchor, on: display, before: land.before)
         return out
@@ -183,6 +184,12 @@ enum DeskArrange {
     /// already off the main display. A one-display Arrange looks exactly as before 2.44.
     static func offersShowOn(windows: Int, _ arrangement: DeskArrangement) -> Bool {
         windows > 1 || arrangement.pieces.contains { $0.monitor != .main }
+    }
+
+    /// Whether `widget`'s chrome offers Show on: where `offersShowOn` says, never for a piece drawn
+    /// once (the companion has no All displays; a drop on another window moves it).
+    static func offersShowOn(_ widget: String, offered: Bool) -> Bool {
+        offered && !DeskWindowPlan.drawnOnce.contains(widget)
     }
 
     /// Show on, for the piece's chrome on the window named `window`: All displays sets `.all`,

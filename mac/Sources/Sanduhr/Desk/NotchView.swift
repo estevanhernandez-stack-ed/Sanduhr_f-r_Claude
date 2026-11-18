@@ -118,7 +118,7 @@ struct NotchView: View {
             .padding(.horizontal, 8)
             .frame(height: chin)
             .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
-            .onGlobalFrame { model.stripAVFrame = $0 }
+            .onDeskFrame(model) { $0.stripAVFrame = $1 }
     }
 
     /// During the watcher intro, the full line scrolls once in `room` (WatcherIntro); nil at rest.
@@ -138,7 +138,7 @@ struct NotchView: View {
                                 scroll: introScroll(line, size: stripSize, room: room))
             .frame(height: chin)
             .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
-            .onGlobalFrame { model.stripWatcherFrame = $0 }
+            .onDeskFrame(model) { $0.stripWatcherFrame = $1 }
             .padding(.horizontal, 18)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(model.watchers.first.map { WatcherText.spoken($0, now: Date()) } ?? line)
@@ -162,7 +162,7 @@ struct NotchView: View {
                 .opacity(0.85)
                 .frame(height: chin)
                 .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
-                .onGlobalFrame { model.stripFrame = $0 }
+                .onDeskFrame(model) { $0.stripFrame = $1 }
             if NowPlayingWingLayout.nextSide(.strip, state: state) != nil {
                 Image(systemName: "forward.end.fill")
                     .font(.system(size: stripSize * 0.8, weight: .semibold))
@@ -170,7 +170,7 @@ struct NotchView: View {
                     .opacity(0.85)
                     .frame(width: NowPlayingWingLayout.nextWidth(stripSize), height: chin)
                     .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
-                    .onGlobalFrame { model.stripNextFrame = $0 }
+                    .onDeskFrame(model) { $0.stripNextFrame = $1 }
                     .accessibilityLabel("Next")
             }
         }

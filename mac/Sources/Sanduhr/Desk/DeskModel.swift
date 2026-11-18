@@ -161,6 +161,10 @@ final class DeskModel {
     /// corners on that side sit this much further in. Changes with an animation while an
     /// auto-hiding Dock comes and goes.
     var dockInsets = DockInsets()
+    /// The auto-hiding Dock's slide on each Desk window besides the main one (2.45, DockFollower),
+    /// by window key: what its DeskView lays out against in place of its geometry's reservation,
+    /// changed in place with the slide's animation, so no window is rebuilt per slide.
+    var extraDockInsets: [DeskDisplay: DockInsets] = [:]
     /// OLED care's drift step (OledDrift), nil while OLED care is off: each piece sits at the orbit's
     /// offset for it. Set by OledCareController inside one animation per step.
     var oledStep: Int?
@@ -221,36 +225,65 @@ final class DeskModel {
     @ObservationIgnored private var watcherIntroTimer: Timer?
     /// Reduce Motion: no intro, straight to rest. A seam for the tests.
     @ObservationIgnored var reduceMotion: () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    /// Every Desk window's reported frames (DeskFrames), by window: `.main`, or the display id of a
+    /// window besides it (DeskWindowElements.key). A piece on All displays reports into each copy's
+    /// window, so every copy takes clicks (2.45). One display: the main window's alone, as before.
+    @ObservationIgnored private(set) var windowFrames: [DeskDisplay: DeskFrames] = [.main: DeskFrames()]
+
+    /// The main window's frames: what the frame properties below read and write.
+    var frames: DeskFrames {
+        get { windowFrames[.main] ?? DeskFrames() }
+        set { setFrames(in: .main) { $0 = newValue } }
+    }
+
+    /// A window's frames; empty for a window that has reported none.
+    func frames(in window: DeskDisplay) -> DeskFrames { windowFrames[window] ?? DeskFrames() }
+
+    /// Changes one window's frames (a view reported, onDeskFrame); a change that moves anything tells
+    /// DeskController (onHitAreasChange).
+    func setFrames(in window: DeskDisplay, _ change: (inout DeskFrames) -> Void) {
+        var f = frames(in: window)
+        change(&f)
+        guard windowFrames[window] != f else { return }
+        windowFrames[window] = f
+        onHitAreasChange?()
+    }
+
+    /// The windows besides the main one were built again: frames of windows that are gone go too.
+    /// The main window's always stay.
+    func keepFrames(for windows: Set<DeskDisplay>) {
+        windowFrames = windowFrames.filter { $0.key == .main || windows.contains($0.key) }
+    }
     /// Each Desk watcher row's frame (SwiftUI global coordinates), keyed by watcher id: a click
     /// opens its link, a two-finger click opens the watcher menu.
-    @ObservationIgnored var watcherRowFrames: [String: CGRect] = [:]
+    var watcherRowFrames: [String: CGRect] { get { frames.watcherRowFrames } set { frames.watcherRowFrames = newValue } }
     /// The Desk's watcher stack as a whole, or .zero when it is not drawn (the pointer watch).
-    @ObservationIgnored var watchersFrame: CGRect = .zero { didSet { if watchersFrame != oldValue { onHitAreasChange?() } } }
+    var watchersFrame: CGRect { get { frames.watchersFrame } set { frames.watchersFrame = newValue } }
     /// Where the strip under the camera draws the watcher line, same coordinates.
-    @ObservationIgnored var stripWatcherFrame: CGRect = .zero { didSet { if stripWatcherFrame != oldValue { onHitAreasChange?() } } }
+    var stripWatcherFrame: CGRect { get { frames.stripWatcherFrame } set { frames.stripWatcherFrame = newValue } }
     /// Where the meeting list sits in the window (SwiftUI global coordinates, top-left origin).
     /// The app delegate lets clicks through everywhere except here, so the rows can be clicked.
-    @ObservationIgnored var meetingsFrame: CGRect = .zero { didSet { if meetingsFrame != oldValue { onHitAreasChange?() } } }
+    var meetingsFrame: CGRect { get { frames.meetingsFrame } set { frames.meetingsFrame = newValue } }
     /// Each meeting row's frame, same coordinates, keyed by meeting id. Clicks are matched here.
-    @ObservationIgnored var rowFrames: [String: CGRect] = [:]
+    var rowFrames: [String: CGRect] { get { frames.rowFrames } set { frames.rowFrames = newValue } }
     /// Where the meters sit in the window, same coordinates, or .zero when they are not drawn.
     /// The window takes the mouse here for the two-finger limit menu; a plain click does nothing.
-    @ObservationIgnored var metersFrame: CGRect = .zero { didSet { if metersFrame != oldValue { onHitAreasChange?() } } }
+    var metersFrame: CGRect { get { frames.metersFrame } set { frames.metersFrame = newValue } }
     /// Each meter row's frame, same coordinates: a two-finger click opens that limit's menu.
-    @ObservationIgnored var meterRowFrames: [Tier: CGRect] = [:]
+    var meterRowFrames: [Tier: CGRect] { get { frames.meterRowFrames } set { frames.meterRowFrames = newValue } }
     /// Where the calendar note sits, same coordinates, or .zero when it is not drawn. A click
     /// here opens System Settings at Privacy & Security, Calendars.
-    @ObservationIgnored var noteFrame: CGRect = .zero { didSet { if noteFrame != oldValue { onHitAreasChange?() } } }
+    var noteFrame: CGRect { get { frames.noteFrame } set { frames.noteFrame = newValue } }
     /// Where the account label at the start of the claude line sits, same coordinates, or .zero
     /// with one account or no line. A click here switches to the next account.
-    @ObservationIgnored var accountFrame: CGRect = .zero { didSet { if accountFrame != oldValue { onHitAreasChange?() } } }
+    var accountFrame: CGRect { get { frames.accountFrame } set { frames.accountFrame = newValue } }
     /// Where the Desk's now playing line sits, same coordinates. A click plays or pauses.
-    @ObservationIgnored var nowPlayingFrame: CGRect = .zero { didSet { if nowPlayingFrame != oldValue { onHitAreasChange?() } } }
+    var nowPlayingFrame: CGRect { get { frames.nowPlayingFrame } set { frames.nowPlayingFrame = newValue } }
     /// Where the text in the strip under the camera sits, same coordinates (clickable while it
     /// shows now playing).
-    @ObservationIgnored var stripFrame: CGRect = .zero { didSet { if stripFrame != oldValue { onHitAreasChange?() } } }
+    var stripFrame: CGRect { get { frames.stripFrame } set { frames.stripFrame = newValue } }
     /// Where the strip's Next button sits while paused (item 53b), same coordinates. A click skips.
-    @ObservationIgnored var stripNextFrame: CGRect = .zero { didSet { if stripNextFrame != oldValue { onHitAreasChange?() } } }
+    var stripNextFrame: CGRect { get { frames.stripNextFrame } set { frames.stripNextFrame = newValue } }
     /// The camera and mic indicators that show (item 67), after their switches: in-use booleans
     /// only, never which app. Set by AVIndicatorController.
     var avIndicators = AVIndicators()
@@ -260,22 +293,24 @@ final class DeskModel {
     /// so it fades the dot that was there rather than going blank. Set by AVIndicatorController.
     var avDrawn = AVIndicators()
     /// Where the strip under the camera draws them, same coordinates: a click opens their menu.
-    @ObservationIgnored var stripAVFrame: CGRect = .zero { didSet { if stripAVFrame != oldValue { onHitAreasChange?() } } }
+    var stripAVFrame: CGRect { get { frames.stripAVFrame } set { frames.stripAVFrame = newValue } }
     /// Where the clock, the message and the claude line sit, same coordinates. Click areas only
     /// while "Clock and message take clicks" is on (DeskPieceClicks).
-    @ObservationIgnored var clockFrame: CGRect = .zero { didSet { if clockFrame != oldValue { onHitAreasChange?() } } }
-    @ObservationIgnored var messageFrame: CGRect = .zero { didSet { if messageFrame != oldValue { onHitAreasChange?() } } }
-    @ObservationIgnored var claudeLineFrame: CGRect = .zero { didSet { if claudeLineFrame != oldValue { onHitAreasChange?() } } }
-    /// Each slanted stack's tilt and top left in the global space the frames above are in (the
-    /// fold), by anchor; reported by DeskFoldStack. A stack that stands upright has none. The
-    /// frames above are the boxes around what is drawn (SwiftUI reports a slanted view's bounds);
-    /// `elements()` recovers each one's layout frame and attaches the slant.
-    @ObservationIgnored private(set) var folds: [DeskAnchor: DeskFold] = [:]
+    var clockFrame: CGRect { get { frames.clockFrame } set { frames.clockFrame = newValue } }
+    var messageFrame: CGRect { get { frames.messageFrame } set { frames.messageFrame = newValue } }
+    var claudeLineFrame: CGRect { get { frames.claudeLineFrame } set { frames.claudeLineFrame = newValue } }
+    /// The main window's slanted stacks: each one's tilt and top left in the global space the frames
+    /// above are in (the fold), by anchor; reported by DeskFoldStack. A stack that stands upright has
+    /// none. The frames above are the boxes around what is drawn (SwiftUI reports a slanted view's
+    /// bounds); `elements(on:)` recovers each one's layout frame and attaches the slant. Every other
+    /// window keeps its own beside its frames (DeskFrames.folds, 2.45).
+    var folds: [DeskAnchor: DeskFold] { frames.folds }
 
-    func setFold(_ fold: DeskFold?, at anchor: DeskAnchor) {
-        guard folds[anchor] != fold else { return }
-        folds[anchor] = fold
-        onHitAreasChange?()
+    /// Changes one window's fold at `anchor` (DeskFoldStack); nil clears it. Clearing one that is not
+    /// there changes nothing, so a stack going with its window leaves no empty frames behind.
+    func setFold(_ fold: DeskFold?, at anchor: DeskAnchor, in window: DeskDisplay = .main) {
+        guard frames(in: window).folds[anchor] != fold else { return }
+        setFrames(in: window) { $0.folds[anchor] = fold }
     }
 
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
@@ -699,10 +734,12 @@ final class DeskModel {
         pulseCount += 1
     }
 
-    /// Every interactive element DeskView draws, with the frame it reported (.zero when none
-    /// arrived): what DeskHitTest picks from and state.yaml's `desk_frames` lists. Reads the same
-    /// layout settings as DeskView.
-    func elements() -> [DeskElement] {
+    /// Every interactive element a Desk window draws, with the frame it reported there (.zero when
+    /// none arrived): what DeskHitTest picks from for a pointer on that window, and, for the main
+    /// window, what state.yaml's `desk_frames` lists. `window` is `.main` or another window's key
+    /// (DeskWindowElements.key); a piece on All displays is an element on every window that draws it.
+    /// Reads the same layout settings as DeskView.
+    func elements(on window: DeskDisplay = .main) -> [DeskElement] {
         let desk = UserDefaults.desk
         // The layout the Desk draws: a Desk design's preview, else the saved one (Settings, Desk banner).
         let layoutWords = MainActor.assumeIsolated {
@@ -717,14 +754,7 @@ final class DeskModel {
         input.hasAccount = claudeParts?.account != nil
         input.calendarNote = calendarNote != nil
         input.rows = meetings.map { DeskElements.Row(id: $0.id, hasLink: $0.link != nil) }
-        input.metersFrame = metersFrame
-        input.meterRowFrames = meterRowFrames
-        input.accountFrame = accountFrame
-        input.noteFrame = noteFrame
-        input.meetingsFrame = meetingsFrame
-        input.rowFrames = rowFrames
         input.nowPlayingLine = input.placed.contains(NowPlayingPlacement.widget) && nowPlaying != nil
-        input.nowPlayingFrame = nowPlayingFrame
         let strip = NotchContent.effective(NotchContent.saved(.strip, in: desk), at: .strip,
                                            nowPlaying: nowPlaying, idle: NowPlayingIdle.saved(in: desk),
                                            watchers: watchers, indicators: avIndicators,
@@ -735,31 +765,27 @@ final class DeskModel {
         input.nowPlayingStrip = DeskNowPlaying.stripShows(
             notch: notch, hasNotch: notchRect != nil, chin: chin, chinText: chinText,
             strip: strip, hasTrack: NowPlayingText.line(nowPlaying, at: .strip) != nil)
-        input.stripFrame = stripFrame
         input.nowPlayingStripNext = NowPlayingWingLayout.showsNext(nowPlaying?.state)
-        input.stripNextFrame = stripNextFrame
         if input.placed.contains(WatcherPlacement.widget) {
             input.watcherRows = watchers.prefix(WatcherPlacement.deskRows).map(\.id)
         }
-        input.watcherRowFrames = watcherRowFrames
         input.watcherStrip = notch && notchRect != nil && chin > 0 && chinText && strip == .watchers
-        input.stripWatcherFrame = stripWatcherFrame
         input.avStrip = notch && notchRect != nil && chin > 0 && chinText && strip == .avIndicators
-        input.stripAVFrame = stripAVFrame
         input.piecesTakeClicks = DeskPieceClicks.isOn(in: desk)
-        input.clockFrame = clockFrame
         input.messageDrawn = cycling || !specialMessages.isEmpty || message != nil
-        input.messageFrame = messageFrame
         input.claudeLineDrawn = claudeLine != nil || claudeParts?.account != nil || switchNote
-        input.claudeLineFrame = claudeLineFrame
-        return DeskElements.folded(DeskElements.build(input),
-                                   arrangement: Self.mainWindowPieces(DeskArrangement(layoutWords), screens: screens),
-                                   folds: folds)
+        let arrangement = DeskArrangement(layoutWords)
+        // No screens known yet: the main window, every piece, as before 2.44. A window that is gone
+        // (its display unplugged) has no elements.
+        let plan = DeskWindowElements.window(window, connected: screens)
+        if plan == nil, window != .main { return [] }
+        return DeskWindowElements.elements(input, frames: frames(in: window), arrangement: arrangement,
+                                           window: plan, connected: screens)
     }
 
-    /// The pieces the main window draws: only its slanted stacks report a fold (DeskFoldStack), so a
-    /// piece on another window never takes the main window's slant for its anchor. No screens known:
-    /// every piece, as before 2.44.
+    /// The pieces the main window draws: its slanted stacks report into its own folds (DeskFoldStack),
+    /// so a piece on another window never takes the main window's slant for its anchor. No screens
+    /// known: every piece, as before 2.44.
     static func mainWindowPieces(_ arrangement: DeskArrangement, screens: [DeskScreenInfo]) -> DeskArrangement {
         guard let main = DeskWindowPlan.plan(arrangement, screens: screens).main else { return arrangement }
         var onMain = arrangement

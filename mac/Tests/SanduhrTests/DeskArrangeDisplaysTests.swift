@@ -93,12 +93,31 @@ struct DeskArrangeCrossDropTests {
         #expect(across.placement("clock")?.anchor == .br)
     }
 
-    @Test("the companion stays on the main display: a drop on another window changes nothing")
-    func companionStays() {
+    @Test("2.45: a drop of the companion on another window moves it to that display, from All too")
+    func companionMovesWithADrop() {
         let a = DeskArrangement("message:tl companion:br")
         let out = DeskArrange.dropped(a, widget: "companion", from: .main, onto: .id(idB),
                                       at: CGPoint(x: 60, y: 90), geometry: rightGeometry)
-        #expect(out == a)
+        #expect(out.placement("companion")?.monitor == .id(idB))
+        #expect(out.placement("companion")?.anchor == .tl)
+        let back = DeskArrange.dropped(out, widget: "companion", from: .id(idB), onto: .main,
+                                       at: CGPoint(x: 1400, y: 900), geometry: mainGeometry)
+        #expect(back.placement("companion")?.monitor == .main)
+        #expect(back.placement("companion")?.anchor == .br)
+        let fromAll = DeskArrange.dropped(DeskArrangement("companion:br@all"), widget: "companion", from: .main,
+                                          onto: .id(idB), at: CGPoint(x: 60, y: 90), geometry: rightGeometry)
+        #expect(fromAll.placement("companion")?.monitor == .id(idB))
+        // Within its own window a drop keeps the display, as for any piece.
+        let within = DeskArrange.dropped(out, widget: "companion", from: .id(idB), onto: .id(idB),
+                                         at: CGPoint(x: 1800, y: 1000), geometry: rightGeometry)
+        #expect(within.placement("companion")?.monitor == .id(idB))
+    }
+
+    @Test("2.45: Show on is never offered for the companion")
+    func showOnNotForTheCompanion() {
+        #expect(!DeskArrange.offersShowOn("companion", offered: true))
+        #expect(DeskArrange.offersShowOn("clock", offered: true))
+        #expect(!DeskArrange.offersShowOn("clock", offered: false))
     }
 
     @Test("the window under a point, in the main window's coordinates")

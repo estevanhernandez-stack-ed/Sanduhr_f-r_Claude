@@ -1417,12 +1417,18 @@ it always had (the notch, wings and pill, the Dock follower, drawers, the compan
 badge and the click layer's main plates; Arrange runs on every window, see Across displays above), and each other display a piece draws on
 (`DeskScreens.showsOn`) gets a plain window at the same level, click-through the same way. A window
 draws only its own share (`DeskWindowPlan.stacks`); a piece on All displays draws on every window, a
-piece whose display is not connected falls back to the main one, and the companion stays on main.
-Each window has its own geometry (`DeskScreenGeometry`: size and menu bar from its screen; no notch
-and no Dock clearance off the main display). Frames from another window reach the model moved by its
-offset from the main window (`DeskFrameReporting`), so the one hit test covers every display. The
-copy of an All-displays piece on another window reports nothing (its click areas are the main
-window's), and a slanted stack there reports no fold, so it clicks by the box around what is drawn. Windows are rebuilt on a display change and come or go when a
+piece whose display is not connected falls back to the main one. The companion is one piece with one display (2.45): it draws in the one
+window its display resolves to, All displays or a display that is not connected reads as main, and it
+re-seats only when its window changes.
+Each window has its own geometry (`DeskScreenGeometry`: size and menu bar from its screen; the notch
+of that screen and the Dock's share of it when the Dock is always shown, so pieces clear both on every
+display; the auto-hiding Dock's slide follows the display under the pointer, one display at a time, `DockTarget`, and reaches
+another window through `DeskModel.extraDockInsets`). Frames from another window reach the model moved by its
+offset from the main window (`DeskFrameReporting`), so the one hit test covers every display. Frames
+are kept per window (`DeskModel.windowFrames`) and a click is judged against the window under the
+pointer, so every copy of an All-displays piece takes clicks (2.45) and a piece on one display lets
+clicks through on the other. A slanted stack reports its fold on every window, so it clicks by its
+shape everywhere. Windows are rebuilt on a display change and come or go when a
 layout change adds or empties a display; OLED care drifts and dims them all.
 
 ### Desk clicks

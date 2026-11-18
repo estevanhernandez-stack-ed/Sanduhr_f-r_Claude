@@ -3,8 +3,9 @@ import Foundation
 
 /// One Desk window's screen geometry: the screen it covers, its size, the menu bar strip on top, the
 /// camera notch (window coordinates, top-left origin) and the Dock's reach. The main window's lives on
-/// `DeskModel` (`deskSize`, `topInset`, `notchRect`, `dockInsets`), where the notch, the companion, OLED
-/// care and the debug hooks read it; every other window carries its own and hands it to its DeskView.
+/// `DeskModel` (`deskSize`, `topInset`, `notchRect`, `dockInsets`), where the notch, OLED care and the
+/// debug hooks read it; every other window carries its own and hands it to its DeskView (and the
+/// companion roams it when placed there, CompanionRoom).
 struct DeskScreenGeometry: Equatable {
     var screen: DeskScreenInfo
     var deskSize: CGSize
@@ -19,6 +20,16 @@ struct DeskScreenGeometry: Equatable {
         DeskScreenGeometry(screen: screen, deskSize: screen.frame.size,
                            topInset: screen.frame.maxY - visibleFrame.maxY,
                            notchRect: notch, dockInsets: dock)
+    }
+
+    /// The geometry for a display besides the main one: its own notch and, when the Dock shows on it,
+    /// the Dock's reservation (`DockGeometry.alwaysShown`, read from that screen's frame against its
+    /// visible frame, so a screen the Dock is not on gets none). The auto-hiding Dock reserves
+    /// nothing here; its slide reaches the window through DockFollower (DeskModel.extraDockInsets).
+    static func extra(_ screen: DeskScreenInfo, visibleFrame: CGRect, notch: CGRect?,
+                      dockPrefs: DockPrefs) -> DeskScreenGeometry {
+        of(screen, visibleFrame: visibleFrame, notch: notch,
+           dock: DockGeometry.alwaysShown(dockPrefs, frame: screen.frame, visible: visibleFrame))
     }
 }
 
@@ -35,9 +46,25 @@ struct DeskWindowPlan: Equatable {
 
     var windows: [Window]
 
-    /// Pieces that stay on the main display whatever their display says: the companion roams the
-    /// main window only (its driver is one, CompanionDriver).
-    static let mainOnly: Set<String> = ["companion"]
+    /// Pieces drawn once, on one window: the companion (its driver is one, CompanionDriver) roams
+    /// the window of the display it is placed on, and All displays draws it on the main one (2.45).
+    static let drawnOnce: Set<String> = ["companion"]
+
+    /// The display a piece's copies follow: its own, except that a piece drawn once on All
+    /// displays is on the main one.
+    static func display(of piece: DeskPlacement) -> DeskDisplay {
+        drawnOnce.contains(piece.widget) && piece.monitor == .all ? .main : piece.monitor
+    }
+
+    /// The one window a piece drawn once draws in, among the connected screens: its display's
+    /// window when that display is connected, else (main, All, a display not connected) the main
+    /// window. nil before the screens are known.
+    static func window(drawing piece: DeskPlacement, connected: [DeskScreenInfo]) -> Window? {
+        guard let main = DeskScreens.main(connected) else { return nil }
+        let shown = display(of: piece)
+        let screen = connected.first { $0 != main && DeskScreens.showsOn(shown, screen: $0, connected: connected) }
+        return screen.map { Window(screen: $0, isMain: false) } ?? Window(screen: main, isMain: true)
+    }
 
     /// While arranging (2.44) every connected display with an id has a window, so a piece can be
     /// dragged onto a display that has none yet; Done or Cancel plans from the layout again.
@@ -48,7 +75,11 @@ struct DeskWindowPlan: Equatable {
             return DeskWindowPlan(windows: all.map { Window(screen: $0, isMain: $0 == main) })
         }
         var spread = arrangement
-        spread.pieces = arrangement.pieces.filter { !mainOnly.contains($0.widget) }
+        spread.pieces = arrangement.pieces.map { p in
+            var q = p
+            q.monitor = display(of: p)
+            return q
+        }
         let windows = DeskScreens.screensWithPieces(spread, screens).map { Window(screen: $0, isMain: $0 == main) }
         return DeskWindowPlan(windows: windows)
     }
@@ -60,10 +91,9 @@ struct DeskWindowPlan: Equatable {
     var extraScreens: [DeskScreenInfo] { windows.filter { !$0.isMain }.map(\.screen) }
 
     /// Whether `window` draws `piece`: where its display shows (DeskScreens.showsOn: All on every
-    /// window, a display that is not connected on the main one), the main-only pieces on main.
+    /// window, a display that is not connected on the main one), a piece drawn once on All on main.
     static func draws(_ piece: DeskPlacement, on window: Window, connected: [DeskScreenInfo]) -> Bool {
-        if mainOnly.contains(piece.widget) { return window.isMain }
-        return DeskScreens.showsOn(piece.monitor, screen: window.screen, connected: connected)
+        DeskScreens.showsOn(display(of: piece), screen: window.screen, connected: connected)
     }
 
     /// The stacks `window` draws, by anchor, top to bottom: `displayStacks` filtered to the displays
@@ -94,4 +124,6 @@ struct DeskExtraWindow: Equatable {
     var offset: CGPoint
 
     var plan: DeskWindowPlan.Window { DeskWindowPlan.Window(screen: geometry.screen, isMain: false) }
+    /// The key its frames are stored under (DeskWindowElements.key, DeskModel.windowFrames).
+    var key: DeskDisplay { DeskWindowElements.key(plan) }
 }

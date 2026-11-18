@@ -54,14 +54,64 @@ struct DeskWindowPlanTests {
         #expect(all.windows.map(\.screen.id) == [idA, idB, idC])
     }
 
-    @Test func companionStaysOnMain() {
+    @Test("2.45: the companion on another display gets that display's window, and main stays")
+    func companionOnAnExtraDisplay() {
         let screens = named([mainScreen, right])
-        let layout = "companion:br@\(idB)"
+        let layout = "message:tl companion:br@\(idB)"
+        let plan = DeskWindowPlan.plan(DeskArrangement(layout), screens: screens)
+        #expect(plan.windows.count == 2)
+        #expect(plan.main?.screen == screens[0])
+        #expect(plan.extraScreens == [screens[1]])
+        #expect(drawn(layout, on: plan.windows[0], screens) == [.tl: ["message"]])
+        #expect(drawn(layout, on: plan.windows[1], screens) == [.br: ["companion"]])
+        let p = DeskArrangement(layout).placement("companion")!
+        #expect(DeskWindowPlan.window(drawing: p, connected: screens) == plan.windows[1])
+    }
+
+    @Test("2.45: the companion on All displays draws once, on main, and adds no window")
+    func companionOnAllStaysOnMain() {
+        let screens = named([mainScreen, right, left])
+        let layout = "companion:br@all"
         let plan = DeskWindowPlan.plan(DeskArrangement(layout), screens: screens)
         #expect(plan.windows.count == 1)
-        let extra = DeskWindowPlan.Window(screen: screens[1], isMain: false)
         #expect(drawn(layout, on: plan.windows[0], screens)[.br] == ["companion"])
-        #expect(drawn(layout, on: extra, screens).isEmpty)
+        for s in screens.dropFirst() {
+            #expect(drawn(layout, on: DeskWindowPlan.Window(screen: s, isMain: false), screens).isEmpty)
+        }
+        let p = DeskArrangement(layout).placement("companion")!
+        #expect(DeskWindowPlan.window(drawing: p, connected: screens)?.isMain == true)
+        // Another piece on All still has a window on every display.
+        #expect(DeskWindowPlan.plan(DeskArrangement("companion:br@all clock:tl@all"), screens: screens).windows.count == 3)
+        // While arranging every display has a window, and still only main draws it.
+        let arranging = DeskWindowPlan.plan(DeskArrangement(layout), screens: screens, arranging: true)
+        #expect(arranging.windows.filter { DeskWindowPlan.draws(p, on: $0, connected: screens) }.map(\.isMain) == [true])
+    }
+
+    @Test("2.45: the companion's display unplugged puts it on main; back, it returns")
+    func companionFallsBackAndReturns() {
+        let layout = "companion:br@\(idB)"
+        let p = DeskArrangement(layout).placement("companion")!
+        let one = named([mainScreen])
+        let unplugged = DeskWindowPlan.plan(DeskArrangement(layout), screens: one)
+        #expect(unplugged.windows.count == 1)
+        #expect(drawn(layout, on: unplugged.windows[0], one)[.br] == ["companion"])
+        #expect(DeskWindowPlan.window(drawing: p, connected: one)?.isMain == true)
+        let two = named([mainScreen, right])
+        let back = DeskWindowPlan.plan(DeskArrangement(layout), screens: two)
+        #expect(back.extraScreens == [two[1]])
+        #expect(DeskWindowPlan.window(drawing: p, connected: two)?.screen == two[1])
+        #expect(drawn(layout, on: back.windows[0], two).isEmpty)
+    }
+
+    @Test("2.45: one display, the companion roams main as in 2.44.0, whatever its display says")
+    func companionOnOneDisplay() {
+        let one = named([mainScreen])
+        for word in ["companion:br", "companion:br@all", "companion:br@\(idA)", "companion:br@\(idB)"] {
+            let plan = DeskWindowPlan.plan(DeskArrangement(word), screens: one)
+            #expect(plan.windows.count == 1)
+            #expect(drawn(word, on: plan.windows[0], one)[.br] == ["companion"])
+            #expect(DeskWindowPlan.window(drawing: DeskArrangement(word).placement("companion")!, connected: one)?.isMain == true)
+        }
     }
 
     @Test func aDisplayThatGoesAwayFallsBackToMainWithoutARewrite() {
@@ -125,6 +175,37 @@ struct DeskWindowPlanTests {
         #expect(g.notchRect == notch)
     }
 
+    @Test func extraWindowsGetTheDockOnItsSideAndNothingElsewhere() {
+        // The right display, 1920x1080, with the visible frame reduced on the Dock's side only.
+        let frame = right.frame
+        let bottom = CGRect(x: 1512, y: 70, width: 1920, height: 985)
+        let leftSide = CGRect(x: 1512 + 80, y: 0, width: 1840, height: 1055)
+        let rightSide = CGRect(x: 1512, y: 0, width: 1840, height: 1055)
+        let none = CGRect(x: 1512, y: 0, width: 1920, height: 1055)
+        func geo(_ side: DockSide, _ visible: CGRect, autohide: Bool = false) -> DeskScreenGeometry {
+            DeskScreenGeometry.extra(right, visibleFrame: visible, notch: nil, dockPrefs: DockPrefs(side: side, autohide: autohide))
+        }
+        #expect(frame.size == CGSize(width: 1920, height: 1080))
+        #expect(geo(.bottom, bottom).dockInsets == .on(.bottom, 70))
+        #expect(geo(.left, leftSide).dockInsets == .on(.left, 80))
+        #expect(geo(.right, rightSide).dockInsets == .on(.right, 80))
+        // The Dock is on another display, or hides: nothing reserved here.
+        #expect(geo(.bottom, none).dockInsets == DockInsets())
+        #expect(geo(.bottom, bottom, autohide: true).dockInsets == DockInsets())
+    }
+
+    @Test func aNotchedExtraScreenKeepsItsNotchAndTheMainGeometryIsUnchanged() {
+        let notch = CGRect(x: 640, y: 0, width: 188, height: 32)
+        let visible = CGRect(x: 1512, y: 0, width: 1920, height: 1055)
+        let g = DeskScreenGeometry.extra(right, visibleFrame: visible, notch: notch, dockPrefs: DockPrefs())
+        #expect(g.notchRect == notch)
+        #expect(g.topInset == 25)
+        // The main window's geometry still comes from `of`, with the Dock left to DockFollower.
+        let main = DeskScreenGeometry.of(mainScreen, visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 945), notch: nil)
+        #expect(main.dockInsets == DockInsets())
+        #expect(main.topInset == 37)
+    }
+
     @Test func offsetsAreFromTheMainWindowsTopLeft() {
         let main = mainScreen.frame
         #expect(DeskWindowPlan.offset(of: main, from: main) == .zero)
@@ -143,5 +224,38 @@ struct DeskWindowPlanTests {
 
     @Test func noScreensPlansNothing() {
         #expect(DeskWindowPlan.plan(DeskArrangement("message:tl"), screens: []).windows.isEmpty)
+    }
+}
+
+@Suite("The companion's room, 2.45")
+struct CompanionRoomTests {
+    /// The display right of main with a 70-point Dock at the bottom and a 25-point menu bar.
+    private let extra = DeskScreenGeometry.extra(right, visibleFrame: CGRect(x: 1512, y: 70, width: 1920, height: 985),
+                                                 notch: nil, dockPrefs: DockPrefs(side: .bottom))
+    private let mainSize = CGSize(width: 1512, height: 982)
+    private let mainDock = DockInsets.on(.left, 60)
+
+    @Test func onAnExtraDisplayItRoamsThatWindowLessItsMenuBarAndDock() {
+        let area = CompanionRoom.area(extra, mainSize: mainSize, mainTopInset: 37, mainDock: mainDock)
+        #expect(area == CGRect(x: 0, y: 25, width: 1920, height: 1080 - 25 - 70))
+        #expect(CompanionRoom.key(extra) == .id(idB))
+    }
+
+    @Test func onMainItRoamsTheModelsGeometryAsIn2440() {
+        let area = CompanionRoom.area(nil, mainSize: mainSize, mainTopInset: 37, mainDock: mainDock)
+        #expect(area == CompanionRoamMath.area(window: mainSize, topInset: 37, dock: mainDock))
+        #expect(area == CGRect(x: 60, y: 37, width: 1452, height: 945))
+        #expect(CompanionRoom.key(nil) == .main)
+    }
+
+    @Test func itReseatsWhenItChangesWindowsNotWhenItsWindowChanges() {
+        #expect(!CompanionRoom.reseats(from: nil, to: nil))
+        #expect(CompanionRoom.reseats(from: nil, to: extra))      // placed on the other display
+        #expect(CompanionRoom.reseats(from: extra, to: nil))      // unplugged, or placed back on main
+        var docked = extra
+        docked.dockInsets = DockInsets()
+        #expect(!CompanionRoom.reseats(from: extra, to: docked))  // the Dock moved off that display
+        let other = DeskScreenGeometry.extra(left, visibleFrame: left.frame, notch: nil, dockPrefs: DockPrefs())
+        #expect(CompanionRoom.reseats(from: extra, to: other))
     }
 }

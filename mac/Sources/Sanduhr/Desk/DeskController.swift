@@ -36,14 +36,17 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// The click layer (DeskClickLayer): stands in for the Desk window's click areas while the
     /// Desk is under the desktop icons, nil otherwise and while arranging.
     private(set) var clickWindow: NSWindow?
-    /// A Desk window on a display besides the main one (DeskWindowPlan): its pieces only, no notch,
-    /// wings, pill, drawers or companion. Its frames reach the model moved by `offset`, in the main
-    /// window's coordinates, so the one hit test and the click handling serve it too.
+    /// A Desk window on a display besides the main one (DeskWindowPlan): its pieces only (the
+    /// companion too, when it is placed there), no notch, wings, pill or drawers. Its frames reach the model moved by `offset`, in the main
+    /// window's coordinates, into its own frames (`key`, DeskModel.windowFrames), so a click on it is
+    /// judged against its own elements with the same pointer reading and click handling.
     private struct ExtraWindow {
         let window: DeskWindow
         var clickWindow: NSWindow?
         let screen: DeskScreenInfo
         let offset: CGPoint
+        let geometry: DeskScreenGeometry
+        let key: DeskDisplay
     }
     private var extras: [ExtraWindow] = []
     /// The Desk windows besides the main one, for the debug hooks' window list.
@@ -124,6 +127,9 @@ final class DeskController: NSObject, NSMenuDelegate {
             NSRunningApplication.runningApplications(withBundleIdentifier: id).forEach { $0.terminate() }
         }
         dock.apply = { [weak self] insets, animation in self?.applyDock(insets, animation: animation) }
+        dock.applyExtra = { [weak self] key, insets, animation in
+            self?.applyExtraDock(key, insets, animation: animation)
+        }
         dock.start()
         buildWindow()
         applyOled()
@@ -158,18 +164,37 @@ final class DeskController: NSObject, NSMenuDelegate {
     @objc private func otherAppActivated() {
         // Back from System Settings, Desktop & Dock: the Dock may have moved or stopped hiding.
         dock.refreshPrefs()
+        refreshExtraGeometry()
         updateMouseThrough()
     }
 
     /// The Dock's reach changed (DockFollower): the corners move, sliding with the auto-hiding
     /// Dock (no slide with Reduce Motion, which DockFollower passes as no animation).
     private func applyDock(_ insets: DockInsets, animation: Animation?) {
+        refreshExtraGeometry()
         guard model.dockInsets != insets else { return }
         if let animation {
             withAnimation(animation) { model.dockInsets = insets }
         } else {
             model.dockInsets = insets
         }
+    }
+
+    /// The auto-hiding Dock's slide on another display's window (2.45): its DeskView reads it from
+    /// the model, so the window slides in place. Nil hands the window back to its geometry.
+    private func applyExtraDock(_ key: DeskDisplay, _ insets: DockInsets?, animation: Animation?) {
+        guard model.extraDockInsets[key] != insets else { return }
+        if let animation {
+            withAnimation(animation) { model.extraDockInsets[key] = insets }
+        } else {
+            model.extraDockInsets[key] = insets
+        }
+    }
+
+    /// The pointer in global CoreGraphics coordinates, for the Dock's slide on every display.
+    private func dockPointer() -> CGPoint {
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        return DockTarget.topLeft(NSEvent.mouseLocation, primaryHeight: primaryHeight)
     }
 
     /// OLED care follows the switch and the Desk: the drift timer and the idle subscription exist only
@@ -277,7 +302,9 @@ final class DeskController: NSObject, NSMenuDelegate {
         model.onHitAreasChange = nil
         dock.stop()
         dock.apply = nil
+        dock.applyExtra = nil
         model.dockInsets = DockInsets()
+        model.extraDockInsets = [:]
         setMenuIcon(false)
         model.stop()
         applyHotKeys()
@@ -372,24 +399,23 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.contentView = DeskClickLayerView(frame: NSRect(origin: .zero, size: frame.size))
         w.setFrame(frame, display: true)
         w.orderFront(nil)
-        syncClickAreas(w, offset: .zero)
+        syncClickAreas(w, key: .main, offset: .zero)
         return w
     }
 
     /// The plates follow the frames (onHitAreasChange, every mouse-through check), on every
-    /// display's click layer: the frames are in the main window's coordinates, so another
-    /// window's plates move back by its offset (its slanted stacks report no fold, so it has none).
+    /// display's click layer, each from its own window's elements (2.45): the frames are in the main
+    /// window's coordinates, so another window's plates, its slanted ones too, move back by its offset.
     private func syncClickAreas() {
-        if let main = clickWindow { syncClickAreas(main, offset: .zero) }
-        for e in extras { if let c = e.clickWindow { syncClickAreas(c, offset: e.offset) } }
+        if let main = clickWindow { syncClickAreas(main, key: .main, offset: .zero) }
+        for e in extras { if let c = e.clickWindow { syncClickAreas(c, key: e.key, offset: e.offset) } }
     }
 
-    private func syncClickAreas(_ w: NSWindow, offset: CGPoint) {
+    private func syncClickAreas(_ w: NSWindow, key: DeskDisplay, offset: CGPoint) {
         guard let view = w.contentView as? DeskClickLayerView else { return }
-        let elements = model.elements()
-        let areas = DeskClickLayer.areas(in: elements)
-        view.areas = offset == .zero ? areas : areas.map { $0.offsetBy(dx: -offset.x, dy: -offset.y) }
-        view.slanted = offset == .zero ? DeskClickLayer.slantedAreas(in: elements) : []
+        let plates = DeskClickLayer.plates(in: model.elements(on: key), offset: offset)
+        view.areas = plates.areas
+        view.slanted = plates.slanted
     }
 
     /// The window a Desk menu pops in and a click is judged against: the click layer while it
@@ -406,6 +432,10 @@ final class DeskController: NSObject, NSMenuDelegate {
         let m = NSEvent.mouseLocation
         return extras.first { $0.window.frame.contains(m) }
     }
+
+    /// The key of the Desk window the pointer is on (DeskModel.windowFrames): a click there is
+    /// judged against that window's elements.
+    private var keyUnderPointer: DeskDisplay { extraUnderPointer()?.key ?? .main }
 
     /// True for an event from a Desk window or a click layer (or none: a global monitor's).
     private func isDeskEvent(_ event: NSEvent) -> Bool {
@@ -435,8 +465,8 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     /// One Desk window per display with pieces (DeskWindowPlan): the main one on the menu bar
-    /// display with every role (wings, pill, notch, Dock, drawers, companion, click layer, Arrange),
-    /// and a plain one on each other display a piece draws on.
+    /// display with every role (wings, pill, notch, Dock follower, drawers, click layer, Arrange),
+    /// and a plain one on each other display a piece draws on (the companion's included).
     private func buildWindow() {
         if let old = window {
             NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: old)
@@ -501,6 +531,29 @@ final class DeskController: NSObject, NSMenuDelegate {
         applyLayer()
     }
 
+    /// The Dock moved to another display, resized or started or stopped hiding: the other displays'
+    /// windows are built again when their Dock clearance or notch no longer matches. Screen
+    /// parameter changes rebuild every window anyway (screensChanged).
+    private func refreshExtraGeometry() {
+        guard running, !extras.isEmpty else { return }
+        let prefs = dock.prefs
+        let stale = extras.contains { e in
+            guard let ns = NSScreen.screens.first(where: { $0.frame == e.screen.frame && DeskScreens.id(of: $0) == e.screen.id }) else { return false }
+            return DeskScreenGeometry.extra(e.screen, visibleFrame: ns.visibleFrame, notch: ns.cameraNotch,
+                                            dockPrefs: prefs) != e.geometry
+        }
+        if stale { buildExtraWindows(extras.map(\.screen)) }
+    }
+
+    /// The Dock follower watches the other displays' windows as built now; a gone window's slide
+    /// leaves the model.
+    private func followDockOnExtras() {
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        let keys = Set(extras.map(\.key))
+        model.extraDockInsets = model.extraDockInsets.filter { keys.contains($0.key) }
+        dock.setExtras(extras.map { DockDisplay(key: $0.key, frame: DebugTree.topLeft($0.window.frame, primaryHeight: primaryHeight)) })
+    }
+
     private func closeExtraWindows() {
         for e in extras {
             model.arrange.removeWindow(.id(e.screen.id ?? ""))
@@ -512,28 +565,34 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     /// A plain Desk window on each of `screens`: the pieces whose display shows there, at that
-    /// screen's size and menu bar, with no notch and no Dock clearance (the Dock is followed on the
-    /// main display only), at the main window's layer, click-through, with a click layer under the icons.
+    /// screen's size and menu bar, its own notch and the always-shown Dock's clearance (the auto-hiding
+    /// Dock's slide follows each one too, DockFollower), at the main window's layer, click-through, with a click layer under the icons.
     private func buildExtraWindows(_ screens: [DeskScreenInfo]) {
         closeExtraWindows()
+        defer { followDockOnExtras() }
         guard let mainFrame = window?.frame else { return }
         let underIcons = DeskLayer.isOn(in: UserDefaults.desk)
+        let dockPrefs = dock.prefs
         for info in screens {
             guard let ns = NSScreen.screens.first(where: { $0.frame == info.frame && DeskScreens.id(of: $0) == info.id }) else { continue }
             let w = makeDeskWindow(frame: ns.frame, arranging: model.arrange.active)
-            let extra = DeskExtraWindow(geometry: DeskScreenGeometry.of(info, visibleFrame: ns.visibleFrame, notch: nil),
+            let extra = DeskExtraWindow(geometry: DeskScreenGeometry.extra(info, visibleFrame: ns.visibleFrame, notch: ns.cameraNotch,
+                                                                         dockPrefs: dockPrefs),
                                         offset: DeskWindowPlan.offset(of: ns.frame, from: mainFrame))
             w.contentView = FirstClickHostingView(rootView: DeskView(model: model, extra: extra))
             w.setFrame(ns.frame, display: true)
             w.orderFront(nil)
             let click = DeskClickLayer.active(underIcons: underIcons, arranging: model.arrange.active)
                 ? makeClickWindow(frame: ns.frame) : nil
-            extras.append(ExtraWindow(window: w, clickWindow: click, screen: info, offset: extra.offset))
+            extras.append(ExtraWindow(window: w, clickWindow: click, screen: info, offset: extra.offset,
+                                      geometry: extra.geometry, key: extra.key))
             NotificationCenter.default.addObserver(
                 self, selector: #selector(occlusionChanged),
                 name: NSWindow.didChangeOcclusionStateNotification, object: w)
         }
         MainActor.assumeIsolated { OledCareController.shared.deskWindowsRebuilt(extraDeskWindows) }
+        // A window that went takes its frames with it; a new one reports its own as it draws.
+        model.keepFrames(for: Set(extras.map(\.key)))
         syncClickAreas()
     }
 
@@ -819,11 +878,15 @@ final class DeskController: NSObject, NSMenuDelegate {
         return DeskHitTest.element(at: point, in: clickableElements())
     }
 
-    /// The elements that take a click right now: all of them, or the click layer's small pieces
-    /// while it stands in for the Desk window under the icons (DeskClickLayer.elements).
+    /// The elements that take a click right now on the window under the pointer (2.45: each window
+    /// its own, so every copy of a piece on All displays takes clicks): all of them, or the click
+    /// layer's small pieces while it stands in for the Desk window under the icons
+    /// (DeskClickLayer.elements).
     private func clickableElements() -> [DeskElement] {
-        let all = model.elements()
-        return clickWindow == nil ? all : DeskClickLayer.elements(in: all)
+        let extra = extraUnderPointer()
+        let all = model.elements(on: extra?.key ?? .main)
+        let layer = extra.map { $0.clickWindow } ?? clickWindow
+        return layer == nil ? all : DeskClickLayer.elements(in: all)
     }
 
     /// A two-finger click on the meters opens the limit menu for the row under the pointer
@@ -979,11 +1042,12 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// The limit menu's Show Widget: a hidden widget comes back beside the meters, or where it
     /// was when the meters are not drawn.
     func showWidgetBesideMeters() {
-        guard let w = window, !model.metersFrame.isEmpty else {
+        // The copy of the meters the menu was opened on, else the main window's, else any window's.
+        let f = DeskWindowElements.metersFrame(model.windowFrames, preferring: keyUnderPointer)
+        guard let w = window, !f.isEmpty else {
             MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.showPanel() }
             return
         }
-        let f = model.metersFrame
         let onScreen = CGRect(x: w.frame.minX + f.minX, y: w.frame.maxY - f.maxY,
                               width: f.width, height: f.height)
         // The meters may draw on another display's window: the screen they are on.
@@ -1031,13 +1095,11 @@ final class DeskController: NSObject, NSMenuDelegate {
             let others: [NSWindow] = [w, clickWindow].compactMap { $0 } + extras.flatMap { [$0.window, $0.clickWindow].compactMap { $0 } }
             for o in others where o !== taker && !o.ignoresMouseEvents { o.ignoresMouseEvents = true }
         }
-        let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame,
-                      model.nowPlayingFrame, model.stripFrame, model.stripNextFrame,
-                      model.watchersFrame, model.stripWatcherFrame, model.stripAVFrame]
-            + (DeskPieceClicks.isOn(in: UserDefaults.desk) ? [model.clockFrame, model.messageFrame, model.claudeLineFrame] : [])
+        // The blocks of the window the pointer is on.
+        let blocks = model.frames(in: keyUnderPointer).watchedBlocks(piecesTakeClicks: DeskPieceClicks.isOn(in: UserDefaults.desk))
         nearBlocks = DeskPointerWatch.near(point, frames: blocks)
         // The auto-hiding Dock's edge (item 56) runs the same watch, which reads the window list.
-        watchApproach(nearBlocks || dock.wantsWatch(pointer: point, size: w.frame.size))
+        watchApproach(nearBlocks || dock.wantsWatch(pointer: dockPointer()))
     }
 
     /// The close watch's tick: a pointer that has not moved since the last tick needs nothing
@@ -1051,10 +1113,10 @@ final class DeskController: NSObject, NSMenuDelegate {
             lastWatchedPointer = p
             updateMouseThrough()
         }
-        guard approachTimer != nil, let w = window else { return }
-        let point = pointerInWindow()
-        dock.tick(pointer: point, size: w.frame.size, moved: moved)
-        if !nearBlocks, !dock.wantsWatch(pointer: point, size: w.frame.size) { watchApproach(false) }
+        guard approachTimer != nil, window != nil else { return }
+        let point = dockPointer()
+        dock.tick(pointer: point, moved: moved)
+        if !nearBlocks, !dock.wantsWatch(pointer: point) { watchApproach(false) }
     }
 
     /// Starts the close watch when `on` and none runs, stops it when off. Common run loop modes,

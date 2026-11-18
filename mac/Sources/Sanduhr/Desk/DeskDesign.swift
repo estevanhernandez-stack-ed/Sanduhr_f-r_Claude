@@ -10,7 +10,8 @@ struct DeskFontChoice: Equatable {
 /// One piece's part of a design's layout. Every member but `piece` is optional: absent leaves the current
 /// value alone. A hidden piece has no anchor, size, tilt, style or monitor. `tilt` is the fold (whole degrees, -20 to
 /// 20) and belongs to the piece's stack; `style` is the meter style, only on `DeskMeterStyles.pieces`; `monitor` is
-/// the display ("main", "all" or a display id from get_desk `monitors`).
+/// the display ("main", "all" or a display id from get_desk `monitors`). The companion takes one as any piece does;
+/// it is drawn once (DeskWindowPlan.drawnOnce), so "all" puts it on the main display.
 struct DeskPieceLayout: Equatable {
     var piece: String
     var anchor: DeskAnchor?

@@ -169,6 +169,8 @@ final class CompanionNSView: NSView {
 struct CompanionPiece: View {
     var model: DeskModel
     var scale: Double = 1
+    /// The window it draws in: nil on the main one, another display's geometry there (2.45).
+    @Environment(\.deskScreenGeometry) private var room
 
     var body: some View {
         let driver = model.companion
@@ -184,7 +186,8 @@ struct CompanionPiece: View {
                     .accessibilityHidden(true)
             }
         }
-        .onAppear { driver.show(model) }
+        .onAppear { driver.setRoom(room); driver.show(model) }
+        .onChange(of: room) { _, now in driver.setRoom(now) }
         .onDisappear { driver.pieceDisappeared() }
     }
 }

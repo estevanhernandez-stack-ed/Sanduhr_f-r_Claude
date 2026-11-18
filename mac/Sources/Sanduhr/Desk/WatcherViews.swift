@@ -145,7 +145,7 @@ struct DeskWatchers: View {
                 VStack(alignment: alignment, spacing: size * 0.5) {
                     ForEach(shown) { w in
                         DeskWatcherRow(watcher: w, now: context.date, font: font, size: size, alignment: alignment)
-                            .onGlobalFrame { model.watcherRowFrames[w.id] = $0 }
+                            .onDeskFrame(model) { $0.watcherRowFrames[w.id] = $1 }
                             .transition(.opacity)
                     }
                     if model.watchers.count > shown.count {
@@ -156,7 +156,7 @@ struct DeskWatchers: View {
                 }
                 .animation(.easeOut(duration: 0.6), value: shown.map(\.id))
             }
-            .onGlobalFrame { model.watchersFrame = $0 }
+            .onDeskFrame(model) { $0.watchersFrame = $1 }
             .padding(.vertical, DeskNowPlaying.padding)
         }
     }

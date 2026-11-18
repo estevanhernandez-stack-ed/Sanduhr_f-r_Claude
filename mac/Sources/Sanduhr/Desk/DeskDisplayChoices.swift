@@ -54,10 +54,13 @@ enum DeskDisplayChoices {
     }
 
     /// The choices for a piece: Main, All, each connected non-main display by name, and, when the
-    /// piece sits on an id that is not connected, the stranded choice last.
+    /// piece sits on an id that is not connected, the stranded choice last. A piece drawn once
+    /// (DeskWindowPlan.drawnOnce, the companion) has no All: it lives on one display.
     static func choices(for placement: DeskPlacement, screens: [DeskScreenInfo]) -> [DeskDisplayChoice] {
-        var out = [DeskDisplayChoice(kind: .main, title: mainTitle),
-                   DeskDisplayChoice(kind: .all, title: allTitle)]
+        var out = [DeskDisplayChoice(kind: .main, title: mainTitle)]
+        if !DeskWindowPlan.drawnOnce.contains(placement.widget) {
+            out.append(DeskDisplayChoice(kind: .all, title: allTitle))
+        }
         let main = DeskScreens.main(screens)
         for s in screens {
             guard let id = s.id, !(main.map { same($0.id, id) } ?? false) else { continue }
@@ -70,7 +73,8 @@ enum DeskDisplayChoices {
     }
 
     /// The choice the piece is on. The main display's own id reads as Main; an id nothing
-    /// connected carries is the stranded choice.
+    /// connected carries is the stranded choice; a companion on All (a layout written by hand or a
+    /// design) reads as Main, where it draws.
     static func selection(for placement: DeskPlacement, screens: [DeskScreenInfo]) -> DeskDisplayChoice {
         let all = choices(for: placement, screens: screens)
         let kind: DeskDisplayChoice.Kind

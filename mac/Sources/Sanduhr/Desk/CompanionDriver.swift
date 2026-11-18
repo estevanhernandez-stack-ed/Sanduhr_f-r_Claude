@@ -63,6 +63,11 @@ final class CompanionDriver {
     @ObservationIgnored private var segment: Segment?
     @ObservationIgnored private var segmentTimer: Timer?
     @ObservationIgnored private var pausedAt: Date?
+    /// The window the piece draws in (2.45): nil for the main one, whose geometry is the model's;
+    /// another display's geometry when the companion is placed there.
+    @ObservationIgnored private var room: DeskScreenGeometry?
+    /// Re-seated and not yet started: the next segment waits for the piece view to be in its window.
+    @ObservationIgnored private var awaitingSeat = false
 
     // MARK: Showing and hiding
 
@@ -109,6 +114,29 @@ final class CompanionDriver {
         self.view = view
         lastKey = nil
         if sheet != nil { applySheet(); refresh() }
+    }
+
+    /// The window the piece draws in now (CompanionPiece, from its window's geometry). Another
+    /// window than before (placed on another display, its display unplugged or back) re-seats it
+    /// inside that window's room; the same window with new geometry builds its next walk there.
+    func setRoom(_ geometry: DeskScreenGeometry?) {
+        let was = room
+        room = geometry
+        if CompanionRoom.reseats(from: was, to: geometry) { reseat() }
+    }
+
+    /// Drops the walk and the place on it, so the next segment starts from where the piece view
+    /// stands in its window. Waits a turn of the run loop for a new view to be in its window.
+    private func reseat() {
+        stopSegment(commit: false)
+        path = nil
+        roamerBuilt = false
+        awaitingSeat = true
+        guard shown else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.lastKey = nil
+            self?.refresh()
+        }
     }
 
     // MARK: Choice
@@ -339,16 +367,20 @@ final class CompanionDriver {
         if segment == nil, !paused { startSegment(now: now) }
     }
 
-    /// The Desk's room: its window less the menu bar and the Dock.
+    /// The Desk's room: the window it draws in less the menu bar and the Dock (CompanionRoom).
     private func buildPath() -> CompanionPath? {
         guard let model, let sprite = pick?.sprite, let view else { return nil }
         let size = CGSize(width: view.cell.width, height: view.cell.height)
-        let area = CompanionRoamMath.area(window: model.deskSize, topInset: model.topInset, dock: model.dockInsets)
+        let area = CompanionRoom.area(room, mainSize: model.deskSize, mainTopInset: model.topInset,
+                                      mainDock: model.dockInsets)
         return CompanionPath.build(edges: sprite.edges, area: area, spriteWidth: size.width, spriteHeight: size.height)
     }
 
     private func startSegment(now: Date) {
         guard let sprite = pick?.sprite, let view else { return }
+        // Re-seated on another window: a view not yet in it has no place to start from.
+        if awaitingSeat, view.homePoint() == nil { return }
+        awaitingSeat = false
         guard let built = buildPath() else { return }
         path = built
         if !roamerBuilt {
@@ -456,6 +488,30 @@ final class CompanionDriver {
     var debug: CompanionDebug? {
         guard shown, let pick, let stage else { return nil }
         return CompanionDebug(pack: pick.packId, stage: stage.id, mood: lastMood.key, roaming: segment != nil)
+    }
+}
+
+/// The room the companion roams (2.45): the window of the display it is placed on, from that
+/// window's geometry (size, menu bar, Dock), or the main window's, which the model holds (nil).
+enum CompanionRoom {
+    /// The window's key (DeskWindowElements.key): `.main`, or the display's.
+    static func key(_ geometry: DeskScreenGeometry?) -> DeskDisplay {
+        geometry.map { DeskWindowElements.key($0.screen, isMain: false) } ?? .main
+    }
+
+    /// The roam area, y-down in that window's points (CompanionRoamMath.area).
+    static func area(_ geometry: DeskScreenGeometry?, mainSize: CGSize, mainTopInset: CGFloat,
+                     mainDock: DockInsets) -> CGRect {
+        guard let g = geometry else {
+            return CompanionRoamMath.area(window: mainSize, topInset: mainTopInset, dock: mainDock)
+        }
+        return CompanionRoamMath.area(window: g.deskSize, topInset: g.topInset, dock: g.dockInsets)
+    }
+
+    /// Whether the companion re-seats: it went to another window. The same window with new geometry
+    /// (the Dock moved, the display resized) keeps its place and walks in the new room.
+    static func reseats(from old: DeskScreenGeometry?, to new: DeskScreenGeometry?) -> Bool {
+        key(old) != key(new)
     }
 }
 

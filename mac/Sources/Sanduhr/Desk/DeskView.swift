@@ -43,7 +43,8 @@ struct DeskView: View {
     var model: DeskModel
     /// A window besides the main one (one per display with pieces, DeskWindowPlan): its geometry and
     /// its offset from the main window. nil on the main window, which reads the model's geometry and
-    /// alone carries the notch and the slanted stacks' click areas. Arrange runs on every window (2.44).
+    /// alone carries the notch. Arrange runs on every window (2.44), and every window's slanted stacks
+    /// take clicks by their shape (2.45).
     var extra: DeskExtraWindow? = nil
 
     @AppStorage("layout", store: .desk) private var layout = "message:tl clock:bl claude:bl meetings:bl"
@@ -63,7 +64,11 @@ struct DeskView: View {
 
     /// This window's menu bar strip, Dock reach and notch: the model's on the main window.
     private var topInset: CGFloat { extra?.geometry.topInset ?? model.topInset }
-    private var dockInsets: DockInsets { extra?.geometry.dockInsets ?? model.dockInsets }
+    /// On another display, the auto-hiding Dock's slide there (2.45) wins over the geometry's.
+    private var dockInsets: DockInsets {
+        guard let extra else { return model.dockInsets }
+        return model.extraDockInsets[extra.key] ?? extra.geometry.dockInsets
+    }
     private var notchRect: CGRect? { extra == nil ? model.notchRect : extra?.geometry.notchRect }
 
     /// The window this view draws, as the plan names it; nil before the screens are known (then it
@@ -91,7 +96,7 @@ struct DeskView: View {
         content(place, arranging: arranging, margins: margins)
             .modifier(DeskExtraScreensWatch(model: model, extras: extraScreens(arrangement)))
             .environment(\.deskScreenGeometry, extra?.geometry)
-            .environment(\.deskFrameReporting, extra.map { DeskFrameReporting(offset: $0.offset, mainWindow: false) } ?? .main)
+            .environment(\.deskFrameReporting, extra.map { DeskFrameReporting(offset: $0.offset, window: $0.key) } ?? .main)
     }
 
     /// On the main window, the screens the other windows should cover now (DeskWindowPlan), so a
@@ -249,14 +254,14 @@ struct DeskView: View {
         }
     }
 
-    /// A piece on a window besides the main one (it takes Arrange's chrome as the main window's do):
-    /// a piece on All displays reports no click frames here, so its click areas stay the main window's.
+    /// A piece on a window besides the main one (it takes Arrange's chrome as the main window's do).
+    /// It reports its click frames into this window's own (DeskFrameReporting), a piece on All
+    /// displays included, so every copy takes clicks (2.45).
     private func extraPiece(_ widget: Widget, _ p: DeskPlacement, alignment: HorizontalAlignment,
                             lineInLayout: Bool) -> some View {
         DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale,
                   style: p.style)
             .oledDrift(model)
-            .transformEnvironment(\.deskFrameReporting) { if p.monitor == .all { $0.on = false } }
     }
 }
 
@@ -336,8 +341,8 @@ struct DeskPiece: View {
     @ViewBuilder
     private var piece: some View {
         switch widget {
-        case .clock: clock.deskPieceClickArea(.clock) { model.clockFrame = $0 }.deskInk()
-        case .claude: claude.deskPieceClickArea(.claudeLine) { model.claudeLineFrame = $0 }.deskInk()
+        case .clock: clock.deskPieceClickArea(.clock, model) { $0.clockFrame = $1 }.deskInk()
+        case .claude: claude.deskPieceClickArea(.claudeLine, model) { $0.claudeLineFrame = $1 }.deskInk()
         case .meters: meters.deskInk()
         case .nowPlaying: nowPlaying.deskInk()
         case .telemetry:
@@ -347,7 +352,7 @@ struct DeskPiece: View {
             DeskWeatherPiece(shown: shownWeather, font: font, timeSize: timeSize, alignment: alignment).deskInk()
         case .watchers: DeskWatchers(model: model, font: font, size: timeSize * 0.17, alignment: alignment).deskInk()
         case .meetings: meetings.deskInk()
-        case .message: message.deskPieceClickArea(.message) { model.messageFrame = $0 }
+        case .message: message.deskPieceClickArea(.message, model) { $0.messageFrame = $1 }
         case .companion: CompanionPiece(model: model, scale: scale)
         }
     }
@@ -434,7 +439,7 @@ struct DeskPiece: View {
                 if style == .bar {
                     ForEach(model.meters) { row in
                         MeterRow(row: row, ink: ink, font: font, size: size, width: timeSize * 3.2, alignment: alignment)
-                            .onGlobalFrame { model.meterRowFrames[row.tier] = $0 }
+                            .onDeskFrame(model) { $0.meterRowFrames[row.tier] = $1 }
                             .deskPulse(model.pulses[row.tier] ?? 0, ink: ink, size: size)
                     }
                 } else {
@@ -457,7 +462,7 @@ struct DeskPiece: View {
             .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity)
                 .padding(EdgeInsets(top: -6, leading: -8, bottom: -6, trailing: -8)))
             .contentShape(Rectangle())
-            .onGlobalFrame { model.metersFrame = $0 }
+            .onDeskFrame(model) { $0.metersFrame = $1 }
         }
     }
 
@@ -466,7 +471,7 @@ struct DeskPiece: View {
     private func styledMeters(size: CGFloat) -> some View {
         DeskStyledGauges(gauges: DeskMeterStyleModel.gauges(model.meters), style: style, ink: ink, font: font,
                          size: size, width: timeSize * 2.6, alignment: alignment,
-                         report: { model.meterRowFrames[$0] = $1 })
+                         report: { tier, frame, window in model.setFrames(in: window) { $0.meterRowFrames[tier] = frame } })
     }
 
     /// The claude line in slim (two short rows) or ring and ticks (the name over the session and
@@ -523,18 +528,18 @@ struct DeskPiece: View {
                     .onHover { inside in
                         if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                     }
-                    .onGlobalFrame { model.noteFrame = $0 }
+                    .onDeskFrame(model) { $0.noteFrame = $1 }
             } else if model.meetings.isEmpty {
                 Text(model.noMeetingsLine).opacity(0.6)
             } else {
                 ForEach(model.meetings) { meeting in
                     MeetingRow(meeting: meeting)
-                        .onGlobalFrame { model.rowFrames[meeting.id] = $0 }
+                        .onDeskFrame(model) { $0.rowFrames[meeting.id] = $1 }
                 }
             }
         }
         .font(.custom(font, size: timeSize * 0.21))
-        .onGlobalFrame { model.meetingsFrame = $0 }
+        .onDeskFrame(model) { $0.meetingsFrame = $1 }
     }
 
     /// The handwritten line with its per-line effects (DeskMessageLine, item 54). messageColor
@@ -602,14 +607,16 @@ private extension View {
     /// click slack, gives every point there a drawn pixel, so the window server hands a two-finger
     /// click to this transparent window instead of the Finder (DeskPointerMenu). Off, nothing is
     /// drawn behind it and the click goes through, as before.
-    func deskPieceClickArea(_ kind: DeskElement.Kind, report: @escaping (CGRect) -> Void) -> some View {
-        modifier(DeskPieceClickArea(kind: kind, report: report))
+    func deskPieceClickArea(_ kind: DeskElement.Kind, _ model: DeskModel,
+                            report: @escaping (inout DeskFrames, CGRect) -> Void) -> some View {
+        modifier(DeskPieceClickArea(kind: kind, model: model, report: report))
     }
 }
 
 private struct DeskPieceClickArea: ViewModifier {
     let kind: DeskElement.Kind
-    let report: (CGRect) -> Void
+    let model: DeskModel
+    let report: (inout DeskFrames, CGRect) -> Void
     @AppStorage(DeskPieceClicks.key, store: .desk) private var on = DeskPieceClicks.defaultOn
 
     func body(content: Content) -> some View {
@@ -617,7 +624,7 @@ private struct DeskPieceClickArea: ViewModifier {
         content
             .background(Color.black.opacity(on ? DeskPointerMenu.hitPlateOpacity : 0)
                 .padding(EdgeInsets(top: -s.height, leading: -s.width, bottom: -s.height, trailing: -s.width)))
-            .onGlobalFrame(report)
+            .onDeskFrame(model, report)
     }
 }
 
@@ -861,7 +868,7 @@ private struct AccountLead: View {
             .underline(hovering)
             .contentTransition(.opacity)
             .contentShape(Rectangle())
-            .onGlobalFrame { model.accountFrame = $0 }
+            .onDeskFrame(model) { $0.accountFrame = $1 }
             .onHover { inside in
                 hovering = inside
                 if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
@@ -908,13 +915,20 @@ extension View {
     /// stale frame is harmless, because DeskElements lists only what is drawn now.
     /// Under `isSurfacePreview` (Settings' previews, item 68) nothing is reported: a preview's
     /// pieces are never click areas.
-    func onGlobalFrame(_ report: @escaping (CGRect) -> Void) -> some View {
+    /// `report` also gets the window the view is drawn on (DeskFrameReporting.window).
+    func onGlobalFrame(_ report: @escaping (CGRect, DeskDisplay) -> Void) -> some View {
         modifier(GlobalFrameReport(report: report))
+    }
+
+    /// Reports this view's frame into the frames of the Desk window it is drawn on (DeskFrames,
+    /// DeskModel.setFrames): `write` puts it in its place, `{ $0.metersFrame = $1 }`.
+    func onDeskFrame(_ model: DeskModel, _ write: @escaping (inout DeskFrames, CGRect) -> Void) -> some View {
+        onGlobalFrame { frame, window in model.setFrames(in: window) { write(&$0, frame) } }
     }
 }
 
 private struct GlobalFrameReport: ViewModifier {
-    let report: (CGRect) -> Void
+    let report: (CGRect, DeskDisplay) -> Void
     @Environment(\.isSurfacePreview) private var preview
     @Environment(\.deskFrameReporting) private var reporting
 
@@ -923,8 +937,8 @@ private struct GlobalFrameReport: ViewModifier {
             let r = reporting
             content.background(GeometryReader { geo in
                 Color.clear
-                    .onAppear { report(r.shifted(geo.frame(in: .global))) }
-                    .onChange(of: geo.frame(in: .global)) { _, frame in report(r.shifted(frame)) }
+                    .onAppear { report(r.shifted(geo.frame(in: .global)), r.window) }
+                    .onChange(of: geo.frame(in: .global)) { _, frame in report(r.shifted(frame), r.window) }
             })
         } else {
             content
@@ -954,13 +968,16 @@ extension EnvironmentValues {
 
 /// How a Desk window's views report their frames (onGlobalFrame): the main window's as they are; a
 /// window on another display moved by its offset from the main window (DeskWindowPlan.offset), so the
-/// model holds every frame in the main window's coordinates and one hit test covers every window. Off
-/// for a piece on All displays drawn on another window: the main window's copy is the click area.
+/// model holds every frame in the main window's coordinates and one pointer reading judges every
+/// window. Each window's frames go to its own store (`window`, DeskModel.windowFrames), so every copy
+/// of a piece on All displays takes clicks (2.45).
 struct DeskFrameReporting: Equatable {
     var on = true
     var offset: CGPoint = .zero
-    /// The main window: only it reports the slanted stacks' folds (DeskFoldStack).
-    var mainWindow = true
+    /// The window the views are drawn on: `.main`, or another window's key (DeskWindowElements.key).
+    var window: DeskDisplay = .main
+    /// The main window: only it reports the slanted stacks' folds to Arrange (DeskFoldStack).
+    var mainWindow: Bool { window == .main }
 
     static let main = DeskFrameReporting()
 
