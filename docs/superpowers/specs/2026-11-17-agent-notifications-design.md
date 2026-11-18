@@ -54,8 +54,8 @@ new sign-in, and no prompt or reply text is read.
 | `AgentTurnEvent` | Core | Agent, kind (`Started`, `Finished`, `Stopped`, `Waiting`), project folder, session id, time, duration when known |
 | `CodexTurnReader`, `AntigravityTurnReader`, `ClaudeCodeSignalFile` | Core | Pure: lines or a decoded file in, events out. No IO |
 | `NotificationRules` | Core | Pure: an event, the settings, what is in front and the limiter's state in; the surfaces to use out |
-| `AgentActivityService` | App | Owns the file watching and per-file offsets, feeds the readers, raises events |
-| `NotificationDispatcher` | App | Applies the rules once and calls the four surfaces |
+| `AgentActivityWatcher` | Core | Owns the file watching and per-file offsets, feeds the readers, raises events. File IO, no window, so it is tested over scratch folders |
+| `AgentNotifier` | Core | Applies the rules once and calls the four surfaces, which the App plugs in as delegates |
 | Surfaces: toast, glow, flash, Desk card | App | Thin adapters over what exists (`GlowOverlayWindow`, `GlowNative.FlashTray`, `WatcherStore`) plus one toast builder |
 
 The three existing toasts move onto the toast surface and one activation handler that routes by an `action`
@@ -63,15 +63,18 @@ argument. The MCP server links none of it; `TrustBoundaryTests` is unchanged.
 
 ## 3. How each agent is read
 
-**Codex (exact).** The activity service shares `CodexUsageService`'s watcher and tails each changed plain
-rollout from an in-memory offset, keeping a torn last line for the next read. Compressed rollouts are
-finished history and are not tailed.
+**Codex (exact).** The watcher runs its own `FileSystemWatcher` on each Codex home's `sessions` folder and
+tails each changed plain rollout from an in-memory offset, keeping a torn last line for the next read.
+Compressed rollouts are finished history and are not tailed. It does not share `CodexUsageService`'s watcher:
+that service exists only while Codex limits are on and is rebuilt whenever the statusline or the MCP server
+is installed or removed, which would tie turn state to its lifetime (amended 2026-11-17, from the code map).
 
 - `task_started` gives `Started`. `task_complete` gives `Finished`, with the duration from `duration_ms`.
   `turn_aborted` gives `Stopped`.
 - The project is the `cwd` of the `turn_context` in force, as the burn parser reads it.
 - A rollout whose `session_meta` has `forked_from_id` or `parent_thread_id` is a sub-agent: its events
-  update nothing and notify nobody. One run, one notification.
+  update nothing and notify nobody. One run, one notification. The mark sticks once set, because a forked
+  rollout repeats its parent's `session_meta` without the keys.
 
 **Antigravity CLI (inferred, late by design).** A watcher on `<cliHome>\brain` tails each
 `transcript.jsonl`.
@@ -132,9 +135,12 @@ its last 4 MB to learn whether a turn is open, without notifying; older files st
 - **Glow.** `Finished` and `Stopped` glow in the agent's Sources color. `Waiting` keeps today's color.
   Where it shows follows the existing target settings.
 - **Taskbar flash.** As today, on the widget's button, with its own switch.
-- **Desk card.** A `WatcherSource.Automatic` card per session: the agent's name, the project, "working 2m",
-  then "finished, 4m 12s" for about a minute before it fades. Shown only where the watcher cards piece is
-  placed. It does not need "Let Claude show watchers", which gates the MCP's cards.
+- **Desk card.** A card per session from a new `WatcherSource.Turn`: the agent's name, the project,
+  "working 2m", then "finished, 4m 12s" for about a minute before it fades. Shown only where the watcher
+  cards piece is placed. It does not need "Let Claude show watchers", which gates the MCP's cards. Not
+  `WatcherSource.Automatic`: that is the Mac port's seam for Claude Code's background tasks from the Stop
+  hook, with its own ids and one-hour window (amended 2026-11-17). A running turn card loses touch after an
+  hour, Antigravity's after 10 minutes.
 - **Streamer mode** masks the project on every surface through `StreamerMode.Mask`, before a toast is sent.
 
 ## 6. Settings and defaults
@@ -145,9 +151,11 @@ A new **Notifications** page (`SettingsPage.Notifications`, after Alerts until s
   late", "Working, finished and waiting"), and a switch. Claude Code's row shows the hook's state and Update.
 - Switches for the toast, the glow on finished, the glow on waiting, the taskbar flash and the Desk card.
 - The threshold: Every turn, 30 seconds, 1 minute, 2 minutes, 5 minutes.
-- "Not while the agent's window is in front", where the glow shows, and Try it buttons.
+- "Not while the agent's window is in front", a link to where the glow shows, and Try it buttons.
 
-The Claude Code page keeps the hook's install row and links here.
+The Claude Code page keeps the hook's install row and the "Where the glow shows" picker, and links here.
+The picker carries the Desk piece panel and the monitor list, so moving it belongs to spec 6's
+reorganization (amended 2026-11-17).
 
 | Setting | Default | On upgrade |
 |---|---|---|
@@ -203,9 +211,12 @@ and must not name Antigravity (`No_card_names_Antigravity`).
 1. On Windows, an async PowerShell hook receives `session_id` and `cwd` on standard input for
    `UserPromptSubmit`, `Notification` and `Stop`. The code's own note says the hook fields came from the
    docs and were not exercised live.
-2. The Codex desktop app's process name, for the in-front list.
+2. The Codex desktop app's process name, for the in-front list. **Checked 2026-11-17: `codex`.**
 3. `forked_from_id` and `parent_thread_id` are absent on every top-level Codex session, across all rollouts.
-4. The 90-second quiet time against any Antigravity transcripts added since the sample.
+   **Checked 2026-11-17 over all 90 rollouts, plain and compressed:** 86 have `parent_thread_id` (46
+   sub-agents, 40 guardian reviews); the 4 top-level ones have neither key.
+4. The 90-second quiet time against any Antigravity transcripts added since the sample. **No new transcripts
+   by plan time; the live check repeats it.**
 
 If 1 fails, Claude Code keeps today's glow and gets no toast or card until a signal with identity exists. If
 4 shows a false ending, Antigravity drops to working-only.
