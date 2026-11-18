@@ -342,6 +342,41 @@ struct AudioBarsDriverTests {
         #expect(!ticker.running)
         #expect(sink.frames.last?.allSatisfy { $0 == 0 } == true)
     }
+
+    @Test func everyCopyOfNowPlayingGetsTheFrames() {
+        final class Sink: AudioBarsSink {
+            var frames: [[Float]] = []
+            func show(heights: [Float], caps: [Float], showsCaps: Bool) { frames.append(heights) }
+        }
+        let (d, tap, _) = make()
+        let main = Sink(), second = Sink()
+        d.attach(main)
+        d.attach(second)
+        d.attach(second)
+        #expect(d.attachedCount == 2)
+        d.setDeskShowing(true)
+        d.setTrack(playing())
+        advance(d, 0.3, peak: 0.9, tap: tap)
+        #expect(main.frames.last?.contains { $0 > 0 } == true)
+        #expect(second.frames.last == main.frames.last)
+        d.detach(second)
+        #expect(d.attachedCount == 1)
+        let before = second.frames.count
+        advance(d, 0.2, peak: 0.9, tap: tap)
+        #expect(second.frames.count == before)
+        #expect(main.frames.count > before)
+    }
+
+    @Test func aBarsViewThatWentAwayDropsOut() {
+        final class Sink: AudioBarsSink {
+            func show(heights: [Float], caps: [Float], showsCaps: Bool) {}
+        }
+        let (d, _, _) = make()
+        let kept = Sink()
+        d.attach(kept)
+        do { let gone = Sink(); d.attach(gone) }
+        #expect(d.attachedCount == 1)
+    }
 }
 
 @Suite("Audio bars drawing")
