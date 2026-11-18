@@ -73,6 +73,10 @@ public enum WatcherSource
 
     /// <summary>A job a GitHub Actions runner container on this PC ran, read from its log (spec ci-watchers-3.9).</summary>
     Runner,
+
+    /// <summary>An agent's turn, read by the app from the agent's own files (5.0 spec 4). Not <see cref="Automatic"/>,
+    /// which is Claude Code's background tasks from the Stop hook.</summary>
+    Turn,
 }
 
 /// <summary>One card. Immutable; the board replaces it on every change.</summary>
@@ -113,6 +117,10 @@ public sealed record Watcher
 
     /// <summary>An automatic watcher's kind of task (shell, subagent, monitor, workflow).</summary>
     public string? Kind { get; init; }
+
+    /// <summary>A turn card's project folder, kept so its title can be rebuilt when streamer mode changes.
+    /// A turn card keeps its agent's id in <see cref="Kind"/> and the agent's session in <see cref="Session"/>.</summary>
+    public string? Folder { get; init; }
 
     /// <summary>A runner card's runner as the card shows it (the Compose service name).</summary>
     public string? Runner { get; init; }
@@ -241,7 +249,7 @@ public sealed record StopReport(string Session, string? Folder, IReadOnlyList<Ba
 public readonly record struct RunnerChange(bool Changed, bool Failed);
 
 /// <summary>Every watcher, and how they change (the Mac's <c>WatcherBoard</c>). Pure: the time comes in.</summary>
-public sealed class WatcherBoard
+public sealed partial class WatcherBoard
 {
     /// <summary>An agent's watcher with no update for this long has lost touch.</summary>
     public static readonly TimeSpan AgentWindow = TimeSpan.FromMinutes(10);
@@ -252,6 +260,29 @@ public sealed class WatcherBoard
 
     /// <summary>Passed and finished fade after this long.</summary>
     public static readonly TimeSpan FadeAfter = TimeSpan.FromSeconds(6);
+
+    /// <summary>A turn card hears its end from the agent's own log, so it waits an hour before losing touch.</summary>
+    public static readonly TimeSpan TurnWindow = TimeSpan.FromHours(1);
+
+    /// <summary>The Antigravity CLI writes no end for a turn that errors, so its card loses touch sooner.</summary>
+    public static readonly TimeSpan AntigravityTurnWindow = TimeSpan.FromMinutes(10);
+
+    /// <summary>A finished turn stays long enough to be seen on coming back to the desktop.</summary>
+    public static readonly TimeSpan TurnFadeAfter = TimeSpan.FromSeconds(60);
+
+    /// <summary>The Antigravity agent id (<c>AgentSources.Antigravity</c>). Written out here because the MCP server links this
+    /// file and not <c>AgentSources.cs</c>; a test pins the Antigravity window.</summary>
+    private const string AntigravityId = "antigravity";
+
+    public static string TurnId(string agent, string session) => $"t:{agent}:{session}";
+
+    /// <summary>How long this watcher may go unheard before it loses touch; null when it never does.</summary>
+    public static TimeSpan? WindowOf(Watcher w) => w.Source == WatcherSource.Turn
+        ? (w.Kind == AntigravityId ? AntigravityTurnWindow : TurnWindow)
+        : Window(w.Source);
+
+    /// <summary>How long this watcher shows after it passed or finished.</summary>
+    public static TimeSpan FadeOf(Watcher w) => w.Source == WatcherSource.Turn ? TurnFadeAfter : FadeAfter;
 
     /// <summary>Most watchers kept; past it the least urgent, oldest go.</summary>
     public const int Capacity = 24;
@@ -441,12 +472,12 @@ public sealed class WatcherBoard
     public bool Tick(DateTimeOffset now)
     {
         var before = _watchers.ToList();
-        _watchers.RemoveAll(w => w.State.Fades() && w.Ended is { } ended && now - ended >= FadeAfter);
+        _watchers.RemoveAll(w => w.State.Fades() && w.Ended is { } ended && now - ended >= FadeOf(w));
         for (var i = 0; i < _watchers.Count; i++)
         {
             var w = _watchers[i];
             if (w.State is WatcherState.Running or WatcherState.Waiting
-                && Window(w.Source) is { } window && now - w.Touched > window)
+                && WindowOf(w) is { } window && now - w.Touched > window)
                 _watchers[i] = w with { State = WatcherState.LostTouch };
         }
         return !_watchers.SequenceEqual(before);
@@ -459,8 +490,8 @@ public sealed class WatcherBoard
         foreach (var w in _watchers)
         {
             DateTimeOffset? at = null;
-            if (w.State.Fades() && w.Ended is { } ended) at = ended + FadeAfter;
-            else if (w.State is WatcherState.Running or WatcherState.Waiting && Window(w.Source) is { } window)
+            if (w.State.Fades() && w.Ended is { } ended) at = ended + FadeOf(w);
+            else if (w.State is WatcherState.Running or WatcherState.Waiting && WindowOf(w) is { } window)
                 at = w.Touched + window + TimeSpan.FromSeconds(1);
             if (at is { } a && (best is null || a < best)) best = a;
         }
@@ -486,7 +517,7 @@ public sealed class WatcherBoard
     /// <summary>What the Desk shows: the ordered watchers, less the work ones and the runners' in demo
     /// mode (a runner's name can name a private repo).</summary>
     public static IReadOnlyList<Watcher> Shown(IReadOnlyList<Watcher> ordered, bool demo) =>
-        demo ? ordered.Where(w => !w.Work && w.Source != WatcherSource.Runner).ToList() : ordered;
+        demo ? ordered.Where(w => !w.Work && w.Source != WatcherSource.Runner && w.Source != WatcherSource.Turn).ToList() : ordered;
 
     /// <summary>Past capacity, the least urgent and oldest go first.</summary>
     private void Trim()
