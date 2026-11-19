@@ -12,6 +12,10 @@ public static class ClaudeCodeSignalFile
 {
     public const string Prefix = "cc-signal-";
     public const string Pattern = Prefix + "*.json";
+    /// <summary>A file the hook wrote and did not rename (a failed move): Reset and the watcher clear these.</summary>
+    public const string TempPattern = Prefix + "*.json.tmp";
+    /// <summary>The hook writes nothing while this many signals already wait unread (Sanduhr not running, or gone).</summary>
+    public const int MaxWaiting = 100;
     public const int MaxBytes = 4096;
     public static readonly TimeSpan MaxAge = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan MaxAhead = TimeSpan.FromMinutes(1);

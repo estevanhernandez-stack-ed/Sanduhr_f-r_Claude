@@ -178,6 +178,7 @@ public static partial class ResetPlan
             AddFile(history, Path.Combine(dir, ThemeHandoff.ResultFileName));
             AddMatchingFiles(history, dir, "glow-*.signal");
             AddMatchingFiles(history, dir, ClaudeCodeSignalFile.Pattern);
+            AddMatchingFiles(history, dir, ClaudeCodeSignalFile.TempPattern);
             AddMatchingFiles(history, dir, "desk-messages-*.json");
             AddMatchingFiles(history, dir, "desk-design-*.json");
             AddMatchingFiles(history, dir, "watch-request-*.json");

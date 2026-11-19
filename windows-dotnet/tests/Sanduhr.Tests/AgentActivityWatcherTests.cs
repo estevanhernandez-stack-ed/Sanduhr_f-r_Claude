@@ -386,6 +386,30 @@ public sealed class AgentActivityWatcherTests : IDisposable
     }
 
     [Fact]
+    public void A_leftover_temp_file_older_than_the_signal_age_is_deleted_and_raises_nothing()
+    {
+        using var w = Sut();
+        var tmp = Path.Combine(Signals, "cc-signal-1-2.json.tmp");
+        File.WriteAllText(tmp, "{\"v\":1}");
+        File.SetLastWriteTimeUtc(tmp, _now.UtcDateTime - ClaudeCodeSignalFile.MaxAge - TimeSpan.FromMinutes(1));
+        w.Scan();
+        Assert.Empty(_events);
+        Assert.False(File.Exists(tmp));
+    }
+
+    [Fact]
+    public void A_fresh_temp_file_is_left_alone_it_may_be_mid_rename()
+    {
+        using var w = Sut();
+        var tmp = Path.Combine(Signals, "cc-signal-1-3.json.tmp");
+        File.WriteAllText(tmp, "{\"v\":1}");
+        File.SetLastWriteTimeUtc(tmp, _now.UtcDateTime - ClaudeCodeSignalFile.MaxAge + TimeSpan.FromMinutes(1));
+        w.Scan();
+        Assert.Empty(_events);
+        Assert.True(File.Exists(tmp));
+    }
+
+    [Fact]
     public void With_claude_code_off_a_signal_is_deleted_and_raises_nothing()
     {
         using var w = Sut();

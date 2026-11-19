@@ -840,8 +840,8 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         try
         {
             var choice = AskConsent(new ConsentSpec(
-                "Glow when Claude Code needs you?",
-                "Sanduhr lights the top edge of your window when Claude Code waits on you or finishes.",
+                "Tell Sanduhr when Claude Code finishes or waits on you?",
+                "Sanduhr can then show a notification, a card on the Desk or a glow when Claude Code finishes a long turn or needs you.",
                 row.Display,
                 "What gets written: one UserPromptSubmit hook, one Notification hook and one Stop hook in this folder's "
                 + "settings.json. Each hook writes a small file under %USERPROFILE%\\.sanduhr naming the event, the folder and "
@@ -850,7 +850,9 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 "Install"));
             if (choice is null) return;
             var res = MakeIntegrations().Install(IntegrationKind.Hooks, row.Path);
-            Done(res.Ok ? "Glow hooks installed. Turn the glow on below."
+            // Interim: once the Notifications page exists, this also names it as a Settings path (the path lint refuses a
+            // link to a page that is not there yet).
+            Done(res.Ok ? "Hooks installed."
                         : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't install the hooks."), res.Ok);   // streamer: masked - via Shorten: the hook message passes FoldersIn (CP 8)
         }
         catch (Exception)
@@ -864,7 +866,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         try
         {
             var res = MakeIntegrations().Remove(IntegrationKind.Hooks, row.Path);
-            Done(res.Ok ? "Glow hooks removed." : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't remove the hooks."), res.Ok);   // streamer: masked - via Shorten: the hook message passes FoldersIn (CP 8)
+            Done(res.Ok ? "Hooks removed." : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't remove the hooks."), res.Ok);   // streamer: masked - via Shorten: the hook message passes FoldersIn (CP 8)
         }
         catch (Exception)
         {

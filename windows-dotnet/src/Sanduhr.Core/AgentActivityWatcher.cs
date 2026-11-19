@@ -403,6 +403,21 @@ public sealed class AgentActivityWatcher : IDisposable
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { continue; }
             if (data is not null && ClaudeCodeSignalFile.Decode(data, now) is { } signal) events.Add(_claude.Apply(signal));
         }
+
+        // A hook whose rename failed leaves its temporary file. One older than any signal Sanduhr would still read goes;
+        // a younger one may be mid-rename and stays. Best effort.
+        try
+        {
+            foreach (var tmp in new DirectoryInfo(_signalDir).EnumerateFiles(ClaudeCodeSignalFile.TempPattern))
+            {
+                try
+                {
+                    if (now - new DateTimeOffset(tmp.LastWriteTimeUtc, TimeSpan.Zero) > ClaudeCodeSignalFile.MaxAge) tmp.Delete();
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
 
     // ---- timers and folder watchers ----

@@ -73,12 +73,48 @@ public class ClaudeCodeHookSignalTests
         Assert.False(ClaudeCodeIntegrations.IsOurHookGroup(Group(ClaudeCodeIntegrations.HookCommand("waiting"))));   // no matcher
     }
 
+    private static JsonObject Hook(string command, string type = "command") => new() { ["type"] = type, ["command"] = command };
+
     [Fact]
-    public void The_new_command_reads_as_Sanduhrs_command() =>
-        Assert.True(ClaudeCodeIntegrations.IsOurHookCommand(new JsonObject
+    public void The_new_command_reads_as_Sanduhrs_command()
+    {
+        foreach (var word in new[] { "prompt", "waiting", "done" })
+            Assert.True(ClaudeCodeIntegrations.IsOurHookCommand(Hook(ClaudeCodeIntegrations.HookCommand(word))));
+    }
+
+    [Fact]
+    public void Each_older_generation_of_the_command_reads_as_Sanduhrs_command()
+    {
+        foreach (var signal in new[] { ClaudeCodeIntegrations.WaitingSignal, ClaudeCodeIntegrations.DoneSignal })
         {
-            ["type"] = "command", ["command"] = ClaudeCodeIntegrations.HookCommand("done"),
-        }));
+            Assert.True(ClaudeCodeIntegrations.IsOurHookCommand(Hook(ClaudeCodeIntegrations.GlowHookCommand(signal))));
+            Assert.True(ClaudeCodeIntegrations.IsOurHookCommand(Hook(ClaudeCodeIntegrations.LegacyHookCommand(signal))));
+        }
+    }
+
+    [Fact]
+    public void A_command_that_only_mentions_sanduhrs_names_is_not_sanduhrs_command()
+    {
+        Assert.False(ClaudeCodeIntegrations.IsOurHookCommand(Hook("echo cc-signal- > C:\\Users\\x\\.sanduhr\\mine.txt")));
+        Assert.False(ClaudeCodeIntegrations.IsOurHookCommand(Hook("powershell -c touch $env:USERPROFILE\\.sanduhr\\glow-done.signal")));
+        Assert.False(ClaudeCodeIntegrations.IsOurHookCommand(Hook(ClaudeCodeIntegrations.HookCommand("done") + "; echo mine")));
+        Assert.False(ClaudeCodeIntegrations.IsOurHookCommand(Hook(ClaudeCodeIntegrations.HookCommand("done"), type: "prompt")));
+        Assert.False(ClaudeCodeIntegrations.IsOurHookCommand(Hook(ClaudeCodeIntegrations.HookCommand("finished"))));
+    }
+
+    [Fact]
+    public void The_command_stops_writing_once_enough_signals_are_waiting()
+    {
+        Assert.Equal(100, ClaudeCodeSignalFile.MaxWaiting);
+        foreach (var word in new[] { "prompt", "waiting", "done" })
+        {
+            var cmd = ClaudeCodeIntegrations.HookCommand(word);
+            var check = "if (@(Get-ChildItem -LiteralPath $d -Filter '" + ClaudeCodeSignalFile.Pattern
+                        + "' -File -ErrorAction SilentlyContinue).Count -lt " + ClaudeCodeSignalFile.MaxWaiting + ") { ";
+            Assert.Contains(check, cmd);
+            Assert.True(cmd.IndexOf(check, StringComparison.Ordinal) < cmd.IndexOf("ReadToEnd", StringComparison.Ordinal));   // counts before it reads or writes
+        }
+    }
 }
 
 /// <summary>
@@ -159,6 +195,32 @@ public sealed class ClaudeCodeHookCommandRunTests : IDisposable
         Assert.Equal(ClaudeCodeSignalFile.Waiting, signal!.Event);
         Assert.Equal("sess-2", signal.Session);
         Assert.Equal(folder, signal.Folder);
+    }
+
+    private void Waiting(int count)
+    {
+        Directory.CreateDirectory(SanduhrDir);
+        for (int n = 0; n < count; n++) File.WriteAllBytes(Path.Combine(SanduhrDir, $"{ClaudeCodeSignalFile.Prefix}1-{n}.json"), []);
+    }
+
+    [PowerShellFact]
+    public void With_the_cap_of_signals_waiting_the_real_command_writes_nothing()
+    {
+        Waiting(ClaudeCodeSignalFile.MaxWaiting);
+        Assert.Equal(0, RunHook(ClaudeCodeSignalFile.Done, StopInput));
+        Assert.Equal(ClaudeCodeSignalFile.MaxWaiting, Directory.GetFiles(SanduhrDir, ClaudeCodeSignalFile.Pattern).Length);
+        Assert.Empty(Directory.GetFiles(SanduhrDir, "*.tmp"));
+    }
+
+    [PowerShellFact]
+    public void One_under_the_cap_the_real_command_writes_one_more()
+    {
+        Waiting(ClaudeCodeSignalFile.MaxWaiting - 1);
+        Assert.Equal(0, RunHook(ClaudeCodeSignalFile.Done, StopInput));
+        var files = Directory.GetFiles(SanduhrDir, ClaudeCodeSignalFile.Pattern);
+        Assert.Equal(ClaudeCodeSignalFile.MaxWaiting, files.Length);
+        var written = Assert.Single(files, f => new FileInfo(f).Length > 0);
+        Assert.Equal("sess-1", ClaudeCodeSignalFile.Decode(File.ReadAllBytes(written), DateTimeOffset.UtcNow)!.Session);
     }
 
     [PowerShellFact]

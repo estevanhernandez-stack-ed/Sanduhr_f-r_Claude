@@ -383,15 +383,18 @@ public sealed class ClaudeCodeIntegrations
     /// holding the event, the session's folder and its id. Written under a temporary name and renamed, so Sanduhr never
     /// reads half a file. It takes <c>cwd</c> and <c>session_id</c> from the input and nothing else. Standard input is read
     /// as UTF-8 (what Claude Code writes): Windows PowerShell's <c>[Console]::In</c> decodes it with the console code page,
-    /// which garbles a folder name that is not ASCII.
+    /// which garbles a folder name that is not ASCII. It writes nothing while <see cref="ClaudeCodeSignalFile.MaxWaiting"/>
+    /// signals already wait unread, so files never pile up while Sanduhr is not running.
     /// </summary>
     public static string HookCommand(string word)
-        => "$d = Join-Path $env:USERPROFILE '.sanduhr'; if (Test-Path -LiteralPath $d) { $i = $null; "
+        => "$d = Join-Path $env:USERPROFILE '.sanduhr'; if (Test-Path -LiteralPath $d) { "
+           + "if (@(Get-ChildItem -LiteralPath $d -Filter '" + ClaudeCodeSignalFile.Pattern + "' -File -ErrorAction SilentlyContinue).Count -lt "
+           + ClaudeCodeSignalFile.MaxWaiting.ToString(CultureInfo.InvariantCulture) + ") { $i = $null; "
            + "try { $i = [IO.StreamReader]::new([Console]::OpenStandardInput(), [Text.Encoding]::UTF8).ReadToEnd() | ConvertFrom-Json } catch { }; "
            + "$at = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); "
            + "$j = @{ 'v' = 1; 'event' = '" + word + "'; 'cwd' = [string]$i.cwd; 'session' = [string]$i.session_id; 'at' = $at } | ConvertTo-Json -Compress; "
            + "$f = Join-Path $d ('" + ClaudeCodeSignalFile.Prefix + "' + $at + '-' + $PID + '.json'); "
-           + "[IO.File]::WriteAllText($f + '.tmp', $j); Move-Item -LiteralPath ($f + '.tmp') -Destination $f -Force }";
+           + "[IO.File]::WriteAllText($f + '.tmp', $j); Move-Item -LiteralPath ($f + '.tmp') -Destination $f -Force } }";
 
     /// <summary>The command 3.5.0 to 4.9.0 wrote (touches an empty <c>%USERPROFILE%\.sanduhr\&lt;signal&gt;</c>). Still
     /// recognised as Sanduhr's: Status reads it Outdated, Install replaces it, Remove takes it out, and until then it
@@ -433,13 +436,28 @@ public sealed class ClaudeCodeIntegrations
     private static JsonEdit.Value HooksValue()
         => JsonEdit.Value.Obj([.. HookEvents.Select(e => new JsonEdit.Pair(e.Name, JsonEdit.Value.Arr(HookGroup(e.Name))))]);
 
-    public static bool IsOurHookCommand(JsonNode? hook)
+    /// <summary>
+    /// The event whose command <paramref name="cmd"/> is, byte for byte, in any generation (<see cref="HookCommand"/>,
+    /// <see cref="GlowHookCommand"/>, <see cref="LegacyHookCommand"/>); null when it is no command of Sanduhr's. The one list
+    /// of Sanduhr's commands: <see cref="IsOurHookCommand"/> and <see cref="IsOurHookGroup"/> both ask it.
+    /// </summary>
+    private static string? EventOfOurCommand(string cmd)
     {
-        if (hook is not JsonObject o || !(Str(o["type"]) == "command") || Str(o["command"]) is not { } cmd) return false;
-        return (cmd.Contains(WaitingSignal, StringComparison.Ordinal) || cmd.Contains(DoneSignal, StringComparison.Ordinal)
-                || cmd.Contains(ClaudeCodeSignalFile.Prefix, StringComparison.Ordinal))
-            && cmd.Contains("Sanduhr", StringComparison.OrdinalIgnoreCase);
+        foreach (var (name, word) in HookEvents)
+        {
+            if (string.Equals(cmd, HookCommand(word), StringComparison.Ordinal)
+                || (OldSignal(name) is { } signal
+                    && (string.Equals(cmd, GlowHookCommand(signal), StringComparison.Ordinal)
+                        || string.Equals(cmd, LegacyHookCommand(signal), StringComparison.Ordinal))))
+                return name;
+        }
+        return null;
     }
+
+    /// <summary>A command hook whose command is exactly one of Sanduhr's, of any generation. Says nothing of the group around
+    /// it (shell, matcher, other hooks): only <see cref="IsOurHookGroup"/> decides what Sanduhr may claim or remove.</summary>
+    public static bool IsOurHookCommand(JsonNode? hook)
+        => hook is JsonObject o && Str(o["type"]) == "command" && Str(o["command"]) is { } cmd && EventOfOurCommand(cmd) is not null;
 
     /// <summary>
     /// A group is Sanduhr's only when it matches Sanduhr's exact shape: the Notification matcher (none for
@@ -453,17 +471,9 @@ public sealed class ClaudeCodeIntegrations
     {
         if (group is not JsonObject o || o["hooks"] is not JsonArray hs || hs.Count != 1 || hs[0] is not JsonObject hook) return false;
         if (Str(hook["type"]) != "command" || Str(hook["shell"]) != "powershell" || Str(hook["command"]) is not { } cmd) return false;
-        foreach (var (name, word) in HookEvents)
-        {
-            bool ours = string.Equals(cmd, HookCommand(word), StringComparison.Ordinal)
-                || (OldSignal(name) is { } signal
-                    && (string.Equals(cmd, GlowHookCommand(signal), StringComparison.Ordinal)
-                        || string.Equals(cmd, LegacyHookCommand(signal), StringComparison.Ordinal)));
-            if (!ours) continue;
-            var matcher = o["matcher"];
-            return name == "Notification" ? Str(matcher) == WaitingMatcher : matcher is null;
-        }
-        return false;
+        if (EventOfOurCommand(cmd) is not { } name) return false;
+        var matcher = o["matcher"];
+        return name == "Notification" ? Str(matcher) == WaitingMatcher : matcher is null;
     }
 
     // ------------------------------------------------------------------ status
