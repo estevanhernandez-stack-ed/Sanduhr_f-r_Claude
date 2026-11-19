@@ -6,6 +6,11 @@ protocol AudioBarsSink: AnyObject {
     func show(heights: [Float], caps: [Float], showsCaps: Bool)
 }
 
+/// A bars view the driver hands frames to, held weakly.
+struct WeakAudioBarsSink {
+    weak var sink: AudioBarsSink?
+}
+
 /// Ticks the driver. The real one is a main-run-loop Timer; tests use a counter.
 protocol AudioBarsTicker: AnyObject {
     var running: Bool { get }
@@ -58,7 +63,9 @@ final class AudioBarsDriver {
     @ObservationIgnored private var motion = AudioBarMotion()
     @ObservationIgnored private var inference = AudioDeniedInference()
     @ObservationIgnored private var lastTapped: Int?
-    @ObservationIgnored private weak var sink: AudioBarsSink?
+    /// Every bars view on screen: now playing on All displays (2.45) draws one per Desk window, and
+    /// each copy moves with the same frames. Held weakly; a view that went away drops out.
+    @ObservationIgnored private var sinks: [WeakAudioBarsSink] = []
     @ObservationIgnored private var observing = false
 
     /// `tap` defaults to the real one; it builds nothing until a tap starts.
@@ -118,14 +125,23 @@ final class AudioBarsDriver {
 
     // MARK: The line's view
 
-    /// Hands frames to `sink` (the bars view), and the current ones at once.
+    /// Hands frames to `sink` (a bars view) beside any others already attached, and the current
+    /// ones at once.
     func attach(_ sink: AudioBarsSink) {
-        self.sink = sink
+        sinks.removeAll { $0.sink == nil || $0.sink === sink }
+        sinks.append(WeakAudioBarsSink(sink: sink))
         sink.show(heights: motion.heights, caps: motion.caps, showsCaps: motion.showsCaps)
     }
 
     func detach(_ sink: AudioBarsSink) {
-        if self.sink === sink { self.sink = nil }
+        sinks.removeAll { $0.sink == nil || $0.sink === sink }
+    }
+
+    /// How many bars views receive frames now, for the tests.
+    var attachedCount: Int { sinks.filter { $0.sink != nil }.count }
+
+    private func showFrame() {
+        for s in sinks { s.sink?.show(heights: motion.heights, caps: motion.caps, showsCaps: motion.showsCaps) }
     }
 
     // MARK: Running
@@ -166,7 +182,7 @@ final class AudioBarsDriver {
         if inference.denied != denied { denied = inference.denied }
         bars.push(peak, now: at)
         motion.step(bars.levels)
-        sink?.show(heights: motion.heights, caps: motion.caps, showsCaps: motion.showsCaps)
+        showFrame()
         if bars.isIdle(now: at) { sleep() }
     }
 
@@ -175,7 +191,7 @@ final class AudioBarsDriver {
         sleeping = true
         bars.reset()
         motion.reset()
-        sink?.show(heights: motion.heights, caps: motion.caps, showsCaps: motion.showsCaps)
+        showFrame()
         tap.armWake { [weak self] in self?.wake() }
     }
 
@@ -191,7 +207,7 @@ final class AudioBarsDriver {
         inference.reset()
         sleeping = false
         if denied { denied = false }
-        sink?.show(heights: motion.heights, caps: motion.caps, showsCaps: motion.showsCaps)
+        showFrame()
     }
 
     // MARK: The system
