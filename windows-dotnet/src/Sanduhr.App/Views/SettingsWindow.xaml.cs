@@ -248,6 +248,10 @@ internal partial class SettingsWindow : Window
         if (page == SettingsPage.UsageSources)
             ViewModel.Sources.Reload();
 
+        // Notifications reads the saved switches and each agent's state again: Sources and the Claude Code page change them.
+        if (page == SettingsPage.Notifications)
+            ViewModel.Notifications.Reload();
+
         // Accounts shows the selected account's folder link, which the Claude Code page changes: read it again on each visit.
         if (page == SettingsPage.Accounts)
             ViewModel.Accounts.Reload();

@@ -96,7 +96,8 @@ public sealed record HookReceipt
     [JsonObjectCreationHandling(JsonObjectCreationHandling.Populate)]
     public SortedDictionary<string, string> ArrayInners { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>The event lists Sanduhr created (<c>Notification</c>, <c>Stop</c>).</summary>
+    /// <summary>The event lists Sanduhr created (<c>UserPromptSubmit</c>, <c>Notification</c>, <c>Stop</c>). An update of
+    /// an older install adds the lists it made to the first install's.</summary>
     [JsonPropertyName("createdEvents")] public List<string> CreatedEvents { get; init; } = [];
 
     /// <summary>What sat between the braces of <c>hooks</c> when it was empty before Sanduhr's first list.</summary>

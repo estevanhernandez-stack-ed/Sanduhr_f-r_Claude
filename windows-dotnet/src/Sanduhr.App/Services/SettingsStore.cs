@@ -92,22 +92,34 @@ public sealed class SettingsStore
 
     private JsonObject Read()
     {
+        // Corrupt / unreadable settings start fresh rather than crash launch.
+        TryRead(out var root);
+        return root;
+    }
+
+    /// <summary>The settings as <see cref="Read"/> returns them, and false when the file was there but could not be read or
+    /// parsed (a save in flight holds it). A file that is not there is a good read of nothing.</summary>
+    private bool TryRead(out JsonObject root)
+    {
         try
         {
-            if (File.Exists(_path))
-                return JsonNode.Parse(File.ReadAllText(_path)) as JsonObject ?? new JsonObject();
+            root = File.Exists(_path) ? JsonNode.Parse(File.ReadAllText(_path)) as JsonObject ?? new JsonObject() : new JsonObject();
+            return true;
         }
         catch (Exception e) when (e is JsonException or IOException)
         {
-            // Corrupt / unreadable settings start fresh rather than crash launch.
+            root = new JsonObject();
+            return false;
         }
-        return new JsonObject();
     }
 
-    private void Write(JsonObject root)
+    private void Write(JsonObject root) => TryWrite(root);
+
+    /// <summary><see cref="Write"/>, and whether settings.json took it (false after Reset Sanduhr… or on a failed write).</summary>
+    private bool TryWrite(JsonObject root)
     {
         if (ResetGuard.Done)
-            return;   // Reset Sanduhr… has run: nothing writes settings.json again
+            return false;   // Reset Sanduhr… has run: nothing writes settings.json again
         try
         {
             File.WriteAllText(_path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
@@ -115,11 +127,12 @@ public sealed class SettingsStore
         catch (IOException)
         {
             // Best-effort persistence — a failed write must never take down the UI.
-            return;
+            return false;
         }
         McpSettingsExport.Sync(root, _mcpSettingsPath, LogLine);
         try { AnyWritten?.Invoke(); }
         catch (Exception e) when (e is InvalidOperationException or ObjectDisposedException) { /* a subscriber's problem never fails a save */ }
+        return true;
     }
 
     /// <summary>Raised after any <see cref="SettingsStore"/> wrote settings.json, on whatever thread wrote it (the
@@ -501,10 +514,12 @@ public sealed class SettingsStore
     }
 
     /// <summary>Activity-only sources switched on in Sources (spec 3): settings.json "activity", {"antigravity": true}.</summary>
-    public IReadOnlyDictionary<string, bool> LoadActivity()
+    public IReadOnlyDictionary<string, bool> LoadActivity() => ActivityOf(Read());
+
+    private static IReadOnlyDictionary<string, bool> ActivityOf(JsonObject root)
     {
         var result = new Dictionary<string, bool>(StringComparer.Ordinal);
-        if (Read()["activity"] is JsonObject map)
+        if (root["activity"] is JsonObject map)
             foreach (var (name, node) in map)
             {
                 try { result[name] = node?.GetValue<bool>() ?? false; }
@@ -684,31 +699,44 @@ public sealed class SettingsStore
         Write(root);
     }
 
-    /// <summary>The Claude Code edge glow switches (settings.json "claude_code_glow"
-    /// {"waiting", "done", "skip_terminal"}). Off, off, and skip-terminal on until set.</summary>
-    public GlowSwitches LoadClaudeCodeGlow()
-    {
-        var o = Read()["claude_code_glow"] as JsonObject;
-        return new GlowSwitches(
-            Waiting: ReadBool(o, "waiting", false),
-            Done: ReadBool(o, "done", false),
-            SkipTerminal: ReadBool(o, "skip_terminal", true));
-    }
-
-    public void SaveClaudeCodeGlow(GlowSwitches switches)
+    /// <summary>Settings, Notifications (5.0 spec 4): settings.json "agent_notifications". With none saved, the defaults
+    /// with the old Claude Code glow switches ("claude_code_glow" {"waiting", "done", "skip_terminal"}) carried over.</summary>
+    public NotificationSettings LoadAgentNotifications()
     {
         var root = Read();
-        // The switches only: the glow target's members (spec 6.8) beside them are kept.
-        if (root["claude_code_glow"] is not JsonObject glow)
-        {
-            glow = new JsonObject();
-            root["claude_code_glow"] = glow;
-        }
-        glow["waiting"] = switches.Waiting;
-        glow["done"] = switches.Done;
-        glow["skip_terminal"] = switches.SkipTerminal;
+        var o = root["claude_code_glow"] as JsonObject;   // named "o" so SettingsKeysContractTests still finds the old switches' keys
+        return NotificationSettings.Decode(root[NotificationSettings.Key],
+            new GlowSwitches(Waiting: ReadBool(o, "waiting", false), Done: ReadBool(o, "done", false), SkipTerminal: ReadBool(o, "skip_terminal", true)));
+    }
+
+    public void SaveAgentNotifications(NotificationSettings settings)
+    {
+        var root = Read();
+        root[NotificationSettings.Key] = settings.Encode();
         Write(root);
     }
+
+    /// <summary>Settings, Notifications' save: false when settings.json could not be read (nothing is written over it then) or
+    /// written, so the page can snap its switches back and clear nothing.</summary>
+    public bool TrySaveAgentNotifications(NotificationSettings settings)
+    {
+        if (!TryRead(out var root)) return false;
+        root[NotificationSettings.Key] = settings.Encode();
+        return TryWrite(root);
+    }
+
+    /// <summary>The glow switches as the glow service reads them. Since 5.0 they live in "agent_notifications".</summary>
+    public GlowSwitches LoadClaudeCodeGlow()
+    {
+        var n = LoadAgentNotifications();
+        return new GlowSwitches(Waiting: n.GlowWaiting, Done: n.GlowFinished, SkipTerminal: n.SkipInFront);
+    }
+
+    public void SaveClaudeCodeGlow(GlowSwitches switches) =>
+        SaveAgentNotifications(LoadAgentNotifications() with
+        {
+            GlowWaiting = switches.Waiting, GlowFinished = switches.Done, SkipInFront = switches.SkipTerminal,
+        });
 
     /// <summary>Where the Claude Code glow lands (spec 6.8): "claude_code_glow" members "target",
     /// "edge_side" and "edge_monitor". Absent reads as the window in use (S4's behavior).</summary>
@@ -925,9 +953,21 @@ public sealed class SettingsStore
 
     /// <summary>The setup (setup spec, section 1): null when no setup has been made yet, a first run. Decoded entry by entry; an
     /// unreadable entry takes what the migration would say for it.</summary>
-    public SetupSettings? LoadSetup()
+    public SetupSettings? LoadSetup() => SetupOf(Read());
+
+    /// <summary>Whether Codex and the Antigravity CLI are on in Sources, read in one pass for the turn watcher (5.0 spec 4).
+    /// False when the settings file could not be read or parsed just now (a save in flight): the caller keeps what it knew.
+    /// A file that is not there is a good read with both off.</summary>
+    public bool TryLoadAgentSources(out bool codex, out bool antigravity)
     {
-        var root = Read();
+        bool ok = TryRead(out var root);
+        codex = SetupOf(root)?.CodexUsage ?? false;
+        antigravity = ActivityOf(root).GetValueOrDefault(AgentSources.Antigravity);
+        return ok;
+    }
+
+    private static SetupSettings? SetupOf(JsonObject root)
+    {
         if (root[SetupSettings.Key] is not { } node) return null;
         var fallback = SetupMigration.From(true, false, false, ReadBool(root, "desk_enabled", false))!.Setup;
         return SetupSettings.Decode(node, fallback);

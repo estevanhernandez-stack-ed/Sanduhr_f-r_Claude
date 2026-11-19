@@ -133,20 +133,28 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
     });
 
     [Fact]
-    public void The_three_glow_switches_are_named_by_their_labels() => AppHost.Run(() =>
+    public void The_glow_section_links_to_the_notification_switches() => AppHost.Run(() =>
     {
-        // P8: Content and the spoken name are the same words, from SettingsNames.
+        // 5.0 (spec 4): the three glow switches and Try it moved to Settings, Notifications (NotificationsPageTests names them
+        // there); the glow section keeps the hook line and the picker, and links to the switches.
         var (window, _, guard) = Open("Personal");
         try
         {
             window.SelectPage(SettingsPage.ClaudeCode);
             Settle(window, guard);
-            var boxes = Below<CheckBox>(window).ToList();
+            var page = Below<ClaudeCodePage>(window).Single();
+            var boxes = Below<CheckBox>(page).ToList();
             foreach (var label in new[] { SettingsNames.GlowWhenWaiting, SettingsNames.GlowWhenDone, SettingsNames.GlowNotInTerminal })
-            {
-                var box = Assert.Single(boxes, b => Equals(b.Content, label));
-                Assert.Equal(label, NameOf(box));
-            }
+                Assert.DoesNotContain(boxes, b => Equals(b.Content, label));
+            Assert.DoesNotContain(Below<Button>(page), b => NameOf(b).StartsWith("Try it", StringComparison.Ordinal));
+            var link = Assert.Single(Below<Button>(page), b => NameOf(b) == SettingsNames.NotificationsLinkTitle);
+            Assert.Equal(SettingsNames.NotificationsLinkTitle, link.Content);
+            // Fix round 1: the flash follows Notifications' Flash switch since 5.0, so the picker's caption says where it is.
+            var texts = Below<TextBlock>(page).Select(t => t.Text).ToList();
+            Assert.Contains("To flash Sanduhr in the taskbar too, turn it on in Settings, Notifications. Only flash skips the light.", texts);
+            Assert.Equal("To flash Sanduhr in the taskbar too, turn it on in Settings, Notifications. Only flash skips the light.", SettingsNames.GlowFlashCaption);
+            Assert.DoesNotContain(texts, t => t.Contains("flashes in every choice", StringComparison.Ordinal));
+            Assert.Equal(new SettingsLink(SettingsPage.Notifications, SettingsIndex.NotifyShow), SettingsIndex.ParseLink(SettingsLinkTo.GetLink(link)));
         }
         finally { window.Close(); }
     });
@@ -174,7 +182,7 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
 
             // No Install, Change or Update button shows for the statusline or the glow hook: both stay out of a settings.json they can't read.
             // "Install MCP server" is deliberately not asserted: it writes .claude.json, not the unreadable settings.json.
-            Assert.DoesNotContain(Below<Button>(card), b => b.IsVisible && NameOf(b) is "Install Statusline" or "Install Claude Code glow hook");
+            Assert.DoesNotContain(Below<Button>(card), b => b.IsVisible && NameOf(b) is "Install Statusline" or "Install Claude Code hook");
             // The one switch on the card is the MCP read switch, which is Sanduhr's own setting and not in the folder.
             Assert.Equal([row.McpReadableName], Below<CheckBox>(card).Select(NameOf).ToList());
         }

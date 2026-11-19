@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
-using Microsoft.Toolkit.Uwp.Notifications;
 using Sanduhr.App.Interop;
 using Sanduhr.App.Services;
 using Sanduhr.Core;
@@ -274,10 +273,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     {
         try
         {
-            new ToastContentBuilder()
-                .AddText($"Couldn't open {name}")
-                .AddText("Check that it is still there, then try again.")
-                .Show();
+            Toasts.Show($"Couldn't open {name}", "Check that it is still there, then try again.");
         }
         catch (Exception e)
         {

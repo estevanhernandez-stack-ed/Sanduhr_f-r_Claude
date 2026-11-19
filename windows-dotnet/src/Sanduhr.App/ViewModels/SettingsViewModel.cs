@@ -37,6 +37,9 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
     /// <summary>Settings, Usage, Sources (agent layer): on, primary, color and alerts for each source.</summary>
     public SourcesViewModel Sources { get; }
 
+    /// <summary>Settings, Notifications (5.0 spec 4): which agents notify, where it shows and when.</summary>
+    public NotificationsViewModel Notifications { get; }
+
     /// <summary>Settings, Drawers (5.0 drawers spec): on and off, the folder, Sort my desktop now, the rules, the drawers and the recent moves.</summary>
     public DrawersSettingsViewModel Drawers { get; }
 
@@ -45,6 +48,9 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
 
     /// <summary>Called after the Message page saves the file or its settings (the Desk redraws).</summary>
     public Action? MessageChanged { get; set; }
+
+    /// <summary>Set by App: an activity-only source was switched on (5.0 spec 4: the turn watcher looks at its folder at once).</summary>
+    public Action? ActivitySourceChanged { get; set; }
 
     /// <summary>Settings, Now playing (spec 6.3).</summary>
     public NowPlayingPageViewModel NowPlayingPage { get; }
@@ -242,7 +248,16 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
             () => CodexHomes.Discover(Environment.GetEnvironmentVariable("CODEX_HOME"),
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)),   // streamer: notname - only whether a Codex home exists, never drawn
             () => System.IO.Directory.Exists(AntigravityBurnSource.DefaultCliHome(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))),   // streamer: notname - only whether the folder exists, never drawn
-            agent => widget.Vault?.SetAgentVaultOn(agent));
+            agent => { widget.Vault?.SetAgentVaultOn(agent); ActivitySourceChanged?.Invoke(); });
+        // Each row's state is read on each visit: Sources switches Codex and Antigravity, and Claude Code's hook is read from the
+        // folders' own files (not the Claude Code page's cards), so it is right before that page is ever shown.
+        Notifications = new NotificationsViewModel(new SettingsStore(new Paths()), agent => agent switch
+        {
+            AgentSources.Codex => (new SettingsStore(new Paths()).LoadSetup()?.CodexUsage ?? false) ? AgentRowState.Ready : AgentRowState.SourceOff,
+            AgentSources.Antigravity => new SettingsStore(new Paths()).LoadActivity().GetValueOrDefault(AgentSources.Antigravity)
+                ? AgentRowState.Ready : AgentRowState.SourceOff,
+            _ => ClaudeCodePage.HookState(),
+        });
         var msgPaths = new Paths();
         MessagePage = new DeskMessagePageViewModel(new SettingsStore(msgPaths), System.IO.Path.Combine(msgPaths.AppDataDir, "messages.txt"),
             () => !ResetGuard.Done, () => MessageChanged?.Invoke(), Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies(),

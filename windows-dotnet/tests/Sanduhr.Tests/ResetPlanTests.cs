@@ -91,7 +91,7 @@ public class ResetPlanTests : IDisposable
         [
             "snapshot.json", "snapshot.abcd1234.json", "seats.json",
             "publish-request.json", "publish-result.json", "theme-request.json", "theme-result.json",
-            "glow-waiting.signal", "glow-done.signal", "desk-messages-request.json", "watch-request-1-2-w1.json",
+            "glow-waiting.signal", "glow-done.signal", "cc-signal-1-2.json", "cc-signal-3-4.json.tmp", "desk-messages-request.json", "watch-request-1-2-w1.json",
             "mods\\m\\file.txt", "mcp\\v1\\sanduhr-mcp.exe", "bin\\sanduhr-statusline.ps1", "mcp-settings.json",
             "watchers.json", "desk-state.json", "wallpaper-preview.png", "desk-design-request.json", "desk-design-result.json",
             "now-playing-looks-request.json", "now-playing-looks-result.json", "now-playing-look.json", "now-playing-look-offer.json",
@@ -128,7 +128,7 @@ public class ResetPlanTests : IDisposable
             // the same names in ~\.sanduhr
             "~\\snapshot.json", "~\\snapshot.abcd1234.json", "~\\seats.json",
             "~\\publish-request.json", "~\\publish-result.json", "~\\theme-request.json", "~\\theme-result.json",
-            "~\\glow-waiting.signal", "~\\glow-done.signal", "~\\desk-messages-request.json", "~\\watch-request-1-2-w1.json",
+            "~\\glow-waiting.signal", "~\\glow-done.signal", "~\\cc-signal-1-2.json", "~\\cc-signal-3-4.json.tmp", "~\\desk-messages-request.json", "~\\watch-request-1-2-w1.json",
             "~\\desk-design-request.json", "~\\desk-design-result.json",
             "~\\now-playing-looks-request.json", "~\\now-playing-looks-result.json", "~\\now-playing-look.json", "~\\now-playing-look-offer.json",
             // the widget handoff (3.8, propose_widget), by name

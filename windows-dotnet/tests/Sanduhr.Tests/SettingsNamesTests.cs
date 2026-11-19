@@ -300,7 +300,7 @@ public class SettingsNamesTests
         Assert.Equal("Open archive folder", SettingsNames.OpenArchiveFolder);
         Assert.Equal("Folders to share (off until you tick them)", SettingsNames.FoldersToShare);
         Assert.Equal("Nothing archived yet.", SettingsNames.NothingArchivedYet);
-        Assert.Equal("Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, glow hook)", SettingsNames.ResetClaudeCodeEntries);
+        Assert.Equal("Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, hook)", SettingsNames.ResetClaudeCodeEntries);
         Assert.Equal("Meter history and the session archive", SettingsNames.ResetMeterHistory);
         foreach (var old in new[] { "Export CSV…", "History vault", "Usage vault", "Erase archive", "Open vault folder", "Homes to share", "(statusline, MCP server)", "Usage history and the vault" })
             Assert.NotEmpty(SettingsNames.RetiredNames(old));
@@ -310,7 +310,7 @@ public class SettingsNamesTests
     public void Page_copy_names_are_pinned_and_the_old_ones_retired()
     {
         Assert.Equal("Desk: a clock, your meters, a message and more on the desktop", SettingsNames.DeskSwitch);
-        Assert.Equal("Claude Code glow hook", SettingsNames.ClaudeCodeGlowHook);
+        Assert.Equal("Claude Code hook", SettingsNames.ClaudeCodeGlowHook);
         Assert.Equal("Installed, but not the current version.", SettingsNames.PieceOutdated);
         Assert.Equal("Once the statusline or meters are installed here, they show this account's meters.", SettingsNames.LinkedAccountCaption);
         Assert.Equal("Claude Code keeps transcripts for", SettingsNames.TranscriptsKept);

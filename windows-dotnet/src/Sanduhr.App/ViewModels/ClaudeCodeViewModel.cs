@@ -254,10 +254,6 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     partial void OnHasFoldersChanged(bool value) => OnPropertyChanged(nameof(HasNoFolders));
     [ObservableProperty] private bool _linkEnabled = true;
 
-    [ObservableProperty] private bool _glowWaiting;
-    [ObservableProperty] private bool _glowDone;
-    [ObservableProperty] private bool _glowSkipTerminal = true;
-
     /// <summary>The Claude Code glow section's line: which folders have the hook (WF11).</summary>
     [ObservableProperty] private string _glowHookStatus = "";
 
@@ -274,8 +270,6 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
 
     /// <summary>Set by App: tells the glow service to re-read the switches.</summary>
     public Action? GlowReload { get; set; }
-    /// <summary>Set by App: plays the glow once ("Try it").</summary>
-    public Action<ClaudeCodeEvent>? GlowPreview { get; set; }
 
     public ClaudeCodeViewModel(WidgetViewModel widget)
     {
@@ -284,10 +278,6 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         AskConsent = spec => IntegrationConsentDialog.Ask(_owner, spec);
         Reload();
         _loading = true;
-        var glow = _widget.LoadClaudeCodeGlow();
-        GlowWaiting = glow.Waiting;
-        GlowDone = glow.Done;
-        GlowSkipTerminal = glow.SkipTerminal;
         var target = _glowSaved = _glowStore.LoadGlowTarget();
         GlowTarget = GlowTargets.First(c => c.Kind == target.Kind);
         GlowSide = GlowSides.First(c => c.Side == target.Side);
@@ -415,9 +405,9 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             () => InstallMcp(row), () => RemoveMcp(row), "Update…",
             "Asks first, then copies the current server files again and refreshes Sanduhr's entry in this folder's .claude.json."),
         _ => new CcPieceViewModel(SettingsNames.ClaudeCodeGlowHook,
-            "Two hooks that light the edge of your window when Claude Code waits on you or finishes.",
+            "Three hooks that tell Sanduhr when Claude Code starts a turn, waits on you or finishes.",
             () => InstallHooks(row), () => RemoveHooks(row), "Update…",
-            "Asks first, then writes Sanduhr's two hooks into this folder's settings.json again."),
+            "Asks first, then writes Sanduhr's three hooks into this folder's settings.json again."),
     };
 
     /// <summary>A card's "What this folder holds".</summary>
@@ -840,16 +830,18 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         try
         {
             var choice = AskConsent(new ConsentSpec(
-                "Glow when Claude Code needs you?",
-                "Sanduhr lights the top edge of your window when Claude Code waits on you or finishes.",
+                "Tell Sanduhr when Claude Code finishes or waits on you?",
+                "Sanduhr can then show a notification, a card on the Desk or a glow when Claude Code finishes a long turn or needs you.",
                 row.Display,
-                "What gets written: one Notification hook and one Stop hook in this folder's settings.json. Each only "
-                + "touches a signal file under %USERPROFILE%\\.sanduhr. Nothing from Claude Code is passed on or read. "
-                + "Remove takes out only those two hooks.",
+                "What gets written: one UserPromptSubmit hook, one Notification hook and one Stop hook in this folder's "
+                + "settings.json. Each hook writes a small file under %USERPROFILE%\\.sanduhr naming the event, the folder and "
+                + "the session. Sanduhr deletes it as it reads it. Claude Code hands each hook its input, which includes the prompt "
+                + "when a prompt is sent. The hook takes only the folder and the session id from it, and never writes or sends the rest. "
+                + "Remove takes out only those three hooks.",
                 "Install"));
             if (choice is null) return;
             var res = MakeIntegrations().Install(IntegrationKind.Hooks, row.Path);
-            Done(res.Ok ? "Glow hooks installed. Turn the glow on below."
+            Done(res.Ok ? "Hooks installed. Choose what shows in Settings, Notifications."
                         : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't install the hooks."), res.Ok);   // streamer: masked - via Shorten: the hook message passes FoldersIn (CP 8)
         }
         catch (Exception)
@@ -863,7 +855,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         try
         {
             var res = MakeIntegrations().Remove(IntegrationKind.Hooks, row.Path);
-            Done(res.Ok ? "Glow hooks removed." : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't remove the hooks."), res.Ok);   // streamer: masked - via Shorten: the hook message passes FoldersIn (CP 8)
+            Done(res.Ok ? "Hooks removed." : Shorten(res.Message is { Length: > 0 } m ? m : "Couldn't remove the hooks."), res.Ok);   // streamer: masked - via Shorten: the hook message passes FoldersIn (CP 8)
         }
         catch (Exception)
         {
@@ -871,24 +863,26 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         }
     }
 
-    // ------------------------------------------------------------------ glow switches
+    // ------------------------------------------------------------------ Settings, Notifications
 
-    partial void OnGlowWaitingChanged(bool value) => SaveGlow();
-    partial void OnGlowDoneChanged(bool value) => SaveGlow();
-    partial void OnGlowSkipTerminalChanged(bool value) => SaveGlow();
+    /// <summary>The glow's switches live on Settings, Notifications since 5.0 (spec 4).</summary>
+    public SettingsLink NotificationsLink { get; } = SettingsIndex.Check(SettingsPage.Notifications, SettingsIndex.NotifyShow);
 
-    private void SaveGlow()
+    /// <summary><see cref="NotificationsLink"/> as the link text a button's <c>SettingsLinkTo.Link</c> carries ("notifications#notify-show").</summary>
+    public string NotificationsLinkText => SettingsIndex.PageId(NotificationsLink.Page) + "#" + NotificationsLink.Anchor;
+
+    /// <summary>What Settings, Notifications says on Claude Code's row: ready when any folder has the current hook, an older
+    /// hook when none has but one has the 3.5 to 4.9 one, unreadable when none has either and a folder's settings.json can't be read,
+    /// else missing. Read from the folders' settings.json files on each call,
+    /// not from this page's cards, so it is right on a visit to Notifications before this page was ever shown.</summary>
+    internal AgentRowState HookState()
     {
-        if (_loading) return;
-        _widget.SaveClaudeCodeGlow(new GlowSwitches(GlowWaiting, GlowDone, GlowSkipTerminal));
-        GlowReload?.Invoke();
+        var integ = MakeIntegrations();
+        var states = KnownFolders().Select(f => integ.Status(IntegrationKind.Hooks, f.Path)).ToList();   // streamer: key - folder paths handed to the status reader, never drawn
+        if (states.Contains(IntegrationStatus.Installed)) return AgentRowState.Ready;
+        if (states.Contains(IntegrationStatus.Outdated)) return AgentRowState.HookOutdated;
+        return states.Contains(IntegrationStatus.Unreadable) ? AgentRowState.HookUnreadable : AgentRowState.HookMissing;
     }
-
-    [RelayCommand]
-    private void TryWaiting() => GlowPreview?.Invoke(ClaudeCodeEvent.Waiting);
-
-    [RelayCommand]
-    private void TryDone() => GlowPreview?.Invoke(ClaudeCodeEvent.Done);
 
     // ------------------------------------------------------------------ reset
 

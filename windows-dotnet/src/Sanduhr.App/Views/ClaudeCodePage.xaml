@@ -254,21 +254,10 @@
                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                     <TextBlock Text="{Binding GlowHookStatus}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,10"
                                views:LiveRegion.Announces="True" Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
-                    <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,0,0,6" Content="{x:Static core:SettingsNames.GlowWhenWaiting}"
-                              AutomationProperties.Name="{x:Static core:SettingsNames.GlowWhenWaiting}"
-                              IsChecked="{Binding GlowWaiting, Mode=TwoWay}" />
-                    <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,0,0,6" Content="{x:Static core:SettingsNames.GlowWhenDone}"
-                              AutomationProperties.Name="{x:Static core:SettingsNames.GlowWhenDone}"
-                              IsChecked="{Binding GlowDone, Mode=TwoWay}" />
-                    <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,0,0,8" Content="{x:Static core:SettingsNames.GlowNotInTerminal}"
-                              AutomationProperties.Name="{x:Static core:SettingsNames.GlowNotInTerminal}"
-                              IsChecked="{Binding GlowSkipTerminal, Mode=TwoWay}" />
-                    <StackPanel Orientation="Horizontal">
-                        <Button Style="{DynamicResource FlatButton}" Content="Try it: waiting" Padding="10,5" Command="{Binding TryWaitingCommand}"
-                                AutomationProperties.Name="Try it: waiting" />
-                        <Button Style="{DynamicResource FlatButton}" Content="Try it: done" Padding="10,5" Command="{Binding TryDoneCommand}"
-                                AutomationProperties.Name="Try it: done" />
-                    </StackPanel>
+                    <!-- The glow's switches and Try it moved to Settings, Notifications in 5.0 (spec 4). -->
+                    <Button Style="{DynamicResource SettingsLinkButton}" HorizontalAlignment="Left" Margin="0,0,0,4"
+                            Content="{x:Static core:SettingsNames.NotificationsLinkTitle}" views:SettingsLinkTo.Link="{Binding NotificationsLinkText}"
+                            AutomationProperties.Name="{x:Static core:SettingsNames.NotificationsLinkTitle}" />
                     <StackPanel views:SettingsAnchor.Id="glow-where" Margin="0,12,0,0">
                         <TextBlock Text="{x:Static core:SettingsNames.GlowWhere}" FontSize="12" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level3"
                                    Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
@@ -287,7 +276,7 @@
                             <views:DeskPieceStatusPanel DataContext="{Binding DataContext.Desk.GlowPiece, RelativeSource={RelativeSource AncestorType=Window}}" />
                         </Border>
                         <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                   Text="The taskbar button flashes in every choice. Only flash skips the light." />
+                                   Text="{x:Static core:SettingsNames.GlowFlashCaption}" />
                     </StackPanel>
                 </StackPanel>
 

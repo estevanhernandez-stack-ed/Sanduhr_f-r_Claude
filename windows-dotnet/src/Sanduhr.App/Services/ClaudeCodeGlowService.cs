@@ -26,7 +26,7 @@ internal sealed class ClaudeCodeGlowService : IDisposable
     private readonly Dictionary<ClaudeCodeEvent, DispatcherTimer> _pending = new();
     private FileSystemWatcher? _watcher;
     private GlowOverlayWindow? _overlay;
-    private GlowSwitches _switches = new();
+    private NotificationSettings _notify = NotificationSettings.Default;
     private ClaudeCodeGlowLimiter _limiter;
     private bool _disposed;
 
@@ -80,7 +80,7 @@ internal sealed class ClaudeCodeGlowService : IDisposable
     /// <summary>Re-read the switches (Settings changed them).</summary>
     public void Reload()
     {
-        _switches = _store.LoadClaudeCodeGlow();
+        _notify = _store.LoadAgentNotifications();
         _target = _store.LoadGlowTarget();
     }
 
@@ -100,8 +100,34 @@ internal sealed class ClaudeCodeGlowService : IDisposable
     {
         if (_disposed) return;
         if (!_ui.CheckAccess()) { _ui.BeginInvoke(() => Preview(e)); return; }
-        Show(e, flash: false);
+        Show(GlowOverlayContent.ColorFor(e), flash: false);
     }
+
+    /// <summary>Lights the current target in <paramref name="color"/> (an agent's Sources color for a finished turn),
+    /// flashing the widget's taskbar button too when <paramref name="flash"/> is set. The notifier has already applied
+    /// the switches, the in-front rule and the limiter (5.0 spec 4).</summary>
+    public void Glow(System.Windows.Media.Color color, bool flash)
+    {
+        if (_disposed) return;
+        if (!_ui.CheckAccess()) { _ui.BeginInvoke(() => Glow(color, flash)); return; }
+        Show(color, flash);
+    }
+
+    /// <summary>The taskbar flash without the light.</summary>
+    public void FlashOnly()
+    {
+        if (_disposed) return;
+        if (!_ui.CheckAccess()) { _ui.BeginInvoke(FlashOnly); return; }
+        try { GlowNative.FlashTray(new WindowInteropHelper(_widget).Handle); }
+        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception
+                                      or DllNotFoundException or EntryPointNotFoundException)
+        {
+            // A flash that cannot show is not worth a crash.
+        }
+    }
+
+    /// <summary>The process name of the window in front, null when there is none or it cannot be read.</summary>
+    public string? ForegroundProcess() => ProcessNameOf(GlowNative.GetForegroundWindow(), out _);
 
     // Runs on a thread-pool thread: only hop to the UI thread, and never open the file.
     private void OnSignal(object sender, FileSystemEventArgs e)
@@ -130,20 +156,21 @@ internal sealed class ClaudeCodeGlowService : IDisposable
     private void Fire(ClaudeCodeEvent kind)
     {
         if (_disposed) return;
-        var fg = GlowNative.GetForegroundWindow();
-        if (!ClaudeCodeGlowRules.Decide(kind, _switches, ProcessNameOf(fg, out _), ref _limiter, DateTimeOffset.UtcNow))
-            return;
-        Show(kind, flash: true);
+        // An older hook's signal (3.5 to 4.9): it glows as it did, and flashes when Settings, Notifications says so. Nothing
+        // while Claude Code is switched off there. The front window is read only when a glow is otherwise due.
+        var (glow, flash) = NotificationRules.OldHookSignal(_notify, kind, ForegroundProcess, ref _limiter, DateTimeOffset.UtcNow);
+        if (!glow) return;
+        Show(GlowOverlayContent.ColorFor(kind), flash);
     }
 
-    private void Show(ClaudeCodeEvent kind, bool flash)
+    private void Show(System.Windows.Media.Color color, bool flash)
     {
         try
         {
             // Where it lands (spec 6.8, 7.3): the window in use (S4), a chosen screen edge, the Desk's spot,
             // or the widget's taskbar flash alone. The Desk's spot draws when the Desk is on and the spot is
             // in sight; otherwise the glow goes to the window in use.
-            if (_target.Kind == GlowTargetKind.Desk && DeskGlow?.Invoke(GlowOverlayContent.ColorFor(kind)) == true)
+            if (_target.Kind == GlowTargetKind.Desk && DeskGlow?.Invoke(color) == true)
             {
                 if (flash) GlowNative.FlashTray(new WindowInteropHelper(_widget).Handle);
                 return;
@@ -152,14 +179,14 @@ internal sealed class ClaudeCodeGlowService : IDisposable
             if (where == GlowTargetKind.Edge && EdgeMonitor() is { } mon)
             {
                 _overlay ??= new GlowOverlayWindow();
-                _overlay.Glow(GlowPlacement.Edge(mon.Bounds, _target.Side, mon.Scale), GlowOverlayContent.ColorFor(kind), _target.Side);
+                _overlay.Glow(GlowPlacement.Edge(mon.Bounds, _target.Side, mon.Scale), color, _target.Side);
             }
             else if (where != GlowTargetKind.Widget)
             {
                 var (target, fallback, scale) = Observe();
                 var rect = GlowPlacement.Compute(target, fallback, scale);
                 _overlay ??= new GlowOverlayWindow();
-                _overlay.Glow(rect, GlowOverlayContent.ColorFor(kind));
+                _overlay.Glow(rect, color);
             }
             if (flash || where == GlowTargetKind.Widget) GlowNative.FlashTray(new WindowInteropHelper(_widget).Handle);
         }

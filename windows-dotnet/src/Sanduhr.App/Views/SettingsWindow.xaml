@@ -1390,6 +1390,11 @@
                     </Border>
                 </TabItem>
 
+                <!-- Notifications (5.0 spec 4): which agents notify, where it shows and when. -->
+                <TabItem Header="Notifications" Tag="Notifications" AutomationProperties.Name="Notifications" DataContext="{Binding Notifications}">
+                    <views:NotificationsPage />
+                </TabItem>
+
                 <!-- Settings, Privacy (slice 6): what leaves this PC and what Claude can change (WF6, WF10). Slice 7 adds Streamer mode at its top. -->
                 <TabItem Header="Privacy" Tag="Privacy" AutomationProperties.Name="Privacy" DataContext="{Binding Privacy}">
                     <views:PrivacyPage />

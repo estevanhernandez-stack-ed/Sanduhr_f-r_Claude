@@ -164,8 +164,8 @@
                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
 
                 <CheckBox x:Name="ClaudeCodeBox" Style="{StaticResource ThemedCheckBox}" IsChecked="True"
-                          Content="Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, glow hook)"
-                          AutomationProperties.Name="Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, glow hook)"
+                          Content="Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, hook)"
+                          AutomationProperties.Name="Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, hook)"
                           Margin="0,0,0,4" Checked="Choice_Changed" Unchecked="Choice_Changed" />
                 <!-- Settings v2, slice 8 (R12): a checkbox per folder that holds Sanduhr's entries, then the lines that are true for
                      what is ticked (decision 6). Rows show folders as every page does; the choice keys on the real folder. The list scrolls

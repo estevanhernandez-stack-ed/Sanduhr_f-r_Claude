@@ -172,7 +172,7 @@ The Claude Code side (`docs/spec.md` Stage 4, `../docs/mods-and-config-spec.md`)
 - **Settings, Claude Code**: every folder Sanduhr finds (`~/.claude`, `~/.claude-*` with
   `projects/` or a `.claude.json`, the `CLAUDE_CONFIG_DIR` folder in the profile) plus folders
   added by hand (`cc_folders_added`); a linked account per folder; the MCP consent per folder;
-  Install and Remove for the statusline, the MCP server, the meters mod and the glow hooks, each
+  Install and Remove for the statusline, the MCP server, the meters mod and the Claude Code hooks, each
   behind a consent dialog. The statusline and MCP moved here from Claude Usage.
 - **Edits with exact undo**: `JsonEdit` splices one member and keeps every other byte (LF and
   CRLF); `ConfigCommit` re-reads and compares before replacing, with backups in
@@ -185,9 +185,15 @@ The Claude Code side (`docs/spec.md` Stage 4, `../docs/mods-and-config-spec.md`)
   `%USERPROFILE%\.sanduhr\mods\<stamp>` and joins `env.CLAUDE_CODE_PLUGIN_DIRS`; On, Off, Update and
   Remove live on **Settings, Mods & Widgets**, which otherwise reads a folder without changing it (settings,
   statusline, hooks, plugins, mods, MCP names, `CLAUDE.md`, retention). Secrets are masked.
-- **Glow when Claude needs you**: `Notification` and `Stop` hooks touch a signal file; the widget
-  lights the top edge of the window you are working in, in the theme's accent (waiting) or
-  success color (done), and flashes the taskbar button. Off by default (`claude_code_glow`).
+- **The Claude Code hook** (5.0; "Claude Code glow hook" before): `UserPromptSubmit`, `Notification`
+  and `Stop` hooks each write one `cc-signal-<time>-<pid>.json` under `%USERPROFILE%\.sanduhr`
+  (event, the session's folder, the session id, the time; never anything said; nothing is written
+  once 100 are waiting). Sanduhr deletes each as it reads it. They feed the agent notifications
+  (a toast, a Desk card, and when switched on the glow and the taskbar flash), whose switches are
+  on **Settings, Notifications**; where the glow shows stays on the Claude Code page. A 3.5 to 4.9
+  hook still only touches an empty `glow-waiting.signal` or `glow-done.signal`, lights the glow in
+  the theme's accent (waiting) or success color (done), and reads Outdated in Settings. The glow is
+  off by default (`claude_code_glow`).
 - **Accounts**: Follow the account I'm using (`follow_account`, off by default) checks the other
   signed-in accounts every 15 minutes through their own WebView2 profiles
   (`%APPDATA%\Sanduhr\webview2-<account_ref>`); linked folders get
@@ -195,7 +201,7 @@ The Claude Code side (`docs/spec.md` Stage 4, `../docs/mods-and-config-spec.md`)
 - **Files outside AppData (3.5.0).** Everything a process outside the app reads or writes lives in
   `%USERPROFILE%\.sanduhr` (`Paths.ExternalDir`): the snapshots, `seats.json`, `mcp-settings.json`
   (a projection of the MCP consent and publish readiness), the publish and theme handoff files, the
-  glow signals, `bin\`, `mcp\` and `mods\`. Private data stays in `%APPDATA%\Sanduhr` and the vault;
+  glow signals, the hook's `cc-signal-*.json` files, `bin\`, `mcp\` and `mods\`. Private data stays in `%APPDATA%\Sanduhr` and the vault;
   on the Store build Windows keeps those in package storage. The manifest declares `runFullTrust`
   only. `ExternalDirMigration` re-points registrations that still name the old paths on first
   launch. See "Plan B" in `docs/spec.md`.

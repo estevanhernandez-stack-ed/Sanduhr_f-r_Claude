@@ -101,7 +101,21 @@ public sealed class ClaudeCodeIntegrations
     public const string WaitingSignal = "glow-waiting.signal";
     public const string DoneSignal = "glow-done.signal";
 
-    private static readonly (string Name, string Signal)[] HookEvents = [("Notification", WaitingSignal), ("Stop", DoneSignal)];
+    /// <summary>The three hook events and the word each writes into its signal file (5.0 spec 4). UserPromptSubmit is new in
+    /// 5.0: it gives the turn's start, so a finished turn has a length.</summary>
+    private static readonly (string Name, string Word)[] HookEvents =
+    [
+        ("UserPromptSubmit", ClaudeCodeSignalFile.Prompt), ("Notification", ClaudeCodeSignalFile.Waiting), ("Stop", ClaudeCodeSignalFile.Done),
+    ];
+
+    /// <summary>The empty signal file an event's older command touched (3.5 to 4.9, and the pre-3.5 one); null for an
+    /// event that had no older command.</summary>
+    private static string? OldSignal(string eventName) => eventName switch
+    {
+        "Notification" => WaitingSignal,
+        "Stop" => DoneSignal,
+        _ => null,
+    };
     private static readonly Regex StampName = new(@"^v[0-9A-Za-z.+\-]+-\d{14}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private readonly string _profileDir;
@@ -363,8 +377,29 @@ public sealed class ClaudeCodeIntegrations
 
     // ------------------------------------------------------------------ hooks: the entries
 
-    /// <summary>The command a glow hook runs: touches <c>%USERPROFILE%\.sanduhr\&lt;signal&gt;</c> when that folder exists.</summary>
-    public static string HookCommand(string signal)
+    /// <summary>
+    /// The 5.0 command: reads the JSON Claude Code passes on standard input and writes one small file per event under
+    /// <c>%USERPROFILE%\.sanduhr</c> (only if that folder exists), named <c>cc-signal-&lt;unix ms&gt;-&lt;pid&gt;.json</c>,
+    /// holding the event, the session's folder and its id. Written under a temporary name and renamed, so Sanduhr never
+    /// reads half a file. It takes <c>cwd</c> and <c>session_id</c> from the input and nothing else. Standard input is read
+    /// as UTF-8 (what Claude Code writes): Windows PowerShell's <c>[Console]::In</c> decodes it with the console code page,
+    /// which garbles a folder name that is not ASCII. It writes nothing while <see cref="ClaudeCodeSignalFile.MaxWaiting"/>
+    /// signals already wait unread, so files never pile up while Sanduhr is not running.
+    /// </summary>
+    public static string HookCommand(string word)
+        => "$d = Join-Path $env:USERPROFILE '.sanduhr'; if (Test-Path -LiteralPath $d) { "
+           + "if (@(Get-ChildItem -LiteralPath $d -Filter '" + ClaudeCodeSignalFile.Pattern + "' -File -ErrorAction SilentlyContinue).Count -lt "
+           + ClaudeCodeSignalFile.MaxWaiting.ToString(CultureInfo.InvariantCulture) + ") { $i = $null; "
+           + "try { $i = [IO.StreamReader]::new([Console]::OpenStandardInput(), [Text.Encoding]::UTF8).ReadToEnd() | ConvertFrom-Json } catch { }; "
+           + "$at = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); "
+           + "$j = @{ 'v' = 1; 'event' = '" + word + "'; 'cwd' = [string]$i.cwd; 'session' = [string]$i.session_id; 'at' = $at } | ConvertTo-Json -Compress; "
+           + "$f = Join-Path $d ('" + ClaudeCodeSignalFile.Prefix + "' + $at + '-' + $PID + '.json'); "
+           + "[IO.File]::WriteAllText($f + '.tmp', $j); Move-Item -LiteralPath ($f + '.tmp') -Destination $f -Force } }";
+
+    /// <summary>The command 3.5.0 to 4.9.0 wrote (touches an empty <c>%USERPROFILE%\.sanduhr\&lt;signal&gt;</c>). Still
+    /// recognised as Sanduhr's: Status reads it Outdated, Install replaces it, Remove takes it out, and until then it
+    /// keeps driving the glow as it did.</summary>
+    public static string GlowHookCommand(string signal)
         => "$d = Join-Path $env:USERPROFILE '.sanduhr'; if (Test-Path -LiteralPath $d) { [IO.File]::WriteAllText((Join-Path $d '" + signal + "'), '') }";
 
     /// <summary>The command pre-3.5.0 builds wrote (touches <c>%APPDATA%\Sanduhr\&lt;signal&gt;</c>). Still recognised as Sanduhr's: Status reads it Outdated, Install replaces it, Remove takes it out.</summary>
@@ -376,7 +411,7 @@ public sealed class ClaudeCodeIntegrations
         if (!IsOurHookGroup(group)) return false;
         var o = (JsonObject)group!;
         var cmd = Str(((JsonObject)((JsonArray)o["hooks"]!)[0]!)["command"]);
-        return HookEvents.Any(e => string.Equals(cmd, LegacyHookCommand(e.Signal), StringComparison.Ordinal));
+        return new[] { WaitingSignal, DoneSignal }.Any(s => string.Equals(cmd, LegacyHookCommand(s), StringComparison.Ordinal));
     }
 
     // The per-hook "shell" ("bash" or "powershell") and "async" (true runs the hook in the background)
@@ -385,11 +420,11 @@ public sealed class ClaudeCodeIntegrations
     /// <summary>Sanduhr's group for one event: a matcher group (Notification only) with one async PowerShell command hook.</summary>
     public static JsonEdit.Value HookGroup(string eventName)
     {
-        var signal = HookEvents.First(e => e.Name == eventName).Signal;
+        var word = HookEvents.First(e => e.Name == eventName).Word;
         var hook = JsonEdit.Value.Obj(
             new JsonEdit.Pair("type", JsonEdit.Value.Str("command")),
             new JsonEdit.Pair("shell", JsonEdit.Value.Str("powershell")),
-            new JsonEdit.Pair("command", JsonEdit.Value.Str(HookCommand(signal))),
+            new JsonEdit.Pair("command", JsonEdit.Value.Str(HookCommand(word))),
             new JsonEdit.Pair("async", JsonEdit.Value.Bool(true)),
             new JsonEdit.Pair("timeout", JsonEdit.Value.Int(HookTimeoutSeconds)));
         var pairs = new List<JsonEdit.Pair>();
@@ -401,32 +436,44 @@ public sealed class ClaudeCodeIntegrations
     private static JsonEdit.Value HooksValue()
         => JsonEdit.Value.Obj([.. HookEvents.Select(e => new JsonEdit.Pair(e.Name, JsonEdit.Value.Arr(HookGroup(e.Name))))]);
 
-    public static bool IsOurHookCommand(JsonNode? hook)
+    /// <summary>
+    /// The event whose command <paramref name="cmd"/> is, byte for byte, in any generation (<see cref="HookCommand"/>,
+    /// <see cref="GlowHookCommand"/>, <see cref="LegacyHookCommand"/>); null when it is no command of Sanduhr's. The one list
+    /// of Sanduhr's commands: <see cref="IsOurHookCommand"/> and <see cref="IsOurHookGroup"/> both ask it.
+    /// </summary>
+    private static string? EventOfOurCommand(string cmd)
     {
-        if (hook is not JsonObject o || !(Str(o["type"]) == "command") || Str(o["command"]) is not { } cmd) return false;
-        return (cmd.Contains(WaitingSignal, StringComparison.Ordinal) || cmd.Contains(DoneSignal, StringComparison.Ordinal))
-            && cmd.Contains("Sanduhr", StringComparison.OrdinalIgnoreCase);
+        foreach (var (name, word) in HookEvents)
+        {
+            if (string.Equals(cmd, HookCommand(word), StringComparison.Ordinal)
+                || (OldSignal(name) is { } signal
+                    && (string.Equals(cmd, GlowHookCommand(signal), StringComparison.Ordinal)
+                        || string.Equals(cmd, LegacyHookCommand(signal), StringComparison.Ordinal))))
+                return name;
+        }
+        return null;
     }
+
+    /// <summary>A command hook whose command is exactly one of Sanduhr's, of any generation. Says nothing of the group around
+    /// it (shell, matcher, other hooks): only <see cref="IsOurHookGroup"/> decides what Sanduhr may claim or remove.</summary>
+    public static bool IsOurHookCommand(JsonNode? hook)
+        => hook is JsonObject o && Str(o["type"]) == "command" && Str(o["command"]) is { } cmd && EventOfOurCommand(cmd) is not null;
 
     /// <summary>
     /// A group is Sanduhr's only when it matches Sanduhr's exact shape: the Notification matcher (none for
     /// Stop) and exactly one hook, type command, shell powershell, whose command equals
     /// <see cref="HookCommand"/> for that event's signal byte for byte. A user's near-copy (an extra hook,
     /// a different matcher or command) is theirs and is never claimed or removed. async and timeout are
-    /// not compared, so an older Sanduhr group still reads as ours (Outdated, not foreign).
+    /// not compared, so an older Sanduhr group still reads as ours (Outdated, not foreign). A group carrying the 3.5 to
+    /// 4.9 command or the pre-3.5 one is still Sanduhr's, and reads Outdated.
     /// </summary>
     public static bool IsOurHookGroup(JsonNode? group)
     {
         if (group is not JsonObject o || o["hooks"] is not JsonArray hs || hs.Count != 1 || hs[0] is not JsonObject hook) return false;
         if (Str(hook["type"]) != "command" || Str(hook["shell"]) != "powershell" || Str(hook["command"]) is not { } cmd) return false;
-        foreach (var (name, signal) in HookEvents)
-        {
-            if (!string.Equals(cmd, HookCommand(signal), StringComparison.Ordinal)
-                && !string.Equals(cmd, LegacyHookCommand(signal), StringComparison.Ordinal)) continue;
-            var matcher = o["matcher"];
-            return name == "Notification" ? Str(matcher) == WaitingMatcher : matcher is null;
-        }
-        return false;
+        if (EventOfOurCommand(cmd) is not { } name) return false;
+        var matcher = o["matcher"];
+        return name == "Notification" ? Str(matcher) == WaitingMatcher : matcher is null;
     }
 
     // ------------------------------------------------------------------ status

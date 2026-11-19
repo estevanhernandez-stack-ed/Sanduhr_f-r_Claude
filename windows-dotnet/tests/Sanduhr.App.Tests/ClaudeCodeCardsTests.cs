@@ -70,11 +70,27 @@ public sealed class ClaudeCodeCardsTests : AppWindowFixture
 
         Card(page, ".claude-work").Hooks.InstallCommand.Execute(null);
 
-        Assert.Contains("glow-waiting.signal", File.ReadAllText(Path.Combine(work, "settings.json")));
+        Assert.Contains(ClaudeCodeSignalFile.Prefix, File.ReadAllText(Path.Combine(work, "settings.json")));
         Assert.Equal(personalBefore, File.ReadAllBytes(Path.Combine(personal, "settings.json")));
         Assert.True(Card(page, ".claude-work").Hooks.IsInstalled);
         Assert.False(Card(page, ".claude-personal").Hooks.IsInstalled);
         Assert.Equal(SettingsNames.GlowHookIn([@"~\.claude-work"]), page.GlowHookStatus);
+        // 5.0 (spec 4): the done message names where the notification's switches are.
+        Assert.Equal("Hooks installed. Choose what shows in Settings, Notifications.", page.StatusText);
+    });
+
+    [Fact]
+    public void The_hook_state_for_Notifications_is_outdated_for_the_4_9_hook_and_ready_after_its_update() => AppHost.Run(() =>
+    {
+        var (empty, _) = Page(answer: _ => Yes);
+        Assert.Equal(AgentRowState.HookMissing, empty.HookState());
+
+        Home(".claude-work", NotificationsPageTests.HooksFrom49());
+        var (page, _) = Page(answer: _ => Yes);
+        Assert.Equal(AgentRowState.HookOutdated, page.HookState());
+
+        Card(page, ".claude-work").Hooks.InstallCommand.Execute(null);   // the card's Update…
+        Assert.Equal(AgentRowState.Ready, page.HookState());
     });
 
     [Fact]

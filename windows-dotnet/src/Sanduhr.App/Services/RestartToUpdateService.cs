@@ -26,13 +26,12 @@ public sealed class RestartToUpdateService
         {
             // The toast's button carries the action; the body click does not, and only shows the widget.
             // A 3.4 to 3.7 "Quit and update" toast still in the notification centre lands here too.
-            ToastNotificationManagerCompat.OnActivated += args =>
+            Toasts.OnActivated(argument =>
             {
-                var argument = args.Argument ?? "";
                 if (argument.Contains(RestartToUpdate.RestartAction, StringComparison.Ordinal)
                     || argument.Contains(StoreUpdate.LegacyQuitAction, StringComparison.Ordinal))
                     System.Windows.Application.Current?.Dispatcher.BeginInvoke(Accept);
-            };
+            });
         }
         catch (Exception e)
         {
@@ -97,12 +96,9 @@ public sealed class RestartToUpdateService
     {
         try
         {
-            new ToastContentBuilder()
-                .AddText(RestartToUpdate.ReadyText(version))
-                .AddText(RestartToUpdate.ToastBody)
+            Toasts.Show(RestartToUpdate.ReadyText(version), RestartToUpdate.ToastBody, more: b => b
                 .AddButton(new ToastButton().SetContent(RestartToUpdate.ButtonText).AddArgument("action", RestartToUpdate.RestartAction))
-                .AddButton(new ToastButtonDismiss(RestartToUpdate.LaterText))
-                .Show();
+                .AddButton(new ToastButtonDismiss(RestartToUpdate.LaterText)));
         }
         catch (Exception e)
         {

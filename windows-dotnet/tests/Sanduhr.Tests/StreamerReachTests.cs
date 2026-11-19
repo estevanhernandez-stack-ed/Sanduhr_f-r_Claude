@@ -117,8 +117,8 @@ public class StreamerReachTests
     private static readonly (string File, string Id, int Count)[] Known =
     [
         ("Sanduhr.App/App.xaml.cs", "key", 8),
-        ("Sanduhr.App/App.xaml.cs", "masked", 2),
-        ("Sanduhr.App/App.xaml.cs", "notname", 6),
+        ("Sanduhr.App/App.xaml.cs", "masked", 3),    // agent notifications (5.0): TurnProject masks a turn's project through Mask.Name
+        ("Sanduhr.App/App.xaml.cs", "notname", 7),   // agent notifications (5.0): the turn watcher's user folder, handed to the readers
         ("Sanduhr.App/Desk/DeskArrangeMode.cs", "notname", 3),
         ("Sanduhr.App/Desk/DeskClicks.cs", "notname", 4),
         ("Sanduhr.App/Desk/DeskCompanion.cs", "key", 1),
@@ -184,7 +184,7 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/CcTrendsViewModel.cs", "masked", 1),
         ("Sanduhr.App/ViewModels/ClaudeCodeHost.cs", "key", 2),
         ("Sanduhr.App/ViewModels/ClaudeCodeHost.cs", "notname", 1),
-        ("Sanduhr.App/ViewModels/ClaudeCodeViewModel.cs", "key", 16),   // slice 8: the undo moved to Core (ClaudeCodeReset)
+        ("Sanduhr.App/ViewModels/ClaudeCodeViewModel.cs", "key", 17),   // slice 8: the undo moved to Core (ClaudeCodeReset); 5.0: HookState reads each folder's hook
         ("Sanduhr.App/ViewModels/ClaudeCodeViewModel.cs", "masked", 5),
         ("Sanduhr.App/ViewModels/DesignsSettingsViewModel.cs", "cant", 1),
         ("Sanduhr.App/ViewModels/DeskCompanionViewModel.cs", "notname", 1),
