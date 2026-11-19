@@ -220,3 +220,44 @@ and must not name Antigravity (`No_card_names_Antigravity`).
 
 If 1 fails, Claude Code keeps today's glow and gets no toast or card until a signal with identity exists. If
 4 shows a false ending, Antigravity drops to working-only.
+
+**Check 1 passed on 2026-11-18** (a live Claude Code run on Windows: `cwd` and `session_id` arrived for
+`UserPromptSubmit` and `Stop`).
+
+## 11. Amended during the build (2026-11-18)
+
+The build and its reviews changed these points. Where this section and a section above differ, this one is
+what shipped.
+
+- **The idle reminder is its own switch (owner's decision).** Claude Code raises its idle reminder about a
+  minute after a turn ends, through the same `Notification` hook as a permission prompt. Section 3 treated
+  both as `Waiting`, which would have notified after most turns. Now: a `waiting` signal while a turn is open
+  is `Waiting`; with no open turn it is `Idle`. Idle has a switch in Settings ▸ Notifications, "Remind me when
+  Claude Code has waited a minute for my next prompt", off by default, carried over as on for someone who had
+  "glow when waiting" on in 4.9. When on it interrupts like waiting (toast, the waiting glow, the flash, the
+  in-front rule, the limiter), never touches the Desk card, and its toast has its own tag so it does not
+  replace that turn's "finished" toast. The hook and its matcher are unchanged.
+- **A turn card that loses touch leaves.** Section 5 left a lost-touch card on the Desk. It is removed 60
+  seconds after it loses touch. A Codex or Antigravity turn that is still writing keeps its card alive (the
+  watcher reports activity at most once a minute).
+- **Nothing replays at launch, for Claude Code too.** The first pass over the signal files records each
+  turn's start and raises nothing, as the first pass over Codex's and Antigravity's files does.
+- **The hook command.** It reads Claude Code's input as UTF-8 (Windows PowerShell 5.1 otherwise garbled a
+  non-ASCII folder name), stops writing once 100 signal files are waiting, and a leftover temporary file is
+  cleaned up by the watcher after 10 minutes and by Reset. It reads all of its input, which includes the
+  prompt on the prompt event, takes only the folder and the session id, and writes nothing else; the consent
+  dialog and the privacy policy say exactly that.
+- **The front window is read only when it can matter:** an interrupt is otherwise due and "not while the
+  agent's window is in front" is on. That holds for the older hook's glow too.
+- **A source's switch is read safely.** A settings save in flight keeps the last known on/off value instead
+  of reading as "off".
+- **The page.** The Claude Code row has a fourth state for a folder whose settings cannot be read. The piece
+  is called "Claude Code hook" where the person reads it (it was "Claude Code glow hook"). The taskbar flash
+  has its own switch, so the Claude Code page's caption now points to it.
+- **Known limits.** A Claude Code turn that started more than ten minutes before Sanduhr launched has no
+  recorded start, so a later permission prompt in it reads as the idle reminder. A Claude Code turn that
+  ends while Sanduhr is restarting is not notified. A running card reads "2m" and a finished one
+  "finished · 4m", not section 5's "working 2m" and "finished, 4m 12s".
+- **Carried to later work.** A "waiting" signal for Codex (after 5.0). Moving "Where the glow shows" and
+  rewording "Needs the Claude Code hook in a folder above" (spec 6). The reviewer letter's trademark line for
+  toast and Desk card titles (see the umbrella).

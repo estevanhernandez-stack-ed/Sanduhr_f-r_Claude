@@ -45,6 +45,24 @@ Cut in this order: the spectrum visualizer, then arm64 to 5.1, then the neon glo
 - More sources (Cursor, the Gemini CLI, local models) and the Gemini meter.
 - Rainmeter import.
 
+## For the release paperwork
+
+Carried here so they are not lost when the 5.0.0.0 reviewer letter, Store copy and hosted privacy text are
+written (release-runbook Phases 2 and 7).
+
+- **Reviewer letter: a trademark line for toasts and Desk cards (owner's decision, 2026-11-18).** A
+  notification's title and a Desk card's title name Codex and Antigravity ("Codex finished",
+  "Antigravity · project") where no notice can sit beside them. The letter states that these names are used
+  nominatively to say which agent's turn ended, with the usual statement that "Codex" is a trademark of
+  OpenAI and "Antigravity" is a trademark of Google LLC and that Sanduhr is not affiliated with either. The
+  Notifications page itself carries all three notices.
+- **Reviewer letter: the disclosure change from spec 4.** No new destination, capability or library. The
+  Claude Code hook now writes one small file per event under `%USERPROFILE%\.sanduhr` naming the event, the
+  folder and the session, which Sanduhr deletes as it reads; a Windows notification shows the agent, the
+  project's name and how long the turn ran.
+- **Hosted privacy page.** `docs/store/hub-privacy-5.0.0.md` holds spec 4's paragraph; each later 5.0 part
+  adds its own. File the hub issue and check the page before the Store commit.
+
 ## Open
 
 - The three 4.9 smoke minors for spec 6: the archive list shows a newly switched-on agent only after Settings reopens; the Sources header names only Codex; the stop-archiving dialog's buttons are not exposed to UI Automation.
