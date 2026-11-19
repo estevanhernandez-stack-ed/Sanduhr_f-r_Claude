@@ -184,7 +184,7 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/CcTrendsViewModel.cs", "masked", 1),
         ("Sanduhr.App/ViewModels/ClaudeCodeHost.cs", "key", 2),
         ("Sanduhr.App/ViewModels/ClaudeCodeHost.cs", "notname", 1),
-        ("Sanduhr.App/ViewModels/ClaudeCodeViewModel.cs", "key", 16),   // slice 8: the undo moved to Core (ClaudeCodeReset)
+        ("Sanduhr.App/ViewModels/ClaudeCodeViewModel.cs", "key", 17),   // slice 8: the undo moved to Core (ClaudeCodeReset); 5.0: HookState reads each folder's hook
         ("Sanduhr.App/ViewModels/ClaudeCodeViewModel.cs", "masked", 5),
         ("Sanduhr.App/ViewModels/DesignsSettingsViewModel.cs", "cant", 1),
         ("Sanduhr.App/ViewModels/DeskCompanionViewModel.cs", "notname", 1),

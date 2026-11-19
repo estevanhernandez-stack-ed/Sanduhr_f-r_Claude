@@ -33,9 +33,11 @@ public class SettingsSlice6IndexTests
     }
 
     [Fact]
-    public void Privacy_is_the_first_groups_fourth_page()
+    public void Privacy_is_the_first_groups_last_page()
     {
-        Assert.Equal([SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts, SettingsPage.Privacy], SettingsNames.Sidebar[0].Pages);
+        // 5.0 (spec 4) put Notifications after Alerts, so Privacy is fifth.
+        Assert.Equal([SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts, SettingsPage.Notifications, SettingsPage.Privacy],
+            SettingsNames.Sidebar[0].Pages);
         Assert.Equal("Privacy", SettingsNames.PageTitle(SettingsPage.Privacy));
         Assert.Equal(SettingsPage.Privacy, SettingsNames.Linked("Privacy settings…"));
         Assert.Empty(SettingsNames.TitlesToCome);

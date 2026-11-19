@@ -62,7 +62,7 @@ public sealed class ResetWindowFoldersTests : AppWindowFixture
             Assert.False(list.ReceiptsUnreadable);
             Assert.Equal(new[] { keep, other, added }, list.Rows.Select(r => r.Path));
             Assert.Equal("statusline, meters mod", list.Rows[0].Kinds);
-            Assert.Equal("glow hook", list.Rows[1].Kinds);
+            Assert.Equal("hook", list.Rows[1].Kinds);
             Assert.True(list.Rows[0].Discovered);
             Assert.False(list.Rows[2].Discovered);
             Assert.True(list.Rows[2].Added);

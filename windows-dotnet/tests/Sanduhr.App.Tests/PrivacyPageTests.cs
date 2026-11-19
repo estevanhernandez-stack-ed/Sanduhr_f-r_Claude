@@ -51,13 +51,15 @@ public sealed class PrivacyPageTests : AppWindowFixture
     private static void Click(Button b) => b.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
 
     [Fact]
-    public void Privacy_sits_after_Alerts_and_lands_on_its_sections() => AppHost.Run(() =>
+    public void Privacy_sits_after_Alerts_and_Notifications_and_lands_on_its_sections() => AppHost.Run(() =>
     {
         var (window, _, widget, guard) = Open();
         try
         {
             var tags = ((TabControl)window.FindName("Tabs")).Items.OfType<TabItem>().Select(t => (string)t.Tag).ToList();
-            Assert.Equal(tags.IndexOf(nameof(SettingsPage.Alerts)) + 1, tags.IndexOf(nameof(SettingsPage.Privacy)));
+            // 5.0 (spec 4): Notifications sits between Alerts and Privacy.
+            Assert.Equal(tags.IndexOf(nameof(SettingsPage.Alerts)) + 1, tags.IndexOf(nameof(SettingsPage.Notifications)));
+            Assert.Equal(tags.IndexOf(nameof(SettingsPage.Notifications)) + 1, tags.IndexOf(nameof(SettingsPage.Privacy)));
             foreach (var anchor in new[] { SettingsIndex.Network, SettingsIndex.Agents })
             {
                 window.SelectPage(SettingsPage.Privacy, anchor);

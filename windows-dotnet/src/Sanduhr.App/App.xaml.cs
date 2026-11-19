@@ -970,6 +970,19 @@ public partial class App : Application
         svm.ClaudeCodePage.GlowReload = () => _glow?.Reload();
         svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
+        // Settings, Notifications (5.0 spec 4).
+        svm.Notifications.Changed = () => _glow?.Reload();
+        svm.Notifications.AgentSwitchedOff = agent => _watchers?.ClearTurns(agent);
+        svm.Notifications.TryIt = kind =>
+        {
+            // A sample through the real toast and the real glow, whatever the switches say: Try it shows what they would do.
+            var store = new SettingsStore(new Sanduhr.Core.Paths());
+            var sample = new AgentTurnEvent(AgentSources.Claude, kind, "try-it", null, DateTimeOffset.UtcNow, TimeSpan.FromSeconds(252));
+            try { Toasts.Show(NotificationText.Title(sample), NotificationText.Body(sample, "your project"), group: "sanduhr-agents", tag: "try-it"); }
+            catch (Exception e) when (e is not OutOfMemoryException) { /* a toast that cannot show is not worth a crash */ }
+            _glow?.Glow(kind == AgentTurnKind.Waiting
+                ? GlowOverlayContent.ColorFor(ClaudeCodeEvent.Waiting) : AgentColor(store, AgentSources.Claude), flash: false);
+        };
         svm.Desk.Changed = () => _desk?.Reload();
         // Sources: a Codex on or off starts or stops its service (as Set up Sanduhr does); a primary or color change redraws the widget.
         svm.Sources.OnOffChanged = (wasAny, nowAny) =>

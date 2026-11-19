@@ -47,6 +47,10 @@ public static class SettingsIndex
     public const string TestAlert = "test";
     public const string EachLimit = "each-limit";
     public const string SignInReminders = "signin-reminders";
+    // Notifications (5.0 spec 4)
+    public const string NotifyAgents = "notify-agents";
+    public const string NotifyShow = "notify-show";
+    public const string NotifyWhen = "notify-when";
     // Privacy: Streamer mode first (slice 7), then What leaves this PC and What Claude can change (slice 6)
     public const string Streamer = "streamer";
     public const string StreamerAllowlist = "streamer-allowlist";
@@ -202,6 +206,13 @@ public static class SettingsIndex
         E("Sound", SettingsPage.Alerts, Sound, ["chime", "sound", "snake", "model-scoped", "mute"]),
         E(SettingsNames.SendTestAlert, SettingsPage.Alerts, TestAlert, ["test", "try"]),
 
+        E(SettingsNames.NotifyAgentsHeader, SettingsPage.Notifications, NotifyAgents,
+            ["agent notifications", "notify", "agent", "codex", "antigravity", "claude code", "finished", "done", "working"]),
+        E(SettingsNames.NotifyShowHeader, SettingsPage.Notifications, NotifyShow,
+            ["toast", "windows notification", "desk card", "glow", "flash", "taskbar"]),
+        E(SettingsNames.NotifyWhenHeader, SettingsPage.Notifications, NotifyWhen,
+            ["threshold", "longer than", "every turn", "in front", "terminal", "do not disturb"]),
+
         // Streamer mode (slice 7): the spec's words are Boosts (stream, streamer, screen share, hide names, obs, demo, codename). The entries
         // take only words no other page owns: "recording" would take "record" from Shortcuts, "hide" from Alerts (decision 17).
         E(SettingsNames.StreamerSection, SettingsPage.Privacy, Streamer,
@@ -237,7 +248,7 @@ public static class SettingsIndex
             ["folder", "seat", "home", ".claude", "add folder", "forget folder", "linked account", "account folder", "CLAUDE_CONFIG_DIR",
              "statusline", "status line", "prompt", "install statusline", "remove statusline", "segments", "combine", "replace",
              "MCP", "MCP server", "sanduhr-mcp", "agents", "tools", "project totals", "quota tools", "burn attribution",
-             "glow hook", SettingsNames.ClaudeCodeGlowHook, "hooks", "install", "update", "remove"]),
+             "glow hook", SettingsNames.ClaudeCodeGlowHook, "hooks", "notifications hook", "install", "update", "remove"]),
         E(SettingsNames.FolderHolds, SettingsPage.ClaudeCode, FolderConfig,
             ["settings.json", "readable", "unreadable", "statusline command", "hook groups", "plugin switches", "enabledPlugins",
              "MCP servers", "mcpServers", "CLAUDE.md", "memory", "instructions", "transcripts", "retention", "cleanupPeriodDays",
@@ -477,6 +488,7 @@ public static class SettingsIndex
         [SettingsPage.General] = ["tray", "startup", "shortcut"],
         [SettingsPage.Accounts] = ["sign in", "account"],
         [SettingsPage.Alerts] = ["notification", "warning"],
+        [SettingsPage.Notifications] = ["agent notifications", "toast", "finished", "waiting on you"],
         [SettingsPage.Privacy] = ["privacy", "what leaves this PC", "what Claude can change", "agents", "network"],
         // "vault" lives on the archive section only: as a page synonym it ties the section at rank 1 and the page row wins.
         [SettingsPage.UsageSources] = ["sources", "codex", "primary", "colors"],
@@ -596,6 +608,9 @@ public static class SettingsIndex
         new(["stream", "streamer", "screen share", "hide names", "obs"], "privacy", "streamer"),
         new(["demo"], "privacy", "streamer"),
         new(["codename", "codenames"], "privacy", "streamer-allowlist"),
+        // 5.0 (spec 4): Notifications' first section is titled Agents and sits above Privacy in the sidebar. The word stays Privacy's
+        // (slice 6, What Claude can change); the Notifications section still shows, under it.
+        new(["agents"], "privacy", Agents),
         new(["widgets", "packs", "pack"], "mods", ModList),
         new(["history", "meter history", "meters", "usage history"], "claudeusage", MeterHistory),
     ];

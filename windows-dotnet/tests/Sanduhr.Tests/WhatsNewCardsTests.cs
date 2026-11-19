@@ -12,7 +12,8 @@ public class WhatsNewCardsTests
     public void Table_HasEveryReleaseNewestFirst()
     {
         Assert.Equal(
-            ["agent-activity",
+            ["agent-notifications",
+             "agent-activity",
              "codex-limits",
              "widget-from-file",
              "desk-under-icons",
@@ -57,7 +58,19 @@ public class WhatsNewCardsTests
 
     [Fact]
     public void Only_the_Codex_cards_name_Codex() =>
-        Assert.Equal(["agent-activity", "codex-limits"], Table.Where(c => c.NamesCodex).Select(c => c.Id));
+        Assert.Equal(["agent-notifications", "agent-activity", "codex-limits"], Table.Where(c => c.NamesCodex).Select(c => c.Id));
+
+    [Fact]
+    public void Release500_ShowsTheNotificationsCard()
+    {
+        var cards = WhatsNew.Cards("4.9.0", "5.0.0");
+        var card = Assert.Single(cards);
+        Assert.Equal("agent-notifications", card.Id);
+        Assert.Equal("Know when your agent is done", card.Title);
+        Assert.StartsWith("A notification, a Desk card or a glow when Claude Code, Codex or another agent finishes a long turn.", card.Body);
+        Assert.Equal(SettingsPage.Notifications, card.Destination);
+        Assert.Equal(SettingsIndex.NotifyAgents, card.Anchor);
+    }
 
     [Fact]
     public void Every_card_that_says_Codex_shows_the_trademark_line() =>

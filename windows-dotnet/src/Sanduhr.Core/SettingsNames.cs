@@ -33,7 +33,7 @@ public static class SettingsNames
     /// <see cref="SettingsPage"/> for their aliases but are in no group.</summary>
     public static IReadOnlyList<SettingsGroup> Sidebar { get; } =
     [
-        new(null, [SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts, SettingsPage.Privacy]),
+        new(null, [SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts, SettingsPage.Notifications, SettingsPage.Privacy]),
         new("Usage", [SettingsPage.UsageSources, SettingsPage.ClaudeUsage, SettingsPage.Publish]),
         new("Extend", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Widget, SettingsPage.Themes]),
@@ -63,6 +63,7 @@ public static class SettingsNames
         SettingsPage.Accounts => "Accounts",
         SettingsPage.Alerts => "Alerts",
         SettingsPage.Privacy => PrivacyTitle,
+        SettingsPage.Notifications => NotificationsTitle,
         SettingsPage.History => "History",   // retired in slice 5: keeps its old title for aliases and logs
         SettingsPage.UsageSources => SourcesTitle,
         SettingsPage.ClaudeUsage => "Claude Usage",
@@ -143,7 +144,7 @@ public static class SettingsNames
     /// <summary>Publish usage: the folders whose totals may leave ("Folder" is the one word, WF21).</summary>
     public const string FoldersToShare = "Folders to share (off until you tick them)";
     /// <summary>Reset Sanduhr…: two of its five parts, named for everything they remove (WF20).</summary>
-    public const string ResetClaudeCodeEntries = "Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, glow hook)";
+    public const string ResetClaudeCodeEntries = "Sanduhr's entries in Claude Code (statusline, MCP server, meters mod, hook)";
     public const string ResetMeterHistory = "Meter history and the session archive";
     /// <summary>Themes (paste box and Studio).</summary>
     public const string SaveAndApply = "Save & apply";
@@ -208,9 +209,10 @@ public static class SettingsNames
     /// <summary>Desk: the switch at the top of the page (settings.json "desk_enabled", off by default). It lists
     /// what the Desk draws, as the tour does (WF16).</summary>
     public const string DeskSwitch = "Desk: a clock, your meters, a message and more on the desktop";
-    /// <summary>Claude Code: the install that lights the glow, the Mac's name (WF11). "Claude Code glow" is the
+    /// <summary>Claude Code: the install that tells Sanduhr a turn started, waits or finished (WF11). "Claude Code glow hook" until 5.0
+    /// (spec 4): it feeds the notification and the Desk card first, so it is the Claude Code hook. "Claude Code glow" is the
     /// section and the Desk piece.</summary>
-    public const string ClaudeCodeGlowHook = "Claude Code glow hook";
+    public const string ClaudeCodeGlowHook = "Claude Code hook";
     /// <summary>Claude Code: a piece installed in an older version. "Update…" beside it is the verb (WF42).</summary>
     public const string PieceOutdated = "Installed, but not the current version.";
     /// <summary>Claude Code, a folder card's Linked account caption, true before and after an install (WF27).</summary>
@@ -435,10 +437,44 @@ public static class SettingsNames
     public const string FolderHoldsHelp = "settings.json, the statusline, hooks, plugin switches, MCP servers, CLAUDE.md and how long transcripts are kept.";
     /// <summary>The Refresh button's spoken name in one card: the folder it reads (T7-1).</summary>
     public static string RefreshFolderNamed(string display) => $"{RefreshFolder}, read {display} again";
-    /// <summary>The Claude Code glow section's three switches (P8): the label and the spoken name are the same words.</summary>
-    public const string GlowWhenWaiting = "Glow when Claude is waiting on you";
-    public const string GlowWhenDone = "Glow when Claude finishes";
-    public const string GlowNotInTerminal = "Not while a terminal or editor is in front";
+    /// <summary>The glow's three switches (P8), on Settings, Notifications since 5.0 (spec 4): the label and the spoken name are the same words.</summary>
+    public const string GlowWhenWaiting = "Glow when an agent is waiting on you";
+    public const string GlowWhenDone = "Glow when an agent finishes";
+    public const string GlowNotInTerminal = "Not while the agent's window is in front";
+
+    // ---- Settings, Notifications (5.0 spec 4) ----
+    public const string NotificationsTitle = "Notifications";
+    public const string NotificationsIntro =
+        "Know when an agent finishes a long turn or needs you. Sanduhr reads this from each agent's own files on this PC; nothing is sent anywhere.";
+    public const string NotifyAgentsHeader = "Agents";
+    public const string NotifyShowHeader = "Where it shows";
+    public const string NotifyWhenHeader = "When";
+    public const string NotifyToast = "Show a Windows notification";
+    public const string NotifyDeskCard = "Show a card on the Desk";
+    public const string NotifyDeskCardCaption = "Shows where the watcher cards piece is placed.";
+    public const string NotifyFlash = "Flash Sanduhr in the taskbar";
+    public const string NotifyThreshold = "Only for turns longer than";
+    public const string NotifyInFrontCaption =
+        "A terminal or an editor in front counts for Claude Code and Antigravity. The Codex app counts for Codex.";
+    public const string NotifyGlowWhere = "Where the glow shows…";
+    public const string NotifyTryFinished = "Try it: finished";
+    public const string NotifyTryWaiting = "Try it: waiting";
+    public const string NotifySourceOff = "Turn it on in Sources first.";
+    public const string NotifyHookMissing = "Needs the Claude Code hook. Install it on the Claude Code page.";
+    public const string NotifyHookOutdated =
+        "The Claude Code hook here is an older one. Update it on the Claude Code page to get the notification and the Desk card.";
+
+    /// <summary>What an agent's files can tell Sanduhr (spec 4, section 6).</summary>
+    public static string NotifySupports(string agent) => agent switch
+    {
+        AgentSources.Claude => "Working, finished and waiting.",
+        AgentSources.Codex => "Working and finished.",
+        AgentSources.Antigravity => "Working, and finished about a minute and a half late.",
+        _ => throw new ArgumentOutOfRangeException(nameof(agent), agent, "unknown agent"),
+    };
+
+    /// <summary>The accessible name of an agent's switch.</summary>
+    public static string NotifyAgentSwitch(string agent) => $"Notify me about {AgentSources.BurnName(agent)}";
     /// <summary>A folder card piece's install button help while the piece is absent (P23: the card's own folder).</summary>
     public static string PieceInstallHelp(string piece) => $"Asks first, then adds {piece} to this folder.";
 
@@ -1062,7 +1098,7 @@ public static class SettingsNames
         IntegrationKind.Statusline => "statusline",
         IntegrationKind.Mcp => "MCP server",
         IntegrationKind.Meters => "meters mod",
-        IntegrationKind.Hooks => "glow hook",
+        IntegrationKind.Hooks => "hook",
         _ => "",
     };
 
