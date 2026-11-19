@@ -60,7 +60,10 @@ public static class ClaudeCodeSignalFile
 }
 
 /// <summary>Turns Claude Code's signals into turn events: a prompt starts a turn, done finishes it with the time between
-/// the two, waiting is waiting. Start times are kept per session, in memory, for at most <see cref="MaxSessions"/>.</summary>
+/// the two, waiting inside an open turn is waiting. A waiting with no open turn is <see cref="AgentTurnKind.Idle"/>: the
+/// hook's Notification matcher also catches Claude Code's idle reminder, raised a minute after a turn ends, and that is not
+/// a wait on you, so it has its own switch. Start times are kept per session, in memory, for at most
+/// <see cref="MaxSessions"/>.</summary>
 public sealed class ClaudeCodeTurns
 {
     public const int MaxSessions = 64;
@@ -77,7 +80,8 @@ public sealed class ClaudeCodeTurns
                 _started[s.Session] = s.At;
                 return new AgentTurnEvent(AgentSources.Claude, AgentTurnKind.Started, s.Session, s.Folder, s.At);
             case ClaudeCodeSignalFile.Waiting:
-                return new AgentTurnEvent(AgentSources.Claude, AgentTurnKind.Waiting, s.Session, s.Folder, s.At);
+                return new AgentTurnEvent(AgentSources.Claude,
+                    _started.ContainsKey(s.Session) ? AgentTurnKind.Waiting : AgentTurnKind.Idle, s.Session, s.Folder, s.At);
             default:
                 TimeSpan? duration = _started.Remove(s.Session, out var start) && s.At >= start ? s.At - start : null;
                 return new AgentTurnEvent(AgentSources.Claude, AgentTurnKind.Finished, s.Session, s.Folder, s.At, duration);

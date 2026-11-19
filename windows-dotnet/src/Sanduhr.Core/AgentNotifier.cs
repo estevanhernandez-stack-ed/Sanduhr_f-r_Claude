@@ -30,7 +30,8 @@ public sealed class AgentNotifier(Func<NotificationSettings> settings, Func<bool
     public NotifySurfaces Handle(AgentTurnEvent e)
     {
         if (demo()) return NotifySurfaces.None;
-        var surfaces = NotificationRules.Decide(e, settings(), NotificationRules.InFront(e.Agent, foregroundProcess()), _limiter, clock());
+        // The front window is read only once an interruption is otherwise due (the rules call the function at most once).
+        var surfaces = NotificationRules.Decide(e, settings(), () => NotificationRules.InFront(e.Agent, foregroundProcess()), _limiter, clock());
         if (surfaces == NotifySurfaces.None) return surfaces;
 
         var name = project(e.Folder);
@@ -45,9 +46,11 @@ public sealed class AgentNotifier(Func<NotificationSettings> settings, Func<bool
         return surfaces;
     }
 
-    /// <summary>What ties a session's toasts together: 16 hex characters, well inside a toast tag's limit.</summary>
+    /// <summary>What ties a session's toasts together: 16 hex characters, well inside a toast tag's limit. The idle reminder
+    /// has a tag of its own, so it never replaces that turn's "finished" toast in the notification history.</summary>
     public static string Tag(AgentTurnEvent e) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(e.Agent + "\n" + e.Session)))[..16];
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+            e.Agent + "\n" + e.Session + (e.Kind == AgentTurnKind.Idle ? "\nidle" : ""))))[..16];
 
     private void Try(string surface, Action call)
     {

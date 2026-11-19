@@ -211,7 +211,8 @@ public static class SettingsIndex
         E(SettingsNames.NotifyShowHeader, SettingsPage.Notifications, NotifyShow,
             ["toast", "windows notification", "desk card", "glow", "flash", "taskbar", "waiting", "finishes", "try it"]),
         E(SettingsNames.NotifyWhenHeader, SettingsPage.Notifications, NotifyWhen,
-            ["threshold", "longer than", "every turn", "in front", "terminal", "do not disturb"]),
+            ["threshold", "longer than", "every turn", "in front", "terminal", "do not disturb", "idle", "reminder",
+             SettingsNames.NotifyIdle]),
 
         // Streamer mode (slice 7): the spec's words are Boosts (stream, streamer, screen share, hide names, obs, demo, codename). The entries
         // take only words no other page owns: "recording" would take "record" from Shortcuts, "hide" from Alerts (decision 17).

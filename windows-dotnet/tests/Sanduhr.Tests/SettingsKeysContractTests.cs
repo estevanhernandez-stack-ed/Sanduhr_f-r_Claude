@@ -18,6 +18,7 @@ public class SettingsKeysContractTests
     // Not frozen: "window" (legacy read fallback for "geom") and "publish_626" (migrated into "publish").
     private static readonly string[] Frozen =
     [
+        "agent_notifications",   // 5.0 spec 4: Settings, Notifications (stored through NotificationSettings.Key)
         "alert_muted_tiers",
         "alert_projection",
         "alert_reset",
@@ -139,6 +140,9 @@ public class SettingsKeysContractTests
         // Keys passed by constant: the tour state.
         if (store.Contains("WelcomeTour.StateKey", StringComparison.Ordinal))
             keys.Add(WelcomeTour.StateKey);
+        // Settings, Notifications (5.0 spec 4).
+        if (store.Contains("root[NotificationSettings.Key]", StringComparison.Ordinal))
+            keys.Add(NotificationSettings.Key);
         // "window" is the legacy read fallback, not a key the store owns.
         keys.Remove("window");
 

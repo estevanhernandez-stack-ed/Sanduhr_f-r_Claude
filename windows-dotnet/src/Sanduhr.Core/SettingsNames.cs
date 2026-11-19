@@ -455,7 +455,9 @@ public static class SettingsNames
     public const string NotifyFlash = "Flash Sanduhr in the taskbar";
     public const string NotifyThreshold = "Only for turns longer than";
     public const string NotifyInFrontCaption =
-        "A terminal or an editor in front counts for Claude Code and Antigravity. The Codex app counts for Codex.";
+        "A terminal or an editor in front counts for every agent. The Codex app also counts for Codex.";
+    public const string NotifyIdle = "Remind me when Claude Code has waited a minute for my next prompt";
+    public const string NotifyIdleCaption = "Claude Code only. Off, only a permission prompt or a question counts as waiting on you.";
     public const string NotifyGlowWhere = "Where the glow shows…";
     public const string NotifyTryFinished = "Try it: finished";
     public const string NotifyTryWaiting = "Try it: waiting";

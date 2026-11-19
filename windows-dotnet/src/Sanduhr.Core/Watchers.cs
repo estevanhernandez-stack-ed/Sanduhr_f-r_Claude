@@ -469,20 +469,27 @@ public sealed partial class WatcherBoard
     }
 
     /// <summary>The clock moved: running and waiting watchers past their window lose touch, passed
-    /// and finished ones past the fade go. True when anything changed.</summary>
+    /// and finished ones past the fade go. A turn card that lost touch keeps when it did in
+    /// <see cref="Watcher.Ended"/> and goes <see cref="TurnFadeAfter"/> later: nothing on Windows
+    /// dismisses it, and its session may be long closed. True when anything changed.</summary>
     public bool Tick(DateTimeOffset now)
     {
         var before = _watchers.ToList();
-        _watchers.RemoveAll(w => w.State.Fades() && w.Ended is { } ended && now - ended >= FadeOf(w));
+        _watchers.RemoveAll(w => (w.State.Fades() && w.Ended is { } ended && now - ended >= FadeOf(w))
+            || (LostTurn(w) is { } lost && now - lost >= TurnFadeAfter));
         for (var i = 0; i < _watchers.Count; i++)
         {
             var w = _watchers[i];
             if (w.State is WatcherState.Running or WatcherState.Waiting
                 && WindowOf(w) is { } window && now - w.Touched > window)
-                _watchers[i] = w with { State = WatcherState.LostTouch };
+                _watchers[i] = w with { State = WatcherState.LostTouch, Ended = w.Source == WatcherSource.Turn ? now : w.Ended };
         }
         return !_watchers.SequenceEqual(before);
     }
+
+    /// <summary>When a turn card lost touch; null for any other card or state.</summary>
+    private static DateTimeOffset? LostTurn(Watcher w) =>
+        w.Source == WatcherSource.Turn && w.State == WatcherState.LostTouch ? w.Ended : null;
 
     /// <summary>The next moment <see cref="Tick"/> would change something, null when nothing waits on the clock.</summary>
     public DateTimeOffset? NextChange()
@@ -492,6 +499,7 @@ public sealed partial class WatcherBoard
         {
             DateTimeOffset? at = null;
             if (w.State.Fades() && w.Ended is { } ended) at = ended + FadeOf(w);
+            else if (LostTurn(w) is { } lost) at = lost + TurnFadeAfter;
             else if (w.State is WatcherState.Running or WatcherState.Waiting && WindowOf(w) is { } window)
                 at = w.Touched + window + TimeSpan.FromSeconds(1);
             if (at is { } a && (best is null || a < best)) best = a;

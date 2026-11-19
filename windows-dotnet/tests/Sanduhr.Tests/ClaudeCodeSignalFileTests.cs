@@ -99,6 +99,30 @@ public class ClaudeCodeSignalFileTests
     }
 
     [Fact]
+    public void A_wait_inside_an_open_turn_is_waiting()
+    {
+        var turns = new ClaudeCodeTurns();
+        turns.Apply(new("prompt", "sess-1", null, Now));
+        var waiting = turns.Apply(new("waiting", "sess-1", @"C:\proj\alpha", Now.AddSeconds(30)));
+        Assert.Equal(new AgentTurnEvent("claude", AgentTurnKind.Waiting, "sess-1", @"C:\proj\alpha", Now.AddSeconds(30)), waiting);
+    }
+
+    /// <summary>Claude Code's idle reminder comes a minute after a turn ends: it is not a wait on you.</summary>
+    [Fact]
+    public void A_wait_after_the_turn_finished_is_the_idle_reminder()
+    {
+        var turns = new ClaudeCodeTurns();
+        Assert.Equal(AgentTurnKind.Started, turns.Apply(new("prompt", "sess-1", null, Now)).Kind);
+        Assert.Equal(AgentTurnKind.Finished, turns.Apply(new("done", "sess-1", null, Now.AddSeconds(10))).Kind);
+        Assert.Equal(new AgentTurnEvent("claude", AgentTurnKind.Idle, "sess-1", null, Now.AddSeconds(70)),
+            turns.Apply(new("waiting", "sess-1", null, Now.AddSeconds(70))));
+    }
+
+    [Fact]
+    public void A_wait_with_no_prompt_seen_is_the_idle_reminder() =>
+        Assert.Equal(AgentTurnKind.Idle, new ClaudeCodeTurns().Apply(new("waiting", "sess-1", null, Now)).Kind);
+
+    [Fact]
     public void Two_sessions_keep_their_own_start_times()
     {
         var turns = new ClaudeCodeTurns();

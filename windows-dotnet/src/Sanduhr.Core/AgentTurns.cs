@@ -13,6 +13,10 @@ public enum AgentTurnKind
 
     /// <summary>The agent needs the person before it can go on.</summary>
     Waiting,
+
+    /// <summary>Claude Code's reminder that the prompt has sat idle after a turn ended (its idle Notification). Not a wait on
+    /// the person: it has its own switch, off by default, and never touches the Desk card.</summary>
+    Idle,
 }
 
 /// <summary>One thing an agent's turn did, the same shape for every agent. <paramref name="Session"/> tells one run from
@@ -26,18 +30,18 @@ public static class NotificationText
 {
     public static string Title(AgentTurnEvent e) => e.Kind switch
     {
-        AgentTurnKind.Waiting => $"{AgentSources.BurnName(e.Agent)} is waiting on you",
+        AgentTurnKind.Waiting or AgentTurnKind.Idle => $"{AgentSources.BurnName(e.Agent)} is waiting on you",
         AgentTurnKind.Stopped => $"{AgentSources.BurnName(e.Agent)} stopped",
         _ => $"{AgentSources.BurnName(e.Agent)} finished",
     };
 
-    /// <summary>"alpha, 4m 12s"; the project alone for waiting; whichever part is known; empty with neither.
-    /// <paramref name="project"/> arrives already masked for streamer mode.</summary>
+    /// <summary>"alpha, 4m 12s"; the project alone for waiting and the idle reminder; whichever part is known; empty with
+    /// neither. <paramref name="project"/> arrives already masked for streamer mode.</summary>
     public static string Body(AgentTurnEvent e, string? project)
     {
         var parts = new List<string>(2);
         if (!string.IsNullOrWhiteSpace(project)) parts.Add(project);
-        if (e.Kind != AgentTurnKind.Waiting && e.Duration is { } d) parts.Add(Duration(d));
+        if (e.Kind is not (AgentTurnKind.Waiting or AgentTurnKind.Idle) && e.Duration is { } d) parts.Add(Duration(d));
         return string.Join(", ", parts);
     }
 

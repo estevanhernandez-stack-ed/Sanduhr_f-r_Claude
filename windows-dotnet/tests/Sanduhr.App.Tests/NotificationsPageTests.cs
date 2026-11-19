@@ -32,6 +32,7 @@ public sealed class NotificationsPageTests : AppWindowFixture
         Assert.False(vm.GlowWaiting);
         Assert.False(vm.Flash);
         Assert.True(vm.SkipInFront);
+        Assert.False(vm.Idle);
         Assert.Equal(60, vm.Threshold.Seconds);
         Assert.Equal(["Every turn", "30 seconds", "1 minute", "2 minutes", "5 minutes"], NotificationsViewModel.ThresholdChoices.Select(c => c.Name));
     });
@@ -47,6 +48,7 @@ public sealed class NotificationsPageTests : AppWindowFixture
         vm.GlowFinished = true;
         vm.Flash = true;
         vm.SkipInFront = false;
+        vm.Idle = true;
         vm.Threshold = NotificationsViewModel.ThresholdChoices.Single(c => c.Seconds == 300);
 
         var s = store.LoadAgentNotifications();
@@ -54,8 +56,9 @@ public sealed class NotificationsPageTests : AppWindowFixture
         Assert.True(s.GlowFinished);
         Assert.True(s.Flash);
         Assert.False(s.SkipInFront);
+        Assert.True(s.Idle);
         Assert.Equal(300, s.ThresholdSeconds);
-        Assert.Equal(5, changed);
+        Assert.Equal(6, changed);
     });
 
     [Fact]
@@ -165,7 +168,7 @@ public sealed class NotificationsPageTests : AppWindowFixture
                      {
                          "Notify me about Claude Code", "Notify me about Codex", "Notify me about Antigravity",
                          SettingsNames.NotifyToast, SettingsNames.NotifyDeskCard, SettingsNames.GlowWhenDone, SettingsNames.GlowWhenWaiting,
-                         SettingsNames.NotifyFlash, SettingsNames.NotifyThreshold, SettingsNames.GlowNotInTerminal,
+                         SettingsNames.NotifyFlash, SettingsNames.NotifyThreshold, SettingsNames.GlowNotInTerminal, SettingsNames.NotifyIdle,
                          SettingsNames.NotifyGlowWhere, SettingsNames.NotifyTryFinished, SettingsNames.NotifyTryWaiting,
                          SettingsNames.NotificationsIntro, SettingsNames.TrademarkNotice, SettingsNames.CodexNotice, SettingsNames.AntigravityNotice,
                      })
@@ -175,9 +178,9 @@ public sealed class NotificationsPageTests : AppWindowFixture
                 .Where(p => p.GetAutomationControlType() is AutomationControlType.Button or AutomationControlType.CheckBox
                     or AutomationControlType.ComboBox)
                 .ToList();
-            // Three agents; toast, card, two glows, flash, in front; the threshold; the link and two Try it. If the count is off,
-            // print each peer's type and name before touching the number: a control with no name is what this test is for.
-            Assert.Equal(3 + 6 + 1 + 3, controls.Count);
+            // Three agents; toast, card, two glows, flash, in front, the idle reminder; the threshold; the link and two Try it. If the
+            // count is off, print each peer's type and name before touching the number: a control with no name is what this test is for.
+            Assert.Equal(3 + 7 + 1 + 3, controls.Count);
             Assert.All(controls, p => Assert.False(string.IsNullOrWhiteSpace(p.GetName())));
         }
         finally { window.Close(); }

@@ -26,7 +26,7 @@ internal sealed class ClaudeCodeGlowService : IDisposable
     private readonly Dictionary<ClaudeCodeEvent, DispatcherTimer> _pending = new();
     private FileSystemWatcher? _watcher;
     private GlowOverlayWindow? _overlay;
-    private GlowSwitches _switches = new();
+    private NotificationSettings _notify = NotificationSettings.Default;
     private ClaudeCodeGlowLimiter _limiter;
     private bool _disposed;
 
@@ -77,14 +77,10 @@ internal sealed class ClaudeCodeGlowService : IDisposable
         _pending.Clear();
     }
 
-    private bool _flash;
-
     /// <summary>Re-read the switches (Settings changed them).</summary>
     public void Reload()
     {
-        var n = _store.LoadAgentNotifications();
-        _switches = new GlowSwitches(Waiting: n.GlowWaiting, Done: n.GlowFinished, SkipTerminal: n.SkipInFront);
-        _flash = n.Flash;
+        _notify = _store.LoadAgentNotifications();
         _target = _store.LoadGlowTarget();
     }
 
@@ -160,11 +156,12 @@ internal sealed class ClaudeCodeGlowService : IDisposable
     private void Fire(ClaudeCodeEvent kind)
     {
         if (_disposed) return;
+        // An older hook's signal (3.5 to 4.9): it glows as it did, and flashes when Settings, Notifications says so. Nothing
+        // while Claude Code is switched off there.
         var fg = GlowNative.GetForegroundWindow();
-        if (!ClaudeCodeGlowRules.Decide(kind, _switches, ProcessNameOf(fg, out _), ref _limiter, DateTimeOffset.UtcNow))
-            return;
-        // An older hook's signal (3.5 to 4.9): it glows as it did, and flashes when Settings, Notifications says so.
-        Show(GlowOverlayContent.ColorFor(kind), _flash);
+        var (glow, flash) = NotificationRules.OldHookSignal(_notify, kind, ProcessNameOf(fg, out _), ref _limiter, DateTimeOffset.UtcNow);
+        if (!glow) return;
+        Show(GlowOverlayContent.ColorFor(kind), flash);
     }
 
     private void Show(System.Windows.Media.Color color, bool flash)

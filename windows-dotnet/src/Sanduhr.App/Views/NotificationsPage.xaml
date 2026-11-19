@@ -96,6 +96,13 @@
                               IsChecked="{Binding SkipInFront, Mode=TwoWay}" />
                     <TextBlock Text="{x:Static core:SettingsNames.NotifyInFrontCaption}" FontSize="11" TextWrapping="Wrap" Margin="24,2,0,0"
                                Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                    <!-- Claude Code's idle reminder, a minute after a turn ends: off by default. -->
+                    <CheckBox Style="{DynamicResource ThemedCheckBox}" Content="{x:Static core:SettingsNames.NotifyIdle}" Margin="0,8,0,0"
+                              AutomationProperties.Name="{x:Static core:SettingsNames.NotifyIdle}"
+                              AutomationProperties.HelpText="{x:Static core:SettingsNames.NotifyIdleCaption}"
+                              IsChecked="{Binding Idle, Mode=TwoWay}" />
+                    <TextBlock Text="{x:Static core:SettingsNames.NotifyIdleCaption}" FontSize="11" TextWrapping="Wrap" Margin="24,2,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                 </StackPanel>
 
                 <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />

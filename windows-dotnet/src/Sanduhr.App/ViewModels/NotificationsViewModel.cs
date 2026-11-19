@@ -60,6 +60,7 @@ public sealed partial class NotificationsViewModel : ObservableObject
     [ObservableProperty] private bool _glowWaiting;
     [ObservableProperty] private bool _flash;
     [ObservableProperty] private bool _skipInFront;
+    [ObservableProperty] private bool _idle;
     [ObservableProperty] private ThresholdChoice _threshold;
 
     /// <summary>Set by App: a setting was saved (the glow service re-reads its switches).</summary>
@@ -90,6 +91,7 @@ public sealed partial class NotificationsViewModel : ObservableObject
             GlowWaiting = s.GlowWaiting;
             Flash = s.Flash;
             SkipInFront = s.SkipInFront;
+            Idle = s.Idle;
             Threshold = ThresholdChoices.Single(c => c.Seconds == s.ThresholdSeconds);
             foreach (var row in Agents) row.Load(s.AgentOn(row.Agent), _agentState(row.Agent));
         }
@@ -102,6 +104,7 @@ public sealed partial class NotificationsViewModel : ObservableObject
     partial void OnGlowWaitingChanged(bool value) => Save();
     partial void OnFlashChanged(bool value) => Save();
     partial void OnSkipInFrontChanged(bool value) => Save();
+    partial void OnIdleChanged(bool value) => Save();
     partial void OnThresholdChanged(ThresholdChoice value) => Save();
 
     internal void AgentToggled(string agent, bool on)
@@ -119,7 +122,7 @@ public sealed partial class NotificationsViewModel : ObservableObject
         {
             var agents = Agents.ToDictionary(a => a.Agent, a => a.On, StringComparer.Ordinal);
             if (_store.TrySaveAgentNotifications(new NotificationSettings(agents, Toast, GlowFinished, GlowWaiting, Flash, DeskCard,
-                    Threshold.Seconds, SkipInFront)))
+                    Threshold.Seconds, SkipInFront, Idle)))
             {
                 Changed?.Invoke();
                 return true;

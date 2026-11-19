@@ -131,6 +131,144 @@ public class NotificationRulesTests
         Assert.Equal(Everything, NotificationRules.Decide(E(AgentTurnKind.Finished, 600), AllOn, false, limiter, Now.AddSeconds(1)));
     }
 
+    // ---- in front, asked only when it can matter ----
+
+    private static (NotifySurfaces Surfaces, int Calls) Counted(AgentTurnEvent e, NotificationSettings s, bool inFront = false)
+    {
+        int calls = 0;
+        var surfaces = NotificationRules.Decide(e, s, () => { calls++; return inFront; }, new NotificationLimiter(), Now);
+        return (surfaces, calls);
+    }
+
+    [Fact]
+    public void The_front_window_is_not_asked_when_it_cannot_matter()
+    {
+        Assert.Equal((NotifySurfaces.Card, 0), Counted(E(AgentTurnKind.Started), AllOn));
+        Assert.Equal((NotifySurfaces.None, 0), Counted(E(AgentTurnKind.Finished, 600), AllOn.WithAgent("codex", false)));
+        Assert.Equal((NotifySurfaces.Card, 0), Counted(E(AgentTurnKind.Finished, 59), AllOn));
+        Assert.Equal((NotifySurfaces.Card, 0), Counted(E(AgentTurnKind.Finished, 600), AllOn with { Toast = false, GlowFinished = false, Flash = false }));
+        Assert.Equal((Everything, 0), Counted(E(AgentTurnKind.Finished, 600), AllOn with { SkipInFront = false }, inFront: true));
+    }
+
+    [Fact]
+    public void The_front_window_is_asked_once_for_a_long_finished_turn()
+    {
+        Assert.Equal((Everything, 1), Counted(E(AgentTurnKind.Finished, 600), AllOn));
+        Assert.Equal((NotifySurfaces.Card, 1), Counted(E(AgentTurnKind.Finished, 600), AllOn, inFront: true));
+    }
+
+    [Fact]
+    public void An_event_stopped_by_the_front_window_through_the_function_does_not_use_up_the_limit()
+    {
+        var limiter = new NotificationLimiter();
+        Assert.Equal(NotifySurfaces.Card, NotificationRules.Decide(E(AgentTurnKind.Finished, 600), AllOn, () => true, limiter, Now));
+        Assert.Equal(Everything, NotificationRules.Decide(E(AgentTurnKind.Finished, 600), AllOn, () => false, limiter, Now.AddSeconds(1)));
+    }
+
+    [Fact]
+    public void The_in_front_caption_says_terminals_count_for_every_agent() =>
+        Assert.Equal("A terminal or an editor in front counts for every agent. The Codex app also counts for Codex.",
+            SettingsNames.NotifyInFrontCaption);
+
+    // ---- Claude Code's idle reminder ----
+
+    private const NotifySurfaces Interrupts = NotifySurfaces.Toast | NotifySurfaces.Glow | NotifySurfaces.Flash;
+
+    [Fact]
+    public void The_idle_reminder_with_its_switch_off_does_nothing()
+    {
+        Assert.Equal((NotifySurfaces.None, 0), Counted(E(AgentTurnKind.Idle, agent: "claude"), AllOn));
+        Assert.Equal(NotifySurfaces.None, Decide(E(AgentTurnKind.Idle, agent: "claude"), NotificationSettings.Default));
+    }
+
+    [Fact]
+    public void The_idle_reminder_switched_on_interrupts_like_a_wait_and_never_shows_a_card()
+    {
+        Assert.Equal(Interrupts, Decide(E(AgentTurnKind.Idle, agent: "claude"), AllOn with { Idle = true, ThresholdSeconds = 300 }));
+        Assert.Equal(NotifySurfaces.Toast, Decide(E(AgentTurnKind.Idle, agent: "claude"), NotificationSettings.Default with { Idle = true }));
+        Assert.False(Decide(E(AgentTurnKind.Idle, agent: "claude"), AllOn with { Idle = true, GlowWaiting = false }).HasFlag(NotifySurfaces.Glow));
+        Assert.Equal(NotifySurfaces.None, Decide(E(AgentTurnKind.Idle, agent: "claude"),
+            AllOn with { Idle = true, Toast = false, GlowWaiting = false, Flash = false }));
+    }
+
+    [Fact]
+    public void The_idle_reminder_with_the_agents_window_in_front_does_nothing() =>
+        Assert.Equal(NotifySurfaces.None, Decide(E(AgentTurnKind.Idle, agent: "claude"), AllOn with { Idle = true }, inFront: true));
+
+    [Fact]
+    public void The_idle_reminder_keeps_to_the_limit_of_the_waiting_slot()
+    {
+        var limiter = new NotificationLimiter();
+        var on = AllOn with { Idle = true };
+        Assert.Equal(Interrupts, NotificationRules.Decide(E(AgentTurnKind.Idle, agent: "claude"), on, false, limiter, Now));
+        Assert.Equal(NotifySurfaces.None, NotificationRules.Decide(E(AgentTurnKind.Idle, agent: "claude"), on, false, limiter, Now.AddSeconds(19)));
+        Assert.Equal(NotifySurfaces.Card, NotificationRules.Decide(E(AgentTurnKind.Waiting, agent: "claude"), on, false, limiter, Now.AddSeconds(19)));
+    }
+
+    [Fact]
+    public void The_idle_reminder_for_an_agent_switched_off_does_nothing() =>
+        Assert.Equal(NotifySurfaces.None, Decide(E(AgentTurnKind.Idle, agent: "claude"), (AllOn with { Idle = true }).WithAgent("claude", false)));
+
+    [Fact]
+    public void The_idle_reminder_is_off_by_default_carries_over_the_old_waiting_glow_and_round_trips()
+    {
+        Assert.False(NotificationSettings.Default.Idle);
+        Assert.True(NotificationSettings.Decode(null, new GlowSwitches(Waiting: true)).Idle);
+        Assert.False(NotificationSettings.Decode(null, new GlowSwitches(Done: true)).Idle);
+        Assert.False(NotificationSettings.Decode(JsonNode.Parse("{}"), new GlowSwitches(Waiting: true)).Idle);
+        var on = NotificationSettings.Default with { Idle = true };
+        Assert.True(NotificationSettings.Decode(JsonNode.Parse(on.Encode().ToJsonString()), new GlowSwitches()).Idle);
+        Assert.Equal(true, on.Encode()["idle"]!.GetValue<bool>());
+    }
+
+    // ---- an older hook's glow (3.5 to 4.9), from the migrated switches ----
+
+    private static readonly NotificationSettings Migrated =
+        NotificationSettings.Decode(null, new GlowSwitches(Waiting: true, Done: true, SkipTerminal: true));
+
+    private static (bool Glow, bool Flash) Old(NotificationSettings s, ClaudeCodeEvent kind = ClaudeCodeEvent.Done, string? front = "chrome")
+    {
+        var limiter = new ClaudeCodeGlowLimiter();
+        return NotificationRules.OldHookSignal(s, kind, front, ref limiter, Now);
+    }
+
+    [Fact]
+    public void With_nothing_saved_and_the_old_switches_on_an_old_signal_glows_and_flashes()
+    {
+        Assert.Equal((true, true), Old(Migrated));
+        Assert.Equal((true, true), Old(Migrated, ClaudeCodeEvent.Waiting));
+    }
+
+    [Fact]
+    public void With_the_flash_off_an_old_signal_glows_without_the_flash() =>
+        Assert.Equal((true, false), Old(Migrated with { Flash = false }));
+
+    [Fact]
+    public void With_the_glow_off_for_its_kind_an_old_signal_does_nothing()
+    {
+        Assert.Equal((false, false), Old(Migrated with { GlowFinished = false }));
+        Assert.Equal((true, true), Old(Migrated with { GlowFinished = false }, ClaudeCodeEvent.Waiting));
+    }
+
+    [Fact]
+    public void With_a_terminal_in_front_and_in_front_on_an_old_signal_does_nothing()
+    {
+        Assert.Equal((false, false), Old(Migrated, front: "WindowsTerminal"));
+        Assert.Equal((true, true), Old(Migrated with { SkipInFront = false }, front: "WindowsTerminal"));
+    }
+
+    [Fact]
+    public void With_claude_code_switched_off_an_old_signal_does_nothing() =>
+        Assert.Equal((false, false), Old(Migrated.WithAgent(AgentSources.Claude, false)));
+
+    [Fact]
+    public void An_old_signal_keeps_to_the_limiter()
+    {
+        var limiter = new ClaudeCodeGlowLimiter();
+        Assert.True(NotificationRules.OldHookSignal(Migrated, ClaudeCodeEvent.Done, null, ref limiter, Now).Glow);
+        Assert.False(NotificationRules.OldHookSignal(Migrated, ClaudeCodeEvent.Done, null, ref limiter, Now.AddSeconds(5)).Glow);
+    }
+
     // ---- in front ----
 
     [Theory]
@@ -149,6 +287,10 @@ public class NotificationRulesTests
         Assert.Equal(expected, NotificationRules.InFront(agent, process));
 
     // ---- the settings ----
+
+    [Fact]
+    public void The_settings_key_is_frozen() =>
+        Assert.Equal("agent_notifications", NotificationSettings.Key);
 
     [Fact]
     public void The_defaults_are_the_specs()

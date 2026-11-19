@@ -3,10 +3,11 @@ using System.Text.Json.Nodes;
 namespace Sanduhr.Core;
 
 /// <summary>What the person chose on Settings, Notifications (5.0 spec 4). Stored as <c>agent_notifications</c> in
-/// settings.json. An agent with no entry in <see cref="Agents"/> is on.</summary>
+/// settings.json. An agent with no entry in <see cref="Agents"/> is on. <paramref name="Idle"/> is Claude Code's idle
+/// reminder (<see cref="AgentTurnKind.Idle"/>), off by default.</summary>
 public sealed record NotificationSettings(
     IReadOnlyDictionary<string, bool> Agents, bool Toast, bool GlowFinished, bool GlowWaiting, bool Flash, bool DeskCard,
-    int ThresholdSeconds, bool SkipInFront)
+    int ThresholdSeconds, bool SkipInFront, bool Idle)
 {
     public const string Key = "agent_notifications";
 
@@ -17,7 +18,7 @@ public sealed record NotificationSettings(
 
     public static NotificationSettings Default { get; } =
         new(new Dictionary<string, bool>(), Toast: true, GlowFinished: false, GlowWaiting: false, Flash: false, DeskCard: true,
-            ThresholdSeconds: DefaultThreshold, SkipInFront: true);
+            ThresholdSeconds: DefaultThreshold, SkipInFront: true, Idle: false);
 
     public bool AgentOn(string agent) => Agents.GetValueOrDefault(agent, true);
 
@@ -25,14 +26,15 @@ public sealed record NotificationSettings(
         this with { Agents = new Dictionary<string, bool>(Agents, StringComparer.Ordinal) { [agent] = on } };
 
     /// <summary>The saved settings; with none saved, the defaults with the old Claude Code glow switches carried over
-    /// (the taskbar flash on when either glow was on).</summary>
+    /// (the taskbar flash on when either glow was on, and the idle reminder on with the old waiting glow, which lit for
+    /// it).</summary>
     public static NotificationSettings Decode(JsonNode? node, GlowSwitches legacy)
     {
         if (node is not JsonObject o)
             return Default with
             {
                 GlowFinished = legacy.Done, GlowWaiting = legacy.Waiting, Flash = legacy.Done || legacy.Waiting,
-                SkipInFront = legacy.SkipTerminal,
+                SkipInFront = legacy.SkipTerminal, Idle = legacy.Waiting,
             };
 
         var agents = new Dictionary<string, bool>(StringComparer.Ordinal);
@@ -45,7 +47,7 @@ public sealed record NotificationSettings(
         return new NotificationSettings(agents,
             Toast: Bool(o, "toast", true), GlowFinished: Bool(o, "glow_finished", false), GlowWaiting: Bool(o, "glow_waiting", false),
             Flash: Bool(o, "flash", false), DeskCard: Bool(o, "desk_card", true), ThresholdSeconds: threshold,
-            SkipInFront: Bool(o, "skip_in_front", true));
+            SkipInFront: Bool(o, "skip_in_front", true), Idle: Bool(o, "idle", false));
     }
 
     public JsonObject Encode()
@@ -56,6 +58,7 @@ public sealed record NotificationSettings(
         {
             ["agents"] = agents, ["toast"] = Toast, ["glow_finished"] = GlowFinished, ["glow_waiting"] = GlowWaiting,
             ["flash"] = Flash, ["desk_card"] = DeskCard, ["threshold_seconds"] = ThresholdSeconds, ["skip_in_front"] = SkipInFront,
+            ["idle"] = Idle,
         };
     }
 
@@ -86,7 +89,7 @@ public sealed class NotificationLimiter
     {
         var key = (e.Agent, e.Session);
         _bySession.TryGetValue(key, out var limiter);
-        bool allowed = limiter.Allow(e.Kind == AgentTurnKind.Waiting ? ClaudeCodeEvent.Waiting : ClaudeCodeEvent.Done, now);
+        bool allowed = limiter.Allow(e.Kind is AgentTurnKind.Waiting or AgentTurnKind.Idle ? ClaudeCodeEvent.Waiting : ClaudeCodeEvent.Done, now);
         if (_bySession.Count >= MaxSessions && !_bySession.ContainsKey(key)) _bySession.Clear();
         _bySession[key] = limiter;
         return allowed;
@@ -112,20 +115,45 @@ public static class NotificationRules
     }
 
     public static NotifySurfaces Decide(AgentTurnEvent e, NotificationSettings s, bool agentInFront, NotificationLimiter limiter,
+        DateTimeOffset now) => Decide(e, s, () => agentInFront, limiter, now);
+
+    /// <summary>As the other overload, with the front window asked through <paramref name="agentInFront"/>: at most once, and
+    /// only when its answer can matter (the agent is on, the event is not a start, the in-front switch is on, the threshold lets
+    /// the event through and some interrupting surface is on; for the idle reminder, its switch is on too). The limiter is
+    /// asked last, so an event the front window stops does not use up the limit. The idle reminder is never a card: it is the
+    /// interrupting surfaces or nothing.</summary>
+    public static NotifySurfaces Decide(AgentTurnEvent e, NotificationSettings s, Func<bool> agentInFront, NotificationLimiter limiter,
         DateTimeOffset now)
     {
         if (!s.AgentOn(e.Agent)) return NotifySurfaces.None;
-        var card = s.DeskCard ? NotifySurfaces.Card : NotifySurfaces.None;
+        bool idle = e.Kind == AgentTurnKind.Idle;
+        if (idle && !s.Idle) return NotifySurfaces.None;
+        // The idle reminder never touches the Desk card; otherwise it interrupts as a wait does.
+        var card = s.DeskCard && !idle ? NotifySurfaces.Card : NotifySurfaces.None;
+        bool waits = e.Kind is AgentTurnKind.Waiting or AgentTurnKind.Idle;
         if (e.Kind == AgentTurnKind.Started) return card;
-        if (s.SkipInFront && agentInFront) return card;
-        if (e.Kind != AgentTurnKind.Waiting && !LongEnough(e.Duration, s.ThresholdSeconds)) return card;
+        if (!waits && !LongEnough(e.Duration, s.ThresholdSeconds)) return card;
 
         var interrupt = NotifySurfaces.None;
         if (s.Toast) interrupt |= NotifySurfaces.Toast;
-        if (e.Kind == AgentTurnKind.Waiting ? s.GlowWaiting : s.GlowFinished) interrupt |= NotifySurfaces.Glow;
+        if (waits ? s.GlowWaiting : s.GlowFinished) interrupt |= NotifySurfaces.Glow;
         if (s.Flash) interrupt |= NotifySurfaces.Flash;
-        if (interrupt == NotifySurfaces.None || !limiter.Allow(e, now)) return card;
+        if (interrupt == NotifySurfaces.None) return card;
+        if (s.SkipInFront && agentInFront()) return card;
+        if (!limiter.Allow(e, now)) return card;
         return card | interrupt;
+    }
+
+    /// <summary>An older hook's signal (3.5 to 4.9, which names no folder or session) arrived: whether it glows, and whether the
+    /// taskbar flashes with it. Nothing while Claude Code is switched off on Settings, Notifications; otherwise the glow switch
+    /// for its kind, the in-front rule (a terminal or an editor) and the limiter decide, and the flash follows its own switch.</summary>
+    public static (bool Glow, bool Flash) OldHookSignal(NotificationSettings s, ClaudeCodeEvent kind, string? foregroundProcess,
+        ref ClaudeCodeGlowLimiter limiter, DateTimeOffset now)
+    {
+        if (!s.AgentOn(AgentSources.Claude)) return (false, false);
+        var switches = new GlowSwitches(Waiting: s.GlowWaiting, Done: s.GlowFinished, SkipTerminal: s.SkipInFront);
+        if (!ClaudeCodeGlowRules.Decide(kind, switches, foregroundProcess, ref limiter, now)) return (false, false);
+        return (true, s.Flash);
     }
 
     /// <summary>"Every turn" (0) lets anything through; otherwise the turn's length must be known and long enough.</summary>

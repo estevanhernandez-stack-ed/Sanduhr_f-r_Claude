@@ -87,6 +87,36 @@ public class AgentNotifierTests
     }
 
     [Fact]
+    public void The_front_window_is_read_only_when_an_interruption_is_otherwise_due()
+    {
+        int reads = 0;
+        var sut = new AgentNotifier(() => _settings, () => false, () => { reads++; return null; }, _ => null, () => Now);
+        sut.Handle(E(AgentTurnKind.Started));
+        sut.Handle(E(AgentTurnKind.Finished, 5));
+        _settings = _settings.WithAgent("codex", false);
+        sut.Handle(E(AgentTurnKind.Finished));
+        Assert.Equal(0, reads);
+
+        _settings = _settings.WithAgent("codex", true);
+        sut.Handle(E(AgentTurnKind.Finished));
+        Assert.Equal(1, reads);
+    }
+
+    [Fact]
+    public void The_idle_reminder_has_its_own_tag_says_waiting_and_puts_up_no_card()
+    {
+        _settings = _settings with { Idle = true };
+        var idle = E(AgentTurnKind.Idle, null, "claude");
+        Assert.NotEqual(AgentNotifier.Tag(E(AgentTurnKind.Finished, agent: "claude")), AgentNotifier.Tag(idle));
+        Assert.Equal(AgentNotifier.Tag(E(AgentTurnKind.Finished, agent: "claude")), AgentNotifier.Tag(E(AgentTurnKind.Waiting, agent: "claude")));
+
+        Sut().Handle(idle);
+        Assert.DoesNotContain(_calls, c => c.StartsWith("card"));
+        Assert.Contains($"toast|Claude Code is waiting on you|masked:alpha|{AgentNotifier.Tag(idle)}", _calls);
+        Assert.Contains("glow|claude|Idle|True", _calls);
+    }
+
+    [Fact]
     public void Demo_mode_does_nothing()
     {
         _demo = true;
