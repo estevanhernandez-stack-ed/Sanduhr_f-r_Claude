@@ -30,6 +30,8 @@ public partial class App : Application
     private MenuItem? _trayShowsItem;
     private GlobalHotKeyService? _hotKeys;
     private ClaudeCodeGlowService? _glow;
+    private AgentActivityWatcher? _agentActivity;
+    private AgentNotifier? _agentNotifier;
     private Desk.DeskController? _desk;
     /// <summary>This PC's font families for the theme's font (theme match): drawn when present, warned about when not. Read again when a
     /// font pack comes or goes.</summary>
@@ -159,6 +161,7 @@ public partial class App : Application
         Instance?.Listen(message => Dispatcher.BeginInvoke(() => { if (!_quitting) OnSecondLaunch(message); }));
         SetupHotKeys();
         StartGlow();
+        StartAgentNotifications();
         StartDesk();
 
         // Session archive (WS-C): consent resolves BEFORE the service attaches —
@@ -778,6 +781,78 @@ public partial class App : Application
         _glow.Start();
     }
 
+    /// <summary>Agent notifications (5.0 spec 4): watches each agent's own files for its turns and shows them on the toast,
+    /// the glow, the taskbar flash and a Desk card. Codex and the Antigravity CLI are read only while their source is on.</summary>
+    private void StartAgentNotifications()
+    {
+        if (_vm is not { } vm) return;
+        var paths = new Sanduhr.Core.Paths();
+        var store = new SettingsStore(paths);
+        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);   // streamer: notname - user folder handed to the readers, never drawn
+        var agyHome = AntigravityBurnSource.DefaultCliHome(profile);   // streamer: notname - the CLI folder the reader joins its names to, never drawn
+
+        // The conversation list, read at most once a minute. Called by the watcher under its own lock, one call at a time.
+        IReadOnlyDictionary<string, string?>? workspaces = null;
+        var workspacesAt = DateTimeOffset.MinValue;
+        string? AntigravityFolder(string conversation)
+        {
+            if (DateTimeOffset.UtcNow - workspacesAt > TimeSpan.FromSeconds(60))
+            {
+                workspaces = AntigravitySummaries.Read(AntigravityBurnSource.SummariesPath(agyHome));
+                workspacesAt = DateTimeOffset.UtcNow;
+            }
+            return workspaces is not null && workspaces.TryGetValue(conversation, out var uris)
+                ? AntigravityBurnSource.ProjectPathOf(uris) : null;
+        }
+
+        _agentNotifier = new AgentNotifier(
+            store.LoadAgentNotifications,
+            () => vm.IsDemo,
+            () => _glow?.ForegroundProcess(),
+            TurnProject,
+            () => DateTimeOffset.UtcNow)
+        {
+            Toast = (title, body, tag) => Toasts.Show(title, body, group: "sanduhr-agents", tag: tag),
+            Glow = (e, flash) => _glow?.Glow(
+                e.Kind == AgentTurnKind.Waiting ? GlowOverlayContent.ColorFor(ClaudeCodeEvent.Waiting) : AgentColor(store, e.Agent), flash),
+            Flash = () => _glow?.FlashOnly(),
+            Card = (e, title, shortTitle) => _watchers?.ApplyTurn(e, title, shortTitle),
+            Log = message => LogLine(paths, message),
+        };
+
+        _agentActivity = new AgentActivityWatcher(
+            codexHomes: () => (new SettingsStore(paths).LoadSetup()?.CodexUsage ?? false)
+                ? CodexHomes.Discover(Environment.GetEnvironmentVariable("CODEX_HOME"), profile)
+                : [],
+            antigravityHome: () => new SettingsStore(paths).LoadActivity().GetValueOrDefault(AgentSources.Antigravity)
+                && System.IO.Directory.Exists(agyHome) ? agyHome : null,
+            antigravityFolder: AntigravityFolder,
+            claudeOn: () => true,
+            signalDir: paths.ExternalDir,
+            log: message => LogLine(paths, message));
+        _agentActivity.Turn += e => Dispatcher.BeginInvoke(() =>
+        {
+            if (!_quitting) _agentNotifier?.Handle(e);
+        });
+        _agentActivity.AgentOff += agent => Dispatcher.BeginInvoke(() => _watchers?.ClearTurns(agent));
+        _agentActivity.Start();
+    }
+
+    /// <summary>A turn's project as every surface shows it: the folder's name, or its codename while streamer mode hides it.</summary>
+    private static string? TurnProject(string? folder) =>
+        string.IsNullOrWhiteSpace(folder) ? null
+            : StreamerMode.Mask.Name(CodenameCategory.Project, CcLogReader.ProjectDisplayName(folder));   // streamer: masked - a turn's project name goes through Mask.Name on this line
+
+    /// <summary>An agent's color as saved in Sources.</summary>
+    internal static System.Windows.Media.Color AgentColor(SettingsStore store, string agent) =>
+        (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(store.LoadSources().ColorOf(agent));
+
+    private static void LogLine(Sanduhr.Core.Paths paths, string message)
+    {
+        try { System.IO.File.AppendAllText(paths.LogFile, $"{DateTime.UtcNow:o} {message}{Environment.NewLine}"); }   // streamer: notname - written to the log file, never drawn
+        catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException) { }
+    }
+
     /// <summary>The global shortcut: registers what <c>hotkey_settings</c> asks for (off until the user turns it on).</summary>
     private void SetupHotKeys()
     {
@@ -872,8 +947,10 @@ public partial class App : Application
                 case WidgetVisibility.Show: ShowWindowWithoutActivating(); break;
                 case WidgetVisibility.Hide: _window?.Hide(); break;
             }
+            _agentActivity?.Refresh();   // a source went on or off: watch the folders that are on now
         };
         svm.Sources.DisplayChanged = () => _vm?.RefreshSources();
+        svm.ActivitySourceChanged = () => _agentActivity?.Refresh();
         // Turning drawers on or off from Settings reaches the running Desk the way the Desk page's own switch does.
         svm.Drawers.DeskChanged = () => { _desk?.Reload(); svm.Desk.Reload(); };
         // Tidy drawers on the Drawers page lines the drawers up from the corner and direction the page shows.
@@ -1203,6 +1280,8 @@ public partial class App : Application
             OnTrayReadingChanged(_vm?.CurrentTrayReading);
         _desk?.PrivacyChanged();
         RunnerStatusShown?.Invoke();
+        // Turn cards name a project: rebuild their titles so a codename shows at once (5.0 spec 4).
+        _watchers?.RetitleTurns(w => (NotificationText.CardTitle(w.Kind ?? AgentSources.Claude, TurnProject(w.Folder)), w.Short));
     }
 
     /// <summary>"Tray shows" submenu: one checkable item per mode, checks refreshed on open.</summary>
@@ -1320,6 +1399,8 @@ public partial class App : Application
                 ResetGuard.MarkDone();
                 vm.StopBackgroundWork();
                 _glow?.Stop();
+                _agentActivity?.Dispose();   // it reads only, but its log line must not land after a reset
+                _agentActivity = null;
                 _desk?.StopForReset();
                 _runners?.Dispose();
                 _dockerPipe?.Dispose();
@@ -1429,6 +1510,8 @@ public partial class App : Application
         WhatsNewWindow.Quitting = true;
         BrowserProcessGuard.Current.BeginShutdown();
         _glow?.Dispose();
+        _agentActivity?.Dispose();
+        _agentActivity = null;
         _desk?.Dispose();
         _looks?.Dispose();
         _launcherApps?.Dispose();
@@ -1567,6 +1650,8 @@ public partial class App : Application
         WhatsNewWindow.Quitting = true;
         _codex?.Dispose();
         _glow?.Dispose();
+        _agentActivity?.Dispose();
+        _agentActivity = null;
         _desk?.Dispose();
         _looks?.Dispose();
         _launcherApps?.Dispose();

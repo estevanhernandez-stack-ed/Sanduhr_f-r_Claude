@@ -684,31 +684,35 @@ public sealed class SettingsStore
         Write(root);
     }
 
-    /// <summary>The Claude Code edge glow switches (settings.json "claude_code_glow"
-    /// {"waiting", "done", "skip_terminal"}). Off, off, and skip-terminal on until set.</summary>
-    public GlowSwitches LoadClaudeCodeGlow()
-    {
-        var o = Read()["claude_code_glow"] as JsonObject;
-        return new GlowSwitches(
-            Waiting: ReadBool(o, "waiting", false),
-            Done: ReadBool(o, "done", false),
-            SkipTerminal: ReadBool(o, "skip_terminal", true));
-    }
-
-    public void SaveClaudeCodeGlow(GlowSwitches switches)
+    /// <summary>Settings, Notifications (5.0 spec 4): settings.json "agent_notifications". With none saved, the defaults
+    /// with the old Claude Code glow switches ("claude_code_glow" {"waiting", "done", "skip_terminal"}) carried over.</summary>
+    public NotificationSettings LoadAgentNotifications()
     {
         var root = Read();
-        // The switches only: the glow target's members (spec 6.8) beside them are kept.
-        if (root["claude_code_glow"] is not JsonObject glow)
-        {
-            glow = new JsonObject();
-            root["claude_code_glow"] = glow;
-        }
-        glow["waiting"] = switches.Waiting;
-        glow["done"] = switches.Done;
-        glow["skip_terminal"] = switches.SkipTerminal;
+        var o = root["claude_code_glow"] as JsonObject;   // named "o" so SettingsKeysContractTests still finds the old switches' keys
+        return NotificationSettings.Decode(root[NotificationSettings.Key],
+            new GlowSwitches(Waiting: ReadBool(o, "waiting", false), Done: ReadBool(o, "done", false), SkipTerminal: ReadBool(o, "skip_terminal", true)));
+    }
+
+    public void SaveAgentNotifications(NotificationSettings settings)
+    {
+        var root = Read();
+        root[NotificationSettings.Key] = settings.Encode();
         Write(root);
     }
+
+    /// <summary>The glow switches as the glow service reads them. Since 5.0 they live in "agent_notifications".</summary>
+    public GlowSwitches LoadClaudeCodeGlow()
+    {
+        var n = LoadAgentNotifications();
+        return new GlowSwitches(Waiting: n.GlowWaiting, Done: n.GlowFinished, SkipTerminal: n.SkipInFront);
+    }
+
+    public void SaveClaudeCodeGlow(GlowSwitches switches) =>
+        SaveAgentNotifications(LoadAgentNotifications() with
+        {
+            GlowWaiting = switches.Waiting, GlowFinished = switches.Done, SkipInFront = switches.SkipTerminal,
+        });
 
     /// <summary>Where the Claude Code glow lands (spec 6.8): "claude_code_glow" members "target",
     /// "edge_side" and "edge_monitor". Absent reads as the window in use (S4's behavior).</summary>

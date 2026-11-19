@@ -167,6 +167,29 @@ internal sealed class WatcherStore : IDisposable, IRunnerSink
         Changed?.Invoke();
     }
 
+    /// <summary>An agent's turn moved (5.0 spec 4). Not gated by "Let Claude show watchers", which covers the cards the
+    /// MCP tools put up: these come from the app's own reading, behind Settings, Notifications.</summary>
+    public void ApplyTurn(AgentTurnEvent e, string title, string shortTitle)
+    {
+        if (_disposed) return;
+        if (Board.ApplyTurn(e, title, shortTitle, DateTimeOffset.Now)) Changed?.Invoke();
+        Schedule();
+    }
+
+    /// <summary>An agent's source or its notifications went off: its turn cards go.</summary>
+    public void ClearTurns(string agent)
+    {
+        if (_disposed) return;
+        if (Board.ClearTurns(agent)) Changed?.Invoke();
+    }
+
+    /// <summary>Streamer mode changed: each turn card's title is rebuilt.</summary>
+    public void RetitleTurns(Func<Watcher, (string Title, string Short)> name)
+    {
+        if (_disposed) return;
+        if (Board.RetitleTurns(name)) Changed?.Invoke();
+    }
+
     public IReadOnlyList<Watcher> Shown => WatcherBoard.Shown(Board.Ordered(), _demo());
 
     public void Start()

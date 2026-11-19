@@ -46,6 +46,9 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
     /// <summary>Called after the Message page saves the file or its settings (the Desk redraws).</summary>
     public Action? MessageChanged { get; set; }
 
+    /// <summary>Set by App: an activity-only source was switched on (5.0 spec 4: the turn watcher looks at its folder at once).</summary>
+    public Action? ActivitySourceChanged { get; set; }
+
     /// <summary>Settings, Now playing (spec 6.3).</summary>
     public NowPlayingPageViewModel NowPlayingPage { get; }
 
@@ -242,7 +245,7 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
             () => CodexHomes.Discover(Environment.GetEnvironmentVariable("CODEX_HOME"),
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)),   // streamer: notname - only whether a Codex home exists, never drawn
             () => System.IO.Directory.Exists(AntigravityBurnSource.DefaultCliHome(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))),   // streamer: notname - only whether the folder exists, never drawn
-            agent => widget.Vault?.SetAgentVaultOn(agent));
+            agent => { widget.Vault?.SetAgentVaultOn(agent); ActivitySourceChanged?.Invoke(); });
         var msgPaths = new Paths();
         MessagePage = new DeskMessagePageViewModel(new SettingsStore(msgPaths), System.IO.Path.Combine(msgPaths.AppDataDir, "messages.txt"),
             () => !ResetGuard.Done, () => MessageChanged?.Invoke(), Sanduhr.App.Desk.DeskFonts.ForThisPc(new Paths()).PickerFamilies(),
