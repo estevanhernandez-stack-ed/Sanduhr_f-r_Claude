@@ -284,15 +284,16 @@ public sealed class ExternalDirMigrationTests : IDisposable
 
     // ------------------------------------------------------------------ hooks
 
-    /// <summary>Installs the hooks, then rewrites their command to the pre-3.5.0 text (the receipt stays).</summary>
+    /// <summary>Installs the hooks, then turns the file and the receipt into what a pre-3.5.0 build left: the two glow
+    /// events with the pre-3.5.0 command, and no UserPromptSubmit group.</summary>
     private void InstallLegacyHooks(string settingsText)
     {
         File.WriteAllText(Settings, settingsText);
         Assert.True(NewCc().Install(IntegrationKind.Hooks, Folder).Ok);
         var text = File.ReadAllText(Settings);
-        var legacy = text.Replace("$env:USERPROFILE '.sanduhr'", "$env:APPDATA 'Sanduhr'");
-        Assert.NotEqual(text, legacy);
-        File.WriteAllText(Settings, legacy);
+        ClaudeCodeIntegrationsTestAccess.AsOlderHookInstall(Settings, Path.Combine(AppData, "integrations", "installs.json"), ClaudeCodeIntegrations.LegacyHookCommand);
+        Assert.NotEqual(text, File.ReadAllText(Settings));
+        Assert.Contains("$env:APPDATA 'Sanduhr'", File.ReadAllText(Settings));
     }
 
     private const string HooksSettings =
@@ -317,10 +318,16 @@ public sealed class ExternalDirMigrationTests : IDisposable
         Assert.Equal(2, stop.Count);
         Assert.Equal(mine, stop.Where(g => !ClaudeCodeIntegrations.IsOurHookGroup(g)).Select(g => g!.ToJsonString()).ToList());
         Assert.Single(Json(Settings)["hooks"]!["Notification"]!.AsArray());
+        Assert.Single(Json(Settings)["hooks"]!["UserPromptSubmit"]!.AsArray(), ClaudeCodeIntegrations.IsOurHookGroup);
         var receipt = Receipts(IntegrationKind.Hooks).Single();
-        Assert.Equal(receipt0.Hooks!.CreatedEvents, receipt.Hooks!.CreatedEvents);
+        // The update keeps the first install's record and adds the UserPromptSubmit list it made.
+        Assert.Equal([.. receipt0.Hooks!.CreatedEvents, "UserPromptSubmit"], receipt.Hooks!.CreatedEvents);
         Assert.Equal(receipt0.Hooks.HooksInner, receipt.Hooks.HooksInner);
         Assert.True(BackupCount > backups);
+
+        // Remove still gives the person's file back as it was before Sanduhr.
+        Assert.True(sut.Remove(IntegrationKind.Hooks, Folder).Ok);
+        Assert.Equal(HooksSettings, File.ReadAllText(Settings));
     }
 
     [Fact]
@@ -360,10 +367,10 @@ public sealed class ExternalDirMigrationTests : IDisposable
     }
 
     [Fact]
-    public void Hook_command_is_the_new_text_and_the_legacy_text_is_the_old_one()
+    public void Glow_hook_command_is_the_3_5_text_and_the_legacy_text_is_the_old_one()
     {
         Assert.Equal("$d = Join-Path $env:USERPROFILE '.sanduhr'; if (Test-Path -LiteralPath $d) { [IO.File]::WriteAllText((Join-Path $d 'glow-done.signal'), '') }",
-            ClaudeCodeIntegrations.HookCommand("glow-done.signal"));
+            ClaudeCodeIntegrations.GlowHookCommand("glow-done.signal"));
         Assert.Equal("$d = Join-Path $env:APPDATA 'Sanduhr'; if (Test-Path -LiteralPath $d) { [IO.File]::WriteAllText((Join-Path $d 'glow-done.signal'), '') }",
             ClaudeCodeIntegrations.LegacyHookCommand("glow-done.signal"));
     }
@@ -377,7 +384,7 @@ public sealed class ExternalDirMigrationTests : IDisposable
         Assert.True(OldStatusline().Install(".claude", StatuslineMode.Replace, StatuslineInstaller.DefaultSegments, StatuslineInstaller.JoinLine));
         Assert.True(OldCc().Install(IntegrationKind.Meters, Folder).Ok);
         Assert.True(NewCc().Install(IntegrationKind.Hooks, Folder).Ok);
-        File.WriteAllText(Settings, File.ReadAllText(Settings).Replace("$env:USERPROFILE '.sanduhr'", "$env:APPDATA 'Sanduhr'"));
+        ClaudeCodeIntegrationsTestAccess.AsOlderHookInstall(Settings, Path.Combine(AppData, "integrations", "installs.json"), ClaudeCodeIntegrations.LegacyHookCommand);
         Directory.CreateDirectory(Path.GetDirectoryName(McpConfig)!);
         File.WriteAllText(McpConfig, McpText(LegacyLauncher));
     }

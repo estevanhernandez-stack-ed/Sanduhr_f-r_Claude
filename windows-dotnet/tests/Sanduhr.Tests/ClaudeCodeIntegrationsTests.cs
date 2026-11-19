@@ -412,7 +412,7 @@ public sealed class ClaudeCodeIntegrationsTests : IDisposable
         Assert.True(res.Ok, res.Message);
         Assert.Equal(IntegrationStatus.Installed, sut.Status(IntegrationKind.Hooks, folder));
         var hooks = (JsonObject)Json(folder)["hooks"]!;
-        foreach (var name in new[] { "Notification", "Stop" })
+        foreach (var name in new[] { "UserPromptSubmit", "Notification", "Stop" })
         {
             var ours = ((JsonArray)hooks[name]!).Where(ClaudeCodeIntegrations.IsOurHookGroup).ToList();
             Assert.Single(ours);
@@ -424,10 +424,13 @@ public sealed class ClaudeCodeIntegrationsTests : IDisposable
         }
         var notification = ((JsonArray)hooks["Notification"]!).First(ClaudeCodeIntegrations.IsOurHookGroup)!;
         Assert.Equal("permission_prompt|idle_prompt|elicitation_dialog|agent_needs_input", (string)notification["matcher"]!);
-        Assert.Contains("glow-waiting.signal", (string)notification["hooks"]![0]!["command"]!);
+        Assert.Equal(ClaudeCodeIntegrations.HookCommand(ClaudeCodeSignalFile.Waiting), (string)notification["hooks"]![0]!["command"]!);
         var stop = ((JsonArray)hooks["Stop"]!).First(ClaudeCodeIntegrations.IsOurHookGroup)!;
         Assert.Null(stop["matcher"]);
-        Assert.Contains("glow-done.signal", (string)stop["hooks"]![0]!["command"]!);
+        Assert.Equal(ClaudeCodeIntegrations.HookCommand(ClaudeCodeSignalFile.Done), (string)stop["hooks"]![0]!["command"]!);
+        var prompt = ((JsonArray)hooks["UserPromptSubmit"]!).First(ClaudeCodeIntegrations.IsOurHookGroup)!;
+        Assert.Null(prompt["matcher"]);
+        Assert.Equal(ClaudeCodeIntegrations.HookCommand(ClaudeCodeSignalFile.Prompt), (string)prompt["hooks"]![0]!["command"]!);
 
         // The user's own groups survive the install.
         if (original?.Contains("notify-send hi") == true)
@@ -525,6 +528,130 @@ public sealed class ClaudeCodeIntegrationsTests : IDisposable
         Assert.Equal(B(original), Bytes(folder));
     }
 
+    private static readonly (string Event, string Word)[] HookWords =
+        [("UserPromptSubmit", "prompt"), ("Notification", "waiting"), ("Stop", "done")];
+
+    /// <summary>A settings.json as 4.9 left it: Sanduhr's two groups with the empty-file command, beside a Stop hook of the person's own.</summary>
+    private static string SettingsFrom49() =>
+        "{\"hooks\":{"
+        + "\"Notification\":[{\"matcher\":" + Quote(ClaudeCodeIntegrations.WaitingMatcher) + ",\"hooks\":[{\"type\":\"command\",\"shell\":\"powershell\",\"command\":"
+        + Quote(ClaudeCodeIntegrations.GlowHookCommand(ClaudeCodeIntegrations.WaitingSignal)) + ",\"async\":true,\"timeout\":5}]}],"
+        + "\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"echo mine\"}]},{\"hooks\":[{\"type\":\"command\",\"shell\":\"powershell\",\"command\":"
+        + Quote(ClaudeCodeIntegrations.GlowHookCommand(ClaudeCodeIntegrations.DoneSignal)) + ",\"async\":true,\"timeout\":5}]}]}}";
+
+    private static List<JsonObject> OurGroups(JsonObject root, string ev) =>
+        root["hooks"]?[ev] is JsonArray list ? [.. list.Where(ClaudeCodeIntegrations.IsOurHookGroup).Select(g => (JsonObject)g!)] : [];
+
+    private static bool HasThePersonsStopHook(JsonObject root) =>
+        root["hooks"]?["Stop"] is JsonArray list && list.Any(g => (string?)g?["hooks"]?[0]?["command"] == "echo mine");
+
+    [Fact]
+    public void A_4_9_hook_install_reads_outdated()
+    {
+        var sut = Sut();
+        var folder = Folder();
+        Put(folder, SettingsFrom49());
+        Assert.Equal(IntegrationStatus.Outdated, sut.Status(IntegrationKind.Hooks, folder));
+    }
+
+    [Fact]
+    public void Updating_a_4_9_hook_install_writes_all_three_events_and_keeps_the_persons_hook()
+    {
+        var sut = Sut();
+        var folder = Folder();
+        Put(folder, SettingsFrom49());
+
+        Ok(sut.Install(IntegrationKind.Hooks, folder));
+        var root = Json(folder);
+        foreach (var (ev, word) in HookWords)
+        {
+            var mine = Assert.Single(OurGroups(root, ev));
+            Assert.Equal(ClaudeCodeIntegrations.HookCommand(word), (string?)mine["hooks"]![0]!["command"]);
+            Assert.True((bool)mine["hooks"]![0]!["async"]!);
+        }
+        Assert.True(HasThePersonsStopHook(root));
+        Assert.Equal(IntegrationStatus.Installed, sut.Status(IntegrationKind.Hooks, folder));
+
+        Ok(sut.Remove(IntegrationKind.Hooks, folder));
+        var after = Json(folder);
+        foreach (var (ev, _) in HookWords) Assert.Empty(OurGroups(after, ev));
+        Assert.True(HasThePersonsStopHook(after));
+        Assert.Equal(IntegrationStatus.NotInstalled, sut.Status(IntegrationKind.Hooks, folder));
+    }
+
+    [Fact]
+    public void A_fresh_hook_install_writes_three_events_and_remove_restores_the_file_byte_for_byte()
+    {
+        var sut = Sut();
+        var folder = Folder();
+        const string original = "{\n  \"model\": \"x\"\n}\n";
+        Put(folder, original);
+
+        Ok(sut.Install(IntegrationKind.Hooks, folder));
+        var root = Json(folder);
+        foreach (var (ev, word) in HookWords)
+            Assert.Equal(ClaudeCodeIntegrations.HookCommand(word), (string?)Assert.Single(OurGroups(root, ev))["hooks"]![0]!["command"]);
+
+        Ok(sut.Remove(IntegrationKind.Hooks, folder));
+        Assert.Equal(B(original), Bytes(folder));
+    }
+
+    public static IEnumerable<object?[]> OlderHooksInputs()
+    {
+        foreach (var input in HooksInputs()) yield return input;
+        // The person already has UserPromptSubmit hooks, or an empty list of them.
+        yield return new object?[] { "{\n  \"hooks\": {\n    \"UserPromptSubmit\": [\n      { \"hooks\": [ { \"type\": \"command\", \"command\": \"mine\" } ] }\n    ]\n  }\n}\n" };
+        yield return new object?[] { "{\n  \"hooks\": {\n    \"UserPromptSubmit\": [\n    ],\n    \"Stop\": []\n  }\n}\n" };
+    }
+
+    private IntegrationReceipt HooksReceipt() => Assert.Single(new ReceiptStore(Receipts).Load().Records, r => r.Kind == IntegrationKind.Hooks);
+
+    /// <summary>
+    /// An install an older Sanduhr made, with its receipt: Notification and Stop only. The update adds UserPromptSubmit and
+    /// records the list it made in the first install's receipt, so Remove still gives the person's file back byte for byte.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(OlderHooksInputs))]
+    public void An_older_install_updated_to_three_events_then_removed_gives_the_original_bytes(string? original)
+    {
+        foreach (var older in new Func<string, string>[] { ClaudeCodeIntegrations.GlowHookCommand, ClaudeCodeIntegrations.LegacyHookCommand })
+        {
+            var sut = Sut();
+            var folder = Folder();
+            Put(folder, original);
+            Ok(sut.Install(IntegrationKind.Hooks, folder));
+            ClaudeCodeIntegrationsTestAccess.AsOlderHookInstall(SettingsOf(folder), Receipts, older);
+            var before = HooksReceipt();
+            Assert.DoesNotContain("UserPromptSubmit", before.Hooks!.CreatedEvents);
+            Assert.Empty(OurGroups(Json(folder), "UserPromptSubmit"));
+            Assert.Equal(IntegrationStatus.Outdated, sut.Status(IntegrationKind.Hooks, folder));
+
+            Ok(sut.Install(IntegrationKind.Hooks, folder));
+            Assert.Equal(IntegrationStatus.Installed, sut.Status(IntegrationKind.Hooks, folder));
+            var root = Json(folder);
+            foreach (var (ev, word) in HookWords)
+                Assert.Equal(ClaudeCodeIntegrations.HookCommand(word), (string?)Assert.Single(OurGroups(root, ev))["hooks"]![0]!["command"]);
+            var after = HooksReceipt();
+            Assert.Equal(before.CreatedFile, after.CreatedFile);
+            Assert.Equal(before.CreatedParent, after.CreatedParent);
+            Assert.Equal(before.EmptyInner, after.EmptyInner);
+            Assert.Equal(before.Hooks.HooksInner, after.Hooks!.HooksInner);
+            // The list the update made is recorded beside the first install's; a list the person had is not.
+            bool hadList = original?.Contains("UserPromptSubmit") == true;
+            Assert.Equal(hadList ? before.Hooks.CreatedEvents : [.. before.Hooks.CreatedEvents, "UserPromptSubmit"], after.Hooks.CreatedEvents);
+
+            // Installing again changes nothing.
+            var once = Bytes(folder);
+            Ok(sut.Install(IntegrationKind.Hooks, folder));
+            Assert.Equal(once, Bytes(folder));
+
+            Ok(sut.Remove(IntegrationKind.Hooks, folder));
+            Assert.Equal(original is null ? null : B(original), Bytes(folder));
+            Assert.False(File.Exists(Receipts));
+            Assert.Equal(IntegrationStatus.NotInstalled, sut.Status(IntegrationKind.Hooks, folder));
+        }
+    }
+
     // ------------------------------------------------------------------ concurrency and refusal
 
     [Fact]
@@ -609,8 +736,8 @@ public sealed class ClaudeCodeIntegrationsTests : IDisposable
     {
         var sut = Sut();
         var folder = Folder();
-        var ours = ClaudeCodeIntegrations.HookCommand("glow-waiting.signal");
-        var done = ClaudeCodeIntegrations.HookCommand("glow-done.signal");
+        var ours = ClaudeCodeIntegrations.HookCommand(ClaudeCodeSignalFile.Waiting);
+        var done = ClaudeCodeIntegrations.HookCommand(ClaudeCodeSignalFile.Done);
         string Hook(string cmd, string shell = "powershell") => "{\"type\":\"command\",\"shell\":" + Quote(shell) + ",\"command\":" + Quote(cmd) + "}";
         var matcher = Quote(ClaudeCodeIntegrations.WaitingMatcher);
         var nearCopies = new[]
@@ -849,6 +976,50 @@ public sealed class ClaudeCodeIntegrationsTests : IDisposable
 /// <summary>Builds a Sanduhr hook command the way the installer writes it, for the "theirs" test.</summary>
 internal static class ClaudeCodeIntegrationsTestAccess
 {
+    private const string PromptEvent = "UserPromptSubmit";
+
+    /// <summary>
+    /// Turns a current hook install (file and receipt) into what an older Sanduhr left: no group of Sanduhr's under
+    /// UserPromptSubmit (the array goes too when the install made it, and the receipt no longer records making it), and
+    /// the Notification and Stop groups running <paramref name="older"/> for their signal file.
+    /// </summary>
+    public static void AsOlderHookInstall(string settingsFile, string receiptsFile, Func<string, string> older)
+    {
+        var store = new ReceiptStore(receiptsFile);
+        var records = store.Load().Records.ToList();
+        var index = records.FindIndex(r => r.Kind == IntegrationKind.Hooks && string.Equals(r.File, settingsFile, StringComparison.OrdinalIgnoreCase));
+        Assert.True(index >= 0, "no hooks receipt for the file");
+        var made = records[index].Hooks!;
+
+        var b = File.ReadAllBytes(settingsFile);
+        var hooks = JsonEdit.Object(b, JsonEdit.TopObject(b).Member(ClaudeCodeIntegrations.HooksKey)!.Value.ValueStart);
+        if (made.CreatedEvents.Contains(PromptEvent)) b = JsonEdit.Remove(b, hooks, PromptEvent);
+        else
+        {
+            var list = JsonEdit.Array(b, hooks.Member(PromptEvent)!.Value.ValueStart);
+            var i = Enumerable.Range(0, list.Elements.Count).Single(k => ClaudeCodeIntegrations.IsOurHookGroup(
+                JsonNode.Parse(b.AsSpan(list.Elements[k].Start, list.Elements[k].End - list.Elements[k].Start))));
+            var inner = made.ArrayInners.TryGetValue(PromptEvent, out var ai) ? Encoding.UTF8.GetBytes(ai) : null;
+            b = JsonEdit.RemoveElement(b, list, i, inner);
+        }
+        var text = Encoding.UTF8.GetString(b);
+        foreach (var (word, signal) in new[]
+                 {
+                     (ClaudeCodeSignalFile.Waiting, ClaudeCodeIntegrations.WaitingSignal), (ClaudeCodeSignalFile.Done, ClaudeCodeIntegrations.DoneSignal),
+                 })
+        {
+            var now = Encoding.UTF8.GetString(JsonEdit.Quoted(ClaudeCodeIntegrations.HookCommand(word)));
+            Assert.Contains(now, text);
+            text = text.Replace(now, Encoding.UTF8.GetString(JsonEdit.Quoted(older(signal))));
+        }
+        File.WriteAllBytes(settingsFile, Encoding.UTF8.GetBytes(text));
+
+        var was = new HookReceipt { HooksInner = made.HooksInner, CreatedEvents = [.. made.CreatedEvents.Where(e => e != PromptEvent)] };
+        foreach (var kv in made.ArrayInners.Where(kv => kv.Key != PromptEvent)) was.ArrayInners[kv.Key] = kv.Value;
+        records[index] = records[index] with { Hooks = was };
+        Assert.True(store.Save(records));
+    }
+
     public static JsonNode OurHookCommand(string eventName)
     {
         var group = ClaudeCodeIntegrations.HookGroup(eventName);

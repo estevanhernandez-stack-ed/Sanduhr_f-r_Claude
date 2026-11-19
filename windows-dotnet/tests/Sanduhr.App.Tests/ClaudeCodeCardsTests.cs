@@ -70,7 +70,7 @@ public sealed class ClaudeCodeCardsTests : AppWindowFixture
 
         Card(page, ".claude-work").Hooks.InstallCommand.Execute(null);
 
-        Assert.Contains("glow-waiting.signal", File.ReadAllText(Path.Combine(work, "settings.json")));
+        Assert.Contains(ClaudeCodeSignalFile.Prefix, File.ReadAllText(Path.Combine(work, "settings.json")));
         Assert.Equal(personalBefore, File.ReadAllBytes(Path.Combine(personal, "settings.json")));
         Assert.True(Card(page, ".claude-work").Hooks.IsInstalled);
         Assert.False(Card(page, ".claude-personal").Hooks.IsInstalled);

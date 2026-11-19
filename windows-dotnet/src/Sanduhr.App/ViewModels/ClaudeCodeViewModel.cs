@@ -415,9 +415,9 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             () => InstallMcp(row), () => RemoveMcp(row), "Update…",
             "Asks first, then copies the current server files again and refreshes Sanduhr's entry in this folder's .claude.json."),
         _ => new CcPieceViewModel(SettingsNames.ClaudeCodeGlowHook,
-            "Two hooks that light the edge of your window when Claude Code waits on you or finishes.",
+            "Three hooks that tell Sanduhr when Claude Code starts a turn, waits on you or finishes.",
             () => InstallHooks(row), () => RemoveHooks(row), "Update…",
-            "Asks first, then writes Sanduhr's two hooks into this folder's settings.json again."),
+            "Asks first, then writes Sanduhr's three hooks into this folder's settings.json again."),
     };
 
     /// <summary>A card's "What this folder holds".</summary>
@@ -843,9 +843,10 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 "Glow when Claude Code needs you?",
                 "Sanduhr lights the top edge of your window when Claude Code waits on you or finishes.",
                 row.Display,
-                "What gets written: one Notification hook and one Stop hook in this folder's settings.json. Each only "
-                + "touches a signal file under %USERPROFILE%\\.sanduhr. Nothing from Claude Code is passed on or read. "
-                + "Remove takes out only those two hooks.",
+                "What gets written: one UserPromptSubmit hook, one Notification hook and one Stop hook in this folder's "
+                + "settings.json. Each hook writes a small file under %USERPROFILE%\\.sanduhr naming the event, the folder and "
+                + "the session. Sanduhr deletes it as it reads it. Nothing of the conversation is read or passed on. "
+                + "Remove takes out only those three hooks.",
                 "Install"));
             if (choice is null) return;
             var res = MakeIntegrations().Install(IntegrationKind.Hooks, row.Path);
