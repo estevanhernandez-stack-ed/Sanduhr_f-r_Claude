@@ -5,7 +5,7 @@
 ### New
 
 - **Know when your agent is done.** A Windows notification, a card on the Desk, the glow or a taskbar flash when Claude Code, Codex or the Antigravity CLI finishes a long turn, and when Claude Code is waiting on you. It names the agent, the project and how long the turn ran ("Codex finished", "your-project, 4m 12s"), never anything that was said. By default the notification and the Desk card are on, the glow and the flash are off, and a finished turn only interrupts when it ran at least a minute and the agent's own window isn't in front; all of it is in the new Settings ▸ Notifications. Codex and Antigravity notify while their source is on in Sources. Antigravity's "finished" arrives about a minute and a half after its last step, because its log has no end marker. A finished glow takes the agent's color from Sources.
-- **The Claude Code hook is updated.** Update it in Settings ▸ Claude Code to get the notification and the Desk card: the new hook tells Sanduhr which folder and session an event came from, and when a turn started. It names the folder and the session, never anything said, and it stops writing once 100 signals are waiting. In Settings the piece is now called "Claude Code hook". The older hook keeps lighting the glow as before.
+- **The Claude Code hook is updated.** Update it in Settings ▸ Claude Code to get the notification and the Desk card: the new hook tells Sanduhr which folder and session an event came from, and when a turn started. It writes the folder and the session, never anything that was said, and it stops writing once 100 signals are waiting. In Settings the piece is now called "Claude Code hook". The older hook keeps lighting the glow as before.
 
 ### Changed
 
