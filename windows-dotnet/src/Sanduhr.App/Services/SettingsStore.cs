@@ -92,16 +92,25 @@ public sealed class SettingsStore
 
     private JsonObject Read()
     {
+        // Corrupt / unreadable settings start fresh rather than crash launch.
+        TryRead(out var root);
+        return root;
+    }
+
+    /// <summary>The settings as <see cref="Read"/> returns them, and false when the file was there but could not be read or
+    /// parsed (a save in flight holds it). A file that is not there is a good read of nothing.</summary>
+    private bool TryRead(out JsonObject root)
+    {
         try
         {
-            if (File.Exists(_path))
-                return JsonNode.Parse(File.ReadAllText(_path)) as JsonObject ?? new JsonObject();
+            root = File.Exists(_path) ? JsonNode.Parse(File.ReadAllText(_path)) as JsonObject ?? new JsonObject() : new JsonObject();
+            return true;
         }
         catch (Exception e) when (e is JsonException or IOException)
         {
-            // Corrupt / unreadable settings start fresh rather than crash launch.
+            root = new JsonObject();
+            return false;
         }
-        return new JsonObject();
     }
 
     private void Write(JsonObject root)
@@ -501,10 +510,12 @@ public sealed class SettingsStore
     }
 
     /// <summary>Activity-only sources switched on in Sources (spec 3): settings.json "activity", {"antigravity": true}.</summary>
-    public IReadOnlyDictionary<string, bool> LoadActivity()
+    public IReadOnlyDictionary<string, bool> LoadActivity() => ActivityOf(Read());
+
+    private static IReadOnlyDictionary<string, bool> ActivityOf(JsonObject root)
     {
         var result = new Dictionary<string, bool>(StringComparer.Ordinal);
-        if (Read()["activity"] is JsonObject map)
+        if (root["activity"] is JsonObject map)
             foreach (var (name, node) in map)
             {
                 try { result[name] = node?.GetValue<bool>() ?? false; }
@@ -929,9 +940,21 @@ public sealed class SettingsStore
 
     /// <summary>The setup (setup spec, section 1): null when no setup has been made yet, a first run. Decoded entry by entry; an
     /// unreadable entry takes what the migration would say for it.</summary>
-    public SetupSettings? LoadSetup()
+    public SetupSettings? LoadSetup() => SetupOf(Read());
+
+    /// <summary>Whether Codex and the Antigravity CLI are on in Sources, read in one pass for the turn watcher (5.0 spec 4).
+    /// False when the settings file could not be read or parsed just now (a save in flight): the caller keeps what it knew.
+    /// A file that is not there is a good read with both off.</summary>
+    public bool TryLoadAgentSources(out bool codex, out bool antigravity)
     {
-        var root = Read();
+        bool ok = TryRead(out var root);
+        codex = SetupOf(root)?.CodexUsage ?? false;
+        antigravity = ActivityOf(root).GetValueOrDefault(AgentSources.Antigravity);
+        return ok;
+    }
+
+    private static SetupSettings? SetupOf(JsonObject root)
+    {
         if (root[SetupSettings.Key] is not { } node) return null;
         var fallback = SetupMigration.From(true, false, false, ReadBool(root, "desk_enabled", false))!.Setup;
         return SetupSettings.Decode(node, fallback);

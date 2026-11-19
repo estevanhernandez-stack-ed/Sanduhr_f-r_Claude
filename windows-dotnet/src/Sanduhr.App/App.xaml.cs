@@ -820,22 +820,55 @@ public partial class App : Application
             Log = message => LogLine(paths, message),
         };
 
+        // Both delegates run on the watcher's thread under its lock, one call at a time; only they touch this pair.
+        var known = new AgentSourcesKnown();
+        void ReadSources()
+        {
+            bool read = store.TryLoadAgentSources(out var codex, out var antigravity);
+            known.Update(read, codex, antigravity);
+        }
+
         _agentActivity = new AgentActivityWatcher(
-            codexHomes: () => (new SettingsStore(paths).LoadSetup()?.CodexUsage ?? false)
-                ? CodexHomes.Discover(Environment.GetEnvironmentVariable("CODEX_HOME"), profile)
-                : [],
-            antigravityHome: () => new SettingsStore(paths).LoadActivity().GetValueOrDefault(AgentSources.Antigravity)
-                && System.IO.Directory.Exists(agyHome) ? agyHome : null,
+            codexHomes: () =>
+            {
+                ReadSources();
+                return known.Codex ? CodexHomes.Discover(Environment.GetEnvironmentVariable("CODEX_HOME"), profile) : [];
+            },
+            antigravityHome: () =>
+            {
+                ReadSources();
+                return known.Antigravity && System.IO.Directory.Exists(agyHome) ? agyHome : null;
+            },
             antigravityFolder: AntigravityFolder,
             claudeOn: () => true,
             signalDir: paths.ExternalDir,
             log: message => LogLine(paths, message));
+        // A post already queued when Reset or a quit runs does nothing: no toast, glow, card or log line after either.
         _agentActivity.Turn += e => Dispatcher.BeginInvoke(() =>
         {
-            if (!_quitting) _agentNotifier?.Handle(e);
+            if (!_quitting && !ResetGuard.Done) _agentNotifier?.Handle(e);
         });
-        _agentActivity.AgentOff += agent => Dispatcher.BeginInvoke(() => _watchers?.ClearTurns(agent));
+        _agentActivity.AgentOff += agent => Dispatcher.BeginInvoke(() =>
+        {
+            if (!_quitting && !ResetGuard.Done) _watchers?.ClearTurns(agent);
+        });
         _agentActivity.Start();
+    }
+
+    /// <summary>Whether Codex and the Antigravity CLI are on, as the turn watcher last read them. A read that failed (a settings
+    /// save in flight) keeps the last good values, so it never looks like a source going off; a good read is believed.
+    /// Both are off before the first good read.</summary>
+    internal sealed class AgentSourcesKnown
+    {
+        public bool Codex { get; private set; }
+        public bool Antigravity { get; private set; }
+
+        public void Update(bool read, bool codex, bool antigravity)
+        {
+            if (!read) return;
+            Codex = codex;
+            Antigravity = antigravity;
+        }
     }
 
     /// <summary>A turn's project as every surface shows it: the folder's name, or its codename while streamer mode hides it.</summary>
@@ -849,6 +882,7 @@ public partial class App : Application
 
     private static void LogLine(Sanduhr.Core.Paths paths, string message)
     {
+        if (ResetGuard.Done) return;   // after Reset nothing writes AppData again
         try { System.IO.File.AppendAllText(paths.LogFile, $"{DateTime.UtcNow:o} {message}{Environment.NewLine}"); }   // streamer: notname - written to the log file, never drawn
         catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException) { }
     }
@@ -1399,7 +1433,7 @@ public partial class App : Application
                 ResetGuard.MarkDone();
                 vm.StopBackgroundWork();
                 _glow?.Stop();
-                _agentActivity?.Dispose();   // it reads only, but its log line must not land after a reset
+                _agentActivity?.Dispose();   // stops its scans; a turn posted before this is dropped by the listeners' ResetGuard check
                 _agentActivity = null;
                 _desk?.StopForReset();
                 _runners?.Dispose();

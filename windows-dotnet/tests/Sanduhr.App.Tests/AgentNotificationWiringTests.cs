@@ -79,6 +79,60 @@ public sealed class AgentNotificationWiringTests : AppWindowFixture
     }
 
     [Fact]
+    public void A_missing_settings_file_reads_well_with_both_sources_off()
+    {
+        var paths = ScratchPaths();
+        Assert.False(File.Exists(paths.SettingsFile));
+        Assert.True(new SettingsStore(paths).TryLoadAgentSources(out var codex, out var antigravity));
+        Assert.False(codex);
+        Assert.False(antigravity);
+    }
+
+    [Fact]
+    public void Both_sources_on_read_as_on()
+    {
+        var store = StoreOver("{}");
+        store.SaveSetup(new SetupSettings(false, new Dictionary<string, bool> { [SetupSettings.Claude] = true, [SetupSettings.Codex] = true }));
+        store.SaveActivity(AgentSources.Antigravity, true);
+        Assert.True(store.TryLoadAgentSources(out var codex, out var antigravity));
+        Assert.True(codex);
+        Assert.True(antigravity);
+    }
+
+    [Fact]
+    public void A_file_held_open_by_a_save_is_a_failed_read()
+    {
+        var paths = ScratchPaths();
+        Directory.CreateDirectory(paths.AppDataDir);
+        File.WriteAllText(paths.SettingsFile, "{}");
+        var store = new SettingsStore(paths);
+        using (new FileStream(paths.SettingsFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            Assert.False(store.TryLoadAgentSources(out _, out _));
+    }
+
+    [Fact]
+    public void Truncated_json_is_a_failed_read()
+    {
+        Assert.False(StoreOver("{\"setup\":").TryLoadAgentSources(out _, out _));
+    }
+
+    [Fact]
+    public void A_failed_read_keeps_the_last_good_values_and_a_good_off_is_believed()
+    {
+        var known = new App.AgentSourcesKnown();
+        Assert.Equal((false, false), (known.Codex, known.Antigravity));   // before any good read, both off
+
+        known.Update(read: true, codex: true, antigravity: true);
+        Assert.Equal((true, true), (known.Codex, known.Antigravity));
+
+        known.Update(read: false, codex: false, antigravity: false);
+        Assert.Equal((true, true), (known.Codex, known.Antigravity));     // a save in flight is not a switch going off
+
+        known.Update(read: true, codex: false, antigravity: true);
+        Assert.Equal((false, true), (known.Codex, known.Antigravity));
+    }
+
+    [Fact]
     public void A_turn_card_goes_up_through_the_store_is_renamed_and_clears_with_its_agent() => AppHost.Run(() =>
     {
         using var store = new Sanduhr.App.Desk.WatcherStore(ScratchPaths(), () => false);
