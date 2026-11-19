@@ -256,8 +256,8 @@
                                views:LiveRegion.Announces="True" Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
                     <!-- The glow's switches and Try it moved to Settings, Notifications in 5.0 (spec 4). -->
                     <Button Style="{DynamicResource SettingsLinkButton}" HorizontalAlignment="Left" Margin="0,0,0,4"
-                            Content="Notification settings…" views:SettingsLinkTo.Link="{Binding NotificationsLinkText}"
-                            AutomationProperties.Name="Notification settings…" />
+                            Content="{x:Static core:SettingsNames.NotificationsLinkTitle}" views:SettingsLinkTo.Link="{Binding NotificationsLinkText}"
+                            AutomationProperties.Name="{x:Static core:SettingsNames.NotificationsLinkTitle}" />
                     <StackPanel views:SettingsAnchor.Id="glow-where" Margin="0,12,0,0">
                         <TextBlock Text="{x:Static core:SettingsNames.GlowWhere}" FontSize="12" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level3"
                                    Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
@@ -276,7 +276,7 @@
                             <views:DeskPieceStatusPanel DataContext="{Binding DataContext.Desk.GlowPiece, RelativeSource={RelativeSource AncestorType=Window}}" />
                         </Border>
                         <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                   Text="The taskbar button flashes in every choice. Only flash skips the light." />
+                                   Text="{x:Static core:SettingsNames.GlowFlashCaption}" />
                     </StackPanel>
                 </StackPanel>
 

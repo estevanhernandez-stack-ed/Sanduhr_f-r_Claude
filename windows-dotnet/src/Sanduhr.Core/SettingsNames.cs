@@ -463,6 +463,14 @@ public static class SettingsNames
     public const string NotifyHookMissing = "Needs the Claude Code hook. Install it on the Claude Code page.";
     public const string NotifyHookOutdated =
         "The Claude Code hook here is an older one. Update it on the Claude Code page to get the notification and the Desk card.";
+    public const string NotifyHookUnreadable = "A Claude Code folder's settings can't be read. See the Claude Code page.";
+
+    /// <summary>The Claude Code glow section's link to the switches that moved: the page's own link title.</summary>
+    public static string NotificationsLinkTitle { get; } = LinkTitle(SettingsPage.Notifications);
+
+    /// <summary>Under Where the glow shows: since 5.0 the taskbar flash follows Notifications' Flash switch (off by default).</summary>
+    public const string GlowFlashCaption =
+        "To flash Sanduhr in the taskbar too, turn it on in Settings, Notifications. Only flash skips the light.";
 
     /// <summary>What an agent's files can tell Sanduhr (spec 4, section 6).</summary>
     public static string NotifySupports(string agent) => agent switch

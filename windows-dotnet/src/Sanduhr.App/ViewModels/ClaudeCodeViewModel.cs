@@ -270,8 +270,6 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
 
     /// <summary>Set by App: tells the glow service to re-read the switches.</summary>
     public Action? GlowReload { get; set; }
-    /// <summary>Set by App: plays the glow once ("Try it").</summary>
-    public Action<ClaudeCodeEvent>? GlowPreview { get; set; }
 
     public ClaudeCodeViewModel(WidgetViewModel widget)
     {
@@ -873,14 +871,16 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     public string NotificationsLinkText => SettingsIndex.PageId(NotificationsLink.Page) + "#" + NotificationsLink.Anchor;
 
     /// <summary>What Settings, Notifications says on Claude Code's row: ready when any folder has the current hook, an older
-    /// hook when none has but one has the 3.5 to 4.9 one, else missing. Read from the folders' settings.json files on each call,
+    /// hook when none has but one has the 3.5 to 4.9 one, unreadable when none has either and a folder's settings.json can't be read,
+    /// else missing. Read from the folders' settings.json files on each call,
     /// not from this page's cards, so it is right on a visit to Notifications before this page was ever shown.</summary>
     internal AgentRowState HookState()
     {
         var integ = MakeIntegrations();
         var states = KnownFolders().Select(f => integ.Status(IntegrationKind.Hooks, f.Path)).ToList();   // streamer: key - folder paths handed to the status reader, never drawn
         if (states.Contains(IntegrationStatus.Installed)) return AgentRowState.Ready;
-        return states.Contains(IntegrationStatus.Outdated) ? AgentRowState.HookOutdated : AgentRowState.HookMissing;
+        if (states.Contains(IntegrationStatus.Outdated)) return AgentRowState.HookOutdated;
+        return states.Contains(IntegrationStatus.Unreadable) ? AgentRowState.HookUnreadable : AgentRowState.HookMissing;
     }
 
     // ------------------------------------------------------------------ reset

@@ -20,6 +20,9 @@ public enum AgentRowState
 
     /// <summary>Claude Code's hook is the 3.5 to 4.9 one: the glow works, the notification and the card do not.</summary>
     HookOutdated,
+
+    /// <summary>No folder has a hook, and a folder's settings.json can't be read: whether it has one is unknown.</summary>
+    HookUnreadable,
 }
 
 /// <summary>Settings, Notifications (5.0 spec 4): which agents notify, where it shows and when. Every change saves to
@@ -104,25 +107,31 @@ public sealed partial class NotificationsViewModel : ObservableObject
     internal void AgentToggled(string agent, bool on)
     {
         if (_loading) return;
-        Save();
-        if (!on) AgentSwitchedOff?.Invoke(agent);
+        // Only a saved switch clears the cards: a failed save snaps the switch back on.
+        if (Save() && !on) AgentSwitchedOff?.Invoke(agent);
     }
 
-    private void Save()
+    /// <summary>Saves every switch; true when settings.json took it. A failed save snaps the switches back to what is saved.</summary>
+    private bool Save()
     {
-        if (_loading) return;
+        if (_loading) return false;
         try
         {
             var agents = Agents.ToDictionary(a => a.Agent, a => a.On, StringComparer.Ordinal);
-            _store.SaveAgentNotifications(new NotificationSettings(agents, Toast, GlowFinished, GlowWaiting, Flash, DeskCard,
-                Threshold.Seconds, SkipInFront));
-            Changed?.Invoke();
+            if (_store.TrySaveAgentNotifications(new NotificationSettings(agents, Toast, GlowFinished, GlowWaiting, Flash, DeskCard,
+                    Threshold.Seconds, SkipInFront)))
+            {
+                Changed?.Invoke();
+                return true;
+            }
+            System.Diagnostics.Debug.WriteLine("[Sanduhr.Notifications] not saved: settings.json could not be read or written");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             System.Diagnostics.Debug.WriteLine($"[Sanduhr.Notifications] not saved: {e.GetType().Name}");
-            Reload();   // the switches snap back to what is saved
         }
+        Reload();   // the switches snap back to what is saved
+        return false;
     }
 
     [RelayCommand] private void TryFinished() => TryIt?.Invoke(AgentTurnKind.Finished);
@@ -166,6 +175,7 @@ public sealed partial class NotifyAgentRowViewModel : ObservableObject
             AgentRowState.SourceOff => SettingsNames.NotifySourceOff,
             AgentRowState.HookMissing => SettingsNames.NotifyHookMissing,
             AgentRowState.HookOutdated => SettingsNames.NotifyHookOutdated,
+            AgentRowState.HookUnreadable => SettingsNames.NotifyHookUnreadable,
             _ => "",
         };
     }

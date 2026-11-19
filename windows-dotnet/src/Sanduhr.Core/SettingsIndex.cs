@@ -209,7 +209,7 @@ public static class SettingsIndex
         E(SettingsNames.NotifyAgentsHeader, SettingsPage.Notifications, NotifyAgents,
             ["agent notifications", "notify", "agent", "codex", "antigravity", "claude code", "finished", "done", "working"]),
         E(SettingsNames.NotifyShowHeader, SettingsPage.Notifications, NotifyShow,
-            ["toast", "windows notification", "desk card", "glow", "flash", "taskbar"]),
+            ["toast", "windows notification", "desk card", "glow", "flash", "taskbar", "waiting", "finishes", "try it"]),
         E(SettingsNames.NotifyWhenHeader, SettingsPage.Notifications, NotifyWhen,
             ["threshold", "longer than", "every turn", "in front", "terminal", "do not disturb"]),
 
@@ -254,7 +254,7 @@ public static class SettingsIndex
              "MCP servers", "mcpServers", "CLAUDE.md", "memory", "instructions", "transcripts", "retention", "cleanupPeriodDays",
              "history kept", "refresh", "inventory", "config"]),
         E(SettingsNames.DeskGlow, SettingsPage.ClaudeCode, Glow,
-            ["glow when Claude needs you", "glow", "waiting", "finishes", "edge light", "terminal", "try it"]),
+            ["glow when Claude needs you", "glow", "edge light"]),
         E(SettingsNames.GlowWhere, SettingsPage.ClaudeCode, GlowWhere,
             ["where the glow shows", "screen edge", "monitor", "flash", "taskbar flash", "glow target"]),
 

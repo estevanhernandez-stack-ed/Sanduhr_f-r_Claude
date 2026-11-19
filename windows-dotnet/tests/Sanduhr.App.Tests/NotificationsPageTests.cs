@@ -85,12 +85,36 @@ public sealed class NotificationsPageTests : AppWindowFixture
         Assert.Equal(["codex"], cleared);
     });
 
+    [Fact]
+    public void A_failed_save_leaves_the_agent_on_and_its_cards_alone() => AppHost.Run(() =>
+    {
+        var paths = ScratchPaths();
+        System.IO.Directory.CreateDirectory(paths.AppDataDir);
+        System.IO.File.WriteAllText(paths.SettingsFile, "{}");
+        var store = new SettingsStore(paths);
+        var vm = new NotificationsViewModel(store, _ => AgentRowState.Ready);
+        var cleared = new List<string>();
+        int changed = 0;
+        vm.AgentSwitchedOff = cleared.Add;
+        vm.Changed = () => changed++;
+        var codex = vm.Agents.Single(a => a.Agent == "codex");
+
+        using (new System.IO.FileStream(paths.SettingsFile, System.IO.FileMode.Open, System.IO.FileAccess.ReadWrite, System.IO.FileShare.None))
+            codex.On = false;
+
+        Assert.True(codex.On);   // snapped back to what is saved
+        Assert.Empty(cleared);
+        Assert.Equal(0, changed);
+        Assert.True(store.LoadAgentNotifications().AgentOn("codex"));
+    });
+
     [Theory]
     [InlineData(AgentRowState.Ready, true, "")]
     [InlineData(AgentRowState.SourceOff, false, "Turn it on in Sources first.")]
     [InlineData(AgentRowState.HookMissing, false, "Needs the Claude Code hook. Install it on the Claude Code page.")]
     [InlineData(AgentRowState.HookOutdated, true,
         "The Claude Code hook here is an older one. Update it on the Claude Code page to get the notification and the Desk card.")]
+    [InlineData(AgentRowState.HookUnreadable, false, "A Claude Code folder's settings can't be read. See the Claude Code page.")]
     public void A_row_says_what_stands_in_its_way(AgentRowState state, bool canToggle, string text) => AppHost.Run(() =>
     {
         var (vm, _) = Build(_ => state);
@@ -244,5 +268,20 @@ public sealed class NotificationsPageTests : AppWindowFixture
         Assert.Equal(AgentRowState.HookOutdated, svm.ClaudeCodePage.HookState());
         Assert.Equal(SettingsNames.NotifyHookOutdated, claude.StateText);
         Assert.True(claude.CanToggle);
+
+        // Fix round 1: a folder whose settings.json is not JSON reads as unreadable, not as one without the hook; any folder with a
+        // hook still wins over it.
+        var broken = Home(".claude-broken", "{ nope");
+        svm.Notifications.Reload();
+        Assert.Equal(AgentRowState.HookOutdated, svm.ClaudeCodePage.HookState());
+        System.IO.File.WriteAllText(System.IO.Path.Combine(work, "settings.json"), "{}");
+        svm.Notifications.Reload();
+        Assert.Equal(AgentRowState.HookUnreadable, svm.ClaudeCodePage.HookState());
+        Assert.Equal(SettingsNames.NotifyHookUnreadable, claude.StateText);
+        Assert.False(claude.CanToggle);
+        Assert.True(ClaudeCodeHost.For(widget).Integrations().Install(IntegrationKind.Hooks, work).Ok);
+        svm.Notifications.Reload();
+        Assert.Equal(AgentRowState.Ready, svm.ClaudeCodePage.HookState());
+        Assert.True(System.IO.Directory.Exists(broken));
     });
 }

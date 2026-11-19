@@ -113,10 +113,13 @@ public sealed class SettingsStore
         }
     }
 
-    private void Write(JsonObject root)
+    private void Write(JsonObject root) => TryWrite(root);
+
+    /// <summary><see cref="Write"/>, and whether settings.json took it (false after Reset Sanduhr… or on a failed write).</summary>
+    private bool TryWrite(JsonObject root)
     {
         if (ResetGuard.Done)
-            return;   // Reset Sanduhr… has run: nothing writes settings.json again
+            return false;   // Reset Sanduhr… has run: nothing writes settings.json again
         try
         {
             File.WriteAllText(_path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
@@ -124,11 +127,12 @@ public sealed class SettingsStore
         catch (IOException)
         {
             // Best-effort persistence — a failed write must never take down the UI.
-            return;
+            return false;
         }
         McpSettingsExport.Sync(root, _mcpSettingsPath, LogLine);
         try { AnyWritten?.Invoke(); }
         catch (Exception e) when (e is InvalidOperationException or ObjectDisposedException) { /* a subscriber's problem never fails a save */ }
+        return true;
     }
 
     /// <summary>Raised after any <see cref="SettingsStore"/> wrote settings.json, on whatever thread wrote it (the
@@ -710,6 +714,15 @@ public sealed class SettingsStore
         var root = Read();
         root[NotificationSettings.Key] = settings.Encode();
         Write(root);
+    }
+
+    /// <summary>Settings, Notifications' save: false when settings.json could not be read (nothing is written over it then) or
+    /// written, so the page can snap its switches back and clear nothing.</summary>
+    public bool TrySaveAgentNotifications(NotificationSettings settings)
+    {
+        if (!TryRead(out var root)) return false;
+        root[NotificationSettings.Key] = settings.Encode();
+        return TryWrite(root);
     }
 
     /// <summary>The glow switches as the glow service reads them. Since 5.0 they live in "agent_notifications".</summary>

@@ -966,10 +966,9 @@ public partial class App : Application
         var landing = SettingsIndex.Landing(page, anchor, _lastSettings);
         var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync, _hotKeys,
             ShowWhatsNewFromMenu, ShowTour, checkForUpdatesNow: CheckForUpdatesNowAsync);
-        // The Claude Code page re-reads the glow switches and plays "Try it" through the running glow service.
+        // The Claude Code page's glow target picker: the running glow service re-reads where the glow lands.
         svm.ClaudeCodePage.GlowReload = () => _glow?.Reload();
         svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };
-        svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
         // Settings, Notifications (5.0 spec 4).
         svm.Notifications.Changed = () => _glow?.Reload();
         svm.Notifications.AgentSwitchedOff = agent => _watchers?.ClearTurns(agent);

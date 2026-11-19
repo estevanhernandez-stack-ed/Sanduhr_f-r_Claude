@@ -147,7 +147,13 @@ public sealed class ModsAndCardsPagesTests : AppWindowFixture
             foreach (var label in new[] { SettingsNames.GlowWhenWaiting, SettingsNames.GlowWhenDone, SettingsNames.GlowNotInTerminal })
                 Assert.DoesNotContain(boxes, b => Equals(b.Content, label));
             Assert.DoesNotContain(Below<Button>(page), b => NameOf(b).StartsWith("Try it", StringComparison.Ordinal));
-            var link = Assert.Single(Below<Button>(page), b => NameOf(b) == "Notification settings…");
+            var link = Assert.Single(Below<Button>(page), b => NameOf(b) == SettingsNames.NotificationsLinkTitle);
+            Assert.Equal(SettingsNames.NotificationsLinkTitle, link.Content);
+            // Fix round 1: the flash follows Notifications' Flash switch since 5.0, so the picker's caption says where it is.
+            var texts = Below<TextBlock>(page).Select(t => t.Text).ToList();
+            Assert.Contains("To flash Sanduhr in the taskbar too, turn it on in Settings, Notifications. Only flash skips the light.", texts);
+            Assert.Equal("To flash Sanduhr in the taskbar too, turn it on in Settings, Notifications. Only flash skips the light.", SettingsNames.GlowFlashCaption);
+            Assert.DoesNotContain(texts, t => t.Contains("flashes in every choice", StringComparison.Ordinal));
             Assert.Equal(new SettingsLink(SettingsPage.Notifications, SettingsIndex.NotifyShow), SettingsIndex.ParseLink(SettingsLinkTo.GetLink(link)));
         }
         finally { window.Close(); }
