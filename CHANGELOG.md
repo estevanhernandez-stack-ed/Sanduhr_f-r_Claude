@@ -10,6 +10,7 @@
 ### Changed
 
 - **The glow's switches moved to Settings ▸ Notifications** and now cover every agent. Where the glow shows stays on the Claude Code page. With the updated hook, a finished glow waits for a turn of at least a minute; choose "Every turn" under "Only for turns longer than" for the old behaviour. If you already had the glow on, it stays on, with the taskbar flash.
+- **Claude Code's idle reminder is its own switch.** With the updated hook, the reminder Claude Code raises about a minute after a turn ends is its own switch in Settings ▸ Notifications, off by default; a permission prompt or a question still counts as waiting on you. If you had "glow when waiting" on, the reminder stays on for you.
 
 ## v4.9.0 — 2026-11-17
 
