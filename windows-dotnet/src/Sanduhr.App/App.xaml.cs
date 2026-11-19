@@ -814,7 +814,8 @@ public partial class App : Application
         {
             Toast = (title, body, tag) => Toasts.Show(title, body, group: "sanduhr-agents", tag: tag),
             Glow = (e, flash) => _glow?.Glow(
-                e.Kind == AgentTurnKind.Waiting ? GlowOverlayContent.ColorFor(ClaudeCodeEvent.Waiting) : AgentColor(store, e.Agent), flash),
+                e.Kind is AgentTurnKind.Waiting or AgentTurnKind.Idle
+                    ? GlowOverlayContent.ColorFor(ClaudeCodeEvent.Waiting) : AgentColor(store, e.Agent), flash),
             Flash = () => _glow?.FlashOnly(),
             Card = (e, title, shortTitle) => _watchers?.ApplyTurn(e, title, shortTitle),
             Log = message => LogLine(paths, message),
@@ -840,7 +841,9 @@ public partial class App : Application
                 return known.Antigravity && System.IO.Directory.Exists(agyHome) ? agyHome : null;
             },
             antigravityFolder: AntigravityFolder,
-            claudeOn: () => true,
+            // Claude Code unticked on Settings, Notifications: its signal files are deleted unread. A failed read decodes to the
+            // defaults, so this fails open.
+            claudeOn: () => store.LoadAgentNotifications().AgentOn(AgentSources.Claude),
             signalDir: paths.ExternalDir,
             log: message => LogLine(paths, message));
         // A post already queued when Reset or a quit runs does nothing: no toast, glow, card or log line after either.
@@ -851,6 +854,11 @@ public partial class App : Application
         _agentActivity.AgentOff += agent => Dispatcher.BeginInvoke(() =>
         {
             if (!_quitting && !ResetGuard.Done) _watchers?.ClearTurns(agent);
+        });
+        // A Codex or Antigravity turn is still writing lines: its card has heard from it, so it does not lose touch.
+        _agentActivity.Active += (agent, session) => Dispatcher.BeginInvoke(() =>
+        {
+            if (!_quitting && !ResetGuard.Done) _watchers?.TouchTurn(agent, session);
         });
         _agentActivity.Start();
     }
@@ -970,7 +978,13 @@ public partial class App : Application
         svm.ClaudeCodePage.GlowReload = () => _glow?.Reload();
         svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };
         // Settings, Notifications (5.0 spec 4).
-        svm.Notifications.Changed = () => _glow?.Reload();
+        svm.Notifications.Changed = () =>
+        {
+            _glow?.Reload();
+            // With "Show a card on the Desk" off, the cards already up go too: nothing would update them again.
+            if (!svm.Notifications.DeskCard)
+                foreach (var agent in AgentSources.Burn) _watchers?.ClearTurns(agent);
+        };
         svm.Notifications.AgentSwitchedOff = agent => _watchers?.ClearTurns(agent);
         svm.Notifications.TryIt = kind =>
         {

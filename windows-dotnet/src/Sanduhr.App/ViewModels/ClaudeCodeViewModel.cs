@@ -835,7 +835,8 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
                 row.Display,
                 "What gets written: one UserPromptSubmit hook, one Notification hook and one Stop hook in this folder's "
                 + "settings.json. Each hook writes a small file under %USERPROFILE%\\.sanduhr naming the event, the folder and "
-                + "the session. Sanduhr deletes it as it reads it. Nothing of the conversation is read or passed on. "
+                + "the session. Sanduhr deletes it as it reads it. Claude Code hands each hook its input, which includes the prompt "
+                + "when a prompt is sent. The hook takes only the folder and the session id from it, and never writes or sends the rest. "
                 + "Remove takes out only those three hooks.",
                 "Install"));
             if (choice is null) return;

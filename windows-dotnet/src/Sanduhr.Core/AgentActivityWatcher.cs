@@ -6,9 +6,13 @@ namespace Sanduhr.Core;
 /// Watches the files that say what each agent's turn is doing (5.0 spec 4) and raises one <see cref="AgentTurnEvent"/> per
 /// change: Codex's plain rollouts, the Antigravity CLI's transcripts and the signal files Claude Code's hook writes. It
 /// tails each file from an offset kept in memory and stores nothing. The first pass over an agent reads for state and
-/// raises nothing, so starting Sanduhr never replays old turns. An agent that is off is not read at all.
-/// Scans run one at a time and raise their events before the next scan starts, so events arrive in file order. A
-/// listener may call Start, Refresh or Dispose, but must not block on another thread that is waiting to scan.
+/// raises nothing, so starting Sanduhr never replays old turns: this holds for all three agents, Claude Code's signal
+/// files included (the first pass reads and deletes them and remembers when a turn started, but raises nothing). An agent
+/// that is off is not read at all.
+/// Scans run one at a time and raise their events before the next scan starts, so events arrive in file order. Each of
+/// the three parts of a scan is isolated: one that throws is logged by its exception's type, and what the others (and
+/// it, up to the throw) collected is still delivered. A listener may call Start, Refresh or Dispose, but must not block on
+/// another thread that is waiting to scan.
 /// </summary>
 public sealed class AgentActivityWatcher : IDisposable
 {
@@ -22,6 +26,12 @@ public sealed class AgentActivityWatcher : IDisposable
 
     /// <summary>A longer line is skipped whole: turn markers are small, and tool output can be huge.</summary>
     public const int MaxLineBytes = 1024 * 1024;
+
+    /// <summary>A file with a turn open raises <see cref="Active"/> at most this often.</summary>
+    public static readonly TimeSpan ActiveEvery = TimeSpan.FromSeconds(60);
+
+    /// <summary>A line buffer grown past this is let go once its line ends, so one huge line does not hold memory.</summary>
+    private const int KeepLineCapacity = 64 * 1024;
 
     private readonly Func<IReadOnlyList<string>> _codexHomes;
     private readonly Func<string?> _antigravityHome;
@@ -38,6 +48,7 @@ public sealed class AgentActivityWatcher : IDisposable
     private readonly ClaudeCodeTurns _claude = new();
     private readonly List<FileSystemWatcher> _watchers = [];
     private bool _claudeWasOn;
+    private bool _signalsPrimed;   // the first pass over the signal files has run: from now on they raise events
     private Timer? _poll;
     private Timer? _soon;
     private Timer? _due;
@@ -62,6 +73,10 @@ public sealed class AgentActivityWatcher : IDisposable
     /// <summary>An agent's source went off: whatever shows its turns should clear them. Raised on a worker thread.</summary>
     public event Action<string>? AgentOff;
 
+    /// <summary>A Codex or Antigravity file with a turn open got new lines (agent id, session id): the turn is still going.
+    /// At most once per <see cref="ActiveEvery"/> per file; never for Claude Code. Raised on a worker thread.</summary>
+    public event Action<string, string>? Active;
+
     private sealed class Tail(string agent, string session)
     {
         public readonly string Agent = agent;
@@ -69,13 +84,24 @@ public sealed class AgentActivityWatcher : IDisposable
         public long Offset;
         public readonly MemoryStream Partial = new();
         public bool Oversized;
+        public long Lines;                      // complete lines read so far
+        public DateTimeOffset? ActiveAt;        // when this file last raised Active
         public CodexTurnReader? Codex = agent == AgentSources.Codex ? new CodexTurnReader(session) : null;
         public AntigravityTurnReader? Antigravity = agent == AgentSources.Antigravity ? new AntigravityTurnReader(session) : null;
+
+        public bool TurnOpen => Codex is { IsChild: false, TurnOpen: true } || Antigravity is { TurnOpen: true };
+
+        /// <summary>Empties the line buffer, letting go of one grown past <see cref="KeepLineCapacity"/>.</summary>
+        public void ClearPartial()
+        {
+            Partial.SetLength(0);
+            if (Partial.Capacity > KeepLineCapacity) Partial.Capacity = 0;
+        }
 
         public void Reset(long offset)
         {
             Offset = offset;
-            Partial.SetLength(0);
+            ClearPartial();
             Oversized = false;
             if (Codex is not null) Codex = new CodexTurnReader(Session);
             if (Antigravity is not null) Antigravity = new AntigravityTurnReader(Session);
@@ -126,14 +152,17 @@ public sealed class AgentActivityWatcher : IDisposable
         lock (_scanGate)
         {
             var events = new List<AgentTurnEvent>();
+            var active = new List<(string Agent, string Session)>();
             var off = new List<string>();
             lock (_gate)
             {
                 if (_disposed) return;
                 var now = _clock();
-                ScanAgent(AgentSources.Codex, CodexFiles(), now, events, off);
-                ScanAgent(AgentSources.Antigravity, AntigravityFiles(), now, events, off);
-                ScanSignals(now, events, off);
+                // Each part on its own: one that throws (a delegate, a due loop) does not stop the others, and what was
+                // collected before the throw is still delivered below.
+                Part("codex", () => ScanAgent(AgentSources.Codex, CodexFiles(), now, events, active, off));
+                Part("antigravity", () => ScanAgent(AgentSources.Antigravity, AntigravityFiles(), now, events, active, off));
+                Part("claude code", () => ScanSignals(now, events, off));
                 ArmDue(now);
             }
             foreach (var agent in off)
@@ -142,7 +171,16 @@ public sealed class AgentActivityWatcher : IDisposable
             foreach (var e in events)
                 foreach (var handler in Turn?.GetInvocationList() ?? [])
                     Raise(() => ((Action<AgentTurnEvent>)handler)(e));
+            foreach (var (agent, session) in active)
+                foreach (var handler in Active?.GetInvocationList() ?? [])
+                    Raise(() => ((Action<string, string>)handler)(agent, session));
         }
+    }
+
+    private void Part(string name, Action part)
+    {
+        try { part(); }
+        catch (Exception e) when (e is not OutOfMemoryException) { _log?.Invoke($"agent activity: {name} scan failed ({e.GetType().Name})"); }
     }
 
     private void SafeScan()
@@ -205,7 +243,7 @@ public sealed class AgentActivityWatcher : IDisposable
     }
 
     private void ScanAgent(string agent, List<(string Path, string Session)>? files, DateTimeOffset now,
-        List<AgentTurnEvent> events, List<string> off)
+        List<AgentTurnEvent> events, List<(string, string)> active, List<string> off)
     {
         if (files is null)
         {
@@ -240,7 +278,7 @@ public sealed class AgentActivityWatcher : IDisposable
                     _tails[path] = tail;
                 }
                 if (fi.Length < tail.Offset) Rewritten(tail, fi);          // rewritten shorter: carry on from its new end
-                else if (fi.Length > tail.Offset) ReadNew(tail, path, now, events);
+                else if (fi.Length > tail.Offset) ReadNew(tail, path, now, events, active);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
@@ -269,7 +307,7 @@ public sealed class AgentActivityWatcher : IDisposable
             using var fs = Open(fi.FullName);
             long consumed = 0;
             ReadLines(tail, fs, Math.Min(fs.Length, MaxLineBytes), false, default, null, null, ref consumed, firstLineOnly: true);
-            tail.Partial.SetLength(0);
+            tail.ClearPartial();
             tail.Oversized = false;
         }
         catch
@@ -296,7 +334,7 @@ public sealed class AgentActivityWatcher : IDisposable
         long length = fs.Length;
         long consumed = 0;   // the prime sets the offset itself
         if (tail.Codex is not null) ReadLines(tail, fs, Math.Min(length, MaxLineBytes), false, now, null, null, ref consumed, firstLineOnly: true);
-        tail.Partial.SetLength(0);
+        tail.ClearPartial();
         tail.Oversized = false;
 
         if (now.UtcDateTime - fi.LastWriteTimeUtc <= PrimeWindow)
@@ -309,7 +347,7 @@ public sealed class AgentActivityWatcher : IDisposable
         tail.Offset = length;
     }
 
-    private void ReadNew(Tail tail, string path, DateTimeOffset now, List<AgentTurnEvent> events)
+    private void ReadNew(Tail tail, string path, DateTimeOffset now, List<AgentTurnEvent> events, List<(string, string)> active)
     {
         using var fs = Open(path);
         long length = fs.Length;
@@ -317,8 +355,16 @@ public sealed class AgentActivityWatcher : IDisposable
         fs.Seek(tail.Offset, SeekOrigin.Begin);
         var folder = tail.Antigravity is null ? null : _antigravityFolder(tail.Session);
         long consumed = 0;
+        long lines = tail.Lines;
         try { ReadLines(tail, fs, length - tail.Offset, false, now, events, folder, ref consumed); }
         finally { tail.Offset += consumed; }   // Offset and Partial always agree, even when a read faults part-way
+
+        // New lines while a turn is open: the agent is still at it (its card must not lose touch), at most once a minute.
+        if (tail.Lines > lines && tail.TurnOpen && (tail.ActiveAt is not { } at || now - at >= ActiveEvery))
+        {
+            tail.ActiveAt = now;
+            active.Add((tail.Agent, tail.Session));
+        }
     }
 
     /// <summary>Feeds every complete line in the next <paramref name="count"/> bytes to the tail's reader. A line with no
@@ -358,7 +404,7 @@ public sealed class AgentActivityWatcher : IDisposable
         if (tail.Partial.Length + count > MaxLineBytes)
         {
             tail.Oversized = true;
-            tail.Partial.SetLength(0);
+            tail.ClearPartial();
             return;
         }
         tail.Partial.Write(buf, start, count);
@@ -366,6 +412,7 @@ public sealed class AgentActivityWatcher : IDisposable
 
     private static void EndLine(Tail tail, DateTimeOffset now, List<AgentTurnEvent>? sink, string? folder)
     {
+        tail.Lines++;
         if (tail.Oversized)
         {
             tail.Oversized = false;
@@ -373,7 +420,7 @@ public sealed class AgentActivityWatcher : IDisposable
             return;
         }
         var line = Encoding.UTF8.GetString(tail.Partial.GetBuffer(), 0, (int)tail.Partial.Length).Trim();
-        tail.Partial.SetLength(0);
+        tail.ClearPartial();
         if (line.Length == 0) return;
         var e = tail.Codex is { } codex ? codex.Read(line) : tail.Antigravity?.Read(line, folder, now);
         if (e is not null) sink?.Add(e);
@@ -391,6 +438,10 @@ public sealed class AgentActivityWatcher : IDisposable
         try { files = [.. Directory.EnumerateFiles(_signalDir, ClaudeCodeSignalFile.Pattern).OrderBy(f => f, StringComparer.Ordinal)]; }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return; }
 
+        // The first pass is state only: each file is read, applied and deleted, but nothing replays at launch.
+        var sink = _signalsPrimed ? events : null;
+        _signalsPrimed = true;
+
         foreach (var file in files)
         {
             byte[]? data = null;
@@ -401,7 +452,11 @@ public sealed class AgentActivityWatcher : IDisposable
                 File.Delete(file);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { continue; }
-            if (data is not null && ClaudeCodeSignalFile.Decode(data, now) is { } signal) events.Add(_claude.Apply(signal));
+            if (data is not null && ClaudeCodeSignalFile.Decode(data, now) is { } signal)
+            {
+                var turn = _claude.Apply(signal);   // applied even in the first pass, so a prompt read then still times its done
+                sink?.Add(turn);
+            }
         }
 
         // A hook whose rename failed leaves its temporary file. One older than any signal Sanduhr would still read goes;

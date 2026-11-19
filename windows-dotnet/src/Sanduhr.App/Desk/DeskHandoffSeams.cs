@@ -176,6 +176,14 @@ internal sealed class WatcherStore : IDisposable, IRunnerSink
         Schedule();
     }
 
+    /// <summary>A Codex or Antigravity turn wrote a line: its card has heard from it (it does not lose touch).</summary>
+    public void TouchTurn(string agent, string session)
+    {
+        if (_disposed) return;
+        if (Board.TouchTurn(agent, session, DateTimeOffset.Now)) Changed?.Invoke();
+        Schedule();
+    }
+
     /// <summary>An agent's source or its notifications went off: its turn cards go.</summary>
     public void ClearTurns(string agent)
     {

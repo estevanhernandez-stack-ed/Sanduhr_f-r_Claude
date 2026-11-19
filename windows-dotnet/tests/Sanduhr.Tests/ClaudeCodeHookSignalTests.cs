@@ -182,6 +182,24 @@ public sealed class ClaudeCodeHookCommandRunTests : IDisposable
     }
 
     [PowerShellFact]
+    public void A_prompt_never_reaches_the_signal_file()
+    {
+        Directory.CreateDirectory(SanduhrDir);
+        Assert.Equal(0, RunHook(ClaudeCodeSignalFile.Prompt,
+            "{\"session_id\":\"sess-1\",\"cwd\":\"C:\\\\proj\\\\alpha\",\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"SECRET-PROMPT\"}"));
+
+        var path = Assert.Single(Directory.GetFiles(SanduhrDir, ClaudeCodeSignalFile.Pattern));
+        var bytes = File.ReadAllBytes(path);
+        var signal = ClaudeCodeSignalFile.Decode(bytes, DateTimeOffset.UtcNow);
+        Assert.NotNull(signal);
+        Assert.Equal(ClaudeCodeSignalFile.Prompt, signal!.Event);
+        Assert.Equal("sess-1", signal.Session);
+        var text = Encoding.UTF8.GetString(bytes);
+        Assert.DoesNotContain("SECRET-PROMPT", text);
+        Assert.DoesNotContain("prompt\":\"S", text);
+    }
+
+    [PowerShellFact]
     public void A_folder_name_that_is_not_ascii_comes_through_unchanged()
     {
         Directory.CreateDirectory(SanduhrDir);

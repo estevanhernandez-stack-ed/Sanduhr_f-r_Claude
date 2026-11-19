@@ -10,8 +10,11 @@ public sealed class AgentActivityWatcherTests : IDisposable
     private readonly TempDir _t = new();
     private DateTimeOffset _now = DateTimeOffset.UtcNow.AddSeconds(-2);   // a little behind the file system, so new files are newer
     private bool _codexOn = true, _antigravityOn = true, _claudeOn = true;
+    private bool _codexThrows, _folderThrows;
     private readonly List<AgentTurnEvent> _events = [];
     private readonly List<string> _off = [];
+    private readonly List<(string Agent, string Session)> _active = [];
+    private readonly List<string> _log = [];
 
     private string CodexHome => Path.Combine(_t.Path, "codex");
     private string Sessions => Path.Combine(CodexHome, "sessions", "2026", "11", "17");
@@ -30,12 +33,13 @@ public sealed class AgentActivityWatcherTests : IDisposable
     private AgentActivityWatcher Sut()
     {
         var w = new AgentActivityWatcher(
-            () => _codexOn ? [CodexHome] : [],
+            () => _codexThrows ? throw new UnauthorizedAccessException("no") : _codexOn ? [CodexHome] : [],
             () => _antigravityOn ? AgyHome : null,
-            conversation => @"C:\proj\" + conversation,
-            () => _claudeOn, Signals, () => _now);
+            conversation => _folderThrows ? throw new InvalidOperationException("no") : @"C:\proj\" + conversation,
+            () => _claudeOn, Signals, () => _now, _log.Add);
         w.Turn += _events.Add;
         w.AgentOff += _off.Add;
+        w.Active += (agent, session) => _active.Add((agent, session));
         return w;
     }
 
@@ -352,6 +356,7 @@ public sealed class AgentActivityWatcherTests : IDisposable
     public void Two_sessions_signals_in_the_same_millisecond_both_arrive_and_the_files_go()
     {
         using var w = Sut();
+        w.Scan();                                   // the first pass is silent
         long at = _now.ToUnixTimeMilliseconds();
         Signal("done", "sess-a", at, pid: 100);
         Signal("done", "sess-b", at, pid: 200);
@@ -365,11 +370,13 @@ public sealed class AgentActivityWatcherTests : IDisposable
     public void A_prompt_then_a_done_gives_the_turns_length()
     {
         using var w = Sut();
+        w.Scan();                                   // the first pass is silent
         Signal("prompt", "sess-a", _now.ToUnixTimeMilliseconds());
         w.Scan();
         _now = _now.AddSeconds(252);
         Signal("done", "sess-a", _now.ToUnixTimeMilliseconds());
         w.Scan();
+        Assert.Equal([AgentTurnKind.Started, AgentTurnKind.Finished], _events.Select(e => e.Kind));
         Assert.Equal(TimeSpan.FromSeconds(252), _events[^1].Duration);
     }
 
@@ -377,6 +384,7 @@ public sealed class AgentActivityWatcherTests : IDisposable
     public void A_stale_malformed_or_oversized_signal_is_deleted_unread()
     {
         using var w = Sut();
+        w.Scan();                                   // the first pass is silent
         Signal("done", "old", _now.AddMinutes(-11).ToUnixTimeMilliseconds());
         Signal("done", "bad", pid: 300, raw: "not json");
         Signal("done", "big", pid: 400, raw: new string('x', ClaudeCodeSignalFile.MaxBytes + 1));
@@ -422,6 +430,142 @@ public sealed class AgentActivityWatcherTests : IDisposable
         Assert.Equal(["claude"], _off);
     }
 
+    // ---- the first pass over the signal files is silent ----
+
+    [Fact]
+    public void Signals_waiting_before_the_first_scan_raise_nothing_and_are_deleted()
+    {
+        Signal("prompt", "sess-a", _now.AddMinutes(-2).ToUnixTimeMilliseconds(), pid: 1);
+        Signal("done", "sess-a", _now.AddMinutes(-1).ToUnixTimeMilliseconds(), pid: 2);
+        Signal("waiting", "sess-b", _now.ToUnixTimeMilliseconds(), pid: 3);
+        using var w = Sut();
+        w.Scan();
+        Assert.Empty(_events);
+        Assert.Empty(Directory.GetFiles(Signals));
+    }
+
+    [Fact]
+    public void A_prompt_read_in_the_first_pass_still_gives_a_later_done_its_length()
+    {
+        Signal("prompt", "sess-a", _now.ToUnixTimeMilliseconds());
+        using var w = Sut();
+        w.Scan();
+        Assert.Empty(_events);
+        _now = _now.AddSeconds(252);
+        Signal("done", "sess-a", _now.ToUnixTimeMilliseconds());
+        w.Scan();
+        var done = Assert.Single(_events);
+        Assert.Equal((AgentTurnKind.Finished, TimeSpan.FromSeconds(252)), (done.Kind, done.Duration));
+    }
+
+    // ---- one part failing does not lose the others ----
+
+    [Fact]
+    public void A_codex_homes_delegate_that_throws_still_lets_the_signals_through()
+    {
+        _codexThrows = true;
+        using var w = Sut();
+        w.Scan();                                   // the first pass is silent
+        Signal("done", "sess-a");
+        w.Scan();
+        Assert.Equal(("claude", AgentTurnKind.Finished), (Assert.Single(_events).Agent, _events[0].Kind));
+        Assert.Contains(_log, l => l.Contains("UnauthorizedAccessException", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void An_antigravity_folder_delegate_that_throws_does_not_lose_a_codex_event_from_the_same_scan()
+    {
+        using var w = Sut();
+        w.Scan();
+        Rollout("rollout-new", Meta() + Started(_now), newFile: true);
+        Transcript("conv-1", Step(_now, "USER_INPUT"), newFile: true);
+        _folderThrows = true;
+        w.Scan();
+        Assert.Equal(("codex", AgentTurnKind.Started), (Assert.Single(_events).Agent, _events[0].Kind));
+        Assert.Contains(_log, l => l.Contains("InvalidOperationException", StringComparison.Ordinal));
+
+        _folderThrows = false;                      // the transcript was left where it was: read on the next scan
+        w.Scan();
+        Assert.Equal(("antigravity", AgentTurnKind.Started), (_events[^1].Agent, _events[^1].Kind));
+    }
+
+    // ---- a line for an open turn says the agent is still at it ----
+
+    private string Filler() => CodexLine(_now, "response_item", new() { ["type"] = "message", ["content"] = "x" });
+
+    [Fact]
+    public void Lines_for_an_open_codex_turn_raise_active_at_most_once_a_minute()
+    {
+        Rollout("rollout-a", Meta() + Started(_now.AddMinutes(-1)));
+        using var w = Sut();
+        w.Scan();
+        Assert.Empty(_active);                      // the first pass is history
+
+        Rollout("rollout-a", Filler());
+        w.Scan();
+        Assert.Equal([("codex", "rollout-a")], _active);
+
+        _now = _now.AddSeconds(59);
+        Rollout("rollout-a", Filler());
+        w.Scan();
+        Assert.Single(_active);
+
+        _now = _now.AddSeconds(1);
+        Rollout("rollout-a", Filler());
+        w.Scan();
+        Assert.Equal(2, _active.Count);
+
+        _now = _now.AddMinutes(5);
+        w.Scan();                                   // no new line, nothing
+        Assert.Equal(2, _active.Count);
+        Assert.Empty(_events);
+    }
+
+    [Fact]
+    public void Lines_for_a_codex_rollout_with_no_open_turn_raise_no_active()
+    {
+        Rollout("rollout-a", Meta() + Started(_now.AddMinutes(-3)) + Complete(_now.AddMinutes(-1)));
+        using var w = Sut();
+        w.Scan();
+        Rollout("rollout-a", Filler());
+        w.Scan();
+        Assert.Empty(_active);
+    }
+
+    [Fact]
+    public void Lines_for_an_open_antigravity_turn_raise_active_at_most_once_a_minute()
+    {
+        Transcript("conv-1", Step(_now.AddMinutes(-1), "USER_INPUT"));
+        using var w = Sut();
+        w.Scan();
+        Assert.Empty(_active);
+
+        Transcript("conv-1", Step(_now, "PLANNER_RESPONSE", toolCalls: true));
+        w.Scan();
+        Assert.Equal([("antigravity", "conv-1")], _active);
+
+        _now = _now.AddSeconds(30);
+        Transcript("conv-1", Step(_now, "PLANNER_RESPONSE", toolCalls: true));
+        w.Scan();
+        Assert.Single(_active);
+
+        _now = _now.AddSeconds(30);
+        Transcript("conv-1", Step(_now, "PLANNER_RESPONSE", toolCalls: true));
+        w.Scan();
+        Assert.Equal(2, _active.Count);
+    }
+
+    [Fact]
+    public void Lines_for_an_antigravity_conversation_with_no_open_turn_raise_no_active()
+    {
+        Transcript("conv-1", Step(_now.AddMinutes(-2), "USER_INPUT") + Step(_now.AddMinutes(-1), "PLANNER_RESPONSE"));
+        using var w = Sut();
+        w.Scan();
+        Transcript("conv-1", Step(_now, "PLANNER_RESPONSE", toolCalls: true));
+        w.Scan();
+        Assert.Empty(_active);
+    }
+
     // ---- the service ----
 
     [Fact]
@@ -430,6 +574,7 @@ public sealed class AgentActivityWatcherTests : IDisposable
         using var w = new AgentActivityWatcher(() => [], () => null, _ => null, () => true, Signals, () => _now);
         w.Turn += _ => throw new InvalidOperationException("boom");
         w.Turn += _events.Add;
+        w.Scan();                                   // the first pass is silent
         Signal("done", "sess-a");
         w.Scan();
         Assert.Single(_events);
