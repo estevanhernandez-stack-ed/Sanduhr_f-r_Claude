@@ -229,7 +229,33 @@ public class NotificationRulesTests
     private static (bool Glow, bool Flash) Old(NotificationSettings s, ClaudeCodeEvent kind = ClaudeCodeEvent.Done, string? front = "chrome")
     {
         var limiter = new ClaudeCodeGlowLimiter();
-        return NotificationRules.OldHookSignal(s, kind, front, ref limiter, Now);
+        return NotificationRules.OldHookSignal(s, kind, () => front, ref limiter, Now);
+    }
+
+    private static ((bool Glow, bool Flash) Result, int Calls) OldCounted(NotificationSettings s, string? front = "chrome")
+    {
+        int calls = 0;
+        var limiter = new ClaudeCodeGlowLimiter();
+        var result = NotificationRules.OldHookSignal(s, ClaudeCodeEvent.Done, () => { calls++; return front; }, ref limiter, Now);
+        return (result, calls);
+    }
+
+    [Fact]
+    public void An_old_signal_reads_the_front_window_only_when_a_glow_is_due()
+    {
+        Assert.Equal(((false, false), 0), OldCounted(Migrated with { GlowFinished = false }));
+        Assert.Equal(((false, false), 0), OldCounted(Migrated.WithAgent(AgentSources.Claude, false)));
+        Assert.Equal(((true, true), 0), OldCounted(Migrated with { SkipInFront = false }));
+        Assert.Equal(((true, true), 1), OldCounted(Migrated));
+        Assert.Equal(((false, false), 1), OldCounted(Migrated, front: "WindowsTerminal"));
+    }
+
+    [Fact]
+    public void An_old_signal_stopped_by_a_terminal_in_front_does_not_use_up_the_limit()
+    {
+        var limiter = new ClaudeCodeGlowLimiter();
+        Assert.False(NotificationRules.OldHookSignal(Migrated, ClaudeCodeEvent.Done, () => "WindowsTerminal", ref limiter, Now).Glow);
+        Assert.True(NotificationRules.OldHookSignal(Migrated, ClaudeCodeEvent.Done, () => "chrome", ref limiter, Now.AddSeconds(1)).Glow);
     }
 
     [Fact]
@@ -265,8 +291,8 @@ public class NotificationRulesTests
     public void An_old_signal_keeps_to_the_limiter()
     {
         var limiter = new ClaudeCodeGlowLimiter();
-        Assert.True(NotificationRules.OldHookSignal(Migrated, ClaudeCodeEvent.Done, null, ref limiter, Now).Glow);
-        Assert.False(NotificationRules.OldHookSignal(Migrated, ClaudeCodeEvent.Done, null, ref limiter, Now.AddSeconds(5)).Glow);
+        Assert.True(NotificationRules.OldHookSignal(Migrated, ClaudeCodeEvent.Done, () => null, ref limiter, Now).Glow);
+        Assert.False(NotificationRules.OldHookSignal(Migrated, ClaudeCodeEvent.Done, () => null, ref limiter, Now.AddSeconds(5)).Glow);
     }
 
     // ---- in front ----

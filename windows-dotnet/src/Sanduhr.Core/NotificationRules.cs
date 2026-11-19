@@ -146,13 +146,17 @@ public static class NotificationRules
 
     /// <summary>An older hook's signal (3.5 to 4.9, which names no folder or session) arrived: whether it glows, and whether the
     /// taskbar flashes with it. Nothing while Claude Code is switched off on Settings, Notifications; otherwise the glow switch
-    /// for its kind, the in-front rule (a terminal or an editor) and the limiter decide, and the flash follows its own switch.</summary>
-    public static (bool Glow, bool Flash) OldHookSignal(NotificationSettings s, ClaudeCodeEvent kind, string? foregroundProcess,
+    /// for its kind, the in-front rule (a terminal or an editor) and the limiter decide, and the flash follows its own switch.
+    /// <paramref name="foregroundProcess"/> is called at most once, and only when its answer can matter (Claude Code on, the
+    /// glow switch for the kind on, the in-front switch on). The limiter is asked last, as <see cref="ClaudeCodeGlowRules.Decide"/>
+    /// does, so a signal the front window stops does not use up the limit.</summary>
+    public static (bool Glow, bool Flash) OldHookSignal(NotificationSettings s, ClaudeCodeEvent kind, Func<string?> foregroundProcess,
         ref ClaudeCodeGlowLimiter limiter, DateTimeOffset now)
     {
         if (!s.AgentOn(AgentSources.Claude)) return (false, false);
-        var switches = new GlowSwitches(Waiting: s.GlowWaiting, Done: s.GlowFinished, SkipTerminal: s.SkipInFront);
-        if (!ClaudeCodeGlowRules.Decide(kind, switches, foregroundProcess, ref limiter, now)) return (false, false);
+        if (!(kind == ClaudeCodeEvent.Waiting ? s.GlowWaiting : s.GlowFinished)) return (false, false);
+        if (s.SkipInFront && ClaudeCodeGlowRules.IsTerminal(foregroundProcess())) return (false, false);
+        if (!limiter.Allow(kind, now)) return (false, false);
         return (true, s.Flash);
     }
 

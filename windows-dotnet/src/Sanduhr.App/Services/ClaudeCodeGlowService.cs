@@ -157,9 +157,8 @@ internal sealed class ClaudeCodeGlowService : IDisposable
     {
         if (_disposed) return;
         // An older hook's signal (3.5 to 4.9): it glows as it did, and flashes when Settings, Notifications says so. Nothing
-        // while Claude Code is switched off there.
-        var fg = GlowNative.GetForegroundWindow();
-        var (glow, flash) = NotificationRules.OldHookSignal(_notify, kind, ProcessNameOf(fg, out _), ref _limiter, DateTimeOffset.UtcNow);
+        // while Claude Code is switched off there. The front window is read only when a glow is otherwise due.
+        var (glow, flash) = NotificationRules.OldHookSignal(_notify, kind, ForegroundProcess, ref _limiter, DateTimeOffset.UtcNow);
         if (!glow) return;
         Show(GlowOverlayContent.ColorFor(kind), flash);
     }
