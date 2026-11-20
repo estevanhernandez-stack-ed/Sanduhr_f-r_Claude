@@ -157,7 +157,10 @@ final class SourcesSettingsModel {
         message = nil
         switch source {
         case .antigravity:
+            let wasOn = AgentSourceSettings.load(from: store).antigravityOn
             store.set(on, forKey: AgentSourceSettings.antigravityOnKey)
+            // Switched on again: a record erased while it was on starts again.
+            if on, !wasOn { VaultAgentStop.clear(.antigravity, in: store) }
         case .claude, .codex:
             guard applySetup(source, on) else { reload(); return }
         }

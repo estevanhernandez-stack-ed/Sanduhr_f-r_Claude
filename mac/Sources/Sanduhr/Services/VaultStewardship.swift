@@ -12,10 +12,15 @@ struct VaultRecordInfo: Identifiable, Equatable, Sendable {
     let account: String?
     /// That account's linked folder, nil when not linked.
     let folder: String?
-    /// The linked account keeps a record (erase turns it to Live only first).
+    /// The linked account keeps a record (erase turns it to Live only first); for an agent's
+    /// record, its source is being recorded (erase stops it until the source is switched on again).
     let recording: Bool
+    /// The agent whose burn this record holds (`vault/codex`, `vault/antigravity`); nil for a
+    /// Claude Code folder's record. An agent record belongs to no account and is never "not linked".
+    var agent: AgentSource? = nil
 
     var isLinked: Bool { account != nil }
+    var isAgent: Bool { agent != nil }
 
     /// A short handle for a record no account names: the id's first 8 digits.
     var shortID: String { String(id.prefix(8)) }
@@ -30,8 +35,10 @@ enum VaultStewardship {
         !id.isEmpty && !id.contains("/") && !id.hasPrefix(".")
     }
 
-    /// Linked records first, by account (case-insensitively), then the unlinked ones by id.
-    static func records(in store: VaultStore, choices: [String: AccountDataChoices]) -> [VaultRecordInfo] {
+    /// Linked records first, by account (case-insensitively), then agent records in source order,
+    /// then the unlinked ones by id. `agentRecording` says whether an agent's source is recorded now.
+    static func records(in store: VaultStore, choices: [String: AccountDataChoices],
+                        agentRecording: (AgentSource) -> Bool = { _ in false }) -> [VaultRecordInfo] {
         let fm = FileManager.default
         let names = (try? fm.contentsOfDirectory(atPath: store.vaultDir)) ?? []
         var links: [String: (account: String, folder: String, recording: Bool)] = [:]
@@ -45,12 +52,24 @@ enum VaultStewardship {
             var isDir: ObjCBool = false
             let dir = store.rootDir(name)
             guard fm.fileExists(atPath: dir, isDirectory: &isDir), isDir.boolValue else { continue }
+            if let agent = VaultAgentStop.agent(ofRoot: name) {
+                out.append(VaultRecordInfo(id: name, bytes: size(of: dir), oldestDay: oldestDay(store, name),
+                                           account: nil, folder: nil, recording: agentRecording(agent), agent: agent))
+                continue
+            }
             let link = links[name]
             out.append(VaultRecordInfo(id: name, bytes: size(of: dir), oldestDay: oldestDay(store, name),
                                        account: link?.account, folder: link?.folder,
                                        recording: link?.recording ?? false))
         }
+        let order = Dictionary(uniqueKeysWithValues: AgentSource.allCases.enumerated().map { ($1, $0) })
         return out.sorted { a, b in
+            switch (a.agent, b.agent) {
+            case let (x?, y?): return order[x, default: 0] < order[y, default: 0]
+            case (.some, nil): return b.account == nil
+            case (nil, .some): return a.account != nil
+            case (nil, nil): break
+            }
             switch (a.account, b.account) {
             case let (x?, y?):
                 let order = x.localizedCaseInsensitiveCompare(y)

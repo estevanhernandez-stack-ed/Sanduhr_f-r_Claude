@@ -378,8 +378,9 @@ final class VaultIngester: @unchecked Sendable {
         store.saveRollupShard(id, month, VaultRollups.fold(shard))
     }
 
-    private func updateMeta(_ id: String, now: Date, nowIso: String) {
+    private func updateMeta(_ id: String, now: Date, nowIso: String, agent: String? = nil) {
         var meta = store.loadMeta(id) ?? VaultRootMeta()
+        if let agent { meta.agent = agent }
         let today = CCLocalDay(now, calendar: calendar)
         if meta.since.isEmpty { meta.since = today.key }
         meta.covered = Self.mergeCoverage(meta.covered, from: today.adding(days: -Self.coverageMarginDays), to: today)
@@ -581,6 +582,207 @@ final class VaultIngester: @unchecked Sendable {
         try h.seek(toOffset: UInt64(offset - Int64(len)))
         let bytes = try h.read(upToCount: len) ?? Data()
         return VaultStore.sha256Hex(bytes)
+    }
+}
+
+// MARK: Agent roots
+
+extension VaultIngester {
+    /// One cycle of an agent's root, `vault/<agent>` (every-agents spec, section 3; Windows
+    /// `IngestAgentRoot`). The same shards, rollups, checkpoints, quarantine and write order as a
+    /// Claude Code folder; the source lists the files and parses them. A plain file resumes from
+    /// its checkpoint's offset with the parser state saved there; a compressed one is read whole.
+    /// A source that throws while listing skips only this root (`rootsAborted`); a file that
+    /// can't be read fails alone. The Claude Code path (`ingestOnce`) is not involved.
+    /// - Parameters:
+    ///   - names: how project names are kept; agent roots belong to no account and keep names.
+    ///   - stillRecording: asked with the root name right before the first write; false drops
+    ///     the cycle's work (a purge during the cycle).
+    @discardableResult
+    func ingestAgent(_ source: AgentBurnSource, now: Date, names: ProjectNamesChoice = .names,
+                     stillRecording: ((String) -> Bool)? = nil) -> VaultIngestResult {
+        guard let lock = VaultWriterLock.tryAcquire(lockPath) else {
+            log?("ingest skipped (writer lock held)")
+            return .skipped
+        }
+        defer { lock.release() }
+        return ingestAgentRoot(source, now: now, names: names, stillRecording: stillRecording)
+    }
+
+    private func ingestAgentRoot(_ source: AgentBurnSource, now: Date, names: ProjectNamesChoice,
+                                 stillRecording: ((String) -> Bool)?) -> VaultIngestResult {
+        var r = VaultIngestResult()
+        let id = source.agent.rawValue
+        var files: [AgentBurnFile]
+        do {
+            files = try source.files()
+        } catch {
+            log?(VaultLog.failure("agent-root", error))
+            r.rootsAborted = 1
+            return r
+        }
+        files.sort { $0.mtimeTicks != $1.mtimeTicks ? $0.mtimeTicks < $1.mtimeTicks : $0.path < $1.path }
+
+        var checkpoints = store.loadCheckpoints(id)
+        var shards: [String: VaultSessionShard] = [:]
+        var dirty = Set<String>()
+        let nowIso = VaultTime.iso(now)
+
+        for f in files {
+            r.filesSeen += 1
+            let key = VaultStore.pathKey(f.path)
+            let cp = checkpoints.entries[key]
+            let uuid = f.sessionID
+            let mtime = VaultTime.date(ticks: f.mtimeTicks)
+
+            let unchanged = cp.map { $0.mtimeTicks == f.mtimeTicks && $0.length == f.length } ?? false
+            let quiesced = now.timeIntervalSince(mtime) >= Self.quiesceAfter
+            if unchanged, let cp, cp.sealed || !quiesced {
+                checkpoints.entries[key]?.lastSeen = nowIso
+                r.filesSkipped += 1
+                continue
+            }
+
+            let sealAfter = unchanged
+            var seed: SessionAgg?
+            if !f.compressed, let cp, !unchanged, !cp.sealed, f.length > cp.length, cp.offset > 0, !cp.tailGuard.isEmpty {
+                var corrupt = false
+                seed = seedFromStored(id, uuid: uuid, months: cp.months, shards: &shards, now: now, corrupt: &corrupt)
+                if corrupt {
+                    r.rootsAborted = 1
+                    return r
+                }
+                if let s = seed,
+                   s.byDay.values.reduce(0, { $0 + $1.total }) != cp.rowTotal || s.eventCount != cp.rowEvents
+                    || s.cacheRead != cp.rowCacheRead || s.cacheCreation != cp.rowCacheCreation {
+                    seed = nil
+                }
+            }
+
+            let agg: SessionAgg
+            let read: AgentBurnRead
+            let guardHex: String
+            var usedTail = false
+            do {
+                if f.compressed {
+                    agg = SessionAgg()
+                    agg.cwd = f.cwd
+                    read = try source.read(f, from: 0, state: nil)
+                    guardHex = ""
+                } else {
+                    guard let h = FileHandle(forReadingAtPath: f.path) else { throw VaultIOError.open }
+                    defer { try? h.close() }
+                    let size = Int64(try h.seekToEnd())
+                    if let s = seed, let cp, size >= cp.offset, try guardAt(h, cp.offset) == cp.tailGuard {
+                        agg = s
+                        // A project learned since the last pass moves the session.
+                        if let cwd = f.cwd { agg.cwd = cwd }
+                        read = try source.read(f, from: cp.offset, state: cp.parserState)
+                        usedTail = true
+                    } else {
+                        agg = SessionAgg()
+                        agg.cwd = f.cwd
+                        read = try source.read(f, from: 0, state: nil)
+                    }
+                    guardHex = try guardAt(h, read.endOffset)
+                }
+            } catch {
+                if cp != nil { checkpoints.entries[key]?.lastSeen = nowIso }
+                log?(VaultLog.failure("file-open", error))
+                r.filesFailed += 1
+                continue
+            }
+            agg.skippedLines += read.skippedLines
+            for e in read.events { fold(e, agg) }
+
+            let newRows = buildRows(agg, names: names, parent: nil)
+            var touched = Set(cp?.months ?? [])
+            touched.formUnion(newRows.keys)
+            for month in touched.sorted() {
+                var corrupt = false
+                var shard = shardFor(id, month, shards: &shards, now: now, corrupt: &corrupt)
+                if corrupt {
+                    r.rootsAborted = 1
+                    return r
+                }
+                shard.sessions.removeValue(forKey: uuid)
+                if let row = newRows[month] { shard.sessions[uuid] = row }
+                shards[month] = shard
+                dirty.insert(month)
+            }
+
+            var entry = VaultCheckpointEntry()
+            entry.mtimeTicks = f.mtimeTicks
+            entry.length = f.length
+            entry.offset = read.endOffset
+            entry.tailGuard = guardHex
+            entry.rowTotal = newRows.values.reduce(0) { $0 + $1.total }
+            entry.rowEvents = newRows.values.reduce(0) { $0 + $1.eventCount }
+            entry.rowCacheRead = newRows.values.reduce(0) { $0 + ($1.cacheTokens?.read ?? 0) }
+            entry.rowCacheCreation = newRows.values.reduce(0) { $0 + ($1.cacheTokens?.creation ?? 0) }
+            entry.months = newRows.keys.sorted()
+            entry.sealed = sealAfter
+            entry.lastSeen = nowIso
+            entry.parserState = read.state
+            checkpoints.entries[key] = entry
+            if usedTail { r.filesTailParsed += 1 } else { r.filesFullParsed += 1 }
+        }
+
+        let pruneBefore = now.addingTimeInterval(-Double(Self.checkpointPruneDays) * 86_400)
+        for (k, e) in checkpoints.entries {
+            if let seen = VaultTime.parse(e.lastSeen), seen >= pruneBefore { continue }
+            checkpoints.entries.removeValue(forKey: k)
+        }
+
+        if let stillRecording, !stillRecording(id) {
+            log?("agent root writes skipped (recording ended)")
+            r.rootsWithdrawn = 1
+            return r
+        }
+
+        // Write order (binding): session shards, rollups, checkpoints, meta.
+        do {
+            for month in dirty.sorted() {
+                if let shard = shards[month] { try store.saveSessionShard(id, month, shard) }
+            }
+        } catch {
+            log?(VaultLog.failure("shard-write", error))
+            r.rootsAborted = 1
+            return r
+        }
+
+        var rollupMonths = dirty
+        let currentMonth = CCLocalDay(now, calendar: calendar).monthKey
+        if store.listSessionShardMonths(id).contains(currentMonth) { rollupMonths.insert(currentMonth) }
+        for month in rollupMonths.sorted() { rebuildRollups(id, month, shards: shards) }
+
+        store.saveCheckpoints(id, checkpoints)
+        updateMeta(id, now: now, nowIso: nowIso, agent: id)
+        return r
+    }
+
+    /// One agent event into the session (Windows `Fold`): cache counts land even for an event
+    /// with no tokens; everything else needs input + output above zero, as a Claude event does.
+    /// The project is the cwd in force at the first counted event. The day is the event's own
+    /// local day, the convention Claude rows use.
+    private func fold(_ e: BurnEvent, _ agg: SessionAgg) {
+        agg.cacheRead += e.cacheRead
+        agg.cacheCreation += e.cacheCreation
+        let tokens = e.input + e.output
+        guard tokens > 0 else { return }
+        if agg.cwd == nil { agg.cwd = e.cwd }
+        var model = e.model ?? ""
+        if model.isEmpty { model = "<none>" }   // conservation: sum(by_model) == total
+        if agg.firstTs.map({ e.timestamp < $0 }) ?? true { agg.firstTs = e.timestamp }
+        if agg.lastTs.map({ e.timestamp > $0 }) ?? true { agg.lastTs = e.timestamp }
+        agg.eventCount += 1
+        let day = CCLocalDay(e.timestamp, calendar: calendar).key
+        var bucket = agg.byDay[day] ?? DayAgg()
+        bucket.total += tokens
+        bucket.input += e.input
+        bucket.output += e.output
+        bucket.byModel[model, default: 0] += tokens
+        agg.byDay[day] = bucket
     }
 }
 

@@ -27,11 +27,20 @@ enum Zstd {
     static let defaultCap = 64 * 1024 * 1024
 
     static func decompress(_ data: Data, cap: Int = Zstd.defaultCap) throws -> Data {
+        var out = Data()
+        try decompress(data, cap: cap) { out.append(contentsOf: $0) }
+        return out
+    }
+
+    /// The same decode, handing each piece of output to `sink` as it comes instead of holding the
+    /// whole result: memory stays at one output buffer however large the cap. The cap counts every
+    /// byte handed out, and a piece that would pass it throws before it reaches `sink`.
+    static func decompress(_ data: Data, cap: Int, sink: (UnsafeRawBufferPointer) throws -> Void) throws {
         guard !data.isEmpty else { throw Failure.truncated }
         guard let stream = ZSTD_createDStream() else { throw Failure.badFrame("the decoder could not allocate") }
         defer { ZSTD_freeDStream(stream) }
 
-        var out = Data()
+        var total = 0
         var chunk = [UInt8](repeating: 0, count: max(Int(ZSTD_DStreamOutSize()), 1))
         // Zero when the last frame ended cleanly; the decoder's "bytes still wanted" hint otherwise.
         var hint = 0
@@ -52,8 +61,9 @@ enum Zstd {
                     }
                     hint = ret
                     produced = output.pos
-                    if out.count + produced > cap { throw Failure.capExceeded(cap: cap) }
-                    out.append(dst.baseAddress!.assumingMemoryBound(to: UInt8.self), count: produced)
+                    if total + produced > cap { throw Failure.capExceeded(cap: cap) }
+                    total += produced
+                    if produced > 0 { try sink(UnsafeRawBufferPointer(rebasing: UnsafeRawBufferPointer(dst)[0..<produced])) }
                     drained = output.pos < output.size
                 }
                 // No input taken and no output given means the decoder is waiting for more.
@@ -61,6 +71,5 @@ enum Zstd {
             }
         }
         if hint != 0 { throw Failure.truncated }
-        return out
     }
 }
