@@ -177,6 +177,8 @@ final class UsageViewModel {
     /// Bumped after each ingest cycle and each erase from the Claude Usage page, so the page
     /// reloads what the record now holds.
     private(set) var vaultCycles = 0
+    /// The footer's agent pieces: each agent's burn between its last two ingests.
+    private(set) var agentDeltas = AgentBurnDeltas()
     /// The accounts in list order and the active one, as the Accounts page, the menus and the
     /// widget chip show them. Read from the registry's defaults (never the Keychain) and kept
     /// current by every account change here (`reloadAccounts`).
@@ -390,7 +392,12 @@ final class UsageViewModel {
         seatMeters.context = { [weak self] in self?.seatContext() ?? SeatMeters.Context() }
         follower.apply(enabled: followEnabled && usageOn)
         vault.onCycleEnd = { [weak self] in
-            Task { @MainActor in self?.vaultCycles += 1 }
+            // On the vault's queue: the agents' totals for today are read here, off the main thread.
+            let totals = self?.readAgentBurnToday()
+            Task { @MainActor in
+                self?.vaultCycles += 1
+                if let totals { self?.noteAgentBurn(totals) }
+            }
         }
     }
 
@@ -1296,9 +1303,20 @@ final class UsageViewModel {
     }
 
     func footerText() -> String {
-        guard let ts = lastUpdated else { return "" }
-        let f = DateFormatter(); f.dateFormat = "h:mm a"
         let mode = compact ? "Compact" : (pinned ? "Pinned" : "Float")
-        return "Updated \(f.string(from: ts)) · \(mode)"
+        return FooterText.make(updated: lastUpdated, mode: mode, agentPieces: agentDeltas.footerPieces(), demo: demo)
+    }
+
+    /// Today's Vault total for each agent that is ingesting now (a source on and not stopped, and
+    /// not demo). Safe off the main thread.
+    nonisolated private func readAgentBurnToday() -> (day: CCLocalDay, active: [AgentSource], totals: [AgentSource: Int64]) {
+        let day = CCLocalDay(Date(), calendar: .current)
+        let active = vault.activeAgents(in: KeychainStore.accounts.defaults).map(\.agent)
+        return (day, active, AgentBurnToday.totals(active, reader: vault.reader, today: day))
+    }
+
+    /// One ingest's reading for the footer: an agent no longer ingesting is forgotten.
+    func noteAgentBurn(_ read: (day: CCLocalDay, active: [AgentSource], totals: [AgentSource: Int64])) {
+        agentDeltas.observe(active: read.active, day: read.day) { read.totals[$0] ?? 0 }
     }
 }

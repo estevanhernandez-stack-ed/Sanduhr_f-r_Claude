@@ -53,6 +53,8 @@ struct VaultSessionInfo: Equatable, Sendable {
     let cache: VaultCacheTokens?
     let agentCount: Int
     let agentTokens: Int64
+    /// Which agent's root the session came from (the root's meta); Claude Code for a folder.
+    var agent: AgentSource = .claude
 }
 
 /// The read side of the vault (item 46), a port of Windows `VaultReader`, for the MCP tools
@@ -133,10 +135,16 @@ final class VaultReader: @unchecked Sendable {
 
     // MARK: Sessions
 
-    /// Every logical session in the folders, from the session shards.
+    /// The agents (other than Claude Code) whose root holds a record, from the root's meta.
+    func agentRoots() -> [AgentSource] {
+        AgentSource.burnRoots.filter { store.loadMeta($0.rawValue)?.agentSource == $0 }
+    }
+
+    /// Every logical session in the folders, from the session shards. Each carries its root's agent.
     func readSessions(_ roots: [String]) -> [VaultSessionInfo] {
         var result: [VaultSessionInfo] = []
         for root in roots {
+            let agent = store.loadMeta(root)?.agentSource ?? .claude
             var byUuid: [String: [VaultSessionRow]] = [:]
             for month in store.listSessionShardMonths(root) {
                 let (status, shard) = store.loadSessionShard(root, month)
@@ -168,7 +176,8 @@ final class VaultReader: @unchecked Sendable {
                     cache: cacheRead + cacheCreation > 0
                         ? VaultCacheTokens(read: cacheRead, creation: cacheCreation) : nil,
                     agentCount: agents.count,
-                    agentTokens: agents.reduce(Int64(0)) { $0 + $1.row.total }))
+                    agentTokens: agents.reduce(Int64(0)) { $0 + $1.row.total },
+                    agent: agent))
             }
         }
         return result
@@ -259,15 +268,18 @@ enum VaultLedgerCsv {
         let tokensInScope: Int64
         let tokensTotal: Int64
         let models: String
+        /// The agent's product name ("Claude Code", "Codex", "Antigravity"), last on the line so a
+        /// parser reading the older columns by position keeps working.
+        let agent: String
     }
 
-    static let header = "session,root,project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models\r\n"
+    static let header = "session,root,project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models,agent\r\n"
 
     static func build(_ rows: [Row]) -> (text: String, rowCount: Int) {
         var s = header
         for r in rows {
             s += [escape(r.uuid), escape(r.root), escape(r.project), escape(r.firstTs), escape(r.lastTs),
-                  String(r.tokensInScope), String(r.tokensTotal), escape(r.models)].joined(separator: ",")
+                  String(r.tokensInScope), String(r.tokensTotal), escape(r.models), escape(r.agent)].joined(separator: ",")
             s += "\r\n"
         }
         return (s, rows.count)
@@ -280,7 +292,8 @@ enum VaultLedgerCsv {
             firstTs: utcSeconds(s.firstTs), lastTs: utcSeconds(s.lastTs),
             tokensInScope: tokensInScope, tokensTotal: s.total,
             models: VaultReader.ranked(s.byModel, top: s.byModel.count)
-                .map { "\($0.name):\($0.total)" }.joined(separator: ";"))
+                .map { "\($0.name):\($0.total)" }.joined(separator: ";"),
+            agent: s.agent.burnName)
     }
 
     static func utcSeconds(_ d: Date) -> String {
