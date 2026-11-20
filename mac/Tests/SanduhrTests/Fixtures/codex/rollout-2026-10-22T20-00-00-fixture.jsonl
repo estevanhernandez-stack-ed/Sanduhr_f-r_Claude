@@ -1,0 +1,5 @@
+{"timestamp":"2026-10-22T20:00:00.000Z","type":"session_meta","payload":{"id":"00000000-0000-0000-0000-000000000000","cwd":"/made/up/project"}}
+{"timestamp":"2026-10-22T20:01:00.000Z","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"limit_id":"codex","primary":{"used_percent":12.0,"window_minutes":300,"resets_at":1792721664},"secondary":{"used_percent":3.0,"window_minutes":10080,"resets_at":1793308464},"plan_type":"plus"}}}
+{"timestamp":"2026-10-22T20:02:00.000Z","type":"response_item","payload":{"type":"message","role":"assistant"}}
+{"timestamp":"2026-10-22T23:48:09.060Z","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"limit_id":"codex","limit_name":null,"primary":{"used_percent":64.0,"window_minutes":300,"resets_at":1792721664},"secondary":{"used_percent":21.5,"window_minutes":10080,"resets_at":1793308464},"credits":{"has_credits":false,"unlimited":false,"balance":"0"},"plan_type":"plus"}}}
+{"timestamp":"2026-10-22T23:48:10.000Z","type":"event_msg","payload":{"type":"token_count","rate_limits":{"limit_id":"premium","primary":null,"secondary":null,"plan_type":"plus"}}}
