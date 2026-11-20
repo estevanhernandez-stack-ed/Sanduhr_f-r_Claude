@@ -19,7 +19,7 @@ Each group gets a lead feature, and the trailer and Store listing carry both pit
 | Agent notifications | spec 4 | Working, finished and waiting signals per agent, on the glow, the taskbar flash, a Desk card and a Windows toast | Any-agent users |
 | Ready-made Desk looks | spec 5 | A gallery of complete designs applied in one click, plus a neon glow on the ink | Customizers |
 | Cleanup and organization | spec 6 | Settings pages and names reorganized for a multi-agent app, and the three 4.9 smoke minors | Both |
-| Arm64 | spec 7 | A second Store package, an arm64 MCP server and a separate update feed | Both |
+| Arm64 | spec 7 | A second Store package, an arm64 GitHub installer with its own update feed, and a one-time notice for x64 installs on Arm PCs | Both |
 | Trailer and listing | no spec, a release task | New trailer, new screenshots, a description that carries both pitches | Both |
 
 ## Decisions already made
@@ -62,6 +62,15 @@ written (release-runbook Phases 2 and 7).
   project's name and how long the turn ran.
 - **Hosted privacy page.** `docs/store/hub-privacy-5.0.0.md` holds spec 4's paragraph; each later 5.0 part
   adds its own. File the hub issue and check the page before the Store commit.
+- **Arm64 (spec 7).** Reviewer letter: one sentence that the submission carries an x64 and an arm64
+  package with the same features and the same capabilities. Store Listing Console:
+  `apps/sanduhr/config.toml` lists both package files under `packages`. Partner Center: both packages
+  go into the Packages page of the one submission. What's New: a line that Sanduhr is now native on
+  Arm PCs. The Windows download links (`INSTALL.md`, `docs/index.html`) move from `releases?q=v4` to
+  `releases?q=v5` before the tag; the release workflow refuses the tag until they do. Run the Arm
+  check on the draft before publishing (release-runbook Phase 6). In that same change, add the small
+  print "Arm PC? Take the win-arm64 installer on the same page." under the Windows download button in
+  docs/index.html.
 
 ## Open
 

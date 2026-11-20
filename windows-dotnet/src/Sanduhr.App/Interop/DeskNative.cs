@@ -123,7 +123,7 @@ internal static class DeskNative
     [DllImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetWindowRect(IntPtr h, out RECT r);
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] public static extern int GetWindowLong(IntPtr h, int index);
     // SetWindowLongPtrW exists only in 64-bit user32 (32-bit exports SetWindowLongW alone); Sanduhr ships
-    // x64 only (win-x64 publish and Store package), so this binding is safe there and nowhere else.
+    // 64-bit only (win-x64 and win-arm64), so this binding is safe there and would not be in a 32-bit build.
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] public static extern IntPtr SetWindowLongPtr(IntPtr h, int index, IntPtr value);
     [DllImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern uint RegisterWindowMessageW(string name);

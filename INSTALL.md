@@ -6,8 +6,8 @@ see [mac/README.md](mac/README.md). The original Python widgets were retired and
 
 ## Requirements
 
-- Windows 10 version 1809 (build 17763) or later, x64. Windows 11 22H2+ gets the Mica glass
-  backdrop; Windows 10 falls back to a solid theme color.
+- Windows 10 version 1809 (build 17763) or later, on an x64 or an Arm64 PC. Windows 11 22H2+ gets
+  the Mica glass backdrop; Windows 10 falls back to a solid theme color.
 - The WebView2 runtime (part of Windows 11; on Windows 10 it usually arrives with Edge). Without
   it, the in-app sign-in is unavailable and the manual session-key path below still works.
 - An active Claude Pro, Max, Team, or Enterprise subscription. Sanduhr reads your own usage from
@@ -28,21 +28,34 @@ offers to quit for it.
 
 ### 2. GitHub Release (Setup.exe)
 
-Download **`626Labs.Sanduhr-win-Setup.exe`** from the
+Download the installer for your PC from the
 [newest Windows release](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases?q=v4&expanded=true)
-and run it.
+and run it:
+
+- **`626Labs.Sanduhr-win-Setup.exe`** for an x64 PC (Intel or AMD). Most PCs.
+- **`626Labs.Sanduhr-win-arm64-Setup.exe`** for an Arm PC (Snapdragon), from 5.0 on.
+
+Not sure which you have? Settings → System → About → **System type** says "x64-based processor" or
+"ARM-based processor".
 
 - The installer is not code-signed, so SmartScreen shows "Windows protected your PC": click
   **More info → Run anyway**. The Store package is the signed path if you would rather not.
 - It installs per-user under `%LOCALAPPDATA%\626Labs.Sanduhr` and checks the release feed for
   updates; new versions install themselves within about a day of publishing.
-- `626Labs.Sanduhr-win-Portable.zip` on the same release page is the no-install flavor.
+- `626Labs.Sanduhr-win-Portable.zip` (x64) and `626Labs.Sanduhr-win-arm64-Portable.zip` (Arm) on
+  the same release page are the no-install flavor.
+
+**An Arm PC that already has the x64 build.** Sanduhr installed before 5.0 on an Arm PC is the x64
+build, which Windows runs through emulation, and it keeps updating as x64. To move to the native
+build, run `626Labs.Sanduhr-win-arm64-Setup.exe` once. It replaces the x64 build where it is; your
+settings, history and sign-in stay. From 5.0 the x64 build says so once, and Settings → About →
+Updates carries the same link.
 
 ### Sideloading the `.msix`
 
-The `Sanduhr-Store-v<version>.msix` attached to a GitHub Release is the **unsigned** package that
-gets uploaded to Partner Center; the Store signs it on ingestion. Windows will not install it as
-is. Use the Store or the Setup.exe. (Developers: `windows-dotnet/scripts/build-msix.ps1 -Sideload`
+The `Sanduhr-Store-x64-v<version>.msix` and `Sanduhr-Store-arm64-v<version>.msix` files attached to a GitHub Release are the **unsigned** packages that
+get uploaded to Partner Center; the Store signs them on ingestion. Windows will not install them as they
+are. Use the Store or the Setup.exe. (Developers: `windows-dotnet/scripts/build-msix.ps1 -Sideload`
 builds a self-signed flavor for local testing; see `docs/release-runbook.md`.)
 
 ## First run: sign in

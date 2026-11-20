@@ -62,9 +62,9 @@ and drag to Applications.
 
 **Via the Microsoft Store** (recommended): search **Sanduhr für Claude** (publisher 626Labs LLC) and install. Store-signed, no SmartScreen prompt, updates arrive through the Store.
 
-**Via GitHub Release**: download **`626Labs.Sanduhr-win-Setup.exe`** from [Releases][releases], click through SmartScreen ("More info → Run anyway"; the installer is unsigned, the Store package is the signed path), and run it. Installs per-user and updates itself from the release feed. A portable zip sits on the same page.
+**Via GitHub Release**: download **`626Labs.Sanduhr-win-Setup.exe`** (x64) or **`626Labs.Sanduhr-win-arm64-Setup.exe`** (Arm PCs, from 5.0) from [Releases][releases], click through SmartScreen ("More info → Run anyway"; the installer is unsigned, the Store package is the signed path), and run it. Installs per-user and updates itself from the release feed. A portable zip sits on the same page.
 
-- Win11 Mica glass backdrop (Win10 falls back to solid theme color). Windows 10 1809+ / x64.
+- Win11 Mica glass backdrop (Win10 falls back to solid theme color). Windows 10 1809+ on x64, or on Arm64 from 5.0.
 - Windows Credential Manager storage (service `com.626labs.sanduhr`). Uninstall does not clear these entries on either channel — use Sign Out first, or delete them from Credential Manager yourself.
 - Full source under [`windows-dotnet/`](windows-dotnet/). The retired Python apps (tkinter v1 and the PySide6 build) were removed on 2026-09-13; they live at tag `legacy/python-v2.3.0`.
 - Step-by-step sign-in, where your data lives, the `.msix` sideload note, and uninstall behaviour: [INSTALL.md](INSTALL.md).
