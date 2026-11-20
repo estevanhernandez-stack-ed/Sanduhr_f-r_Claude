@@ -68,6 +68,7 @@ enum DeskDesignApply {
             if let s = p.size { arr.setScale(p.piece, s) }
             if let t = p.tilt { arr.setTilt(p.piece, t) }
             if let st = p.style { arr.setStyle(p.piece, st) }
+            if let src = p.source { arr.setSource(p.piece, src) }
         }
         return arr
     }
@@ -217,12 +218,16 @@ enum DeskDesignApply {
                 if DeskMeterStyles.supports(key), style != a.arrangement.style(of: key) {
                     lines.append("\(name): \(DeskMeterStyles.word(style))")
                 }
+                if DeskMeterSources.supports(key), now.source != was.source {
+                    lines.append("\(name): shows \(DeskMeterSources.name(now.source))")
+                }
             } else {
                 var line = "\(name): shown at \(now.anchor.name.lowercased())"
                 if abs(now.scale - 1) > 1e-9 { line += ", size \(percent(now.scale))" }
                 if !sameDisplay(now.monitor, .main, screens: screens) { line += ", on \(displayName(now.monitor, screens: screens))" }
                 if tilt != 0 { line += ", slanted \(degrees(tilt))" }
                 if DeskMeterStyles.supports(key), style != .bar { line += ", \(DeskMeterStyles.word(style))" }
+                if DeskMeterSources.supports(key), now.source != .combined { line += ", shows \(DeskMeterSources.name(now.source))" }
                 lines.append(line)
             }
         }

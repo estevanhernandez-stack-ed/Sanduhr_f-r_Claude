@@ -23,6 +23,7 @@ struct DeskStyledGauges: View {
             HStack(alignment: .top, spacing: size * 0.6) {
                 ForEach(gauges) { g in
                     DeskRingGauge(gauge: g, ink: ink, font: font, size: size)
+                        .sourceStale(g.stale)
                         .reporting(g.tier, report)
                 }
             }
@@ -30,6 +31,7 @@ struct DeskStyledGauges: View {
             VStack(alignment: alignment, spacing: size * 0.4) {
                 ForEach(gauges) { g in
                     row(g)
+                        .sourceStale(g.stale)
                         .reporting(g.tier, report)
                 }
             }
@@ -109,9 +111,7 @@ struct DeskSlimGauge: View {
         let fill = DeskMeterStyleModel.slimFillWidth(gauge.fill, width: Double(width))
         return ZStack(alignment: .leading) {
             Capsule().fill(LinearGradient.ink(ink)).opacity(0.22).frame(height: barH)
-            Capsule().fill(gauge.warning ? AnyShapeStyle(meterWarningRed) : AnyShapeStyle(LinearGradient.ink(ink)))
-                .frame(width: fill, height: barH)
-                .background { glow(barH) }
+            slimFill(fill, barH: barH, markH: markH)
             if let pace = gauge.pace {
                 Rectangle().fill(LinearGradient.ink(ink))
                     .frame(width: 2, height: markH)
@@ -120,8 +120,20 @@ struct DeskSlimGauge: View {
         }
         .frame(width: width, height: markH)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(gauge.label)
-        .accessibilityValue(MeterWarning.spokenValue(percent: gauge.percent, warning: gauge.warning))
+        .accessibilityLabel(gauge.layout?.accessibleName ?? gauge.label)
+        .accessibilityValue(gauge.layout == nil ? MeterWarning.spokenValue(percent: gauge.percent, warning: gauge.warning) : "")
+    }
+
+    /// The fill: the one usage fill, or a reading two sources share drawn as their two-tone fill and ticks.
+    @ViewBuilder
+    private func slimFill(_ fill: CGFloat, barH: CGFloat, markH: CGFloat) -> some View {
+        if let layout = gauge.layout {
+            DeskSourceBarFill(layout: layout, width: width, height: barH, tickHeight: markH)
+        } else {
+            Capsule().fill(gauge.warning ? AnyShapeStyle(meterWarningRed) : AnyShapeStyle(LinearGradient.ink(ink)))
+                .frame(width: fill, height: barH)
+                .background { glow(barH) }
+        }
     }
 
     @ViewBuilder
@@ -155,7 +167,33 @@ struct DeskTicksGauge: View {
         .frame(width: width)
     }
 
+    /// The cells: lit in the ink as ever, or in the source colors for a reading two sources share.
+    @ViewBuilder
     private var cells: some View {
+        if let layout = gauge.layout { sourceCells(layout) } else { inkCells }
+    }
+
+    private func sourceCells(_ layout: SourceBarLayout) -> some View {
+        let n = DeskMeterStyleModel.ticks
+        let gap = max(2, (size * 0.16).rounded())
+        let cw = (width - CGFloat(n - 1) * gap) / CGFloat(n)
+        let ch = max(4, (size * 0.42).rounded())
+        let over: CGFloat = gauge.pace == nil ? 0 : max(2, (size * 0.18).rounded())
+        return ZStack(alignment: .topLeading) {
+            DeskSourceCells(layout: layout, ink: ink, width: width, cellWidth: cw, cellHeight: ch, gap: gap, over: over,
+                            radius: min(cw, ch) * 0.2)
+            if let pace = gauge.pace {
+                Rectangle().fill(LinearGradient.ink(ink))
+                    .frame(width: 2, height: ch + 2 * over)
+                    .offset(x: DeskMeterStyleModel.markOffset(pace, width: Double(width)))
+            }
+        }
+        .frame(width: width, height: ch + 2 * over, alignment: .topLeading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(layout.accessibleName)
+    }
+
+    private var inkCells: some View {
         let n = DeskMeterStyleModel.ticks
         let gap = max(2, (size * 0.16).rounded())
         let cw = (width - CGFloat(n - 1) * gap) / CGFloat(n)
@@ -223,8 +261,8 @@ struct DeskRingGauge: View {
                 .padding(.top, -size * 0.3)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(gauge.label)
-        .accessibilityValue(MeterWarning.spokenValue(percent: gauge.percent, warning: gauge.warning))
+        .accessibilityLabel(gauge.layout?.accessibleName ?? gauge.label)
+        .accessibilityValue(gauge.layout == nil ? MeterWarning.spokenValue(percent: gauge.percent, warning: gauge.warning) : "")
     }
 
     private func face(_ d: CGFloat) -> some View {
@@ -236,7 +274,9 @@ struct DeskRingGauge: View {
                 .stroke(LinearGradient.ink(ink), style: StrokeStyle(lineWidth: t, lineCap: .round))
                 .opacity(0.22)
                 .rotationEffect(.degrees(DeskMeterStyleModel.ringStart))
-            if trim > 0 {
+            if let layout = gauge.layout {
+                DeskSourceRingArcs(layout: layout, diameter: d, thickness: t)
+            } else if trim > 0 {
                 Circle().inset(by: t).trim(from: 0, to: trim)
                     .stroke(arcStyle, style: StrokeStyle(lineWidth: t, lineCap: .round))
                     .rotationEffect(.degrees(DeskMeterStyleModel.ringStart))

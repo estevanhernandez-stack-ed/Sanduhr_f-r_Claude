@@ -76,7 +76,7 @@ struct DeskUsage {
 struct DeskMeterRow: Identifiable, Equatable {
     let tier: Tier
     /// The widget's label for the tier ("Session (5hr)").
-    let label: String
+    var label: String
     /// Utilization as the widget prints it; can pass 100.
     let percent: Int
     /// How much of the bar to fill, 0 to 1. Clamped, so a limit over 100% fills the bar and stops.
@@ -87,6 +87,11 @@ struct DeskMeterRow: Identifiable, Equatable {
     let reset: String
     /// Nearly full with the reset still far away (MeterWarning): the bar draws red with an ink glow.
     var warning = false
+    /// A row two sources share (a combined piece): the two-tone fill and ticks to draw in place of the one
+    /// fill. Nil for every Claude-only row, which draws as it always has.
+    var layout: SourceBarLayout? = nil
+    /// The number can't be trusted now (a Codex window that is not fresh): the row draws dimmed.
+    var stale = false
 
     var id: String { tier.rawValue }
 

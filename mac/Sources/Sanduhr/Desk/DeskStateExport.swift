@@ -59,6 +59,7 @@ enum DeskStateExport {
                                         "tilt": Int(arrangement.tilt(of: widget) ?? 0),
                                         "monitor": DeskDesign.monitorJson(p.monitor)]
             if DeskMeterStyles.supports(widget) { piece["style"] = DeskMeterStyles.word(arrangement.style(of: widget)) }
+            if DeskMeterSources.supports(widget) { piece["source"] = arrangement.source(of: widget).rawValue }
             layout[widget] = piece
         }
         let desk = DeskFont.resolve(saved: d.string(forKey: "font"), available: fontAvailable)
@@ -93,6 +94,8 @@ enum DeskStateExport {
                 "piece_tilt": ["min": Int(DeskArrangement.tiltRange.lowerBound), "max": Int(DeskArrangement.tiltRange.upperBound)],
                 "piece_style": ["pieces": DeskMeterStyles.pieces, "values": DeskMeterStyle.allCases.map(\.rawValue),
                                 "default": DeskMeterStyles.word(.bar)],
+                "piece_source": ["pieces": DeskMeterSources.pieces, "values": DeskMeterSource.allCases.map(\.rawValue),
+                                 "default": DeskMeterSource.combined.rawValue],
             ] as [String: Any],
         ]
         return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()

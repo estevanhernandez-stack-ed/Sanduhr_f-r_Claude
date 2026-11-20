@@ -111,6 +111,7 @@ private struct DeskArrangeable: ViewModifier {
         HStack(spacing: 4) {
             Text(name)
             if showsShowOn { DeskArrangeShowOnMenu(mode: mode, placement: placement, window: windowKey) }
+            if showsShows { DeskArrangeShowsMenu(mode: mode, placement: placement) }
             Button { mode.edit { $0.hide(widget) } } label: {
                 Image(systemName: "xmark.circle.fill")
             }
@@ -165,6 +166,11 @@ private struct DeskArrangeable: ViewModifier {
         }
     }
 
+    /// Shows in the chrome: the Claude line and limits, while Codex is on.
+    private var showsShows: Bool {
+        DeskMeterSources.offers(widget, codexOn: DeskMeterSourceSettings.codexOn())
+    }
+
     /// Show on in the chrome: offered with more than one display, never for the companion.
     private var showsShowOn: Bool {
         DeskArrange.offersShowOn(widget, offered: mode.offersShowOn)
@@ -190,10 +196,43 @@ private struct DeskArrangeable: ViewModifier {
         Button("Bigger") { mode.edit { $0.setScale(widget, placement.scale + DeskArrangement.scaleStep) } }
         Button("Smaller") { mode.edit { $0.setScale(widget, placement.scale - DeskArrangement.scaleStep) } }
         Button(DeskArrangeCopy.hide) { mode.edit { $0.hide(widget) } }
+        if showsShows {
+            ForEach(DeskMeterSource.allCases, id: \.self) { s in
+                Button("\(DeskMeterSources.title) \(DeskMeterSources.name(s))") { mode.edit { $0.setSource(widget, s) } }
+            }
+        }
         if showsShowOn {
             Button("\(DeskArrangeCopy.showOn) \(DeskArrangeCopy.showOnThis)") { mode.showOn(widget, all: false, window: windowKey) }
             Button("\(DeskArrangeCopy.showOn) \(DeskArrangeCopy.showOnAll)") { mode.showOn(widget, all: true, window: windowKey) }
         }
+    }
+}
+
+/// Shows, in a usage piece's name tag (2.46): Combined, Claude or Codex, the one in force checked. Offered
+/// only while Codex is on; the pieces redraw as the choice is made, and Done writes it.
+private struct DeskArrangeShowsMenu: View {
+    let mode: DeskArrangeMode
+    let placement: DeskPlacement
+
+    var body: some View {
+        Menu {
+            ForEach(DeskMeterSource.allCases, id: \.self) { source in
+                Toggle(DeskMeterSources.name(source), isOn: choice(source))
+            }
+        } label: {
+            Image(systemName: "circle.lefthalf.filled")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(DeskMeterSources.title)
+        .accessibilityLabel(DeskMeterSources.title)
+    }
+
+    private func choice(_ source: DeskMeterSource) -> Binding<Bool> {
+        Binding(get: { placement.source == source }, set: { picked in
+            if picked { mode.edit { $0.setSource(placement.widget, source) } }
+        })
     }
 }
 

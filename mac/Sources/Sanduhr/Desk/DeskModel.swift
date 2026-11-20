@@ -190,6 +190,16 @@ final class DeskModel {
         }
         return SetupDesk.visible(arrangement, desktop: desktopOn)
     }
+    /// What the Desk is told about Codex and Primary (2.46); `claudeOnly` on a Mac with only Claude on,
+    /// where every piece draws exactly as before there were sources. Set by `updateSources`.
+    private(set) var sourceInput = DeskSourceInput.claudeOnly
+    /// A piece set to Codex: its rows, gauges, line and staleness. Empty while Codex is off.
+    private(set) var codexView = DeskSourceView()
+    /// A combined piece with two sources: Claude's rows with the shared windows joined. Empty with one source.
+    private(set) var combinedView = DeskSourceView()
+    /// Claude has numbers, or a sign-in line to draw (`DeskSourceRows.resolve`).
+    private var claudePresent = false
+    private var claudeNumbers = false
     /// The Claude meters, short enough for the notch: "5h 7%  wk 63%".
     var claudeCompact: String?
     /// The `claude` piece's compact two-row form (slim style), nil when there is nothing to say.
@@ -691,6 +701,48 @@ final class DeskModel {
         let gauges = DeskMeterStyleModel.claudeGauges(Self.claudeRows(usage.usage, now: now), signInNeeded: usage.signInNeeded)
         if gauges != claudeGauges { claudeGauges = gauges }
         claudeLineIsStale = usage.isStale(now: now)
+        refreshSources(usage, now: now)
+    }
+
+    /// The sources the Desk was handed changed (Codex on or off, its reading, Primary, a color).
+    func updateSources(_ input: DeskSourceInput, now: Date = Date()) {
+        guard input != sourceInput else { return }
+        sourceInput = input
+        refreshClaude(now: now)
+    }
+
+    /// What a piece set to `source` draws now (`DeskSourceRows.resolve`): `.claude` is today's piece, for
+    /// every piece on a Mac with only Claude on.
+    func drawn(_ source: DeskMeterSource) -> DeskMeterSource {
+        DeskSourceRows.resolve(source, input: sourceInput, claudePresent: claudePresent, claudeNumbers: claudeNumbers)
+    }
+
+    /// The view of a source other than Claude's own (which the pieces read from the properties above).
+    func sourceView(_ drawn: DeskMeterSource) -> DeskSourceView {
+        switch drawn {
+        case .codex: return codexView
+        case .combined: return combinedView
+        case .claude: return DeskSourceView()
+        }
+    }
+
+    /// Rebuilds the Codex and combined views from the last numbers; with Codex off they are empty, so a
+    /// Claude-only Mac does no extra work and sets nothing.
+    private func refreshSources(_ usage: DeskUsage, now: Date) {
+        let numbers = !usage.signInNeeded && (usage.usage?.tiers.values.contains { $0.utilization != nil } ?? false)
+        if claudeNumbers != numbers { claudeNumbers = numbers }
+        let present = numbers || usage.signInNeeded
+        if claudePresent != present { claudePresent = present }
+        guard sourceInput.codexOn else {
+            if codexView != DeskSourceView() { codexView = DeskSourceView() }
+            if combinedView != DeskSourceView() { combinedView = DeskSourceView() }
+            return
+        }
+        let codex = DeskSourceRows.codexView(sourceInput, now: now)
+        if codex != codexView { codexView = codex }
+        let combined = DeskSourceRows.combinedView(meters: meters, all: Self.claudeRows(usage.usage, now: now),
+                                                   claudeUsage: usage.usage, input: sourceInput, now: now)
+        if combined != combinedView { combinedView = combined }
     }
 
     /// Settings' "Show this limit" switch: hiding records what the limit reads now

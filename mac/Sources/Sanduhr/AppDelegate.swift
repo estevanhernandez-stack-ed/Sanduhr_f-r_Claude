@@ -130,12 +130,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // never starts the service, so neither callback ever runs there.
         codexUsage.onUpdate = { [weak self] in
             self?.codexRecorder.record($0)
+            self?.syncDeskSources()
             self?.fitPanelToContent()
             self?.renderStatusItem()   // the menu bar follows Primary, so a Codex reading can change it
         }
         codexUsage.onStop = { [weak self] in
             let on = AgentSourceSettings.load().isOn(.codex, setup: SetupStore.load())
             self?.codexRecorder.stopped(codexOn: on)
+            self?.syncDeskSources()
             self?.fitPanelToContent()
             self?.renderStatusItem()
         }
@@ -278,6 +280,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         widgetSources.reload()
         codexUsage.update(on: CodexUsageService.wants(
             setup: SetupStore.load(), sources: AgentSourceSettings.load(), demo: viewModel.demo))
+        syncDeskSources()
+    }
+
+    /// Tells the Desk which sources are on and what Codex read, so its Claude pieces can show Codex or both.
+    /// A Mac with only Claude on hands it `claudeOnly`, which changes nothing the pieces draw.
+    private func syncDeskSources() {
+        let reading = CodexWidgetReading(usage: codexUsage.codexUsage, asOf: codexUsage.asOf,
+                                         freshTiers: codexUsage.freshTiers, emptyState: codexUsage.emptyState)
+        DeskController.shared.model.updateSources(DeskSourceInput.make(
+            setup: SetupStore.load(), sources: AgentSourceSettings.load(), codex: reading,
+            demo: viewModel.demo, now: Date()))
     }
 
     /// Claude usage as the last update saw it, to tell a switch from an ordinary refresh.

@@ -30,9 +30,9 @@ tools the same way on either machine:
   propose_config             hands agents, skills, commands, output styles, settings keys and MCP
                              servers for one Claude Code folder to Sanduhr, which opens them for the
                              user to import or dismiss, under the same switch
-  get_desk                   the Desk as it is: layout words with tilt and style, ink, plate, shadow, font,
+  get_desk                   the Desk as it is: layout words with tilt, style and source, ink, plate, shadow, font,
                              the pieces shown, and the limits a design must keep (from desk-state.json)
-  propose_desk               suggests a whole Desk design (layout, tilt, style, font, ink, plate, shadow);
+  propose_desk               suggests a whole Desk design (layout, tilt, style, source, font, ink, plate, shadow);
                              checked here with the app's own rules, then previewed in Settings, Desk and
                              applied only when the user presses Apply (no switch lets Claude skip that)
   propose_widget             builds a sprite, palette or effects pack from data (no PNG, no font),
@@ -418,6 +418,7 @@ DESIGN_GUIDE_READ = (
     "layout with every piece's anchor, size, hidden, monitor (\"main\", \"all\" or a display id) and tilt (the slant "
     "of its stack in degrees, 0 upright), and "
     "for claude, meters and telemetry its style (bar, slim, ring or ticks; limits.piece_style lists the pieces and "
+    "the words), for claude and meters its source (combined, claude or codex; limits.piece_source lists the pieces and "
     "the words), weather.nickname (the name the weather piece shows instead of the place's, \"\" for the place's own), "
     "font, ink, plate, shadow), pieces and anchors (the allowed words), monitors (each display: id, name, width, "
     "height, primary, left, top; the Desk places pieces per display), fonts (installed families, and the "
@@ -445,7 +446,10 @@ DESIGN_GUIDE_PROPOSE = (
     "(the default, a full-width bar with its label above), slim (label and value on one line over a thin bar, about "
     "half the height; claude becomes a compact two-row line), ring (small arc gauges with the value inside, side by "
     "side in a row), ticks (ten segmented cells, the OLED-friendly one); a Claude limit keeps its pace mark in every "
-    "style; font (a family from get_desk fonts.installed or the bundled EsteFont Pro or EsteFont 26, or {family, "
+    "style; source in a layout piece, only on claude and meters, is which agent the piece shows once the user has "
+    "turned Codex on: combined (the default, every source that is on in one two-tone bar), claude or codex (that "
+    "source's own limits); a design that names no source leaves each piece's own, and with only Claude on every "
+    "piece draws as it always has; font (a family from get_desk fonts.installed or the bundled EsteFont Pro or EsteFont 26, or {family, "
     "link} with an https link to get a font the user lacks: Sanduhr never downloads it, the review shows the link "
     "and Apply waits for the font, status needs_font); ink (one #rrggbb, or a list of 2 to 4 #rrggbb for a "
     "left-to-right gradient); plate and shadow (true or false; the plate is a soft panel behind each stack of "
@@ -828,7 +832,7 @@ TOOLS += [
                         "name": {"type": "string", "maxLength": 40},
                         "note": {"type": "string", "maxLength": 200},
                         "layout": {"type": "object",
-                                   "description": "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean, monitor: main|all|a display id from get_desk monitors, tilt: -20 to 20 degrees, the slant of the piece's whole stack, style: bar|slim|ring|ticks, only on claude, meters and telemetry}."},
+                                   "description": "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean, monitor: main|all|a display id from get_desk monitors, tilt: -20 to 20 degrees, the slant of the piece's whole stack, style: bar|slim|ring|ticks, only on claude, meters and telemetry, source: combined|claude|codex, only on claude and meters}."},
                         "weather": {"type": "object",
                                     "description": "{nickname: up to 24 characters}: the name the weather piece shows instead of the place's own; \"\" goes back to the place's name. Local only; the forecast keeps the city's coordinates.",
                                     "properties": {"nickname": {"type": "string", "maxLength": 24}},
@@ -3902,6 +3906,9 @@ DESIGN_PIECES = ("message", "clock", "claude", "meters", "nowPlaying", "telemetr
 DESIGN_ANCHORS = ("tl", "tc", "tr", "ml", "mr", "bl", "bc", "br")
 DESIGN_STYLE_PIECES = ("claude", "meters", "telemetry")
 DESIGN_STYLES = ("bar", "slim", "ring", "ticks")
+# Which source a usage piece draws (2.46, agent sources): the Claude line and the Claude limits, as Windows' DeskSources.
+DESIGN_SOURCE_PIECES = ("claude", "meters")
+DESIGN_SOURCES = ("combined", "claude", "codex")
 DESIGN_MIN_SCALE = 0.6
 DESIGN_MAX_SCALE = 1.6
 DESIGN_SCALE_STEP = 0.1
@@ -4061,7 +4068,7 @@ def design_parse_layout(node, reasons, monitors=None, current=None):
     if node is None:
         return None
     if not isinstance(node, dict):
-        reasons.append(design_reason("layout", "must be an object of piece name to {anchor, size, hidden, monitor, tilt, style}"))
+        reasons.append(design_reason("layout", "must be an object of piece name to {anchor, size, hidden, monitor, tilt, style, source}"))
         return None
     if len(node) > DESIGN_MAX_PIECES:
         reasons.append(design_reason("layout", "names %d pieces; the Desk has %d" % (len(node), len(DESIGN_PIECES))))
@@ -4077,10 +4084,10 @@ def design_parse_layout(node, reasons, monitors=None, current=None):
                 reasons.append(design_reason(field, "is not a Desk piece; the pieces are " + ", ".join(DESIGN_PIECES)))
             continue
         if not isinstance(value, dict):
-            reasons.append(design_reason(field, "must be an object with anchor, size, hidden, monitor, tilt and style"))
+            reasons.append(design_reason(field, "must be an object with anchor, size, hidden, monitor, tilt, style and source"))
             continue
-        for bad in sorted((k for k in value if k not in ("anchor", "size", "hidden", "monitor", "tilt", "style")), key=u16)[:3]:
-            reasons.append(design_reason(field, "unknown member '%s'; use anchor, size, hidden, monitor, tilt and style" % design_clip(bad, 20)))
+        for bad in sorted((k for k in value if k not in ("anchor", "size", "hidden", "monitor", "tilt", "style", "source")), key=u16)[:3]:
+            reasons.append(design_reason(field, "unknown member '%s'; use anchor, size, hidden, monitor, tilt, style and source" % design_clip(bad, 20)))
         anchor = None
         if value.get("anchor") is not None:
             word = design_str(value["anchor"])
@@ -4124,10 +4131,21 @@ def design_parse_layout(node, reasons, monitors=None, current=None):
                     style = word.strip().lower()
                 else:
                     reasons.append(design_reason(field + ".style", "must be one of " + ", ".join(DESIGN_STYLES)))
+        source = None
+        if value.get("source") is not None:
+            # A source only on a piece that takes one: a clock with a source is a mistake, not a no-op.
+            if key not in DESIGN_SOURCE_PIECES:
+                reasons.append(design_reason(field + ".source", "only " + ", ".join(DESIGN_SOURCE_PIECES) + " take a source"))
+            else:
+                word = design_str(value["source"])
+                if word is not None and word.strip().lower() in DESIGN_SOURCES:
+                    source = word.strip().lower()
+                else:
+                    reasons.append(design_reason(field + ".source", "must be one of " + ", ".join(DESIGN_SOURCES)))
         if hidden is True:
-            anchor = size = tilt = style = monitor = None
+            anchor = size = tilt = style = monitor = source = None
         pieces.append({"piece": key, "anchor": anchor, "size": size, "hidden": hidden, "tilt": tilt, "style": style,
-                       "monitor": monitor})
+                       "monitor": monitor, "source": source})
     # One slant per stack: two pieces sent to the same anchor of one display with different tilts cannot both be
     # honored. A piece that names no monitor keeps the display it is on now.
     groups = {}
@@ -4323,6 +4341,8 @@ def design_to_json(d):
                 po["style"] = p["style"]
             if p.get("monitor") is not None:
                 po["monitor"] = p["monitor"]
+            if p.get("source") is not None:
+                po["source"] = p["source"]
             lo[p["piece"]] = po
         o["layout"] = lo
     if d.get("weather_nickname") is not None:

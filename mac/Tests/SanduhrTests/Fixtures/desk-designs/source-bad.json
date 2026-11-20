@@ -1,0 +1,14 @@
+{
+  "layout": {
+    "clock": {
+      "anchor": "bl",
+      "source": "codex"
+    },
+    "meters": {
+      "source": "gpt"
+    },
+    "claude": {
+      "source": true
+    }
+  }
+}
