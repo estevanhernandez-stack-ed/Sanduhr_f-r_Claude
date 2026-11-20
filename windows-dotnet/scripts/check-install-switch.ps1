@@ -95,12 +95,21 @@ function Install-Setup {
 
 function Start-Running {
     # The installed app, started the way smoke-launch.ps1 starts it, and left running: the state the notice finds.
+    # Sanduhr is single-instance: a copy started while the last launch check's copy is still going hands off to
+    # it and exits with code 0. So wait until no Sanduhr is left before starting this one.
+    Stop-Sanduhr
+    $deadline = (Get-Date).AddSeconds(30)
+    while (@(Get-Process -Name Sanduhr -ErrorAction SilentlyContinue).Count -gt 0 -and ((Get-Date) -lt $deadline)) { [System.Threading.Thread]::Sleep(500) }
+    if (@(Get-Process -Name Sanduhr -ErrorAction SilentlyContinue).Count -gt 0) { throw 'A Sanduhr was still running 30 seconds after it was stopped.' }
     $p = Start-Process -FilePath $exe -ArgumentList '--demo' -PassThru
     $null = $p.Handle
     $deadline = (Get-Date).AddSeconds(60)
     while ((Get-Date) -lt $deadline) {
         $p.Refresh()
-        if ($p.HasExited) { throw "The installed app exited during startup (code $($p.ExitCode))." }
+        if ($p.HasExited) {
+            $others = @(Get-Process -Name Sanduhr -ErrorAction SilentlyContinue | ForEach-Object { $_.Id }) -join ', '
+            throw "The installed app exited during startup (code $($p.ExitCode); other Sanduhr processes: '$others')."
+        }
         if ($p.MainWindowHandle -ne [System.IntPtr]::Zero) { break }
         [System.Threading.Thread]::Sleep(500)
     }
