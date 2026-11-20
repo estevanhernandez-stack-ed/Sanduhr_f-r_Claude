@@ -43,6 +43,40 @@ public class ReleaseScriptPinsTests
         => Assert.Contains(Code(Script("build-msix.ps1")), l => l.Contains("check-architecture.ps1", StringComparison.Ordinal));
 
     [Fact]
+    public void Velopack_script_accepts_exactly_the_two_runtimes()
+        => Assert.Contains(Code(Script("build-velopack-release.ps1")), l => l.Trim() == "[ValidateSet('win-x64', 'win-arm64')]");
+
+    [Fact]
+    public void Velopack_script_names_a_runtime_and_a_channel_only_for_arm64()
+    {
+        // x64 must pack exactly as it always has: no --channel (it stays on Velopack's default, "win") and no --runtime.
+        var code = Code(Script("build-velopack-release.ps1"));
+        const string armOnly = "if ($Runtime -eq 'win-arm64') { $vpkArgs += @('--runtime', 'win-arm64', '--channel', 'win-arm64') }";
+        var channel = Assert.Single(code, l => l.Contains("--channel", StringComparison.Ordinal));
+        Assert.Equal(armOnly, channel.Trim());
+        var runtime = Assert.Single(code, l => l.Contains("'--runtime'", StringComparison.Ordinal));
+        Assert.Equal(armOnly, runtime.Trim());
+    }
+
+    [Fact]
+    public void Velopack_script_runs_the_architecture_gate()
+        => Assert.Contains(Code(Script("build-velopack-release.ps1")), l => l.Contains("check-architecture.ps1", StringComparison.Ordinal));
+
+    [Fact]
+    public void The_pack_id_is_frozen()
+        => Assert.Contains(Code(Script("build-velopack-release.ps1")), l => l.Contains("'--packId',", StringComparison.Ordinal) && l.Contains("'626Labs.Sanduhr'", StringComparison.Ordinal));
+
+    [Fact]
+    public void The_update_checker_names_no_channel()
+    {
+        // An install follows the channel it was packaged with. Naming one here would move every install to it.
+        var text = File.ReadAllText(Path.Combine(Root(), "src", "Sanduhr.App", "Updates", "UpdateChecker.cs"));
+        Assert.Contains("new UpdateManager(source)", text);
+        Assert.DoesNotContain("ExplicitChannel", text);
+        Assert.DoesNotContain("UpdateOptions", text);
+    }
+
+    [Fact]
     public void The_committed_manifest_stays_x64()
     {
         var manifest = XDocument.Load(Path.Combine(Root(), "src", "Sanduhr.App", "Package.appxmanifest"));
