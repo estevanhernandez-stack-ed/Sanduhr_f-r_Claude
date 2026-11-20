@@ -853,6 +853,97 @@ folders: each sharing level, no access file, hidden names, and the Windows MCP t
 two lints share `mac/Tests/SanduhrTests/Fixtures/theme-builtins.json`, the built-ins they must pass
 clean.
 
+## Agent sources (2.46.0)
+
+Codex's limits sit beside Claude's, and Codex and the Antigravity CLI count in the Vault beside Claude Code. It is
+two Windows releases in one (4.8 limits, 4.9 activity); `docs/superpowers/specs/2026-11-19-mac-agent-sources-design.md`
+records what the Mac does differently, and the run's decisions are in `docs/cart-runs/2026-11-20-mac-agent-sources-2-46/decisions.md`.
+`AgentSource` (`claude`, `codex`, `antigravity`; not `UsageSource`, which is the Claude Code activity source) names them.
+Antigravity has no limits, so it is never a widget section, a Primary or a Desk meter.
+
+### Sources (Settings, Usage)
+
+A **Sources** group tops Settings ▸ Usage: a row per source with its switch, a color and, for Claude and Codex, Primary.
+Claude's and Codex's switches are the setup's `usage` entry (`SetupSettings.usage`, keys `claude` and `codex`), the same
+entry Set up Sanduhr's Continue writes, and they go through `SetupService.apply`, so turning Claude off has the
+consequences and lines it has in setup. Antigravity's "Activity only" switch is its own key, `sources.antigravity.on`
+(off by default). Colors (`sources.<id>.color`, `#RRGGBB`; Claude `#E0875A`, Codex `#2FB5A3`, Antigravity `#7B8CF0`)
+and Primary (`sources.primary`) sit in the same domain. `SourceContrastTests` holds each default at 3:1 or better
+against every built-in theme's glass and bar track. A Mac with only Claude on writes `{claude: Bool}` as in 2.45.0.
+A Sources change posts `sanduhrSourcesDidChange`: the widget and menu bar redraw and the Vault ingests, so a Mac with only
+Antigravity on doesn't wait for a launch.
+
+### Codex limits
+
+`CodexUsageService` polls every 30 seconds while Codex is on (no FSEvents stream; the reader tails the newest files, and
+a cache keyed by file size and modification time means an unchanged `.jsonl.zst` is not decompressed again).
+
+- **Where it reads.** `~/.codex/sessions/**/rollout-*.jsonl` and `rollout-*.jsonl.zst`, and `$CODEX_HOME/sessions` only when
+  the app's own environment has `CODEX_HOME` (an app opened from the Dock doesn't see a shell's export, so the row says
+  "Reads ~/.codex"). Nothing outside `sessions/` is opened, never `auth.json`, and there is no network call: a test
+  counts every file the reader opens. A `token_count` event gives the percents, window lengths, reset times, the plan name
+  and the event's timestamp; nothing else on the line is kept.
+- **Which reading wins.** The newest 20 rollouts by modification time plus the newest 20 by the session stamp in their
+  names are read, and the newest event inside them wins: Codex rewrites old rollouts when it compresses them, so
+  modification time alone picks wrong. Plain files are read from their end in doubling chunks (64 KB up to a 4 MB tail);
+  a compressed one is decompressed under a cap and its last 4 MB searched.
+- **Windows by length.** 300 minutes is the 5-hour tier and 10080 the weekly; any other length is dropped and logged once.
+  `UsageResponse` is reused, so `UsageMath` and the pace marker work unchanged.
+- **Freshness.** A reading is fresh for 30 minutes after its `as_of`; each tier is fresh or stale on its own, and a tier
+  whose reset has passed reads 0% and counts as fresh. A stale limit dims, keeps its countdown and draws no pace or burn,
+  and never alerts.
+- **Primary and combined bars.** Primary (Claude by default) is the source the menu bar and the combined bars' fill follow;
+  a source that is off can't lead. With two sources on, two combined bars (5-hour, weekly) draw `SourceBar`'s two-tone
+  layout (the primary's fill, a tick where the other is) with no warning glow, breath or pace tick, then a section per
+  source with a header (name, color, Codex's "as of"); Codex's cards leave out Claude's limit menu, local burn and sparkline.
+  A lone Claude section has no header, and one source on draws today's widget exactly. Compact keeps the primary's
+  highest card. The menu bar's tooltip appears only when the other source is further out or a Codex primary is stale.
+- **Desk meters.** A meter piece's source is a `src=` field of the layout word (`Combined` writes nothing, so every older
+  word round-trips); only `claude` and `meters` take one. A Codex meter never pulses.
+- **Alerts.** Per source, on `codex|tier|resets_at|kind` once-keys; Codex alerts are off by default and arrive as banners.
+- **Files.** `history.@codex.json` (HistoryStore, the reserved `@codex` account; 30 days) and `snapshot.codex.json` beside
+  `snapshot.json`, same schema with `source: "codex"` and no `account_ref`. The snapshot goes when Codex is turned off or a
+  reading comes back empty. `sanduhr_statusline.py` appends `cx 5h 40% wk 12%` while it is under 30 minutes old, and
+  `sanduhr_mcp.py` (0.6.0-mac) adds a `codex` block to `get_usage` (`status`, `stale`, `as_of`, `age_seconds`, `plan`,
+  `tiers`) when it reads; a test checks the MCP and the statusline import no network module.
+- **Demo mode** shows a sample Codex section when Codex is on and never reads `~/.codex`.
+
+### Agent burn (Codex and the Antigravity CLI in the Vault)
+
+`vault/codex` and `vault/antigravity` are agent roots beside the account folders. They are not accounts: there is no Keep a
+record choice, they ingest while their source is on (the Codex poll triggers an ingest at most every five minutes, and a
+Sources change triggers one), and `VaultRootMeta` carries `agent` (absent means Claude, so Claude roots write exactly what
+2.45.0 wrote and an old checkpoint re-encodes byte for byte). A checkpoint may carry a parser state (the Codex model and last
+total) so a grown rollout resumes.
+
+- **Codex.** One rollout is one session, keyed by its file name without `.jsonl` or `.jsonl.zst`, so a rollout Codex compresses
+  later replaces its row. It reads timestamps, segment boundaries, model names, token counts and the working folder, which it
+  turns into a project name through `CCProjectName.displayName` and keeps; the folder path is never stored.
+- **Antigravity CLI.** Each `~/.gemini/antigravity-cli/brain/<conversation id>/.system_generated/logs/transcript.jsonl` is one session
+  (`transcript_full.jsonl` repeats it and is never opened). The project comes from `conversation_summaries.db`, opened read-only
+  with a two-second busy timeout and exactly `SELECT conversation_id, workspace_uris FROM conversation_summaries`, which a test
+  pins: `title`, `preview` and `raw_summary` can't be read. Activity only: the IDE keeps protobuf Sanduhr can't read, and the
+  limits live server-side. Antigravity and Gemini are trademarks of Google LLC, and Sanduhr is not affiliated with or endorsed by Google.
+- **Where it shows.** Agent roots join every account's Overview and Sessions on the Usage page, while their rows exist (even after the
+  source is switched off): the widget footer's per-agent pieces (`TokenFormat.compact`, the burn between the last two ingests, left
+  out when zero, none in demo), `UsageStripChart` stacked by agent with each agent's 30-day total in its accessible name,
+  `UsageRankedList` shares ("13.0M (Codex)"), the Sessions agent filter (shown with more than one agent) and label, and
+  `VaultLedgerCsv`'s trailing `agent` column (always appended, Claude-only included). Trends and Skills stay Claude-only.
+- **Erase.** Erasing an agent's record under Records on this Mac sets `vault.agentStopped.<agent>` and then purges; the agent
+  stays stopped until its source is switched on again.
+
+### The vendored zstd decoder
+
+Codex writes `.jsonl.zst` and neither macOS nor Apple's Compression decodes zstd, so `Sources/CZstd` is zstd's own
+decompress-only single-file decoder as a C target (`CZstd` in `Package.swift`). The tag (v1.5.7), the tarball's SHA-256 and the
+amalgamation command are in the header comment of `zstddeclib.c`; `zstd.h` and `zstd_errors.h` are copied from the same tarball's
+`lib/`, and the BSD licence is in `THIRD-PARTY-NOTICES.txt`. `Zstd.decompress` (Swift) streams through `ZSTD_decompressStream`,
+caps the output (64 MB by default; Codex's burn reader raises it to 64 times the file on disk), decodes concatenated frames and
+throws on a bad or truncated frame. To update: download the new release tarball, verify its published SHA-256, run the
+tarball's `build/single_file_libs/combine.py -r ../../lib -x legacy/zstd_legacy.h -o zstddeclib.c zstddeclib-in.c` (the amalgamator
+`create_single_file_decoder.sh` runs), then replace the `.c`, the two headers and the tag and hash in the comment together. `ZstdTests`
+uses a made-up text fixture compressed once with the zstd CLI.
+
 ## Mods
 
 Item 64, slice 1: Settings, Mods & Config (Mods before Settings v2; under Claude Code) lists every mod and plugin each Claude Code
@@ -2497,7 +2588,7 @@ refusal. `ResetShutdownTests` covers the gate (each writer a no-op inside
 - Shortcuts (Settings v2) → desk preferences `hotKeySettings` and `hotKeyJoin`, seeded once from 2.10's `hotKeys`, which stays for an older build; Camera and mic's placement → `avPlace`; 2.10's `showClaude` is removed once its choice is in `layout`
 - Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps`, `nowPlayingExcluded` (bundle ids switched off) and `nowPlayingIdle` (When nothing is playing: `automatic` when unset, or a notch content's raw value). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory
 - EsteFont Pro and EsteFont 26 → `Sanduhr.app/Contents/Resources/Fonts/`, from `mac/Resources/Fonts/` (see Fonts); the Desk's choice in the desk preference `font`
-- Third-party notices (Sparkle, mediaremote-adapter, EsteFont Pro, EsteFont 26) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
+- Third-party notices (Sparkle, mediaremote-adapter, zstd, EsteFont Pro, EsteFont 26) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
 
 - Widgets (2.35.0) → `~/Library/Application Support/Sanduhr/widgets/`: one folder per installed pack (with `.raster/` for pixel-sheet PNGs drawn at install), `widgets.json` (Windows' shape: the installed packs and the rollback marker `catalog_generated_at`), `.staging/` (installs and removals in flight) and `companion.json` (`schema_version`, `growth`, `active_ms`, `days`); the companion's choice in the desk preference `deskCompanionPack`; Reset Sanduhr… has a **Your widgets** part
 - OLED care (2.35.0) → the desk preference `deskOledCare` (off when absent); nothing on disk
@@ -2507,6 +2598,7 @@ refusal. `ResetShutdownTests` covers the gate (each writer a no-op inside
 - Weather (2.38.0) → the desk preference `desk_weather` (place, rounded coordinates, unit, and the nickname when set); the forecast is never written
 - CI runner cards (2.38.0) → the preference `watchersCiRunners` (off when absent); nothing on disk, the cards live in memory
 - Drawers (2.40.0) → the `drawers.*` preferences in `com.626labs.sanduhr.desk` and `~/Library/Application Support/Sanduhr/drawers-journal.json` (mode 0600, holds full paths, so file names); the folders themselves are real folders on the Mac, `~/Desktop/Drawers/<Name>` by default; Reset Sanduhr… puts the files back first and removes the preferences and the journal
+- Agent sources (2.46.0) → `history.@codex.json` and `snapshot.codex.json` in `~/Library/Application Support/Sanduhr/` (see Agent sources); the Vault's `vault/codex/` and `vault/antigravity/` roots; the preferences `sources.primary`, `sources.<id>.color`, `sources.antigravity.on` and `vault.agentStopped.<agent>` in `com.626labs.sanduhr`, and Codex's switch inside the setup's `usage` entry. Reset Sanduhr… removes them with the folder and the domain
 
 ## Controls
 
@@ -2539,6 +2631,6 @@ refusal. `ResetShutdownTests` covers the gate (each writer a no-op inside
 
 ## License
 
-MIT. Python original by [626Labs LLC](https://626labs.dev). Third-party code: Sparkle (MIT) and
-mediaremote-adapter (BSD-3-Clause), with their licenses in `THIRD-PARTY-NOTICES.txt`. The bundled
+MIT. Python original by [626Labs LLC](https://626labs.dev). Third-party code: Sparkle (MIT),
+mediaremote-adapter (BSD-3-Clause) and zstd's decoder (BSD), with their licenses in `THIRD-PARTY-NOTICES.txt`. The bundled
 EsteFont Pro and EsteFont 26 are proprietary (626Labs LLC), not MIT; their license is in the same file.

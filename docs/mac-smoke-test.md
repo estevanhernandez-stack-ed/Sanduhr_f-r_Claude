@@ -2983,3 +2983,104 @@ otherwise. Where a step says "one display", unplug the second one first.
 12. One display: everything looks and clicks exactly as 2.44.0, and the companion is where it was.
 
 Afterwards put the layout back the way it was and restore per section 45.
+
+## 80. Codex and the Antigravity CLI (2.46.0)
+
+Use a dev build (signed out, file store) after the section 45 backup, on made-up files only: this walk never needs a real Codex or Antigravity
+install. Per CLAUDE.md, before testing quit `/Applications/Sanduhr.app` and copy `~/Library/Application Support/Sanduhr` to
+`~/sanduhr-smoke/support-backup`; never sign in or remove an account in the dev build. A signed-out build has no Claude numbers, so the
+Claude side of the combined bars reads empty here: you are checking that the Codex side and the agent counts draw.
+
+Make the fixtures. Codex honors `CODEX_HOME` when the app's own environment has it, so launch the dev build's binary from a shell with it
+set (`open` would drop it) and the real `~/.codex` is never touched:
+
+```
+mkdir -p ~/sanduhr-smoke/codex-home/sessions/2026/11/20 ~/sanduhr-smoke/agy-fixture
+python3 - <<'PY'
+import datetime as dt, json, os
+home = os.path.expanduser("~/sanduhr-smoke/codex-home/sessions/2026/11/20")
+now = dt.datetime.now(dt.timezone.utc)
+ts = lambda m: (now - dt.timedelta(minutes=m)).strftime("%Y-%m-%dT%H:%M:%SZ")
+def usage(i, o): return {"input_tokens": i, "cached_input_tokens": 0, "cache_write_input_tokens": 0,
+                         "output_tokens": o, "reasoning_output_tokens": 0, "total_tokens": i + o}
+def tokens(m, i, o, five, week):
+    return {"timestamp": ts(m), "type": "event_msg", "payload": {"type": "token_count",
+      "info": {"total_token_usage": usage(i, o), "last_token_usage": usage(0, 0)},
+      "rate_limits": {"limit_id": "codex",
+        "primary": {"used_percent": five, "window_minutes": 300, "resets_at": int(now.timestamp()) + 9000},
+        "secondary": {"used_percent": week, "window_minutes": 10080, "resets_at": int(now.timestamp()) + 400000},
+        "plan_type": "plus"}}}
+lines = [{"timestamp": ts(30), "type": "session_meta", "payload": {"session_id": "fixture-1", "cwd": "/work/Projects/float-demo", "thread_source": "user"}},
+         {"timestamp": ts(29), "type": "turn_context", "payload": {"model": "gpt-demo"}},
+         tokens(20, 1000, 200, 20, 8), tokens(10, 5000, 900, 30, 9), tokens(1, 12000, 2500, 40, 12)]
+with open(home + "/rollout-2026-11-20T10-00-00-fixture1.jsonl", "w") as f:
+    f.write("\n".join(json.dumps(l) for l in lines) + "\n")
+PY
+```
+
+For the Antigravity CLI there is no override, so the app reads `~/.gemini/antigravity-cli`. Check that folder first (`ls ~/.gemini/antigravity-cli`):
+if it exists with real data, skip steps 8 to 10 and do them later on that Mac. If it does not exist, make the fixture there and remove it at
+the end (`rm -r ~/.gemini/antigravity-cli`, and `~/.gemini` too if you made it and it is empty):
+
+```
+D=~/.gemini/antigravity-cli; mkdir -p $D/brain/fixture-conv/.system_generated/logs
+python3 - <<'PY'
+import datetime as dt, json, os, sqlite3
+d = os.path.expanduser("~/.gemini/antigravity-cli")
+now = dt.datetime.now(dt.timezone.utc)
+ts = lambda m: (now - dt.timedelta(minutes=m)).strftime("%Y-%m-%dT%H:%M:%SZ")
+rows = [{"type": "USER_INPUT", "created_at": ts(30), "step_index": 0, "content": "never read"},
+        {"type": "PLANNER_RESPONSE", "created_at": ts(20), "step_index": 1, "input_tokens": 3000, "output_tokens": 400, "cache_read_tokens": 1000, "content": "never read"},
+        {"type": "PLANNER_RESPONSE", "created_at": ts(5), "step_index": 2, "input_tokens": 2000, "output_tokens": 300, "cache_read_tokens": 500, "content": "never read"}]
+open(d + "/brain/fixture-conv/.system_generated/logs/transcript.jsonl", "w").write("\n".join(json.dumps(r) for r in rows) + "\n")
+db = sqlite3.connect(d + "/conversation_summaries.db")
+db.execute("CREATE TABLE conversation_summaries (conversation_id TEXT, title TEXT, preview TEXT, workspace_uris TEXT, raw_summary TEXT, last_modified_time TEXT)")
+db.execute("INSERT INTO conversation_summaries VALUES ('fixture-conv', 'a title', 'a preview', ?, 'a summary', '2026-11-20')", (json.dumps(["file:///work/Projects/agy-demo"]),))
+db.commit(); db.close()
+PY
+```
+
+Launch with `CODEX_HOME=~/sanduhr-smoke/codex-home mac/Sanduhr.app/Contents/MacOS/Sanduhr` (a dev build from `cd mac && ./build.sh --debug`).
+
+1. Settings, Usage: a **Sources** group sits above the account picker with a row each for Claude, Codex and Antigravity. Codex reads "Reads
+   ~/.codex. Activity and limits, no sign-in." and its switch is off; Antigravity reads "Activity only, from the Antigravity CLI…" with
+   Google's trademark line under it and its switch off. Nothing of either is read while both are off (the widget and Usage page look as 2.45.0).
+2. Tick **Track Codex**: within a minute the widget shows a **Codex** section under Claude's, 5-hour 40% and weekly 12%, "as of" a minute
+   ago in the header, and combined two-tone bars on top. Untick it: the section and the combined bars go and the widget is as 2.45.0.
+3. With Codex on, set **Codex primary**: the menu bar number follows Codex (40% for the 5-hour). Set Claude primary again. Change the Codex
+   color to `#2255CC`: the section, the combined bar's second tone and the Sources row follow. A color like `red` is refused with "Use a
+   color like #2FB5A3." Reset restores `#2FB5A3`.
+4. Stale: edit the fixture's timestamps back an hour (or wait 30 minutes): the Codex section dims, keeps its countdown and draws no pace or
+   burn, and the menu bar tooltip says "Codex" is stale. A tier whose reset has passed (change `resets_at` to the past) reads 0%.
+5. Alerts: Settings, Alerts has a Codex alerts switch, off by default. Turn it on, raise the fixture's weekly percent past the threshold:
+   one banner names "Codex weekly…" and the Desk's Claude meters do not pulse. A stale limit sends none.
+6. Desk meters: Settings, Desk, Layout, the meters piece has **Shows** (Combined, Claude, Codex). Pick Codex: the piece draws Codex's
+   numbers in its color. `smoke/smoke state` or `get_desk` reports `source`. With Codex off the piece draws as before.
+7. Statusline and MCP, if installed: the statusline line ends `cx 5h 40% wk 12%` while the fixture is under 30 minutes old and
+   loses it after; `get_usage` returns a `codex` block (`status`, `stale`, `as_of`, `age_seconds`, `plan`, `tiers`) and the server reports
+   0.6.0-mac. `~/Library/Application Support/Sanduhr/snapshot.codex.json` and `history.@codex.json` exist and hold percents and times only.
+8. Settings, Usage, Sources: tick **Track Antigravity** (activity only). Within a minute or two (an ingest) the Usage page, Overview
+   and Sessions, show the Antigravity CLI session, `agy-demo` as the project, and the Codex session as `float-demo`. The widget footer
+   gains each agent's new burn as "Codex +…k" and "Agy +…k" pieces (the fixtures hold about 14k and 5k tokens; the exact figure depends on
+   how cached input counts), left out once nothing is new.
+9. Usage page with both agents on: the 30-day strip stacks each day by agent color, and its accessible name gives each agent's total;
+   a project from one agent other than Claude Code reads "(Codex)" or "(Antigravity)"; the Sessions tab shows an agent filter and a label per row;
+   **Export CSV…** ends each row with an `agent` column (`claude`, `codex`, `antigravity`).
+10. Records on this Mac (Settings, Usage) lists the two agent records as agent records, not "not linked to an account". **Erase…** on
+    Codex's removes `vault/codex` and Codex stays out of the Usage page after the next ingest even with its switch on, until you switch
+    it off and on again.
+11. Privacy line: `grep -r "never read" ~/Library/Application\ Support/Sanduhr/vault` and `grep -r "a title" ...` find nothing, and
+    `grep -r "/work/Projects" ...` finds nothing: only project names are kept, never a path, a prompt or a title.
+12. One source: untick Codex and Antigravity. Settings, Usage and the widget are exactly as 2.45.0; the footer has no agent pieces.
+13. Demo mode with Codex on shows a sample Codex section and no agent rows or footer pieces.
+14. The MCP's `get_local_burn_by_project` with no agent consent returns no `agents` list. (The consent switch and the list itself ride
+    with the held item 13; skip this step if that did not ship.)
+15. Real data (later): on a Mac with Codex, tick Codex in Sources and compare: the Codex section's 5-hour and weekly percents against Codex's
+    own `/status`, and "as of" against the time of its last prompt. Count only: how many rollouts sit under `~/.codex/sessions` and how many
+    are `.zst` (`fd rollout- ~/.codex/sessions | wc -l`), which of them the page's session count reaches, and whether any compressed one
+    fails (a wrong count or a missing limit, never a path or a prompt, goes in the report). With the Antigravity CLI installed, tick it
+    and compare the number of conversations under `brain/` with the sessions listed. Record the counts and names here.
+
+Afterwards: quit the dev build; `rm -r ~/sanduhr-smoke/codex-home ~/sanduhr-smoke/agy-fixture`; remove `~/.gemini/antigravity-cli` only if you
+made it; restore `~/Library/Application Support/Sanduhr` from the backup (`rm -r` it, then copy `support-backup` back) and the preferences per
+section 45; relaunch `/Applications/Sanduhr.app`.
