@@ -18,6 +18,9 @@ defaults:
 jobs:
   build-and-test:
     runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -54,6 +57,9 @@ jobs:
   # PowerShell), then the arm64 app is published and started.
   build-test-arm64:
     runs-on: windows-11-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

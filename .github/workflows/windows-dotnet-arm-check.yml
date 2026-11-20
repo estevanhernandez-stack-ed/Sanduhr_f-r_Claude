@@ -22,6 +22,11 @@ on:
       - "windows-dotnet/scripts/check-install-switch.ps1"
       - "windows-dotnet/scripts/check-architecture.ps1"
       - "windows-dotnet/scripts/smoke-launch.ps1"
+      - "windows-dotnet/scripts/smoke-mcp.ps1"
+      - "windows-dotnet/src/Sanduhr.App/Sanduhr.App.csproj"
+      - "windows-dotnet/src/Sanduhr.App/Services/ArmBuildNoticeService.cs"
+      - "windows-dotnet/src/Sanduhr.App/Interop/MachineNative.cs"
+      - "windows-dotnet/src/Sanduhr.Core/ArmBuildNotice.cs"
       - ".github/workflows/windows-dotnet-arm-check.yml"
 
 defaults:
@@ -32,14 +37,20 @@ jobs:
   draft:
     if: github.event_name == 'workflow_dispatch'
     runs-on: windows-11-arm
+    timeout-minutes: 30
     permissions:
       contents: write   # a draft release's files are visible only with write access
     env:
       TAG: ${{ github.event.inputs.tag }}
-      GH_TOKEN: ${{ github.token }}
     steps:
+      # The write token goes only to the download step: no checked-out credential, and nothing else
+      # this job runs (the draft's own installers among them) can read it.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Download the draft's files
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: gh release download "$env:TAG" --repo "$env:GITHUB_REPOSITORY" --dir dist/draft
       - name: The draft holds every file
         run: ./scripts/check-release-assets.ps1 -Dir dist/draft -Tag "$env:TAG"
@@ -71,10 +82,13 @@ jobs:
   built:
     if: github.event_name == 'pull_request'
     runs-on: windows-11-arm
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"

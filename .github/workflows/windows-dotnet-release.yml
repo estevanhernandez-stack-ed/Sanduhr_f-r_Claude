@@ -22,6 +22,9 @@ jobs:
   # 5.0 spec 7: the suites must pass on Arm before a release that ships an arm64 package is drafted.
   test-arm64:
     runs-on: windows-11-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -35,6 +38,7 @@ jobs:
   release:
     needs: test-arm64
     runs-on: windows-latest
+    timeout-minutes: 45   # it builds two Store packages
     permissions:
       contents: write
     steps:
