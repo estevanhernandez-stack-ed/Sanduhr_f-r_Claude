@@ -16,6 +16,8 @@ final class UsagePageModel {
     private(set) var sessionsLoaded = false
     private(set) var loadedAt = Date()
     var scope: LedgerScope = .default
+    /// The Sessions tab's agent filter; nil shows every agent. Reset when its agent has no session.
+    var agentFilter: AgentSource?
     private(set) var sortColumn: LedgerColumn = .tokens
     private(set) var descending = true
     var expanded: Set<String> = []
@@ -138,12 +140,12 @@ final class UsagePageModel {
         trends = result
     }
 
+    /// The rows the list shows: all of them, or one agent's.
+    var shownRows: [LedgerRow] { UsageLedger.filtered(rows, agent: agentFilter) }
+
+    /// Sessions: the account's record and every agent root that has one. With neither, nothing.
     func loadSessions(_ vm: UsageViewModel, label: String) async {
-        guard let id = UsageSource.of(vm.dataChoices(for: label)).recordID else {
-            rows = []
-            sessionsLoaded = false
-            return
-        }
+        let id = UsageSource.of(vm.dataChoices(for: label)).recordID
         let vault = vm.vault.reader
         let scope = self.scope
         let column = sortColumn
@@ -161,6 +163,7 @@ final class UsagePageModel {
             ? fresh : UsageLedger.sorted(fresh, by: sortColumn, descending: self.descending)
         let ids = Set(rows.map(\.id))
         expanded.formIntersection(ids)
+        if let f = agentFilter, !UsageLedger.agentsPresent(rows).contains(f) { agentFilter = nil }
         loadedAt = Date()
         sessionsLoaded = true
     }
@@ -454,6 +457,10 @@ private struct UsageOverviewTab: View {
                 case .notTracked, .noFolder:
                     UsageNeedsSetup(text: "Link \(label)'s Claude Code folder on Accounts, then choose Live only or Keep a record under Data, to see its activity here.",
                                     label: label, navigation: navigation)
+                    // An agent's activity needs no Claude Code folder.
+                    if let o = page.overview {
+                        UsageOverviewBody(overview: o, accent: accent, hidden: false)
+                    }
                 case .live, .record:
                     if let o = page.overview {
                         UsageOverviewBody(overview: o, accent: accent, hidden: vm.dataChoices(for: label).names == .hidden)
@@ -491,7 +498,7 @@ private struct UsageOverviewBody: View {
                           detail: nil)
             }
             VStack(alignment: .leading, spacing: 4) {
-                UsageStripChart(days: overview.strip, accent: accent)
+                UsageStripChart(days: overview.strip, accent: accent, stack: AgentStripStack(overview))
                     .frame(height: 64)
                 HStack {
                     Text(overview.strip.first.map { UsageDates.short($0.day) } ?? "")
@@ -501,6 +508,7 @@ private struct UsageOverviewBody: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 UsageLegend(noRecord: overview.strip.contains(where: \.noRecord), current: false)
+                if overview.stacked { UsageAgentLegend(stack: AgentStripStack(overview)) }
             }
             HStack(alignment: .top, spacing: 24) {
                 UsageRankedList(title: "Projects", items: overview.projects)
@@ -542,7 +550,7 @@ struct UsageRankedList: View {
                 HStack {
                     Text(item.name).lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: 8)
-                    Text(TokenFormat.compact(item.total)).monospacedDigit().foregroundStyle(.secondary)
+                    Text(item.valueText).monospacedDigit().foregroundStyle(.secondary)
                 }
                 .font(.callout)
             }
@@ -776,10 +784,52 @@ enum UsageTexture {
     }
 }
 
-/// The Overview's 30 days: a bar per day, today brightest, "no record" days textured.
+/// How the strip stacks by agent: the source colors and the accessible name. `nil` (Claude Code
+/// alone) draws the one accent color under the old name, as 2.45.0 did.
+struct AgentStripStack: Equatable {
+    let name: String
+    let colors: [AgentSource: String]
+
+    init?(_ overview: UsageOverview, settings: AgentSourceSettings = .load()) {
+        guard overview.stacked else { return nil }
+        name = overview.stripName
+        colors = Dictionary(uniqueKeysWithValues: AgentSource.burn.map { ($0, settings.color(of: $0)) })
+    }
+
+    func color(_ agent: AgentSource) -> Color { Color.hex(colors[agent] ?? agent.defaultColor) }
+}
+
+/// The key to the stacked strip: each agent with a 30-day figure, in its color.
+struct UsageAgentLegend: View {
+    let stack: AgentStripStack?
+
+    var body: some View {
+        if let stack {
+            HStack(spacing: 12) {
+                ForEach(AgentSource.burn) { agent in
+                    HStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: 2).fill(stack.color(agent)).frame(width: 10, height: 10)
+                        Text(agent.burnName)
+                    }
+                }
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+extension AgentSource: Identifiable {
+    var id: String { rawValue }
+}
+
+/// The Overview's 30 days: a bar per day, today brightest, "no record" days textured. With an
+/// agent other than Claude Code in the window each bar stacks by agent in the source colors.
 struct UsageStripChart: View {
     let days: [UsageOverview.Day]
     let accent: Color
+    var stack: AgentStripStack?
 
     static let gap: CGFloat = 2
 
@@ -787,27 +837,45 @@ struct UsageStripChart: View {
         Canvas { ctx, size in draw(ctx, size) }
             .overlay { tips }
             .accessibilityElement()
-            .accessibilityLabel("Claude Code tokens, last 30 days")
-            .accessibilityValue(days.last.map { "Today \(TokenFormat.compact($0.tokens))" } ?? "")
+            .accessibilityLabel(stack?.name ?? "Claude Code tokens, last 30 days")
+            .accessibilityValue(days.last.map { "Today \(TokenFormat.compact($0.total))" } ?? "")
     }
 
     private func draw(_ ctx: GraphicsContext, _ size: CGSize) {
         let n = CGFloat(days.count)
         guard n > 0 else { return }
         let width = max(2, (size.width - Self.gap * (n - 1)) / n)
-        let peak = CGFloat(max(1, days.map(\.tokens).max() ?? 1))
+        let peak = CGFloat(max(1, days.map(\.total).max() ?? 1))
         for (i, d) in days.enumerated() {
             let x = CGFloat(i) * (width + Self.gap)
             if d.noRecord {
                 UsageTexture.dots(ctx, CGRect(x: x, y: size.height - 14, width: width, height: 14), color: .secondary)
-            } else if d.tokens == 0 {
+            } else if d.total == 0 {
                 ctx.fill(Path(CGRect(x: x, y: size.height - 1, width: width, height: 1)), with: .color(.secondary.opacity(0.35)))
             } else {
-                let h = max(3, CGFloat(d.tokens) / peak * (size.height - 2))
-                let rect = CGRect(x: x, y: size.height - h, width: width, height: h)
+                let h = max(3, CGFloat(d.total) / peak * (size.height - 2))
                 let opacity: Double = i == days.count - 1 ? 1 : 0.7
-                ctx.fill(Path(roundedRect: rect, cornerRadius: 1.5), with: .color(accent.opacity(opacity)))
+                drawBar(ctx, d, x: x, width: width, height: h, bottom: size.height, opacity: opacity)
             }
+        }
+    }
+
+    /// One bar: a single accent fill, or the day's segments stacked bottom up.
+    private func drawBar(_ ctx: GraphicsContext, _ d: UsageOverview.Day, x: CGFloat, width: CGFloat,
+                         height: CGFloat, bottom: CGFloat, opacity: Double) {
+        guard let stack else {
+            let rect = CGRect(x: x, y: bottom - height, width: width, height: height)
+            ctx.fill(Path(roundedRect: rect, cornerRadius: 1.5), with: .color(accent.opacity(opacity)))
+            return
+        }
+        var clipped = ctx
+        clipped.clip(to: Path(roundedRect: CGRect(x: x, y: bottom - height, width: width, height: height), cornerRadius: 1.5))
+        var y = bottom
+        for seg in d.segments {
+            let h = height * CGFloat(seg.tokens) / CGFloat(d.total)
+            clipped.fill(Path(CGRect(x: x, y: y - h, width: width, height: h)),
+                         with: .color(stack.color(seg.agent).opacity(opacity)))
+            y -= h
         }
     }
 
@@ -816,7 +884,7 @@ struct UsageStripChart: View {
             ForEach(days) { d in
                 Color.clear
                     .contentShape(Rectangle())
-                    .help("\(UsageDates.short(d.day)): \(d.noRecord ? "no record" : TokenFormat.compact(d.tokens))")
+                    .help("\(UsageDates.short(d.day)): \(d.noRecord ? "no record" : TokenFormat.compact(d.total))")
             }
         }
     }

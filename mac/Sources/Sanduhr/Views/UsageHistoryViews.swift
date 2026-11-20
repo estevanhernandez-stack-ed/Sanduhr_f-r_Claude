@@ -152,8 +152,13 @@ struct UsageSessionsTab: View {
 
     private var choices: AccountDataChoices { vm.dataChoices(for: label) }
 
+    /// Sessions come from the account's record and from any agent's; with neither, the way to a record.
+    private var needsRecord: Bool {
+        UsageSource.of(choices).recordID == nil && !page.rows.contains { $0.agent != .claude }
+    }
+
     var body: some View {
-        if UsageSource.of(choices).recordID == nil {
+        if needsRecord {
             UsageNeedsRecord(what: "Sessions", label: label, navigation: navigation)
         } else {
             VStack(alignment: .leading, spacing: 8) {
@@ -177,6 +182,7 @@ struct UsageSessionsTab: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
+            if UsageLedger.showsAgentFilter(page.rows) { AgentFilterPicker(page: page) }
             Spacer(minLength: 0)
             Button("Export CSV…") { export() }
                 .disabled(page.rows.isEmpty)
@@ -188,8 +194,9 @@ struct UsageSessionsTab: View {
         if page.sessionsLoaded && page.rows.isEmpty {
             UsageCaption("No sessions recorded yet. The first pass lands within a minute of choosing Keep a record.")
         } else {
-            let inScope = page.rows.reduce(0) { $0 + ($1.scoped > 0 ? 1 : 0) }
-            UsageCaption("\(page.rows.count) sessions, \(inScope) with tokens in \(page.scope == .all ? "the record" : page.scope.title). Times are wall clock; tokens are input plus output.")
+            let shown = page.shownRows
+            let inScope = shown.reduce(0) { $0 + ($1.scoped > 0 ? 1 : 0) }
+            UsageCaption("\(shown.count) sessions, \(inScope) with tokens in \(page.scope == .all ? "the record" : page.scope.title). Times are wall clock; tokens are input plus output.")
         }
         if choices.names == .hidden || UsageProjectNames.anyHidden(page.rows.prefix(200).map(\.session.projectName)) {
             UsageCaption(UsageProjectNames.hiddenCaption)
@@ -216,6 +223,20 @@ struct UsageSessionsTab: View {
         } catch {
             exportNote = ("Could not write the file. Is it open elsewhere?", true)
         }
+    }
+}
+
+/// The agent filter above the session list: All, then each agent with a session.
+private struct AgentFilterPicker: View {
+    @Bindable var page: UsagePageModel
+
+    var body: some View {
+        Picker("Agent", selection: $page.agentFilter) {
+            Text("All agents").tag(AgentSource?.none)
+            ForEach(UsageLedger.agentsPresent(page.rows)) { Text($0.burnName).tag(AgentSource?.some($0)) }
+        }
+        .pickerStyle(.menu)
+        .fixedSize()
     }
 }
 
@@ -260,8 +281,10 @@ private struct LedgerList: View {
 
     var body: some View {
         let now = page.loadedAt
-        List(page.rows) { row in
-            LedgerRowView(row: row, expanded: page.expanded.contains(row.id), now: now, recordTitle: recordTitle) {
+        let labels = UsageLedger.showsAgentLabels(page.rows)
+        List(page.shownRows) { row in
+            LedgerRowView(row: row, expanded: page.expanded.contains(row.id), now: now,
+                          recordTitle: UsageLedger.recordText(row, recordTitle: recordTitle), showsAgent: labels) {
                 page.toggle(row.id)
             }
             .equatable()
@@ -278,17 +301,19 @@ private struct LedgerRowView: View, Equatable {
     let expanded: Bool
     let now: Date
     let recordTitle: String
+    let showsAgent: Bool
     let toggle: () -> Void
 
     static func == (a: LedgerRowView, b: LedgerRowView) -> Bool {
         a.row == b.row && a.expanded == b.expanded && a.now == b.now && a.recordTitle == b.recordTitle
+            && a.showsAgent == b.showsAgent
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Button(action: toggle) { summary }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(row.projectText), \(UsageLedger.tokensText(row.scoped)) tokens, \(UsageLedger.relative(row.session.lastTs, now: now))")
+                .accessibilityLabel(UsageLedger.spoken(row, now: now, showsAgent: showsAgent))
                 .accessibilityHint(expanded ? "Hides the session's details" : "Shows the session's details")
             if expanded {
                 VStack(alignment: .leading, spacing: 2) {
@@ -305,15 +330,24 @@ private struct LedgerRowView: View, Equatable {
         }
     }
 
+    /// The project, and with an agent other than Claude Code in the list the row's agent after it.
+    private var projectCell: some View {
+        HStack(spacing: 6) {
+            Text(row.projectText).lineLimit(1).truncationMode(.middle)
+            if showsAgent {
+                Text(row.agent.burnName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var summary: some View {
         HStack(spacing: 8) {
             Text(UsageLedger.relative(row.session.lastTs, now: now))
                 .foregroundStyle(.secondary)
                 .frame(width: LedgerLayout.lastActive, alignment: .leading)
-            Text(row.projectText)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            projectCell
             Text(row.badge)
                 .font(.caption)
                 .foregroundStyle(.secondary)

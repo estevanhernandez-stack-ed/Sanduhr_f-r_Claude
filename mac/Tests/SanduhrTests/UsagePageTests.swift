@@ -419,9 +419,9 @@ struct UsagePageTests {
         let csv = UsageLedger.csv(rows, recordTitle: ".claude-work")
         #expect(csv.rowCount == 3)
         #expect(csv.text == VaultLedgerCsv.header
-                + "yday,.claude-work,api ~22222222,2026-07-11T10:00:00Z,2026-07-11T11:00:00Z,800000,800000,claude-fable-5:800000\r\n"
-                + "span,.claude-work,web,2026-07-10T10:00:00Z,2026-07-12T09:00:00Z,200,600,claude-fable-5:600\r\n"
-                + "old,.claude-work,api ~11111111,2026-07-01T10:00:00Z,2026-07-01T12:00:00Z,0,900000,claude-fable-5:900000\r\n")
+                + "yday,.claude-work,api ~22222222,2026-07-11T10:00:00Z,2026-07-11T11:00:00Z,800000,800000,claude-fable-5:800000,Claude Code\r\n"
+                + "span,.claude-work,web,2026-07-10T10:00:00Z,2026-07-12T09:00:00Z,200,600,claude-fable-5:600,Claude Code\r\n"
+                + "old,.claude-work,api ~11111111,2026-07-01T10:00:00Z,2026-07-01T12:00:00Z,0,900000,claude-fable-5:900000,Claude Code\r\n")
         let direct = VaultLedgerCsv.build(rows.map {
             VaultLedgerCsv.row($0.session, root: ".claude-work", project: $0.projectText, tokensInScope: $0.scoped)
         })

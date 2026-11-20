@@ -49,7 +49,13 @@ enum UsageSource: Equatable, Sendable {
 struct UsageRanked: Equatable, Sendable, Identifiable {
     let name: String
     let total: Int64
+    /// Each agent's share, only for a project an agent other than Claude Code touched (Claude's
+    /// part included); empty otherwise, so Claude Code's own rows read as they always did.
+    var byAgent: [AgentSource: Int64] = [:]
     var id: String { name }
+
+    /// "13.0M", "13.0M (Codex)" or "1.2M (Claude Code 900k, Codex 300k)".
+    var valueText: String { byAgent.isEmpty ? TokenFormat.compact(total) : AgentShares.describe(total, byAgent) }
 
     static func ranked(_ totals: [String: Int64], top: Int) -> [UsageRanked] {
         VaultReader.ranked(totals, top: top).map { UsageRanked(name: $0.name, total: $0.total) }
@@ -109,6 +115,8 @@ struct UsageOverview: Equatable, Sendable {
         case paused
         /// Degraded: the record has never finished a pass.
         case starting
+        /// No Claude Code folder is read; only an agent's rows show.
+        case agentsOnly
     }
 
     struct Day: Equatable, Sendable, Identifiable {
@@ -119,7 +127,20 @@ struct UsageOverview: Equatable, Sendable {
         let noRecord: Bool
         /// Served by the live reader (a hot day, or every day without a trusted record).
         let live: Bool
+        /// The day's tokens from the agents other than Claude Code (`tokens` is Claude Code's).
+        var agents: [AgentSource: Int64] = [:]
         var id: CCLocalDay { day }
+
+        /// Every agent's tokens for the day: the bar's height.
+        var total: Int64 { tokens + agents.values.reduce(0, +) }
+
+        /// The stack, bottom up: Claude Code, then each agent with tokens, in agent order.
+        var segments: [(agent: AgentSource, tokens: Int64)] {
+            var out: [(agent: AgentSource, tokens: Int64)] = []
+            if tokens > 0 { out.append((.claude, tokens)) }
+            for a in AgentSource.burnRoots { if let t = agents[a], t > 0 { out.append((a, t)) } }
+            return out
+        }
     }
 
     static let windowDays = 30
@@ -135,9 +156,20 @@ struct UsageOverview: Equatable, Sendable {
     var windowTotal: Int64 = 0
     var projects: [UsageRanked] = []
     var skills: [UsageRanked] = []
+    /// The 30 days' tokens per agent with any, Claude Code included; empty with Claude Code alone.
+    var agentTotals: [AgentSource: Int64] = [:]
+
+    /// Whether some agent other than Claude Code has tokens in the window: only then does the
+    /// strip stack by agent.
+    var stacked: Bool { !agentTotals.isEmpty }
+
+    /// The strip's accessible name: unchanged with Claude Code alone, each agent's 30-day total
+    /// otherwise, so color is never the only cue.
+    var stripName: String { stacked ? AgentShares.stripName(agentTotals) : "Claude Code tokens, last 30 days" }
 
     var status: String? {
         switch mode {
+        case .agentsOnly: nil
         case .record: nil
         case .live: "Live only: Claude Code's own logs, which it deletes after about 30 days. Nothing is kept."
         case .paused: "Record paused: showing Claude Code's live logs only until the next pass."
@@ -173,6 +205,7 @@ struct UsageOverview: Equatable, Sendable {
     /// Live only). `name` turns a live cwd into what the page shows (`UsageProjectNames`).
     static func build(today: CCLocalDay, now: Date, calendar: Calendar,
                       live: [CCLocalDay: CCLiveDay], record: UsageRecordFacts?,
+                      agents: [AgentSource: VaultWindow] = [:],
                       name: (String) -> String) -> UsageOverview {
         var o = UsageOverview()
         let start = windowStart(today)
@@ -193,26 +226,65 @@ struct UsageOverview: Equatable, Sendable {
         }
         var d = start
         while d <= today {
+            let others = agentDay(agents, d)
             if d < hot, let record {
                 let tokens = record.window.byDay[d] ?? 0
                 o.strip.append(Day(day: d, tokens: tokens,
-                                   noRecord: tokens == 0 && !record.covered.contains(d), live: false))
+                                   noRecord: tokens == 0 && others.isEmpty && !record.covered.contains(d),
+                                   live: false, agents: others))
             } else {
                 let day = live[d] ?? CCLiveDay()
-                o.strip.append(Day(day: d, tokens: day.total, noRecord: false, live: true))
+                o.strip.append(Day(day: d, tokens: day.total, noRecord: false, live: true, agents: others))
                 for (cwd, v) in day.byCwd { projects[name(cwd), default: 0] += v }
                 for (s, v) in day.bySkill { skills[s, default: 0] += v }
             }
             d = d.adding(days: 1)
         }
         let todayLive = live[today] ?? CCLiveDay()
-        o.today = todayLive.total
-        o.todayInput = todayLive.input
-        o.todayOutput = todayLive.output
-        o.windowTotal = o.strip.reduce(0) { $0 + $1.tokens }
-        o.projects = UsageRanked.ranked(projects, top: topCount)
+        o.today = todayLive.total + (o.strip.last?.agents.values.reduce(0, +) ?? 0)
+        o.todayInput = todayLive.input + agents.values.reduce(0) { $0 + ($1.byDayInput[today] ?? 0) }
+        o.todayOutput = todayLive.output + agents.values.reduce(0) { $0 + ($1.byDayOutput[today] ?? 0) }
+        o.windowTotal = o.strip.reduce(0) { $0 + $1.total }
+        o.projects = rankedProjects(projects, agents: agents)
         o.skills = UsageRanked.ranked(skills, top: topCount)
+        o.agentTotals = agentTotals(o.strip)
         return o
+    }
+
+    /// The day's tokens per agent other than Claude Code, from their Vault windows.
+    private static func agentDay(_ agents: [AgentSource: VaultWindow], _ day: CCLocalDay) -> [AgentSource: Int64] {
+        var out: [AgentSource: Int64] = [:]
+        for (agent, w) in agents { if let t = w.byDay[day], t > 0 { out[agent] = t } }
+        return out
+    }
+
+    /// Per agent over the strip, Claude Code included, and only when some other agent has tokens.
+    private static func agentTotals(_ strip: [Day]) -> [AgentSource: Int64] {
+        var totals: [AgentSource: Int64] = [:]
+        for day in strip {
+            for (a, t) in day.agents { totals[a, default: 0] += t }
+        }
+        guard !totals.isEmpty else { return [:] }
+        totals[.claude] = strip.reduce(0) { $0 + $1.tokens }
+        return totals.filter { $0.value > 0 }
+    }
+
+    /// The projects, the agents' merged in by name, each row of an agent-touched project carrying
+    /// its shares (Claude Code's part is what the agents leave).
+    private static func rankedProjects(_ claude: [String: Int64], agents: [AgentSource: VaultWindow]) -> [UsageRanked] {
+        var totals = claude
+        var shares: [String: [AgentSource: Int64]] = [:]
+        for (agent, w) in agents {
+            for (n, v) in w.byProjectName where v > 0 {
+                totals[n, default: 0] += v
+                shares[n, default: [:]][agent, default: 0] += v
+            }
+        }
+        return UsageRanked.ranked(totals, top: topCount).map { row in
+            guard var split = shares[row.name] else { return row }
+            split[.claude] = max(0, row.total - split.values.reduce(0, +))
+            return UsageRanked(name: row.name, total: row.total, byAgent: split)
+        }
     }
 }
 
@@ -322,6 +394,8 @@ struct LedgerRow: Identifiable, Equatable, Sendable {
     let projectText: String
     let scoped: Int64
     let badge: String
+
+    var agent: AgentSource { session.agent }
 }
 
 /// The ledger's pure logic (Windows `LedgerRowViewModel`, `CcLedgerViewModel`, `LedgerSort`):
@@ -397,6 +471,38 @@ enum UsageLedger {
 
     /// The scoped tokens as the column shows them: a dash outside the scope.
     static func tokensText(_ n: Int64) -> String { n > 0 ? TokenFormat.compact(n) : "—" }
+
+    // MARK: Agents
+
+    /// The agents with a session in the rows, in agent order.
+    static func agentsPresent(_ rows: [LedgerRow]) -> [AgentSource] {
+        AgentSource.burn.filter { a in rows.contains { $0.agent == a } }
+    }
+
+    /// The agent filter shows only when more than one agent has sessions.
+    static func showsAgentFilter(_ rows: [LedgerRow]) -> Bool { agentsPresent(rows).count > 1 }
+
+    /// The per-row agent label shows once an agent other than Claude Code is in the list; Claude
+    /// Code alone reads as it did in 2.45.0.
+    static func showsAgentLabels(_ rows: [LedgerRow]) -> Bool { rows.contains { $0.agent != .claude } }
+
+    /// The rows of one agent, or all of them.
+    static func filtered(_ rows: [LedgerRow], agent: AgentSource?) -> [LedgerRow] {
+        guard let agent else { return rows }
+        return rows.filter { $0.agent == agent }
+    }
+
+    /// What a screen reader says for a row; the agent follows the project once labels show.
+    static func spoken(_ row: LedgerRow, now: Date, showsAgent: Bool) -> String {
+        let agent = showsAgent ? ", \(row.agent.burnName)" : ""
+        return "\(row.projectText)\(agent), \(tokensText(row.scoped)) tokens, \(relative(row.session.lastTs, now: now))"
+    }
+
+    /// What the CSV's `root` column and the expansion call the row's record: an agent's root is
+    /// its id (`codex`), a Claude Code folder is the account's folder name.
+    static func recordText(_ row: LedgerRow, recordTitle: String) -> String {
+        row.agent == .claude ? recordTitle : row.agent.rawValue
+    }
 
     // MARK: Texts
 
@@ -476,7 +582,8 @@ enum UsageLedger {
     /// record's title and `project` the shown project text.
     static func csv(_ sortedRows: [LedgerRow], recordTitle: String) -> (text: String, rowCount: Int) {
         VaultLedgerCsv.build(sortedRows.map {
-            VaultLedgerCsv.row($0.session, root: recordTitle, project: $0.projectText, tokensInScope: $0.scoped)
+            VaultLedgerCsv.row($0.session, root: recordText($0, recordTitle: recordTitle), project: $0.projectText,
+                               tokensInScope: $0.scoped)
         })
     }
 
