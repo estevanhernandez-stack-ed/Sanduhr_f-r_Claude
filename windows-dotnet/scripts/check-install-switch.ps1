@@ -13,8 +13,11 @@
        will update from), the markers must still be there, the app must start, and it must not
        record the notice as due.
 
-  CI RUNNERS ONLY. It installs and replaces Sanduhr, kills running copies and writes into the
-  real data folders. Never run it on a PC that has Sanduhr installed; it refuses to start there.
+  CI RUNNERS ONLY, and enforced. It installs, launches and replaces Sanduhr, kills running copies,
+  writes markers into the real data folders and deletes the real log. So before it stops, installs,
+  writes or deletes anything, it refuses to run unless GITHUB_ACTIONS is 'true' (a GitHub Actions
+  runner), and then refuses again if a Velopack install is already present. Neither refusal can
+  see a Store or portable copy, which is why the first one does not depend on finding an install.
 
 .EXAMPLE
   pwsh windows-dotnet/scripts/check-install-switch.ps1 -X64Setup dist/release/626Labs.Sanduhr-win-Setup.exe -Arm64Setup dist/release/626Labs.Sanduhr-win-arm64-Setup.exe
@@ -29,6 +32,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $X64Setup = (Resolve-Path -LiteralPath $X64Setup).Path
 $Arm64Setup = (Resolve-Path -LiteralPath $Arm64Setup).Path
+if ($env:GITHUB_ACTIONS -ne 'true') {
+    throw 'This script installs, launches and uninstalls Sanduhr and writes into its data folders. It runs on CI runners only (GITHUB_ACTIONS is not true here); nothing was stopped, installed or changed.'
+}
 
 $installRoot = Join-Path $env:LOCALAPPDATA '626Labs.Sanduhr'
 $current = Join-Path $installRoot 'current'
@@ -83,8 +89,8 @@ function Test-NoticeDue {
     return (Test-Path -LiteralPath $logFile) -and [bool](Select-String -LiteralPath $logFile -SimpleMatch $dueLine -Quiet)
 }
 
-Stop-Sanduhr
 if (Test-Path -LiteralPath $installRoot) { throw "Sanduhr is already installed at $installRoot. This check is for a clean runner." }
+Stop-Sanduhr
 
 # 1. The x64 build. On an Arm PC it runs through emulation and must say the notice was due.
 Install-Setup $X64Setup
