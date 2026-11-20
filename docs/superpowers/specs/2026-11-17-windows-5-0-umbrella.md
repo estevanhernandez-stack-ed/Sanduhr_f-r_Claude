@@ -70,9 +70,11 @@ written (release-runbook Phases 2 and 7).
   `releases?q=v5` before the tag; the release workflow refuses the tag until they do. Run the Arm
   check on the draft before publishing (release-runbook Phase 6). In that same change, add the small
   print "Arm PC? Take the win-arm64 installer on the same page." under the Windows download button in
-  docs/index.html. The rehearsal in the arm64 plan's Task 12 is a gate before the 5.0 tag, not an
-  optional follow-up: it is the first run of the Arm check's `draft` job, of the workflow token reading
-  a draft, and of an x64 package packed on an x64 PC installing on Arm. The 5.0 release notes name both
+  docs/index.html. The rehearsal in the arm64 plan's Task 12, the gate before the 5.0 tag, ran
+  on 2026-11-20 and passed (run 44725897790): the first run of the Arm check's `draft` job, of the
+  workflow token reading a draft, and of an x64 package packed on an x64 PC installing on Arm. Rehearse
+  again before the tag if the Arm check workflow, the release-asset check or the build scripts change
+  after that date. The 5.0 release notes name both
   installers at the top, because the notice lands people on a release list and never names the file.
 
 ## Open
