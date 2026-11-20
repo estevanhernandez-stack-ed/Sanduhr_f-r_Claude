@@ -15,7 +15,16 @@ enum SnapshotWriter {
             .appendingPathComponent("snapshot.json")
     }
 
-    static func writeOk(_ usage: UsageResponse, accountRef: String?, plan: String? = nil, now: Date = Date(), to target: URL = url) {
+    /// Codex's own snapshot, beside snapshot.json: same schema plus a root `source: "codex"` and no
+    /// `account_ref`, since it belongs to no Claude account. Seat sync lists 8-hex names only, so it
+    /// never reads or deletes this one (agent sources design, section 2).
+    static var codexURL: URL {
+        url.deletingLastPathComponent().appendingPathComponent("snapshot.codex.json")
+    }
+
+    /// `source` is set for a non-Claude source (`"codex"`): the file then carries it and no `account_ref`.
+    static func writeOk(_ usage: UsageResponse, accountRef: String?, plan: String? = nil, now: Date = Date(),
+                        source: String? = nil, to target: URL = url) {
         var tiers: [[String: Any]] = []
         for tier in Tier.allCases {
             guard let t = usage.tiers[tier], let util = t.utilization else { continue }
@@ -27,7 +36,8 @@ enum SnapshotWriter {
                 "limit": NSNull(),
             ])
         }
-        write(status: "ok", errorKind: nil, tiers: tiers, accountRef: accountRef, plan: plan, now: now, to: target)
+        write(status: "ok", errorKind: nil, tiers: tiers, accountRef: accountRef, plan: plan, now: now,
+              source: source, to: target)
     }
 
     /// On a failed fetch keep the last good tiers, so readers can say "sign in again"
@@ -74,19 +84,19 @@ enum SnapshotWriter {
     }
 
     private static func write(status: String, errorKind: String?, tiers: [[String: Any]], accountRef: String?,
-                              plan: String?, now: Date, to target: URL = url) {
+                              plan: String?, now: Date, source: String? = nil, to target: URL = url) {
         // Reset Sanduhr… ran: no snapshot comes back.
         guard !ResetGate.isOn else { return }
-        let root: [String: Any] = [
+        var root: [String: Any] = [
             "schema_version": schemaVersion,
             "writer_version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown",
             "captured_at": ISO8601.stamp(now),
-            "account_ref": accountRef ?? NSNull(),
             "plan": plan ?? NSNull(),
             "status": status,
             "error_kind": errorKind ?? NSNull(),
             "tiers": tiers,
         ]
+        if let source { root["source"] = source } else { root["account_ref"] = accountRef ?? NSNull() }
         do {
             try FileManager.default.createDirectory(at: target.deletingLastPathComponent(),
                                                     withIntermediateDirectories: true)

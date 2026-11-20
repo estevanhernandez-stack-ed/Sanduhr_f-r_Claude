@@ -19,6 +19,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         static let fired = "alertsFired"
         static let weeklyReset = "alertWeeklyReset"
         static let pace = "alertPace"
+        /// Codex's alerts switch (Settings, Alerts): off until turned on.
+        static let codexAlerts = "alertsCodex"
         static let delivery = "alertDelivery"
         static let quietEnabled = "alertQuietEnabled"
         static let quietStart = "alertQuietStart"
@@ -31,7 +33,9 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     static let firedLimit = 200
 
     private let defaults = UserDefaults.standard
-    private var lastUsage: UsageResponse?
+    /// The usage before the latest one, per source, for the reset alerts. Claude's is the one an
+    /// account switch clears; Codex's has its own, so neither is compared with the other's numbers.
+    private var lastUsages: [AgentSource: UsageResponse] = [:]
 
     private override init() {
         super.init()
@@ -44,15 +48,19 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    /// Called after every successful refresh.
-    func evaluate(_ usage: UsageResponse) {
-        let previous = lastUsage
-        lastUsage = usage
+    /// Called after every successful refresh. `source` and `freshTiers` are for another source's
+    /// readings (Codex's): its alerts carry the source in their once-keys and speak only for the
+    /// fresh tiers. Claude's call, with neither, is what it always was.
+    func evaluate(_ usage: UsageResponse, source: AgentSource = .claude, freshTiers: Set<Tier>? = nil) {
+        let previous = lastUsages[source]
+        lastUsages[source] = usage
         let settings = AlertSettings(defaults)
         var fired = defaults.stringArray(forKey: Key.fired) ?? []
         let outcome = AlertRules.evaluate(usage: usage, previous: previous, settings: settings,
                                           fired: Set(fired), deskRunning: DeskController.shared.running,
-                                          now: Date(), hidden: MeterVisibility.hidden(in: UserDefaults.desk))
+                                          now: Date(),
+                                          hidden: source == .claude ? MeterVisibility.hidden(in: UserDefaults.desk) : [],
+                                          source: source, freshTiers: freshTiers)
         guard !outcome.alerts.isEmpty else { return }
         // Recorded even when quiet hours hold the banner back, so nothing bursts out at the end.
         fired.append(contentsOf: outcome.alerts.map(\.onceKey))
@@ -65,7 +73,12 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     /// Windows' AlertEngine.Reset prevents). The once-per-window memory stays: its keys name each
     /// tier's reset time, which belongs to one account, so switching back never repeats an alert.
     func resetForSwitch() {
-        lastUsage = nil
+        lastUsages[.claude] = nil
+    }
+
+    /// Codex was turned off: its next reading is a first one, compared with nothing.
+    func forget(_ source: AgentSource) {
+        lastUsages[source] = nil
     }
 
     /// A sample alert through the chosen delivery and sound. Quiet hours do not apply to it.

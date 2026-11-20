@@ -34,10 +34,20 @@ final class CodexGeneration: @unchecked Sendable {
     func bump() { lock.withLock { value += 1 } }
 }
 
+/// What one read published, for the recorder: the limits in Claude's tier shape, when Codex wrote
+/// the event they came from, which tiers are current, and the plan.
+struct CodexPublication: Equatable {
+    var usage: UsageResponse
+    var asOf: Date
+    var freshTiers: Set<Tier>
+    var planType: String?
+}
+
 /// Codex limits, kept current (agent layer spec, sections 1 and 4; agent sources design, section 1):
 /// reads the newest rollout event every 30 seconds while Codex is on and publishes the limits in
 /// Claude's tier shape, their `as_of`, freshness and the empty states. No file watch, no network,
-/// nothing under demo mode. History, snapshot and alerts are not here (item 4). Main thread only.
+/// nothing under demo mode. History, snapshot and alerts are the recorder's (`CodexRecorder`), fed
+/// through `onUpdate` and `onStop`. Main thread only.
 @Observable
 @MainActor
 final class CodexUsageService {
@@ -68,6 +78,13 @@ final class CodexUsageService {
     private(set) var emptyState: EmptyState?
     /// Polling (Codex on, not demo, not reset).
     private(set) var running = false
+
+    /// Called after every read that landed: the reading, or nil when there are no limits to draw
+    /// (not installed, nothing logged yet, unreadable). Not called by `stop`.
+    @ObservationIgnored var onUpdate: ((CodexPublication?) -> Void)?
+    /// Called when a running service stops (Codex turned off, demo mode, Reset). Never for a service
+    /// that was not running, so a Mac with only Claude on is never told anything.
+    @ObservationIgnored var onStop: (() -> Void)?
 
     @ObservationIgnored private let homes: () -> [URL]
     @ObservationIgnored private let fileSystem: CodexFileSystem
@@ -119,12 +136,14 @@ final class CodexUsageService {
 
     /// Stops polling and clears what it published. A tick or read from before returns without IO.
     func stop() {
+        let wasRunning = running
         generation.bump()
         ticker.stop()
         running = false
         inFlight = false
         cache = CodexReadCache()
         set(usage: nil, asOf: nil, freshness: nil, freshTiers: [], plan: nil, empty: nil)
+        if wasRunning { onStop?() }
     }
 
     /// One read now (the timer's tick). Skipped while off, after Reset, or with a read still in flight.
@@ -162,6 +181,7 @@ final class CodexUsageService {
             case .noLimits, .ok: .noLimitsYet
             }
             set(usage: nil, asOf: nil, freshness: nil, freshTiers: [], plan: nil, empty: empty)
+            onUpdate?(nil)
             return
         }
         let now = clock()
@@ -173,6 +193,7 @@ final class CodexUsageService {
         let fresh = CodexLimits.freshTiers(reading, now: now)
         set(usage: usage, asOf: reading.asOf, freshness: fresh.isEmpty ? .stale : .fresh,
             freshTiers: fresh, plan: reading.planType, empty: nil)
+        onUpdate?(CodexPublication(usage: usage, asOf: reading.asOf, freshTiers: fresh, planType: reading.planType))
     }
 
     /// Assigns only what changed, so observers redraw on a real change only.
