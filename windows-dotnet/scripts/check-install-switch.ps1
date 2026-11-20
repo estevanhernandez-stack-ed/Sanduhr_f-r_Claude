@@ -76,7 +76,7 @@ function Assert-Installed {
     [xml]$record = Get-Content -LiteralPath (Join-Path $current 'sq.version') -Raw
     $meta = $record.package.metadata
     if ($meta.channel -ne $Channel) { throw "The installed package's channel is '$($meta.channel)', not '$Channel'." }
-    Write-Output "[switch] installed: version $($meta.version), channel $($meta.channel)"
+    Write-Output "[switch] installed: version $($meta.version), channel $($meta.channel), rid $($meta.rid), machineArchitecture $($meta.machineArchitecture)"
 }
 
 function Test-NoticeDue {
