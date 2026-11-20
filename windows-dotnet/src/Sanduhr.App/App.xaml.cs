@@ -56,6 +56,7 @@ public partial class App : Application
     private MenuItem? _restartToUpdateItem;
     private MenuItem? _restartItem;
     private RestartToUpdateService? _restartToUpdate;
+    private ArmBuildNoticeService? _armBuildNotice;
     /// <summary>The GitHub update check (Settings v2, slice 6): launch, the widget's tick and About's Check now share it.</summary>
     private UpdateChecker? _updateChecker;
     private bool _quitting;
@@ -293,9 +294,35 @@ public partial class App : Application
 
         ScheduleWhatsNewAtLaunch();
 
+        // 5.0 spec 7: an x64 GitHub build running emulated on an Arm PC says once that a native build exists.
+        StartArmBuildNotice(LogUpdate);
+
         // `Sanduhr.exe --settings <page>[#<anchor>]` as the first launch: Settings opens there once the widget is up.
         if (SettingsIndex.LinkFromArgs(Environment.GetCommandLineArgs().Skip(1)) is { } startLink)
             Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => OpenSettingsLink(startLink)));
+    }
+
+    /// <summary>The Arm build notice (5.0 spec 7): hook its button now, and show it five seconds on, once the widget
+    /// has settled. It does nothing on a native build or the Store package.</summary>
+    private void StartArmBuildNotice(Action<string> log)
+    {
+        try
+        {
+            _armBuildNotice = ArmBuildNoticeService.ForThisApp(new SettingsStore(new Sanduhr.Core.Paths()), log);
+            _armBuildNotice.Start();
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                if (!ResetGuard.Done)   // Reset deleted settings.json; a late flag must not bring it back
+                    _armBuildNotice?.ShowIfDue();
+            };
+            timer.Start();
+        }
+        catch (Exception)
+        {
+            // A notice is never worth a failed launch.
+        }
     }
 
     /// <summary>The app version as Major.Minor.Build, the same shape Settings shows.</summary>

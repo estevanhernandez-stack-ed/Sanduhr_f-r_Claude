@@ -1232,6 +1232,17 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>The Arm build notice has been shown (settings.json "arm_build_notice_shown", 5.0 spec 7): false when absent.
+    /// It shows once; Reset clears it with the rest of the file.</summary>
+    public bool LoadArmBuildNoticeShown() => ReadBool(Read(), ArmBuildNotice.SettingsKey, false);
+
+    public void SaveArmBuildNoticeShown()
+    {
+        var root = Read();
+        root[ArmBuildNotice.SettingsKey] = true;
+        Write(root);
+    }
+
     /// <summary>Settings, Privacy, Streamer mode (settings.json "streamer_mode", Settings v2 slice 7): off when absent. The tray's and the
     /// widget's "Streamer mode" items write the same key.</summary>
     public bool LoadStreamerMode() => ReadBool(Read(), "streamer_mode", false);
