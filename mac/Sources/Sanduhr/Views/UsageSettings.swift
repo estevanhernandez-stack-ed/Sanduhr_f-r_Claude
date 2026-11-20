@@ -605,11 +605,13 @@ private struct UsageRecordsSection: View {
     }
 
     private func eraseTitle(_ r: VaultRecordInfo) -> String {
+        if let agent = r.agent { return UsageRecordCopy.eraseTitle(agent) }
         if let account = r.account { return "Erase \(account)'s Claude Code record?" }
         return "Erase the record \(r.shortID), not linked to an account?"
     }
 
     private func eraseMessage(_ r: VaultRecordInfo) -> String {
+        if let agent = r.agent { return UsageRecordCopy.eraseMessage(agent, bytes: r.bytes, oldest: r.oldestDay) }
         var text = "Deletes \(VaultStewardship.sizeText(r.bytes)) of session summaries"
         if let day = r.oldestDay { text += " going back to \(UsageDates.long(day))" }
         if let folder = r.folder {
@@ -652,6 +654,7 @@ private struct UsageRecordRow: View {
     }
 
     private var title: String {
+        if let agent = record.agent { return UsageRecordCopy.title(agent) }
         guard let account = record.account else { return "Not linked to an account (\(record.shortID))" }
         let folder = record.folder.map { ClaudeCodeFolders.Folder(path: $0).display(home: home) } ?? ""
         return "\(account) · \(folder)"
@@ -660,8 +663,23 @@ private struct UsageRecordRow: View {
     private var details: String {
         var parts = [VaultStewardship.sizeText(record.bytes)]
         if let day = record.oldestDay { parts.append("since \(UsageDates.long(day))") }
-        if record.isLinked { parts.append(record.recording ? "recording" : "not recording") }
+        if record.isLinked || record.isAgent { parts.append(record.recording ? "recording" : "not recording") }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// The words for an agent's record (`vault/codex`) in Records on this Mac.
+enum UsageRecordCopy {
+    static func title(_ agent: AgentSource) -> String { "\(agent.displayName) · local activity" }
+
+    static func eraseTitle(_ agent: AgentSource) -> String { "Erase \(agent.displayName)'s record?" }
+
+    static func eraseMessage(_ agent: AgentSource, bytes: Int64, oldest: CCLocalDay?) -> String {
+        var text = "Deletes \(VaultStewardship.sizeText(bytes)) of session summaries"
+        if let oldest { text += " going back to \(UsageDates.long(oldest))" }
+        text += ". \(agent.displayName)'s own logs stay as they are."
+        text += " Nothing more is recorded until you switch \(agent.displayName) on again in Sources."
+        return text
     }
 }
 

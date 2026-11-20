@@ -932,6 +932,7 @@ final class UsageViewModel {
             endSwitchVeil()
             let shown = demoSession.start(shownState, now: now)
             demo = true
+            vault.agentsPaused = true
             plan = nil
             seatMeters.paused = true
             apply(shown)
@@ -940,6 +941,7 @@ final class UsageViewModel {
         }
         guard let real = demoSession.end() else { return }
         demo = false
+        vault.agentsPaused = false
         seatMeters.paused = !usageOn
         apply(real)
         reloadAccounts()

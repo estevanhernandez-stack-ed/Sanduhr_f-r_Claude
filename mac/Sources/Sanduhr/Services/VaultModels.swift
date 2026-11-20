@@ -225,6 +225,10 @@ struct VaultCheckpointEntry: Codable, Equatable, Sendable {
     var months: [String] = []
     var sealed = false
     var lastSeen = ""
+    /// An agent reader's state at `offset` (Codex: the model and the segment's last total), so a
+    /// grown file resumes mid-segment. Nil for Claude Code logs, and then not written at all: a
+    /// Claude root's checkpoints keep exactly the keys they always had.
+    var parserState: String?
 
     enum CodingKeys: String, CodingKey {
         case mtimeTicks = "mtime_ticks"
@@ -236,6 +240,7 @@ struct VaultCheckpointEntry: Codable, Equatable, Sendable {
         case rowCacheCreation = "row_cache_creation"
         case months, sealed
         case lastSeen = "last_seen"
+        case parserState = "parser_state"
     }
 
     init() {}
@@ -253,6 +258,7 @@ struct VaultCheckpointEntry: Codable, Equatable, Sendable {
         months = try c.decodeIfPresent([String].self, forKey: .months) ?? []
         sealed = try c.decodeIfPresent(Bool.self, forKey: .sealed) ?? false
         lastSeen = try c.decodeIfPresent(String.self, forKey: .lastSeen) ?? ""
+        parserState = try c.decodeIfPresent(String.self, forKey: .parserState)
     }
 }
 
@@ -303,19 +309,28 @@ struct VaultRootMeta: Codable, Equatable, Sendable {
     /// invalidated once so the re-ingest sees them. The Mac has walked recursively from the
     /// start and always writes 2.
     var walkVersion = 0
+    /// Which agent's burn the root holds: "codex" or "antigravity". Nil (absent) is a Claude Code
+    /// folder, and a Claude root's meta is written without the key, as before.
+    var agent: String?
 
     enum CodingKeys: String, CodingKey {
         case since, covered
         case lastIngestTs = "last_ingest_ts"
         case walkVersion = "walk_version"
+        case agent
     }
 
-    init(since: String = "", covered: [VaultDateRange] = [], lastIngestTs: String = "", walkVersion: Int = 0) {
+    init(since: String = "", covered: [VaultDateRange] = [], lastIngestTs: String = "", walkVersion: Int = 0,
+         agent: String? = nil) {
         self.since = since
         self.covered = covered
         self.lastIngestTs = lastIngestTs
         self.walkVersion = walkVersion
+        self.agent = agent
     }
+
+    /// The agent this root holds; a root without one is a Claude Code folder.
+    var agentSource: AgentSource { agent.flatMap(AgentSource.init(rawValue:)) ?? .claude }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -323,6 +338,7 @@ struct VaultRootMeta: Codable, Equatable, Sendable {
         covered = try c.decodeIfPresent([VaultDateRange].self, forKey: .covered) ?? []
         lastIngestTs = try c.decodeIfPresent(String.self, forKey: .lastIngestTs) ?? ""
         walkVersion = try c.decodeIfPresent(Int.self, forKey: .walkVersion) ?? 0
+        agent = try c.decodeIfPresent(String.self, forKey: .agent)
     }
 }
 

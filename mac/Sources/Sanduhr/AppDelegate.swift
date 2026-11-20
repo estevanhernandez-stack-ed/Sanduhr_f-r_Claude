@@ -133,6 +133,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.syncDeskSources()
             self?.fitPanelToContent()
             self?.renderStatusItem()   // the menu bar follows Primary, so a Codex reading can change it
+            self?.triggerCodexIngest()
         }
         codexUsage.onStop = { [weak self] in
             let on = AgentSourceSettings.load().isOn(.codex, setup: SetupStore.load())
@@ -273,6 +274,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             awaitingSignIn = true
             applyWidgetVisibility(.signedOut)
         }
+    }
+
+    /// The Vault's Codex root catches up from the Codex poll at most every five minutes, so a Mac
+    /// with Claude off (no Claude refresh to trigger it) still records Codex's burn.
+    private var lastCodexIngest: Date?
+
+    private func triggerCodexIngest(now: Date = Date()) {
+        if let last = lastCodexIngest, now.timeIntervalSince(last) < 300 { return }
+        lastCodexIngest = now
+        viewModel.vault.trigger()
     }
 
     /// Starts or stops the Codex reader from the stored setup and demo mode. Idempotent.
