@@ -5,6 +5,10 @@
 #   -Sideload : self-signed via a dev cert whose subject CN matches the manifest Publisher.
 #               For local sideload testing only -- never submitted to the Store.
 #   -Verify   : run the logo gate + manifest sanity check only; build nothing.
+#   -Runtime  : win-x64 (the default) or win-arm64. One run builds one architecture; a release runs it twice.
+#               The architecture goes into the STAGED manifest and into the file name:
+#                 dist\Sanduhr-Store-x64-v<version>.msix   dist\Sanduhr-Store-arm64-v<version>.msix
+#               An arm64 package cannot be run on an x64 PC. The Arm check workflow runs it.
 #
 # Run from repo root (Sanduhr/):
 #   powershell -ExecutionPolicy Bypass -File windows-dotnet/scripts/build-msix.ps1 -Store
@@ -40,6 +44,7 @@ param(
     [string]$Version,
 
     [string]$Configuration = 'Release',
+    [ValidateSet('win-x64', 'win-arm64')]
     [string]$Runtime = 'win-x64',
     [switch]$AllowPlaceholders
 )
@@ -122,6 +127,7 @@ if ($Verify) {
 
 $ver = Resolve-Version
 $flavor = if ($Sideload) { 'Sideload' } else { 'Store' }
+$arch = $Runtime -replace '^win-', ''
 Write-Host "[build-msix] Sanduhr v$ver ($flavor / $Configuration / $Runtime)" -ForegroundColor Cyan
 
 # === Logo gate. ===
@@ -129,7 +135,8 @@ if (-not (Test-LogosPresent -AllowPlaceholders:$AllowPlaceholders)) { exit 1 }
 
 # === Publish (self-contained: bundles .NET 10 Desktop Runtime so the MSIX installs on a fresh
 #     Win11 box without a separate runtime install). ===
-$publishDir = Join-Path $outDir 'publish'
+# x64 keeps dist\publish (smoke-mcp.ps1's default); arm64 gets its own folder so one build cannot overwrite the other.
+if ($arch -eq 'x64') { $publishDir = Join-Path $outDir 'publish' } else { $publishDir = Join-Path $outDir "publish-$arch" }
 if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
 New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
 
@@ -155,6 +162,10 @@ Write-Host "[build-msix] Publishing..." -ForegroundColor Cyan
     /p:DebugSymbols=false
 if ($LASTEXITCODE -ne 0) { Write-Host '[build-msix] dotnet publish FAILED.' -ForegroundColor Red; exit $LASTEXITCODE }
 
+# === Architecture gate: no file for the other processor, and the app and the server are this one's. ===
+& (Join-Path $PSScriptRoot 'check-architecture.ps1') -Dir $publishDir -Runtime $Runtime
+if ($LASTEXITCODE -ne 0) { Write-Host '[build-msix] architecture gate FAILED.' -ForegroundColor Red; exit 1 }
+
 # === Stage publish output + manifest (version-patched) + logos into one tree for makeappx. ===
 $stage = Join-Path $outDir 'staging'
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
@@ -166,6 +177,7 @@ Copy-Item "$publishDir\*" $stage -Recurse -Force
 # "für" into "fÃ¼r" in the staged manifest and Partner Center rejected the unreserved name (3.4.0).
 [xml]$m = [System.IO.File]::ReadAllText($manifestPath, [System.Text.Encoding]::UTF8)
 $m.Package.Identity.Version = $ver
+$m.Package.Identity.ProcessorArchitecture = $arch
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 $ws = New-Object System.Xml.XmlWriterSettings
 $ws.Indent = $true; $ws.IndentChars = '  '; $ws.Encoding = $utf8NoBom
@@ -178,7 +190,7 @@ Copy-Item "$logosDir\*.png" $stageLogos -Force
 
 # === Pack. ===
 $makeAppx = Get-SdkTool 'makeappx.exe'
-$msixPath = Join-Path $outDir "Sanduhr-$flavor-v$ver.msix"
+$msixPath = Join-Path $outDir "Sanduhr-$flavor-$arch-v$ver.msix"
 if (Test-Path $msixPath) { Remove-Item $msixPath -Force }
 Write-Host "[build-msix] Packing $msixPath..." -ForegroundColor Cyan
 & $makeAppx pack /v /d $stage /p $msixPath /o

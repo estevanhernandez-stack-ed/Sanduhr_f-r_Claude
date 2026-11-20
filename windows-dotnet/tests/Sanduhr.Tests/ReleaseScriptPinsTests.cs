@@ -1,0 +1,52 @@
+using System.Xml.Linq;
+using Xunit;
+
+namespace Sanduhr.Tests;
+
+/// <summary>
+/// 5.0 spec 7: the release scripts are read as text and pinned where a quiet edit would ship the wrong thing.
+/// The x64 Velopack channel is the one that matters most: every x64 install reads releases.win.json.
+/// </summary>
+public class ReleaseScriptPinsTests
+{
+    private static readonly XNamespace Foundation = "http://schemas.microsoft.com/appx/manifest/foundation/windows10";
+
+    private static string Root()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "src", "Sanduhr.App", "Package.appxmanifest")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        return dir!.FullName;
+    }
+
+    private static string Script(string name) => File.ReadAllText(Path.Combine(Root(), "scripts", name));
+
+    /// <summary>The script's lines that are not comments.</summary>
+    internal static List<string> Code(string text) =>
+        [.. text.Split('\n').Select(l => l.TrimEnd('\r')).Where(l => !l.TrimStart().StartsWith('#'))];
+
+    [Fact]
+    public void Msix_script_accepts_exactly_the_two_runtimes()
+        => Assert.Contains(Code(Script("build-msix.ps1")), l => l.Trim() == "[ValidateSet('win-x64', 'win-arm64')]");
+
+    [Fact]
+    public void Msix_script_stamps_the_architecture_into_the_staged_manifest()
+        => Assert.Contains(Code(Script("build-msix.ps1")), l => l.Trim() == "$m.Package.Identity.ProcessorArchitecture = $arch");
+
+    [Fact]
+    public void Msix_script_names_the_package_with_its_architecture()
+        => Assert.Contains(Code(Script("build-msix.ps1")), l => l.Contains("\"Sanduhr-$flavor-$arch-v$ver.msix\"", StringComparison.Ordinal));
+
+    [Fact]
+    public void Msix_script_runs_the_architecture_gate()
+        => Assert.Contains(Code(Script("build-msix.ps1")), l => l.Contains("check-architecture.ps1", StringComparison.Ordinal));
+
+    [Fact]
+    public void The_committed_manifest_stays_x64()
+    {
+        var manifest = XDocument.Load(Path.Combine(Root(), "src", "Sanduhr.App", "Package.appxmanifest"));
+        var identity = manifest.Root!.Element(Foundation + "Identity")!;
+        Assert.Equal("x64", (string?)identity.Attribute("ProcessorArchitecture"));
+    }
+}
