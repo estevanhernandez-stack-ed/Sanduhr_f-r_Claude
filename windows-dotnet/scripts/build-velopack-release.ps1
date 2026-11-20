@@ -58,6 +58,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# -CleanOnly is for tests. Without -ReleaseDir it would clean the real dist\release and exit.
+if ($CleanOnly -and -not $ReleaseDir) { throw '-CleanOnly needs -ReleaseDir (a test folder). Nothing was cleaned.' }
 
 # vpk --packVersion wants 3-part SemVer2; the assembly + tag use the 4-part .NET version. Strip
 # the 4th segment for vpk only.
@@ -69,7 +71,8 @@ $arch = $Runtime -replace '^win-', ''
 # x64 keeps dist\publish-velopack; arm64 gets its own folder so one build cannot overwrite the other.
 if ($arch -eq 'x64') { $publishDir = Join-Path $repoRoot 'windows-dotnet\dist\publish-velopack' }
 else { $publishDir = Join-Path $repoRoot "windows-dotnet\dist\publish-velopack-$arch" }
-if ($ReleaseDir) { $releaseDir = [System.IO.Path]::GetFullPath($ReleaseDir) }
+# Resolved against PowerShell's location, not the .NET current directory, which a relative path would otherwise use.
+if ($ReleaseDir) { $releaseDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ReleaseDir) }
 else { $releaseDir = Join-Path $repoRoot 'windows-dotnet\dist\release' }
 
 # Both architectures pack into one folder, and each build must leave the other's files alone. A file belongs
@@ -77,6 +80,7 @@ else { $releaseDir = Join-Path $repoRoot 'windows-dotnet\dist\release' }
 function Clear-ChannelFiles {
     param([string]$Dir, [string]$ForRuntime)
     if (-not (Test-Path -LiteralPath $Dir)) { return }
+    # Any file without 'win-arm64' in its name counts as x64, and subfolders are left alone (-File, no -Recurse).
     foreach ($f in @(Get-ChildItem -LiteralPath $Dir -File)) {
         $isArm = $f.Name -like '*win-arm64*'
         if (($ForRuntime -eq 'win-arm64' -and $isArm) -or ($ForRuntime -ne 'win-arm64' -and -not $isArm)) {

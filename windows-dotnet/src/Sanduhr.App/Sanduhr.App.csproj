@@ -133,8 +133,16 @@
          - here, immediately before the nested publish, for a rewrite that lands
            while the app is still building. Without it the server ships
            untrimmed (79 MB, the 2026-11-19 arm64 trial).
-       MSBuildRestoreSessionId gives each Restore its own project instance, so
-       what follows evaluates the project after the restore wrote its files.
+       What makes the build after each restore see the fresh files is that it
+       runs under a different set of global properties from any evaluation made
+       before the restore: the nested publish adds PublishDir, and the reference
+       build carries the runtime. MSBuildRestoreSessionId only keeps the Restore's
+       own evaluation apart. So do not align those properties with an earlier
+       evaluation of the server: the build would reuse it and read the old files.
+       Both restores run even when the outer build passes dotnet's no-restore
+       option, so an offline run with a cold package cache fails inside the build.
+       This assumes a single-project publish: a solution-wide publish with a
+       runtime could race on the server's obj\project.assets.json.
        PublishReadyToRun is the App's own setting and must not leak into the
        server publish; TargetFramework and OutDir must not leak either. -->
   <Target Name="RestoreMcpServerForRuntime" BeforeTargets="ResolveProjectReferences" Condition="'$(RuntimeIdentifier)' != ''">

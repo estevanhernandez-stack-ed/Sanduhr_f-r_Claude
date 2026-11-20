@@ -7,8 +7,9 @@
   (sample numbers, nothing fetched), waits for a visible window, holds, and fails when the
   process exits early, never shows a window, or leaves a crash in the Application event log.
 
-  CI RUNNERS ONLY. A Sanduhr started from a publish folder uses the same data folders as an
-  installed Sanduhr. Never run this on a PC that has Sanduhr installed.
+  CI RUNNERS ONLY, and enforced. A Sanduhr started from a publish folder uses the same data
+  folders as an installed Sanduhr. So before it loads, checks or starts anything, it refuses to
+  run unless GITHUB_ACTIONS is 'true' (a GitHub Actions runner).
 
 .PARAMETER NoWindowCheck
   For a runner that cannot show a window: pass on the process staying up alone.
@@ -25,6 +26,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($env:GITHUB_ACTIONS -ne 'true') {
+    throw 'This script launches a Sanduhr build against Sanduhr''s real data folders. It runs on CI runners only (GITHUB_ACTIONS is not true here); nothing was started.'
+}
 $Exe = [System.IO.Path]::GetFullPath($Exe)
 if (-not (Test-Path -LiteralPath $Exe)) { throw "No app at $Exe." }
 
