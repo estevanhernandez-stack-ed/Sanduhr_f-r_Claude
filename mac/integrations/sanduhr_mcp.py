@@ -83,12 +83,14 @@ import unicodedata
 import uuid
 from datetime import datetime, timedelta, timezone
 
-SERVER_VERSION = "0.5.0-mac"
+SERVER_VERSION = "0.6.0-mac"
 PROTOCOL_VERSION = "2025-06-18"
 SCHEMA_VERSION = 1
 ACCESS_SCHEMA_VERSION = 1
 FRESH_SECONDS = 450
 DEAD_SECONDS = 900
+# Codex's limits are fresh for 30 minutes of Codex idle time by captured_at (the widget's rule).
+CODEX_FRESH_SECONDS = 1800
 DATA_LAG_NOTE = "claude.ai's own numbers lag consumption by several minutes"
 BURN_CAVEAT = (
     "token-count proxy from local Claude Code logs (input+output only, cache excluded); "
@@ -482,7 +484,10 @@ TOOLS = [
             "not be the account this session bills to - confirm with the user if they run multiple "
             "accounts. Answers only when the user shares that account with "
             "Claude in Sanduhr. A stale, no_data or not_shared result means unknown headroom - "
-            "never assume budget."),
+            "never assume budget. When the user has Codex switched on in Sanduhr, a separate "
+            "`codex` block carries Codex's own 5-hour and weekly limits in the same tier shape "
+            "(as_of, stale, plan); it is independent of Claude's status and absent when Codex "
+            "has no reading."),
         "inputSchema": NO_ARGS,
         "annotations": READ_ONLY,
     },
@@ -996,6 +1001,9 @@ class Paths:
         named = snapshot or os.environ.get("SANDUHR_SNAPSHOT")
         self.snapshot_named = bool(named)
         self.snapshot = named or os.path.join(self.support_dir, "snapshot.json")
+        # Codex's snapshot sits beside the Claude one, a named snapshot's folder included.
+        self.codex_snapshot = os.path.join(
+            os.path.dirname(os.path.abspath(named)) if named else self.support_dir, "snapshot.codex.json")
         self.access = os.path.join(self.support_dir, "mcp-access.json")
         self.vault = os.path.join(self.support_dir, "vault")
         # Desk's folder sits beside Sanduhr's (Application Support/Desk), so a test folder moves
@@ -1547,8 +1555,49 @@ def read_meter_history(paths, account, first, last):
 # -- tools -------------------------------------------------------------------------------
 
 def build_usage(now=None, paths=None, env=None):
+    """Claude's usage plus, when snapshot.codex.json reads, the independent `codex` block: Codex
+    shows whatever state Claude's side is in (not shared, missing, stale), as on Windows. No file,
+    no `codex` key, so a Claude-only answer is the one it always was."""
     now = now or datetime.now(timezone.utc)
     paths = paths or Paths()
+    result = build_claude_usage(now, paths, env)
+    codex = build_codex_block(now, paths)
+    if codex is not None:
+        result["codex"] = codex
+    return result
+
+
+def build_codex_block(now, paths):
+    """Codex's limits from snapshot.codex.json in the tier shape, or None (no key at all) when the
+    file is missing, unreadable, a newer schema or carries no readable captured_at: Codex is an
+    extra, never the thing whose absence is an error. `stale` is past 30 minutes by captured_at (the
+    Codex event's own time, so it counts Codex idle time, not Claude's 450 s) or a file in error."""
+    outcome, snap = read_snapshot(paths, paths.codex_snapshot)
+    if outcome != "ok":
+        return None
+    try:
+        if int(snap.get("schema_version")) > SCHEMA_VERSION:
+            return None
+    except (TypeError, ValueError):
+        return None
+    captured = parse(snap.get("captured_at"))
+    if captured is None:
+        return None
+    age = round(max(0.0, (now - captured).total_seconds()))
+    stale = age >= CODEX_FRESH_SECONDS or snap.get("status") == "error"
+    tiers = [build_tier(t["key"], t, now) for t in snap.get("tiers") or []
+             if isinstance(t, dict) and isinstance(t.get("key"), str) and t["key"]]
+    return {
+        "status": "stale" if stale else "ok",
+        "stale": stale,
+        "as_of": snap.get("captured_at"),
+        "age_seconds": age,
+        "plan": snap.get("plan"),
+        "tiers": tiers,
+    }
+
+
+def build_claude_usage(now, paths, env=None):
     access, accounts = read_access(paths)
     if access != "ok" or not accounts:
         return not_shared(access if access != "ok" else "none")

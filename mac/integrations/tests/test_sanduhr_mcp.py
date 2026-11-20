@@ -583,6 +583,139 @@ class GetUsageParity(Base):
         self.assertEqual(pace["projected_final_pct"], 20)
 
 
+class CodexBlock(Base):
+    """get_usage's `codex` block (agent sources, item 9), from snapshot.codex.json beside the Claude
+    snapshot: always when the file reads, whatever Claude's side says, as on Windows
+    (ToolLogicUsageTests). Absent file means no `codex` key at all."""
+
+    CLAUDE_KEYS = ["status", "reason", "remedy", "fetch_error", "as_of", "age_seconds", "writer_version",
+                   "data_source", "scope", "account", "data_lag_note", "schema_version", "tiers",
+                   "local_burn_since_snapshot"]
+
+    def write_codex(self, captured=None, schema=1, status="ok", tiers=None, plan="Pro"):
+        captured = captured or NOW - timedelta(minutes=1)
+        if tiers is None:
+            tiers = [
+                {"key": "five_hour", "utilization": 40, "resets_at": iso(captured + timedelta(hours=3)),
+                 "used": None, "limit": None},
+                {"key": "seven_day", "utilization": 12, "resets_at": iso(captured + timedelta(days=5)),
+                 "used": None, "limit": None}]
+        self.fx.write_json("snapshot.codex.json", {
+            "schema_version": schema, "writer_version": "2.46.0", "captured_at": iso(captured),
+            "source": "codex", "plan": plan, "status": status, "error_kind": None, "tiers": tiers})
+
+    def share_claude(self):
+        self.fx.access(entry("Home", "meters"))
+        self.fx.snapshot("Home")
+
+    def test_a_fresh_codex_snapshot_adds_an_ok_block_in_the_tier_shape(self):
+        self.share_claude()
+        self.write_codex(captured=NOW - timedelta(seconds=60))
+        r = self.usage()
+        block = r["codex"]
+        self.assertEqual((block["status"], block["stale"]), ("ok", False))
+        self.assertEqual(block["as_of"], iso(NOW - timedelta(seconds=60)))
+        self.assertEqual(block["age_seconds"], 60)
+        self.assertEqual(block["plan"], "Pro")
+        self.assertEqual([t["key"] for t in block["tiers"]], ["five_hour", "seven_day"])
+        self.assertEqual([t["utilization_pct"] for t in block["tiers"]], [40, 12])
+        self.assertEqual([t["headroom_pct"] for t in block["tiers"]], [60, 88])
+        self.assertEqual(set(block["tiers"][0]), set(r["tiers"][0]))
+        self.assertEqual(r["status"], "ok")
+
+    def test_the_claude_block_is_untouched_by_codex(self):
+        self.share_claude()
+        before = self.usage()
+        self.write_codex()
+        after = dict(self.usage())
+        after.pop("codex")
+        self.assertEqual(after, before)
+
+    def test_without_a_codex_file_there_is_no_codex_key_and_claudes_keys_are_the_same(self):
+        self.share_claude()
+        r = self.usage()
+        self.assertNotIn("codex", r)
+        self.assertEqual(list(r), self.CLAUDE_KEYS)
+
+    def test_fresh_for_thirty_minutes_then_stale(self):
+        self.share_claude()
+        self.write_codex(captured=NOW - timedelta(seconds=1000))
+        self.assertEqual(self.usage()["codex"]["stale"], False)
+        self.write_codex(captured=NOW - timedelta(seconds=1900))
+        block = self.usage()["codex"]
+        self.assertEqual((block["status"], block["stale"]), ("stale", True))
+        self.assertEqual(block["tiers"][0]["utilization_pct"], 40)
+        self.assertEqual(block["age_seconds"], 1900)
+
+    def test_an_error_snapshot_is_stale_whatever_its_age(self):
+        self.share_claude()
+        self.write_codex(status="error")
+        block = self.usage()["codex"]
+        self.assertEqual((block["status"], block["stale"]), ("stale", True))
+
+    def test_a_crossed_reset_reads_as_unknown_not_a_stale_percent(self):
+        self.share_claude()
+        self.write_codex(tiers=[{"key": "five_hour", "utilization": 40, "resets_at": iso(NOW - timedelta(minutes=5))}])
+        t = self.usage()["codex"]["tiers"][0]
+        self.assertEqual((t["utilization_pct"], t["reset_crossed"]), (None, True))
+
+    def test_a_newer_schema_or_a_malformed_file_is_absent_not_an_error(self):
+        self.share_claude()
+        self.write_codex(schema=2)
+        self.assertNotIn("codex", self.usage())
+        with open(os.path.join(self.fx.support, "snapshot.codex.json"), "w") as f:
+            f.write("{ not json")
+        r = self.usage()
+        self.assertNotIn("codex", r)
+        self.assertEqual(r["status"], "ok")
+        self.write_codex()
+        os.remove(os.path.join(self.fx.support, "snapshot.codex.json"))
+        self.assertNotIn("codex", self.usage())
+
+    def test_a_snapshot_without_a_readable_captured_at_is_absent(self):
+        self.share_claude()
+        self.fx.write_json("snapshot.codex.json", {"schema_version": 1, "status": "ok", "tiers": []})
+        self.assertNotIn("codex", self.usage())
+
+    def test_codex_shows_when_claude_is_not_shared_at_all(self):
+        self.fx.snapshot("Home")
+        self.write_codex()
+        r = self.usage()
+        self.assertEqual((r["status"], r["reason"]), ("no_data", "not_shared"))
+        self.assertNotIn("tiers", r)
+        self.assertEqual(r["codex"]["status"], "ok")
+
+    def test_codex_shows_when_the_claude_snapshot_is_missing_or_malformed(self):
+        self.fx.access(entry("Home", "meters"))
+        self.write_codex()
+        r = self.usage()
+        self.assertEqual((r["status"], r["reason"]), ("no_data", "missing"))
+        self.assertEqual(r["codex"]["tiers"][0]["utilization_pct"], 40)
+        with open(os.path.join(self.fx.support, "snapshot.json"), "w") as f:
+            f.write("{ not json")
+        r = self.usage()
+        self.assertEqual(r["reason"], "malformed")
+        self.assertEqual(r["codex"]["status"], "ok")
+
+    def test_the_other_tools_never_carry_codex(self):
+        self.fx.access(entry("Home", "activity", vault_id=VAULT_A))
+        self.fx.snapshot("Home")
+        self.write_codex()
+        for r in (self.burn(), self.models(), self.history()):
+            self.assertNotIn("codex", r)
+
+    def test_a_named_snapshot_reads_codex_beside_it(self):
+        named = os.path.join(self.fx.folder("named"), "snap.json")
+        with open(named, "w") as f:
+            f.write("{}")
+        with open(os.path.join(os.path.dirname(named), "snapshot.codex.json"), "w") as f:
+            json.dump({"schema_version": 1, "captured_at": iso(NOW), "status": "ok", "tiers": []}, f)
+        paths = mcp.Paths(support_dir=self.fx.support, snapshot=named)
+        self.assertEqual(paths.codex_snapshot, os.path.join(os.path.dirname(named), "snapshot.codex.json"))
+        self.assertEqual(mcp.Paths(support_dir=self.fx.support).codex_snapshot,
+                         os.path.join(self.fx.support, "snapshot.codex.json"))
+
+
 class Protocol(Base):
     def run_server(self, *messages):
         env = dict(os.environ, SANDUHR_SUPPORT_DIR=self.fx.support)
