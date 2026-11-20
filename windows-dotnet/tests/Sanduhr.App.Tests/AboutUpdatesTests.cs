@@ -17,11 +17,12 @@ namespace Sanduhr.App.Tests;
 public sealed class AboutUpdatesTests : AppWindowFixture
 {
     private (SettingsWindow Window, SettingsViewModel Svm, WidgetViewModel Widget, NoActivate Guard) Open(
-        Func<Task<UpdateProbeResult>>? checkNow = null, bool isStoreBuild = false)
+        Func<Task<UpdateProbeResult>>? checkNow = null, bool isStoreBuild = false, Func<string?>? armBuildUrl = null)
     {
         var (widget, _) = ScratchWidget("Personal");
+        // The tests say what the machine is; null is "this is not an x64 build on an Arm PC", whatever PC runs them.
         var svm = new SettingsViewModel(widget, () => Task.CompletedTask, _ => Task.CompletedTask,
-            checkForUpdatesNow: checkNow, isStoreBuild: isStoreBuild);
+            checkForUpdatesNow: checkNow, isStoreBuild: isStoreBuild, armBuildUrl: armBuildUrl ?? (() => null));
         var window = new SettingsWindow(svm);
         var guard = NoActivate.Show(window);
         window.SelectPage(SettingsPage.About, SettingsIndex.Updates);
@@ -201,6 +202,78 @@ public sealed class AboutUpdatesTests : AppWindowFixture
                 var defaulted = new SettingsViewModel(w2, () => Task.CompletedTask, _ => Task.CompletedTask);
                 Assert.Equal(Startup.IsPackaged(), defaulted.AboutUpdates.IsStoreBuild);
             }
+        }
+        finally { window.Close(); widget.Dispose(); }
+    });
+
+    private const string ArmUrl = "https://example.invalid/releases?q=v5&expanded=true";
+
+    [Fact]
+    public void An_x64_build_on_an_Arm_pc_shows_the_line_and_the_link() => AppHost.Run(() =>
+    {
+        var (window, svm, widget, _) = Open(armBuildUrl: () => ArmUrl);
+        try
+        {
+            Assert.True(svm.AboutUpdates.ArmBuildAvailable);
+            var line = Below<TextBlock>(window).Single(t => t.Text == ArmBuildNotice.AboutLine);
+            Assert.True(line.IsVisible);
+            var button = Named<Button>(window, ArmBuildNotice.GetText);
+            Assert.True(button.IsVisible);
+            Assert.Same(svm.AboutUpdates.GetArmBuildCommand, button.Command);
+        }
+        finally { window.Close(); widget.Dispose(); }
+    });
+
+    [Fact]
+    public void Any_other_pc_shows_neither() => AppHost.Run(() =>
+    {
+        var (window, svm, widget, _) = Open();
+        try
+        {
+            Assert.False(svm.AboutUpdates.ArmBuildAvailable);
+            Assert.DoesNotContain(Below<TextBlock>(window), t => t.Text == ArmBuildNotice.AboutLine && t.IsVisible);
+            Assert.DoesNotContain(Below<Button>(window), b => Spoken(b) == ArmBuildNotice.GetText && b.IsVisible);
+        }
+        finally { window.Close(); widget.Dispose(); }
+    });
+
+    [Fact]
+    public void The_Store_build_never_shows_it() => AppHost.Run(() =>
+    {
+        var (window, svm, widget, _) = Open(isStoreBuild: true, armBuildUrl: () => ArmUrl);
+        try
+        {
+            Assert.False(svm.AboutUpdates.ArmBuildAvailable);
+            Assert.DoesNotContain(Below<Button>(window), b => Spoken(b) == ArmBuildNotice.GetText && b.IsVisible);
+        }
+        finally { window.Close(); widget.Dispose(); }
+    });
+
+    [Fact]
+    public void The_link_opens_the_release_list() => AppHost.Run(() =>
+    {
+        // Open() first: it points the settings paths at this test's scratch folder.
+        var (window, _, widget, _) = Open();
+        try
+        {
+            string? opened = null;
+            var vm = new AboutUpdatesViewModel(new SettingsStore(new Paths()), isStoreBuild: false, checkNow: null,
+                armBuildUrl: ArmUrl, openLink: url => opened = url);
+            vm.GetArmBuildCommand.Execute(null);
+            Assert.Equal(ArmUrl, opened);
+        }
+        finally { window.Close(); widget.Dispose(); }
+    });
+
+    [Fact]
+    public void The_shown_flag_round_trips() => AppHost.Run(() =>
+    {
+        var (window, _, widget, _) = Open();
+        try
+        {
+            Assert.False(new SettingsStore(new Paths()).LoadArmBuildNoticeShown());
+            new SettingsStore(new Paths()).SaveArmBuildNoticeShown();
+            Assert.True(new SettingsStore(new Paths()).LoadArmBuildNoticeShown());
         }
         finally { window.Close(); widget.Dispose(); }
     });
