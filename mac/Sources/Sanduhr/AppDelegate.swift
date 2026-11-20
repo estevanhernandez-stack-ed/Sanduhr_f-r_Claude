@@ -15,6 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static var resetSweep: (() -> Void)?
 
     let viewModel = UsageViewModel()
+    /// Codex's limits from its own rollouts (agent sources, item 3): polls only while Codex is ticked
+    /// in the setup and demo mode is off. Nothing draws it yet.
+    let codexUsage = CodexUsageService()
     private var panel: FloatingPanel?
     private var statusItem: NSStatusItem?
     /// Rotate's timer (Settings, General, Menu bar), nil in every other mode; the step counts its turns.
@@ -118,8 +121,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The lock screen line (#137): keeps lock-line.txt current while its switch is on.
         LockLineController.shared.start(viewModel: viewModel)
 
+        // Codex polls while its source is on; a setup change or demo mode flipping re-decides.
+        syncCodexSource()
+        NotificationCenter.default.addObserver(forName: .sanduhrSetupDidChange, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.syncCodexSource() }
+        }
+
         // Wire up status-item updates.
         viewModel.onUsageUpdate = { [weak self] in
+            self?.syncCodexSource()
             self?.renderStatusItem()
             self?.fitPanelToContent()
             // Desk takes the numbers straight from the view model, so its meters move with
@@ -230,6 +240,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             awaitingSignIn = true
             applyWidgetVisibility(.signedOut)
         }
+    }
+
+    /// Starts or stops the Codex reader from the stored setup and demo mode. Idempotent.
+    private func syncCodexSource() {
+        codexUsage.update(on: CodexUsageService.wants(
+            setup: SetupStore.load(), sources: AgentSourceSettings.load(), demo: viewModel.demo))
     }
 
     /// Claude usage as the last update saw it, to tell a switch from an ordinary refresh.
@@ -349,6 +365,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             awaitingSignIn = !SignInGate.fetched(KeychainStore.accounts.active, in: UserDefaults.standard) || !hasKey
         }
         lastUsageOn = viewModel.usageOn
+        syncCodexSource()
         applyWidgetVisibility(.usageChanged)
         DeskController.shared.model.refreshClaude()
         renderStatusItem()
