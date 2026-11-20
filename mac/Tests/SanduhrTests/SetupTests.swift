@@ -158,4 +158,51 @@ struct SetupTests {
         #expect(SetupChange.blocked(SetupChoices(desktop: false, drawers: false, claudeUsage: false)) == SetupCopy.pickOne)
         #expect(SetupChange.blocked(SetupChoices(desktop: false, drawers: false, claudeUsage: true)) == nil)
     }
+
+    // MARK: Codex (agent sources)
+
+    @Test func codexUsageRoundTripsThroughTheStore() {
+        let s = MemoryDefaults()
+        let setup = SetupSettings(desktop: true, usage: ["claude": true, "codex": true])
+        SetupStore.save(setup, to: s)
+        #expect(SetupStore.load(from: s)?.codexUsage == true)
+        #expect(SetupStore.load(from: s) == setup)
+        #expect(SetupSettings(desktop: true, usage: ["claude": true]).codexUsage == false)
+        #expect(on.withCodex(true).usage == ["claude": true, "codex": true])
+        #expect(on.withCodex(true).withCodex(false) == SetupSettings(desktop: true, usage: ["claude": true, "codex": false]))
+        #expect(on.withCodex(true).usageOn && SetupSettings(desktop: true, usage: ["codex": true]).usageOn)
+    }
+
+    @Test func codexAloneKeepsTheSetupFromBeingEmpty() {
+        let codexOnly = SetupChoices(desktop: false, drawers: false, claudeUsage: false, codexUsage: true)
+        #expect(codexOnly.anyTicked && !codexOnly.deskRuns)
+        #expect(SetupChange.blocked(codexOnly) == nil)
+        #expect(SetupChoices.of(on.withCodex(true), drawersOn: false, deskEnabled: false).codexUsage)
+    }
+
+    /// A Claude-only Mac stores exactly what 2.45.0 stored.
+    @Test func aClaudeOnlyChoiceStoresNoCodexEntry() {
+        let claudeOnly = SetupChoices(desktop: true, drawers: true, claudeUsage: true)
+        #expect(claudeOnly.codexUsage == false)
+        #expect(claudeOnly.toSettings(before: nil) == SetupSettings(desktop: true, usage: ["claude": true]))
+        #expect(claudeOnly.toSettings(before: on) == SetupSettings(desktop: true, usage: ["claude": true]))
+        #expect(SetupChoices.firstRun.toSettings(before: nil).usage == ["claude": false])
+    }
+
+    @Test func tickingCodexWritesItsEntryAndUntickingKeepsItFalse() {
+        let ticked = SetupChoices(desktop: true, drawers: false, claudeUsage: true, codexUsage: true)
+        let saved = ticked.toSettings(before: on)
+        #expect(saved.usage == ["claude": true, "codex": true])
+        let unticked = SetupChoices(desktop: true, drawers: false, claudeUsage: true, codexUsage: false)
+        #expect(unticked.toSettings(before: saved).usage == ["claude": true, "codex": false])
+    }
+
+    @Test func codexOffLineSaysNothingInCodexChanges() {
+        let before = SetupChoices(desktop: true, drawers: true, claudeUsage: true, codexUsage: true)
+        let after = SetupChoices(desktop: true, drawers: true, claudeUsage: true, codexUsage: false)
+        let lines = SetupChange.lines(before: before, after: after, drawerFiles: 0, addonsInstalled: true, hasAccount: true)
+        #expect(lines == [SetupCopy.codexOffLine])
+        #expect(SetupCopy.codexNotInstalled == "Codex isn't installed on this Mac.")
+        for s in SetupCopy.all { #expect(!s.contains("\u{2014}"), "\(s)") }
+    }
 }

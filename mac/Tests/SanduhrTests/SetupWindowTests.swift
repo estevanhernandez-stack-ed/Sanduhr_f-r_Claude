@@ -48,8 +48,10 @@ struct SetupViewModelTests {
         deskStore.set(deskOn, forKey: DeskController.enabledKey)
     }
 
-    private func model(firstRun: Bool, failSave: Bool = false, hasAccount: @escaping () -> Bool = { false }) -> SetupViewModel {
-        SetupViewModel(service: service(failSave: failSave), firstRun: firstRun, hasAccount: hasAccount)
+    private func model(firstRun: Bool, failSave: Bool = false, hasAccount: @escaping () -> Bool = { false },
+                       codexInstalled: Bool = false) -> SetupViewModel {
+        SetupViewModel(service: service(failSave: failSave), firstRun: firstRun, hasAccount: hasAccount,
+                       codexInstalled: codexInstalled)
     }
 
     // MARK: ticks
@@ -226,6 +228,52 @@ struct SetupViewModelTests {
     @Test func theDesignButtonHasNoActionUntilItemSevenSetsOne() {
         let m = model(firstRun: true)
         #expect(m.onDesignWithChat == nil)
+    }
+
+    // MARK: Codex (agent sources)
+
+    @Test func codexIsGreyedWithALineWhenItsFolderIsAbsent() {
+        let m = model(firstRun: true, codexInstalled: false)
+        #expect(!m.codexEnabled)
+        #expect(m.codexNotInstalledLine == "Codex isn't installed on this Mac.")
+        let here = model(firstRun: true, codexInstalled: true)
+        #expect(here.codexEnabled && here.codexNotInstalledLine == nil)
+    }
+
+    @Test func aTickedCodexCanStillBeClearedWhenItsFolderIsGone() {
+        store(SetupSettings(desktop: true, usage: ["claude": true, "codex": true]))
+        let m = model(firstRun: false, codexInstalled: false)
+        #expect(m.codexUsage && m.codexEnabled)
+    }
+
+    @Test func codexRoundTripsThroughContinue() {
+        let m = model(firstRun: true, codexInstalled: true)
+        #expect(!m.codexUsage)
+        m.claudeUsage = true
+        m.codexUsage = true
+        #expect(m.choices == SetupChoices(desktop: true, drawers: true, claudeUsage: true, codexUsage: true))
+        m.continueTapped()
+        #expect(SetupStore.load(from: setupStore) == SetupSettings(desktop: true, usage: ["claude": true, "codex": true]))
+        // Reopened, the tick is there. Codex never reaches the host's Claude usage switch.
+        #expect(model(firstRun: false, codexInstalled: true).codexUsage)
+        #expect(!host.calls.contains("usage:false"))
+    }
+
+    @Test func codexAloneIsAValidChoice() {
+        let m = model(firstRun: true, codexInstalled: true)
+        m.desktop = false; m.drawers = false; m.claudeUsage = false
+        #expect(m.blocked == SetupCopy.pickOne)
+        m.codexUsage = true
+        #expect(m.blocked == nil && m.canContinue)
+    }
+
+    /// 2.45.0's stored shape: Continue on a Claude-only choice writes no Codex entry.
+    @Test func aClaudeOnlyContinueStoresExactlyWhatItAlwaysDid() {
+        let m = model(firstRun: true, codexInstalled: true)
+        m.claudeUsage = true
+        m.continueTapped()
+        #expect(SetupStore.load(from: setupStore) == SetupSettings(desktop: true, usage: ["claude": true]))
+        #expect((setupStore.values[SetupSettings.key] as? [String: Any])?["usage"] as? [String: Bool] == ["claude": true])
     }
 }
 
