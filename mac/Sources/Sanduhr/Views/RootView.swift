@@ -5,6 +5,10 @@ import AppKit
 /// an NSVisualEffectView so the whole thing has real system vibrancy.
 struct RootView: View {
     @Bindable var vm: UsageViewModel
+    /// The setup's sources, their colors and Primary, and which sections are collapsed.
+    var sources: WidgetSourcesState
+    /// Codex's limits while its source is on.
+    var codex: CodexUsageService
 
     @State private var showOnboarding = false
 
@@ -47,14 +51,19 @@ struct RootView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 } else {
                     let rows = vm.visibleTiers()
+                    let layout = sourceLayout
                     VStack(alignment: .leading, spacing: 6) {
                         // A switch fading the old cards says so over them (switchNote), not here.
-                        if vm.status != .idle && !(vm.status == .switching && !rows.isEmpty) {
+                        if vm.status != .idle && !(vm.status == .switching && !rows.isEmpty) && showsClaudeStatus(layout) {
                             if rows.isEmpty { statusLine.padding(.bottom, 2) } else { statusLine }
                         }
 
-                        if !rows.isEmpty {
-                            cards(rows, palette: t)
+                        if layout.isClaudeOnly {
+                            if !rows.isEmpty {
+                                cards(rows, palette: t)
+                            }
+                        } else {
+                            WidgetSourcesView(layout: layout, palette: t, vm: vm) { sources.toggle($0) }
                         }
                     }
                     .transition(.opacity.combined(with: .scale(scale: 1.05)))
@@ -147,6 +156,23 @@ struct RootView: View {
     /// account's fade in when they arrive (AccountSwitchFade).
     private func cards(_ rows: [(tier: Tier, usage: TierUsage)], palette t: Theme.Palette) -> some View {
         WidgetCardStack(cards: WidgetCards.live(vm, rows: rows), palette: t, vm: vm)
+    }
+
+    /// What the card stack draws for the sources that are on (WidgetSources). With only Claude on it is
+    /// today's widget, and the cards above draw exactly as they always have.
+    private var sourceLayout: WidgetSourceLayout {
+        WidgetSources.build(WidgetSourcesInput(
+            claudeOn: vm.usageOn || vm.demo, claudeUsage: vm.shownUsage, hidden: vm.hiddenTiers,
+            codexOn: sources.codexOn,
+            codex: CodexWidgetReading(usage: codex.codexUsage, asOf: codex.asOf, freshTiers: codex.freshTiers,
+                                      emptyState: codex.emptyState),
+            primary: sources.primary, settings: sources.settings, collapsed: sources.collapsed,
+            compact: vm.compact, demo: vm.demo, now: Date()))
+    }
+
+    /// Claude's status line shows while Claude's section does (or Claude alone, as today).
+    private func showsClaudeStatus(_ layout: WidgetSourceLayout) -> Bool {
+        layout.isClaudeOnly || layout.sections.contains { $0.source == .claude }
     }
 
     /// The action row's Deep Work and Snake buttons: open the tool, or close it if it is open.

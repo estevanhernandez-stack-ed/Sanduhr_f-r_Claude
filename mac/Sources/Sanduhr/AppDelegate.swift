@@ -18,6 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Codex's limits from its own rollouts (agent sources, item 3): polls only while Codex is ticked
     /// in the setup and demo mode is off. Nothing draws it yet.
     let codexUsage = CodexUsageService()
+    /// What the widget needs about sources beyond the view model (WidgetSources).
+    let widgetSources = WidgetSourcesState()
     /// Codex's history, `snapshot.codex.json` and alerts (item 4), fed by the service's readings.
     private let codexRecorder = CodexRecorder()
     private var panel: FloatingPanel?
@@ -78,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastUsageOn = viewModel.usageOn
 
         // Build widget panel.
-        let hosting = NSHostingController(rootView: RootView(vm: viewModel))
+        let hosting = NSHostingController(rootView: RootView(vm: viewModel, sources: widgetSources, codex: codexUsage))
         hosting.view.wantsLayer = true
         hosting.view.layer?.cornerRadius = 14
         hosting.view.layer?.masksToBounds = true
@@ -126,14 +128,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Codex polls while its source is on; a setup change or demo mode flipping re-decides. What a
         // reading leaves behind (history, snapshot, alerts) is the recorder's; a Mac with only Claude on
         // never starts the service, so neither callback ever runs there.
-        codexUsage.onUpdate = { [weak self] in self?.codexRecorder.record($0) }
+        codexUsage.onUpdate = { [weak self] in
+            self?.codexRecorder.record($0)
+            self?.fitPanelToContent()
+        }
         codexUsage.onStop = { [weak self] in
             let on = AgentSourceSettings.load().isOn(.codex, setup: SetupStore.load())
             self?.codexRecorder.stopped(codexOn: on)
+            self?.fitPanelToContent()
         }
+        // A section's chevron changes the widget's height.
+        widgetSources.onChange = { [weak self] in self?.fitPanelToContent() }
         syncCodexSource()
         NotificationCenter.default.addObserver(forName: .sanduhrSetupDidChange, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.syncCodexSource() }
+            MainActor.assumeIsolated {
+                self?.syncCodexSource()
+                self?.fitPanelToContent()
+            }
         }
 
         // Wire up status-item updates.
@@ -253,6 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Starts or stops the Codex reader from the stored setup and demo mode. Idempotent.
     private func syncCodexSource() {
+        widgetSources.reload()
         codexUsage.update(on: CodexUsageService.wants(
             setup: SetupStore.load(), sources: AgentSourceSettings.load(), demo: viewModel.demo))
     }
