@@ -1,0 +1,93 @@
+name: Windows .NET Arm check
+
+# 5.0 spec 7. The arm64 files a release ships are built on x64 machines, which cannot run them.
+# This runs them on Arm.
+#
+#   With a tag (run by hand in release-runbook Phase 6, on the DRAFT release, before publishing):
+#     downloads the draft's own files, checks that none is missing, runs the arm64 Store package's
+#     contents, then installs the x64 installer and the arm64 installer over it.
+#   On a pull request that touches the installer path:
+#     builds test installers on the runner and runs the same install switch, so the path is
+#     exercised whenever it changes and not for the first time on release day.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The draft release's tag, for example v5.0.0.0"
+        required: true
+  pull_request:
+    paths:
+      - "windows-dotnet/scripts/build-velopack-release.ps1"
+      - "windows-dotnet/scripts/check-install-switch.ps1"
+      - "windows-dotnet/scripts/check-architecture.ps1"
+      - "windows-dotnet/scripts/smoke-launch.ps1"
+      - ".github/workflows/windows-dotnet-arm-check.yml"
+
+defaults:
+  run:
+    working-directory: windows-dotnet
+
+jobs:
+  draft:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-11-arm
+    permissions:
+      contents: write   # a draft release's files are visible only with write access
+    env:
+      TAG: ${{ github.event.inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the draft's files
+        run: gh release download "$env:TAG" --repo "$env:GITHUB_REPOSITORY" --dir dist/draft
+      - name: The draft holds every file
+        run: ./scripts/check-release-assets.ps1 -Dir dist/draft -Tag "$env:TAG"
+      - name: Unpack the arm64 Store package
+        run: |
+          $msix = Get-ChildItem dist/draft -Filter 'Sanduhr-Store-arm64-*.msix' | Select-Object -First 1
+          if (-not $msix) { throw 'No arm64 Store package in the draft.' }
+          $all = @(Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter makeappx.exe -ErrorAction SilentlyContinue)
+          $tool = @($all | Where-Object { $_.FullName -like '*\arm64\*' }) + @($all | Where-Object { $_.FullName -like '*\x64\*' }) | Select-Object -First 1
+          if ($tool) {
+            & $tool.FullName unpack /p $msix.FullName /d dist/msix-arm64 /o
+            if ($LASTEXITCODE -ne 0) { throw "makeappx unpack failed ($LASTEXITCODE)." }
+          } else {
+            # No Windows SDK on the runner: an .msix is a zip.
+            Copy-Item $msix.FullName dist/msix-arm64.zip
+            Expand-Archive dist/msix-arm64.zip dist/msix-arm64
+          }
+      - name: "Store package: architecture gate"
+        run: ./scripts/check-architecture.ps1 -Dir dist/msix-arm64 -Runtime win-arm64
+      - name: "Store package: MCP smoke"
+        run: ./scripts/smoke-mcp.ps1 -Exe dist/msix-arm64/mcp/sanduhr-mcp.exe
+      - name: "Store package: launch check"
+        run: ./scripts/smoke-launch.ps1 -Exe dist/msix-arm64/Sanduhr.exe
+      - name: "Installers: x64, then arm64 over it"
+        run: ./scripts/check-install-switch.ps1 -X64Setup dist/draft/626Labs.Sanduhr-win-Setup.exe -Arm64Setup dist/draft/626Labs.Sanduhr-win-arm64-Setup.exe
+      - name: "Installed arm64 copy: MCP smoke"
+        run: ./scripts/smoke-mcp.ps1 -Exe "$env:LOCALAPPDATA\626Labs.Sanduhr\current\mcp\sanduhr-mcp.exe"
+
+  built:
+    if: github.event_name == 'pull_request'
+    runs-on: windows-11-arm
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Install vpk
+        run: |
+          dotnet tool install -g vpk --version 1.2.0
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      # A version below every shipped one: nothing built here could ever be offered as an update.
+      - name: Build the x64 installer
+        run: ./scripts/build-velopack-release.ps1 -Version 0.9.0 -Runtime win-x64
+      - name: Build the arm64 installer
+        run: ./scripts/build-velopack-release.ps1 -Version 0.9.0 -Runtime win-arm64
+      - name: "Installers: x64, then arm64 over it"
+        run: ./scripts/check-install-switch.ps1 -X64Setup dist/release/626Labs.Sanduhr-win-Setup.exe -Arm64Setup dist/release/626Labs.Sanduhr-win-arm64-Setup.exe
+      - name: "Installed arm64 copy: MCP smoke"
+        run: ./scripts/smoke-mcp.ps1 -Exe "$env:LOCALAPPDATA\626Labs.Sanduhr\current\mcp\sanduhr-mcp.exe"
