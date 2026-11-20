@@ -851,5 +851,172 @@ class SwiftLetterMapTests(unittest.TestCase):
         self.assertEqual(set(sl.FONTS), set(self.CASES.values()) | {"small-caps"})
 
 
+class CodexSegmentTests(unittest.TestCase):
+    """Codex's meters (agent sources, item 9): `cx 5h 40% wk 12%` after Claude's, from
+    snapshot.codex.json beside the snapshot, only while its captured_at is under 30 minutes old.
+    Parity with windows-dotnet StatuslineScriptRunTests; made-up numbers, temp folders."""
+
+    def setUp(self):
+        self.r = Rig()
+
+    def tearDown(self):
+        self.r.close()
+
+    def codex(self, five=40, week=12, age=10, schema=1, tiers=None):
+        now = datetime.now(timezone.utc)
+        body = {"schema_version": schema, "writer_version": "2.46.0", "source": "codex",
+                "captured_at": iso(now - timedelta(seconds=age)), "plan": "Pro", "status": "ok",
+                "error_kind": None,
+                "tiers": tiers if tiers is not None else [
+                    {"key": "five_hour", "utilization": five, "resets_at": iso(now + timedelta(hours=3)),
+                     "used": None, "limit": None},
+                    {"key": "seven_day", "utilization": week, "resets_at": iso(now + timedelta(days=5)),
+                     "used": None, "limit": None}]}
+        with open(self.r.path("snapshot.codex.json"), "w", encoding="utf-8") as f:
+            json.dump(body, f)
+
+    def line(self, *args, stdin=b""):
+        p, _ = self.r.run(list(args), stdin=stdin)
+        self.assertEqual(p.returncode, 0)
+        return p.stdout.decode()
+
+    def claude_only(self):
+        """A fresh Claude snapshot whose weekly reset falls on a whole hour, and the exact line it prints."""
+        now = datetime.now(timezone.utc)
+        reset = (now + timedelta(days=3)).replace(minute=0, second=0, microsecond=0)
+        snap = {"schema_version": 1, "captured_at": iso(now), "status": "ok", "tiers": [
+            {"key": "five_hour", "utilization": 42, "resets_at": iso(now + timedelta(hours=2))},
+            {"key": "seven_day", "utilization": 18, "resets_at": iso(reset)}]}
+        with open(self.r.snapshot, "w", encoding="utf-8") as f:
+            json.dump(snap, f)
+        hour = reset.strftime("%I").lstrip("0")
+        return "5h 42%% | wk 18%% | wk resets %s %s%s\n" % (reset.strftime("%a"), hour, "a" if reset.hour < 12 else "p")
+
+    def test_a_fresh_codex_snapshot_appends_its_meters_after_claudes(self):
+        expected = self.claude_only()
+        self.codex()
+        self.assertEqual(self.line(), expected.rstrip("\n") + " | cx 5h 40% wk 12%\n")
+
+    def test_without_a_codex_file_the_line_is_exactly_what_it_was(self):
+        expected = self.claude_only()
+        self.assertEqual(self.line(), expected)
+
+    def test_a_stale_codex_snapshot_adds_nothing(self):
+        expected = self.claude_only()
+        self.codex(age=1900)
+        self.assertEqual(self.line(), expected)
+
+    def test_a_codex_snapshot_idle_inside_thirty_minutes_still_prints(self):
+        self.r.fresh()
+        self.codex(age=1000)
+        self.assertTrue(self.line().rstrip("\n").endswith(" | cx 5h 40% wk 12%"))
+
+    def test_a_newer_schema_adds_nothing(self):
+        expected = self.claude_only()
+        self.codex(schema=2)
+        self.assertEqual(self.line(), expected)
+
+    def test_a_malformed_codex_file_adds_nothing(self):
+        expected = self.claude_only()
+        with open(self.r.path("snapshot.codex.json"), "w", encoding="utf-8") as f:
+            f.write("{ not json")
+        self.assertEqual(self.line(), expected)
+
+    def test_a_window_past_its_reset_is_left_out_and_unknown_keys_too(self):
+        now = datetime.now(timezone.utc)
+        self.r.fresh()
+        self.codex(tiers=[
+            {"key": "five_hour", "utilization": 40, "resets_at": iso(now - timedelta(minutes=1))},
+            {"key": "seven_day", "utilization": 12, "resets_at": iso(now + timedelta(days=2))},
+            {"key": "seven_day_opus", "utilization": 99, "resets_at": iso(now + timedelta(days=2))}])
+        self.assertTrue(self.line().rstrip("\n").endswith(" | cx wk 12%"))
+
+    def test_a_codex_snapshot_with_no_usable_window_adds_nothing(self):
+        expected = self.claude_only()
+        self.codex(tiers=[{"key": "five_hour", "utilization": None}])
+        self.assertEqual(self.line(), expected)
+
+    def test_a_codex_only_user_sees_just_the_codex_segment(self):
+        self.codex()
+        self.assertEqual(self.line(), "cx 5h 40% wk 12%\n")
+
+    def test_a_dead_claude_line_still_gets_the_codex_segment(self):
+        self.r.dead()
+        self.codex()
+        out = self.line()
+        self.assertTrue(out.startswith("sanduhr: stale 40m - start widget | "), out)
+        self.assertTrue(out.endswith(" | cx 5h 40% wk 12%\n"), out)
+
+    def test_it_joins_a_combined_line_after_claudes_meters(self):
+        self.r.fresh()
+        self.codex()
+        p, _ = self.r.chain("echo mine", join="line")
+        lines = p.stdout.decode().split("\n")
+        self.assertEqual(lines[0], "mine")
+        self.assertTrue(lines[1].startswith("5h 42% | wk 18%"), lines)
+        self.assertTrue(lines[1].endswith(" | cx 5h 40% wk 12%"), lines)
+
+    def test_mine_without_a_meter_hides_it_and_with_one_keeps_it(self):
+        self.r.fresh()
+        self.codex()
+        args = ["--chain-b64", b64("echo mine"), "--join", "line", "--mine"]
+        p, _ = self.r.run(args + ["context,model"], session_json())
+        self.assertEqual(p.stdout.decode(), "mine\nctx 8% | Opus\n")
+        p, _ = self.r.run(args + ["weekly,model"], session_json())
+        self.assertEqual(p.stdout.decode(), "mine\nwk 18% | cx 5h 40% wk 12% | Opus\n")
+
+    def test_in_the_band_the_codex_segment_stays_in_the_statusline(self):
+        self.r.fresh()
+        self.codex()
+        p, _ = self.r.run(["--chain-b64", b64("echo mine"), "--join", "line", "--band"], session_json())
+        self.assertEqual(p.stdout.decode(), "mine\ncx 5h 40% wk 12%\n")
+
+    def test_inspect_still_lists_only_the_segments_it_always_did(self):
+        self.r.fresh()
+        self.codex()
+        p, _ = self.r.run(["--inspect-b64", ""])
+        d = json.loads(p.stdout.decode())
+        self.assertEqual([m["name"] for m in d["mine"]], list(sl.MINE))
+        self.assertNotIn("cx", json.dumps(d["mine"]))
+
+
+class NoNetworkTests(unittest.TestCase):
+    """The statusline and the MCP server read files and never reach a network (privacy contract):
+    neither script imports a network module."""
+
+    FORBIDDEN = {"socket", "ssl", "http", "urllib", "urllib2", "urllib3", "requests", "httpx", "aiohttp",
+                 "ftplib", "smtplib", "poplib", "imaplib", "telnetlib", "xmlrpc", "socketserver", "asyncio",
+                 "websockets", "websocket"}
+
+    @staticmethod
+    def imports(source):
+        import ast
+        found = set()
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.Import):
+                found.update(a.name.split(".")[0] for a in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                found.add(node.module.split(".")[0])
+            elif (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "__import__"
+                  and node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str)):
+                found.add(node.args[0].value.split(".")[0])
+        return found
+
+    def check(self, path):
+        with open(path, encoding="utf-8") as f:
+            return self.imports(f.read()) & self.FORBIDDEN
+
+    def test_the_statusline_imports_no_network_module(self):
+        self.assertEqual(self.check(SCRIPT), set())
+
+    def test_the_mcp_server_imports_no_network_module(self):
+        self.assertEqual(self.check(os.path.join(os.path.dirname(HERE), "sanduhr_mcp.py")), set())
+
+    def test_the_check_sees_a_network_import(self):
+        self.assertEqual(self.imports("import json\nimport urllib.request\nfrom http import client\n"
+                                      "x = __import__('socket')\n") & self.FORBIDDEN,
+                         {"urllib", "http", "socket"})
+
+
 if __name__ == "__main__":
     unittest.main()
