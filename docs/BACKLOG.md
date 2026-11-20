@@ -371,3 +371,26 @@ Not planned: turning a user's PNG into a pixel sheet Claude can read or edit ins
 would send the art to Claude), and any upload host. A user who wants Claude's help making a sheet
 from their own art does that with Claude outside Sanduhr; Sanduhr just uses the finished sheet.
 
+## #10 — Windows arm64 follow-ups (5.0 spec 7)
+
+**Raised 2026-11-19 by the arm64 branch's whole-branch review.** Written down, not fixed; one line each.
+
+- `check-architecture.ps1`: a wrong-architecture `Sanduhr.exe` is reported twice; no test pins a missing
+  `Sanduhr.exe`, a wrong-architecture MCP server or a short non-PE file; the unknown-runtime test asserts
+  only a non-zero exit; machine value 0x014C cannot tell a managed-neutral file from a native x86 one.
+- `ReleaseScriptPinsTests`: the `ValidateSet` pin is not tied to `$Runtime`.
+- `VelopackCleanTests`: no arm64 delta in the fixture; the real delta name is unknown until the release
+  after 5.0.
+- `ArmBuildNoticeService`: settings are read before the applies check; the 5-second timer starts on every
+  launch; clicking the notice also raises the widget; `SetLastError` on `IsWow64Process2` is never read.
+- `AboutUpdatesTests`: other Settings tests fall through to the real `UrlIfApplies`.
+- `smoke-launch.ps1`: the crash event is read only on the success path; any visible window counts;
+  published folders are not uploaded on failure; the CI publish steps are duplicated across two jobs.
+- `windows-dotnet-release.yml`: the Arm test job saves no trx results; the x64 tests wait on the Arm job.
+- `check-install-switch.ps1`: the arm64 "no due line" check passes when no log exists; no version
+  comparison against the tag; no cleanup on failure (fine on a hosted runner).
+- `check-release-assets.ps1`: the empty-feed and bad-JSON branches are not pinned; it could compare each
+  full package's hash with its feed entry.
+- A dry-run mode for the release workflow: build both Store packages at a test version without drafting.
+- Unverified, older than this work: whether Velopack's GitHub source reads only the newest page of
+  releases, which matters because the Mac app releases often.
